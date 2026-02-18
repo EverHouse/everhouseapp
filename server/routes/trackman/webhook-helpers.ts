@@ -111,8 +111,8 @@ export interface TrackmanWebhookPayload {
   eventType?: string;
   data?: TrackmanBookingPayload;
   booking?: TrackmanBookingPayload | TrackmanV2Booking;
-  user?: any;
-  purchase?: any;
+  user?: Record<string, unknown>;
+  purchase?: Record<string, unknown>;
   timestamp?: string;
   venue?: TrackmanV2Venue;
 }
@@ -148,11 +148,14 @@ export function extractBookingData(payload: TrackmanWebhookPayload): TrackmanBoo
   return payload.data || payload.booking as TrackmanBookingPayload || null;
 }
 
-export function isTrackmanV2Payload(payload: any): payload is TrackmanV2WebhookPayload {
-  return payload?.booking?.start && 
-         payload?.booking?.end && 
-         typeof payload?.booking?.id === 'number' &&
-         (payload?.venue || payload?.booking?.bay?.ref);
+export function isTrackmanV2Payload(payload: unknown): payload is TrackmanV2WebhookPayload {
+  if (!payload || typeof payload !== 'object') return false;
+  const p = payload as Record<string, unknown>;
+  const booking = p.booking as Record<string, unknown> | undefined;
+  return !!booking?.start && 
+         !!booking?.end && 
+         typeof booking?.id === 'number' &&
+         !!(p.venue || (booking?.bay as Record<string, unknown>)?.ref);
 }
 
 export function parseISOToPacific(isoStr: string): { date: string; time: string } {
@@ -325,19 +328,19 @@ export function parseDateTime(dateTimeStr: string | undefined, dateStr: string |
   return null;
 }
 
-export function redactPII(payload: any): any {
+export function redactPII(payload: unknown): unknown {
   if (!payload || typeof payload !== 'object') return payload;
   
-  const redacted = Array.isArray(payload) ? [...payload] : { ...payload };
+  const redacted: Record<string, unknown> = Array.isArray(payload) ? [...payload] as unknown as Record<string, unknown> : { ...(payload as Record<string, unknown>) };
   const sensitiveFields = ['email', 'phone', 'phoneNumber', 'mobile', 'customer_email', 'customerEmail'];
   
   for (const key of Object.keys(redacted)) {
     if (sensitiveFields.some(f => key.toLowerCase().includes(f.toLowerCase()))) {
-      if (typeof redacted[key] === 'string' && redacted[key].includes('@')) {
-        const parts = redacted[key].split('@');
+      if (typeof redacted[key] === 'string' && (redacted[key] as string).includes('@')) {
+        const parts = (redacted[key] as string).split('@');
         redacted[key] = `${parts[0].substring(0, 2)}***@${parts[1]}`;
       } else if (typeof redacted[key] === 'string') {
-        redacted[key] = redacted[key].replace(/\d/g, '*').substring(0, 6) + '...';
+        redacted[key] = (redacted[key] as string).replace(/\d/g, '*').substring(0, 6) + '...';
       }
     } else if (typeof redacted[key] === 'object' && redacted[key] !== null) {
       redacted[key] = redactPII(redacted[key]);

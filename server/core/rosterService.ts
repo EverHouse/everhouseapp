@@ -49,14 +49,14 @@ export type RosterError = {
   error: string;
   code?: string;
   errorType?: string;
-  extra?: Record<string, any>;
+  extra?: Record<string, unknown>;
 };
 
 export type RosterResult<T> =
   | { ok: true; data: T }
   | { ok: false; err: RosterError };
 
-function fail(status: number, error: string, extra?: Record<string, any>): RosterResult<never> {
+function fail(status: number, error: string, extra?: Record<string, unknown>): RosterResult<never> {
   return { ok: false, err: { status, error, ...extra } };
 }
 
@@ -137,7 +137,7 @@ export async function getParticipantsData(
     }
   }
 
-  let participants: any[] = [];
+  let participants: Record<string, unknown>[] = [];
   if (booking.session_id) {
     const participantRows = await db
       .select({
@@ -221,7 +221,7 @@ export async function addParticipant(params: {
   rosterVersion?: number;
   userEmail: string;
   sessionUserId?: string;
-}): Promise<RosterResult<any>> {
+}): Promise<RosterResult<Record<string, unknown>>> {
   const { bookingId, type, userId, guest, rosterVersion, userEmail, sessionUserId } = params;
 
   const booking = await getBookingWithSession(bookingId);
@@ -712,7 +712,7 @@ export async function removeParticipant(params: {
   participantId: number;
   rosterVersion?: number;
   userEmail: string;
-}): Promise<RosterResult<any>> {
+}): Promise<RosterResult<Record<string, unknown>>> {
   const { bookingId, participantId, rosterVersion, userEmail } = params;
 
   const booking = await getBookingWithSession(bookingId);
@@ -895,13 +895,13 @@ export async function removeParticipant(params: {
 export async function previewFees(params: {
   bookingId: number;
   provisionalParticipants?: Array<{ type: string; name: string; email?: string }>;
-}): Promise<RosterResult<any>> {
+}): Promise<RosterResult<Record<string, unknown>>> {
   const { bookingId, provisionalParticipants = [] } = params;
 
   const booking = await getBookingWithSession(bookingId);
   if (!booking) return fail(404, 'Booking not found');
 
-  let existingParticipants: any[] = [];
+  let existingParticipants: Record<string, unknown>[] = [];
   if (booking.session_id) {
     existingParticipants = await getSessionParticipants(booking.session_id);
   }
@@ -1167,7 +1167,7 @@ export async function acceptInvite(params: {
   onBehalfOf?: string;
   sessionUserRole?: string;
   sessionUserEmail?: string;
-}): Promise<RosterResult<any>> {
+}): Promise<RosterResult<Record<string, unknown>>> {
   let userEmail = params.userEmail;
 
   if (params.onBehalfOf && typeof params.onBehalfOf === 'string') {
@@ -1283,7 +1283,7 @@ export async function declineInvite(params: {
   onBehalfOf?: string;
   sessionUserRole?: string;
   sessionUserEmail?: string;
-}): Promise<RosterResult<any>> {
+}): Promise<RosterResult<Record<string, unknown>>> {
   let userEmail = params.userEmail;
 
   if (params.onBehalfOf && typeof params.onBehalfOf === 'string') {
@@ -1363,7 +1363,7 @@ export async function guestFeeCheckout(params: {
   guestEmail: string;
   userEmail: string;
   sessionUserId?: string;
-}): Promise<RosterResult<any>> {
+}): Promise<RosterResult<Record<string, unknown>>> {
   const { bookingId, guestName, guestEmail, userEmail, sessionUserId } = params;
 
   const booking = await getBookingWithSession(bookingId);
@@ -1553,7 +1553,7 @@ export async function confirmGuestPayment(params: {
   paymentIntentId: string;
   participantId: number;
   userEmail: string;
-}): Promise<RosterResult<any>> {
+}): Promise<RosterResult<Record<string, unknown>>> {
   const { bookingId, paymentIntentId, participantId, userEmail } = params;
 
   const booking = await getBookingWithSession(bookingId);
@@ -1650,7 +1650,7 @@ export async function cancelGuestPayment(params: {
   participantId: number;
   paymentIntentId?: string;
   userEmail: string;
-}): Promise<RosterResult<any>> {
+}): Promise<RosterResult<Record<string, unknown>>> {
   const { bookingId, participantId, paymentIntentId, userEmail } = params;
 
   const booking = await getBookingWithSession(bookingId);
@@ -1712,7 +1712,7 @@ export async function updatePlayerCount(params: {
   bookingId: number;
   playerCount: number;
   staffEmail: string;
-}): Promise<RosterResult<any>> {
+}): Promise<RosterResult<Record<string, unknown>>> {
   const { bookingId, playerCount, staffEmail } = params;
 
   const bookingResult = await pool.query(`
@@ -1770,7 +1770,7 @@ export async function updatePlayerCount(params: {
   }
 
   if (booking.session_id) {
-    await recalculateSessionFees(booking.session_id, 'staff_action' as any);
+    await recalculateSessionFees(booking.session_id, 'staff_action');
   }
 
   logger.info('[roster] Player count updated', {

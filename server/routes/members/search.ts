@@ -86,7 +86,7 @@ router.get('/api/members/search', isAuthenticated, async (req, res) => {
       )
       .limit(maxResults);
     
-    const sessionUser = (req as any).session?.user;
+    const sessionUser = getSessionUser(req);
     const isStaffUser = sessionUser?.isStaff || sessionUser?.role === 'admin' || sessionUser?.role === 'staff';
     
     // Check staff_users table to detect instructors and staff members
@@ -354,29 +354,33 @@ router.get('/api/members/directory', isStaffOrAdmin, async (req, res) => {
       ]);
 
       for (const row of bookingsResult.rows || []) {
-        bookingCounts[(row as any).email] = Number((row as any).count);
+        const r = row as Record<string, unknown>;
+        bookingCounts[r.email as string] = Number(r.count);
       }
 
       for (const row of eventsResult.rows || []) {
-        eventCounts[(row as any).email] = Number((row as any).count);
+        const r = row as Record<string, unknown>;
+        eventCounts[r.email as string] = Number(r.count);
       }
 
       for (const row of wellnessResult.rows || []) {
-        wellnessCounts[(row as any).email] = Number((row as any).count);
+        const r = row as Record<string, unknown>;
+        wellnessCounts[r.email as string] = Number(r.count);
       }
 
       for (const row of lastActivityResult.rows || []) {
-        const r = row as any;
+        const r = row as Record<string, unknown>;
         if (r.last_date) {
           const dateVal = r.last_date instanceof Date 
             ? r.last_date.toISOString().split('T')[0]
             : String(r.last_date).split('T')[0];
-          lastActivityMap[r.email] = dateVal;
+          lastActivityMap[r.email as string] = dateVal;
         }
       }
 
       for (const row of walkInCountResult.rows || []) {
-        walkInCounts[(row as any).email] = (row as any).count;
+        const r = row as Record<string, unknown>;
+        walkInCounts[r.email as string] = r.count as number;
       }
     }
 
@@ -389,7 +393,7 @@ router.get('/api/members/directory', isStaffOrAdmin, async (req, res) => {
       // Consider all active statuses, including trialing and past_due (still has access)
       // Also consider active if they have a Stripe subscription
       const activeStatuses = ['active', 'trialing', 'past_due'];
-      const isActive = activeStatuses.includes(status.toLowerCase()) || !status || !!(member as any).stripeSubscriptionId;
+      const isActive = activeStatuses.includes(status.toLowerCase()) || !status || !!(member.stripeSubscriptionId);
       
       return {
         id: member.id,

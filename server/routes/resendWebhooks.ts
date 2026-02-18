@@ -16,7 +16,7 @@ interface ResendEmailEvent {
     to: string[];
     subject: string;
     created_at?: string;
-    [key: string]: any;
+    [key: string]: unknown;
   };
 }
 

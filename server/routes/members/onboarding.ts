@@ -31,7 +31,7 @@ router.get('/api/member/onboarding', isAuthenticated, async (req, res) => {
       LIMIT 1
     `);
 
-    const user = (result as any).rows?.[0];
+    const user = (result.rows as Record<string, unknown>[])?.[0];
     if (!user) return res.status(404).json({ error: 'User not found' });
 
     const hasProfile = !!(user.first_name && user.last_name && user.phone);
@@ -58,7 +58,7 @@ router.get('/api/member/onboarding', isAuthenticated, async (req, res) => {
         SELECT profile_completed_at, onboarding_completed_at
         FROM users WHERE LOWER(email) = ${email} LIMIT 1
       `);
-      const refreshed = (refreshResult as any).rows?.[0];
+      const refreshed = (refreshResult.rows as Record<string, unknown>[])?.[0];
       if (refreshed) {
         finalUser = { ...user, ...refreshed };
       }
@@ -125,7 +125,7 @@ router.post('/api/member/onboarding/complete-step', isAuthenticated, async (req,
       FROM users WHERE LOWER(email) = ${email}
     `);
 
-    const check = (checkResult as any).rows?.[0];
+    const check = (checkResult.rows as Record<string, unknown>[])?.[0];
     if (check?.has_profile && check?.has_waiver && check?.has_booking && check?.has_app && check?.has_concierge) {
       await db.execute(sql`UPDATE users SET onboarding_completed_at = NOW(), updated_at = NOW() WHERE LOWER(email) = ${email} AND onboarding_completed_at IS NULL`);
     }
@@ -184,7 +184,7 @@ router.put('/api/member/profile', isAuthenticated, async (req, res) => {
       RETURNING first_name, last_name, phone, profile_completed_at
     `);
 
-    const updated = (result as any).rows?.[0];
+    const updated = (result.rows as Record<string, unknown>[])?.[0];
     if (!updated) return res.status(404).json({ error: 'User not found' });
 
     db.execute(sql`UPDATE users SET onboarding_completed_at = NOW(), updated_at = NOW() 
@@ -219,7 +219,7 @@ async function syncProfileToExternalServices(
     const userResult = await db.execute(sql`
       SELECT stripe_customer_id, hubspot_id, tier, id FROM users WHERE LOWER(email) = ${email.toLowerCase()}
     `);
-    const user = (userResult as any).rows?.[0];
+    const user = (userResult.rows as Record<string, unknown>[])?.[0];
 
     if (user?.stripe_customer_id) {
       const { getStripeClient } = await import('../../core/stripe/client');
@@ -260,7 +260,7 @@ async function syncProfileToExternalServices(
           filterGroups: [{
             filters: [{
               propertyName: 'email',
-              operator: 'EQ' as any,
+              operator: 'EQ',
               value: email.toLowerCase(),
             }],
           }],

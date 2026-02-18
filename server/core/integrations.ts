@@ -2,8 +2,8 @@ import { Client } from '@hubspot/api-client';
 import { google } from 'googleapis';
 
 import { logger } from './logger';
-let hubspotConnectionSettings: any;
-let googleCalendarConnectionSettings: any;
+let hubspotConnectionSettings: Record<string, unknown> | null = null;
+let googleCalendarConnectionSettings: Record<string, unknown> | null = null;
 
 export async function getHubSpotAccessToken() {
   const TOKEN_REFRESH_BUFFER_MS = 5 * 60 * 1000; // Refresh 5 minutes before expiry
@@ -131,7 +131,7 @@ async function getGoogleCalendarAccessToken() {
         'X_REPLIT_TOKEN': xReplitToken
       }
     }
-  ).then(res => res.json()).then((data: any) => data.items?.[0]);
+  ).then(res => res.json()).then((data: Record<string, unknown>) => (data.items as Record<string, unknown>[] | undefined)?.[0] ?? null);
 
   const accessToken = googleCalendarConnectionSettings?.settings?.access_token || googleCalendarConnectionSettings.settings?.oauth?.credentials?.access_token;
 

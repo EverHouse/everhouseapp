@@ -34,7 +34,7 @@ interface MemberBillingTabProps {
   guestPassInfo?: { remainingPasses: number; totalUsed: number } | null;
   guestHistory?: GuestHistoryItem[];
   guestCheckInsHistory?: GuestCheckInItem[];
-  purchases?: Array<any>;
+  purchases?: Array<{ id: number | string; category?: string; description?: string; amount?: number; date?: string; created_at?: string; product_name?: string; quantity?: number; status?: string }>;
 }
 
 interface Subscription {
@@ -1505,7 +1505,7 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({
             };
             
             const categoryOrder = ['add_funds', 'subscription', 'membership', 'sim_walk_in', 'guest_pass', 'payment', 'invoice', 'cafe', 'retail', 'other'];
-            const groupedPurchases = purchases.reduce((acc: Record<string, any[]>, purchase: any) => {
+            const groupedPurchases = purchases.reduce((acc: Record<string, Array<{ id: number | string; category?: string; description?: string; amount?: number; date?: string; created_at?: string; product_name?: string; quantity?: number; status?: string }>>, purchase: { id: number | string; category?: string; description?: string; amount?: number; date?: string; created_at?: string; product_name?: string; quantity?: number; status?: string }) => {
               const category = purchase.itemCategory || 'other';
               if (!acc[category]) {
                 acc[category] = [];
@@ -1537,7 +1537,7 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({
                         </span>
                       </h4>
                       <div className="space-y-3">
-                        {categoryPurchases.slice(0, 5).map((purchase: any) => {
+                        {categoryPurchases.slice(0, 5).map((purchase: { id: number | string; category?: string; description?: string; amount?: number; date?: string; created_at?: string; product_name?: string; quantity?: number; status?: string }) => {
                           const displayDate = purchase.saleDate || purchase.date;
                           const displayAmount = purchase.salePriceCents || purchase.amountCents || 0;
                           const displaySource = purchase.source || (purchase.type === 'stripe' ? 'Stripe' : '');

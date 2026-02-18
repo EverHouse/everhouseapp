@@ -1,5 +1,6 @@
 import { schedulerTracker } from '../core/schedulerTracker';
 import { getPacificDateParts } from '../utils/dateUtils';
+import { logger } from '../core/logger';
 
 const CLEANUP_DAY = 0;
 const CLEANUP_HOUR = 3;
@@ -15,7 +16,7 @@ async function checkAndRunCleanup(): Promise<void> {
     
     if (currentDay === CLEANUP_DAY && currentHour === CLEANUP_HOUR && currentWeek !== lastCleanupWeek) {
       lastCleanupWeek = currentWeek;
-      console.log('[Cleanup] Starting weekly cleanup...');
+      logger.info('[Cleanup] Starting weekly cleanup...');
       
       const { runScheduledCleanup } = await import('../core/databaseCleanup');
       await runScheduledCleanup();
@@ -23,16 +24,16 @@ async function checkAndRunCleanup(): Promise<void> {
       const { runSessionCleanup } = await import('../core/sessionCleanup');
       await runSessionCleanup();
       
-      console.log('[Cleanup] Weekly cleanup completed');
+      logger.info('[Cleanup] Weekly cleanup completed');
       schedulerTracker.recordRun('Weekly Cleanup', true);
     }
   } catch (err) {
-    console.error('[Cleanup] Scheduler error:', err);
+    logger.error('[Cleanup] Scheduler error:', { error: err as Error });
     schedulerTracker.recordRun('Weekly Cleanup', false, String(err));
   }
 }
 
 export function startWeeklyCleanupScheduler(): void {
   setInterval(checkAndRunCleanup, 60 * 60 * 1000);
-  console.log('[Startup] Weekly cleanup scheduler enabled (runs Sundays at 3am)');
+  logger.info('[Startup] Weekly cleanup scheduler enabled (runs Sundays at 3am)');
 }

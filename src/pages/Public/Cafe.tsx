@@ -42,7 +42,7 @@ const PublicCafe: React.FC = () => {
         const response = await fetch('/api/cafe-menu');
         if (response.ok) {
           const data = await response.json();
-          const normalized = data.map((item: any) => ({
+          const normalized = data.map((item: Record<string, unknown>) => ({
             id: item.id?.toString() || '',
             name: item.name || '',
             category: item.category || '',

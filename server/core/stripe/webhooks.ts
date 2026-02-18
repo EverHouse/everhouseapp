@@ -31,13 +31,29 @@ const EVENT_DEDUP_WINDOW_DAYS = 7;
 
 type DeferredAction = () => Promise<void>;
 
+interface StripeSubscriptionWithPeriods extends Stripe.Subscription {
+  current_period_start: number;
+  current_period_end: number;
+}
+
+interface StripeProductWithMarketingFeatures extends Stripe.Product {
+  marketing_features?: Array<{ name: string }>;
+}
+
+interface SubscriptionPreviousAttributes {
+  items?: { data: Array<{ id: string; metadata?: Record<string, string> }> };
+  status?: string;
+  cancel_at_period_end?: boolean;
+  [key: string]: unknown;
+}
+
 interface WebhookProcessingResult {
   processed: boolean;
   reason?: 'duplicate' | 'out_of_order' | 'error';
   deferredActions: DeferredAction[];
 }
 
-function extractResourceId(event: any): string | null {
+function extractResourceId(event: Stripe.Event): string | null {
   const obj = event.data?.object;
   if (!obj || !obj.id) return null;
   
@@ -159,7 +175,7 @@ interface CacheTransactionParams {
   customerEmail?: string | null;
   customerName?: string | null;
   description?: string | null;
-  metadata?: Record<string, any> | null;
+  metadata?: Record<string, string> | null;
   source?: 'webhook' | 'backfill';
   paymentIntentId?: string | null;
   chargeId?: string | null;
@@ -591,7 +607,7 @@ async function handleChargeRefunded(client: PoolClient, charge: Stripe.Charge): 
               title: 'Payment Refunded',
               message: `Your booking payment of $${(amount_refunded / 100).toFixed(2)} has been refunded. It may take 5-10 business days to appear on your statement.`,
               data: { sessionId: row.session_id, eventType: 'payment_refunded' }
-            }, { action: 'payment_refunded', sessionId: row.session_id, triggerSource: 'webhooks.ts' } as any);
+            }, { action: 'payment_refunded', sessionId: row.session_id, triggerSource: 'webhooks.ts' } as Record<string, unknown>);
           });
         }
       }
@@ -599,7 +615,7 @@ async function handleChargeRefunded(client: PoolClient, charge: Stripe.Charge): 
   }
   
   deferredActions.push(async () => {
-    broadcastBillingUpdate({ action: 'payment_refunded', status, amount: amount_refunded } as any);
+    broadcastBillingUpdate({ action: 'payment_refunded', status, amount: amount_refunded });
   });
 
   if (paymentIntentId) {
@@ -758,7 +774,7 @@ async function handleChargeDisputeCreated(client: PoolClient, dispute: Stripe.Di
   }
   
   deferredActions.push(async () => {
-    broadcastBillingUpdate({ action: 'payment_failed', status, amount } as any);
+    broadcastBillingUpdate({ action: 'payment_failed', status, amount });
   });
   
   return deferredActions;
@@ -837,7 +853,7 @@ async function handleChargeDisputeClosed(client: PoolClient, dispute: Stripe.Dis
   }
   
   deferredActions.push(async () => {
-    broadcastBillingUpdate({ action: 'payment_succeeded', status, amount } as any);
+    broadcastBillingUpdate({ action: 'payment_succeeded', status, amount });
   });
   
   return deferredActions;
@@ -849,8 +865,8 @@ async function handlePaymentIntentSucceeded(client: PoolClient, paymentIntent: S
   
   logger.info(`[Stripe Webhook] Payment succeeded: ${id}, amount: $${(amount / 100).toFixed(2)}`);
 
-  const customerEmail = typeof customer === 'object' ? (customer as any)?.email : receipt_email || metadata?.email;
-  const customerName = typeof customer === 'object' ? (customer as any)?.name : metadata?.memberName;
+  const customerEmail = typeof customer === 'object' ? (customer as Stripe.Customer)?.email : receipt_email || metadata?.email;
+  const customerName = typeof customer === 'object' ? (customer as Stripe.Customer)?.name : metadata?.memberName;
   const customerId = typeof customer === 'string' ? customer : customer?.id;
   
   deferredActions.push(async () => {
@@ -916,7 +932,7 @@ async function handlePaymentIntentSucceeded(client: PoolClient, paymentIntent: S
     try {
       const currentFees = await computeFeeBreakdown({ 
         sessionId: snapshot.session_id, 
-        source: 'webhook_verification' as any 
+        source: 'stripe' 
       });
       
       // Compare totals with tolerance (allow up to $1.00 difference for rounding)
@@ -1249,8 +1265,8 @@ async function handlePaymentIntentStatusUpdate(client: PoolClient, paymentIntent
   );
 
   const customerId = typeof customer === 'string' ? customer : customer?.id;
-  const customerEmail = typeof customer === 'object' ? (customer as any)?.email : metadata?.email;
-  const customerName = typeof customer === 'object' ? (customer as any)?.name : metadata?.memberName;
+  const customerEmail = typeof customer === 'object' ? (customer as Stripe.Customer)?.email : metadata?.email;
+  const customerName = typeof customer === 'object' ? (customer as Stripe.Customer)?.name : metadata?.memberName;
 
   deferredActions.push(async () => {
     await upsertTransactionCache({
@@ -1287,7 +1303,7 @@ async function handlePaymentIntentFailed(client: PoolClient, paymentIntent: Stri
   
   logPaymentFailure({
     paymentIntentId: id,
-    customerId: customer as any,
+    customerId: typeof customer === 'string' ? customer : customer?.id,
     userEmail: metadata?.email,
     amountCents: amount,
     errorMessage: reason,
@@ -1324,8 +1340,8 @@ async function handlePaymentIntentFailed(client: PoolClient, paymentIntent: Stri
   logger.info(`[Stripe Webhook] Updated payment ${id}: retry ${newRetryCount}/${MAX_RETRY_ATTEMPTS}, requires_card_update=${requiresCardUpdate}`);
 
   const customerId = typeof customer === 'string' ? customer : customer?.id;
-  const customerEmail = typeof customer === 'object' ? (customer as any)?.email : metadata?.email;
-  const customerName = typeof customer === 'object' ? (customer as any)?.name : metadata?.memberName;
+  const customerEmail = typeof customer === 'object' ? (customer as Stripe.Customer)?.email : metadata?.email;
+  const customerName = typeof customer === 'object' ? (customer as Stripe.Customer)?.name : metadata?.memberName;
   
   deferredActions.push(async () => {
     await upsertTransactionCache({
@@ -1439,7 +1455,7 @@ async function handlePaymentIntentFailed(client: PoolClient, paymentIntent: Stri
         memberEmail: email,
         memberName,
         amount: localAmount / 100,
-      } as any);
+      });
 
       logger.info(`[Stripe Webhook] Staff notified about payment failure for ${email}`);
     } catch (error) {
@@ -1512,7 +1528,7 @@ async function handleInvoicePaymentSucceeded(client: PoolClient, invoice: Stripe
   const invoiceEmail = invoice.customer_email;
   const invoiceAmountPaid = invoice.amount_paid || 0;
   const invoiceCustomerId = typeof invoice.customer === 'string' ? invoice.customer : invoice.customer?.id;
-  const invoiceCustomerName = typeof invoice.customer === 'object' ? (invoice.customer as any)?.name : undefined;
+  const invoiceCustomerName = typeof invoice.customer === 'object' ? (invoice.customer as Stripe.Customer)?.name : undefined;
   
   deferredActions.push(async () => {
     await upsertTransactionCache({
@@ -1526,14 +1542,14 @@ async function handleInvoicePaymentSucceeded(client: PoolClient, invoice: Stripe
       customerEmail: invoiceEmail,
       customerName: invoiceCustomerName,
       description: invoice.lines?.data?.[0]?.description || 'Invoice payment',
-      metadata: invoice.metadata,
+      metadata: invoice.metadata as Record<string, string>,
       source: 'webhook',
       invoiceId: invoice.id,
-      paymentIntentId: (invoice as any).payment_intent,
+      paymentIntentId: typeof invoice.payment_intent === 'string' ? invoice.payment_intent : invoice.payment_intent?.id,
     });
   });
   
-  if (!(invoice as any).subscription) {
+  if (!invoice.subscription) {
     logger.info(`[Stripe Webhook] Skipping one-time invoice ${invoice.id} (no subscription)`);
     return deferredActions;
   }
@@ -1554,7 +1570,7 @@ async function handleInvoicePaymentSucceeded(client: PoolClient, invoice: Stripe
     [email]
   );
 
-  if (userResult.rows.length === 0 && (invoice as any).subscription) {
+  if (userResult.rows.length === 0 && invoice.subscription) {
     logger.warn(`[Stripe Webhook] Payment succeeded for customer ${invoiceCustomerId} but no matching user found in database. Subscription may need manual cancellation.`);
   }
 
@@ -1578,7 +1594,7 @@ async function handleInvoicePaymentSucceeded(client: PoolClient, invoice: Stripe
     [email]
   );
 
-  const priceId = (invoice.lines?.data?.[0] as any)?.price?.id;
+  const priceId = invoice.lines?.data?.[0]?.price?.id;
   let restoreTierClause = '';
   let queryParams: (string | number | null)[] = [email];
   
@@ -1618,7 +1634,7 @@ async function handleInvoicePaymentSucceeded(client: PoolClient, invoice: Stripe
   const localPlanName = planName;
   const localNextBillingDate = nextBillingDate;
   const localUserId = userId;
-  const localPaymentIntent = (invoice as any).payment_intent || invoice.id;
+  const localPaymentIntent = (typeof invoice.payment_intent === 'string' ? invoice.payment_intent : invoice.payment_intent?.id) || invoice.id;
 
   deferredActions.push(async () => {
     try {
@@ -1674,11 +1690,11 @@ async function handleInvoicePaymentSucceeded(client: PoolClient, invoice: Stripe
 async function handleInvoicePaymentFailed(client: PoolClient, invoice: Stripe.Invoice): Promise<DeferredAction[]> {
   const deferredActions: DeferredAction[] = [];
   const invoiceCustomerId = typeof invoice.customer === 'string' ? invoice.customer : invoice.customer?.id;
-  const invoiceCustomerName = typeof invoice.customer === 'object' ? (invoice.customer as any)?.name : undefined;
+  const invoiceCustomerName = typeof invoice.customer === 'object' ? (invoice.customer as Stripe.Customer)?.name : undefined;
   const attemptCount = invoice.attempt_count || 1;
   
   logPaymentFailure({
-    paymentIntentId: (invoice as any).payment_intent,
+    paymentIntentId: typeof invoice.payment_intent === 'string' ? invoice.payment_intent : invoice.payment_intent?.id,
     customerId: invoiceCustomerId,
     userEmail: invoice.customer_email,
     amountCents: invoice.amount_due,
@@ -1700,14 +1716,14 @@ async function handleInvoicePaymentFailed(client: PoolClient, invoice: Stripe.In
       customerEmail: invoice.customer_email,
       customerName: invoiceCustomerName,
       description: invoice.lines?.data?.[0]?.description || 'Invoice payment failed',
-      metadata: invoice.metadata,
+      metadata: invoice.metadata as Record<string, string>,
       source: 'webhook',
       invoiceId: invoice.id,
-      paymentIntentId: (invoice as any).payment_intent,
+      paymentIntentId: typeof invoice.payment_intent === 'string' ? invoice.payment_intent : invoice.payment_intent?.id,
     });
   });
   
-  if (!(invoice as any).subscription) {
+  if (!invoice.subscription) {
     logger.info(`[Stripe Webhook] Skipping one-time invoice ${invoice.id} (no subscription)`);
     return deferredActions;
   }
@@ -1732,13 +1748,13 @@ async function handleInvoicePaymentFailed(client: PoolClient, invoice: Stripe.In
 
   try {
     const stripe = await getStripeClient();
-    const subscription = await stripe.subscriptions.retrieve((invoice as any).subscription as string);
+    const subscription = await stripe.subscriptions.retrieve(typeof invoice.subscription === 'string' ? invoice.subscription : (invoice.subscription as Stripe.Subscription).id);
     if (['canceled', 'incomplete_expired'].includes(subscription.status)) {
-      logger.info(`[Stripe Webhook] Skipping grace period for ${email} — subscription ${(invoice as any).subscription} is ${subscription.status}`);
+      logger.info(`[Stripe Webhook] Skipping grace period for ${email} — subscription ${typeof invoice.subscription === 'string' ? invoice.subscription : invoice.subscription?.id} is ${subscription.status}`);
       return deferredActions;
     }
   } catch (stripeErr) {
-    logger.warn(`[Stripe Webhook] Could not verify subscription ${(invoice as any).subscription} status, continuing with grace period logic:`, { error: stripeErr });
+    logger.warn(`[Stripe Webhook] Could not verify subscription ${typeof invoice.subscription === 'string' ? invoice.subscription : invoice.subscription?.id} status, continuing with grace period logic:`, { error: stripeErr });
   }
 
   const userStatusCheck = await client.query(
@@ -1848,7 +1864,7 @@ async function handleInvoicePaymentFailed(client: PoolClient, invoice: Stripe.In
         context: 'stripe',
         details: {
           invoiceId: invoice.id,
-          subscriptionId: (invoice as any).subscription,
+          subscriptionId: typeof invoice.subscription === 'string' ? invoice.subscription : invoice.subscription?.id,
           attemptCount: localAttemptCount,
           amountCents: localAmountDue,
           planName: localPlanName,
@@ -1868,7 +1884,7 @@ async function handleInvoiceLifecycle(client: PoolClient, invoice: Stripe.Invoic
   const invoiceEmail = invoice.customer_email;
   const amountDue = invoice.amount_due || 0;
   const customerId = typeof invoice.customer === 'string' ? invoice.customer : invoice.customer?.id;
-  const customerName = typeof invoice.customer === 'object' ? (invoice.customer as any)?.name : undefined;
+  const customerName = typeof invoice.customer === 'object' ? (invoice.customer as Stripe.Customer)?.name : undefined;
   
   logger.info(`[Stripe Webhook] Invoice ${eventType}: ${invoice.id}, status: ${invoice.status}, amount: $${(amountDue / 100).toFixed(2)}`);
   
@@ -1884,10 +1900,10 @@ async function handleInvoiceLifecycle(client: PoolClient, invoice: Stripe.Invoic
       customerEmail: invoiceEmail,
       customerName,
       description: invoice.lines?.data?.[0]?.description || `Invoice ${invoice.number || invoice.id}`,
-      metadata: invoice.metadata,
+      metadata: invoice.metadata as Record<string, string>,
       source: 'webhook',
       invoiceId: invoice.id,
-      paymentIntentId: (invoice as any).payment_intent,
+      paymentIntentId: typeof invoice.payment_intent === 'string' ? invoice.payment_intent : invoice.payment_intent?.id,
     });
   });
   
@@ -1900,7 +1916,7 @@ async function handleInvoiceLifecycle(client: PoolClient, invoice: Stripe.Invoic
           action: 'invoice_failed',
           memberEmail: invoiceEmail,
           amount: amountDue / 100,
-        } as any);
+        });
       });
     }
   }
@@ -1942,7 +1958,7 @@ async function handleInvoiceVoided(client: PoolClient, invoice: Stripe.Invoice, 
     broadcastBillingUpdate({
       action: 'invoice_failed',
       memberEmail: localInvoiceEmail,
-    } as any);
+    });
   });
 
   return deferredActions;
@@ -2280,8 +2296,8 @@ async function handleCheckoutSessionCompleted(client: PoolClient, session: Strip
         try {
           const stripeForPhone = await getStripeClient();
           const stripeCustomer = await stripeForPhone.customers.retrieve(customerId);
-          if (!(stripeCustomer as any).deleted) {
-            customerPhone = (stripeCustomer as any).phone || undefined;
+          if (!(stripeCustomer as Stripe.DeletedCustomer).deleted) {
+            customerPhone = (stripeCustomer as Stripe.Customer).phone || undefined;
           }
         } catch (phoneErr) {
           // Non-blocking
@@ -2435,8 +2451,8 @@ async function handleSubscriptionCreated(client: PoolClient, subscription: Strip
     const planName = subscription.items?.data?.[0]?.price?.nickname || 
                      subscription.items?.data?.[0]?.plan?.nickname || 
                      'Membership';
-    const subscriptionPeriodEnd = (subscription as any).current_period_end 
-      ? new Date((subscription as any).current_period_end * 1000) 
+    const subscriptionPeriodEnd = (subscription as StripeSubscriptionWithPeriods).current_period_end 
+      ? new Date((subscription as StripeSubscriptionWithPeriods).current_period_end * 1000) 
       : null;
 
     // First try to find user by stripe_customer_id
@@ -2465,9 +2481,9 @@ async function handleSubscriptionCreated(client: PoolClient, subscription: Strip
       logger.info(`[Stripe Webhook] No user found for Stripe customer ${customerId}, creating user from Stripe data`);
       
       const stripe = await getStripeClient();
-      const customer = await stripe.customers.retrieve(customerId as string) as any;
+      const customer = await stripe.customers.retrieve(customerId as string) as Stripe.Customer | Stripe.DeletedCustomer;
       
-      if (!customer || customer.deleted) {
+      if (!customer || (customer as Stripe.DeletedCustomer).deleted) {
         logger.error(`[Stripe Webhook] Customer ${customerId} not found or deleted`);
         return deferredActions;
       }
@@ -2492,7 +2508,7 @@ async function handleSubscriptionCreated(client: PoolClient, subscription: Strip
         logger.info(`[Stripe Webhook] Using name from subscription metadata: ${firstName} ${lastName}`);
       } else {
         // Fallback to customer name
-        const customerName = (customer as any).name || '';
+        const customerName = (customer as Stripe.Customer).name || '';
         const nameParts = customerName.split(' ');
         firstName = nameParts[0] || '';
         lastName = nameParts.slice(1).join(' ') || '';
@@ -2957,7 +2973,7 @@ async function handleSubscriptionCreated(client: PoolClient, subscription: Strip
         const trialEndDate = subscription.trial_end 
           ? new Date(subscription.trial_end * 1000) 
           : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-        const couponCode = (subscription as any).discount?.coupon?.id || subscription.metadata?.coupon_code || undefined;
+        const couponCode = subscription.discounts?.[0] && typeof subscription.discounts[0] !== 'string' ? (subscription.discounts[0] as Stripe.Discount).coupon?.id : subscription.metadata?.coupon_code || undefined;
 
         deferredActions.push(async () => {
           try {
@@ -2983,23 +2999,23 @@ async function handleSubscriptionCreated(client: PoolClient, subscription: Strip
   return deferredActions;
 }
 
-async function handleSubscriptionUpdated(client: PoolClient, subscription: Stripe.Subscription, previousAttributes?: any): Promise<DeferredAction[]> {
+async function handleSubscriptionUpdated(client: PoolClient, subscription: Stripe.Subscription, previousAttributes?: SubscriptionPreviousAttributes): Promise<DeferredAction[]> {
   const deferredActions: DeferredAction[] = [];
   try {
     const customerId = subscription.customer;
     const status = subscription.status;
     const currentPriceId = subscription.items?.data?.[0]?.price?.id;
-    const subscriptionPeriodEnd = (subscription as any).current_period_end 
-      ? new Date((subscription as any).current_period_end * 1000) 
+    const subscriptionPeriodEnd = (subscription as StripeSubscriptionWithPeriods).current_period_end 
+      ? new Date((subscription as StripeSubscriptionWithPeriods).current_period_end * 1000) 
       : null;
 
     if (previousAttributes?.items?.data) {
       const { handleSubscriptionItemsChanged } = await import('./groupBilling');
-      const currentItems = subscription.items?.data?.map((i: any) => ({
+      const currentItems = subscription.items?.data?.map((i: Stripe.SubscriptionItem) => ({
         id: i.id,
         metadata: i.metadata,
       })) || [];
-      const previousItems = previousAttributes.items.data.map((i: any) => ({
+      const previousItems = previousAttributes.items.data.map((i: { id: string; metadata?: Record<string, string> }) => ({
         id: i.id,
         metadata: i.metadata,
       }));
@@ -3523,8 +3539,8 @@ async function handleSubscriptionResumed(client: PoolClient, subscription: Strip
   const deferredActions: DeferredAction[] = [];
   try {
     const customerId = subscription.customer;
-    const subscriptionPeriodEnd = (subscription as any).current_period_end
-      ? new Date((subscription as any).current_period_end * 1000)
+    const subscriptionPeriodEnd = (subscription as StripeSubscriptionWithPeriods).current_period_end
+      ? new Date((subscription as StripeSubscriptionWithPeriods).current_period_end * 1000)
       : null;
 
     const userResult = await client.query(
@@ -3679,7 +3695,7 @@ async function handleSubscriptionDeleted(client: PoolClient, subscription: Strip
           userEmail: email,
           title: 'Trial Ended',
           message: 'Your free trial has ended. Your account is still here - renew anytime to pick up where you left off!',
-          type: 'membership_failed' as any,
+          type: 'membership_failed',
         });
       } catch (notifyErr) {
         logger.error('[Stripe Webhook] Notification failed (non-fatal):', { error: (notifyErr as Error).message });
@@ -3700,7 +3716,7 @@ async function handleSubscriptionDeleted(client: PoolClient, subscription: Strip
         action: 'subscription_updated',
         memberEmail: email,
         memberName
-      } as any);
+      });
 
       return deferredActions;
     }
@@ -3726,7 +3742,7 @@ async function handleSubscriptionDeleted(client: PoolClient, subscription: Strip
       );
 
       if (deactivatedMembersResult.rows.length > 0) {
-        const orphanedEmails = deactivatedMembersResult.rows.map((m: any) => m.member_email);
+        const orphanedEmails = deactivatedMembersResult.rows.map((m: Record<string, unknown>) => m.member_email);
         
         logger.warn(`[Stripe Webhook] ORPHAN BILLING WARNING: Primary member ${memberName} (${email}) ` +
           `subscription cancelled with ${orphanedEmails.length} group members deactivated: ${orphanedEmails.join(', ')}`);
@@ -3830,7 +3846,7 @@ async function handleSubscriptionDeleted(client: PoolClient, subscription: Strip
   return deferredActions;
 }
 
-async function handleProductUpdated(client: PoolClient, product: any): Promise<DeferredAction[]> {
+async function handleProductUpdated(client: PoolClient, product: StripeProductWithMarketingFeatures): Promise<DeferredAction[]> {
   const deferredActions: DeferredAction[] = [];
 
   try {
@@ -3848,7 +3864,7 @@ async function handleProductUpdated(client: PoolClient, product: any): Promise<D
 
       if (Array.isArray(product.marketing_features) && product.marketing_features.length > 0) {
         const featureNames = product.marketing_features
-          .map((f: any) => f.name)
+          .map((f: { name: string }) => f.name)
           .filter((n: string) => n && n.trim());
         if (featureNames.length > 0) {
           await client.query(
@@ -3906,7 +3922,7 @@ async function handleProductUpdated(client: PoolClient, product: any): Promise<D
   return deferredActions;
 }
 
-async function handleProductCreated(client: PoolClient, product: any): Promise<DeferredAction[]> {
+async function handleProductCreated(client: PoolClient, product: Stripe.Product): Promise<DeferredAction[]> {
   const deferredActions: DeferredAction[] = [];
 
   try {
@@ -3937,7 +3953,7 @@ async function handleProductCreated(client: PoolClient, product: any): Promise<D
   return deferredActions;
 }
 
-async function handleProductDeleted(client: PoolClient, product: any): Promise<DeferredAction[]> {
+async function handleProductDeleted(client: PoolClient, product: Stripe.Product): Promise<DeferredAction[]> {
   const deferredActions: DeferredAction[] = [];
 
   try {
@@ -3976,7 +3992,7 @@ async function handleProductDeleted(client: PoolClient, product: any): Promise<D
   return deferredActions;
 }
 
-async function handlePriceChange(client: PoolClient, price: any): Promise<DeferredAction[]> {
+async function handlePriceChange(client: PoolClient, price: Stripe.Price): Promise<DeferredAction[]> {
   const deferredActions: DeferredAction[] = [];
 
   try {

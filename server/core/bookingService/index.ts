@@ -23,7 +23,6 @@ export {
   validateTierWindowAndBalance,
   getRemainingMinutes,
   enforceSocialTierRules,
-  enforceSocialTierRulesLegacy,
   getGuestPassesRemaining,
   getMemberTier,
   getTierLimits,

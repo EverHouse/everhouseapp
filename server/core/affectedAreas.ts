@@ -2,12 +2,12 @@ import { pool } from './db';
 
 export async function getAllActiveBayIds(): Promise<number[]> {
   const result = await pool.query("SELECT id FROM resources WHERE type = 'simulator'");
-  return result.rows.map((r: any) => r.id);
+  return result.rows.map((r: Record<string, unknown>) => r.id as number);
 }
 
 export async function getAllResourceIds(): Promise<number[]> {
   const result = await pool.query('SELECT id FROM resources');
-  return result.rows.map((r: any) => r.id);
+  return result.rows.map((r: Record<string, unknown>) => r.id as number);
 }
 
 export async function getConferenceRoomId(): Promise<number | null> {

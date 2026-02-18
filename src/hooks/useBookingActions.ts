@@ -15,7 +15,7 @@ export interface CheckInResult {
   requiresRoster?: boolean;
   requiresSync?: boolean;
   error?: string;
-  data?: any;
+  data?: unknown;
 }
 
 export interface ChargeCardOptions {

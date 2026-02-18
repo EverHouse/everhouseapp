@@ -3,7 +3,7 @@ import { logger } from '../../core/logger';
 import { sendNotificationToUser, broadcastToStaff } from '../../core/websocket';
 import { notifyAllStaff, notifyMember } from '../../core/notificationService';
 import { refundGuestPass } from '../guestPasses';
-import { calculateFullSessionBilling } from '../../core/bookingService/usageCalculator';
+import { calculateFullSessionBilling, Participant } from '../../core/bookingService/usageCalculator';
 import { recalculateSessionFees } from '../../core/billing/unifiedFeeService';
 import { recordUsage, createSessionWithUsageTracking, ensureSessionForBooking } from '../../core/bookingService/sessionManager';
 import { getMemberTierByEmail } from '../../core/tierService';
@@ -86,7 +86,7 @@ export async function createBookingForMember(
               'UPDATE booking_sessions SET start_time = $1, end_time = $2 WHERE id = $3',
               [startTime, endTime, existingBooking.rows[0].session_id]
             );
-            await recalculateSessionFees(existingBooking.rows[0].session_id, 'trackman_webhook' as any);
+            await recalculateSessionFees(existingBooking.rows[0].session_id, 'trackman_webhook');
             logger.info('[Trackman Webhook] Recalculated fees after duration change', {
               extra: { sessionId: existingBooking.rows[0].session_id }
             });
@@ -204,7 +204,7 @@ export async function createBookingForMember(
               'UPDATE booking_sessions SET start_time = $1, end_time = $2 WHERE id = $3',
               [startTime, endTime, sessionCheck.rows[0].session_id]
             );
-            await recalculateSessionFees(sessionCheck.rows[0].session_id, 'trackman_webhook' as any);
+            await recalculateSessionFees(sessionCheck.rows[0].session_id, 'trackman_webhook');
           } catch (recalcErr: unknown) {
             logger.warn('[Trackman Webhook] Failed to recalculate fees', { extra: { bookingId: pendingBookingId, error: recalcErr } });
           }
@@ -240,7 +240,7 @@ export async function createBookingForMember(
               `, [newSessionId, `Guest ${i + 1}`, slotDuration]);
             }
             
-            const feeBreakdown = await recalculateSessionFees(newSessionId, 'trackman_webhook' as any);
+            const feeBreakdown = await recalculateSessionFees(newSessionId, 'trackman_webhook');
             logger.info('[Trackman Webhook] Created session and participants for linked booking', {
               extra: { bookingId: pendingBookingId, sessionId: newSessionId, playerCount, slotDuration }
             });
@@ -430,13 +430,13 @@ export async function createBookingForMember(
           try {
             const ownerTier = await getMemberTierByEmail(member.email, { allowInactive: true });
             
-            const participants: Array<{ email: any; participantType: string; displayName: string }> = [
+            const participants: Participant[] = [
               { email: member.email, participantType: 'owner', displayName: memberName }
             ];
             
             for (let i = 1; i < playerCount; i++) {
               participants.push({
-                email: undefined as any,
+                email: undefined,
                 participantType: 'guest',
                 displayName: `Guest ${i + 1}`
               });
@@ -445,7 +445,7 @@ export async function createBookingForMember(
             const billingResult = await calculateFullSessionBilling(
               slotDate,
               durationMinutes,
-              participants as any,
+              participants,
               member.email,
               playerCount
             );
@@ -497,7 +497,7 @@ export async function createBookingForMember(
                 `, [sessionId, `Guest ${i + 1}`, slotDuration]);
               }
               
-              await recalculateSessionFees(sessionId, 'trackman_webhook' as any);
+              await recalculateSessionFees(sessionId, 'trackman_webhook');
               logger.info('[Trackman Webhook] Created guest participants and cached fees', {
                 extra: { sessionId, playerCount, slotDuration }
               });
@@ -678,7 +678,7 @@ export async function linkByExternalBookingId(
           'UPDATE booking_sessions SET start_time = $1, end_time = $2 WHERE id = $3',
           [startTime, endTime, booking.session_id]
         );
-        await recalculateSessionFees(booking.session_id, 'trackman_webhook' as any);
+        await recalculateSessionFees(booking.session_id, 'trackman_webhook');
         logger.info('[Trackman Webhook] Recalculated fees after externalBookingId link', {
           extra: { bookingId, sessionId: booking.session_id, originalDuration, newDuration: durationMinutes }
         });

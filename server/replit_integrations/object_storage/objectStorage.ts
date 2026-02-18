@@ -8,6 +8,7 @@ import {
   getObjectAclPolicy,
   setObjectAclPolicy,
 } from "./objectAcl";
+import { logger } from "../../core/logger";
 
 const REPLIT_SIDECAR_ENDPOINT = "http://127.0.0.1:1106";
 
@@ -115,7 +116,7 @@ export class ObjectStorageService {
       const stream = file.createReadStream();
 
       stream.on("error", (err) => {
-        console.error("Stream error:", err);
+        logger.error("Stream error:", { error: err as Error });
         if (!res.headersSent) {
           res.status(500).json({ error: "Error streaming file" });
         }
@@ -123,7 +124,7 @@ export class ObjectStorageService {
 
       stream.pipe(res);
     } catch (error) {
-      console.error("Error downloading file:", error);
+      logger.error("Error downloading file:", { error: error as Error });
       if (!res.headersSent) {
         res.status(500).json({ error: "Error downloading file" });
       }

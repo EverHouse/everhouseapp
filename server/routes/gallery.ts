@@ -51,7 +51,7 @@ router.post('/api/admin/gallery', isStaffOrAdmin, async (req, res) => {
       isActive: isActive !== false
     }).returning();
     
-    logFromRequest(req, 'create_gallery_item' as any, 'gallery' as any, String(newImage.id), newImage.title, {});
+    logFromRequest(req, 'create_gallery_item', 'gallery', String(newImage.id), newImage.title, {});
     res.status(201).json(newImage);
   } catch (error: unknown) {
     logAndRespond(req, res, 500, 'Failed to create gallery image', error, 'GALLERY_CREATE_ERROR');
@@ -78,7 +78,7 @@ router.put('/api/admin/gallery/:id', isStaffOrAdmin, async (req, res) => {
       return res.status(404).json({ error: 'Gallery image not found' });
     }
     
-    logFromRequest(req, 'update_gallery_item' as any, 'gallery' as any, String(id), undefined, {});
+    logFromRequest(req, 'update_gallery_item', 'gallery', String(id), undefined, {});
     res.json(updated);
   } catch (error: unknown) {
     logAndRespond(req, res, 500, 'Failed to update gallery image', error, 'GALLERY_UPDATE_ERROR');
@@ -98,7 +98,7 @@ router.delete('/api/admin/gallery/:id', isStaffOrAdmin, async (req, res) => {
       return res.status(404).json({ error: 'Gallery image not found' });
     }
     
-    logFromRequest(req, 'delete_gallery_item' as any, 'gallery' as any, String(id), undefined, {});
+    logFromRequest(req, 'delete_gallery_item', 'gallery', String(id), undefined, {});
     res.json({ success: true, archived: updated });
   } catch (error: unknown) {
     logAndRespond(req, res, 500, 'Failed to archive gallery image', error, 'GALLERY_DELETE_ERROR');
@@ -127,7 +127,7 @@ router.post('/api/admin/gallery/reorder', isStaffOrAdmin, async (req, res) => {
       )
     );
     
-    logFromRequest(req, 'reorder_gallery' as any, 'gallery' as any, undefined, 'Gallery Reorder', {});
+    logFromRequest(req, 'reorder_gallery', 'gallery', undefined, 'Gallery Reorder', {});
     res.json({ success: true, updated: order.length });
   } catch (error: unknown) {
     logAndRespond(req, res, 500, 'Failed to reorder gallery images', error, 'GALLERY_REORDER_ERROR');

@@ -51,7 +51,7 @@ router.post('/api/members/:email/notes', isStaffOrAdmin, async (req, res) => {
       })
       .returning();
     
-    logFromRequest(req, 'create_note' as any, 'note' as any, String(result[0].id), normalizedEmail);
+    logFromRequest(req, 'create_note', 'note', String(result[0].id), normalizedEmail);
     res.status(201).json(result[0]);
   } catch (error: unknown) {
     logger.error('Create note error', { error: error instanceof Error ? error : new Error(String(error)) });
@@ -65,7 +65,7 @@ router.put('/api/members/:email/notes/:noteId', isStaffOrAdmin, async (req, res)
     const { content, isPinned } = req.body;
     const normalizedEmail = decodeURIComponent(email as string).toLowerCase();
     
-    const updateData: Record<string, any> = { updatedAt: new Date() };
+    const updateData: Record<string, unknown> = { updatedAt: new Date() };
     if (content !== undefined) updateData.content = content.trim();
     if (isPinned !== undefined) updateData.isPinned = isPinned;
     
@@ -81,7 +81,7 @@ router.put('/api/members/:email/notes/:noteId', isStaffOrAdmin, async (req, res)
       return res.status(404).json({ error: 'Note not found' });
     }
     
-    logFromRequest(req, 'update_note' as any, 'note' as any, noteId as string, normalizedEmail);
+    logFromRequest(req, 'update_note', 'note', noteId as string, normalizedEmail);
     res.json(result[0]);
   } catch (error: unknown) {
     logger.error('Update note error', { error: error instanceof Error ? error : new Error(String(error)) });
@@ -105,7 +105,7 @@ router.delete('/api/members/:email/notes/:noteId', isStaffOrAdmin, async (req, r
       return res.status(404).json({ error: 'Note not found for this member' });
     }
     
-    logFromRequest(req, 'delete_note' as any, 'note' as any, noteId as string, normalizedEmail);
+    logFromRequest(req, 'delete_note', 'note', noteId as string, normalizedEmail);
     res.json({ success: true });
   } catch (error: unknown) {
     logger.error('Delete note error', { error: error instanceof Error ? error : new Error(String(error)) });

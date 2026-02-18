@@ -127,7 +127,7 @@ router.post('/api/member/bookings/:id/pay-fees', isAuthenticated, paymentRateLim
       
       if (existingSnapshot.rows.length > 0) {
         const existing = existingSnapshot.rows[0];
-        const existingParticipantIds = (existing.participant_fees || []).map((p: any) => p.id).sort().join(',');
+        const existingParticipantIds = (existing.participant_fees || []).map((p: Record<string, unknown>) => p.id).sort().join(',');
         const newParticipantIds = serverFees.map(p => p.id).sort().join(',');
         const participantsMatch = existingParticipantIds === newParticipantIds;
         
@@ -388,7 +388,7 @@ router.post('/api/member/bookings/:id/confirm-payment', isAuthenticated, async (
     const currentFees = await computeFeeBreakdown({ sessionId: booking.session_id, source: 'stripe' as const });
     const snapshotFees = snapshot.participant_fees;
     const snapshotTotal = Array.isArray(snapshotFees) 
-      ? snapshotFees.reduce((sum: number, f: any) => sum + (f.amountCents || 0), 0)
+      ? snapshotFees.reduce((sum: number, f: Record<string, unknown>) => sum + ((f.amountCents as number) || 0), 0)
       : 0;
     const currentTotal = currentFees.totals.totalCents;
 
@@ -417,13 +417,13 @@ router.post('/api/member/bookings/:id/confirm-payment', isAuthenticated, async (
         return res.status(400).json({ error: confirmResult.error || 'Payment verification failed' });
       }
 
-      let participantFees: any[] = [];
+      let participantFees: Array<{ id: number; amountCents?: number }> = [];
       try {
         participantFees = JSON.parse(snapshot.participant_fees || '[]');
       } catch (parseErr) {
         logger.error('[MemberPayments] Failed to parse participant_fees for snapshot', { extra: { snapshot_id: snapshot.id, data: ':', parseErr } });
       }
-      const participantIds = participantFees.map((pf: any) => pf.id);
+      const participantIds = participantFees.map((pf) => pf.id);
 
       if (participantIds.length > 0) {
         await client.query(
@@ -450,7 +450,7 @@ router.post('/api/member/bookings/:id/confirm-payment', isAuthenticated, async (
         data: { bookingId, status: 'paid' }
       });
       
-      (broadcastBillingUpdate as any)({
+      broadcastBillingUpdate({
         memberEmail: sessionEmail,
         action: 'payment_confirmed',
         bookingId,
@@ -625,10 +625,9 @@ router.post('/api/member/invoices/:invoiceId/confirm', isAuthenticated, async (r
         data: { invoiceId, status: 'paid' }
       });
       
-      (broadcastBillingUpdate as any)({
+      broadcastBillingUpdate({
         memberEmail: sessionEmail,
         action: 'invoice_paid',
-        invoiceId,
         status: 'paid'
       });
     } catch (payErr: unknown) {
@@ -1220,7 +1219,7 @@ router.post('/api/member/balance/pay', isAuthenticated, async (req: Request, res
         const existing = existingSnapshot.rows[0];
         const existingFees = existing.participant_fees || {};
         const existingApplyCredit = existingFees.applyCredit !== false;
-        const existingParticipantIds = (existingFees.fees || []).map((p: any) => p.id).sort().join(',');
+        const existingParticipantIds = (existingFees.fees || []).map((p: Record<string, unknown>) => p.id).sort().join(',');
         const newParticipantIds = participantFees.map(p => p.id).sort().join(',');
         const participantsMatch = existingParticipantIds === newParticipantIds;
         
@@ -1277,7 +1276,7 @@ router.post('/api/member/balance/pay', isAuthenticated, async (req: Request, res
           const customer = await stripe.customers.retrieve((existingIntent.customer as string) || '');
           let availableCredit = 0;
           if (!('deleted' in customer) || !customer.deleted) {
-            const customerBalance = (customer as any).balance || 0;
+            const customerBalance = ('balance' in customer ? (customer.balance as number) : 0) || 0;
             availableCredit = customerBalance < 0 ? Math.abs(customerBalance) : 0;
           }
           
@@ -1314,7 +1313,7 @@ router.post('/api/member/balance/pay', isAuthenticated, async (req: Request, res
     const customer = await stripe.customers.retrieve(stripeCustomerId);
     let availableCreditCents = 0;
     if (!('deleted' in customer) || !customer.deleted) {
-      const customerBalance = (customer as any).balance || 0;
+      const customerBalance = ('balance' in customer ? (customer.balance as number) : 0) || 0;
       availableCreditCents = customerBalance < 0 ? Math.abs(customerBalance) : 0;
     }
 

@@ -1,13 +1,14 @@
 import { schedulerTracker } from '../core/schedulerTracker';
 import { syncHubSpotFormSubmissions } from '../core/hubspot/formSync';
 import { getErrorMessage } from '../utils/errorUtils';
+import { logger } from '../core/logger';
 
 const SYNC_INTERVAL_MS = 30 * 60 * 1000;
 let isSyncing = false;
 
 async function runSync(): Promise<void> {
   if (isSyncing) {
-    console.log('[HubSpot FormSync] Skipping — sync already in progress');
+    logger.info('[HubSpot FormSync] Skipping — sync already in progress');
     return;
   }
 
@@ -16,7 +17,7 @@ async function runSync(): Promise<void> {
   try {
     await syncHubSpotFormSubmissions();
   } catch (error: unknown) {
-    console.error('[HubSpot FormSync] Scheduler error:', getErrorMessage(error));
+    logger.error('[HubSpot FormSync] Scheduler error:', { error: error as Error });
     schedulerTracker.recordRun('HubSpot Form Sync', false, getErrorMessage(error));
   } finally {
     isSyncing = false;
@@ -24,11 +25,11 @@ async function runSync(): Promise<void> {
 }
 
 export function startHubSpotFormSyncScheduler(): void {
-  console.log('[Startup] HubSpot form sync scheduler enabled (runs every 30 minutes)');
+  logger.info('[Startup] HubSpot form sync scheduler enabled (runs every 30 minutes)');
 
   setTimeout(() => {
     runSync().catch(err => {
-      console.error('[HubSpot FormSync] Initial run failed:', err);
+      logger.error('[HubSpot FormSync] Initial run failed:', { error: err as Error });
       schedulerTracker.recordRun('HubSpot Form Sync', false, String(err));
     });
   }, 60000);

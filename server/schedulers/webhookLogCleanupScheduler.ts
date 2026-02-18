@@ -1,5 +1,6 @@
 import { schedulerTracker } from '../core/schedulerTracker';
 import { getPacificHour } from '../utils/dateUtils';
+import { logger } from '../core/logger';
 
 async function scheduleWebhookLogCleanup(): Promise<void> {
   try {
@@ -7,7 +8,7 @@ async function scheduleWebhookLogCleanup(): Promise<void> {
     await cleanupOldWebhookLogs();
     schedulerTracker.recordRun('Webhook Log Cleanup', true);
   } catch (err) {
-    console.error('[Webhook Cleanup] Scheduler error:', err);
+    logger.error('[Webhook Cleanup] Scheduler error:', { error: err as Error });
     schedulerTracker.recordRun('Webhook Log Cleanup', false, String(err));
   }
 }
@@ -19,9 +20,9 @@ export function startWebhookLogCleanupScheduler(): void {
         await scheduleWebhookLogCleanup();
       }
     } catch (err) {
-      console.error('[Webhook Cleanup] Check error:', err);
+      logger.error('[Webhook Cleanup] Check error:', { error: err as Error });
     }
   }, 60 * 60 * 1000);
   
-  console.log('[Startup] Webhook log cleanup scheduler enabled (runs daily at 4am Pacific, deletes logs older than 30 days)');
+  logger.info('[Startup] Webhook log cleanup scheduler enabled (runs daily at 4am Pacific, deletes logs older than 30 days)');
 }

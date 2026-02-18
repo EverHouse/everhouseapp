@@ -13,7 +13,7 @@ function BookingFeeButton({ bookingId, dbOwed, hasUnpaidFees, setBookingSheet, f
     bookingId: number;
     dbOwed: number;
     hasUnpaidFees: boolean;
-    setBookingSheet: (sheet: any) => void;
+    setBookingSheet: (sheet: Record<string, unknown> | null) => void;
     fallback?: React.ReactNode;
 }) {
     const { data, isLoading, isError } = useQuery({
@@ -21,7 +21,7 @@ function BookingFeeButton({ bookingId, dbOwed, hasUnpaidFees, setBookingSheet, f
         queryFn: async () => {
             const res = await fetch(`/api/fee-estimate?bookingId=${bookingId}`, { credentials: 'include' });
             if (!res.ok) throw new Error('Failed to fetch fee estimate');
-            return res.json() as Promise<{ totalFee: number; note: string; feeBreakdown: any; ownerTier: string }>;
+            return res.json() as Promise<{ totalFee: number; note: string; feeBreakdown: Record<string, unknown>; ownerTier: string }>;
         },
         staleTime: 30_000,
         retry: 1,
@@ -56,7 +56,7 @@ export interface BookingRequestsPanelProps {
     memberNameMap: Record<string, string>;
     actionInProgress: Record<string, string>;
     navigateToTab: (tab: string) => void;
-    setBookingSheet: (sheet: any) => void;
+    setBookingSheet: (sheet: Record<string, unknown> | null) => void;
     setTrackmanModal: (modal: { isOpen: boolean; booking: BookingRequest | null }) => void;
     setSelectedRequest: (req: BookingRequest | null) => void;
     setActionModal: (modal: 'approve' | 'decline' | null) => void;
@@ -72,8 +72,8 @@ export interface BookingRequestsPanelProps {
     optimisticNewBooking: BookingRequest | null;
     startDate: string;
     endDate: string;
-    queryClient: any;
-    simulatorKeys: any;
+    queryClient: { setQueryData: (key: unknown, updater: unknown) => void; invalidateQueries: (opts: { queryKey: unknown }) => void };
+    simulatorKeys: { allRequests: () => string[]; approvedBookings: (start: string, end: string) => string[] };
     activeView: 'requests' | 'calendar';
     queueMaxHeight: number | null;
     setActionInProgress: React.Dispatch<React.SetStateAction<Record<string, string>>>;
@@ -170,10 +170,10 @@ const BookingRequestsPanel: React.FC<BookingRequestsPanelProps> = ({
                                             style={{ '--stagger-index': index + 2 } as React.CSSProperties}
                                             onClick={() => setBookingSheet({
                                                 isOpen: true,
-                                                trackmanBookingId: (item as any).trackman_booking_id || null,
+                                                trackmanBookingId: item.trackman_booking_id || null,
                                                 bookingId: item.id,
                                                 mode: 'manage' as const,
-                                                bayName: bookingResource?.name || (item as any).bay_name || `Bay ${item.resource_id}`,
+                                                bayName: bookingResource?.name || (item as Record<string, unknown>).bay_name || `Bay ${item.resource_id}`,
                                                 bookingDate: item.request_date,
                                                 timeSlot: `${formatTime12Hour(item.start_time)} - ${formatTime12Hour(item.end_time)}`,
                                                 matchedBookingId: Number(item.id),
@@ -199,9 +199,9 @@ const BookingRequestsPanel: React.FC<BookingRequestsPanelProps> = ({
                                             <p className="text-sm text-red-700 dark:text-red-400 mb-1">
                                                 {formatDateShortAdmin(item.request_date)} • {formatTime12Hour(item.start_time)} - {formatTime12Hour(item.end_time)}
                                             </p>
-                                            {(item as any).cancellation_reason && (
+                                            {(item as Record<string, unknown>).cancellation_reason && (
                                                 <p className="text-sm text-red-600/80 dark:text-red-400/80 italic mb-2">
-                                                    "{(item as any).cancellation_reason}"
+                                                    "{(item as Record<string, unknown>).cancellation_reason}"
                                                 </p>
                                             )}
                                             {item.created_at && (
@@ -454,7 +454,7 @@ const BookingRequestsPanel: React.FC<BookingRequestsPanelProps> = ({
                                                         style={{ '--stagger-index': index } as React.CSSProperties}
                                                         onClick={() => !isOptimisticNew && !isActionPending && setBookingSheet({
                                                             isOpen: true,
-                                                            trackmanBookingId: (booking as any).trackman_booking_id || null,
+                                                            trackmanBookingId: booking.trackman_booking_id || null,
                                                             bookingId: booking.id,
                                                             mode: isUnmatched ? 'assign' as const : 'manage' as const,
                                                             bayName: bookingResource?.name || booking.bay_name || booking.resource_name,
@@ -465,10 +465,10 @@ const BookingRequestsPanel: React.FC<BookingRequestsPanelProps> = ({
                                                             currentMemberEmail: isUnmatched ? undefined : (booking.user_email || undefined),
                                                             ownerName: booking.user_name || undefined,
                                                             ownerEmail: booking.user_email || undefined,
-                                                            declaredPlayerCount: (booking as any).declared_player_count || (booking as any).player_count || 1,
+                                                            declaredPlayerCount: booking.declared_player_count || (booking as Record<string, unknown>).player_count || 1,
                                                             isRelink: !isUnmatched,
-                                                            importedName: (booking as any).user_name || (booking as any).userName,
-                                                            notes: (booking as any).notes || (booking as any).note,
+                                                            importedName: booking.user_name || (booking as Record<string, unknown>).userName,
+                                                            notes: booking.notes || (booking as Record<string, unknown>).note,
                                                             bookingStatus: booking.status,
                                                             bookingContext: { requestDate: booking.request_date, startTime: booking.start_time, endTime: booking.end_time, resourceId: booking.resource_id || undefined, resourceName: (bookingResource?.name || booking.bay_name || booking.resource_name) || undefined, durationMinutes: booking.duration_minutes || undefined },
                                                         })}
@@ -503,7 +503,7 @@ const BookingRequestsPanel: React.FC<BookingRequestsPanelProps> = ({
                                                                     <p className="font-semibold text-base text-primary dark:text-white">
                                                                         {displayName}
                                                                     </p>
-                                                                    {(booking as any).tier && <TierBadge tier={(booking as any).tier} size="sm" />}
+                                                                    {(booking as Record<string, unknown>).tier && <TierBadge tier={(booking as Record<string, unknown>).tier} size="sm" />}
                                                                     {isConferenceRoom ? (
                                                                         <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-400">
                                                                             Conf
@@ -590,8 +590,8 @@ const BookingRequestsPanel: React.FC<BookingRequestsPanelProps> = ({
                                                                         timeSlot: `${formatTime12Hour(booking.start_time)} - ${formatTime12Hour(booking.end_time)}`,
                                                                         matchedBookingId: Number(booking.id),
                                                                         isRelink: false,
-                                                                        importedName: (booking as any).user_name || (booking as any).userName,
-                                                                        notes: (booking as any).notes || (booking as any).note
+                                                                        importedName: booking.user_name || (booking as Record<string, unknown>).userName,
+                                                                        notes: booking.notes || (booking as Record<string, unknown>).note
                                                                     })}
                                                                     className="flex-1 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-sm font-medium flex items-center justify-center gap-2 hover:shadow-md active:scale-95 transition-all duration-fast"
                                                                 >
@@ -603,7 +603,7 @@ const BookingRequestsPanel: React.FC<BookingRequestsPanelProps> = ({
                                                                     <span aria-hidden="true" className="material-symbols-outlined text-lg">check_circle</span>
                                                                     Checked In
                                                                 </span>
-                                                            ) : !isConferenceRoom && isToday && (booking as any).fee_snapshot_paid ? (
+                                                            ) : !isConferenceRoom && isToday && (booking as Record<string, unknown>).fee_snapshot_paid ? (
                                                                 <span className="flex-1 py-2.5 bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400 rounded-xl text-sm font-medium flex items-center justify-center gap-2">
                                                                     <span aria-hidden="true" className="material-symbols-outlined text-lg">check_circle</span>
                                                                     Paid
@@ -632,7 +632,7 @@ const BookingRequestsPanel: React.FC<BookingRequestsPanelProps> = ({
                                                                         </button>
                                                                     }
                                                                 />
-                                                            ) : !isConferenceRoom && (booking as any).declared_player_count > 0 && (booking as any).declared_player_count > ((booking as any).filled_player_count || 0) ? (
+                                                            ) : !isConferenceRoom && booking.declared_player_count > 0 && booking.declared_player_count > (booking.filled_player_count || 0) ? (
                                                                 <button
                                                                     onClick={() => {
                                                                         const bookingId = typeof booking.id === 'string' ? parseInt(String(booking.id).replace('cal_', '')) : booking.id;
@@ -646,7 +646,7 @@ const BookingRequestsPanel: React.FC<BookingRequestsPanelProps> = ({
                                                                     className="flex-1 py-2.5 bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400 rounded-xl text-sm font-medium flex items-center justify-center gap-2 hover:bg-blue-200 dark:hover:bg-blue-500/30 hover:shadow-md active:scale-95 transition-all duration-fast"
                                                                 >
                                                                     <span aria-hidden="true" className="material-symbols-outlined text-lg">group_add</span>
-                                                                    Roster {(booking as any).filled_player_count || 0}/{(booking as any).declared_player_count}
+                                                                    Roster {booking.filled_player_count || 0}/{booking.declared_player_count}
                                                                 </button>
                                                             ) : null}
                                                         </div>

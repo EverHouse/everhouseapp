@@ -61,18 +61,81 @@ const formatImportLabel = (filename: string, createdAt?: string): string => {
   return cleaned.replace(/[_-]/g, ' ').replace(/\s+/g, ' ').trim() || 'Trackman Import';
 };
 
+
+interface TrackmanBooking {
+  id: number;
+  userName?: string;
+  user_name?: string;
+  originalEmail?: string;
+  original_email?: string;
+  userEmail?: string;
+  user_email?: string;
+  bookingDate?: string;
+  booking_date?: string;
+  request_date?: string;
+  startTime?: string;
+  start_time?: string;
+  endTime?: string;
+  end_time?: string;
+  bayName?: string;
+  bay_name?: string;
+  resource_id?: number;
+  trackmanPlayerCount?: number;
+  playerCount?: number;
+  player_count?: number;
+  assignedCount?: number;
+  assigned_count?: number;
+  status?: string;
+  slotInfo?: { totalSlots?: number; expectedPlayerCount?: number; filledSlots?: number };
+  resource_name?: string;
+}
+
+interface TrackmanMember {
+  email: string;
+  firstName?: string;
+  firstname?: string;
+  lastName?: string;
+  lastname?: string;
+  name?: string;
+}
+
+interface FuzzyMatch {
+  email: string;
+  firstName?: string;
+  lastName?: string;
+  score: number;
+}
+
+interface ImportRun {
+  id: number;
+  filename: string;
+  createdAt?: string;
+  importedBy?: string;
+  matchedRows?: number;
+  unmatchedRows?: number;
+  skippedRows?: number;
+}
+
+interface ImportResult {
+  success: boolean;
+  error?: string;
+  matched?: number;
+  unmatched?: number;
+  skipped?: number;
+}
+
 interface UnmatchedResponse {
-  data: any[];
+  data: TrackmanBooking[];
   totalCount: number;
 }
 
 interface NeedsPlayersResponse {
-  data: any[];
+  data: TrackmanBooking[];
   totalCount: number;
 }
 
 interface FuzzyMatchesResponse {
-  matches: any[];
+  matches: FuzzyMatch[];
 }
 
 const TrackmanTab: React.FC = () => {
@@ -88,9 +151,9 @@ const TrackmanTab: React.FC = () => {
   const [unmatchedPage, setUnmatchedPage] = useState(1);
   const [needsPlayersPage, setNeedsPlayersPage] = useState(1);
   const [needsPlayersSearchQuery, setNeedsPlayersSearchQuery] = useState('');
-  const [fuzzyMatchModal, setFuzzyMatchModal] = useState<{ booking: any; matches: any[]; isLoading: boolean; selectedEmail: string; rememberEmail: boolean } | null>(null);
-  const [importResult, setImportResult] = useState<any>(null);
-  const [assignPlayersModal, setAssignPlayersModal] = useState<{ booking: any; isOpen: boolean } | null>(null);
+  const [fuzzyMatchModal, setFuzzyMatchModal] = useState<{ booking: TrackmanBooking; matches: FuzzyMatch[]; isLoading: boolean; selectedEmail: string; rememberEmail: boolean } | null>(null);
+  const [importResult, setImportResult] = useState<ImportResult | null>(null);
+  const [assignPlayersModal, setAssignPlayersModal] = useState<{ booking: TrackmanBooking; isOpen: boolean } | null>(null);
   const [bookingSheet, setBookingSheet] = useState<{ 
     bookingId: number;
     bookingContext: {
@@ -108,13 +171,13 @@ const TrackmanTab: React.FC = () => {
   const [unmatchedSearchQuery, setUnmatchedSearchQuery] = useState('');
   const [fuzzySearchQuery, setFuzzySearchQuery] = useState('');
   const [isDragging, setIsDragging] = useState(false);
-  const [viewDetailBooking, setViewDetailBooking] = useState<any>(null);
+  const [viewDetailBooking, setViewDetailBooking] = useState<ImportResult | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const unmatchedSectionRef = useRef<HTMLDivElement>(null);
   const needsPlayersSectionRef = useRef<HTMLDivElement>(null);
   
   const [optimisticActions, setOptimisticActions] = useState<Map<number, OptimisticAction>>(new Map());
-  const snapshotRef = useRef<any[]>([]);
+  const snapshotRef = useRef<TrackmanBooking[]>([]);
 
   const unmatchedOffset = (unmatchedPage - 1) * ITEMS_PER_PAGE;
   const needsPlayersOffset = (needsPlayersPage - 1) * ITEMS_PER_PAGE;
@@ -127,12 +190,12 @@ const TrackmanTab: React.FC = () => {
     },
   });
 
-  const { data: importRuns = [], isLoading: runsLoading } = useQuery<any[]>({
+  const { data: importRuns = [], isLoading: runsLoading } = useQuery<ImportRun[]>({
     queryKey: ['trackman', 'import-runs'],
     queryFn: () => fetchWithCredentials('/api/admin/trackman/import-runs'),
   });
 
-  const { data: membersData, isLoading: membersLoading } = useQuery<any>({
+  const { data: membersData, isLoading: membersLoading } = useQuery<{ contacts?: TrackmanMember[] }>({
     queryKey: ['hubspot', 'contacts', 'all'],
     queryFn: () => fetchWithCredentials('/api/hubspot/contacts?status=all'),
   });
@@ -145,11 +208,11 @@ const TrackmanTab: React.FC = () => {
     },
   });
 
-  const { data: searchResults = [], isLoading: isSearching } = useQuery<any[]>({
+  const { data: searchResults = [], isLoading: isSearching } = useQuery<TrackmanMember[]>({
     queryKey: ['members', 'search', searchQuery],
     queryFn: async () => {
-      const data = await fetchWithCredentials<any[]>(`/api/members/search?query=${encodeURIComponent(searchQuery)}&limit=20&includeFormer=true`);
-      return data.map((m: any) => {
+      const data = await fetchWithCredentials<TrackmanMember[]>(`/api/members/search?query=${encodeURIComponent(searchQuery)}&limit=20&includeFormer=true`);
+      return data.map((m: TrackmanMember) => {
         const nameParts = (m.name || '').split(' ');
         return {
           ...m,
@@ -196,8 +259,8 @@ const TrackmanTab: React.FC = () => {
       setImportResult(data);
       queryClient.invalidateQueries({ queryKey: ['trackman'] });
     },
-    onError: (err: any) => {
-      setImportResult({ success: false, error: err.message || 'Network error - please check your connection and try again' });
+    onError: (err: unknown) => {
+      setImportResult({ success: false, error: (err instanceof Error ? err.message : 'Network error - please check your connection and try again') });
     },
   });
 
@@ -285,7 +348,7 @@ const TrackmanTab: React.FC = () => {
     setNeedsPlayersPage(1);
   }, [needsPlayersSearchQuery]);
 
-  const handleOpenFuzzyMatchModal = (booking: any) => {
+  const handleOpenFuzzyMatchModal = (booking: TrackmanBooking) => {
     setFuzzyMatchModal({ booking, matches: [], isLoading: true, selectedEmail: '', rememberEmail: true });
   };
 
@@ -331,14 +394,14 @@ const TrackmanTab: React.FC = () => {
     if (file) handleFileUpload(file);
   };
 
-  const filteredMembers = searchQuery.length >= 2 ? searchResults : members.filter((m: any) => {
+  const filteredMembers = searchQuery.length >= 2 ? searchResults : members.filter((m: TrackmanMember) => {
     const query = searchQuery.toLowerCase();
     const name = `${m.firstName || m.firstname || ''} ${m.lastName || m.lastname || ''}`.toLowerCase();
     const email = (m.email || '').toLowerCase();
     return name.includes(query) || email.includes(query);
   });
 
-  const fuzzyFilteredMembers = members.filter((m: any) => {
+  const fuzzyFilteredMembers = members.filter((m: TrackmanMember) => {
     if (!fuzzySearchQuery.trim()) return false;
     const query = fuzzySearchQuery.toLowerCase();
     const name = `${m.firstName || m.firstname || ''} ${m.lastName || m.lastname || ''}`.toLowerCase();
@@ -438,7 +501,7 @@ const TrackmanTab: React.FC = () => {
             Import History
           </h2>
           <div className="space-y-2">
-            {importRuns.slice(0, 5).map((run: any, idx: number) => (
+            {importRuns.slice(0, 5).map((run: ImportRun, idx: number) => (
               <div key={run.id} className="p-3 bg-white/50 dark:bg-white/5 rounded-xl animate-slide-up-stagger" style={{ '--stagger-index': idx } as React.CSSProperties}>
                 <div className="flex flex-col gap-1">
                   <p className="font-medium text-primary dark:text-white text-sm truncate">{formatImportLabel(run.filename, run.createdAt)}</p>
@@ -501,14 +564,14 @@ const TrackmanTab: React.FC = () => {
             {/* Mobile card view */}
             <div className="md:hidden space-y-3 max-h-[500px] overflow-y-auto">
               {unmatchedBookings
-                .filter((booking: any) => {
+                .filter((booking: TrackmanBooking) => {
                   if (!unmatchedSearchQuery.trim()) return true;
                   const query = unmatchedSearchQuery.toLowerCase();
                   const name = (booking.userName || booking.user_name || '').toLowerCase();
                   const email = (booking.originalEmail || booking.original_email || '').toLowerCase();
                   return name.includes(query) || email.includes(query);
                 })
-                .map((booking: any, idx: number) => {
+                .map((booking: TrackmanBooking, idx: number) => {
                   const isLinking = optimisticActions.get(booking.id)?.type === 'linking';
                   const linkingEmail = optimisticActions.get(booking.id)?.targetEmail;
                   
@@ -589,14 +652,14 @@ const TrackmanTab: React.FC = () => {
                 </thead>
                 <tbody className="divide-y divide-primary/5 dark:divide-white/5">
                   {unmatchedBookings
-                    .filter((booking: any) => {
+                    .filter((booking: TrackmanBooking) => {
                       if (!unmatchedSearchQuery.trim()) return true;
                       const query = unmatchedSearchQuery.toLowerCase();
                       const name = (booking.userName || booking.user_name || '').toLowerCase();
                       const email = (booking.originalEmail || booking.original_email || '').toLowerCase();
                       return name.includes(query) || email.includes(query);
                     })
-                    .map((booking: any, idx: number) => {
+                    .map((booking: TrackmanBooking, idx: number) => {
                       const isLinking = optimisticActions.get(booking.id)?.type === 'linking';
                       const linkingEmail = optimisticActions.get(booking.id)?.targetEmail;
                       
@@ -700,7 +763,7 @@ const TrackmanTab: React.FC = () => {
           </div>
           
           <div className="space-y-2 max-h-[400px] overflow-y-auto">
-            {needsPlayersBookings.map((booking: any) => {
+            {needsPlayersBookings.map((booking: TrackmanBooking) => {
               const expectedCount = booking.slotInfo?.totalSlots || booking.slotInfo?.expectedPlayerCount || booking.trackmanPlayerCount || booking.playerCount || booking.player_count || 1;
               const assignedCount = booking.slotInfo?.filledSlots || booking.assignedCount || booking.assigned_count || 0;
               const isComplete = assignedCount >= expectedCount;
@@ -923,7 +986,7 @@ const TrackmanTab: React.FC = () => {
                     Suggested Matches:
                   </label>
                   <div className="max-h-40 overflow-y-auto space-y-2 -mx-2 px-2">
-                    {fuzzyMatchesData.matches.map((match: any, idx: number) => (
+                    {fuzzyMatchesData.matches.map((match: FuzzyMatch, idx: number) => (
                       <button
                         key={match.email || idx}
                         onClick={() => setFuzzyMatchModal(prev => prev ? { ...prev, selectedEmail: match.email } : null)}
@@ -974,7 +1037,7 @@ const TrackmanTab: React.FC = () => {
               
               {fuzzySearchQuery.trim() && (
                 <div className="max-h-48 overflow-y-auto space-y-2 -mx-2 px-2 mb-4">
-                  {fuzzyFilteredMembers.slice(0, 15).map((member: any) => (
+                  {fuzzyFilteredMembers.slice(0, 15).map((member: TrackmanMember) => (
                     <button
                       key={member.email}
                       onClick={() => setFuzzyMatchModal(prev => prev ? { ...prev, selectedEmail: member.email } : null)}

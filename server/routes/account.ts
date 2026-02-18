@@ -7,7 +7,7 @@ import { isAuthenticated } from '../core/middleware';
 
 const router = Router();
 
-router.post('/api/account/delete-request', isAuthenticated, async (req: any, res: Response) => {
+router.post('/api/account/delete-request', isAuthenticated, async (req: Request, res: Response) => {
   const userEmail = req.session?.user?.email;
 
   try {

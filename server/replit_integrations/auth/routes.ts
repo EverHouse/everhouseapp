@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import { isAuthenticated, isAdminEmail } from "./replitAuth";
 import { Pool } from "pg";
+import { logger } from "../../core/logger";
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -15,13 +16,13 @@ async function isStaffEmail(email: string): Promise<boolean> {
     );
     return result.rows.length > 0;
   } catch (error) {
-    console.error('Error checking staff status:', error);
+    logger.error('Error checking staff status:', { error: error as Error });
     return false;
   }
 }
 
 export function registerAuthRoutes(app: Express): void {
-  app.get("/api/auth/user", isAuthenticated, async (req: any, res) => {
+  app.get("/api/auth/user", isAuthenticated, async (req, res) => {
     try {
       const user = req.session?.user;
       
@@ -149,7 +150,7 @@ export function registerAuthRoutes(app: Express): void {
         lastBookingDate: lastActivityDate
       });
     } catch (error) {
-      console.error("Error fetching user:", error);
+      logger.error("Error fetching user:", { error: error as Error });
       res.status(500).json({ message: "Failed to fetch user" });
     }
   });

@@ -1,6 +1,11 @@
 import React from 'react';
 import { useAutoAnimate } from '@formkit/auto-animate/react';
 
+
+interface StripeCacheStats { cached?: number; total?: number; failed?: number; }
+interface DuplicateRecord { email: string; emails?: string[]; name?: string; count?: number; }
+interface StripeCleanupCustomer { email?: string; name?: string; id?: string; reason?: string; }
+
 interface SyncToolsPanelProps {
   showDataTools: boolean;
   setShowDataTools: (show: boolean) => void;
@@ -22,10 +27,10 @@ interface SyncToolsPanelProps {
   } | null;
   handleBackfillStripeCache: () => void;
   isBackfillingStripeCache: boolean;
-  stripeCacheResult: { success: boolean; message: string; stats?: any } | null;
+  stripeCacheResult: { success: boolean; message: string; stats?: StripeCacheStats } | null;
   handleDetectDuplicates: () => void;
   isRunningDuplicateDetection: boolean;
-  duplicateDetectionResult: { success: boolean; message: string; appDuplicates?: any[]; hubspotDuplicates?: any[] } | null;
+  duplicateDetectionResult: { success: boolean; message: string; appDuplicates?: DuplicateRecord[]; hubspotDuplicates?: DuplicateRecord[] } | null;
   expandedDuplicates: { app: boolean; hubspot: boolean };
   setExpandedDuplicates: React.Dispatch<React.SetStateAction<{ app: boolean; hubspot: boolean }>>;
   handleCleanupStripeCustomers: (dryRun: boolean) => void;
@@ -221,7 +226,7 @@ const SyncToolsPanel: React.FC<SyncToolsPanelProps> = ({
                     </button>
                     {expandedDuplicates.app && (
                       <div className="mt-1 max-h-32 overflow-y-auto text-[11px] bg-white dark:bg-white/5 rounded p-2">
-                        {duplicateDetectionResult.appDuplicates.map((dup: any, i: number) => (
+                        {duplicateDetectionResult.appDuplicates.map((dup: DuplicateRecord, i: number) => (
                           <div key={i} className="py-1 border-b border-gray-100 dark:border-white/10 last:border-0">
                             {dup.email}: {dup.count} records
                           </div>
@@ -241,7 +246,7 @@ const SyncToolsPanel: React.FC<SyncToolsPanelProps> = ({
                     </button>
                     {expandedDuplicates.hubspot && (
                       <div className="mt-1 max-h-32 overflow-y-auto text-[11px] bg-white dark:bg-white/5 rounded p-2">
-                        {duplicateDetectionResult.hubspotDuplicates.map((dup: any, i: number) => (
+                        {duplicateDetectionResult.hubspotDuplicates.map((dup: DuplicateRecord, i: number) => (
                           <div key={i} className="py-1 border-b border-gray-100 dark:border-white/10 last:border-0">
                             {dup.email}: {dup.count} contacts
                           </div>
@@ -327,7 +332,7 @@ const SyncToolsPanel: React.FC<SyncToolsPanelProps> = ({
                 {stripeCleanupResult.dryRun && stripeCleanupResult.customers && stripeCleanupResult.customers.length > 0 && (
                   <div className="mt-2 max-h-40 overflow-y-auto text-xs bg-white dark:bg-white/10 rounded p-2">
                     <p className="font-medium mb-1">{stripeCleanupResult.emptyCount} empty customers found:</p>
-                    {stripeCleanupResult.customers.map((c: any, i: number) => (
+                    {stripeCleanupResult.customers.map((c: StripeCleanupCustomer, i: number) => (
                       <div key={i} className="py-1 border-b border-gray-100 dark:border-white/10 last:border-0">
                         {c.email || 'No email'} — {c.name || 'No name'} ({c.id})
                       </div>
@@ -337,7 +342,7 @@ const SyncToolsPanel: React.FC<SyncToolsPanelProps> = ({
                 {!stripeCleanupResult.dryRun && stripeCleanupResult.deleted && stripeCleanupResult.deleted.length > 0 && (
                   <div className="mt-2 max-h-40 overflow-y-auto text-xs bg-white dark:bg-white/10 rounded p-2">
                     <p className="font-medium mb-1">{stripeCleanupResult.deletedCount} customers deleted:</p>
-                    {stripeCleanupResult.deleted.map((c: any, i: number) => (
+                    {stripeCleanupResult.deleted.map((c: StripeCleanupCustomer, i: number) => (
                       <div key={i} className="py-1 border-b border-gray-100 dark:border-white/10 last:border-0">
                         {c.email || 'No email'} ({c.id})
                       </div>

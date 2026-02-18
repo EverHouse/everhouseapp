@@ -18,10 +18,27 @@ import {
   integrityIgnores
 } from '../../shared/schema';
 import { sql, eq, isNull, lt, and, or, gte, desc, isNotNull, gt } from 'drizzle-orm';
+import { Client } from '@hubspot/api-client';
+import Stripe from 'stripe';
 import { getHubSpotClient } from './integrations';
 import { isProduction } from './db';
 import { getTodayPacific } from '../utils/dateUtils';
 import { getStripeClient } from './stripe/client';
+
+interface MemberRow {
+  email: string;
+  first_name?: string;
+  last_name?: string;
+  tier?: string;
+  membership_status?: string;
+  stripe_customer_id?: string;
+  hubspot_id?: string;
+  billing_provider?: string;
+  mindbody_client_id?: string;
+  role?: string;
+  id?: number;
+  [key: string]: unknown;
+}
 import { syncCustomerMetadataToStripe } from './stripe/customers';
 import { alertOnCriticalIntegrityIssues, alertOnHighIntegrityIssues } from './dataAlerts';
 import { denormalizeTierForHubSpot } from '../utils/tierUtils';
@@ -134,7 +151,7 @@ export interface IntegrityIssue {
 
 export interface IntegrityCheckResult {
   checkName: string;
-  status: 'pass' | 'warning' | 'fail';
+  status: 'pass' | 'warning' | 'fail' | 'info';
   issueCount: number;
   issues: IntegrityIssue[];
   lastRun: Date;
@@ -194,7 +211,7 @@ async function checkOrphanBookingParticipants(): Promise<IntegrityCheckResult> {
     WHERE bs.id IS NULL
   `);
   
-  for (const row of orphans.rows as any[]) {
+  for (const row of orphans.rows as Record<string, unknown>[]) {
     issues.push({
       category: 'orphan_record',
       severity: 'error',
@@ -242,9 +259,9 @@ async function checkUnmatchedTrackmanBookings(): Promise<IntegrityCheckResult> {
           WHERE br.trackman_booking_id = tub.trackman_booking_id::text
         )
     `);
-    const total = (totalCount.rows[0] as any)?.count || 0;
+    const total = (totalCount.rows[0] as Record<string, unknown>)?.count || 0;
     
-    for (const row of unmatchedBookings.rows as any[]) {
+    for (const row of unmatchedBookings.rows as Record<string, unknown>[]) {
       issues.push({
         category: 'sync_mismatch',
         severity: 'warning',
@@ -303,7 +320,7 @@ async function checkOrphanWellnessEnrollments(): Promise<IntegrityCheckResult> {
     WHERE wc.id IS NULL
   `);
   
-  for (const row of orphans.rows as any[]) {
+  for (const row of orphans.rows as Record<string, unknown>[]) {
     issues.push({
       category: 'orphan_record',
       severity: 'error',
@@ -336,7 +353,7 @@ async function checkOrphanEventRsvps(): Promise<IntegrityCheckResult> {
     WHERE e.id IS NULL
   `);
   
-  for (const row of orphans.rows as any[]) {
+  for (const row of orphans.rows as Record<string, unknown>[]) {
     issues.push({
       category: 'orphan_record',
       severity: 'error',
@@ -370,7 +387,7 @@ async function checkBookingResourceRelationships(): Promise<IntegrityCheckResult
     WHERE br.resource_id IS NOT NULL AND r.id IS NULL
   `);
   
-  for (const row of invalidResources.rows as any[]) {
+  for (const row of invalidResources.rows as Record<string, unknown>[]) {
     issues.push({
       category: 'missing_relationship',
       severity: 'error',
@@ -411,7 +428,7 @@ async function checkParticipantUserRelationships(): Promise<IntegrityCheckResult
     WHERE bp.user_id IS NOT NULL AND bp.user_id != '' AND u.id IS NULL
   `);
   
-  for (const row of invalidUsers.rows as any[]) {
+  for (const row of invalidUsers.rows as Record<string, unknown>[]) {
     issues.push({
       category: 'missing_relationship',
       severity: 'warning',
@@ -440,7 +457,7 @@ async function checkParticipantUserRelationships(): Promise<IntegrityCheckResult
 async function checkHubSpotSyncMismatch(): Promise<IntegrityCheckResult> {
   const issues: IntegrityIssue[] = [];
   
-  let hubspot: any;
+  let hubspot: Client;
   try {
     hubspot = await getHubSpotClient();
   } catch (err) {
@@ -474,7 +491,7 @@ async function checkHubSpotSyncMismatch(): Promise<IntegrityCheckResult> {
     ORDER BY RANDOM()
     LIMIT 100
   `);
-  const appMembers = appMembersResult.rows as any[];
+  const appMembers = appMembersResult.rows as Record<string, unknown>[];
   
   for (const member of appMembers) {
     if (!member.hubspot_id) continue;
@@ -634,7 +651,7 @@ async function checkNeedsReviewItems(): Promise<IntegrityCheckResult> {
     SELECT id, title, date, instructor, time AS start_time FROM wellness_classes WHERE needs_review = true
   `);
   
-  for (const row of eventsNeedingReview.rows as any[]) {
+  for (const row of eventsNeedingReview.rows as Record<string, unknown>[]) {
     issues.push({
       category: 'sync_mismatch',
       severity: 'info',
@@ -650,7 +667,7 @@ async function checkNeedsReviewItems(): Promise<IntegrityCheckResult> {
     });
   }
   
-  for (const row of wellnessNeedingReview.rows as any[]) {
+  for (const row of wellnessNeedingReview.rows as Record<string, unknown>[]) {
     issues.push({
       category: 'sync_mismatch',
       severity: 'info',
@@ -669,7 +686,7 @@ async function checkNeedsReviewItems(): Promise<IntegrityCheckResult> {
   
   return {
     checkName: 'Items Needing Review',
-    status: issues.length === 0 ? 'pass' : 'info' as any,
+    status: issues.length === 0 ? 'pass' : 'info',
     issueCount: issues.length,
     issues,
     lastRun: new Date()
@@ -688,7 +705,7 @@ async function checkBookingTimeValidity(): Promise<IntegrityCheckResult> {
     AND NOT (br.start_time >= '20:00:00' AND br.end_time <= '06:00:00')
   `);
   
-  for (const row of invalidBookings.rows as any[]) {
+  for (const row of invalidBookings.rows as Record<string, unknown>[]) {
     issues.push({
       category: 'data_quality',
       severity: 'error',
@@ -716,7 +733,7 @@ async function checkBookingTimeValidity(): Promise<IntegrityCheckResult> {
     AND NOT (bs.start_time >= '20:00:00' AND bs.end_time <= '06:00:00')
   `);
   
-  for (const row of invalidSessions.rows as any[]) {
+  for (const row of invalidSessions.rows as Record<string, unknown>[]) {
     issues.push({
       category: 'data_quality',
       severity: 'error',
@@ -765,7 +782,7 @@ async function checkStalePastTours(): Promise<IntegrityCheckResult> {
     AND status IN ('pending', 'scheduled')
   `);
   
-  for (const row of staleTours.rows as any[]) {
+  for (const row of staleTours.rows as Record<string, unknown>[]) {
     issues.push({
       category: 'data_quality',
       severity: 'warning',
@@ -800,7 +817,7 @@ async function checkMembersWithoutEmail(): Promise<IntegrityCheckResult> {
     WHERE email IS NULL OR email = ''
   `);
   
-  for (const row of noEmailMembers.rows as any[]) {
+  for (const row of noEmailMembers.rows as Record<string, unknown>[]) {
     const name = [row.first_name, row.last_name].filter(Boolean).join(' ') || 'Unknown';
     issues.push({
       category: 'data_quality',
@@ -837,7 +854,7 @@ async function checkDealsWithoutLineItems(): Promise<IntegrityCheckResult> {
       AND hd.deal_name NOT LIKE '%(Legacy)%'
   `);
   
-  for (const row of dealsWithoutLineItems.rows as any[]) {
+  for (const row of dealsWithoutLineItems.rows as Record<string, unknown>[]) {
     issues.push({
       category: 'data_quality',
       severity: 'error',
@@ -904,7 +921,7 @@ async function checkDealStageDrift(): Promise<IntegrityCheckResult> {
       AND u.membership_status IS NOT NULL
   `);
   
-  for (const row of driftingDeals.rows as any[]) {
+  for (const row of driftingDeals.rows as Record<string, unknown>[]) {
     const membershipStatus = (row.membership_status || 'non-member').toLowerCase();
     const expectedStage = STAGE_MAPPING[membershipStatus] || 'closedlost';
     const currentStage = row.current_stage;
@@ -947,7 +964,7 @@ async function checkDealStageDrift(): Promise<IntegrityCheckResult> {
 async function checkStripeSubscriptionSync(): Promise<IntegrityCheckResult> {
   const issues: IntegrityIssue[] = [];
   
-  let stripe: any;
+  let stripe: Stripe;
   try {
     stripe = await getStripeClient();
   } catch (err) {
@@ -979,7 +996,7 @@ async function checkStripeSubscriptionSync(): Promise<IntegrityCheckResult> {
       AND (billing_provider IS NULL OR billing_provider NOT IN ('mindbody', 'family_addon', 'comped'))
     ORDER BY id
   `);
-  const appMembers = appMembersResult.rows as any[];
+  const appMembers = appMembersResult.rows as Record<string, unknown>[];
   
   if (appMembers.length === 0) {
     return {
@@ -1015,7 +1032,7 @@ async function checkStripeSubscriptionSync(): Promise<IntegrityCheckResult> {
   const BATCH_SIZE = 10;
   const BATCH_DELAY_MS = 100;
   
-  const processMember = async (member: any): Promise<void> => {
+  const processMember = async (member: MemberRow): Promise<void> => {
     const customerId = member.stripe_customer_id;
     if (!customerId) return;
     
@@ -1205,7 +1222,7 @@ async function checkStuckTransitionalMembers(): Promise<IntegrityCheckResult> {
     ORDER BY updated_at ASC
     LIMIT 50
   `);
-  const stuckMembers = stuckMembersResult.rows as any[];
+  const stuckMembers = stuckMembersResult.rows as Record<string, unknown>[];
   
   for (const member of stuckMembers) {
     const memberName = [member.first_name, member.last_name].filter(Boolean).join(' ') || 'Unknown';
@@ -1240,7 +1257,7 @@ async function checkStuckTransitionalMembers(): Promise<IntegrityCheckResult> {
 async function checkTierReconciliation(): Promise<IntegrityCheckResult> {
   const issues: IntegrityIssue[] = [];
   
-  let stripe: any;
+  let stripe: Stripe;
   try {
     stripe = await getStripeClient();
   } catch (err) {
@@ -1261,7 +1278,7 @@ async function checkTierReconciliation(): Promise<IntegrityCheckResult> {
     };
   }
   
-  let hubspot: any;
+  let hubspot: Client | undefined;
   try {
     hubspot = await getHubSpotClient();
   } catch (err) {
@@ -1276,7 +1293,7 @@ async function checkTierReconciliation(): Promise<IntegrityCheckResult> {
       AND (billing_provider IS NULL OR billing_provider NOT IN ('mindbody', 'family_addon', 'comped'))
     ORDER BY id
   `);
-  const appMembers = appMembersResult.rows as any[];
+  const appMembers = appMembersResult.rows as Record<string, unknown>[];
   
   if (appMembers.length === 0) {
     return {
@@ -1292,17 +1309,17 @@ async function checkTierReconciliation(): Promise<IntegrityCheckResult> {
   
   const hubspotTierMap = new Map<string, string>();
   if (hubspot) {
-    const membersWithHubspot = appMembers.filter((m: any) => m.hubspot_id);
+    const membersWithHubspot = appMembers.filter((m: MemberRow) => m.hubspot_id);
     for (let h = 0; h < membersWithHubspot.length; h += 100) {
       const hsBatch = membersWithHubspot.slice(h, h + 100);
       try {
         const readResult = await retryableHubSpotRequest(() =>
           hubspot.crm.contacts.batchApi.read({
-            inputs: hsBatch.map((m: any) => ({ id: m.hubspot_id })),
+            inputs: hsBatch.map((m: MemberRow) => ({ id: m.hubspot_id as string })),
             properties: ['membership_tier']
-          } as any)
+          })
         );
-        for (const contact of ((readResult as any).results || [])) {
+        for (const contact of ((readResult as Record<string, unknown>).results as Array<{ id: string; properties?: Record<string, string> }> || [])) {
           hubspotTierMap.set(contact.id, (contact.properties?.membership_tier || '').toLowerCase().trim());
         }
       } catch (batchErr: unknown) {
@@ -1313,7 +1330,7 @@ async function checkTierReconciliation(): Promise<IntegrityCheckResult> {
   const BATCH_SIZE = 10;
   const BATCH_DELAY_MS = 100;
   
-  const processMember = async (member: any): Promise<void> => {
+  const processMember = async (member: MemberRow): Promise<void> => {
     const customerId = member.stripe_customer_id;
     if (!customerId) return;
     
@@ -1328,7 +1345,7 @@ async function checkTierReconciliation(): Promise<IntegrityCheckResult> {
         expand: ['data.items.data.price']
       });
       
-      const activeSub = customerSubs.data?.find((s: any) => 
+      const activeSub = customerSubs.data?.find((s: Stripe.Subscription) => 
         ['active', 'trialing', 'past_due'].includes(s.status)
       );
       
@@ -1455,7 +1472,7 @@ async function checkBookingsWithoutSessions(): Promise<IntegrityCheckResult> {
     ORDER BY br.request_date DESC
     LIMIT 100
   `);
-  const ghosts = ghostsResult.rows as any[];
+  const ghosts = ghostsResult.rows as Record<string, unknown>[];
   
   for (const row of ghosts) {
     const dateStr = row.request_date ? new Date(row.request_date).toISOString().split('T')[0] : 'unknown';
@@ -1530,7 +1547,7 @@ async function checkDuplicateStripeCustomers(): Promise<IntegrityCheckResult> {
     LIMIT 25
   `);
   
-  const duplicates = duplicatesResult.rows as any[];
+  const duplicates = duplicatesResult.rows as Record<string, unknown>[];
   
   for (const dup of duplicates) {
     issues.push({
@@ -1560,7 +1577,7 @@ async function checkDuplicateStripeCustomers(): Promise<IntegrityCheckResult> {
     LIMIT 25
   `);
   
-  const sharedCustomers = sharedCustomersResult.rows as any[];
+  const sharedCustomers = sharedCustomersResult.rows as Record<string, unknown>[];
   
   for (const shared of sharedCustomers) {
     const emails = shared.emails as string[];
@@ -1584,7 +1601,7 @@ async function checkDuplicateStripeCustomers(): Promise<IntegrityCheckResult> {
 
   return {
     checkName: 'Duplicate Stripe Customers',
-    status: issues.length === 0 ? 'pass' : issues.some(i => i.severity === 'warning') ? 'warning' : 'info' as any,
+    status: issues.length === 0 ? 'pass' : issues.some(i => i.severity === 'warning') ? 'warning' : 'info',
     issueCount: issues.length,
     issues,
     lastRun: new Date()
@@ -1606,7 +1623,7 @@ async function checkMindBodyStaleSyncMembers(): Promise<IntegrityCheckResult> {
     ORDER BY updated_at ASC
     LIMIT 50
   `);
-  const staleMembers = staleSyncResult.rows as any[];
+  const staleMembers = staleSyncResult.rows as Record<string, unknown>[];
   
   for (const member of staleMembers) {
     const memberName = [member.first_name, member.last_name].filter(Boolean).join(' ') || 'Unknown';
@@ -1663,7 +1680,7 @@ async function checkMindBodyStatusMismatch(): Promise<IntegrityCheckResult> {
     ORDER BY u.updated_at DESC
     LIMIT 50
   `);
-  const mismatches = mismatchResult.rows as any[];
+  const mismatches = mismatchResult.rows as Record<string, unknown>[];
   
   for (const member of mismatches) {
     const memberName = [member.first_name, member.last_name].filter(Boolean).join(' ') || 'Unknown';
@@ -1808,7 +1825,7 @@ async function checkHubSpotIdDuplicates(): Promise<IntegrityCheckResult> {
       LIMIT 50
     `);
     
-    const duplicates = duplicatesResult.rows as any[];
+    const duplicates = duplicatesResult.rows as Record<string, unknown>[];
     
     for (const dup of duplicates) {
       const emails = dup.emails as string[];
@@ -1824,7 +1841,7 @@ async function checkHubSpotIdDuplicates(): Promise<IntegrityCheckResult> {
           WHERE LOWER(primary_email) = LOWER(${emails[0]}) 
             AND LOWER(linked_email) IN (${sql.join(remainingEmails.map((e: string) => sql`${e.toLowerCase()}`), sql`, `)})
         `);
-        alreadyLinked = parseInt((linkedCheck.rows[0] as any)?.linked_count || '0') > 0;
+        alreadyLinked = parseInt((linkedCheck.rows[0] as Record<string, unknown>)?.linked_count as string || '0') > 0;
       }
       
       const userDetails = emails.map((email: string, idx: number) => 
@@ -1876,7 +1893,7 @@ async function checkOrphanedFeeSnapshots(): Promise<IntegrityCheckResult> {
     LIMIT 100
   `);
 
-  for (const row of orphans.rows as any[]) {
+  for (const row of orphans.rows as Record<string, unknown>[]) {
     issues.push({
       category: 'orphan_record',
       severity: 'error',
@@ -1913,7 +1930,7 @@ async function checkSessionsWithoutParticipants(): Promise<IntegrityCheckResult>
     LIMIT 100
   `);
 
-  for (const row of emptySessions.rows as any[]) {
+  for (const row of emptySessions.rows as Record<string, unknown>[]) {
     issues.push({
       category: 'orphan_record',
       severity: 'warning',
@@ -1953,7 +1970,7 @@ async function checkOrphanedPaymentIntents(): Promise<IntegrityCheckResult> {
     LIMIT 100
   `);
 
-  for (const row of orphans.rows as any[]) {
+  for (const row of orphans.rows as Record<string, unknown>[]) {
     issues.push({
       category: 'data_quality',
       severity: 'error',
@@ -1988,7 +2005,7 @@ async function checkGuestPassesForNonExistentMembers(): Promise<IntegrityCheckRe
     LIMIT 100
   `);
 
-  for (const row of orphans.rows as any[]) {
+  for (const row of orphans.rows as Record<string, unknown>[]) {
     issues.push({
       category: 'orphan_record',
       severity: 'warning',
@@ -2037,7 +2054,7 @@ async function checkBillingProviderHybridState(): Promise<IntegrityCheckResult> 
     ORDER BY membership_status, email
     LIMIT 50
   `);
-  const hybrids = hybridResult.rows as any[];
+  const hybrids = hybridResult.rows as Record<string, unknown>[];
   
   for (const member of hybrids) {
     const memberName = [member.first_name, member.last_name].filter(Boolean).join(' ') || 'Unknown';
@@ -2399,7 +2416,7 @@ export async function syncPush(params: SyncPushParams): Promise<{ success: boole
       throw new Error(`User with id ${userId} not found`);
     }
     
-    const user = userResult.rows[0] as any;
+    const user = userResult.rows[0] as Record<string, unknown>;
     
     const hubspot = await getHubSpotClient();
     
@@ -2444,7 +2461,7 @@ export async function bulkPushToHubSpot(dryRun: boolean = true): Promise<{
     WHERE hubspot_id IS NOT NULL
     ORDER BY id
   `);
-  const allMembers = allMembersResult.rows as any[];
+  const allMembers = allMembersResult.rows as Record<string, unknown>[];
 
   const batchSize = 100;
 
@@ -2452,16 +2469,16 @@ export async function bulkPushToHubSpot(dryRun: boolean = true): Promise<{
     const batch = allMembers.slice(i, i + batchSize);
     totalChecked += batch.length;
 
-    let hsContactMap: Record<string, any> = {};
+    let hsContactMap: Record<string, Record<string, string>> = {};
     try {
       const readInput = {
-        inputs: batch.map((m: any) => ({ id: m.hubspot_id })),
+        inputs: batch.map((m: MemberRow) => ({ id: m.hubspot_id as string })),
         properties: ['firstname', 'lastname', 'email', 'membership_tier']
       };
       const readResult = await retryableHubSpotRequest(() =>
-        hubspot.crm.contacts.batchApi.read(readInput as any)
+        hubspot.crm.contacts.batchApi.read(readInput)
       );
-      for (const contact of ((readResult as any).results || [])) {
+      for (const contact of ((readResult as Record<string, unknown>).results as Array<{ id: string; properties?: Record<string, string> }> || [])) {
         hsContactMap[contact.id] = contact.properties || {};
       }
     } catch (error: unknown) {
@@ -2885,7 +2902,7 @@ export async function runDataCleanup(): Promise<{
         (SELECT COUNT(*) FROM wellness_updated) +
         (SELECT COUNT(*) FROM guest_passes_updated) as total
     `);
-    normalizedEmails = (emailResult.rows[0] as any)?.total || 0;
+    normalizedEmails = (emailResult.rows[0] as Record<string, unknown>)?.total || 0;
 
     const feeSnapshotResult = await db.execute(sql`
       DELETE FROM booking_fee_snapshots bfs
@@ -2928,7 +2945,7 @@ export async function autoFixMissingTiers(): Promise<{
     `);
     normalizedStatusCase = caseNormResult.rows.length;
     if (normalizedStatusCase > 0) {
-      const details = (caseNormResult.rows as any[]).map(r => `${r.email} -> ${r.membership_status}`).join(', ');
+      const details = (caseNormResult.rows as Record<string, unknown>[]).map(r => `${r.email} -> ${r.membership_status}`).join(', ');
       logger.info(`[AutoFix] Normalized membership_status case for ${normalizedStatusCase} members: ${details}`);
     }
 
@@ -2945,7 +2962,7 @@ export async function autoFixMissingTiers(): Promise<{
     `);
     fixedBillingProvider = billingProviderResult.rows.length;
     if (fixedBillingProvider > 0) {
-      const emails = (billingProviderResult.rows as any[]).map(r => r.email).join(', ');
+      const emails = (billingProviderResult.rows as Record<string, unknown>[]).map(r => r.email).join(', ');
       logger.info(`[AutoFix] Set billing_provider='mindbody' for ${fixedBillingProvider} members with MindBody IDs: ${emails}`);
     }
 
@@ -2982,7 +2999,7 @@ export async function autoFixMissingTiers(): Promise<{
       RETURNING u.email, u.tier
     `);
     
-    fixedFromAlternateEmail = (fixResult as any).rowCount || 0;
+    fixedFromAlternateEmail = (fixResult as { rowCount?: number }).rowCount || 0;
     
     if (fixedFromAlternateEmail > 0) {
       logger.info(`[AutoFix] Fixed ${fixedFromAlternateEmail} members missing tier by copying from alternate email`);
@@ -2998,7 +3015,7 @@ export async function autoFixMissingTiers(): Promise<{
         AND email NOT LIKE '%example.com'
     `);
     
-    const remainingWithoutTier = parseInt((remainingResult.rows[0] as any)?.count || '0', 10);
+    const remainingWithoutTier = parseInt((remainingResult.rows[0] as Record<string, unknown>)?.count as string || '0', 10);
     
     if (remainingWithoutTier > 0) {
       const emailsResult = await db.execute(sql`
@@ -3012,7 +3029,7 @@ export async function autoFixMissingTiers(): Promise<{
         ORDER BY created_at DESC
         LIMIT 20
       `);
-      const emails = (emailsResult.rows as any[]).map(r => `${r.first_name || ''} ${r.last_name || ''} <${r.email}>${r.mindbody_client_id ? ` (MindBody: ${r.mindbody_client_id})` : ''}`).join(', ');
+      const emails = (emailsResult.rows as Record<string, unknown>[]).map(r => `${r.first_name || ''} ${r.last_name || ''} <${r.email}>${r.mindbody_client_id ? ` (MindBody: ${r.mindbody_client_id})` : ''}`).join(', ');
       logger.info(`[AutoFix] ${remainingWithoutTier} active members still without tier (cannot auto-determine): ${emails}`);
     }
 
@@ -3030,7 +3047,7 @@ export async function autoFixMissingTiers(): Promise<{
     `);
     syncedStaffRoles = staffSyncResult.rows.length;
     if (syncedStaffRoles > 0) {
-      const details = (staffSyncResult.rows as any[]).map(r => `${r.email} -> role=${r.new_role}, tier=VIP, status=active`).join(', ');
+      const details = (staffSyncResult.rows as Record<string, unknown>[]).map(r => `${r.email} -> role=${r.new_role}, tier=VIP, status=active`).join(', ');
       logger.info(`[AutoFix] Synced staff role for ${syncedStaffRoles} users: ${details}`);
     }
     

@@ -5,7 +5,7 @@ import { parseAffectedAreas } from './affectedAreas';
 import { logger } from './logger';
 
 interface ClosureCacheEntry {
-  closures: any[];
+  closures: Record<string, unknown>[];
   expiry: number;
 }
 
@@ -27,7 +27,7 @@ export function hasTimeOverlap(start1: number, end1: number, start2: number, end
   return start1 < end2 && end1 > start2;
 }
 
-async function getActiveClosuresForDate(bookingDate: string): Promise<any[]> {
+async function getActiveClosuresForDate(bookingDate: string): Promise<Record<string, unknown>[]> {
   const cacheKey = `closures_${bookingDate}`;
   const cached = closureCache.get(cacheKey);
   
@@ -97,7 +97,7 @@ export async function checkBookingConflict(
   startTime: string,
   endTime: string,
   excludeBookingId?: number
-): Promise<{ hasConflict: boolean; conflictingBooking?: any }> {
+): Promise<{ hasConflict: boolean; conflictingBooking?: Record<string, unknown> }> {
   try {
     const conditions = [
       eq(bookingRequests.resourceId, resourceId),

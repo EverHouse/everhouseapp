@@ -570,7 +570,7 @@ router.post('/api/group-billing/reconcile', isStaffOrAdmin, async (req, res) => 
     logger.info('[GroupBilling] Starting reconciliation with Stripe...');
     const result = await reconcileGroupBillingWithStripe();
     logger.info('[GroupBilling] Reconciliation complete: groups checked, deactivated, reactivated, created, relinked', { extra: { resultGroupsChecked: result.groupsChecked, resultMembersDeactivated: result.membersDeactivated, resultMembersReactivated: result.membersReactivated, resultMembersCreated: result.membersCreated, resultItemsRelinked: result.itemsRelinked } });
-    logFromRequest(req, 'reconcile_group_billing' as any, 'billing_groups', null, undefined, {
+    logFromRequest(req, 'reconcile_group_billing', 'billing_groups', null, undefined, {
       action: 'reconcile',
       groupsChecked: result.groupsChecked,
       membersDeactivated: result.membersDeactivated,
@@ -592,7 +592,7 @@ router.post('/api/family-billing/reconcile', isStaffOrAdmin, async (req, res) =>
     logger.info('[GroupBilling] Starting reconciliation with Stripe...');
     const result = await reconcileGroupBillingWithStripe();
     logger.info('[GroupBilling] Reconciliation complete: groups checked, deactivated, reactivated, created, relinked', { extra: { resultGroupsChecked: result.groupsChecked, resultMembersDeactivated: result.membersDeactivated, resultMembersReactivated: result.membersReactivated, resultMembersCreated: result.membersCreated, resultItemsRelinked: result.itemsRelinked } });
-    logFromRequest(req, 'reconcile_group_billing' as any, 'billing_groups', null, undefined, {
+    logFromRequest(req, 'reconcile_group_billing', 'billing_groups', null, undefined, {
       action: 'reconcile',
       groupsChecked: result.groupsChecked,
       membersDeactivated: result.membersDeactivated,

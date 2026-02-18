@@ -154,9 +154,9 @@ router.post('/api/waivers/update-version', isStaffOrAdmin, async (req, res) => {
       AND (waiver_version IS NULL OR waiver_version != ${version})
     `);
     
-    const affectedCount = Number((affectedUsersResult as any).rows?.[0]?.count || 0);
+    const affectedCount = Number((affectedUsersResult as { rows?: Array<{ count?: number }> }).rows?.[0]?.count || 0);
 
-    logFromRequest(req, 'update_waiver_version' as any, 'waiver', undefined, undefined, { version, affectedMembers: affectedCount });
+    logFromRequest(req, 'update_waiver_version', 'waiver', undefined, undefined, { version, affectedMembers: affectedCount });
     res.json({
       success: true,
       version,

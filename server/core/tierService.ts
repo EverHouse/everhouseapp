@@ -133,7 +133,7 @@ export async function getDailyBookedMinutes(email: string, date: string, resourc
         AND br.request_date = $2
         AND br.status IN ('pending', 'approved', 'attended', 'confirmed')`;
     
-    const params: any[] = [email, normalizedDate];
+    const params: (string | number)[] = [email, normalizedDate];
     
     // Filter by resource type if specified
     if (resourceType) {
@@ -157,7 +157,7 @@ export async function getDailyBookedMinutes(email: string, date: string, resourc
 export async function getDailyParticipantMinutes(email: string, date: string, excludeBookingId?: number, resourceType?: string): Promise<number> {
   try {
     const normalizedDate = normalizeToISODate(date);
-    const baseParams: any[] = [email, normalizedDate];
+    const baseParams: (string | number)[] = [email, normalizedDate];
     let paramIdx = 3;
 
     let excludeClause = '';
@@ -240,7 +240,7 @@ export async function getTotalDailyUsageMinutes(
   resourceType?: string
 ): Promise<{ ownerMinutes: number; participantMinutes: number; totalMinutes: number }> {
   try {
-    const ownerParams: any[] = [email, date];
+    const ownerParams: (string | number)[] = [email, date];
     let ownerParamIdx = 3;
 
     let ownerExcludeClause = '';

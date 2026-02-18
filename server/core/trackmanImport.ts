@@ -1473,7 +1473,7 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
                 noticeType: 'private_event',
                 isActive: true,
                 createdBy: 'trackman_import'
-              } as any).returning();
+              } as typeof facilityClosures.$inferInsert).returning();
               
               // Create Availability Block (time slot)
               await db.insert(availabilityBlocks).values({
@@ -1483,7 +1483,7 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
                 startTime: startTime,
                 endTime: endTime || startTime,
                 reason: `Lesson - ${row.userName}`
-              } as any);
+              } as typeof availabilityBlocks.$inferInsert);
               
               process.stderr.write(`[Trackman Import] Converted staff lesson to block: ${row.userEmail} -> "${row.userName}" on ${bookingDate}\n`);
             } catch (blockErr: unknown) {
@@ -1730,7 +1730,7 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
         const isWebhookCreated = existing.origin === 'trackman_webhook';
         
         // Build update object with changed fields
-        const updateFields: Record<string, any> = {};
+        const updateFields: Record<string, unknown> = {};
         let changes: string[] = [];
         
         // Check if bay/resource changed
@@ -2057,7 +2057,7 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
           const mergeStatus = matchedEmail ? 'approved' : (normalizedStatus || 'approved');
           
           // UPDATE the placeholder with real data from CSV
-          const updateFields: any = {
+          const updateFields: Record<string, unknown> = {
             trackman_booking_id: row.bookingId,
             user_name: row.userName || placeholder.user_name,
             start_time: startTime,
@@ -2081,7 +2081,7 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
           
           // Build SET clause dynamically
           const setClauses: string[] = [];
-          const setValues: any[] = [];
+          const setValues: unknown[] = [];
           let paramIdx = 1;
           for (const [key, value] of Object.entries(updateFields)) {
             setClauses.push(`${key} = $${paramIdx}`);
@@ -2223,7 +2223,7 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
               if (!existing.trackmanBookingId) {
                 // Link Trackman ID to existing app booking with sync tracking
                 // Preserve request's player count - only update trackmanPlayerCount, not declaredPlayerCount
-                const updateFields: Record<string, any> = { 
+                const updateFields: Record<string, unknown> = { 
                   trackmanBookingId: row.bookingId,
                   trackmanPlayerCount: row.playerCount,
                   lastSyncSource: 'trackman_import',
@@ -2425,7 +2425,7 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
               const existing = matchesWithinTolerance[0];
               
               // Preserve request's player count - only update trackmanPlayerCount
-              const updateFields: Record<string, any> = { 
+              const updateFields: Record<string, unknown> = { 
                 trackmanBookingId: row.bookingId,
                 trackmanPlayerCount: row.playerCount,
                 lastSyncSource: 'trackman_import',
@@ -2567,7 +2567,7 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
             const existingGhost = existingByTrackmanId[0];
             const ghostUpdateStatus = matchedEmail ? 'approved' : (normalizedStatus || existingGhost.status);
 
-            const ghostUpdateFields: Record<string, any> = {
+            const ghostUpdateFields: Record<string, unknown> = {
               userName: row.userName || undefined,
               startTime: startTime,
               endTime: endTime,
@@ -3287,7 +3287,7 @@ export async function getUnmatchedBookings(options?: {
   limit?: number; 
   offset?: number;
   search?: string;
-}): Promise<{ data: any[]; totalCount: number }> {
+}): Promise<{ data: Record<string, unknown>[]; totalCount: number }> {
   let whereCondition = sql`1=1`;
   
   if (options?.resolved === false) {
@@ -3585,7 +3585,7 @@ export async function resolveUnmatchedBooking(
       SELECT session_id FROM booking_requests WHERE id = ${insertResult.bookingId} AND session_id IS NOT NULL
     `);
     
-    if ((existingSession.rows as any[]).length === 0 || !(existingSession.rows[0] as any)?.session_id) {
+    if ((existingSession.rows as Record<string, unknown>[]).length === 0 || !(existingSession.rows[0] as Record<string, unknown>)?.session_id) {
       const bookingDate = booking.bookingDate ? new Date(booking.bookingDate).toISOString().split('T')[0] : '';
       const startTime = booking.startTime?.toString() || '';
       const endTime = booking.endTime?.toString() || '';
@@ -3701,7 +3701,7 @@ export async function resolveUnmatchedBooking(
           SELECT session_id FROM booking_requests WHERE id = ${otherResult.bookingId} AND session_id IS NOT NULL
         `);
         
-        if ((otherExistingSession.rows as any[]).length === 0 || !(otherExistingSession.rows[0] as any)?.session_id) {
+        if ((otherExistingSession.rows as Record<string, unknown>[]).length === 0 || !(otherExistingSession.rows[0] as Record<string, unknown>)?.session_id) {
           const otherBookingDate = other.bookingDate ? new Date(other.bookingDate).toISOString().split('T')[0] : '';
           const otherStartTime = other.startTime?.toString() || '';
           const otherEndTime = other.endTime?.toString() || '';
@@ -3903,7 +3903,7 @@ export async function rescanUnmatchedBookings(performedBy: string = 'system'): P
         // This is a lesson booking - convert to availability block
         const resourceId = parseInt(booking.bayNumber || '') || null;
         const bookingDate = booking.bookingDate ? 
-          ((booking.bookingDate as any) instanceof Date ? (booking.bookingDate as any).toISOString().split('T')[0] : booking.bookingDate) : null;
+          ((booking.bookingDate as string | Date) instanceof Date ? (booking.bookingDate as Date).toISOString().split('T')[0] : booking.bookingDate) : null;
         const startTime = booking.startTime?.toString() || null;
         const endTime = booking.endTime?.toString() || startTime;
         
@@ -4342,8 +4342,8 @@ export async function cleanupHistoricalLessons(dryRun = false): Promise<{
       continue;
     }
 
-    const bookingDate = (item.bookingDate as any) instanceof Date 
-      ? (item.bookingDate as any).toISOString().split('T')[0]
+    const bookingDate = (item.bookingDate as string | Date) instanceof Date 
+      ? (item.bookingDate as Date).toISOString().split('T')[0]
       : item.bookingDate;
 
     if (!dryRun) {

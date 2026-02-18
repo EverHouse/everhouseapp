@@ -5,6 +5,15 @@ import { getCheckMetadata, CheckSeverity } from '../../../../data/integrityCheck
 import EmptyState from '../../../../components/EmptyState';
 import type { IntegrityCheckResult, IntegrityIssue, IssueContext, ActiveIssue } from './dataIntegrityTypes';
 
+
+interface HubspotSyncMember { email: string; firstName?: string; lastName?: string; tier?: string; status?: string; }
+interface SubscriptionUpdate { email: string; oldStatus?: string; newStatus?: string; reason?: string; }
+interface OrphanedStripeRecord { email: string; stripeCustomerId?: string; reason?: string; }
+interface StripeHubspotMember { email: string; name?: string; stripeCustomerId?: string; hubspotId?: string; }
+interface PaymentUpdate { email: string; oldStatus?: string; newStatus?: string; }
+interface VisitMismatch { email: string; name?: string; currentCount?: number; actualCount?: number; }
+interface OrphanedParticipantDetail { email: string; bookingId?: number; action?: string; }
+
 interface IntegrityResultsPanelProps {
   results: IntegrityCheckResult[];
   expandedChecks: Set<string>;
@@ -30,18 +39,18 @@ interface IntegrityResultsPanelProps {
     originalEmail?: string;
     isUnmatched?: boolean;
   }) => void;
-  fixIssueMutation: UseMutationResult<{ success: boolean; message: string }, any, { endpoint: string; body: Record<string, any> }, unknown>;
+  fixIssueMutation: UseMutationResult<{ success: boolean; message: string }, Error, { endpoint: string; body: Record<string, unknown> }, unknown>;
   openIgnoreModal: (issue: IntegrityIssue, checkName: string) => void;
   openBulkIgnoreModal: (checkName: string, issues: IntegrityIssue[]) => void;
   getIssueTracking: (issue: IntegrityIssue) => ActiveIssue | undefined;
   isSyncingToHubspot: boolean;
-  hubspotSyncResult: { success: boolean; message: string; members?: any[]; dryRun?: boolean } | null;
+  hubspotSyncResult: { success: boolean; message: string; members?: HubspotSyncMember[]; dryRun?: boolean } | null;
   handleSyncMembersToHubspot: (dryRun: boolean) => void;
   isRunningSubscriptionSync: boolean;
-  subscriptionStatusResult: { success: boolean; message: string; totalChecked?: number; mismatchCount?: number; updated?: any[]; dryRun?: boolean } | null;
+  subscriptionStatusResult: { success: boolean; message: string; totalChecked?: number; mismatchCount?: number; updated?: SubscriptionUpdate[]; dryRun?: boolean } | null;
   handleSyncSubscriptionStatus: (dryRun: boolean) => void;
   isRunningOrphanedStripeCleanup: boolean;
-  orphanedStripeResult: { success: boolean; message: string; totalChecked?: number; orphanedCount?: number; cleared?: any[]; dryRun?: boolean } | null;
+  orphanedStripeResult: { success: boolean; message: string; totalChecked?: number; orphanedCount?: number; cleared?: OrphanedStripeRecord[]; dryRun?: boolean } | null;
   handleClearOrphanedStripeIds: (dryRun: boolean) => void;
   isRunningStripeCustomerCleanup: boolean;
   stripeCleanupResult: { success: boolean; message: string; dryRun?: boolean; totalCustomers?: number; emptyCount?: number; customers?: Array<{ id: string; email: string | null; name: string | null; created: string }>; deleted?: Array<{ id: string; email: string | null }>; deletedCount?: number } | null;
@@ -65,13 +74,13 @@ interface IntegrityResultsPanelProps {
   dealStageRemediationResult: { success: boolean; message: string; total?: number; fixed?: number; dryRun?: boolean } | null;
   handleRemediateDealStages: (dryRun: boolean) => void;
   isRunningStripeHubspotLink: boolean;
-  stripeHubspotLinkResult: { success: boolean; message: string; stripeOnlyMembers?: any[]; hubspotOnlyMembers?: any[]; linkedCount?: number; dryRun?: boolean } | null;
+  stripeHubspotLinkResult: { success: boolean; message: string; stripeOnlyMembers?: StripeHubspotMember[]; hubspotOnlyMembers?: StripeHubspotMember[]; linkedCount?: number; dryRun?: boolean } | null;
   handleLinkStripeHubspot: (dryRun: boolean) => void;
   isRunningPaymentStatusSync: boolean;
-  paymentStatusResult: { success: boolean; message: string; totalChecked?: number; updatedCount?: number; updates?: any[]; dryRun?: boolean } | null;
+  paymentStatusResult: { success: boolean; message: string; totalChecked?: number; updatedCount?: number; updates?: PaymentUpdate[]; dryRun?: boolean } | null;
   handleSyncPaymentStatus: (dryRun: boolean) => void;
   isRunningVisitCountSync: boolean;
-  visitCountResult: { success: boolean; message: string; mismatchCount?: number; updatedCount?: number; sampleMismatches?: any[]; dryRun?: boolean } | null;
+  visitCountResult: { success: boolean; message: string; mismatchCount?: number; updatedCount?: number; sampleMismatches?: VisitMismatch[]; dryRun?: boolean } | null;
   handleSyncVisitCounts: (dryRun: boolean) => void;
   handleArchiveStaleVisitors: (dryRun: boolean) => void;
   isRunningVisitorArchive: boolean;
@@ -95,7 +104,7 @@ interface IntegrityResultsPanelProps {
     errors: number;
   } | null;
   isRunningOrphanedParticipantFix: boolean;
-  orphanedParticipantResult: { success: boolean; message: string; relinked?: number; converted?: number; total?: number; dryRun?: boolean; relinkedDetails?: any[]; convertedDetails?: any[] } | null;
+  orphanedParticipantResult: { success: boolean; message: string; relinked?: number; converted?: number; total?: number; dryRun?: boolean; relinkedDetails?: OrphanedParticipantDetail[]; convertedDetails?: OrphanedParticipantDetail[] } | null;
   handleFixOrphanedParticipants: (dryRun: boolean) => void;
   isRunningReviewItemsApproval: boolean;
   reviewItemsResult: { success: boolean; message: string; wellnessCount?: number; eventCount?: number; total?: number; dryRun?: boolean } | null;
@@ -374,7 +383,7 @@ const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
                   <p className={`text-xs ${getTextStyle(orphanedStripeResult)}`}>{orphanedStripeResult.message}</p>
                   {orphanedStripeResult.cleared && orphanedStripeResult.cleared.length > 0 && (
                     <div className="mt-2 max-h-24 overflow-y-auto text-xs bg-white dark:bg-white/10 rounded p-2">
-                      {orphanedStripeResult.cleared.map((c: any, i: number) => (
+                      {orphanedStripeResult.cleared.map((c: OrphanedStripeRecord, i: number) => (
                         <div key={i} className="py-1 border-b border-gray-100 dark:border-white/10 last:border-0">
                           {c.email}: {c.stripeCustomerId}
                         </div>
@@ -697,7 +706,7 @@ const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
                 {orphanedParticipantResult.relinkedDetails && orphanedParticipantResult.relinkedDetails.length > 0 && (
                   <div className="mt-1">
                     <p className="text-[10px] font-bold text-green-600 dark:text-green-400">Re-linked to members ({orphanedParticipantResult.relinked}):</p>
-                    {orphanedParticipantResult.relinkedDetails.map((d: any, i: number) => (
+                    {orphanedParticipantResult.relinkedDetails.map((d: OrphanedParticipantDetail, i: number) => (
                       <p key={i} className="text-[10px] text-gray-600 dark:text-gray-400">{d.displayName} → {d.email}</p>
                     ))}
                   </div>
@@ -705,7 +714,7 @@ const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
                 {orphanedParticipantResult.convertedDetails && orphanedParticipantResult.convertedDetails.length > 0 && (
                   <div className="mt-1">
                     <p className="text-[10px] font-bold text-orange-600 dark:text-orange-400">Converted to guests ({orphanedParticipantResult.converted}):</p>
-                    {orphanedParticipantResult.convertedDetails.map((d: any, i: number) => (
+                    {orphanedParticipantResult.convertedDetails.map((d: OrphanedParticipantDetail, i: number) => (
                       <p key={i} className="text-[10px] text-gray-600 dark:text-gray-400">{d.displayName} (was: {d.userId})</p>
                     ))}
                   </div>
@@ -1150,8 +1159,8 @@ const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
                                   )}
                                   {!issue.ignored && (issue.context?.email || (issue.context?.memberEmails && issue.context.memberEmails.length > 0)) && (issue.context?.stripeCustomerIds || issue.context?.stripeCustomerId) && (
                                     <button
-                                      onClick={() => handleViewProfile(issue.context!.email || (issue.context!.memberEmails as any)?.[0])}
-                                      disabled={loadingMemberEmail === (issue.context!.email || (issue.context!.memberEmails as any)?.[0])}
+                                      onClick={() => handleViewProfile(issue.context!.email || (issue.context!.memberEmails as string[] | undefined)?.[0])}
+                                      disabled={loadingMemberEmail === (issue.context!.email || (issue.context!.memberEmails as string[] | undefined)?.[0])}
                                       className="p-1.5 text-blue-600 hover:bg-blue-100 dark:text-blue-400 dark:hover:bg-blue-900/30 rounded transition-colors disabled:opacity-50"
                                       title="View member profile"
                                     >

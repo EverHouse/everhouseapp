@@ -1,13 +1,18 @@
 import React, { useState, useMemo } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
+import type { BookingHistoryItem as BaseBookingHistoryItem, EventRsvpItem as BaseEventRsvpItem, WellnessHistoryItem as BaseWellnessHistoryItem, VisitHistoryItem } from '../memberProfile/memberProfileTypes';
+
+type BookingHistoryItem = BaseBookingHistoryItem & { bookingDate?: string; requestDate?: string; bayName?: string; resourceName?: string };
+type EventRsvpItem = BaseEventRsvpItem & { eventDate?: string; eventTitle?: string };
+type WellnessHistoryItem = BaseWellnessHistoryItem & { classDate?: string; className?: string; classTitle?: string };
 
 interface MemberActivityTabProps {
   memberEmail: string;
-  bookingHistory: any[];
-  bookingRequestsHistory: any[];
-  eventRsvpHistory: any[];
-  wellnessHistory: any[];
-  visitHistory: any[];
+  bookingHistory: BookingHistoryItem[];
+  bookingRequestsHistory: BookingHistoryItem[];
+  eventRsvpHistory: EventRsvpItem[];
+  wellnessHistory: WellnessHistoryItem[];
+  visitHistory: VisitHistoryItem[];
   onCancelBooking?: (bookingId: number) => Promise<void>;
   onConfirmBookingRequest?: (requestId: number) => Promise<void>;
 }
@@ -18,7 +23,7 @@ interface ActivityItem {
   id: string;
   type: 'booking' | 'event' | 'wellness' | 'visit';
   date: Date;
-  data: any;
+  data: BookingHistoryItem | EventRsvpItem | WellnessHistoryItem | VisitHistoryItem;
 }
 
 const FILTER_TABS: { id: ActivityFilter; label: string; icon: string }[] = [
@@ -126,10 +131,10 @@ const MemberActivityTab: React.FC<MemberActivityTabProps> = ({
   const allActivities = useMemo(() => {
     const activities: ActivityItem[] = [];
 
-    const filteredBookingHistory = (bookingHistory || []).filter((b: any) => b.status !== 'cancelled' && b.status !== 'declined');
-    const filteredBookingRequestsHistory = (bookingRequestsHistory || []).filter((b: any) => b.status !== 'cancelled' && b.status !== 'declined');
+    const filteredBookingHistory = (bookingHistory || []).filter((b: BookingHistoryItem) => b.status !== 'cancelled' && b.status !== 'declined');
+    const filteredBookingRequestsHistory = (bookingRequestsHistory || []).filter((b: BookingHistoryItem) => b.status !== 'cancelled' && b.status !== 'declined');
 
-    filteredBookingHistory.forEach((booking: any) => {
+    filteredBookingHistory.forEach((booking: BookingHistoryItem) => {
       const dateStr = booking.bookingDate || booking.requestDate;
       activities.push({
         id: `booking-${booking.id}`,
@@ -139,7 +144,7 @@ const MemberActivityTab: React.FC<MemberActivityTabProps> = ({
       });
     });
 
-    filteredBookingRequestsHistory.forEach((booking: any) => {
+    filteredBookingRequestsHistory.forEach((booking: BookingHistoryItem) => {
       const dateStr = booking.bookingDate || booking.requestDate;
       activities.push({
         id: `booking-request-${booking.id}`,
@@ -149,7 +154,7 @@ const MemberActivityTab: React.FC<MemberActivityTabProps> = ({
       });
     });
 
-    (eventRsvpHistory || []).forEach((rsvp: any) => {
+    (eventRsvpHistory || []).forEach((rsvp: EventRsvpItem) => {
       const dateStr = rsvp.eventDate;
       activities.push({
         id: `event-${rsvp.id}`,
@@ -159,7 +164,7 @@ const MemberActivityTab: React.FC<MemberActivityTabProps> = ({
       });
     });
 
-    (wellnessHistory || []).forEach((enrollment: any) => {
+    (wellnessHistory || []).forEach((enrollment: WellnessHistoryItem) => {
       const dateStr = enrollment.classDate;
       activities.push({
         id: `wellness-${enrollment.id}`,
@@ -169,7 +174,7 @@ const MemberActivityTab: React.FC<MemberActivityTabProps> = ({
       });
     });
 
-    (visitHistory || []).filter((v: any) => v.isWalkIn).forEach((visit: any) => {
+    (visitHistory || []).filter((v: VisitHistoryItem & { isWalkIn?: boolean }) => v.isWalkIn).forEach((visit: VisitHistoryItem) => {
       const dateStr = visit.bookingDate;
       activities.push({
         id: `walkin-${visit.id}`,
@@ -193,7 +198,7 @@ const MemberActivityTab: React.FC<MemberActivityTabProps> = ({
     // - Wellness classes with status='attended'
     if (activeFilter === 'visits') {
       const now = new Date();
-      const visitHistoryIds = new Set((visitHistory || []).map((v: any) => v.id));
+      const visitHistoryIds = new Set((visitHistory || []).map((v: VisitHistoryItem) => v.id));
       return allActivities.filter(a => {
         if (a.type === 'visit') return true;
         if (a.type === 'booking' && visitHistoryIds.has(a.data?.id)) return true;
@@ -258,7 +263,7 @@ const MemberActivityTab: React.FC<MemberActivityTabProps> = ({
     }
   };
 
-  const renderBookingItem = (booking: any) => {
+  const renderBookingItem = (booking: BookingHistoryItem) => {
     const canConfirm = booking.source === 'request' && booking.status === 'pending' && onConfirmBookingRequest;
     const canCancel = (booking.status === 'approved' || booking.status === 'confirmed' || booking.status === 'pending') && onCancelBooking;
     const isConfirmLoading = actionLoading === `confirm-${booking.id}`;
@@ -317,7 +322,7 @@ const MemberActivityTab: React.FC<MemberActivityTabProps> = ({
     );
   };
 
-  const renderEventItem = (rsvp: any) => (
+  const renderEventItem = (rsvp: EventRsvpItem) => (
     <div className="flex-1 min-w-0">
       <div className="flex items-center gap-2 mb-1">
         <span className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>{rsvp.eventTitle}</span>
@@ -330,7 +335,7 @@ const MemberActivityTab: React.FC<MemberActivityTabProps> = ({
     </div>
   );
 
-  const renderWellnessItem = (enrollment: any) => (
+  const renderWellnessItem = (enrollment: WellnessHistoryItem) => (
     <div className="flex-1 min-w-0">
       <div className="flex items-center gap-2 mb-1">
         <span className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>{enrollment.classTitle}</span>
@@ -345,7 +350,7 @@ const MemberActivityTab: React.FC<MemberActivityTabProps> = ({
     </div>
   );
 
-  const renderVisitItem = (visit: any) => (
+  const renderVisitItem = (visit: VisitHistoryItem & { isWalkIn?: boolean; resource_name?: string; check_in_time?: string }) => (
     <div className="flex-1 min-w-0">
       <div className="flex items-center gap-2 mb-1">
         <span className="material-symbols-outlined text-green-500 text-lg">{visit.isWalkIn ? 'qr_code_scanner' : getRoleIcon(visit.role)}</span>
@@ -404,17 +409,17 @@ const MemberActivityTab: React.FC<MemberActivityTabProps> = ({
   };
 
   const getCounts = () => {
-    const filteredBookingHistory = (bookingHistory || []).filter((b: any) => b.status !== 'cancelled' && b.status !== 'declined');
-    const filteredBookingRequestsHistory = (bookingRequestsHistory || []).filter((b: any) => b.status !== 'cancelled' && b.status !== 'declined');
+    const filteredBookingHistory = (bookingHistory || []).filter((b: BookingHistoryItem) => b.status !== 'cancelled' && b.status !== 'declined');
+    const filteredBookingRequestsHistory = (bookingRequestsHistory || []).filter((b: BookingHistoryItem) => b.status !== 'cancelled' && b.status !== 'declined');
     
     // Count visits: use visitHistory (attended simulator bookings) + past events + attended wellness
     // This matches the backend attendedVisitsCount calculation
     const attendedBookingsCount = visitHistory?.length || 0;
-    const pastEventsCount = (eventRsvpHistory || []).filter((e: any) => {
+    const pastEventsCount = (eventRsvpHistory || []).filter((e: EventRsvpItem) => {
       const eventDate = new Date(e.eventDate);
       return eventDate < new Date(); // Past events count as attended
     }).length;
-    const attendedWellnessCount = (wellnessHistory || []).filter((w: any) => w.status === 'attended').length;
+    const attendedWellnessCount = (wellnessHistory || []).filter((w: WellnessHistoryItem) => w.status === 'attended').length;
     
     return {
       all: allActivities.length,

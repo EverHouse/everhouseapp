@@ -79,7 +79,7 @@ router.post('/api/stripe/coupons', isAdmin, async (req: Request, res: Response) 
     const { getStripeClient } = await import('../../core/stripe/client');
     const stripe = await getStripeClient();
     
-    const couponParams: any = {
+    const couponParams: Record<string, unknown> = {
       duration,
       name: name || undefined,
       metadata: {

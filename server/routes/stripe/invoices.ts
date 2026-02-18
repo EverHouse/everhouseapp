@@ -91,7 +91,7 @@ router.post('/api/stripe/invoices', isStaffOrAdmin, async (req: Request, res: Re
           message: 'A new invoice has been created for your account.',
           data: { invoiceId: result.invoice?.id }
         });
-        (broadcastBillingUpdate as any)(memberEmail, 'invoice_created');
+        broadcastBillingUpdate({ action: 'invoice_created', memberEmail });
       }
     } catch (notifyError) {
       logger.error('[Stripe] Failed to send invoice notification', { extra: { notifyError } });
@@ -118,10 +118,10 @@ router.post('/api/stripe/invoices/:invoiceId/finalize', isStaffOrAdmin, async (r
     }
     
     try {
-      if ((result as any).invoice?.customer) {
-        const customerId = typeof (result as any).invoice.customer === 'string' 
-          ? (result as any).invoice.customer 
-          : (result as any).invoice.customer.id;
+      if (result.invoice?.customer) {
+        const customerId = typeof result.invoice.customer === 'string' 
+          ? result.invoice.customer 
+          : result.invoice.customer.id;
         const memberLookup = await pool.query(
           'SELECT email FROM users WHERE stripe_customer_id = $1',
           [customerId]
@@ -132,9 +132,9 @@ router.post('/api/stripe/invoices/:invoiceId/finalize', isStaffOrAdmin, async (r
             type: 'billing_update',
             title: 'Invoice Ready',
             message: 'Your invoice is ready for payment.',
-            data: { invoiceId: (result as any).invoice.id }
+            data: { invoiceId: result.invoice.id }
           });
-          (broadcastBillingUpdate as any)(memberEmail, 'invoice_finalized');
+          broadcastBillingUpdate({ action: 'invoice_finalized', memberEmail });
         }
       }
     } catch (notifyError) {
@@ -173,10 +173,10 @@ router.post('/api/stripe/invoices/:invoiceId/void', isStaffOrAdmin, async (req: 
     const { invoiceId } = req.params;
     
     const invoiceResult = await getInvoice(invoiceId as string);
-    const customerId = (invoiceResult as any).invoice?.customer 
-      ? (typeof (invoiceResult as any).invoice.customer === 'string' 
-          ? (invoiceResult as any).invoice.customer 
-          : (invoiceResult as any).invoice.customer.id)
+    const customerId = invoiceResult.invoice?.customer 
+      ? (typeof invoiceResult.invoice.customer === 'string' 
+          ? invoiceResult.invoice.customer 
+          : invoiceResult.invoice.customer.id)
       : null;
     
     const result = await voidInvoice(invoiceId as string);
@@ -199,7 +199,7 @@ router.post('/api/stripe/invoices/:invoiceId/void', isStaffOrAdmin, async (req: 
             message: 'An invoice on your account has been voided.',
             data: { invoiceId }
           });
-          (broadcastBillingUpdate as any)(memberEmail, 'invoice_voided');
+          broadcastBillingUpdate({ action: 'invoice_voided', memberEmail });
         }
       }
     } catch (notifyError) {

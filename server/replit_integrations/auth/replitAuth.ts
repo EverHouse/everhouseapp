@@ -5,10 +5,11 @@ import type { Pool } from "pg";
 import { pool } from "../../core/db";
 import { getSessionUser } from "../../types/session";
 import { getErrorMessage } from "../../utils/errorUtils";
+import { logger } from "../../core/logger";
 
 export function getAuthPool() {
   if (!process.env.DATABASE_URL) {
-    console.warn('[Auth] DATABASE_URL not configured - database features disabled');
+    logger.warn('[Auth] DATABASE_URL not configured - database features disabled');
     return null;
   }
   return pool;
@@ -30,8 +31,8 @@ export function getSession() {
     if (isProduction) {
       throw new Error('[Session] FATAL: SESSION_SECRET is required in production. Set it in your environment variables.');
     }
-    console.warn('[Session] SESSION_SECRET is missing - using development fallback (NOT SAFE FOR PRODUCTION)');
-    console.log('[Session] Using MemoryStore');
+    logger.warn('[Session] SESSION_SECRET is missing - using development fallback (NOT SAFE FOR PRODUCTION)');
+    logger.info('[Session] Using MemoryStore');
     return session({
       secret: 'dev-only-fallback-secret-' + Date.now(),
       resave: false,
@@ -41,7 +42,7 @@ export function getSession() {
   }
   
   if (!databaseUrl) {
-    console.log('[Session] Using MemoryStore');
+    logger.info('[Session] Using MemoryStore');
     return session({
       secret: sessionSecret,
       resave: false,
@@ -59,11 +60,11 @@ export function getSession() {
       ttl: sessionTtl,
       tableName: "sessions",
       errorLog: (err: Error) => {
-        console.error('[Session Store] Error:', err.message);
+        logger.error('[Session Store] Error:', { extra: { message: err.message } });
       },
     });
     
-    console.log('[Session] Using Postgres session store');
+    logger.info('[Session] Using Postgres session store');
     return session({
       secret: sessionSecret,
       store: sessionStore,
@@ -72,8 +73,8 @@ export function getSession() {
       cookie: cookieConfig,
     });
   } catch (err: unknown) {
-    console.warn('[Session] Postgres store failed, using MemoryStore:', getErrorMessage(err));
-    console.log('[Session] Using MemoryStore');
+    logger.warn('[Session] Postgres store failed, using MemoryStore:', { extra: { errorMessage: getErrorMessage(err) } });
+    logger.info('[Session] Using MemoryStore');
     return session({
       secret: sessionSecret,
       resave: false,
@@ -83,11 +84,11 @@ export function getSession() {
   }
 }
 
-export async function queryWithRetry(pool: Pool, query: string, params: any[]): Promise<any> {
+export async function queryWithRetry(pool: Pool, query: string, params: unknown[]): Promise<unknown> {
   try {
     return await pool.query(query, params);
   } catch (error: unknown) {
-    console.warn('[Auth] Query failed, retrying once:', getErrorMessage(error));
+    logger.warn('[Auth] Query failed, retrying once:', { extra: { errorMessage: getErrorMessage(error) } });
     return await pool.query(query, params);
   }
 }
@@ -104,7 +105,7 @@ export async function isAdminEmail(email: string): Promise<boolean> {
     );
     return result.rows.length > 0;
   } catch (error: unknown) {
-    console.error('Error checking admin status:', getErrorMessage(error));
+    logger.error('Error checking admin status:', { extra: { errorMessage: getErrorMessage(error) } });
     return false;
   }
 }
@@ -165,7 +166,7 @@ export const isStaffOrAdmin: RequestHandler = async (req, res, next) => {
       return next();
     }
   } catch (error: unknown) {
-    console.error('Error checking staff status:', getErrorMessage(error));
+    logger.error('Error checking staff status:', { extra: { errorMessage: getErrorMessage(error) } });
   }
 
   return res.status(403).json({ message: "Forbidden: Staff access required" });

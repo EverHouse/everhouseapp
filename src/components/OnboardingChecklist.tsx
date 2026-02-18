@@ -34,7 +34,7 @@ const OnboardingChecklist: React.FC = () => {
   const deferredPromptRef = useRef<BeforeInstallPromptEvent | null>(null);
 
   const isInStandaloneMode = typeof window !== 'undefined' && (
-    (window.navigator as any).standalone === true ||
+    (window.navigator as unknown as { standalone?: boolean }).standalone === true ||
     window.matchMedia('(display-mode: standalone)').matches
   );
 
@@ -50,7 +50,7 @@ const OnboardingChecklist: React.FC = () => {
   useEffect(() => {
     const fetchStatus = async () => {
       try {
-        const data = await fetchWithCredentials('/api/member/onboarding');
+        const data = await fetchWithCredentials<OnboardingStatus>('/api/member/onboarding');
         if (isInStandaloneMode && data.steps) {
           const appStep = data.steps.find((s: OnboardingStep) => s.key === 'app');
           if (appStep && !appStep.completed) {
@@ -61,7 +61,7 @@ const OnboardingChecklist: React.FC = () => {
                 credentials: 'include',
                 body: JSON.stringify({ step: 'app' }),
               });
-              const refreshed = await fetchWithCredentials('/api/member/onboarding');
+              const refreshed = await fetchWithCredentials<OnboardingStatus>('/api/member/onboarding');
               setStatus(refreshed);
               if (refreshed.isComplete && !refreshed.isDismissed) {
                 setCelebrating(true);

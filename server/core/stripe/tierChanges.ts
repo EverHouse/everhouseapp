@@ -36,11 +36,11 @@ export async function previewTierChange(
     
     const currentItem = sub.items.data[0];
     const currentPrice = currentItem.price;
-    const currentProduct = currentPrice.product as any;
+    const currentProduct = currentPrice.product as Stripe.Product;
     
     // Get new price details
     const newPrice = await stripe.prices.retrieve(newPriceId, { expand: ['product'] });
-    const newProduct = newPrice.product as any;
+    const newProduct = newPrice.product as Stripe.Product;
     
     if (immediate) {
       // Use createPreview to preview proration (replaces deprecated retrieveUpcoming)
@@ -56,7 +56,7 @@ export async function previewTierChange(
       // Calculate proration from invoice line items
       let prorationAmount = 0;
       for (const line of previewInvoice.lines.data) {
-        if ((line as any).proration) {
+        if ((line as Stripe.InvoiceLineItem & { proration?: boolean }).proration) {
           prorationAmount += line.amount;
         }
       }
@@ -89,7 +89,7 @@ export async function previewTierChange(
           newAmountCents: newPrice.unit_amount || 0,
           prorationAmountCents: 0,
           nextInvoiceAmountCents: newPrice.unit_amount || 0,
-          effectiveDate: new Date((sub as any).current_period_end * 1000),
+          effectiveDate: new Date(sub.current_period_end * 1000),
           isImmediate: false,
         }
       };

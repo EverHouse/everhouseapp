@@ -3,11 +3,12 @@ process.env.TZ = 'America/Los_Angeles';
 import http from 'http';
 import type { Server } from 'http';
 import { getErrorMessage } from './utils/errorUtils';
+import { logger } from './core/logger';
 
 let isShuttingDown = false;
 let isReady = false;
 let httpServer: Server | null = null;
-let expressApp: any = null;
+let expressApp: Express | null = null;
 let cachedIndexHtml: string | null = null;
 
 declare global {
@@ -19,7 +20,7 @@ declare global {
 }
 
 process.on('uncaughtException', (error) => {
-  console.error('[Process] Uncaught Exception:', error);
+  logger.error('[Process] Uncaught Exception:', { error: error as Error });
   if (error.message?.includes('EADDRINUSE')) {
     process.exit(1);
   }
@@ -27,16 +28,16 @@ process.on('uncaughtException', (error) => {
 
 process.on('unhandledRejection', (reason, promise) => {
   const errorMessage = reason instanceof Error ? reason.message : String(reason);
-  console.error('[Process] Unhandled Rejection:', errorMessage);
+  logger.error('[Process] Unhandled Rejection:', { extra: { errorMessage } });
 });
 
 process.on('SIGTERM', () => {
-  console.log('[Process] Received SIGTERM signal');
+  logger.info('[Process] Received SIGTERM signal');
   gracefulShutdown('SIGTERM');
 });
 
 process.on('SIGINT', () => {
-  console.log('[Process] Received SIGINT signal');
+  logger.info('[Process] Received SIGINT signal');
   gracefulShutdown('SIGINT');
 });
 
@@ -44,10 +45,10 @@ async function gracefulShutdown(signal: string) {
   if (isShuttingDown) return;
   isShuttingDown = true;
   isReady = false;
-  console.log(`[Shutdown] Starting graceful shutdown (${signal})...`);
+  logger.info(`[Shutdown] Starting graceful shutdown (${signal})...`);
 
   const shutdownTimeout = setTimeout(() => {
-    console.error('[Shutdown] Timeout exceeded, forcing exit');
+    logger.error('[Shutdown] Timeout exceeded, forcing exit');
     process.exit(1);
   }, 30000);
 
@@ -74,10 +75,10 @@ async function gracefulShutdown(signal: string) {
     } catch {}
 
     clearTimeout(shutdownTimeout);
-    console.log('[Shutdown] Complete');
+    logger.info('[Shutdown] Complete');
     process.exit(0);
   } catch (error) {
-    console.error('[Shutdown] Error:', error);
+    logger.error('[Shutdown] Error:', { error: error as Error });
     clearTimeout(shutdownTimeout);
     process.exit(1);
   }
@@ -109,16 +110,16 @@ httpServer = http.createServer((req, res) => {
 });
 
 httpServer.listen(PORT, '0.0.0.0', () => {
-  console.log(`[Startup] HTTP server listening on port ${PORT} - health check ready`);
+  logger.info(`[Startup] HTTP server listening on port ${PORT} - health check ready`);
   isReady = true;
 
   initializeApp().catch((err) => {
-    console.error('[Startup] Express initialization failed:', err);
+    logger.error('[Startup] Express initialization failed:', { error: err as Error });
   });
 });
 
 httpServer.on('error', (err: unknown) => {
-  console.error(`[Startup] Server failed to start:`, err);
+  logger.error(`[Startup] Server failed to start:`, { error: err as Error });
   process.exit(1);
 });
 
@@ -134,7 +135,7 @@ async function initializeApp() {
   const { getSession, registerAuthRoutes } = await import('./replit_integrations/auth');
   const { setupSupabaseAuthRoutes } = await import('./supabase/auth');
   const { isProduction, pool } = await import('./core/db');
-  const { requestIdMiddleware, logRequest, logger } = await import('./core/logger');
+  const { requestIdMiddleware, logRequest } = await import('./core/logger');
   const { registerRoutes } = await import('./loaders/routes');
   const { runStartupTasks, getStartupHealth } = await import('./loaders/startup');
   const { initWebSocketServer, closeWebSocketServer } = await import('./core/websocket');
@@ -144,8 +145,8 @@ async function initializeApp() {
   const __filename = fileURLToPath(import.meta.url);
   const __dirname = path.dirname(__filename);
 
-  console.log(`[Startup] Environment: ${isProduction ? 'production' : 'development'}`);
-  console.log(`[Startup] DATABASE_URL: ${process.env.DATABASE_URL ? 'configured' : 'MISSING'}`);
+  logger.info(`[Startup] Environment: ${isProduction ? 'production' : 'development'}`);
+  logger.info(`[Startup] DATABASE_URL: ${process.env.DATABASE_URL ? 'configured' : 'MISSING'}`);
 
   const app = express();
 
@@ -271,7 +272,7 @@ async function initializeApp() {
         const sig = Array.isArray(signature) ? signature[0] : signature;
 
         if (!Buffer.isBuffer(req.body)) {
-          console.error('[Stripe Webhook] req.body is not a Buffer - express.json() may have run first');
+          logger.error('[Stripe Webhook] req.body is not a Buffer - express.json() may have run first');
           return res.status(500).json({ error: 'Webhook processing error' });
         }
 
@@ -279,7 +280,7 @@ async function initializeApp() {
         res.status(200).json({ received: true });
       } catch (error: unknown) {
         const errorMsg = getErrorMessage(error);
-        console.error('[Stripe Webhook] Error:', errorMsg);
+        logger.error('[Stripe Webhook] Error:', { extra: { errorMsg } });
 
         if (errorMsg.includes('signature') || errorMsg.includes('payload') || (error && typeof error === 'object' && 'type' in error && (error as { type: unknown }).type === 'StripeSignatureVerificationError')) {
           return res.status(400).json({ error: 'Invalid request' });
@@ -292,7 +293,7 @@ async function initializeApp() {
 
   app.use(express.json({
     limit: '1mb',
-    verify: (req: any, res, buf) => {
+    verify: (req: IncomingMessage & { rawBody?: string; originalUrl?: string }, _res, buf) => {
       if (req.originalUrl?.includes('/webhooks') || req.url?.includes('/webhooks')) {
         req.rawBody = buf.toString('utf8');
       }
@@ -402,9 +403,9 @@ async function initializeApp() {
 
   app.post('/api/client-error', (req, res) => {
     const { page, error, stack, componentStack } = req.body || {};
-    console.error(`[CLIENT ERROR] Page: ${page}, Error: ${error}`);
-    if (stack) console.error(`[CLIENT ERROR] Stack: ${stack}`);
-    if (componentStack) console.error(`[CLIENT ERROR] Component: ${componentStack}`);
+    logger.error(`[CLIENT ERROR] Page: ${page}, Error: ${error}`);
+    if (stack) logger.error(`[CLIENT ERROR] Stack: ${stack}`);
+    if (componentStack) logger.error(`[CLIENT ERROR] Component: ${componentStack}`);
     res.json({ ok: true });
   });
 
@@ -412,7 +413,7 @@ async function initializeApp() {
     setupSupabaseAuthRoutes(app);
     registerAuthRoutes(app);
   } catch (err) {
-    console.error('[Startup] Auth routes setup failed:', err);
+    logger.error('[Startup] Auth routes setup failed:', { error: err as Error });
   }
 
   registerRoutes(app);
@@ -797,45 +798,45 @@ async function initializeApp() {
   }
 
   expressApp = app;
-  console.log('[Startup] Express app fully initialized and accepting requests');
+  logger.info('[Startup] Express app fully initialized and accepting requests');
 
   if (isProduction) {
     try {
       const indexPath = path.join(__dirname, '../dist/index.html');
       const fs = await import('fs');
       cachedIndexHtml = fs.readFileSync(indexPath, 'utf8');
-      console.log('[Startup] Cached index.html for fast serving');
+      logger.info('[Startup] Cached index.html for fast serving');
     } catch (err) {
-      console.error('[Startup] Failed to cache index.html:', err);
+      logger.error('[Startup] Failed to cache index.html:', { error: err as Error });
     }
   }
 
   const heavyTaskDelay = isProduction ? 10000 : 500;
-  console.log(`[Startup] Scheduling heavy background tasks in ${heavyTaskDelay / 1000}s...`);
+  logger.info(`[Startup] Scheduling heavy background tasks in ${heavyTaskDelay / 1000}s...`);
 
   setTimeout(() => {
-    console.log('[Startup] Starting heavy background tasks...');
+    logger.info('[Startup] Starting heavy background tasks...');
 
     try {
       initWebSocketServer(httpServer!);
     } catch (err) {
-      console.error('[Startup] WebSocket initialization failed:', err);
+      logger.error('[Startup] WebSocket initialization failed:', { error: err as Error });
     }
 
     runStartupTasks()
       .then(() => {
         const startupHealth = getStartupHealth();
         if (startupHealth.criticalFailures.length > 0) {
-          console.error('[Startup] Critical failures detected:', startupHealth.criticalFailures);
+          logger.error('[Startup] Critical failures detected:', { extra: { criticalFailures: startupHealth.criticalFailures } });
         } else {
-          console.log('[Startup] All startup tasks complete');
+          logger.info('[Startup] All startup tasks complete');
           if (startupHealth.warnings.length > 0) {
-            console.warn('[Startup] Startup completed with warnings:', startupHealth.warnings);
+            logger.warn('[Startup] Startup completed with warnings:', { extra: { warnings: startupHealth.warnings } });
           }
         }
       })
       .catch((err) => {
-        console.error('[Startup] Startup tasks failed unexpectedly:', err);
+        logger.error('[Startup] Startup tasks failed unexpectedly:', { error: err as Error });
       });
 
     if (!isProduction) {
@@ -843,12 +844,12 @@ async function initializeApp() {
         try {
           await autoSeedResources(pool, isProduction);
         } catch (err) {
-          console.error('[Startup] Auto-seed resources failed:', err);
+          logger.error('[Startup] Auto-seed resources failed:', { error: err as Error });
         }
         try {
           await autoSeedCafeMenu(pool, isProduction);
         } catch (err) {
-          console.error('[Startup] Auto-seed cafe menu failed:', err);
+          logger.error('[Startup] Auto-seed cafe menu failed:', { error: err as Error });
         }
       }, 30000);
     }
@@ -856,18 +857,18 @@ async function initializeApp() {
     try {
       initSchedulers();
     } catch (err) {
-      console.error('[Startup] Scheduler initialization failed:', err);
+      logger.error('[Startup] Scheduler initialization failed:', { error: err as Error });
     }
   }, heavyTaskDelay);
 }
 
-async function autoSeedResources(pool: any, isProduction: boolean) {
+async function autoSeedResources(pool: { query: (text: string, values?: unknown[]) => Promise<{ rows: Record<string, unknown>[] }> }, isProduction: boolean) {
   try {
     const result = await pool.query('SELECT COUNT(*) as count FROM resources');
     const count = parseInt(result.rows[0].count);
 
     if (count === 0) {
-      if (!isProduction) console.log('Auto-seeding resources...');
+      if (!isProduction) logger.info('Auto-seeding resources...');
       const resources = [
         { name: 'Simulator Bay 1', type: 'simulator', description: 'TrackMan Simulator Bay 1', capacity: 6 },
         { name: 'Simulator Bay 2', type: 'simulator', description: 'TrackMan Simulator Bay 2', capacity: 6 },
@@ -884,20 +885,20 @@ async function autoSeedResources(pool: any, isProduction: boolean) {
           [resource.name, resource.type, resource.description, resource.capacity]
         );
       }
-      if (!isProduction) console.log(`Auto-seeded ${resources.length} resources`);
+      if (!isProduction) logger.info(`Auto-seeded ${resources.length} resources`);
     }
   } catch (error) {
-    if (!isProduction) console.log('Resources table may not exist yet, skipping auto-seed');
+    if (!isProduction) logger.info('Resources table may not exist yet, skipping auto-seed');
   }
 }
 
-async function autoSeedCafeMenu(pool: any, isProduction: boolean) {
+async function autoSeedCafeMenu(pool: { query: (text: string, values?: unknown[]) => Promise<{ rows: Record<string, unknown>[] }> }, isProduction: boolean) {
   try {
     const result = await pool.query('SELECT COUNT(*) as count FROM cafe_items');
     const count = parseInt(result.rows[0].count);
 
     if (count === 0) {
-      if (!isProduction) console.log('Auto-seeding cafe menu...');
+      if (!isProduction) logger.info('Auto-seeding cafe menu...');
       const cafeItems = [
         { category: 'Breakfast', name: 'Egg Toast', price: 14, description: 'Schaner Farm scrambled eggs, whipped ricotta, chives, micro greens, toasted country batard', icon: 'egg_alt', sort_order: 1 },
         { category: 'Breakfast', name: 'Avocado Toast', price: 16, description: 'Hass smashed avocado, radish, lemon, micro greens, dill, toasted country batard', icon: 'eco', sort_order: 2 },
@@ -942,9 +943,9 @@ async function autoSeedCafeMenu(pool: any, isProduction: boolean) {
           [item.category, item.name, item.price, item.description, item.icon, item.sort_order]
         );
       }
-      if (!isProduction) console.log(`Auto-seeded ${cafeItems.length} cafe menu items`);
+      if (!isProduction) logger.info(`Auto-seeded ${cafeItems.length} cafe menu items`);
     }
   } catch (error) {
-    if (!isProduction) console.log('Cafe menu table may not exist yet, skipping auto-seed');
+    if (!isProduction) logger.info('Cafe menu table may not exist yet, skipping auto-seed');
   }
 }

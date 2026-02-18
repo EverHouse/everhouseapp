@@ -1,13 +1,14 @@
+import type { BookingHistoryItem, EventRsvpItem, WellnessHistoryItem, VisitHistoryItem } from './memberProfileTypes';
 import React from 'react';
 import MemberActivityTab from '../admin/MemberActivityTab';
 
 interface ActivityTabProps {
   memberEmail: string;
-  filteredBookingHistory: any[];
-  filteredBookingRequestsHistory: any[];
-  eventRsvpHistory: any[];
-  wellnessHistory: any[];
-  visitHistory: any[];
+  filteredBookingHistory: BookingHistoryItem[];
+  filteredBookingRequestsHistory: BookingHistoryItem[];
+  eventRsvpHistory: EventRsvpItem[];
+  wellnessHistory: WellnessHistoryItem[];
+  visitHistory: VisitHistoryItem[];
 }
 
 const ActivityTab: React.FC<ActivityTabProps> = ({

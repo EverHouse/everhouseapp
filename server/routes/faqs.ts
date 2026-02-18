@@ -60,7 +60,7 @@ router.post('/api/admin/faqs', isStaffOrAdmin, async (req, res) => {
       isActive: isActive ?? true,
     }).returning();
     
-    logFromRequest(req, 'create_faq' as any, 'faq' as any, newFaq.id.toString(), newFaq.question);
+    logFromRequest(req, 'create_faq', 'faq', newFaq.id.toString(), newFaq.question);
     
     res.status(201).json(newFaq);
   } catch (error: unknown) {
@@ -90,7 +90,7 @@ router.put('/api/admin/faqs/:id', isStaffOrAdmin, async (req, res) => {
       return res.status(404).json({ error: 'FAQ not found' });
     }
     
-    logFromRequest(req, 'update_faq' as any, 'faq' as any, id);
+    logFromRequest(req, 'update_faq', 'faq', id);
     
     res.json(updated);
   } catch (error: unknown) {
@@ -111,7 +111,7 @@ router.delete('/api/admin/faqs/:id', isStaffOrAdmin, async (req, res) => {
       return res.status(404).json({ error: 'FAQ not found' });
     }
     
-    logFromRequest(req, 'delete_faq' as any, 'faq' as any, id);
+    logFromRequest(req, 'delete_faq', 'faq', id);
     
     res.json({ success: true, deleted });
   } catch (error: unknown) {
@@ -142,7 +142,7 @@ router.post('/api/admin/faqs/reorder', isStaffOrAdmin, async (req, res) => {
       )
     );
     
-    logFromRequest(req, 'reorder_faqs' as any, 'faq' as any, undefined, 'FAQ Reorder');
+    logFromRequest(req, 'reorder_faqs', 'faq', undefined, 'FAQ Reorder');
     
     res.json({ success: true, updated: order.length });
   } catch (error: unknown) {
@@ -166,7 +166,7 @@ router.post('/api/admin/faqs/seed', isStaffOrAdmin, async (req, res) => {
       }))
     ).returning();
     
-    logFromRequest(req, 'seed_faqs' as any, 'faq' as any, undefined, 'FAQ Seed');
+    logFromRequest(req, 'seed_faqs', 'faq', undefined, 'FAQ Seed');
     
     res.json({ success: true, count: inserted.length, faqs: inserted });
   } catch (error: unknown) {

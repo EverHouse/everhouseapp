@@ -24,7 +24,7 @@ const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({
     
     const existingScript = document.querySelector('script[src="https://accounts.google.com/gsi/client"]');
     if (existingScript) {
-      if ((window as any).google?.accounts?.id) {
+      if ((window as unknown as { google?: { accounts?: { id?: { initialize: (opts: unknown) => void; renderButton: (el: HTMLElement, opts: unknown) => void } } } }).google?.accounts?.id) {
         setLoaded(true);
       } else {
         existingScript.addEventListener('load', () => setLoaded(true));
@@ -44,12 +44,12 @@ const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({
   useEffect(() => {
     if (!loaded || !clientId || !buttonRef.current) return;
 
-    const google = (window as any).google;
+    const google = (window as unknown as { google?: { accounts?: { id?: { initialize: (opts: { client_id: string; callback: (response: { credential: string }) => void }) => void; renderButton: (el: HTMLElement | null, opts: Record<string, unknown>) => void } } } }).google;
     if (!google?.accounts?.id) return;
 
     google.accounts.id.initialize({
       client_id: clientId,
-      callback: (response: any) => {
+      callback: (response: { credential: string }) => {
         if (response.credential) {
           onSuccess(response.credential);
         } else {

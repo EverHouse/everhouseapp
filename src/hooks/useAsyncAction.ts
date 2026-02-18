@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 
-interface UseAsyncActionOptions<T = any> {
+interface UseAsyncActionOptions<T = unknown> {
   onSuccess?: (result: T) => void;
   onError?: (error: Error) => void;
   debounceMs?: number;
@@ -22,7 +22,7 @@ interface UseAsyncActionOptions<T = any> {
  *   {isLoading ? 'Processing...' : 'Approve'}
  * </button>
  */
-export function useAsyncAction<T = any, Args extends any[] = any[]>(
+export function useAsyncAction<T = unknown, Args extends unknown[] = unknown[]>(
   asyncFn: (...args: Args) => Promise<T>,
   options: UseAsyncActionOptions<T> = {}
 ) {

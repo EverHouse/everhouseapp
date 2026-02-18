@@ -70,11 +70,11 @@ const WhatsOn: React.FC = () => {
         
         if (eventsRes.ok) {
           const data = await eventsRes.json();
-          setEvents(data.map((e: any) => ({ ...e, type: 'event' })));
+          setEvents(data.map((e: Record<string, unknown>) => ({ ...e, type: 'event' })));
         }
         if (wellnessRes.ok) {
           const data = await wellnessRes.json();
-          setWellnessClasses(data.map((w: any) => ({ ...w, type: 'wellness' })));
+          setWellnessClasses(data.map((w: Record<string, unknown>) => ({ ...w, type: 'wellness' })));
         }
       } catch (error) {
         console.error('Failed to fetch data:', error);

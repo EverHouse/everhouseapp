@@ -1,6 +1,7 @@
 import { pool } from '../core/db';
 import { getStripeClient } from '../core/stripe/client';
 import { getErrorMessage } from '../utils/errorUtils';
+import { logger } from '../core/logger';
 
 const PLACEHOLDER_EMAIL_PATTERNS = [
   '@visitors.evenhouse.club',
@@ -68,10 +69,10 @@ async function findAndCategorizeCustomers(): Promise<CleanupResult> {
   let startingAfter: string | undefined;
   let processed = 0;
   
-  console.log('Fetching Stripe customers...');
+  logger.info('Fetching Stripe customers...');
   
   while (hasMore) {
-    const params: any = { limit: 100 };
+    const params: Record<string, unknown> = { limit: 100 };
     if (startingAfter) params.starting_after = startingAfter;
     
     const customers = await stripe.customers.list(params);
@@ -79,7 +80,7 @@ async function findAndCategorizeCustomers(): Promise<CleanupResult> {
     for (const customer of customers.data) {
       processed++;
       if (processed % 100 === 0) {
-        console.log(`  Processed ${processed} customers...`);
+        logger.info(`  Processed ${processed} customers...`);
       }
       
       const email = customer.email?.toLowerCase() || '';
@@ -138,56 +139,56 @@ async function findAndCategorizeCustomers(): Promise<CleanupResult> {
     }
   }
   
-  console.log(`  Total processed: ${processed} customers`);
+  logger.info(`  Total processed: ${processed} customers`);
   return result;
 }
 
 async function runDryRun(): Promise<void> {
-  console.log('\n========================================');
-  console.log('STRIPE CLEANUP - DRY RUN MODE');
-  console.log('========================================\n');
+  logger.info('\n========================================');
+  logger.info('STRIPE CLEANUP - DRY RUN MODE');
+  logger.info('========================================\n');
   
   const result = await findAndCategorizeCustomers();
   
-  console.log('\n--- SAFE TO DELETE (placeholder emails, no historical data) ---');
-  console.log(`Count: ${result.safeToDelete.length}`);
+  logger.info('\n--- SAFE TO DELETE (placeholder emails, no historical data) ---');
+  logger.info(`Count: ${result.safeToDelete.length}`);
   if (result.safeToDelete.length > 0) {
-    console.log('Sample (first 20):');
+    logger.info('Sample (first 20):');
     result.safeToDelete.slice(0, 20).forEach(c => {
-      console.log(`  ${c.id}: ${c.email} (${c.name || 'no name'})`);
+      logger.info(`  ${c.id}: ${c.email} (${c.name || 'no name'})`);
     });
     if (result.safeToDelete.length > 20) {
-      console.log(`  ... and ${result.safeToDelete.length - 20} more`);
+      logger.info(`  ... and ${result.safeToDelete.length - 20} more`);
     }
   }
   
-  console.log('\n--- KEEP (has historical data) ---');
-  console.log(`Count: ${result.hasData.length}`);
+  logger.info('\n--- KEEP (has historical data) ---');
+  logger.info(`Count: ${result.hasData.length}`);
   if (result.hasData.length > 0) {
     result.hasData.forEach(c => {
-      console.log(`  ${c.id}: ${c.email} - ${c.reason}`);
+      logger.info(`  ${c.id}: ${c.email} - ${c.reason}`);
     });
   }
   
-  console.log('\n--- SUMMARY ---');
-  console.log(`Safe to delete: ${result.safeToDelete.length}`);
-  console.log(`Keeping (has data): ${result.hasData.length}`);
-  console.log(`\nTo execute deletion, run with --execute flag`);
+  logger.info('\n--- SUMMARY ---');
+  logger.info(`Safe to delete: ${result.safeToDelete.length}`);
+  logger.info(`Keeping (has data): ${result.hasData.length}`);
+  logger.info(`\nTo execute deletion, run with --execute flag`);
 }
 
 async function executeCleanup(): Promise<void> {
-  console.log('\n========================================');
-  console.log('STRIPE CLEANUP - EXECUTE MODE');
-  console.log('========================================\n');
+  logger.info('\n========================================');
+  logger.info('STRIPE CLEANUP - EXECUTE MODE');
+  logger.info('========================================\n');
   
   const result = await findAndCategorizeCustomers();
   
   if (result.safeToDelete.length === 0) {
-    console.log('No customers to delete. Exiting.');
+    logger.info('No customers to delete. Exiting.');
     return;
   }
   
-  console.log(`\nDeleting ${result.safeToDelete.length} orphaned placeholder customers...`);
+  logger.info(`\nDeleting ${result.safeToDelete.length} orphaned placeholder customers...`);
   
   const stripe = await getStripeClient();
   let deleted = 0;
@@ -198,18 +199,18 @@ async function executeCleanup(): Promise<void> {
       await stripe.customers.del(customer.id);
       deleted++;
       if (deleted % 50 === 0) {
-        console.log(`  Deleted ${deleted}/${result.safeToDelete.length}...`);
+        logger.info(`  Deleted ${deleted}/${result.safeToDelete.length}...`);
       }
     } catch (err: unknown) {
-      console.error(`  Failed to delete ${customer.email}: ${getErrorMessage(err)}`);
+      logger.error(`  Failed to delete ${customer.email}: ${getErrorMessage(err)}`);
       failed++;
     }
   }
   
-  console.log('\n--- CLEANUP COMPLETE ---');
-  console.log(`Deleted: ${deleted}`);
-  console.log(`Failed: ${failed}`);
-  console.log(`Kept (has data): ${result.hasData.length}`);
+  logger.info('\n--- CLEANUP COMPLETE ---');
+  logger.info(`Deleted: ${deleted}`);
+  logger.info(`Failed: ${failed}`);
+  logger.info(`Kept (has data): ${result.hasData.length}`);
 }
 
 async function main() {
@@ -226,6 +227,6 @@ async function main() {
 }
 
 main().catch((err) => {
-  console.error('Cleanup failed:', err);
+  logger.error('Cleanup failed:', { error: err as Error });
   process.exit(1);
 });

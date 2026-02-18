@@ -7,6 +7,8 @@ import { logFromRequest } from '../../core/auditLog';
 import { pool } from '../../core/db';
 import { getErrorMessage, getErrorCode } from '../../utils/errorUtils';
 import { findOrCreateHubSpotContact } from '../../core/hubspot/members';
+import { getSessionUser } from '../../types/session';
+import Stripe from 'stripe';
 
 const router = Router();
 
@@ -73,7 +75,7 @@ router.post('/api/stripe/terminal/create-simulated-reader', isStaffOrAdmin, asyn
     });
     
     await logFromRequest(req, {
-      action: 'terminal_reader_created' as any,
+      action: 'terminal_reader_created',
       resourceType: 'terminal_reader',
       resourceId: reader.id,
       resourceName: reader.label || 'Simulated Reader',
@@ -218,7 +220,7 @@ router.post('/api/stripe/terminal/process-payment', isStaffOrAdmin, async (req: 
       }
     }
 
-    let paymentIntent: any;
+    let paymentIntent: Stripe.PaymentIntent;
     let invoiceId: string | null = null;
 
     if (Array.isArray(cartItems) && cartItems.length > 0 && customerId) {
@@ -471,7 +473,7 @@ router.post('/api/stripe/terminal/process-subscription-payment', isStaffOrAdmin,
       expand: ['latest_invoice.payment_intent']
     });
     
-    const invoice = subscription.latest_invoice as any;
+    const invoice = subscription.latest_invoice as Stripe.Invoice;
     if (!invoice) {
       return res.status(400).json({ error: 'No invoice found for subscription' });
     }
@@ -506,8 +508,8 @@ router.post('/api/stripe/terminal/process-subscription-payment', isStaffOrAdmin,
       logger.error('[Terminal] Error listing existing PIs:', { extra: { error: getErrorMessage(listErr) } });
     }
 
-    const invoicePI = invoice.payment_intent as any;
-    let paymentIntent: any;
+    const invoicePI = invoice.payment_intent as Stripe.PaymentIntent;
+    let paymentIntent: Stripe.PaymentIntent;
     
     if (invoicePI && invoicePI.id) {
       if (invoicePI.status !== 'requires_payment_method' && invoicePI.status !== 'requires_confirmation') {
@@ -672,7 +674,7 @@ router.post('/api/stripe/terminal/confirm-subscription-payment', isStaffOrAdmin,
     const subscription = await stripe.subscriptions.retrieve(subscriptionId, {
       expand: ['latest_invoice']
     });
-    const latestInvoice = subscription.latest_invoice as any;
+    const latestInvoice = subscription.latest_invoice as Stripe.Invoice;
     const actualInvoiceId = latestInvoice?.id || invoiceId;
     
     if (latestInvoice) {
@@ -707,7 +709,7 @@ router.post('/api/stripe/terminal/confirm-subscription-payment', isStaffOrAdmin,
       .where(eq(terminalPayments.stripePaymentIntentId, paymentIntentId));
     
     if (existingPaymentRecord.length === 0) {
-      const staffEmail = (req as any).user?.email || 'unknown';
+      const staffEmail = getSessionUser(req)?.email || 'unknown';
       await db.insert(terminalPayments).values({
         userId,
         userEmail: existingUser?.email || piMetadata.email || 'unknown',
@@ -733,7 +735,7 @@ router.post('/api/stripe/terminal/confirm-subscription-payment', isStaffOrAdmin,
         let reusablePaymentMethodId: string | null = null;
 
         if (pm.type === 'card_present') {
-          const latestCharge = (paymentIntent as any).latest_charge;
+          const latestCharge = paymentIntent.latest_charge as Stripe.Charge | null;
           const generatedCard = latestCharge?.payment_method_details?.card_present?.generated_card;
 
           if (generatedCard) {
@@ -818,7 +820,7 @@ router.post('/api/stripe/terminal/confirm-subscription-payment', isStaffOrAdmin,
     }
     
     await logFromRequest(req, {
-      action: 'terminal_subscription_activated' as any,
+      action: 'terminal_subscription_activated',
       resourceType: 'user',
       resourceId: userId,
       resourceName: updatedUser?.email || userId,
@@ -913,10 +915,10 @@ router.post('/api/stripe/terminal/process-existing-payment', isStaffOrAdmin, asy
     let readerLabel = readerId;
     try {
       const readerObj = await stripe.terminal.readers.retrieve(readerId);
-      readerLabel = (readerObj as any).label || readerId;
+      readerLabel = readerObj.label || readerId;
     } catch (e) { /* reader label is cosmetic, ignore */ }
 
-    const updateParams: any = {
+    const updateParams: Stripe.PaymentIntentUpdateParams = {
       payment_method_types: ['card_present'],
       automatic_payment_methods: { enabled: false },
       metadata: {
@@ -943,7 +945,7 @@ router.post('/api/stripe/terminal/process-existing-payment', isStaffOrAdmin, asy
           readerLabel,
           terminalPayment: 'true',
         },
-      } as any);
+      } as Stripe.PaymentIntentUpdateParams);
       await stripe.paymentIntents.update(paymentIntentId, {
         payment_method_types: ['card_present']
       });
@@ -962,7 +964,7 @@ router.post('/api/stripe/terminal/process-existing-payment', isStaffOrAdmin, asy
     }
 
     await logFromRequest(req, {
-      action: 'terminal_existing_payment_routed' as any,
+      action: 'terminal_existing_payment_routed',
       resourceType: 'payment',
       resourceId: paymentIntentId,
       details: {
@@ -1013,7 +1015,7 @@ router.post('/api/stripe/terminal/save-card', isStaffOrAdmin, async (req: Reques
     const reader = await stripe.terminal.readers.processSetupIntent(readerId, {
       setup_intent: setupIntent.id,
       customer_consent_collected: true
-    } as any);
+    });
 
     if (reader.device_type?.startsWith('simulated')) {
       try {
@@ -1024,7 +1026,7 @@ router.post('/api/stripe/terminal/save-card', isStaffOrAdmin, async (req: Reques
     }
 
     await logFromRequest(req, {
-      action: 'terminal_save_card_initiated' as any,
+      action: 'terminal_save_card_initiated',
       resourceType: 'setup_intent',
       resourceId: setupIntent.id,
       resourceName: email || customerId,
@@ -1104,8 +1106,8 @@ router.post('/api/stripe/terminal/confirm-save-card', isStaffOrAdmin, async (req
 
     let reusablePaymentMethodId = pmId;
 
-    if (pm.type === 'card_present' && (pm as any).card_present?.generated_card) {
-      reusablePaymentMethodId = (pm as any).card_present.generated_card;
+    if (pm.type === 'card_present' && pm.card_present?.generated_card) {
+      reusablePaymentMethodId = pm.card_present.generated_card;
       logger.info('[Terminal] Found generated_card from SetupIntent card_present', { extra: { reusablePaymentMethodId } });
     }
 
@@ -1138,7 +1140,7 @@ router.post('/api/stripe/terminal/confirm-save-card', isStaffOrAdmin, async (req
     }
 
     await logFromRequest(req, {
-      action: 'terminal_card_saved' as any,
+      action: 'terminal_card_saved',
       resourceType: 'payment_method',
       resourceId: paymentMethodId,
       resourceName: customerId,

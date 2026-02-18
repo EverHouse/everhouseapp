@@ -197,7 +197,7 @@ export function PaymentSection({
                     purpose="overage_fee"
                     bookingId={bookingId}
                     sessionId={rosterData?.sessionId}
-                    participantFees={rosterData?.financialSummary?.playerBreakdown?.filter((p: any) => p.fee > 0).map((p: any, i: number) => ({ id: i, amount: p.fee })) || []}
+                    participantFees={rosterData?.financialSummary?.playerBreakdown?.filter((p: { fee: number }) => p.fee > 0).map((p: { fee: number }, i: number) => ({ id: i, amount: p.fee })) || []}
                     onSuccess={handleInlineStripeSuccess}
                     onCancel={() => setInlinePaymentAction(null)}
                   />

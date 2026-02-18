@@ -5,6 +5,7 @@ import { pool } from '../../core/db';
 import { db } from '../../db';
 import { membershipTiers } from '../../../shared/schema';
 import { eq } from 'drizzle-orm';
+import Stripe from 'stripe';
 import {
   createSubscription,
   cancelSubscription,
@@ -75,7 +76,7 @@ router.post('/api/stripe/subscriptions', isStaffOrAdmin, async (req: Request, re
           message: 'Your membership subscription has been activated.',
           data: { subscriptionId: result.subscription?.subscriptionId }
         });
-        (broadcastBillingUpdate as any)(memberEmail, 'subscription_created');
+        broadcastBillingUpdate({ action: 'subscription_created', memberEmail });
       } else {
         const memberLookup = await pool.query(
           'SELECT email FROM users WHERE stripe_customer_id = $1',
@@ -89,7 +90,7 @@ router.post('/api/stripe/subscriptions', isStaffOrAdmin, async (req: Request, re
             message: 'Your membership subscription has been activated.',
             data: { subscriptionId: result.subscription?.subscriptionId }
           });
-          (broadcastBillingUpdate as any)(email, 'subscription_created');
+          broadcastBillingUpdate({ action: 'subscription_created', memberEmail: email });
         }
       }
     } catch (notifyError) {
@@ -130,7 +131,7 @@ router.delete('/api/stripe/subscriptions/:subscriptionId', isStaffOrAdmin, async
           message: 'Your membership subscription has been cancelled.',
           data: { subscriptionId }
         });
-        (broadcastBillingUpdate as any)(memberEmail, 'subscription_cancelled');
+        broadcastBillingUpdate({ action: 'subscription_cancelled', memberEmail });
       }
     } catch (notifyError) {
       logger.error('[Stripe] Failed to send subscription cancellation notification', { extra: { notifyError } });
@@ -158,7 +159,7 @@ router.post('/api/stripe/sync-subscriptions', isStaffOrAdmin, sensitiveActionRat
     
     res.json({
       success: result.success,
-      processed: (result as any).processed,
+      processed: result.created + result.updated + result.skipped,
       updated: result.updated,
       errors: result.errors
     });
@@ -331,7 +332,7 @@ router.post('/api/stripe/subscriptions/create-for-member', isStaffOrAdmin, async
         message: `Your ${tierName} membership has been activated.`,
         data: { subscriptionId: subscriptionResult.subscription?.subscriptionId, tier: tierName }
       });
-      (broadcastBillingUpdate as any)(member.email, 'subscription_created');
+      broadcastBillingUpdate({ action: 'subscription_created', memberEmail: member.email });
     } catch (notifyError) {
       logger.error('[Stripe] Failed to send membership activation notification', { extra: { notifyError } });
     }
@@ -668,7 +669,7 @@ router.post('/api/stripe/subscriptions/confirm-inline-payment', isStaffOrAdmin, 
       }
       
       try {
-        const { sendNotificationToUser: sendNotif, broadcastBillingUpdate: broadcastUpdate } = await import('../../core/websocket') as any;
+        const { sendNotificationToUser: sendNotif, broadcastBillingUpdate: broadcastUpdate } = await import('../../core/websocket');
         sendNotif(userEmail, {
           type: 'billing_update',
           title: 'Membership Activated',
@@ -682,7 +683,7 @@ router.post('/api/stripe/subscriptions/confirm-inline-payment', isStaffOrAdmin, 
     }
     
     await logFromRequest(req, {
-      action: 'inline_payment_confirmed' as any,
+      action: 'inline_payment_confirmed',
       resourceType: 'member',
       resourceId: userId || paymentIntent.customer as string,
       resourceName: userEmail,
@@ -822,7 +823,7 @@ router.post('/api/stripe/subscriptions/send-activation-link', isStaffOrAdmin, as
     const successUrl = `${baseUrl}/welcome?session_id={CHECKOUT_SESSION_ID}`;
     const cancelUrl = `${baseUrl}/`;
     
-    const sessionParams: any = {
+    const sessionParams: Stripe.Checkout.SessionCreateParams = {
       customer: customerId,
       mode: 'subscription',
       line_items: [{
@@ -879,7 +880,7 @@ router.post('/api/stripe/subscriptions/send-activation-link', isStaffOrAdmin, as
     }
     
     await logFromRequest(req, {
-      action: (isResend ? 'activation_link_resent' : 'activation_link_sent') as any,
+      action: isResend ? 'activation_link_resent' : 'activation_link_sent',
       resourceType: 'member',
       resourceId: userId,
       resourceName: memberName,

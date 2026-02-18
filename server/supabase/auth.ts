@@ -1,6 +1,7 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import type { Express, RequestHandler } from 'express';
 import { authStorage } from '../replit_integrations/auth/storage';
+import { logger } from '../core/logger';
 
 const supabaseUrl = process.env.SUPABASE_URL || '';
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || '';
@@ -23,9 +24,9 @@ export function setupSupabaseAuthRoutes(app: Express) {
   const client = getSupabaseClient();
   
   if (!client) {
-    console.log('Supabase auth routes disabled - credentials not configured');
+    logger.info('Supabase auth routes disabled - credentials not configured');
     
-    const supabaseNotConfigured = (req: any, res: any) => {
+    const supabaseNotConfigured = (_req: Request, res: Response) => {
       res.status(503).json({ error: 'Supabase authentication is not configured' });
     };
     
@@ -38,7 +39,7 @@ export function setupSupabaseAuthRoutes(app: Express) {
     return;
   }
 
-  console.log('Supabase auth routes enabled');
+  logger.info('Supabase auth routes enabled');
 
   app.post('/api/supabase/signup', async (req, res) => {
     try {
@@ -73,7 +74,7 @@ export function setupSupabaseAuthRoutes(app: Express) {
         user: data.user 
       });
     } catch (error: unknown) {
-      console.error('Supabase signup error:', error);
+      logger.error('Supabase signup error:', { error: error as Error });
       res.status(500).json({ error: 'Signup failed' });
     }
   });
@@ -105,7 +106,7 @@ export function setupSupabaseAuthRoutes(app: Express) {
         session: data.session
       });
     } catch (error: unknown) {
-      console.error('Supabase login error:', error);
+      logger.error('Supabase login error:', { error: error as Error });
       res.status(500).json({ error: 'Login failed' });
     }
   });
@@ -120,7 +121,7 @@ export function setupSupabaseAuthRoutes(app: Express) {
       
       res.json({ message: 'Logged out successfully' });
     } catch (error: unknown) {
-      console.error('Supabase logout error:', error);
+      logger.error('Supabase logout error:', { error: error as Error });
       res.status(500).json({ error: 'Logout failed' });
     }
   });
@@ -139,7 +140,7 @@ export function setupSupabaseAuthRoutes(app: Express) {
       
       res.json({ message: 'Check your email for the password reset link' });
     } catch (error: unknown) {
-      console.error('Forgot password error:', error);
+      logger.error('Forgot password error:', { error: error as Error });
       res.status(500).json({ error: 'Failed to send reset email' });
     }
   });
@@ -168,7 +169,7 @@ export function setupSupabaseAuthRoutes(app: Express) {
         role: dbUser?.role || 'member',
       });
     } catch (error: unknown) {
-      console.error('Get user error:', error);
+      logger.error('Get user error:', { error: error as Error });
       res.status(500).json({ error: 'Failed to get user' });
     }
   });
@@ -190,7 +191,7 @@ export function setupSupabaseAuthRoutes(app: Express) {
       
       res.json({ url: data.url });
     } catch (error: unknown) {
-      console.error('OAuth error:', error);
+      logger.error('OAuth error:', { error: error as Error });
       res.status(500).json({ error: 'OAuth failed' });
     }
   });
@@ -216,7 +217,7 @@ export const isSupabaseAuthenticated: RequestHandler = async (req, res, next) =>
       return res.status(401).json({ error: 'Invalid token' });
     }
     
-    (req as any).supabaseUser = user;
+    (req as Request & { supabaseUser?: unknown }).supabaseUser = user;
     next();
   } catch (error) {
     res.status(401).json({ error: 'Authentication failed' });

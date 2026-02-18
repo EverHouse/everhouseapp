@@ -86,7 +86,7 @@ export function getBaseDescription(description: string): string {
 async function getAllResourceIds(): Promise<number[]> {
   const idSet = new Set<number>();
   const resourcesResult = await pool.query('SELECT id FROM resources');
-  resourcesResult.rows.forEach((r: any) => idSet.add(r.id));
+  resourcesResult.rows.forEach((r: Record<string, unknown>) => idSet.add(r.id as number));
   return Array.from(idSet);
 }
 
@@ -105,14 +105,14 @@ async function getResourceIdsForAffectedAreas(affectedAreas: string): Promise<nu
   
   if (normalized === 'all_bays') {
     const simulatorsResult = await pool.query("SELECT id FROM resources WHERE type = 'simulator'");
-    simulatorsResult.rows.forEach((r: any) => idSet.add(r.id));
+    simulatorsResult.rows.forEach((r: Record<string, unknown>) => idSet.add(r.id as number));
     return Array.from(idSet);
   }
   
   if (normalized === 'conference_room' || normalized === 'conference room') {
     const confResult = await pool.query("SELECT id FROM resources WHERE LOWER(name) LIKE '%conference%' LIMIT 1");
     if (confResult.rows.length > 0) {
-      idSet.add(confResult.rows[0].id);
+      idSet.add((confResult.rows[0] as Record<string, unknown>).id as number);
     }
     return Array.from(idSet);
   }
@@ -124,10 +124,10 @@ async function getResourceIdsForAffectedAreas(affectedAreas: string): Promise<nu
       all.forEach(id => idSet.add(id));
     } else if (t === 'all_bays') {
       const simulatorsResult = await pool.query("SELECT id FROM resources WHERE type = 'simulator'");
-      simulatorsResult.rows.forEach((r: any) => idSet.add(r.id));
+      simulatorsResult.rows.forEach((r: Record<string, unknown>) => idSet.add(r.id as number));
     } else if (t === 'conference_room' || t === 'conference room') {
       const confResult = await pool.query("SELECT id FROM resources WHERE LOWER(name) LIKE '%conference%' LIMIT 1");
-      if (confResult.rows.length > 0) idSet.add(confResult.rows[0].id);
+      if (confResult.rows.length > 0) idSet.add((confResult.rows[0] as Record<string, unknown>).id as number);
     } else if (t.startsWith('bay_')) {
       const bayId = parseInt(t.replace('bay_', ''));
       if (!isNaN(bayId)) idSet.add(bayId);
@@ -193,7 +193,7 @@ async function createAvailabilityBlocks(
     'SELECT id FROM resources WHERE id = ANY($1)',
     [resourceIds]
   );
-  const validResourceIds = new Set(validResourcesResult.rows.map((r: any) => r.id));
+  const validResourceIds = new Set(validResourcesResult.rows.map((r: Record<string, unknown>) => r.id as number));
   const filteredIds = resourceIds.filter(id => validResourceIds.has(id));
   
   if (filteredIds.length < resourceIds.length) {
@@ -201,8 +201,8 @@ async function createAvailabilityBlocks(
     logger.info(`[Calendar Sync] Skipping non-existent resource IDs: ${skippedIds.join(', ')}`);
   }
   
-  const valueRows: any[] = [];
-  const params: any[] = [];
+  const valueRows: string[] = [];
+  const params: (string | number)[] = [];
   let paramIdx = 1;
   for (const resId of filteredIds) {
     for (const date of dates) {

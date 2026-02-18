@@ -56,7 +56,7 @@ export async function addLineItemToDeal(
         lineItemId,
         'deals',
         hubspotDealId,
-        [{ associationCategory: 'HUBSPOT_DEFINED' as any, associationTypeId: 20 }]
+        [{ associationCategory: 'HUBSPOT_DEFINED' as unknown as 'HUBSPOT_DEFINED', associationTypeId: 20 }]
       )
     );
     
@@ -162,7 +162,7 @@ export async function removeLineItemFromDeal(
   }
 }
 
-export async function getMemberDealWithLineItems(memberEmail: string): Promise<any | null> {
+export async function getMemberDealWithLineItems(memberEmail: string): Promise<Record<string, unknown> | null> {
   try {
     const deal = await db.select()
       .from(hubspotDeals)

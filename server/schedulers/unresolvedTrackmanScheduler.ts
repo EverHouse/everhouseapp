@@ -4,6 +4,7 @@ import { systemSettings } from '../../shared/schema';
 import { sql } from 'drizzle-orm';
 import { notifyAllStaff } from '../core/notificationService';
 import { getPacificHour, getTodayPacific } from '../utils/dateUtils';
+import { logger } from '../core/logger';
 
 const UNRESOLVED_TRACKMAN_CHECK_HOUR = 9;
 const UNRESOLVED_TRACKMAN_SETTING_KEY = 'last_unresolved_trackman_check_date';
@@ -29,7 +30,7 @@ async function tryClaimUnresolvedTrackmanSlot(todayStr: string): Promise<boolean
     
     return result.length > 0;
   } catch (err) {
-    console.error('[Unresolved Trackman Check] Database error:', err);
+    logger.error('[Unresolved Trackman Check] Database error:', { error: err as Error });
     schedulerTracker.recordRun('Unresolved Trackman', false, String(err));
     return false;
   }
@@ -44,7 +45,7 @@ async function checkUnresolvedTrackmanBookings(): Promise<void> {
       const claimed = await tryClaimUnresolvedTrackmanSlot(todayStr);
       
       if (claimed) {
-        console.log('[Unresolved Trackman Check] Starting scheduled check...');
+        logger.info('[Unresolved Trackman Check] Starting scheduled check...');
         
         try {
           const result = await db.execute(sql`SELECT created_at
@@ -67,7 +68,7 @@ async function checkUnresolvedTrackmanBookings(): Promise<void> {
             
             const message = `Found ${unresolved.length} unresolved Trackman booking${unresolved.length !== 1 ? 's' : ''} older than 24 hours. Oldest: ${oldestDate}`;
             
-            console.log(`[Unresolved Trackman Check] ${message}`);
+            logger.info(`[Unresolved Trackman Check] ${message}`);
             
             await notifyAllStaff(
               'Unresolved Trackman Bookings',
@@ -76,21 +77,21 @@ async function checkUnresolvedTrackmanBookings(): Promise<void> {
               { sendPush: true }
             );
           } else {
-            console.log('[Unresolved Trackman Check] No unresolved bookings found');
+            logger.info('[Unresolved Trackman Check] No unresolved bookings found');
           }
         } catch (err) {
-          console.error('[Unresolved Trackman Check] Check failed:', err);
+          logger.error('[Unresolved Trackman Check] Check failed:', { error: err as Error });
           schedulerTracker.recordRun('Unresolved Trackman', false, String(err));
         }
       }
     }
   } catch (err) {
-    console.error('[Unresolved Trackman Check] Scheduler error:', err);
+    logger.error('[Unresolved Trackman Check] Scheduler error:', { error: err as Error });
     schedulerTracker.recordRun('Unresolved Trackman', false, String(err));
   }
 }
 
 export function startUnresolvedTrackmanScheduler(): void {
   setInterval(checkUnresolvedTrackmanBookings, 15 * 60 * 1000);
-  console.log('[Startup] Unresolved Trackman check scheduler enabled (runs at 9am Pacific)');
+  logger.info('[Startup] Unresolved Trackman check scheduler enabled (runs at 9am Pacific)');
 }

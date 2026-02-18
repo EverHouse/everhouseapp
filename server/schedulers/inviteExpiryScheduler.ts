@@ -34,7 +34,7 @@ async function expireUnacceptedInvites(): Promise<void> {
       return;
     }
     
-    console.log(`[Invite Expiry] Processing ${expiredInvites.rows.length} expired invites`);
+    logger.info(`[Invite Expiry] Processing ${expiredInvites.rows.length} expired invites`);
     schedulerTracker.recordRun('Invite Expiry', true);
     
     for (const invite of expiredInvites.rows) {
@@ -100,15 +100,15 @@ async function expireUnacceptedInvites(): Promise<void> {
       }
     }
     
-    console.log(`[Invite Expiry] Completed processing ${expiredInvites.rows.length} expired invites`);
+    logger.info(`[Invite Expiry] Completed processing ${expiredInvites.rows.length} expired invites`);
     schedulerTracker.recordRun('Invite Expiry', true);
   } catch (err) {
-    console.error('[Invite Expiry] Scheduler error:', err);
+    logger.error('[Invite Expiry] Scheduler error:', { error: err as Error });
     schedulerTracker.recordRun('Invite Expiry', false, String(err));
   }
 }
 
 export function startInviteExpiryScheduler(): void {
   setInterval(expireUnacceptedInvites, INVITE_EXPIRY_INTERVAL_MS);
-  console.log('[Startup] Invite auto-expiry scheduler enabled (runs every 5 minutes)');
+  logger.info('[Startup] Invite auto-expiry scheduler enabled (runs every 5 minutes)');
 }

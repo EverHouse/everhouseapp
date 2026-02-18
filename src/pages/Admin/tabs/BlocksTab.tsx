@@ -180,7 +180,7 @@ const BlocksTab: React.FC = () => {
             queryClient.invalidateQueries({ queryKey: ['closureReasons'] });
             showToast('Closure reason added', 'success');
         },
-        onError: (error: any) => {
+        onError: (error: unknown) => {
             showToast(error.message || 'Failed to add reason', 'error');
         }
     });
@@ -198,7 +198,7 @@ const BlocksTab: React.FC = () => {
             queryClient.invalidateQueries({ queryKey: ['closureReasons'] });
             showToast('Closure reason updated', 'success');
         },
-        onError: (error: any) => {
+        onError: (error: unknown) => {
             showToast(error.message || 'Failed to update reason', 'error');
         }
     });
@@ -209,7 +209,7 @@ const BlocksTab: React.FC = () => {
             queryClient.invalidateQueries({ queryKey: ['closureReasons'] });
             showToast('Closure reason deleted', 'success');
         },
-        onError: (error: any) => {
+        onError: (error: unknown) => {
             showToast(error.message || 'Failed to delete reason', 'error');
         }
     });
@@ -220,7 +220,7 @@ const BlocksTab: React.FC = () => {
             queryClient.invalidateQueries({ queryKey: ['closureReasons'] });
             showToast('Closure reason reactivated', 'success');
         },
-        onError: (error: any) => {
+        onError: (error: unknown) => {
             showToast(error.message || 'Failed to reactivate reason', 'error');
         }
     });
@@ -232,7 +232,7 @@ const BlocksTab: React.FC = () => {
             queryClient.invalidateQueries({ queryKey: ['noticeTypes'] });
             showToast('Notice type added', 'success');
         },
-        onError: (error: any) => {
+        onError: (error: unknown) => {
             showToast(error.message || 'Failed to add notice type', 'error');
         }
     });
@@ -245,7 +245,7 @@ const BlocksTab: React.FC = () => {
             queryClient.invalidateQueries({ queryKey: ['noticeTypes'] });
             showToast('Notice type updated', 'success');
         },
-        onError: (error: any) => {
+        onError: (error: unknown) => {
             showToast(error.message || 'Failed to update notice type', 'error');
         }
     });
@@ -256,7 +256,7 @@ const BlocksTab: React.FC = () => {
             queryClient.invalidateQueries({ queryKey: ['noticeTypes'] });
             showToast('Notice type deleted', 'success');
         },
-        onError: (error: any) => {
+        onError: (error: unknown) => {
             showToast(error.message || 'Failed to delete notice type', 'error');
         }
     });
@@ -333,7 +333,7 @@ const BlocksTab: React.FC = () => {
                 ? putWithCredentials(url, payload)
                 : postWithCredentials(url, payload);
         },
-        onSuccess: (data: any) => {
+        onSuccess: (data: { blocks?: unknown[] }) => {
             setIsClosureModalOpen(false);
             resetClosureForm();
             queryClient.invalidateQueries({ queryKey: ['closures'] });
@@ -350,7 +350,7 @@ const BlocksTab: React.FC = () => {
                 );
             }
         },
-        onError: (error: any) => {
+        onError: (error: unknown) => {
             showToast(error.message || 'Failed to save notice', 'error');
         }
     });
@@ -361,7 +361,7 @@ const BlocksTab: React.FC = () => {
             queryClient.invalidateQueries({ queryKey: ['closures'] });
             showToast('Notice deleted', 'success');
         },
-        onError: (error: any) => {
+        onError: (error: unknown) => {
             showToast(error.message || 'Failed to delete notice', 'error');
         }
     });
@@ -375,7 +375,7 @@ const BlocksTab: React.FC = () => {
         onSuccess: () => {
             showToast('Calendar synced & notices refreshed', 'success');
         },
-        onError: (error: any) => {
+        onError: (error: unknown) => {
             console.error('Calendar sync failed:', error);
             showToast('Failed to sync calendar', 'error');
         }

@@ -81,7 +81,7 @@ Even if quality is poor, still attempt to extract whatever information is visibl
       return res.status(500).json({ error: 'No response from AI model' });
     }
 
-    let parsed: any;
+    let parsed: Record<string, unknown>;
     try {
       parsed = JSON.parse(content);
     } catch (parseErr) {

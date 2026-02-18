@@ -3,6 +3,7 @@ import { pool } from '../core/db';
 import { getStripeClient } from '../core/stripe';
 import { PaymentStatusService } from '../core/billing/PaymentStatusService';
 import { getErrorMessage, getErrorCode } from '../utils/errorUtils';
+import { logger } from '../core/logger';
 
 const RECONCILIATION_INTERVAL_MS = 15 * 60 * 1000; // 15 minutes
 const STALE_THRESHOLD_MINUTES = 5;
@@ -34,7 +35,7 @@ async function reconcilePendingSnapshots(): Promise<{ synced: number; errors: nu
       return { synced: 0, errors: 0 };
     }
     
-    console.log(`[Fee Snapshot Reconciliation] Found ${staleSnapshots.rows.length} pending snapshots to check`);
+    logger.info(`[Fee Snapshot Reconciliation] Found ${staleSnapshots.rows.length} pending snapshots to check`);
     schedulerTracker.recordRun('Fee Snapshot Reconciliation', true);
     
     const stripe = await getStripeClient();
@@ -53,11 +54,11 @@ async function reconcilePendingSnapshots(): Promise<{ synced: number; errors: nu
           });
           
           if (result.success) {
-            console.log(`[Fee Snapshot Reconciliation] Synced succeeded payment ${snapshot.stripe_payment_intent_id} for booking ${snapshot.booking_id}`);
+            logger.info(`[Fee Snapshot Reconciliation] Synced succeeded payment ${snapshot.stripe_payment_intent_id} for booking ${snapshot.booking_id}`);
             schedulerTracker.recordRun('Fee Snapshot Reconciliation', true);
             synced++;
           } else {
-            console.error(`[Fee Snapshot Reconciliation] Failed to sync ${snapshot.stripe_payment_intent_id}:`, result.error);
+            logger.error(`[Fee Snapshot Reconciliation] Failed to sync ${snapshot.stripe_payment_intent_id}:`, { extra: { error: result.error } });
             schedulerTracker.recordRun('Fee Snapshot Reconciliation', false, result.error);
             errors++;
           }
@@ -65,7 +66,7 @@ async function reconcilePendingSnapshots(): Promise<{ synced: number; errors: nu
           await PaymentStatusService.markPaymentCancelled({
             paymentIntentId: snapshot.stripe_payment_intent_id
           });
-          console.log(`[Fee Snapshot Reconciliation] Synced cancelled payment ${snapshot.stripe_payment_intent_id}`);
+          logger.info(`[Fee Snapshot Reconciliation] Synced cancelled payment ${snapshot.stripe_payment_intent_id}`);
           schedulerTracker.recordRun('Fee Snapshot Reconciliation', true);
           synced++;
         }
@@ -76,11 +77,11 @@ async function reconcilePendingSnapshots(): Promise<{ synced: number; errors: nu
             `UPDATE booking_fee_snapshots SET status = 'cancelled' WHERE id = $1`,
             [snapshot.id]
           );
-          console.log(`[Fee Snapshot Reconciliation] Marked orphan snapshot ${snapshot.id} as cancelled (PI not found)`);
+          logger.info(`[Fee Snapshot Reconciliation] Marked orphan snapshot ${snapshot.id} as cancelled (PI not found)`);
           schedulerTracker.recordRun('Fee Snapshot Reconciliation', true);
           synced++;
         } else {
-          console.error(`[Fee Snapshot Reconciliation] Error checking ${snapshot.stripe_payment_intent_id}:`, getErrorMessage(err));
+          logger.error(`[Fee Snapshot Reconciliation] Error checking ${snapshot.stripe_payment_intent_id}:`, { extra: { errorMessage: getErrorMessage(err) } });
           schedulerTracker.recordRun('Fee Snapshot Reconciliation', false, getErrorMessage(err));
           errors++;
         }
@@ -91,9 +92,9 @@ async function reconcilePendingSnapshots(): Promise<{ synced: number; errors: nu
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
     if (msg.includes('timeout')) {
-      console.warn('[Fee Snapshot Reconciliation] Skipped due to DB connection timeout — will retry next cycle');
+      logger.warn('[Fee Snapshot Reconciliation] Skipped due to DB connection timeout — will retry next cycle');
     } else {
-      console.error('[Fee Snapshot Reconciliation] Scheduler error:', error);
+      logger.error('[Fee Snapshot Reconciliation] Scheduler error:', { error: error as Error });
     }
     schedulerTracker.recordRun('Fee Snapshot Reconciliation', false, String(error));
     return { synced, errors: errors + 1 };
@@ -128,7 +129,7 @@ async function cancelAbandonedPaymentIntents(): Promise<{ cancelled: number; err
       return { cancelled: 0, errors: 0 };
     }
 
-    console.log(`[Abandoned PI Cleanup] Found ${abandonedIntents.rows.length} abandoned payment intents to cancel`);
+    logger.info(`[Abandoned PI Cleanup] Found ${abandonedIntents.rows.length} abandoned payment intents to cancel`);
     schedulerTracker.recordRun('Fee Snapshot Reconciliation', true);
 
     const stripe = await getStripeClient();
@@ -137,16 +138,16 @@ async function cancelAbandonedPaymentIntents(): Promise<{ cancelled: number; err
       try {
         try {
           await stripe.paymentIntents.cancel(spi.stripe_payment_intent_id);
-          console.log(`[Abandoned PI Cleanup] Cancelled payment intent ${spi.stripe_payment_intent_id} in Stripe`);
+          logger.info(`[Abandoned PI Cleanup] Cancelled payment intent ${spi.stripe_payment_intent_id} in Stripe`);
         } catch (stripeErr: unknown) {
           const errorCode = getErrorCode(stripeErr);
           
           if (errorCode === 'resource_missing') {
-            console.log(`[Abandoned PI Cleanup] Payment intent ${spi.stripe_payment_intent_id} not found in Stripe, marking as cancelled`);
+            logger.info(`[Abandoned PI Cleanup] Payment intent ${spi.stripe_payment_intent_id} not found in Stripe, marking as cancelled`);
           } else if (errorCode === 'payment_intent_unexpected_state') {
             try {
               const pi = await stripe.paymentIntents.retrieve(spi.stripe_payment_intent_id);
-              console.log(`[Abandoned PI Cleanup] Payment intent ${spi.stripe_payment_intent_id} already in state: ${pi.status}, syncing status`);
+              logger.info(`[Abandoned PI Cleanup] Payment intent ${spi.stripe_payment_intent_id} already in state: ${pi.status}, syncing status`);
               
               await client.query('BEGIN');
               try {
@@ -168,13 +169,13 @@ async function cancelAbandonedPaymentIntents(): Promise<{ cancelled: number; err
               cancelled++;
               continue;
             } catch (retrieveErr: unknown) {
-              console.error(`[Abandoned PI Cleanup] Failed to retrieve PI status for ${spi.stripe_payment_intent_id}:`, getErrorMessage(retrieveErr));
+              logger.error(`[Abandoned PI Cleanup] Failed to retrieve PI status for ${spi.stripe_payment_intent_id}:`, { extra: { errorMessage: getErrorMessage(retrieveErr) } });
               schedulerTracker.recordRun('Fee Snapshot Reconciliation', false, getErrorMessage(retrieveErr));
               errors++;
               continue;
             }
           } else {
-            console.error(`[Abandoned PI Cleanup] Stripe error cancelling ${spi.stripe_payment_intent_id}:`, getErrorMessage(stripeErr));
+            logger.error(`[Abandoned PI Cleanup] Stripe error cancelling ${spi.stripe_payment_intent_id}:`, { extra: { errorMessage: getErrorMessage(stripeErr) } });
             schedulerTracker.recordRun('Fee Snapshot Reconciliation', false, getErrorMessage(stripeErr));
             errors++;
             continue;
@@ -197,11 +198,11 @@ async function cancelAbandonedPaymentIntents(): Promise<{ cancelled: number; err
           throw txErr;
         }
 
-        console.log(`[Abandoned PI Cleanup] Cancelled and cleaned up payment intent ${spi.stripe_payment_intent_id}`);
+        logger.info(`[Abandoned PI Cleanup] Cancelled and cleaned up payment intent ${spi.stripe_payment_intent_id}`);
         schedulerTracker.recordRun('Fee Snapshot Reconciliation', true);
         cancelled++;
       } catch (err: unknown) {
-        console.error(`[Abandoned PI Cleanup] Error processing ${spi.stripe_payment_intent_id}:`, getErrorMessage(err));
+        logger.error(`[Abandoned PI Cleanup] Error processing ${spi.stripe_payment_intent_id}:`, { extra: { errorMessage: getErrorMessage(err) } });
         schedulerTracker.recordRun('Fee Snapshot Reconciliation', false, getErrorMessage(err));
         errors++;
       }
@@ -211,9 +212,9 @@ async function cancelAbandonedPaymentIntents(): Promise<{ cancelled: number; err
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
     if (msg.includes('timeout')) {
-      console.warn('[Abandoned PI Cleanup] Skipped due to DB connection timeout — will retry next cycle');
+      logger.warn('[Abandoned PI Cleanup] Skipped due to DB connection timeout — will retry next cycle');
     } else {
-      console.error('[Abandoned PI Cleanup] Scheduler error:', error);
+      logger.error('[Abandoned PI Cleanup] Scheduler error:', { error: error as Error });
     }
     schedulerTracker.recordRun('Fee Snapshot Reconciliation', false, String(error));
     return { cancelled, errors: errors + 1 };
@@ -248,7 +249,7 @@ async function reconcileStalePaymentIntents(): Promise<{ reconciled: number; err
       return { reconciled: 0, errors: 0 };
     }
 
-    console.log(`[Payment Intent Reconciliation] Found ${staleIntents.rows.length} stale pending payment intents to check`);
+    logger.info(`[Payment Intent Reconciliation] Found ${staleIntents.rows.length} stale pending payment intents to check`);
     schedulerTracker.recordRun('Fee Snapshot Reconciliation', true);
 
     const stripe = await getStripeClient();
@@ -260,7 +261,7 @@ async function reconcileStalePaymentIntents(): Promise<{ reconciled: number; err
             `UPDATE stripe_payment_intents SET status = 'canceled', failure_reason = $1 WHERE id = $2`,
             ['Auto-reconciled: orphan payment intent with no linked booking', spi.id]
           );
-          console.log(`[Payment Intent Reconciliation] Canceled orphan payment intent ${spi.stripe_payment_intent_id} (no linked booking)`);
+          logger.info(`[Payment Intent Reconciliation] Canceled orphan payment intent ${spi.stripe_payment_intent_id} (no linked booking)`);
           schedulerTracker.recordRun('Fee Snapshot Reconciliation', true);
           reconciled++;
           continue;
@@ -276,7 +277,7 @@ async function reconcileStalePaymentIntents(): Promise<{ reconciled: number; err
             `UPDATE stripe_payment_intents SET status = 'canceled', failure_reason = $1 WHERE id = $2`,
             ['Auto-reconciled: orphan payment intent with no linked booking', spi.id]
           );
-          console.log(`[Payment Intent Reconciliation] Canceled payment intent ${spi.stripe_payment_intent_id} (booking ${spi.booking_id} not found)`);
+          logger.info(`[Payment Intent Reconciliation] Canceled payment intent ${spi.stripe_payment_intent_id} (booking ${spi.booking_id} not found)`);
           schedulerTracker.recordRun('Fee Snapshot Reconciliation', true);
           reconciled++;
           continue;
@@ -289,7 +290,7 @@ async function reconcileStalePaymentIntents(): Promise<{ reconciled: number; err
             `UPDATE stripe_payment_intents SET status = 'canceled', failure_reason = $1 WHERE id = $2`,
             ['Auto-reconciled: linked booking was cancelled/declined/expired', spi.id]
           );
-          console.log(`[Payment Intent Reconciliation] Canceled payment intent ${spi.stripe_payment_intent_id} (booking ${spi.booking_id} status: ${bookingStatus})`);
+          logger.info(`[Payment Intent Reconciliation] Canceled payment intent ${spi.stripe_payment_intent_id} (booking ${spi.booking_id} status: ${bookingStatus})`);
           schedulerTracker.recordRun('Fee Snapshot Reconciliation', true);
           reconciled++;
         } else if (['attended', 'confirmed'].includes(bookingStatus)) {
@@ -301,7 +302,7 @@ async function reconcileStalePaymentIntents(): Promise<{ reconciled: number; err
                 `UPDATE stripe_payment_intents SET status = 'succeeded' WHERE id = $1`,
                 [spi.id]
               );
-              console.log(`[Payment Intent Reconciliation] Marked payment intent ${spi.stripe_payment_intent_id} as succeeded (confirmed by Stripe)`);
+              logger.info(`[Payment Intent Reconciliation] Marked payment intent ${spi.stripe_payment_intent_id} as succeeded (confirmed by Stripe)`);
               schedulerTracker.recordRun('Fee Snapshot Reconciliation', true);
               reconciled++;
             } else if (pi.status === 'canceled') {
@@ -309,7 +310,7 @@ async function reconcileStalePaymentIntents(): Promise<{ reconciled: number; err
                 `UPDATE stripe_payment_intents SET status = 'canceled' WHERE id = $1`,
                 [spi.id]
               );
-              console.log(`[Payment Intent Reconciliation] Marked payment intent ${spi.stripe_payment_intent_id} as canceled (confirmed by Stripe)`);
+              logger.info(`[Payment Intent Reconciliation] Marked payment intent ${spi.stripe_payment_intent_id} as canceled (confirmed by Stripe)`);
               schedulerTracker.recordRun('Fee Snapshot Reconciliation', true);
               reconciled++;
             }
@@ -319,18 +320,18 @@ async function reconcileStalePaymentIntents(): Promise<{ reconciled: number; err
                 `UPDATE stripe_payment_intents SET status = 'canceled', failure_reason = $1 WHERE id = $2`,
                 ['Auto-reconciled: payment intent not found in Stripe', spi.id]
               );
-              console.log(`[Payment Intent Reconciliation] Canceled payment intent ${spi.stripe_payment_intent_id} (not found in Stripe)`);
+              logger.info(`[Payment Intent Reconciliation] Canceled payment intent ${spi.stripe_payment_intent_id} (not found in Stripe)`);
               schedulerTracker.recordRun('Fee Snapshot Reconciliation', true);
               reconciled++;
             } else {
-              console.error(`[Payment Intent Reconciliation] Stripe error for ${spi.stripe_payment_intent_id}:`, getErrorMessage(stripeErr));
+              logger.error(`[Payment Intent Reconciliation] Stripe error for ${spi.stripe_payment_intent_id}:`, { extra: { errorMessage: getErrorMessage(stripeErr) } });
               schedulerTracker.recordRun('Fee Snapshot Reconciliation', false, getErrorMessage(stripeErr));
               errors++;
             }
           }
         }
       } catch (err: unknown) {
-        console.error(`[Payment Intent Reconciliation] Error processing ${spi.stripe_payment_intent_id}:`, getErrorMessage(err));
+        logger.error(`[Payment Intent Reconciliation] Error processing ${spi.stripe_payment_intent_id}:`, { extra: { errorMessage: getErrorMessage(err) } });
         schedulerTracker.recordRun('Fee Snapshot Reconciliation', false, getErrorMessage(err));
         errors++;
       }
@@ -340,9 +341,9 @@ async function reconcileStalePaymentIntents(): Promise<{ reconciled: number; err
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
     if (msg.includes('timeout')) {
-      console.warn('[Payment Intent Reconciliation] Skipped due to DB connection timeout — will retry next cycle');
+      logger.warn('[Payment Intent Reconciliation] Skipped due to DB connection timeout — will retry next cycle');
     } else {
-      console.error('[Payment Intent Reconciliation] Scheduler error:', error);
+      logger.error('[Payment Intent Reconciliation] Scheduler error:', { error: error as Error });
     }
     schedulerTracker.recordRun('Fee Snapshot Reconciliation', false, String(error));
     return { reconciled, errors: errors + 1 };
@@ -355,12 +356,12 @@ let intervalId: NodeJS.Timeout | null = null;
 
 export function startFeeSnapshotReconciliationScheduler(): void {
   if (intervalId) {
-    console.log('[Fee Snapshot Reconciliation] Scheduler already running');
+    logger.info('[Fee Snapshot Reconciliation] Scheduler already running');
     schedulerTracker.recordRun('Fee Snapshot Reconciliation', true);
     return;
   }
 
-  console.log(`[Startup] Fee snapshot reconciliation scheduler enabled (runs every 15 minutes)`);
+  logger.info(`[Startup] Fee snapshot reconciliation scheduler enabled (runs every 15 minutes)`);
   schedulerTracker.recordRun('Fee Snapshot Reconciliation', true);
   
   // Run first check after 2 minutes (give server time to start)
@@ -368,36 +369,36 @@ export function startFeeSnapshotReconciliationScheduler(): void {
     reconcilePendingSnapshots()
       .then(result => {
         if (result.synced > 0 || result.errors > 0) {
-          console.log(`[Fee Snapshot Reconciliation] Initial run: synced=${result.synced}, errors=${result.errors}`);
+          logger.info(`[Fee Snapshot Reconciliation] Initial run: synced=${result.synced}, errors=${result.errors}`);
           schedulerTracker.recordRun('Fee Snapshot Reconciliation', true);
         }
       })
       .catch(err => {
-        console.error('[Fee Snapshot Reconciliation] Initial run error:', err);
+        logger.error('[Fee Snapshot Reconciliation] Initial run error:', { error: err as Error });
         schedulerTracker.recordRun('Fee Snapshot Reconciliation', false, String(err));
       });
 
     reconcileStalePaymentIntents()
       .then(result => {
         if (result.reconciled > 0 || result.errors > 0) {
-          console.log(`[Payment Intent Reconciliation] Initial run: reconciled=${result.reconciled}, errors=${result.errors}`);
+          logger.info(`[Payment Intent Reconciliation] Initial run: reconciled=${result.reconciled}, errors=${result.errors}`);
           schedulerTracker.recordRun('Fee Snapshot Reconciliation', true);
         }
       })
       .catch(err => {
-        console.error('[Payment Intent Reconciliation] Initial run error:', err);
+        logger.error('[Payment Intent Reconciliation] Initial run error:', { error: err as Error });
         schedulerTracker.recordRun('Fee Snapshot Reconciliation', false, String(err));
       });
 
     cancelAbandonedPaymentIntents()
       .then(result => {
         if (result.cancelled > 0 || result.errors > 0) {
-          console.log(`[Abandoned PI Cleanup] Initial run: cancelled=${result.cancelled}, errors=${result.errors}`);
+          logger.info(`[Abandoned PI Cleanup] Initial run: cancelled=${result.cancelled}, errors=${result.errors}`);
           schedulerTracker.recordRun('Fee Snapshot Reconciliation', true);
         }
       })
       .catch(err => {
-        console.error('[Abandoned PI Cleanup] Initial run error:', err);
+        logger.error('[Abandoned PI Cleanup] Initial run error:', { error: err as Error });
         schedulerTracker.recordRun('Fee Snapshot Reconciliation', false, String(err));
       });
   }, 2 * 60 * 1000);
@@ -406,36 +407,36 @@ export function startFeeSnapshotReconciliationScheduler(): void {
     reconcilePendingSnapshots()
       .then(result => {
         if (result.synced > 0 || result.errors > 0) {
-          console.log(`[Fee Snapshot Reconciliation] Run complete: synced=${result.synced}, errors=${result.errors}`);
+          logger.info(`[Fee Snapshot Reconciliation] Run complete: synced=${result.synced}, errors=${result.errors}`);
           schedulerTracker.recordRun('Fee Snapshot Reconciliation', true);
         }
       })
       .catch(err => {
-        console.error('[Fee Snapshot Reconciliation] Uncaught error:', err);
+        logger.error('[Fee Snapshot Reconciliation] Uncaught error:', { error: err as Error });
         schedulerTracker.recordRun('Fee Snapshot Reconciliation', false, String(err));
       });
 
     reconcileStalePaymentIntents()
       .then(result => {
         if (result.reconciled > 0 || result.errors > 0) {
-          console.log(`[Payment Intent Reconciliation] Run complete: reconciled=${result.reconciled}, errors=${result.errors}`);
+          logger.info(`[Payment Intent Reconciliation] Run complete: reconciled=${result.reconciled}, errors=${result.errors}`);
           schedulerTracker.recordRun('Fee Snapshot Reconciliation', true);
         }
       })
       .catch(err => {
-        console.error('[Payment Intent Reconciliation] Uncaught error:', err);
+        logger.error('[Payment Intent Reconciliation] Uncaught error:', { error: err as Error });
         schedulerTracker.recordRun('Fee Snapshot Reconciliation', false, String(err));
       });
 
     cancelAbandonedPaymentIntents()
       .then(result => {
         if (result.cancelled > 0 || result.errors > 0) {
-          console.log(`[Abandoned PI Cleanup] Run complete: cancelled=${result.cancelled}, errors=${result.errors}`);
+          logger.info(`[Abandoned PI Cleanup] Run complete: cancelled=${result.cancelled}, errors=${result.errors}`);
           schedulerTracker.recordRun('Fee Snapshot Reconciliation', true);
         }
       })
       .catch(err => {
-        console.error('[Abandoned PI Cleanup] Uncaught error:', err);
+        logger.error('[Abandoned PI Cleanup] Uncaught error:', { error: err as Error });
         schedulerTracker.recordRun('Fee Snapshot Reconciliation', false, String(err));
       });
   }, RECONCILIATION_INTERVAL_MS);
@@ -445,7 +446,7 @@ export function stopFeeSnapshotReconciliationScheduler(): void {
   if (intervalId) {
     clearInterval(intervalId);
     intervalId = null;
-    console.log('[Fee Snapshot Reconciliation] Scheduler stopped');
+    logger.info('[Fee Snapshot Reconciliation] Scheduler stopped');
     schedulerTracker.recordRun('Fee Snapshot Reconciliation', true);
   }
 }

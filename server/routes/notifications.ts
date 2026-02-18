@@ -6,7 +6,7 @@ import { getSessionUser } from '../types/session';
 
 const router = Router();
 
-function getSessionEmail(req: any): string | null {
+function getSessionEmail(req: Request): string | null {
   return getSessionUser(req)?.email?.toLowerCase() || null;
 }
 
@@ -25,7 +25,7 @@ async function isStaffUser(email: string): Promise<boolean> {
   }
 }
 
-async function getEffectiveEmail(req: any, requestedEmail?: string): Promise<{ email: string; isStaff: boolean } | null> {
+async function getEffectiveEmail(req: Request, requestedEmail?: string): Promise<{ email: string; isStaff: boolean } | null> {
   const sessionEmail = getSessionEmail(req);
   if (!sessionEmail) return null;
   
@@ -50,7 +50,7 @@ router.get('/api/notifications', isAuthenticated, async (req, res) => {
     }
     
     let query = 'SELECT * FROM notifications WHERE LOWER(user_email) = LOWER($1)';
-    const params: any[] = [effective.email];
+    const params: (string | boolean)[] = [effective.email];
     
     if (unread_only === 'true') {
       query += ' AND is_read = false';
@@ -62,7 +62,7 @@ router.get('/api/notifications', isAuthenticated, async (req, res) => {
     
     // Convert timestamps to proper ISO format for UTC interpretation
     // Database stores 'timestamp without time zone' in UTC, but pg driver returns it without 'Z' suffix
-    const notifications = result.rows.map((row: any) => {
+    const notifications = result.rows.map((row: Record<string, unknown>) => {
       if (!row.created_at) return row;
       
       const createdAtStr = String(row.created_at);

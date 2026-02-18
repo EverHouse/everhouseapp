@@ -23,7 +23,7 @@ router.get('/api/admin/email-templates/:templateId/preview', isStaffOrAdmin, asy
       return res.status(404).json({ error: 'Template not found' });
     }
 
-    logFromRequest(req, 'view' as any, 'system' as any, templateId as string, `Email template preview: ${templateId}`);
+    logFromRequest(req, 'view', 'system', templateId as string, `Email template preview: ${templateId}`);
 
     res.json({ html });
   } catch (error: unknown) {

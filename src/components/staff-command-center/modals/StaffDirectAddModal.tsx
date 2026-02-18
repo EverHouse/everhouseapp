@@ -101,7 +101,7 @@ export const StaffDirectAddModal: React.FC<StaffDirectAddModalProps> = ({
     setError(null);
 
     try {
-      let body: any = {};
+      let body: Record<string, unknown> = {};
 
       if (mode === 'member') {
         if (!selectedMember) {

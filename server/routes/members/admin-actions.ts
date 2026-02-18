@@ -9,6 +9,7 @@ import { getSessionUser } from '../../types/session';
 import { TIER_NAMES } from '../../../shared/constants/tiers';
 import { getTierRank } from './helpers';
 import { createMemberLocally, queueMemberCreation, getAllDiscountRules, handleTierChange, queueTierSync } from '../../core/hubspot';
+import Stripe from 'stripe';
 import { changeSubscriptionTier, pauseSubscription } from '../../core/stripe';
 import { notifyMember } from '../../core/notificationService';
 import { broadcastTierUpdate } from '../../core/websocket';
@@ -28,7 +29,7 @@ router.patch('/api/members/:email/tier', isStaffOrAdmin, async (req, res) => {
     
     const normalizedTier = tier === '' || tier === null || tier === undefined ? null : tier;
     
-    if (normalizedTier !== null && !TIER_NAMES.includes(normalizedTier as any)) {
+    if (normalizedTier !== null && !(TIER_NAMES as readonly string[]).includes(normalizedTier)) {
       return res.status(400).json({ error: `Invalid tier. Must be one of: ${TIER_NAMES.join(', ')} or empty to clear` });
     }
     
@@ -90,7 +91,7 @@ router.patch('/api/members/:email/tier', isStaffOrAdmin, async (req, res) => {
       ? `${sessionUser.firstName} ${sessionUser.lastName || ''}`.trim() 
       : sessionUser?.email?.split('@')[0] || 'Staff';
 
-    let hubspotResult: any = { success: true, oldLineItemRemoved: false, newLineItemAdded: false };
+    let hubspotResult: Record<string, unknown> = { success: true, oldLineItemRemoved: false, newLineItemAdded: false };
 
     if (normalizedTier) {
       hubspotResult = await handleTierChange(
@@ -382,7 +383,7 @@ router.delete('/api/members/:email', isStaffOrAdmin, async (req, res) => {
             let hasMore = true;
             let startingAfter: string | undefined;
             while (hasMore) {
-              const params: any = { customer: stripeCustomerId, limit: 100 };
+              const params: Stripe.SubscriptionListParams = { customer: stripeCustomerId, limit: 100 };
               if (startingAfter) params.starting_after = startingAfter;
               const subscriptions = await stripe.subscriptions.list(params);
               for (const sub of subscriptions.data) {
@@ -478,7 +479,7 @@ router.delete('/api/members/:email/permanent', isAdmin, async (req, res) => {
     deletionLog.push('wellness_enrollments');
     
     const sessionIdsResult = await db.execute(sql`SELECT DISTINCT session_id FROM booking_requests WHERE (LOWER(user_email) = ${normalizedEmail} OR user_id = ${userId}) AND session_id IS NOT NULL`);
-    const sessionIds = (sessionIdsResult.rows as any[]).map((r: any) => r.session_id);
+    const sessionIds = (sessionIdsResult.rows as Record<string, unknown>[]).map((r) => r.session_id);
     deletionLog.push(`booking_session_ids_found (${sessionIds.length})`);
 
     await db.execute(sql`DELETE FROM booking_fee_snapshots WHERE booking_id IN (SELECT id FROM booking_requests WHERE LOWER(user_email) = ${normalizedEmail} OR user_id = ${userId})`);
@@ -637,7 +638,7 @@ router.delete('/api/members/:email/permanent', isAdmin, async (req, res) => {
         let hasMore = true;
         let startingAfter: string | undefined;
         while (hasMore) {
-          const params: any = { customer: stripeCustomerId, limit: 100 };
+          const params: Stripe.SubscriptionListParams = { customer: stripeCustomerId, limit: 100 };
           if (startingAfter) params.starting_after = startingAfter;
           const subscriptions = await stripe.subscriptions.list(params);
           for (const sub of subscriptions.data) {
@@ -826,7 +827,7 @@ router.get('/api/members/add-options', isStaffOrAdmin, async (req, res) => {
     
     res.json({
       tiers: TIER_NAMES,
-      tiersWithIds: tiersResult.rows.map((t: any) => ({
+      tiersWithIds: tiersResult.rows.map((t: Record<string, unknown>) => ({
         id: t.id,
         name: t.name,
         slug: t.slug,
@@ -866,7 +867,7 @@ router.post('/api/members', isStaffOrAdmin, async (req, res) => {
     if (!email || typeof email !== 'string' || !email.includes('@')) {
       return res.status(400).json({ error: 'Valid email is required' });
     }
-    if (!tier || !TIER_NAMES.includes(tier as any)) {
+    if (!tier || !(TIER_NAMES as readonly string[]).includes(tier)) {
       return res.status(400).json({ error: `Invalid tier. Must be one of: ${TIER_NAMES.join(', ')}` });
     }
     
@@ -1043,7 +1044,7 @@ router.post('/api/members/admin/bulk-tier-update', isStaffOrAdmin, async (req, r
     
     // For non-dry-run: queue the updates as background jobs
     const { queueJobs } = await import('../../core/jobQueue');
-    const jobsToQueue: Array<{ jobType: 'update_member_tier'; payload: any; options?: any }> = [];
+    const jobsToQueue: Array<{ jobType: 'update_member_tier'; payload: Record<string, unknown>; options?: Record<string, unknown> }> = [];
     
     for (const member of members) {
       const { email, tier: csvTier } = member;
@@ -1291,7 +1292,7 @@ router.post('/api/members/merge/execute', isAdmin, async (req, res) => {
     
     const result = await executeMerge(primaryUserId, secondaryUserId, sessionUser?.email || 'admin');
     
-    logFromRequest(req, 'merge_users' as any, 'user', primaryUserId, undefined, {
+    logFromRequest(req, 'merge_users', 'user', primaryUserId, undefined, {
       secondary_user_id: secondaryUserId,
       records_merged: result.recordsMerged,
       merged_lifetime_visits: result.mergedLifetimeVisits
@@ -1320,7 +1321,7 @@ router.post('/api/members/backfill-discount-codes', isAdmin, async (req, res) =>
     for (let i = 0; i < total; i += BATCH_SIZE) {
       const batch = usersWithSubs.rows.slice(i, i + BATCH_SIZE);
       
-      await Promise.all(batch.map(async (row: any) => {
+      await Promise.all(batch.map(async (row: Record<string, unknown>) => {
         try {
           const subscription = await stripe.subscriptions.retrieve(row.stripe_subscription_id);
           const couponName = subscription.discount?.coupon?.name;

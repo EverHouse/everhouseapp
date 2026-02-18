@@ -331,7 +331,7 @@ router.get('/api/member/dashboard-data', isAuthenticated, async (req, res) => {
         const userResult = await withRetry(() =>
           db.execute(sql`SELECT tier FROM users WHERE LOWER(email) = LOWER(${userEmail}) LIMIT 1`)
         );
-        const actualTier = (userResult as any).rows?.[0]?.tier || null;
+        const actualTier = (userResult as Record<string, unknown> & { rows?: Record<string, unknown>[] }).rows?.[0]?.tier as string || null;
         
         const tierLimits = actualTier ? await getTierLimits(actualTier) : null;
         const passesTotal = tierLimits?.guest_passes_per_month ?? 0;

@@ -1,9 +1,9 @@
-type LazyComponent = { prefetch?: () => Promise<any> };
+type LazyComponent = { prefetch?: () => Promise<unknown> };
 
 const prefetchedPaths = new Set<string>();
 const prefetchedAPIs = new Set<string>();
 
-const routeImports: Record<string, () => Promise<any>> = {
+const routeImports: Record<string, () => Promise<{ default: React.ComponentType<Record<string, unknown>> }>> = {
   '/book': () => import('../pages/Member/BookGolf'),
   '/member-events': () => import('../pages/Member/Events'),
   '/member-wellness': () => import('../pages/Member/Wellness'),
@@ -53,14 +53,14 @@ export const prefetchAllNavRoutes = () => {
 
 export const prefetchOnIdle = () => {
   if ('requestIdleCallback' in window) {
-    (window as any).requestIdleCallback(() => prefetchAllNavRoutes(), { timeout: 2000 });
+    (window as unknown as { requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => void }).requestIdleCallback(() => prefetchAllNavRoutes(), { timeout: 2000 });
   } else {
     setTimeout(prefetchAllNavRoutes, 100);
   }
 };
 
 // Staff portal prefetching
-const staffRouteImports: Record<string, () => Promise<any>> = {
+const staffRouteImports: Record<string, () => Promise<{ default: React.ComponentType<Record<string, unknown>> }>> = {
   '/admin': () => import('../pages/Admin/AdminDashboard'),
   '/admin/bookings': () => import('../pages/Admin/tabs/SimulatorTab'),
   '/admin/financials': () => import('../pages/Admin/tabs/FinancialsTab'),

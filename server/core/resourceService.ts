@@ -441,7 +441,7 @@ export async function fetchBookings(params: {
   includeAll?: boolean;
   includeArchived?: boolean;
 }) {
-  let conditions: any[] = [];
+  let conditions: ReturnType<typeof eq | typeof sql>[] = [];
   
   if (!params.includeArchived) {
     conditions.push(sql`${bookingRequests.archivedAt} IS NULL`);
@@ -595,8 +595,8 @@ export async function approveBooking(bookingId: number) {
       try {
         const dateStr = typeof updated.requestDate === 'string'
           ? updated.requestDate
-          : (updated.requestDate as any) instanceof Date
-            ? (updated.requestDate as any).toISOString().split('T')[0]
+          : (updated.requestDate as unknown) instanceof Date
+            ? (updated.requestDate as Date).toISOString().split('T')[0]
             : '';
         await ensureSessionForBooking({
           bookingId: updated.id,
@@ -714,7 +714,7 @@ export async function assignMemberToBooking(bookingId: number, memberEmail: stri
     action: 'member_assigned',
     memberEmail: memberEmail,
     memberName: memberName
-  } as any);
+  });
   
   const formattedDate = result.requestDate ? new Date(result.requestDate).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) : '';
   const formattedTime = result.startTime || '';
@@ -909,7 +909,7 @@ export async function convertToInstructorBlock(
     noticeType: 'private_event',
     isActive: true,
     createdBy: staffEmail
-  } as any).returning();
+  } as typeof facilityClosures.$inferInsert).returning();
   
   await db.insert(availabilityBlocks).values({
     closureId: closure.id,
@@ -943,7 +943,7 @@ export async function convertToInstructorBlock(
     closureId: closure.id,
     instructorEmail: ownerEmail,
     instructorName: ownerName
-  } as any);
+  });
   
   return closure;
 }
@@ -992,7 +992,7 @@ export async function linkTrackmanToMember(
         ORDER BY created_at DESC
         LIMIT 1
       `);
-      const webhookLog = (webhookResult as any).rows?.[0] ?? (webhookResult as any)[0];
+      const webhookLog = (webhookResult as { rows?: Record<string, unknown>[] }).rows?.[0] ?? (webhookResult as Record<string, unknown>[])[0];
       
       if (!webhookLog) {
         throw { statusCode: 404, error: 'Trackman booking not found in webhook logs' };
@@ -1047,7 +1047,7 @@ export async function linkTrackmanToMember(
           staffNotes: `[Linked from Trackman webhook by staff: ${ownerName} with ${totalPlayerCount} players]`,
           createdAt: new Date(),
           updatedAt: new Date()
-        } as any)
+        } as typeof bookingRequests.$inferInsert)
         .returning();
       booking = newBooking;
       created = true;
@@ -1101,7 +1101,7 @@ export async function linkTrackmanToMember(
   
   if (result.sessionId) {
     try {
-      await recalculateSessionFees(result.sessionId, 'approval' as any);
+      await recalculateSessionFees(result.sessionId, 'approval');
       logger.info('[link-trackman-to-member] Recalculated fees after member assignment', {
         extra: { bookingId: result.booking.id, sessionId: result.sessionId, newOwner: ownerEmail }
       });
@@ -1120,7 +1120,7 @@ export async function linkTrackmanToMember(
     memberEmail: ownerEmail,
     memberName: ownerName,
     totalPlayers: totalPlayerCount
-  } as any);
+  });
   
   return result;
 }
@@ -1213,7 +1213,7 @@ export async function markBookingAsEvent(params: {
   existingClosureId?: number;
   staffEmail: string;
 }) {
-  let primaryBooking: any;
+  let primaryBooking: typeof bookingRequests.$inferSelect | undefined;
   let isFromUnmatched = false;
   
   if (params.bookingId) {
@@ -1281,7 +1281,7 @@ export async function markBookingAsEvent(params: {
     endTime = `${String(endHours).padStart(2, '0')}:${String(endMins).padStart(2, '0')}:00`;
   }
   
-  let relatedBookings: any[] = [];
+  let relatedBookings: (typeof bookingRequests.$inferSelect)[] = [];
   let relatedUnmatchedIds: number[] = [];
   
   if (userName && bookingDate && startTime) {
@@ -1337,7 +1337,7 @@ export async function markBookingAsEvent(params: {
   const eventTitle = primaryBooking.userName || 'Private Event';
   
   const result = await db.transaction(async (tx) => {
-    let closure: any = null;
+    let closure: typeof facilityClosures.$inferSelect | null = null;
     let linkedToExisting = false;
     
     if (params.existingClosureId) {
@@ -1458,13 +1458,10 @@ export async function markBookingAsEvent(params: {
     action: 'converted_to_private_event',
     bookingIds: result.bookingIds,
     closureId: result.closure?.id
-  } as any);
+  });
   
   if (result.closure) {
-    broadcastClosureUpdate({
-      type: 'closure_created',
-      closureId: result.closure.id
-    } as any);
+    broadcastClosureUpdate('created', result.closure.id);
   }
   
   let message = `Converted ${result.bookingIds.length} booking(s) to private event`;
@@ -1565,7 +1562,7 @@ export async function assignWithPlayers(
   
   if (result.sessionId) {
     try {
-      await recalculateSessionFees(result.sessionId, 'approval' as any);
+      await recalculateSessionFees(result.sessionId, 'approval');
       logger.info('[assign-with-players] Recalculated fees after member assignment', {
         extra: { bookingId, sessionId: result.sessionId, newOwner: owner.email }
       });
@@ -1630,7 +1627,7 @@ export async function assignWithPlayers(
     memberEmail: owner.email,
     memberName: owner.name,
     totalPlayers: totalPlayerCount
-  } as any);
+  });
   
   if (owner.member_id) {
     try {
@@ -1710,7 +1707,7 @@ export async function changeBookingOwner(bookingId: number, newEmail: string, ne
     previousOwner,
     newOwnerEmail: newEmail,
     newOwnerName: newName
-  } as any);
+  });
   
   return { booking: updated, previousOwner };
 }
@@ -2274,12 +2271,12 @@ export async function checkinBooking(bookingId: number, staffEmail: string | und
   `, [bookingId]);
   
   if (unpaidCheck.rows.length > 0) {
-    const unpaidNames = unpaidCheck.rows.map((r: any) => r.display_name).join(', ');
+    const unpaidNames = unpaidCheck.rows.map((r: Record<string, unknown>) => r.display_name).join(', ');
     throw {
       statusCode: 402,
       error: 'OUTSTANDING_BALANCE',
       message: `Cannot check in - outstanding fees for: ${unpaidNames}. Please collect payment first.`,
-      unpaidParticipants: unpaidCheck.rows.map((r: any) => ({
+      unpaidParticipants: unpaidCheck.rows.map((r: Record<string, unknown>) => ({
         id: r.id,
         name: r.display_name,
         status: r.payment_status,

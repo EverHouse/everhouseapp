@@ -68,7 +68,7 @@ export async function createSession(
       startTime: request.startTime,
       endTime: request.endTime,
       trackmanBookingId: request.trackmanBookingId,
-      source: source as any,
+      source: source as BookingSource,
       createdBy: request.createdBy
     };
     
@@ -328,7 +328,7 @@ export async function recordUsage(
           input.memberId 
             ? eq(usageLedger.memberId, input.memberId) 
             : isNull(usageLedger.memberId),
-          eq(usageLedger.source, source as any)
+          eq(usageLedger.source, source as BookingSource)
         )
       )
       .limit(1);
@@ -363,7 +363,7 @@ export async function recordUsage(
       guestFee: input.guestFee?.toString() ?? '0.00',
       tierAtBooking,
       paymentMethod: input.paymentMethod ?? 'unpaid',
-      source: source as any
+      source: source as BookingSource
     };
     
     await dbCtx.insert(usageLedger).values(usageData);
@@ -895,7 +895,7 @@ export async function createSessionWithUsageTracking(
           `);
           
           if (holdResult.rows && holdResult.rows.length > 0) {
-            const passesToConvert = (holdResult.rows[0] as any).passes_held || 0;
+            const passesToConvert = (holdResult.rows[0] as Record<string, unknown>).passes_held as number || 0;
             
             if (passesToConvert > 0) {
               // Verify we don't exceed total passes available
@@ -906,7 +906,9 @@ export async function createSessionWithUsageTracking(
               `);
               
               if (passCheck.rows && passCheck.rows.length > 0) {
-                const { passes_total, passes_used } = passCheck.rows[0] as any;
+                const passRow = passCheck.rows[0] as Record<string, unknown>;
+                const passes_total = passRow.passes_total as number;
+                const passes_used = passRow.passes_used as number;
                 if (passes_used + passesToConvert > passes_total) {
                   throw new Error(
                     `Insufficient guest passes: have ${passes_total - passes_used}, need ${passesToConvert}. ` +
@@ -946,7 +948,9 @@ export async function createSessionWithUsageTracking(
           `);
           
           if (passCheck.rows && passCheck.rows.length > 0) {
-            const { passes_total, passes_used } = passCheck.rows[0] as any;
+            const passRow = passCheck.rows[0] as Record<string, unknown>;
+            const passes_total = passRow.passes_total as number;
+            const passes_used = passRow.passes_used as number;
             const available = passes_total - passes_used;
             
             if (available < passesNeeded) {

@@ -1,5 +1,6 @@
 import { getResendClient } from '../utils/resend';
 import { getErrorMessage } from '../utils/errorUtils';
+import { logger } from '../core/logger';
 
 const CLUB_COLORS = {
   deepGreen: '#293515',
@@ -266,10 +267,10 @@ export async function sendOnboardingNudge24h(email: string, firstName?: string):
       html: getNudge24hHtml(firstName)
     });
 
-    console.log(`[Onboarding Nudge] 24h nudge sent successfully to ${email}`);
+    logger.info(`[Onboarding Nudge] 24h nudge sent successfully to ${email}`);
     return { success: true };
   } catch (error: unknown) {
-    console.error(`[Onboarding Nudge] Failed to send 24h nudge to ${email}:`, getErrorMessage(error));
+    logger.error(`[Onboarding Nudge] Failed to send 24h nudge to ${email}:`, { extra: { errorMessage: getErrorMessage(error) } });
     return { success: false, error: getErrorMessage(error) };
   }
 }
@@ -285,10 +286,10 @@ export async function sendOnboardingNudge72h(email: string, firstName?: string):
       html: getNudge72hHtml(firstName)
     });
 
-    console.log(`[Onboarding Nudge] 72h nudge sent successfully to ${email}`);
+    logger.info(`[Onboarding Nudge] 72h nudge sent successfully to ${email}`);
     return { success: true };
   } catch (error: unknown) {
-    console.error(`[Onboarding Nudge] Failed to send 72h nudge to ${email}:`, getErrorMessage(error));
+    logger.error(`[Onboarding Nudge] Failed to send 72h nudge to ${email}:`, { extra: { errorMessage: getErrorMessage(error) } });
     return { success: false, error: getErrorMessage(error) };
   }
 }
@@ -304,10 +305,10 @@ export async function sendOnboardingNudge7d(email: string, firstName?: string): 
       html: getNudge7dHtml(firstName)
     });
 
-    console.log(`[Onboarding Nudge] 7d nudge sent successfully to ${email}`);
+    logger.info(`[Onboarding Nudge] 7d nudge sent successfully to ${email}`);
     return { success: true };
   } catch (error: unknown) {
-    console.error(`[Onboarding Nudge] Failed to send 7d nudge to ${email}:`, getErrorMessage(error));
+    logger.error(`[Onboarding Nudge] Failed to send 7d nudge to ${email}:`, { extra: { errorMessage: getErrorMessage(error) } });
     return { success: false, error: getErrorMessage(error) };
   }
 }

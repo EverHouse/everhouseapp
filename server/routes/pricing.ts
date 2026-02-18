@@ -7,7 +7,7 @@ import { eq } from 'drizzle-orm';
 const router = Router();
 
 router.get('/api/pricing', async (req, res) => {
-  const response: any = {
+  const response: Record<string, unknown> = {
     guestFeeDollars: PRICING.GUEST_FEE_DOLLARS,
     overageRatePerBlockDollars: PRICING.OVERAGE_RATE_DOLLARS,
     overageBlockMinutes: PRICING.OVERAGE_BLOCK_MINUTES,

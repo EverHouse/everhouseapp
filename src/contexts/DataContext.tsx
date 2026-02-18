@@ -14,6 +14,57 @@ import {
 
 export type { CafeItem, EventSource, EventData, Announcement, MemberProfile, Booking };
 
+interface DirectoryContact {
+  id: string;
+  firstName?: string;
+  lastName?: string;
+  email: string;
+  phone?: string;
+  tier?: string;
+  rawTier?: string;
+  tags?: string[];
+  status?: string;
+  lifetimeVisits?: number;
+  lastBookingDate?: string;
+  joinDate?: string;
+  mindbodyClientId?: string;
+  stripeCustomerId?: string;
+  hubspotId?: string;
+  manuallyLinkedEmails?: string[];
+  billingProvider?: string;
+  billing_provider?: string;
+  membershipStatus?: string;
+  firstLoginAt?: string;
+  lastTier?: string;
+  billingGroupId?: number | null;
+  discountCode?: string;
+}
+
+interface CafeMenuItem {
+  id: number | string;
+  category: string;
+  name: string;
+  price: string | number;
+  description?: string;
+  icon?: string;
+  image_url?: string;
+}
+
+interface DBEventRecord {
+  id: number | string;
+  source?: string;
+  eventbrite_url?: string;
+  external_url?: string;
+  title: string;
+  category?: string;
+  event_date: string;
+  start_time?: string;
+  location?: string;
+  image_url?: string;
+  description?: string;
+  max_attendees?: number;
+}
+
 // Pagination response type for paginated member fetching
 export interface PaginatedMembersResponse {
   members: MemberProfile[];
@@ -57,7 +108,7 @@ interface DataContextType {
   
   // Auth Actions
   login: (email: string) => Promise<void>;
-  loginWithMember: (member: any) => void;
+  loginWithMember: (member: MemberProfile) => void;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
   
@@ -385,7 +436,7 @@ export const DataProvider: React.FC<{children: ReactNode}> = ({ children }) => {
         if (res.ok) {
           const data = await res.json();
           const contacts = Array.isArray(data) ? data : (data.contacts || []);
-          const formatted: MemberProfile[] = contacts.map((contact: any) => ({
+          const formatted: MemberProfile[] = contacts.map((contact: DirectoryContact) => ({
             id: contact.id,
             name: [contact.firstName, contact.lastName].filter(Boolean).join(' ') || contact.email || 'Unknown',
             tier: contact.tier || '',
@@ -455,7 +506,7 @@ export const DataProvider: React.FC<{children: ReactNode}> = ({ children }) => {
       if (res.ok) {
         const data = await res.json();
         const contacts = Array.isArray(data) ? data : (data.contacts || []);
-        const formatted: MemberProfile[] = contacts.map((contact: any) => ({
+        const formatted: MemberProfile[] = contacts.map((contact: DirectoryContact) => ({
           id: contact.id,
           name: [contact.firstName, contact.lastName].filter(Boolean).join(' ') || contact.email || 'Unknown',
           tier: contact.tier || '',
@@ -501,7 +552,7 @@ export const DataProvider: React.FC<{children: ReactNode}> = ({ children }) => {
       if (res.ok) {
         const data = await res.json();
         const contacts = Array.isArray(data) ? data : (data.contacts || []);
-        const formatted: MemberProfile[] = contacts.map((contact: any) => ({
+        const formatted: MemberProfile[] = contacts.map((contact: DirectoryContact) => ({
           id: contact.id,
           name: [contact.firstName, contact.lastName].filter(Boolean).join(' ') || contact.email || 'Unknown',
           tier: contact.tier || '',
@@ -562,7 +613,7 @@ export const DataProvider: React.FC<{children: ReactNode}> = ({ children }) => {
       if (res.ok) {
         const data = await res.json();
         const contacts = Array.isArray(data) ? data : (data.contacts || []);
-        const formatted: MemberProfile[] = contacts.map((contact: any) => ({
+        const formatted: MemberProfile[] = contacts.map((contact: DirectoryContact) => ({
           id: contact.id,
           name: [contact.firstName, contact.lastName].filter(Boolean).join(' ') || contact.email || 'Unknown',
           tier: contact.tier || '',
@@ -667,7 +718,7 @@ export const DataProvider: React.FC<{children: ReactNode}> = ({ children }) => {
         if (res.ok) {
           const data = await res.json();
           if (Array.isArray(data) && data.length > 0) {
-            setCafeMenu(data.map((item: any) => ({
+            setCafeMenu(data.map((item: CafeMenuItem) => ({
               id: item.id.toString(),
               category: item.category,
               name: item.name,
@@ -747,7 +798,7 @@ export const DataProvider: React.FC<{children: ReactNode}> = ({ children }) => {
   }, [refreshAnnouncements]);
 
   const refreshCafeMenu = useCallback(async () => {
-    const formatCafeData = (data: any[]) => data.map((item: any) => ({
+    const formatCafeData = (data: CafeMenuItem[]) => data.map((item: CafeMenuItem) => ({
       id: item.id.toString(),
       category: item.category,
       name: item.name,
@@ -937,7 +988,7 @@ export const DataProvider: React.FC<{children: ReactNode}> = ({ children }) => {
       return categoryMap[lower] || cat.charAt(0).toUpperCase() + cat.slice(1).toLowerCase();
     };
 
-    const formatEventData = (data: any[]) => data.map((event: any) => ({
+    const formatEventData = (data: DBEventRecord[]) => data.map((event: DBEventRecord) => ({
       id: event.id.toString(),
       source: event.source === 'eventbrite' ? 'eventbrite' : 'internal',
       externalLink: event.eventbrite_url || event.external_url || undefined,
@@ -1014,7 +1065,7 @@ export const DataProvider: React.FC<{children: ReactNode}> = ({ children }) => {
     setSessionVersion(v => v + 1);
   }, [sessionChecked]);
 
-  const loginWithMember = useCallback((member: any) => {
+  const loginWithMember = useCallback((member: MemberProfile) => {
     const memberProfile: MemberProfile = {
       id: member.id,
       name: [member.firstName, member.lastName].filter(Boolean).join(' ') || member.email || 'Member',
@@ -1278,7 +1329,7 @@ export const DataProvider: React.FC<{children: ReactNode}> = ({ children }) => {
         if (eventsRes.ok) {
           const data = await eventsRes.json();
           if (data?.length) {
-            const formatEventData = (events: any[]) => events.map((event: any) => ({
+            const formatEventData = (events: DBEventRecord[]) => events.map((event: DBEventRecord) => ({
               id: event.id.toString(),
               source: event.source === 'eventbrite' ? 'eventbrite' : 'internal',
               externalLink: event.eventbrite_url || event.external_url || undefined,

@@ -3,7 +3,7 @@ import { sql } from 'drizzle-orm';
 import { logger } from './logger';
 
 function isTableMissingError(error: unknown): boolean {
-  const code = (error as any)?.code;
+  const code = (error as Record<string, unknown>)?.code;
   if (code === '42P01') return true;
   const msg = error instanceof Error ? error.message : String(error);
   return msg.includes('42P01') || msg.includes('relation "session" does not exist') || msg.includes('relation \\"session\\" does not exist');
@@ -56,14 +56,14 @@ export async function getSessionStats(): Promise<{
       FROM session
     `);
     
-    const row = result.rows[0] as any;
+    const row = result.rows[0] as Record<string, unknown>;
     
     return {
-      total: parseInt(row.total) || 0,
-      active: parseInt(row.active) || 0,
-      expired: parseInt(row.expired) || 0,
-      oldestActive: row.oldest_active ? new Date(row.oldest_active) : null,
-      newestActive: row.newest_active ? new Date(row.newest_active) : null,
+      total: parseInt(String(row.total)) || 0,
+      active: parseInt(String(row.active)) || 0,
+      expired: parseInt(String(row.expired)) || 0,
+      oldestActive: row.oldest_active ? new Date(String(row.oldest_active)) : null,
+      newestActive: row.newest_active ? new Date(String(row.newest_active)) : null,
     };
   } catch (error) {
     if (isTableMissingError(error)) {

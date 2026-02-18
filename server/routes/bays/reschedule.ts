@@ -204,7 +204,7 @@ router.post('/api/admin/booking/:id/reschedule/confirm', isStaffOrAdmin, async (
 
     if (updated.session_id) {
       try {
-        await recalculateSessionFees(updated.session_id, 'reschedule' as any);
+        await recalculateSessionFees(updated.session_id, 'reschedule');
         logger.info('[Reschedule] Recalculated session fees after reschedule', {
           extra: { bookingId, sessionId: updated.session_id }
         });
@@ -244,7 +244,7 @@ router.post('/api/admin/booking/:id/reschedule/confirm', isStaffOrAdmin, async (
     }
 
     const newBayResult = await db.execute(sql`SELECT name FROM resources WHERE id = ${resource_id}`);
-    const newBayName = (newBayResult.rows[0] as any)?.name || 'Unknown';
+    const newBayName = (newBayResult.rows[0] as Record<string, unknown>)?.name || 'Unknown';
 
     logFromRequest(req, {
       action: 'booking_rescheduled',
@@ -268,7 +268,7 @@ router.post('/api/admin/booking/:id/reschedule/confirm', isStaffOrAdmin, async (
         date: originalDate as string,
         action: 'updated'
       });
-      if (resource_id !== (originalResourceId as any) || request_date !== (originalDate as any)) {
+      if (resource_id !== Number(originalResourceId) || request_date !== String(originalDate)) {
         broadcastAvailabilityUpdate({
           resourceId: resource_id,
           resourceType: 'simulator',

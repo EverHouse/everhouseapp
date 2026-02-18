@@ -21,7 +21,7 @@ interface QueueJobOptions {
 
 export async function enqueueHubSpotSync(
   operation: HubSpotOperation,
-  payload: Record<string, any>,
+  payload: Record<string, unknown>,
   options: QueueJobOptions = {}
 ): Promise<number | null> {
   const { priority = 5, idempotencyKey, maxRetries = 5 } = options;
@@ -35,7 +35,7 @@ export async function enqueueHubSpotSync(
         logger.info('[HubSpot Queue] Duplicate job skipped', { 
           extra: { idempotencyKey, existingId: existing.rows[0].id }
         });
-        return (existing.rows[0] as any).id;
+        return (existing.rows[0] as Record<string, unknown>).id as number;
       }
     }
     
@@ -44,10 +44,10 @@ export async function enqueueHubSpotSync(
        RETURNING id`);
     
     logger.info('[HubSpot Queue] Job enqueued', { 
-      extra: { jobId: (result.rows[0] as any).id, operation, idempotencyKey }
+      extra: { jobId: (result.rows[0] as Record<string, unknown>).id, operation, idempotencyKey }
     });
     
-    return (result.rows[0] as any).id;
+    return (result.rows[0] as Record<string, unknown>).id as number;
   } catch (error: unknown) {
     logger.error('[HubSpot Queue] Failed to enqueue job', { 
       error: error as Error,
@@ -96,7 +96,7 @@ export async function processHubSpotQueue(batchSize: number = 10): Promise<{
   });
   
   for (const _job of result.rows) {
-    const job = _job as any;
+    const job = _job as Record<string, unknown>;
     stats.processed++;
     
     try {
@@ -205,7 +205,7 @@ export async function processHubSpotQueue(batchSize: number = 10): Promise<{
 }
 
 // Execute a specific HubSpot operation
-async function executeHubSpotOperation(operation: string, payload: any): Promise<void> {
+async function executeHubSpotOperation(operation: string, payload: Record<string, unknown>): Promise<void> {
   // Import handlers dynamically to avoid circular deps
   const members = await import('./members');
   const contacts = await import('./contacts');
@@ -309,12 +309,12 @@ export async function getQueueStats(): Promise<{
     FROM hubspot_sync_queue
   `);
   
-  const statsRow = result.rows[0] as any;
+  const statsRow = result.rows[0] as Record<string, unknown>;
   return {
-    pending: parseInt(statsRow.pending) || 0,
-    processing: parseInt(statsRow.processing) || 0,
-    failed: parseInt(statsRow.failed) || 0,
-    dead: parseInt(statsRow.dead) || 0,
-    completedToday: parseInt(statsRow.completed_today) || 0
+    pending: parseInt(String(statsRow.pending)) || 0,
+    processing: parseInt(String(statsRow.processing)) || 0,
+    failed: parseInt(String(statsRow.failed)) || 0,
+    dead: parseInt(String(statsRow.dead)) || 0,
+    completedToday: parseInt(String(statsRow.completed_today)) || 0
   };
 }

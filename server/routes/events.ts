@@ -11,7 +11,7 @@ import { createPacificDate, parseLocalDate, formatDateDisplayWithDay, getTodayPa
 import { getAllActiveBayIds, getConferenceRoomId } from '../core/affectedAreas';
 import { sendNotificationToUser, broadcastToStaff } from '../core/websocket';
 import { getSessionUser } from '../types/session';
-import { logFromRequest } from '../core/auditLog';
+import { logFromRequest, type AuditAction } from '../core/auditLog';
 import { getErrorMessage } from '../utils/errorUtils';
 import { logger } from '../core/logger';
 
@@ -152,7 +152,7 @@ router.post('/api/events/sync', isStaffOrAdmin, async (req, res) => {
     let eventbriteResult = { synced: 0, created: 0, updated: 0, error: 'No Eventbrite token configured' };
     const eventbriteToken = process.env.EVENTBRITE_PRIVATE_TOKEN;
     if (eventbriteToken) {
-      eventbriteResult = { synced: 0, created: 0, updated: 0, error: undefined as any };
+      eventbriteResult = { synced: 0, created: 0, updated: 0, error: undefined as string | undefined };
     }
     
     logFromRequest(req, 'sync_events', 'event', undefined, 'Event Sync', {
@@ -272,7 +272,7 @@ router.post('/api/events/:id/mark-reviewed', isStaffOrAdmin, async (req, res) =>
 router.get('/api/events', async (req, res) => {
   try {
     const { date, include_past, visibility, include_archived } = req.query;
-    const conditions: any[] = [];
+    const conditions: ReturnType<typeof sql>[] = [];
     const todayPacific = getTodayPacific();
     
     // Filter archived records by default unless include_archived=true
@@ -507,7 +507,7 @@ router.put('/api/events/:id', isStaffOrAdmin, async (req, res) => {
     const hasLocation = location && location.trim() !== '';
     const shouldClearReview = existing[0]?.needsReview && hasValidCategory && hasDescription && hasLocation;
     
-    const updateData: any = {
+    const updateData: Record<string, unknown> = {
       title: trimmedTitle,
       description,
       eventDate: trimmedEventDate,
@@ -663,7 +663,7 @@ router.delete('/api/events/:id', isStaffOrAdmin, async (req, res) => {
           logger.error(`[Events] Calendar "${CALENDAR_CONFIG.events.name}" not found for event deletion`);
         }
       } catch (calError: unknown) {
-        logger.error('Failed to delete Google Calendar event', { extra: { error: (calError as any)?.message || calError } });
+        logger.error('Failed to delete Google Calendar event', { extra: { error: (calError as Error)?.message || calError } });
       }
     }
     
@@ -697,8 +697,8 @@ router.delete('/api/events/:id', isStaffOrAdmin, async (req, res) => {
     
     res.json({ success: true, archived: true, archivedBy });
   } catch (error: unknown) {
-    logger.error('Event archive error', { extra: { error: (error as any)?.message || error } });
-    res.status(500).json({ error: 'Failed to archive event', details: (error as any)?.message });
+    logger.error('Event archive error', { extra: { error: (error as Error)?.message || error } });
+    res.status(500).json({ error: 'Failed to archive event', details: (error as Error)?.message });
   }
 });
 
@@ -742,7 +742,20 @@ router.post('/api/eventbrite/sync', isStaffOrAdmin, async (req, res) => {
       return res.status(400).json({ error: 'Failed to fetch Eventbrite events' });
     }
 
-    const eventsData = await eventsResponse.json() as { events?: any[] };
+    interface EventbriteEvent {
+      id: string;
+      name?: { text?: string };
+      description?: { text?: string };
+      start?: { local?: string };
+      end?: { local?: string };
+      venue?: { name?: string };
+      online_event?: boolean;
+      logo?: { url?: string };
+      url?: string;
+      capacity?: number;
+    }
+
+    const eventsData = await eventsResponse.json() as { events?: EventbriteEvent[] };
     const eventbriteEvents = eventsData.events || [];
 
     let synced = 0;
@@ -1084,7 +1097,7 @@ router.delete('/api/rsvps/:event_id/:user_email', async (req, res) => {
       memberEmail: user_email
     });
     
-    logFromRequest(req, 'cancel_event_rsvp' as any, 'event', event_id as string, undefined, {
+    logFromRequest(req, 'cancel_event_rsvp', 'event', event_id as string, undefined, {
       member_email: user_email,
       event_title: evt.title,
       event_date: evt.eventDate

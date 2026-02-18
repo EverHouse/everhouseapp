@@ -1,16 +1,17 @@
+import type { GuestPassInfo, GuestCheckInItem } from './memberProfileTypes';
 import React from 'react';
 import MemberBillingTab from '../admin/MemberBillingTab';
 import type { GuestVisit } from './memberProfileTypes';
 
 interface BillingTabProps {
   memberEmail: string;
-  memberId: any;
+  memberId: string | number;
   displayedTier: string;
   onTierUpdate: (newTier: string) => void;
-  guestPassInfo: any | null;
+  guestPassInfo: GuestPassInfo | null;
   guestHistory: GuestVisit[];
-  guestCheckInsHistory: any[];
-  purchases: any[];
+  guestCheckInsHistory: GuestCheckInItem[];
+  purchases: Array<{ id: number | string; description?: string; amount?: number; date?: string; status?: string; type?: string; product_name?: string; quantity?: number; created_at?: string }>;
 }
 
 const BillingTab: React.FC<BillingTabProps> = ({

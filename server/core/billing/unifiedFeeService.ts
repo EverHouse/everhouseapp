@@ -207,6 +207,7 @@ export async function computeFeeBreakdown(params: FeeComputeParams): Promise<Fee
   let participants: Array<{
     participantId?: number;
     userId?: string;
+    guestId?: number | null;
     email?: string;
     displayName: string;
     participantType: 'owner' | 'member' | 'guest';
@@ -292,7 +293,7 @@ export async function computeFeeBreakdown(params: FeeComputeParams): Promise<Fee
   resolvedEmails.forEach((email, idx) => {
     const p = participants[idx];
     participantIdentifiers.push({
-      participantId: (p as any).participantId,
+      participantId: p.participantId,
       userId: p.userId || null,
       email: email || null
     });
@@ -589,7 +590,7 @@ export async function computeFeeBreakdown(params: FeeComputeParams): Promise<Fee
   let participantIdx = 0;
   for (const participant of participants) {
     const lineItem: FeeLineItem = {
-      participantId: (participant as any).participantId,
+      participantId: participant.participantId,
       userId: participant.userId,
       displayName: participant.displayName,
       participantType: participant.participantType,
@@ -620,7 +621,7 @@ export async function computeFeeBreakdown(params: FeeComputeParams): Promise<Fee
         lineItem.totalCents = 0;
         lineItem.isStaff = true;
         logger.info('[FeeBreakdown] Staff in guest slot — $0 fee (Pro in the Slot rule)', {
-          extra: { guestEmail, participantId: (participant as any).participantId }
+          extra: { guestEmail, participantId: participant.participantId }
         });
         lineItems.push(lineItem);
         participantIdx++;
@@ -631,7 +632,7 @@ export async function computeFeeBreakdown(params: FeeComputeParams): Promise<Fee
       // Members incorrectly marked as guests should not be charged guest fees
       // This matches the logic in feeCalculator.ts for consistency
       const isActualGuest = !participant.userId;
-      const hasRealGuestId = !!(participant as any).guestId;
+      const hasRealGuestId = !!participant.guestId;
       const isPlaceholderGuest = /^Guest \d+$/i.test(participant.displayName || '');
       const isRealNamedGuest = isActualGuest && (hasRealGuestId || !isPlaceholderGuest);
       
@@ -639,7 +640,7 @@ export async function computeFeeBreakdown(params: FeeComputeParams): Promise<Fee
         // Member mistakenly marked as guest - don't charge guest fee
         lineItem.guestCents = 0;
         logger.info('[FeeBreakdown] Skipping guest fee for member marked as guest', {
-          extra: { participantId: (participant as any).participantId, userId: participant.userId }
+          extra: { participantId: participant.participantId, userId: participant.userId }
         });
       } else if (isRealNamedGuest && guestPassInfo.hasGuestPassBenefit && guestPassesRemaining > 0) {
         lineItem.guestPassUsed = true;

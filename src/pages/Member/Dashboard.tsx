@@ -136,7 +136,7 @@ interface DashboardData {
   rsvps: DBRSVP[];
   wellnessEnrollments: DBWellnessEnrollment[];
   bookingRequests: DBBookingRequest[];
-  conferenceRoomBookings: any[];
+  conferenceRoomBookings: DashboardBookingItem[];
   wellnessClasses: { id: number; title: string; date: string; time: string }[];
   events: { id: number; title: string; event_date: string; start_time: string }[];
   guestPasses: GuestPasses | null;
@@ -146,6 +146,37 @@ interface DashboardData {
 const formatDate = (dateStr: string): string => {
   return formatDateShort(dateStr);
 };
+
+
+interface DashboardBookingItem {
+  id: number | string;
+  resource_name?: string;
+  bay_name?: string;
+  request_date?: string;
+  start_time?: string;
+  end_time?: string;
+  status?: string;
+  user_email?: string;
+  user_name?: string;
+  resource_id?: number;
+  resource_type?: string;
+  isLinkedMember?: boolean;
+  primaryBookerName?: string;
+  declared_player_count?: number;
+  notes?: string;
+}
+
+interface DashboardRawBooking {
+  booking_id?: number;
+  request_date?: string;
+  start_time?: string;
+  end_time?: string;
+  bay_name?: string;
+  resource_name?: string;
+  resource_type?: string;
+  status?: string;
+}
+
 
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -395,7 +426,7 @@ const Dashboard: React.FC = () => {
       itemDate = raw.date.split('T')[0];
       endTime = undefined;
     } else if (item.type === 'conference_room_calendar') {
-      const raw = item.raw as any;
+      const raw = item.raw as DashboardRawBooking;
       itemDate = raw.request_date.split('T')[0];
       endTime = raw.end_time;
     }
@@ -420,7 +451,7 @@ const Dashboard: React.FC = () => {
   const simMinutesToday = todayBookingsAll
     .filter(b => b.resourceType === 'simulator')
     .reduce((sum, b) => {
-      const raw = b.raw as any;
+      const raw = b.raw as DashboardRawBooking;
       const start = raw.start_time?.split(':').map(Number) || [0, 0];
       const end = raw.end_time?.split(':').map(Number) || [0, 0];
       const totalMinutes = (end[0] * 60 + end[1]) - (start[0] * 60 + start[1]);
@@ -433,7 +464,7 @@ const Dashboard: React.FC = () => {
   const confMinutesToday = todayBookingsAll
     .filter(b => b.resourceType === 'conference_room')
     .reduce((sum, b) => {
-      const raw = b.raw as any;
+      const raw = b.raw as DashboardRawBooking;
       const start = raw.start_time?.split(':').map(Number) || [0, 0];
       const end = raw.end_time?.split(':').map(Number) || [0, 0];
       const totalMinutes = (end[0] * 60 + end[1]) - (start[0] * 60 + start[1]);
@@ -577,7 +608,7 @@ const Dashboard: React.FC = () => {
           const participantsData = await participantsRes.json();
           const participants = participantsData.participants || [];
           
-          const myParticipant = participants.find((p: any) => 
+          const myParticipant = participants.find((p: { user_email?: string }) => 
             p.email?.toLowerCase() === user.email.toLowerCase()
           );
           
@@ -890,12 +921,12 @@ const Dashboard: React.FC = () => {
                 const isCancelling = optimisticCancellingIds.has(item.dbId);
                 
                 if (item.type === 'booking' || item.type === 'booking_request') {
-                  const bookingStatus = (item as any).status;
+                  const bookingStatus = (item as DashboardBookingItem).status;
                   const isConfirmed = bookingStatus === 'approved' || bookingStatus === 'confirmed';
                   const rawBooking = item.raw as DBBookingRequest | DBBooking;
                   const startTime24 = 'start_time' in rawBooking ? rawBooking.start_time : '';
                   const endTime24 = 'end_time' in rawBooking ? rawBooking.end_time : '';
-                  const isLinkedMember = (item as any).isLinkedMember || false;
+                  const isLinkedMember = (item as DashboardBookingItem).isLinkedMember || false;
                   
                   const hasUnpaidOverage = 'overage_fee_cents' in rawBooking && 
                     rawBooking.overage_fee_cents && 
@@ -903,9 +934,9 @@ const Dashboard: React.FC = () => {
                     !rawBooking.overage_paid;
                   const overageAmount = hasUnpaidOverage ? (rawBooking.overage_fee_cents! / 100).toFixed(2) : null;
                   
-                  const primaryBookerName = (item as any).primaryBookerName;
+                  const primaryBookerName = (item as DashboardBookingItem).primaryBookerName;
                   
-                  const isCancellationPending = (item as any).status === 'cancellation_pending';
+                  const isCancellationPending = (item as DashboardBookingItem).status === 'cancellation_pending';
                   
                   // When cancelling or cancellation_pending, show no actions (disabled state)
                   if (isCancelling || isCancellationPending) {
@@ -949,8 +980,8 @@ const Dashboard: React.FC = () => {
                 }
                 const getStatusBadge = () => {
                   if (item.type !== 'booking' && item.type !== 'booking_request') return null;
-                  const status = (item as any).status;
-                  const isLinked = (item as any).isLinkedMember || false;
+                  const status = (item as DashboardBookingItem).status;
+                  const isLinked = (item as DashboardBookingItem).isLinkedMember || false;
                   const rawBooking = item.raw as DBBookingRequest;
                   
                   const badges: React.ReactNode[] = [];
@@ -1018,8 +1049,8 @@ const Dashboard: React.FC = () => {
                   return <div className="flex gap-1.5 flex-wrap">{badges}</div>;
                 };
                 const isSimulatorBooking = item.resourceType === 'simulator';
-                const isApprovedOrConfirmed = ['approved', 'confirmed'].includes((item as any).status);
-                const isOwnerOfBooking = !((item as any).isLinkedMember);
+                const isApprovedOrConfirmed = ['approved', 'confirmed'].includes((item as DashboardBookingItem).status);
+                const isOwnerOfBooking = !((item as DashboardBookingItem).isLinkedMember);
                 const showRosterManager = (item.type === 'booking' || item.type === 'booking_request') && 
                   isSimulatorBooking && 
                   isApprovedOrConfirmed && 

@@ -328,10 +328,10 @@ export async function sendMembershipRenewalEmail(
       html: getMembershipRenewalHtml(params)
     });
     
-    console.log(`[Membership Renewal Email] Sent successfully to ${email}`);
+    logger.info(`[Membership Renewal Email] Sent successfully to ${email}`);
     return { success: true };
   } catch (error: unknown) {
-    console.error(`[Membership Renewal Email] Failed to send to ${email}:`, getErrorMessage(error));
+    logger.error(`[Membership Renewal Email] Failed to send to ${email}:`, { extra: { errorMessage: getErrorMessage(error) } });
     return { success: false, error: getErrorMessage(error) };
   }
 }
@@ -354,10 +354,10 @@ export async function sendMembershipFailedEmail(
       html: getMembershipFailedHtml(params)
     });
     
-    console.log(`[Membership Failed Email] Sent successfully to ${email}`);
+    logger.info(`[Membership Failed Email] Sent successfully to ${email}`);
     return { success: true };
   } catch (error: unknown) {
-    console.error(`[Membership Failed Email] Failed to send to ${email}:`, getErrorMessage(error));
+    logger.error(`[Membership Failed Email] Failed to send to ${email}:`, { extra: { errorMessage: getErrorMessage(error) } });
     return { success: false, error: getErrorMessage(error) };
   }
 }
@@ -380,10 +380,10 @@ export async function sendCardExpiringEmail(
       html: getCardExpiringHtml(params)
     });
     
-    console.log(`[Card Expiring Email] Sent successfully to ${email}`);
+    logger.info(`[Card Expiring Email] Sent successfully to ${email}`);
     return { success: true };
   } catch (error: unknown) {
-    console.error(`[Card Expiring Email] Failed to send to ${email}:`, getErrorMessage(error));
+    logger.error(`[Card Expiring Email] Failed to send to ${email}:`, { extra: { errorMessage: getErrorMessage(error) } });
     return { success: false, error: getErrorMessage(error) };
   }
 }
@@ -510,10 +510,10 @@ export async function sendGracePeriodReminderEmail(
       html: getGracePeriodReminderHtml(params)
     });
     
-    console.log(`[Grace Period Email] Day ${params.currentDay}/${params.totalDays} sent to ${email}`);
+    logger.info(`[Grace Period Email] Day ${params.currentDay}/${params.totalDays} sent to ${email}`);
     return { success: true };
   } catch (error: unknown) {
-    console.error(`[Grace Period Email] Failed to send to ${email}:`, getErrorMessage(error));
+    logger.error(`[Grace Period Email] Failed to send to ${email}:`, { extra: { errorMessage: getErrorMessage(error) } });
     return { success: false, error: getErrorMessage(error) };
   }
 }
@@ -555,29 +555,32 @@ export function getMembershipActivationHtml(params: MembershipActivationParams):
               <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
                 <tr>
                   <td style="font-size: 14px; color: ${CLUB_COLORS.textMuted};">Membership Tier</td>
-                  <td style="font-size: 16px; font-weight: 600; color: ${CLUB_COLORS.deepGreen}; text-align: right;">${tierName}</td>
+                  <td style="font-size: 14px; color: ${CLUB_COLORS.textDark}; text-align: right; font-weight: 600;">${tierName}</td>
                 </tr>
                 <tr>
                   <td style="font-size: 14px; color: ${CLUB_COLORS.textMuted}; padding-top: 12px;">Monthly Price</td>
-                  <td style="font-size: 16px; font-weight: 600; color: ${CLUB_COLORS.deepGreen}; text-align: right; padding-top: 12px;">${formatCurrency(monthlyPrice)}</td>
+                  <td style="font-size: 14px; color: ${CLUB_COLORS.textDark}; text-align: right; font-weight: 600; padding-top: 12px;">${formatCurrency(monthlyPrice)}/mo</td>
+                </tr>
+                <tr>
+                  <td style="font-size: 14px; color: ${CLUB_COLORS.textMuted}; padding-top: 12px;">Link Expires</td>
+                  <td style="font-size: 14px; color: ${CLUB_COLORS.textDark}; text-align: right; padding-top: 12px;">${formatDate(expiresAt)}</td>
                 </tr>
               </table>
             </td>
           </tr>
           
           <tr>
-            <td style="padding-top: 32px; padding-bottom: 32px; text-align: center;">
-              <a href="${checkoutUrl}" style="display: inline-block; background-color: ${CLUB_COLORS.deepGreen}; color: #ffffff; padding: 16px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 16px;">
+            <td style="text-align: center; padding: 24px 0;">
+              <a href="${checkoutUrl}" style="display: inline-block; background-color: ${CLUB_COLORS.deepGreen}; color: #ffffff; font-size: 16px; font-weight: 500; text-decoration: none; padding: 14px 32px; border-radius: 12px;">
                 Complete Membership Setup
               </a>
             </td>
           </tr>
           
           <tr>
-            <td>
-              <p style="margin: 0; font-size: 14px; color: ${CLUB_COLORS.textMuted}; line-height: 1.5; text-align: center;">
-                This link expires on ${formatDate(expiresAt)}. If you have any questions, 
-                please reply to this email or contact us at the club.
+            <td style="padding-bottom: 32px;">
+              <p style="margin: 0; font-size: 13px; color: ${CLUB_COLORS.textMuted}; line-height: 1.5; text-align: center;">
+                This invitation link will expire on ${formatDate(expiresAt)}. If you have any questions, please reply to this email.
               </p>
             </td>
           </tr>
@@ -596,14 +599,14 @@ export async function sendMembershipActivationEmail(
     await client.emails.send({
       from: fromEmail || 'Ever Club <noreply@everclub.app>',
       to: email,
-      subject: `Complete Your ${params.tierName} Membership - Ever Club`,
+      subject: `Welcome to Ever Club — Complete Your ${params.tierName} Membership`,
       html: getMembershipActivationHtml(params)
     });
     
-    console.log(`[Activation Email] Sent to ${email} for ${params.tierName} membership`);
+    logger.info(`[Membership Activation Email] Sent successfully to ${email}`);
     return { success: true };
   } catch (error: unknown) {
-    console.error(`[Activation Email] Failed to send to ${email}:`, getErrorMessage(error));
+    logger.error(`[Membership Activation Email] Failed to send to ${email}:`, { extra: { errorMessage: getErrorMessage(error) } });
     return { success: false, error: getErrorMessage(error) };
   }
 }

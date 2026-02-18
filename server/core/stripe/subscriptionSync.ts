@@ -113,7 +113,7 @@ export async function syncActiveSubscriptionsFromStripe(): Promise<SubscriptionS
                 expand: ['data.items.data.price']
               });
               for (const sub of custSubs.data) {
-                (sub as any).customer = cust;
+                (sub as unknown as Record<string, unknown>).customer = cust;
                 subscriptions.push(sub);
               }
             }

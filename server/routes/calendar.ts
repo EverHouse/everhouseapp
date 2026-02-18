@@ -124,7 +124,7 @@ router.get('/api/calendar/availability', async (req, res) => {
     const busySlots = response.data.calendars?.primary?.busy || [];
     
     res.json({
-      busy: busySlots.map((slot: any) => ({
+      busy: busySlots.map((slot: Record<string, unknown>) => ({
         start: slot.start,
         end: slot.end,
       })),
@@ -166,13 +166,11 @@ router.post('/api/admin/conference-room/backfill', isAdmin, async (req, res) => 
 });
 
 // Endpoint to sync booking history from Google Calendar
-// NOTE: Golf calendar sync is deprecated - only conference room sync is active
 router.post('/api/admin/bookings/sync-history', isAdmin, async (req, res) => {
   try {
     const { monthsBack = 12 } = req.body;
     
     logger.info('[Admin] Starting conference room booking history sync for months...', { extra: { monthsBack } });
-    logger.info('[Admin] Note: Golf calendar sync is deprecated - bookings are done in-app only');
     
     const conferenceResult = await syncConferenceRoomCalendarToBookings({ monthsBack });
     
@@ -180,20 +178,13 @@ router.post('/api/admin/bookings/sync-history', isAdmin, async (req, res) => {
     
     res.json({
       success: !conferenceResult.error,
-      message: `Sync complete for ${monthsBack} months (conference room only - golf sync is deprecated)`,
+      message: `Sync complete for ${monthsBack} months`,
       conference_room: {
         synced: conferenceResult.synced,
         linked: conferenceResult.linked,
         created: conferenceResult.created,
         skipped: conferenceResult.skipped,
         error: conferenceResult.error
-      },
-      booked_golf: {
-        synced: 0,
-        linked: 0,
-        created: 0,
-        skipped: 0,
-        error: 'Golf calendar sync is deprecated - bookings are done in-app only'
       },
       totals: {
         synced: conferenceResult.synced,

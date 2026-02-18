@@ -151,19 +151,6 @@ export async function enforceSocialTierRules(
   }
 }
 
-// Legacy function for backward compatibility (deprecated)
-export async function enforceSocialTierRulesLegacy(
-  ownerTier: string,
-  participantCount: number
-): Promise<SocialTierResult> {
-  // Convert count to participants (assume all additional are guests for conservative check)
-  const participants: ParticipantForValidation[] = [{ type: 'owner' }];
-  for (let i = 1; i < participantCount; i++) {
-    participants.push({ type: 'guest' });
-  }
-  return enforceSocialTierRules(ownerTier, participants);
-}
-
 export async function getGuestPassesRemaining(memberEmail: string): Promise<number> {
   try {
     const tier = await getMemberTierByEmail(memberEmail);

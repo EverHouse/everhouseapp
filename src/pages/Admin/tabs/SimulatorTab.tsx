@@ -87,7 +87,7 @@ const SimulatorTab: React.FC = () => {
     );
     
     const availabilityBlocks: AvailabilityBlock[] = useMemo(() => 
-        availabilityBlocksData.map((b: any) => ({
+        availabilityBlocksData.map((b: { id: number; resource_id?: number; resourceId?: number; block_date?: string; blockDate?: string; start_time?: string; startTime?: string; end_time?: string; endTime?: string; block_type?: string; blockType?: string; notes?: string; closure_title?: string; closureTitle?: string }) => ({
             id: b.id,
             resourceId: b.resource_id || b.resourceId,
             blockDate: b.block_date?.includes('T') ? b.block_date.split('T')[0] : (b.blockDate || b.block_date),
@@ -101,8 +101,8 @@ const SimulatorTab: React.FC = () => {
     );
     
     const requests: BookingRequest[] = useMemo(() => {
-        const fromRequests = bookingRequestsData.map((r: any) => ({ ...r, source: 'booking_request' as const }));
-        const fromPending = pendingBookingsData.map((b: any) => ({
+        const fromRequests = bookingRequestsData.map((r: BookingRequest) => ({ ...r, source: 'booking_request' as const }));
+        const fromPending = pendingBookingsData.map((b: Record<string, string | number | null>) => ({
             id: b.id,
             user_email: b.user_email,
             user_name: b.first_name && b.last_name ? `${b.first_name} ${b.last_name}` : b.user_email,
@@ -124,12 +124,12 @@ const SimulatorTab: React.FC = () => {
         return [...fromRequests, ...fromPending];
     }, [bookingRequestsData, pendingBookingsData]);
     
-    const approvedBookings: BookingRequest[] = approvedBookingsData as any;
+    const approvedBookings: BookingRequest[] = approvedBookingsData as BookingRequest[];
     
     const { memberStatusMap, memberNameMap } = useMemo(() => {
         const statusMap: Record<string, string> = {};
         const nameMap: Record<string, string> = {};
-        memberContactsData.forEach((m: any) => {
+        memberContactsData.forEach((m: { email?: string; firstName?: string; lastName?: string; status?: string; manuallyLinkedEmails?: string[] }) => {
             const fullName = [m.firstName, m.lastName].filter(Boolean).join(' ');
             if (m.email) {
                 const emailLower = m.email.toLowerCase();
@@ -177,7 +177,7 @@ const SimulatorTab: React.FC = () => {
     const [isSyncing, setIsSyncing] = useState(false);
     const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
     
-    const [rescheduleModal, setRescheduleModal] = useState<{ isOpen: boolean; booking: any | null }>({ isOpen: false, booking: null });
+    const [rescheduleModal, setRescheduleModal] = useState<{ isOpen: boolean; booking: BookingRequest | null }>({ isOpen: false, booking: null });
     const [feeEstimate, setFeeEstimate] = useState<{
       totalFee: number;
       ownerTier: string | null;
@@ -488,7 +488,7 @@ const SimulatorTab: React.FC = () => {
     const unmatchedBookings = useMemo(() => {
         const today = getTodayPacific();
         return approvedBookings.filter(b => 
-            (b as any).is_unmatched === true && 
+            b.is_unmatched === true && 
             b.request_date >= today &&
             (b.status === 'approved' || b.status === 'confirmed')
         ).sort((a, b) => {
@@ -518,12 +518,12 @@ const SimulatorTab: React.FC = () => {
         const previousRequests = queryClient.getQueryData(simulatorKeys.allRequests());
         const previousApproved = queryClient.getQueryData(simulatorKeys.approvedBookings(startDate, endDate));
         
-        queryClient.setQueryData(simulatorKeys.allRequests(), (old: any[] | undefined) => 
+        queryClient.setQueryData(simulatorKeys.allRequests(), (old: BookingRequest[] | undefined) => 
             (old || []).map(r => 
                 r.id === booking.id ? { ...r, status: newStatus } : r
             )
         );
-        queryClient.setQueryData(simulatorKeys.approvedBookings(startDate, endDate), (old: any[] | undefined) => 
+        queryClient.setQueryData(simulatorKeys.approvedBookings(startDate, endDate), (old: BookingRequest[] | undefined) => 
             (old || []).map(b => 
                 b.id === booking.id ? { ...b, status: newStatus } : b
             )
@@ -595,14 +595,14 @@ const SimulatorTab: React.FC = () => {
         const previousRequests = queryClient.getQueryData(simulatorKeys.allRequests());
         const previousApproved = queryClient.getQueryData(simulatorKeys.approvedBookings(startDate, endDate));
         
-        queryClient.setQueryData(simulatorKeys.allRequests(), (old: any[] | undefined) => 
+        queryClient.setQueryData(simulatorKeys.allRequests(), (old: BookingRequest[] | undefined) => 
             (old || []).map(r => 
                 r.id === booking.id && r.source === booking.source 
                     ? { ...r, status: 'cancelled' } 
                     : r
             )
         );
-        queryClient.setQueryData(simulatorKeys.approvedBookings(startDate, endDate), (old: any[] | undefined) => 
+        queryClient.setQueryData(simulatorKeys.approvedBookings(startDate, endDate), (old: BookingRequest[] | undefined) => 
             (old || []).filter(b => 
                 !(b.id === booking.id && b.source === booking.source)
             )
@@ -678,7 +678,7 @@ const SimulatorTab: React.FC = () => {
                     const reqStart = selectedRequest.start_time;
                     const reqEnd = selectedRequest.end_time;
                     
-                    const conflict = bookings.find((b: any) => 
+                    const conflict = bookings.find((b: { resource_id?: number; request_date?: string; start_time: string; end_time: string }) => 
                         b.resource_id === selectedBayId && 
                         b.request_date === selectedRequest.request_date &&
                         b.start_time < reqEnd && b.end_time > reqStart
@@ -696,7 +696,7 @@ const SimulatorTab: React.FC = () => {
                     const reqStartMins = parseInt(selectedRequest.start_time.split(':')[0]) * 60 + parseInt(selectedRequest.start_time.split(':')[1]);
                     const reqEndMins = parseInt(selectedRequest.end_time.split(':')[0]) * 60 + parseInt(selectedRequest.end_time.split(':')[1]);
                     
-                    const closure = allClosures.find((c: any) => {
+                    const closure = allClosures.find((c: { startDate: string; endDate: string; affectedAreas: string; startTime?: string; endTime?: string; title: string }) => {
                         if (c.startDate > reqDate || c.endDate < reqDate) return false;
                         
                         const areas = c.affectedAreas;
@@ -766,8 +766,8 @@ const SimulatorTab: React.FC = () => {
                 if (res.ok) {
                     const blocks = await res.json();
                     const available = blocks
-                        .filter((b: any) => b.block_type === 'available' || !b.block_type)
-                        .map((b: any) => b.start_time?.substring(0, 5))
+                        .filter((b: { block_type?: string; start_time?: string }) => b.block_type === 'available' || !b.block_type)
+                        .map((b: { block_type?: string; start_time?: string }) => b.start_time?.substring(0, 5))
                         .filter(Boolean);
                     setDeclineAvailableSlots(available);
                 }
@@ -801,7 +801,7 @@ const SimulatorTab: React.FC = () => {
             email.startsWith('classpass-') ||
             email === 'unmatched@trackman.import';
         
-        const isUnmatched = (b as any).is_unmatched === true ||
+        const isUnmatched = b.is_unmatched === true ||
             isPlaceholderEmail ||
             (b.user_name || '').includes('Unknown (Trackman)');
         
@@ -871,7 +871,7 @@ const SimulatorTab: React.FC = () => {
             email.startsWith('classpass-') ||
             email === 'unmatched@trackman.import';
         
-        return (booking as any).is_unmatched === true ||
+        return booking.is_unmatched === true ||
             isPlaceholderEmail ||
             (booking.user_name || '').includes('Unknown (Trackman)');
     }, []);
@@ -898,7 +898,7 @@ const SimulatorTab: React.FC = () => {
         
         const previousRequests = queryClient.getQueryData(simulatorKeys.allRequests());
         
-        queryClient.setQueryData(simulatorKeys.allRequests(), (old: any[] | undefined) => 
+        queryClient.setQueryData(simulatorKeys.allRequests(), (old: BookingRequest[] | undefined) => 
             (old || []).map(r => 
                 r.id === selectedRequest.id && r.source === selectedRequest.source 
                     ? { ...r, status: 'confirmed' } 
@@ -973,7 +973,7 @@ const SimulatorTab: React.FC = () => {
         
         const previousRequests = queryClient.getQueryData(simulatorKeys.allRequests());
         
-        queryClient.setQueryData(simulatorKeys.allRequests(), (old: any[] | undefined) => 
+        queryClient.setQueryData(simulatorKeys.allRequests(), (old: BookingRequest[] | undefined) => 
             (old || []).map(r => 
                 r.id === selectedRequest.id && r.source === selectedRequest.source 
                     ? { ...r, status: newStatus } 
@@ -1108,7 +1108,7 @@ const SimulatorTab: React.FC = () => {
                         isBookingUnmatched={isBookingUnmatched}
                         handleRefresh={handleRefresh}
                         showToast={showToast}
-                        confirm={confirm as any}
+                        confirm={confirm}
                         guestFeeDollars={guestFeeDollars}
                         overageRatePerBlockDollars={overageRatePerBlockDollars}
                         tierMinutes={tierMinutes}
@@ -1161,10 +1161,10 @@ const SimulatorTab: React.FC = () => {
                         <p className="text-sm text-gray-500 dark:text-gray-400">
                             {selectedRequest && formatDateShortAdmin(selectedRequest.request_date)} • {selectedRequest && formatTime12Hour(selectedRequest.start_time)} - {selectedRequest && formatTime12Hour(selectedRequest.end_time)}
                         </p>
-                        {(selectedRequest as any)?.declared_player_count && (
+                        {selectedRequest?.declared_player_count && (
                             <div className="flex items-center gap-1 mt-2 text-sm text-accent">
                                 <span className="material-symbols-outlined text-base">group</span>
-                                <span>{(selectedRequest as any).declared_player_count} {(selectedRequest as any).declared_player_count === 1 ? 'player' : 'players'}</span>
+                                <span>{selectedRequest?.declared_player_count} {selectedRequest?.declared_player_count === 1 ? 'player' : 'players'}</span>
                             </div>
                         )}
                     </div>
@@ -1230,13 +1230,13 @@ const SimulatorTab: React.FC = () => {
                         </div>
                     )}
                     
-                    {(selectedRequest as any)?.member_notes && (
+                    {selectedRequest?.member_notes && (
                         <div className="p-3 bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/30 rounded-lg">
                             <p className="text-xs text-blue-600 dark:text-blue-400 mb-1 flex items-center gap-1">
                                 <span className="material-symbols-outlined text-sm">chat</span>
                                 Member Notes
                             </p>
-                            <p className="text-sm text-primary dark:text-white">{(selectedRequest as any).member_notes}</p>
+                            <p className="text-sm text-primary dark:text-white">{selectedRequest?.member_notes}</p>
                         </div>
                     )}
                     

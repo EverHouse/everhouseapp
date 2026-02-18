@@ -252,10 +252,10 @@ const POSRegister: React.FC = () => {
 
       if (customer.isNewCustomer) {
         payload.isNewCustomer = true;
-        payload.firstName = (customer as any).firstName;
-        payload.lastName = (customer as any).lastName;
-        if ((customer as any).phone) {
-          payload.phone = (customer as any).phone;
+        payload.firstName = (customer as Record<string, unknown>).firstName;
+        payload.lastName = (customer as Record<string, unknown>).lastName;
+        if ((customer as Record<string, unknown>).phone) {
+          payload.phone = (customer as Record<string, unknown>).phone;
         }
       }
 
@@ -457,7 +457,7 @@ const POSRegister: React.FC = () => {
         const searchRes = await fetch(`/api/members/search?q=${encodeURIComponent(email)}&limit=1`, { credentials: 'include' });
         if (searchRes.ok) {
           const results = await searchRes.json();
-          const user = Array.isArray(results) ? results.find((u: any) => u.email?.toLowerCase() === email.toLowerCase()) : null;
+          const user = Array.isArray(results) ? results.find((u: { email?: string }) => u.email?.toLowerCase() === email.toLowerCase()) : null;
           if (user?.id) {
             await fetch('/api/admin/save-id-image', {
               method: 'POST',

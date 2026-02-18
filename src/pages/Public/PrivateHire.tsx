@@ -168,7 +168,7 @@ const PrivateHire: React.FC = () => {
   );
 };
 
-const SpaceCard: React.FC<any> = ({ title, cap, img, tags, desc, index = 0 }) => (
+const SpaceCard: React.FC<{ title: string; cap: string; img: string; tags: string[]; desc: string; index?: number }> = ({ title, cap, img, tags, desc, index = 0 }) => (
   <div className="group relative flex flex-col rounded-[2rem] overflow-hidden backdrop-blur-xl bg-white/40 dark:bg-white/5 border border-white/60 dark:border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.1),inset_0_1px_1px_rgba(255,255,255,0.6)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.3)] hover:scale-[1.02] hover:-translate-y-1 transition-all duration-[400ms] animate-slide-up-stagger" style={{ '--stagger-index': index + 1 } as React.CSSProperties}>
      <div className="h-56 bg-cover bg-center relative" style={{backgroundImage: `url("${img}")`}}>
         <div className="absolute inset-0 bg-gradient-to-t from-white/40 dark:from-black/40 to-transparent"></div>

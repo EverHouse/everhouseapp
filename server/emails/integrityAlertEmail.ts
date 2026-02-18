@@ -1,6 +1,7 @@
 import { getResendClient } from '../utils/resend';
 import { IntegrityCheckResult, IntegrityIssue } from '../core/dataIntegrity';
 import { getErrorMessage } from '../utils/errorUtils';
+import { logger } from '../core/logger';
 
 const CLUB_COLORS = {
   deepGreen: '#293515',
@@ -232,7 +233,7 @@ export async function sendIntegrityAlertEmail(
     const errorCount = criticalIssues.filter(i => i.severity === 'error').length;
     
     if (errorCount === 0) {
-      console.log('[Integrity Alert] No critical issues found, skipping email');
+      logger.info('[Integrity Alert] No critical issues found, skipping email');
       return { success: true };
     }
     
@@ -245,10 +246,10 @@ export async function sendIntegrityAlertEmail(
       html: getIntegrityAlertEmailHtml(results, criticalIssues)
     });
     
-    console.log(`[Integrity Alert] Email sent successfully to ${adminEmail}`);
+    logger.info(`[Integrity Alert] Email sent successfully to ${adminEmail}`);
     return { success: true };
   } catch (error: unknown) {
-    console.error(`[Integrity Alert] Failed to send email to ${adminEmail}:`, getErrorMessage(error));
+    logger.error(`[Integrity Alert] Failed to send email to ${adminEmail}: ${getErrorMessage(error)}`, { error: error as Error });
     return { success: false, error: getErrorMessage(error) };
   }
 }

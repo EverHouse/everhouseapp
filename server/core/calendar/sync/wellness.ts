@@ -302,8 +302,8 @@ export async function syncWellnessCalendarEvents(options?: { suppressAlert?: boo
     );
     
     const idsToDeactivate = existingClasses.rows
-      .filter((dbClass: any) => cancelledEventIds.has(dbClass.google_calendar_id) || !fetchedEventIds.has(dbClass.google_calendar_id))
-      .map((dbClass: any) => dbClass.id);
+      .filter((dbClass: Record<string, unknown>) => cancelledEventIds.has(dbClass.google_calendar_id as string) || !fetchedEventIds.has(dbClass.google_calendar_id as string))
+      .map((dbClass: Record<string, unknown>) => dbClass.id as number);
     let deleted = 0;
     if (idsToDeactivate.length > 0) {
       await pool.query('UPDATE wellness_classes SET is_active = false WHERE id = ANY($1)', [idsToDeactivate]);

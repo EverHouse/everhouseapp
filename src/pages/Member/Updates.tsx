@@ -127,7 +127,7 @@ const MemberUpdates: React.FC = () => {
       if (res.ok) {
         const data = await res.json();
         // Map is_read from API to read for frontend consistency
-        const mapped = data.map((n: any) => ({ ...n, read: n.is_read ?? n.read ?? false }));
+        const mapped = data.map((n: Record<string, unknown>) => ({ ...n, read: n.is_read ?? n.read ?? false }));
         setNotifications(mapped);
         setUnreadCount(mapped.filter((n: NotificationItem) => !n.read).length);
       }

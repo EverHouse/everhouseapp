@@ -241,7 +241,7 @@ router.post('/api/staff/passes/:id/redeem', isStaffOrAdmin, async (req: Request,
       quantity: passDetails?.quantity || 1,
     });
 
-    logFromRequest(req, 'redeem_pass' as any, 'day_pass' as any, id as string, guestName, {
+    logFromRequest(req, 'redeem_pass', 'day_pass', id as string, guestName, {
       passType: passDetails?.productType,
       remainingUses: remainingUses ?? 0,
       location: location || 'front_desk',
@@ -370,7 +370,7 @@ router.post('/api/staff/passes/:passId/refund', isStaffOrAdmin, async (req: Requ
       quantity: pass.quantity || 1,
     });
 
-    logFromRequest(req, 'refund_pass' as any, 'day_pass' as any, passId as string, guestName, {
+    logFromRequest(req, 'refund_pass', 'day_pass', passId as string, guestName, {
       passType: pass.productType,
       previousRemainingUses: pass.remainingUses,
       stripePaymentIntentId: pass.stripePaymentIntentId,

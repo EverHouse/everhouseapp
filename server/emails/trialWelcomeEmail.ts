@@ -1,5 +1,6 @@
 import { getResendClient } from '../utils/resend';
 import { getErrorMessage } from '../utils/errorUtils';
+import { logger } from '../core/logger';
 
 const CLUB_COLORS = {
   deepGreen: '#293515',
@@ -231,10 +232,10 @@ export async function sendTrialWelcomeWithQrEmail(
       html: getTrialWelcomeHtml(params)
     });
     
-    console.log(`[TrialWelcomeEmail] Sent trial welcome email to ${email} for user #${params.userId}`);
+    logger.info(`[TrialWelcomeEmail] Sent trial welcome email to ${email} for user #${params.userId}`);
     return { success: true };
   } catch (error: unknown) {
-    console.error(`[TrialWelcomeEmail] Failed to send to ${email}:`, getErrorMessage(error));
+    logger.error(`[TrialWelcomeEmail] Failed to send to ${email}: ${getErrorMessage(error)}`, { error: error as Error });
     return { success: false, error: getErrorMessage(error) };
   }
 }

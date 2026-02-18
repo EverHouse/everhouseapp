@@ -1,4 +1,5 @@
 import { getResendClient } from '../utils/resend';
+import { logger } from '../core/logger';
 
 const CLUB_COLORS = {
   deepGreen: '#293515',
@@ -195,9 +196,9 @@ export async function sendPassWithQrEmail(
       html: getPassWithQrHtml(passDetails)
     });
     
-    console.log(`[PassEmails] Sent QR pass email to ${email} for pass #${passDetails.passId}`);
+    logger.info(`[PassEmails] Sent QR pass email to ${email} for pass #${passDetails.passId}`);
   } catch (error) {
-    console.error('[PassEmails] Error sending pass email:', error);
+    logger.error('[PassEmails] Error sending pass email:', { error: error as Error });
     throw error;
   }
 }
@@ -407,8 +408,8 @@ export async function sendRedemptionConfirmationEmail(
       html: getRedemptionConfirmationHtml(details)
     });
     
-    console.log(`[PassEmails] Sent redemption confirmation to ${email}`);
+    logger.info(`[PassEmails] Sent redemption confirmation to ${email}`);
   } catch (error) {
-    console.error('[PassEmails] Error sending redemption confirmation:', error);
+    logger.error('[PassEmails] Error sending redemption confirmation:', { error: error as Error });
   }
 }

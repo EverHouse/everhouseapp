@@ -118,7 +118,7 @@ export async function runStartupTasks(): Promise<void> {
     const databaseUrl = process.env.DATABASE_URL;
     if (databaseUrl) {
       logger.info('[Stripe] Initializing Stripe schema...');
-      await retryWithBackoff(() => runMigrations({ databaseUrl, schema: 'stripe' } as any), 'Stripe schema migration');
+      await retryWithBackoff(() => runMigrations({ databaseUrl, schema: 'stripe' } as Record<string, unknown>), 'Stripe schema migration');
       logger.info('[Stripe] Schema ready');
 
       const stripeSync = await retryWithBackoff(() => getStripeSync(), 'Stripe sync init');
@@ -184,7 +184,7 @@ export async function runStartupTasks(): Promise<void> {
       
       import('../core/stripe/customerSync.js')
         .then(({ syncStripeCustomersForMindBodyMembers }) => syncStripeCustomersForMindBodyMembers())
-        .then((result: any) => {
+        .then((result: { created: number; linked: number }) => {
           if (result.created > 0 || result.linked > 0) {
             logger.info('[Stripe] Customer sync complete', { extra: { created: result.created, linked: result.linked } });
           }
@@ -261,7 +261,7 @@ export async function runStartupTasks(): Promise<void> {
       WHERE u.id = sub.user_id
         AND u.first_login_at IS NULL
     `);
-    const count = (backfillResult as any)?.rowCount || 0;
+    const count = (backfillResult as { rowCount?: number })?.rowCount || 0;
     if (count > 0) {
       logger.info(`[Startup] Backfilled first_login_at for ${count} members from self-requested booking history`);
     }
@@ -277,7 +277,7 @@ export async function runStartupTasks(): Promise<void> {
         AND tier IS NOT NULL AND tier != ''
         AND (last_tier IS NULL OR last_tier = '')
     `);
-    const count = (tierBackfill as any)?.rowCount || 0;
+    const count = (tierBackfill as { rowCount?: number })?.rowCount || 0;
     if (count > 0) {
       logger.info(`[Startup] Backfilled last_tier for ${count} former members`);
     }

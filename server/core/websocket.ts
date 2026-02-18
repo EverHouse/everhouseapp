@@ -486,7 +486,7 @@ export function sendNotificationToUser(
     type: string;
     title: string;
     message: string;
-    data?: any;
+    data?: Record<string, unknown>;
   },
   context?: NotificationContext
 ): NotificationDeliveryResult {
@@ -564,7 +564,7 @@ export function broadcastToAllMembers(notification: {
   type: string;
   title: string;
   message: string;
-  data?: any;
+  data?: Record<string, unknown>;
 }) {
   const payload = JSON.stringify({
     type: 'notification',
@@ -598,7 +598,10 @@ export function broadcastToStaff(notification: {
   classId?: number;
   tourId?: number;
   memberEmail?: string;
-  data?: any;
+  data?: unknown;
+  result?: unknown;
+  error?: string;
+  [key: string]: unknown;
 }) {
   const payload = JSON.stringify({
     type: 'notification',
@@ -660,7 +663,7 @@ export function broadcastBookingEvent(event: BookingEvent) {
   return sent;
 }
 
-export function broadcastAnnouncementUpdate(action: 'created' | 'updated' | 'deleted', announcement?: any) {
+export function broadcastAnnouncementUpdate(action: 'created' | 'updated' | 'deleted', announcement?: Record<string, unknown>) {
   const payload = JSON.stringify({
     type: 'announcement_update',
     action,
@@ -971,7 +974,9 @@ export function broadcastDataIntegrityUpdate(action: 'check_complete' | 'issue_r
 export function broadcastBillingUpdate(data: {
   action: 'subscription_created' | 'subscription_cancelled' | 'subscription_updated' | 
           'payment_succeeded' | 'payment_failed' | 'invoice_paid' | 'invoice_failed' |
-          'booking_payment_updated' | 'payment_refunded' | 'balance_updated';
+          'booking_payment_updated' | 'payment_refunded' | 'balance_updated' |
+          'invoice_created' | 'invoice_finalized' | 'invoice_voided' |
+          'overage_paid' | 'payment_confirmed';
   customerId?: string;
   memberEmail?: string;
   memberName?: string;

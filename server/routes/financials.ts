@@ -9,7 +9,7 @@ import { getPacificMidnightUTC } from '../utils/dateUtils';
 import { upsertTransactionCache } from '../core/stripe/webhooks';
 import Stripe from 'stripe';
 import { getErrorMessage } from '../utils/errorUtils';
-import { logFromRequest } from '../core/auditLog';
+import { logFromRequest, type AuditAction } from '../core/auditLog';
 
 const router = Router();
 
@@ -116,15 +116,15 @@ router.get('/api/financials/recent-transactions', isStaffOrAdmin, async (req: Re
     `);
     
     const hasMore = result.rows.length > limit;
-    const transactions: RecentTransaction[] = result.rows.slice(0, limit).map((row: any) => ({
-      id: row.id,
-      type: row.type,
-      amount_cents: parseInt(row.amount_cents),
-      description: row.description,
-      member_email: row.member_email,
-      member_name: row.member_name,
-      created_at: new Date(row.created_at),
-      status: row.status
+    const transactions: RecentTransaction[] = result.rows.slice(0, limit).map((row: Record<string, unknown>) => ({
+      id: row.id as string,
+      type: row.type as string,
+      amount_cents: parseInt(row.amount_cents as string),
+      description: row.description as string,
+      member_email: row.member_email as string,
+      member_name: row.member_name as string,
+      created_at: new Date(row.created_at as string),
+      status: row.status as string
     }));
     
     const seen = new Set<string>();
@@ -316,7 +316,7 @@ router.post('/api/financials/backfill-stripe-cache', isStaffOrAdmin, async (req:
             metadata: inv.metadata,
             source: 'backfill',
             invoiceId: inv.id,
-            paymentIntentId: typeof (inv as any).payment_intent === 'string' ? (inv as any).payment_intent : undefined,
+            paymentIntentId: typeof (inv as Stripe.Invoice).payment_intent === 'string' ? (inv as Stripe.Invoice).payment_intent as string : undefined,
           });
           invoicesProcessed++;
         }
@@ -338,7 +338,7 @@ router.post('/api/financials/backfill-stripe-cache', isStaffOrAdmin, async (req:
     
     logger.info('[Financials Backfill] Complete: payment intents, charges, invoices', { extra: { paymentIntentsProcessed, chargesProcessed, invoicesProcessed } });
     
-    logFromRequest(req, 'backfill_stripe_cache' as any, 'stripe', null, undefined, {
+    logFromRequest(req, 'backfill_stripe_cache', 'stripe', null as unknown as string, undefined, {
       action: 'backfill',
       daysBack,
       paymentIntentsProcessed,
@@ -387,7 +387,7 @@ router.post('/api/financials/sync-member-payments', isStaffOrAdmin, async (req: 
       return res.status(404).json({ success: false, error: 'User not found' });
     }
     
-    const user = userResult.rows[0] as any;
+    const user = userResult.rows[0] as Record<string, unknown>;
     if (!user.stripe_customer_id) {
       return res.status(400).json({ success: false, error: 'User has no Stripe customer linked' });
     }
@@ -634,10 +634,10 @@ router.get('/api/financials/subscriptions', isStaffOrAdmin, async (req: Request,
       
       logger.info('[Financials] Found Stripe-billed customers in database', { extra: { dbResultRowsLength: dbResult.rows.length } });
       
-      const uniqueCustomers = new Map<string, any>();
-      for (const row of dbResult.rows as any[]) {
-        if (!uniqueCustomers.has(row.stripe_customer_id)) {
-          uniqueCustomers.set(row.stripe_customer_id, row);
+      const uniqueCustomers = new Map<string, Record<string, unknown>>();
+      for (const row of dbResult.rows as Record<string, unknown>[]) {
+        if (!uniqueCustomers.has(row.stripe_customer_id as string)) {
+          uniqueCustomers.set(row.stripe_customer_id as string, row);
         }
       }
       
@@ -666,7 +666,7 @@ router.get('/api/financials/subscriptions', isStaffOrAdmin, async (req: Request,
               
               const row = result.value.row;
               if (typeof sub.customer === 'string') {
-                (sub as any).customer = {
+                (sub as unknown as Record<string, unknown>).customer = {
                   id: row.stripe_customer_id,
                   email: row.email,
                   name: [row.first_name, row.last_name].filter(Boolean).join(' ') || row.email,
@@ -705,7 +705,7 @@ router.get('/api/financials/subscriptions', isStaffOrAdmin, async (req: Request,
         currency: price?.currency || 'usd',
         interval: price?.recurring?.interval || 'month',
         status: sub.status,
-        currentPeriodEnd: (sub as any).current_period_end,
+        currentPeriodEnd: (sub as Stripe.Subscription).current_period_end,
         cancelAtPeriodEnd: sub.cancel_at_period_end,
       };
     });
@@ -760,7 +760,7 @@ router.post('/api/financials/subscriptions/:subscriptionId/send-reminder', isSta
       memberName: customer.name || 'Member',
       amount,
       description: `${product?.name || 'Membership'} subscription payment is past due`,
-      dueDate: new Date((subscription as any).current_period_end * 1000).toLocaleDateString('en-US', {
+      dueDate: new Date((subscription as Stripe.Subscription).current_period_end * 1000).toLocaleDateString('en-US', {
         weekday: 'long',
         year: 'numeric',
         month: 'long',

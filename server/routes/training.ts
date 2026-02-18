@@ -799,7 +799,7 @@ router.post('/api/admin/training-sections', isAdmin, async (req, res) => {
       sortOrder: sortOrder ?? 0,
     }).returning();
     
-    logFromRequest(req, 'create_training' as any, 'training' as any, String(newSection.id), newSection.title, {});
+    logFromRequest(req, 'create_training', 'training', String(newSection.id), newSection.title, {});
     res.status(201).json(newSection);
   } catch (error: unknown) {
     logger.error('Training section creation error', { error: error instanceof Error ? error : new Error(String(error)) });
@@ -829,7 +829,7 @@ router.put('/api/admin/training-sections/:id', isAdmin, async (req, res) => {
       return res.status(404).json({ error: 'Training section not found' });
     }
     
-    logFromRequest(req, 'update_training' as any, 'training' as any, String(id), title, {});
+    logFromRequest(req, 'update_training', 'training', String(id), title, {});
     res.json(updated);
   } catch (error: unknown) {
     logger.error('Training section update error', { error: error instanceof Error ? error : new Error(String(error)) });
@@ -849,7 +849,7 @@ router.delete('/api/admin/training-sections/:id', isAdmin, async (req, res) => {
       return res.status(404).json({ error: 'Training section not found' });
     }
     
-    logFromRequest(req, 'delete_training' as any, 'training' as any, String(id), undefined, {});
+    logFromRequest(req, 'delete_training', 'training', String(id), undefined, {});
     res.json({ success: true, deleted });
   } catch (error: unknown) {
     logger.error('Training section deletion error', { error: error instanceof Error ? error : new Error(String(error)) });
@@ -865,7 +865,7 @@ router.post('/api/admin/training-sections/seed', isAdmin, async (req, res) => {
     const insertedSections = await db.select().from(trainingSections)
       .orderBy(asc(trainingSections.sortOrder), asc(trainingSections.id));
     
-    logFromRequest(req, 'seed_training' as any, 'training' as any, undefined, 'Training Seed', {});
+    logFromRequest(req, 'seed_training', 'training', undefined, 'Training Seed', {});
     res.status(201).json({ 
       success: true, 
       message: `Seeded ${insertedSections.length} training sections`,

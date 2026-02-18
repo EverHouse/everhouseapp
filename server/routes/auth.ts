@@ -11,10 +11,11 @@ import { normalizeTierName, DEFAULT_TIER } from '../../shared/constants/tiers';
 import { getResendClient } from '../utils/resend';
 import { triggerMemberSync } from '../core/memberSync';
 import { withResendRetry } from '../core/retryUtils';
-import { getSessionUser } from '../types/session';
+import { getSessionUser, SessionUser } from '../types/session';
 import { sendWelcomeEmail } from '../emails/welcomeEmail';
 import { getSupabaseAdmin, isSupabaseAvailable } from '../core/supabase/client';
 import { normalizeEmail } from '../core/utils/emailNormalization';
+import { FilterOperatorEnum } from '@hubspot/api-client/lib/codegen/crm/contacts';
 import { getErrorMessage } from '../utils/errorUtils';
 
 interface StaffUserData {
@@ -189,8 +190,8 @@ async function createSupabaseToken(user: { id: string, email: string, role: stri
       return null;
     }
     
-    if ((linkData?.properties as any)?.access_token) {
-      return (linkData.properties as any).access_token;
+    if ((linkData?.properties as Record<string, unknown>)?.access_token) {
+      return (linkData.properties as Record<string, unknown>).access_token as string;
     }
     
     const hashedToken = linkData?.properties?.hashed_token;
@@ -480,7 +481,7 @@ router.post('/api/auth/verify-member', async (req, res) => {
       filterGroups: [{
         filters: [{
           propertyName: 'email',
-          operator: 'EQ' as any,
+          operator: FilterOperatorEnum.Eq,
           value: normalizedEmail
         }]
       }],
@@ -650,7 +651,7 @@ router.post('/api/auth/request-otp', async (req, res) => {
         filterGroups: [{
           filters: [{
             propertyName: 'email',
-            operator: 'EQ' as any,
+            operator: FilterOperatorEnum.Eq,
             value: normalizedEmail
           }]
         }],
@@ -838,7 +839,7 @@ router.post('/api/auth/verify-otp', async (req, res) => {
     const role = await getUserRole(normalizedEmail);
     const sessionTtl = 7 * 24 * 60 * 60 * 1000;
     
-    let member: any;
+    let member: SessionUser | undefined;
     let shouldSetupPassword = false;
     
     if (role === 'admin' || role === 'staff') {
@@ -942,7 +943,7 @@ router.post('/api/auth/verify-otp', async (req, res) => {
           filterGroups: [{
             filters: [{
               propertyName: 'email',
-              operator: 'EQ' as any,
+              operator: FilterOperatorEnum.Eq,
               value: normalizedEmail
             }]
           }],
@@ -1183,7 +1184,7 @@ router.post('/api/auth/password-login', async (req, res) => {
         filterGroups: [{
           filters: [{
             propertyName: 'email',
-            operator: 'EQ' as any,
+            operator: FilterOperatorEnum.Eq,
             value: normalizedEmail
           }]
         }],
@@ -1344,7 +1345,7 @@ router.post('/api/auth/dev-login', async (req, res) => {
       expires_at: Date.now() + sessionTtl
     };
     
-    req.session.user = member as any;
+    req.session.user = member as SessionUser;
 
     const supabaseToken = await createSupabaseToken({ ...member, email: member.email as string });
     

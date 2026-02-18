@@ -107,7 +107,7 @@ export async function cleanupNotificationsForBooking(
 export async function validateBookingStatus(
   bookingId: number,
   allowedStatuses: string[]
-): Promise<{ valid: boolean; currentStatus?: string; booking?: any }> {
+): Promise<{ valid: boolean; currentStatus?: string; booking?: Record<string, unknown> }> {
   try {
     const [booking] = await db.select()
       .from(bookingRequests)

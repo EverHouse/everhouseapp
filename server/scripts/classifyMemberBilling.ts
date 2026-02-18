@@ -2,6 +2,7 @@ import { db } from '../db';
 import { users } from '../../shared/schema';
 import { eq, and, isNotNull, isNull, sql } from 'drizzle-orm';
 import { getErrorMessage } from '../utils/errorUtils';
+import { logger } from '../core/logger';
 
 export interface BillingClassification {
   stripe: MemberBillingInfo[];
@@ -141,8 +142,8 @@ export async function bulkClassifyMindbodyMembers(): Promise<{ updated: number; 
         sql`${users.billingProvider} IS NULL OR ${users.billingProvider} = ''`
       ));
     
-    updated = (result as any).count || 0;
-    console.log(`[BillingClassify] Updated ${updated} members with Mindbody IDs to mindbody provider`);
+    updated = (result as Record<string, unknown>).count as number || 0;
+    logger.info(`[BillingClassify] Updated ${updated} members with Mindbody IDs to mindbody provider`);
     
     return { updated, errors };
   } catch (error: unknown) {

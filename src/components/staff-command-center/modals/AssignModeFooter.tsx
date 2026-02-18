@@ -20,7 +20,7 @@ interface AssignModeFooterProps {
   handleFinalizeBooking: () => Promise<void>;
   handleMarkAsEvent: () => Promise<void>;
   executeMarkAsEvent: (existingClosureId?: number) => Promise<void>;
-  handleAssignToStaff: (staff: any) => Promise<void>;
+  handleAssignToStaff: (staff: { id: string | number; name: string; email: string }) => Promise<void>;
   getRoleBadge: (role: string) => React.ReactNode;
   onDeleteBooking?: () => Promise<void>;
   deleting?: boolean;

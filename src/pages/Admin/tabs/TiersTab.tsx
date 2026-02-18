@@ -83,6 +83,19 @@ const BOOLEAN_FIELDS = [
     { key: 'unlimited_access', label: 'Unlimited Access' },
 ] as const;
 
+
+interface TierRecord {
+  id: number;
+  name: string;
+  slug?: string;
+  description?: string;
+  monthlyPrice?: number;
+  product_type?: string;
+  stripe_price_id?: string;
+  [key: string]: unknown;
+}
+
+
 const TiersTab: React.FC = () => {
     const queryClient = useQueryClient();
     const { showToast } = useToast();
@@ -135,7 +148,7 @@ const TiersTab: React.FC = () => {
         queryKey: ['membership-tiers'],
         queryFn: async () => {
             const data = await fetchWithCredentials<MembershipTier[]>('/api/membership-tiers');
-            return data.map((t: any) => ({
+            return data.map((t: TierRecord) => ({
                 ...t,
                 highlighted_features: Array.isArray(t.highlighted_features) ? t.highlighted_features : 
                     (typeof t.highlighted_features === 'string' ? JSON.parse(t.highlighted_features || '[]') : []),
@@ -222,8 +235,8 @@ const TiersTab: React.FC = () => {
     });
 
     const updateFeatureValueMutation = useMutation({
-        mutationFn: async ({ featureId, tierId, value }: { featureId: number; tierId: number; value: any }) => {
-            return fetchWithCredentials<{ value: any }>(`/api/tier-features/${featureId}/values/${tierId}`, {
+        mutationFn: async ({ featureId, tierId, value }: { featureId: number; tierId: number; value: string | boolean | number }) => {
+            return fetchWithCredentials<{ value: string | boolean | number }>(`/api/tier-features/${featureId}/values/${tierId}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ value }),
@@ -329,16 +342,16 @@ const TiersTab: React.FC = () => {
 
     const syncStripeMutation = useMutation({
         mutationFn: async () => {
-            return postWithCredentials<{ success: boolean; synced: number; failed: number; skipped: number; details?: any[] }>('/api/admin/stripe/sync-products', {});
+            return postWithCredentials<{ success: boolean; synced: number; failed: number; skipped: number; details?: Array<{ success: boolean; tierName: string; error?: string }> }>('/api/admin/stripe/sync-products', {});
         },
         onSuccess: (data) => {
             let message = `Synced ${data.synced} products to Stripe`;
             if (data.failed > 0) {
                 message += `\n\nFailed: ${data.failed}`;
                 if (data.details) {
-                    const failedDetails = data.details.filter((d: any) => !d.success);
+                    const failedDetails = data.details.filter((d: { success: boolean; tierName: string; error?: string }) => !d.success);
                     if (failedDetails.length > 0) {
-                        message += '\n' + failedDetails.map((d: any) => `- ${d.tierName}: ${d.error}`).join('\n');
+                        message += '\n' + failedDetails.map((d: { success: boolean; tierName: string; error?: string }) => `- ${d.tierName}: ${d.error}`).join('\n');
                     }
                 }
             }
@@ -377,7 +390,7 @@ const TiersTab: React.FC = () => {
         },
     });
 
-    const debouncedUpdateFeatureValue = useCallback((featureId: number, tierId: number, value: any) => {
+    const debouncedUpdateFeatureValue = useCallback((featureId: number, tierId: number, value: string | boolean | number) => {
         const key = `${featureId}-${tierId}`;
         if (debounceTimers.current[key]) {
             clearTimeout(debounceTimers.current[key]);
@@ -695,7 +708,7 @@ const TiersTab: React.FC = () => {
                                                     Select up to 4 features to highlight on the pricing card
                                                 </p>
                                                 <div className="space-y-2">
-                                                    {BOOLEAN_FIELDS.filter(f => (selectedTier as any)?.[f.key]).map(field => (
+                                                    {BOOLEAN_FIELDS.filter(f => (selectedTier as Record<string, unknown>)?.[f.key]).map(field => (
                                                         <label 
                                                             key={field.key}
                                                             className={`flex items-center gap-3 p-2.5 rounded-xl cursor-pointer transition-colors ${
@@ -920,7 +933,7 @@ const TiersTab: React.FC = () => {
                                                     >
                                                         <span className="text-sm text-primary dark:text-white">{field.label}</span>
                                                         <Toggle
-                                                            checked={(selectedTier as any)?.[field.key] || false}
+                                                            checked={(selectedTier as Record<string, unknown>)?.[field.key] || false}
                                                             onChange={(val) => {
                                                                 if (selectedTier?.stripe_product_id) return;
                                                                 selectedTier && setSelectedTier({...selectedTier, [field.key]: val});
@@ -1096,7 +1109,7 @@ const TiersTab: React.FC = () => {
                                         <select
                                             className="border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-2 rounded-lg text-sm text-primary dark:text-white"
                                             value={newFeatureForm.type}
-                                            onChange={e => setNewFeatureForm(prev => ({ ...prev, type: e.target.value as any }))}
+                                            onChange={e => setNewFeatureForm(prev => ({ ...prev, type: e.target.value as 'boolean' | 'number' | 'text' }))}
                                         >
                                             <option value="boolean">Boolean</option>
                                             <option value="number">Number</option>

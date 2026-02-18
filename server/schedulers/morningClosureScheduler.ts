@@ -4,6 +4,7 @@ import { systemSettings } from '../../shared/schema';
 import { sql } from 'drizzle-orm';
 import { sendMorningClosureNotifications } from '../routes/push';
 import { getPacificHour, getTodayPacific } from '../utils/dateUtils';
+import { logger } from '../core/logger';
 
 const MORNING_HOUR = 8;
 const MORNING_SETTING_KEY = 'last_morning_closure_notification_date';
@@ -29,7 +30,7 @@ async function tryClaimMorningSlot(todayStr: string): Promise<boolean> {
     
     return result.length > 0;
   } catch (err) {
-    console.error('[Morning Closures] Database error:', err);
+    logger.error('[Morning Closures] Database error:', { error: err as Error });
     schedulerTracker.recordRun('Morning Closure', false, String(err));
     return false;
   }
@@ -44,25 +45,25 @@ async function checkAndSendMorningNotifications(): Promise<void> {
       const claimed = await tryClaimMorningSlot(todayStr);
       
       if (claimed) {
-        console.log('[Morning Closures] Starting morning closure notifications...');
+        logger.info('[Morning Closures] Starting morning closure notifications...');
         
         try {
           const result = await sendMorningClosureNotifications();
-          console.log(`[Morning Closures] Completed: ${result.message}`);
+          logger.info(`[Morning Closures] Completed: ${result.message}`);
           schedulerTracker.recordRun('Morning Closure', true);
         } catch (err) {
-          console.error('[Morning Closures] Send failed:', err);
+          logger.error('[Morning Closures] Send failed:', { error: err as Error });
           schedulerTracker.recordRun('Morning Closure', false, String(err));
         }
       }
     }
   } catch (err) {
-    console.error('[Morning Closures] Scheduler error:', err);
+    logger.error('[Morning Closures] Scheduler error:', { error: err as Error });
     schedulerTracker.recordRun('Morning Closure', false, String(err));
   }
 }
 
 export function startMorningClosureScheduler(): void {
   setInterval(checkAndSendMorningNotifications, 30 * 60 * 1000);
-  console.log('[Startup] Morning closure notification scheduler enabled (runs at 8am)');
+  logger.info('[Startup] Morning closure notification scheduler enabled (runs at 8am)');
 }

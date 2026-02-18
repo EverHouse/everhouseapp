@@ -456,7 +456,7 @@ class MemberServiceClass {
     return memberCache.getStats();
   }
   
-  private rowToMemberRecord(row: any, includeTierConfig: boolean = false): MemberRecord {
+  private rowToMemberRecord(row: Record<string, unknown>, includeTierConfig: boolean = false): MemberRecord {
     const linkedEmails = Array.isArray(row.linked_emails) 
       ? row.linked_emails 
       : (typeof row.linked_emails === 'string' ? JSON.parse(row.linked_emails) : []);
@@ -465,7 +465,7 @@ class MemberServiceClass {
       ? row.tags
       : (typeof row.tags === 'string' ? JSON.parse(row.tags) : []);
     
-    let tierConfig: any = null;
+    let tierConfig: Record<string, unknown> | null = null;
     if (includeTierConfig && row.tier_config_id) {
       tierConfig = {
         id: row.tier_config_id,

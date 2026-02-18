@@ -115,7 +115,7 @@ router.post('/api/auth/google/verify', async (req, res) => {
       dateOfBirth: user.dateOfBirth || null,
     };
 
-    req.session.user = member as any;
+    req.session.user = member;
 
     if (!user.googleId || user.googleId !== googleUser.sub) {
       const existingGoogleLink = await db.select({ id: users.id, email: users.email })

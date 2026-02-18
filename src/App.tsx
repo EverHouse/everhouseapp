@@ -88,9 +88,9 @@ const PageSkeleton: React.FC = () => (
   </div>
 );
 
-const lazyWithPrefetch = (importFn: () => Promise<{ default: React.ComponentType<any> }>) => {
+const lazyWithPrefetch = (importFn: () => Promise<{ default: React.ComponentType<Record<string, unknown>> }>) => {
   const Component = lazy(importFn);
-  (Component as any).prefetch = importFn;
+  (Component as unknown as { prefetch: typeof importFn }).prefetch = importFn;
   return Component;
 };
 

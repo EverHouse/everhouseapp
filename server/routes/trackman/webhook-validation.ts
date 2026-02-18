@@ -21,7 +21,7 @@ export function validateTrackmanWebhookSignature(req: Request): boolean {
     return !isProduction;
   }
   
-  const rawBody = (req as any).rawBody;
+  const rawBody = (req as Request & { rawBody?: string }).rawBody;
   if (!rawBody) {
     logger.warn('[Trackman Webhook] No raw body available for signature validation');
     return !isProduction;
@@ -58,7 +58,7 @@ export function validateTrackmanWebhookSignature(req: Request): boolean {
 
 export async function logWebhookEvent(
   eventType: string,
-  payload: any,
+  payload: Record<string, unknown>,
   trackmanBookingId?: string,
   trackmanUserId?: string,
   matchedBookingId?: number,

@@ -263,7 +263,7 @@ const RosterManager: React.FC<RosterManagerProps> = ({
     haptic.light();
     
     try {
-      const { ok, data, error, errorType, errorData } = await apiRequest<{ success: boolean; participant: any; conflict?: any; errorType?: string }>(
+      const { ok, data, error, errorType, errorData } = await apiRequest<{ success: boolean; participant: Record<string, unknown>; conflict?: Record<string, unknown>; errorType?: string }>(
         `/api/bookings/${bookingId}/participants`,
         {
           method: 'POST',

@@ -592,7 +592,7 @@ export async function executeMerge(
         ? { version: primaryUser.waiverVersion, signedAt: primaryUser.waiverSignedAt }
         : { version: secondaryUser.waiverVersion, signedAt: secondaryUser.waiverSignedAt };
     
-    const mergeInfo: Record<string, any> = {
+    const mergeInfo: Record<string, unknown> = {
       mergedFrom: secondaryUserId,
       mergedFromEmail: secondaryEmail,
       mergedFromName: `${secondaryUser.firstName || ''} ${secondaryUser.lastName || ''}`.trim(),
@@ -602,7 +602,7 @@ export async function executeMerge(
       secondaryHubspotId: secondaryUser.hubspotId,
     };
     
-    const currentTags = (primaryUser.tags as any[]) || [];
+    const currentTags = (primaryUser.tags as unknown[]) || [];
     
     // FIX: Transfer external IDs (Stripe/HubSpot) from secondary to primary if primary is missing them
     // This prevents losing billing history when merging a fresh duplicate into the active payer
@@ -689,7 +689,7 @@ export async function executeMerge(
       ]
     );
     
-    const secondaryTags = (secondaryUser.tags as any[]) || [];
+    const secondaryTags = (secondaryUser.tags as unknown[]) || [];
     const archiveTags = [...secondaryTags, { 
       type: 'merged_into', 
       primaryUserId, 

@@ -19,7 +19,7 @@ async function expireStaleBookingRequests(): Promise<void> {
     const todayStr = getTodayPacific();
     const currentTimePacific = formatTimePacific(now);
     
-    console.log(`[Booking Expiry] Running stale booking check at ${todayStr} ${currentTimePacific}`);
+    logger.info(`[Booking Expiry] Running stale booking check at ${todayStr} ${currentTimePacific}`);
 
     const expiredBookings = await queryWithRetry<ExpiredBookingResult>(
       `UPDATE booking_requests 
@@ -40,18 +40,18 @@ async function expireStaleBookingRequests(): Promise<void> {
     const expiredCount = expiredBookings.rows.length;
 
     if (expiredCount === 0) {
-      console.log('[Booking Expiry] No stale pending bookings found');
+      logger.info('[Booking Expiry] No stale pending bookings found');
       return;
     }
 
     for (const booking of expiredBookings.rows) {
-      console.log(
+      logger.info(
         `[Booking Expiry] Expired request #${booking.id}: ` +
         `${booking.userName || booking.userEmail} for ${booking.requestDate} ${booking.startTime}`
       );
     }
 
-    console.log(`[Booking Expiry] Auto-expired ${expiredCount} stale booking request(s)`);
+    logger.info(`[Booking Expiry] Auto-expired ${expiredCount} stale booking request(s)`);
     schedulerTracker.recordRun('Booking Expiry', true);
 
     if (expiredCount >= 2) {
@@ -71,7 +71,7 @@ async function expireStaleBookingRequests(): Promise<void> {
     }
 
   } catch (error) {
-    console.error('[Booking Expiry] Error expiring stale bookings:', error);
+    logger.error('[Booking Expiry] Error expiring stale bookings:', { error: error as Error });
     schedulerTracker.recordRun('Booking Expiry', false, String(error));
     logger.error('Failed to expire stale booking requests', { error: error as Error, extra: { context: 'booking_expiry_scheduler' } });
   }
@@ -81,21 +81,21 @@ let intervalId: NodeJS.Timeout | null = null;
 
 export function startBookingExpiryScheduler(): void {
   if (intervalId) {
-    console.log('[Booking Expiry] Scheduler already running');
+    logger.info('[Booking Expiry] Scheduler already running');
     return;
   }
 
-  console.log('[Startup] Booking expiry scheduler enabled (runs every hour)');
+  logger.info('[Startup] Booking expiry scheduler enabled (runs every hour)');
 
   intervalId = setInterval(() => {
     expireStaleBookingRequests().catch(err => {
-      console.error('[Booking Expiry] Uncaught error:', err);
+      logger.error('[Booking Expiry] Uncaught error:', { error: err as Error });
     });
   }, 60 * 60 * 1000);
   
   setTimeout(() => {
     expireStaleBookingRequests().catch(err => {
-      console.error('[Booking Expiry] Initial run error:', err);
+      logger.error('[Booking Expiry] Initial run error:', { error: err as Error });
     });
   }, 60 * 1000);
 }
@@ -104,12 +104,12 @@ export function stopBookingExpiryScheduler(): void {
   if (intervalId) {
     clearInterval(intervalId);
     intervalId = null;
-    console.log('[Booking Expiry] Scheduler stopped');
+    logger.info('[Booking Expiry] Scheduler stopped');
   }
 }
 
 export async function runManualBookingExpiry(): Promise<{ expiredCount: number }> {
-  console.log('[Booking Expiry] Running manual expiry check...');
+  logger.info('[Booking Expiry] Running manual expiry check...');
   
   const todayStr = getTodayPacific();
   const currentTimePacific = formatTimePacific(new Date());
@@ -131,7 +131,7 @@ export async function runManualBookingExpiry(): Promise<{ expiredCount: number }
   );
   
   const expiredCount = result.rows.length;
-  console.log(`[Booking Expiry] Manual run expired ${expiredCount} booking(s)`);
+  logger.info(`[Booking Expiry] Manual run expired ${expiredCount} booking(s)`);
   
   return { expiredCount };
 }

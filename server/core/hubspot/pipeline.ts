@@ -43,7 +43,7 @@ export async function validateMembershipPipeline(): Promise<{
     );
     
     const membershipPipeline = pipelinesResponse.results.find(
-      (p: any) => p.id === MEMBERSHIP_PIPELINE_ID || p.label?.toLowerCase().includes('membership')
+      (p: Record<string, unknown>) => p.id === MEMBERSHIP_PIPELINE_ID || (p.label as string)?.toLowerCase().includes('membership')
     );
     
     if (!membershipPipeline) {
@@ -56,7 +56,7 @@ export async function validateMembershipPipeline(): Promise<{
       };
     }
     
-    const validStages = membershipPipeline.stages?.map((s: any) => s.id) || [];
+    const validStages = membershipPipeline.stages?.map((s: Record<string, unknown>) => s.id as string) || [];
     
     const requiredStages = Object.values(HUBSPOT_STAGE_IDS);
     const missingStages = requiredStages.filter(s => !validStages.includes(s));

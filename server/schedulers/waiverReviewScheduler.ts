@@ -3,6 +3,7 @@ import { db } from '../db';
 import { sql } from 'drizzle-orm';
 import { notifyAllStaff } from '../core/notificationService';
 import { alertOnScheduledTaskFailure } from '../core/dataAlerts';
+import { logger } from '../core/logger';
 
 interface StaleWaiver {
   id: number;
@@ -44,7 +45,7 @@ export async function checkStaleWaivers(): Promise<{
 
     const staleWaivers: StaleWaiver[] = result.rows as unknown as StaleWaiver[];
 
-    console.log(`[Waiver Review] Found ${staleWaivers.length} stale waiver(s) pending review`);
+    logger.info(`[Waiver Review] Found ${staleWaivers.length} stale waiver(s) pending review`);
 
     let notificationSent = false;
 
@@ -56,7 +57,7 @@ export async function checkStaleWaivers(): Promise<{
         { relatedType: 'waiver_review', sendPush: false }
       );
       notificationSent = true;
-      console.log(`[Waiver Review] Staff notification sent for ${staleWaivers.length} stale waiver(s)`);
+      logger.info(`[Waiver Review] Staff notification sent for ${staleWaivers.length} stale waiver(s)`);
     }
 
     return {
@@ -65,7 +66,7 @@ export async function checkStaleWaivers(): Promise<{
       waivers: staleWaivers
     };
   } catch (error) {
-    console.error('[Waiver Review] Error checking stale waivers:', error);
+    logger.error('[Waiver Review] Error checking stale waivers:', { error: error as Error });
     schedulerTracker.recordRun('Waiver Review', false, String(error));
     throw error;
   }
@@ -76,14 +77,14 @@ async function scheduledCheck(): Promise<void> {
     const now = new Date();
     
     if (lastCheckTime && (now.getTime() - lastCheckTime.getTime()) < MIN_CHECK_INTERVAL_MS) {
-      console.log('[Waiver Review] Skipping check - too soon since last check');
+      logger.info('[Waiver Review] Skipping check - too soon since last check');
       return;
     }
 
     lastCheckTime = now;
     await checkStaleWaivers();
   } catch (error) {
-    console.error('[Waiver Review] Scheduled check failed:', error);
+    logger.error('[Waiver Review] Scheduled check failed:', { error: error as Error });
     schedulerTracker.recordRun('Waiver Review', false, String(error));
     
     // Notify staff about waiver review scheduler failure
@@ -92,7 +93,7 @@ async function scheduledCheck(): Promise<void> {
       error instanceof Error ? error : new Error(String(error)),
       { context: 'Scheduled check for stale waivers' }
     ).catch(alertErr => {
-      console.error('[Waiver Review] Failed to send staff alert:', alertErr);
+      logger.error('[Waiver Review] Failed to send staff alert:', { error: alertErr as Error });
       schedulerTracker.recordRun('Waiver Review', false, String(alertErr));
     });
   }
@@ -102,5 +103,5 @@ export function startWaiverReviewScheduler(): void {
   const CHECK_INTERVAL_MS = 4 * 60 * 60 * 1000;
   
   setInterval(scheduledCheck, CHECK_INTERVAL_MS);
-  console.log('[Startup] Waiver review scheduler enabled (checks every 4 hours for stale waivers)');
+  logger.info('[Startup] Waiver review scheduler enabled (checks every 4 hours for stale waivers)');
 }

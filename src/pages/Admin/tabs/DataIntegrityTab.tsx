@@ -30,6 +30,115 @@ import HubSpotQueuePanel from './dataIntegrity/HubSpotQueuePanel';
 import AlertHistoryPanel from './dataIntegrity/AlertHistoryPanel';
 import IgnoreModals from './dataIntegrity/IgnoreModals';
 
+
+interface HubspotSyncMember {
+  email: string;
+  firstName?: string;
+  lastName?: string;
+  tier?: string;
+  status?: string;
+}
+
+interface SubscriptionUpdate {
+  email: string;
+  oldStatus?: string;
+  newStatus?: string;
+  reason?: string;
+}
+
+interface OrphanedStripeRecord {
+  email: string;
+  stripeCustomerId?: string;
+  reason?: string;
+}
+
+interface StripeHubspotMember {
+  email: string;
+  name?: string;
+  stripeCustomerId?: string;
+  hubspotId?: string;
+}
+
+interface PaymentUpdate {
+  email: string;
+  oldStatus?: string;
+  newStatus?: string;
+}
+
+interface VisitMismatch {
+  email: string;
+  name?: string;
+  currentCount?: number;
+  actualCount?: number;
+}
+
+interface OrphanedParticipantDetail {
+  email: string;
+  bookingId?: number;
+  action?: string;
+}
+
+interface DuplicateRecord {
+  email: string;
+  emails?: string[];
+  name?: string;
+  count?: number;
+}
+
+interface UnlinkedGuestFee {
+  id: number;
+  guest_name?: string;
+  guest_email?: string;
+  fee_amount?: number;
+  booking_date?: string;
+  member_email?: string;
+}
+
+interface AvailableSession {
+  id: number;
+  date: string;
+  start_time: string;
+  end_time: string;
+  resource_name?: string;
+}
+
+interface AttendanceBooking {
+  id: number;
+  user_email?: string;
+  user_name?: string;
+  request_date?: string;
+  start_time?: string;
+  end_time?: string;
+  status?: string;
+  resource_name?: string;
+}
+
+interface StripeCacheStats {
+  cached?: number;
+  total?: number;
+  failed?: number;
+}
+
+interface PlaceholderAccount {
+  email: string;
+  name?: string;
+  source?: string;
+  createdAt?: string;
+}
+
+interface BackgroundJobStatus {
+  hasJob: boolean;
+  job?: { id: string; status: string; progress?: number; result?: unknown };
+}
+
+interface MemberDetails {
+  email: string;
+  name?: string;
+  tier?: string;
+  [key: string]: unknown;
+}
+
+
 const DataIntegrityTab: React.FC = () => {
   const { showToast } = useToast();
   const queryClient = useQueryClient();
@@ -61,14 +170,14 @@ const DataIntegrityTab: React.FC = () => {
 
   const [guestFeeStartDate, setGuestFeeStartDate] = useState('');
   const [guestFeeEndDate, setGuestFeeEndDate] = useState('');
-  const [unlinkedGuestFees, setUnlinkedGuestFees] = useState<any[]>([]);
-  const [availableSessions, setAvailableSessions] = useState<any[]>([]);
+  const [unlinkedGuestFees, setUnlinkedGuestFees] = useState<UnlinkedGuestFee[] | AvailableSession[] | AttendanceBooking[]>([]);
+  const [availableSessions, setAvailableSessions] = useState<UnlinkedGuestFee[] | AvailableSession[] | AttendanceBooking[]>([]);
   const [selectedFeeId, setSelectedFeeId] = useState<number | null>(null);
   const [selectedSessionId, setSelectedSessionId] = useState<number | null>(null);
 
   const [attendanceSearchDate, setAttendanceSearchDate] = useState('');
   const [attendanceSearchEmail, setAttendanceSearchEmail] = useState('');
-  const [attendanceBookings, setAttendanceBookings] = useState<any[]>([]);
+  const [attendanceBookings, setAttendanceBookings] = useState<UnlinkedGuestFee[] | AvailableSession[] | AttendanceBooking[]>([]);
   const [updatingAttendanceId, setUpdatingAttendanceId] = useState<number | null>(null);
   const [attendanceNote, setAttendanceNote] = useState('');
 
@@ -76,7 +185,7 @@ const DataIntegrityTab: React.FC = () => {
   const [mindbodyEndDate, setMindbodyEndDate] = useState('');
   const [mindbodyResult, setMindbodyResult] = useState<{ success: boolean; message: string } | null>(null);
 
-  const [hubspotSyncResult, setHubspotSyncResult] = useState<{ success: boolean; message: string; members?: any[]; dryRun?: boolean } | null>(null);
+  const [hubspotSyncResult, setHubspotSyncResult] = useState<{ success: boolean; message: string; members?: HubspotSyncMember[]; dryRun?: boolean } | null>(null);
   const [mindbodyCleanupResult, setMindbodyCleanupResult] = useState<{ success: boolean; message: string; toClean?: number; dryRun?: boolean } | null>(null);
   const [stripeCleanupResult, setStripeCleanupResult] = useState<{ 
     success: boolean; 
@@ -109,18 +218,18 @@ const DataIntegrityTab: React.FC = () => {
     errors: string[];
   } | null>(null);
 
-  const [stripeCacheResult, setStripeCacheResult] = useState<{ success: boolean; message: string; stats?: any } | null>(null);
+  const [stripeCacheResult, setStripeCacheResult] = useState<{ success: boolean; message: string; stats?: StripeCacheStats } | null>(null);
 
   const [showSyncTools, setShowSyncTools] = useState(true);
-  const [subscriptionStatusResult, setSubscriptionStatusResult] = useState<{ success: boolean; message: string; totalChecked?: number; mismatchCount?: number; updated?: any[]; dryRun?: boolean } | null>(null);
-  const [orphanedStripeResult, setOrphanedStripeResult] = useState<{ success: boolean; message: string; totalChecked?: number; orphanedCount?: number; cleared?: any[]; dryRun?: boolean } | null>(null);
-  const [stripeHubspotLinkResult, setStripeHubspotLinkResult] = useState<{ success: boolean; message: string; stripeOnlyMembers?: any[]; hubspotOnlyMembers?: any[]; linkedCount?: number; dryRun?: boolean } | null>(null);
-  const [paymentStatusResult, setPaymentStatusResult] = useState<{ success: boolean; message: string; totalChecked?: number; updatedCount?: number; updates?: any[]; dryRun?: boolean } | null>(null);
-  const [visitCountResult, setVisitCountResult] = useState<{ success: boolean; message: string; mismatchCount?: number; updatedCount?: number; sampleMismatches?: any[]; dryRun?: boolean } | null>(null);
+  const [subscriptionStatusResult, setSubscriptionStatusResult] = useState<{ success: boolean; message: string; totalChecked?: number; mismatchCount?: number; updated?: SubscriptionUpdate[]; dryRun?: boolean } | null>(null);
+  const [orphanedStripeResult, setOrphanedStripeResult] = useState<{ success: boolean; message: string; totalChecked?: number; orphanedCount?: number; cleared?: OrphanedStripeRecord[]; dryRun?: boolean } | null>(null);
+  const [stripeHubspotLinkResult, setStripeHubspotLinkResult] = useState<{ success: boolean; message: string; stripeOnlyMembers?: StripeHubspotMember[]; hubspotOnlyMembers?: StripeHubspotMember[]; linkedCount?: number; dryRun?: boolean } | null>(null);
+  const [paymentStatusResult, setPaymentStatusResult] = useState<{ success: boolean; message: string; totalChecked?: number; updatedCount?: number; updates?: PaymentUpdate[]; dryRun?: boolean } | null>(null);
+  const [visitCountResult, setVisitCountResult] = useState<{ success: boolean; message: string; mismatchCount?: number; updatedCount?: number; sampleMismatches?: VisitMismatch[]; dryRun?: boolean } | null>(null);
   const [ghostBookingResult, setGhostBookingResult] = useState<{ success: boolean; message: string; ghostBookings?: number; fixed?: number; dryRun?: boolean; errors?: Array<{ bookingId: number; error: string }> } | null>(null);
-  const [orphanedParticipantResult, setOrphanedParticipantResult] = useState<{ success: boolean; message: string; relinked?: number; converted?: number; total?: number; dryRun?: boolean; relinkedDetails?: any[]; convertedDetails?: any[] } | null>(null);
+  const [orphanedParticipantResult, setOrphanedParticipantResult] = useState<{ success: boolean; message: string; relinked?: number; converted?: number; total?: number; dryRun?: boolean; relinkedDetails?: OrphanedParticipantDetail[]; convertedDetails?: OrphanedParticipantDetail[] } | null>(null);
   const [reviewItemsResult, setReviewItemsResult] = useState<{ success: boolean; message: string; wellnessCount?: number; eventCount?: number; total?: number; dryRun?: boolean } | null>(null);
-  const [duplicateDetectionResult, setDuplicateDetectionResult] = useState<{ success: boolean; message: string; appDuplicates?: any[]; hubspotDuplicates?: any[] } | null>(null);
+  const [duplicateDetectionResult, setDuplicateDetectionResult] = useState<{ success: boolean; message: string; appDuplicates?: DuplicateRecord[]; hubspotDuplicates?: DuplicateRecord[] } | null>(null);
   const [expandedDuplicates, setExpandedDuplicates] = useState<{ app: boolean; hubspot: boolean }>({ app: false, hubspot: false });
   const [dealStageRemediationResult, setDealStageRemediationResult] = useState<{ success: boolean; message: string; total?: number; fixed?: number; dryRun?: boolean } | null>(null);
 
@@ -408,7 +517,7 @@ const DataIntegrityTab: React.FC = () => {
 
   const searchGuestFeesMutation = useMutation({
     mutationFn: (params: { startDate: string; endDate: string }) => 
-      fetchWithCredentials<any[]>(`/api/data-tools/unlinked-guest-fees?startDate=${params.startDate}&endDate=${params.endDate}`),
+      fetchWithCredentials<UnlinkedGuestFee[]>(`/api/data-tools/unlinked-guest-fees?startDate=${params.startDate}&endDate=${params.endDate}`),
     onSuccess: (data) => {
       setUnlinkedGuestFees(data);
     },
@@ -419,7 +528,7 @@ const DataIntegrityTab: React.FC = () => {
 
   const loadSessionsMutation = useMutation({
     mutationFn: (params: { date: string; memberEmail: string }) => 
-      fetchWithCredentials<any[]>(`/api/data-tools/available-sessions?date=${params.date}&memberEmail=${params.memberEmail || ''}`),
+      fetchWithCredentials<AvailableSession[]>(`/api/data-tools/available-sessions?date=${params.date}&memberEmail=${params.memberEmail || ''}`),
     onSuccess: (data) => {
       setAvailableSessions(data);
     },
@@ -448,7 +557,7 @@ const DataIntegrityTab: React.FC = () => {
       const searchParams = new URLSearchParams();
       if (params.date) searchParams.append('date', params.date);
       if (params.memberEmail) searchParams.append('memberEmail', params.memberEmail);
-      return fetchWithCredentials<any[]>(`/api/data-tools/bookings-search?${searchParams.toString()}`);
+      return fetchWithCredentials<AttendanceBooking[]>(`/api/data-tools/bookings-search?${searchParams.toString()}`);
     },
     onSuccess: (data) => {
       setAttendanceBookings(data);
@@ -524,7 +633,7 @@ const DataIntegrityTab: React.FC = () => {
 
   const backfillStripeCacheMutation = useMutation({
     mutationFn: () => 
-      postWithCredentials<{ stats?: any }>('/api/financials/backfill-stripe-cache', {}),
+      postWithCredentials<{ stats?: StripeCacheStats }>('/api/financials/backfill-stripe-cache', {}),
     onSuccess: (data) => {
       const msg = `Backfilled ${data.stats?.paymentIntents || 0} payments, ${data.stats?.charges || 0} charges, ${data.stats?.invoices || 0} invoices`;
       setStripeCacheResult({ success: true, message: msg, stats: data.stats });
@@ -538,7 +647,7 @@ const DataIntegrityTab: React.FC = () => {
 
   const syncMembersToHubspotMutation = useMutation({
     mutationFn: (dryRun: boolean) => 
-      postWithCredentials<{ message: string; members?: any[]; syncedCount?: number; totalSynced?: number }>('/api/data-tools/bulk-push-to-hubspot', { dryRun }),
+      postWithCredentials<{ message: string; members?: HubspotSyncMember[]; syncedCount?: number; totalSynced?: number }>('/api/data-tools/bulk-push-to-hubspot', { dryRun }),
     onSuccess: (data, dryRun) => {
       setHubspotSyncResult({ 
         success: true, 
@@ -583,7 +692,7 @@ const DataIntegrityTab: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['data-integrity'] });
       runIntegrityMutation.mutate();
     },
-    onError: (err: any) => {
+    onError: (err: unknown) => {
       showToast((err instanceof Error ? err.message : String(err)) || 'Failed to fix issue', 'error');
     }
   });
@@ -659,7 +768,7 @@ const DataIntegrityTab: React.FC = () => {
     if (!isRunningStripeCleanup) return;
     const interval = setInterval(async () => {
       try {
-        const statusData = await fetchWithCredentials<{ hasJob: boolean; job?: any }>('/api/data-tools/cleanup-stripe-customers/status');
+        const statusData = await fetchWithCredentials<BackgroundJobStatus>('/api/data-tools/cleanup-stripe-customers/status');
         if (statusData.hasJob && statusData.job) {
           setStripeCleanupProgress(statusData.job.progress);
           if (statusData.job.status === 'completed') {
@@ -733,7 +842,7 @@ const DataIntegrityTab: React.FC = () => {
     if (!isRunningVisitorArchive) return;
     const interval = setInterval(async () => {
       try {
-        const statusData = await fetchWithCredentials<{ hasJob: boolean; job?: any }>('/api/data-tools/archive-stale-visitors/status');
+        const statusData = await fetchWithCredentials<BackgroundJobStatus>('/api/data-tools/archive-stale-visitors/status');
         if (statusData.hasJob && statusData.job) {
           setVisitorArchiveProgress(statusData.job.progress);
           if (statusData.job.status === 'completed') {
@@ -770,7 +879,7 @@ const DataIntegrityTab: React.FC = () => {
 
   const syncSubscriptionStatusMutation = useMutation({
     mutationFn: (dryRun: boolean) => 
-      postWithCredentials<{ message?: string; totalChecked?: number; mismatchCount?: number; updated?: any[]; updatedCount?: number }>('/api/data-tools/sync-subscription-status', { dryRun }),
+      postWithCredentials<{ message?: string; totalChecked?: number; mismatchCount?: number; updated?: SubscriptionUpdate[]; updatedCount?: number }>('/api/data-tools/sync-subscription-status', { dryRun }),
     onSuccess: (data, dryRun) => {
       setSubscriptionStatusResult({
         success: true,
@@ -793,7 +902,7 @@ const DataIntegrityTab: React.FC = () => {
 
   const clearOrphanedStripeIdsMutation = useMutation({
     mutationFn: (dryRun: boolean) => 
-      postWithCredentials<{ message?: string; totalChecked?: number; orphanedCount?: number; cleared?: any[]; clearedCount?: number }>('/api/data-tools/clear-orphaned-stripe-ids', { dryRun }),
+      postWithCredentials<{ message?: string; totalChecked?: number; orphanedCount?: number; cleared?: OrphanedStripeRecord[]; clearedCount?: number }>('/api/data-tools/clear-orphaned-stripe-ids', { dryRun }),
     onSuccess: (data, dryRun) => {
       setOrphanedStripeResult({
         success: true,
@@ -816,7 +925,7 @@ const DataIntegrityTab: React.FC = () => {
 
   const linkStripeHubspotMutation = useMutation({
     mutationFn: (dryRun: boolean) => 
-      postWithCredentials<{ message?: string; stripeOnlyMembers?: any[]; hubspotOnlyMembers?: any[]; linkedCount?: number }>('/api/data-tools/link-stripe-hubspot', { dryRun }),
+      postWithCredentials<{ message?: string; stripeOnlyMembers?: StripeHubspotMember[]; hubspotOnlyMembers?: StripeHubspotMember[]; linkedCount?: number }>('/api/data-tools/link-stripe-hubspot', { dryRun }),
     onSuccess: (data, dryRun) => {
       setStripeHubspotLinkResult({
         success: true,
@@ -836,7 +945,7 @@ const DataIntegrityTab: React.FC = () => {
 
   const syncPaymentStatusMutation = useMutation({
     mutationFn: (dryRun: boolean) => 
-      postWithCredentials<{ message?: string; totalChecked?: number; updatedCount?: number; updates?: any[] }>('/api/data-tools/sync-payment-status', { dryRun }),
+      postWithCredentials<{ message?: string; totalChecked?: number; updatedCount?: number; updates?: PaymentUpdate[] }>('/api/data-tools/sync-payment-status', { dryRun }),
     onSuccess: (data, dryRun) => {
       setPaymentStatusResult({
         success: true,
@@ -856,7 +965,7 @@ const DataIntegrityTab: React.FC = () => {
 
   const syncVisitCountsMutation = useMutation({
     mutationFn: (dryRun: boolean) => 
-      postWithCredentials<{ message?: string; mismatchCount?: number; updatedCount?: number; sampleMismatches?: any[] }>('/api/data-tools/sync-visit-counts', { dryRun }),
+      postWithCredentials<{ message?: string; mismatchCount?: number; updatedCount?: number; sampleMismatches?: VisitMismatch[] }>('/api/data-tools/sync-visit-counts', { dryRun }),
     onSuccess: (data, dryRun) => {
       setVisitCountResult({
         success: true,
@@ -915,7 +1024,7 @@ const DataIntegrityTab: React.FC = () => {
 
   const fixOrphanedParticipantsMutation = useMutation({
     mutationFn: (dryRun: boolean) =>
-      postWithCredentials<{ message?: string; relinked?: number; converted?: number; total?: number; dryRun?: boolean; relinkedDetails?: any[]; convertedDetails?: any[] }>('/api/data-integrity/fix/fix-orphaned-participants', { dryRun }),
+      postWithCredentials<{ message?: string; relinked?: number; converted?: number; total?: number; dryRun?: boolean; relinkedDetails?: OrphanedParticipantDetail[]; convertedDetails?: OrphanedParticipantDetail[] }>('/api/data-integrity/fix/fix-orphaned-participants', { dryRun }),
     onSuccess: (data, dryRun) => {
       setOrphanedParticipantResult({
         success: true,
@@ -982,7 +1091,7 @@ const DataIntegrityTab: React.FC = () => {
 
   const detectDuplicatesMutation = useMutation({
     mutationFn: () => 
-      postWithCredentials<{ message?: string; appDuplicates?: any[]; hubspotDuplicates?: any[] }>('/api/data-tools/detect-duplicates', {}),
+      postWithCredentials<{ message?: string; appDuplicates?: DuplicateRecord[]; hubspotDuplicates?: DuplicateRecord[] }>('/api/data-tools/detect-duplicates', {}),
     onSuccess: (data) => {
       const appCount = data.appDuplicates?.length || 0;
       const hubspotCount = data.hubspotDuplicates?.length || 0;
@@ -1003,7 +1112,7 @@ const DataIntegrityTab: React.FC = () => {
 
   const scanPlaceholdersMutation = useMutation({
     mutationFn: () => 
-      fetchWithCredentials<{ success: boolean; stripeCustomers?: any[]; hubspotContacts?: any[]; localDatabaseUsers?: any[]; totals?: { stripe: number; hubspot: number; localDatabase: number; total: number } }>('/api/data-integrity/placeholder-accounts'),
+      fetchWithCredentials<{ success: boolean; stripeCustomers?: PlaceholderAccount[]; hubspotContacts?: PlaceholderAccount[]; localDatabaseUsers?: PlaceholderAccount[]; totals?: { stripe: number; hubspot: number; localDatabase: number; total: number } }>('/api/data-integrity/placeholder-accounts'),
     onSuccess: (data) => {
       if (data.success) {
         setPlaceholderAccounts({
@@ -1131,7 +1240,7 @@ const DataIntegrityTab: React.FC = () => {
     if (!email) return;
     setLoadingMemberEmail(email);
     try {
-      const response = await fetchWithCredentials<any>(`/api/members/${encodeURIComponent(email)}/details`);
+      const response = await fetchWithCredentials<MemberDetails>(`/api/members/${encodeURIComponent(email)}/details`);
       if (!response || !response.id) {
         throw new Error('Invalid response from server');
       }
@@ -1203,7 +1312,7 @@ const DataIntegrityTab: React.FC = () => {
     searchGuestFeesMutation.mutate({ startDate: guestFeeStartDate, endDate: guestFeeEndDate });
   };
 
-  const handleLoadSessionsForFee = (fee: any) => {
+  const handleLoadSessionsForFee = (fee: UnlinkedGuestFee) => {
     setSelectedFeeId(fee.id);
     setSelectedSessionId(null);
     loadSessionsMutation.mutate({ date: fee.saleDate, memberEmail: fee.memberEmail || '' });

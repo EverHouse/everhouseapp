@@ -60,7 +60,7 @@ export async function syncPaymentToHubSpot(params: SyncPaymentParams): Promise<v
     
     const unitPrice = amountCents / 100;
     
-    const lineItemProperties: any = {
+    const lineItemProperties: Record<string, string> = {
       quantity: '1',
       price: String(unitPrice),
       name: productName,
@@ -81,7 +81,7 @@ export async function syncPaymentToHubSpot(params: SyncPaymentParams): Promise<v
       lineItemId,
       'deals',
       hubspotDealId,
-      [{ associationCategory: 'HUBSPOT_DEFINED' as any, associationTypeId: 20 }]
+      [{ associationCategory: 'HUBSPOT_DEFINED' as unknown as 'HUBSPOT_DEFINED', associationTypeId: 20 }]
     );
 
     await db.insert(hubspotLineItems).values({
@@ -163,7 +163,7 @@ export async function syncDayPassToHubSpot(params: SyncDayPassParams): Promise<v
 
       const unitPrice = amountCents / 100;
 
-      const lineItemProperties: any = {
+      const lineItemProperties: Record<string, string> = {
         quantity: '1',
         price: String(unitPrice),
         name: productName,
@@ -184,7 +184,7 @@ export async function syncDayPassToHubSpot(params: SyncDayPassParams): Promise<v
         lineItemId,
         'deals',
         hubspotDealId,
-        [{ associationCategory: 'HUBSPOT_DEFINED' as any, associationTypeId: 20 }]
+        [{ associationCategory: 'HUBSPOT_DEFINED' as unknown as 'HUBSPOT_DEFINED', associationTypeId: 20 }]
       );
 
       await db.insert(hubspotLineItems).values({

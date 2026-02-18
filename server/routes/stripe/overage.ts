@@ -36,7 +36,7 @@ router.post('/api/stripe/overage/create-payment-intent', isAuthenticated, async 
       return res.status(404).json({ error: 'Booking not found.' });
     }
     
-    const booking = bookingResult.rows[0] as any;
+    const booking = bookingResult.rows[0] as Record<string, unknown>;
     
     const isOwner = (booking.user_email as string).toLowerCase() === userEmail?.toLowerCase();
     const isStaff = sessionUser?.role === 'staff' || sessionUser?.role === 'admin';
@@ -133,7 +133,7 @@ router.post('/api/stripe/overage/create-payment-intent', isAuthenticated, async 
       WHERE slug = 'simulator-overage-30min' AND is_active = true
     `);
     
-    if (productResult.rows.length === 0 || !(productResult.rows[0] as any).stripe_price_id) {
+    if (productResult.rows.length === 0 || !(productResult.rows[0] as Record<string, unknown>).stripe_price_id) {
       return res.status(500).json({ error: 'Simulator overage product is not set up in Stripe yet. This usually resolves itself on server restart. Try refreshing in a minute.' });
     }
     
@@ -157,7 +157,7 @@ router.post('/api/stripe/overage/create-payment-intent', isAuthenticated, async 
         member_email: booking.user_email as string,
         booking_date: booking.request_date as string,
         fee_type: 'simulator_overage',
-        product_id: (productResult.rows[0] as any).stripe_product_id as string,
+        product_id: (productResult.rows[0] as Record<string, unknown>).stripe_product_id as string,
       },
     });
 
@@ -185,7 +185,7 @@ router.post('/api/stripe/overage/create-payment-intent', isAuthenticated, async 
             message: `Your overage payment of $${(Number(booking.overage_fee_cents) / 100).toFixed(2)} has been covered by account credit.`,
             data: { bookingId, amount: booking.overage_fee_cents }
           });
-          (broadcastBillingUpdate as any)(booking.user_email as string, 'overage_paid');
+          broadcastBillingUpdate({ action: 'overage_paid', memberEmail: booking.user_email as string });
         }
       } catch (notifyError) {
         logger.error('[Overage Payment] Failed to send notification for balance payment', { extra: { notifyError } });
@@ -238,7 +238,7 @@ router.post('/api/stripe/overage/confirm-payment', isAuthenticated, async (req: 
     if (ownerCheck.rows.length === 0) {
       return res.status(404).json({ error: 'Booking not found.' });
     }
-    const isOwner = (ownerCheck.rows[0] as any).user_email?.toLowerCase() === userEmail.toLowerCase();
+    const isOwner = (ownerCheck.rows[0] as Record<string, unknown>).user_email?.toString().toLowerCase() === userEmail.toLowerCase();
     if (!isOwner && !isStaff) {
       return res.status(403).json({ error: 'Not authorized to confirm this payment.' });
     }
@@ -263,7 +263,7 @@ router.post('/api/stripe/overage/confirm-payment', isAuthenticated, async (req: 
       return res.status(404).json({ error: 'Booking not found or payment intent mismatch.' });
     }
     
-    const booking = result.rows[0] as any;
+    const booking = result.rows[0] as Record<string, unknown>;
     logger.info('[Overage Payment] Confirmed payment for booking : $', { extra: { bookingId, Number_bookingOverage_fee_cents_100_ToFixed_2: (Number(booking.overage_fee_cents) / 100).toFixed(2) } });
     
     try {
@@ -274,7 +274,7 @@ router.post('/api/stripe/overage/confirm-payment', isAuthenticated, async (req: 
           message: `Your overage payment of $${(Number(booking.overage_fee_cents) / 100).toFixed(2)} has been confirmed.`,
           data: { bookingId, amount: booking.overage_fee_cents }
         });
-        (broadcastBillingUpdate as any)(booking.user_email as string, 'overage_paid');
+        broadcastBillingUpdate({ action: 'overage_paid', memberEmail: booking.user_email as string });
       }
     } catch (notifyError) {
       logger.error('[Overage Payment] Failed to send notification', { extra: { notifyError } });
@@ -313,7 +313,7 @@ router.get('/api/stripe/overage/check/:bookingId', isAuthenticated, async (req: 
       return res.status(404).json({ error: 'Booking not found.' });
     }
     
-    const booking = result.rows[0] as any;
+    const booking = result.rows[0] as Record<string, unknown>;
     const isOwner = (booking.user_email as string)?.toLowerCase() === userEmail.toLowerCase();
     if (!isOwner && !isStaff) {
       return res.status(403).json({ error: 'Not authorized to view this booking.' });

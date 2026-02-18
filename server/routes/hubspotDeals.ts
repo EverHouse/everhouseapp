@@ -481,7 +481,7 @@ router.post('/api/admin/hubspot/deals/batch-delete', isStaffOrAdmin, async (req:
         await hubspot.crm.deals.basicApi.archive(deal.hubspot_deal_id);
         deleted++;
       } catch (err: unknown) {
-        if ((err as any)?.code === 404 || (err as any)?.statusCode === 404 || (err as any)?.message?.includes('NOT_FOUND')) {
+        if ((err as Record<string, unknown>)?.code === 404 || (err as Record<string, unknown>)?.statusCode === 404 || (err as Error)?.message?.includes('NOT_FOUND')) {
           deleted++;
         } else {
           failed++;
@@ -498,7 +498,7 @@ router.post('/api/admin/hubspot/deals/batch-delete', isStaffOrAdmin, async (req:
     await pool.query('DELETE FROM hubspot_deals');
     
     const { logFromRequest } = await import('../core/auditLog');
-    logFromRequest(req, 'bulk_action' as any, 'system' as any, 'all',
+    logFromRequest(req, 'bulk_action', 'system', 'all',
       `Batch deleted ${deleted} deals`, { deleted, failed, total: deals.length });
     
     logger.info('[HubSpot] Batch deleted deals from HubSpot, failures, cleared local tables', { extra: { deleted, failed } });

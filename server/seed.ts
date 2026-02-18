@@ -2,6 +2,7 @@ import pg from 'pg';
 import fs from 'fs';
 import path from 'path';
 import { normalizeTierName } from './utils/tierUtils';
+import { logger } from './core/logger';
 const { Pool } = pg;
 
 const pool = new Pool({
@@ -61,11 +62,11 @@ function parseLinkedEmails(trackmanEmails: string): string[] {
 }
 
 async function seed() {
-  console.log('🌱 Seeding database...\n');
+  logger.info('Seeding database...');
 
   try {
     // Seed Resources (4 simulator bays + 1 conference room)
-    console.log('Creating resources...');
+    logger.info('Creating resources...');
     const resources = [
       { name: 'Simulator Bay 1', type: 'simulator', description: 'TrackMan Simulator Bay 1', capacity: 6 },
       { name: 'Simulator Bay 2', type: 'simulator', description: 'TrackMan Simulator Bay 2', capacity: 6 },
@@ -82,10 +83,10 @@ async function seed() {
         [resource.name, resource.type, resource.description, resource.capacity]
       );
     }
-    console.log('✓ Resources created\n');
+    logger.info('Resources created');
 
     // Seed Admin Users
-    console.log('Creating admin users...');
+    logger.info('Creating admin users...');
     const admins = [
       { email: 'adam@evenhouse.club', first_name: 'Adam', last_name: 'Ever Club', role: 'admin' },
       { email: 'nick@evenhouse.club', first_name: 'Nick', last_name: 'Luu', role: 'admin' },
@@ -99,10 +100,10 @@ async function seed() {
         [admin.email, admin.first_name, admin.last_name, admin.role]
       );
     }
-    console.log('✓ Admin users created\n');
+    logger.info('Admin users created');
 
     // Seed Members from CSV
-    console.log('Importing members from CSV...');
+    logger.info('Importing members from CSV...');
     const csvPath = path.join(process.cwd(), 'even_house_cleaned_member_data.csv');
     
     if (fs.existsSync(csvPath)) {
@@ -159,17 +160,17 @@ async function seed() {
           );
           imported++;
         } catch (err) {
-          console.error(`  Failed to import ${email}:`, err);
+          logger.error(`  Failed to import ${email}:`, { error: err as Error });
           skipped++;
         }
       }
-      console.log(`✓ Members imported: ${imported} imported, ${skipped} skipped\n`);
+      logger.info(`Members imported: ${imported} imported, ${skipped} skipped`);
     } else {
-      console.log('⚠ Member CSV file not found, skipping member import\n');
+      logger.info('Member CSV file not found, skipping member import');
     }
 
     // Seed Cafe Menu Items - Real Ever Club Menu
-    console.log('Creating cafe menu...');
+    logger.info('Creating cafe menu...');
     const cafeItems = [
       { category: 'Breakfast', name: 'Egg Toast', price: 14, description: 'Schaner Farm scrambled eggs, whipped ricotta, chives, micro greens, toasted country batard', icon: 'egg_alt', sort_order: 1 },
       { category: 'Breakfast', name: 'Avocado Toast', price: 16, description: 'Hass smashed avocado, radish, lemon, micro greens, dill, toasted country batard', icon: 'eco', sort_order: 2 },
@@ -214,10 +215,10 @@ async function seed() {
         [item.category, item.name, item.price, item.description, item.icon, item.sort_order]
       );
     }
-    console.log('✓ Cafe menu created\n');
+    logger.info('Cafe menu created');
 
     // Seed Training Sections
-    console.log('Creating training sections...');
+    logger.info('Creating training sections...');
     const trainingSections = [
       { icon: 'login', title: 'Getting Started', description: 'How to access and navigate the Staff Portal', is_admin_only: false, sort_order: 1, steps: JSON.stringify([
         { title: 'Logging In', content: 'Use your registered email to sign in via the magic link system. Check your email for the login link - no password needed. The link expires after 15 minutes for security.' },
@@ -328,23 +329,24 @@ async function seed() {
       );
       if (result.rowCount && result.rowCount > 0) trainingSectionsInserted++;
     }
-    console.log(`✓ Training sections: ${trainingSectionsInserted} new (${trainingSections.length - trainingSectionsInserted} already existed)\n`);
+    logger.info(`Training sections: ${trainingSectionsInserted} new (${trainingSections.length - trainingSectionsInserted} already existed)`);
 
     // Get member count
     const memberCount = await pool.query(`SELECT COUNT(*) as count FROM users WHERE role = 'member'`);
     const totalMembers = parseInt(memberCount.rows[0].count, 10);
 
-    console.log('✅ Database seeded successfully!');
-    console.log('\nSeeded:');
-    console.log(`  • ${resources.length} bookable resources (4 simulators + 1 conference room)`);
-    console.log(`  • ${admins.length} admin users`);
-    console.log(`  • ${totalMembers} members from CSV`);
-    console.log(`  • ${cafeItems.length} cafe menu items`);
-    console.log(`  • ${trainingSectionsInserted} training sections`);
-    console.log('\nNote: Events and wellness classes sync from Google Calendar.');
+    logger.info('Database seeded successfully!');
+    logger.info('Seeded:', { extra: {
+      resources: `${resources.length} bookable resources (4 simulators + 1 conference room)`,
+      admins: `${admins.length} admin users`,
+      members: `${totalMembers} members from CSV`,
+      cafeItems: `${cafeItems.length} cafe menu items`,
+      trainingSections: `${trainingSectionsInserted} training sections`,
+    }});
+    logger.info('Note: Events and wellness classes sync from Google Calendar.');
 
   } catch (error) {
-    console.error('❌ Seed error:', error);
+    logger.error('Seed error:', { error: error as Error });
     throw error;
   } finally {
     await pool.end();

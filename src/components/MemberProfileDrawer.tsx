@@ -12,7 +12,33 @@ import { TIER_NAMES } from '../../shared/constants/tiers';
 import IdScannerModal from './staff-command-center/modals/IdScannerModal';
 import { useBookingActions } from '../hooks/useBookingActions';
 import { formatDatePacific } from './memberProfile/memberProfileTypes';
-import type { MemberHistory, GuestVisit, MemberNote, CommunicationLog, TabType } from './memberProfile/memberProfileTypes';
+import type { MemberHistory, GuestVisit, MemberNote, CommunicationLog, TabType, BookingHistoryItem } from './memberProfile/memberProfileTypes';
+
+interface PurchaseItem {
+  id: number | string;
+  description?: string;
+  amount?: number;
+  date?: string;
+  status?: string;
+  type?: string;
+  category?: string;
+  product_name?: string;
+  quantity?: number;
+  created_at?: string;
+}
+
+interface MergePreviewData {
+  sourceEmail: string;
+  targetEmail: string;
+  recordsToTransfer?: number;
+  bookings?: number;
+  notes?: number;
+  communications?: number;
+  guestPasses?: number;
+  recordsToMerge?: Record<string, { source: number; target: number; action: string }>;
+  conflicts?: Array<{ field: string; sourceValue: unknown; targetValue: unknown }>;
+  recommendations?: Array<{ field: string; recommendation: string }>;
+}
 import OverviewTab from './memberProfile/OverviewTab';
 import BillingTab from './memberProfile/BillingTab';
 import ActivityTab from './memberProfile/ActivityTab';
@@ -70,7 +96,7 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
   const [notes, setNotes] = useState<MemberNote[]>([]);
   const [communications, setCommunications] = useState<CommunicationLog[]>([]);
   const [guestHistory, setGuestHistory] = useState<GuestVisit[]>([]);
-  const [purchases, setPurchases] = useState<any[]>([]);
+  const [purchases, setPurchases] = useState<PurchaseItem[]>([]);
   const [linkedEmails, setLinkedEmails] = useState<string[]>([]);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteOptions, setDeleteOptions] = useState({ hubspot: true, stripe: true });
@@ -96,7 +122,7 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
   const [displayedTier, setDisplayedTier] = useState<string>('');
   const [showMergeModal, setShowMergeModal] = useState(false);
   const [selectedMergeTarget, setSelectedMergeTarget] = useState<SelectedMember | null>(null);
-  const [mergePreview, setMergePreview] = useState<any>(null);
+  const [mergePreview, setMergePreview] = useState<MergePreviewData | null>(null);
   const [isMerging, setIsMerging] = useState(false);
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
   const [accountBalance, setAccountBalance] = useState<{ balanceCents: number; balanceDollars: number } | null>(null);
@@ -343,10 +369,10 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
           if (!prev) return prev;
           return {
             ...prev,
-            bookingHistory: prev.bookingHistory.map((b: any) => 
+            bookingHistory: prev.bookingHistory.map((b: BookingHistoryItem) => 
               b.id === bookingId ? { ...b, status: newStatus } : b
             ),
-            bookingRequestsHistory: prev.bookingRequestsHistory.map((b: any) => 
+            bookingRequestsHistory: prev.bookingRequestsHistory.map((b: BookingHistoryItem) => 
               b.id === bookingId ? { ...b, status: newStatus } : b
             )
           };
@@ -503,8 +529,8 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
 
   if (!isOpen || !member) return null;
 
-  const filteredBookingHistory = (history?.bookingHistory || []).filter((b: any) => b.status !== 'cancelled' && b.status !== 'declined');
-  const filteredBookingRequestsHistory = (history?.bookingRequestsHistory || []).filter((b: any) => b.status !== 'cancelled' && b.status !== 'declined');
+  const filteredBookingHistory = (history?.bookingHistory || []).filter((b: BookingHistoryItem) => b.status !== 'cancelled' && b.status !== 'declined');
+  const filteredBookingRequestsHistory = (history?.bookingRequestsHistory || []).filter((b: BookingHistoryItem) => b.status !== 'cancelled' && b.status !== 'declined');
   const bookingsCount = filteredBookingHistory.length + filteredBookingRequestsHistory.length;
   const eventsCount = history?.eventRsvpHistory?.length || 0;
   const wellnessCount = history?.wellnessHistory?.length || 0;
@@ -916,8 +942,8 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
                           credentials: 'include',
                           body: JSON.stringify({ 
                             email: member.email,
-                            firstName: (member as any).firstName || member.name?.split(' ')[0] || '',
-                            lastName: (member as any).lastName || member.name?.split(' ').slice(1).join(' ') || '',
+                            firstName: member.name?.split(' ')[0] || '',
+                            lastName: member.name?.split(' ').slice(1).join(' ') || '',
                             tierId: selectedTierId
                           })
                         });
@@ -1014,7 +1040,7 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
               </div>
               
               <p className={`mb-4 ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
-                This will permanently delete <strong>{(member as any).firstName} {(member as any).lastName}</strong> ({member.email}) and all their data from the app.
+                This will permanently delete <strong>{member.name}</strong> ({member.email}) and all their data from the app.
               </p>
               
               <div className="space-y-3 mb-6">
@@ -1080,7 +1106,7 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
               <div className="flex items-center gap-3 mb-4">
                 <span className="material-symbols-outlined text-3xl text-indigo-500">merge</span>
                 <h3 className={`text-lg font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                  Merge {member.name || (member as any).firstName}
+                  Merge {member.name}
                 </h3>
               </div>
               
@@ -1115,7 +1141,7 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
                         credentials: 'include',
                         body: JSON.stringify({
                           primaryUserId: selected.id,
-                          secondaryUserId: member.id || (member as any).userId
+                          secondaryUserId: member.id
                         })
                       });
                       if (res.ok) {
@@ -1343,7 +1369,7 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
                         credentials: 'include',
                         body: JSON.stringify({
                           primaryUserId: selectedMergeTarget.id,
-                          secondaryUserId: member.id || (member as any).userId
+                          secondaryUserId: member.id
                         })
                       });
                       if (res.ok) {

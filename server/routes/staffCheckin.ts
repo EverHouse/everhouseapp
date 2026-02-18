@@ -233,7 +233,7 @@ router.get('/api/bookings/:id/staff-checkin-context', isStaffOrAdmin, async (req
           
           logger.info('[Checkin Context Sync] Cleaned up  orphaned participants for booking', { extra: { length: orphanedIds.length, bookingId, orphanedNames } });
           // Recalculate fees after cleanup
-          await recalculateSessionFees(sessionId, 'sync_cleanup' as any);
+          await recalculateSessionFees(sessionId, 'sync_cleanup');
         }
       } catch (syncError: unknown) {
         logger.warn('[Checkin Context Sync] Non-blocking sync cleanup failed for booking', { extra: { bookingId, error: getErrorMessage(syncError) } });
@@ -432,7 +432,7 @@ router.patch('/api/bookings/:id/payments', isStaffOrAdmin, async (req: Request, 
     // This handles the case where we no longer write on GET requests
     if (sessionId) {
       try {
-        await recalculateSessionFees(sessionId, 'staff_action' as any);
+        await recalculateSessionFees(sessionId, 'staff_action');
       } catch (calcError: unknown) {
         logger.error('[StaffCheckin] Failed to recalculate fees before payment action', { extra: { calcError } });
         // Continue with existing values - non-blocking error
@@ -829,7 +829,7 @@ router.get('/api/bookings/overdue-payments', isStaffOrAdmin, async (req: Request
       ORDER BY booking_date DESC
     `);
 
-    const overduePayments: OverduePayment[] = result.rows.map((row: any) => {
+    const overduePayments: OverduePayment[] = result.rows.map((row: Record<string, unknown>) => {
       const bookingDate = row.booking_date instanceof Date 
         ? row.booking_date.toISOString().split('T')[0]
         : String(row.booking_date || '').split('T')[0];
@@ -1193,7 +1193,7 @@ router.post('/api/bookings/:id/staff-direct-add', isStaffOrAdmin, async (req: Re
         ]);
 
         try {
-          await recalculateSessionFees(sessionId, 'staff_add_member' as any);
+          await recalculateSessionFees(sessionId, 'staff_add_member');
           
           // Create prepayment intent for any new fees (e.g., overage)
           try {
@@ -1283,7 +1283,7 @@ router.post('/api/bookings/:id/staff-direct-add', isStaffOrAdmin, async (req: Re
 
       // Recalculate fees to update all participant fees
       try {
-        await recalculateSessionFees(sessionId, 'staff_add_guest' as any);
+        await recalculateSessionFees(sessionId, 'staff_add_guest');
         
         // Create prepayment intent for the new fees
         try {
@@ -1434,7 +1434,7 @@ router.post('/api/bookings/:id/staff-direct-add', isStaffOrAdmin, async (req: Re
 
       // Recalculate fees to update all participant fees
       try {
-        await recalculateSessionFees(sessionId, 'staff_add_member' as any);
+        await recalculateSessionFees(sessionId, 'staff_add_member');
       } catch (feeErr: unknown) {
         logger.warn('[Staff Add Member] Failed to recalculate fees for session', { extra: { sessionId, feeErr } });
       }

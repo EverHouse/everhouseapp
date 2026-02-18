@@ -10,7 +10,7 @@ import { syncAllCustomerMetadata, isPlaceholderEmail } from '../core/stripe/cust
 import { getStripeClient } from '../core/stripe/client';
 import { getHubSpotClientWithFallback } from '../core/integrations';
 import { retryableHubSpotRequest } from '../core/hubspot/request';
-import { logFromRequest } from '../core/auditLog';
+import { logFromRequest, type ResourceType } from '../core/auditLog';
 import { getSystemHealth } from '../core/healthCheck';
 import { getSessionUser } from '../types/session';
 import type { Request } from 'express';
@@ -430,7 +430,7 @@ router.get('/api/data-integrity/placeholder-accounts', isAdmin, async (req, res)
       logger.warn('[DataIntegrity] HubSpot scan failed', { extra: { hubspotError: getErrorMessage(hubspotError) } });
     }
     
-    logFromRequest(req, 'placeholder_scan' as any, 'system', undefined, undefined, {
+    logFromRequest(req, 'placeholder_scan', 'system', undefined, undefined, {
       action: 'scan',
       stripeCount: stripeCustomers.length,
       hubspotCount: hubspotContacts.length,
@@ -732,7 +732,7 @@ router.post('/api/data-integrity/fix/delete-guest-pass', isAdmin, async (req: Re
     
     await db.execute(sql`DELETE FROM guest_passes WHERE id = ${recordId}`);
     
-    logFromRequest(req, 'delete_orphan_guest_pass' as any, 'guest_passes' as any, recordId, undefined, { deletedId: recordId });
+    logFromRequest(req, 'delete_orphan_guest_pass', 'guest_passes', recordId, undefined, { deletedId: recordId });
     
     res.json({ success: true, message: `Deleted orphaned guest pass ${recordId}` });
   } catch (error: unknown) {
@@ -748,7 +748,7 @@ router.post('/api/data-integrity/fix/delete-fee-snapshot', isAdmin, async (req: 
     
     await db.execute(sql`DELETE FROM booking_fee_snapshots WHERE id = ${recordId}`);
     
-    logFromRequest(req, 'delete_orphan_fee_snapshot' as any, 'booking_fee_snapshots' as any, recordId, undefined, { deletedId: recordId });
+    logFromRequest(req, 'delete_orphan_fee_snapshot', 'booking_fee_snapshots', recordId, undefined, { deletedId: recordId });
     
     res.json({ success: true, message: `Deleted orphaned fee snapshot ${recordId}` });
   } catch (error: unknown) {
@@ -762,11 +762,11 @@ router.post('/api/data-integrity/fix/dismiss-trackman-unmatched', isAdmin, async
     const { recordId } = req.body;
     if (!recordId) return res.status(400).json({ success: false, message: 'recordId is required' });
     
-    const staffEmail = (req as any).session?.user?.email || 'admin';
+    const staffEmail = getSessionUser(req)?.email || 'admin';
     
     await db.execute(sql`UPDATE trackman_unmatched_bookings SET resolved_at = NOW(), resolved_by = ${staffEmail} WHERE id = ${recordId} AND resolved_at IS NULL`);
     
-    logFromRequest(req, 'dismiss' as any, 'trackman_unmatched' as any, undefined, 'Trackman unmatched #' + recordId, { action: 'dismiss_from_integrity' });
+    logFromRequest(req, 'dismiss', 'trackman_unmatched', undefined, 'Trackman unmatched #' + recordId, { action: 'dismiss_from_integrity' });
     
     res.json({ success: true, message: 'Unmatched booking dismissed' });
   } catch (error: unknown) {
@@ -782,7 +782,7 @@ router.post('/api/data-integrity/fix/delete-booking-participant', isAdmin, async
     
     await db.execute(sql`DELETE FROM booking_participants WHERE id = ${recordId}`);
     
-    logFromRequest(req, 'delete_orphan_booking_participant' as any, 'booking_participants' as any, recordId, undefined, { deletedId: recordId });
+    logFromRequest(req, 'delete_orphan_booking_participant', 'booking_participants', recordId, undefined, { deletedId: recordId });
     
     res.json({ success: true, message: `Deleted orphaned booking participant ${recordId}` });
   } catch (error: unknown) {
@@ -802,7 +802,7 @@ router.post('/api/data-integrity/fix/fix-orphaned-participants', isAdmin, async 
       WHERE bp.user_id IS NOT NULL AND bp.user_id != '' AND u.id IS NULL
     `);
     
-    const rows = invalidParticipants.rows as any[];
+    const rows = invalidParticipants.rows as Record<string, unknown>[];
     
     if (rows.length === 0) {
       return res.json({ success: true, message: 'No orphaned participants found', relinked: 0, converted: 0, total: 0, dryRun });
@@ -817,19 +817,19 @@ router.post('/api/data-integrity/fix/fix-orphaned-participants', isAdmin, async 
       `);
       
       if (emailMatch.rows.length > 0) {
-        const matchedUser = emailMatch.rows[0] as any;
+        const matchedUser = emailMatch.rows[0] as Record<string, unknown>;
         relinked.push({
-          id: row.id,
-          displayName: row.display_name,
-          oldUserId: row.user_id,
-          newUserId: matchedUser.id,
-          email: matchedUser.email
+          id: row.id as number,
+          displayName: row.display_name as string,
+          oldUserId: row.user_id as string,
+          newUserId: matchedUser.id as string,
+          email: matchedUser.email as string
         });
       } else {
         toConvert.push({
-          id: row.id,
-          displayName: row.display_name,
-          userId: row.user_id
+          id: row.id as number,
+          displayName: row.display_name as string,
+          userId: row.user_id as string
         });
       }
     }
@@ -851,7 +851,7 @@ router.post('/api/data-integrity/fix/fix-orphaned-participants', isAdmin, async 
         `);
       }
       
-      logFromRequest(req, 'fix_orphaned_participants' as any, 'booking_participants' as any, undefined, undefined, {
+      logFromRequest(req, 'fix_orphaned_participants', 'booking_participants', undefined, undefined, {
         relinkedCount: relinked.length,
         convertedCount: toConvert.length,
         totalFixed: rows.length,
@@ -891,7 +891,7 @@ router.post('/api/data-integrity/fix/convert-participant-to-guest', isAdmin, asy
       WHERE id = ${recordId}
     `);
     
-    logFromRequest(req, 'convert_participant_to_guest' as any, 'booking_participants' as any, recordId, undefined, { convertedId: recordId });
+    logFromRequest(req, 'convert_participant_to_guest', 'booking_participants', recordId, undefined, { convertedId: recordId });
     
     res.json({ success: true, message: `Converted participant ${recordId} to guest` });
   } catch (error: unknown) {
@@ -918,7 +918,7 @@ router.post('/api/data-integrity/fix/approve-review-item', isAdmin, async (req: 
       return res.status(400).json({ success: false, message: `Unsupported table: ${table}` });
     }
     
-    logFromRequest(req, 'approve_review_item' as any, table as any, recordId, undefined, { table, reviewedBy });
+    logFromRequest(req, 'approve_review_item', table as ResourceType, recordId, undefined, { table, reviewedBy });
     
     res.json({ success: true, message: `Approved ${table === 'wellness_classes' ? 'wellness class' : 'event'} #${recordId}` });
   } catch (error: unknown) {
@@ -940,7 +940,7 @@ router.post('/api/data-integrity/fix/delete-review-item', isAdmin, async (req: R
       return res.status(400).json({ success: false, message: `Unsupported table: ${table}` });
     }
     
-    logFromRequest(req, 'delete_review_item' as any, table as any, recordId, undefined, { table });
+    logFromRequest(req, 'delete_review_item', table as ResourceType, recordId, undefined, { table });
     
     res.json({ success: true, message: `Removed ${table === 'wellness_classes' ? 'wellness class' : 'event'} #${recordId}` });
   } catch (error: unknown) {
@@ -958,8 +958,8 @@ router.post('/api/data-integrity/fix/approve-all-review-items', isAdmin, async (
     const wellnessCount = await db.execute(sql`SELECT COUNT(*)::int as count FROM wellness_classes WHERE needs_review = true AND is_active = true`);
     const eventCount = await db.execute(sql`SELECT COUNT(*)::int as count FROM events WHERE needs_review = true`);
     
-    const wCount = (wellnessCount.rows[0] as any)?.count || 0;
-    const eCount = (eventCount.rows[0] as any)?.count || 0;
+    const wCount = (wellnessCount.rows[0] as Record<string, unknown>)?.count || 0;
+    const eCount = (eventCount.rows[0] as Record<string, unknown>)?.count || 0;
     const total = wCount + eCount;
     
     if (!dryRun) {
@@ -972,7 +972,7 @@ router.post('/api/data-integrity/fix/approve-all-review-items', isAdmin, async (
         await db.execute(sql`UPDATE events SET needs_review = false WHERE needs_review = true`);
       }
       
-      logFromRequest(req, 'approve_all_review_items' as any, 'wellness_classes' as any, undefined, undefined, { wellnessApproved: wCount, eventsApproved: eCount, total, reviewedBy });
+      logFromRequest(req, 'approve_all_review_items', 'wellness_classes', undefined, undefined, { wellnessApproved: wCount, eventsApproved: eCount, total, reviewedBy });
     }
     
     res.json({
@@ -1024,7 +1024,7 @@ router.post('/api/data-integrity/fix/delete-empty-session', isAdmin, async (req:
 
     await client.query('COMMIT');
 
-    logFromRequest(req, 'delete' as any, 'booking_session' as any, recordId.toString(), 'Deleted empty session', {});
+    logFromRequest(req, 'delete', 'booking_session', recordId.toString(), 'Deleted empty session', {});
 
     res.json({ success: true, message: `Deleted empty session #${recordId}` });
   } catch (error: unknown) {
@@ -1051,7 +1051,7 @@ router.post('/api/data-integrity/fix/merge-stripe-customers', isAdmin, async (re
       WHERE LOWER(email) = LOWER(${email}) AND stripe_customer_id = ${removeCustomerId}
     `);
 
-    logFromRequest(req, 'merge_stripe_customers' as any, 'user' as any, undefined, `Merged Stripe customers for ${email}`, {
+    logFromRequest(req, 'merge_stripe_customers', 'user', undefined, `Merged Stripe customers for ${email}`, {
       email,
       keepCustomerId,
       removeCustomerId,
@@ -1080,7 +1080,7 @@ router.post('/api/data-integrity/fix/deactivate-stale-member', isAdmin, async (r
       return res.status(404).json({ success: false, message: `User ${userId} not found or not a MindBody user` });
     }
 
-    logFromRequest(req, 'deactivate_stale_member' as any, 'user' as any, userId.toString(), 'Deactivated stale MindBody member', { userId });
+    logFromRequest(req, 'deactivate_stale_member', 'user', userId.toString(), 'Deactivated stale MindBody member', { userId });
 
     res.json({ success: true, message: `Deactivated MindBody member #${userId}` });
   } catch (error: unknown) {
@@ -1109,7 +1109,7 @@ router.post('/api/data-integrity/fix/change-billing-provider', isAdmin, async (r
       return res.status(404).json({ success: false, message: `User ${userId} not found` });
     }
 
-    logFromRequest(req, 'change_billing_provider' as any, 'user' as any, userId.toString(), `Changed billing provider to ${newProvider}`, { userId, newProvider });
+    logFromRequest(req, 'change_billing_provider', 'user', userId.toString(), `Changed billing provider to ${newProvider}`, { userId, newProvider });
 
     res.json({ success: true, message: `Changed billing provider to ${newProvider} for user #${userId}` });
   } catch (error: unknown) {

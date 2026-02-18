@@ -51,7 +51,7 @@ router.put('/api/admin/trackman/reconciliation/:id', isStaffOrAdmin, async (req,
   try {
     const { id } = req.params;
     const { status, notes, adjustLedger } = req.body;
-    const staffEmail = (req as any).session?.user?.email || 'admin';
+    const staffEmail = req.session?.user?.email || 'admin';
     
     if (!status || !['reviewed', 'adjusted'].includes(status)) {
       return res.status(400).json({ 

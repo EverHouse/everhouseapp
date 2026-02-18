@@ -1,5 +1,6 @@
 import rateLimit from 'express-rate-limit';
 import { Request, Response } from 'express';
+import { logger } from '../core/logger';
 
 const getClientKey = (req: Request): string => {
   const userId = req.session?.user?.id;
@@ -17,7 +18,7 @@ export const globalRateLimiter = rateLimit({
   keyGenerator: getClientKey,
   validate: false,
   handler: (req: Request, res: Response) => {
-    console.warn(`[RateLimit] Global limit exceeded for ${getClientKey(req)} on ${req.path}`);
+    logger.warn(`[RateLimit] Global limit exceeded for ${getClientKey(req)} on ${req.path}`);
     res.status(429).json({ error: 'Too many requests. Please slow down.' });
   },
   skip: (req) => {
@@ -46,7 +47,7 @@ export const paymentRateLimiter = rateLimit({
   keyGenerator: getClientKey,
   validate: false,
   handler: (req: Request, res: Response) => {
-    console.warn(`[RateLimit] Payment limit exceeded for ${getClientKey(req)} on ${req.path}`);
+    logger.warn(`[RateLimit] Payment limit exceeded for ${getClientKey(req)} on ${req.path}`);
     res.status(429).json({ error: 'Too many payment requests. Please wait a moment.' });
   }
 });
@@ -59,7 +60,7 @@ export const bookingRateLimiter = rateLimit({
   keyGenerator: getClientKey,
   validate: false,
   handler: (req: Request, res: Response) => {
-    console.warn(`[RateLimit] Booking limit exceeded for ${getClientKey(req)} on ${req.path}`);
+    logger.warn(`[RateLimit] Booking limit exceeded for ${getClientKey(req)} on ${req.path}`);
     res.status(429).json({ error: 'Too many booking requests. Please wait a moment.' });
   }
 });
@@ -75,7 +76,7 @@ export const authRateLimiter = rateLimit({
   },
   validate: false,
   handler: (req: Request, res: Response) => {
-    console.warn(`[RateLimit] Auth limit exceeded for ${req.body?.email || 'unknown'}`);
+    logger.warn(`[RateLimit] Auth limit exceeded for ${req.body?.email || 'unknown'}`);
     res.status(429).json({ error: 'Too many login attempts. Please try again in 15 minutes.' });
   }
 });
@@ -88,7 +89,7 @@ export const sensitiveActionRateLimiter = rateLimit({
   keyGenerator: getClientKey,
   validate: false,
   handler: (req: Request, res: Response) => {
-    console.warn(`[RateLimit] Sensitive action limit exceeded for ${getClientKey(req)} on ${req.path}`);
+    logger.warn(`[RateLimit] Sensitive action limit exceeded for ${getClientKey(req)} on ${req.path}`);
     res.status(429).json({ error: 'Too many requests for this action. Please wait.' });
   }
 });
@@ -111,7 +112,7 @@ export const checkoutRateLimiter = rateLimit({
   },
   validate: false,
   handler: (req: Request, res: Response) => {
-    console.warn(`[RateLimit] Checkout limit exceeded for ${req.body?.email || 'unknown'} on ${req.path}`);
+    logger.warn(`[RateLimit] Checkout limit exceeded for ${req.body?.email || 'unknown'} on ${req.path}`);
     res.status(429).json({ error: 'Too many checkout attempts. Please wait a minute before trying again.' });
   }
 });
@@ -124,7 +125,7 @@ export const memberLookupRateLimiter = rateLimit({
   keyGenerator: getClientKey,
   validate: false,
   handler: (req: Request, res: Response) => {
-    console.warn(`[RateLimit] Member lookup limit exceeded for ${getClientKey(req)} on ${req.path}`);
+    logger.warn(`[RateLimit] Member lookup limit exceeded for ${getClientKey(req)} on ${req.path}`);
     res.status(429).json({ error: 'Too many member lookup requests. Please wait a moment.' });
   }
 });

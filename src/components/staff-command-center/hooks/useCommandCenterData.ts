@@ -68,7 +68,7 @@ export function useCommandCenterData(userEmail?: string) {
       if (hubspotContactsRes.ok) {
         const data = await hubspotContactsRes.json();
         const contacts = Array.isArray(data) ? data : (data.contacts || []);
-        contacts.forEach((contact: any) => {
+        contacts.forEach((contact: { email?: string; firstName?: string; lastName?: string; manuallyLinkedEmails?: string[] }) => {
           const name = [contact.firstName, contact.lastName].filter(Boolean).join(' ');
           if (contact.email && name) {
             memberNameByEmail.set(contact.email.toLowerCase(), name);
@@ -109,7 +109,7 @@ export function useCommandCenterData(userEmail?: string) {
 
       if (pendingBookingsRes.ok) {
         const pendingBookings = await pendingBookingsRes.json();
-        allPending = [...allPending, ...pendingBookings.map((b: any) => {
+        allPending = [...allPending, ...pendingBookings.map((b: Record<string, string | number | null>) => {
           const email = b.user_email || b.userEmail;
           const originalName = b.user_name || b.userName;
           return {
@@ -183,15 +183,15 @@ export function useCommandCenterData(userEmail?: string) {
       }
       // On error, keep existing todaysBookings state instead of clearing
       
-      const resourceMap = new Map<number, any>();
+      const resourceMap = new Map<number, { id: number; name: string; type?: string }>();
 
       if (baysRes.ok) {
         const baysData = await baysRes.json();
-        baysData.forEach((b: any) => resourceMap.set(b.id, { ...b, type: 'simulator' }));
+        baysData.forEach((b: { id: number; name: string; type?: string }) => resourceMap.set(b.id, { ...b, type: 'simulator' }));
       }
       if (resourcesRes.ok) {
         const resourcesData = await resourcesRes.json();
-        resourcesData.forEach((r: any) => resourceMap.set(r.id, r));
+        resourcesData.forEach((r: { id: number; name: string; type?: string }) => resourceMap.set(r.id, r));
       }
 
       const allResources = Array.from(resourceMap.values());
@@ -283,7 +283,7 @@ export function useCommandCenterData(userEmail?: string) {
       };
       
       if (allResources.length > 0) {
-        const statuses: BayStatus[] = allResources.map((r: any) => {
+        const statuses: BayStatus[] = allResources.map((r: { id: number; name: string; type?: string }) => {
           const existing = bayMap.get(r.id);
           const closureStatus = isBayClosed(r);
           
@@ -361,16 +361,16 @@ export function useCommandCenterData(userEmail?: string) {
       if (upcomingBookingsRes.ok) {
         const bookings = await upcomingBookingsRes.json();
         const normalizeTime = (t: string) => t ? t.slice(0, 5) : '00:00';
-        const filteredBookings = bookings.filter((b: any) => {
+        const filteredBookings = bookings.filter((b: Record<string, string | number | null>) => {
           const bookingDate = b.request_date;
           const startTime = normalizeTime(b.start_time);
           if (bookingDate > today) return true;
           if (bookingDate === today && startTime >= nowTime) return true;
           return false;
-        }).sort((a: any, b: any) => {
+        }).sort((a: Record<string, string | number | null>, b: Record<string, string | number | null>) => {
           if (a.request_date !== b.request_date) return a.request_date.localeCompare(b.request_date);
           return normalizeTime(a.start_time).localeCompare(normalizeTime(b.start_time));
-        }).map((b: any) => ({
+        }).map((b: Record<string, string | number | null>) => ({
           id: b.id,
           resource_name: b.resource_name || b.bay_name || 'Booking',
           resource_type: b.resource_type || 'simulator',

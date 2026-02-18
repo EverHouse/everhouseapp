@@ -113,8 +113,8 @@ export function NewUserDrawer({
       if (tiersRes.ok) {
         const tiersData = await tiersRes.json();
         const subscriptionTiers = tiersData
-          .filter((t: any) => t.product_type === 'subscription' && t.stripe_price_id)
-          .map((t: any) => ({
+          .filter((t: { product_type?: string; stripe_price_id?: string; name: string; monthly_price?: number; slug?: string }) => t.product_type === 'subscription' && t.stripe_price_id)
+          .map((t: { product_type?: string; stripe_price_id?: string; name: string; monthly_price?: number; slug?: string }) => ({
             id: t.id,
             name: t.name,
             slug: t.slug,
@@ -132,7 +132,7 @@ export function NewUserDrawer({
 
       if (discountsRes.ok) {
         const discountsData = await discountsRes.json();
-        setDiscounts((discountsData.coupons || []).filter((c: any) => c.valid && c.percentOff).map((c: any) => ({
+        setDiscounts((discountsData.coupons || []).filter((c: { valid?: boolean; percentOff?: number; id: string; name?: string }) => c.valid && c.percentOff).map((c: { valid?: boolean; percentOff?: number; id: string; name?: string }) => ({
           id: c.id,
           name: c.name || c.id,
           code: c.id,
@@ -144,8 +144,8 @@ export function NewUserDrawer({
       if (billingGroupsRes.ok) {
         const groupsData = await billingGroupsRes.json();
         const activeGroups = (groupsData || [])
-          .filter((g: any) => g.isActive && g.stripeSubscriptionId)
-          .map((g: any) => ({
+          .filter((g: { isActive?: boolean; stripeSubscriptionId?: string; id: number; name?: string; memberCount?: number }) => g.isActive && g.stripeSubscriptionId)
+          .map((g: { isActive?: boolean; stripeSubscriptionId?: string; id: number; name?: string; memberCount?: number }) => ({
             id: g.id,
             primaryEmail: g.primaryEmail,
             primaryName: g.primaryName,
@@ -388,7 +388,7 @@ export function NewUserDrawer({
           }}
           createdUser={createdUser}
           onClose={handleClose}
-          onBookNow={onBookNow as any}
+          onBookNow={onBookNow}
           showToast={showToast}
           scannedIdImage={scannedIdImage}
           onShowIdScanner={() => setShowIdScanner(true)}

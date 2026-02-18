@@ -46,7 +46,7 @@ router.get('/api/visitors', isStaffOrAdmin, async (req, res) => {
     const nullsLast = sortBy === 'name' || sortBy === 'totalSpent' || sortBy === 'purchaseCount' ? '' : ' NULLS LAST';
     const sortColumn = sortColumnMap[sortBy as string] || 'last_purchase_date';
     const validSortOrders = ['ASC', 'DESC'] as const;
-    const safeSortOrder = validSortOrders.includes(sortOrder as any) ? sortOrder : 'DESC';
+    const safeSortOrder = validSortOrders.includes(sortOrder as typeof validSortOrders[number]) ? sortOrder : 'DESC';
     const validColumns = [...Object.values(sortColumnMap), 'last_purchase_date'];
     const safeSortColumn = validColumns.includes(sortColumn) ? sortColumn : 'last_purchase_date';
     const orderByClause = sql.raw(`${safeSortColumn} ${safeSortOrder}${nullsLast}`);
@@ -157,7 +157,7 @@ router.get('/api/visitors', isStaffOrAdmin, async (req, res) => {
       FROM visitor_data
       WHERE 1=1 ${sql.raw(typeConditionCount)}
     `);
-    const totalCount = (countResult.rows[0] as any)?.total || 0;
+    const totalCount = (countResult.rows[0] as Record<string, unknown>)?.total || 0;
     
     const visitorsWithPurchases = await db.execute(sql`
       WITH 
@@ -254,7 +254,7 @@ router.get('/api/visitors', isStaffOrAdmin, async (req, res) => {
       OFFSET ${pageOffset}
     `);
     
-    const getSource = (row: any): 'mindbody' | 'hubspot' | 'stripe' | 'app' => {
+    const getSource = (row: Record<string, unknown>): 'mindbody' | 'hubspot' | 'stripe' | 'app' => {
       if (row.data_source === 'APP') return 'app';
       const hasMindbodyData = row.mindbody_client_id || row.legacy_source === 'mindbody_import';
       const hasStripeData = !!row.stripe_customer_id;
@@ -271,7 +271,7 @@ router.get('/api/visitors', isStaffOrAdmin, async (req, res) => {
     };
     
     type VisitorTypeValue = 'NEW' | 'classpass' | 'sim_walkin' | 'private_lesson' | 'day_pass' | 'guest' | 'lead';
-    const getType = (row: any): VisitorTypeValue => {
+    const getType = (row: Record<string, unknown>): VisitorTypeValue => {
       if (row.effective_type) {
         const et = row.effective_type as string;
         if (et === 'NEW') return 'NEW';
@@ -298,7 +298,7 @@ router.get('/api/visitors', isStaffOrAdmin, async (req, res) => {
       return 'lead';
     };
     
-    const visitors = (visitorsWithPurchases.rows as any[]).map((row: any) => ({
+    const visitors = (visitorsWithPurchases.rows as Record<string, unknown>[]).map((row: Record<string, unknown>) => ({
       id: row.id,
       email: row.email,
       firstName: row.first_name,
@@ -414,7 +414,7 @@ router.get('/api/guests/needs-email', isStaffOrAdmin, async (req, res) => {
     
     res.json({
       success: true,
-      guests: result.rows.map((row: any) => ({
+      guests: result.rows.map((row: Record<string, unknown>) => ({
         guestId: row.guest_id,
         guestName: row.guest_name,
         participantId: row.participant_id,
@@ -453,7 +453,7 @@ router.patch('/api/guests/:guestId/email', isStaffOrAdmin, async (req, res) => {
     res.json({
       success: true,
       guest: result.rows[0],
-      message: `Email updated for ${(result.rows[0] as any).name}`
+      message: `Email updated for ${(result.rows[0] as Record<string, unknown>).name}`
     });
   } catch (error: unknown) {
     logger.error('[Update Guest Email] Error', { error: error instanceof Error ? error : new Error(String(error)) });
@@ -483,10 +483,10 @@ router.post('/api/visitors', isStaffOrAdmin, async (req, res) => {
     }
     
     if (existingUser.rows.length > 0) {
-      const user = existingUser.rows[0] as any;
+      const user = existingUser.rows[0] as Record<string, unknown>;
       
-      const isNonMemberOrLead = ['non-member', 'visitor', 'lead'].includes(user.membership_status) || 
-                                ['visitor', 'lead'].includes(user.role);
+      const isNonMemberOrLead = ['non-member', 'visitor', 'lead'].includes(user.membership_status as string) || 
+                                ['visitor', 'lead'].includes(user.role as string);
       
       if (isNonMemberOrLead) {
         if (user.membership_status === 'non-member') {
@@ -524,9 +524,9 @@ router.post('/api/visitors', isStaffOrAdmin, async (req, res) => {
           }).catch(() => {});
         }
 
-        const staffEmail = (req as any).session?.user?.email || 'admin';
+        const staffEmail = getSessionUser(req)?.email || 'admin';
         await logFromRequest(req, {
-          action: 'visitor_linked' as any,
+          action: 'visitor_linked',
           resourceType: 'user',
           resourceId: user.id,
           resourceName: `${user.first_name || ''} ${user.last_name || ''}`.trim() || normalizedEmail,
@@ -567,7 +567,7 @@ router.post('/api/visitors', isStaffOrAdmin, async (req, res) => {
     }
     
     const visitorExclusionCheck = await db.execute(sql`SELECT 1 FROM sync_exclusions WHERE email = ${normalizedEmail}`);
-    if ((visitorExclusionCheck.rows as any[]).length > 0) {
+    if ((visitorExclusionCheck.rows as Record<string, unknown>[]).length > 0) {
       return res.status(400).json({ error: 'This email belongs to a previously removed member and cannot be re-used.' });
     }
 
@@ -579,7 +579,7 @@ router.post('/api/visitors', isStaffOrAdmin, async (req, res) => {
       RETURNING id, email, first_name, last_name, phone, role, membership_status, visitor_type, data_source
     `);
     
-    const newUser = insertResult.rows[0] as any;
+    const newUser = insertResult.rows[0] as Record<string, unknown>;
 
     let stripeCustomerId: string | null = null;
     let stripeCreated = false;
@@ -608,9 +608,9 @@ router.post('/api/visitors', isStaffOrAdmin, async (req, res) => {
       }).catch(() => {});
     }
 
-    const staffEmail = (req as any).session?.user?.email || 'admin';
+    const staffEmail = getSessionUser(req)?.email || 'admin';
     await logFromRequest(req, {
-      action: 'visitor_created' as any,
+      action: 'visitor_created',
       resourceType: 'user',
       resourceId: userId,
       resourceName: `${firstName || ''} ${lastName || ''}`.trim() || normalizedEmail,
@@ -700,7 +700,7 @@ router.get('/api/visitors/search', isStaffOrAdmin, async (req, res) => {
       LIMIT ${maxResults}
     `);
     
-    const visitors = results.rows.map((row: any) => {
+    const visitors = results.rows.map((row: Record<string, unknown>) => {
       // Determine user type based on staff_users role and users table data
       const isGolfInstructor = row.staff_role === 'golf_instructor' && row.is_staff_active;
       const isStaff = row.role === 'staff' || row.role === 'admin' || row.staff_role === 'staff' || row.staff_role === 'admin';
@@ -796,9 +796,9 @@ router.post('/api/visitors/backfill-types', isAdmin, async (req, res) => {
       RETURNING id
     `);
     
-    const staffEmail = (req as any).session?.user?.email || 'admin';
+    const staffEmail = getSessionUser(req)?.email || 'admin';
     await logFromRequest(req, {
-      action: 'data_migration' as any,
+      action: 'data_migration',
       resourceType: 'system',
       resourceId: 'visitor_types_backfill',
       resourceName: 'Visitor Types Backfill',
@@ -979,7 +979,7 @@ router.delete('/api/visitors/:id', isStaffOrAdmin, async (req, res) => {
         let hasMore = true;
         let startingAfter: string | undefined;
         while (hasMore) {
-          const params: any = { customer: visitor.stripeCustomerId, limit: 100 };
+          const params: Record<string, unknown> = { customer: visitor.stripeCustomerId, limit: 100 };
           if (startingAfter) params.starting_after = startingAfter;
           const subscriptions = await stripe.subscriptions.list(params);
           for (const sub of subscriptions.data) {
@@ -993,7 +993,7 @@ router.delete('/api/visitors/:id', isStaffOrAdmin, async (req, res) => {
             startingAfter = subscriptions.data[subscriptions.data.length - 1].id;
           }
         }
-        await (stripe as any).customers.del(visitor.stripeCustomerId);
+        await stripe.customers.del(visitor.stripeCustomerId);
         stripeDeleted = true;
         deletionLog.push('stripe_customer');
       } catch (stripeError: unknown) {
@@ -1018,7 +1018,7 @@ router.delete('/api/visitors/:id', isStaffOrAdmin, async (req, res) => {
     deletionLog.push('users');
     
     await logFromRequest(req, {
-      action: 'delete_visitor' as any,
+      action: 'delete_visitor',
       resourceType: 'user',
       resourceId: id as string,
       resourceName: visitorName || undefined,

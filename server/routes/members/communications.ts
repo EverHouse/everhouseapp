@@ -58,7 +58,7 @@ router.post('/api/members/:email/communications', isStaffOrAdmin, async (req, re
       })
       .returning();
     
-    logFromRequest(req, 'create_communication' as any, 'communication' as any, String(result[0].id), normalizedEmail);
+    logFromRequest(req, 'create_communication', 'communication', String(result[0].id), normalizedEmail);
     res.status(201).json(result[0]);
   } catch (error: unknown) {
     if (!isProduction) logger.error('Create communication log error', { error: error instanceof Error ? error : new Error(String(error)) });
@@ -82,7 +82,7 @@ router.delete('/api/members/:email/communications/:logId', isStaffOrAdmin, async
       return res.status(404).json({ error: 'Communication log not found for this member' });
     }
     
-    logFromRequest(req, 'delete_communication' as any, 'communication' as any, logId as string, normalizedEmail);
+    logFromRequest(req, 'delete_communication', 'communication', logId as string, normalizedEmail);
     res.json({ success: true });
   } catch (error: unknown) {
     if (!isProduction) logger.error('Delete communication log error', { error: error instanceof Error ? error : new Error(String(error)) });
@@ -112,7 +112,7 @@ router.patch('/api/members/me/preferences', isAuthenticated, async (req, res) =>
       }
     }
     
-    const updateData: Record<string, any> = { updatedAt: new Date() };
+    const updateData: Record<string, unknown> = { updatedAt: new Date() };
     if (emailOptIn !== undefined) updateData.emailOptIn = emailOptIn;
     if (smsOptIn !== undefined) updateData.smsOptIn = smsOptIn;
     if (doNotSellMyInfo !== undefined) updateData.doNotSellMyInfo = doNotSellMyInfo;
@@ -309,10 +309,10 @@ router.get('/api/my-visits', isAuthenticated, async (req, res) => {
       ORDER BY visit_type, visit_id, date DESC
     `);
     
-    const rows = (unifiedVisitsResult as any).rows || [];
+    const rows = (unifiedVisitsResult.rows as Record<string, unknown>[]) || [];
     
     const visits = rows
-      .map((row: any) => ({
+      .map((row: Record<string, unknown>) => ({
         id: row.visit_id,
         type: row.visit_type,
         role: row.role,
@@ -324,7 +324,7 @@ router.get('/api/my-visits', isAuthenticated, async (req, res) => {
         category: row.category || undefined,
         invitedBy: row.invited_by || undefined,
       }))
-      .sort((a: any, b: any) => b.date.localeCompare(a.date));
+      .sort((a: { date: string }, b: { date: string }) => b.date.localeCompare(a.date));
     
     res.json(visits);
   } catch (error: unknown) {

@@ -1,3 +1,4 @@
+import Stripe from 'stripe';
 import { pool } from '../db';
 import { getStripeClient } from './client';
 import { alertOnExternalServiceError } from '../errorAlerts';
@@ -149,13 +150,13 @@ export async function getOrCreateStripeCustomer(
       const lastName = userResult.rows[0]?.last_name;
       
       // Update metadata and name if missing
-      const cust = existingCustomer as any;
-      const needsUpdate = !cust.deleted && (
-        !cust.metadata?.userId ||
-        !cust.name ||
-        (userTier && cust.metadata?.tier !== userTier) ||
-        (firstName && !cust.metadata?.firstName) ||
-        (lastName && !cust.metadata?.lastName)
+      const cust = existingCustomer as Stripe.Customer | Stripe.DeletedCustomer;
+      const needsUpdate = !('deleted' in cust && cust.deleted) && (
+        !('metadata' in cust && cust.metadata?.userId) ||
+        !('name' in cust && cust.name) ||
+        (userTier && 'metadata' in cust && cust.metadata?.tier !== userTier) ||
+        (firstName && !('metadata' in cust && cust.metadata?.firstName)) ||
+        (lastName && !('metadata' in cust && cust.metadata?.lastName))
       );
       
       if (needsUpdate) {
@@ -171,8 +172,8 @@ export async function getOrCreateStripeCustomer(
         const userPhone = userResult.rows[0]?.phone;
         await stripeForValidation.customers.update(existingCustomerId, {
           metadata: updateMetadata,
-          ...(resolvedName && !(existingCustomer as any).name ? { name: resolvedName } : {}),
-          ...(userPhone && !(existingCustomer as any).phone ? { phone: userPhone } : {}),
+          ...(resolvedName && !('name' in existingCustomer && existingCustomer.name) ? { name: resolvedName } : {}),
+          ...(userPhone && !('phone' in existingCustomer && existingCustomer.phone) ? { phone: userPhone } : {}),
         });
         logger.info(`[Stripe] Updated metadata for existing customer ${existingCustomerId}`);
       }
@@ -192,7 +193,7 @@ export async function getOrCreateStripeCustomer(
     `SELECT linked_email FROM user_linked_emails WHERE LOWER(primary_email) = LOWER($1)`,
     [email]
   );
-  const linkedEmails = linkedEmailsResult.rows.map((r: any) => r.linked_email.toLowerCase());
+  const linkedEmails = linkedEmailsResult.rows.map((r: Record<string, unknown>) => (r.linked_email as string).toLowerCase());
   const allEmails = [email.toLowerCase(), ...linkedEmails];
   const uniqueEmails = [...new Set(allEmails)];
 
@@ -474,7 +475,7 @@ export async function syncCustomerMetadataToStripe(
     if (user.first_name) metadata.firstName = user.first_name;
     if (user.last_name) metadata.lastName = user.last_name;
     
-    const updateParams: any = { metadata };
+    const updateParams: Stripe.CustomerUpdateParams = { metadata };
     if (user.first_name || user.last_name) {
       updateParams.name = [user.first_name, user.last_name].filter(Boolean).join(' ');
     }
@@ -515,7 +516,7 @@ export async function syncAllCustomerMetadata(): Promise<{ synced: number; faile
       if (user.first_name) metadata.firstName = user.first_name;
       if (user.last_name) metadata.lastName = user.last_name;
       
-      const updateParams: any = { metadata };
+      const updateParams: Stripe.CustomerUpdateParams = { metadata };
       if (user.first_name || user.last_name) {
         updateParams.name = [user.first_name, user.last_name].filter(Boolean).join(' ');
       }

@@ -61,11 +61,11 @@ router.get('/api/settings/:key', isAuthenticated, async (req, res) => {
     
     if (setting) {
       res.json(setting);
-    } else if ((DEFAULT_SETTINGS as any)[key]) {
+    } else if (DEFAULT_SETTINGS[key]) {
       res.json({
         key,
-        value: (DEFAULT_SETTINGS as any)[key].value,
-        category: (DEFAULT_SETTINGS as any)[key].category,
+        value: DEFAULT_SETTINGS[key].value,
+        category: DEFAULT_SETTINGS[key].category,
         updatedAt: new Date()
       });
     } else {
@@ -86,7 +86,7 @@ router.put('/api/admin/settings/:key', isAdmin, async (req, res) => {
       return res.status(400).json({ error: 'Value is required' });
     }
     
-    const category = (DEFAULT_SETTINGS as any)[key]?.category || 'general';
+    const category = DEFAULT_SETTINGS[key]?.category || 'general';
     
     const [existing] = await db.select().from(appSettings).where(eq(appSettings.key, key as string));
     
@@ -97,7 +97,7 @@ router.put('/api/admin/settings/:key', isAdmin, async (req, res) => {
           value: String(value),
           updatedAt: new Date(),
           updatedBy: userEmail
-        } as any)
+        })
         .where(eq(appSettings.key, key as string))
         .returning();
       
@@ -111,7 +111,7 @@ router.put('/api/admin/settings/:key', isAdmin, async (req, res) => {
           value: String(value),
           category,
           updatedBy: userEmail
-        } as any)
+        })
         .returning();
       
       logFromRequest(req, 'update_setting', 'setting', req.params.key, req.params.key, { value: req.body.value });
@@ -131,7 +131,7 @@ router.put('/api/admin/settings', isAdmin, async (req, res) => {
       return res.status(400).json({ error: 'Settings object is required' });
     }
     
-    const results: any[] = [];
+    const results: Array<typeof appSettings.$inferSelect> = [];
     
     for (const [key, value] of Object.entries(settings)) {
       const category = DEFAULT_SETTINGS[key]?.category || 'general';

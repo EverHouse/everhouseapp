@@ -219,7 +219,7 @@ export async function cleanupOldAvailabilityBlocks(daysOld: number = 30): Promis
       WHERE block_date < CURRENT_DATE - ${daysOld} * INTERVAL '1 day'
     `);
     
-    const count = Number((result as any).rowCount || (result as any).rows?.length || 0);
+    const count = Number((result as Record<string, unknown>).rowCount || ((result as Record<string, unknown>).rows as unknown[] | undefined)?.length || 0);
     
     if (count > 0) {
       logger.info(`[Cleanup] Removed ${count} old availability blocks (>${daysOld} days)`, {

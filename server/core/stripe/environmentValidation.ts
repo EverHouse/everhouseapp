@@ -30,7 +30,7 @@ export async function validateStripeEnvironmentIds(): Promise<void> {
     for (let i = 0; i < tiers.length; i += 5) {
       const batch = tiers.slice(i, i + 5);
       const results = await Promise.allSettled(
-        batch.map(async (tier: any) => {
+        batch.map(async (tier: Record<string, unknown>) => {
           try {
             await stripe.products.retrieve(tier.stripe_product_id);
           } catch (error: unknown) {
@@ -68,7 +68,7 @@ export async function validateStripeEnvironmentIds(): Promise<void> {
     for (let i = 0; i < cafeItems.length; i += 10) {
       const batch = cafeItems.slice(i, i + 10);
       const results = await Promise.allSettled(
-        batch.map(async (item: any) => {
+        batch.map(async (item: Record<string, unknown>) => {
           try {
             await stripe.products.retrieve(item.stripe_product_id);
           } catch (error: unknown) {
@@ -102,7 +102,7 @@ export async function validateStripeEnvironmentIds(): Promise<void> {
     for (let i = 0; i < usersWithSubs.length; i += 10) {
       const batch = usersWithSubs.slice(i, i + 10);
       const results = await Promise.allSettled(
-        batch.map(async (user: any) => {
+        batch.map(async (user: Record<string, unknown>) => {
           try {
             await stripe.subscriptions.retrieve(user.stripe_subscription_id);
           } catch (error: unknown) {

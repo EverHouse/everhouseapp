@@ -4,6 +4,7 @@ import { getPacificHour, getTodayPacific, CLUB_TIMEZONE } from '../utils/dateUti
 import { sendGracePeriodReminderEmail } from '../emails/membershipEmails';
 import { notifyAllStaff } from '../core/notificationService';
 import { getStripeClient } from '../core/stripe/client';
+import { logger } from '../core/logger';
 
 const GRACE_PERIOD_HOUR = 10;
 const GRACE_PERIOD_DAYS = 3;
@@ -41,7 +42,7 @@ async function getReactivationLink(stripeCustomerId: string | null): Promise<str
     });
     return session.url;
   } catch (error) {
-    console.warn('[Grace Period] Could not create billing portal session, using fallback link');
+    logger.warn('[Grace Period] Could not create billing portal session, using fallback link');
     return fallbackLink;
   }
 }
@@ -54,7 +55,7 @@ async function processGracePeriodMembers(): Promise<void> {
       return;
     }
     
-    console.log('[Grace Period] Starting daily grace period check...');
+    logger.info('[Grace Period] Starting daily grace period check...');
     
     const membersResult = await pool.query(
       `SELECT id, email, first_name, last_name, tier, grace_period_start, grace_period_email_count, stripe_customer_id
@@ -66,11 +67,11 @@ async function processGracePeriodMembers(): Promise<void> {
     );
     
     if (membersResult.rows.length === 0) {
-      console.log('[Grace Period] No members in grace period requiring emails');
+      logger.info('[Grace Period] No members in grace period requiring emails');
       return;
     }
     
-    console.log(`[Grace Period] Found ${membersResult.rows.length} members in grace period`);
+    logger.info(`[Grace Period] Found ${membersResult.rows.length} members in grace period`);
     
     for (const member of membersResult.rows) {
       const { id, email, first_name, last_name, tier, grace_period_start, grace_period_email_count, stripe_customer_id } = member;
@@ -92,7 +93,7 @@ async function processGracePeriodMembers(): Promise<void> {
           [newEmailCount, id]
         );
         
-        console.log(`[Grace Period] Sent day ${newEmailCount} email to ${email}`);
+        logger.info(`[Grace Period] Sent day ${newEmailCount} email to ${email}`);
         
         if (newEmailCount >= GRACE_PERIOD_DAYS) {
           const daysSinceStart = getDaysSinceStartPacific(new Date(grace_period_start));
@@ -110,16 +111,16 @@ async function processGracePeriodMembers(): Promise<void> {
               [id]
             );
             
-            console.log(`[Grace Period] TERMINATED membership for ${email} (was tier: ${tier})`);
+            logger.info(`[Grace Period] TERMINATED membership for ${email} (was tier: ${tier})`);
             
             // Sync terminated status to HubSpot
             try {
               const { syncMemberToHubSpot } = await import('../core/hubspot/stages');
               await syncMemberToHubSpot({ email, status: 'terminated', billingProvider: 'mindbody' });
-              console.log(`[Grace Period] Synced ${email} status=terminated to HubSpot`);
+              logger.info(`[Grace Period] Synced ${email} status=terminated to HubSpot`);
               schedulerTracker.recordRun('Grace Period', true);
             } catch (hubspotError) {
-              console.error('[Grace Period] HubSpot sync failed:', hubspotError);
+              logger.error('[Grace Period] HubSpot sync failed:', { error: hubspotError as Error });
               schedulerTracker.recordRun('Grace Period', false, String(hubspotError));
             }
             
@@ -132,15 +133,15 @@ async function processGracePeriodMembers(): Promise<void> {
           }
         }
       } catch (error) {
-        console.error(`[Grace Period] Error processing member ${email}:`, error);
+        logger.error(`[Grace Period] Error processing member ${email}:`, { error: error as Error });
         schedulerTracker.recordRun('Grace Period', false, String(error));
       }
     }
     
-    console.log('[Grace Period] Daily check complete');
+    logger.info('[Grace Period] Daily check complete');
     schedulerTracker.recordRun('Grace Period', true);
   } catch (error) {
-    console.error('[Grace Period] Scheduler error:', error);
+    logger.error('[Grace Period] Scheduler error:', { error: error as Error });
     schedulerTracker.recordRun('Grace Period', false, String(error));
   }
 }
@@ -149,15 +150,15 @@ let intervalId: NodeJS.Timeout | null = null;
 
 export function startGracePeriodScheduler(): void {
   if (intervalId) {
-    console.log('[Grace Period] Scheduler already running');
+    logger.info('[Grace Period] Scheduler already running');
     return;
   }
 
-  console.log(`[Startup] Grace period scheduler enabled (runs at 10am Pacific)`);
+  logger.info(`[Startup] Grace period scheduler enabled (runs at 10am Pacific)`);
   
   intervalId = setInterval(() => {
     processGracePeriodMembers().catch(err => {
-      console.error('[Grace Period] Uncaught error:', err);
+      logger.error('[Grace Period] Uncaught error:', { error: err as Error });
       schedulerTracker.recordRun('Grace Period', false, String(err));
     });
   }, 60 * 60 * 1000);
@@ -167,6 +168,6 @@ export function stopGracePeriodScheduler(): void {
   if (intervalId) {
     clearInterval(intervalId);
     intervalId = null;
-    console.log('[Grace Period] Scheduler stopped');
+    logger.info('[Grace Period] Scheduler stopped');
   }
 }

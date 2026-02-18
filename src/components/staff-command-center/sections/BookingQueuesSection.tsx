@@ -469,7 +469,7 @@ export const BookingQueuesSection: React.FC<BookingQueuesSectionProps> = ({
                             <span className="px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 rounded-full">
                               Needs Assignment
                             </span>
-                            {(booking as any).resource_type === 'conference_room' ? (
+                            {(booking as Record<string, unknown>).resource_type === 'conference_room' ? (
                               <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-glass-surface-primary dark:bg-glass-surface-primary-dark text-glass-surface-primary-text dark:text-purple-400">
                                 Conf
                               </span>
@@ -484,7 +484,7 @@ export const BookingQueuesSection: React.FC<BookingQueuesSectionProps> = ({
                             <p className="font-semibold text-sm truncate text-primary dark:text-white">
                               {booking.user_name || 'Unknown Customer'}
                             </p>
-                            {(booking as any).resource_type === 'conference_room' ? (
+                            {(booking as Record<string, unknown>).resource_type === 'conference_room' ? (
                               <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-glass-surface-primary dark:bg-glass-surface-primary-dark text-glass-surface-primary-text dark:text-purple-400">
                                 Conf
                               </span>

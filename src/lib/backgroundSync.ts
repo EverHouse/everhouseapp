@@ -18,7 +18,7 @@ const MAX_RETRIES = 2;
 const RETRY_DELAY = 1000;
 
 interface SyncCache {
-  data: any;
+  data: unknown;
   timestamp: number;
 }
 
@@ -39,7 +39,7 @@ export const getCached = <T>(key: string): T | null => {
   }
 };
 
-export const setCache = (key: string, data: any) => {
+export const setCache = (key: string, data: unknown) => {
   const cache: SyncCache = { data, timestamp: Date.now() };
   try {
     localStorage.setItem(`sync_${key}`, JSON.stringify(cache));
@@ -132,7 +132,7 @@ const syncAll = async () => {
     await fetchAndCache(
       'notifications', 
       `/api/notifications?user_email=${encodeURIComponent(user.email)}&unread_only=true`,
-      (data: any[]) => {
+      (data: Array<{ id: number }>) => {
         useNotificationStore.getState().setUnreadCount(data.length);
         window.dispatchEvent(new CustomEvent('notifications-read'));
       }

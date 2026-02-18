@@ -191,7 +191,7 @@ function validateHubSpotWebhookSignature(req: Request): boolean {
 const router = Router();
 
 // Shared cache for all HubSpot contacts (used by both active and former member views)
-let allContactsCache: { data: any[] | null; timestamp: number; lastModifiedCheck: number } = { data: null, timestamp: 0, lastModifiedCheck: 0 };
+let allContactsCache: { data: Record<string, unknown>[] | null; timestamp: number; lastModifiedCheck: number } = { data: null, timestamp: 0, lastModifiedCheck: 0 };
 const ALL_CONTACTS_CACHE_TTL = 30 * 60 * 1000; // 30 minutes for full refresh
 const INCREMENTAL_SYNC_INTERVAL = 5 * 60 * 1000; // Check for updates every 5 minutes
 
@@ -203,8 +203,9 @@ let backgroundRefreshInProgress = false;
  */
 function isRateLimitError(error: unknown): boolean {
   const errorMsg = error instanceof Error ? getErrorMessage(error) : String(error);
-  const errObj = error as Record<string, any>;
-  const statusCode = errObj?.response?.statusCode || errObj?.status || errObj?.code;
+  const errObj = error as Record<string, unknown>;
+  const response = errObj?.response as Record<string, unknown> | undefined;
+  const statusCode = response?.statusCode || errObj?.status || errObj?.code;
   
   return (
     statusCode === 429 ||
@@ -260,9 +261,10 @@ const HUBSPOT_CONTACT_PROPERTIES = [
 /**
  * Transform a raw HubSpot contact into our normalized format
  */
-function transformHubSpotContact(contact: any): any {
-  const lifecycleStage = (contact.properties.lifecyclestage || '').toLowerCase();
-  const membershipStatus = (contact.properties.membership_status || '').toLowerCase();
+function transformHubSpotContact(contact: Record<string, unknown>): Record<string, unknown> {
+  const props = contact.properties as Record<string, string | null | undefined>;
+  const lifecycleStage = (props.lifecyclestage || '').toLowerCase();
+  const membershipStatus = (props.membership_status || '').toLowerCase();
   
   // Include trialing and past_due as active - they still have membership access
   const activeStatuses = ['active', 'trialing', 'past_due'];
@@ -270,30 +272,30 @@ function transformHubSpotContact(contact: any): any {
   
   const isActiveMember = activeStatuses.includes(membershipStatus);
   
-  const membershipStartDate = contact.properties.membership_start_date || null;
+  const membershipStartDate = props.membership_start_date || null;
   const wasEverMember = membershipStartDate !== null && membershipStartDate.trim() !== '';
   
   const isFormerMember = formerStatuses.includes(membershipStatus) && wasEverMember;
   const isNonMemberLead = formerStatuses.includes(membershipStatus) && !wasEverMember;
   
-  const rawTierValue = contact.properties.membership_tier;
+  const rawTierValue = props.membership_tier;
   
   return {
     id: contact.id,
-    firstName: contact.properties.firstname || '',
-    lastName: contact.properties.lastname || '',
-    email: contact.properties.email || '',
-    phone: contact.properties.phone || '',
-    company: contact.properties.company || '',
+    firstName: props.firstname || '',
+    lastName: props.lastname || '',
+    email: props.email || '',
+    phone: props.phone || '',
+    company: props.company || '',
     lifecycleStage,
     status: membershipStatus || (isActiveMember ? 'active' : ''),
     tier: normalizeTierName(rawTierValue),
     rawTier: rawTierValue && rawTierValue.trim() ? rawTierValue.trim() : null,
     tags: [],
     membershipStartDate,
-    createdAt: contact.properties.createdate,
-    lastModified: contact.properties.lastmodifieddate,
-    dateOfBirth: contact.properties.date_of_birth || null,
+    createdAt: props.createdate,
+    lastModified: props.lastmodifieddate,
+    dateOfBirth: props.date_of_birth || null,
     isActiveMember,
     isFormerMember,
     wasEverMember,
@@ -305,10 +307,10 @@ function transformHubSpotContact(contact: any): any {
  * Fetch only contacts modified since the given timestamp using HubSpot Search API
  * This is much more efficient than fetching all contacts when we only need updates
  */
-async function fetchRecentlyModifiedContacts(sinceTimestamp: number): Promise<any[]> {
+async function fetchRecentlyModifiedContacts(sinceTimestamp: number): Promise<Record<string, unknown>[]> {
   const hubspot = await getHubSpotClient();
   
-  let modifiedContacts: any[] = [];
+  let modifiedContacts: Record<string, unknown>[] = [];
   let after: string | undefined = undefined;
   
   do {
@@ -341,7 +343,7 @@ async function fetchRecentlyModifiedContacts(sinceTimestamp: number): Promise<an
  * - Full refresh: Every 30 minutes or on force refresh
  * - Incremental sync: Every 5 minutes, only fetches recently modified contacts
  */
-async function fetchAllHubSpotContacts(forceRefresh: boolean = false): Promise<any[]> {
+async function fetchAllHubSpotContacts(forceRefresh: boolean = false): Promise<Record<string, unknown>[]> {
   const now = Date.now();
   
   // If we have cache and it's within TTL, check if we need incremental sync
@@ -356,7 +358,7 @@ async function fetchAllHubSpotContacts(forceRefresh: boolean = false): Promise<a
           const enrichedModified = await enrichContactsWithDbData(modifiedContacts);
           
           // Now merge enriched contacts into cache, preserving existing enriched data for unchanged contacts
-          const contactMap = new Map(allContactsCache.data.map((c: any) => [c.id, c]));
+          const contactMap = new Map(allContactsCache.data.map((c: Record<string, unknown>) => [c.id, c]));
           for (const contact of enrichedModified) {
             contactMap.set(contact.id, contact);
           }
@@ -380,7 +382,7 @@ async function fetchAllHubSpotContacts(forceRefresh: boolean = false): Promise<a
   
   const hubspot = await getHubSpotClient();
   
-  let allContacts: any[] = [];
+  let allContacts: Record<string, unknown>[] = [];
   let after: string | undefined = undefined;
   
   do {
@@ -408,12 +410,12 @@ async function fetchAllHubSpotContacts(forceRefresh: boolean = false): Promise<a
 /**
  * Enrich contacts with additional data from the database (visits, join dates, etc.)
  */
-async function enrichContactsWithDbData(contacts: any[]): Promise<any[]> {
-  const emails = contacts.map((c: any) => c.email.toLowerCase()).filter(Boolean);
+async function enrichContactsWithDbData(contacts: Record<string, unknown>[]): Promise<Record<string, unknown>[]> {
+  const emails = contacts.map((c: Record<string, unknown>) => (c.email as string).toLowerCase()).filter(Boolean);
   
   if (emails.length === 0) return contacts;
   
-  let dbUserMap: Record<string, any> = {};
+  let dbUserMap: Record<string, Record<string, unknown>> = {};
   let lastActivityMap: Record<string, string> = {};
   let pastBookingsMap: Record<string, number> = {};
   let eventVisitsMap: Record<string, number> = {};
@@ -423,7 +425,7 @@ async function enrichContactsWithDbData(contacts: any[]): Promise<any[]> {
   const dbResult = await db.execute(sql`SELECT id, email, join_date, joined_on, mindbody_client_id, manually_linked_emails 
      FROM users WHERE LOWER(email) IN (${sql.join(emails.map(e => sql`${e}`), sql`, `)})`);
   for (const row of dbResult.rows) {
-    dbUserMap[(row as any).email.toLowerCase()] = row;
+    dbUserMap[((row as Record<string, unknown>).email as string).toLowerCase()] = row as Record<string, unknown>;
   }
   
   // Get last visit date - most recent PAST date from bookings or experiences
@@ -445,8 +447,9 @@ async function enrichContactsWithDbData(contacts: any[]): Promise<any[]> {
     GROUP BY email`);
   for (const row of lastActivityResult.rows) {
     if (row.last_activity) {
-      const date = (row as any).last_activity instanceof Date ? (row as any).last_activity : new Date((row as any).last_activity);
-      lastActivityMap[(row as any).email] = date.toISOString().split('T')[0];
+      const r = row as Record<string, unknown>;
+      const date = r.last_activity instanceof Date ? r.last_activity : new Date(r.last_activity as string);
+      lastActivityMap[r.email as string] = date.toISOString().split('T')[0];
     }
   }
   
@@ -458,7 +461,7 @@ async function enrichContactsWithDbData(contacts: any[]): Promise<any[]> {
        AND status NOT IN ('cancelled', 'declined', 'cancellation_pending')
      GROUP BY LOWER(user_email)`);
   for (const row of pastBookingsResult.rows) {
-    pastBookingsMap[(row as any).email] = (row as any).count;
+    pastBookingsMap[(row as Record<string, unknown>).email as string] = (row as Record<string, unknown>).count as number;
   }
   
   // Count past event RSVPs (excluding cancelled) - include both email and matched_user_id
@@ -471,7 +474,7 @@ async function enrichContactsWithDbData(contacts: any[]): Promise<any[]> {
        AND e.event_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
      GROUP BY u.email`);
   for (const row of eventVisitsResult.rows) {
-    eventVisitsMap[(row as any).email.toLowerCase()] = (row as any).count;
+    eventVisitsMap[((row as Record<string, unknown>).email as string).toLowerCase()] = (row as Record<string, unknown>).count as number;
   }
   
   // Count past wellness enrollments (excluding cancelled)
@@ -483,7 +486,7 @@ async function enrichContactsWithDbData(contacts: any[]): Promise<any[]> {
        AND wc.date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
      GROUP BY LOWER(we.user_email)`);
   for (const row of wellnessVisitsResult.rows) {
-    wellnessVisitsMap[(row as any).email] = (row as any).count;
+    wellnessVisitsMap[(row as Record<string, unknown>).email as string] = (row as Record<string, unknown>).count as number;
   }
   
   const walkInCountResult = await db.execute(sql`
@@ -493,13 +496,13 @@ async function enrichContactsWithDbData(contacts: any[]): Promise<any[]> {
   `);
   const walkInCounts: Record<string, number> = {};
   for (const row of walkInCountResult.rows) {
-    walkInCounts[(row as any).email] = (row as any).count;
+    walkInCounts[(row as Record<string, unknown>).email as string] = (row as Record<string, unknown>).count as number;
   }
 
   // Merge contact data with database data
   // Join date logic handles batch-import vs post-import contacts differently
-  return contacts.map((contact: any) => {
-    const emailLower = contact.email.toLowerCase();
+  return contacts.map((contact: Record<string, unknown>) => {
+    const emailLower = (contact.email as string).toLowerCase();
     const dbUser = dbUserMap[emailLower];
     const pastBookings = pastBookingsMap[emailLower] || 0;
     const eventVisits = eventVisitsMap[emailLower] || 0;
@@ -553,8 +556,8 @@ router.get('/api/hubspot/contacts', isStaffOrAdmin, async (req, res) => {
   const page = isNaN(pageParam) || pageParam < 1 ? 1 : pageParam;
   const limit = isNaN(limitParam) ? 50 : Math.min(Math.max(limitParam, 1), 100); // Default 50, max 100
   
-  const filterContacts = (contacts: any[]) => {
-    let filtered = contacts.filter((contact: any) => {
+  const filterContacts = (contacts: Record<string, unknown>[]) => {
+    let filtered = contacts.filter((contact: Record<string, unknown>) => {
       if (statusFilter === 'active') return contact.isActiveMember;
       if (statusFilter === 'former') return contact.isFormerMember;
       return true;
@@ -563,7 +566,7 @@ router.get('/api/hubspot/contacts', isStaffOrAdmin, async (req, res) => {
     // Apply search filter if provided - supports multi-word queries like "nick luu"
     if (searchQuery) {
       const searchWords = searchQuery.split(/\s+/).filter(Boolean);
-      filtered = filtered.filter((contact: any) => {
+      filtered = filtered.filter((contact: Record<string, unknown>) => {
         const firstName = (contact.firstName || '').toLowerCase();
         const lastName = (contact.lastName || '').toLowerCase();
         const email = (contact.email || '').toLowerCase();
@@ -582,7 +585,7 @@ router.get('/api/hubspot/contacts', isStaffOrAdmin, async (req, res) => {
     return filtered;
   };
   
-  const buildResponse = (allFilteredContacts: any[], stale: boolean, refreshing: boolean) => {
+  const buildResponse = (allFilteredContacts: Record<string, unknown>[], stale: boolean, refreshing: boolean) => {
     const total = allFilteredContacts.length;
     
     // If pagination is requested, slice the results
@@ -779,11 +782,12 @@ async function enrichEventDeal(
 
     for (let attempt = 0; attempt < 2; attempt++) {
       const associations = await retryableHubSpotRequest(() =>
-        (hubspot.crm.contacts as any).associationsApi.getAll(contactId, 'deals')
+        (hubspot.crm.contacts as unknown as { associationsApi: { getAll: (id: string, type: string) => Promise<{ results?: Array<{ id: string }> }> } }).associationsApi.getAll(contactId, 'deals')
       );
 
-      if ((associations as any).results?.length) {
-        for (const assoc of (associations as any).results) {
+      const assocResults = (associations as { results?: Array<{ id: string }> }).results;
+      if (assocResults?.length) {
+        for (const assoc of assocResults) {
           const deal = await retryableHubSpotRequest(() =>
             hubspot.crm.deals.basicApi.getById(assoc.id, ['pipeline', 'dealstage', 'createdate'])
           );
@@ -823,7 +827,7 @@ async function enrichEventDeal(
         associations: [{
           to: { id: contactId },
           types: [{
-            associationCategory: 'HUBSPOT_DEFINED' as any,
+            associationCategory: 'HUBSPOT_DEFINED' as const,
             associationTypeId: 3
           }]
         }]
@@ -962,7 +966,7 @@ router.post('/api/hubspot/forms/:formType', async (req, res) => {
       return res.status(response.status).json({ error: 'Form submission failed' });
     }
     
-    const result: any = await response.json();
+    const result: Record<string, unknown> = await response.json();
     
     const getFieldValue = (name: string): string | undefined => {
       const field = fields.find((f: { name: string; value: string }) => f.name === name);
@@ -1008,7 +1012,7 @@ router.post('/api/hubspot/forms/:formType', async (req, res) => {
         'system',
         {
           relatedId: insertResult[0]?.id,
-          relatedType: notificationRelatedType as any,
+          relatedType: notificationRelatedType,
           url: notificationUrl
         }
       ).catch(err => logger.error('Staff inquiry notification failed:', { extra: { err } }));
@@ -1107,7 +1111,7 @@ router.post('/api/hubspot/sync-tiers', isStaffOrAdmin, async (req, res) => {
     
     // Fetch all HubSpot contacts
     const properties = ['firstname', 'lastname', 'email', 'membership_tier', 'mindbody_client_id'];
-    let allContacts: any[] = [];
+    let allContacts: Record<string, unknown>[] = [];
     let after: string | undefined = undefined;
     
     do {
@@ -1224,7 +1228,7 @@ router.post('/api/hubspot/sync-tiers', isStaffOrAdmin, async (req, res) => {
 router.put('/api/hubspot/contacts/:id/tier', isStaffOrAdmin, async (req, res) => {
   const { id } = req.params;
   const { tier } = req.body;
-  const staffUser = (req as any).staffUser;
+  const staffUser = (req as Request & { staffUser?: { name?: string } }).staffUser;
   
   if (!tier || typeof tier !== 'string') {
     return res.status(400).json({ error: 'Tier is required' });
@@ -1280,7 +1284,7 @@ router.put('/api/hubspot/contacts/:id/tier', isStaffOrAdmin, async (req, res) =>
         tierId: tierData.tier_id,
         membershipTier: tierData.tier,
         membershipStatus: 'active',
-      } as any)
+      } as Record<string, unknown>)
       .where(eq(users.id, localUser.id));
     
     logger.info('[Tier Update] Updated local database for', { extra: { contactEmail } });
@@ -1576,11 +1580,11 @@ router.post('/api/hubspot/sync-billing-providers', isStaffOrAdmin, async (req, r
     };
     
     for (const member of membersResult.rows) {
-      const m = member as any;
-      const email: string = m.email;
-      const status: string = m.membership_status || 'active';
-      const billingProvider: string = m.billing_provider || 'manual';
-      const tier: string = m.tier;
+      const m = member as Record<string, unknown>;
+      const email: string = m.email as string;
+      const status: string = (m.membership_status as string) || 'active';
+      const billingProvider: string = (m.billing_provider as string) || 'manual';
+      const tier: string = m.tier as string;
       
       if (dryRun) {
         results.details.push({
@@ -1657,7 +1661,7 @@ router.get('/api/hubspot/products', isStaffOrAdmin, async (req, res) => {
     const hubspot = await getHubSpotClient();
     
     const properties = ['name', 'price', 'hs_sku', 'description', 'hs_recurring_billing_period'];
-    let allProducts: any[] = [];
+    let allProducts: Record<string, unknown>[] = [];
     let after: string | undefined = undefined;
     
     do {
@@ -1668,20 +1672,25 @@ router.get('/api/hubspot/products', isStaffOrAdmin, async (req, res) => {
       after = response.paging?.next?.after;
     } while (after);
     
-    const products = allProducts.map((product: any) => ({
+    const products = allProducts.map((product: Record<string, unknown>) => {
+      const props = product.properties as Record<string, string | null | undefined>;
+      return {
       id: product.id,
-      name: product.properties.name || '',
-      price: parseFloat(product.properties.price) || 0,
-      sku: product.properties.hs_sku || null,
-      description: product.properties.description || null,
-      recurringPeriod: product.properties.hs_recurring_billing_period || null,
-    }));
+      name: props.name || '',
+      price: parseFloat(props.price || '0') || 0,
+      sku: props.hs_sku || null,
+      description: props.description || null,
+      recurringPeriod: props.hs_recurring_billing_period || null,
+    };
+    });
     
     res.json({ products, count: products.length });
   } catch (error: unknown) {
-    const errObj = error as Record<string, any>;
-    const statusCode = errObj?.response?.statusCode || errObj?.status || errObj?.code;
-    const category = errObj?.response?.body?.category || errObj?.body?.category;
+    const errObj = error as Record<string, unknown>;
+    const response = errObj?.response as Record<string, unknown> | undefined;
+    const body = response?.body as Record<string, unknown> | undefined;
+    const statusCode = response?.statusCode || errObj?.status || errObj?.code;
+    const category = body?.category || (errObj?.body as Record<string, unknown> | undefined)?.category;
     if (statusCode === 403 || category === 'MISSING_SCOPES') {
       return res.status(403).json({ error: 'HubSpot API key missing required scopes for products' });
     }

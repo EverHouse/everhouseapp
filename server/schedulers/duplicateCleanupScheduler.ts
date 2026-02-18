@@ -1,6 +1,7 @@
 import { schedulerTracker } from '../core/schedulerTracker';
 import { pool } from '../core/db';
 import { getPacificHour, getTodayPacific } from '../utils/dateUtils';
+import { logger } from '../core/logger';
 
 const CLEANUP_HOUR = 4;
 let lastCleanupDate = '';
@@ -32,7 +33,7 @@ async function cleanupDuplicateTrackmanBookings(): Promise<{ deletedCount: numbe
       return { deletedCount: 0 };
     }
     
-    console.log(`[Duplicate Cleanup] Found ${idsToDelete.length} duplicate bookings to remove`);
+    logger.info(`[Duplicate Cleanup] Found ${idsToDelete.length} duplicate bookings to remove`);
     
     await client.query(
       `DELETE FROM booking_payment_audit WHERE booking_id = ANY($1)`,
@@ -53,7 +54,7 @@ async function cleanupDuplicateTrackmanBookings(): Promise<{ deletedCount: numbe
     
     await client.query('COMMIT');
     
-    console.log(`[Duplicate Cleanup] Successfully removed ${idsToDelete.length} duplicate bookings`);
+    logger.info(`[Duplicate Cleanup] Successfully removed ${idsToDelete.length} duplicate bookings`);
     return { deletedCount: idsToDelete.length };
   } catch (error) {
     await client.query('ROLLBACK');
@@ -70,34 +71,34 @@ async function checkAndRunCleanup(): Promise<void> {
     
     if (currentHour === CLEANUP_HOUR && lastCleanupDate !== todayStr) {
       lastCleanupDate = todayStr;
-      console.log('[Duplicate Cleanup] Running scheduled cleanup...');
+      logger.info('[Duplicate Cleanup] Running scheduled cleanup...');
       const result = await cleanupDuplicateTrackmanBookings();
       if (result.deletedCount > 0) {
-        console.log(`[Duplicate Cleanup] Completed: removed ${result.deletedCount} duplicates`);
+        logger.info(`[Duplicate Cleanup] Completed: removed ${result.deletedCount} duplicates`);
         schedulerTracker.recordRun('Duplicate Cleanup', true);
       }
     }
   } catch (error) {
-    console.error('[Duplicate Cleanup] Scheduler error:', error);
+    logger.error('[Duplicate Cleanup] Scheduler error:', { error: error as Error });
     schedulerTracker.recordRun('Duplicate Cleanup', false, String(error));
   }
 }
 
 export function startDuplicateCleanupScheduler(): void {
-  console.log('[Startup] Duplicate cleanup scheduler enabled (runs at 4am Pacific and on startup)');
+  logger.info('[Startup] Duplicate cleanup scheduler enabled (runs at 4am Pacific and on startup)');
   
   setTimeout(async () => {
     try {
-      console.log('[Duplicate Cleanup] Running startup cleanup check...');
+      logger.info('[Duplicate Cleanup] Running startup cleanup check...');
       const result = await cleanupDuplicateTrackmanBookings();
       if (result.deletedCount > 0) {
-        console.log(`[Duplicate Cleanup] Startup cleanup removed ${result.deletedCount} duplicates`);
+        logger.info(`[Duplicate Cleanup] Startup cleanup removed ${result.deletedCount} duplicates`);
         schedulerTracker.recordRun('Duplicate Cleanup', true);
       } else {
-        console.log('[Duplicate Cleanup] No duplicates found');
+        logger.info('[Duplicate Cleanup] No duplicates found');
       }
     } catch (error) {
-      console.error('[Duplicate Cleanup] Startup cleanup error:', error);
+      logger.error('[Duplicate Cleanup] Startup cleanup error:', { error: error as Error });
       schedulerTracker.recordRun('Duplicate Cleanup', false, String(error));
     }
   }, 10000);

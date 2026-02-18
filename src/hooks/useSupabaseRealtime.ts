@@ -6,9 +6,9 @@ import { bookingEvents } from '../lib/bookingEvents';
 export interface UseSupabaseRealtimeOptions {
   userEmail?: string;
   tables?: string[];
-  onNotification?: (payload: any) => void;
-  onBookingUpdate?: (payload: any) => void;
-  onAnnouncementUpdate?: (payload: any) => void;
+  onNotification?: (payload: Record<string, unknown>) => void;
+  onBookingUpdate?: (payload: Record<string, unknown>) => void;
+  onAnnouncementUpdate?: (payload: Record<string, unknown>) => void;
 }
 
 const DEFAULT_TABLES = ['notifications', 'booking_sessions', 'announcements'];
@@ -25,7 +25,7 @@ export function useSupabaseRealtime(options: UseSupabaseRealtimeOptions = {}) {
   const channelsRef = useRef<RealtimeChannel[]>([]);
   const isSubscribedRef = useRef(false);
 
-  const handleNotification = useCallback((payload: any) => {
+  const handleNotification = useCallback((payload: Record<string, unknown>) => {
     window.dispatchEvent(new CustomEvent('member-notification', { detail: payload }));
     // Only emit if WebSocket is not handling events (Supabase Realtime acts as fallback)
     if (!window.__wsConnected) {
@@ -34,7 +34,7 @@ export function useSupabaseRealtime(options: UseSupabaseRealtimeOptions = {}) {
     onNotification?.(payload);
   }, [onNotification]);
 
-  const handleBookingUpdate = useCallback((payload: any) => {
+  const handleBookingUpdate = useCallback((payload: Record<string, unknown>) => {
     window.dispatchEvent(new CustomEvent('booking-update', { detail: payload }));
     // Only emit if WebSocket is not handling events (Supabase Realtime acts as fallback)
     if (!window.__wsConnected) {
@@ -43,7 +43,7 @@ export function useSupabaseRealtime(options: UseSupabaseRealtimeOptions = {}) {
     onBookingUpdate?.(payload);
   }, [onBookingUpdate]);
 
-  const handleAnnouncementUpdate = useCallback((payload: any) => {
+  const handleAnnouncementUpdate = useCallback((payload: Record<string, unknown>) => {
     window.dispatchEvent(new CustomEvent('announcement-update', { detail: payload }));
     onAnnouncementUpdate?.(payload);
   }, [onAnnouncementUpdate]);

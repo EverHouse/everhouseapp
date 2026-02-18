@@ -418,20 +418,20 @@ router.get('/api/availability', async (req, res) => {
       const startTime = `${startHour.toString().padStart(2, '0')}:${startMin.toString().padStart(2, '0')}:00`;
       const endTime = `${endHour.toString().padStart(2, '0')}:${endMin.toString().padStart(2, '0')}:00`;
       
-      const hasBookingConflict = bookedSlots.rows.some((booking: any) => {
+      const hasBookingConflict = bookedSlots.rows.some((booking: Record<string, unknown>) => {
         const bookStart = booking.start_time;
         const bookEnd = booking.end_time;
         return (startTime < bookEnd && endTime > bookStart);
       });
       
-      const hasBlockConflict = blockedSlots.rows.some((block: any) => {
+      const hasBlockConflict = blockedSlots.rows.some((block: Record<string, unknown>) => {
         const blockStart = block.start_time;
         const blockEnd = block.end_time;
         return (startTime < blockEnd && endTime > blockStart);
       });
       
       // Check unmatched Trackman bookings (unresolved historical imports)
-      const hasUnmatchedConflict = unmatchedTrackmanSlots.rows.some((unmatched: any) => {
+      const hasUnmatchedConflict = unmatchedTrackmanSlots.rows.some((unmatched: Record<string, unknown>) => {
         const unmatchedStart = unmatched.start_time;
         const unmatchedEnd = unmatched.end_time;
         return (startTime < unmatchedEnd && endTime > unmatchedStart);
@@ -470,7 +470,7 @@ router.post('/api/availability-blocks', isStaffOrAdmin, async (req, res) => {
       [resource_id, block_date, start_time, end_time, block_type, notes, created_by]
     );
     
-    logFromRequest(req, 'create_availability_block' as any, 'availability' as any, String(result.rows[0].id), undefined, { resource_id, block_date, start_time, end_time });
+    logFromRequest(req, 'create_availability_block', 'availability', String(result.rows[0].id), undefined, { resource_id, block_date, start_time, end_time });
     res.status(201).json(result.rows[0]);
   } catch (error: unknown) {
     logger.error('Availability block creation error', { error: error instanceof Error ? error : new Error(String(error)) });
@@ -487,7 +487,7 @@ router.get('/api/availability-blocks', async (req, res) => {
                  JOIN resources r ON ab.resource_id = r.id
                  LEFT JOIN facility_closures fc ON ab.closure_id = fc.id
                  WHERE 1=1`;
-    const params: any[] = [];
+    const params: (string | number)[] = [];
     
     if (start_date) {
       params.push(start_date);
@@ -533,7 +533,7 @@ router.put('/api/availability-blocks/:id', isStaffOrAdmin, async (req, res) => {
       return res.status(404).json({ error: 'Block not found' });
     }
     
-    logFromRequest(req, 'update_availability_block' as any, 'availability' as any, id as string, undefined, { resource_id, block_date, start_time, end_time });
+    logFromRequest(req, 'update_availability_block', 'availability', id as string, undefined, { resource_id, block_date, start_time, end_time });
     res.json(result.rows[0]);
   } catch (error: unknown) {
     logger.error('Update block error', { error: error instanceof Error ? error : new Error(String(error)) });
@@ -545,7 +545,7 @@ router.delete('/api/availability-blocks/:id', isStaffOrAdmin, async (req, res) =
   try {
     const { id } = req.params;
     await pool.query('DELETE FROM availability_blocks WHERE id = $1', [id]);
-    logFromRequest(req, 'delete_availability_block' as any, 'availability' as any, id as string);
+    logFromRequest(req, 'delete_availability_block', 'availability', id as string);
     res.json({ success: true });
   } catch (error: unknown) {
     logger.error('Delete block error', { error: error instanceof Error ? error : new Error(String(error)) });

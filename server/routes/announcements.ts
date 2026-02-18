@@ -63,7 +63,7 @@ router.get('/api/announcements', async (req, res) => {
       endDate: a.endsAt ? formatDatePacific(new Date(a.endsAt)) : undefined,
       linkType: a.linkType || undefined,
       linkTarget: a.linkTarget || undefined,
-      showAsBanner: (a as any).show_as_banner || false
+      showAsBanner: (a as unknown as Record<string, unknown>).show_as_banner === true
     }));
     
     res.json(formatted);
@@ -123,7 +123,7 @@ router.get('/api/announcements/export', isStaffOrAdmin, async (req, res) => {
     const results = await db.select().from(announcements).orderBy(desc(announcements.createdAt));
     
     // Helper function to escape CSV values
-    const escapeCsv = (value: any): string => {
+    const escapeCsv = (value: unknown): string => {
       if (value === null || value === undefined) {
         return '';
       }
@@ -136,7 +136,7 @@ router.get('/api/announcements/export', isStaffOrAdmin, async (req, res) => {
     
     // Build CSV rows
     const rows = results.map(a => {
-      const showBanner = (a as any).show_as_banner === true ? 'Yes' : 'No';
+      const showBanner = (a as unknown as Record<string, unknown>).show_as_banner === true ? 'Yes' : 'No';
       return [
         a.id,
         escapeCsv(a.title),
@@ -161,7 +161,7 @@ router.get('/api/announcements/export', isStaffOrAdmin, async (req, res) => {
     res.setHeader('Content-Disposition', 'attachment; filename="announcements_export.csv"');
     
     // Log audit trail
-    logFromRequest(req, 'export_announcements' as any, 'announcement', undefined, 'Announcements Export', {
+    logFromRequest(req, 'export_announcements', 'announcement', undefined, 'Announcements Export', {
       totalRecords: results.length
     });
     
@@ -202,7 +202,8 @@ router.post('/api/announcements', isStaffOrAdmin, async (req, res) => {
       )
       RETURNING *
     `);
-    const newAnnouncement = (result as any).rows?.[0] || (result as any)[0];
+    const resultRows = (result as { rows?: Record<string, unknown>[] }).rows || (result as unknown as Record<string, unknown>[]);
+    const newAnnouncement = (Array.isArray(resultRows) ? resultRows[0] : resultRows) as Record<string, unknown>;
     
     const responseData = {
       id: newAnnouncement.id.toString(),
@@ -287,7 +288,8 @@ router.put('/api/announcements/:id', isStaffOrAdmin, async (req, res) => {
       RETURNING *
     `);
     
-    const updated = (results as any).rows?.[0] || (results as any)[0];
+    const resultsRows = (results as { rows?: Record<string, unknown>[] }).rows || (results as unknown as Record<string, unknown>[]);
+    const updated = (Array.isArray(resultsRows) ? resultsRows[0] : resultsRows) as Record<string, unknown>;
     
     if (!updated) {
       return res.status(404).json({ error: 'Announcement not found' });
@@ -390,7 +392,7 @@ router.post('/api/announcements/sheets/connect', isStaffOrAdmin, async (req, res
     const sheetId = await createAnnouncementSheet();
     const sheetUrl = getSheetUrl(sheetId);
 
-    logFromRequest(req, 'update_settings' as any, 'announcement', undefined, 'Google Sheets Connect', {
+    logFromRequest(req, 'update_settings', 'announcement', undefined, 'Google Sheets Connect', {
       sheetId,
       sheetUrl
     });
@@ -427,7 +429,7 @@ router.post('/api/announcements/sheets/sync-from', isStaffOrAdmin, async (req, r
 
     broadcastAnnouncementUpdate('updated', { action: 'bulk_sync' });
 
-    logFromRequest(req, 'update_settings' as any, 'announcement', undefined, 'Google Sheets Sync From', {
+    logFromRequest(req, 'update_settings', 'announcement', undefined, 'Google Sheets Sync From', {
       created: result.created,
       updated: result.updated,
       errors: result.errors
@@ -449,7 +451,7 @@ router.post('/api/announcements/sheets/sync-to', isStaffOrAdmin, async (req, res
 
     const result = await syncToSheet(sheetId);
 
-    logFromRequest(req, 'update_settings' as any, 'announcement', undefined, 'Google Sheets Sync To', {
+    logFromRequest(req, 'update_settings', 'announcement', undefined, 'Google Sheets Sync To', {
       pushed: result.pushed
     });
 
@@ -465,7 +467,7 @@ router.post('/api/announcements/sheets/disconnect', isStaffOrAdmin, async (req, 
     await db.delete(systemSettings)
       .where(eq(systemSettings.key, 'announcements_google_sheet_id'));
 
-    logFromRequest(req, 'update_settings' as any, 'announcement', undefined, 'Google Sheets Disconnect', {});
+    logFromRequest(req, 'update_settings', 'announcement', undefined, 'Google Sheets Disconnect', {});
 
     res.json({ success: true });
   } catch (error: unknown) {

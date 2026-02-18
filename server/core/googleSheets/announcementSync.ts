@@ -6,7 +6,15 @@ import { systemSettings } from '../../../shared/models/system';
 import { eq, desc, sql } from 'drizzle-orm';
 import { formatDatePacific, createPacificDate } from '../../utils/dateUtils';
 
-let connectionSettings: any;
+interface ConnectionSettings {
+  settings: {
+    expires_at?: string;
+    access_token?: string;
+    oauth?: { credentials?: { access_token?: string } };
+  };
+}
+
+let connectionSettings: ConnectionSettings | undefined;
 
 async function getAccessToken() {
   if (connectionSettings && connectionSettings.settings.expires_at && new Date(connectionSettings.settings.expires_at).getTime() > Date.now()) {
@@ -58,16 +66,16 @@ async function getGoogleDriveClient() {
 
 const HEADER_ROW = ['App ID', 'Title', 'Description', 'Start Date', 'End Date', 'Link Type', 'Link Target', 'Banner (yes/no)', 'Active (yes/no)', 'Status'];
 
-function announcementToRow(a: any): string[] {
+function announcementToRow(a: Record<string, unknown>): string[] {
   return [
     String(a.id),
-    a.title || '',
-    a.message || '',
-    a.starts_at || a.startsAt ? formatDatePacific(new Date(a.starts_at || a.startsAt)) : '',
-    a.ends_at || a.endsAt ? formatDatePacific(new Date(a.ends_at || a.endsAt)) : '',
-    a.link_type || a.linkType || '',
-    a.link_target || a.linkTarget || '',
-    (a.show_as_banner ?? (a as any).showAsBanner) ? 'yes' : 'no',
+    (a.title as string) || '',
+    (a.message as string) || '',
+    a.starts_at || a.startsAt ? formatDatePacific(new Date((a.starts_at || a.startsAt) as string)) : '',
+    a.ends_at || a.endsAt ? formatDatePacific(new Date((a.ends_at || a.endsAt) as string)) : '',
+    (a.link_type || a.linkType || '') as string,
+    (a.link_target || a.linkTarget || '') as string,
+    (a.show_as_banner ?? a.showAsBanner) ? 'yes' : 'no',
     (a.is_active ?? a.isActive) !== false ? 'yes' : 'no',
     'synced'
   ];
@@ -133,10 +141,11 @@ export async function createAnnouncementSheet(): Promise<string> {
     });
 
   const allAnnouncements = await db.execute(sql`SELECT * FROM announcements ORDER BY id ASC`);
-  const rows = ((allAnnouncements as any).rows || allAnnouncements) as any[];
+  const queryResult = allAnnouncements as unknown as { rows: Record<string, unknown>[] };
+  const rows = queryResult.rows || (allAnnouncements as unknown as Record<string, unknown>[]);
 
   if (rows.length > 0) {
-    const dataRows = rows.map((a: any) => announcementToRow(a));
+    const dataRows = rows.map((a: Record<string, unknown>) => announcementToRow(a));
     await sheets.spreadsheets.values.append({
       spreadsheetId,
       range: 'Announcements!A2',
@@ -149,7 +158,7 @@ export async function createAnnouncementSheet(): Promise<string> {
     for (let i = 0; i < rows.length; i++) {
       await db.update(announcements)
         .set({ googleSheetRowId: i + 2 })
-        .where(eq(announcements.id, rows[i].id));
+        .where(eq(announcements.id, rows[i].id as number));
     }
   }
 
@@ -257,7 +266,8 @@ export async function syncFromSheet(sheetId: string): Promise<{ created: number;
           )
           RETURNING id
         `);
-        const newRow = (result as any).rows?.[0] || (result as any)[0];
+        const resultRows = (result as unknown as { rows?: Record<string, unknown>[] }).rows;
+        const newRow = resultRows?.[0] || (result as unknown as Record<string, unknown>[])[0];
         const newId = newRow?.id;
 
         if (newId) {
@@ -300,7 +310,8 @@ export async function syncToSheet(sheetId: string): Promise<{ pushed: number }> 
   let pushed = 0;
 
   const allAnnouncements = await db.execute(sql`SELECT * FROM announcements ORDER BY id ASC`);
-  const dbRows = ((allAnnouncements as any).rows || allAnnouncements) as any[];
+  const syncResult = allAnnouncements as unknown as { rows: Record<string, unknown>[] };
+  const dbRows = syncResult.rows || (allAnnouncements as unknown as Record<string, unknown>[]);
 
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId: sheetId,
@@ -322,7 +333,7 @@ export async function syncToSheet(sheetId: string): Promise<{ pushed: number }> 
 
   for (const a of dbRows) {
     const rowData = announcementToRow(a);
-    const existingRow = existingIds.get(a.id);
+    const existingRow = existingIds.get(a.id as number);
 
     if (existingRow) {
       updateData.push({
@@ -359,7 +370,7 @@ export async function syncToSheet(sheetId: string): Promise<{ pushed: number }> 
   return { pushed };
 }
 
-export async function pushSingleAnnouncement(sheetId: string, announcement: any): Promise<void> {
+export async function pushSingleAnnouncement(sheetId: string, announcement: Record<string, unknown>): Promise<void> {
   const sheets = await getGoogleSheetClient();
 
   const response = await sheets.spreadsheets.values.get({

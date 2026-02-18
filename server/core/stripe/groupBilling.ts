@@ -190,7 +190,7 @@ export async function getBillingGroupByPrimaryEmail(primaryEmail: string): Promi
       )
     : { rows: [] };
   const memberUserMap = new Map(
-    allMemberUsers.rows.map((r: any) => [r.email.toLowerCase(), r])
+    allMemberUsers.rows.map((r: Record<string, unknown>) => [(r.email as string).toLowerCase(), r])
   );
 
   const memberInfos: GroupMemberInfo[] = [];
@@ -556,7 +556,7 @@ export async function addGroupMember(params: {
       // Create or update user account (matching addCorporateMember pattern)
       if (userExists) {
         const updateFields: string[] = ['billing_group_id = $1', 'tier = $2', "billing_provider = 'stripe'", "membership_status = 'active'", 'updated_at = NOW()'];
-        const updateValues: any[] = [params.billingGroupId, normalizedTier];
+        const updateValues: unknown[] = [params.billingGroupId, normalizedTier];
         let paramIndex = 3;
         
         if (params.firstName) {
@@ -868,7 +868,7 @@ export async function addCorporateMember(params: {
       
       if (existingUserCheck.rows.length > 0) {
         const updateFields: string[] = ['billing_group_id = $1', 'tier = $2', "billing_provider = 'stripe'", "membership_status = 'active'"];
-        const updateValues: any[] = [params.billingGroupId, normalizedTier];
+        const updateValues: unknown[] = [params.billingGroupId, normalizedTier];
         let paramIndex = 3;
         
         if (params.firstName) {
@@ -1473,7 +1473,7 @@ export async function reconcileGroupBillingWithStripe(): Promise<ReconciliationR
                 await db.update(groupMembers)
                   .set({
                     stripeSubscriptionItemId: stripeItem.id,
-                  } as any)
+                  } as Partial<typeof groupMembers.$inferInsert>)
                   .where(eq(groupMembers.id, member.id));
                 
                 result.itemsRelinked++;
@@ -1489,7 +1489,7 @@ export async function reconcileGroupBillingWithStripe(): Promise<ReconciliationR
                   .set({
                     isActive: false,
                     removedAt: new Date(),
-                  } as any)
+                  } as Partial<typeof groupMembers.$inferInsert>)
                   .where(eq(groupMembers.id, member.id));
                 
                 await pool.query(
@@ -1513,7 +1513,7 @@ export async function reconcileGroupBillingWithStripe(): Promise<ReconciliationR
               await db.update(groupMembers)
                 .set({
                   stripeSubscriptionItemId: stripeItem.id,
-                } as any)
+                } as Partial<typeof groupMembers.$inferInsert>)
                 .where(eq(groupMembers.id, member.id));
               
               result.itemsRelinked++;
@@ -1549,7 +1549,7 @@ export async function reconcileGroupBillingWithStripe(): Promise<ReconciliationR
                   isActive: true,
                   stripeSubscriptionItemId: item.id,
                   removedAt: null,
-                } as any)
+                } as Partial<typeof groupMembers.$inferInsert>)
                 .where(eq(groupMembers.id, inactiveMember[0].id));
               
               await pool.query(
@@ -1680,7 +1680,7 @@ export async function handleSubscriptionItemsChanged(
             await db.update(groupMembers)
               .set({
                 stripeSubscriptionItemId: existingItemForEmail.id,
-              } as any)
+              } as Partial<typeof groupMembers.$inferInsert>)
               .where(eq(groupMembers.id, member[0].id));
             logger.info(`[GroupBilling] Updated member ${memberEmail} subscription item ID from ${item.id} to ${existingItemForEmail.id}`);
           }

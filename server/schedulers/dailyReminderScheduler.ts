@@ -4,6 +4,7 @@ import { systemSettings } from '../../shared/schema';
 import { sql } from 'drizzle-orm';
 import { sendDailyReminders } from '../routes/push';
 import { getPacificHour, getTodayPacific } from '../utils/dateUtils';
+import { logger } from '../core/logger';
 
 const REMINDER_HOUR = 18;
 const REMINDER_SETTING_KEY = 'last_daily_reminder_date';
@@ -29,7 +30,7 @@ async function tryClaimReminderSlot(todayStr: string): Promise<boolean> {
     
     return result.length > 0;
   } catch (err) {
-    console.error('[Daily Reminders] Database error:', err);
+    logger.error('[Daily Reminders] Database error:', { error: err as Error });
     schedulerTracker.recordRun('Daily Reminder', false, String(err));
     return false;
   }
@@ -44,25 +45,25 @@ async function checkAndSendReminders(): Promise<void> {
       const claimed = await tryClaimReminderSlot(todayStr);
       
       if (claimed) {
-        console.log('[Daily Reminders] Starting scheduled reminder job...');
+        logger.info('[Daily Reminders] Starting scheduled reminder job...');
         
         try {
           const result = await sendDailyReminders();
-          console.log(`[Daily Reminders] Completed: ${result.message}`);
+          logger.info(`[Daily Reminders] Completed: ${result.message}`);
           schedulerTracker.recordRun('Daily Reminder', true);
         } catch (err) {
-          console.error('[Daily Reminders] Send failed:', err);
+          logger.error('[Daily Reminders] Send failed:', { error: err as Error });
           schedulerTracker.recordRun('Daily Reminder', false, String(err));
         }
       }
     }
   } catch (err) {
-    console.error('[Daily Reminders] Scheduler error:', err);
+    logger.error('[Daily Reminders] Scheduler error:', { error: err as Error });
     schedulerTracker.recordRun('Daily Reminder', false, String(err));
   }
 }
 
 export function startDailyReminderScheduler(): void {
   setInterval(checkAndSendReminders, 30 * 60 * 1000);
-  console.log('[Startup] Daily reminder scheduler enabled (runs at 6pm)');
+  logger.info('[Startup] Daily reminder scheduler enabled (runs at 6pm)');
 }

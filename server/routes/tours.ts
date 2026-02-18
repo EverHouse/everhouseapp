@@ -20,10 +20,17 @@ function parseTimeToMinutes(timeStr: string): number {
   return hours * 60 + minutes;
 }
 
-function extractContactFromAttendees(attendees: any[]): { email: string | null; name: string | null } {
+interface CalendarAttendee {
+  email?: string;
+  displayName?: string;
+  organizer?: boolean;
+  self?: boolean;
+}
+
+function extractContactFromAttendees(attendees: CalendarAttendee[]): { email: string | null; name: string | null } {
   if (!attendees || attendees.length === 0) return { email: null, name: null };
   
-  const guest = attendees.find((a: any) => !a.organizer && !a.self) || attendees[0];
+  const guest = attendees.find((a: CalendarAttendee) => !a.organizer && !a.self) || attendees[0];
   if (!guest) return { email: null, name: null };
   
   return {
@@ -136,7 +143,7 @@ router.patch('/api/tours/:id/status', isStaffOrAdmin, async (req, res) => {
     const [existingTour] = await db.select().from(tours).where(eq(tours.id, parseInt(id as string)));
     const previousStatus = existingTour?.status || 'unknown';
     
-    const updateData: any = {
+    const updateData: Record<string, unknown> = {
       status,
       updatedAt: new Date(),
     };
@@ -312,13 +319,13 @@ router.get('/api/tours/needs-review', isStaffOrAdmin, async (req, res) => {
     const dismissedMeetings = await db.select().from(dismissedHubspotMeetings);
     const dismissedIds = new Set(dismissedMeetings.map(d => d.hubspotMeetingId));
     
-    const unmatchedMeetings: any[] = [];
+    const unmatchedMeetings: Array<HubSpotMeetingDetails & { potentialMatches: Array<{ id: number; guestName: string | null; guestEmail: string | null; tourDate: string; startTime: string; status: string | null }>; wouldBackfill: boolean }> = [];
     
     for (const meeting of meetings) {
       if (linkedHubspotIds.has(meeting.hubspotMeetingId)) continue;
       if (dismissedIds.has(meeting.hubspotMeetingId)) continue;
       
-      let potentialMatches: any[] = [];
+      let potentialMatches: Array<{ id: number; guestName: string | null; guestEmail: string | null; tourDate: string; startTime: string; status: string | null }> = [];
       if (meeting.guestEmail) {
         const meetingTimeMinutes = parseTimeToMinutes(meeting.startTime);
         const candidateTours = await db.select().from(tours).where(
@@ -494,7 +501,7 @@ async function fetchHubSpotTourMeetings(): Promise<HubSpotMeetingDetails[]> {
   const oneYearAgo = new Date();
   oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
   
-  const allMeetings: any[] = [];
+  const allMeetings: Array<{ id: string; properties: Record<string, string | null>; associations?: Record<string, unknown> }> = [];
   let after: string | undefined = undefined;
   
   do {
@@ -517,7 +524,7 @@ async function fetchHubSpotTourMeetings(): Promise<HubSpotMeetingDetails[]> {
     );
     
     if (response.results) {
-      const filteredMeetings = response.results.filter((meeting: any) => {
+      const filteredMeetings = response.results.filter((meeting) => {
         const startTime = meeting.properties.hs_meeting_start_time;
         if (!startTime) return false;
         const meetingDate = new Date(startTime);
@@ -529,7 +536,7 @@ async function fetchHubSpotTourMeetings(): Promise<HubSpotMeetingDetails[]> {
                location.includes('tourbooking') || 
                externalUrl.includes('tourbooking');
       });
-      allMeetings.push(...filteredMeetings);
+      allMeetings.push(...filteredMeetings as Array<{ id: string; properties: Record<string, string | null>; associations?: Record<string, unknown> }>);
     }
     after = response.paging?.next?.after;
   } while (after);
@@ -612,11 +619,11 @@ export async function syncToursFromCalendar(): Promise<{ synced: number; created
     oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
     oneYearAgo.setHours(0, 0, 0, 0);
     
-    const allEvents: any[] = [];
+    const allEvents: Array<{ id?: string | null; summary?: string | null; description?: string | null; start?: { dateTime?: string | null; date?: string | null }; end?: { dateTime?: string | null; date?: string | null }; attendees?: CalendarAttendee[]; status?: string | null }> = [];
     let pageToken: string | undefined = undefined;
     
     do {
-      const response: any = await calendar.events.list({
+      const response = await calendar.events.list({
         calendarId,
         timeMin: oneYearAgo.toISOString(),
         maxResults: 250,
@@ -775,7 +782,7 @@ export async function syncToursFromCalendar(): Promise<{ synced: number; created
           await notifyAllStaff(
             'New Tour Scheduled',
             `${guestName} scheduled a tour for ${formattedDate}`,
-            'tour_scheduled' as any,
+            'tour_scheduled',
             { relatedType: 'tour' }
           );
         }
@@ -829,7 +836,7 @@ export async function sendTodayTourReminders(): Promise<number> {
       await notifyAllStaff(
         `${todayTours.length} Tour${todayTours.length > 1 ? 's' : ''} Today`,
         `Today's tours: ${tourList}`,
-        'tour_reminder' as any,
+        'tour_reminder',
         { relatedType: 'tour' }
       );
     }
@@ -848,7 +855,7 @@ export async function syncToursFromHubSpot(): Promise<{ synced: number; created:
     const oneYearAgo = new Date();
     oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
     
-    const allMeetings: any[] = [];
+    const allMeetings: Record<string, unknown>[] = [];
     let after: string | undefined = undefined;
     
     do {
@@ -871,7 +878,7 @@ export async function syncToursFromHubSpot(): Promise<{ synced: number; created:
       );
       
       if (response.results) {
-        const filteredMeetings = response.results.filter((meeting: any) => {
+        const filteredMeetings = response.results.filter((meeting: Record<string, unknown>) => {
           const startTime = meeting.properties.hs_meeting_start_time;
           if (!startTime) return false;
           const meetingDate = new Date(startTime);
@@ -1027,7 +1034,7 @@ export async function syncToursFromHubSpot(): Promise<{ synced: number; created:
             await notifyAllStaff(
               'New Tour Scheduled',
               `${guestName || 'Guest'} scheduled a tour for ${formattedDate}`,
-              'tour_scheduled' as any,
+              'tour_scheduled',
               { relatedType: 'tour' }
             );
           }

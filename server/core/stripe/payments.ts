@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import Stripe from 'stripe';
 import { pool } from '../db';
 import { db } from '../../db';
 import { billingAuditLog } from '../../../shared/schema';
@@ -219,7 +220,7 @@ export async function createInvoiceWithLineItems(params: CreatePOSInvoiceParams)
       });
     }
 
-    const finalizedInvoice = await stripe.invoices.finalizeInvoice(invoice.id) as any;
+    const finalizedInvoice = await stripe.invoices.finalizeInvoice(invoice.id);
 
     if (forTerminal) {
       const invoicePiId = typeof finalizedInvoice.payment_intent === 'string'
@@ -261,9 +262,9 @@ export async function createInvoiceWithLineItems(params: CreatePOSInvoiceParams)
       };
     }
 
-    const paymentIntentId = typeof (finalizedInvoice as any).payment_intent === 'string'
-      ? (finalizedInvoice as any).payment_intent
-      : (finalizedInvoice as any).payment_intent?.id;
+    const paymentIntentId = typeof finalizedInvoice.payment_intent === 'string'
+      ? finalizedInvoice.payment_intent
+      : (finalizedInvoice.payment_intent as Stripe.PaymentIntent | null)?.id;
 
     if (!paymentIntentId) {
       throw new Error('Invoice finalization did not create a PaymentIntent');
@@ -306,7 +307,7 @@ export async function confirmPaymentSuccess(
   paymentIntentId: string,
   performedBy: string,
   performedByName?: string,
-  txClient?: any
+  txClient?: { query: (text: string, values?: unknown[]) => Promise<unknown> }
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const stripe = await getStripeClient();
@@ -456,7 +457,7 @@ export async function createBalanceAwarePayment(params: {
     if (customer.deleted) {
       throw new Error('Customer has been deleted');
     }
-    const customerBalance = (customer as any).balance || 0;
+    const customerBalance = customer.balance || 0;
     // Available credit is the absolute value of a negative balance
     const availableCredit = customerBalance < 0 ? Math.abs(customerBalance) : 0;
 

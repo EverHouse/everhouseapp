@@ -74,7 +74,7 @@ const DiscountsSubTab: React.FC<DiscountsSubTabProps> = ({ onCreateClick }) => {
     setIsSaving(true);
     
     try {
-      const payload: any = {
+      const payload: Record<string, unknown> = {
         duration: newCoupon.duration,
         name: newCoupon.name || undefined,
       };

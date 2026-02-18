@@ -56,7 +56,7 @@ router.get('/api/guest-passes/:email', isAuthenticated, async (req, res) => {
       const userResult = await withRetry(() =>
         db.execute(sql`SELECT tier FROM users WHERE LOWER(email) = LOWER(${requestedEmail}) LIMIT 1`)
       );
-      actualTier = (userResult as any).rows?.[0]?.tier || null;
+      actualTier = (userResult as { rows?: Array<{ tier?: string }> }).rows?.[0]?.tier || null;
     }
     
     const tierLimits = actualTier ? await getTierLimits(actualTier) : null;
@@ -117,7 +117,7 @@ router.get('/api/guest-passes/:email', isAuthenticated, async (req, res) => {
         const participants = booking.requestParticipants;
         if (Array.isArray(participants)) {
           // Count guests that have either email OR userId (directory-selected guests)
-          pendingGuestCount += participants.filter((p: any) => 
+          pendingGuestCount += participants.filter((p: Record<string, unknown>) => 
             p.type === 'guest' && (p.email || p.userId)
           ).length;
         }
@@ -243,7 +243,7 @@ router.put('/api/guest-passes/:email', isStaffOrAdmin, async (req, res) => {
     
     try { broadcastMemberStatsUpdated(normalizedEmail, { guestPasses: passesRemaining }); } catch (err: unknown) { logger.error('[Broadcast] Stats update error', { extra: { error: err } }); }
     
-    logFromRequest(req, 'update_guest_passes' as any, 'guest_pass' as any, normalizedEmail, undefined, { passes_total: passes_total });
+    logFromRequest(req, 'update_guest_passes', 'guest_pass', normalizedEmail, undefined, { passes_total: passes_total });
     res.json({
       passes_used: data.passesUsed,
       passes_total: data.passesTotal,

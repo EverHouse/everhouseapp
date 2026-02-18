@@ -11,22 +11,22 @@ const router = Router();
 
 interface MemberDataExport {
   exportDate: string;
-  profile: any;
-  bookings: any[];
-  linkedBookings: any[];
-  notifications: any[];
-  guestPasses: any;
-  eventRsvps: any[];
-  memberNotes: any[];
-  communicationLogs: any[];
-  billingHistory: any[];
-  bookingMemberships: any[];
-  guestCheckIns: any[];
-  wellnessEnrollments: any[];
-  preferences: any;
+  profile: Record<string, unknown> | null;
+  bookings: Record<string, unknown>[];
+  linkedBookings: Record<string, unknown>[];
+  notifications: Record<string, unknown>[];
+  guestPasses: Record<string, unknown> | null;
+  eventRsvps: Record<string, unknown>[];
+  memberNotes: Record<string, unknown>[];
+  communicationLogs: Record<string, unknown>[];
+  billingHistory: Record<string, unknown>[];
+  bookingMemberships: Record<string, unknown>[];
+  guestCheckIns: Record<string, unknown>[];
+  wellnessEnrollments: Record<string, unknown>[];
+  preferences: Record<string, unknown> | null;
 }
 
-router.get('/api/account/my-data', isAuthenticated, async (req: any, res: Response) => {
+router.get('/api/account/my-data', isAuthenticated, async (req: Request, res: Response) => {
   const userEmail = req.session?.user?.email;
 
   try {
@@ -50,7 +50,7 @@ router.get('/api/account/my-data', isAuthenticated, async (req: any, res: Respon
   }
 });
 
-router.get('/api/account/my-data/preview', isAuthenticated, async (req: any, res: Response) => {
+router.get('/api/account/my-data/preview', isAuthenticated, async (req: Request, res: Response) => {
   const userEmail = req.session?.user?.email;
 
   try {
@@ -81,7 +81,7 @@ router.get('/api/account/my-data/preview', isAuthenticated, async (req: any, res
   }
 });
 
-router.get('/api/account/export-history', isAuthenticated, async (req: any, res: Response) => {
+router.get('/api/account/export-history', isAuthenticated, async (req: Request, res: Response) => {
   const userEmail = req.session?.user?.email;
 
   try {

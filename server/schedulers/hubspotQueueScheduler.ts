@@ -53,7 +53,7 @@ async function processQueue(): Promise<void> {
 }
 
 export function startHubSpotQueueScheduler(): void {
-  console.log('[Startup] HubSpot queue scheduler enabled (runs every 2 minutes)');
+  logger.info('[Startup] HubSpot queue scheduler enabled (runs every 2 minutes)');
   
   // Ensure HubSpot properties have all required options on startup
   setTimeout(async () => {
@@ -61,20 +61,20 @@ export function startHubSpotQueueScheduler(): void {
       const { ensureHubSpotPropertiesExist } = await import('../core/hubspot/stages');
       const result = await ensureHubSpotPropertiesExist();
       if (result.created.length > 0) {
-        console.log(`[HubSpot] Created properties: ${result.created.join(', ')}`);
+        logger.info(`[HubSpot] Created properties: ${result.created.join(', ')}`);
       }
       if (result.errors.length > 0) {
-        console.error(`[HubSpot] Property errors: ${result.errors.join(', ')}`);
+        logger.error(`[HubSpot] Property errors: ${result.errors.join(', ')}`);
       }
     } catch (err) {
-      console.error('[HubSpot] Failed to ensure properties exist:', err);
+      logger.error('[HubSpot] Failed to ensure properties exist:', { error: err as Error });
     }
   }, 15000);
   
   // Run immediately on startup to process any pending jobs
   setTimeout(() => {
     processQueue().catch(err => {
-      console.error('[HubSpot Queue] Initial run failed:', err);
+      logger.error('[HubSpot Queue] Initial run failed:', { error: err as Error });
     });
   }, 30000); // Wait 30 seconds after startup
   

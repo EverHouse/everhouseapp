@@ -99,7 +99,7 @@ router.put('/api/admin/bug-reports/:id', isStaffOrAdmin, async (req, res) => {
     const { status, staffNotes } = req.body;
     const user = getSessionUser(req);
     
-    const updateData: any = {
+    const updateData: Record<string, unknown> = {
       updatedAt: new Date(),
     };
     
@@ -141,7 +141,7 @@ router.put('/api/admin/bug-reports/:id', isStaffOrAdmin, async (req, res) => {
       return res.status(404).json({ error: 'Bug report not found' });
     }
     
-    logFromRequest(req, 'update_bug_report' as any, 'bug_report' as any, String(id), undefined, { status: req.body.status });
+    logFromRequest(req, 'update_bug_report', 'bug_report', String(id), undefined, { status: req.body.status });
     res.json(updated);
   } catch (error: unknown) {
     logger.error('Bug report update error', { error: error instanceof Error ? error : new Error(String(error)) });
@@ -161,7 +161,7 @@ router.delete('/api/admin/bug-reports/:id', isStaffOrAdmin, async (req, res) => 
       return res.status(404).json({ error: 'Bug report not found' });
     }
     
-    logFromRequest(req, 'delete_bug_report' as any, 'bug_report' as any, String(id), undefined, {});
+    logFromRequest(req, 'delete_bug_report', 'bug_report', String(id), undefined, {});
     res.json({ success: true });
   } catch (error: unknown) {
     logger.error('Bug report delete error', { error: error instanceof Error ? error : new Error(String(error)) });

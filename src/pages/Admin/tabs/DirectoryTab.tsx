@@ -529,7 +529,7 @@ const DirectoryTab: React.FC = () => {
         name: [visitor.firstName, visitor.lastName].filter(Boolean).join(' ') || 'Unknown',
         tier: null,
         rawTier: null,
-        role: (visitor.role || 'visitor') as any,
+        role: visitor.role || 'visitor',
         joinDate: visitor.createdAt || null,
         phone: visitor.phone || '',
         mindbodyId: null,
@@ -558,7 +558,7 @@ const DirectoryTab: React.FC = () => {
         name: [member.first_name, member.last_name].filter(Boolean).join(' ') || 'Unknown',
         tier: member.tier || null,
         rawTier: member.tier || null,
-        role: (member.role || 'staff') as any,
+        role: member.role || 'staff',
         joinDate: null,
         phone: member.phone || '',
         mindbodyId: null,
@@ -579,7 +579,7 @@ const DirectoryTab: React.FC = () => {
 
     const openTeamMemberDetails = useCallback((member: TeamMember) => {
         const profile = teamMemberToMemberProfile(member);
-        setSelectedMember(profile as any);
+        setSelectedMember(profile as MemberProfile);
         setIsViewingDetails(true);
     }, [teamMemberToMemberProfile]);
 
@@ -1976,7 +1976,7 @@ const DirectoryTab: React.FC = () => {
 
             <MemberProfileDrawer
                 isOpen={visitorDetailsOpen && !!selectedVisitor}
-                member={selectedVisitor ? visitorToMemberProfile(selectedVisitor) as any : null}
+                member={selectedVisitor ? visitorToMemberProfile(selectedVisitor) as MemberProfile : null}
                 isAdmin={isAdmin}
                 onClose={() => { setVisitorDetailsOpen(false); setSelectedVisitor(null); }}
                 onViewAs={() => {}}

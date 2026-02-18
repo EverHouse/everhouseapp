@@ -1,7 +1,7 @@
 import { Resend } from 'resend';
 import { logger } from '../core/logger';
 
-let connectionSettings: any;
+let connectionSettings: Record<string, unknown> | null = null;
 
 const isDevelopment = process.env.NODE_ENV !== 'production' && !process.env.WEB_REPL_RENEWAL;
 
@@ -39,7 +39,7 @@ async function getCredentials() {
         'X_REPLIT_TOKEN': xReplitToken
       }
     }
-  ).then(res => res.json()).then((data: any) => data.items?.[0]);
+  ).then(res => res.json()).then((data: Record<string, unknown>) => (data.items as Record<string, unknown>[] | undefined)?.[0] ?? null);
 
   if (!connectionSettings || (!connectionSettings.settings.api_key)) {
     throw new Error('Resend not connected');

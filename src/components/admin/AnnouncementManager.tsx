@@ -67,7 +67,7 @@ const AnnouncementManager: React.FC<AnnouncementManagerProps> = ({ triggerCreate
 
     const handleSave = async () => {
         if(!newItem.title) return;
-        const ann: any = {
+        const ann = {
             id: editId || undefined,
             title: newItem.title,
             desc: newItem.desc || '',

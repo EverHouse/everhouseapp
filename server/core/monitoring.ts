@@ -8,7 +8,7 @@ interface AlertEvent {
   severity: AlertSeverity;
   category: AlertCategory;
   message: string;
-  details?: Record<string, any>;
+  details?: Record<string, unknown>;
   userEmail?: string;
   timestamp: Date;
 }
@@ -83,7 +83,7 @@ export function logWebhookFailure(params: {
   eventId: string;
   eventType: string;
   errorMessage: string;
-  payload?: any;
+  payload?: unknown;
 }): void {
   logAlert({
     severity: 'warning',
@@ -101,7 +101,7 @@ export function logSecurityEvent(params: {
   event: string;
   userEmail?: string;
   ipAddress?: string;
-  details?: Record<string, any>;
+  details?: Record<string, unknown>;
 }): void {
   logAlert({
     severity: 'warning',

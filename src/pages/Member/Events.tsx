@@ -62,8 +62,8 @@ const MemberEvents: React.FC = () => {
     queryKey: ['user-rsvps', user?.email],
     queryFn: async () => {
       if (!user?.email) return [];
-      const data = await fetchWithCredentials<any[]>(`/api/rsvps?user_email=${encodeURIComponent(user.email)}`);
-      return data.map((r: any) => ({ event_id: r.event_id, status: r.status }));
+      const data = await fetchWithCredentials<Array<{ event_id: number; status: string }>>(`/api/rsvps?user_email=${encodeURIComponent(user.email)}`);
+      return data.map((r: { event_id: number; status: string }) => ({ event_id: r.event_id, status: r.status }));
     },
     enabled: !!user?.email,
   });

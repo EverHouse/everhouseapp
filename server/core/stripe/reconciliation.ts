@@ -22,7 +22,7 @@ export async function reconcileDailyPayments() {
     let statusMismatches = 0;
 
     while (hasMore) {
-      const params: any = {
+      const params: Record<string, unknown> = {
         created: { gte: yesterday },
         limit: 100,
       };

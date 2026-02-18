@@ -30,7 +30,7 @@ router.post('/api/checkout/sessions', checkoutRateLimiter, async (req, res) => {
     const parseResult = checkoutSessionSchema.safeParse(req.body);
     
     if (!parseResult.success) {
-      const firstError = (parseResult.error as any).errors[0];
+      const firstError = parseResult.error.errors[0];
       return res.status(400).json({ error: firstError.message || 'Invalid input' });
     }
     
@@ -73,7 +73,7 @@ router.post('/api/checkout/sessions', checkoutRateLimiter, async (req, res) => {
     
     const seatCount = isCorporate ? Math.max(quantity || CORPORATE_MIN_SEATS, CORPORATE_MIN_SEATS) : 1;
 
-    let sessionParams: any = {
+    let sessionParams: Stripe.Checkout.SessionCreateParams = {
       mode: 'subscription',
       ui_mode: 'embedded',
       return_url: `${baseUrl}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
@@ -192,9 +192,9 @@ router.get('/api/checkout/session/:sessionId', checkoutRateLimiter, async (req, 
     
     const stripe = await getStripeClient();
     
-    const session = await stripe.checkout.sessions.retrieve(sessionId as string, { expand: ['customer'] }) as any;
+    const session = await stripe.checkout.sessions.retrieve(sessionId as string, { expand: ['customer'] });
     
-    const customerEmail = session.customer_details?.email || (session.customer as any)?.email || null;
+    const customerEmail = session.customer_details?.email || (typeof session.customer === 'object' && session.customer !== null && 'email' in session.customer ? (session.customer as Record<string, unknown>).email as string : null) || null;
     const metadata = session.metadata || {};
     
     let tierName: string | null = null;

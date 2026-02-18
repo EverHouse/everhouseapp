@@ -1,6 +1,7 @@
 import { schedulerTracker } from '../core/schedulerTracker';
 import { syncAllMembersFromHubSpot, getLastMemberSyncTime, setLastMemberSyncTime } from '../core/memberSync';
 import { getPacificDateParts } from '../utils/dateUtils';
+import { logger } from '../core/logger';
 
 const SYNC_HOUR = 3;
 
@@ -22,20 +23,20 @@ function getMillisecondsUntil3amPacific(): number {
 }
 
 async function runDailyMemberSync(): Promise<void> {
-  console.log('[MemberSync] Starting daily off-hours sync...');
+  logger.info('[MemberSync] Starting daily off-hours sync...');
   try {
     const result = await syncAllMembersFromHubSpot();
-    console.log(`[MemberSync] Daily sync complete - Synced: ${result.synced}, Errors: ${result.errors}`);
+    logger.info(`[MemberSync] Daily sync complete - Synced: ${result.synced}, Errors: ${result.errors}`);
     schedulerTracker.recordRun('Member Sync', true);
     await setLastMemberSyncTime(Date.now());
   } catch (err) {
-    console.error('[MemberSync] Daily sync failed:', err);
+    logger.error('[MemberSync] Daily sync failed:', { error: err as Error });
     schedulerTracker.recordRun('Member Sync', false, String(err));
   }
   
   const nextRun = getMillisecondsUntil3amPacific();
   setTimeout(runDailyMemberSync, nextRun);
-  console.log(`[MemberSync] Next sync scheduled in ${Math.round(nextRun / 1000 / 60 / 60)} hours`);
+  logger.info(`[MemberSync] Next sync scheduled in ${Math.round(nextRun / 1000 / 60 / 60)} hours`);
 }
 
 export function startMemberSyncScheduler(): void {
@@ -43,5 +44,5 @@ export function startMemberSyncScheduler(): void {
   const hoursUntilSync = Math.round(msUntilSync / 1000 / 60 / 60);
   
   setTimeout(runDailyMemberSync, msUntilSync);
-  console.log(`[Startup] Member sync scheduler enabled (runs daily at 3am Pacific, next run in ~${hoursUntilSync} hours)`);
+  logger.info(`[Startup] Member sync scheduler enabled (runs daily at 3am Pacific, next run in ~${hoursUntilSync} hours)`);
 }

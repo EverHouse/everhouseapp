@@ -26,11 +26,11 @@ async function checkStuckCancellations(): Promise<void> {
     );
 
     if (stuckBookings.rows.length === 0) {
-      console.log('[Stuck Cancellations] No stuck cancellation pending bookings found');
+      logger.info('[Stuck Cancellations] No stuck cancellation pending bookings found');
       return;
     }
 
-    console.log(`[Stuck Cancellations] Found ${stuckBookings.rows.length} stuck cancellation(s)`);
+    logger.info(`[Stuck Cancellations] Found ${stuckBookings.rows.length} stuck cancellation(s)`);
 
     const recentlyAlerted = await queryWithRetry(
       `SELECT DISTINCT related_id FROM notifications 
@@ -45,11 +45,11 @@ async function checkStuckCancellations(): Promise<void> {
     const newStuckBookings = stuckBookings.rows.filter(b => !alreadyAlertedIds.has(b.id));
     
     if (newStuckBookings.length === 0) {
-      console.log('[Stuck Cancellations] All stuck bookings already alerted recently, skipping');
+      logger.info('[Stuck Cancellations] All stuck bookings already alerted recently, skipping');
       return;
     }
 
-    console.log(`[Stuck Cancellations] ${newStuckBookings.length} new stuck cancellation(s) to alert`);
+    logger.info(`[Stuck Cancellations] ${newStuckBookings.length} new stuck cancellation(s) to alert`);
 
     // Build summary notification for staff
     const summary = newStuckBookings
@@ -76,7 +76,7 @@ async function checkStuckCancellations(): Promise<void> {
     );
 
   } catch (error) {
-    console.error('[Stuck Cancellations] Scheduler error:', error);
+    logger.error('[Stuck Cancellations] Scheduler error:', { error: error as Error });
     schedulerTracker.recordRun('Stuck Cancellation', false, String(error));
     logger.error('Failed to check stuck cancellation bookings', { error: error as Error, extra: { context: 'stuck_cancellation_scheduler' } });
   }
@@ -86,15 +86,15 @@ let intervalId: NodeJS.Timeout | null = null;
 
 export function startStuckCancellationScheduler(): void {
   if (intervalId) {
-    console.log('[Stuck Cancellations] Scheduler already running');
+    logger.info('[Stuck Cancellations] Scheduler already running');
     return;
   }
 
-  console.log('[Startup] Stuck cancellation check scheduler enabled (runs every 2 hours)');
+  logger.info('[Startup] Stuck cancellation check scheduler enabled (runs every 2 hours)');
 
   intervalId = setInterval(() => {
     checkStuckCancellations().catch(err => {
-      console.error('[Stuck Cancellations] Uncaught error:', err);
+      logger.error('[Stuck Cancellations] Uncaught error:', { error: err as Error });
       schedulerTracker.recordRun('Stuck Cancellation', false, String(err));
     });
   }, 2 * 60 * 60 * 1000);
@@ -102,7 +102,7 @@ export function startStuckCancellationScheduler(): void {
   // Run initial check after 1 minute
   setTimeout(() => {
     checkStuckCancellations().catch(err => {
-      console.error('[Stuck Cancellations] Initial run error:', err);
+      logger.error('[Stuck Cancellations] Initial run error:', { error: err as Error });
       schedulerTracker.recordRun('Stuck Cancellation', false, String(err));
     });
   }, 60 * 1000);
@@ -112,6 +112,6 @@ export function stopStuckCancellationScheduler(): void {
   if (intervalId) {
     clearInterval(intervalId);
     intervalId = null;
-    console.log('[Stuck Cancellations] Scheduler stopped');
+    logger.info('[Stuck Cancellations] Scheduler stopped');
   }
 }

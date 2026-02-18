@@ -47,7 +47,7 @@ interface QueueJobOptions {
 
 export async function queueJob(
   jobType: JobType,
-  payload: Record<string, any>,
+  payload: Record<string, unknown>,
   options: QueueJobOptions = {}
 ): Promise<number> {
   const { priority = 0, maxRetries = 3, scheduledFor = new Date(), webhookEventId } = options;
@@ -56,13 +56,13 @@ export async function queueJob(
      VALUES (${jobType}, ${JSON.stringify(payload)}, ${priority}, ${maxRetries}, ${scheduledFor}, ${webhookEventId})
      RETURNING id`);
   
-  return (result.rows[0] as any).id;
+  return (result.rows[0] as Record<string, unknown>).id as number;
 }
 
 export async function queueJobInTransaction(
   client: PoolClient,
   jobType: JobType,
-  payload: Record<string, any>,
+  payload: Record<string, unknown>,
   options: QueueJobOptions = {}
 ): Promise<number> {
   const { priority = 0, maxRetries = 3, scheduledFor = new Date(), webhookEventId } = options;
@@ -78,7 +78,7 @@ export async function queueJobInTransaction(
 }
 
 export async function queueJobs(
-  jobs: Array<{ jobType: JobType; payload: Record<string, any>; options?: QueueJobOptions }>
+  jobs: Array<{ jobType: JobType; payload: Record<string, unknown>; options?: QueueJobOptions }>
 ): Promise<number[]> {
   if (jobs.length === 0) return [];
   
@@ -91,10 +91,10 @@ export async function queueJobs(
      VALUES ${sql.join(valuesSql, sql`, `)}
      RETURNING id`);
   
-  return result.rows.map((r: any) => r.id);
+  return result.rows.map((r: Record<string, unknown>) => r.id as number);
 }
 
-async function claimJobs(): Promise<Array<{ id: number; jobType: string; payload: any; retryCount: number; maxRetries: number }>> {
+async function claimJobs(): Promise<Array<{ id: number; jobType: string; payload: Record<string, unknown>; retryCount: number; maxRetries: number }>> {
   const now = new Date();
   const lockExpiry = new Date(now.getTime() - LOCK_TIMEOUT_MS);
   
@@ -111,12 +111,12 @@ async function claimJobs(): Promise<Array<{ id: number; jobType: string; payload
      )
      RETURNING id, job_type, payload, retry_count, max_retries`);
   
-  return result.rows.map((r: any) => ({
-    id: r.id,
-    jobType: r.job_type,
-    payload: r.payload,
-    retryCount: r.retry_count,
-    maxRetries: r.max_retries,
+  return result.rows.map((r: Record<string, unknown>) => ({
+    id: r.id as number,
+    jobType: r.job_type as string,
+    payload: r.payload as Record<string, unknown>,
+    retryCount: r.retry_count as number,
+    maxRetries: r.max_retries as number,
   }));
 }
 
@@ -134,7 +134,7 @@ async function markJobFailed(jobId: number, error: string, retryCount: number, m
   }
 }
 
-async function executeJob(job: { id: number; jobType: string; payload: any; retryCount: number; maxRetries: number }): Promise<void> {
+async function executeJob(job: { id: number; jobType: string; payload: Record<string, unknown>; retryCount: number; maxRetries: number }): Promise<void> {
   const { jobType, payload } = job;
   
   try {
@@ -319,11 +319,11 @@ export async function getJobQueueStats(): Promise<{
   
   const stats = { pending: 0, processing: 0, completed: 0, failed: 0 };
   for (const _row of result.rows) {
-    const row = _row as any;
-    if (row.status === 'pending') stats.pending = row.count;
-    else if (row.status === 'processing') stats.processing = row.count;
-    else if (row.status === 'completed') stats.completed = row.count;
-    else if (row.status === 'failed') stats.failed = row.count;
+    const row = _row as Record<string, unknown>;
+    if (row.status === 'pending') stats.pending = row.count as number;
+    else if (row.status === 'processing') stats.processing = row.count as number;
+    else if (row.status === 'completed') stats.completed = row.count as number;
+    else if (row.status === 'failed') stats.failed = row.count as number;
   }
   
   return stats;

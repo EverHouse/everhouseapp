@@ -445,13 +445,13 @@ router.post('/api/wellness-classes', isStaffOrAdmin, async (req, res) => {
     if (newBlockSimulators || newBlockConferenceRoom) {
       try {
         const userEmail = getSessionUser(req)?.email || 'system';
-        await createWellnessAvailabilityBlocks((createdClass as any).id as number, date, startTime24, endTime24, newBlockSimulators, newBlockConferenceRoom, userEmail, title);
+        await createWellnessAvailabilityBlocks((createdClass as Record<string, unknown>).id as number, date, startTime24, endTime24, newBlockSimulators, newBlockConferenceRoom, userEmail, title);
       } catch (blockError: unknown) {
         logger.error('Failed to create availability blocks for wellness class', { extra: { error: blockError } });
       }
     }
     
-    logFromRequest(req, 'create_wellness_class', 'wellness', String((createdClass as any).id), title, {
+    logFromRequest(req, 'create_wellness_class', 'wellness', String((createdClass as Record<string, unknown>).id), title, {
       instructor,
       date,
       time,
@@ -523,11 +523,11 @@ router.put('/api/wellness-classes/:id', isStaffOrAdmin, async (req, res) => {
       return res.status(404).json({ error: 'Wellness class not found' });
     }
     
-    if (existing.rows.length > 0 && (existing.rows[0] as any).google_calendar_id) {
+    if (existing.rows.length > 0 && (existing.rows[0] as Record<string, unknown>).google_calendar_id) {
       try {
         const calendarId = await getCalendarIdByName(CALENDAR_CONFIG.wellness.name);
         if (calendarId) {
-          const updated = result.rows[0] as any;
+          const updated = result.rows[0] as Record<string, unknown>;
           const calendarTitle = `${updated.category} - ${updated.title} with ${updated.instructor}`;
           const calendarDescription = [updated.description, `Duration: ${updated.duration}`, `Spots: ${updated.spots}`].filter(Boolean).join('\n');
           
@@ -565,7 +565,7 @@ router.put('/api/wellness-classes/:id', isStaffOrAdmin, async (req, res) => {
           const endTime24 = calculateEndTime(startTime24, updated.duration);
           
           await updateCalendarEvent(
-            (existing.rows[0] as any).google_calendar_id,
+            (existing.rows[0] as Record<string, unknown>).google_calendar_id as string,
             calendarId,
             calendarTitle,
             calendarDescription,
@@ -579,9 +579,9 @@ router.put('/api/wellness-classes/:id', isStaffOrAdmin, async (req, res) => {
       }
     }
     
-    const updated = result.rows[0] as any;
+    const updated = result.rows[0] as Record<string, unknown>;
     let recurringUpdated = 0;
-    const existingRow = existing.rows[0] as any;
+    const existingRow = existing.rows[0] as Record<string, unknown>;
     
     if (apply_to_recurring !== false) {
       try {
@@ -713,7 +713,7 @@ router.put('/api/wellness-classes/:id', isStaffOrAdmin, async (req, res) => {
       }
     }
     
-    (updated as any).recurringUpdated = recurringUpdated;
+    (updated as Record<string, unknown>).recurringUpdated = recurringUpdated;
     const wellnessClassId = parseInt(id as string);
     const userEmail = getSessionUser(req)?.email || 'system';
     
@@ -927,7 +927,7 @@ router.post('/api/wellness-enrollments', async (req, res) => {
       return res.status(404).json({ error: 'Wellness class not found' });
     }
     
-    const cls = classDataResult.rows[0] as any;
+    const cls = classDataResult.rows[0] as Record<string, unknown>;
     const dateStr = cls.date instanceof Date 
       ? cls.date.toISOString().split('T')[0] 
       : (typeof cls.date === 'string' ? cls.date.split('T')[0] : String(cls.date));
@@ -1059,7 +1059,7 @@ router.delete('/api/wellness-enrollments/:class_id/:user_email', async (req, res
       return res.status(404).json({ error: 'Wellness class not found' });
     }
     
-    const cls = classDataResult.rows[0] as any;
+    const cls = classDataResult.rows[0] as Record<string, unknown>;
     const dateStr = cls.date instanceof Date 
       ? cls.date.toISOString().split('T')[0] 
       : (typeof cls.date === 'string' ? cls.date.split('T')[0] : String(cls.date));
@@ -1119,7 +1119,7 @@ router.delete('/api/wellness-enrollments/:class_id/:user_email', async (req, res
            FOR UPDATE SKIP LOCKED`);
         
         if (waitlistedResult.rows.length > 0) {
-          const promotedUserRow = waitlistedResult.rows[0] as any;
+          const promotedUserRow = waitlistedResult.rows[0] as Record<string, unknown>;
           const promotedEmail = promotedUserRow.user_email;
           const promotedName = await getMemberDisplayName(promotedEmail);
           
@@ -1183,10 +1183,10 @@ router.delete('/api/wellness-enrollments/:class_id/:user_email', async (req, res
           ELSE NULL
         END as spots_available
        FROM wellness_classes WHERE id = ${class_id}`);
-    const spotsAvailable = (spotsQuery.rows[0] as any)?.spots_available;
+    const spotsAvailable = (spotsQuery.rows[0] as Record<string, unknown>)?.spots_available;
     broadcastWaitlistUpdate({ classId: parseInt(class_id), action: 'spot_opened', spotsAvailable: spotsAvailable ?? undefined });
     
-    logFromRequest(req, 'delete_wellness_class' as any, 'wellness' as any, class_id as string, undefined, {
+    logFromRequest(req, 'delete_wellness_class', 'wellness', class_id as string, undefined, {
       member_email: user_email,
       class_title: cls.title,
       class_date: dateStr
@@ -1205,11 +1205,11 @@ router.delete('/api/wellness-classes/:id', isStaffOrAdmin, async (req, res) => {
     const wellnessClassId = parseInt(id as string);
     
     const existing = await db.execute(sql`SELECT google_calendar_id FROM wellness_classes WHERE id = ${id}`);
-    if (existing.rows.length > 0 && (existing.rows[0] as any).google_calendar_id) {
+    if (existing.rows.length > 0 && (existing.rows[0] as Record<string, unknown>).google_calendar_id) {
       try {
         const calendarId = await getCalendarIdByName(CALENDAR_CONFIG.wellness.name);
         if (calendarId) {
-          await deleteCalendarEvent((existing.rows[0] as any).google_calendar_id, calendarId);
+          await deleteCalendarEvent((existing.rows[0] as Record<string, unknown>).google_calendar_id as string, calendarId);
         }
       } catch (calError: unknown) {
         logger.error('Failed to delete Google Calendar event for wellness class', { extra: { error: calError } });
@@ -1228,7 +1228,7 @@ router.delete('/api/wellness-classes/:id', isStaffOrAdmin, async (req, res) => {
       return res.status(404).json({ error: 'Wellness class not found' });
     }
     
-    const deletedClass = result.rows[0] as any;
+    const deletedClass = result.rows[0] as Record<string, unknown>;
     logFromRequest(req, 'delete_wellness_class', 'wellness', String(deletedClass.id), deletedClass.title, {
       instructor: deletedClass.instructor,
       date: deletedClass.date,
@@ -1297,7 +1297,7 @@ router.post('/api/wellness-classes/:id/enrollments/manual', isStaffOrAdmin, asyn
 
     // Get the class details for audit logging
     const classQuery = await db.execute(sql`SELECT id, title, instructor FROM wellness_classes WHERE id = ${parseInt(id as string)}`);
-    const classDetails = classQuery.rows[0] as any;
+    const classDetails = classQuery.rows[0] as Record<string, unknown>;
 
     await db.insert(wellnessEnrollments).values({
       classId: parseInt(id as string),

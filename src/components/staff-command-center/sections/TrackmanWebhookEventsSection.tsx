@@ -74,7 +74,26 @@ const calculateDuration = (startStr: string, endStr: string): string => {
   return `${hours.toFixed(1)} hrs`;
 };
 
-const getPlayerCount = (bookingData: any): number | null => {
+
+interface TrackmanWebhookEvent {
+  id: number | string;
+  event_type?: string;
+  payload?: Record<string, unknown>;
+  created_at?: string;
+  processed?: boolean;
+  booking_id?: number;
+  status?: string;
+}
+
+interface WebhookStats {
+  total?: number;
+  processed?: number;
+  unprocessed?: number;
+  byType?: Record<string, number>;
+}
+
+
+const getPlayerCount = (bookingData: Record<string, unknown>): number | null => {
   if (bookingData?.players && Array.isArray(bookingData.players)) {
     return bookingData.players.length;
   }
@@ -87,7 +106,7 @@ const getPlayerCount = (bookingData: any): number | null => {
   return null;
 };
 
-const getEventTypeFromPayload = (payload: any, storedEventType: string): string => {
+const getEventTypeFromPayload = (payload: Record<string, unknown>, storedEventType: string): string => {
   // If we have a stored event type that's not unknown, use it
   if (storedEventType && storedEventType !== 'unknown') {
     return storedEventType;
@@ -129,8 +148,8 @@ interface TrackmanWebhookEventsSectionProps {
 export const TrackmanWebhookEventsSection: React.FC<TrackmanWebhookEventsSectionProps> = ({ compact = true, onLinkToMember }) => {
   const [webhookEventsRef] = useAutoAnimate();
   const [showSection, setShowSection] = useState(false);
-  const [webhookEvents, setWebhookEvents] = useState<any[]>([]);
-  const [webhookStats, setWebhookStats] = useState<any>(null);
+  const [webhookEvents, setWebhookEvents] = useState<TrackmanWebhookEvent[]>([]);
+  const [webhookStats, setWebhookStats] = useState<WebhookStats | null>(null);
   const [webhookPage, setWebhookPage] = useState(1);
   const [webhookTotalCount, setWebhookTotalCount] = useState(0);
   const [webhookLoading, setWebhookLoading] = useState(false);
@@ -383,7 +402,7 @@ export const TrackmanWebhookEventsSection: React.FC<TrackmanWebhookEventsSection
           ) : (
             <div className="space-y-2">
               <div ref={webhookEventsRef} className={`space-y-2 ${compact ? 'max-h-[300px]' : 'max-h-[500px]'} overflow-y-auto`}>
-                {webhookEvents.map((event: any) => {
+                {webhookEvents.map((event: TrackmanWebhookEvent) => {
 
                   const hasError = !!event.processing_error;
                   const isExpanded = expandedEventId === event.id;

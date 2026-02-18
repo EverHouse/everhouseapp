@@ -3,10 +3,23 @@ import { db } from '../../db';
 import { stripeProducts, membershipTiers } from '../../../shared/schema';
 import { eq } from 'drizzle-orm';
 import { getStripeClient } from './client';
+import Stripe from 'stripe';
 import { getHubSpotClientWithFallback } from '../integrations';
 import { clearTierCache } from '../tierService';
 import { PRICING, getCorporateVolumeTiers, getCorporateBasePrice, updateCorporateVolumePricing, updateOverageRate, updateGuestFee, VolumeTier } from '../billing/pricingConfig';
 import { getErrorMessage, getErrorCode } from '../../utils/errorUtils';
+
+type TierRecord = typeof membershipTiers.$inferSelect;
+
+interface StripeProductWithMarketingFeatures extends Stripe.Product {
+  marketing_features?: Array<{ name: string }>;
+}
+
+interface StripePaginationParams {
+  limit: number;
+  active?: boolean;
+  starting_after?: string;
+}
 
 import { logger } from '../logger';
 export interface HubSpotProduct {
@@ -74,7 +87,7 @@ function parseRecurringPeriod(period: string | null): { interval: 'month' | 'yea
  * Returns the existing product if found, null otherwise.
  */
 async function findExistingStripeProduct(
-  stripe: any,
+  stripe: Stripe,
   productName: string,
   metadataKey?: string,
   metadataValue?: string
@@ -115,16 +128,16 @@ export async function fetchHubSpotProducts(): Promise<HubSpotProduct[]> {
     logger.info(`[Stripe Products] Using HubSpot ${source} for products API`);
     
     const properties = ['name', 'price', 'hs_sku', 'description', 'hs_recurring_billing_period'];
-    let allProducts: any[] = [];
+    let allProducts: Array<{ id: string; properties: Record<string, string> }> = [];
     let after: string | undefined = undefined;
     
     do {
       const response = await hubspot.crm.products.basicApi.getPage(100, after, properties);
-      allProducts = allProducts.concat(response.results);
+      allProducts = allProducts.concat(response.results as Array<{ id: string; properties: Record<string, string> }>);
       after = response.paging?.next?.after;
     } while (after);
     
-    return allProducts.map((product: any) => ({
+    return allProducts.map((product) => ({
       id: product.id,
       name: product.properties.name || '',
       price: parseFloat(product.properties.price) || 0,
@@ -186,7 +199,7 @@ export async function syncHubSpotProductToStripe(hubspotProduct: HubSpotProduct)
       if (priceChanged || intervalChanged) {
         await stripe.prices.update(existing.stripePriceId, { active: false });
         
-        const pricePayload: any = {
+        const pricePayload: Stripe.PriceCreateParams = {
           product: existing.stripeProductId,
           unit_amount: priceCents,
           currency: 'usd',
@@ -260,7 +273,7 @@ export async function syncHubSpotProductToStripe(hubspotProduct: HubSpotProduct)
     let recurringConfigCreate = parseRecurringPeriod(hubspotProduct.recurringPeriod);
     if (isOneTimeNameCreate) recurringConfigCreate = null;
     
-    const pricePayloadCreate: any = {
+    const pricePayloadCreate: Stripe.PriceCreateParams = {
       product: stripeProduct.id,
       unit_amount: priceCents,
       currency: 'usd',
@@ -387,7 +400,7 @@ export interface TierSyncResult {
 }
 
 // Helper to build privilege metadata for Stripe products
-function buildPrivilegeMetadata(tier: any): Record<string, string> {
+function buildPrivilegeMetadata(tier: TierRecord): Record<string, string> {
   const metadata: Record<string, string> = {
     tier_id: tier.id.toString(),
     tier_slug: tier.slug,
@@ -495,7 +508,7 @@ export async function syncMembershipTiersToStripe(): Promise<{
           : [];
 
         if (stripeProductId) {
-          const updateParams: any = {
+          const updateParams: Stripe.ProductUpdateParams & { marketing_features?: Array<{ name: string }> } = {
             name: productName,
             description: tier.description || undefined,
             metadata: privilegeMetadata,
@@ -513,7 +526,7 @@ export async function syncMembershipTiersToStripe(): Promise<{
             const existingPrice = await stripe.prices.retrieve(stripePriceId);
             if (existingPrice.unit_amount !== tier.priceCents) {
               await stripe.prices.update(stripePriceId, { active: false });
-              const priceParams: any = {
+              const priceParams: Stripe.PriceCreateParams = {
                 product: stripeProductId,
                 unit_amount: tier.priceCents,
                 currency: 'usd',
@@ -527,7 +540,7 @@ export async function syncMembershipTiersToStripe(): Promise<{
               logger.info(`[Tier Sync] Created new price for ${tier.name} (price changed)`);
             }
           } else {
-            const priceParams: any = {
+            const priceParams: Stripe.PriceCreateParams = {
               product: stripeProductId,
               unit_amount: tier.priceCents,
               currency: 'usd',
@@ -556,7 +569,7 @@ export async function syncMembershipTiersToStripe(): Promise<{
           synced++;
         } else {
           // Create new product with privilege metadata and marketing features
-          const createParams: any = {
+          const createParams: Stripe.ProductCreateParams & { marketing_features?: Array<{ name: string }> } = {
             name: productName,
             description: tier.description || undefined,
             metadata: privilegeMetadata,
@@ -583,7 +596,7 @@ export async function syncMembershipTiersToStripe(): Promise<{
           stripeProductId = stripeProduct.id;
 
           const priceMetadata = { tier_id: tier.id.toString(), tier_slug: tier.slug, product_type: tier.productType || 'subscription' };
-          const priceParams: any = {
+          const priceParams: Stripe.PriceCreateParams = {
             product: stripeProductId,
             unit_amount: tier.priceCents,
             currency: 'usd',
@@ -709,7 +722,7 @@ export async function cleanupOrphanStripeProducts(): Promise<{
     let startingAfter: string | undefined;
     
     while (hasMore) {
-      const params: any = { limit: 100, active: true };
+      const params: StripePaginationParams = { limit: 100, active: true };
       if (startingAfter) params.starting_after = startingAfter;
       
       const products = await stripe.products.list(params);
@@ -1376,7 +1389,7 @@ export async function pullCorporateVolumePricingFromStripe(): Promise<boolean> {
   }
 }
 
-function buildFeatureKeysForTier(tier: any): Array<{ lookupKey: string; name: string; metadata?: Record<string, string> }> {
+function buildFeatureKeysForTier(tier: TierRecord): Array<{ lookupKey: string; name: string; metadata?: Record<string, string> }> {
   const features: Array<{ lookupKey: string; name: string; metadata?: Record<string, string> }> = [];
 
   const booleanMap: Array<{ field: string; key: string; name: string }> = [
@@ -1473,7 +1486,7 @@ export async function syncTierFeaturesToStripe(): Promise<{
     let startingAfterFeature: string | undefined;
 
     while (hasMoreFeatures) {
-      const params: any = { limit: 100 };
+      const params: StripePaginationParams = { limit: 100 };
       if (startingAfterFeature) params.starting_after = startingAfterFeature;
       const featureList = await stripe.entitlements.features.list(params);
       for (const f of featureList.data) {
@@ -1525,7 +1538,7 @@ export async function syncTierFeaturesToStripe(): Promise<{
       let startingAfterAttached: string | undefined;
 
       while (hasMoreAttached) {
-        const params: any = { limit: 100 };
+        const params: StripePaginationParams = { limit: 100 };
         if (startingAfterAttached) params.starting_after = startingAfterAttached;
         const attached = await stripe.products.listFeatures(tier.stripeProductId, params);
         for (const af of attached.data) {
@@ -1727,7 +1740,7 @@ export async function pullTierFeaturesFromStripe(): Promise<{
         let startingAfter: string | undefined;
 
         while (hasMore) {
-          const params: any = { limit: 100 };
+          const params: StripePaginationParams = { limit: 100 };
           if (startingAfter) params.starting_after = startingAfter;
           const attached = await stripe.products.listFeatures(tier.stripeProductId, params);
           for (const af of attached.data) {
@@ -1742,10 +1755,10 @@ export async function pullTierFeaturesFromStripe(): Promise<{
         }
 
         const stripeProduct = await stripe.products.retrieve(tier.stripeProductId);
-        const marketingFeatures = (stripeProduct as any).marketing_features;
+        const marketingFeatures = (stripeProduct as StripeProductWithMarketingFeatures).marketing_features;
         if (Array.isArray(marketingFeatures) && marketingFeatures.length > 0) {
           const featureNames = marketingFeatures
-            .map((f: any) => f.name)
+            .map((f: { name: string }) => f.name)
             .filter((n: string) => n && n.trim());
           if (featureNames.length > 0) {
             await db.update(membershipTiers)
@@ -1771,7 +1784,7 @@ export async function pullTierFeaturesFromStripe(): Promise<{
           continue;
         }
 
-        const update: Record<string, any> = {
+        const update: Record<string, boolean | number> = {
           canBookSimulators: false,
           canBookConference: false,
           canBookWellness: false,
@@ -1866,14 +1879,14 @@ export async function pullCafeItemsFromStripe(): Promise<{
     const stripe = await getStripeClient();
     logger.info('[Reverse Sync] Starting cafe items pull from Stripe');
 
-    const activeStripeProducts: any[] = [];
+    const activeStripeProducts: Stripe.Product[] = [];
     const inactiveStripeProductIds: string[] = [];
 
     let hasMore = true;
     let startingAfter: string | undefined;
 
     while (hasMore) {
-      const params: any = { limit: 100, active: true };
+      const params: StripePaginationParams = { limit: 100, active: true };
       if (startingAfter) params.starting_after = startingAfter;
       const products = await stripe.products.list(params);
       for (const product of products.data) {
@@ -1895,7 +1908,7 @@ export async function pullCafeItemsFromStripe(): Promise<{
     startingAfter = undefined;
 
     while (hasMore) {
-      const params: any = { limit: 100, active: false };
+      const params: StripePaginationParams = { limit: 100, active: false };
       if (startingAfter) params.starting_after = startingAfter;
       const products = await stripe.products.list(params);
       for (const product of products.data) {

@@ -11,7 +11,7 @@ router.get('/api/cafe-menu', async (req, res) => {
   try {
     const { category, include_inactive } = req.query;
     const conditions: string[] = [];
-    const params: any[] = [];
+    const params: (string | number)[] = [];
     
     if (include_inactive !== 'true') {
       conditions.push('is_active = true');
@@ -51,7 +51,7 @@ router.post('/api/cafe-menu', isStaffOrAdmin, async (req, res) => {
     );
     
     broadcastCafeMenuUpdate('created');
-    logFromRequest(req, 'create_cafe_item' as any, 'cafe' as any, String(result.rows[0].id), result.rows[0].name || name, {});
+    logFromRequest(req, 'create_cafe_item', 'cafe', String(result.rows[0].id), result.rows[0].name || name, {});
     res.status(201).json(result.rows[0]);
   } catch (error: unknown) {
     if (!isProduction) logger.error('Cafe item creation error', { error: error instanceof Error ? error : new Error(String(error)) });
@@ -97,7 +97,7 @@ router.put('/api/cafe-menu/:id', isStaffOrAdmin, async (req, res) => {
     }
     
     broadcastCafeMenuUpdate('updated');
-    logFromRequest(req, 'update_cafe_item' as any, 'cafe' as any, String(id), name, {});
+    logFromRequest(req, 'update_cafe_item', 'cafe', String(id), name, {});
     res.json(result.rows[0]);
   } catch (error: unknown) {
     if (!isProduction) logger.error('Cafe item update error', { error: error instanceof Error ? error : new Error(String(error)) });
@@ -116,7 +116,7 @@ router.delete('/api/cafe-menu/:id', isStaffOrAdmin, async (req, res) => {
     
     await pool.query('DELETE FROM cafe_items WHERE id = $1', [id]);
     broadcastCafeMenuUpdate('deleted');
-    logFromRequest(req, 'delete_cafe_item' as any, 'cafe' as any, String(id), undefined, {});
+    logFromRequest(req, 'delete_cafe_item', 'cafe', String(id), undefined, {});
     res.json({ success: true });
   } catch (error: unknown) {
     if (!isProduction) logger.error('Cafe item delete error', { error: error instanceof Error ? error : new Error(String(error)) });
@@ -193,7 +193,7 @@ router.post('/api/admin/seed-cafe', isAdmin, async (req, res) => {
     );
     const inserted = insertResult.rowCount || 0;
     
-    logFromRequest(req, 'seed_cafe' as any, 'cafe' as any, undefined, 'Cafe Menu Seed', {});
+    logFromRequest(req, 'seed_cafe', 'cafe', undefined, 'Cafe Menu Seed', {});
     res.json({ 
       success: true, 
       message: `Cafe menu seeded: ${inserted} new items added`,

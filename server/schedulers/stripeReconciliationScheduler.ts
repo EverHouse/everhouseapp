@@ -4,6 +4,7 @@ import { systemSettings } from '../../shared/schema';
 import { sql } from 'drizzle-orm';
 import { reconcileDailyPayments, reconcileSubscriptions } from '../core/stripe/reconciliation';
 import { getPacificHour, getTodayPacific } from '../utils/dateUtils';
+import { logger } from '../core/logger';
 
 const RECONCILIATION_HOUR = 5;
 const RECONCILIATION_SETTING_KEY = 'last_stripe_reconciliation_date';
@@ -29,7 +30,7 @@ async function tryClaimReconciliationSlot(todayStr: string): Promise<boolean> {
     
     return result.length > 0;
   } catch (err) {
-    console.error('[Stripe Reconciliation] Database error:', err);
+    logger.error('[Stripe Reconciliation] Database error:', { error: err as Error });
     schedulerTracker.recordRun('Stripe Reconciliation', false, String(err));
     return false;
   }
@@ -44,19 +45,19 @@ async function checkAndRunReconciliation(): Promise<void> {
       const claimed = await tryClaimReconciliationSlot(todayStr);
       
       if (claimed) {
-        console.log('[Stripe Reconciliation] Starting scheduled reconciliation...');
+        logger.info('[Stripe Reconciliation] Starting scheduled reconciliation...');
         schedulerTracker.recordRun('Stripe Reconciliation', true);
         
         try {
           const paymentResults = await reconcileDailyPayments();
-          console.log('[Stripe Reconciliation] Payment reconciliation complete:', paymentResults);
+          logger.info('[Stripe Reconciliation] Payment reconciliation complete:', { extra: { results: paymentResults } });
           schedulerTracker.recordRun('Stripe Reconciliation', true);
           
           const subscriptionResults = await reconcileSubscriptions();
-          console.log('[Stripe Reconciliation] Subscription reconciliation complete:', subscriptionResults);
+          logger.info('[Stripe Reconciliation] Subscription reconciliation complete:', { extra: { results: subscriptionResults } });
           schedulerTracker.recordRun('Stripe Reconciliation', true);
         } catch (error) {
-          console.error('[Stripe Reconciliation] Error running reconciliation:', error);
+          logger.error('[Stripe Reconciliation] Error running reconciliation:', { error: error as Error });
           schedulerTracker.recordRun('Stripe Reconciliation', false, String(error));
           
           // Alert staff so financial discrepancies don't go unnoticed
@@ -70,7 +71,7 @@ async function checkAndRunReconciliation(): Promise<void> {
       }
     }
   } catch (error) {
-    console.error('[Stripe Reconciliation] Scheduler error:', error);
+    logger.error('[Stripe Reconciliation] Scheduler error:', { error: error as Error });
     schedulerTracker.recordRun('Stripe Reconciliation', false, String(error));
   }
 }
@@ -79,17 +80,17 @@ let intervalId: NodeJS.Timeout | null = null;
 
 export function startStripeReconciliationScheduler(): void {
   if (intervalId) {
-    console.log('[Stripe Reconciliation] Scheduler already running');
+    logger.info('[Stripe Reconciliation] Scheduler already running');
     schedulerTracker.recordRun('Stripe Reconciliation', true);
     return;
   }
 
-  console.log(`[Startup] Stripe reconciliation scheduler enabled (runs at 5am Pacific)`);
+  logger.info(`[Startup] Stripe reconciliation scheduler enabled (runs at 5am Pacific)`);
   schedulerTracker.recordRun('Stripe Reconciliation', true);
   
   intervalId = setInterval(() => {
     checkAndRunReconciliation().catch(err => {
-      console.error('[Stripe Reconciliation] Uncaught error:', err);
+      logger.error('[Stripe Reconciliation] Uncaught error:', { error: err as Error });
       schedulerTracker.recordRun('Stripe Reconciliation', false, String(err));
     });
   }, 60 * 60 * 1000);
@@ -99,7 +100,7 @@ export function stopStripeReconciliationScheduler(): void {
   if (intervalId) {
     clearInterval(intervalId);
     intervalId = null;
-    console.log('[Stripe Reconciliation] Scheduler stopped');
+    logger.info('[Stripe Reconciliation] Scheduler stopped');
     schedulerTracker.recordRun('Stripe Reconciliation', true);
   }
 }

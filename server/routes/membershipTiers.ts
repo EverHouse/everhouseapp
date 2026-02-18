@@ -13,7 +13,7 @@ router.get('/api/membership-tiers', async (req, res) => {
   try {
     const { active } = req.query;
     let query = 'SELECT * FROM membership_tiers';
-    const params: any[] = [];
+    const params: (string | number | boolean)[] = [];
     
     if (active === 'true') {
       query += ' WHERE is_active = true';

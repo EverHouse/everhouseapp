@@ -612,7 +612,7 @@ router.post('/api/booking-requests', async (req, res) => {
               email: users.email, 
               firstName: users.firstName,
               lastName: users.lastName,
-              name: (users as any).name
+              name: sql<string>`COALESCE(TRIM(CONCAT(${users.firstName}, ' ', ${users.lastName})), '')`.as('name')
             }).from(users)
               .where(eq(users.id, participant.userId))
               .limit(1);
@@ -620,7 +620,7 @@ router.post('/api/booking-requests', async (req, res) => {
               participant.email = existingUser.email?.toLowerCase() || '';
               // Also set name if not already set
               if (!participant.name) {
-                participant.name = (existingUser as any).name || 
+                participant.name = existingUser.name || 
                   `${existingUser.firstName || ''} ${existingUser.lastName || ''}`.trim() || 
                   existingUser.email;
               }
@@ -637,7 +637,7 @@ router.post('/api/booking-requests', async (req, res) => {
           const statusCheck = await db.select({ 
             membershipStatus: users.membershipStatus,
             email: users.email,
-            name: (users as any).name
+            name: sql<string>`COALESCE(TRIM(CONCAT(${users.firstName}, ' ', ${users.lastName})), '')`.as('name')
           }).from(users)
             .where(eq(users.id, participant.userId))
             .limit(1);
@@ -1644,7 +1644,7 @@ router.get('/api/fee-estimate', async (req, res) => {
       }
       
       const request = booking[0];
-      const declaredPlayerCount = (request as any).declaredPlayerCount || 1;
+      const declaredPlayerCount = request.declaredPlayerCount || 1;
       
       // Get resource type to determine if this is a conference room booking
       let resourceType = 'simulator';
@@ -1660,14 +1660,14 @@ router.get('/api/fee-estimate', async (req, res) => {
       let effectivePlayerCount = declaredPlayerCount;
       let guestCount = Math.max(0, declaredPlayerCount - 1);
       
-      if ((request as any).sessionId) {
+      if (request.sessionId) {
         const participantResult = await pool.query(
           `SELECT 
             COUNT(*) FILTER (WHERE participant_type = 'guest') as guest_count,
             COUNT(*) as total_count
            FROM booking_participants 
            WHERE session_id = $1`,
-          [(request as any).sessionId]
+          [request.sessionId]
         );
         const actualTotal = parseInt(participantResult.rows[0]?.total_count || '0');
         const actualGuests = parseInt(participantResult.rows[0]?.guest_count || '0');
@@ -1683,7 +1683,7 @@ router.get('/api/fee-estimate', async (req, res) => {
         guestCount,
         requestDate: request.requestDate || new Date().toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' }),
         playerCount: effectivePlayerCount,
-        sessionId: (request as any).sessionId ? parseInt((request as any).sessionId) : undefined,
+        sessionId: request.sessionId ? request.sessionId : undefined,
         bookingId,
         resourceType
       });
@@ -1751,7 +1751,7 @@ router.get('/api/booking-requests/:id/fee-estimate', async (req, res) => {
     }
     
     const request = booking[0];
-    const declaredPlayerCount = (request as any).declaredPlayerCount || 1;
+    const declaredPlayerCount = request.declaredPlayerCount || 1;
     
     // Get resource type to determine if this is a conference room booking
     let resourceType = 'simulator';
@@ -1767,14 +1767,14 @@ router.get('/api/booking-requests/:id/fee-estimate', async (req, res) => {
     let effectivePlayerCount = declaredPlayerCount;
     let guestCount = Math.max(0, declaredPlayerCount - 1);
     
-    if ((request as any).sessionId) {
+    if (request.sessionId) {
       const participantResult = await pool.query(
         `SELECT 
           COUNT(*) FILTER (WHERE participant_type = 'guest') as guest_count,
           COUNT(*) as total_count
          FROM booking_participants 
          WHERE session_id = $1`,
-        [(request as any).sessionId]
+        [request.sessionId]
       );
       const actualTotal = parseInt(participantResult.rows[0]?.total_count || '0');
       const actualGuests = parseInt(participantResult.rows[0]?.guest_count || '0');
@@ -1790,7 +1790,7 @@ router.get('/api/booking-requests/:id/fee-estimate', async (req, res) => {
       guestCount,
       requestDate: request.requestDate || new Date().toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' }),
       playerCount: effectivePlayerCount,
-      sessionId: (request as any).sessionId ? parseInt((request as any).sessionId) : undefined,
+      sessionId: request.sessionId ? request.sessionId : undefined,
       bookingId,
       resourceType
     });

@@ -14,7 +14,7 @@ interface WebSocketMessage {
   type: string;
   title?: string;
   message?: string;
-  data?: any;
+  data?: unknown;
 }
 
 interface UseWebSocketOptions {
@@ -35,7 +35,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
     if (!emailToUse) return;
     
     if (isViewAsMode) {
-      const { ok, data } = await apiRequest<any[]>(
+      const { ok, data } = await apiRequest<Array<Record<string, unknown>>>(
         `/api/notifications?user_email=${encodeURIComponent(emailToUse)}&unread_only=true`
       );
       if (ok && data) {

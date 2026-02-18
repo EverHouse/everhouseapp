@@ -2,6 +2,7 @@ import { schedulerTracker } from '../core/schedulerTracker';
 import { pool } from '../core/db';
 import { getPacificHour } from '../utils/dateUtils';
 import { sendOnboardingNudge24h, sendOnboardingNudge72h, sendOnboardingNudge7d } from '../emails/onboardingNudgeEmails';
+import { logger } from '../core/logger';
 
 const NUDGE_CHECK_HOUR = 10; // 10 AM Pacific
 
@@ -10,7 +11,7 @@ async function processOnboardingNudges(): Promise<void> {
     const currentHour = getPacificHour();
     if (currentHour !== NUDGE_CHECK_HOUR) return;
 
-    console.log('[Onboarding Nudge] Starting onboarding nudge check...');
+    logger.info('[Onboarding Nudge] Starting onboarding nudge check...');
 
     const membersResult = await pool.query(`
       SELECT id, email, first_name, created_at, onboarding_nudge_count
@@ -28,11 +29,11 @@ async function processOnboardingNudges(): Promise<void> {
     `);
 
     if (membersResult.rows.length === 0) {
-      console.log('[Onboarding Nudge] No stalled members found');
+      logger.info('[Onboarding Nudge] No stalled members found');
       return;
     }
 
-    console.log(`[Onboarding Nudge] Found ${membersResult.rows.length} stalled members to nudge`);
+    logger.info(`[Onboarding Nudge] Found ${membersResult.rows.length} stalled members to nudge`);
 
     for (const member of membersResult.rows) {
       const hoursSinceSignup = (Date.now() - new Date(member.created_at).getTime()) / (1000 * 60 * 60);
@@ -55,13 +56,13 @@ async function processOnboardingNudges(): Promise<void> {
           `UPDATE users SET onboarding_nudge_count = onboarding_nudge_count + 1, onboarding_last_nudge_at = NOW(), updated_at = NOW() WHERE id = $1`,
           [member.id]
         );
-        console.log(`[Onboarding Nudge] Sent nudge #${currentNudgeCount + 1} to ${member.email}`);
+        logger.info(`[Onboarding Nudge] Sent nudge #${currentNudgeCount + 1} to ${member.email}`);
       } else {
-        console.warn(`[Onboarding Nudge] Failed to send to ${member.email}: ${sendResult.error}`);
+        logger.warn(`[Onboarding Nudge] Failed to send to ${member.email}: ${sendResult.error}`);
       }
     }
   } catch (error) {
-    console.error('[Onboarding Nudge] Scheduler error:', error);
+    logger.error('[Onboarding Nudge] Scheduler error:', { error: error as Error });
   }
 }
 
@@ -71,5 +72,5 @@ export function startOnboardingNudgeScheduler(): void {
     schedulerTracker.recordRun('Onboarding Nudge');
     await processOnboardingNudges();
   }, interval);
-  console.log('[Scheduler] Onboarding Nudge scheduler started (runs at 10 AM Pacific)');
+  logger.info('[Scheduler] Onboarding Nudge scheduler started (runs at 10 AM Pacific)');
 }

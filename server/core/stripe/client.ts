@@ -1,6 +1,6 @@
 import Stripe from 'stripe';
 
-let connectionSettings: any;
+let connectionSettings: Record<string, unknown> | undefined;
 
 async function getCredentials() {
   const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
@@ -48,7 +48,7 @@ export async function getStripeClient(): Promise<Stripe> {
   const { secretKey } = await getCredentials();
 
   return new Stripe(secretKey, {
-    apiVersion: '2025-08-27.basil' as any,
+    apiVersion: '2025-08-27.basil' as Stripe.LatestApiVersion,
   });
 }
 
@@ -69,7 +69,7 @@ export async function getStripeEnvironmentInfo(): Promise<{ isLive: boolean; mod
   return { isLive, mode: isLive ? 'live' : 'test', isProduction };
 }
 
-let stripeSync: any = null;
+let stripeSync: unknown = null;
 
 export async function getStripeSync() {
   if (!stripeSync) {

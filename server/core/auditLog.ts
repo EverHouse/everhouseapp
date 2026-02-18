@@ -154,6 +154,11 @@ export type AuditAction =
   | 'detect_duplicates'
   | 'sync_payment_status'
   | 'fix_trackman_ghost_bookings'
+  | 'cleanup_stripe_customers'
+  | 'archive_stale_visitors'
+  | 'charge_saved_card'
+  | 'cancel_payment'
+  | 'subscription_payment_collected'
   | 'create_staff_user'
   | 'update_staff_user'
   | 'delete_staff_user'
@@ -165,7 +170,81 @@ export type AuditAction =
   | 'create_coupon'
   | 'update_coupon'
   | 'delete_coupon'
-  | 'change_member_role';
+  | 'change_member_role'
+  | 'visitor_linked'
+  | 'visitor_created'
+  | 'data_migration'
+  | 'placeholder_scan'
+  | 'fix_orphaned_participants'
+  | 'convert_participant_to_guest'
+  | 'approve_review_item'
+  | 'delete_review_item'
+  | 'approve_all_review_items'
+  | 'delete'
+  | 'merge_stripe_customers'
+  | 'deactivate_stale_member'
+  | 'change_billing_provider'
+  | 'delete_empty_session'
+  | 'terminal_reader_created'
+  | 'terminal_subscription_activated'
+  | 'terminal_existing_payment_routed'
+  | 'terminal_save_card_initiated'
+  | 'terminal_card_saved'
+  | 'inline_payment_confirmed'
+  | 'activation_link_resent'
+  | 'undo_cancel_subscription'
+  | 'create_tier_feature'
+  | 'update_tier_feature'
+  | 'delete_tier_feature'
+  | 'update_tier_feature_value'
+  | 'mindbody_csv_import'
+  | 'export_announcements'
+  | 'merge_users'
+  | 'cancel_event_rsvp'
+  | 'backfill_stripe_cache'
+  | 'create_notice_type'
+  | 'update_notice_type'
+  | 'delete_notice_type'
+  | 'create_closure_reason'
+  | 'update_closure_reason'
+  | 'delete_closure_reason'
+  | 'trackman_rescan'
+  | 'create_availability_block'
+  | 'update_availability_block'
+  | 'delete_availability_block'
+  | 'create_communication'
+  | 'delete_communication'
+  | 'create_faq'
+  | 'update_faq'
+  | 'delete_faq'
+  | 'reorder_faqs'
+  | 'seed_faqs'
+  | 'create_cafe_item'
+  | 'update_cafe_item'
+  | 'delete_cafe_item'
+  | 'seed_cafe'
+  | 'create_gallery_item'
+  | 'update_gallery_item'
+  | 'delete_gallery_item'
+  | 'reorder_gallery'
+  | 'create_training'
+  | 'update_training'
+  | 'delete_training'
+  | 'seed_training'
+  | 'create_note'
+  | 'update_note'
+  | 'delete_note'
+  | 'update_guest_passes'
+  | 'update_bug_report'
+  | 'delete_bug_report'
+  | 'update_waiver_version'
+  | 'redeem_pass'
+  | 'refund_pass'
+  | 'update_inquiry'
+  | 'delete_inquiry'
+  | 'reconcile_group_billing'
+  | 'tour_scheduled'
+  | 'view_email_template';
 
 export type ActorType = 'staff' | 'member' | 'system';
 
@@ -200,11 +279,33 @@ export type ResourceType =
   | 'legacy_purchase'
   | 'bulk_waiver'
   | 'terminal_reader'
+  | 'tier_feature'
   | 'setup_intent'
   | 'trackman_booking'
   | 'staff_user'
   | 'setting'
-  | 'coupon';
+  | 'coupon'
+  | 'booking_requests'
+  | 'guest_passes'
+  | 'booking_fee_snapshots'
+  | 'trackman_unmatched'
+  | 'booking_participants'
+  | 'booking_session'
+  | 'wellness_classes'
+  | 'events'
+  | 'notice_type'
+  | 'closure_reason'
+  | 'availability'
+  | 'communication'
+  | 'faq'
+  | 'cafe'
+  | 'gallery'
+  | 'training'
+  | 'note'
+  | 'bug_report'
+  | 'day_pass'
+  | 'inquiry'
+  | 'guest_pass';
 
 interface AuditLogParams {
   staffEmail: string;
@@ -213,7 +314,7 @@ interface AuditLogParams {
   resourceType: ResourceType;
   resourceId?: string;
   resourceName?: string;
-  details?: Record<string, any>;
+  details?: Record<string, unknown>;
   req?: Request;
   actorType?: ActorType;
   actorEmail?: string;
@@ -248,7 +349,7 @@ interface SystemActionParams {
   resourceType: ResourceType;
   resourceId?: string;
   resourceName?: string;
-  details?: Record<string, any>;
+  details?: Record<string, unknown>;
 }
 
 export async function logSystemAction(params: SystemActionParams): Promise<void> {
@@ -282,7 +383,7 @@ interface MemberActionParams {
   resourceType: ResourceType;
   resourceId?: string;
   resourceName?: string;
-  details?: Record<string, any>;
+  details?: Record<string, unknown>;
   req?: Request;
 }
 
@@ -315,7 +416,7 @@ interface LogFromRequestParams {
   resourceType: ResourceType;
   resourceId?: string;
   resourceName?: string;
-  details?: Record<string, any>;
+  details?: Record<string, unknown>;
 }
 
 export function logFromRequest(
@@ -324,7 +425,7 @@ export function logFromRequest(
   resourceType?: ResourceType, 
   resourceId?: string, 
   resourceName?: string, 
-  details?: Record<string, any>
+  details?: Record<string, unknown>
 ): void {
   const staffEmail = req.session?.user?.email;
   const staffName = req.session?.user?.name;
@@ -335,7 +436,7 @@ export function logFromRequest(
   let finalResourceType: ResourceType;
   let finalResourceId: string | undefined;
   let finalResourceName: string | undefined;
-  let finalDetails: Record<string, any> | undefined;
+  let finalDetails: Record<string, unknown> | undefined;
   
   if (typeof actionOrParams === 'object' && actionOrParams !== null && 'action' in actionOrParams) {
     finalAction = actionOrParams.action;
@@ -380,7 +481,7 @@ export async function getAuditLogs(params: {
   endDate?: Date;
   limit?: number;
   offset?: number;
-}): Promise<{ logs: any[]; total: number }> {
+}): Promise<{ logs: Record<string, unknown>[]; total: number }> {
   const { staffEmail, action, resourceType, resourceId, startDate, endDate, limit = 100, offset = 0 } = params;
   
   try {

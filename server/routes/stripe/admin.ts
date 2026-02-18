@@ -4,6 +4,8 @@ import { isStaffOrAdmin, isAdmin } from '../../core/middleware';
 import { db } from '../../db';
 import { sql } from 'drizzle-orm';
 import { getStripeClient } from '../../core/stripe/client';
+import Stripe from 'stripe';
+import { CustomerSyncResult } from '../../core/stripe/customerSync';
 import {
   getStripeProducts,
   getProductSyncStatus,
@@ -252,7 +254,7 @@ router.post('/api/stripe/staff/send-membership-link', isStaffOrAdmin, async (req
       return res.status(404).json({ error: 'Tier not found or inactive' });
     }
 
-    const tier = tierResult.rows[0] as any;
+    const tier = tierResult.rows[0] as Record<string, unknown>;
 
     if (!tier.stripe_price_id) {
       return res.status(400).json({ error: 'This tier has not been synced to Stripe. Please sync tiers first.' });
@@ -372,7 +374,7 @@ router.post('/api/stripe/staff/send-reactivation-link', isStaffOrAdmin, async (r
       return res.status(404).json({ error: 'Member not found' });
     }
 
-    const member = memberResult.rows[0] as any;
+    const member = memberResult.rows[0] as Record<string, unknown>;
     const memberName = [member.first_name, member.last_name].filter(Boolean).join(' ') || member.email;
 
     let reactivationLink = 'https://everclub.app/billing';
@@ -409,7 +411,7 @@ router.post('/api/stripe/staff/send-reactivation-link', isStaffOrAdmin, async (r
             LIMIT 1`);
 
           if (tierResult.rows.length > 0) {
-            const tier = tierResult.rows[0] as any;
+            const tier = tierResult.rows[0] as Record<string, unknown>;
             if (tier.stripe_price_id) {
               const stripe = await getStripeClient();
               const baseUrl = process.env.REPLIT_DEV_DOMAIN
@@ -564,7 +566,7 @@ router.post('/api/public/day-pass/checkout', checkoutRateLimiter, async (req: Re
       return res.status(404).json({ error: 'Day pass type not found' });
     }
 
-    const tier = tierResult.rows[0] as any;
+    const tier = tierResult.rows[0] as Record<string, unknown>;
 
     if (!tier.stripe_price_id) {
       return res.status(400).json({ error: 'This day pass is not set up in Stripe yet. This usually resolves itself on server restart. Try refreshing in a minute.' });
@@ -635,12 +637,12 @@ router.post('/api/stripe/sync-customers', isStaffOrAdmin, sensitiveActionRateLim
     
     res.json({
       success: result.success,
-      created: (result as any).created,
-      linked: (result as any).linked,
+      created: (result as CustomerSyncResult & { created?: number; linked?: number }).created,
+      linked: (result as CustomerSyncResult & { created?: number; linked?: number }).linked,
       skipped: result.skipped,
       errorCount: result.errors.length,
       errors: result.errors.slice(0, 10),
-      message: `Created ${(result as any).created} new customers, linked ${(result as any).linked} existing customers`,
+      message: `Created ${(result as CustomerSyncResult & { created?: number; linked?: number }).created} new customers, linked ${(result as CustomerSyncResult & { created?: number; linked?: number }).linked} existing customers`,
     });
   } catch (error: unknown) {
     logger.error('[Stripe Customer Sync] Error', { error: error instanceof Error ? error : new Error(String(error)) });
@@ -719,9 +721,9 @@ router.post('/api/stripe/sync-member-subscriptions', isStaffOrAdmin, sensitiveAc
     let synced = 0;
     let updated = 0;
     let errorCount = 0;
-    const details: any[] = [];
+    const details: Array<{ email: string; action: string; changes?: string[] }> = [];
 
-    async function resolveTierFromSubscription(subscription: any): Promise<string | null> {
+    async function resolveTierFromSubscription(subscription: Stripe.Subscription): Promise<string | null> {
       const metadataTierSlug = subscription.metadata?.tier_slug || subscription.metadata?.tierSlug;
       const metadataTierName = subscription.metadata?.tier_name || subscription.metadata?.tier;
 
@@ -756,8 +758,8 @@ router.post('/api/stripe/sync-member-subscriptions', isStaffOrAdmin, sensitiveAc
           try {
             const subscription = await stripe.subscriptions.retrieve(member.stripe_subscription_id);
             const mappedStatus = statusMap[subscription.status] || subscription.status;
-            const periodEnd = (subscription as any).current_period_end
-              ? new Date((subscription as any).current_period_end * 1000)
+            const periodEnd = subscription.current_period_end
+              ? new Date(subscription.current_period_end * 1000)
               : null;
             const resolvedTier = await resolveTierFromSubscription(subscription);
             const changes: string[] = [];
@@ -798,7 +800,7 @@ router.post('/api/stripe/sync-member-subscriptions', isStaffOrAdmin, sensitiveAc
                 `stripe_current_period_end = $2`,
                 `updated_at = NOW()`
               ];
-              const updateParams: any[] = [mappedStatus, periodEnd];
+              const updateParams: Array<string | Date | null> = [mappedStatus, periodEnd];
               let paramIndex = 3;
 
               if (resolvedTier && member.tier !== resolvedTier) {
@@ -847,8 +849,8 @@ router.post('/api/stripe/sync-member-subscriptions', isStaffOrAdmin, sensitiveAc
             if (subscriptions.data.length > 0) {
               const sub = subscriptions.data[0];
               const mappedStatus = statusMap[sub.status] || sub.status;
-              const periodEnd = (sub as any).current_period_end
-                ? new Date((sub as any).current_period_end * 1000)
+              const periodEnd = sub.current_period_end
+                ? new Date(sub.current_period_end * 1000)
                 : null;
               const resolvedTier = await resolveTierFromSubscription(sub);
 
@@ -859,7 +861,7 @@ router.post('/api/stripe/sync-member-subscriptions', isStaffOrAdmin, sensitiveAc
                 `stripe_current_period_end = $3`,
                 `updated_at = NOW()`
               ];
-              const updateParams: any[] = [sub.id, mappedStatus, periodEnd];
+              const updateParams: Array<string | Date | null> = [sub.id, mappedStatus, periodEnd];
               let paramIndex = 4;
 
               if (resolvedTier) {

@@ -182,7 +182,7 @@ export function renderTemplatePreview(templateId: string): string | null {
           { checkName: 'Orphaned Bookings', status: 'warning', issueCount: 3, issues: [], lastRun: new Date(), durationMs: 1200 },
           { checkName: 'Duplicate Members', status: 'fail', issueCount: 1, issues: [], lastRun: new Date(), durationMs: 800 },
           { checkName: 'Stripe Sync', status: 'pass', issueCount: 0, issues: [], lastRun: new Date(), durationMs: 500 },
-        ] as any[],
+        ] as unknown[],
         [
           {
             category: 'data_quality' as const,

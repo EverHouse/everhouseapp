@@ -1,5 +1,6 @@
 import { schedulerTracker } from '../core/schedulerTracker';
 import { getPacificHour } from '../utils/dateUtils';
+import { logger } from '../core/logger';
 
 export function startSessionCleanupScheduler(): void {
   setInterval(async () => {
@@ -10,10 +11,10 @@ export function startSessionCleanupScheduler(): void {
         schedulerTracker.recordRun('Session Cleanup', true);
       }
     } catch (err) {
-      console.error('[Session Cleanup] Scheduler error:', err);
+      logger.error('[Session Cleanup] Scheduler error:', { error: err as Error });
       schedulerTracker.recordRun('Session Cleanup', false, String(err));
     }
   }, 60 * 60 * 1000);
   
-  console.log('[Startup] Session cleanup scheduler enabled (runs daily at 2am Pacific)');
+  logger.info('[Startup] Session cleanup scheduler enabled (runs daily at 2am Pacific)');
 }

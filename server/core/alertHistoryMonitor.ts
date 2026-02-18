@@ -40,13 +40,13 @@ export async function getAlertHistory(params: AlertQueryParams): Promise<AlertEn
     LIMIT ${limit}
   `);
 
-  const alerts: AlertEntry[] = result.rows.map((r: any) => ({
-    id: r.id,
-    title: r.title,
-    message: r.message,
-    createdAt: r.created_at?.toISOString?.() || r.created_at,
-    isRead: r.is_read,
-    userEmail: r.user_email,
+  const alerts: AlertEntry[] = result.rows.map((r: Record<string, unknown>) => ({
+    id: r.id as number,
+    title: r.title as string,
+    message: r.message as string,
+    createdAt: r.created_at instanceof Date ? r.created_at.toISOString() : String(r.created_at),
+    isRead: r.is_read as boolean,
+    userEmail: r.user_email as string,
   }));
 
   alerts.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());

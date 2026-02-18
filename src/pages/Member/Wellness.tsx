@@ -221,9 +221,9 @@ const ClassesView: React.FC<{onBook: (cls: WellnessClass) => void; isDark?: bool
   const { data: classes = [], isLoading: classesLoading, refetch: refetchClasses, error: classesError } = useQuery({
     queryKey: ['wellness-classes'],
     queryFn: async () => {
-      const { ok, data } = await apiRequest<any[]>('/api/wellness-classes?active_only=true');
+      const { ok, data } = await apiRequest<Array<Record<string, unknown>>>('/api/wellness-classes?active_only=true');
       if (ok && data) {
-        return data.map((c: any) => {
+        return data.map((c: Record<string, unknown>) => {
           const spotsRemaining = c.spots_remaining !== null ? parseInt(c.spots_remaining, 10) : null;
           const enrolledCount = parseInt(c.enrolled_count, 10) || 0;
           const waitlistCount = parseInt(c.waitlist_count, 10) || 0;
@@ -640,7 +640,7 @@ const LoadingSpinner: React.FC<{ className?: string }> = ({ className = '' }) =>
   </svg>
 );
 
-const ClassCard: React.FC<any> = ({ title, date, time, instructor, duration, category, spots, spotsRemaining, enrolledCount, status, description, isExpanded, onToggle, onBook, onCancel, isEnrolled, isOnWaitlist, isCancelling, isRsvping, isCancelDisabled = false, isDark = true, isMembershipInactive = false, isFull = false, capacity, waitlistEnabled, waitlistCount = 0, externalUrl }) => {
+const ClassCard: React.FC<Record<string, unknown>> = ({ title, date, time, instructor, duration, category, spots, spotsRemaining, enrolledCount, status, description, isExpanded, onToggle, onBook, onCancel, isEnrolled, isOnWaitlist, isCancelling, isRsvping, isCancelDisabled = false, isDark = true, isMembershipInactive = false, isFull = false, capacity, waitlistEnabled, waitlistCount = 0, externalUrl }) => {
   const formattedTime = formatTimeTo12Hour(time);
   const showJoinWaitlist = isFull && waitlistEnabled && !isEnrolled;
   const showFullNoWaitlist = isFull && !waitlistEnabled && !isEnrolled;

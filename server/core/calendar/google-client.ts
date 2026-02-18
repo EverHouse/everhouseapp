@@ -3,7 +3,7 @@ import { getPacificISOString } from '../../utils/dateUtils';
 import { withCalendarRetry } from '../retryUtils';
 
 import { logger } from '../logger';
-export async function createCalendarEvent(booking: any, bayName: string): Promise<string | null> {
+export async function createCalendarEvent(booking: Record<string, unknown>, bayName: string): Promise<string | null> {
   try {
     const calendar = await getGoogleCalendarClient();
     

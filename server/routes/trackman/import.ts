@@ -7,6 +7,7 @@ import { importTrackmanBookings, getImportRuns, rescanUnmatchedBookings } from '
 import { logFromRequest } from '../../core/auditLog';
 import { getErrorMessage } from '../../utils/errorUtils';
 import { logger } from '../../core/logger';
+import { getSessionUser } from '../../types/session';
 
 const router = Router();
 
@@ -51,7 +52,7 @@ router.get('/api/admin/trackman/import-runs', isStaffOrAdmin, async (req, res) =
 router.post('/api/admin/trackman/import', isStaffOrAdmin, async (req, res) => {
   try {
     const { filename } = req.body;
-    const user = (req as any).session?.user?.email || 'admin';
+    const user = getSessionUser(req)?.email || 'admin';
     
     const safeFilename = path.basename(filename || 'trackman_bookings_1767009308200.csv');
     if (!safeFilename.endsWith('.csv') || !/^[a-zA-Z0-9_\-\.]+$/.test(safeFilename)) {
@@ -64,8 +65,8 @@ router.post('/api/admin/trackman/import', isStaffOrAdmin, async (req, res) => {
     
     logFromRequest(req, 'import_trackman', 'trackman', undefined, 'Trackman CSV Import', {
       filename: safeFilename,
-      bookingsImported: (result as any).bookingsCreated || 0,
-      sessionsCreated: (result as any).sessionsCreated || 0
+      bookingsImported: result.matchedRows || 0,
+      sessionsCreated: result.totalRows || 0
     });
     
     res.json({
@@ -85,7 +86,7 @@ router.post('/api/admin/trackman/upload', isStaffOrAdmin, upload.single('file'),
       return res.status(400).json({ error: 'No file uploaded' });
     }
     
-    const user = (req as any).session?.user?.email || 'admin';
+    const user = getSessionUser(req)?.email || 'admin';
     csvPath = req.file.path;
     
     const result = await importTrackmanBookings(csvPath, user);
@@ -111,11 +112,11 @@ router.post('/api/admin/trackman/upload', isStaffOrAdmin, upload.single('file'),
 
 router.post('/api/admin/trackman/rescan', isStaffOrAdmin, async (req, res) => {
   try {
-    const user = (req as any).session?.user?.email || 'admin';
+    const user = getSessionUser(req)?.email || 'admin';
     const result = await rescanUnmatchedBookings(user);
     
     await logFromRequest(req, {
-      action: 'trackman_rescan' as any,
+      action: 'trackman_rescan',
       resourceType: 'trackman_booking',
       resourceName: 'Unmatched Bookings Rescan',
       details: { matched: result.matched, lessonsConverted: result.lessonsConverted, scanned: result.scanned }

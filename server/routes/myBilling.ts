@@ -1,5 +1,6 @@
 import { logger } from '../core/logger';
-import { Router } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
+import Stripe from 'stripe';
 import { pool } from '../core/db';
 import { getStripeClient } from '../core/stripe/client';
 import { isPlaceholderEmail, getOrCreateStripeCustomer } from '../core/stripe/customers';
@@ -12,14 +13,14 @@ import { formatDatePacific } from '../utils/dateUtils';
 
 const router = Router();
 
-function requireAuth(req: any, res: any, next: any) {
+function requireAuth(req: Request, res: Response, next: NextFunction) {
   if (!req.session?.user?.email) {
     return res.status(401).json({ error: 'Not authenticated' });
   }
   next();
 }
 
-function requireStaffAuth(req: any, res: any, next: any) {
+function requireStaffAuth(req: Request, res: Response, next: NextFunction) {
   if (!req.session?.user?.email) {
     return res.status(401).json({ error: 'Not authenticated' });
   }
@@ -48,7 +49,7 @@ router.get('/api/my/billing', requireAuth, async (req, res) => {
       return res.status(404).json({ error: 'Member not found' });
     }
     
-    const billingInfo: any = {
+    const billingInfo: Record<string, unknown> = {
       billingProvider: member.billing_provider,
       stripeCustomerId: member.stripe_customer_id,
       hubspotId: member.hubspot_id,
@@ -125,7 +126,7 @@ router.get('/api/my/billing', requireAuth, async (req, res) => {
         const customer = await stripe.customers.retrieve(member.stripe_customer_id);
         if (customer && !customer.deleted) {
           // Return balance in cents (UI divides by 100 for display)
-          billingInfo.customerBalance = (customer as any).balance || 0;
+          billingInfo.customerBalance = (customer as Stripe.Customer).balance || 0;
         }
       } catch (stripeError: unknown) {
         logger.error('[MyBilling] Stripe error', { extra: { stripeError: getErrorMessage(stripeError) } });
@@ -182,7 +183,7 @@ router.get('/api/my/billing/invoices', requireAuth, async (req, res) => {
       return res.status(500).json({ error: 'Failed to load invoices' });
     }
     
-    const invoices = (invoicesResult.invoices || []).map((inv: any) => ({
+    const invoices = (invoicesResult.invoices || []).map((inv) => ({
       id: inv.id,
       number: inv.number,
       status: inv.status,
@@ -280,7 +281,7 @@ router.post('/api/my/billing/portal', requireAuth, async (req, res) => {
         const { syncMemberToHubSpot } = await import('../core/hubspot/stages');
         await syncMemberToHubSpot({ email: member.email, billingProvider: preservedProvider });
       } catch (e: unknown) {
-        logger.warn('[MyBilling] Failed to sync billing provider to HubSpot for', { extra: { email: member.email, e_as_any_e: (e as any)?.message || e } });
+        logger.warn('[MyBilling] Failed to sync billing provider to HubSpot for', { extra: { email: member.email, e_as_any_e: (e as Error)?.message || e } });
       }
     }
     
@@ -456,7 +457,7 @@ router.get('/api/my/balance', requireAuth, async (req, res) => {
       return res.json({ balanceCents: 0, balanceDollars: 0 });
     }
     
-    const balanceCents = (customer as any).balance || 0;
+    const balanceCents = (customer as Stripe.Customer).balance || 0;
     res.json({
       balanceCents: Math.abs(balanceCents),
       balanceDollars: Math.abs(balanceCents) / 100,
@@ -572,7 +573,7 @@ router.get('/api/my-billing/account-balance', requireAuth, async (req, res) => {
       return res.json({ balanceCents: 0, balanceDollars: 0 });
     }
     
-    const balanceCents = (customer as any).balance || 0;
+    const balanceCents = (customer as Stripe.Customer).balance || 0;
     res.json({
       balanceCents: Math.abs(balanceCents),
       balanceDollars: Math.abs(balanceCents) / 100,
@@ -900,7 +901,7 @@ router.post('/api/my/billing/request-cancellation', requireAuth, async (req, res
     const subscription = subscriptions.data[0];
     const now = new Date();
     const thirtyDaysFromNow = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
-    const currentPeriodEnd = new Date((subscription as any).current_period_end * 1000);
+    const currentPeriodEnd = new Date((subscription as Stripe.Subscription).current_period_end * 1000);
     const effectiveDate = thirtyDaysFromNow > currentPeriodEnd ? thirtyDaysFromNow : currentPeriodEnd;
     const cancelAtTimestamp = Math.floor(effectiveDate.getTime() / 1000);
     

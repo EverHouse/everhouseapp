@@ -93,17 +93,17 @@ router.post('/api/staff/manual-booking', isStaffOrAdmin, async (req, res) => {
       return res.status(400).json({ error: 'Booking cannot extend past midnight. Please choose an earlier start time or shorter duration.' });
     }
     
-    let sanitizedParticipants: any[] = [];
+    let sanitizedParticipants: Array<{ email: string; type: string; userId?: string; name?: string }> = [];
     if (request_participants && Array.isArray(request_participants)) {
       sanitizedParticipants = request_participants
         .slice(0, 3)
-        .map((p: any) => ({
+        .map((p: Record<string, unknown>) => ({
           email: typeof p.email === 'string' ? p.email.toLowerCase().trim() : '',
           type: p.type === 'member' ? 'member' : 'guest',
           userId: p.userId != null ? String(p.userId) : undefined,
           name: typeof p.name === 'string' ? p.name.trim() : undefined
         }))
-        .filter((p: any) => p.email || p.userId);
+        .filter((p: { email: string; userId?: string }) => p.email || p.userId);
     }
     
     const isDayPassPayment = paymentStatus === 'Paid (Day Pass)' && dayPassPurchaseId;
@@ -111,7 +111,7 @@ router.post('/api/staff/manual-booking', isStaffOrAdmin, async (req, res) => {
     const staffEmail = sessionUser?.email || 'staff';
     
     const client = await pool.connect();
-    let row: any;
+    let row: Record<string, unknown> | undefined;
     let dayPassRedeemed = false;
     
     try {

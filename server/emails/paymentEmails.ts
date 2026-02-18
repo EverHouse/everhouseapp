@@ -413,10 +413,10 @@ export async function sendPaymentReceiptEmail(
       html: getPaymentReceiptHtml(params)
     });
     
-    console.log(`[Payment Receipt Email] Sent successfully to ${email}`);
+    logger.info(`[Payment Receipt Email] Sent successfully to ${email}`);
     return { success: true };
   } catch (error: unknown) {
-    console.error(`[Payment Receipt Email] Failed to send to ${email}:`, getErrorMessage(error));
+    logger.error(`[Payment Receipt Email] Failed to send to ${email}:`, { extra: { errorMessage: getErrorMessage(error) } });
     return { success: false, error: getErrorMessage(error) };
   }
 }
@@ -439,10 +439,10 @@ export async function sendPaymentFailedEmail(
       html: getPaymentFailedHtml(params)
     });
     
-    console.log(`[Payment Failed Email] Sent successfully to ${email}`);
+    logger.info(`[Payment Failed Email] Sent successfully to ${email}`);
     return { success: true };
   } catch (error: unknown) {
-    console.error(`[Payment Failed Email] Failed to send to ${email}:`, getErrorMessage(error));
+    logger.error(`[Payment Failed Email] Failed to send to ${email}:`, { extra: { errorMessage: getErrorMessage(error) } });
     return { success: false, error: getErrorMessage(error) };
   }
 }
@@ -465,10 +465,10 @@ export async function sendOutstandingBalanceEmail(
       html: getOutstandingBalanceHtml(params)
     });
     
-    console.log(`[Outstanding Balance Email] Sent successfully to ${email}`);
+    logger.info(`[Outstanding Balance Email] Sent successfully to ${email}`);
     return { success: true };
   } catch (error: unknown) {
-    console.error(`[Outstanding Balance Email] Failed to send to ${email}:`, getErrorMessage(error));
+    logger.error(`[Outstanding Balance Email] Failed to send to ${email}:`, { extra: { errorMessage: getErrorMessage(error) } });
     return { success: false, error: getErrorMessage(error) };
   }
 }
@@ -491,10 +491,10 @@ export async function sendFeeWaivedEmail(
       html: getFeeWaivedHtml(params)
     });
     
-    console.log(`[Fee Waived Email] Sent successfully to ${email}`);
+    logger.info(`[Fee Waived Email] Sent successfully to ${email}`);
     return { success: true };
   } catch (error: unknown) {
-    console.error(`[Fee Waived Email] Failed to send to ${email}:`, getErrorMessage(error));
+    logger.error(`[Fee Waived Email] Failed to send to ${email}:`, { extra: { errorMessage: getErrorMessage(error) } });
     return { success: false, error: getErrorMessage(error) };
   }
 }
@@ -556,13 +556,13 @@ export function getPurchaseReceiptHtml(params: PurchaseReceiptParams): string {
                   <td style="padding: 24px;">
                     <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
                       <tr>
-                        <td style="padding-bottom: 12px; font-size: 12px; color: ${CLUB_COLORS.textMuted}; text-transform: uppercase; letter-spacing: 0.5px;">Item</td>
-                        <td style="padding-bottom: 12px; font-size: 12px; color: ${CLUB_COLORS.textMuted}; text-transform: uppercase; letter-spacing: 0.5px; text-align: right;">Amount</td>
+                        <td style="padding-bottom: 16px; font-size: 12px; color: ${CLUB_COLORS.textMuted}; text-transform: uppercase; letter-spacing: 0.5px;">Items</td>
+                        <td style="padding-bottom: 16px; font-size: 12px; color: ${CLUB_COLORS.textMuted}; text-transform: uppercase; letter-spacing: 0.5px; text-align: right;">Amount</td>
                       </tr>
                       ${lineItemsHtml}
                       <tr>
                         <td style="padding-top: 16px; font-size: 16px; font-weight: 600; color: ${CLUB_COLORS.deepGreen};">Total</td>
-                        <td style="padding-top: 16px; font-size: 20px; font-weight: 600; color: ${CLUB_COLORS.deepGreen}; text-align: right;">${formatCurrency(totalAmount / 100)}</td>
+                        <td style="padding-top: 16px; font-size: 16px; font-weight: 600; color: ${CLUB_COLORS.deepGreen}; text-align: right;">${formatCurrency(totalAmount / 100)}</td>
                       </tr>
                     </table>
                   </td>
@@ -576,21 +576,21 @@ export function getPurchaseReceiptHtml(params: PurchaseReceiptParams): string {
               <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
                 <tr>
                   <td style="padding-bottom: 8px;">
-                    <p style="margin: 0 0 4px 0; font-size: 12px; color: ${CLUB_COLORS.textMuted}; text-transform: uppercase; letter-spacing: 0.5px;">Payment Method</p>
-                    <p style="margin: 0; font-size: 14px; color: ${CLUB_COLORS.textDark};">${paymentMethodLabel}</p>
+                    <span style="font-size: 12px; color: ${CLUB_COLORS.textMuted}; text-transform: uppercase; letter-spacing: 0.5px;">Payment Method</span>
+                    <span style="font-size: 14px; color: ${CLUB_COLORS.textDark}; float: right;">${paymentMethodLabel}</span>
                   </td>
                 </tr>
                 <tr>
                   <td style="padding-bottom: 8px;">
-                    <p style="margin: 0 0 4px 0; font-size: 12px; color: ${CLUB_COLORS.textMuted}; text-transform: uppercase; letter-spacing: 0.5px;">Date</p>
-                    <p style="margin: 0; font-size: 14px; color: ${CLUB_COLORS.textDark};">${formatDate(date)}</p>
+                    <span style="font-size: 12px; color: ${CLUB_COLORS.textMuted}; text-transform: uppercase; letter-spacing: 0.5px;">Date</span>
+                    <span style="font-size: 14px; color: ${CLUB_COLORS.textDark}; float: right;">${formatDate(date)}</span>
                   </td>
                 </tr>
                 ${paymentIntentId ? `
                 <tr>
                   <td>
-                    <p style="margin: 0 0 4px 0; font-size: 12px; color: ${CLUB_COLORS.textMuted}; text-transform: uppercase; letter-spacing: 0.5px;">Transaction ID</p>
-                    <p style="margin: 0; font-size: 12px; color: ${CLUB_COLORS.textMuted}; font-family: monospace;">${paymentIntentId}</p>
+                    <span style="font-size: 12px; color: ${CLUB_COLORS.textMuted}; text-transform: uppercase; letter-spacing: 0.5px;">Transaction ID</span>
+                    <span style="font-size: 12px; color: ${CLUB_COLORS.textMuted}; font-family: monospace; float: right;">${paymentIntentId}</span>
                   </td>
                 </tr>
                 ` : ''}
@@ -601,7 +601,7 @@ export function getPurchaseReceiptHtml(params: PurchaseReceiptParams): string {
           <tr>
             <td style="text-align: center; padding-bottom: 32px;">
               <a href="https://everclub.app/history" style="display: inline-block; background-color: ${CLUB_COLORS.deepGreen}; color: #ffffff; font-size: 16px; font-weight: 500; text-decoration: none; padding: 14px 32px; border-radius: 12px;">
-                View Purchase History
+                View Payment History
               </a>
             </td>
           </tr>
@@ -614,20 +614,24 @@ export async function sendPurchaseReceipt(
   email: string,
   params: PurchaseReceiptParams
 ): Promise<{ success: boolean; error?: string }> {
+  if (BILLING_EMAILS_DISABLED) {
+    logger.info('[Purchase Receipt Email] SKIPPED - billing emails disabled', { extra: { email } });
+    return { success: true };
+  }
   try {
     const { client, fromEmail } = await getResendClient();
 
     await client.emails.send({
       from: fromEmail || 'Ever Club <noreply@everclub.app>',
       to: email,
-      subject: 'Your Purchase Receipt - Ever Club',
+      subject: 'Purchase Receipt - Ever Club',
       html: getPurchaseReceiptHtml(params)
     });
 
-    console.log(`[Purchase Receipt] Sent successfully to ${email}`);
+    logger.info(`[Purchase Receipt Email] Sent successfully to ${email}`);
     return { success: true };
   } catch (error: unknown) {
-    console.error(`[Purchase Receipt] Failed to send to ${email}:`, getErrorMessage(error));
+    logger.error(`[Purchase Receipt Email] Failed to send to ${email}:`, { extra: { errorMessage: getErrorMessage(error) } });
     return { success: false, error: getErrorMessage(error) };
   }
 }

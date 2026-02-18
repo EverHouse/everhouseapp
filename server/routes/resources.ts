@@ -34,6 +34,16 @@ import {
 } from '../core/resourceService';
 import { normalizeToISODate } from '../utils/dateNormalize';
 
+interface ServiceError extends Error {
+  error?: string;
+  bookingType?: string;
+  remainingMinutes?: number;
+  detail?: string;
+  constraint?: string;
+  _logData?: Record<string, unknown>;
+  unpaidParticipants?: unknown[];
+}
+
 const router = Router();
 
 router.get('/api/resources', async (req, res) => {
@@ -153,7 +163,7 @@ router.put('/api/bookings/:id/approve', isStaffOrAdmin, async (req, res) => {
   } catch (error: unknown) {
     if (getErrorStatusCode(error)) {
       return res.status(getErrorStatusCode(error)).json({ 
-        error: (error as any).error, 
+        error: (error as ServiceError).error, 
         message: getErrorMessage(error) 
       });
     }
@@ -176,7 +186,7 @@ router.put('/api/bookings/:id/decline', isStaffOrAdmin, async (req, res) => {
     res.json(result);
   } catch (error: unknown) {
     if (getErrorStatusCode(error)) {
-      return res.status(getErrorStatusCode(error)).json({ error: (error as any).error });
+      return res.status(getErrorStatusCode(error)).json({ error: (error as ServiceError).error });
     }
     logAndRespond(req, res, 500, 'Failed to decline booking', error, 'DECLINE_BOOKING_ERROR');
   }
@@ -203,7 +213,7 @@ router.post('/api/bookings/:id/assign-member', isStaffOrAdmin, async (req, res) 
     res.json(result);
   } catch (error: unknown) {
     if (getErrorStatusCode(error)) {
-      return res.status(getErrorStatusCode(error)).json({ error: (error as any).error });
+      return res.status(getErrorStatusCode(error)).json({ error: (error as ServiceError).error });
     }
     logAndRespond(req, res, 500, 'Failed to assign member to booking', error, 'ASSIGN_MEMBER_ERROR');
   }
@@ -248,7 +258,7 @@ router.post('/api/bookings/link-trackman-to-member', isStaffOrAdmin, async (req,
         trackman_booking_id, ownerName, ownerEmail, bookingData, existingBooking, staffEmail
       );
       
-      logFromRequest(req, 'create_closure' as any, 'closure', closure.id.toString(), ownerName, {
+      logFromRequest(req, 'create_closure', 'closure', closure.id.toString(), ownerName, {
         trackman_booking_id,
         instructor_email: ownerEmail,
         instructor_name: ownerName,
@@ -300,7 +310,7 @@ router.post('/api/bookings/link-trackman-to-member', isStaffOrAdmin, async (req,
     });
   } catch (error: unknown) {
     if (getErrorStatusCode(error)) {
-      return res.status(getErrorStatusCode(error)).json({ error: (error as any).error });
+      return res.status(getErrorStatusCode(error)).json({ error: (error as ServiceError).error });
     }
     logAndRespond(req, res, 500, 'Failed to link Trackman booking to member', error, 'LINK_TRACKMAN_ERROR');
   }
@@ -344,7 +354,7 @@ router.post('/api/bookings/mark-as-event', isStaffOrAdmin, async (req, res) => {
       staffEmail,
     });
     
-    logFromRequest(req, 'update_booking' as any, 'booking', result.primaryBooking.id.toString(), `Private Event: ${result.eventTitle}`, {
+    logFromRequest(req, 'update_booking', 'booking', result.primaryBooking.id.toString(), `Private Event: ${result.eventTitle}`, {
       booking_id: result.primaryBooking.id,
       trackman_booking_id,
       grouped_booking_count: result.convertedBookingIds.length,
@@ -365,7 +375,7 @@ router.post('/api/bookings/mark-as-event', isStaffOrAdmin, async (req, res) => {
     });
   } catch (error: unknown) {
     if (getErrorStatusCode(error)) {
-      return res.status(getErrorStatusCode(error)).json({ error: (error as any).error });
+      return res.status(getErrorStatusCode(error)).json({ error: (error as ServiceError).error });
     }
     logAndRespond(req, res, 500, 'Failed to mark booking as event', error, 'MARK_EVENT_ERROR');
   }
@@ -394,7 +404,7 @@ router.put('/api/bookings/:id/assign-with-players', isStaffOrAdmin, async (req, 
       emailLinked = await linkEmailToMember(owner.email, originalEmail);
     }
     
-    logFromRequest(req, 'assign_member_to_booking' as any, 'booking', bookingId.toString(), owner.email, {
+    logFromRequest(req, 'assign_member_to_booking', 'booking', bookingId.toString(), owner.email, {
       owner_email: owner.email,
       owner_name: owner.name,
       total_players: result.totalPlayerCount,
@@ -413,7 +423,7 @@ router.put('/api/bookings/:id/assign-with-players', isStaffOrAdmin, async (req, 
     });
   } catch (error: unknown) {
     if (getErrorStatusCode(error)) {
-      return res.status(getErrorStatusCode(error)).json({ error: (error as any).error });
+      return res.status(getErrorStatusCode(error)).json({ error: (error as ServiceError).error });
     }
     logger.error('[assign-with-players] Database error details', {
       extra: {
@@ -421,9 +431,9 @@ router.put('/api/bookings/:id/assign-with-players', isStaffOrAdmin, async (req, 
         owner: req.body.owner,
         errorMessage: getErrorMessage(error),
         errorCode: getErrorCode(error),
-        errorDetail: (error as any).detail,
-        errorConstraint: (error as any).constraint,
-        errorStack: (error as any).stack?.split('\n').slice(0, 5).join('\n')
+        errorDetail: (error as ServiceError).detail,
+        errorConstraint: (error as ServiceError).constraint,
+        errorStack: (error instanceof Error ? error.stack : '')?.split('\n').slice(0, 5).join('\n')
       }
     });
     logAndRespond(req, res, 500, 'Failed to assign players to booking', error, 'ASSIGN_PLAYERS_ERROR');
@@ -457,7 +467,7 @@ router.put('/api/bookings/:id/change-owner', isStaffOrAdmin, async (req, res) =>
     });
   } catch (error: unknown) {
     if (getErrorStatusCode(error)) {
-      return res.status(getErrorStatusCode(error)).json({ error: (error as any).error });
+      return res.status(getErrorStatusCode(error)).json({ error: (error as ServiceError).error });
     }
     logAndRespond(req, res, 500, 'Failed to change booking owner', error, 'CHANGE_OWNER_ERROR');
   }
@@ -502,7 +512,7 @@ router.post('/api/bookings', bookingRateLimiter, async (req, res) => {
     });
   } catch (error: unknown) {
     if (getErrorStatusCode(error)) {
-      const err = error as any;
+      const err = error as ServiceError;
       return res.status(getErrorStatusCode(error)).json({ 
         error: err.error,
         ...(err.bookingType && { bookingType: err.bookingType }),
@@ -523,7 +533,7 @@ router.get('/api/bookings/:id/cascade-preview', isStaffOrAdmin, async (req, res)
     res.json(result);
   } catch (error: unknown) {
     if (getErrorStatusCode(error)) {
-      return res.status(getErrorStatusCode(error)).json({ error: (error as any).error });
+      return res.status(getErrorStatusCode(error)).json({ error: (error as ServiceError).error });
     }
     logAndRespond(req, res, 500, 'Failed to fetch cascade preview', error, 'CASCADE_PREVIEW_ERROR');
   }
@@ -545,7 +555,7 @@ router.delete('/api/bookings/:id', isStaffOrAdmin, async (req, res) => {
     });
   } catch (error: unknown) {
     if (getErrorStatusCode(error)) {
-      return res.status(getErrorStatusCode(error)).json({ error: (error as any).error });
+      return res.status(getErrorStatusCode(error)).json({ error: (error as ServiceError).error });
     }
     logAndRespond(req, res, 500, 'Failed to delete booking', error, 'BOOKING_DELETE_ERROR');
   }
@@ -595,7 +605,7 @@ router.put('/api/bookings/:id/member-cancel', async (req, res) => {
     });
   } catch (error: unknown) {
     if (getErrorStatusCode(error)) {
-      const err = error as any;
+      const err = error as ServiceError;
       if (err._logData) {
         logger.warn('Member cancel email mismatch', err._logData);
       }
@@ -615,7 +625,7 @@ router.post('/api/bookings/:id/checkin', isStaffOrAdmin, async (req, res) => {
     res.json({ success: true, booking });
   } catch (error: unknown) {
     if (getErrorStatusCode(error)) {
-      const err = error as any;
+      const err = error as ServiceError;
       return res.status(getErrorStatusCode(error)).json({ 
         error: err.error,
         ...(err.message && { message: err.message }),
@@ -673,7 +683,7 @@ router.post('/api/staff/bookings/manual', isStaffOrAdmin, async (req, res) => {
     });
   } catch (error: unknown) {
     if (getErrorStatusCode(error)) {
-      const err = error as any;
+      const err = error as ServiceError;
       return res.status(getErrorStatusCode(error)).json({ 
         error: err.error,
         ...(err.message && { message: err.message }),

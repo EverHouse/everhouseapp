@@ -188,13 +188,13 @@ router.get('/api/members/:email/details', isAuthenticated, memberLookupRateLimit
       )
     ]);
     
-    const pastBookingsCount = Number((pastBookingsResult as any).rows?.[0]?.count || 0);
+    const pastBookingsCount = Number((pastBookingsResult as { rows?: Record<string, unknown>[] }).rows?.[0]?.count || 0);
     const pastEventsCount = Number(pastEventsResult[0]?.count || 0);
     const pastWellnessCount = Number(pastWellnessResult[0]?.count || 0);
-    const walkInCount = (walkInResult as any).rows?.[0]?.count || 0;
+    const walkInCount = (walkInResult as { rows?: Record<string, unknown>[] }).rows?.[0]?.count || 0;
     const totalLifetimeVisits = pastBookingsCount + pastEventsCount + pastWellnessCount + walkInCount;
     
-    const lastBookingDateRaw = (lastActivityResult as any).rows?.[0]?.last_date;
+    const lastBookingDateRaw = (lastActivityResult as { rows?: Record<string, unknown>[] }).rows?.[0]?.last_date;
     const lastBookingDate = lastBookingDateRaw 
       ? (lastBookingDateRaw instanceof Date ? lastBookingDateRaw.toISOString().split('T')[0] : String(lastBookingDateRaw).split('T')[0])
       : null;
@@ -258,7 +258,7 @@ router.put('/api/members/:email/sms-preferences', isAuthenticated, async (req, r
     const { smsPromoOptIn, smsTransactionalOptIn, smsRemindersOptIn } = bodyParseResult.data;
     
     // Build update object with only provided fields
-    const updateData: Record<string, any> = { updatedAt: new Date() };
+    const updateData: Record<string, unknown> = { updatedAt: new Date() };
     if (typeof smsPromoOptIn === 'boolean') updateData.smsPromoOptIn = smsPromoOptIn;
     if (typeof smsTransactionalOptIn === 'boolean') updateData.smsTransactionalOptIn = smsTransactionalOptIn;
     if (typeof smsRemindersOptIn === 'boolean') updateData.smsRemindersOptIn = smsRemindersOptIn;
@@ -377,7 +377,7 @@ router.get('/api/members/:email/history', isStaffOrAdmin, async (req, res) => {
         FULL OUTER JOIN guest_counts gc ON mc.booking_id = gc.booking_id
       `);
       
-      for (const row of (batchCountsResult as any).rows || []) {
+      for (const row of (batchCountsResult as { rows?: Record<string, unknown>[] }).rows || []) {
         countsMap.set(row.booking_id, {
           memberSlotsCount: row.member_slots_count || 0,
           additionalMemberCount: row.additional_member_count || 0,
@@ -527,7 +527,7 @@ router.get('/api/members/:email/history', isStaffOrAdmin, async (req, res) => {
       ORDER BY created_at DESC
     `, [normalizedEmail]);
 
-    const walkInItems = walkInResult.rows.map((v: any) => ({
+    const walkInItems = walkInResult.rows.map((v: Record<string, unknown>) => ({
       id: `walkin-${v.id}`,
       bookingDate: v.created_at,
       startTime: null,
@@ -539,18 +539,18 @@ router.get('/api/members/:email/history', isStaffOrAdmin, async (req, res) => {
       isWalkIn: true,
     }));
 
-    const combinedVisitHistory = [...visitHistory, ...walkInItems].sort((a: any, b: any) =>
+    const combinedVisitHistory = [...visitHistory, ...walkInItems].sort((a, b) =>
       new Date(b.bookingDate).getTime() - new Date(a.bookingDate).getTime()
     );
 
     // Calculate total attended visits including bookings, walk-ins, events, and wellness
     const attendedBookingsCount = visitHistory.length + walkInItems.length;
     const now = new Date();
-    const attendedEventsCount = eventRsvpHistory.filter((e: any) => {
+    const attendedEventsCount = eventRsvpHistory.filter((e) => {
       const eventDate = new Date(e.eventDate);
       return eventDate < now;
     }).length;
-    const attendedWellnessCount = wellnessHistory.filter((w: any) => w.status === 'attended').length;
+    const attendedWellnessCount = wellnessHistory.filter((w) => w.status === 'attended').length;
     const totalAttendedVisits = attendedBookingsCount + attendedEventsCount + attendedWellnessCount;
     
     res.json({
@@ -612,7 +612,7 @@ router.put('/api/members/:id/role', isAdmin, async (req, res) => {
       return res.status(400).json({ error: 'No updates provided' });
     }
     
-    const updateData: Record<string, any> = { updatedAt: new Date() };
+    const updateData: Record<string, unknown> = { updatedAt: new Date() };
     if (role) updateData.role = role;
     if (tags !== undefined) updateData.tags = tags;
     
@@ -627,7 +627,7 @@ router.put('/api/members/:id/role', isAdmin, async (req, res) => {
           id: id as string,
           role: role || 'member',
           tags: tags || []
-        } as any)
+        } as Record<string, unknown>)
         .onConflictDoUpdate({
           target: users.id,
           set: {
@@ -673,7 +673,7 @@ router.get('/api/members/:email/cascade-preview', isStaffOrAdmin, async (req, re
       )
       AND br.archived_at IS NULL
     `);
-    const bookingsCount = Number((bookingsResult as any).rows?.[0]?.count || 0);
+    const bookingsCount = Number((bookingsResult as { rows?: Record<string, unknown>[] }).rows?.[0]?.count || 0);
     
     const rsvpsResult = await db.select({ count: sql<number>`count(*)::int` })
       .from(eventRsvps)

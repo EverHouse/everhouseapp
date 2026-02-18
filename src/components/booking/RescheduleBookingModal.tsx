@@ -117,7 +117,7 @@ export function RescheduleBookingModal({ isOpen, onClose, booking, resources, on
     setErrorMsg(null);
 
     try {
-      const body: any = {
+      const body: Record<string, unknown> = {
         resource_id: newResourceId,
         request_date: newDate,
         start_time: newStartTime,

@@ -16,6 +16,66 @@ import { getStripeClient } from '../core/stripe/client';
 import { syncCustomerMetadataToStripe } from '../core/stripe/customers';
 import { bulkPushToHubSpot } from '../core/dataIntegrity';
 import { normalizeTierName } from '@shared/constants/tiers';
+import Stripe from 'stripe';
+import { FilterOperatorEnum } from '@hubspot/api-client/lib/codegen/crm/contacts';
+
+interface DbUserRow {
+  id: number;
+  email: string;
+  first_name: string | null;
+  last_name: string | null;
+  tier: string | null;
+  hubspot_id: string | null;
+  stripe_customer_id: string | null;
+  membership_status: string | null;
+  mindbody_client_id: string | null;
+  role: string;
+  billing_provider: string | null;
+}
+
+interface DbBookingSearchRow {
+  id: number;
+  user_email: string;
+  user_name: string | null;
+  request_date: string;
+  start_time: string;
+  end_time: string;
+  status: string;
+  resource_name: string | null;
+  reconciliation_status: string | null;
+  reconciliation_notes: string | null;
+  reconciled_by: string | null;
+  reconciled_at: string | null;
+}
+
+interface DbCountRow {
+  count: string;
+}
+
+interface DbDuplicateRow {
+  normalized_email: string;
+  count: string;
+  user_ids: string[];
+  emails: string[];
+  names: string[];
+  hubspot_ids: (string | null)[];
+}
+
+interface DbGhostBookingRow {
+  id: number;
+  user_id: number | null;
+  user_email: string;
+  user_name: string | null;
+  request_date: string;
+  start_time: string;
+  end_time: string;
+  duration_minutes: string;
+  resource_id: number;
+  trackman_booking_id: string;
+  trackman_player_count: string;
+  status: string;
+  tier: string | null;
+}
 
 interface StripeCleanupJob {
   id: string;
@@ -32,7 +92,7 @@ interface StripeCleanupJob {
     deleted: number;
     errors: number;
   };
-  result?: any;
+  result?: Record<string, unknown>;
   error?: string;
 }
 
@@ -53,7 +113,7 @@ interface VisitorArchiveJob {
     archived: number;
     errors: number;
   };
-  result?: any;
+  result?: Record<string, unknown>;
   error?: string;
 }
 
@@ -78,7 +138,7 @@ router.post('/api/data-tools/resync-member', isAdmin, async (req: Request, res: 
       return res.status(404).json({ error: 'Member not found in database' });
     }
     
-    const user = existingUser.rows[0] as any;
+    const user = existingUser.rows[0] as DbUserRow;
     let hubspotContactId = user.hubspot_id;
     
     const hubspot = await getHubSpotClient();
@@ -89,7 +149,7 @@ router.post('/api/data-tools/resync-member', isAdmin, async (req: Request, res: 
           filterGroups: [{
             filters: [{
               propertyName: 'email',
-              operator: 'EQ' as any,
+              operator: FilterOperatorEnum.Eq,
               value: normalizedEmail
             }]
           }],
@@ -126,7 +186,7 @@ router.post('/api/data-tools/resync-member', isAdmin, async (req: Request, res: 
             filterGroups: [{
               filters: [{
                 propertyName: 'email',
-                operator: 'EQ' as any,
+                operator: FilterOperatorEnum.Eq,
                 value: normalizedEmail
               }]
             }],
@@ -153,7 +213,7 @@ router.post('/api/data-tools/resync-member', isAdmin, async (req: Request, res: 
     
     const props = contactResponse.properties;
     
-    const updateData: Record<string, any> = {
+    const updateData: Record<string, unknown> = {
       hubspotId: hubspotContactId,
       updatedAt: new Date()
     };
@@ -284,16 +344,19 @@ router.get('/api/data-tools/available-sessions', isAdmin, async (req: Request, r
     
     const result = await db.execute(queryBuilder);
     
-    res.json(result.rows.map((row: any) => ({
-      id: row.id,
-      userEmail: row.user_email,
-      userName: row.user_name,
-      requestDate: row.request_date,
-      startTime: row.start_time,
-      endTime: row.end_time,
-      status: row.status,
-      resourceName: row.resource_name
-    })));
+    res.json(result.rows.map((row) => {
+      const r = row as DbBookingSearchRow;
+      return {
+        id: r.id,
+        userEmail: r.user_email,
+        userName: r.user_name,
+        requestDate: r.request_date,
+        startTime: r.start_time,
+        endTime: r.end_time,
+        status: r.status,
+        resourceName: r.resource_name
+      };
+    }));
   } catch (error: unknown) {
     logger.error('[DataTools] Get available sessions error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to get available sessions', details: getErrorMessage(error) });
@@ -399,20 +462,23 @@ router.get('/api/data-tools/bookings-search', isStaffOrAdmin, async (req: Reques
     
     const result = await db.execute(queryBuilder);
     
-    res.json(result.rows.map((row: any) => ({
-      id: row.id,
-      userEmail: row.user_email,
-      userName: row.user_name,
-      requestDate: row.request_date,
-      startTime: row.start_time,
-      endTime: row.end_time,
-      status: row.status,
-      reconciliationStatus: row.reconciliation_status,
-      reconciliationNotes: row.reconciliation_notes,
-      reconciledBy: row.reconciled_by,
-      reconciledAt: row.reconciled_at,
-      resourceName: row.resource_name
-    })));
+    res.json(result.rows.map((row) => {
+      const r = row as DbBookingSearchRow;
+      return {
+        id: r.id,
+        userEmail: r.user_email,
+        userName: r.user_name,
+        requestDate: r.request_date,
+        startTime: r.start_time,
+        endTime: r.end_time,
+        status: r.status,
+        reconciliationStatus: r.reconciliation_status,
+        reconciliationNotes: r.reconciliation_notes,
+        reconciledBy: r.reconciled_by,
+        reconciledAt: r.reconciled_at,
+        resourceName: r.resource_name
+      };
+    }));
   } catch (error: unknown) {
     logger.error('[DataTools] Bookings search error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to search bookings', details: getErrorMessage(error) });
@@ -438,8 +504,9 @@ router.post('/api/data-tools/update-attendance', isAdmin, async (req: Request, r
       return res.status(404).json({ error: 'Booking not found' });
     }
     
-    const previousStatus = (existingBooking.rows[0] as any).reconciliation_status;
-    const previousNotes = (existingBooking.rows[0] as any).reconciliation_notes;
+    const bookingRow = existingBooking.rows[0] as Record<string, unknown>;
+    const previousStatus = bookingRow.reconciliation_status as string | null;
+    const previousNotes = bookingRow.reconciliation_notes as string | null;
     
     await db.execute(sql`UPDATE booking_requests SET 
         reconciliation_status = ${attendanceStatus},
@@ -450,7 +517,7 @@ router.post('/api/data-tools/update-attendance', isAdmin, async (req: Request, r
       WHERE id = ${bookingId}`);
     
     await db.insert(billingAuditLog).values({
-      memberEmail: (existingBooking.rows[0] as any).user_email || 'unknown',
+      memberEmail: (bookingRow.user_email as string) || 'unknown',
       actionType: 'attendance_manually_updated',
       previousValue: previousStatus || 'none',
       newValue: attendanceStatus,
@@ -462,7 +529,7 @@ router.post('/api/data-tools/update-attendance', isAdmin, async (req: Request, r
       },
       performedBy: staffEmail,
       performedByName: staffEmail
-    } as any);
+    });
     
     if (!isProduction) {
       logger.info('[DataTools] Updated attendance for booking to by', { extra: { bookingId, attendanceStatus, staffEmail } });
@@ -531,20 +598,16 @@ router.get('/api/data-tools/audit-log', isAdmin, async (req: Request, res: Respo
   try {
     const { limit = '20', actionType } = req.query;
     
-    let query: any = db.select()
-      .from(billingAuditLog)
-      .orderBy(desc(billingAuditLog.createdAt))
-      .limit(parseInt(limit as string));
-    
-    if (actionType) {
-      query = db.select()
-        .from(billingAuditLog)
-        .where(eq(billingAuditLog.actionType, actionType as string))
-        .orderBy(desc(billingAuditLog.createdAt))
-        .limit(parseInt(limit as string));
-    }
-    
-    const logs = await query;
+    const logs = actionType
+      ? await db.select()
+          .from(billingAuditLog)
+          .where(eq(billingAuditLog.actionType, actionType as string))
+          .orderBy(desc(billingAuditLog.createdAt))
+          .limit(parseInt(limit as string))
+      : await db.select()
+          .from(billingAuditLog)
+          .orderBy(desc(billingAuditLog.createdAt))
+          .limit(parseInt(limit as string));
     
     res.json(logs.filter(log => 
       ['member_resynced_from_hubspot', 'guest_fee_manually_linked', 'attendance_manually_updated', 'mindbody_reimport_requested'].includes(log.actionType)
@@ -634,7 +697,7 @@ router.post('/api/data-tools/cleanup-mindbody-ids', isAdmin, async (req: Request
     // Process in batches to avoid rate limits
     const batchSize = 50;
     for (let i = 0; i < usersWithMindbody.rows.length; i += batchSize) {
-      const batch = (usersWithMindbody.rows.slice(i, i + batchSize) as any[]);
+      const batch = usersWithMindbody.rows.slice(i, i + batchSize) as DbUserRow[];
       
       for (const user of batch) {
         try {
@@ -653,7 +716,7 @@ router.post('/api/data-tools/cleanup-mindbody-ids', isAdmin, async (req: Request
                 filterGroups: [{
                   filters: [{
                     propertyName: 'email',
-                    operator: 'EQ' as any,
+                    operator: FilterOperatorEnum.Eq,
                     value: user.email.toLowerCase()
                   }]
                 }],
@@ -790,7 +853,7 @@ router.post('/api/data-tools/sync-members-to-hubspot', isAdmin, async (req: Requ
     const errors: string[] = [];
     
     if (!dryRun) {
-      for (const member of membersWithoutHubspot.rows as any[]) {
+      for (const member of membersWithoutHubspot.rows as DbUserRow[]) {
         try {
           const result = await findOrCreateHubSpotContact(
             member.email,
@@ -835,7 +898,7 @@ router.post('/api/data-tools/sync-members-to-hubspot', isAdmin, async (req: Requ
         ? `Dry run: Found ${membersWithoutHubspot.rows.length} members without HubSpot contacts` 
         : `Synced ${created.length + existing.length} members to HubSpot (${created.length} new, ${existing.length} existing)`,
       totalFound: membersWithoutHubspot.rows.length,
-      members: membersWithoutHubspot.rows.map((m: any) => ({
+      members: (membersWithoutHubspot.rows as DbUserRow[]).map((m) => ({
         email: m.email,
         name: `${m.first_name || ''} ${m.last_name || ''}`.trim(),
         tier: m.tier,
@@ -905,7 +968,7 @@ router.post('/api/data-tools/sync-subscription-status', isAdmin, async (req: Req
     const BATCH_DELAY_MS = 100;
     
     for (let i = 0; i < membersWithStripe.rows.length; i += BATCH_SIZE) {
-      const batch = (membersWithStripe.rows.slice(i, i + BATCH_SIZE) as any[]);
+      const batch = membersWithStripe.rows.slice(i, i + BATCH_SIZE) as DbUserRow[];
       
       await Promise.all(batch.map(async (member) => {
         try {
@@ -914,11 +977,11 @@ router.post('/api/data-tools/sync-subscription-status', isAdmin, async (req: Req
           
           const customerSubs = await stripe.subscriptions.list({
             customer: customerId,
-            status: 'all' as any,
+            status: 'all',
             limit: 10
           });
           
-          const activeSub = customerSubs.data?.find((s: any) => 
+          const activeSub = customerSubs.data?.find((s: Stripe.Subscription) => 
             ['active', 'trialing', 'past_due'].includes(s.status)
           ) || customerSubs.data?.[0];
           
@@ -965,7 +1028,7 @@ router.post('/api/data-tools/sync-subscription-status', isAdmin, async (req: Req
                 const { syncMemberToHubSpot } = await import('../core/hubspot/stages');
                 await syncMemberToHubSpot({ email: member.email, status: expectedAppStatus, billingProvider: 'stripe' });
               } catch (e: unknown) {
-                logger.warn('[DataTools] Failed to sync status to HubSpot for', { extra: { email: member.email, e_as_any_e: (e as any)?.message || e } });
+                logger.warn('[DataTools] Failed to sync status to HubSpot for', { extra: { email: member.email, e_as_any_e: (e as Error)?.message || e } });
               }
               
               await db.insert(billingAuditLog).values({
@@ -981,7 +1044,7 @@ router.post('/api/data-tools/sync-subscription-status', isAdmin, async (req: Req
                 },
                 performedBy: staffEmail,
                 performedByName: staffEmail
-              } as any);
+              });
               
               updated.push({
                 email: member.email,
@@ -1073,7 +1136,7 @@ router.post('/api/data-tools/clear-orphaned-stripe-ids', isAdmin, async (req: Re
     const BATCH_DELAY_MS = 100;
     
     for (let i = 0; i < usersWithStripe.rows.length; i += BATCH_SIZE) {
-      const batch = (usersWithStripe.rows.slice(i, i + BATCH_SIZE) as any[]);
+      const batch = usersWithStripe.rows.slice(i, i + BATCH_SIZE) as DbUserRow[];
       
       await Promise.all(batch.map(async (user) => {
         try {
@@ -1174,7 +1237,7 @@ router.post('/api/data-tools/link-stripe-hubspot', isAdmin, async (req: Request,
        ORDER BY email
        LIMIT 200`);
     
-    const stripeOnlyList = stripeOnlyMembers.rows.map((m: any) => ({
+    const stripeOnlyList = (stripeOnlyMembers.rows as DbUserRow[]).map((m) => ({
       id: m.id,
       email: m.email,
       name: [m.first_name, m.last_name].filter(Boolean).join(' ') || 'Unknown',
@@ -1183,7 +1246,7 @@ router.post('/api/data-tools/link-stripe-hubspot', isAdmin, async (req: Request,
       issue: 'has_stripe_no_hubspot'
     }));
     
-    const hubspotOnlyList = hubspotOnlyMembers.rows.map((m: any) => ({
+    const hubspotOnlyList = (hubspotOnlyMembers.rows as DbUserRow[]).map((m) => ({
       id: m.id,
       email: m.email,
       name: [m.first_name, m.last_name].filter(Boolean).join(' ') || 'Unknown',
@@ -1197,7 +1260,7 @@ router.post('/api/data-tools/link-stripe-hubspot', isAdmin, async (req: Request,
     const errors: string[] = [];
     
     if (!dryRun) {
-      for (const member of stripeOnlyMembers.rows as any[]) {
+      for (const member of stripeOnlyMembers.rows as DbUserRow[]) {
         try {
           const result = await findOrCreateHubSpotContact(
             member.email,
@@ -1235,7 +1298,7 @@ router.post('/api/data-tools/link-stripe-hubspot', isAdmin, async (req: Request,
         }
       }
       
-      for (const member of hubspotOnlyMembers.rows as any[]) {
+      for (const member of hubspotOnlyMembers.rows as DbUserRow[]) {
         try {
           const memberName = [member.first_name, member.last_name].filter(Boolean).join(' ') || undefined;
           const result = await getOrCreateStripeCustomer(
@@ -1341,7 +1404,7 @@ router.post('/api/data-tools/sync-visit-counts', isAdmin, async (req: Request, r
     const BATCH_DELAY_MS = 150;
     
     for (let i = 0; i < membersWithHubspot.rows.length; i += BATCH_SIZE) {
-      const batch = (membersWithHubspot.rows.slice(i, i + BATCH_SIZE) as any[]);
+      const batch = membersWithHubspot.rows.slice(i, i + BATCH_SIZE) as DbUserRow[];
       
       await Promise.all(batch.map(async (member) => {
         try {
@@ -1384,9 +1447,9 @@ router.post('/api/data-tools/sync-visit-counts', isAdmin, async (req: Request, r
               AND we.status != 'cancelled'
           `);
           
-          const bookingCount = parseInt((visitCountResult.rows[0] as any)?.count || '0');
-          const eventCount = parseInt((eventCountResult.rows[0] as any)?.count || '0');
-          const wellnessCount = parseInt((wellnessCountResult.rows[0] as any)?.count || '0');
+          const bookingCount = parseInt((visitCountResult.rows[0] as DbCountRow)?.count || '0');
+          const eventCount = parseInt((eventCountResult.rows[0] as DbCountRow)?.count || '0');
+          const wellnessCount = parseInt((wellnessCountResult.rows[0] as DbCountRow)?.count || '0');
           const appVisitCount = bookingCount + eventCount + wellnessCount;
           
           let hubspotVisitCount: number | null = null;
@@ -1445,7 +1508,7 @@ router.post('/api/data-tools/sync-visit-counts', isAdmin, async (req: Request, r
                   },
                   performedBy: staffEmail,
                   performedByName: staffEmail
-                } as any);
+                });
                 
                 if (!isProduction) {
                   logger.info('[DataTools] Updated HubSpot visit count for : ->', { extra: { memberEmail: member.email, hubspotVisitCount, appVisitCount } });
@@ -1501,7 +1564,7 @@ router.post('/api/data-tools/detect-duplicates', isAdmin, async (req: Request, r
   try {
     const staffEmail = getSessionUser(req)?.email || 'unknown';
     
-    logFromRequest(req, 'detect_duplicates' as any, 'users', null, undefined, {
+    logFromRequest(req, 'detect_duplicates', 'users', null, undefined, {
       action: 'started',
       staffEmail
     });
@@ -1524,7 +1587,7 @@ router.post('/api/data-tools/detect-duplicates', isAdmin, async (req: Request, r
       ORDER BY COUNT(*) DESC
     `);
     
-    const appDuplicates = appDuplicatesResult.rows.map((row: any) => ({
+    const appDuplicates = (appDuplicatesResult.rows as DbDuplicateRow[]).map((row) => ({
       email: row.normalized_email,
       count: parseInt(row.count),
       members: row.user_ids.map((id: string, idx: number) => ({
@@ -1553,7 +1616,7 @@ router.post('/api/data-tools/detect-duplicates', isAdmin, async (req: Request, r
     const BATCH_DELAY_MS = 50;
     
     for (let i = 0; i < membersWithHubspot.rows.length; i += BATCH_SIZE) {
-      const batch = (membersWithHubspot.rows.slice(i, i + BATCH_SIZE) as any[]);
+      const batch = membersWithHubspot.rows.slice(i, i + BATCH_SIZE) as DbUserRow[];
       
       await Promise.all(batch.map(async (member) => {
         try {
@@ -1562,7 +1625,7 @@ router.post('/api/data-tools/detect-duplicates', isAdmin, async (req: Request, r
               filterGroups: [{
                 filters: [{
                   propertyName: 'email',
-                  operator: 'EQ' as any,
+                  operator: FilterOperatorEnum.Eq,
                   value: member.email
                 }]
               }],
@@ -1574,7 +1637,7 @@ router.post('/api/data-tools/detect-duplicates', isAdmin, async (req: Request, r
           if (searchResponse.results && searchResponse.results.length > 1) {
             hubspotDuplicates.push({
               email: member.email,
-              contacts: searchResponse.results.map((contact: any) => ({
+              contacts: searchResponse.results.map((contact) => ({
                 contactId: contact.id,
                 firstname: contact.properties?.firstname || '',
                 lastname: contact.properties?.lastname || '',
@@ -1677,14 +1740,14 @@ router.post('/api/data-tools/sync-payment-status', isAdmin, async (req: Request,
     const BATCH_DELAY_MS = 150;
     
     for (let i = 0; i < membersWithBoth.rows.length; i += BATCH_SIZE) {
-      const batch = (membersWithBoth.rows.slice(i, i + BATCH_SIZE) as any[]);
+      const batch = membersWithBoth.rows.slice(i, i + BATCH_SIZE) as DbUserRow[];
       
       await Promise.all(batch.map(async (member) => {
         try {
           const invoices = await stripe.invoices.list({
-            customer: member.stripe_customer_id,
+            customer: member.stripe_customer_id!,
             limit: 1,
-            status: 'paid' as any
+            status: 'paid'
           });
           
           let stripePaymentStatus = 'no_invoices';
@@ -1774,7 +1837,7 @@ router.post('/api/data-tools/sync-payment-status', isAdmin, async (req: Request,
                   },
                   performedBy: staffEmail,
                   performedByName: staffEmail
-                } as any);
+                });
                 
                 if (!isProduction) {
                   logger.info('[DataTools] Updated HubSpot payment status for : ->', { extra: { memberEmail: member.email, hubspotPaymentStatus, stripePaymentStatus } });
@@ -1866,7 +1929,7 @@ router.post('/api/data-tools/fix-trackman-ghost-bookings', isAdmin, async (req: 
     
     const ghostBookingsResult = await db.execute(ghostQuery);
     
-    const ghostBookings = ghostBookingsResult.rows.map((row: any) => ({
+    const ghostBookings = (ghostBookingsResult.rows as DbGhostBookingRow[]).map((row) => ({
       bookingId: row.id,
       userId: row.user_id,
       userEmail: row.user_email,
@@ -1883,7 +1946,7 @@ router.post('/api/data-tools/fix-trackman-ghost-bookings', isAdmin, async (req: 
     }));
     
     if (dryRun) {
-      logFromRequest(req, 'fix_trackman_ghost_bookings' as any, 'booking_requests' as any, null, undefined, {
+      logFromRequest(req, 'fix_trackman_ghost_bookings', 'booking_requests', null, undefined, {
         action: 'preview',
         ghostBookingsFound: ghostBookings.length,
         staffEmail
@@ -1916,7 +1979,7 @@ router.post('/api/data-tools/fix-trackman-ghost-bookings', isAdmin, async (req: 
         const duplicateSessionCheck = await db.execute(sql`SELECT id FROM booking_sessions WHERE trackman_booking_id = ${booking.trackmanBookingId}`);
         
         if (duplicateSessionCheck.rows.length > 0) {
-          const existingSessionId = (duplicateSessionCheck.rows[0] as any).id as number;
+          const existingSessionId = (duplicateSessionCheck.rows[0] as Record<string, unknown>).id as number;
           await db.execute(sql`UPDATE booking_requests SET session_id = ${existingSessionId}, updated_at = NOW() WHERE id = ${booking.bookingId}`);
           
           fixed.push({
@@ -1936,7 +1999,7 @@ router.post('/api/data-tools/fix-trackman-ghost-bookings', isAdmin, async (req: 
             },
             performedBy: staffEmail,
             performedByName: staffEmail
-          } as any);
+          });
           
           continue;
         }
@@ -1964,7 +2027,7 @@ router.post('/api/data-tools/fix-trackman-ghost-bookings', isAdmin, async (req: 
         const ownerTier = booking.tier || await getMemberTierByEmail(booking.userEmail, { allowInactive: true });
         
         const resourceResult = await pool.query(`SELECT type FROM resources WHERE id = $1`, [booking.resourceId]);
-        const resourceType = (resourceResult.rows[0] as any)?.type || 'simulator';
+        const resourceType = (resourceResult.rows[0] as Record<string, unknown>)?.type as string || 'simulator';
         
         const participants = [
           { email: booking.userEmail, participantType: 'owner' as const, displayName: booking.userName || booking.userEmail }
@@ -1972,8 +2035,8 @@ router.post('/api/data-tools/fix-trackman-ghost-bookings', isAdmin, async (req: 
         
         for (let i = 1; i < booking.playerCount; i++) {
           participants.push({
-            email: undefined as any,
-            participantType: 'guest' as any,
+            email: undefined as unknown as string,
+            participantType: 'guest' as const,
             displayName: `Guest ${i + 1}`
           });
         }
@@ -2006,9 +2069,9 @@ router.post('/api/data-tools/fix-trackman-ghost-bookings', isAdmin, async (req: 
                 minutesCharged: billing.minutesAllocated,
                 overageFee: billing.overageFee,
                 guestFee: 0,
-                tierAtBooking: (billing as any).tier || ownerTier || undefined,
+                tierAtBooking: (billing as Record<string, unknown>).tier as string || ownerTier || undefined,
                 paymentMethod: 'unpaid'
-              } as any, 'staff_manual' as any);
+              }, 'staff_manual');
             }
           }
         } catch (billingErr: unknown) {
@@ -2032,7 +2095,7 @@ router.post('/api/data-tools/fix-trackman-ghost-bookings', isAdmin, async (req: 
             : booking.durationMinutes || 60;
           
           const userResult = await db.execute(sql`SELECT id FROM users WHERE LOWER(email) = LOWER(${booking.userEmail})`);
-          const userId = (userResult.rows[0] as any)?.id || null;
+          const userId = (userResult.rows[0] as Record<string, unknown>)?.id as number || null;
           
           await db.execute(sql`
             INSERT INTO booking_participants (session_id, user_id, participant_type, display_name, payment_status, slot_duration)
@@ -2047,7 +2110,7 @@ router.post('/api/data-tools/fix-trackman-ghost-bookings', isAdmin, async (req: 
             `);
           }
           
-          await recalculateSessionFees(sessionId, 'staff_manual' as any);
+          await recalculateSessionFees(sessionId, 'staff_manual');
         } catch (participantErr: unknown) {
           logger.warn('[DataTools] Failed to create participants for session', { extra: { sessionId, error: getErrorMessage(participantErr) } });
         }
@@ -2072,7 +2135,7 @@ router.post('/api/data-tools/fix-trackman-ghost-bookings', isAdmin, async (req: 
           },
           performedBy: staffEmail,
           performedByName: staffEmail
-        } as any);
+        });
         
         if (!isProduction) {
           logger.info('[DataTools] Fixed ghost booking -> session', { extra: { bookingBookingId: booking.bookingId, sessionId } });
@@ -2084,7 +2147,7 @@ router.post('/api/data-tools/fix-trackman-ghost-bookings', isAdmin, async (req: 
       }
     }
     
-    logFromRequest(req, 'fix_trackman_ghost_bookings' as any, 'booking_requests' as any, null, undefined, {
+    logFromRequest(req, 'fix_trackman_ghost_bookings', 'booking_requests', null, undefined, {
       action: 'execute',
       ghostBookingsFound: ghostBookings.length,
       fixedCount: fixed.length,
@@ -2119,12 +2182,12 @@ async function runCleanupInBackground(dryRun: boolean, staffEmail: string, req: 
     let startingAfter: string | undefined;
     
     while (hasMore) {
-      const params: any = { limit: 100 };
+      const params: Stripe.CustomerListParams = { limit: 100 };
       if (startingAfter) params.starting_after = startingAfter;
       const batch = await stripe.customers.list(params);
       
       for (const cust of batch.data) {
-        if (!(cust as any).deleted) {
+        if (!(cust as Stripe.Customer & { deleted?: boolean }).deleted) {
           allCustomers.push({
             id: cust.id,
             email: cust.email,
@@ -2150,7 +2213,7 @@ async function runCleanupInBackground(dryRun: boolean, staffEmail: string, req: 
       WHERE stripe_customer_id IS NOT NULL 
         AND membership_status = 'active'
     `);
-    const activeStripeIds = new Set(activeUsersResult.rows.map((r: any) => r.stripe_customer_id));
+    const activeStripeIds = new Set(activeUsersResult.rows.map((r) => (r as Record<string, unknown>).stripe_customer_id as string));
     
     const emptyCustomers: typeof allCustomers = [];
     let skippedActiveCount = 0;
@@ -2168,7 +2231,7 @@ async function runCleanupInBackground(dryRun: boolean, staffEmail: string, req: 
         const charges = await stripe.charges.list({ customer: customer.id, limit: 1 });
         if (charges.data.length > 0) { activeCleanupJob!.progress.checked++; if (activeCleanupJob!.progress.checked % 25 === 0) broadcastToStaff({ type: 'stripe_cleanup_progress', data: activeCleanupJob!.progress }); continue; }
         
-        const subscriptions = await stripe.subscriptions.list({ customer: customer.id, limit: 1, status: 'all' as any });
+        const subscriptions = await stripe.subscriptions.list({ customer: customer.id, limit: 1, status: 'all' });
         if (subscriptions.data.length > 0) { activeCleanupJob!.progress.checked++; if (activeCleanupJob!.progress.checked % 25 === 0) broadcastToStaff({ type: 'stripe_cleanup_progress', data: activeCleanupJob!.progress }); continue; }
         
         const invoices = await stripe.invoices.list({ customer: customer.id, limit: 1 });
@@ -2199,7 +2262,7 @@ async function runCleanupInBackground(dryRun: boolean, staffEmail: string, req: 
     logger.info('[DataTools] Skipping active members with zero transactions (keeping for future charges)', { extra: { skippedActiveCount } });
     
     if (dryRun) {
-      logFromRequest(req, 'cleanup_stripe_customers' as any, 'stripe', null, undefined, {
+      logFromRequest(req, 'cleanup_stripe_customers', 'stripe', null, undefined, {
         action: 'preview',
         totalCustomers: allCustomers.length,
         emptyFound: emptyCustomers.length,
@@ -2226,7 +2289,7 @@ async function runCleanupInBackground(dryRun: boolean, staffEmail: string, req: 
       activeCleanupJob!.completedAt = new Date();
       activeCleanupJob!.result = result;
       activeCleanupJob!.progress.phase = 'done';
-      broadcastToStaff({  type: 'stripe_cleanup_progress', data: activeCleanupJob!.progress, result } as any);
+      broadcastToStaff({ type: 'stripe_cleanup_progress', data: activeCleanupJob!.progress, result });
       return;
     }
     
@@ -2257,7 +2320,7 @@ async function runCleanupInBackground(dryRun: boolean, staffEmail: string, req: 
       }
     }
     
-    logFromRequest(req, 'cleanup_stripe_customers' as any, 'stripe', null, undefined, {
+    logFromRequest(req, 'cleanup_stripe_customers', 'stripe', null, undefined, {
       action: 'execute',
       totalCustomers: allCustomers.length,
       emptyFound: emptyCustomers.length,
@@ -2285,14 +2348,14 @@ async function runCleanupInBackground(dryRun: boolean, staffEmail: string, req: 
     activeCleanupJob!.completedAt = new Date();
     activeCleanupJob!.result = result;
     activeCleanupJob!.progress.phase = 'done';
-    broadcastToStaff({  type: 'stripe_cleanup_progress', data: activeCleanupJob!.progress, result } as any);
+    broadcastToStaff({ type: 'stripe_cleanup_progress', data: activeCleanupJob!.progress, result });
   } catch (error: unknown) {
     logger.error('[DataTools] Stripe customer cleanup error', { error: error instanceof Error ? error : new Error(String(error)) });
     activeCleanupJob!.status = 'failed';
     activeCleanupJob!.completedAt = new Date();
     activeCleanupJob!.error = getErrorMessage(error);
     activeCleanupJob!.progress.phase = 'done';
-    broadcastToStaff({  type: 'stripe_cleanup_progress', data: activeCleanupJob!.progress, error: getErrorMessage(error) } as any);
+    broadcastToStaff({ type: 'stripe_cleanup_progress', data: activeCleanupJob!.progress, error: getErrorMessage(error) });
   }
 }
 
@@ -2507,7 +2570,7 @@ async function runVisitorArchiveInBackground(dryRun: boolean, staffEmail: string
       sampleArchived
     };
 
-    logFromRequest(req, 'archive_stale_visitors' as any, 'users', null, undefined, {
+    logFromRequest(req, 'archive_stale_visitors', 'users', null, undefined, {
       action: dryRun ? 'preview' : 'execute',
       totalScanned: candidates.length,
       eligibleCount: eligible.length,
@@ -2520,14 +2583,14 @@ async function runVisitorArchiveInBackground(dryRun: boolean, staffEmail: string
     activeVisitorArchiveJob!.completedAt = new Date();
     activeVisitorArchiveJob!.result = result;
     activeVisitorArchiveJob!.progress.phase = 'done';
-    broadcastToStaff({  type: 'visitor_archive_progress', data: activeVisitorArchiveJob!.progress, result } as any);
+    broadcastToStaff({ type: 'visitor_archive_progress', data: activeVisitorArchiveJob!.progress, result });
   } catch (error: unknown) {
     logger.error('[DataTools] Visitor archive error', { error: error instanceof Error ? error : new Error(String(error)) });
     activeVisitorArchiveJob!.status = 'failed';
     activeVisitorArchiveJob!.completedAt = new Date();
     activeVisitorArchiveJob!.error = getErrorMessage(error);
     activeVisitorArchiveJob!.progress.phase = 'done';
-    broadcastToStaff({  type: 'visitor_archive_progress', data: activeVisitorArchiveJob!.progress, error: getErrorMessage(error) } as any);
+    broadcastToStaff({ type: 'visitor_archive_progress', data: activeVisitorArchiveJob!.progress, error: getErrorMessage(error) });
   }
 }
 

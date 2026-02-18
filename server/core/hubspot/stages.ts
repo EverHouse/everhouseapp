@@ -167,7 +167,7 @@ export async function syncMemberToHubSpot(
         filterGroups: [{
           filters: [{
             propertyName: 'email',
-            operator: 'EQ' as any,
+            operator: 'EQ',
             value: email.toLowerCase()
           }]
         }],
@@ -541,10 +541,10 @@ export async function ensureHubSpotPropertiesExist(): Promise<{ success: boolean
 
         if (prop.type === 'enumeration' && prop.options) {
           const existingValues = new Set(
-            (existingProp.options || []).map((o: any) => o.value)
+            (existingProp.options || []).map((o: { value: string }) => o.value)
           );
           const missingOptions = prop.options.filter(
-            (o: any) => !existingValues.has(o.value)
+            (o: { value: string }) => !existingValues.has(o.value)
           );
           if (missingOptions.length > 0) {
             const allOptions = [
@@ -554,16 +554,16 @@ export async function ensureHubSpotPropertiesExist(): Promise<{ success: boolean
             await retryableHubSpotRequest(() =>
               hubspot.crm.properties.coreApi.update('contacts', prop.name, {
                 options: allOptions,
-              } as any)
+              } as Partial<typeof prop>)
             );
-            logger.info(`[HubSpot] Added options to ${prop.name}: ${missingOptions.map((o: any) => o.label).join(', ')}`);
+            logger.info(`[HubSpot] Added options to ${prop.name}: ${missingOptions.map((o: { label: string }) => o.label).join(', ')}`);
           }
         }
       } catch (getError: unknown) {
         if (getErrorCode(getError) === '404' || getErrorMessage(getError)?.includes('not exist')) {
           try {
             await retryableHubSpotRequest(() =>
-              hubspot.crm.properties.coreApi.create('contacts', prop as any)
+              hubspot.crm.properties.coreApi.create('contacts', prop as Parameters<typeof hubspot.crm.properties.coreApi.create>[1])
             );
             created.push(prop.name);
             logger.info(`[HubSpot] Created property ${prop.name}`);

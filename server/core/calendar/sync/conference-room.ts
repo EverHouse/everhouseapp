@@ -474,7 +474,7 @@ export async function syncConferenceRoomCalendarToBookings(options?: { monthsBac
         }
 
         if (matchedBooking) {
-          const updates: any = { calendarEventId: googleEventId, updatedAt: new Date() };
+          const updates: Record<string, unknown> = { calendarEventId: googleEventId, updatedAt: new Date() };
           if (matchedBooking.status === 'pending') {
             updates.status = eventStatus;
           }

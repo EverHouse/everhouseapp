@@ -204,7 +204,7 @@ router.put('/api/booking-requests/:id/complete-cancellation', isStaffOrAdmin, as
       return res.status(result.statusCode).json({ error: result.error });
     }
 
-    logFromRequest(req, 'complete_cancellation' as any, 'booking', req.params.id as string, staffEmail, {
+    logFromRequest(req, 'complete_cancellation', 'booking', req.params.id as string, staffEmail, {
       member_email: result.existing?.userEmail,
       trackman_booking_id: result.existing?.trackmanBookingId,
       completed_manually: true,

@@ -1,5 +1,6 @@
 import { getResendClient } from '../utils/resend';
 import { getErrorMessage } from '../utils/errorUtils';
+import { logger } from '../core/logger';
 
 const CLUB_COLORS = {
   deepGreen: '#293515',
@@ -180,10 +181,10 @@ export async function sendWelcomeEmail(email: string, firstName?: string): Promi
       html: getWelcomeEmailHtml(firstName)
     });
     
-    console.log(`[Welcome Email] Sent successfully to ${email}`);
+    logger.info(`[Welcome Email] Sent successfully to ${email}`);
     return { success: true };
   } catch (error: unknown) {
-    console.error(`[Welcome Email] Failed to send to ${email}:`, getErrorMessage(error));
+    logger.error(`[Welcome Email] Failed to send to ${email}: ${getErrorMessage(error)}`, { error: error as Error });
     return { success: false, error: getErrorMessage(error) };
   }
 }

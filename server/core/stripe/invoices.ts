@@ -68,7 +68,7 @@ export async function createInvoice(params: CreateInvoiceParams): Promise<{
           invoice: invoice.id,
           price: item.priceId,
           quantity: item.quantity || 1,
-        } as any);
+        });
       } else if (item.amountCents && item.description) {
         await stripe.invoiceItems.create({
           customer: customerId,

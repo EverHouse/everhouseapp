@@ -6,6 +6,7 @@ import { sendIntegrityAlertEmail } from '../emails/integrityAlertEmail';
 import { getPacificHour, getTodayPacific } from '../utils/dateUtils';
 import { alertOnScheduledTaskFailure } from '../core/dataAlerts';
 import { schedulerTracker } from '../core/schedulerTracker';
+import { logger } from '../core/logger';
 
 const INTEGRITY_CHECK_HOUR = 0;
 const INTEGRITY_SETTING_KEY = 'last_integrity_check_date';
@@ -31,7 +32,7 @@ async function tryClaimIntegritySlot(todayStr: string): Promise<boolean> {
     
     return result.length > 0;
   } catch (err) {
-    console.error('[Integrity Check] Database error:', err);
+    logger.error('[Integrity Check] Database error:', { error: err as Error });
     return false;
   }
 }
@@ -45,17 +46,17 @@ async function checkAndRunIntegrityCheck(): Promise<void> {
       const claimed = await tryClaimIntegritySlot(todayStr);
       
       if (claimed) {
-        console.log('[Integrity Check] Starting scheduled integrity check...');
+        logger.info('[Integrity Check] Starting scheduled integrity check...');
         
         try {
           const { runDataCleanup } = await import('../core/dataIntegrity');
           try {
             const cleanupResult = await runDataCleanup();
             if (cleanupResult.orphanedNotifications > 0 || cleanupResult.orphanedBookings > 0 || cleanupResult.normalizedEmails > 0) {
-              console.log(`[Integrity Check] Pre-check cleanup: ${cleanupResult.orphanedNotifications} orphaned notifications removed, ${cleanupResult.orphanedBookings} orphaned bookings marked, ${cleanupResult.normalizedEmails} emails normalized`);
+              logger.info(`[Integrity Check] Pre-check cleanup: ${cleanupResult.orphanedNotifications} orphaned notifications removed, ${cleanupResult.orphanedBookings} orphaned bookings marked, ${cleanupResult.normalizedEmails} emails normalized`);
             }
           } catch (cleanupErr) {
-            console.error('[Integrity Check] Pre-check cleanup failed (continuing with checks):', cleanupErr);
+            logger.error('[Integrity Check] Pre-check cleanup failed (continuing with checks):', { error: cleanupErr as Error });
           }
 
           const results = await runAllIntegrityChecks();
@@ -68,7 +69,7 @@ async function checkAndRunIntegrityCheck(): Promise<void> {
             sum + r.issues.filter(i => i.severity === 'warning').length, 0
           );
           
-          console.log(`[Integrity Check] Completed: ${totalIssues} issues found (${errorCount} errors, ${warningCount} warnings)`);
+          logger.info(`[Integrity Check] Completed: ${totalIssues} issues found (${errorCount} errors, ${warningCount} warnings)`);
           
           if (errorCount > 0 || warningCount > 0) {
             const adminEmail = process.env.ADMIN_ALERT_EMAIL;
@@ -76,19 +77,19 @@ async function checkAndRunIntegrityCheck(): Promise<void> {
             if (adminEmail) {
               const emailResult = await sendIntegrityAlertEmail(results, adminEmail);
               if (emailResult.success) {
-                console.log(`[Integrity Check] Alert email sent to ${adminEmail}`);
+                logger.info(`[Integrity Check] Alert email sent to ${adminEmail}`);
               } else {
-                console.error(`[Integrity Check] Failed to send alert email: ${emailResult.error}`);
+                logger.error(`[Integrity Check] Failed to send alert email: ${emailResult.error}`);
               }
             } else {
-              console.log('[Integrity Check] No ADMIN_ALERT_EMAIL configured, skipping email alert');
+              logger.info('[Integrity Check] No ADMIN_ALERT_EMAIL configured, skipping email alert');
             }
           } else {
-            console.log('[Integrity Check] No critical issues found, no alert needed');
+            logger.info('[Integrity Check] No critical issues found, no alert needed');
           }
           schedulerTracker.recordRun('Integrity Check', true);
         } catch (err) {
-          console.error('[Integrity Check] Check failed:', err);
+          logger.error('[Integrity Check] Check failed:', { error: err as Error });
           schedulerTracker.recordRun('Integrity Check', false, String(err));
           
           alertOnScheduledTaskFailure(
@@ -96,13 +97,13 @@ async function checkAndRunIntegrityCheck(): Promise<void> {
             err instanceof Error ? err : new Error(String(err)),
             { context: 'Scheduled check at midnight Pacific' }
           ).catch(alertErr => {
-            console.error('[Integrity Check] Failed to send staff alert:', alertErr);
+            logger.error('[Integrity Check] Failed to send staff alert:', { error: alertErr as Error });
           });
         }
       }
     }
   } catch (err) {
-    console.error('[Integrity Check] Scheduler error:', err);
+    logger.error('[Integrity Check] Scheduler error:', { error: err as Error });
     schedulerTracker.recordRun('Integrity Check', false, String(err));
     
     alertOnScheduledTaskFailure(
@@ -110,7 +111,7 @@ async function checkAndRunIntegrityCheck(): Promise<void> {
       err instanceof Error ? err : new Error(String(err)),
       { context: 'Scheduler loop error' }
     ).catch(alertErr => {
-      console.error('[Integrity Check] Failed to send staff alert:', alertErr);
+      logger.error('[Integrity Check] Failed to send staff alert:', { error: alertErr as Error });
     });
   }
 }
@@ -119,20 +120,20 @@ async function runPeriodicAutoFix(): Promise<void> {
   try {
     const result = await autoFixMissingTiers();
     if (result.normalizedStatusCase > 0) {
-      console.log(`[Auto-Fix] Normalized membership_status case for ${result.normalizedStatusCase} members`);
+      logger.info(`[Auto-Fix] Normalized membership_status case for ${result.normalizedStatusCase} members`);
     }
     if (result.fixedBillingProvider > 0) {
-      console.log(`[Auto-Fix] Set billing_provider='mindbody' for ${result.fixedBillingProvider} members with MindBody IDs`);
+      logger.info(`[Auto-Fix] Set billing_provider='mindbody' for ${result.fixedBillingProvider} members with MindBody IDs`);
     }
     if (result.fixedFromAlternateEmail > 0) {
-      console.log(`[Auto-Fix] Fixed ${result.fixedFromAlternateEmail} members, ${result.remainingWithoutTier} still without tier`);
+      logger.info(`[Auto-Fix] Fixed ${result.fixedFromAlternateEmail} members, ${result.remainingWithoutTier} still without tier`);
     }
     if (result.syncedStaffRoles > 0) {
-      console.log(`[Auto-Fix] Synced staff roles for ${result.syncedStaffRoles} users`);
+      logger.info(`[Auto-Fix] Synced staff roles for ${result.syncedStaffRoles} users`);
     }
     schedulerTracker.recordRun('Auto-Fix Tiers', true);
   } catch (err) {
-    console.error('[Auto-Fix] Periodic tier fix failed:', err);
+    logger.error('[Auto-Fix] Periodic tier fix failed:', { error: err as Error });
     schedulerTracker.recordRun('Auto-Fix Tiers', false, String(err));
   }
 }
@@ -142,7 +143,7 @@ async function cleanupAbandonedPendingUsers(): Promise<void> {
     const { pool } = await import('../core/db');
     
     if (!pool) {
-      console.log('[Auto-Cleanup] Database pool not ready, skipping cleanup');
+      logger.info('[Auto-Cleanup] Database pool not ready, skipping cleanup');
       return;
     }
     
@@ -184,7 +185,7 @@ async function cleanupAbandonedPendingUsers(): Promise<void> {
         }
       } catch (err) {
         await client.query('ROLLBACK');
-        console.error(`[Auto-Cleanup] Failed to cleanup user ${user.email}:`, err);
+        logger.error(`[Auto-Cleanup] Failed to cleanup user ${user.email}:`, { error: err as Error });
       } finally {
         client.release();
       }
@@ -192,11 +193,11 @@ async function cleanupAbandonedPendingUsers(): Promise<void> {
     
     if (deletedCount > 0) {
       const emails = pendingResult.rows.slice(0, deletedCount).map(r => r.email).join(', ');
-      console.log(`[Auto-Cleanup] Deleted ${deletedCount} abandoned pending users with all related records: ${emails}`);
+      logger.info(`[Auto-Cleanup] Deleted ${deletedCount} abandoned pending users with all related records: ${emails}`);
     }
     schedulerTracker.recordRun('Abandoned Pending Cleanup', true);
   } catch (err) {
-    console.error('[Auto-Cleanup] Failed to cleanup abandoned pending users:', err);
+    logger.error('[Auto-Cleanup] Failed to cleanup abandoned pending users:', { error: err as Error });
     schedulerTracker.recordRun('Abandoned Pending Cleanup', false, String(err));
   }
 }
@@ -207,8 +208,8 @@ export function startIntegrityScheduler(): void {
   setInterval(cleanupAbandonedPendingUsers, 6 * 60 * 60 * 1000);
   setTimeout(() => cleanupAbandonedPendingUsers().catch(() => {}), 60 * 1000);
   runPeriodicAutoFix().catch(() => {});
-  console.log('[Startup] Daily integrity check scheduler enabled (runs at midnight Pacific)');
-  console.log('[Startup] Periodic auto-fix scheduler enabled (runs every 4 hours)');
+  logger.info('[Startup] Daily integrity check scheduler enabled (runs at midnight Pacific)');
+  logger.info('[Startup] Periodic auto-fix scheduler enabled (runs every 4 hours)');
 }
 
 export async function runManualIntegrityCheck(): Promise<{
@@ -216,7 +217,7 @@ export async function runManualIntegrityCheck(): Promise<{
   emailSent: boolean;
   emailError?: string;
 }> {
-  console.log('[Integrity Check] Running manual integrity check...');
+  logger.info('[Integrity Check] Running manual integrity check...');
   
   const results = await runAllIntegrityChecks();
   
@@ -225,7 +226,7 @@ export async function runManualIntegrityCheck(): Promise<{
     sum + r.issues.filter(i => i.severity === 'error').length, 0
   );
   
-  console.log(`[Integrity Check] Manual check completed: ${totalIssues} issues found (${errorCount} errors)`);
+  logger.info(`[Integrity Check] Manual check completed: ${totalIssues} issues found (${errorCount} errors)`);
   
   let emailSent = false;
   let emailError: string | undefined;

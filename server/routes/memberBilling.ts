@@ -100,7 +100,7 @@ router.get('/api/member-billing/:email', isStaffOrAdmin, async (req, res) => {
       return res.json({ billing: null });
     }
 
-    const billingInfo: any = {
+    const billingInfo: Record<string, unknown> = {
       email: member.email,
       firstName: member.first_name,
       lastName: member.last_name,
@@ -142,7 +142,7 @@ router.get('/api/member-billing/:email', isStaffOrAdmin, async (req, res) => {
 
         const customer = await stripe.customers.retrieve(member.stripe_customer_id);
         if (customer && !customer.deleted) {
-          const balanceCents = (customer as any).balance || 0;
+          const balanceCents = (customer as Stripe.Customer).balance || 0;
           billingInfo.customerBalance = balanceCents;
           billingInfo.customerBalanceDollars = balanceCents / 100;
         }
@@ -168,7 +168,7 @@ router.get('/api/member-billing/:email', isStaffOrAdmin, async (req, res) => {
           // Get customer balance (credits)
           const customer = await stripe.customers.retrieve(member.stripe_customer_id);
           if (customer && !customer.deleted) {
-            const balanceCents = (customer as any).balance || 0;
+            const balanceCents = (customer as Stripe.Customer).balance || 0;
             billingInfo.customerBalance = balanceCents;
             billingInfo.customerBalanceDollars = balanceCents / 100;
           }
@@ -381,7 +381,7 @@ router.post('/api/member-billing/:email/pause', isStaffOrAdmin, async (req, res)
 
     logger.info('[MemberBilling] Paused subscription for until ( days)', { extra: { subscriptionId: subscription.id, email, resumeDateToISOString: resumeDate.toISOString(), durationDays } });
     
-    logFromRequest(req, 'pause_subscription' as any, 'subscription', subscription.id, email as string, {
+    logFromRequest(req, 'pause_subscription', 'subscription', subscription.id, email as string, {
       pause_until: resumeDate.toISOString()
     });
     
@@ -423,12 +423,12 @@ router.post('/api/member-billing/:email/resume', isStaffOrAdmin, async (req, res
     }
 
     await stripe.subscriptions.update(subscription.id, {
-      pause_collection: null as any,
+      pause_collection: '',
     });
 
     logger.info('[MemberBilling] Resumed subscription for', { extra: { subscriptionId: subscription.id, email } });
     
-    logFromRequest(req, 'resume_subscription' as any, 'subscription', subscription.id, email as string, {});
+    logFromRequest(req, 'resume_subscription', 'subscription', subscription.id, email as string, {});
     
     res.json({ success: true, subscriptionId: subscription.id, status: 'active' });
   } catch (error: unknown) {
@@ -464,7 +464,7 @@ router.post('/api/member-billing/:email/cancel', isStaffOrAdmin, async (req, res
 
     const now = new Date();
     const thirtyDaysFromNow = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
-    const currentPeriodEnd = new Date((subscription as any).current_period_end * 1000);
+    const currentPeriodEnd = new Date(subscription.current_period_end * 1000);
     
     const effectiveDate = immediate ? currentPeriodEnd : 
       (thirtyDaysFromNow > currentPeriodEnd ? thirtyDaysFromNow : currentPeriodEnd);
@@ -486,7 +486,7 @@ router.post('/api/member-billing/:email/cancel', isStaffOrAdmin, async (req, res
 
     logger.info('[MemberBilling] Set cancel_at for subscription , email , effective', { extra: { subscriptionId: subscription.id, email, effectiveDateToISOString: effectiveDate.toISOString() } });
     
-    logFromRequest(req, 'cancel_subscription' as any, 'subscription', subscription.id, email as string, {
+    logFromRequest(req, 'cancel_subscription', 'subscription', subscription.id, email as string, {
       reason: reason || 'Not specified',
       effective_date: effectiveDate.toISOString(),
       immediate: !!immediate
@@ -554,7 +554,7 @@ router.post('/api/member-billing/:email/undo-cancellation', isStaffOrAdmin, asyn
 
     logger.info('[MemberBilling] Undid cancellation for subscription , email', { extra: { pendingCancelSubId: pendingCancelSub.id, email } });
     
-    logFromRequest(req, 'undo_cancel_subscription' as any, 'subscription', pendingCancelSub.id, email as string, {});
+    logFromRequest(req, 'undo_cancel_subscription', 'subscription', pendingCancelSub.id, email as string, {});
     
     res.json({
       success: true,
@@ -619,7 +619,7 @@ router.post('/api/member-billing/:email/credit', isStaffOrAdmin, async (req, res
     logger.info('[MemberBilling] Applied credit of cents to', { extra: { amountCents, email } });
     
     // Audit log the credit application
-    await logFromRequest(req, 'apply_credit' as any, 'member', email as string, email as string, {
+    await logFromRequest(req, 'apply_credit', 'member', email as string, email as string, {
       amountCents,
       amountDollars: (amountCents / 100).toFixed(2),
       description,
@@ -691,7 +691,7 @@ router.post('/api/member-billing/:email/discount', isStaffOrAdmin, async (req, r
       appliedCouponId = coupon.id;
     }
 
-    await (stripe.subscriptions as any).update(subscription.id, {
+    await stripe.subscriptions.update(subscription.id, {
       coupon: appliedCouponId,
     });
 
@@ -794,7 +794,7 @@ router.post('/api/member-billing/:email/payment-link', isStaffOrAdmin, async (re
 
     logger.info('[MemberBilling] Created billing portal session for', { extra: { email } });
     
-    logFromRequest(req, 'send_payment_link' as any, 'member', member.id?.toString() || null, email as string, {});
+    logFromRequest(req, 'send_payment_link', 'member', member.id?.toString() || null, email as string, {});
     
     res.json({
       success: true,

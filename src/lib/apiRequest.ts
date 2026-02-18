@@ -2,12 +2,12 @@ const isDev = import.meta.env.DEV;
 
 // CSRF protection removed - SameSite cookies + CORS provide sufficient protection for SPA
 
-export interface ApiResult<T = any> {
+export interface ApiResult<T = unknown> {
   ok: boolean;
   data?: T;
   error?: string;
   errorType?: string;
-  errorData?: Record<string, any>;
+  errorData?: Record<string, unknown>;
 }
 
 interface RetryConfig {
@@ -30,9 +30,9 @@ function isIdempotentMethod(method?: string): boolean {
   return IDEMPOTENT_METHODS.includes((method || 'GET').toUpperCase());
 }
 
-function isRetryableError(error: any): boolean {
+function isRetryableError(error: unknown): boolean {
   if (!error) return false;
-  const message = (error.message || '').toLowerCase();
+  const message = (error instanceof Error ? error.message : String(error)).toLowerCase();
   const retryablePatterns = [
     'network',
     'fetch',
@@ -53,7 +53,7 @@ function delay(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-export async function apiRequest<T = any>(
+export async function apiRequest<T = unknown>(
   url: string,
   options?: RequestInit,
   retryConfig?: RetryConfig
@@ -63,7 +63,7 @@ export async function apiRequest<T = any>(
   const canRetry = isIdempotentMethod(method) || config.retryNonIdempotent;
   const maxRetries = canRetry ? (config.maxRetries || 3) : 1;
   
-  let lastError: any = null;
+  let lastError: unknown = null;
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
@@ -136,10 +136,10 @@ export async function apiRequest<T = any>(
     }
   }
 
-  return { ok: false, error: lastError?.message || 'Request failed after retries' };
+  return { ok: false, error: (lastError instanceof Error ? lastError.message : null) || 'Request failed after retries' };
 }
 
-export async function apiRequestNoRetry<T = any>(
+export async function apiRequestNoRetry<T = unknown>(
   url: string,
   options?: RequestInit
 ): Promise<ApiResult<T>> {

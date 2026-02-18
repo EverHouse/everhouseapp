@@ -15,6 +15,7 @@ import { createSessionWithUsageTracking, ensureSessionForBooking } from './sessi
 import { recalculateSessionFees } from '../billing/unifiedFeeService';
 import { PaymentStatusService } from '../billing/PaymentStatusService';
 import { cancelPaymentIntent, getStripeClient } from '../stripe';
+import Stripe from 'stripe';
 import { getCalendarNameForBayAsync } from '../../routes/bays/helpers';
 import { getCalendarIdByName, createCalendarEventOnCalendar, deleteCalendarEvent } from '../calendar/index';
 import { releaseGuestPassHold } from '../billing/guestPassHoldService';
@@ -807,9 +808,9 @@ export async function cancelBooking(params: CancelBookingParams) {
 
     if (existing.status === 'cancellation_pending') {
       return {
-        updated: existing as any,
+        updated: existing,
         bookingData: existing,
-        pushInfo: null as any,
+        pushInfo: null as Record<string, unknown> | null,
         overageRefundResult: {},
         isConferenceRoom: false,
         isPendingCancel: true,
@@ -1301,7 +1302,7 @@ export async function checkinBooking(params: CheckinBookingParams) {
       });
       if (sessionResult.sessionId) {
         existing.session_id = sessionResult.sessionId;
-        await recalculateSessionFees(sessionResult.sessionId, 'checkin' as any);
+        await recalculateSessionFees(sessionResult.sessionId, 'checkin');
       }
     } catch (err) {
       logger.error('[Checkin] Failed to auto-create session', { extra: { err } });
@@ -1466,7 +1467,7 @@ export async function checkinBooking(params: CheckinBookingParams) {
     }
   }
 
-  const statusConditions = allowedStatuses.map(s => eq(bookingRequests.status, s as any));
+  const statusConditions = allowedStatuses.map(s => eq(bookingRequests.status, s));
 
   const result = await db.update(bookingRequests)
     .set({
@@ -1503,8 +1504,8 @@ export async function checkinBooking(params: CheckinBookingParams) {
       try { broadcastMemberStatsUpdated(booking.userEmail, { lifetimeVisits: updatedUser.lifetime_visits }); } catch (err: unknown) { logger.error('[Broadcast] Stats update error', { extra: { err } }); }
     }
 
-    const dateStr = (booking.requestDate as any) instanceof Date
-      ? (booking.requestDate as any).toISOString().split('T')[0]
+    const dateStr = booking.requestDate instanceof Date
+      ? booking.requestDate.toISOString().split('T')[0]
       : String(booking.requestDate).split('T')[0];
     const formattedDate = formatDateDisplayWithDay(dateStr);
     const formattedTime = formatTime12Hour(booking.startTime);
@@ -1524,8 +1525,8 @@ export async function checkinBooking(params: CheckinBookingParams) {
   }
 
   if (newStatus === 'no_show' && booking.userEmail) {
-    const noShowDateStr = (booking.requestDate as any) instanceof Date
-      ? (booking.requestDate as any).toISOString().split('T')[0]
+    const noShowDateStr = booking.requestDate instanceof Date
+      ? booking.requestDate.toISOString().split('T')[0]
       : String(booking.requestDate).split('T')[0];
     const formattedDate = formatDateDisplayWithDay(noShowDateStr);
     const formattedTime = formatTime12Hour(booking.startTime);
@@ -1859,7 +1860,7 @@ export async function completeCancellation(params: CompleteCancellationParams) {
         [existing.sessionId]
       );
     } catch (clearErr) {
-      errors.push(`Failed to clear pending fees: ${(clearErr as any).message}`);
+      errors.push(`Failed to clear pending fees: ${(clearErr as Error).message}`);
       logger.error('[Complete Cancellation] Failed to clear pending fees', { extra: { clearErr } });
     }
 
@@ -1883,7 +1884,7 @@ export async function completeCancellation(params: CompleteCancellationParams) {
             const pi = await stripe.paymentIntents.retrieve(participant.stripe_payment_intent_id);
             if (pi.status === 'succeeded' && pi.latest_charge) {
               const refund = await stripe.refunds.create({
-                charge: typeof pi.latest_charge === 'string' ? pi.latest_charge : (pi.latest_charge as any).id,
+                charge: typeof pi.latest_charge === 'string' ? pi.latest_charge : (pi.latest_charge as Stripe.Charge).id,
                 reason: 'requested_by_customer',
                 metadata: {
                   type: 'cancellation_completed_by_staff',
@@ -1956,7 +1957,7 @@ export async function completeCancellation(params: CompleteCancellationParams) {
     await tx.insert(notifications).values({
       userEmail: existing.userEmail || '',
       title: 'Booking Cancelled',
-      message: `Your booking on ${bookingDate} at ${bookingTime} has been cancelled and any charges have been refunded.`,
+      message: `Your booking on ${bookingDate} at ${bookingTime} has been cancelled and charges have been refunded.`,
       type: 'booking_cancelled',
       relatedId: bookingId,
       relatedType: 'booking_request'
@@ -1974,10 +1975,11 @@ export async function completeCancellation(params: CompleteCancellationParams) {
     bookingId,
     memberEmail: existing.userEmail || '',
     resourceId: existing.resourceId || undefined,
-    bookingDate: bookingDate,
+    bookingDate: String(bookingDate),
+    startTime: existing.startTime || '',
     status: 'cancelled',
     actionBy: 'staff'
-  } as any);
+  });
 
   logger.info('[Complete Cancellation] Staff manually completed cancellation of booking', { extra: { staffEmail, bookingId, errorCount: errors.length } });
 

@@ -11,6 +11,7 @@ import { addLineItemToDeal } from './lineItems';
 import { isPlaceholderEmail } from '../stripe/customers';
 import { getTodayPacific } from '../../utils/dateUtils';
 
+import { FilterOperatorEnum } from '@hubspot/api-client/lib/codegen/crm/contacts';
 import { logger } from '../logger';
 export interface AddMemberInput {
   firstName: string;
@@ -33,18 +34,27 @@ export interface AddMemberResult {
   error?: string;
 }
 
-export async function getContactDeals(hubspotContactId: string): Promise<any[]> {
+interface HubSpotAssociationResult {
+  results?: Array<{ id: string }>;
+}
+
+interface HubSpotDeal {
+  id: string;
+  properties: Record<string, string>;
+}
+
+export async function getContactDeals(hubspotContactId: string): Promise<HubSpotDeal[]> {
   try {
     const hubspot = await getHubSpotClient();
     const response = await retryableHubSpotRequest(() =>
-      (hubspot.crm.contacts as any).associationsApi.getAll(hubspotContactId, 'deals')
+      (hubspot.crm.contacts as unknown as { associationsApi: { getAll: (id: string, toObjectType: string) => Promise<HubSpotAssociationResult> } }).associationsApi.getAll(hubspotContactId, 'deals')
     );
     
-    if (!(response as any).results || (response as any).results.length === 0) {
+    if (!(response as HubSpotAssociationResult).results || (response as HubSpotAssociationResult).results!.length === 0) {
       return [];
     }
     
-    const dealIds = (response as any).results.map((r: any) => r.id);
+    const dealIds = (response as HubSpotAssociationResult).results!.map((r) => r.id);
     const deals = await Promise.all(
       dealIds.map((id: string) =>
         retryableHubSpotRequest(() =>
@@ -87,7 +97,7 @@ export async function findOrCreateHubSpotContact(
         filterGroups: [{
           filters: [{
             propertyName: 'email',
-            operator: 'EQ' as any,
+            operator: FilterOperatorEnum.Eq,
             value: email.toLowerCase()
           }]
         }],
@@ -199,7 +209,7 @@ export async function createMembershipDeal(
       dealId,
       'contacts',
       contactId,
-      [{ associationCategory: 'HUBSPOT_DEFINED' as any, associationTypeId: 3 }]
+      [{ associationCategory: 'HUBSPOT_DEFINED' as unknown as string, associationTypeId: 3 }]
     )
   );
   
@@ -251,7 +261,7 @@ export async function createDealForLegacyMember(
     );
     
     const existingDeals = await getContactDeals(contactId);
-    const existingMembershipDeal = existingDeals.find((deal: any) => 
+    const existingMembershipDeal = existingDeals.find((deal: HubSpotDeal) => 
       deal.properties?.pipeline === MEMBERSHIP_PIPELINE_ID
     );
     
@@ -274,7 +284,7 @@ export async function createDealForLegacyMember(
           isPrimary: true,
           lastKnownMindbodyStatus: normalizedStatus,
           billingProvider: 'mindbody'
-        } as any);
+        } as typeof hubspotDeals.$inferInsert);
       }
       
       return { 
@@ -322,7 +332,7 @@ export async function createDealForLegacyMember(
       isPrimary: true,
       lastKnownMindbodyStatus: normalizedStatus,
       billingProvider: 'mindbody'
-    } as any);
+    } as typeof hubspotDeals.$inferInsert);
     
     await pool.query(
       'UPDATE users SET hubspot_id = $1, updated_at = NOW() WHERE LOWER(email) = $2 AND (hubspot_id IS NULL OR hubspot_id = \'\')',
@@ -667,7 +677,7 @@ export async function createMemberWithDeal(input: AddMemberInput): Promise<AddMe
       return { success: false, error: 'Failed to add line item to deal' };
     }
     
-    let userId: any;
+    let userId: { rows: Array<{ id: number }> };
     
     try {
       const tags: string[] = [];
@@ -770,7 +780,7 @@ export async function getMemberPaymentStatus(email: string): Promise<{
       const lastCheck = new Date(cachedDeal.lastPaymentCheck);
       const hourAgo = new Date(Date.now() - 60 * 60 * 1000);
       if (lastCheck > hourAgo && cachedDeal.lastPaymentStatus) {
-        return { status: cachedDeal.lastPaymentStatus as any };
+        return { status: cachedDeal.lastPaymentStatus as 'current' | 'overdue' | 'failed' | 'unknown' };
       }
     }
     

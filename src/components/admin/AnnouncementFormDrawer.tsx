@@ -36,7 +36,7 @@ export const AnnouncementFormDrawer: React.FC<AnnouncementFormDrawerProps> = ({
     }
     setSaving(true);
     try {
-      const ann: any = {
+      const ann = {
         id: editItem?.id || undefined,
         title: formData.title,
         desc: formData.desc || '',

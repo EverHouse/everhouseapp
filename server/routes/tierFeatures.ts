@@ -9,17 +9,17 @@ import { logger } from '../core/logger';
 
 const router = Router();
 
-const FEATURE_KEY_TO_TIER_COLUMN: Record<string, { column: string; type: 'boolean' | 'number' | 'text'; format?: (val: any) => string }> = {
-  'daily_golf_time': { column: 'daily_sim_minutes', type: 'text', format: (val) => val > 0 ? `${val} min` : '—' },
-  'guest_passes': { column: 'guest_passes_per_month', type: 'text', format: (val) => val > 0 ? `${val}/mo` : '—' },
-  'booking_window': { column: 'booking_window_days', type: 'text', format: (val) => val > 0 ? `${val} days` : '—' },
+const FEATURE_KEY_TO_TIER_COLUMN: Record<string, { column: string | null; type: 'boolean' | 'number' | 'text'; format?: (val: unknown) => string }> = {
+  'daily_golf_time': { column: 'daily_sim_minutes', type: 'text', format: (val) => Number(val) > 0 ? `${val} min` : '—' },
+  'guest_passes': { column: 'guest_passes_per_month', type: 'text', format: (val) => Number(val) > 0 ? `${val}/mo` : '—' },
+  'booking_window': { column: 'booking_window_days', type: 'text', format: (val) => Number(val) > 0 ? `${val} days` : '—' },
   'cafe_bar_access': { column: null, type: 'boolean' },
   'lounge_access': { column: null, type: 'boolean' },
   'work_desks': { column: null, type: 'boolean' },
   'golf_simulators': { column: 'can_book_simulators', type: 'boolean' },
   'putting_green': { column: null, type: 'boolean' },
   'member_events': { column: null, type: 'boolean' },
-  'conference_room': { column: 'daily_conf_room_minutes', type: 'text', format: (val) => val > 0 ? `${val} min` : '—' },
+  'conference_room': { column: 'daily_conf_room_minutes', type: 'text', format: (val) => Number(val) > 0 ? `${val} min` : '—' },
   'group_lessons': { column: 'has_group_lessons', type: 'boolean' },
   'extended_sessions': { column: 'has_extended_sessions', type: 'boolean' },
   'private_lessons': { column: 'has_private_lesson', type: 'boolean' },
@@ -54,13 +54,13 @@ router.get('/api/tier-features', async (req, res) => {
       FROM tier_feature_values tfv
     `);
 
-    const valuesByFeature: Record<number, Record<number, { tierId: number; value: any }>> = {};
+    const valuesByFeature: Record<number, Record<number, { tierId: number; value: string | number | boolean | null }>> = {};
     for (const row of valuesResult.rows) {
       if (!valuesByFeature[row.feature_id as number]) {
         valuesByFeature[row.feature_id as number] = {};
       }
       
-      let value: any = null;
+      let value: string | number | boolean | null = null;
       if (row.value_text !== null && row.value_text !== '') {
         value = row.value_text;
       } else if (row.value_number !== null && row.value_number !== 0) {
@@ -79,7 +79,7 @@ router.get('/api/tier-features', async (req, res) => {
       const featureKey = row.feature_key as string;
       const mapping = FEATURE_KEY_TO_TIER_COLUMN[featureKey];
       
-      const values: Record<number, { tierId: number; value: any }> = {};
+      const values: Record<number, { tierId: number; value: string | number | boolean | null }> = {};
       
       for (const tier of tiersResult.rows) {
         const existingValue = valuesByFeature[row.id as number]?.[tier.id as number];
@@ -87,12 +87,12 @@ router.get('/api/tier-features', async (req, res) => {
         if (existingValue && existingValue.value !== null && existingValue.value !== '' && existingValue.value !== false) {
           values[tier.id as number] = existingValue;
         } else if (mapping) {
-          let derivedValue: any = null;
+          let derivedValue: string | number | boolean | null = null;
           
           if (mapping.column === null) {
             derivedValue = true;
           } else {
-            const rawValue = (tier as any)[mapping.column];
+            const rawValue = (tier as Record<string, unknown>)[mapping.column];
             if (mapping.format) {
               derivedValue = mapping.format(rawValue);
               if (derivedValue === '—') derivedValue = null;
@@ -175,7 +175,7 @@ router.post('/api/tier-features', isAdmin, async (req, res) => {
 
     await client.query('COMMIT');
 
-    logFromRequest(req, 'create_tier_feature' as any, 'tier_feature' as any, String(newFeature.id), newFeature.feature_key);
+    logFromRequest(req, 'create_tier_feature', 'tier_feature', String(newFeature.id), newFeature.feature_key);
     res.json({
       id: newFeature.id,
       featureKey: newFeature.feature_key,
@@ -223,7 +223,7 @@ router.put('/api/tier-features/:id', isAdmin, async (req, res) => {
     }
 
     const row = result.rows[0];
-    logFromRequest(req, 'update_tier_feature' as any, 'tier_feature' as any, String(row.id), row.feature_key as string);
+    logFromRequest(req, 'update_tier_feature', 'tier_feature', String(row.id), row.feature_key as string);
     res.json({
       id: row.id,
       featureKey: row.feature_key,
@@ -248,7 +248,7 @@ router.delete('/api/tier-features/:id', isAdmin, async (req, res) => {
       return res.status(404).json({ error: 'Feature not found' });
     }
 
-    logFromRequest(req, 'delete_tier_feature' as any, 'tier_feature' as any, String(result.rows[0].id));
+    logFromRequest(req, 'delete_tier_feature', 'tier_feature', String(result.rows[0].id));
     res.json({ success: true, deleted: result.rows[0].id });
   } catch (error: unknown) {
     if (!isProduction) logger.error('Delete tier feature error', { error: error instanceof Error ? error : new Error(String(error)) });
@@ -295,7 +295,7 @@ router.put('/api/tier-features/:featureId/values/:tierId', isAdmin, async (req, 
     `);
 
     const row = result.rows[0];
-    let returnValue: any = null;
+    let returnValue: string | number | boolean | null = null;
     if (row.value_text !== null) {
       returnValue = row.value_text;
     } else if (row.value_number !== null) {
@@ -304,7 +304,7 @@ router.put('/api/tier-features/:featureId/values/:tierId', isAdmin, async (req, 
       returnValue = row.value_boolean;
     }
 
-    logFromRequest(req, 'update_tier_feature_value' as any, 'tier_feature' as any, String(row.feature_id), undefined, { tierId: row.tier_id, value: returnValue });
+    logFromRequest(req, 'update_tier_feature_value', 'tier_feature', String(row.feature_id), undefined, { tierId: row.tier_id, value: returnValue });
     res.json({
       featureId: row.feature_id,
       tierId: row.tier_id,

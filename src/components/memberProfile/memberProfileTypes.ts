@@ -10,14 +10,77 @@ export interface MemberProfileDrawerProps {
   visitorMode?: boolean;
 }
 
+export interface BookingHistoryItem {
+  id: number | string;
+  resource_name?: string;
+  bay_name?: string;
+  request_date: string;
+  start_time: string;
+  end_time: string;
+  status: string;
+  user_name?: string;
+  user_email?: string;
+  resource_id?: number;
+  source?: string;
+  created_at?: string;
+  notes?: string;
+  member_notes?: string;
+  declared_player_count?: number | null;
+  guest_count?: number | null;
+}
+
+export interface EventRsvpItem {
+  id: number;
+  event_id: number;
+  title?: string;
+  event_date?: string;
+  start_time?: string;
+  status: string;
+  created_at?: string;
+}
+
+export interface WellnessHistoryItem {
+  id: number;
+  class_id?: number;
+  title?: string;
+  date?: string;
+  time?: string;
+  status: string;
+  created_at?: string;
+}
+
+export interface GuestPassInfo {
+  totalPasses: number;
+  usedPasses: number;
+  remainingPasses: number;
+  passType?: string;
+}
+
+export interface GuestCheckInItem {
+  id: number;
+  guest_name?: string;
+  guest_email?: string;
+  check_in_date: string;
+  booking_id?: number;
+  member_email?: string;
+}
+
+export interface VisitHistoryItem {
+  id: number;
+  visit_date: string;
+  check_in_time?: string;
+  status: string;
+  resource_name?: string;
+}
+
 export interface MemberHistory {
-  bookingHistory: any[];
-  bookingRequestsHistory: any[];
-  eventRsvpHistory: any[];
-  wellnessHistory: any[];
-  guestPassInfo: any | null;
-  guestCheckInsHistory: any[];
-  visitHistory: any[];
+  bookingHistory: BookingHistoryItem[];
+  bookingRequestsHistory: BookingHistoryItem[];
+  eventRsvpHistory: EventRsvpItem[];
+  wellnessHistory: WellnessHistoryItem[];
+  guestPassInfo: GuestPassInfo | null;
+  guestCheckInsHistory: GuestCheckInItem[];
+  visitHistory: VisitHistoryItem[];
   pastBookingsCount?: number;
   pastEventsCount?: number;
   pastWellnessCount?: number;

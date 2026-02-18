@@ -8,6 +8,7 @@ import { isStaffOrAdmin, isAdmin } from "../core/middleware";
 import { importMembersFromCSV, importSalesFromCSV, importAttendanceFromCSV, importFirstVisitReport, importSalesFromContent, parseFirstVisitReport } from "../core/mindbody/import";
 import { createDealForLegacyMember } from "../core/hubspotDeals";
 import { getHubSpotClient } from "../core/integrations";
+import type { Client as HubSpotClient } from '@hubspot/api-client';
 import { retryableHubSpotRequest } from "../core/hubspot/request";
 import { listCustomerInvoices } from "../core/stripe/invoices";
 import { getStripeClient } from "../core/stripe/client";
@@ -110,7 +111,7 @@ router.get("/api/legacy-purchases/my-purchases", async (req: Request, res: Respo
       saleDate: p.saleDate,
       isComp: p.isComp,
       quantity: p.quantity || 1,
-      staffName: (p as any).staffName || null,
+      staffName: (p as unknown as Record<string, unknown>).staffName as string || null,
     }));
     
     logger.info('[LegacyPurchases] my-purchases for : found purchases', { extra: { targetEmail, formattedPurchasesLength: formattedPurchases.length } });
@@ -291,7 +292,7 @@ async function getUnifiedPurchasesForEmail(email: string): Promise<UnifiedPurcha
       [userInfo.id, normalizedEmail]
     );
     
-    unifiedPaymentIntents = paymentIntentsResult.rows.map((record: any) => ({
+    unifiedPaymentIntents = paymentIntentsResult.rows.map((record: Record<string, unknown>) => ({
       id: `payment-${record.id}`,
       type: 'stripe' as const,
       itemName: cleanStripeDescription(record.description, record.purpose),
@@ -314,7 +315,7 @@ async function getUnifiedPurchasesForEmail(email: string): Promise<UnifiedPurcha
     [normalizedEmail]
   );
   
-  unifiedCashCheckPayments = cashCheckResult.rows.map((record: any) => {
+  unifiedCashCheckPayments = cashCheckResult.rows.map((record: Record<string, unknown>) => {
     const actionDetails = record.action_details || {};
     const paymentMethod = actionDetails.paymentMethod || actionDetails.payment_method || 'cash';
     
@@ -452,7 +453,7 @@ router.post("/api/legacy-purchases/admin/import", isAdmin, async (req: Request, 
   try {
     const { membersFile, salesFile, attendanceFile } = req.body;
     
-    const results: any = {};
+    const results: Record<string, unknown> = {};
     
     if (membersFile) {
       const membersPath = path.resolve(membersFile);
@@ -532,14 +533,14 @@ router.post("/api/legacy-purchases/admin/upload-csv",
         startedAt: new Date(),
       }).returning({ id: legacyImportJobs.id });
       
-      const results: any = {
+      const results: Record<string, unknown> = {
         batchId,
         firstVisit: null,
         sales: null,
       };
       
       // Step 1: Process First Visit Report first (if provided) to link clients
-      let clientLookup: Map<string, any> | undefined;
+      let clientLookup: ReturnType<typeof parseFirstVisitReport> | undefined;
       
       if (files.firstVisitFile && files.firstVisitFile[0]) {
         const firstVisitContent = files.firstVisitFile[0].buffer.toString('utf-8');
@@ -576,7 +577,7 @@ router.post("/api/legacy-purchases/admin/upload-csv",
           salesFile: files.salesFile?.[0]?.originalname,
           results,
         },
-      } as any);
+      } as unknown as Parameters<typeof logFromRequest>[1]);
       
       // Update job status using the job ID
       await db.update(legacyImportJobs)
@@ -584,7 +585,7 @@ router.post("/api/legacy-purchases/admin/upload-csv",
           status: 'completed',
           completedAt: new Date(),
           results: results,
-        } as any)
+        } as Record<string, unknown>)
         .where(eq(legacyImportJobs.id, job.id));
       
       res.json({
@@ -659,7 +660,7 @@ router.post("/api/legacy-purchases/admin/link-guest-fees", isAdmin, async (req: 
       if (sessions.rows && sessions.rows.length > 0) {
         await db.update(legacyPurchases)
           .set({
-            linkedBookingSessionId: (sessions.rows[0] as any).id,
+            linkedBookingSessionId: (sessions.rows[0] as Record<string, unknown>).id as number,
             linkedAt: new Date(),
           })
           .where(eq(legacyPurchases.id, purchase.id));
@@ -747,9 +748,9 @@ async function getCategoryProductId(itemCategory: string | null, itemName: strin
 
 // Helper: Create a line item directly with custom amount (for legacy purchases with specific prices)
 async function createLegacyLineItem(
-  hubspot: any,
+  hubspot: HubSpotClient,
   dealId: string,
-  purchase: any,
+  purchase: Record<string, unknown>,
   productId: string | null
 ): Promise<{ success: boolean; lineItemId?: string; error?: string }> {
   try {
@@ -775,7 +776,7 @@ async function createLegacyLineItem(
       hubspot.crm.lineItems.basicApi.create({ properties })
     );
     
-    const lineItemId = (lineItemResponse as any).id;
+    const lineItemId = (lineItemResponse as Record<string, unknown>).id as string;
     
     await retryableHubSpotRequest(() =>
       hubspot.crm.associations.v4.basicApi.create(

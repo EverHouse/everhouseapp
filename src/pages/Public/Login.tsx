@@ -45,7 +45,7 @@ const Login: React.FC = () => {
   const isDev = import.meta.env.DEV;
   
   const isPWA = typeof window !== 'undefined' && (
-    (window.navigator as any).standalone === true ||
+    (window.navigator as unknown as { standalone?: boolean }).standalone === true ||
     window.matchMedia('(display-mode: standalone)').matches
   );
 

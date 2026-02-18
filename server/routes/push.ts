@@ -193,7 +193,7 @@ router.get('/api/push/vapid-public-key', (req, res) => {
   res.json({ publicKey: process.env.VAPID_PUBLIC_KEY });
 });
 
-router.post('/api/push/subscribe', isAuthenticated, async (req: any, res) => {
+router.post('/api/push/subscribe', isAuthenticated, async (req, res) => {
   try {
     const { subscription } = req.body;
     const userEmail = req.session?.user?.email;
@@ -221,7 +221,7 @@ router.post('/api/push/subscribe', isAuthenticated, async (req: any, res) => {
   }
 });
 
-router.post('/api/push/unsubscribe', isAuthenticated, async (req: any, res) => {
+router.post('/api/push/unsubscribe', isAuthenticated, async (req, res) => {
   try {
     const { endpoint } = req.body;
     const userEmail = req.session?.user?.email;
@@ -239,7 +239,7 @@ router.post('/api/push/unsubscribe', isAuthenticated, async (req: any, res) => {
   }
 });
 
-router.post('/api/push/test', isAuthenticated, async (req: any, res) => {
+router.post('/api/push/test', isAuthenticated, async (req, res) => {
   try {
     const userEmail = req.session?.user?.email;
     

@@ -11,7 +11,7 @@ import { getGoogleCalendarClient } from '../core/integrations';
 import { createPacificDate, parseLocalDate, addDaysToPacificDate, getPacificISOString, getTodayPacific } from '../utils/dateUtils';
 import { clearClosureCache } from '../core/bookingValidation';
 import { broadcastClosureUpdate } from '../core/websocket';
-import { logFromRequest } from '../core/auditLog';
+import { logFromRequest, type AuditAction, type ResourceType } from '../core/auditLog';
 import { getErrorMessage, getErrorCode, getErrorStatusCode } from '../utils/errorUtils';
 
 const router = Router();
@@ -341,7 +341,7 @@ router.post('/api/notice-types', isStaffOrAdmin, async (req, res) => {
       return res.json(existing);
     }
     
-    logFromRequest(req, 'create_notice_type' as any, 'notice_type' as any, String(result.id), result.name, {});
+    logFromRequest(req, 'create_notice_type', 'notice_type', String(result.id), result.name, {});
     res.status(201).json(result);
   } catch (error: unknown) {
     if (!isProduction) logger.error('Notice type creation error', { error: error instanceof Error ? error : new Error(String(error)) });
@@ -367,7 +367,7 @@ router.put('/api/notice-types/:id', isStaffOrAdmin, async (req, res) => {
       return res.status(403).json({ error: 'Cannot edit preset notice types' });
     }
     
-    const updateData: Record<string, any> = {};
+    const updateData: Record<string, unknown> = {};
     if (name !== undefined) updateData.name = name.trim();
     if (sort_order !== undefined) updateData.sortOrder = sort_order;
     
@@ -381,7 +381,7 @@ router.put('/api/notice-types/:id', isStaffOrAdmin, async (req, res) => {
       .where(eq(noticeTypes.id, parseInt(id as string)))
       .returning();
     
-    logFromRequest(req, 'update_notice_type' as any, 'notice_type' as any, String(id), undefined, {});
+    logFromRequest(req, 'update_notice_type', 'notice_type', String(id), undefined, {});
     res.json(result);
   } catch (error: unknown) {
     if (getErrorCode(error) === '23505') {
@@ -413,7 +413,7 @@ router.delete('/api/notice-types/:id', isStaffOrAdmin, async (req, res) => {
       .delete(noticeTypes)
       .where(eq(noticeTypes.id, parseInt(id as string)));
     
-    logFromRequest(req, 'delete_notice_type' as any, 'notice_type' as any, String(id), undefined, {});
+    logFromRequest(req, 'delete_notice_type', 'notice_type', String(id), undefined, {});
     res.json({ success: true, message: 'Notice type deleted' });
   } catch (error: unknown) {
     if (!isProduction) logger.error('Notice type delete error', { error: error instanceof Error ? error : new Error(String(error)) });
@@ -461,7 +461,7 @@ router.post('/api/closure-reasons', isStaffOrAdmin, async (req, res) => {
       })
       .returning();
     
-    logFromRequest(req, 'create_closure_reason' as any, 'closure_reason' as any, String(result.id), result.label, {});
+    logFromRequest(req, 'create_closure_reason', 'closure_reason', String(result.id), result.label, {});
     res.status(201).json(result);
   } catch (error: unknown) {
     if (getErrorCode(error) === '23505') {
@@ -477,7 +477,7 @@ router.put('/api/closure-reasons/:id', isStaffOrAdmin, async (req, res) => {
     const { id } = req.params;
     const { label, sort_order, is_active } = req.body;
     
-    const updateData: Record<string, any> = {};
+    const updateData: Record<string, unknown> = {};
     if (label !== undefined) updateData.label = label.trim();
     if (sort_order !== undefined) updateData.sortOrder = sort_order;
     if (is_active !== undefined) updateData.isActive = is_active;
@@ -496,7 +496,7 @@ router.put('/api/closure-reasons/:id', isStaffOrAdmin, async (req, res) => {
       return res.status(404).json({ error: 'Closure reason not found' });
     }
     
-    logFromRequest(req, 'update_closure_reason' as any, 'closure_reason' as any, String(id), undefined, {});
+    logFromRequest(req, 'update_closure_reason', 'closure_reason', String(id), undefined, {});
     res.json(result);
   } catch (error: unknown) {
     if (getErrorCode(error) === '23505') {
@@ -521,7 +521,7 @@ router.delete('/api/closure-reasons/:id', isStaffOrAdmin, async (req, res) => {
       return res.status(404).json({ error: 'Closure reason not found' });
     }
     
-    logFromRequest(req, 'delete_closure_reason' as any, 'closure_reason' as any, String(id), undefined, {});
+    logFromRequest(req, 'delete_closure_reason', 'closure_reason', String(id), undefined, {});
     res.json({ success: true, message: 'Closure reason deactivated' });
   } catch (error: unknown) {
     if (!isProduction) logger.error('Closure reason delete error', { error: error instanceof Error ? error : new Error(String(error)) });
@@ -563,7 +563,7 @@ router.get('/api/closures/needs-review', isStaffOrAdmin, async (req, res) => {
       if (!closure.affectedAreas || closure.affectedAreas === 'none') {
         missingFields.push('Affected areas');
       }
-      if (!(closure as any).visibility || (closure as any).visibility.trim() === '') {
+      if (!(closure as Record<string, unknown>).visibility || ((closure as Record<string, unknown>).visibility as string).trim() === '') {
         missingFields.push('Visibility');
       }
       return {
@@ -1076,7 +1076,7 @@ router.put('/api/closures/:id', isStaffOrAdmin, async (req, res) => {
             relatedType: 'closure'
           }));
           
-          await db.insert(notifications).values(notificationValues as any);
+          await db.insert(notifications).values(notificationValues as typeof notifications.$inferInsert[]);
           logger.info('[Closures] Sent same-day publish notification to members for closure #', { extra: { allMembersLength: allMembers.length, closureId } });
         }
       } catch (notifyError: unknown) {

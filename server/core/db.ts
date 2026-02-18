@@ -53,9 +53,9 @@ export function isConstraintError(error: unknown): { type: 'unique' | 'foreign_k
   return { type: null };
 }
 
-export async function queryWithRetry<T = any>(
+export async function queryWithRetry<T = Record<string, unknown>>(
   queryText: string,
-  params?: any[],
+  params?: unknown[],
   maxRetries: number = 3
 ): Promise<QueryResult<T>> {
   let lastError: unknown = null;

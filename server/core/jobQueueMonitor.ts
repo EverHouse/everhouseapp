@@ -34,7 +34,7 @@ export async function getJobQueueMonitorData(): Promise<JobQueueMonitorData> {
     FROM job_queue
   `);
 
-  const statsRow = statsResult.rows[0] as any;
+  const statsRow = statsResult.rows[0] as Record<string, unknown>;
   const stats: JobQueueStats = {
     pending: statsRow?.pending || 0,
     processing: statsRow?.processing || 0,
@@ -50,7 +50,7 @@ export async function getJobQueueMonitorData(): Promise<JobQueueMonitorData> {
     LIMIT 20
   `);
 
-  const recentFailed: FailedJob[] = failedResult.rows.map((r: any) => ({
+  const recentFailed: FailedJob[] = failedResult.rows.map((r: Record<string, unknown>) => ({
     id: r.id,
     jobType: r.job_type,
     lastError: r.last_error,
@@ -67,7 +67,7 @@ export async function getJobQueueMonitorData(): Promise<JobQueueMonitorData> {
     LIMIT 10
   `);
 
-  const recentCompleted = completedResult.rows.map((r: any) => ({
+  const recentCompleted = completedResult.rows.map((r: Record<string, unknown>) => ({
     id: r.id,
     jobType: r.job_type,
     processedAt: r.processed_at?.toISOString?.() || r.processed_at,
@@ -76,7 +76,7 @@ export async function getJobQueueMonitorData(): Promise<JobQueueMonitorData> {
   const oldestResult = await db.execute(sql`
     SELECT MIN(created_at) as oldest FROM job_queue WHERE status = 'pending'
   `);
-  const oldestPending = (oldestResult.rows[0] as any)?.oldest?.toISOString?.() || null;
+  const oldestPending = (oldestResult.rows[0] as Record<string, unknown>)?.oldest ? String((oldestResult.rows[0] as Record<string, unknown>).oldest) : null;
 
   return { stats, recentFailed, recentCompleted, oldestPending };
 }

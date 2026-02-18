@@ -23,7 +23,7 @@ export async function updateVisitorType({
   
   try {
     let updateQuery: string;
-    let params: any[];
+    let params: (string | number | Date)[];
     
     if (type === 'day_pass') {
       updateQuery = `
@@ -97,7 +97,7 @@ export async function updateVisitorTypeByUserId(
 ): Promise<boolean> {
   try {
     let updateQuery: string;
-    let params: any[];
+    let params: (string | number | Date)[];
     
     if (type === 'day_pass') {
       updateQuery = `
