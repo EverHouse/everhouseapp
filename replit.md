@@ -1,17 +1,3 @@
-# 🧠 Skill Selection Protocol (MANDATORY)
-Before executing ANY task (Plan or Build), you must:
-1. **🔍 Scan Context:** Check `SKILL.md` and the `.agents/` directory.
-2. **🎯 Select Skill:** Identify the specific skill that matches the request (e.g., `billing-stripe-expert`, `postgres-drizzle`).
-3. **📢 Announce It:** Start your response by stating: *"Activating [Skill Name] protocols..."*
-4. **🔒 Enforce Rules:** Strictly follow that skill's constraints (e.g., "Always use `billing_provider` checks").
-
-## 🧠 Skill Acquisition Protocol
-If a user asks for a task involving a library or framework (e.g., Stripe, Drizzle, Tailwind) that is NOT covered in `SKILL.md` or `.agents/`:
-1. **STOP** and inform the user: "I lack a specialized skill for [Topic]. Would you like me to research and create one?"
-2. If yes, browse the official docs for that topic.
-3. Compile the best practices into a new file: `.agents/skills/[topic]-expert/SKILL.md`.
-4. Read the file into your context and proceed with the task.
-
 # Ever Club Members App
 
 ## Overview
@@ -55,7 +41,6 @@ The application is built with a React 19 frontend (Vite, Tailwind CSS) and an Ex
 - **Trackman Integration**: 1:1 sync with CSV imports and webhooks for real-time booking and delta billing.
 - **Google Sign-In**: Members can sign in with Google or link accounts.
 - **Error Handling**: Shared `server/utils/errorUtils.ts` utility for safe error handling. All catch blocks use `catch (error: unknown)` with proper type narrowing.
-- **TypeScript Quality**: tsconfig uses `incremental`, `forceConsistentCasingInFileNames`, `noFallthroughCasesInSwitch`. Stripe webhook handlers use proper Stripe types.
 - **Security**: Role-based access control, rate limiting, SQL injection prevention, webhook signature verification, secure session management, CORS origin whitelist, authentication middleware.
 - **Notifications**: In-app real-time notifications with 3-channel delivery (in-app, email, push).
 - **Real-Time Sync**: Instant updates via WebSocket and Supabase Realtime.
