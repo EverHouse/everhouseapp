@@ -11,6 +11,7 @@ import { isExpandedProduct } from '../../types/stripe-helpers';
 import { getTodayPacific, getPacificMidnightUTC } from '../../utils/dateUtils';
 import { getStripeClient } from '../../core/stripe/client';
 import { isPlaceholderEmail } from '../../core/stripe/customers';
+import { findOrCreateHubSpotContact } from '../../core/hubspot/members';
 import {
   createPaymentIntent,
   createBalanceAwarePayment,
@@ -679,6 +680,9 @@ router.post('/api/stripe/staff/quick-charge', isStaffOrAdmin, async (req: Reques
                    archived_by = NULL,
                    updated_at = NOW()`);
               logger.info('[QuickCharge] Created visitor record for new customer', { extra: { memberEmail } });
+              findOrCreateHubSpotContact(memberEmail, firstName, lastName).catch((err) => {
+                logger.error('[QuickCharge] Background HubSpot sync for visitor failed', { error: err instanceof Error ? err : new Error(String(err)) });
+              });
             }
           } else if (!existingUser.rows[0].stripe_customer_id) {
             await db.execute(sql`UPDATE users SET stripe_customer_id = ${stripeCustomerId}, archived_at = NULL, archived_by = NULL, updated_at = NOW() WHERE id = ${existingUser.rows[0].id}`);
@@ -889,6 +893,18 @@ router.post('/api/stripe/staff/quick-charge/confirm', isStaffOrAdmin, async (req
              VALUES (${userId}, ${memberEmail.toLowerCase()}, ${firstName}, ${lastName}, ${phone}, ${dob}, ${validatedTierName}, 'inactive', 'stripe', ${stripeCustomerId || null}, NOW())`);
           logger.info('[Stripe] Created user with tier after payment confirmation', { extra: { memberEmail, validatedTierName } });
         }
+      }
+
+      // Background sync new member to HubSpot
+      if (metadata.createUser === 'true' && metadata.memberEmail) {
+        findOrCreateHubSpotContact(
+          metadata.memberEmail.toLowerCase(),
+          metadata.firstName || '',
+          metadata.lastName || '',
+          metadata.phone || undefined
+        ).catch((err) => {
+          logger.error('[Stripe] Background HubSpot sync after payment confirmation failed', { error: err instanceof Error ? err : new Error(String(err)) });
+        });
       }
     }
 

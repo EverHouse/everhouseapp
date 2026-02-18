@@ -23,6 +23,10 @@ export const changelog: ChangelogEntry[] = [
       "Fixed: Adding a family or corporate sub-member to a billing group now syncs their contact info to HubSpot",
       "Fixed: Resyncing member data from HubSpot (via Data Tools) now also updates their Stripe customer record",
       "Fixed: Data Integrity sync-pull now includes phone number and updates Stripe records to match",
+      "Fixed: Payment confirmation (quick charge with member creation) now syncs new member to HubSpot",
+      "Fixed: QuickCharge and Terminal day-pass visitor records now sync to HubSpot for CRM tracking",
+      "Fixed: Staff-invite checkout webhook now fetches phone from Stripe customer and includes it in HubSpot sync",
+      "Fixed: Activation-link checkout webhook now syncs member contact info (name/phone) to HubSpot — previously only synced status",
     ]
   },
   {

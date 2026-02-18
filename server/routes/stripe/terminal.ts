@@ -6,6 +6,7 @@ import { createInvoiceWithLineItems, type CartLineItem } from '../../core/stripe
 import { logFromRequest } from '../../core/auditLog';
 import { pool } from '../../core/db';
 import { getErrorMessage, getErrorCode } from '../../utils/errorUtils';
+import { findOrCreateHubSpotContact } from '../../core/hubspot/members';
 
 const router = Router();
 
@@ -171,6 +172,16 @@ router.post('/api/stripe/terminal/process-payment', isStaffOrAdmin, async (req: 
                   [visitorId, metadata.ownerEmail, firstName, lastName, customerId]
                 );
                 logger.info('[Terminal] Created/updated visitor record for POS customer', { extra: { metadataOwnerEmail: metadata.ownerEmail } });
+                
+                // Background sync visitor to HubSpot for CRM tracking
+                findOrCreateHubSpotContact(
+                  metadata.ownerEmail,
+                  firstName || '',
+                  lastName || '',
+                  undefined
+                ).catch((err) => {
+                  logger.error('[Terminal] Background HubSpot sync for day-pass visitor failed', { extra: { err: err instanceof Error ? err.message : String(err) } });
+                });
               }
             }
           } catch (visitorErr: unknown) {

@@ -542,6 +542,9 @@ router.post('/api/visitors', isStaffOrAdmin, async (req, res) => {
 
     const userId = crypto.randomUUID();
     
+    // NOTE: Visitors (role='visitor') are intentionally NOT synced to Stripe or HubSpot.
+    // They are local tracking records for walk-ins/check-ins. Day-pass buyers and members
+    // are synced via their respective payment/checkout paths (payments.ts, terminal.ts, webhooks.ts).
     const insertResult = await db.execute(sql`
       INSERT INTO users (id, email, first_name, last_name, phone, role, membership_status, visitor_type, data_source, created_at, updated_at)
       VALUES (${userId}, ${normalizedEmail}, ${firstName || null}, ${lastName || null}, ${phone || null}, 'visitor', 'visitor', ${visitorType || null}, ${dataSource || null}, NOW(), NOW())

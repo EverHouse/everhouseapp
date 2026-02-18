@@ -2111,6 +2111,25 @@ async function handleCheckoutSessionCompleted(client: PoolClient, session: Strip
             const updatedEmail = updateResult.rows[0].email;
             console.log(`[Stripe Webhook] Activation link checkout: activated user ${updatedEmail} with subscription ${subscriptionId}`);
 
+            // Also sync contact info to HubSpot
+            try {
+              const { findOrCreateHubSpotContact } = await import('../hubspot/members');
+              const userInfo = await client.query(
+                'SELECT first_name, last_name, phone FROM users WHERE id = $1',
+                [updateResult.rows[0].id]
+              );
+              if (userInfo.rows[0]) {
+                await findOrCreateHubSpotContact(
+                  updatedEmail,
+                  userInfo.rows[0].first_name || '',
+                  userInfo.rows[0].last_name || '',
+                  userInfo.rows[0].phone || undefined
+                );
+              }
+            } catch (contactErr) {
+              console.error('[Stripe Webhook] HubSpot contact sync failed for activation link:', contactErr);
+            }
+
             try {
               const { syncMemberToHubSpot } = await import('../hubspot/stages');
               await syncMemberToHubSpot({
@@ -2242,11 +2261,24 @@ async function handleCheckoutSessionCompleted(client: PoolClient, session: Strip
       try {
         const { findOrCreateHubSpotContact } = await import('../hubspot/members');
         const { syncMemberToHubSpot } = await import('../hubspot/stages');
+        
+        // Fetch phone from Stripe customer for HubSpot sync
+        let customerPhone: string | undefined;
+        try {
+          const stripeForPhone = await getStripeClient();
+          const stripeCustomer = await stripeForPhone.customers.retrieve(customerId);
+          if (!(stripeCustomer as any).deleted) {
+            customerPhone = (stripeCustomer as any).phone || undefined;
+          }
+        } catch (phoneErr) {
+          // Non-blocking
+        }
+        
         await findOrCreateHubSpotContact(
           email,
           firstName || '',
           lastName || '',
-          undefined,
+          customerPhone,
           tierName || undefined
         );
         
