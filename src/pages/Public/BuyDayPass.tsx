@@ -43,14 +43,14 @@ const BuyDayPass: React.FC = () => {
       
       const allTiers = await response.json();
       const dayPasses = allTiers
-        .filter((tier: { product_type?: string; slug?: string; name: string; stripe_price_id?: string; monthly_price?: number; description?: string }) => tier.product_type === 'one_time')
-        .filter((tier: { product_type?: string; slug?: string; name: string; stripe_price_id?: string; monthly_price?: number; description?: string }) => !tier.slug?.includes('overage'))
-        .map((tier: { product_type?: string; slug?: string; name: string; stripe_price_id?: string; monthly_price?: number; description?: string }) => ({
-          id: tier.id,
+        .filter((tier: { product_type?: string; slug?: string; name: string; stripe_price_id?: string; monthly_price?: number; description?: string; id?: number; price_string?: string; price_cents?: number }) => tier.product_type === 'one_time')
+        .filter((tier: { product_type?: string; slug?: string; name: string; stripe_price_id?: string; monthly_price?: number; description?: string; id?: number; price_string?: string; price_cents?: number }) => !tier.slug?.includes('overage'))
+        .map((tier: { product_type?: string; slug?: string; name: string; stripe_price_id?: string; monthly_price?: number; description?: string; id?: number; price_string?: string; price_cents?: number }) => ({
+          id: tier.id as number,
           name: tier.name,
           slug: tier.slug,
-          priceString: tier.price_string,
-          priceCents: tier.price_cents,
+          priceString: tier.price_string as string,
+          priceCents: tier.price_cents as number,
           description: tier.description,
           stripePriceId: tier.stripe_price_id,
         }));

@@ -27,6 +27,14 @@ export interface BookingRequest {
     guardian_relationship?: string | null;
     guardian_phone?: string | null;
     guardian_consent_at?: string | null;
+    is_unmatched?: boolean;
+    declared_player_count?: number;
+    filled_player_count?: number;
+    cancellation_reason?: string | null;
+    player_count?: number | null;
+    userName?: string | null;
+    note?: string | null;
+    fee_snapshot_paid?: boolean;
 }
 
 export interface Bay {

@@ -410,7 +410,7 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
                                         return !e || e.includes('@trackman.local') || e.includes('@visitors.evenhouse.club') || e.startsWith('unmatched-') || e.startsWith('golfnow-') || e.startsWith('classpass-') || e === 'unmatched@trackman.import' || booking.user_name === 'Unknown (Trackman)';
                                     })());
                                     const declaredPlayers = booking?.declared_player_count ?? 1;
-                                    const unfilledSlots = (booking as Record<string, unknown>)?.unfilled_slots ?? 0;
+                                    const unfilledSlots = Number((booking as unknown as Record<string, unknown>)?.unfilled_slots) || 0;
                                     const filledSlots = Math.max(0, declaredPlayers - unfilledSlots);
                                     const hasPartialRoster = !isConference && booking && declaredPlayers > 1 && filledSlots < declaredPlayers;
                                     const isEmptyCell = !closure && !eventBlock && !booking && !pendingRequest;
@@ -440,12 +440,12 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
                                                 currentMemberEmail: isUnmatched ? undefined : (booking.user_email || undefined),
                                                 ownerName: booking.user_name || undefined,
                                                 ownerEmail: booking.user_email || undefined,
-                                                declaredPlayerCount: booking.declared_player_count || (booking as Record<string, unknown>).player_count || 1,
+                                                declaredPlayerCount: booking.declared_player_count || (booking as unknown as Record<string, unknown>).player_count || 1,
                                                 isRelink: !isUnmatched,
-                                                importedName: booking.user_name || (booking as Record<string, unknown>).userName,
-                                                notes: booking.notes || (booking as Record<string, unknown>).note,
+                                                importedName: booking.user_name || (booking as unknown as Record<string, unknown>).userName,
+                                                notes: booking.notes || (booking as unknown as Record<string, unknown>).note,
                                                 bookingStatus: booking.status,
-                                                bookingContext: { requestDate: booking.request_date, startTime: booking.start_time, endTime: booking.end_time, resourceId: booking.resource_id || undefined, resourceName: (resource.type === 'conference_room' ? 'Conference Room' : resource.name) || undefined, durationMinutes: (booking as Record<string, unknown>).duration_minutes || undefined, trackmanCustomerNotes: (booking as Record<string, unknown>).trackman_customer_notes || undefined },
+                                                bookingContext: { requestDate: booking.request_date, startTime: booking.start_time, endTime: booking.end_time, resourceId: booking.resource_id || undefined, resourceName: (resource.type === 'conference_room' ? 'Conference Room' : resource.name) || undefined, durationMinutes: (booking as unknown as Record<string, unknown>).duration_minutes || undefined, trackmanCustomerNotes: (booking as unknown as Record<string, unknown>).trackman_customer_notes || undefined },
                                                 ownerMembershipStatus: bookingMemberStatus || null,
                                             }) : pendingRequest ? () => setTrackmanModal({ isOpen: true, booking: pendingRequest }) : undefined}
                                             className={`h-7 sm:h-8 rounded ${
@@ -500,8 +500,8 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
                                                         isConference={isConference}
                                                         isUnmatched={!!isUnmatched}
                                                         isInactiveMember={!!isInactiveMember}
-                                                        snapshotPaid={(booking as Record<string, unknown>)?.fee_snapshot_paid === true}
-                                                        dbOwed={(booking as Record<string, unknown>)?.total_owed ?? 0}
+                                                        snapshotPaid={(booking as unknown as Record<string, unknown>)?.fee_snapshot_paid === true}
+                                                        dbOwed={Number((booking as unknown as Record<string, unknown>)?.total_owed) || 0}
                                                         hasUnpaidFeesFlag={booking?.has_unpaid_fees === true}
                                                         bookingStatus={booking?.status || 'approved'}
                                                         startTime={booking.start_time}

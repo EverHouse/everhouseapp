@@ -164,6 +164,7 @@ interface DashboardBookingItem {
   primaryBookerName?: string;
   declared_player_count?: number;
   notes?: string;
+  calendar_event_id?: string | null;
 }
 
 interface DashboardRawBooking {
@@ -175,6 +176,7 @@ interface DashboardRawBooking {
   resource_name?: string;
   resource_type?: string;
   status?: string;
+  declared_player_count?: number;
 }
 
 
@@ -609,7 +611,7 @@ const Dashboard: React.FC = () => {
           const participants = participantsData.participants || [];
           
           const myParticipant = participants.find((p: { user_email?: string }) => 
-            p.email?.toLowerCase() === user.email.toLowerCase()
+            p.user_email?.toLowerCase() === user.email.toLowerCase()
           );
           
           if (!myParticipant) {
@@ -918,7 +920,7 @@ const Dashboard: React.FC = () => {
             <div ref={scheduleRef} className="space-y-3">
               {upcomingItemsFiltered.length > 0 ? upcomingItemsFiltered.slice(0, 6).map((item, idx) => {
                 let actions;
-                const isCancelling = optimisticCancellingIds.has(item.dbId);
+                const isCancelling = optimisticCancellingIds.has(Number(item.dbId));
                 
                 if (item.type === 'booking' || item.type === 'booking_request') {
                   const bookingStatus = (item as DashboardBookingItem).status;
@@ -946,7 +948,7 @@ const Dashboard: React.FC = () => {
                       ...(hasUnpaidOverage && !isLinkedMember ? [{
                         icon: 'payment',
                         label: `Pay $${overageAmount}`,
-                        onClick: () => setOveragePaymentBooking({ id: item.dbId, amount: rawBooking.overage_fee_cents!, minutes: rawBooking.overage_minutes || 0 }),
+                        onClick: () => setOveragePaymentBooking({ id: Number(item.dbId), amount: rawBooking.overage_fee_cents!, minutes: rawBooking.overage_minutes || 0 }),
                         highlight: true
                       }] : []),
                       ...(isConfirmed ? [{
@@ -962,12 +964,12 @@ const Dashboard: React.FC = () => {
                         }, `EverClub_${item.rawDate}_${item.title.replace(/[^a-zA-Z0-9]/g, '_')}.ics`)
                       }] : []),
                       ...(!isLinkedMember ? [
-                        { icon: 'close', label: 'Cancel', onClick: () => handleCancelBooking(item.dbId, item.type) }
+                        { icon: 'close', label: 'Cancel', onClick: () => handleCancelBooking(Number(item.dbId), item.type) }
                       ] : []),
                       ...(isLinkedMember && isConfirmed ? [{
                         icon: 'logout',
                         label: 'Leave',
-                        onClick: () => handleLeaveBooking(item.dbId, primaryBookerName)
+                        onClick: () => handleLeaveBooking(Number(item.dbId), primaryBookerName)
                       }] : [])
                     ];
                   }

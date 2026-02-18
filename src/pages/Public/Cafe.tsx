@@ -46,7 +46,7 @@ const PublicCafe: React.FC = () => {
             id: item.id?.toString() || '',
             name: item.name || '',
             category: item.category || '',
-            price: parseFloat(item.price) || 0,
+            price: parseFloat(String(item.price)) || 0,
             desc: item.description || item.desc || '',
             image: item.image_url || item.image || '',
             icon: item.icon || ''

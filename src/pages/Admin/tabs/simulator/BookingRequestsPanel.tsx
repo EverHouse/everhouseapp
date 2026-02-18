@@ -173,7 +173,7 @@ const BookingRequestsPanel: React.FC<BookingRequestsPanelProps> = ({
                                                 trackmanBookingId: item.trackman_booking_id || null,
                                                 bookingId: item.id,
                                                 mode: 'manage' as const,
-                                                bayName: bookingResource?.name || (item as Record<string, unknown>).bay_name || `Bay ${item.resource_id}`,
+                                                bayName: bookingResource?.name || item.bay_name || `Bay ${item.resource_id}`,
                                                 bookingDate: item.request_date,
                                                 timeSlot: `${formatTime12Hour(item.start_time)} - ${formatTime12Hour(item.end_time)}`,
                                                 matchedBookingId: Number(item.id),
@@ -199,9 +199,9 @@ const BookingRequestsPanel: React.FC<BookingRequestsPanelProps> = ({
                                             <p className="text-sm text-red-700 dark:text-red-400 mb-1">
                                                 {formatDateShortAdmin(item.request_date)} • {formatTime12Hour(item.start_time)} - {formatTime12Hour(item.end_time)}
                                             </p>
-                                            {(item as Record<string, unknown>).cancellation_reason && (
+                                            {item.cancellation_reason && (
                                                 <p className="text-sm text-red-600/80 dark:text-red-400/80 italic mb-2">
-                                                    "{(item as Record<string, unknown>).cancellation_reason}"
+                                                    "{item.cancellation_reason}"
                                                 </p>
                                             )}
                                             {item.created_at && (
@@ -465,10 +465,10 @@ const BookingRequestsPanel: React.FC<BookingRequestsPanelProps> = ({
                                                             currentMemberEmail: isUnmatched ? undefined : (booking.user_email || undefined),
                                                             ownerName: booking.user_name || undefined,
                                                             ownerEmail: booking.user_email || undefined,
-                                                            declaredPlayerCount: booking.declared_player_count || (booking as Record<string, unknown>).player_count || 1,
+                                                            declaredPlayerCount: booking.declared_player_count || booking.player_count || 1,
                                                             isRelink: !isUnmatched,
-                                                            importedName: booking.user_name || (booking as Record<string, unknown>).userName,
-                                                            notes: booking.notes || (booking as Record<string, unknown>).note,
+                                                            importedName: booking.user_name || booking.userName,
+                                                            notes: booking.notes || booking.note,
                                                             bookingStatus: booking.status,
                                                             bookingContext: { requestDate: booking.request_date, startTime: booking.start_time, endTime: booking.end_time, resourceId: booking.resource_id || undefined, resourceName: (bookingResource?.name || booking.bay_name || booking.resource_name) || undefined, durationMinutes: booking.duration_minutes || undefined },
                                                         })}
@@ -503,7 +503,7 @@ const BookingRequestsPanel: React.FC<BookingRequestsPanelProps> = ({
                                                                     <p className="font-semibold text-base text-primary dark:text-white">
                                                                         {displayName}
                                                                     </p>
-                                                                    {(booking as Record<string, unknown>).tier && <TierBadge tier={(booking as Record<string, unknown>).tier} size="sm" />}
+                                                                    {booking.tier && <TierBadge tier={booking.tier} size="sm" />}
                                                                     {isConferenceRoom ? (
                                                                         <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-400">
                                                                             Conf
@@ -590,8 +590,8 @@ const BookingRequestsPanel: React.FC<BookingRequestsPanelProps> = ({
                                                                         timeSlot: `${formatTime12Hour(booking.start_time)} - ${formatTime12Hour(booking.end_time)}`,
                                                                         matchedBookingId: Number(booking.id),
                                                                         isRelink: false,
-                                                                        importedName: booking.user_name || (booking as Record<string, unknown>).userName,
-                                                                        notes: booking.notes || (booking as Record<string, unknown>).note
+                                                                        importedName: booking.user_name || booking.userName,
+                                                                        notes: booking.notes || booking.note
                                                                     })}
                                                                     className="flex-1 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-sm font-medium flex items-center justify-center gap-2 hover:shadow-md active:scale-95 transition-all duration-fast"
                                                                 >
@@ -603,7 +603,7 @@ const BookingRequestsPanel: React.FC<BookingRequestsPanelProps> = ({
                                                                     <span aria-hidden="true" className="material-symbols-outlined text-lg">check_circle</span>
                                                                     Checked In
                                                                 </span>
-                                                            ) : !isConferenceRoom && isToday && (booking as Record<string, unknown>).fee_snapshot_paid ? (
+                                                            ) : !isConferenceRoom && isToday && booking.fee_snapshot_paid ? (
                                                                 <span className="flex-1 py-2.5 bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400 rounded-xl text-sm font-medium flex items-center justify-center gap-2">
                                                                     <span aria-hidden="true" className="material-symbols-outlined text-lg">check_circle</span>
                                                                     Paid

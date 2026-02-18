@@ -223,28 +223,28 @@ const ClassesView: React.FC<{onBook: (cls: WellnessClass) => void; isDark?: bool
     queryFn: async () => {
       const { ok, data } = await apiRequest<Array<Record<string, unknown>>>('/api/wellness-classes?active_only=true');
       if (ok && data) {
-        return data.map((c: Record<string, unknown>) => {
-          const spotsRemaining = c.spots_remaining !== null ? parseInt(c.spots_remaining, 10) : null;
-          const enrolledCount = parseInt(c.enrolled_count, 10) || 0;
-          const waitlistCount = parseInt(c.waitlist_count, 10) || 0;
-          const capacity = c.capacity !== null ? parseInt(c.capacity, 10) : null;
+        return data.map((c: Record<string, unknown>): WellnessClass => {
+          const spotsRemaining = c.spots_remaining !== null ? parseInt(String(c.spots_remaining), 10) : null;
+          const enrolledCount = parseInt(String(c.enrolled_count), 10) || 0;
+          const waitlistCount = parseInt(String(c.waitlist_count), 10) || 0;
+          const capacity = c.capacity !== null ? parseInt(String(c.capacity), 10) : null;
           return {
-            id: c.id,
-            title: c.title,
-            date: c.date,
-            time: c.time,
-            instructor: c.instructor,
-            duration: c.duration,
-            category: c.category,
-            spots: c.spots,
+            id: c.id as number,
+            title: c.title as string,
+            date: c.date as string,
+            time: c.time as string,
+            instructor: c.instructor as string,
+            duration: c.duration as string,
+            category: c.category as string,
+            spots: c.spots as string,
             spotsRemaining,
             enrolledCount,
-            status: spotsRemaining !== null && spotsRemaining <= 0 ? 'Full' : (c.status || 'Open'),
-            description: c.description,
+            status: spotsRemaining !== null && spotsRemaining <= 0 ? 'Full' : ((c.status as string) || 'Open'),
+            description: c.description as string | undefined,
             capacity,
-            waitlistEnabled: c.waitlist_enabled || false,
+            waitlistEnabled: (c.waitlist_enabled as boolean) || false,
             waitlistCount,
-            external_url: c.external_url || undefined
+            external_url: (c.external_url as string) || undefined
           };
         });
       }
@@ -640,7 +640,37 @@ const LoadingSpinner: React.FC<{ className?: string }> = ({ className = '' }) =>
   </svg>
 );
 
-const ClassCard: React.FC<Record<string, unknown>> = ({ title, date, time, instructor, duration, category, spots, spotsRemaining, enrolledCount, status, description, isExpanded, onToggle, onBook, onCancel, isEnrolled, isOnWaitlist, isCancelling, isRsvping, isCancelDisabled = false, isDark = true, isMembershipInactive = false, isFull = false, capacity, waitlistEnabled, waitlistCount = 0, externalUrl }) => {
+interface ClassCardProps {
+  title: string;
+  date: string;
+  time: string;
+  instructor: string;
+  duration: string;
+  category: string;
+  spots: string;
+  spotsRemaining: number | null;
+  enrolledCount: number;
+  status: string;
+  description?: string;
+  isExpanded: boolean;
+  onToggle: () => void;
+  onBook: () => void;
+  onCancel: () => void;
+  isEnrolled: boolean;
+  isOnWaitlist: boolean;
+  isCancelling: boolean;
+  isRsvping: boolean;
+  isCancelDisabled?: boolean;
+  isDark?: boolean;
+  isMembershipInactive?: boolean;
+  isFull?: boolean;
+  capacity?: number | null;
+  waitlistEnabled?: boolean;
+  waitlistCount?: number;
+  externalUrl?: string;
+}
+
+const ClassCard: React.FC<ClassCardProps> = ({ title, date, time, instructor, duration, category, spots, spotsRemaining, enrolledCount, status, description, isExpanded, onToggle, onBook, onCancel, isEnrolled, isOnWaitlist, isCancelling, isRsvping, isCancelDisabled = false, isDark = true, isMembershipInactive = false, isFull = false, capacity, waitlistEnabled, waitlistCount = 0, externalUrl }) => {
   const formattedTime = formatTimeTo12Hour(time);
   const showJoinWaitlist = isFull && waitlistEnabled && !isEnrolled;
   const showFullNoWaitlist = isFull && !waitlistEnabled && !isEnrolled;

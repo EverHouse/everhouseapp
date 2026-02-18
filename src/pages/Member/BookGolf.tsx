@@ -646,7 +646,7 @@ const BookGolf: React.FC = () => {
       const totalMinutes = (end[0] * 60 + end[1]) - (start[0] * 60 + start[1]);
       
       // Split time among all players (members + guests) if total_player_count is available
-      const playerCount = (booking as Record<string, unknown>).total_player_count || 1;
+      const playerCount = Number((booking as unknown as Record<string, unknown>).total_player_count) || 1;
       const memberShare = Math.ceil(totalMinutes / playerCount);
       
       return sum + memberShare;
