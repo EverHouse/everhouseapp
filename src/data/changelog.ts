@@ -13,6 +13,16 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.67.0",
+    date: "2026-02-18",
+    title: "Migrate Mindbody Members to Stripe",
+    changes: [
+      "Added: 'Migrate to Stripe' button in the Billing tab for Mindbody-billed members — staff can now create a Stripe subscription directly from the member profile drawer",
+      "Improved: Migration uses the member's existing Stripe customer (if they have one), preserving any credits or payment methods already on file",
+      "Improved: Stripe contact fields (customer ID, billing dates) are now protected from sandbox data leaking into production HubSpot",
+    ]
+  },
+  {
     version: "7.66.2",
     date: "2026-02-17",
     title: "Fix 'No Tier' Save for Members",

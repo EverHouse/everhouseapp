@@ -26,6 +26,8 @@ interface MindbodyBillingSectionProps {
   recentInvoices?: Invoice[];
   customerBalance?: number;
   isDark: boolean;
+  onMigrateToStripe?: () => void;
+  hasStripeCustomer?: boolean;
 }
 
 export const MindbodyBillingSection: React.FC<MindbodyBillingSectionProps> = ({
@@ -35,6 +37,8 @@ export const MindbodyBillingSection: React.FC<MindbodyBillingSectionProps> = ({
   recentInvoices,
   customerBalance,
   isDark,
+  onMigrateToStripe,
+  hasStripeCustomer = false,
 }) => {
   const formatCurrency = (amount: number, currency: string = 'usd') => {
     return new Intl.NumberFormat('en-US', {
@@ -89,6 +93,35 @@ export const MindbodyBillingSection: React.FC<MindbodyBillingSectionProps> = ({
           </div>
         </div>
       </div>
+
+      {onMigrateToStripe && (
+        <div className={`p-4 rounded-xl ${isDark ? 'bg-green-500/10 border border-green-500/30' : 'bg-green-50 border border-green-200'}`}>
+          <div className="flex items-start gap-3">
+            <div className={`w-10 h-10 rounded-full flex-shrink-0 flex items-center justify-center ${isDark ? 'bg-green-500/20' : 'bg-green-100'}`}>
+              <span className={`material-symbols-outlined ${isDark ? 'text-green-400' : 'text-green-600'}`}>swap_horiz</span>
+            </div>
+            <div className="flex-1">
+              <p className={`text-sm font-medium ${isDark ? 'text-green-300' : 'text-green-700'}`}>
+                Migrate to Stripe Billing
+              </p>
+              <p className={`text-xs mt-1 ${isDark ? 'text-green-400/80' : 'text-green-600'}`}>
+                {hasStripeCustomer
+                  ? 'This member already has a Stripe account with their credits intact. Create a subscription to move their billing from Mindbody to Stripe.'
+                  : 'Create a Stripe subscription for this member. A Stripe customer will be set up automatically and billing will switch from Mindbody to Stripe.'}
+              </p>
+              <button
+                onClick={onMigrateToStripe}
+                className={`inline-flex items-center gap-1.5 mt-3 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  isDark ? 'bg-green-500/20 text-green-300 hover:bg-green-500/30' : 'bg-green-100 text-green-700 hover:bg-green-200'
+                }`}
+              >
+                <span className="material-symbols-outlined text-base">add_card</span>
+                Create Stripe Subscription
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Stripe Customer Info (if they have a Stripe customer) */}
       {stripeCustomerId && (

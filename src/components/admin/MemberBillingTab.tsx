@@ -1316,17 +1316,26 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({
               </div>
             </div>
           )}
-          {/* Only show MindbodyBillingSection if no Stripe customer (otherwise Stripe section above shows wallet) */}
-          {!billingInfo.stripeCustomerId && (
-            <MindbodyBillingSection
-              mindbodyClientId={billingInfo.mindbodyClientId}
-              stripeCustomerId={billingInfo.stripeCustomerId}
-              paymentMethods={billingInfo.paymentMethods}
-              recentInvoices={billingInfo.recentInvoices}
-              customerBalance={billingInfo.customerBalance}
-              isDark={isDark}
-            />
-          )}
+          <MindbodyBillingSection
+            mindbodyClientId={billingInfo.mindbodyClientId}
+            isDark={isDark}
+            hasStripeCustomer={!!billingInfo.stripeCustomerId}
+            onMigrateToStripe={!billingInfo.activeSubscription ? async () => {
+              setShowCreateSubscriptionModal(true);
+              setIsLoadingCoupons(true);
+              try {
+                const res = await fetch('/api/stripe/coupons', { credentials: 'include' });
+                if (res.ok) {
+                  const data = await res.json();
+                  setAvailableCoupons(data.coupons || []);
+                }
+              } catch (err) {
+                console.error('Failed to load coupons:', err);
+              } finally {
+                setIsLoadingCoupons(false);
+              }
+            } : undefined}
+          />
         </>
       )}
 
