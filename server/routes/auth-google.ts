@@ -41,16 +41,7 @@ router.post('/api/auth/google/verify', async (req, res) => {
 
     const googleUser = await verifyGoogleToken(credential);
 
-    const { resolveUserByEmail } = await import('../core/stripe/customers');
-    const resolved = await resolveUserByEmail(googleUser.email);
-
-    if (!resolved) {
-      return res.status(404).json({ error: 'No membership found for this email. Please sign up or use the email associated with your membership.' });
-    }
-
-    const primaryEmail = normalizeEmail(resolved.primaryEmail);
-
-    const dbUser = await db.select({
+    const userSelectFields = {
       id: users.id,
       firstName: users.firstName,
       lastName: users.lastName,
@@ -66,13 +57,35 @@ router.post('/api/auth/google/verify', async (req, res) => {
       dateOfBirth: users.dateOfBirth,
       role: users.role,
       googleId: users.googleId,
-    })
+    };
+
+    let dbUser = await db.select(userSelectFields)
       .from(users)
-      .where(sql`LOWER(${users.email}) = LOWER(${primaryEmail})`)
+      .where(sql`${users.googleId} = ${googleUser.sub} AND ${users.archivedAt} IS NULL`)
       .limit(1);
 
     if (dbUser.length === 0) {
-      return res.status(404).json({ error: 'No membership found for this email.' });
+      dbUser = await db.select(userSelectFields)
+        .from(users)
+        .where(sql`LOWER(${users.googleEmail}) = LOWER(${googleUser.email}) AND ${users.archivedAt} IS NULL`)
+        .limit(1);
+    }
+
+    if (dbUser.length === 0) {
+      const { resolveUserByEmail } = await import('../core/stripe/customers');
+      const resolved = await resolveUserByEmail(googleUser.email);
+
+      if (resolved) {
+        const primaryEmail = normalizeEmail(resolved.primaryEmail);
+        dbUser = await db.select(userSelectFields)
+          .from(users)
+          .where(sql`LOWER(${users.email}) = LOWER(${primaryEmail}) AND ${users.archivedAt} IS NULL`)
+          .limit(1);
+      }
+    }
+
+    if (dbUser.length === 0) {
+      return res.status(404).json({ error: 'No membership found for this email. Please sign up or use the email associated with your membership.' });
     }
 
     const user = dbUser[0];
@@ -90,7 +103,7 @@ router.post('/api/auth/google/verify', async (req, res) => {
       id: user.id,
       firstName: user.firstName || '',
       lastName: user.lastName || '',
-      email: user.email || primaryEmail,
+      email: user.email || googleUser.email,
       phone: user.phone || '',
       tier: normalizeTierName(user.tier),
       tags: user.tags || [],
