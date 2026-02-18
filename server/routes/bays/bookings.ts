@@ -22,6 +22,7 @@ import { PRICING } from '../../core/billing/pricingConfig';
 import { createGuestPassHold, releaseGuestPassHold } from '../../core/billing/guestPassHoldService';
 import { ensureSessionForBooking } from '../../core/bookingService/sessionManager';
 import { getErrorMessage } from '../../utils/errorUtils';
+import { normalizeToISODate } from '../../utils/dateNormalize';
 
 const router = Router();
 
@@ -1662,7 +1663,7 @@ router.get('/api/fee-estimate', async (req, res) => {
     const durationMinutes = parseInt(req.query.durationMinutes as string) || 60;
     const guestCount = parseInt(req.query.guestCount as string) || 0;
     const playerCount = parseInt(req.query.playerCount as string) || 1;
-    const requestDate = (req.query.date as string) || new Date().toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' });
+    const requestDate = normalizeToISODate(req.query.date as string);
     const resourceType = (req.query.resourceType as string) || 'simulator';
     const guestsWithInfo = parseInt(req.query.guestsWithInfo as string) || 0;
     const memberEmailsParam = req.query.memberEmails as string | undefined;

@@ -25,6 +25,7 @@ import { cancelPaymentIntent, getStripeClient } from '../core/stripe';
 import { createPrepaymentIntent } from '../core/billing/prepaymentService';
 import { ensureSessionForBooking } from '../core/bookingService/sessionManager';
 import { getErrorMessage, getErrorCode, getErrorStatusCode } from '../utils/errorUtils';
+import { normalizeToISODate } from '../utils/dateNormalize';
 
 interface CancellationCascadeResult {
   participantsNotified: number;
@@ -1317,7 +1318,7 @@ router.post('/api/bookings/link-trackman-to-member', isStaffOrAdmin, async (req,
             await pool.query(
               `INSERT INTO user_linked_emails (primary_email, linked_email, source, created_at) 
                VALUES ($1, $2, $3, NOW())
-               ON CONFLICT (LOWER(linked_email)) DO NOTHING`,
+               ON CONFLICT (linked_email) DO NOTHING`,
               [member.email, originalEmail.toLowerCase(), 'staff_assignment']
             );
             emailLinked = true;
@@ -1369,8 +1370,8 @@ router.get('/api/resources/overlapping-notices', isStaffOrAdmin, async (req, res
       return res.status(400).json({ error: 'Missing required parameters: startDate, startTime, endTime' });
     }
     
-    const queryDate = startDate as string;
-    const queryEndDate = (endDate as string) || queryDate;
+    const queryDate = normalizeToISODate(startDate as string);
+    const queryEndDate = normalizeToISODate((endDate as string) || queryDate);
     const queryStartTime = startTime as string;
     const queryEndTime = endTime as string;
     const isSameDayOnly = sameDayOnly === 'true';
@@ -1958,7 +1959,7 @@ router.put('/api/bookings/:id/assign-with-players', isStaffOrAdmin, async (req, 
             await pool.query(
               `INSERT INTO user_linked_emails (primary_email, linked_email, source, created_at) 
                VALUES ($1, $2, $3, NOW())
-               ON CONFLICT (LOWER(linked_email)) DO NOTHING`,
+               ON CONFLICT (linked_email) DO NOTHING`,
               [member.email, originalEmail.toLowerCase(), 'staff_assignment']
             );
             emailLinked = true;

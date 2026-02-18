@@ -1,6 +1,7 @@
 import { pool } from './db';
 import { normalizeTierName, DEFAULT_TIER } from '../../shared/constants/tiers';
 import { normalizeEmail } from './utils/emailNormalization';
+import { normalizeToISODate } from '../utils/dateNormalize';
 
 export interface TierLimits {
   daily_sim_minutes: number;
@@ -123,9 +124,7 @@ export async function getMemberTierByEmail(email: string, options?: { allowInact
 
 export async function getDailyBookedMinutes(email: string, date: string, resourceType?: string): Promise<number> {
   try {
-    // Include 'attended' - completed bookings still count toward daily allowance
-    // Exclude 'cancelled' and 'no_show' - those don't consume the allowance
-    // Filter by resource type if specified to separate simulator vs conference room usage
+    const normalizedDate = normalizeToISODate(date);
     let query = `
       SELECT COALESCE(SUM(br.duration_minutes), 0) as total_minutes
       FROM booking_requests br
@@ -133,7 +132,7 @@ export async function getDailyBookedMinutes(email: string, date: string, resourc
         AND br.request_date = $2
         AND br.status IN ('pending', 'approved', 'attended', 'confirmed')`;
     
-    const params: any[] = [email, date];
+    const params: any[] = [email, normalizedDate];
     
     // Filter by resource type if specified
     if (resourceType) {
@@ -156,7 +155,8 @@ export async function getDailyBookedMinutes(email: string, date: string, resourc
 
 export async function getDailyParticipantMinutes(email: string, date: string, excludeBookingId?: number, resourceType?: string): Promise<number> {
   try {
-    const baseParams: any[] = [email, date];
+    const normalizedDate = normalizeToISODate(date);
+    const baseParams: any[] = [email, normalizedDate];
     let paramIdx = 3;
 
     let excludeClause = '';
