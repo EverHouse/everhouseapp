@@ -10,11 +10,13 @@ import TabButton from '../../components/TabButton';
 import SwipeablePage from '../../components/SwipeablePage';
 import PullToRefresh from '../../components/PullToRefresh';
 import { MotionList, MotionListItem, AnimatedPage } from '../../components/motion';
+import { TabTransition } from '../../components/motion/TabTransition';
 import { EmptyEvents } from '../../components/EmptyState';
 import { playSound } from '../../utils/sounds';
 import { formatDateDisplayWithDay } from '../../utils/dateUtils';
 import { bookingEvents } from '../../lib/bookingEvents';
 import { WellnessCardSkeleton, SkeletonList } from '../../components/skeletons';
+import { useAutoAnimate } from '@formkit/auto-animate/react';
 
 interface WellnessEnrollment {
   class_id: number;
@@ -76,6 +78,7 @@ const Wellness: React.FC = () => {
   const activeTab: 'classes' | 'medspa' = searchParams.get('tab') === 'medspa' ? 'medspa' : 'classes';
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [confirmationMessage, setConfirmationMessage] = useState('Booking confirmed.');
+  const [wellnessParent] = useAutoAnimate();
 
   const setActiveTab = (tab: 'classes' | 'medspa') => {
     setSearchParams(prev => {
@@ -175,10 +178,12 @@ const Wellness: React.FC = () => {
         </div>
       </section>
 
-      <div key={activeTab} className="relative z-10 animate-content-enter">
+      <TabTransition activeKey={activeTab}>
+      <div className="relative z-10 animate-content-enter">
         {activeTab === 'classes' && <ClassesView onBook={handleBook} isDark={isDark} userEmail={user?.email} userStatus={user?.status} refreshKey={refreshKey} onRefreshComplete={onRefreshComplete} />}
         {activeTab === 'medspa' && <MedSpaView isDark={isDark} />}
       </div>
+      </TabTransition>
 
       {showConfirmation && (
          <div className="fixed bottom-32 left-0 right-0 z-[60] flex justify-center pointer-events-none">
@@ -446,7 +451,7 @@ const ClassesView: React.FC<{onBook: (cls: WellnessClass) => void; isDark?: bool
             ))}
         </div>
         
-        <MotionList className="space-y-4 md:grid md:grid-cols-2 md:gap-4 md:space-y-0 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4">
+        <MotionList ref={wellnessParent} className="space-y-4 md:grid md:grid-cols-2 md:gap-4 md:space-y-0 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4">
             {sortedClasses.length > 0 ? (
                 sortedClasses.map((cls) => {
                     const isExpanded = expandedId === cls.id;
@@ -683,7 +688,8 @@ const ClassCard: React.FC<any> = ({ title, date, time, instructor, duration, cat
         </div>
       </div>
     </button>
-    <div className={`accordion-content ${isExpanded ? 'expanded' : ''}`}>
+    <div className={`accordion-content ${isExpanded ? 'is-open' : ''}`}>
+      <div className="accordion-inner">
       <div className="px-4 pb-4 pt-0 space-y-3">
         <div className={`flex items-center gap-1.5 text-sm ${isDark ? 'text-gray-400' : 'text-primary/70'}`}>
           <span className="material-symbols-outlined text-[16px]">person</span>
@@ -734,6 +740,7 @@ const ClassCard: React.FC<any> = ({ title, date, time, instructor, duration, cat
             {isRsvping ? (showJoinWaitlist ? 'Joining Waitlist...' : 'Confirming...') : showJoinWaitlist ? 'Join Waitlist' : 'RSVP'}
           </button>
         )}
+      </div>
       </div>
     </div>
   </div>

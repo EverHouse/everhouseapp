@@ -16,6 +16,7 @@ import { getTodayPacific } from '../../utils/dateUtils';
 import WalkingGolferSpinner from '../../components/WalkingGolferSpinner';
 import ModalShell from '../../components/ModalShell';
 import { bookingEvents } from '../../lib/bookingEvents';
+import { useAutoAnimate } from '@formkit/auto-animate/react';
 
 interface UserRsvp {
   event_id: number;
@@ -38,6 +39,7 @@ const MemberEvents: React.FC = () => {
   const [pendingEvent, setPendingEvent] = useState<EventData | null>(null);
   const [optimisticActions, setOptimisticActions] = useState<Map<string, OptimisticAction>>(new Map());
   
+  const [eventsParent] = useAutoAnimate();
   const isAdminViewingAs = actualUser?.role === 'admin' && isViewingAs;
   
   const getOptimisticAction = (eventId: string): OptimisticAction | null => {
@@ -281,14 +283,14 @@ const MemberEvents: React.FC = () => {
       </section>
 
       <section key={filter} className="mb-6 animate-content-enter-delay-3">
-        <div className={`transition-opacity duration-300 ${isLoading ? 'opacity-100' : 'opacity-0 hidden'}`}>
+        <div className={`transition-opacity duration-normal ${isLoading ? 'opacity-100' : 'opacity-0 hidden'}`}>
           <SkeletonList count={4} Component={EventCardSkeleton} isDark={isDark} className="space-y-4" />
         </div>
-        <div className={`transition-opacity duration-300 ${isLoading ? 'opacity-0 hidden' : 'opacity-100'}`}>
+        <div className={`transition-opacity duration-normal ${isLoading ? 'opacity-0 hidden' : 'opacity-100'}`}>
           {filteredAndSortedEvents.length === 0 ? (
             <EmptyEvents />
           ) : (
-            <MotionList className="space-y-4 md:grid md:grid-cols-2 md:gap-4 md:space-y-0 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4">
+            <MotionList ref={eventsParent} className="space-y-4 md:grid md:grid-cols-2 md:gap-4 md:space-y-0 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4">
               {filteredAndSortedEvents.map((event, index) => {
                 const isExpanded = expandedEventId === event.id;
                 const isRsvpd = hasRsvp(event.id);
@@ -347,15 +349,14 @@ const MemberEvents: React.FC = () => {
                         <p className={`text-xs md:text-sm truncate ${isDark ? 'text-white/70' : 'text-primary/70'}`}>{event.location}</p>
                       </div>
                       <div className="flex items-center" aria-hidden="true">
-                        <span className={`material-symbols-outlined transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''} ${isDark ? 'text-white/70' : 'text-primary/70'}`}>
+                        <span className={`material-symbols-outlined transition-transform duration-normal ${isExpanded ? 'rotate-180' : ''} ${isDark ? 'text-white/70' : 'text-primary/70'}`}>
                           expand_more
                         </span>
                       </div>
                     </button>
 
-                    <div 
-                      className={`overflow-hidden transition-all duration-300 ease-in-out ${isExpanded ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'}`}
-                    >
+                    <div className={`accordion-content ${isExpanded ? 'is-open' : ''}`}>
+                      <div className="accordion-inner">
                       <div className={`px-4 pb-4 pt-2 border-t ${isDark ? 'border-white/25' : 'border-black/10'}`}>
                         <p className={`text-sm leading-relaxed mb-4 ${isDark ? 'text-white/70' : 'text-primary/70'}`}>
                           {event.description}
@@ -436,6 +437,7 @@ const MemberEvents: React.FC = () => {
                           )}
                         </div>
                       </div>
+                    </div>
                     </div>
                   </MotionListItem>
                 );

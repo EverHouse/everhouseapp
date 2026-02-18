@@ -9,9 +9,11 @@ import { SlideUpDrawer } from '../../../components/SlideUpDrawer';
 import FloatingActionButton from '../../../components/FloatingActionButton';
 import AvailabilityBlocksContent from '../components/AvailabilityBlocksContent';
 import { AnimatedPage } from '../../../components/motion';
+import { TabTransition } from '../../../components/motion/TabTransition';
 import { useConfirmDialog } from '../../../components/ConfirmDialog';
 import { fetchWithCredentials, postWithCredentials, deleteWithCredentials, putWithCredentials } from '../../../hooks/queries/useFetch';
 import { isBlockingClosure } from '../../../utils/closureUtils';
+import { useAutoAnimate } from '@formkit/auto-animate/react';
 
 interface BlocksClosure {
     id: number;
@@ -105,6 +107,8 @@ const BlocksTab: React.FC = () => {
     const [expandedNotices, setExpandedNotices] = useState<Set<number>>(new Set());
     const [showClosureReasonsSection, setShowClosureReasonsSection] = useState(false);
     const [newReasonLabel, setNewReasonLabel] = useState('');
+    const [needsReviewParent] = useAutoAnimate();
+    const [closuresParent] = useAutoAnimate();
     
     const [showNoticeTypesSection, setShowNoticeTypesSection] = useState(false);
     const [newNoticeTypeName, setNewNoticeTypeName] = useState('');
@@ -640,7 +644,7 @@ const BlocksTab: React.FC = () => {
             <div className="flex items-center justify-between gap-3 flex-wrap animate-content-enter-delay-1">
                 <div className="inline-flex bg-black/5 dark:bg-white/10 backdrop-blur-sm rounded-full p-1 relative">
                     <div
-                        className="absolute top-1 bottom-1 bg-white dark:bg-white/20 shadow-md rounded-full transition-all duration-300"
+                        className="absolute top-1 bottom-1 bg-white dark:bg-white/20 shadow-md rounded-full transition-all duration-normal"
                         style={{
                             width: 'calc(50% - 4px)',
                             left: activeSubTab === 'notices' ? '4px' : 'calc(50% + 0px)',
@@ -648,7 +652,7 @@ const BlocksTab: React.FC = () => {
                     />
                     <button
                         onClick={() => setActiveSubTab('notices')}
-                        className={`relative z-10 px-5 py-1.5 text-sm font-medium transition-colors duration-200 rounded-full flex items-center gap-1.5 ${
+                        className={`relative z-10 px-5 py-1.5 text-sm font-medium transition-colors duration-fast rounded-full flex items-center gap-1.5 ${
                             activeSubTab === 'notices'
                                 ? 'text-primary dark:text-white'
                                 : 'text-gray-500 dark:text-white/60'
@@ -659,7 +663,7 @@ const BlocksTab: React.FC = () => {
                     </button>
                     <button
                         onClick={() => setActiveSubTab('blocks')}
-                        className={`relative z-10 px-5 py-1.5 text-sm font-medium transition-colors duration-200 rounded-full flex items-center gap-1.5 ${
+                        className={`relative z-10 px-5 py-1.5 text-sm font-medium transition-colors duration-fast rounded-full flex items-center gap-1.5 ${
                             activeSubTab === 'blocks'
                                 ? 'text-primary dark:text-white'
                                 : 'text-gray-500 dark:text-white/60'
@@ -674,7 +678,7 @@ const BlocksTab: React.FC = () => {
                     <div className="flex items-center gap-2">
                         <button
                             onClick={() => setShowClosureReasonsSection(!showClosureReasonsSection)}
-                            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium backdrop-blur-sm border transition-all ${
+                            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium backdrop-blur-sm border transition-all tactile-btn ${
                                 showClosureReasonsSection
                                     ? 'bg-primary/10 dark:bg-white/15 border-primary/30 dark:border-white/20 text-primary dark:text-white'
                                     : 'bg-white/60 dark:bg-white/10 border-gray-200/50 dark:border-white/10 hover:bg-white/80 dark:hover:bg-white/15 text-gray-600 dark:text-white/70'
@@ -688,7 +692,7 @@ const BlocksTab: React.FC = () => {
                         </button>
                         <button
                             onClick={() => setShowNoticeTypesSection(!showNoticeTypesSection)}
-                            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium backdrop-blur-sm border transition-all ${
+                            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium backdrop-blur-sm border transition-all tactile-btn ${
                                 showNoticeTypesSection
                                     ? 'bg-primary/10 dark:bg-white/15 border-primary/30 dark:border-white/20 text-primary dark:text-white'
                                     : 'bg-white/60 dark:bg-white/10 border-gray-200/50 dark:border-white/10 hover:bg-white/80 dark:hover:bg-white/15 text-gray-600 dark:text-white/70'
@@ -704,7 +708,8 @@ const BlocksTab: React.FC = () => {
                 )}
             </div>
 
-            <div key={activeSubTab} className="animate-content-enter">
+            <TabTransition activeKey={activeSubTab}>
+            <div className="animate-content-enter">
             {activeSubTab === 'blocks' && <AvailabilityBlocksContent />}
 
             {activeSubTab === 'notices' && (
@@ -887,14 +892,14 @@ const BlocksTab: React.FC = () => {
                     <p className="text-xs text-gray-500 dark:text-white/60">
                         These calendar events were imported and need to be configured before members can see them.
                     </p>
-                    <div className="space-y-2">
+                    <div ref={needsReviewParent} className="space-y-2">
                         {needsReviewClosures.map((closure, index) => {
                             const missingFields = getMissingFields(closure);
                             return (
                                 <div 
                                     key={closure.id}
                                     onClick={() => handleEditClosure(closure)}
-                                    className="bg-white/60 dark:bg-white/5 backdrop-blur-sm border border-white/80 dark:border-white/10 border-l-4 border-l-cyan-500 rounded-2xl shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 overflow-hidden group animate-slide-up-stagger cursor-pointer"
+                                    className="bg-white/60 dark:bg-white/5 backdrop-blur-sm border border-white/80 dark:border-white/10 border-l-4 border-l-cyan-500 rounded-2xl shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-colors duration-fast overflow-hidden group animate-slide-up-stagger cursor-pointer tactile-card"
                                     style={{ '--stagger-index': index } as React.CSSProperties}
                                 >
                                     <div className="p-4 flex items-start justify-between gap-3">
@@ -918,7 +923,7 @@ const BlocksTab: React.FC = () => {
                                             )}
                                         </div>
                                         <div
-                                            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-cyan-500 text-white text-sm font-medium flex-shrink-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-200"
+                                            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-cyan-500 text-white text-sm font-medium flex-shrink-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-fast"
                                         >
                                             <span aria-hidden="true" className="material-symbols-outlined text-base">edit</span>
                                             Edit
@@ -943,7 +948,7 @@ const BlocksTab: React.FC = () => {
                     <p>{closures.length === 0 ? 'No notices' : 'No notices match filters'}</p>
                 </div>
             ) : configuredClosures.length > 0 && (
-                <div className="space-y-3">
+                <div ref={closuresParent} className="space-y-3">
                     {configuredClosures.map((closure, index) => {
                         const blocking = isBlocking(closure.affectedAreas);
                         const isExpanded = expandedNotices.has(closure.id);
@@ -951,7 +956,7 @@ const BlocksTab: React.FC = () => {
                         return (
                             <div 
                                 key={closure.id} 
-                                className={`bg-white/60 dark:bg-white/5 backdrop-blur-sm border border-white/80 dark:border-white/10 rounded-2xl shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 overflow-hidden group animate-pop-in ${
+                                className={`bg-white/60 dark:bg-white/5 backdrop-blur-sm border border-white/80 dark:border-white/10 rounded-2xl shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-colors duration-fast overflow-hidden group animate-pop-in tactile-card ${
                                     blocking 
                                         ? 'border-l-4 border-l-red-500'
                                         : 'border-l-4 border-l-amber-500'
@@ -1023,7 +1028,7 @@ const BlocksTab: React.FC = () => {
                                         <div className="flex items-center gap-2 flex-shrink-0">
                                             <button
                                                 onClick={(e) => handleEditClosure(closure, e)}
-                                                className="p-2 rounded-xl transition-all bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-white/60 hover:bg-gray-200 dark:hover:bg-white/20 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-200"
+                                                className="p-2 rounded-xl transition-all bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-white/60 hover:bg-gray-200 dark:hover:bg-white/20 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-fast"
                                             >
                                                 <span aria-hidden="true" className="material-symbols-outlined text-lg">edit</span>
                                             </button>
@@ -1120,7 +1125,8 @@ const BlocksTab: React.FC = () => {
                         </span>
                     </button>
                     
-                    {showPastAccordion && (
+                    <div className={`accordion-content ${showPastAccordion ? 'is-open' : ''}`}>
+                      <div className="accordion-inner">
                         <div className="p-4 space-y-3 bg-gray-50/50 dark:bg-white/5 border-t border-gray-200/50 dark:border-white/10">
                             {pastClosures.map((closure, index) => {
                                 const blocking = isBlocking(closure.affectedAreas);
@@ -1129,7 +1135,7 @@ const BlocksTab: React.FC = () => {
                                 return (
                                     <div 
                                         key={closure.id} 
-                                        className={`bg-white/60 dark:bg-white/5 backdrop-blur-sm border border-white/80 dark:border-white/10 rounded-xl overflow-hidden transition-all duration-200 opacity-70 hover:opacity-100 hover:shadow-sm group ${
+                                        className={`bg-white/60 dark:bg-white/5 backdrop-blur-sm border border-white/80 dark:border-white/10 rounded-xl overflow-hidden transition-all duration-fast opacity-70 hover:opacity-100 hover:shadow-sm group ${
                                             blocking 
                                                 ? 'border-l-4 border-l-red-500'
                                                 : 'border-l-4 border-l-amber-500'
@@ -1175,7 +1181,7 @@ const BlocksTab: React.FC = () => {
                                                 <div className="flex items-center gap-1 flex-shrink-0">
                                                     <button
                                                         onClick={(e) => handleEditClosure(closure, e)}
-                                                        className="p-1.5 rounded-lg bg-gray-100 dark:bg-white/10 text-gray-500 dark:text-white/50 hover:bg-gray-200 dark:hover:bg-white/20 transition-all opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-200"
+                                                        className="p-1.5 rounded-lg bg-gray-100 dark:bg-white/10 text-gray-500 dark:text-white/50 hover:bg-gray-200 dark:hover:bg-white/20 transition-all opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-fast"
                                                     >
                                                         <span aria-hidden="true" className="material-symbols-outlined text-base">edit</span>
                                                     </button>
@@ -1213,7 +1219,8 @@ const BlocksTab: React.FC = () => {
                                 );
                             })}
                         </div>
-                    )}
+                      </div>
+                    </div>
                 </div>
             )}
 
@@ -1582,6 +1589,7 @@ const BlocksTab: React.FC = () => {
             </>
             )}
             </div>
+            </TabTransition>
             <ConfirmDialogComponent />
         </AnimatedPage>
         </PullToRefresh>

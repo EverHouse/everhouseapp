@@ -5,6 +5,7 @@ import { EmbeddedCheckoutProvider, EmbeddedCheckout } from '@stripe/react-stripe
 import Logo from '../components/Logo';
 import EmptyState from '../components/EmptyState';
 import { usePricing } from '../hooks/usePricing';
+import WalkingGolferSpinner from '../components/WalkingGolferSpinner';
 
 interface DayPassProduct {
   id: string;
@@ -95,7 +96,7 @@ function CheckoutForm({ tier, email, quantity = 1, companyName, jobTitle, isCorp
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16">
-        <div className="animate-spin rounded-full h-12 w-12 border-3 border-primary border-t-transparent" />
+        <WalkingGolferSpinner size="md" variant="dark" />
       </div>
     );
   }
@@ -488,7 +489,7 @@ function DayPassesSection() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16">
-        <div className="animate-spin rounded-full h-12 w-12 border-3 border-primary border-t-transparent" />
+        <WalkingGolferSpinner size="md" variant="dark" />
       </div>
     );
   }
@@ -576,7 +577,7 @@ function DayPassesSection() {
                 className="flex-1 py-3 px-4 rounded-xl font-semibold bg-accent text-brand-green hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {submitting ? (
-                  <div className="animate-spin rounded-full h-5 w-5 border-2 border-brand-green border-t-transparent" />
+                  <WalkingGolferSpinner size="sm" variant="dark" />
                 ) : (
                   <>
                     <span className="material-symbols-outlined text-lg">shopping_cart</span>
@@ -732,7 +733,7 @@ function CheckoutSuccess() {
   if (status === 'loading') {
     return (
       <div className="flex items-center justify-center py-16">
-        <div className="animate-spin rounded-full h-12 w-12 border-3 border-primary border-t-transparent" />
+        <WalkingGolferSpinner size="md" variant="dark" />
       </div>
     );
   }
@@ -807,7 +808,7 @@ function CheckoutSuccess() {
 
       {!pollingDone && !accountReady && (
         <div className="flex items-center justify-center gap-2 text-sm text-primary/60 dark:text-white/60 mb-6">
-          <div className="animate-spin rounded-full h-4 w-4 border-2 border-accent border-t-transparent" />
+          <WalkingGolferSpinner size="sm" variant="dark" />
           Setting up your account...
         </div>
       )}
@@ -897,9 +898,11 @@ export default function Checkout() {
 
       <main className="max-w-4xl mx-auto px-6 py-12">
         {isSuccess ? (
-          <CheckoutSuccess />
+          <div className="animate-content-enter">
+            <CheckoutSuccess />
+          </div>
         ) : tier ? (
-          <div className="glass-card rounded-2xl p-6 md:p-8 backdrop-blur-xl bg-white/50 dark:bg-white/5 border border-white/30 dark:border-white/10">
+          <div className="animate-content-enter glass-card rounded-2xl p-6 md:p-8 backdrop-blur-xl bg-white/50 dark:bg-white/5 border border-white/30 dark:border-white/10">
             {isCorporate ? (
               <CorporateCheckoutForm 
                 tier={tier} 
@@ -914,7 +917,9 @@ export default function Checkout() {
             )}
           </div>
         ) : (
-          <DayPassesSection />
+          <div className="animate-content-enter">
+            <DayPassesSection />
+          </div>
         )}
       </main>
     </div>

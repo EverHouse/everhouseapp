@@ -28,7 +28,7 @@ The application is built with a React 19 frontend (Vite, Tailwind CSS) and an Ex
 - **Navigation**: Unified header, Member Bottom Nav, and Admin route-based navigation with a comprehensive sidebar.
 - **Responsiveness**: Optimized for mobile, tablet, and desktop.
 - **Theming**: Light, Dark, and System themes with local persistence.
-- **Motion**: Pure CSS keyframe animations, staggered content, parallax, and entry/exit animations.
+- **Motion**: Spring-physics motion system with tokenized duration scale (instant/fast/normal/slow/emphasis) and easing curves (spring-bounce, spring-smooth, out-expo) defined in index.css CSS custom properties and tailwind.config.js. Uses @formkit/auto-animate for list reflow animations, CSS grid accordion technique (grid-template-rows: 0fr/1fr) for smooth expand/collapse, tactile utility classes (.tactile-card, .tactile-row, .tactile-btn) for hover lift + press-down feedback, TabTransition for tab-switching fade animations, and WalkingGolferSpinner (inline only, never full-page overlay) for branded loading states. Keyframe animations for page transitions, staggered content entry, parallax effects. All motion respects prefers-reduced-motion.
 - **Drawer UX**: SlideUpDrawer for modals with drag-to-dismiss.
 - **Staff FAB**: Floating action button for quick staff actions (Staff Command Center).
 - **ConfirmDialog**: Custom Liquid Glass styled confirmation dialogs.

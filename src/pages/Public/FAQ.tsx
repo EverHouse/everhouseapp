@@ -6,6 +6,7 @@ import EmptyState from '../../components/EmptyState';
 import { usePageReady } from '../../contexts/PageReadyContext';
 import { AnimatedPage } from '../../components/motion';
 import SEO from '../../components/SEO';
+import { useAutoAnimate } from '@formkit/auto-animate/react';
 
 interface FaqItem {
   id: number;
@@ -33,6 +34,7 @@ const FAQ: React.FC = () => {
   const [faqs, setFaqs] = useState<FaqItem[]>(FALLBACK_FAQS);
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [faqParent] = useAutoAnimate();
 
   useEffect(() => {
     if (!loading) {
@@ -109,7 +111,7 @@ const FAQ: React.FC = () => {
         </div>
       )}
 
-      <div className="px-6 pb-12 flex-1 space-y-3 animate-content-enter-delay-2">
+      <div ref={faqParent} className="px-6 pb-12 flex-1 space-y-3 animate-content-enter-delay-2">
         {loading ? (
           <div className="flex justify-center py-8">
             <WalkingGolferSpinner size="md" />
@@ -148,11 +150,11 @@ const AccordionItem: React.FC<{ question: string; answer: string }> = ({ questio
         <span>{question}</span>
         <span className={`material-symbols-outlined transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`}>expand_more</span>
       </button>
-      <div 
-        className={`overflow-hidden transition-all duration-300 ease-in-out ${isOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'}`}
-      >
-        <div className="p-4 pt-0 text-sm text-primary/70 dark:text-white/70 leading-relaxed">
-          {answer}
+      <div className={`accordion-content ${isOpen ? 'is-open' : ''}`}>
+        <div className="accordion-inner">
+          <div className="p-4 pt-0 text-sm text-primary/70 dark:text-white/70 leading-relaxed">
+            {answer}
+          </div>
         </div>
       </div>
     </div>

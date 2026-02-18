@@ -74,9 +74,17 @@ export default {
       },
       transitionDuration: {
         'liquid': '400ms',
+        'instant': '100ms',
+        'fast': '150ms',
+        'normal': '250ms',
+        'slow': '350ms',
+        'emphasis': '500ms',
       },
       transitionTimingFunction: {
         'liquid': 'ease-in-out',
+        'spring-bounce': 'cubic-bezier(0.34, 1.56, 0.64, 1)',
+        'spring-smooth': 'cubic-bezier(0.22, 1, 0.36, 1)',
+        'out-expo': 'cubic-bezier(0.16, 1, 0.3, 1)',
       },
       animation: {
         'pop-in': 'pop-in 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) backwards',

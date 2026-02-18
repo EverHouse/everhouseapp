@@ -103,7 +103,7 @@ export function SlideUpDrawer({
     setIsClosing(true);
     setTimeout(() => {
       onCloseRef.current();
-    }, 200);
+    }, 250);
   }, [dismissible]);
 
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
@@ -164,7 +164,7 @@ export function SlideUpDrawer({
       style={{ overscrollBehavior: 'contain', touchAction: 'none', zIndex: drawerZIndex, height: '100dvh' }}
     >
       <div 
-        className={`fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity duration-200 ${isClosing ? 'opacity-0' : 'animate-backdrop-fade-in'}`}
+        className={`fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity duration-normal ${isClosing ? 'opacity-0' : 'animate-backdrop-fade-in'}`}
         aria-hidden="true"
         style={{ touchAction: 'none', height: '100dvh' }}
         onClick={dismissible ? handleClose : undefined}
@@ -176,7 +176,7 @@ export function SlideUpDrawer({
         aria-modal="true"
         aria-labelledby={title ? 'drawer-title' : undefined}
         tabIndex={-1}
-        className={`fixed inset-x-0 bottom-0 flex flex-col ${maxHeightClasses[maxHeight]} ${isDark ? 'bg-[#1a1d15]' : 'bg-white'} rounded-t-3xl shadow-2xl transition-transform duration-200 ease-out ${isClosing ? 'translate-y-full' : 'animate-slide-up-drawer'} ${className}`}
+        className={`fixed inset-x-0 bottom-0 flex flex-col ${maxHeightClasses[maxHeight]} ${isDark ? 'bg-[#1a1d15]' : 'bg-white'} rounded-t-3xl shadow-2xl transition-transform duration-normal ease-spring-smooth ${isClosing ? 'translate-y-full' : 'animate-slide-up-drawer'} ${className}`}
         style={{
           transform: dragOffset > 0 ? `translateY(${dragOffset}px)` : undefined,
           transition: dragState.isDragging ? 'none' : undefined

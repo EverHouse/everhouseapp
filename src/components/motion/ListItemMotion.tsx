@@ -5,13 +5,13 @@ interface MotionListProps {
   className?: string;
 }
 
-export const MotionList: React.FC<MotionListProps> = ({ children, className }) => {
+export const MotionList = React.forwardRef<HTMLDivElement, MotionListProps>(({ children, className }, ref) => {
   return (
-    <div className={`animate-fade-in ${className || ''}`}>
+    <div ref={ref} className={`animate-fade-in ${className || ''}`}>
       {children}
     </div>
   );
-};
+});
 
 interface MotionListItemProps {
   children: React.ReactNode;

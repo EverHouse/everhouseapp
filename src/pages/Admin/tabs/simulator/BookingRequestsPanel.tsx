@@ -7,6 +7,7 @@ import { SwipeableListItem } from '../../../../components/SwipeableListItem';
 import type { BookingRequest, Resource } from './simulatorTypes';
 import { formatDateShortAdmin, groupBookingsByDate } from './simulatorUtils';
 import GuideBookings from '../../../../components/guides/GuideBookings';
+import { useAutoAnimate } from '@formkit/auto-animate/react';
 
 function BookingFeeButton({ bookingId, dbOwed, hasUnpaidFees, setBookingSheet, fallback }: {
     bookingId: number;
@@ -36,7 +37,7 @@ function BookingFeeButton({ bookingId, dbOwed, hasUnpaidFees, setBookingSheet, f
     return (
         <button
             onClick={() => setBookingSheet({ isOpen: true, trackmanBookingId: null, bookingId, mode: 'manage' as const })}
-            className="flex-1 py-2.5 bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 rounded-xl text-sm font-medium flex items-center justify-center gap-2 hover:bg-amber-200 dark:hover:bg-amber-500/30 hover:shadow-md active:scale-95 transition-all duration-200"
+            className="flex-1 py-2.5 bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 rounded-xl text-sm font-medium flex items-center justify-center gap-2 hover:bg-amber-200 dark:hover:bg-amber-500/30 hover:shadow-md active:scale-95 transition-all duration-fast"
         >
             <span aria-hidden="true" className="material-symbols-outlined text-lg">payments</span>
             ${Math.round(displayAmount)} Due
@@ -108,6 +109,8 @@ const BookingRequestsPanel: React.FC<BookingRequestsPanelProps> = ({
     queueMaxHeight,
     setActionInProgress,
 }) => {
+    const [queueParent] = useAutoAnimate();
+    const [scheduledParent] = useAutoAnimate();
     return (
         <div 
             className={`lg:border border-gray-200 dark:border-white/25 relative rounded-xl ${activeView === 'requests' ? 'block' : 'hidden lg:block'}`}
@@ -150,7 +153,7 @@ const BookingRequestsPanel: React.FC<BookingRequestsPanelProps> = ({
                             <p className="text-gray-600 dark:text-white/70">No items in queue</p>
                         </div>
                     ) : (
-                        <div className="space-y-3">
+                        <div ref={queueParent} className="space-y-3">
                             {queueItems.map((item, index) => {
                                 const req = item;
                                 
@@ -163,7 +166,7 @@ const BookingRequestsPanel: React.FC<BookingRequestsPanelProps> = ({
                                     return (
                                         <div 
                                             key={`cancel-${item.id}`}
-                                            className="bg-red-50/80 dark:bg-red-500/10 p-4 rounded-xl border-2 border-red-300 dark:border-red-500/30 animate-slide-up-stagger shadow-sm hover:shadow-md hover:bg-red-100/80 dark:hover:bg-red-500/20 hover:scale-[1.01] active:scale-[0.98] transition-all duration-200 cursor-pointer"
+                                            className="bg-red-50/80 dark:bg-red-500/10 p-4 rounded-xl border-2 border-red-300 dark:border-red-500/30 animate-slide-up-stagger shadow-sm hover:shadow-md hover:bg-red-100/80 dark:hover:bg-red-500/20 hover:scale-[1.01] active:scale-[0.98] transition-colors duration-fast cursor-pointer"
                                             style={{ '--stagger-index': index + 2 } as React.CSSProperties}
                                             onClick={() => setBookingSheet({
                                                 isOpen: true,
@@ -261,7 +264,7 @@ const BookingRequestsPanel: React.FC<BookingRequestsPanelProps> = ({
                                                                     });
                                                                 }
                                                             }}
-                                                            className="w-full mt-3 py-2 px-3 bg-red-500 hover:bg-red-600 disabled:opacity-50 disabled:pointer-events-none text-white rounded-lg text-sm font-medium flex items-center justify-center gap-1.5 hover:shadow-md active:scale-95 transition-all duration-200 focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-gray-900"
+                                                            className="w-full mt-3 py-2 px-3 bg-red-500 hover:bg-red-600 disabled:opacity-50 disabled:pointer-events-none text-white rounded-lg text-sm font-medium flex items-center justify-center gap-1.5 hover:shadow-md active:scale-95 transition-all duration-fast focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-gray-900"
                                                         >
                                                             <span aria-hidden="true" className="material-symbols-outlined text-sm">check_circle</span>
                                                             Complete Cancellation
@@ -277,7 +280,7 @@ const BookingRequestsPanel: React.FC<BookingRequestsPanelProps> = ({
                                 const actionState = actionInProgress[actionKey];
                                 const isActionPending = !!actionState;
                                 return (
-                                    <div key={`${req.source || 'request'}-${req.id}`} className={`bg-gray-50 dark:bg-white/5 p-4 rounded-xl border border-gray-200 dark:border-white/25 animate-slide-up-stagger shadow-sm hover:shadow-md hover:bg-gray-100 dark:hover:bg-white/10 transition-all duration-200 cursor-pointer active:scale-[0.98] ${isActionPending ? 'opacity-60 pointer-events-none' : ''}`} style={{ '--stagger-index': index + 2 } as React.CSSProperties}>
+                                    <div key={`${req.source || 'request'}-${req.id}`} className={`bg-gray-50 dark:bg-white/5 p-4 rounded-xl border border-gray-200 dark:border-white/25 animate-slide-up-stagger shadow-sm hover:shadow-md hover:bg-gray-100 dark:hover:bg-white/10 transition-colors duration-fast cursor-pointer active:scale-[0.98] ${isActionPending ? 'opacity-60 pointer-events-none' : ''}`} style={{ '--stagger-index': index + 2 } as React.CSSProperties}>
                                         {isActionPending && (
                                             <div className="flex items-center gap-2 mb-2 text-sm text-primary/70 dark:text-white/70">
                                                 <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
@@ -325,14 +328,14 @@ const BookingRequestsPanel: React.FC<BookingRequestsPanelProps> = ({
                                         <div className="flex gap-2">
                                             <button
                                                 onClick={() => setTrackmanModal({ isOpen: true, booking: req })}
-                                                className="flex-1 py-2 px-3 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 rounded-lg text-sm font-medium flex items-center justify-center gap-1.5 hover:bg-amber-200 dark:hover:bg-amber-900/50 hover:shadow-md active:scale-95 transition-all duration-200"
+                                                className="flex-1 py-2 px-3 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 rounded-lg text-sm font-medium flex items-center justify-center gap-1.5 hover:bg-amber-200 dark:hover:bg-amber-900/50 hover:shadow-md active:scale-95 transition-all duration-fast"
                                             >
                                                 <span aria-hidden="true" className="material-symbols-outlined text-sm">sports_golf</span>
                                                 Book on Trackman
                                             </button>
                                             <button
                                                 onClick={() => { setSelectedRequest(req); setActionModal('decline'); }}
-                                                className="flex-1 py-2 px-3 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-lg text-sm font-medium flex items-center justify-center gap-1.5 hover:bg-red-200 dark:hover:bg-red-900/50 hover:shadow-md active:scale-95 transition-all duration-200"
+                                                className="flex-1 py-2 px-3 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-lg text-sm font-medium flex items-center justify-center gap-1.5 hover:bg-red-200 dark:hover:bg-red-900/50 hover:shadow-md active:scale-95 transition-all duration-fast"
                                             >
                                                 <span aria-hidden="true" className="material-symbols-outlined text-sm">close</span>
                                                 Deny
@@ -399,7 +402,7 @@ const BookingRequestsPanel: React.FC<BookingRequestsPanelProps> = ({
                             <p className="text-primary/70 dark:text-white/70">No scheduled bookings {scheduledFilter !== 'all' ? `for ${scheduledFilter === 'week' ? 'this week' : scheduledFilter}` : ''}</p>
                         </div>
                     ) : (
-                        <div className="space-y-4">
+                        <div ref={scheduledParent} className="space-y-4">
                             {Array.from(groupBookingsByDate(scheduledBookings)).map(([date, bookings]) => (
                                 <div key={date}>
                                     <div className="flex items-center gap-2 mb-2">
@@ -447,7 +450,7 @@ const BookingRequestsPanel: React.FC<BookingRequestsPanelProps> = ({
                                                                     : isUnmatched 
                                                                         ? 'bg-amber-50/80 dark:bg-amber-500/10 border-2 border-dashed border-amber-300 dark:border-amber-500/30 hover:bg-amber-100/80 dark:hover:bg-amber-500/20 hover:shadow-md hover:scale-[1.01]' 
                                                                         : 'glass-card border border-primary/10 dark:border-white/25 hover:shadow-md'
-                                                        } transition-all duration-200`} 
+                                                        } transition-all duration-fast`} 
                                                         style={{ '--stagger-index': index } as React.CSSProperties}
                                                         onClick={() => !isOptimisticNew && !isActionPending && setBookingSheet({
                                                             isOpen: true,
@@ -572,7 +575,7 @@ const BookingRequestsPanel: React.FC<BookingRequestsPanelProps> = ({
                                                                             });
                                                                         }
                                                                     }}
-                                                                    className="flex-1 py-2.5 bg-orange-500 hover:bg-orange-600 text-white rounded-xl text-sm font-medium flex items-center justify-center gap-2 hover:shadow-md active:scale-95 transition-all duration-200"
+                                                                    className="flex-1 py-2.5 bg-orange-500 hover:bg-orange-600 text-white rounded-xl text-sm font-medium flex items-center justify-center gap-2 hover:shadow-md active:scale-95 transition-all duration-fast"
                                                                 >
                                                                     <span aria-hidden="true" className="material-symbols-outlined text-lg">check_circle</span>
                                                                     Complete Cancellation
@@ -590,7 +593,7 @@ const BookingRequestsPanel: React.FC<BookingRequestsPanelProps> = ({
                                                                         importedName: (booking as any).user_name || (booking as any).userName,
                                                                         notes: (booking as any).notes || (booking as any).note
                                                                     })}
-                                                                    className="flex-1 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-sm font-medium flex items-center justify-center gap-2 hover:shadow-md active:scale-95 transition-all duration-200"
+                                                                    className="flex-1 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-sm font-medium flex items-center justify-center gap-2 hover:shadow-md active:scale-95 transition-all duration-fast"
                                                                 >
                                                                     <span aria-hidden="true" className="material-symbols-outlined text-lg">person_add</span>
                                                                     Assign Member
@@ -622,7 +625,7 @@ const BookingRequestsPanel: React.FC<BookingRequestsPanelProps> = ({
                                                                                 await updateBookingStatusOptimistic(booking, 'attended');
                                                                                 btn.disabled = false;
                                                                             }}
-                                                                            className="flex-1 py-2.5 bg-accent text-primary rounded-xl text-sm font-medium flex items-center justify-center gap-2 hover:opacity-90 hover:shadow-md active:scale-95 transition-all duration-200 disabled:opacity-50"
+                                                                            className="flex-1 py-2.5 bg-accent text-primary rounded-xl text-sm font-medium flex items-center justify-center gap-2 hover:opacity-90 hover:shadow-md active:scale-95 transition-all duration-fast disabled:opacity-50"
                                                                         >
                                                                             <span aria-hidden="true" className="material-symbols-outlined text-lg">how_to_reg</span>
                                                                             Check In
@@ -640,7 +643,7 @@ const BookingRequestsPanel: React.FC<BookingRequestsPanelProps> = ({
                                                                             mode: 'manage' as const,
                                                                         });
                                                                     }}
-                                                                    className="flex-1 py-2.5 bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400 rounded-xl text-sm font-medium flex items-center justify-center gap-2 hover:bg-blue-200 dark:hover:bg-blue-500/30 hover:shadow-md active:scale-95 transition-all duration-200"
+                                                                    className="flex-1 py-2.5 bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400 rounded-xl text-sm font-medium flex items-center justify-center gap-2 hover:bg-blue-200 dark:hover:bg-blue-500/30 hover:shadow-md active:scale-95 transition-all duration-fast"
                                                                 >
                                                                     <span aria-hidden="true" className="material-symbols-outlined text-lg">group_add</span>
                                                                     Roster {(booking as any).filled_player_count || 0}/{(booking as any).declared_player_count}

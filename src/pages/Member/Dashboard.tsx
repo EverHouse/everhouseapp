@@ -907,14 +907,14 @@ const Dashboard: React.FC = () => {
               return (
                 <div 
                   onClick={() => setIsCardOpen(true)} 
-                  className={`relative h-56 lg:h-full lg:min-h-56 w-full rounded-[1.5rem] overflow-hidden cursor-pointer transition-all duration-500 ease-out group animate-slide-up-stagger active:scale-[0.98] hover:scale-[1.015] hover:shadow-2xl ${isExpired ? 'grayscale-[30%]' : ''}`}
+                  className={`relative h-56 lg:h-full lg:min-h-56 w-full rounded-[1.5rem] overflow-hidden cursor-pointer transition-all duration-emphasis ease-out group animate-slide-up-stagger active:scale-[0.98] hover:scale-[1.015] hover:shadow-2xl ${isExpired ? 'grayscale-[30%]' : ''}`}
                   style={{ '--stagger-index': 2 } as React.CSSProperties}
                 >
                   <div className="absolute inset-0" style={{ backgroundColor: cardBgColor }}></div>
                   <div className="absolute inset-0" style={{ background: 'linear-gradient(135deg, rgba(255,255,255,0.25) 0%, rgba(255,255,255,0.05) 100%)' }}></div>
                   <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E")` }}></div>
                   <div className="absolute inset-0 border border-white/30 rounded-[1.5rem] backdrop-blur-xl" style={{ boxShadow: 'inset 0 1px 0 0 rgba(255,255,255,0.2)' }}></div>
-                  <div className="absolute inset-0 overflow-hidden rounded-[1.5rem] opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
+                  <div className="absolute inset-0 overflow-hidden rounded-[1.5rem] opacity-0 group-hover:opacity-100 transition-opacity duration-normal pointer-events-none">
                     <div className="holographic-shimmer absolute -inset-full"></div>
                   </div>
                   <div className="absolute inset-0 p-6 flex flex-col justify-between z-10">
@@ -948,7 +948,7 @@ const Dashboard: React.FC = () => {
                       )}
                     </div>
                   </div>
-                  <div className="absolute bottom-0 left-0 right-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-20 p-4 pointer-events-none">
+                  <div className="absolute bottom-0 left-0 right-0 opacity-0 group-hover:opacity-100 transition-opacity duration-normal z-20 p-4 pointer-events-none">
                     <div className="w-full py-2 px-4 rounded-xl bg-black/40 backdrop-blur-md border border-white/20 text-center" style={{ boxShadow: '0 -4px 16px rgba(0,0,0,0.1)' }}>
                       <span className="font-bold text-sm text-white/90">{isExpired ? 'Renew Membership' : 'View Membership Details'}</span>
                     </div>

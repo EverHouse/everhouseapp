@@ -53,7 +53,7 @@ export function ModalShell({
     setIsClosing(true);
     setTimeout(() => {
       onCloseRef.current();
-    }, 150);
+    }, 250);
   }, [isClosing]);
 
   useEffect(() => {
@@ -103,7 +103,7 @@ export function ModalShell({
       style={{ overscrollBehavior: 'contain', touchAction: 'none', zIndex: modalZIndex, height: '100dvh' }}
     >
       <div 
-        className={`fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity duration-150 ${isClosing ? 'opacity-0' : 'animate-backdrop-fade-in'}`}
+        className={`fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity duration-normal ${isClosing ? 'opacity-0' : 'animate-backdrop-fade-in'}`}
         aria-hidden="true"
         style={{ touchAction: 'none', height: '100dvh' }}
       />
@@ -132,7 +132,7 @@ export function ModalShell({
             aria-labelledby={title ? 'modal-title' : undefined}
             tabIndex={-1}
             onClick={(e) => e.stopPropagation()}
-            className={`relative w-full ${sizeClasses[size]} ${isDark ? 'bg-[#1a1d15] border-white/10' : 'bg-white border-gray-200'} rounded-2xl shadow-2xl border transform transition-all duration-150 ${isClosing ? 'scale-95 opacity-0' : 'animate-modal-slide-up'} ${className}`}
+            className={`relative w-full ${sizeClasses[size]} ${isDark ? 'bg-[#1a1d15] border-white/10' : 'bg-white border-gray-200'} rounded-2xl shadow-2xl border transform transition-all duration-normal ease-spring-smooth ${isClosing ? 'scale-95 opacity-0' : 'animate-modal-slide-up'} ${className}`}
           >
             {(title || showCloseButton) && (
               <div className={`flex items-center justify-between p-4 ${hideTitleBorder ? '' : `border-b ${isDark ? 'border-white/10' : 'border-gray-200'}`}`}>

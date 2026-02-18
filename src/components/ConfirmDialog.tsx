@@ -124,7 +124,7 @@ function ConfirmDialogComponent({
     setIsClosing(true);
     setTimeout(() => {
       onConfirm();
-    }, 150);
+    }, 250);
   }, [isLoading, onConfirm]);
 
   const handleCancel = useCallback(() => {
@@ -132,7 +132,7 @@ function ConfirmDialogComponent({
     setIsClosing(true);
     setTimeout(() => {
       onCancel();
-    }, 150);
+    }, 250);
   }, [isLoading, onCancel]);
 
   if (!isOpen) return null;
@@ -145,7 +145,7 @@ function ConfirmDialogComponent({
       style={{ overscrollBehavior: 'contain', touchAction: 'none', zIndex: dialogZIndex, height: '100dvh' }}
     >
       <div
-        className={`fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity duration-150 ${
+        className={`fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity duration-normal ${
           isClosing ? 'opacity-0' : 'animate-backdrop-fade-in'
         }`}
         aria-hidden="true"
@@ -163,7 +163,7 @@ function ConfirmDialogComponent({
           aria-modal="true"
           aria-labelledby="confirm-dialog-title"
           aria-describedby="confirm-dialog-message"
-          className={`relative w-full max-w-sm transform transition-all duration-150 ${
+          className={`relative w-full max-w-sm transform transition-all duration-normal ease-spring-smooth ${
             isClosing ? 'scale-95 opacity-0' : 'animate-modal-slide-up'
           }`}
         >

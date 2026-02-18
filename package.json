@@ -22,6 +22,7 @@
     "stripe:cleanup:execute": "tsx server/scripts/cleanup-stripe-duplicates.ts --execute"
   },
   "dependencies": {
+    "@formkit/auto-animate": "^0.9.0",
     "@google-cloud/storage": "^7.18.0",
     "@hubspot/api-client": "^13.4.0",
     "@modelcontextprotocol/sdk": "^1.25.3",

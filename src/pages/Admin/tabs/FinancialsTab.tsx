@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { AnimatedPage } from '../../../components/motion';
+import { TabTransition } from '../../../components/motion/TabTransition';
 import TransactionsSubTab from '../../../components/admin/payments/TransactionsSubTab';
 import POSRegister from '../../../components/admin/payments/POSRegister';
 import {
@@ -9,6 +10,8 @@ import {
   useOverduePayments,
 } from '../../../hooks/queries/useFinancialsQueries';
 import { getSubscriptionStatusBadge, getInvoiceStatusBadge } from '../../../utils/statusColors';
+import { useAutoAnimate } from '@formkit/auto-animate/react';
+import WalkingGolferSpinner from '../../../components/WalkingGolferSpinner';
 
 interface SubscriptionListItem {
   id: string;
@@ -62,7 +65,7 @@ const FinancialsTab: React.FC = () => {
       <div className="flex gap-2 mb-6 animate-content-enter-delay-1 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-hide">
         <button
           onClick={() => setActiveTab('POS')}
-          className={`shrink-0 px-4 py-2 rounded-full font-medium transition-colors ${
+          className={`shrink-0 px-4 py-2 rounded-full font-medium transition-colors tactile-btn ${
             activeTab === 'POS'
               ? 'bg-primary dark:bg-accent text-white dark:text-primary'
               : 'bg-white/60 dark:bg-white/10 text-primary/60 dark:text-white/60'
@@ -72,7 +75,7 @@ const FinancialsTab: React.FC = () => {
         </button>
         <button
           onClick={() => setActiveTab('Transactions')}
-          className={`shrink-0 px-4 py-2 rounded-full font-medium transition-colors ${
+          className={`shrink-0 px-4 py-2 rounded-full font-medium transition-colors tactile-btn ${
             activeTab === 'Transactions'
               ? 'bg-primary dark:bg-accent text-white dark:text-primary'
               : 'bg-white/60 dark:bg-white/10 text-primary/60 dark:text-white/60'
@@ -89,7 +92,7 @@ const FinancialsTab: React.FC = () => {
         </button>
         <button
           onClick={() => setActiveTab('Subscriptions')}
-          className={`shrink-0 px-4 py-2 rounded-full font-medium transition-colors ${
+          className={`shrink-0 px-4 py-2 rounded-full font-medium transition-colors tactile-btn ${
             activeTab === 'Subscriptions'
               ? 'bg-primary dark:bg-accent text-white dark:text-primary'
               : 'bg-white/60 dark:bg-white/10 text-primary/60 dark:text-white/60'
@@ -99,7 +102,7 @@ const FinancialsTab: React.FC = () => {
         </button>
         <button
           onClick={() => setActiveTab('Invoices')}
-          className={`shrink-0 px-4 py-2 rounded-full font-medium transition-colors ${
+          className={`shrink-0 px-4 py-2 rounded-full font-medium transition-colors tactile-btn ${
             activeTab === 'Invoices'
               ? 'bg-primary dark:bg-accent text-white dark:text-primary'
               : 'bg-white/60 dark:bg-white/10 text-primary/60 dark:text-white/60'
@@ -110,12 +113,14 @@ const FinancialsTab: React.FC = () => {
       </div>
 
       {/* Tab Content */}
-      <div key={activeTab} className="animate-content-enter">
+      <TabTransition activeKey={activeTab}>
+      <div className="animate-content-enter">
         {activeTab === 'POS' && <POSRegister />}
         {activeTab === 'Transactions' && <TransactionsSubTab />}
         {activeTab === 'Subscriptions' && <SubscriptionsSubTab />}
         {activeTab === 'Invoices' && <InvoicesSubTab />}
       </div>
+      </TabTransition>
     </AnimatedPage>
   );
 };
@@ -128,6 +133,8 @@ const SubscriptionsSubTab: React.FC = () => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<{ created: number; updated: number; skipped: number } | null>(null);
   const [localError, setLocalError] = useState<string | null>(null);
+  const [subsMobileParent] = useAutoAnimate();
+  const [subsTbodyParent] = useAutoAnimate();
 
   const { data: subscriptionsData, isLoading, error: queryError, refetch } = useSubscriptions(statusFilter);
   const subscriptions = subscriptionsData?.subscriptions || [];
@@ -229,7 +236,7 @@ const SubscriptionsSubTab: React.FC = () => {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 border-2 border-primary/30 border-t-primary dark:border-white/30 dark:border-t-white rounded-full animate-spin"></div>
+          <WalkingGolferSpinner size="md" variant="dark" />
           <p className="text-sm text-primary/60 dark:text-white/60">Loading subscriptions...</p>
         </div>
       </div>
@@ -330,7 +337,7 @@ const SubscriptionsSubTab: React.FC = () => {
       ) : (
         <>
           {/* Mobile card view */}
-          <div className="md:hidden space-y-3">
+          <div ref={subsMobileParent} className="md:hidden space-y-3">
             {filteredSubscriptions.map((sub) => (
               <div key={sub.id} className="bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-xl p-4">
                 <div className="flex justify-between items-start mb-3">
@@ -405,9 +412,9 @@ const SubscriptionsSubTab: React.FC = () => {
                     <th className="text-right px-4 py-3 text-xs font-semibold text-primary/60 dark:text-white/60 uppercase tracking-wider">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-primary/5 dark:divide-white/5">
+                <tbody ref={subsTbodyParent} className="divide-y divide-primary/5 dark:divide-white/5">
                   {filteredSubscriptions.map((sub) => (
-                    <tr key={sub.id} className="hover:bg-primary/5 dark:hover:bg-white/5 transition-colors">
+                    <tr key={sub.id} className="hover:bg-primary/5 dark:hover:bg-white/5 transition-colors tactile-row">
                       <td className="px-4 py-3">
                         <div>
                           <p className="font-medium text-primary dark:text-white">{sub.memberName}</p>
@@ -481,7 +488,7 @@ const SubscriptionsSubTab: React.FC = () => {
             >
               {isLoadingMore ? (
                 <>
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <WalkingGolferSpinner size="sm" variant="light" />
                   Loading...
                 </>
               ) : (
@@ -512,6 +519,8 @@ const InvoicesSubTab: React.FC = () => {
   const [endDate, setEndDate] = useState('');
   const [appliedStartDate, setAppliedStartDate] = useState('');
   const [appliedEndDate, setAppliedEndDate] = useState('');
+  const [invMobileParent] = useAutoAnimate();
+  const [invTbodyParent] = useAutoAnimate();
 
   const { data: invoicesData, isLoading, error: queryError, refetch } = useInvoices(statusFilter, appliedStartDate, appliedEndDate);
   const invoices = invoicesData?.invoices || [];
@@ -579,7 +588,7 @@ const InvoicesSubTab: React.FC = () => {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 border-2 border-primary/30 border-t-primary dark:border-white/30 dark:border-t-white rounded-full animate-spin"></div>
+          <WalkingGolferSpinner size="md" variant="dark" />
           <p className="text-sm text-primary/60 dark:text-white/60">Loading invoices...</p>
         </div>
       </div>
@@ -681,7 +690,7 @@ const InvoicesSubTab: React.FC = () => {
       ) : (
         <>
           {/* Mobile card view */}
-          <div className="md:hidden space-y-3">
+          <div ref={invMobileParent} className="md:hidden space-y-3">
             {filteredInvoices.map((invoice) => (
               <div key={invoice.id} className="bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-xl p-4">
                 <div className="flex justify-between items-start mb-3">
@@ -757,9 +766,9 @@ const InvoicesSubTab: React.FC = () => {
                     <th className="text-right px-4 py-3 text-xs font-semibold text-primary/60 dark:text-white/60 uppercase tracking-wider">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-primary/5 dark:divide-white/5">
+                <tbody ref={invTbodyParent} className="divide-y divide-primary/5 dark:divide-white/5">
                   {filteredInvoices.map((invoice, index) => (
-                    <tr key={invoice.id} className={`hover:bg-primary/5 dark:hover:bg-white/5 transition-colors animate-list-item-delay-${Math.min(index + 1, 10)}`}>
+                    <tr key={invoice.id} className={`hover:bg-primary/5 dark:hover:bg-white/5 transition-colors tactile-row animate-list-item-delay-${Math.min(index + 1, 10)}`}>
                       <td className="px-4 py-3">
                         <p className="font-medium text-primary dark:text-white font-mono text-sm">
                           {invoice.number || '-'}
@@ -835,7 +844,7 @@ const InvoicesSubTab: React.FC = () => {
             >
               {isLoadingMore ? (
                 <>
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <WalkingGolferSpinner size="sm" variant="light" />
                   Loading...
                 </>
               ) : (

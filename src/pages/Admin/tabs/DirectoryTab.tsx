@@ -17,6 +17,7 @@ import { getMemberStatusLabel, getMemberStatusBadgeClass } from '../../../utils/
 import { AnimatedPage } from '../../../components/motion';
 import { fetchWithCredentials, postWithCredentials } from '../../../hooks/queries/useFetch';
 import { useToast } from '../../../components/Toast';
+import { useAutoAnimate } from '@formkit/auto-animate/react';
 
 const TIER_OPTIONS = ['All', 'Social', 'Core', 'Premium', 'Corporate', 'VIP'] as const;
 const ASSIGNABLE_TIERS = ['Social', 'Core', 'Premium', 'Corporate', 'VIP'] as const;
@@ -191,6 +192,13 @@ const DirectoryTab: React.FC = () => {
     const navigate = useNavigate();
     const queryClient = useQueryClient();
     
+    const [visitorsCardParent] = useAutoAnimate();
+    const [visitorsTbodyParent] = useAutoAnimate();
+    const [teamCardParent] = useAutoAnimate();
+    const [teamTbodyParent] = useAutoAnimate();
+    const [membersCardParent] = useAutoAnimate();
+    const [membersDesktopParent] = useAutoAnimate();
+
     const [searchQuery, setSearchQuery] = useState('');
     const [tierFilter, setTierFilter] = useState<string>('All');
     const [statusFilter, setStatusFilter] = useState<string>('All');
@@ -790,7 +798,7 @@ const DirectoryTab: React.FC = () => {
 
     const SortableHeader = ({ field, label, className = '', width }: { field: SortField; label: string; className?: string; width: string }) => (
         <div 
-            className={`p-4 font-semibold text-gray-600 dark:text-gray-300 text-sm cursor-pointer hover:bg-gray-100 dark:hover:bg-white/10 transition-colors select-none ${className}`}
+            className={`p-4 font-semibold text-gray-600 dark:text-gray-300 text-sm cursor-pointer hover:bg-gray-100 dark:hover:bg-white/10 transition-colors select-none tactile-btn ${className}`}
             style={{ width }}
             onClick={() => handleSort(field)}
         >
@@ -1333,12 +1341,12 @@ const DirectoryTab: React.FC = () => {
                 {!visitorsLoading && !visitorsError && memberTab === 'visitors' && visitors.length > 0 && (
                     <div className="md:hidden flex-1 min-h-0 relative">
                         <div className="h-full overflow-y-auto pt-2 pb-24">
-                            <div className="space-y-3 px-1">
+                            <div ref={visitorsCardParent} className="space-y-3 px-1">
                                 {sortedVisitors.map((v, index) => (
                                     <div 
                                         key={v.id}
                                         onClick={() => openVisitorDetails(v)}
-                                        className="bg-white dark:bg-surface-dark p-4 rounded-xl border border-gray-200 dark:border-white/20 shadow-sm cursor-pointer hover:border-primary/50 transition-colors transition-transform active:scale-[0.98] animate-slide-up-stagger"
+                                        className="bg-white dark:bg-surface-dark p-4 rounded-xl border border-gray-200 dark:border-white/20 shadow-sm cursor-pointer hover:border-primary/50 transition-colors active:scale-[0.98] animate-slide-up-stagger"
                                         style={{ '--stagger-index': index } as React.CSSProperties}
                                     >
                                         <div className="flex justify-between items-start mb-2">
@@ -1431,7 +1439,7 @@ const DirectoryTab: React.FC = () => {
                                         <th className="p-3 text-left text-xs font-bold text-gray-600 dark:text-gray-400 uppercase">Type</th>
                                         <th className="p-3 text-left text-xs font-bold text-gray-600 dark:text-gray-400 uppercase">Source</th>
                                         <th 
-                                            className="p-3 text-left text-xs font-bold text-gray-600 dark:text-gray-400 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-white/10 transition-colors select-none"
+                                            className="p-3 text-left text-xs font-bold text-gray-600 dark:text-gray-400 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-white/10 transition-colors select-none tactile-btn"
                                             onClick={() => {
                                                 if (visitorSortField === 'purchases') {
                                                     setVisitorSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
@@ -1453,7 +1461,7 @@ const DirectoryTab: React.FC = () => {
                                         <th className="p-3 text-left text-xs font-bold text-gray-600 dark:text-gray-400 uppercase">Last Activity</th>
                                     </tr>
                                 </thead>
-                                <tbody>
+                                <tbody ref={visitorsTbodyParent}>
                                     {sortedVisitors.map(v => (
                                         <tr 
                                             key={v.id}
@@ -1562,12 +1570,12 @@ const DirectoryTab: React.FC = () => {
                 {!teamLoading && !teamError && memberTab === 'team' && filteredTeamMembers.length > 0 && (
                     <div className="flex-1 min-h-0 relative">
                         <div className="h-full overflow-y-auto">
-                            <div className="md:hidden space-y-3 px-1 pt-2 pb-24">
+                            <div ref={teamCardParent} className="md:hidden space-y-3 px-1 pt-2 pb-24">
                                 {filteredTeamMembers.map((member, index) => (
                                     <div 
                                         key={member.staff_id}
                                         onClick={() => openTeamMemberDetails(member)}
-                                        className="bg-white dark:bg-surface-dark p-4 rounded-xl border border-gray-200 dark:border-white/20 shadow-sm cursor-pointer hover:border-primary/50 transition-colors transition-transform active:scale-[0.98] animate-slide-up-stagger"
+                                        className="bg-white dark:bg-surface-dark p-4 rounded-xl border border-gray-200 dark:border-white/20 shadow-sm cursor-pointer hover:border-primary/50 transition-colors active:scale-[0.98] animate-slide-up-stagger"
                                         style={{ '--stagger-index': index } as React.CSSProperties}
                                     >
                                         <div className="flex justify-between items-start mb-2">
@@ -1606,7 +1614,7 @@ const DirectoryTab: React.FC = () => {
                                         <th className="p-3 text-left text-xs font-bold text-gray-600 dark:text-gray-400 uppercase">Status</th>
                                     </tr>
                                 </thead>
-                                <tbody>
+                                <tbody ref={teamTbodyParent}>
                                     {filteredTeamMembers.map(member => (
                                         <tr 
                                             key={member.staff_id}
@@ -1640,12 +1648,12 @@ const DirectoryTab: React.FC = () => {
                     <>
                         <div className="md:hidden relative">
                             <div className="pt-2 pb-24">
-                                <div className="space-y-3 px-1">
+                                <div ref={membersCardParent} className="space-y-3 px-1">
                                     {visibleItems.map((m, index) => (
                                         <div 
                                             key={m.email}
                                             onClick={() => openDetailsModal(m)}
-                                            className="bg-white dark:bg-surface-dark p-4 rounded-xl border border-gray-200 dark:border-white/20 shadow-sm cursor-pointer hover:border-primary/50 transition-colors transition-transform active:scale-[0.98] animate-slide-up-stagger"
+                                            className="bg-white dark:bg-surface-dark p-4 rounded-xl border border-gray-200 dark:border-white/20 shadow-sm cursor-pointer hover:border-primary/50 transition-colors active:scale-[0.98] animate-slide-up-stagger"
                                             style={{ '--stagger-index': Math.min(index, 10) } as React.CSSProperties}
                                         >
                                             <div className="flex justify-between items-start mb-2">
@@ -1708,7 +1716,7 @@ const DirectoryTab: React.FC = () => {
                                                     {isAdmin && memberTab === 'active' && !getDisplayTier(m) && !isMemberPendingUpdate(m.email) && (
                                                         <button
                                                             onClick={(e) => { e.stopPropagation(); openAssignTierModal(m); }}
-                                                            className="flex items-center gap-1 px-2 py-1 rounded-lg bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 text-xs font-bold hover:bg-amber-200 dark:hover:bg-amber-500/30 transition-all duration-200 active:scale-95"
+                                                            className="flex items-center gap-1 px-2 py-1 rounded-lg bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 text-xs font-bold hover:bg-amber-200 dark:hover:bg-amber-500/30 transition-all duration-fast active:scale-95"
                                                         >
                                                             <span aria-hidden="true" className="material-symbols-outlined text-[14px]">add_circle</span>
                                                             Assign Tier
@@ -1727,7 +1735,7 @@ const DirectoryTab: React.FC = () => {
                                                 {isAdmin && memberTab === 'active' && (
                                                     <button 
                                                         onClick={(e) => { e.stopPropagation(); handleViewAs(m); }} 
-                                                        className="flex items-center gap-1 px-2 py-1 rounded-lg bg-accent/20 text-brand-green dark:bg-accent/30 dark:text-accent text-xs font-bold hover:bg-accent/30 transition-all duration-200 active:scale-95"
+                                                        className="flex items-center gap-1 px-2 py-1 rounded-lg bg-accent/20 text-brand-green dark:bg-accent/30 dark:text-accent text-xs font-bold hover:bg-accent/30 transition-all duration-fast active:scale-95"
                                                     >
                                                         <span aria-hidden="true" className="material-symbols-outlined text-[14px]">visibility</span>
                                                         View As
@@ -1753,7 +1761,7 @@ const DirectoryTab: React.FC = () => {
                                     <div className="p-4 font-semibold text-gray-600 dark:text-gray-300 text-sm" style={{ width: '13%' }}>Reactivation</div>
                                 )}
                             </div>
-                            <div>
+                            <div ref={membersDesktopParent}>
                                 {visibleItems.map(m => (
                                     <div 
                                         key={m.email}
@@ -1781,7 +1789,7 @@ const DirectoryTab: React.FC = () => {
                                                     {isAdmin && !getDisplayTier(m) && !isMemberPendingUpdate(m.email) && (
                                                         <button
                                                             onClick={(e) => { e.stopPropagation(); openAssignTierModal(m); }}
-                                                            className="flex items-center gap-1 px-2 py-0.5 rounded bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 text-[10px] font-bold hover:bg-amber-200 dark:hover:bg-amber-500/30 transition-all duration-200 active:scale-95"
+                                                            className="flex items-center gap-1 px-2 py-0.5 rounded bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 text-[10px] font-bold hover:bg-amber-200 dark:hover:bg-amber-500/30 transition-all duration-fast active:scale-95"
                                                         >
                                                             <span aria-hidden="true" className="material-symbols-outlined text-[12px]">add_circle</span>
                                                             Assign
@@ -1882,7 +1890,7 @@ const DirectoryTab: React.FC = () => {
                     <button
                         onClick={() => setAddMemberModalOpen(true)}
                         aria-label="Add new user"
-                        className="w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-all duration-300 hover:scale-110 active:scale-95 bg-green-600 text-white backdrop-blur-xl border border-white/30"
+                        className="w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-all duration-normal hover:scale-110 active:scale-95 bg-green-600 text-white backdrop-blur-xl border border-white/30"
                         title="Add New User"
                     >
                         <span className="material-symbols-outlined text-2xl" aria-hidden="true">person_add</span>

@@ -13,6 +13,8 @@ import { BottomSentinel } from '../../components/layout/BottomSentinel';
 import { formatTime12Hour, getRelativeDateLabel } from '../../utils/dateUtils';
 import InvoicePaymentModal from '../../components/billing/InvoicePaymentModal';
 import { AnimatedPage } from '../../components/motion';
+import { TabTransition } from '../../components/motion/TabTransition';
+import { useAutoAnimate } from '@formkit/auto-animate/react';
 
 interface UnifiedVisit {
   id: number;
@@ -52,6 +54,8 @@ const History: React.FC = () => {
   const initialTab = searchParams.get('tab') === 'payments' ? 'payments' : 'visits';
   const [activeTab, setActiveTab] = useState<'visits' | 'payments'>(initialTab);
   const [payingInvoice, setPayingInvoice] = useState<UnifiedPurchase | null>(null);
+  const [visitsParent] = useAutoAnimate();
+  const [purchasesParent] = useAutoAnimate();
 
   const { data: visits = [], isLoading: visitsLoading, refetch: refetchVisits } = useQuery({
     queryKey: ['my-visits', user?.email],
@@ -140,7 +144,8 @@ const History: React.FC = () => {
           </div>
         </section>
 
-        <div key={activeTab} className="relative z-10 animate-content-enter-delay-3">
+        <TabTransition activeKey={activeTab}>
+        <div className="relative z-10 animate-content-enter-delay-3">
           {isLoading ? (
             <div className="animate-pulse space-y-4">
               {[1, 2, 3].map(i => (
@@ -158,7 +163,7 @@ const History: React.FC = () => {
                   <p className={`${isDark ? 'text-white/80' : 'text-primary/80'}`}>No past visits yet</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                <div ref={visitsParent} className="grid grid-cols-1 lg:grid-cols-2 gap-3">
                   {visits.map((visit, index) => {
                     const isConferenceRoom = visit.category === 'Conference Room';
                     
@@ -242,7 +247,7 @@ const History: React.FC = () => {
                   <p className={`text-sm mt-1 ${isDark ? 'text-white/50' : 'text-primary/50'}`}>Your payment history will appear here</p>
                 </div>
               ) : (
-                <div className="space-y-6">
+                <div ref={purchasesParent} className="space-y-6">
                   {(() => {
                     const categoryIcons: Record<string, string> = {
                       sim_walk_in: 'golf_course',
@@ -405,6 +410,7 @@ const History: React.FC = () => {
             </div>
           ) : null}
         </div>
+        </TabTransition>
 
         <BottomSentinel />
       </SwipeablePage>

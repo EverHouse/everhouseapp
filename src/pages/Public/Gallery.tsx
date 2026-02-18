@@ -311,10 +311,11 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ images, currentIndex, onClose
         onTouchEnd={handleTouchEnd}
       >
         <img
+          key={currentIndex}
           src={images[currentIndex]}
           alt="Gallery full view"
           loading="lazy"
-          className="max-w-full max-h-[80vh] object-contain rounded-2xl"
+          className="max-w-full max-h-[80vh] object-contain rounded-2xl animate-content-enter"
         />
       </div>
     </div>,

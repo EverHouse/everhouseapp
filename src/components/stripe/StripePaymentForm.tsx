@@ -8,6 +8,7 @@ import {
 import { loadStripe, Stripe, StripeElementsOptions } from '@stripe/stripe-js';
 import { useTheme } from '../../contexts/ThemeContext';
 import { getStripeAppearance } from './stripeAppearance';
+import WalkingGolferSpinner from '../WalkingGolferSpinner';
 
 let stripePromise: Promise<Stripe | null> | null = null;
 
@@ -120,7 +121,7 @@ export function SimpleCheckoutForm({
         >
           {isProcessing ? (
             <>
-              <div className="animate-spin rounded-full h-4 w-4 border-2 border-emerald-600 dark:border-emerald-400 border-t-transparent" />
+              <WalkingGolferSpinner size="sm" variant="dark" />
               Processing...
             </>
           ) : (
@@ -190,7 +191,7 @@ export function StripePaymentWithSecret({
   if (loading) {
     return (
       <div className="flex items-center justify-center py-8">
-        <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent" />
+        <WalkingGolferSpinner size="md" variant={isDark ? 'light' : 'dark'} />
       </div>
     );
   }
@@ -330,7 +331,7 @@ export function StripePaymentForm({
   if (loading) {
     return (
       <div className="flex items-center justify-center py-8">
-        <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent" />
+        <WalkingGolferSpinner size="md" variant={isDark ? 'light' : 'dark'} />
       </div>
     );
   }

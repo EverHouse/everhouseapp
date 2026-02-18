@@ -20,6 +20,7 @@ import WalkingGolferSpinner from '../../components/WalkingGolferSpinner';
 import ModalShell from '../../components/ModalShell';
 import { GuardianConsentForm, type GuardianConsentData } from '../../components/booking';
 import { AnimatedPage } from '../../components/motion';
+import { TabTransition } from '../../components/motion/TabTransition';
 import { StripePaymentWithSecret } from '../../components/stripe/StripePaymentForm';
 import {
   type APIResource,
@@ -1021,7 +1022,8 @@ const BookGolf: React.FC = () => {
           </a>
         </section>
 ) : (
-        <div key={activeTab} className="relative z-10 animate-content-enter space-y-6">
+        <TabTransition activeKey={activeTab}>
+        <div className="relative z-10 animate-content-enter space-y-6">
           {activeTab === 'simulator' && (
             <PlayerSlotEditor
               playerCount={playerCount}
@@ -1099,7 +1101,7 @@ const BookGolf: React.FC = () => {
                         key={mins}
                         onClick={() => { haptic.selection(); setDuration(mins); setExpandedHour(null); setHasUserSelectedDuration(true); }}
                         aria-pressed={duration === mins}
-                        className={`relative p-3 rounded-xl border transition-all active:scale-95 focus:ring-2 focus:ring-accent focus:outline-none ${
+                        className={`relative p-3 rounded-xl border transition-all duration-fast ease-spring-smooth active:scale-95 focus:ring-2 focus:ring-accent focus:outline-none ${
                           duration === mins
                             ? 'bg-accent text-primary border-accent shadow-glow'
                             : isLowTime
@@ -1335,7 +1337,7 @@ const BookGolf: React.FC = () => {
                   ))}
                 </div>
             )}
-              <div className={`transition-opacity duration-300 ${isLoading ? 'opacity-0 hidden' : 'opacity-100'}`}>
+              <div className={`transition-opacity duration-normal ${isLoading ? 'opacity-0 hidden' : 'opacity-100'}`}>
               <div className="space-y-2">
                 {slotsByHour.map((hourGroup, groupIndex) => {
                   const isExpanded = expandedHour === hourGroup.hour24;
@@ -1361,7 +1363,7 @@ const BookGolf: React.FC = () => {
                         }`}
                       >
                         <div className="flex items-center gap-3">
-                          <span className={`material-symbols-outlined text-xl transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''} ${
+                          <span className={`material-symbols-outlined text-xl transition-transform duration-fast ${isExpanded ? 'rotate-90' : ''} ${
                             hasSelectedSlot ? (isDark ? 'text-accent' : 'text-accent') : (isDark ? 'text-white/80' : 'text-primary/80')
                           }`}>
                             chevron_right
@@ -1380,7 +1382,7 @@ const BookGolf: React.FC = () => {
                         )}
                       </button>
                       
-                      <div className={`grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 overflow-hidden transition-all duration-300 ease-out ${
+                      <div className={`grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 overflow-hidden transition-all duration-normal ease-out ${
                         isExpanded ? 'max-h-[500px] opacity-100 mt-2 pl-6' : 'max-h-0 opacity-0'
                       }`}>
                         {hourGroup.slots.map((slot, slotIndex) => (
@@ -1463,12 +1465,13 @@ const BookGolf: React.FC = () => {
           </>
           )}
         </div>
+        </TabTransition>
       )}
         </>
       )}
 
       {activeTab === 'conference' && selectedSlot && selectedResource && conferencePaymentRequired && !conferencePrepaymentId && (
-        <div ref={requestButtonRef} className="fixed bottom-24 left-0 right-0 z-20 px-4 sm:px-6 flex flex-col items-center w-full max-w-lg sm:max-w-xl lg:max-w-2xl mx-auto animate-in slide-in-from-bottom-4 duration-300 gap-2">
+        <div ref={requestButtonRef} className="fixed bottom-24 left-0 right-0 z-20 px-4 sm:px-6 flex flex-col items-center w-full max-w-lg sm:max-w-xl lg:max-w-2xl mx-auto animate-in slide-in-from-bottom-4 duration-normal gap-2">
           <div className={`w-full px-3 sm:px-4 py-4 rounded-xl backdrop-blur-md border ${isDark ? 'bg-black/70 border-amber-500/30' : 'bg-white/90 border-amber-200 shadow-lg'}`}>
             <div className="flex items-center gap-2 mb-3">
               <span className={`material-symbols-outlined text-lg ${isDark ? 'text-amber-400' : 'text-amber-600'}`}>payments</span>
@@ -1533,7 +1536,7 @@ const BookGolf: React.FC = () => {
       )}
 
       {canBook && (
-        <div ref={requestButtonRef} className="fixed bottom-24 left-0 right-0 z-20 px-4 sm:px-6 flex flex-col items-center w-full max-w-lg sm:max-w-xl lg:max-w-2xl mx-auto animate-in slide-in-from-bottom-4 duration-300 gap-2">
+        <div ref={requestButtonRef} className="fixed bottom-24 left-0 right-0 z-20 px-4 sm:px-6 flex flex-col items-center w-full max-w-lg sm:max-w-xl lg:max-w-2xl mx-auto animate-in slide-in-from-bottom-4 duration-normal gap-2">
           {activeTab === 'conference' && conferencePrepaymentId && (
             <div className={`w-full px-3 sm:px-4 py-2 rounded-xl backdrop-blur-md border flex items-center justify-between ${isDark ? 'bg-emerald-500/20 border-emerald-500/30' : 'bg-emerald-50 border-emerald-200'}`}>
               <div className="flex items-center gap-2">

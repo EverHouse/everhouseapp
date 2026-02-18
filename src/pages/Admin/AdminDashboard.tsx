@@ -103,7 +103,7 @@ const AdminDashboard: React.FC = () => {
   };
 
   const headerContent = (
-    <header className="fixed top-0 left-0 right-0 lg:left-64 flex items-center justify-between px-4 md:px-6 pt-[max(16px,env(safe-area-inset-top))] pb-4 bg-[#293515] shadow-md transition-all duration-200 text-[#F2F2EC] pointer-events-auto" style={{ zIndex: 'var(--z-header)' }}>
+    <header className="fixed top-0 left-0 right-0 lg:left-64 flex items-center justify-between px-4 md:px-6 pt-[max(16px,env(safe-area-inset-top))] pb-4 bg-[#293515] shadow-md transition-all duration-fast text-[#F2F2EC] pointer-events-auto" style={{ zIndex: 'var(--z-header)' }}>
       <div className="flex items-center flex-shrink-0 w-[88px] lg:w-0">
         <button 
           onClick={() => setIsMobileSidebarOpen(true)}
@@ -146,7 +146,7 @@ const AdminDashboard: React.FC = () => {
   );
 
   return (
-    <div className="min-h-screen bg-bone font-display dark:bg-[#141414] transition-colors duration-300 flex flex-col relative">
+    <div className="min-h-screen bg-bone font-display dark:bg-[#141414] transition-colors duration-normal flex flex-col relative">
       
       <StaffSidebar 
         activeTab={activeTab} 
@@ -555,7 +555,7 @@ const StaffTrainingGuide: React.FC = () => {
                                     <h3 className="font-bold text-primary dark:text-white print:text-gray-900">{section.title}</h3>
                                     <p className="text-sm text-primary/80 dark:text-white/80 print:text-gray-500">{section.description}</p>
                                 </div>
-                                <span className={`material-symbols-outlined text-primary/70 dark:text-white/70 transition-transform duration-300 print:hidden ${expandedSection === String(section.id) ? 'rotate-180' : ''}`}>
+                                <span className={`material-symbols-outlined text-primary/70 dark:text-white/70 transition-transform duration-normal print:hidden ${expandedSection === String(section.id) ? 'rotate-180' : ''}`}>
                                     expand_more
                                 </span>
                             </div>
@@ -571,7 +571,7 @@ const StaffTrainingGuide: React.FC = () => {
                             )}
                         </div>
 
-                        <div className={`overflow-hidden transition-all duration-300 ${isPrinting || expandedSection === String(section.id) ? 'max-h-[5000px]' : 'max-h-0'}`}>
+                        <div className={`overflow-hidden transition-all duration-normal ${isPrinting || expandedSection === String(section.id) ? 'max-h-[5000px]' : 'max-h-0'}`}>
                             <div className="px-5 pb-5 space-y-4 print:pt-2">
                                 {section.steps.map((step, index) => (
                                     <div key={index} className="flex gap-4">

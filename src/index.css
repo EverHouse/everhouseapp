@@ -190,9 +190,20 @@
   --font-size-3xl: 1.875rem;
   --font-size-4xl: 2.25rem;
 
-  /* iOS Spring Physics & Tap Tokens */
+  /* Motion Duration Scale */
+  --duration-instant: 100ms;
+  --duration-fast: 150ms;
+  --duration-normal: 250ms;
+  --duration-slow: 350ms;
+  --duration-emphasis: 500ms;
+
+  /* Easing Tokens (Spring Physics) */
   --spring-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
   --spring-smooth: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Tap Tokens */
   --tap-scale: 0.97;
   --tap-duration: 100ms;
   
@@ -1338,15 +1349,8 @@ html.dark .border-accessible {
   }
 }
 
-.accordion-content {
-  overflow: hidden;
-  max-height: 0;
-  opacity: 0;
-  transition: max-height 0.3s ease-out, opacity 0.25s ease-out;
-}
-
 .accordion-content.expanded {
-  max-height: 300px;
+  grid-template-rows: 1fr;
   opacity: 1;
 }
 
@@ -2259,8 +2263,18 @@ html.dark .border-accessible {
   .glass-button:hover,
   .glass-card:hover,
   .tap-target:active,
-  .btn-ios:active {
+  .btn-ios:active,
+  .tactile-card:hover,
+  .tactile-card:active,
+  .tactile-row:hover,
+  .tactile-row:active,
+  .tactile-btn:hover,
+  .tactile-btn:active {
     transform: none !important;
+  }
+  
+  .accordion-content {
+    transition: none !important;
   }
   
   /* Disable backdrop-filter on glass elements */
@@ -2350,6 +2364,53 @@ html.dark .border-accessible {
 /* Faster liquid glass transition for snappier feel */
 .liquid-fast {
   transition: background-color 0.2s ease-out, color 0.2s ease-out, border-color 0.2s ease-out, transform 0.2s ease-out, opacity 0.2s ease-out;
+}
+
+/* Tactile Surface Utilities — hover lift + press down with spring physics */
+@media (hover: hover) and (pointer: fine) {
+  .tactile-card:hover {
+    transform: scale(1.005) translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  }
+  .tactile-row:hover {
+    transform: scale(1.002);
+  }
+  .tactile-btn:hover {
+    transform: scale(1.02);
+  }
+}
+
+.tactile-card,
+.tactile-row,
+.tactile-btn {
+  transition: transform var(--duration-fast) var(--spring-smooth),
+              box-shadow var(--duration-fast) ease-out,
+              background-color var(--duration-fast) ease-out;
+}
+
+.tactile-card:active,
+.tactile-row:active,
+.tactile-btn:active {
+  transform: scale(var(--tap-scale));
+}
+
+/* Accordion height animation using grid technique */
+.accordion-content {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows var(--duration-normal) var(--spring-smooth),
+              opacity var(--duration-normal) var(--spring-smooth);
+  opacity: 0;
+}
+
+.accordion-content[data-open="true"],
+.accordion-content.is-open {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+
+.accordion-inner {
+  overflow: hidden;
 }
 
 /* Content visibility optimization for off-screen elements */
