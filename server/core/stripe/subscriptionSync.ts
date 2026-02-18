@@ -346,6 +346,7 @@ export async function syncActiveSubscriptionsFromStripe(): Promise<SubscriptionS
             
             // Sync new user to HubSpot
             try {
+              await findOrCreateHubSpotContact(email, firstName, lastName);
               const { syncMemberToHubSpot } = await import('../hubspot/stages');
               await syncMemberToHubSpot({ email, status: 'active', tier, billingProvider: 'stripe', memberSince: new Date() });
             } catch (e: unknown) {

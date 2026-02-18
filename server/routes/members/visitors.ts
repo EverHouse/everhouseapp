@@ -516,7 +516,7 @@ router.post('/api/visitors', isStaffOrAdmin, async (req, res) => {
               user.email,
               user.first_name || '',
               user.last_name || '',
-              { phone: user.phone || undefined }
+              user.phone || undefined
             ).catch((err: unknown) => logger.error('[Visitors] HubSpot sync failed for linked visitor', { error: err instanceof Error ? err : new Error(String(err)) }));
           }).catch(() => {});
         }
@@ -597,7 +597,7 @@ router.post('/api/visitors', isStaffOrAdmin, async (req, res) => {
           normalizedEmail,
           firstName || '',
           lastName || '',
-          { phone: phone || undefined }
+          phone || undefined
         ).catch((err: unknown) => logger.error('[Visitors] HubSpot sync failed for new visitor', { error: err instanceof Error ? err : new Error(String(err)) }));
       }).catch(() => {});
     }

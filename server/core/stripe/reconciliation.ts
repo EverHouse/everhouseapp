@@ -271,8 +271,10 @@ export async function reconcileSubscriptions() {
           }
           }
           
-          // Sync to HubSpot
+          // Sync to HubSpot with name and status
           try {
+            const { findOrCreateHubSpotContact } = await import('../hubspot/members');
+            await findOrCreateHubSpotContact(customerEmail, firstName, lastName);
             const { syncMemberToHubSpot } = await import('../hubspot/stages');
             await syncMemberToHubSpot({
               email: customerEmail,
