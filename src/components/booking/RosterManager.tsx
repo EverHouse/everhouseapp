@@ -649,7 +649,7 @@ const RosterManager: React.FC<RosterManagerProps> = ({
                       ${(feePreview?.ownerFees?.estimatedTotalFees ?? ((feePreview?.ownerFees?.estimatedOverageFee ?? 0) + (feePreview?.ownerFees?.estimatedGuestFees ?? 0))).toFixed(2)}
                     </span>
                   </div>
-                  {(booking?.status === 'confirmed' || booking?.status === 'approved') ? (
+                  {(booking?.status === 'confirmed' || booking?.status === 'approved') && (feePreview?.ownerFees?.estimatedTotalFees ?? ((feePreview?.ownerFees?.estimatedOverageFee ?? 0) + (feePreview?.ownerFees?.estimatedGuestFees ?? 0))) > 0 ? (
                     <button
                       onClick={() => {
                         haptic.light();
@@ -660,11 +660,11 @@ const RosterManager: React.FC<RosterManagerProps> = ({
                       <span className="material-symbols-outlined text-lg">credit_card</span>
                       Pay Now
                     </button>
-                  ) : (
+                  ) : (booking?.status !== 'confirmed' && booking?.status !== 'approved') ? (
                     <p className={`text-xs text-center ${isDark ? 'text-white/50' : 'text-[#293515]/50'}`}>
                       Pay now or at check-in once booking is approved
                     </p>
-                  )}
+                  ) : null}
                 </div>
               )}
             </div>
