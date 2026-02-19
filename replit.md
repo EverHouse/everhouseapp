@@ -28,8 +28,8 @@ The application is built with a React 19 frontend (Vite, Tailwind CSS) and an Ex
 - **Navigation**: Unified header, Member Bottom Nav, and Admin route-based navigation with a comprehensive sidebar.
 - **Responsiveness**: Optimized for mobile, tablet, and desktop.
 - **Theming**: Light, Dark, and System themes with local persistence.
-- **Motion**: Spring-physics motion system with tokenized duration scale (instant/fast/normal/slow/emphasis) and easing curves (spring-bounce, spring-smooth, out-expo) defined in index.css CSS custom properties and tailwind.config.js. Uses @formkit/auto-animate for list reflow animations, CSS grid accordion technique (grid-template-rows: 0fr/1fr) for smooth expand/collapse, tactile utility classes (.tactile-card, .tactile-row, .tactile-btn) for hover lift + press-down feedback, TabTransition for tab-switching fade animations, and WalkingGolferSpinner (inline only, never full-page overlay) for branded loading states. Keyframe animations for page transitions, staggered content entry, parallax effects. All motion respects prefers-reduced-motion.
-- **Drawer UX**: SlideUpDrawer for modals with drag-to-dismiss.
+- **Motion**: Spring-physics motion system with tokenized duration scale and easing curves. Uses `@formkit/auto-animate` for list reflow animations, CSS grid for smooth expand/collapse, tactile utility classes for hover lift + press-down feedback, and various animations for transitions and loading states. All motion respects `prefers-reduced-motion`.
+- **Drawer UX**: `SlideUpDrawer` for modals with drag-to-dismiss.
 - **Staff FAB**: Floating action button for quick staff actions (Staff Command Center).
 - **ConfirmDialog**: Custom Liquid Glass styled confirmation dialogs.
 
@@ -38,10 +38,10 @@ The application is built with a React 19 frontend (Vite, Tailwind CSS) and an Ex
 - **Timezone Handling**: All date/time operations prioritize 'America/Los_Angeles'.
 - **Backend**: Modular API routes, core services, loader modules, health checks, graceful shutdown.
 - **Member Management**: Supports tiers, discount tracking, directory, billing groups, member notes, communications log, visitor matching, and flexible tier features.
-- **Booking System**: "Request & Hold," conflict detection, staff/member bookings, multi-member bookings, calendar management, conference room bookings, transactional with row-level locking. Player Management Modal handles all player/roster management. Players added to bookings are auto-confirmed (no invite/accept/decline step).
-- **Trackman Integration**: 1:1 sync with CSV imports and webhooks for real-time booking and delta billing.
+- **Booking System**: "Request & Hold," conflict detection, staff/member bookings, multi-member bookings, calendar management, conference room bookings, transactional with row-level locking. Player Management Modal handles all player/roster management. Players added to bookings are auto-confirmed.
+- **Trackman Integration**: 1:1 sync with CSV imports and webhooks.
 - **Google Sign-In**: Members can sign in with Google or link accounts.
-- **Error Handling**: Shared `server/utils/errorUtils.ts` utility for safe error handling. All catch blocks use `catch (error: unknown)` with proper type narrowing.
+- **Error Handling**: Shared `server/utils/errorUtils.ts` utility for safe error handling.
 - **Security**: Role-based access control, rate limiting, SQL injection prevention, webhook signature verification, secure session management, CORS origin whitelist, authentication middleware.
 - **Notifications**: In-app real-time notifications with 3-channel delivery (in-app, email, push).
 - **Real-Time Sync**: Instant updates via WebSocket and Supabase Realtime.
@@ -49,42 +49,41 @@ The application is built with a React 19 frontend (Vite, Tailwind CSS) and an Ex
 - **Performance**: List virtualization, skeleton loaders, lazy-loading, optimistic updates.
 - **State Management**: Zustand for atomic state and TanStack Query for data fetching.
 - **Admin Tools**: Admin-configurable features, data integrity dashboard, staff command center, data tools, bug report management, FAQ management, gallery management, inquiry management, application pipeline.
-- **Member Onboarding System**: 4-step onboarding checklist, tracks key dates in users table, FirstLoginWelcomeModal, automated stalled-member email nudges via scheduler, and Application Pipeline admin view.
+- **Member Onboarding System**: 4-step onboarding checklist, tracks key dates, welcome modal, automated email nudges, and admin view.
 - **Privacy Compliance**: Privacy modal, CCPA/CPRA features, account deletion, data export, admin audit log.
 - **Waiver Management**: Tracks waiver versions and enforces signing.
-- **Unified Fee Service**: Centralized `computeFeeBreakdown()` for all fee calculations. Remainder minutes (from integer division of session time by player count) are assigned to the booking owner to prevent minute loss. Owner absorption step recalculates overage after adding unoccupied and guest time.
+- **Unified Fee Service**: Centralized `computeFeeBreakdown()` for all fee calculations, including overage and remainder minute handling.
 - **Dynamic Pricing**: Guest fee and overage rates pulled from Stripe product prices and updated via webhooks.
-- **Webhook Safety**: Transactional dedup for Stripe webhooks, deferred action pattern, resource-based ordering, ghost reactivation blocking, subscription sync race condition guard.
+- **Webhook Safety**: Transactional dedup, deferred action pattern, resource-based ordering, subscription sync race condition guard.
 - **Roster Protection**: Optimistic locking with `roster_version` and row-level locking.
 - **Billing Management**: Staff Payments Dashboard, unified payment history, member billing, self-service portal, tier change wizard with proration, dunning, card expiry checking, and refund processing.
 - **Day Pass System**: Non-member day pass purchases with visitor matching and QR code delivery.
 - **QR Code System**: QR codes for day passes and member check-in; staff QR scanner confirms member details.
 - **ID/License Scanning**: Staff can scan IDs using OpenAI Vision (GPT-4o) to extract and auto-fill registration form fields.
 - **Corporate Membership**: Unified billing groups, volume pricing, corporate checkout, HubSpot sync.
-- **Data Integrity**: Stripe as source of truth for billing, transaction rollback, webhook idempotency, dual-source active tracking with HubSpot.
-- **Stripe Wins Rule**: Stripe is authoritative for `membership_status` and `tier` when `billing_provider='stripe'`. HubSpot pushes skip status for Mindbody-billed members to prevent loops. DB CHECK constraint enforces valid `billing_provider` values.
+- **Data Integrity**: Stripe as source of truth for billing, transaction rollback, webhook idempotency, dual-source active tracking with HubSpot. Stripe is authoritative for `membership_status` and `tier` when `billing_provider='stripe'`.
 - **Stripe Member Auto-Fix**: Login flow verifies Stripe subscription status and corrects `membership_status`.
 - **Stripe Subscription → HubSpot Sync**: Automated sync of membership status, tier, billing_provider, and Stripe contact fields. App is the single writer to HubSpot contacts.
 - **Booking Prepayment**: Creates prepayment intents for expected fees, blocking check-in until paid, with auto-refunds on cancellation.
 - **Stripe Customer Metadata Sync**: User ID and tier synced to Stripe customer metadata.
-- **Scheduled Maintenance**: Daily and hourly tasks for session cleanup, webhook log cleanup, Stripe reconciliation, grace period checks, booking expiry, duplicate cleanup, guest pass resets, stuck cancellation checks, member sync, unresolved Trackman checks, communication log sync, pending user cleanup, webhook event cleanup, and onboarding nudge emails.
-- **Stripe Terminal Integration**: In-person card reader support for membership signup. Terminal card payments automatically save the card via Stripe's `generated_card` mechanism for future subscription renewals.
+- **Scheduled Maintenance**: Daily and hourly tasks for various system cleanups, reconciliations, and member syncs.
+- **Stripe Terminal Integration**: In-person card reader support for membership signup, with card saving for future renewals.
 - **Stripe Product Catalog as Source of Truth**: Two-way sync between app and Stripe.
 - **Google Sheets Integration**: Announcement sync.
 - **Staff Training System**: Training sections managed via `server/routes/training.ts` with seed data.
-- **Tours Management**: Native tour scheduling at /tour with Google Calendar integration. 2-step booking flow, server-side conflict detection, configurable business hours and slot duration. Confirmation emails via Resend. Public endpoint, no auth required.
+- **Tours Management**: Native tour scheduling with Google Calendar integration, 2-step booking flow, server-side conflict detection, configurable business hours and slot duration. Public endpoint.
 - **Cafe/POS System**: Cafe item management, POS register for in-person sales.
 - **Guest Pass System**: Monthly guest pass allocation, guest pass purchase, hold/consume flow.
 - **Availability/Closures Management**: Bay availability blocks and club closure scheduling.
 - **Job Queue**: Background job processing.
-- **HubSpot Queue**: Queued sync operations to HubSpot, runs every 2 minutes.
+- **HubSpot Queue**: Queued sync operations to HubSpot.
 - **User Merge**: Duplicate member merging.
-- **Staff = VIP Rule**: All staff/admin/golf_instructor users are automatically treated as VIP members. Auth enforces `tier='VIP'` and `membership_status='active'` on every login. Booking fee service applies $0 fees. Roster UI shows "Staff" badge. `BookingMember.isStaff` flag is the explicit source of truth for staff detection.
+- **Staff = VIP Rule**: All staff/admin/golf_instructor users are automatically treated as VIP members with $0 fees and a "Staff" badge in the UI.
 
 ## External Dependencies
 - **Stripe**: Payment collection, subscription management, webhooks, terminal/POS, product catalog sync, dynamic pricing.
 - **Resend**: Email-based OTP verification, automated alerts, transactional emails.
-- **HubSpot CRM**: Contact and member management, two-way data sync, deal pipeline, corporate membership sync. Form submissions use HubSpot Form Submission API.
+- **HubSpot CRM**: Contact and member management, two-way data sync, deal pipeline, corporate membership sync, form submissions.
 - **Google Calendar**: Integration for club calendars and booking sync.
 - **Google Sheets**: Announcement content sync.
 - **Supabase**: Realtime subscriptions, backend admin client, session token generation.
@@ -94,19 +93,3 @@ The application is built with a React 19 frontend (Vite, Tailwind CSS) and an Ex
 - **Eventbrite**: Members-only event synchronization.
 - **Amarie Aesthetics MedSpa**: Direct booking links (wellness page integration).
 - **Apple Messages for Business**: Direct messaging link (contact page).
-
-## Skill Auto-Update Protocol
-When modifying files in the areas below, update the corresponding skill docs to keep them accurate:
-
-| Skill | File Coverage |
-|-------|--------------|
-| booking-flow | server/core/bookingService/*, server/routes/bays/* |
-| stripe-webhook-flow | server/core/stripe/*, server/routes/webhooks/* |
-| member-lifecycle | server/core/memberService/*, server/routes/members/* |
-| hubspot-sync | server/core/hubspot/*, server/schedulers/hubspot* |
-| fee-calculation | server/core/billing/*, server/routes/billing/* |
-| data-integrity-monitoring | server/core/dataIntegrity.ts, server/core/dataAlerts.ts, server/core/monitoring.ts, server/core/*Monitor*.ts |
-| checkin-flow | server/routes/bays/checkin*, server/core/billing/guestPassConsumer.ts, server/core/billing/prepaymentService.ts |
-| notification-system | server/core/notificationService.ts, server/core/websocket.ts, server/routes/notifications.ts, server/routes/push.ts, src/stores/notificationStore.ts, src/services/pushNotifications.ts |
-| guest-pass-system | server/routes/guestPasses.ts, server/core/billing/guestPassConsumer.ts, server/core/billing/guestPassHoldService.ts, server/schedulers/guestPassResetScheduler.ts |
-| scheduler-jobs | server/schedulers/*, server/core/schedulerTracker.ts, server/core/jobQueue.ts |
