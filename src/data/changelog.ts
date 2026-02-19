@@ -13,6 +13,19 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.75.0",
+    date: "2026-02-19",
+    title: "Billing Accuracy & Fee Display Fixes",
+    changes: [
+      "Fixed: Booking cards no longer show '$0 Due' when the real-time fee calculation says $0 — now shows 'Check In' button correctly",
+      "Fixed: Stale cached fee amounts are now auto-corrected when the live fee estimate detects they're outdated",
+      "Fixed: Remainder minutes from uneven session splits (e.g., 65 min ÷ 3 players) are now properly assigned to the booking owner instead of being lost",
+      "Fixed: Fee calculations no longer under-bill when session time doesn't divide evenly among players",
+      "Improved: Error logging added to 10+ backend processes that previously failed silently",
+      "Improved: Database query safety checks added to prevent crashes from missing data",
+    ]
+  },
+  {
     version: "7.74.0",
     date: "2026-02-18",
     title: "Roster Code Cleanup & Type Safety",

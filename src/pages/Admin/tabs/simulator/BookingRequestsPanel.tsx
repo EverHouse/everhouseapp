@@ -32,7 +32,7 @@ function BookingFeeButton({ bookingId, dbOwed, hasUnpaidFees, setBookingSheet, f
     const serverFee = data?.totalFee ?? 0;
     const displayAmount = data ? serverFee : dbOwed;
 
-    if (displayAmount <= 0 && !hasUnpaidFees) return <>{fallback ?? null}</>;
+    if (displayAmount <= 0) return <>{fallback ?? null}</>;
 
     return (
         <button

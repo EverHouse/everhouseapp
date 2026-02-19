@@ -1688,6 +1688,19 @@ router.get('/api/fee-estimate', async (req, res) => {
         resourceType
       });
       
+      if (request.sessionId && estimate.totalFee === 0) {
+        try {
+          await pool.query(
+            `UPDATE booking_participants 
+             SET cached_fee_cents = 0 
+             WHERE session_id = $1 AND payment_status = 'pending' AND cached_fee_cents > 0`,
+            [request.sessionId]
+          );
+        } catch (syncErr: unknown) {
+          logger.error('[Fee Estimate] Failed to sync cached fee cents', { extra: { syncErr, bookingId } });
+        }
+      }
+      
       return res.json(estimate);
     }
     
