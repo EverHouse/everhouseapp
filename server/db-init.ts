@@ -420,6 +420,16 @@ export async function ensureDatabaseConstraints() {
       { name: 'idx_trackman_unmatched_resolved', query: sql`CREATE INDEX IF NOT EXISTS idx_trackman_unmatched_resolved ON trackman_unmatched_bookings(resolved_at)` },
       { name: 'idx_events_event_date', query: sql`CREATE INDEX IF NOT EXISTS idx_events_event_date ON events(event_date)` },
       { name: 'idx_notifications_user_read', query: sql`CREATE INDEX IF NOT EXISTS idx_notifications_user_read ON notifications(user_email, is_read)` },
+      { name: 'idx_users_email_lower', query: sql`CREATE INDEX IF NOT EXISTS idx_users_email_lower ON users(LOWER(email))` },
+      { name: 'idx_users_membership_status', query: sql`CREATE INDEX IF NOT EXISTS idx_users_membership_status ON users(membership_status)` },
+      { name: 'idx_booking_requests_date_status', query: sql`CREATE INDEX IF NOT EXISTS idx_booking_requests_date_status ON booking_requests(start_time, status)` },
+      { name: 'idx_booking_participants_session_id', query: sql`CREATE INDEX IF NOT EXISTS idx_booking_participants_session_id ON booking_participants(session_id)` },
+      { name: 'idx_stripe_payment_intents_booking_id', query: sql`CREATE INDEX IF NOT EXISTS idx_stripe_payment_intents_booking_id ON stripe_payment_intents(booking_id)` },
+      { name: 'idx_usage_ledger_member_id', query: sql`CREATE INDEX IF NOT EXISTS idx_usage_ledger_member_id ON usage_ledger(member_id)` },
+      { name: 'idx_admin_audit_log_created', query: sql`CREATE INDEX IF NOT EXISTS idx_admin_audit_log_created ON admin_audit_log(created_at)` },
+      { name: 'idx_webhook_processed_events_type', query: sql`CREATE INDEX IF NOT EXISTS idx_webhook_processed_events_type ON webhook_processed_events(event_type)` },
+      { name: 'idx_communication_logs_email', query: sql`CREATE INDEX IF NOT EXISTS idx_communication_logs_email ON communication_logs(member_email)` },
+      { name: 'idx_guest_check_ins_email', query: sql`CREATE INDEX IF NOT EXISTS idx_guest_check_ins_email ON guest_check_ins(member_email)` },
     ];
     
     for (const { name, query } of indexQueries) {
