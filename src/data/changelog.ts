@@ -13,6 +13,15 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.85.6",
+    date: "2026-02-19",
+    title: "Dashboard Booking Cards Layout Improvements",
+    changes: [
+      "Improved: Booking Requests and Today's Bookings cards on the dashboard now have better spacing — names show fully instead of truncating, and action buttons (Check In, Assign Member, etc.) sit on their own row instead of being crammed next to the booking info",
+      "Improved: More breathing room between booking items across all screen sizes — mobile, tablet, and desktop",
+    ]
+  },
+  {
     version: "7.85.5",
     date: "2026-02-19",
     title: "Unified Fee Estimate System",

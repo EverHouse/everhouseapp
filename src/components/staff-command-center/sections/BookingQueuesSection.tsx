@@ -37,7 +37,7 @@ const PendingRequestsCard = memo<PendingRequestsCardProps>(({
       role="region"
       aria-label={pendingRequests.length > 0 ? `Booking Requests - ${pendingRequests.length} pending, action required` : 'Booking Requests'}
     >
-      <div className="flex items-center justify-between mb-3 lg:mb-4 flex-shrink-0">
+      <div className="flex items-center justify-between mb-4 flex-shrink-0">
         <div className="flex items-center gap-2">
           <h3 className={`font-bold text-primary dark:text-white ${variant === 'desktop' ? 'text-sm' : ''}`}>Booking Requests</h3>
           {pendingRequests.length > 0 && (
@@ -53,7 +53,7 @@ const PendingRequestsCard = memo<PendingRequestsCardProps>(({
         </div>
         <button onClick={() => navigateToTab('simulator')} className="tactile-btn text-xs text-primary/80 dark:text-white/80 hover:underline">View all</button>
       </div>
-      <div className="space-y-2">
+      <div className="space-y-3">
         {pendingRequests.length === 0 ? (
           <div className="flex-1 flex flex-col items-center justify-center py-8">
             <EmptyState icon="check_circle" title="All caught up!" description="No pending requests" variant="compact" />
@@ -201,11 +201,11 @@ const UpcomingBookingsCard = memo<UpcomingBookingsCardProps>(({
       role="region"
       aria-label={hasUnmatchedBookings ? "Today's Bookings - some need member assignment" : "Today's Bookings"}
     >
-      <div className="flex items-center justify-between mb-3 lg:mb-4 flex-shrink-0">
+      <div className="flex items-center justify-between mb-4 flex-shrink-0">
         <h3 className="font-bold text-primary dark:text-white">Today's Bookings</h3>
         <button onClick={() => navigateToTab('simulator')} className="tactile-btn text-xs text-primary/80 dark:text-white/80 hover:underline">View all</button>
       </div>
-      <div className="space-y-2">
+      <div className="space-y-3">
         {mergedUpcomingBookings.length === 0 ? (
           <div className="flex-1 flex flex-col items-center justify-center py-8">
             <EmptyState icon="calendar_today" title="No bookings today" variant="compact" />
@@ -227,7 +227,7 @@ const UpcomingBookingsCard = memo<UpcomingBookingsCardProps>(({
                 <div className="flex items-start gap-3">
                   <DateBlock dateStr={booking.request_date || booking.slot_date || ''} today={today} />
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-0.5">
+                    <div className="flex items-center gap-2 mb-1">
                       {isUnmatched ? (
                         <>
                           <span className="px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 rounded-full">
@@ -269,18 +269,18 @@ const UpcomingBookingsCard = memo<UpcomingBookingsCardProps>(({
                       )}
                     </p>
                   </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    {getSmartActionButton(booking)}
-                    {onEditBooking && (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); onEditBooking(booking); }}
-                        className="tactile-btn p-1.5 text-primary/60 dark:text-white/60 hover:text-primary dark:hover:text-white hover:bg-primary/10 dark:hover:bg-white/10 rounded-lg transition-colors"
-                        aria-label="Edit booking"
-                      >
-                        <span className="material-symbols-outlined text-base">edit</span>
-                      </button>
-                    )}
-                  </div>
+                </div>
+                <div className="flex items-center gap-2 ml-[56px]">
+                  {getSmartActionButton(booking)}
+                  {onEditBooking && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onEditBooking(booking); }}
+                      className="tactile-btn p-1.5 text-primary/60 dark:text-white/60 hover:text-primary dark:hover:text-white hover:bg-primary/10 dark:hover:bg-white/10 rounded-lg transition-colors"
+                      aria-label="Edit booking"
+                    >
+                      <span className="material-symbols-outlined text-base">edit</span>
+                    </button>
+                  )}
                 </div>
               </GlassListRow>
             );
