@@ -3,6 +3,7 @@ import { isAuthenticated } from '../core/middleware';
 import { logAndRespond, logger } from '../core/logger';
 import { getSessionUser } from '../types/session';
 import { processWalkInCheckin } from '../core/walkInCheckinService';
+import { logFromRequest } from '../core/auditLog';
 import { db } from '../db';
 import { sql } from 'drizzle-orm';
 
@@ -48,6 +49,14 @@ router.post('/api/member/nfc-checkin', isAuthenticated, async (req: Request, res
     if (!result.success) {
       return res.status(500).json({ error: result.error });
     }
+
+    logFromRequest(req, 'nfc_walkin_checkin', 'member', memberId, result.memberName, {
+      memberEmail: result.memberEmail,
+      tier: result.tier,
+      lifetimeVisits: result.lifetimeVisits,
+      type: 'walk_in',
+      source: 'nfc'
+    });
 
     logger.info('[NFC Checkin] Self check-in via NFC', { extra: { memberEmail, memberName: result.memberName, lifetimeVisits: result.lifetimeVisits } });
 

@@ -65,8 +65,8 @@ export async function processWalkInCheckin(params: WalkInCheckinParams): Promise
       relatedType: 'booking'
     }).catch(err => logger.error(`[WalkInCheckin] Failed to send notification:`, { extra: { err } }));
 
-    await db.execute(sql`INSERT INTO walk_in_visits (member_email, checked_in_by, checked_in_by_name, source, created_at)
-       VALUES (${member.email}, ${params.checkedInBy}, ${params.checkedInByName}, ${params.source}, NOW())`);
+    await db.execute(sql`INSERT INTO walk_in_visits (member_email, member_id, checked_in_by, checked_in_by_name, source, created_at)
+       VALUES (${member.email}, ${Number(member.id)}, ${params.checkedInBy}, ${params.checkedInByName}, ${params.source}, NOW())`);
 
     if (newVisitCount === 1 && member.membership_status?.toLowerCase() === 'trialing') {
       sendFirstVisitConfirmationEmail(member.email, { firstName: member.first_name || undefined })

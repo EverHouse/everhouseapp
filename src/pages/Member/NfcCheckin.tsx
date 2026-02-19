@@ -13,6 +13,7 @@ const NfcCheckin: React.FC = () => {
   const [tier, setTier] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
   const checkinAttemptedRef = useRef(false);
+  const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
     if (!sessionChecked) return;
@@ -52,7 +53,7 @@ const NfcCheckin: React.FC = () => {
         setErrorMessage('Unable to connect. Please try again.');
         setState('error');
       });
-  }, [sessionChecked, user]);
+  }, [sessionChecked, user, retryCount]);
 
   const handleLoginRedirect = () => {
     const currentPath = window.location.pathname + window.location.search;
@@ -150,7 +151,7 @@ const NfcCheckin: React.FC = () => {
             </div>
             <div className="bg-white p-4 text-center">
               <button
-                onClick={() => { checkinAttemptedRef.current = false; setState('loading'); }}
+                onClick={() => { checkinAttemptedRef.current = false; setState('loading'); setRetryCount(c => c + 1); }}
                 className="text-primary font-medium text-sm hover:underline"
               >
                 Try Again
