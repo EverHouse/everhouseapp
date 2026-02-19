@@ -93,3 +93,6 @@ The application is built with a React 19 frontend (Vite, Tailwind CSS) and an Ex
 - **Eventbrite**: Members-only event synchronization.
 - **Amarie Aesthetics MedSpa**: Direct booking links (wellness page integration).
 - **Apple Messages for Business**: Direct messaging link (contact page).
+
+## Future Considerations
+- **Stripe Agent Toolkit**: Could power a staff AI assistant for conversational Stripe operations (e.g., "generate a payment link for John" or "look up Sarah's last 3 payments"). Uses `@stripe/agent-toolkit` with OpenAI/Vercel AI SDK. Not needed currently since all billing operations are handled through purpose-built admin tools, but worth revisiting once core billing is fully stable. Stripe recommends sandbox testing first since agent behavior is non-deterministic. Use restricted API keys (`rk_*`) for security.
