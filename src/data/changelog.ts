@@ -13,6 +13,20 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.83.0",
+    date: "2026-02-19",
+    title: "NFC Tap Check-In: Members Can Check In by Tapping Their Phone",
+    isMajor: true,
+    changes: [
+      "Added: Members can now check in by tapping an NFC tag at the front desk with their phone — no need to show a QR code",
+      "Added: NFC check-ins trigger the same real-time staff notification with sound and member details as QR code scanning",
+      "Added: Staff see pinned notes and membership status for NFC check-ins, identical to the existing QR check-in experience",
+      "Added: Walk-in check-in source tracking — each check-in now records whether it came from QR scan or NFC tap",
+      "Improved: Check-in business logic consolidated into a shared service, ensuring QR and NFC flows stay perfectly in sync",
+      "Added: Post-login redirect for NFC — if a member taps an NFC tag while logged out, they're redirected back to complete check-in after signing in",
+    ]
+  },
+  {
     version: "7.82.1",
     date: "2026-02-19",
     title: "Staff Fee Exemption Fix: Golf Instructors No Longer Charged",

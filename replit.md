@@ -59,6 +59,7 @@ The application is built with a React 19 frontend (Vite, Tailwind CSS) and an Ex
 - **Billing Management**: Staff Payments Dashboard, unified payment history, member billing, self-service portal, tier change wizard with proration, dunning, card expiry checking, and refund processing.
 - **Day Pass System**: Non-member day pass purchases with visitor matching and QR code delivery.
 - **QR Code System**: QR codes for day passes and member check-in; staff QR scanner confirms member details.
+- **NFC Check-In**: Members check in by tapping NFC tags (NTAG215/216) containing `/nfc-checkin` URLs. Uses shared `walkInCheckinService` for identical behavior to QR scans. WebSocket broadcasts to staff with check-in sound and modal. Source tracking distinguishes NFC from QR in `walk_in_visits` table.
 - **ID/License Scanning**: Staff can scan IDs using OpenAI Vision (GPT-4o) to extract and auto-fill registration form fields.
 - **Corporate Membership**: Unified billing groups, volume pricing, corporate checkout, HubSpot sync.
 - **Data Integrity**: Stripe as source of truth for billing, transaction rollback, webhook idempotency, dual-source active tracking with HubSpot. Stripe is authoritative for `membership_status` and `tier` when `billing_provider='stripe'`.
