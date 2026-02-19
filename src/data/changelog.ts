@@ -13,6 +13,19 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.86",
+    date: "2026-02-19",
+    title: "Stripe Payment Integrity & Void Fees",
+    isMajor: true,
+    changes: [
+      "New: 'Void / Cancel Fees' button in booking details — staff can now cancel outstanding Stripe payment intents directly from the app instead of going to the Stripe dashboard",
+      "Fixed: Ghost transactions no longer created for Unknown Trackman bookings without valid owners — prepayment creation is blocked when the booking has no real email or is unmatched without an assigned member",
+      "Improved: Stripe payment descriptions now show the Trackman booking ID (e.g., TM-12345) when available, making it easy to search and cross-reference in the Stripe dashboard",
+      "Improved: All Stripe payment metadata now includes the Trackman booking ID for robust cross-referencing between the app and Trackman systems",
+      "Technical: Voided fees mark participants as 'waived' and update internal payment intent records to 'cancelled' for consistency",
+    ]
+  },
+  {
     version: "7.85.6",
     date: "2026-02-19",
     title: "Dashboard Booking Cards Layout Improvements",
