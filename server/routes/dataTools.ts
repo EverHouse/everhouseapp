@@ -12,6 +12,7 @@ import { logFromRequest } from '../core/auditLog';
 import { getSessionUser } from '../types/session';
 import { broadcastToStaff } from '../core/websocket';
 import { getErrorMessage, getErrorCode, getErrorStatusCode } from '../utils/errorUtils';
+import { getTodayPacific } from '../utils/dateUtils';
 import { getStripeClient } from '../core/stripe/client';
 import { syncCustomerMetadataToStripe } from '../core/stripe/customers';
 import { bulkPushToHubSpot } from '../core/dataIntegrity';
@@ -2111,6 +2112,12 @@ router.post('/api/data-tools/fix-trackman-ghost-bookings', isAdmin, async (req: 
           }
           
           await recalculateSessionFees(sessionId, 'staff_manual' as any);
+          
+          const todayPacific = getTodayPacific();
+          const isPastBooking = booking.requestDate < todayPacific;
+          if (isPastBooking) {
+            await db.execute(sql`UPDATE booking_participants SET payment_status = 'paid', paid_at = NOW() WHERE session_id = ${sessionId} AND payment_status = 'pending'`);
+          }
         } catch (participantErr: unknown) {
           logger.warn('[DataTools] Failed to create participants for session', { extra: { sessionId, error: getErrorMessage(participantErr) } });
         }

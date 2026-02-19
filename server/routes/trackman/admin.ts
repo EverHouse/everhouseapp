@@ -16,6 +16,7 @@ import { updateVisitorTypeByUserId } from '../../core/visitors';
 import { PRICING } from '../../core/billing/pricingConfig';
 import { refundGuestPassForParticipant } from '../../core/billing/guestPassConsumer';
 import { getErrorMessage } from '../../utils/errorUtils';
+import { getTodayPacific } from '../../utils/dateUtils';
 
 type DbRow = Record<string, unknown>;
 
@@ -729,6 +730,12 @@ router.put('/api/admin/trackman/unmatched/:id/resolve', isStaffOrAdmin, async (r
              SET user_id = ${member.id}, display_name = ${memberFullName}
              WHERE session_id = ${sessionId} AND participant_type = 'owner'`);
           
+          const todayPacific = getTodayPacific();
+          const isPastBooking = bookingDateStr < todayPacific;
+          if (isPastBooking) {
+            await db.execute(sql`UPDATE booking_participants SET payment_status = 'paid', paid_at = NOW() WHERE session_id = ${sessionId} AND payment_status = 'pending'`);
+          }
+          
           await recordUsage(sessionId as number, {
             memberId: member.id as string,
             minutesCharged: Number(booking.duration_minutes) || 60,
@@ -774,6 +781,12 @@ router.put('/api/admin/trackman/unmatched/:id/resolve', isStaffOrAdmin, async (r
             logger.info('[Trackman Resolve] Recalculated fees for session', { extra: { sessionId } });
           } catch (feeErr: unknown) {
             logger.warn('[Trackman Resolve] Failed to recalculate fees for session', { extra: { sessionId, feeErr } });
+          }
+          
+          const todayPacific = getTodayPacific();
+          const isPastBooking = bookingDateStr < todayPacific;
+          if (isPastBooking) {
+            await db.execute(sql`UPDATE booking_participants SET payment_status = 'paid', paid_at = NOW() WHERE session_id = ${sessionId} AND payment_status = 'pending'`);
           }
           
           // IDEMPOTENCY: Check existing usage and handle ownership
@@ -3199,6 +3212,18 @@ router.post('/api/admin/backfill-sessions', isStaffOrAdmin, async (req, res) => 
         }
         
         await client.query(`RELEASE SAVEPOINT ${savepointName}`);
+        
+        const newSessionId = sessionResult.sessionId;
+        if (newSessionId && newSessionId > 0) {
+          const todayPacific = getTodayPacific();
+          const isPastBooking = booking.request_date < todayPacific;
+          if (isPastBooking) {
+            await client.query(
+              `UPDATE booking_participants SET payment_status = 'paid', paid_at = NOW() WHERE session_id = $1 AND payment_status = 'pending'`,
+              [newSessionId]
+            );
+          }
+        }
         
         if (sessionResult.created) {
           sessionsCreated++;
