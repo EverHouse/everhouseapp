@@ -277,25 +277,32 @@ export function useMemberContacts(status?: string) {
   });
 }
 
-export function useFeeEstimate(bookingId: number | string | null) {
+export function useFeeEstimate(bookingId: number | string | null, options?: { enabled?: boolean }) {
+  const isEnabled = (options?.enabled ?? true) && !!bookingId;
   return useQuery({
     queryKey: simulatorKeys.feeEstimate(bookingId ?? ''),
-    queryFn: () => fetchWithCredentials<{
-      totalFee: number;
-      ownerTier: string | null;
-      perPersonMins: number;
-      feeBreakdown: {
-        overageMinutes: number;
-        overageFee: number;
-        guestCount: number;
-        guestPassesRemaining: number;
-        guestsUsingPasses: number;
-        guestsCharged: number;
-        guestFees: number;
-      };
-      note: string;
-    }>(`/api/booking-requests/${bookingId}/fee-estimate`),
-    enabled: !!bookingId,
+    queryFn: async () => {
+      const res = await fetch(`/api/fee-estimate?bookingId=${bookingId}`, { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to fetch fee estimate');
+      return res.json() as Promise<{
+        totalFee: number;
+        ownerTier: string | null;
+        perPersonMins: number;
+        feeBreakdown: {
+          overageMinutes: number;
+          overageFee: number;
+          guestCount: number;
+          guestPassesRemaining: number;
+          guestsUsingPasses: number;
+          guestsCharged: number;
+          guestFees: number;
+        };
+        note: string;
+      }>;
+    },
+    enabled: isEnabled,
+    staleTime: 30_000,
+    retry: 1,
   });
 }
 

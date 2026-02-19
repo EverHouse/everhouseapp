@@ -1,5 +1,4 @@
 import React from 'react';
-import { useQuery } from '@tanstack/react-query';
 import { formatTime12Hour, getRelativeDateLabel, formatDuration, formatRelativeTime, getTodayPacific } from '../../../../utils/dateUtils';
 import { getStatusBadge, formatStatusLabel } from '../../../../utils/statusColors';
 import TierBadge from '../../../../components/TierBadge';
@@ -8,7 +7,7 @@ import type { BookingRequest, Resource } from './simulatorTypes';
 import { formatDateShortAdmin, groupBookingsByDate } from './simulatorUtils';
 import GuideBookings from '../../../../components/guides/GuideBookings';
 import { useAutoAnimate } from '@formkit/auto-animate/react';
-import { simulatorKeys } from '../../../../hooks/queries/useBookingsQueries';
+import { useFeeEstimate } from '../../../../hooks/queries/useBookingsQueries';
 
 function BookingFeeButton({ bookingId, dbOwed, hasUnpaidFees, setBookingSheet, fallback }: {
     bookingId: number;
@@ -18,17 +17,7 @@ function BookingFeeButton({ bookingId, dbOwed, hasUnpaidFees, setBookingSheet, f
     fallback?: React.ReactNode;
 }) {
     const skipEstimate = !hasUnpaidFees && dbOwed <= 0;
-    const { data, isLoading, isError } = useQuery({
-        queryKey: simulatorKeys.feeEstimate(bookingId),
-        queryFn: async () => {
-            const res = await fetch(`/api/fee-estimate?bookingId=${bookingId}`, { credentials: 'include' });
-            if (!res.ok) throw new Error('Failed to fetch fee estimate');
-            return res.json() as Promise<{ totalFee: number; note: string; feeBreakdown: Record<string, unknown>; ownerTier: string }>;
-        },
-        staleTime: 30_000,
-        retry: 1,
-        enabled: !skipEstimate,
-    });
+    const { data, isLoading, isError } = useFeeEstimate(bookingId, { enabled: !skipEstimate });
 
     if (skipEstimate) return <>{fallback ?? null}</>;
     if (isLoading || isError) return <>{fallback ?? null}</>;

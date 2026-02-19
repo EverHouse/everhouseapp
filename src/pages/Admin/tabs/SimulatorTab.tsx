@@ -26,6 +26,7 @@ import {
     useCalendarClosures,
     useAvailabilityBlocks,
     useMemberContacts,
+    useFeeEstimate,
     bookingsKeys,
     simulatorKeys,
 } from '../../../hooks/queries/useBookingsQueries';
@@ -177,24 +178,8 @@ const SimulatorTab: React.FC = () => {
     const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
     
     const [rescheduleModal, setRescheduleModal] = useState<{ isOpen: boolean; booking: BookingRequest | null }>({ isOpen: false, booking: null });
-    const [feeEstimate, setFeeEstimate] = useState<{
-      totalFee: number;
-      ownerTier: string | null;
-      perPersonMins: number;
-      feeBreakdown: {
-        overageMinutes: number;
-        overageFee: number;
-        guestCount: number;
-        guestPassesRemaining: number;
-        guestsUsingPasses: number;
-        guestsCharged: number;
-        guestFees: number;
-        guestFeePerUnit?: number;
-        overageRatePerBlock?: number;
-      };
-      note: string;
-    } | null>(null);
-    const [isFetchingFeeEstimate, setIsFetchingFeeEstimate] = useState(false);
+    const feeEstimateBookingId = actionModal === 'approve' && selectedRequest?.id ? selectedRequest.id : null;
+    const { data: feeEstimate, isLoading: isFetchingFeeEstimate } = useFeeEstimate(feeEstimateBookingId);
     const [trackmanModal, setTrackmanModal] = useState<{ isOpen: boolean; booking: BookingRequest | null }>({ isOpen: false, booking: null });
     const { confirm, ConfirmDialogComponent } = useConfirmDialog();
     const [bookingSheet, setBookingSheet] = useState<{ 
@@ -653,32 +638,6 @@ const SimulatorTab: React.FC = () => {
         checkAvailability();
     }, [selectedBayId, selectedRequest, actionModal]);
 
-    useEffect(() => {
-        if (actionModal === 'approve' && selectedRequest?.id) {
-            const fetchFeeEstimate = async () => {
-                setIsFetchingFeeEstimate(true);
-                try {
-                    const res = await fetch(`/api/booking-requests/${selectedRequest.id}/fee-estimate`, {
-                        credentials: 'include'
-                    });
-                    if (res.ok) {
-                        const data = await res.json();
-                        setFeeEstimate(data);
-                    } else {
-                        setFeeEstimate(null);
-                    }
-                } catch (err: unknown) {
-                    console.error('Failed to fetch fee estimate:', err);
-                    setFeeEstimate(null);
-                } finally {
-                    setIsFetchingFeeEstimate(false);
-                }
-            };
-            fetchFeeEstimate();
-        } else {
-            setFeeEstimate(null);
-        }
-    }, [actionModal, selectedRequest?.id]);
 
     useEffect(() => {
         const fetchDeclineSlots = async (bookingDate: string, resourceId: number) => {

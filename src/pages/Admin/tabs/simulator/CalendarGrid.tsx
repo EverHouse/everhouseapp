@@ -1,10 +1,9 @@
 import React, { useMemo } from 'react';
 import ReactDOM from 'react-dom';
-import { useQuery } from '@tanstack/react-query';
 import { formatTime12Hour, getTodayPacific } from '../../../../utils/dateUtils';
 import type { BookingRequest, Resource, CalendarClosure, AvailabilityBlock } from './simulatorTypes';
 import { formatDateShortAdmin, getClosureForSlot, getBlockForSlot } from './simulatorUtils';
-import { simulatorKeys } from '../../../../hooks/queries/useBookingsQueries';
+import { useFeeEstimate } from '../../../../hooks/queries/useBookingsQueries';
 
 export interface CalendarGridProps {
     resources: Resource[];
@@ -70,17 +69,7 @@ function CalendarFeeIndicator({
     const isCheckedIn = bookingStatus === 'attended';
     const skipFeeEstimate = snapshotPaid || isConference || isCheckedIn;
 
-    const { data, isLoading, isError } = useQuery({
-        queryKey: simulatorKeys.feeEstimate(bookingId),
-        queryFn: async () => {
-            const res = await fetch(`/api/fee-estimate?bookingId=${bookingId}`, { credentials: 'include' });
-            if (!res.ok) throw new Error('Failed to fetch fee estimate');
-            return res.json() as Promise<{ totalFee: number; note: string; feeBreakdown: Record<string, unknown>; ownerTier: string }>;
-        },
-        staleTime: 30_000,
-        retry: 1,
-        enabled: !skipFeeEstimate,
-    });
+    const { data, isLoading, isError } = useFeeEstimate(bookingId, { enabled: !skipFeeEstimate });
 
     const isCancellationPending = bookingStatus === 'cancellation_pending';
     const isPartialRoster = !isConference && declaredPlayerCount > 1 && filledPlayerCount < declaredPlayerCount;

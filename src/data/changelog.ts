@@ -13,6 +13,15 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.85.5",
+    date: "2026-02-19",
+    title: "Unified Fee Estimate System",
+    changes: [
+      "Improved: All fee estimate displays (calendar cells, booking cards, and approval modal) now use a single shared system instead of three separate copies of the same code — this eliminates inconsistencies and makes fee amounts more reliable across the page",
+      "Removed: Duplicate fee estimate server endpoint that was no longer needed",
+    ]
+  },
+  {
     version: "7.85.4",
     date: "2026-02-19",
     title: "Fee Estimates Refresh on Calendar Sync & Booking Assignment",
