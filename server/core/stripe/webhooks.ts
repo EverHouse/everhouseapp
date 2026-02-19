@@ -321,6 +321,12 @@ export async function processStripeWebhook(
       }
     } else if (event.type === 'credit_note.created') {
       deferredActions = await handleCreditNoteCreated(client, event.data.object as Stripe.CreditNote);
+    } else if (event.type === 'customer.updated') {
+      deferredActions = await handleCustomerUpdated(client, event.data.object as Stripe.Customer);
+    } else if (event.type === 'customer.subscription.trial_will_end') {
+      deferredActions = await handleTrialWillEnd(client, event.data.object as Stripe.Subscription);
+    } else if (event.type === 'payment_method.attached') {
+      deferredActions = await handlePaymentMethodAttached(client, event.data.object as Stripe.PaymentMethod);
     }
 
     await client.query('COMMIT');
@@ -428,6 +434,12 @@ export async function replayStripeEvent(
       }
     } else if (event.type === 'credit_note.created') {
       deferredActions = await handleCreditNoteCreated(client, event.data.object as Stripe.CreditNote);
+    } else if (event.type === 'customer.updated') {
+      deferredActions = await handleCustomerUpdated(client, event.data.object as Stripe.Customer);
+    } else if (event.type === 'customer.subscription.trial_will_end') {
+      deferredActions = await handleTrialWillEnd(client, event.data.object as Stripe.Subscription);
+    } else if (event.type === 'payment_method.attached') {
+      deferredActions = await handlePaymentMethodAttached(client, event.data.object as Stripe.PaymentMethod);
     }
 
     await client.query('COMMIT');
@@ -4047,6 +4059,224 @@ async function handlePriceChange(client: PoolClient, price: Stripe.Price): Promi
     }
   } catch (error: unknown) {
     logger.error('[Stripe Webhook] Error handling price change:', { error: error });
+  }
+
+  return deferredActions;
+}
+
+async function handleCustomerUpdated(client: PoolClient, customer: Stripe.Customer): Promise<DeferredAction[]> {
+  const deferredActions: DeferredAction[] = [];
+
+  try {
+    const stripeCustomerId = customer.id;
+    const stripeEmail = customer.email?.toLowerCase();
+    const stripeName = customer.name;
+
+    if (!stripeEmail) {
+      logger.warn(`[Stripe Webhook] customer.updated: customer ${stripeCustomerId} has no email — skipping sync`);
+      return deferredActions;
+    }
+
+    const result = await client.query(
+      `SELECT id, email, first_name, last_name, display_name FROM users WHERE stripe_customer_id = $1 LIMIT 1`,
+      [stripeCustomerId]
+    );
+
+    if (result.rows.length === 0) {
+      logger.info(`[Stripe Webhook] customer.updated: no local user for Stripe customer ${stripeCustomerId}`);
+      return deferredActions;
+    }
+
+    const user = result.rows[0];
+    const currentEmail = user.email?.toLowerCase();
+    const updates: string[] = [];
+
+    if (currentEmail && stripeEmail !== currentEmail) {
+      logger.warn(`[Stripe Webhook] customer.updated: email changed in Stripe for customer ${stripeCustomerId}: ${currentEmail} → ${stripeEmail}. NOT auto-syncing email (requires manual verification).`);
+      
+      deferredActions.push(async () => {
+        try {
+          await notifyAllStaff(
+            'Stripe Email Mismatch',
+            `Member ${user.display_name || currentEmail} has a different email in Stripe (${stripeEmail}) than in the app (${currentEmail}). Please verify and update manually if needed.`,
+            'billing_alert',
+            { sendPush: false }
+          );
+        } catch (err: unknown) {
+          logger.error('[Stripe Webhook] Failed to send email mismatch notification:', { error: err });
+        }
+      });
+      updates.push(`email_mismatch_notified (stripe=${stripeEmail}, app=${currentEmail})`);
+    }
+
+    if (stripeName) {
+      const nameParts = stripeName.split(' ');
+      const stripeFirst = nameParts[0] || '';
+      const stripeLast = nameParts.slice(1).join(' ') || '';
+      const currentDisplayName = user.display_name || `${user.first_name || ''} ${user.last_name || ''}`.trim();
+      
+      if (stripeName !== currentDisplayName) {
+        const updateFields: string[] = ['display_name = $1', 'updated_at = NOW()'];
+        const updateValues: (string | null)[] = [stripeName];
+        let paramIdx = 2;
+
+        if (stripeFirst && stripeFirst !== user.first_name) {
+          updateFields.push(`first_name = $${paramIdx}`);
+          updateValues.push(stripeFirst);
+          paramIdx++;
+        }
+        if (stripeLast !== (user.last_name || '')) {
+          updateFields.push(`last_name = $${paramIdx}`);
+          updateValues.push(stripeLast || null);
+          paramIdx++;
+        }
+
+        updateValues.push(user.id);
+        await client.query(
+          `UPDATE users SET ${updateFields.join(', ')} WHERE id = $${paramIdx}`,
+          updateValues
+        );
+        updates.push(`name synced: "${currentDisplayName}" → "${stripeName}"`);
+      }
+    }
+
+    if (updates.length > 0) {
+      logger.info(`[Stripe Webhook] customer.updated for ${stripeCustomerId}: ${updates.join(', ')}`);
+    }
+  } catch (error: unknown) {
+    logger.error('[Stripe Webhook] Error handling customer.updated:', { error });
+  }
+
+  return deferredActions;
+}
+
+async function handleTrialWillEnd(client: PoolClient, subscription: Stripe.Subscription): Promise<DeferredAction[]> {
+  const deferredActions: DeferredAction[] = [];
+
+  try {
+    const customerId = typeof subscription.customer === 'string' ? subscription.customer : subscription.customer?.id;
+    if (!customerId) return deferredActions;
+
+    const trialEnd = subscription.trial_end;
+    if (!trialEnd) return deferredActions;
+
+    const trialEndDate = new Date(trialEnd * 1000);
+    const daysLeft = Math.max(0, Math.ceil((trialEndDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
+
+    const memberResult = await client.query(
+      `SELECT id, email, first_name, last_name, display_name, stripe_customer_id FROM users WHERE stripe_customer_id = $1 LIMIT 1`,
+      [customerId]
+    );
+
+    if (memberResult.rows.length === 0) {
+      logger.info(`[Stripe Webhook] trial_will_end: no local user for customer ${customerId}`);
+      return deferredActions;
+    }
+
+    const member = memberResult.rows[0];
+    const memberName = member.display_name || `${member.first_name || ''} ${member.last_name || ''}`.trim() || member.email;
+    const memberEmail = member.email;
+    const trialEndStr = trialEndDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'America/Los_Angeles' });
+
+    logger.info(`[Stripe Webhook] Trial ending in ${daysLeft} days for ${memberEmail} (${customerId})`);
+
+    deferredActions.push(async () => {
+      try {
+        await notifyMember(
+          memberEmail,
+          'Trial Ending Soon',
+          `Your trial membership ends on ${trialEndStr}. After that, your membership will automatically continue with regular billing. Visit your billing page to review your plan.`,
+          'trial_ending',
+          { sendPush: true }
+        );
+      } catch (err: unknown) {
+        logger.error('[Stripe Webhook] Failed to send trial ending notification:', { error: err });
+      }
+    });
+
+    deferredActions.push(async () => {
+      try {
+        await notifyAllStaff(
+          'Member Trial Ending',
+          `${memberName} (${memberEmail}) trial ends on ${trialEndStr} (${daysLeft} days).`,
+          'trial_ending',
+          { sendPush: false }
+        );
+      } catch (err: unknown) {
+        logger.error('[Stripe Webhook] Failed to send staff trial ending notification:', { error: err });
+      }
+    });
+  } catch (error: unknown) {
+    logger.error('[Stripe Webhook] Error handling trial_will_end:', { error });
+  }
+
+  return deferredActions;
+}
+
+async function handlePaymentMethodAttached(client: PoolClient, paymentMethod: Stripe.PaymentMethod): Promise<DeferredAction[]> {
+  const deferredActions: DeferredAction[] = [];
+
+  try {
+    const customerId = typeof paymentMethod.customer === 'string' ? paymentMethod.customer : paymentMethod.customer?.id;
+    if (!customerId) return deferredActions;
+
+    logger.info(`[Stripe Webhook] Payment method attached: ${paymentMethod.id} (${paymentMethod.type}) to customer ${customerId}`);
+
+    const clearResult = await client.query(
+      `UPDATE stripe_payment_intents 
+       SET requires_card_update = FALSE, updated_at = NOW()
+       WHERE stripe_customer_id = $1 
+         AND requires_card_update = TRUE 
+         AND status IN ('requires_payment_method', 'requires_action', 'failed')
+       RETURNING stripe_payment_intent_id`,
+      [customerId]
+    );
+
+    if (clearResult.rowCount && clearResult.rowCount > 0) {
+      logger.info(`[Stripe Webhook] Cleared requires_card_update on ${clearResult.rowCount} payment intents for customer ${customerId}`);
+      
+      for (const row of clearResult.rows) {
+        deferredActions.push(async () => {
+          try {
+            const { getStripeClient } = await import('./client');
+            const stripe = await getStripeClient();
+            const pi = await stripe.paymentIntents.retrieve(row.stripe_payment_intent_id);
+            if (pi.status === 'requires_payment_method') {
+              await stripe.paymentIntents.confirm(row.stripe_payment_intent_id, {
+                payment_method: paymentMethod.id,
+              });
+              logger.info(`[Stripe Webhook] Auto-retried payment ${row.stripe_payment_intent_id} with new payment method`);
+            }
+          } catch (retryErr: unknown) {
+            logger.error(`[Stripe Webhook] Failed to auto-retry payment ${row.stripe_payment_intent_id}:`, { error: retryErr });
+          }
+        });
+      }
+    }
+
+    const memberResult = await client.query(
+      `SELECT email, display_name FROM users WHERE stripe_customer_id = $1 LIMIT 1`,
+      [customerId]
+    );
+
+    if (memberResult.rows.length > 0 && clearResult.rowCount && clearResult.rowCount > 0) {
+      const member = memberResult.rows[0];
+      deferredActions.push(async () => {
+        try {
+          await notifyMember(
+            member.email,
+            'Payment Method Updated',
+            'Your new payment method has been added successfully. Any pending payments will be retried automatically.',
+            'billing',
+            { sendPush: false }
+          );
+        } catch (err: unknown) {
+          logger.error('[Stripe Webhook] Failed to send payment method notification:', { error: err });
+        }
+      });
+    }
+  } catch (error: unknown) {
+    logger.error('[Stripe Webhook] Error handling payment_method.attached:', { error });
   }
 
   return deferredActions;

@@ -338,23 +338,6 @@ router.delete('/api/members/:email', isStaffOrAdmin, async (req, res) => {
       return res.status(400).json({ error: 'Member is already archived' });
     }
     
-    const client = await pool.connect();
-    try {
-      await client.query('BEGIN');
-
-      await client.query(
-        'UPDATE users SET archived_at = $1, archived_by = $2, membership_status = $3, id_image_url = $4, updated_at = $5 WHERE LOWER(email) = $6',
-        [new Date(), archivedBy, 'archived', null, new Date(), normalizedEmail]
-      );
-
-      await client.query('COMMIT');
-    } catch (txError) {
-      await client.query('ROLLBACK');
-      throw txError;
-    } finally {
-      client.release();
-    }
-    
     let subscriptionCancelled = false;
     const stripeSubscriptionId = userResult[0].stripeSubscriptionId;
     const stripeCustomerId = userResult[0].stripeCustomerId;
@@ -407,12 +390,48 @@ router.delete('/api/members/:email', isStaffOrAdmin, async (req, res) => {
       }
     }
 
+    try {
+      const { syncMemberToHubSpot } = await import('../../core/hubspot/stages');
+      await syncMemberToHubSpot({ email: normalizedEmail, status: 'archived', billingProvider: 'stripe' });
+    } catch (hubspotErr) {
+      logger.error('[Admin] HubSpot sync failed during archive', { extra: { error: getErrorMessage(hubspotErr) } });
+    }
+
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      await client.query(
+        'UPDATE users SET archived_at = $1, archived_by = $2, membership_status = $3, id_image_url = $4, updated_at = $5 WHERE LOWER(email) = $6',
+        [new Date(), archivedBy, 'archived', null, new Date(), normalizedEmail]
+      );
+
+      await client.query('COMMIT');
+    } catch (txError) {
+      await client.query('ROLLBACK');
+      throw txError;
+    } finally {
+      client.release();
+    }
+
     res.json({ 
       success: true, 
       archived: true,
       archivedBy,
       subscriptionCancelled,
       message: 'Member archived successfully'
+    });
+
+    logFromRequest(req, {
+      action: 'archive_member',
+      resourceType: 'user',
+      resourceId: String(userResult[0].id),
+      resourceName: normalizedEmail,
+      details: {
+        email: normalizedEmail,
+        subscriptionCancelled,
+        archivedBy
+      }
     });
   } catch (error: unknown) {
     if (!isProduction) logger.error('Member archive error', { error: error instanceof Error ? error : new Error(String(error)) });
@@ -448,8 +467,100 @@ router.delete('/api/members/:email/permanent', isAdmin, async (req, res) => {
     const hubspotId = userResult[0].hubspotId;
     
     const deletionLog: string[] = [];
+    const warnings: string[] = [];
     const userIdStr = String(userId);
     
+    let subscriptionsCancelled = false;
+    if (stripeCustomerId) {
+      try {
+        const { getStripe } = await import('../../core/stripe');
+        const stripe = await getStripe();
+        let hasMore = true;
+        let startingAfter: string | undefined;
+        while (hasMore) {
+          const params: Stripe.SubscriptionListParams = { customer: stripeCustomerId, limit: 100 };
+          if (startingAfter) params.starting_after = startingAfter;
+          const subscriptions = await stripe.subscriptions.list(params);
+          for (const sub of subscriptions.data) {
+            if (['active', 'trialing', 'past_due', 'unpaid'].includes(sub.status)) {
+              await stripe.subscriptions.cancel(sub.id);
+              deletionLog.push(`stripe_subscription_cancelled (${sub.id})`);
+              subscriptionsCancelled = true;
+            }
+          }
+          hasMore = subscriptions.has_more;
+          if (subscriptions.data.length > 0) {
+            startingAfter = subscriptions.data[subscriptions.data.length - 1].id;
+          }
+        }
+      } catch (stripeSubError: unknown) {
+        const msg = `Failed to cancel Stripe subscriptions: ${getErrorMessage(stripeSubError)}`;
+        warnings.push(msg);
+        logger.error('[Admin] Failed to cancel subscriptions for', { extra: { stripeCustomerId, error: getErrorMessage(stripeSubError) } });
+      }
+    }
+
+    let stripeDeleted = false;
+    if (deleteFromStripe === 'true' && stripeCustomerId) {
+      try {
+        const { getStripe } = await import('../../core/stripe');
+        const stripe = await getStripe();
+        await stripe.customers.del(stripeCustomerId);
+        stripeDeleted = true;
+        deletionLog.push('stripe_customer');
+      } catch (stripeError: unknown) {
+        const msg = `Failed to delete Stripe customer: ${getErrorMessage(stripeError)}`;
+        warnings.push(msg);
+        logger.error('[Admin] Failed to delete Stripe customer', { extra: { stripeCustomerId, error: getErrorMessage(stripeError) } });
+      }
+    }
+    
+    let hubspotArchived = false;
+    let effectiveHubspotId = hubspotId;
+    if (!effectiveHubspotId && deleteFromHubSpot === 'true') {
+      try {
+        const { getHubSpotClient } = await import('../../core/integrations');
+        const hubspot = await getHubSpotClient();
+        const searchResult = await hubspot.crm.contacts.searchApi.doSearch({
+          filterGroups: [{
+            filters: [{ propertyName: 'email', operator: 'EQ' as any, value: normalizedEmail }]
+          }],
+          properties: ['email'],
+          limit: 1,
+          after: '0',
+          sorts: [],
+        });
+        if (searchResult.results.length > 0) {
+          effectiveHubspotId = searchResult.results[0].id;
+          logger.info('[Admin] Found HubSpot contact by email fallback', { extra: { effectiveHubspotId, normalizedEmail } });
+        }
+      } catch (searchErr: unknown) {
+        const msg = `Failed to search HubSpot by email: ${getErrorMessage(searchErr)}`;
+        warnings.push(msg);
+        logger.error('[Admin] HubSpot email search failed', { extra: { normalizedEmail, error: getErrorMessage(searchErr) } });
+      }
+    }
+
+    if (effectiveHubspotId) {
+      try {
+        const { getHubSpotClient } = await import('../../core/integrations');
+        const hubspot = await getHubSpotClient();
+        await hubspot.crm.contacts.basicApi.update(effectiveHubspotId, { properties: { membership_status: 'terminated' } });
+        deletionLog.push('hubspot_membership_status_set_terminated');
+        logger.info('[Admin] Set HubSpot membership_status to terminated before deletion', { extra: { hubspotId: effectiveHubspotId, normalizedEmail } });
+
+        if (deleteFromHubSpot === 'true') {
+          await hubspot.crm.contacts.basicApi.archive(effectiveHubspotId);
+          hubspotArchived = true;
+          deletionLog.push('hubspot_contact (archived)');
+        }
+      } catch (hubspotError: unknown) {
+        const msg = `Failed to update/archive HubSpot contact: ${getErrorMessage(hubspotError)}`;
+        warnings.push(msg);
+        logger.error('[Admin] Failed to update/archive HubSpot contact', { extra: { hubspotId: effectiveHubspotId, error: getErrorMessage(hubspotError) } });
+      }
+    }
+
     if (userResult[0].idImageUrl) {
       try {
         await db.update(users).set({ idImageUrl: null }).where(eq(users.id, userId));
@@ -630,66 +741,6 @@ router.delete('/api/members/:email/permanent', isAdmin, async (req, res) => {
     await db.execute(sql`UPDATE billing_groups SET is_active = false WHERE LOWER(primary_email) = ${normalizedEmail} AND is_active = true`);
     deletionLog.push('billing_groups (deactivated)');
     
-    let subscriptionsCancelled = false;
-    if (stripeCustomerId) {
-      try {
-        const { getStripe } = await import('../../core/stripe');
-        const stripe = await getStripe();
-        let hasMore = true;
-        let startingAfter: string | undefined;
-        while (hasMore) {
-          const params: Stripe.SubscriptionListParams = { customer: stripeCustomerId, limit: 100 };
-          if (startingAfter) params.starting_after = startingAfter;
-          const subscriptions = await stripe.subscriptions.list(params);
-          for (const sub of subscriptions.data) {
-            if (['active', 'trialing', 'past_due', 'unpaid'].includes(sub.status)) {
-              await stripe.subscriptions.cancel(sub.id);
-              deletionLog.push(`stripe_subscription_cancelled (${sub.id})`);
-              subscriptionsCancelled = true;
-            }
-          }
-          hasMore = subscriptions.has_more;
-          if (subscriptions.data.length > 0) {
-            startingAfter = subscriptions.data[subscriptions.data.length - 1].id;
-          }
-        }
-      } catch (stripeSubError: unknown) {
-        logger.error('[Admin] Failed to cancel subscriptions for', { extra: { stripeCustomerId, error: getErrorMessage(stripeSubError) } });
-      }
-    }
-
-    let stripeDeleted = false;
-    if (deleteFromStripe === 'true' && stripeCustomerId) {
-      try {
-        const { getStripe } = await import('../../core/stripe');
-        const stripe = await getStripe();
-        await stripe.customers.del(stripeCustomerId);
-        stripeDeleted = true;
-        deletionLog.push('stripe_customer');
-      } catch (stripeError: unknown) {
-        logger.error('[Admin] Failed to delete Stripe customer', { extra: { stripeCustomerId, error: getErrorMessage(stripeError) } });
-      }
-    }
-    
-    let hubspotArchived = false;
-    if (hubspotId) {
-      try {
-        const { getHubSpotClient } = await import('../../core/integrations');
-        const hubspot = await getHubSpotClient();
-        await hubspot.crm.contacts.basicApi.update(hubspotId, { properties: { membership_status: 'terminated' } });
-        deletionLog.push('hubspot_membership_status_set_terminated');
-        logger.info('[Admin] Set HubSpot membership_status to terminated before deletion', { extra: { hubspotId, normalizedEmail } });
-
-        if (deleteFromHubSpot === 'true') {
-          await hubspot.crm.contacts.basicApi.archive(hubspotId);
-          hubspotArchived = true;
-          deletionLog.push('hubspot_contact (archived)');
-        }
-      } catch (hubspotError: unknown) {
-        logger.error('[Admin] Failed to update/archive HubSpot contact', { extra: { hubspotId, error: getErrorMessage(hubspotError) } });
-      }
-    }
-    
     await db.execute(sql`INSERT INTO sync_exclusions (email, reason, excluded_by) VALUES (${normalizedEmail}, 'permanent_delete', ${sessionUser?.email || 'unknown'}) ON CONFLICT (email) DO NOTHING`);
     deletionLog.push('sync_exclusions');
     
@@ -706,6 +757,7 @@ router.delete('/api/members/:email/permanent', isAdmin, async (req, res) => {
         deletedRecords: deletionLog,
         stripeDeleted,
         hubspotArchived,
+        warnings,
         deletedBy: sessionUser?.email
       }
     });
@@ -720,6 +772,7 @@ router.delete('/api/members/:email/permanent', isAdmin, async (req, res) => {
       subscriptionsCancelled,
       stripeDeleted,
       hubspotArchived,
+      warnings,
       message: `Member ${memberName || normalizedEmail} permanently deleted`
     });
   } catch (error: unknown) {

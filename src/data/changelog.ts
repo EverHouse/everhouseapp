@@ -13,6 +13,23 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.81.0",
+    date: "2026-02-19",
+    title: "Stripe & HubSpot Cleanup: Deletion Actually Works Now",
+    isMajor: true,
+    changes: [
+      "Fixed: Deleting a member now properly cancels their Stripe subscription and deletes their Stripe customer when the checkbox is checked — previously these operations could silently fail",
+      "Fixed: Archiving a member now cancels Stripe subscriptions BEFORE updating the database, preventing partial failures that left subscriptions active",
+      "Fixed: HubSpot contact archival now searches by email as a fallback when the HubSpot ID isn't stored locally — previously members without a synced HubSpot ID were silently skipped",
+      "Fixed: Archiving a member now syncs 'archived' status to HubSpot — previously archive only updated local database",
+      "Improved: Deletion and archive operations now return warnings when Stripe or HubSpot operations fail, instead of silently reporting success",
+      "Improved: Archive operations now include staff activity logging for audit trail",
+      "Added: Trial expiry warnings — members now get a notification when their trial is ending in 3 days, so they're never surprised by billing",
+      "Added: Stripe email mismatch detection — if a customer's email changes in Stripe, staff are notified of the discrepancy",
+      "Added: When a member adds a new payment method, the system automatically clears 'card update required' flags and retries any failed payments",
+    ]
+  },
+  {
     version: "7.80.0",
     date: "2026-02-19",
     title: "Stripe Webhook: Auto-Activate New Members",

@@ -164,6 +164,8 @@ export async function runStartupTasks(): Promise<void> {
           'coupon.updated',
           'coupon.deleted',
           'credit_note.created',
+          'customer.subscription.trial_will_end',
+          'payment_method.attached',
         ];
 
         try {
