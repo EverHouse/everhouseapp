@@ -1935,41 +1935,49 @@ export async function updateDeclaredPlayerCount(params: UpdatePlayerCountParams)
       WHERE id = $2
     `, [playerCount, bookingId]);
 
-    // Step 3: INSERT new booking_member slots (if increasing count)
-    if (playerCount > previousCount) {
-      const slotResult = await client.query(
-        `SELECT COALESCE(MAX(slot_number), 0) as max_slot, COUNT(*) as count FROM booking_members WHERE booking_id = $1`,
-        [bookingId]
-      );
-      const maxSlot = parseInt(slotResult.rows[0].max_slot) || 0;
-      const currentMemberCount = parseInt(slotResult.rows[0].count) || 0;
-      const slotsToCreate = playerCount - currentMemberCount;
+    // Step 3 & 4: Only modify booking_members for legacy bookings without sessions
+    if (!booking.session_id) {
+      // Step 3: INSERT new booking_member slots (if increasing count)
+      if (playerCount > previousCount) {
+        const slotResult = await client.query(
+          `SELECT COALESCE(MAX(slot_number), 0) as max_slot, COUNT(*) as count FROM booking_members WHERE booking_id = $1`,
+          [bookingId]
+        );
+        const maxSlot = parseInt(slotResult.rows[0].max_slot) || 0;
+        const currentMemberCount = parseInt(slotResult.rows[0].count) || 0;
+        const slotsToCreate = playerCount - currentMemberCount;
 
-      if (slotsToCreate > 0) {
-        await client.query(`
-          INSERT INTO booking_members (booking_id, slot_number, user_email, is_primary, created_at)
-          SELECT $1, slot_num, NULL, false, NOW()
-          FROM generate_series($2, $3) AS slot_num
-          ON CONFLICT (booking_id, slot_number) DO NOTHING
-        `, [bookingId, maxSlot + 1, maxSlot + slotsToCreate]);
-        logger.info('[rosterService] Created empty booking member slots', {
-          extra: { bookingId, slotsCreated: slotsToCreate, previousCount, newCount: playerCount }
-        });
+        if (slotsToCreate > 0) {
+          await client.query(`
+            INSERT INTO booking_members (booking_id, slot_number, user_email, is_primary, created_at)
+            SELECT $1, slot_num, NULL, false, NOW()
+            FROM generate_series($2, $3) AS slot_num
+            ON CONFLICT (booking_id, slot_number) DO NOTHING
+          `, [bookingId, maxSlot + 1, maxSlot + slotsToCreate]);
+          logger.info('[rosterService] Created empty booking member slots', {
+            extra: { bookingId, slotsCreated: slotsToCreate, previousCount, newCount: playerCount }
+          });
+        }
+      } else if (playerCount < previousCount) {
+        // Step 4: DELETE empty slots (if decreasing count)
+        const deleted = await client.query(`
+          DELETE FROM booking_members 
+          WHERE booking_id = $1 
+            AND slot_number > $2 
+            AND is_primary = false 
+            AND (user_email IS NULL OR user_email = '')
+        `, [bookingId, playerCount]);
+        if (deleted.rowCount && deleted.rowCount > 0) {
+          logger.info('[rosterService] Cleaned up empty slots after player count decrease', {
+            extra: { bookingId, slotsRemoved: deleted.rowCount, previousCount, newCount: playerCount }
+          });
+        }
       }
-    } else if (playerCount < previousCount) {
-      // Step 4: DELETE empty slots (if decreasing count)
-      const deleted = await client.query(`
-        DELETE FROM booking_members 
-        WHERE booking_id = $1 
-          AND slot_number > $2 
-          AND is_primary = false 
-          AND (user_email IS NULL OR user_email = '')
-      `, [bookingId, playerCount]);
-      if (deleted.rowCount && deleted.rowCount > 0) {
-        logger.info('[rosterService] Cleaned up empty slots after player count decrease', {
-          extra: { bookingId, slotsRemoved: deleted.rowCount, previousCount, newCount: playerCount }
-        });
-      }
+    } else {
+      // Skip legacy booking_members sync for session-based booking
+      logger.info('[rosterService] Skipping legacy booking_members sync for session-based booking', {
+        extra: { bookingId, sessionId: booking.session_id, playerCount }
+      });
     }
 
     // Commit the transaction

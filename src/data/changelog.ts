@@ -13,6 +13,16 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.85.2",
+    date: "2026-02-19",
+    title: "Player Count & Dashboard Fixes for Unified Participant System",
+    changes: [
+      "Fixed: Changing the player count on a booking no longer causes a 500 error — the system now correctly updates session-based bookings without touching legacy data tables",
+      "Fixed: Members who are participants in a booking (not just the owner) now see those bookings on their dashboard",
+      "Improved: Player count changes for session-based bookings are now faster and more reliable",
+    ]
+  },
+  {
     version: "7.85.1",
     date: "2026-02-19",
     title: "Critical Fixes: Guest Addition & Staff Booking Sheet Loading",
