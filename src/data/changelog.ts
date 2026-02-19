@@ -13,6 +13,16 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.76.0",
+    date: "2026-02-19",
+    title: "Data Integrity Resolve Actions",
+    changes: [
+      "Added: Delete button for 'Members Without Email' issues on the Data Integrity page — ghost member records can now be removed directly",
+      "Added: 'Mark Completed' button for 'Active Bookings Without Sessions' issues — private events and resolved bookings can now be closed out",
+      "Fixed: Private event bookings (private-event@resolved) are no longer flagged as missing sessions in the integrity check",
+    ]
+  },
+  {
     version: "7.75.0",
     date: "2026-02-19",
     title: "Billing Accuracy & Fee Display Fixes",

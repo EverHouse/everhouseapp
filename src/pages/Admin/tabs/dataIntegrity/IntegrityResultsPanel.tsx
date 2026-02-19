@@ -974,6 +974,22 @@ const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
                                           <span className="material-symbols-outlined text-[16px]">cancel</span>
                                         )}
                                       </button>
+                                      <button
+                                        onClick={() => {
+                                          if (confirm(`Mark booking #${issue.recordId} as completed? This will resolve the "no session" alert.`)) {
+                                            fixIssueMutation.mutate({ endpoint: '/api/data-integrity/fix/complete-booking', body: { recordId: issue.recordId } });
+                                          }
+                                        }}
+                                        disabled={fixIssueMutation.isPending}
+                                        className="p-1.5 text-green-600 hover:bg-green-100 dark:text-green-400 dark:hover:bg-green-900/30 rounded transition-colors disabled:opacity-50"
+                                        title="Mark as completed"
+                                      >
+                                        {fixIssueMutation.isPending ? (
+                                          <span className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>
+                                        ) : (
+                                          <span className="material-symbols-outlined text-[16px]">check_circle</span>
+                                        )}
+                                      </button>
                                     </>
                                   )}
                                   {!issue.ignored && issue.table === 'trackman_unmatched_bookings' && (
@@ -1155,6 +1171,24 @@ const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
                                       title="Delete empty session"
                                     >
                                       <span className="material-symbols-outlined text-[16px]">delete</span>
+                                    </button>
+                                  )}
+                                  {!issue.ignored && issue.table === 'users' && issue.description?.includes('has no email') && (
+                                    <button
+                                      onClick={() => {
+                                        if (confirm(`Delete member "${issue.context?.memberName || 'Unknown'}" (id: ${issue.recordId})? This will permanently remove their account and related records. This cannot be undone.`)) {
+                                          fixIssueMutation.mutate({ endpoint: '/api/data-integrity/fix/delete-member-no-email', body: { recordId: issue.recordId } });
+                                        }
+                                      }}
+                                      disabled={fixIssueMutation.isPending}
+                                      className="p-1.5 text-red-600 hover:bg-red-100 dark:text-red-400 dark:hover:bg-red-900/30 rounded transition-colors disabled:opacity-50"
+                                      title="Delete this member (no email)"
+                                    >
+                                      {fixIssueMutation.isPending ? (
+                                        <span className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>
+                                      ) : (
+                                        <span className="material-symbols-outlined text-[16px]">delete</span>
+                                      )}
                                     </button>
                                   )}
                                   {!issue.ignored && (issue.context?.email || (issue.context?.memberEmails && issue.context.memberEmails.length > 0)) && ((issue.context as any)?.stripeCustomerIds || issue.context?.stripeCustomerId) && (

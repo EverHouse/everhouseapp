@@ -1118,4 +1118,59 @@ router.post('/api/data-integrity/fix/change-billing-provider', isAdmin, async (r
   }
 });
 
+router.post('/api/data-integrity/fix/delete-member-no-email', isAdmin, async (req: Request, res) => {
+  try {
+    const { recordId } = req.body;
+    if (!recordId) return res.status(400).json({ success: false, message: 'recordId is required' });
+
+    // Safety check: only delete if the member truly has no email
+    const member = await db.execute(sql`SELECT id, email, first_name, last_name FROM users WHERE id = ${recordId}`);
+    if (!member.rows.length) {
+      return res.status(404).json({ success: false, message: 'Member not found' });
+    }
+    const user = member.rows[0] as Record<string, unknown>;
+    if (user.email && String(user.email).trim() !== '') {
+      return res.status(400).json({ success: false, message: 'This member has an email address. Cannot delete via this endpoint.' });
+    }
+
+    // Delete related records first
+    await db.execute(sql`DELETE FROM booking_participants WHERE user_id = ${recordId}`);
+    await db.execute(sql`DELETE FROM notifications WHERE user_id = ${recordId}`);
+    await db.execute(sql`DELETE FROM guest_passes WHERE user_id = ${recordId}`);
+    await db.execute(sql`DELETE FROM users WHERE id = ${recordId} AND (email IS NULL OR email = '')`);
+
+    const name = [user.first_name, user.last_name].filter(Boolean).join(' ') || 'Unknown';
+    logFromRequest(req, 'delete_member', 'user', String(recordId), `Deleted member without email: "${name}" (id: ${recordId})`, { memberName: name });
+
+    res.json({ success: true, message: `Deleted member "${name}" (id: ${recordId})` });
+  } catch (error: unknown) {
+    logger.error('[DataIntegrity] Delete member without email error', { extra: { error: getErrorMessage(error) } });
+    res.status(500).json({ success: false, message: getErrorMessage(error) });
+  }
+});
+
+router.post('/api/data-integrity/fix/complete-booking', isAdmin, async (req: Request, res) => {
+  try {
+    const { recordId } = req.body;
+    if (!recordId) return res.status(400).json({ success: false, message: 'recordId is required' });
+
+    const result = await db.execute(sql`
+      UPDATE booking_requests 
+      SET status = 'completed', updated_at = NOW() 
+      WHERE id = ${recordId} AND status IN ('approved', 'attended', 'confirmed')
+    `);
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ success: false, message: 'Booking not found or not in an active status' });
+    }
+
+    logFromRequest(req, 'complete_booking', 'booking_request', String(recordId), `Marked booking #${recordId} as completed via data integrity`, { bookingId: recordId });
+
+    res.json({ success: true, message: `Booking #${recordId} marked as completed` });
+  } catch (error: unknown) {
+    logger.error('[DataIntegrity] Complete booking error', { extra: { error: getErrorMessage(error) } });
+    res.status(500).json({ success: false, message: getErrorMessage(error) });
+  }
+});
+
 export default router;
