@@ -66,7 +66,7 @@ export async function processWalkInCheckin(params: WalkInCheckinParams): Promise
     }).catch(err => logger.error(`[WalkInCheckin] Failed to send notification:`, { extra: { err } }));
 
     await db.execute(sql`INSERT INTO walk_in_visits (member_email, member_id, checked_in_by, checked_in_by_name, source, created_at)
-       VALUES (${member.email}, ${Number(member.id)}, ${params.checkedInBy}, ${params.checkedInByName}, ${params.source}, NOW())`);
+       VALUES (${member.email}, ${String(member.id)}, ${params.checkedInBy}, ${params.checkedInByName}, ${params.source}, NOW())`);
 
     if (newVisitCount === 1 && member.membership_status?.toLowerCase() === 'trialing') {
       sendFirstVisitConfirmationEmail(member.email, { firstName: member.first_name || undefined })
@@ -106,6 +106,6 @@ export async function processWalkInCheckin(params: WalkInCheckinParams): Promise
     };
   } catch (error: unknown) {
     logger.error(`[WalkInCheckin] Failed to process walk-in check-in:`, { error: error instanceof Error ? error : new Error(String(error)), extra: { memberId: params.memberId, source: params.source } });
-    return { success: false, memberName: '', memberEmail: '', tier: null, lifetimeVisits: 0, pinnedNotes: [], membershipStatus: null, error: getErrorMessage(error) };
+    return { success: false, memberName: '', memberEmail: '', tier: null, lifetimeVisits: 0, pinnedNotes: [], membershipStatus: null, error: 'Unable to complete check-in. Please try again or ask staff for help.' };
   }
 }
