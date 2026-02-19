@@ -189,21 +189,35 @@ export async function cancelBookingByTrackmanId(
     
     // Clear any pending fees for this booking's session
     if (booking.session_id) {
+      const feeClient = await pool.connect();
       try {
-        await pool.query(
+        await feeClient.query('BEGIN');
+        await feeClient.query(
+          `SELECT id FROM booking_requests WHERE id = $1 FOR UPDATE`,
+          [bookingId]
+        );
+        await feeClient.query(
           `UPDATE booking_participants 
            SET cached_fee_cents = 0, payment_status = 'waived'
            WHERE session_id = $1 
            AND payment_status = 'pending'`,
           [booking.session_id]
         );
+        await feeClient.query(
+          `UPDATE booking_requests SET roster_version = COALESCE(roster_version, 0) + 1 WHERE id = $1`,
+          [bookingId]
+        );
+        await feeClient.query('COMMIT');
         logger.info('[Trackman Webhook] Cleared pending fees for cancelled booking', {
           extra: { bookingId, sessionId: booking.session_id }
         });
       } catch (feeErr: unknown) {
+        await feeClient.query('ROLLBACK').catch(() => {});
         logger.warn('[Trackman Webhook] Failed to clear fees for cancelled booking', {
           extra: { bookingId, sessionId: booking.session_id, error: (feeErr as Error).message }
         });
+      } finally {
+        feeClient.release();
       }
     }
     
@@ -264,13 +278,31 @@ export async function cancelBookingByTrackmanId(
                 logger.info('[Trackman Webhook] Payment already refunded in Stripe, marking participant', {
                   extra: { participantId: participant.id, paymentIntentId: participant.stripe_payment_intent_id }
                 });
-                // Update participant
-                await pool.query(
-                  `UPDATE booking_participants 
-                   SET refunded_at = NOW(), payment_status = 'waived'
-                   WHERE id = $1`,
-                  [participant.id]
-                );
+                // Update participant with roster lock
+                const alreadyRefundedClient = await pool.connect();
+                try {
+                  await alreadyRefundedClient.query('BEGIN');
+                  await alreadyRefundedClient.query(
+                    `SELECT id FROM booking_requests WHERE id = $1 FOR UPDATE`,
+                    [bookingId]
+                  );
+                  await alreadyRefundedClient.query(
+                    `UPDATE booking_participants 
+                     SET refunded_at = NOW(), payment_status = 'waived'
+                     WHERE id = $1`,
+                    [participant.id]
+                  );
+                  await alreadyRefundedClient.query(
+                    `UPDATE booking_requests SET roster_version = COALESCE(roster_version, 0) + 1 WHERE id = $1`,
+                    [bookingId]
+                  );
+                  await alreadyRefundedClient.query('COMMIT');
+                } catch (lockErr: unknown) {
+                  await alreadyRefundedClient.query('ROLLBACK').catch(() => {});
+                  throw lockErr;
+                } finally {
+                  alreadyRefundedClient.release();
+                }
                 // Update stripe_payment_intents for consistency
                 await pool.query(
                   `UPDATE stripe_payment_intents 
@@ -301,13 +333,31 @@ export async function cancelBookingByTrackmanId(
                   idempotencyKey: `refund_trackman_cancel_${booking.id}_${pi.id}`
                 });
                 
-                // Mark participant as refunded
-                await pool.query(
-                  `UPDATE booking_participants 
-                   SET refunded_at = NOW(), payment_status = 'waived'
-                   WHERE id = $1`,
-                  [participant.id]
-                );
+                // Mark participant as refunded with roster lock
+                const refundClient = await pool.connect();
+                try {
+                  await refundClient.query('BEGIN');
+                  await refundClient.query(
+                    `SELECT id FROM booking_requests WHERE id = $1 FOR UPDATE`,
+                    [bookingId]
+                  );
+                  await refundClient.query(
+                    `UPDATE booking_participants 
+                     SET refunded_at = NOW(), payment_status = 'waived'
+                     WHERE id = $1`,
+                    [participant.id]
+                  );
+                  await refundClient.query(
+                    `UPDATE booking_requests SET roster_version = COALESCE(roster_version, 0) + 1 WHERE id = $1`,
+                    [bookingId]
+                  );
+                  await refundClient.query('COMMIT');
+                } catch (lockErr: unknown) {
+                  await refundClient.query('ROLLBACK').catch(() => {});
+                  throw lockErr;
+                } finally {
+                  refundClient.release();
+                }
                 
                 // Update stripe_payment_intents status for consistency
                 await pool.query(
