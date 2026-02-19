@@ -8,7 +8,6 @@ import { CALENDAR_CONFIG, ConferenceRoomBooking, MemberMatchResult, CalendarEven
 import { getCalendarIdByName } from '../cache';
 import { getConferenceRoomId } from '../../affectedAreas';
 import { ensureSessionForBooking } from '../../bookingService/sessionManager';
-import { releaseGuestPassHold } from '../../billing/guestPassHoldService';
 import { bookingEvents } from '../../bookingEvents';
 import { broadcastAvailabilityUpdate } from '../../websocket';
 
@@ -395,8 +394,6 @@ export async function syncConferenceRoomCalendarToBookings(options?: { monthsBac
                   updatedAt: new Date()
                 })
                 .where(eq(bookingRequests.id, booking.id));
-
-              await releaseGuestPassHold(booking.id);
 
               const bookingDate = typeof booking.requestDate === 'string'
                 ? booking.requestDate
