@@ -22,7 +22,7 @@ export function registerImageRoutes(app: Express): void {
         url: imageData.url,
         b64_json: imageData.b64_json,
       });
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Error generating image:", error);
       res.status(500).json({ error: "Failed to generate image" });
     }

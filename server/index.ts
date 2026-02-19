@@ -77,7 +77,7 @@ async function gracefulShutdown(signal: string) {
     clearTimeout(shutdownTimeout);
     logger.info('[Shutdown] Complete');
     process.exit(0);
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error('[Shutdown] Error:', { error: error as Error });
     clearTimeout(shutdownTimeout);
     process.exit(1);
@@ -175,7 +175,7 @@ async function initializeApp() {
         startupHealth,
         uptime: process.uptime()
       });
-    } catch (dbError) {
+    } catch (dbError: unknown) {
       res.status(503).json({
         ready: false,
         reason: 'database_unavailable',
@@ -412,7 +412,7 @@ async function initializeApp() {
   try {
     setupSupabaseAuthRoutes(app);
     registerAuthRoutes(app);
-  } catch (err) {
+  } catch (err: unknown) {
     logger.error('[Startup] Auth routes setup failed:', { error: err as Error });
   }
 
@@ -806,7 +806,7 @@ async function initializeApp() {
       const fs = await import('fs');
       cachedIndexHtml = fs.readFileSync(indexPath, 'utf8');
       logger.info('[Startup] Cached index.html for fast serving');
-    } catch (err) {
+    } catch (err: unknown) {
       logger.error('[Startup] Failed to cache index.html:', { error: err as Error });
     }
   }
@@ -819,7 +819,7 @@ async function initializeApp() {
 
     try {
       initWebSocketServer(httpServer!);
-    } catch (err) {
+    } catch (err: unknown) {
       logger.error('[Startup] WebSocket initialization failed:', { error: err as Error });
     }
 
@@ -843,12 +843,12 @@ async function initializeApp() {
       setTimeout(async () => {
         try {
           await autoSeedResources(pool, isProduction);
-        } catch (err) {
+        } catch (err: unknown) {
           logger.error('[Startup] Auto-seed resources failed:', { error: err as Error });
         }
         try {
           await autoSeedCafeMenu(pool, isProduction);
-        } catch (err) {
+        } catch (err: unknown) {
           logger.error('[Startup] Auto-seed cafe menu failed:', { error: err as Error });
         }
       }, 30000);
@@ -856,7 +856,7 @@ async function initializeApp() {
 
     try {
       initSchedulers();
-    } catch (err) {
+    } catch (err: unknown) {
       logger.error('[Startup] Scheduler initialization failed:', { error: err as Error });
     }
   }, heavyTaskDelay);
@@ -887,7 +887,7 @@ async function autoSeedResources(pool: { query: (text: string, values?: unknown[
       }
       if (!isProduction) logger.info(`Auto-seeded ${resources.length} resources`);
     }
-  } catch (error) {
+  } catch (error: unknown) {
     if (!isProduction) logger.info('Resources table may not exist yet, skipping auto-seed');
   }
 }
@@ -945,7 +945,7 @@ async function autoSeedCafeMenu(pool: { query: (text: string, values?: unknown[]
       }
       if (!isProduction) logger.info(`Auto-seeded ${cafeItems.length} cafe menu items`);
     }
-  } catch (error) {
+  } catch (error: unknown) {
     if (!isProduction) logger.info('Cafe menu table may not exist yet, skipping auto-seed');
   }
 }

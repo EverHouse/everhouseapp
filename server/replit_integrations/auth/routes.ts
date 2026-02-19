@@ -15,7 +15,7 @@ async function isStaffEmail(email: string): Promise<boolean> {
       [email]
     );
     return result.rows.length > 0;
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error('Error checking staff status:', { error: error as Error });
     return false;
   }
@@ -149,7 +149,7 @@ export function registerAuthRoutes(app: Express): void {
         tags: dbUser?.tags || [],
         lastBookingDate: lastActivityDate
       });
-    } catch (error) {
+    } catch (error: unknown) {
       logger.error("Error fetching user:", { error: error as Error });
       res.status(500).json({ message: "Failed to fetch user" });
     }

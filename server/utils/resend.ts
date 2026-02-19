@@ -100,7 +100,7 @@ export async function safeSendEmail(options: SafeSendOptions): Promise<{ success
     });
     
     return { success: true, id: result.data?.id };
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error('Failed to send email', { 
       error: error as Error,
       extra: { subject: options.subject, to: options.to }

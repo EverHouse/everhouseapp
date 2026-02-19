@@ -77,7 +77,7 @@ export function registerObjectStorageRoutes(app: Express): void {
       const url = `/objects/${objectName}`;
       
       res.json({ url, objectPath: url });
-    } catch (error) {
+    } catch (error: unknown) {
       logger.error("Error uploading file:", { error: error as Error });
       res.status(500).json({ error: "Failed to upload file" });
     }
@@ -123,7 +123,7 @@ export function registerObjectStorageRoutes(app: Express): void {
         // Echo back the metadata for client convenience
         metadata: { name, size, contentType },
       });
-    } catch (error) {
+    } catch (error: unknown) {
       logger.error("Error generating upload URL:", { error: error as Error });
       res.status(500).json({ error: "Failed to generate upload URL" });
     }
@@ -143,7 +143,7 @@ export function registerObjectStorageRoutes(app: Express): void {
     try {
       const objectFile = await objectStorageService.getObjectEntityFile(req.path.startsWith('/objects') ? req.path : `/objects${req.path}`);
       await objectStorageService.downloadObject(objectFile, res);
-    } catch (error) {
+    } catch (error: unknown) {
       logger.error("Error serving object:", { error: error as Error });
       if (error instanceof ObjectNotFoundError) {
         return res.status(404).json({ error: "Object not found" });

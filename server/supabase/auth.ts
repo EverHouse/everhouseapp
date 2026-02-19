@@ -219,7 +219,7 @@ export const isSupabaseAuthenticated: RequestHandler = async (req, res, next) =>
     
     (req as unknown as Record<string, unknown>).supabaseUser = user;
     next();
-  } catch (error) {
+  } catch (error: unknown) {
     res.status(401).json({ error: 'Authentication failed' });
   }
 };

@@ -165,7 +165,7 @@ export async function batchProcessWithSSE<T, R>(
       );
       results.push(result);
       sendEvent({ type: "progress", index, result });
-    } catch (error) {
+    } catch (error: unknown) {
       errors++;
       results.push(undefined as R); // Placeholder for failed items
       sendEvent({

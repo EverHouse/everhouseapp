@@ -289,7 +289,7 @@ export async function sendBookingRescheduleEmail(
 
     logger.info('[BookingEmails] Sent booking reschedule email', { extra: { email, date: data.date } });
     return true;
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error('[BookingEmails] Failed to send booking reschedule email', { error: error as Error });
     return false;
   }
@@ -317,7 +317,7 @@ export async function sendBookingConfirmationEmail(
     
     logger.info('[BookingEmails] Sent booking confirmation email', { extra: { email, date: data.date } });
     return true;
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error('[BookingEmails] Failed to send booking confirmation', { error: error as Error });
     return false;
   }

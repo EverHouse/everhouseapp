@@ -197,7 +197,7 @@ export async function sendPassWithQrEmail(
     });
     
     logger.info(`[PassEmails] Sent QR pass email to ${email} for pass #${passDetails.passId}`);
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error('[PassEmails] Error sending pass email:', { error: error as Error });
     throw error;
   }
@@ -409,7 +409,7 @@ export async function sendRedemptionConfirmationEmail(
     });
     
     logger.info(`[PassEmails] Sent redemption confirmation to ${email}`);
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error('[PassEmails] Error sending redemption confirmation:', { error: error as Error });
   }
 }

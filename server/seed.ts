@@ -159,7 +159,7 @@ async function seed() {
             ]
           );
           imported++;
-        } catch (err) {
+        } catch (err: unknown) {
           logger.error(`  Failed to import ${email}:`, { error: err as Error });
           skipped++;
         }
@@ -345,7 +345,7 @@ async function seed() {
     }});
     logger.info('Note: Events and wellness classes sync from Google Calendar.');
 
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error('Seed error:', { error: error as Error });
     throw error;
   } finally {
