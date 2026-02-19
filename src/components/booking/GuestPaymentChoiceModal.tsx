@@ -130,10 +130,18 @@ export function GuestPaymentChoiceModal({
       }
     ).then(({ ok, error: apiError }) => {
       if (!ok) {
-        onError?.(apiError || 'Failed to add guest with pass');
+        const msg = (apiError || '').toLowerCase();
+        const isTimeout = msg.includes('abort') || msg.includes('timeout');
+        if (!isTimeout) {
+          onError?.(apiError || 'Failed to add guest with pass');
+        }
       }
     }).catch((err: unknown) => {
-      onError?.((err instanceof Error ? err.message : String(err)) || 'Failed to add guest');
+      const msg = ((err instanceof Error ? err.message : String(err)) || '').toLowerCase();
+      const isTimeout = msg.includes('abort') || msg.includes('timeout');
+      if (!isTimeout) {
+        onError?.(msg || 'Failed to add guest');
+      }
     });
   };
 
