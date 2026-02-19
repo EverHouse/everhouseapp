@@ -5,13 +5,14 @@ import PwaSmartBanner from '../../components/PwaSmartBanner';
 
 type CheckinState = 'loading' | 'checking_in' | 'not_logged_in' | 'error';
 
-const AUTO_REDIRECT_DELAY = 3000;
+const AUTO_REDIRECT_DELAY = 3500;
 
 const NfcCheckin: React.FC = () => {
   const { user, sessionChecked } = useData();
   const navigate = useNavigate();
   const [state, setState] = useState<CheckinState>('loading');
   const [errorMessage, setErrorMessage] = useState('');
+  const [errorRedirect, setErrorRedirect] = useState<'dashboard' | 'login'>('dashboard');
   const checkinAttemptedRef = useRef(false);
 
   useEffect(() => {
@@ -42,6 +43,9 @@ const NfcCheckin: React.FC = () => {
           navigate('/dashboard', { replace: true });
         } else {
           setErrorMessage(data.error || 'Check-in failed');
+          if (res.status === 403 || res.status === 404) {
+            setErrorRedirect('login');
+          }
           setState('error');
         }
       })
@@ -54,10 +58,10 @@ const NfcCheckin: React.FC = () => {
   useEffect(() => {
     if (state !== 'error') return;
     const timer = setTimeout(() => {
-      navigate('/dashboard', { replace: true });
+      navigate(errorRedirect === 'login' ? '/login' : '/dashboard', { replace: true });
     }, AUTO_REDIRECT_DELAY);
     return () => clearTimeout(timer);
-  }, [state, navigate]);
+  }, [state, errorRedirect, navigate]);
 
   const handleLoginRedirect = () => {
     const currentPath = window.location.pathname + window.location.search;
@@ -116,7 +120,7 @@ const NfcCheckin: React.FC = () => {
               </div>
               <h1 className="text-xl font-bold text-white mb-2">Check-In Issue</h1>
               <p className="text-white/80 text-sm">{errorMessage}</p>
-              <p className="text-white/50 text-xs mt-3">Redirecting to your dashboard...</p>
+              <p className="text-white/50 text-xs mt-3">{errorRedirect === 'login' ? 'Redirecting to sign in...' : 'Redirecting to your dashboard...'}</p>
             </div>
           </div>
         )}
