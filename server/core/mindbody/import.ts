@@ -279,7 +279,7 @@ export async function importFirstVisitReport(content: string): Promise<{
       } else {
         result.skipped++;
       }
-    } catch (error) {
+    } catch (error: unknown) {
       result.errors.push(`Client ${clientId}: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
@@ -501,7 +501,7 @@ export async function importSalesFromContent(content: string, clientLookup?: Map
       if (['guest_pass', 'guest_sim_fee'].includes(category) && member[0]?.id) {
         result.linked++;
       }
-    } catch (error) {
+    } catch (error: unknown) {
       result.errors.push(`Row ${i}: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
@@ -605,7 +605,7 @@ export async function importMembersFromCSV(csvPath: string): Promise<{
           result.skipped++;
         }
       }
-    } catch (error) {
+    } catch (error: unknown) {
       result.errors.push(`Row ${i}: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
@@ -718,7 +718,7 @@ export async function importSalesFromCSV(csvPath: string, batchId?: string): Pro
       if (['guest_pass', 'guest_sim_fee'].includes(category) && member[0]?.id) {
         result.linked++;
       }
-    } catch (error) {
+    } catch (error: unknown) {
       result.errors.push(`Row ${i}: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
@@ -761,7 +761,7 @@ export async function importAttendanceFromCSV(csvPath: string): Promise<{
       await db.execute(sql`UPDATE users SET lifetime_visits = GREATEST(COALESCE(lifetime_visits, 0), ${totalVisits}), updated_at = NOW() WHERE mindbody_client_id = ${clientId}`);
       
       result.updated++;
-    } catch (error) {
+    } catch (error: unknown) {
       result.errors.push(`Row ${i}: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }

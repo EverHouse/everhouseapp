@@ -460,7 +460,7 @@ async function checkHubSpotSyncMismatch(): Promise<IntegrityCheckResult> {
   let hubspot: Client;
   try {
     hubspot = await getHubSpotClient();
-  } catch (err) {
+  } catch (err: unknown) {
     if (!isProduction) logger.error('[DataIntegrity] HubSpot API error:', { error: err });
     issues.push({
       category: 'sync_mismatch',
@@ -967,7 +967,7 @@ async function checkStripeSubscriptionSync(): Promise<IntegrityCheckResult> {
   let stripe: Stripe;
   try {
     stripe = await getStripeClient();
-  } catch (err) {
+  } catch (err: unknown) {
     if (!isProduction) logger.error('[DataIntegrity] Stripe API error:', { error: err });
     issues.push({
       category: 'sync_mismatch',
@@ -1261,7 +1261,7 @@ async function checkTierReconciliation(): Promise<IntegrityCheckResult> {
   let stripe: Stripe;
   try {
     stripe = await getStripeClient();
-  } catch (err) {
+  } catch (err: unknown) {
     if (!isProduction) logger.error('[DataIntegrity] Stripe API error for tier reconciliation:', { error: err });
     return {
       checkName: 'Tier Reconciliation',
@@ -1282,7 +1282,7 @@ async function checkTierReconciliation(): Promise<IntegrityCheckResult> {
   let hubspot: Client | undefined;
   try {
     hubspot = await getHubSpotClient();
-  } catch (err) {
+  } catch (err: unknown) {
     if (!isProduction) logger.error('[DataIntegrity] HubSpot API error for tier reconciliation:', { error: err });
   }
   
@@ -2172,7 +2172,7 @@ export async function runAllIntegrityChecks(triggeredBy: 'manual' | 'scheduled' 
     }));
     await alertOnCriticalIntegrityIssues(checkSummaries as any, severityMap);
     await alertOnHighIntegrityIssues(checkSummaries as any, severityMap);
-  } catch (err) {
+  } catch (err: unknown) {
     if (!isProduction) logger.error('[DataIntegrity] Failed to store history:', { error: err });
   }
   

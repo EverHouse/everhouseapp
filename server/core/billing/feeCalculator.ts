@@ -135,7 +135,7 @@ export async function clearCachedFees(participantIds: number[]): Promise<void> {
       `UPDATE booking_participants SET cached_fee_cents = 0 WHERE id = ANY($1::int[])`,
       [participantIds]
     );
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error('[FeeCalculator] Error clearing cached fees:', { error: error });
   }
 }

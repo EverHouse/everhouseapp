@@ -415,7 +415,7 @@ export async function syncInternalCalendarToClosures(): Promise<{ synced: number
     }
     
     return { synced: events.length, created, updated, deleted };
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error('Error syncing Internal Calendar to closures:', { error: error });
     return { synced: 0, created: 0, updated: 0, deleted: 0, error: 'Failed to sync closures' };
   }

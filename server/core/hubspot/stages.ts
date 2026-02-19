@@ -114,7 +114,7 @@ export async function updateContactMembershipStatus(
     
     if (!isProduction) logger.info(`[HubSpotDeals] Updated contact ${hubspotContactId} membership_status to ${newStatus}`);
     return true;
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error('[HubSpotDeals] Error updating contact membership_status:', { error: error });
     return false;
   }
@@ -210,7 +210,7 @@ export async function syncMemberToHubSpot(
           .where(eq(users.email, email.toLowerCase()))
           .limit(1);
         effectiveBillingProvider = userResult[0]?.billingProvider || null;
-      } catch (e) {
+      } catch (e: unknown) {
       }
     }
 
@@ -326,9 +326,9 @@ export async function syncMemberToHubSpot(
       }
       throw updateError;
     }
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error(`[HubSpot Sync] Error syncing ${email}:`, { error: error });
-    return { success: false, error: error instanceof Error ? error.message : String(error), updated: {} };
+    return { success: false, error: getErrorMessage(error), updated: {} };
   }
 }
 
@@ -497,7 +497,7 @@ export async function syncDealStageFromMindbodyStatus(
     }
     
     return { success: dealUpdated, dealId: deal.hubspotDealId, newStage: targetStage, contactUpdated };
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error('[HubSpotDeals] Error syncing deal stage from Mindbody:', { error: error });
     return { success: false };
   }

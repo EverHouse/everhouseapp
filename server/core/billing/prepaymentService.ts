@@ -117,9 +117,9 @@ export async function createPrepaymentIntent(
       clientSecret: result.clientSecret!,
       paidInFull: false
     };
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error('[Prepayment] Failed to create prepayment intent', {
-      error: error as Error,
+      error,
       extra: { sessionId, bookingId, userEmail, totalFeeCents }
     });
     return null;

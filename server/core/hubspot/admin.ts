@@ -8,7 +8,7 @@ export async function getAllDiscountRules(): Promise<any[]> {
   try {
     const rules = await db.select().from(discountRules).orderBy(discountRules.discountPercent);
     return rules;
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error('[HubSpotDeals] Error fetching discount rules:', { error: error });
     return [];
   }
@@ -29,7 +29,7 @@ export async function updateDiscountRule(
       .where(eq(discountRules.discountTag, discountTag));
     
     return true;
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error('[HubSpotDeals] Error updating discount rule:', { error: error });
     return false;
   }
@@ -45,7 +45,7 @@ export async function getBillingAuditLog(memberEmail: string, limit: number = 50
       [memberEmail.toLowerCase(), limit]
     );
     return result.rows;
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error('[HubSpotDeals] Error fetching billing audit log:', { error: error });
     return [];
   }

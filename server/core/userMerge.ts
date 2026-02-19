@@ -647,7 +647,7 @@ export async function executeMerge(
             }
           });
         }
-      } catch (stripeErr) {
+      } catch (stripeErr: unknown) {
         logger.error('[UserMerge] Failed to update Stripe customer metadata after merge', {
           extra: { error: stripeErr, primaryUserId, secondaryUserId }
         });
@@ -733,7 +733,7 @@ export async function executeMerge(
       mergedLifetimeVisits: combinedVisits,
       secondaryArchived: true,
     };
-  } catch (error) {
+  } catch (error: unknown) {
     await client.query('ROLLBACK');
     logger.error('[UserMerge] Failed to merge users', { extra: { primaryUserId, secondaryUserId, error } });
     throw error;
@@ -917,7 +917,7 @@ export async function consolidateStripeCustomers(
         orphanedStripeCustomerId: orphanedCustomerId
       }
     });
-  } catch (stripeErr) {
+  } catch (stripeErr: unknown) {
     logger.error('[UserMerge] Failed to update Stripe metadata during consolidation', {
       extra: { error: stripeErr, keptCustomerId, orphanedCustomerId }
     });

@@ -116,7 +116,7 @@ async function findExistingStripeProduct(
     }
     
     return null;
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error('[Stripe Products] Error searching for existing product:', { error: error });
     return null;
   }
@@ -913,7 +913,7 @@ export async function ensureSimulatorOverageProduct(): Promise<{
       if (actualPrice.unit_amount && actualPrice.unit_amount > 0) {
         updateOverageRate(actualPrice.unit_amount);
       }
-    } catch (priceReadErr) {
+    } catch (priceReadErr: unknown) {
       logger.warn('[Overage Product] Failed to read Stripe price, using default:', { error: priceReadErr });
     }
 
@@ -1028,7 +1028,7 @@ export async function ensureGuestPassProduct(): Promise<{
       if (actualPrice.unit_amount && actualPrice.unit_amount > 0) {
         updateGuestFee(actualPrice.unit_amount);
       }
-    } catch (priceReadErr) {
+    } catch (priceReadErr: unknown) {
       logger.warn('[Guest Pass Product] Failed to read Stripe price, using default:', { error: priceReadErr });
     }
 

@@ -70,7 +70,7 @@ async function loadDailyStateFromDb(): Promise<void> {
         });
       }
     }
-  } catch (err) {
+  } catch (err: unknown) {
     logger.warn('[ErrorAlert] Could not load rate limits from database, using in-memory only');
     dbAvailable = false;
   }
@@ -344,7 +344,7 @@ export async function sendErrorAlert(options: AlertOptions): Promise<boolean> {
     });
     
     return true;
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error('[ErrorAlert] Failed to send alert email', {
       error: error instanceof Error ? error.message : String(error),
       extra: { event: 'error_alert.failed', type }

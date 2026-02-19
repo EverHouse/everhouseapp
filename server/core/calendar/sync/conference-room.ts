@@ -123,7 +123,7 @@ export async function getConferenceRoomBookingsFromCalendar(
     }
     
     return bookings;
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error('Error fetching conference room bookings from calendar:', { error: error });
     return [];
   }
@@ -502,7 +502,7 @@ export async function syncConferenceRoomCalendarToBookings(options?: { monthsBac
                 source: 'staff_manual',
                 createdBy: 'calendar_sync'
               });
-            } catch (sessionErr) {
+            } catch (sessionErr: unknown) {
               logger.error('[Conference Room Sync] Failed to ensure session for linked booking:', { error: sessionErr });
             }
           }
@@ -536,7 +536,7 @@ export async function syncConferenceRoomCalendarToBookings(options?: { monthsBac
                 source: 'staff_manual',
                 createdBy: 'calendar_sync'
               });
-            } catch (sessionErr) {
+            } catch (sessionErr: unknown) {
               logger.error('[Conference Room Sync] Failed to ensure session for new booking:', { error: sessionErr });
             }
           }
@@ -547,7 +547,7 @@ export async function syncConferenceRoomCalendarToBookings(options?: { monthsBac
     const synced = linked + created;
     logger.info(`[Conference Room Sync] Synced ${synced} events (linked: ${linked}, created: ${created}, skipped: ${skipped})`);
     return { synced, linked, created, skipped };
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error('Error syncing conference room calendar to bookings:', { error: error });
     return { synced: 0, linked: 0, created: 0, skipped: 0, error: String(error) };
   }

@@ -65,8 +65,8 @@ export async function checkUnifiedAvailability(
     }
     
     return { available: true };
-  } catch (error) {
-    logger.error('[checkUnifiedAvailability] Error:', { error: error as Error });
+  } catch (error: unknown) {
+    logger.error('[checkUnifiedAvailability] Error:', { error });
     throw error;
   }
 }
@@ -115,8 +115,8 @@ async function checkSessionConflict(
     }
     
     return { hasConflict: false };
-  } catch (error) {
-    logger.error('[checkSessionConflict] Error:', { error: error as Error });
+  } catch (error: unknown) {
+    logger.error('[checkSessionConflict] Error:', { error });
     throw error;
   }
 }
@@ -168,7 +168,7 @@ export async function checkSessionConflictWithLock(
         conflictDetails: undefined
       };
     }
-    logger.error('[checkSessionConflictWithLock] Error:', { error: error as Error });
+    logger.error('[checkSessionConflictWithLock] Error:', { error });
     throw error;
   }
 }
@@ -211,8 +211,8 @@ export async function checkUnifiedAvailabilityWithLock(
     }
     
     return { available: true };
-  } catch (error) {
-    logger.error('[checkUnifiedAvailabilityWithLock] Error:', { error: error as Error });
+  } catch (error: unknown) {
+    logger.error('[checkUnifiedAvailabilityWithLock] Error:', { error });
     throw error;
   }
 }
@@ -283,8 +283,8 @@ export async function getAvailableSlots(
     }
     
     return availableSlots;
-  } catch (error) {
-    logger.error('[getAvailableSlots] Error:', { error: error as Error });
+  } catch (error: unknown) {
+    logger.error('[getAvailableSlots] Error:', { error });
     return [];
   }
 }
@@ -320,8 +320,8 @@ export async function isResourceAvailableForDate(
     }
     
     return true;
-  } catch (error) {
-    logger.error('[isResourceAvailableForDate] Error:', { error: error as Error });
+  } catch (error: unknown) {
+    logger.error('[isResourceAvailableForDate] Error:', { error });
     return true;
   }
 }

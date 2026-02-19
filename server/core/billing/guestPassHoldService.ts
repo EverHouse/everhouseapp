@@ -2,6 +2,7 @@ import { pool } from '../db';
 import { PoolClient } from 'pg';
 
 import { logger } from '../logger';
+import { getErrorMessage } from '../../utils/errorUtils';
 export interface GuestPassHoldResult {
   success: boolean;
   error?: string;
@@ -124,14 +125,14 @@ export async function createGuestPassHold(
       passesHeld: passesToHold,
       passesAvailable: available - passesToHold
     };
-  } catch (error) {
+  } catch (error: unknown) {
     if (manageTransaction) {
       await client.query('ROLLBACK');
     }
     logger.error('[GuestPassHoldService] Error creating hold:', { error: error });
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Unknown error creating guest pass hold'
+      error: getErrorMessage(error)
     };
   } finally {
     if (!externalClient) {
@@ -155,7 +156,7 @@ export async function releaseGuestPassHold(
     logger.info(`[GuestPassHoldService] Released ${passesReleased} guest pass holds for booking ${bookingId}`);
     
     return { success: true, passesReleased };
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error('[GuestPassHoldService] Error releasing hold:', { error: error });
     return { success: false, passesReleased: 0 };
   } finally {
@@ -205,7 +206,7 @@ export async function convertHoldToUsage(
     
     logger.info(`[GuestPassHoldService] Converted ${passesToConvert} held passes to usage for booking ${bookingId}`);
     return { success: true, passesConverted: passesToConvert };
-  } catch (error) {
+  } catch (error: unknown) {
     await client.query('ROLLBACK');
     logger.error('[GuestPassHoldService] Error converting hold:', { error: error });
     return { success: false, passesConverted: 0 };

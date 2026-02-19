@@ -156,7 +156,7 @@ export async function removeLineItemFromDeal(
     
     if (!isProduction) logger.info(`[HubSpotDeals] Removed line item ${lineItemId}`);
     return true;
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error('[HubSpotDeals] Error removing line item:', { error: error });
     return false;
   }
@@ -181,7 +181,7 @@ export async function getMemberDealWithLineItems(memberEmail: string): Promise<R
       ...deal[0],
       lineItems
     };
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error('[HubSpotDeals] Error fetching member deal:', { error: error });
     return null;
   }

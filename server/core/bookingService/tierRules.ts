@@ -71,8 +71,8 @@ export async function validateTierWindowAndBalance(
       includedMinutes: result.includedMinutes,
       tier
     };
-  } catch (error) {
-    logger.error('[validateTierWindowAndBalance] Error:', { error: error as Error });
+  } catch (error: unknown) {
+    logger.error('[validateTierWindowAndBalance] Error:', { error });
     throw error;
   }
 }
@@ -111,8 +111,8 @@ export async function getRemainingMinutes(
     const bookedMinutes = await getDailyBookedMinutes(memberEmail, targetDate, resourceType || 'simulator');
     
     return Math.max(0, dailyLimit - bookedMinutes);
-  } catch (error) {
-    logger.error('[getRemainingMinutes] Error:', { error: error as Error });
+  } catch (error: unknown) {
+    logger.error('[getRemainingMinutes] Error:', { error });
     return 0;
   }
 }
@@ -145,8 +145,8 @@ export async function enforceSocialTierRules(
     
     // Social hosts CAN have other members in their booking
     return { allowed: true };
-  } catch (error) {
-    logger.error('[enforceSocialTierRules] Error:', { error: error as Error });
+  } catch (error: unknown) {
+    logger.error('[enforceSocialTierRules] Error:', { error });
     return { allowed: true };
   }
 }
@@ -190,8 +190,8 @@ export async function getGuestPassesRemaining(memberEmail: string): Promise<numb
     const usedPasses = parseInt(result.rows[0]?.guest_count || '0');
     
     return Math.max(0, limits.guest_passes_per_month - usedPasses);
-  } catch (error) {
-    logger.error('[getGuestPassesRemaining] Error:', { error: error as Error });
+  } catch (error: unknown) {
+    logger.error('[getGuestPassesRemaining] Error:', { error });
     return 0;
   }
 }

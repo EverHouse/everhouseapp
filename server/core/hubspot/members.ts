@@ -71,7 +71,7 @@ export async function getContactDeals(hubspotContactId: string): Promise<HubSpot
     );
     
     return deals;
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error('[HubSpotDeals] Error fetching contact deals:', { error: error });
     return [];
   }
@@ -535,7 +535,7 @@ export async function syncNewMemberToHubSpot(input: AddMemberInput): Promise<voi
     try {
       const hubspot = await getHubSpotClient();
       await hubspot.crm.deals.basicApi.archive(dealId);
-    } catch (rollbackError) {
+    } catch (rollbackError: unknown) {
       logger.error('[SyncMember] Failed to rollback deal creation:', { error: rollbackError });
     }
     throw new Error('Failed to add line item to deal');
@@ -671,7 +671,7 @@ export async function createMemberWithDeal(input: AddMemberInput): Promise<AddMe
       try {
         const hubspot = await getHubSpotClient();
         await hubspot.crm.deals.basicApi.archive(dealId);
-      } catch (rollbackError) {
+      } catch (rollbackError: unknown) {
         logger.error('[AddMember] Failed to rollback deal creation:', { error: rollbackError });
       }
       return { success: false, error: 'Failed to add line item to deal' };
@@ -804,7 +804,7 @@ export async function getMemberPaymentStatus(email: string): Promise<{
       .where(eq(hubspotDeals.id, cachedDeal.id));
     
     return { status };
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error('[HubSpotDeals] Error getting payment status:', { error: error });
     return { status: 'unknown' };
   }
@@ -928,7 +928,7 @@ export async function handleTierChange(
             }
           })
         );
-      } catch (dealUpdateError) {
+      } catch (dealUpdateError: unknown) {
         logger.warn('[HubSpotDeals] Failed to update deal membership_tier property:', { error: dealUpdateError });
       }
       
@@ -942,7 +942,7 @@ export async function handleTierChange(
               }
             })
           );
-        } catch (contactUpdateError) {
+        } catch (contactUpdateError: unknown) {
           logger.warn('[HubSpotDeals] Failed to update contact membership_tier property:', { error: contactUpdateError });
         }
       }
@@ -1072,11 +1072,11 @@ export async function syncTierToHubSpot(params: {
           })
         );
         logger.info(`[HubSpot TierSync] Updated deal ${dealResult[0].hubspotDealId} tier to "${hubspotTier}"`);
-      } catch (dealError) {
+      } catch (dealError: unknown) {
         logger.warn(`[HubSpot TierSync] Failed to update deal tier for ${normalizedEmail}:`, { error: dealError });
       }
     }
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error(`[HubSpot TierSync] Failed to sync tier for ${normalizedEmail}:`, { error: error });
     throw error;
   }

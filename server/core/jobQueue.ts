@@ -281,7 +281,7 @@ export function startJobProcessor(intervalMs: number = 5000): void {
     try {
       await processJobs();
       schedulerTracker.recordRun('Job Queue Processor', true);
-    } catch (error) {
+    } catch (error: unknown) {
       logger.error('[JobQueue] Processing error:', { error: error });
       schedulerTracker.recordRun('Job Queue Processor', false, String(error));
     }

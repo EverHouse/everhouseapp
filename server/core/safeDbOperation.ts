@@ -10,7 +10,7 @@ export async function safeDbOperation<T>(
 ): Promise<T> {
   try {
     return await callback();
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error(`[safeDbOperation] ${label}:`, { error: error });
     if (critical) {
       await alertOnScheduledTaskFailure(label, error instanceof Error ? error : String(error));
@@ -30,7 +30,7 @@ export async function safeDbTransaction<T>(
     const result = await callback(client);
     await client.query('COMMIT');
     return result;
-  } catch (error) {
+  } catch (error: unknown) {
     try {
       await client.query('ROLLBACK');
     } catch {

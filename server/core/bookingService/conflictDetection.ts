@@ -220,9 +220,9 @@ export async function findConflictingBookings(
       hasConflict: conflicts.length > 0,
       conflicts
     };
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error('[conflictDetection] Error checking conflicts', {
-      error: error as Error,
+      error,
       extra: { memberEmail, date, startTime, endTime }
     });
     throw error;

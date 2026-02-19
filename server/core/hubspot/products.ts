@@ -27,7 +27,7 @@ export async function getProductMapping(tierName?: string, productType?: string)
     }
     
     return null;
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error('[HubSpotDeals] Error getting product mapping:', { error: error });
     return null;
   }
@@ -37,7 +37,7 @@ export async function getAllProductMappings(): Promise<any[]> {
   try {
     const products = await db.select().from(hubspotProductMappings).orderBy(hubspotProductMappings.productType);
     return products;
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error('[HubSpotDeals] Error fetching product mappings:', { error: error });
     return [];
   }

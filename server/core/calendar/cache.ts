@@ -44,7 +44,7 @@ export async function discoverCalendarIds(forceRefresh: boolean = false): Promis
       logger.info(`[Calendar] Discovered ${calendars.length} calendars`);
       calendarDiscoveryLogged = true;
     }
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error('[Calendar] Error discovering calendars:', { error: error });
   }
 }

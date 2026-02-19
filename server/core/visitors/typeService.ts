@@ -83,7 +83,7 @@ export async function updateVisitorType({
     }
     
     return false;
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error('[VisitorType] Error updating visitor type:', { error: error });
     return false;
   }
@@ -157,7 +157,7 @@ export async function updateVisitorTypeByUserId(
     }
     
     return false;
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error('[VisitorType] Error updating visitor type by ID:', { error: error });
     return false;
   }
@@ -242,7 +242,7 @@ export async function calculateVisitorTypeFromHistory(email: string): Promise<Vi
     }
     
     return purchaseType || null;
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error('[VisitorType] Error calculating visitor type from history:', { error: error });
     return null;
   }

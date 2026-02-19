@@ -684,7 +684,7 @@ export async function addGroupMember(params: {
         params.firstName || '',
         params.lastName || '',
         params.phone
-      ).catch((err) => {
+      ).catch((err: unknown) => {
         logger.error('[GroupBilling] Background HubSpot sync for sub-member failed:', { error: err });
       });
       
@@ -1017,7 +1017,7 @@ export async function addCorporateMember(params: {
         params.firstName || '',
         params.lastName || '',
         params.phone
-      ).catch((err) => {
+      ).catch((err: unknown) => {
         logger.error('[GroupBilling] Background HubSpot sync for sub-member failed:', { error: err });
       });
       
@@ -1786,7 +1786,7 @@ export async function handlePrimarySubscriptionCancelled(subscriptionId: string)
           await syncMemberToHubSpot({ email: subEmail, status: 'cancelled', billingProvider: 'stripe', billingGroupRole: 'Sub-member' });
         }
         logger.info(`[GroupBilling] Synced ${emailsToDeactivate.length} cancelled sub-members to HubSpot`);
-      } catch (hubspotErr) {
+      } catch (hubspotErr: unknown) {
         logger.error('[GroupBilling] HubSpot sync failed for cancelled sub-members:', { error: hubspotErr });
       }
     }
@@ -1798,7 +1798,7 @@ export async function handlePrimarySubscriptionCancelled(subscriptionId: string)
 
     logger.info(`[GroupBilling] Successfully deactivated group ${groupId} and ${emailsToDeactivate.length} members`);
 
-  } catch (err) {
+  } catch (err: unknown) {
     logger.error('[GroupBilling] Error handling primary subscription cancellation:', { error: err });
     throw err; // Re-throw to ensure webhook retries if this fails
   }

@@ -287,7 +287,7 @@ export async function createInvoiceWithLineItems(params: CreatePOSInvoiceParams)
       clientSecret: paymentIntent.client_secret!,
       status: paymentIntent.status,
     };
-  } catch (error) {
+  } catch (error: unknown) {
     try {
       const currentInvoice = await stripe.invoices.retrieve(invoice.id);
       if (currentInvoice.status === 'draft') {

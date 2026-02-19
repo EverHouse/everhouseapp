@@ -163,7 +163,7 @@ async function executeDeferredActions(actions: DeferredAction[]): Promise<void> 
   for (const action of actions) {
     try {
       await action();
-    } catch (err) {
+    } catch (err: unknown) {
       logger.error('[Stripe Webhook] Deferred action failed (non-critical):', { error: err });
     }
   }
@@ -204,7 +204,7 @@ export async function upsertTransactionCache(params: CacheTransactionParams): Pr
          metadata = COALESCE(EXCLUDED.metadata, stripe_transaction_cache.metadata),
          updated_at = NOW()`
     );
-  } catch (err) {
+  } catch (err: unknown) {
     logger.error('[Stripe Cache] Error upserting transaction cache:', { error: err });
   }
 }
@@ -217,7 +217,7 @@ async function cleanupOldProcessedEvents(): Promise<void> {
     if (result.length > 0) {
       logger.info(`[Stripe Webhook] Cleaned up ${result.length} old processed events (>${EVENT_DEDUP_WINDOW_DAYS} days)`);
     }
-  } catch (err) {
+  } catch (err: unknown) {
     logger.error('[Stripe Webhook] Error cleaning up old events:', { error: err });
   }
 }
@@ -328,8 +328,8 @@ export async function processStripeWebhook(
 
     await executeDeferredActions(deferredActions);
 
-    cleanupOldProcessedEvents().catch(err => logger.warn('[Stripe Webhook] Cleanup failed:', { error: (err as Error).message }));
-  } catch (handlerError) {
+    cleanupOldProcessedEvents().catch((err: unknown) => logger.warn('[Stripe Webhook] Cleanup failed:', { error: getErrorMessage(err) }));
+  } catch (handlerError: unknown) {
     await client.query('ROLLBACK');
     logger.error(`[Stripe Webhook] Handler failed for ${event.type} (${event.id}), rolled back:`, { error: handlerError });
     throw handlerError;
@@ -436,7 +436,7 @@ export async function replayStripeEvent(
     await executeDeferredActions(deferredActions);
 
     return { success: true, eventType: event.type, message: `Successfully replayed event ${event.id} (${event.type})` };
-  } catch (handlerError) {
+  } catch (handlerError: unknown) {
     await client.query('ROLLBACK');
     logger.error(`[Stripe Webhook Replay] Handler failed for ${event.type} (${event.id}), rolled back:`, { error: handlerError });
     throw handlerError;
@@ -494,7 +494,7 @@ async function handleCreditNoteCreated(client: PoolClient, creditNote: Stripe.Cr
               'payment'
             ]
           );
-        } catch (err) {
+        } catch (err: unknown) {
           logger.error('[Stripe Webhook] Failed to create credit note notification:', { error: err });
         }
       });
@@ -951,7 +951,7 @@ async function handlePaymentIntentSucceeded(client: PoolClient, paymentIntent: S
         // Don't reject payment but log for investigation
         // The payment already succeeded via Stripe, so we handle this gracefully
       }
-    } catch (verifyError) {
+    } catch (verifyError: unknown) {
       logger.warn(`[Stripe Webhook] Could not verify fee breakdown for session ${snapshot.session_id}:`, { error: verifyError });
       // Continue processing - verification is non-blocking
     }
@@ -1042,7 +1042,7 @@ async function handlePaymentIntentSucceeded(client: PoolClient, paymentIntent: S
     let clientFees: ParticipantFee[];
     try {
       clientFees = JSON.parse(metadata.participantFees);
-    } catch (parseErr) {
+    } catch (parseErr: unknown) {
       logger.error(`[Stripe Webhook] Failed to parse participantFees metadata for PI ${id} - marking for review`, { error: parseErr });
       await client.query(
         `INSERT INTO audit_log (action, resource_type, resource_id, details, created_at)
@@ -1404,7 +1404,7 @@ async function handlePaymentIntentFailed(client: PoolClient, paymentIntent: Stri
           requires_card_update: requiresCardUpdate
         }
       });
-    } catch (alertErr) {
+    } catch (alertErr: unknown) {
       logger.error('[Stripe Webhook] Error alert send failed (non-blocking):', { error: alertErr });
     }
   });
@@ -1463,7 +1463,7 @@ async function handlePaymentIntentFailed(client: PoolClient, paymentIntent: Stri
       });
 
       logger.info(`[Stripe Webhook] Staff notified about payment failure for ${email}`);
-    } catch (error) {
+    } catch (error: unknown) {
       logger.error('[Stripe Webhook] Error sending payment failed notifications:', { error: error });
     }
   });
@@ -1651,7 +1651,7 @@ async function handleInvoicePaymentSucceeded(client: PoolClient, invoice: Invoic
         purpose: 'membership_renewal',
       });
       logger.info(`[Stripe Webhook] Queued invoice payment HubSpot sync for ${localEmail}`);
-    } catch (hubspotError) {
+    } catch (hubspotError: unknown) {
       logger.error('[Stripe Webhook] Failed to queue HubSpot sync for invoice payment:', { error: hubspotError });
     }
   });
@@ -1758,7 +1758,7 @@ async function handleInvoicePaymentFailed(client: PoolClient, invoice: InvoiceWi
       logger.info(`[Stripe Webhook] Skipping grace period for ${email} — subscription ${typeof invoice.subscription === 'string' ? invoice.subscription : invoice.subscription?.id} is ${subscription.status}`);
       return deferredActions;
     }
-  } catch (stripeErr) {
+  } catch (stripeErr: unknown) {
     logger.warn(`[Stripe Webhook] Could not verify subscription ${typeof invoice.subscription === 'string' ? invoice.subscription : invoice.subscription?.id} status, continuing with grace period logic:`, { error: stripeErr });
   }
 
@@ -1820,7 +1820,7 @@ async function handleInvoicePaymentFailed(client: PoolClient, invoice: InvoiceWi
       const { syncMemberToHubSpot } = await import('../hubspot/stages');
       await syncMemberToHubSpot({ email: localEmail, status: 'past_due', billingProvider: 'stripe', billingGroupRole: 'Primary' });
       logger.info(`[Stripe Webhook] Synced ${localEmail} payment failure status to HubSpot`);
-    } catch (hubspotError) {
+    } catch (hubspotError: unknown) {
       logger.error('[Stripe Webhook] HubSpot sync failed for payment failure:', { error: hubspotError });
     }
   });
@@ -1876,7 +1876,7 @@ async function handleInvoicePaymentFailed(client: PoolClient, invoice: InvoiceWi
         },
         userEmail: localEmail,
       });
-    } catch (alertErr) {
+    } catch (alertErr: unknown) {
       logger.warn('[Stripe Webhook] Failed to send error alert for payment failure:', { error: alertErr });
     }
   });
@@ -2109,7 +2109,7 @@ async function handleCheckoutSessionCompleted(client: PoolClient, session: Strip
         } else if (!companyResult.success) {
           logger.error(`[Stripe Webhook] Company sync failed: ${companyResult.error}`);
         }
-      } catch (companyError) {
+      } catch (companyError: unknown) {
         logger.error('[Stripe Webhook] Error syncing company to HubSpot:', { error: companyError });
       }
     }
@@ -2160,7 +2160,7 @@ async function handleCheckoutSessionCompleted(client: PoolClient, session: Strip
                   userInfo.rows[0].phone || undefined
                 );
               }
-            } catch (contactErr) {
+            } catch (contactErr: unknown) {
               logger.error('[Stripe Webhook] HubSpot contact sync failed for activation link:', { error: contactErr });
             }
 
@@ -2174,7 +2174,7 @@ async function handleCheckoutSessionCompleted(client: PoolClient, session: Strip
                 memberSince: new Date(),
                 billingGroupRole: 'Primary',
               });
-            } catch (hubspotError) {
+            } catch (hubspotError: unknown) {
               logger.error('[Stripe Webhook] HubSpot sync failed for activation link checkout:', { error: hubspotError });
             }
           } else {
@@ -2222,7 +2222,7 @@ async function handleCheckoutSessionCompleted(client: PoolClient, session: Strip
           const { syncMemberToHubSpot } = await import('../hubspot/stages');
           await syncMemberToHubSpot({ email: resolved.primaryEmail, status: 'active', billingProvider: 'stripe', memberSince: new Date(), billingGroupRole: 'Primary' });
           logger.info(`[Stripe Webhook] Synced existing user ${resolved.primaryEmail} to HubSpot`);
-        } catch (hubspotError) {
+        } catch (hubspotError: unknown) {
           logger.error('[Stripe Webhook] HubSpot sync failed for existing user:', { error: hubspotError });
         }
       } else {
@@ -2249,7 +2249,7 @@ async function handleCheckoutSessionCompleted(client: PoolClient, session: Strip
             const { syncMemberToHubSpot } = await import('../hubspot/stages');
             await syncMemberToHubSpot({ email, status: 'active', billingProvider: 'stripe', memberSince: new Date(), billingGroupRole: 'Primary' });
             logger.info(`[Stripe Webhook] Synced existing user ${email} to HubSpot`);
-          } catch (hubspotError) {
+          } catch (hubspotError: unknown) {
             logger.error('[Stripe Webhook] HubSpot sync failed for existing user:', { error: hubspotError });
           }
         } else {
@@ -2304,7 +2304,7 @@ async function handleCheckoutSessionCompleted(client: PoolClient, session: Strip
           if (!(stripeCustomer as Stripe.DeletedCustomer).deleted) {
             customerPhone = (stripeCustomer as Stripe.Customer).phone || undefined;
           }
-        } catch (phoneErr) {
+        } catch (phoneErr: unknown) {
           // Non-blocking
         }
         
@@ -2325,7 +2325,7 @@ async function handleCheckoutSessionCompleted(client: PoolClient, session: Strip
           billingGroupRole: 'Primary',
         });
         logger.info(`[Stripe Webhook] Synced ${email} to HubSpot: status=active, tier=${tierName}, billing=stripe, memberSince=now`);
-      } catch (hubspotError) {
+      } catch (hubspotError: unknown) {
         logger.error('[Stripe Webhook] HubSpot sync failed for staff invite:', { error: hubspotError });
       }
       
@@ -2335,7 +2335,7 @@ async function handleCheckoutSessionCompleted(client: PoolClient, session: Strip
           [email]
         );
         logger.info(`[Stripe Webhook] Marked membership application as converted for ${email}`);
-      } catch (convErr) {
+      } catch (convErr: unknown) {
         logger.error('[Stripe Webhook] Failed to mark application as converted:', { error: convErr });
       }
       
@@ -2413,7 +2413,7 @@ async function handleCheckoutSessionCompleted(client: PoolClient, session: Strip
         purchaseDate: new Date()
       });
       logger.info(`[Stripe Webhook] QR pass email sent to ${email}`);
-    } catch (emailError) {
+    } catch (emailError: unknown) {
       logger.error('[Stripe Webhook] Failed to send QR pass email:', { error: emailError });
     }
 
@@ -2438,10 +2438,10 @@ async function handleCheckoutSessionCompleted(client: PoolClient, session: Strip
         paymentIntentId,
         purchaseId: result.purchaseId
       });
-    } catch (hubspotError) {
+    } catch (hubspotError: unknown) {
       logger.error('[Stripe Webhook] Failed to queue HubSpot sync for day pass:', { error: hubspotError });
     }
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error('[Stripe Webhook] Error handling checkout session completed:', { error: error });
     throw error;
   }
@@ -2828,7 +2828,7 @@ async function handleSubscriptionCreated(client: PoolClient, subscription: Strip
                 billingGroupRole: 'Primary',
               });
               logger.info(`[Stripe Webhook] Synced existing user ${email} to HubSpot: tier=${tierName}, status=${subscription.status}, billing=stripe, memberSince=now`);
-            } catch (hubspotError) {
+            } catch (hubspotError: unknown) {
               logger.error('[Stripe Webhook] HubSpot sync failed for existing user subscription:', { error: hubspotError });
             }
             
@@ -2852,7 +2852,7 @@ async function handleSubscriptionCreated(client: PoolClient, subscription: Strip
                 } else {
                   logger.warn(`[Stripe Webhook] Failed to auto-create corporate billing group: ${groupResult.error}`);
                 }
-              } catch (groupError) {
+              } catch (groupError: unknown) {
                 logger.error('[Stripe Webhook] Error auto-creating corporate billing group:', { error: groupError });
               }
             }
@@ -2870,10 +2870,10 @@ async function handleSubscriptionCreated(client: PoolClient, subscription: Strip
             if (dealUpdateResult.rowCount && dealUpdateResult.rowCount > 0) {
               logger.info(`[Stripe Webhook] User activation: ${email} HubSpot deal updated to current payment status`);
             }
-          } catch (hubspotError) {
+          } catch (hubspotError: unknown) {
             logger.error('[Stripe Webhook] Error updating HubSpot deal:', { error: hubspotError });
           }
-      } catch (tierActivationError) {
+      } catch (tierActivationError: unknown) {
         logger.error('[Stripe Webhook] Error during tier activation:', { error: tierActivationError });
       }
     } else {
@@ -2926,7 +2926,7 @@ async function handleSubscriptionCreated(client: PoolClient, subscription: Strip
                           billingGroupRole: 'Primary',
                         });
                         logger.info(`[Stripe Webhook] Synced ${email} to HubSpot: tier=${tierName}, status=${subscription.status}, billing=stripe, memberSince=now`);
-                      } catch (hubspotError) {
+                      } catch (hubspotError: unknown) {
                         logger.error('[Stripe Webhook] HubSpot sync failed for product name match:', { error: hubspotError });
                       }
                     }
@@ -2934,7 +2934,7 @@ async function handleSubscriptionCreated(client: PoolClient, subscription: Strip
                   }
                 }
               }
-        } catch (productError) {
+        } catch (productError: unknown) {
           logger.error('[Stripe Webhook] Error fetching product for name match:', { error: productError });
         }
       } else {
@@ -2967,7 +2967,7 @@ async function handleSubscriptionCreated(client: PoolClient, subscription: Strip
         queryParams
       );
       logger.info(`[Stripe Webhook] Cleared grace period and set billing_provider for ${email}`);
-    } catch (gracePeriodError) {
+    } catch (gracePeriodError: unknown) {
       logger.error('[Stripe Webhook] Error clearing grace period:', { error: gracePeriodError });
     }
 
@@ -2989,7 +2989,7 @@ async function handleSubscriptionCreated(client: PoolClient, subscription: Strip
               couponCode
             });
             logger.info(`[Stripe Webhook] Trial welcome QR email sent to ${email}`);
-          } catch (emailError) {
+          } catch (emailError: unknown) {
             logger.error(`[Stripe Webhook] Failed to send trial welcome email to ${email}:`, { error: emailError });
           }
         });
@@ -2997,7 +2997,7 @@ async function handleSubscriptionCreated(client: PoolClient, subscription: Strip
     }
 
     logger.info(`[Stripe Webhook] New subscription created for ${memberName} (${email}): ${planName}`);
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error('[Stripe Webhook] Error handling subscription created:', { error: error });
     throw error;
   }
@@ -3031,8 +3031,8 @@ async function handleSubscriptionUpdated(client: PoolClient, subscription: Strip
           currentItems,
           previousItems,
         );
-      } catch (itemsErr) {
-        logger.error('[Stripe Webhook] handleSubscriptionItemsChanged failed (non-fatal):', { error: (itemsErr as Error).message });
+      } catch (itemsErr: unknown) {
+        logger.error('[Stripe Webhook] handleSubscriptionItemsChanged failed (non-fatal):', { error: getErrorMessage(itemsErr) });
       }
     }
 
@@ -3090,7 +3090,7 @@ async function handleSubscriptionUpdated(client: PoolClient, subscription: Strip
                 }
               }
             }
-          } catch (productError) {
+          } catch (productError: unknown) {
             logger.error('[Stripe Webhook] Error fetching product for name match:', { error: productError });
           }
         }
@@ -3145,8 +3145,8 @@ async function handleSubscriptionUpdated(client: PoolClient, subscription: Strip
             message: `Your membership has been changed to ${newTierName}.`,
             type: 'system',
           });
-        } catch (notifyErr) {
-          logger.error('[Stripe Webhook] Notification failed (non-fatal):', { error: (notifyErr as Error).message });
+        } catch (notifyErr: unknown) {
+          logger.error('[Stripe Webhook] Notification failed (non-fatal):', { error: getErrorMessage(notifyErr) });
         }
       }
     }
@@ -3170,8 +3170,8 @@ async function handleSubscriptionUpdated(client: PoolClient, subscription: Strip
             'member_status_change',
             { sendPush: true, url: '/admin/members' }
           );
-        } catch (notifyErr) {
-          logger.error('[Stripe Webhook] Notification failed (non-fatal):', { error: (notifyErr as Error).message });
+        } catch (notifyErr: unknown) {
+          logger.error('[Stripe Webhook] Notification failed (non-fatal):', { error: getErrorMessage(notifyErr) });
         }
       }
       
@@ -3223,13 +3223,13 @@ async function handleSubscriptionUpdated(client: PoolClient, subscription: Strip
                   await syncMemberToHubSpot({ email: subEmail, status: 'active', billingProvider: 'stripe', billingGroupRole: 'Sub-member' });
                 }
                 logger.info(`[Stripe Webhook] Synced ${reactivatedEmails.length} reactivated sub-members to HubSpot`);
-              } catch (hubspotErr) {
+              } catch (hubspotErr: unknown) {
                 logger.error('[Stripe Webhook] HubSpot sync failed for reactivated sub-members:', { error: hubspotErr });
               }
             });
           }
         }
-      } catch (groupErr) {
+      } catch (groupErr: unknown) {
         logger.error('[Stripe Webhook] Error reactivating sub-members:', { error: groupErr });
       }
       
@@ -3238,7 +3238,7 @@ async function handleSubscriptionUpdated(client: PoolClient, subscription: Strip
         const { syncMemberToHubSpot } = await import('../hubspot/stages');
         await syncMemberToHubSpot({ email, status: 'active', billingProvider: 'stripe', billingGroupRole: 'Primary' });
         logger.info(`[Stripe Webhook] Synced ${email} status=active to HubSpot`);
-      } catch (hubspotError) {
+      } catch (hubspotError: unknown) {
         logger.error('[Stripe Webhook] HubSpot sync failed for status active:', { error: hubspotError });
       }
     } else if (status === 'past_due') {
@@ -3253,8 +3253,8 @@ async function handleSubscriptionUpdated(client: PoolClient, subscription: Strip
           message: 'Your membership payment is past due. Please update your payment method to avoid service interruption.',
           type: 'membership_past_due',
         }, { sendPush: true });
-      } catch (notifyErr) {
-        logger.error('[Stripe Webhook] Notification failed (non-fatal):', { error: (notifyErr as Error).message });
+      } catch (notifyErr: unknown) {
+        logger.error('[Stripe Webhook] Notification failed (non-fatal):', { error: getErrorMessage(notifyErr) });
       }
 
       try {
@@ -3264,8 +3264,8 @@ async function handleSubscriptionUpdated(client: PoolClient, subscription: Strip
           'membership_past_due',
           { sendPush: true, sendWebSocket: true }
         );
-      } catch (notifyErr) {
-        logger.error('[Stripe Webhook] Notification failed (non-fatal):', { error: (notifyErr as Error).message });
+      } catch (notifyErr: unknown) {
+        logger.error('[Stripe Webhook] Notification failed (non-fatal):', { error: getErrorMessage(notifyErr) });
       }
 
       logger.info(`[Stripe Webhook] Past due notification sent to ${email}`);
@@ -3318,13 +3318,13 @@ async function handleSubscriptionUpdated(client: PoolClient, subscription: Strip
                   await syncMemberToHubSpot({ email: subEmail, status: 'past_due', billingProvider: 'stripe', billingGroupRole: 'Sub-member' });
                 }
                 logger.info(`[Stripe Webhook] Synced ${pastDueEmails.length} past_due sub-members to HubSpot`);
-              } catch (hubspotErr) {
+              } catch (hubspotErr: unknown) {
                 logger.error('[Stripe Webhook] HubSpot sync failed for past_due sub-members:', { error: hubspotErr });
               }
             });
           }
         }
-      } catch (groupErr) {
+      } catch (groupErr: unknown) {
         logger.error('[Stripe Webhook] Error propagating past_due to sub-members:', { error: groupErr });
       }
       
@@ -3333,7 +3333,7 @@ async function handleSubscriptionUpdated(client: PoolClient, subscription: Strip
         const { syncMemberToHubSpot } = await import('../hubspot/stages');
         await syncMemberToHubSpot({ email, status: 'past_due', billingProvider: 'stripe', billingGroupRole: 'Primary' });
         logger.info(`[Stripe Webhook] Synced ${email} status=past_due to HubSpot`);
-      } catch (hubspotError) {
+      } catch (hubspotError: unknown) {
         logger.error('[Stripe Webhook] HubSpot sync failed for status past_due:', { error: hubspotError });
       }
     } else if (status === 'canceled') {
@@ -3350,8 +3350,8 @@ async function handleSubscriptionUpdated(client: PoolClient, subscription: Strip
           message: 'Your membership is unpaid. Please update your payment method to restore access.',
           type: 'membership_past_due',
         }, { sendPush: true });
-      } catch (notifyErr) {
-        logger.error('[Stripe Webhook] Notification failed (non-fatal):', { error: (notifyErr as Error).message });
+      } catch (notifyErr: unknown) {
+        logger.error('[Stripe Webhook] Notification failed (non-fatal):', { error: getErrorMessage(notifyErr) });
       }
 
       try {
@@ -3361,8 +3361,8 @@ async function handleSubscriptionUpdated(client: PoolClient, subscription: Strip
           'membership_past_due',
           { sendPush: true, sendWebSocket: true }
         );
-      } catch (notifyErr) {
-        logger.error('[Stripe Webhook] Notification failed (non-fatal):', { error: (notifyErr as Error).message });
+      } catch (notifyErr: unknown) {
+        logger.error('[Stripe Webhook] Notification failed (non-fatal):', { error: getErrorMessage(notifyErr) });
       }
 
       logger.info(`[Stripe Webhook] Unpaid notification sent to ${email}`);
@@ -3415,13 +3415,13 @@ async function handleSubscriptionUpdated(client: PoolClient, subscription: Strip
                   await syncMemberToHubSpot({ email: subEmail, status: 'suspended', billingProvider: 'stripe', billingGroupRole: 'Sub-member' });
                 }
                 logger.info(`[Stripe Webhook] Synced ${suspendedEmails.length} suspended sub-members to HubSpot`);
-              } catch (hubspotErr) {
+              } catch (hubspotErr: unknown) {
                 logger.error('[Stripe Webhook] HubSpot sync failed for suspended sub-members:', { error: hubspotErr });
               }
             });
           }
         }
-      } catch (groupErr) {
+      } catch (groupErr: unknown) {
         logger.error('[Stripe Webhook] Error propagating suspension to sub-members:', { error: groupErr });
       }
       
@@ -3430,7 +3430,7 @@ async function handleSubscriptionUpdated(client: PoolClient, subscription: Strip
         const { syncMemberToHubSpot } = await import('../hubspot/stages');
         await syncMemberToHubSpot({ email, status: 'suspended', billingProvider: 'stripe', billingGroupRole: 'Primary' });
         logger.info(`[Stripe Webhook] Synced ${email} status=suspended to HubSpot`);
-      } catch (hubspotError) {
+      } catch (hubspotError: unknown) {
         logger.error('[Stripe Webhook] HubSpot sync failed for status suspended:', { error: hubspotError });
       }
     }
@@ -3443,7 +3443,7 @@ async function handleSubscriptionUpdated(client: PoolClient, subscription: Strip
     });
 
     logger.info(`[Stripe Webhook] Subscription status changed to '${status}' for ${memberName} (${email})`);
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error('[Stripe Webhook] Error handling subscription updated:', { error: error });
     throw error;
   }
@@ -3643,7 +3643,7 @@ async function handleSubscriptionDeleted(client: PoolClient, subscription: Strip
     // This ensures sub-members lose access when primary cancels
     try {
       await handlePrimarySubscriptionCancelled(subscriptionId);
-    } catch (groupErr) {
+    } catch (groupErr: unknown) {
       logger.error('[Stripe Webhook] Error in handlePrimarySubscriptionCancelled:', { error: groupErr });
       // Don't throw - continue to process other cancellation logic
     }
@@ -3691,7 +3691,7 @@ async function handleSubscriptionDeleted(client: PoolClient, subscription: Strip
         const { syncMemberToHubSpot } = await import('../hubspot/stages');
         await syncMemberToHubSpot({ email, status: 'paused', billingProvider: 'stripe', billingGroupRole: 'Primary' });
         logger.info(`[Stripe Webhook] Synced ${email} status=paused to HubSpot`);
-      } catch (hubspotError) {
+      } catch (hubspotError: unknown) {
         logger.error('[Stripe Webhook] HubSpot sync failed for status paused:', { error: hubspotError });
       }
 
@@ -3702,8 +3702,8 @@ async function handleSubscriptionDeleted(client: PoolClient, subscription: Strip
           message: 'Your free trial has ended. Your account is still here - renew anytime to pick up where you left off!',
           type: 'membership_failed',
         });
-      } catch (notifyErr) {
-        logger.error('[Stripe Webhook] Notification failed (non-fatal):', { error: (notifyErr as Error).message });
+      } catch (notifyErr: unknown) {
+        logger.error('[Stripe Webhook] Notification failed (non-fatal):', { error: getErrorMessage(notifyErr) });
       }
 
       try {
@@ -3713,8 +3713,8 @@ async function handleSubscriptionDeleted(client: PoolClient, subscription: Strip
           'trial_expired',
           { sendPush: true, sendWebSocket: true }
         );
-      } catch (notifyErr) {
-        logger.error('[Stripe Webhook] Notification failed (non-fatal):', { error: (notifyErr as Error).message });
+      } catch (notifyErr: unknown) {
+        logger.error('[Stripe Webhook] Notification failed (non-fatal):', { error: getErrorMessage(notifyErr) });
       }
 
       broadcastBillingUpdate({
@@ -3760,8 +3760,8 @@ async function handleSubscriptionDeleted(client: PoolClient, subscription: Strip
             'billing_alert',
             { sendPush: true }
           );
-        } catch (notifyErr) {
-          logger.error('[Stripe Webhook] Notification failed (non-fatal):', { error: (notifyErr as Error).message });
+        } catch (notifyErr: unknown) {
+          logger.error('[Stripe Webhook] Notification failed (non-fatal):', { error: getErrorMessage(notifyErr) });
         }
       }
 
@@ -3800,7 +3800,7 @@ async function handleSubscriptionDeleted(client: PoolClient, subscription: Strip
       const { syncMemberToHubSpot } = await import('../hubspot/stages');
       await syncMemberToHubSpot({ email, status: 'cancelled', billingProvider: 'stripe', billingGroupRole: 'Primary' });
       logger.info(`[Stripe Webhook] Synced ${email} status=cancelled to HubSpot`);
-    } catch (hubspotError) {
+    } catch (hubspotError: unknown) {
       logger.error('[Stripe Webhook] HubSpot sync failed for status cancelled:', { error: hubspotError });
     }
     
@@ -3811,7 +3811,7 @@ async function handleSubscriptionDeleted(client: PoolClient, subscription: Strip
       } else {
         logger.error(`[Stripe Webhook] HubSpot cancellation failed: ${cancellationResult.error}`);
       }
-    } catch (cancellationError) {
+    } catch (cancellationError: unknown) {
       logger.error('[Stripe Webhook] HubSpot cancellation handling failed:', { error: cancellationError });
     }
 
@@ -3822,8 +3822,8 @@ async function handleSubscriptionDeleted(client: PoolClient, subscription: Strip
         message: 'Your membership has been cancelled. We hope to see you again soon.',
         type: 'membership_cancelled',
       });
-    } catch (notifyErr) {
-      logger.error('[Stripe Webhook] Notification failed (non-fatal):', { error: (notifyErr as Error).message });
+    } catch (notifyErr: unknown) {
+      logger.error('[Stripe Webhook] Notification failed (non-fatal):', { error: getErrorMessage(notifyErr) });
     }
 
     try {
@@ -3833,8 +3833,8 @@ async function handleSubscriptionDeleted(client: PoolClient, subscription: Strip
         'membership_cancelled',
         { sendPush: true, sendWebSocket: true }
       );
-    } catch (notifyErr) {
-      logger.error('[Stripe Webhook] Notification failed (non-fatal):', { error: (notifyErr as Error).message });
+    } catch (notifyErr: unknown) {
+      logger.error('[Stripe Webhook] Notification failed (non-fatal):', { error: getErrorMessage(notifyErr) });
     }
 
     broadcastBillingUpdate({
@@ -3844,7 +3844,7 @@ async function handleSubscriptionDeleted(client: PoolClient, subscription: Strip
     });
 
     logger.info(`[Stripe Webhook] Membership cancellation processed for ${memberName} (${email})`);
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error('[Stripe Webhook] Error handling subscription deleted:', { error: error });
     throw error;
   }
@@ -3920,7 +3920,7 @@ async function handleProductUpdated(client: PoolClient, product: StripeProductWi
       );
       logger.info(`[Stripe Webhook] Updated cafe item from product ${product.id}`);
     }
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error('[Stripe Webhook] Error handling product.updated:', { error: error });
   }
 
@@ -3951,7 +3951,7 @@ async function handleProductCreated(client: PoolClient, product: Stripe.Product)
     } else {
       logger.info(`[Stripe Webhook] New product ${product.id} created in Stripe. Use "Pull from Stripe" button to import if needed.`);
     }
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error('[Stripe Webhook] Error handling product.created:', { error: error });
   }
 
@@ -3990,7 +3990,7 @@ async function handleProductDeleted(client: PoolClient, product: Stripe.Product)
         logger.info(`[Stripe Webhook] Deactivated cafe item "${row.name}" (id: ${row.id}) due to Stripe product deletion`);
       }
     }
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error('[Stripe Webhook] Error handling product.deleted:', { error: error });
   }
 
@@ -4045,7 +4045,7 @@ async function handlePriceChange(client: PoolClient, price: Stripe.Price): Promi
         updateGuestFee(priceCents);
       }
     }
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error('[Stripe Webhook] Error handling price change:', { error: error });
   }
 

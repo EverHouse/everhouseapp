@@ -44,7 +44,7 @@ export async function notifyAllStaff(
 ): Promise<void> {
   try {
     await notifyAllStaffRequired(title, message, type, relatedId, relatedType);
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error('Failed to insert staff notifications:', { error: error });
   }
 }

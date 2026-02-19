@@ -116,7 +116,7 @@ export async function syncPaymentToHubSpot(params: SyncPaymentParams): Promise<v
     });
 
     logger.info(`[Stripe->HubSpot] Synced payment ${paymentIntentId} to deal ${hubspotDealId} as line item ${lineItemId}`);
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error('[Stripe->HubSpot] Error syncing payment:', { error: error });
     throw error;
   }
@@ -221,11 +221,11 @@ export async function syncDayPassToHubSpot(params: SyncDayPassParams): Promise<v
       });
 
       logger.info(`[DayPass->HubSpot] Synced day pass ${purchaseId} to deal ${hubspotDealId} as line item ${lineItemId}`);
-    } catch (error) {
+    } catch (error: unknown) {
       logger.error('[DayPass->HubSpot] Error syncing day pass to HubSpot:', { error: error });
       throw error;
     }
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error('[DayPass->HubSpot] Error in syncDayPassToHubSpot:', { error: error });
     // Don't throw - day pass purchases should not fail if HubSpot sync fails
   }

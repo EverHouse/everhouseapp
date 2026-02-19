@@ -202,7 +202,7 @@ export async function syncGoogleCalendarEvents(options?: { suppressAlert?: boole
                 [dbRow.id, newEtag, newUpdatedAt]
               );
               pushedToCalendar++;
-            } catch (pushError) {
+            } catch (pushError: unknown) {
               logger.error(`[Events Sync] Failed to push local edits to calendar for event #${dbRow.id}:`, { error: pushError });
             }
           }
@@ -286,7 +286,7 @@ export async function syncGoogleCalendarEvents(options?: { suppressAlert?: boole
     }
     
     return { synced: calendarEvents.length, created, updated, deleted, pushedToCalendar };
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error('Error syncing Google Calendar events:', { error: error });
     
     if (!options?.suppressAlert) {
@@ -295,7 +295,7 @@ export async function syncGoogleCalendarEvents(options?: { suppressAlert?: boole
         'Events calendar sync',
         error instanceof Error ? error : new Error(String(error)),
         { calendarName: CALENDAR_CONFIG.events.name }
-      ).catch(alertErr => {
+      ).catch((alertErr: unknown) => {
         logger.error('[Events Sync] Failed to send staff alert:', { error: alertErr });
       });
     }

@@ -242,7 +242,7 @@ export async function syncWellnessCalendarEvents(options?: { suppressAlert?: boo
                 [dbRow.id, newEtag, newUpdatedAt]
               );
               pushedToCalendar++;
-            } catch (pushError) {
+            } catch (pushError: unknown) {
               logger.error(`[Wellness Sync] Failed to push local edits to calendar for class #${dbRow.id}:`, { error: pushError });
             }
           }
@@ -311,7 +311,7 @@ export async function syncWellnessCalendarEvents(options?: { suppressAlert?: boo
     }
     
     return { synced: events.length, created, updated, deleted, pushedToCalendar };
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error('Error syncing Wellness Calendar events:', { error: error });
     
     if (!options?.suppressAlert) {
@@ -320,7 +320,7 @@ export async function syncWellnessCalendarEvents(options?: { suppressAlert?: boo
         'Wellness calendar sync',
         error instanceof Error ? error : new Error(String(error)),
         { calendarName: CALENDAR_CONFIG.wellness.name }
-      ).catch(alertErr => {
+      ).catch((alertErr: unknown) => {
         logger.error('[Wellness Sync] Failed to send staff alert:', { error: alertErr });
       });
     }

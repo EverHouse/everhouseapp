@@ -191,8 +191,8 @@ async function loadSessionData(sessionId?: number, bookingId?: number): Promise<
       isConferenceRoom: session.resource_type === 'conference_room',
       participants
     };
-  } catch (error) {
-    logger.error('[UnifiedFeeService] Error loading session data:', { error: error as Error });
+  } catch (error: unknown) {
+    logger.error('[UnifiedFeeService] Error loading session data:', { error });
     return null;
   }
 }
@@ -915,9 +915,9 @@ export async function applyFeeBreakdownToParticipants(
       participantCount: breakdown.participants.length,
       totalCents: breakdown.totals.totalCents
     });
-  } catch (error) {
+  } catch (error: unknown) {
     await client.query('ROLLBACK');
-    logger.error('[UnifiedFeeService] Error applying fee breakdown:', { error: error as Error });
+    logger.error('[UnifiedFeeService] Error applying fee breakdown:', { error });
     throw error;
   } finally {
     client.release();
@@ -942,8 +942,8 @@ export async function invalidateCachedFees(
       participantIds,
       reason
     });
-  } catch (error) {
-    logger.error('[UnifiedFeeService] Error invalidating cached fees:', { error: error as Error });
+  } catch (error: unknown) {
+    logger.error('[UnifiedFeeService] Error invalidating cached fees:', { error });
   }
 }
 
@@ -977,7 +977,7 @@ export async function recalculateSessionFees(
           updated_at = NOW()
       WHERE session_id = $3
     `, [breakdown.totals.totalCents || 0, totalOverageMinutes, sessionId]);
-  } catch (syncError) {
+  } catch (syncError: unknown) {
     logger.warn('[UnifiedFee] Failed to sync fees to booking_requests', { sessionId, error: syncError });
   }
   

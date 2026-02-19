@@ -83,7 +83,7 @@ export async function reconcileDailyPayments() {
       missingPayments,
       statusMismatches
     };
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error('[Reconcile] Error during reconciliation:', { error: error });
     throw error;
   }
@@ -288,7 +288,7 @@ export async function reconcileSubscriptions() {
               memberSince: new Date()
             });
             logger.info(`[Reconcile] Synced ${customerEmail} to HubSpot: status=active, tier=${tierName}, billing=stripe`);
-          } catch (hubspotError) {
+          } catch (hubspotError: unknown) {
             logger.error(`[Reconcile] HubSpot sync failed for ${customerEmail}:`, { error: hubspotError });
           }
           
@@ -313,7 +313,7 @@ export async function reconcileSubscriptions() {
       subscriptionsChecked,
       usersCreated
     };
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error('[Reconcile] Error during subscription reconciliation:', { error: error });
     throw error;
   }

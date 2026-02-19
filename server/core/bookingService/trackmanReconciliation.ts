@@ -54,7 +54,7 @@ async function getTierOverageRate(tier: string | null): Promise<number> {
     if (result.rows.length > 0 && result.rows[0].guest_fee_cents) {
       return Math.round(result.rows[0].guest_fee_cents / 100);
     }
-  } catch (error) {
+  } catch (error: unknown) {
     logger.warn('[getTierOverageRate] Failed to fetch tier overage rate, using default', { extra: { tier, error } });
   }
   
@@ -220,8 +220,8 @@ export async function findAttendanceDiscrepancies(
     };
     
     return { discrepancies, stats, totalCount };
-  } catch (error) {
-    logger.error('[findAttendanceDiscrepancies] Error:', { error: error as Error });
+  } catch (error: unknown) {
+    logger.error('[findAttendanceDiscrepancies] Error:', { error });
     throw error;
   }
 }
@@ -311,8 +311,8 @@ export async function markAsReconciled(
     }
     
     return { success: true, booking: updateResult.rows[0] };
-  } catch (error) {
-    logger.error('[markAsReconciled] Error:', { error: error as Error });
+  } catch (error: unknown) {
+    logger.error('[markAsReconciled] Error:', { error });
     throw error;
   }
 }
@@ -331,8 +331,8 @@ export async function getReconciliationSummary(): Promise<{
       stats,
       recentDiscrepancies: discrepancies
     };
-  } catch (error) {
-    logger.error('[getReconciliationSummary] Error:', { error: error as Error });
+  } catch (error: unknown) {
+    logger.error('[getReconciliationSummary] Error:', { error });
     throw error;
   }
 }
@@ -396,8 +396,8 @@ export async function adjustLedgerForReconciliation(
     });
     
     return { success: true, adjustmentAmount: feeAdjustment };
-  } catch (error) {
-    logger.error('[adjustLedgerForReconciliation] Error:', { error: error as Error });
+  } catch (error: unknown) {
+    logger.error('[adjustLedgerForReconciliation] Error:', { error });
     throw error;
   }
 }

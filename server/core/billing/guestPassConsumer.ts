@@ -188,7 +188,7 @@ export async function consumeGuestPassForParticipant(
           [bookingId, ownerEmailLower]
         );
       }
-    } catch (holdErr) {
+    } catch (holdErr: unknown) {
       logger.info(`[GuestPassConsumer] Hold cleanup failed (non-blocking):`, { extra: { detail: holdErr } });
     }
     
@@ -245,7 +245,7 @@ export async function canUseGuestPass(ownerEmail: string): Promise<{
       remaining,
       total: passes_total
     };
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error('[GuestPassConsumer] Error checking guest pass availability:', { error: error });
     return { canUse: false, remaining: 0, total: 0 };
   }
@@ -300,7 +300,7 @@ export async function refundGuestPassForParticipant(
           guestFeeCents = price.unit_amount;
         }
       }
-    } catch (err) {
+    } catch (err: unknown) {
       logger.warn(`[GuestPassConsumer] Failed to fetch Stripe guest fee price, using default $${PRICING.GUEST_FEE_DOLLARS}:`, { error: err });
     }
     

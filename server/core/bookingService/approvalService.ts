@@ -237,7 +237,7 @@ export async function approveBooking(params: ApproveBookingParams) {
             calendarEventId = await createCalendarEventOnCalendar(calendarId, summary, description, req_data.requestDate, req_data.startTime, req_data.endTime);
           }
         }
-      } catch (calError) {
+      } catch (calError: unknown) {
         logger.error('Calendar sync failed (non-blocking)', { extra: { calError } });
       }
     }
@@ -451,11 +451,11 @@ export async function approveBooking(params: ApproveBookingParams) {
               );
               logger.info('[Booking Approval] Prepayment fully covered by credit for session', { extra: { createdSessionId } });
             }
-          } catch (prepayError) {
+          } catch (prepayError: unknown) {
             logger.error('[Booking Approval] Failed to create prepayment intent', { extra: { prepayError } });
           }
         }
-      } catch (feeError) {
+      } catch (feeError: unknown) {
         logger.error('[Booking Approval] Failed to compute/apply fees', { extra: { feeError } });
       }
     }
@@ -570,13 +570,13 @@ async function populateBookingMembers(bookingId: number, updated: BookingUpdateR
               createdAt: new Date()
             }).onConflictDoNothing();
             logger.info('[Booking Approval] Added participant to booking_members for booking (slot )', { extra: { participantEmail, id: bookingId, slotNumber } });
-          } catch (memberError) {
+          } catch (memberError: unknown) {
             logger.error('[Booking Approval] Failed to add participant to booking_members:', { extra: { memberError } });
           }
         }
       }
     }
-  } catch (err) {
+  } catch (err: unknown) {
     logger.error('[Booking Approval] Failed to populate booking_members', { extra: { err } });
   }
 }
@@ -618,7 +618,7 @@ async function notifyLinkedMembers(bookingId: number, updated: BookingUpdateResu
         }, { action: 'booking_approved_linked', bookingId, triggerSource: 'approval.ts' });
       }
     }
-  } catch (err) {
+  } catch (err: unknown) {
     logger.error('Failed to notify linked members', { extra: { err } });
   }
 }
@@ -679,7 +679,7 @@ async function notifyApprovalParticipants(bookingId: number, updated: BookingUpd
 
       logger.info('[Approval] Sent Added to Booking notification', { extra: { participantEmail, bookingId } });
     }
-  } catch (notifyErr) {
+  } catch (notifyErr: unknown) {
     logger.error('[Approval] Failed to notify participants (non-blocking)', { extra: { notifyErr } });
   }
 }
@@ -968,7 +968,7 @@ export async function cancelBooking(params: CancelBookingParams) {
         );
         logger.info('[Staff Cancel] Cleared pending fees for session', { extra: { existingSessionId: existing.sessionId } });
       }
-    } catch (cancelIntentsErr) {
+    } catch (cancelIntentsErr: unknown) {
       logger.error('[Staff Cancel] Failed to handle payment intents (non-blocking)', { extra: { cancelIntentsErr } });
     }
 
@@ -1054,7 +1054,7 @@ export async function cancelBooking(params: CancelBookingParams) {
           [sessionResult[0].sessionId]
         );
         logger.info('[Staff Cancel] Cleared pending fees for session', { extra: { sessionResult_0_SessionId: sessionResult[0].sessionId } });
-      } catch (feeCleanupErr) {
+      } catch (feeCleanupErr: unknown) {
         logger.error('[Staff Cancel] Failed to clear pending fees (non-blocking)', { extra: { feeCleanupErr } });
       }
     }
@@ -1164,7 +1164,7 @@ export async function handleCancelPostTransaction(
           await deleteCalendarEvent(bookingData.calendarEventId, calendarId);
         }
       }
-    } catch (calError) {
+    } catch (calError: unknown) {
       logger.error('Failed to delete calendar event (non-blocking)', { extra: { calError } });
     }
   }
@@ -1304,7 +1304,7 @@ export async function checkinBooking(params: CheckinBookingParams) {
         existing.session_id = sessionResult.sessionId;
         await recalculateSessionFees(sessionResult.sessionId, 'checkin');
       }
-    } catch (err) {
+    } catch (err: unknown) {
       logger.error('[Checkin] Failed to auto-create session', { extra: { err } });
     }
   }
@@ -1370,7 +1370,7 @@ export async function checkinBooking(params: CheckinBookingParams) {
       try {
         await recalculateSessionFees(existing.session_id, 'checkin');
         logger.info('[Check-in Guard] Recalculated fees for session - some participants had NULL cached_fee_cents', { extra: { existingSession_id: existing.session_id } });
-      } catch (recalcError) {
+      } catch (recalcError: unknown) {
         logger.error('[Check-in Guard] Failed to recalculate fees for session', { extra: { session_id: existing.session_id, recalcError } });
       }
     }
@@ -1648,7 +1648,7 @@ export async function devConfirmBooking(params: DevConfirmParams) {
               [sessionId, resolvedUserId, participantType, resolvedName]
             );
             participantsCreated++;
-          } catch (partErr) {
+          } catch (partErr: unknown) {
             logger.error('[Dev Confirm] Failed to create participant', { extra: { partErr } });
           }
 
@@ -1664,7 +1664,7 @@ export async function devConfirmBooking(params: DevConfirmParams) {
               }).onConflictDoNothing();
               slotNumber++;
               logger.info('[Dev Confirm] Added participant to booking_members for booking', { extra: { participantEmail, bookingId } });
-            } catch (memberError) {
+            } catch (memberError: unknown) {
               logger.error('[Dev Confirm] Failed to add participant to booking_members:', { extra: { memberError } });
             }
           }
@@ -1676,7 +1676,7 @@ export async function devConfirmBooking(params: DevConfirmParams) {
         if (feeResult?.totalSessionFee) {
           totalFeeCents = feeResult.totalSessionFee;
         }
-      } catch (feeError) {
+      } catch (feeError: unknown) {
         logger.warn('[Dev Confirm] Failed to calculate fees', { extra: { feeError } });
       }
     }
@@ -1757,7 +1757,7 @@ export async function devConfirmBooking(params: DevConfirmParams) {
 
         logger.info('[Dev Confirm] Sent Added to Booking notification', { extra: { participantEmail, bookingId } });
       }
-    } catch (notifyErr) {
+    } catch (notifyErr: unknown) {
       logger.error('[Dev Confirm] Failed to notify participants (non-blocking)', { extra: { notifyErr } });
     }
   }
@@ -1826,7 +1826,7 @@ export async function completeCancellation(params: CompleteCancellationParams) {
       await db.update(bookingRequests)
         .set({ overagePaymentIntentId: null, overageFeeCents: 0 })
         .where(eq(bookingRequests.id, bookingId));
-    } catch (clearErr) {
+    } catch (clearErr: unknown) {
       logger.error('[Complete Cancellation] Failed to clear overage fields', { extra: { clearErr } });
     }
   }
@@ -1859,8 +1859,8 @@ export async function completeCancellation(params: CompleteCancellationParams) {
          WHERE session_id = $1 AND payment_status = 'pending'`,
         [existing.sessionId]
       );
-    } catch (clearErr) {
-      errors.push(`Failed to clear pending fees: ${(clearErr as Error).message}`);
+    } catch (clearErr: unknown) {
+      errors.push(`Failed to clear pending fees: ${getErrorMessage(clearErr)}`);
       logger.error('[Complete Cancellation] Failed to clear pending fees', { extra: { clearErr } });
     }
 

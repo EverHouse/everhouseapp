@@ -153,7 +153,7 @@ export async function cascadeEmailChange(
           });
           logger.info(`[EmailChangeService] Updated HubSpot contact ${user.hubspot_id} email to ${normalizedNewEmail}`);
         }
-      } catch (err) {
+      } catch (err: unknown) {
         logger.error('[EmailChangeService] Background sync failed:', { error: err });
       }
     })();
@@ -213,7 +213,7 @@ export async function previewEmailChangeImpact(
       if (count > 0) {
         tables.push({ tableName: table, columnName: column, rowCount: count });
       }
-    } catch (error) {
+    } catch (error: unknown) {
       logger.warn(`[EmailChangeService] Could not check table ${table}:`, { error: error });
     }
   }

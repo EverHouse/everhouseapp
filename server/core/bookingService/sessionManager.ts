@@ -88,8 +88,8 @@ export async function createSession(
     });
     
     return { session, participants: linkedParticipants };
-  } catch (error) {
-    logger.error('[createSession] Error creating session:', { error: error as Error });
+  } catch (error: unknown) {
+    logger.error('[createSession] Error creating session:', { error });
     throw error;
   }
 }
@@ -304,8 +304,8 @@ export async function linkParticipants(
       .returning();
     
     return inserted;
-  } catch (error) {
-    logger.error('[linkParticipants] Error linking participants:', { error: error as Error });
+  } catch (error: unknown) {
+    logger.error('[linkParticipants] Error linking participants:', { error });
     throw error;
   }
 }
@@ -388,7 +388,7 @@ export async function recordUsage(
       });
       return { success: true, alreadyRecorded: true };
     }
-    logger.error('[recordUsage] Error recording usage:', { error: error as Error });
+    logger.error('[recordUsage] Error recording usage:', { error });
     throw error;
   }
 }
@@ -402,8 +402,8 @@ export async function getSessionById(sessionId: number): Promise<BookingSession 
       .limit(1);
     
     return sessions[0] || null;
-  } catch (error) {
-    logger.error('[getSessionById] Error:', { error: error as Error });
+  } catch (error: unknown) {
+    logger.error('[getSessionById] Error:', { error });
     return null;
   }
 }
@@ -414,8 +414,8 @@ export async function getSessionParticipants(sessionId: number): Promise<Booking
       .select()
       .from(bookingParticipants)
       .where(eq(bookingParticipants.sessionId, sessionId));
-  } catch (error) {
-    logger.error('[getSessionParticipants] Error:', { error: error as Error });
+  } catch (error: unknown) {
+    logger.error('[getSessionParticipants] Error:', { error });
     return [];
   }
 }
@@ -456,8 +456,8 @@ export async function createOrFindGuest(
       .returning();
     
     return newGuest.id;
-  } catch (error) {
-    logger.error('[createOrFindGuest] Error:', { error: error as Error });
+  } catch (error: unknown) {
+    logger.error('[createOrFindGuest] Error:', { error });
     throw error;
   }
 }
@@ -471,8 +471,8 @@ export async function linkBookingRequestToSession(
       `UPDATE booking_requests SET session_id = $1, updated_at = NOW() WHERE id = $2`,
       [sessionId, bookingRequestId]
     );
-  } catch (error) {
-    logger.error('[linkBookingRequestToSession] Error:', { error: error as Error });
+  } catch (error: unknown) {
+    logger.error('[linkBookingRequestToSession] Error:', { error });
     throw error;
   }
 }
@@ -581,9 +581,9 @@ async function deductGuestPassesInternal(
     if (manageTransaction) await client.query('ROLLBACK');
     logger.warn('[deductGuestPasses] Insufficient passes after race resolution', { extra: { memberEmail, passCount } });
     return { success: false, passesDeducted: 0 };
-  } catch (error) {
+  } catch (error: unknown) {
     if (manageTransaction) await client.query('ROLLBACK');
-    logger.error('[deductGuestPasses] Error:', { error: error as Error });
+    logger.error('[deductGuestPasses] Error:', { error });
     return { success: false, passesDeducted: 0 };
   } finally {
     if (manageTransaction) client.release();
@@ -636,9 +636,9 @@ async function resolveUserIdToEmail(userId: string): Promise<string | null> {
       .limit(1);
     
     return user?.email || null;
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error('[resolveUserIdToEmail] Error resolving user ID', { 
-      error: error as Error,
+      error,
       extra: { userId }
     });
     return null;
@@ -702,8 +702,8 @@ export async function findOverlappingSession(
       } as BookingSession;
     }
     return null;
-  } catch (error) {
-    logger.error('[findOverlappingSession] Error:', { error: error as Error });
+  } catch (error: unknown) {
+    logger.error('[findOverlappingSession] Error:', { error });
     return null;
   }
 }
@@ -1010,11 +1010,11 @@ export async function createSessionWithUsageTracking(
       participants: txResult.linkedParticipants,
       usageLedgerEntries: txResult.ledgerEntriesCreated
     };
-  } catch (error) {
-    logger.error('[createSessionWithUsageTracking] Error:', { error: error as Error });
+  } catch (error: unknown) {
+    logger.error('[createSessionWithUsageTracking] Error:', { error });
     return {
       success: false,
-      error: (error as Error).message,
+      error: getErrorMessage(error),
       errorType: 'database_error'
     };
   }

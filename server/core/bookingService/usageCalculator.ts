@@ -208,13 +208,13 @@ export async function getDailyUsageFromLedger(
           extra: { memberEmail, date, missingSessionCount: missingCount }
         });
       }
-    } catch (checkError) {
+    } catch (checkError: unknown) {
       // Non-critical check, don't fail the main query
     }
 
     return parseInt(result.rows[0].total_minutes) || 0;
-  } catch (error) {
-    logger.error('[getDailyUsageFromLedger] Error:', { error: error as Error });
+  } catch (error: unknown) {
+    logger.error('[getDailyUsageFromLedger] Error:', { error });
     return 0;
   }
 }
@@ -244,8 +244,8 @@ export async function getGuestPassInfo(
     
     const remaining = Math.max(0, result.rows[0].passes_total - result.rows[0].passes_used);
     return { remaining, hasGuestPassBenefit: true };
-  } catch (error) {
-    logger.error('[getGuestPassInfo] Error:', { error: error as Error });
+  } catch (error: unknown) {
+    logger.error('[getGuestPassInfo] Error:', { error });
     return { remaining: 0, hasGuestPassBenefit: false };
   }
 }
@@ -624,8 +624,8 @@ export async function assignGuestTimeToHost(
       guestFee,
       guestPassUsed
     };
-  } catch (error) {
-    logger.error('[assignGuestTimeToHost] Error:', { error: error as Error });
+  } catch (error: unknown) {
+    logger.error('[assignGuestTimeToHost] Error:', { error });
     throw error;
   }
 }
@@ -791,7 +791,7 @@ export async function recalculateSessionFees(
       participantsUpdated = validBillings.length;
       
       await client.query('COMMIT');
-    } catch (error) {
+    } catch (error: unknown) {
       await client.query('ROLLBACK');
       throw error;
     } finally {
@@ -812,8 +812,8 @@ export async function recalculateSessionFees(
       ledgerUpdated: true,
       participantsUpdated
     };
-  } catch (error) {
-    logger.error('[recalculateSessionFees] Error:', { error: error as Error });
+  } catch (error: unknown) {
+    logger.error('[recalculateSessionFees] Error:', { error });
     throw error;
   }
 }

@@ -26,7 +26,7 @@ export async function cleanupExpiredSessions(): Promise<number> {
     }
     
     return deletedCount;
-  } catch (error) {
+  } catch (error: unknown) {
     if (isTableMissingError(error)) {
       return 0;
     }
@@ -65,7 +65,7 @@ export async function getSessionStats(): Promise<{
       oldestActive: row.oldest_active ? new Date(String(row.oldest_active)) : null,
       newestActive: row.newest_active ? new Date(String(row.newest_active)) : null,
     };
-  } catch (error) {
+  } catch (error: unknown) {
     if (isTableMissingError(error)) {
       return { total: 0, active: 0, expired: 0, oldestActive: null, newestActive: null };
     }
@@ -96,7 +96,7 @@ export async function runSessionCleanup(): Promise<void> {
         activeRemaining: afterStats.active
       }
     });
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error('[SessionCleanup] Scheduled cleanup failed', {
       error: error instanceof Error ? error.message : String(error),
       extra: { event: 'session.cleanup_failed' }
