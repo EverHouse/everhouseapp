@@ -11,6 +11,7 @@ import { sendFeeWaivedEmail } from '../emails/paymentEmails';
 import { computeFeeBreakdown, applyFeeBreakdownToParticipants, recalculateSessionFees } from '../core/billing/unifiedFeeService';
 import { consumeGuestPassForParticipant, canUseGuestPass } from '../core/billing/guestPassConsumer';
 import { createPrepaymentIntent } from '../core/billing/prepaymentService';
+import { cancelPaymentIntent } from '../core/stripe';
 import { logFromRequest } from '../core/auditLog';
 import { PRICING } from '../core/billing/pricingConfig';
 import { enforceSocialTierRules, type ParticipantForValidation } from '../core/bookingService/tierRules';
@@ -373,8 +374,8 @@ router.patch('/api/bookings/:id/payments', isStaffOrAdmin, async (req: Request, 
 
     const { participantId, action, reason } = req.body;
 
-    if (!action || !['confirm', 'waive', 'use_guest_pass', 'confirm_all', 'waive_all'].includes(action)) {
-      return res.status(400).json({ error: 'Invalid action. Must be confirm, waive, use_guest_pass, confirm_all, or waive_all' });
+    if (!action || !['confirm', 'waive', 'use_guest_pass', 'confirm_all', 'waive_all', 'cancel_all'].includes(action)) {
+      return res.status(400).json({ error: 'Invalid action. Must be confirm, waive, use_guest_pass, confirm_all, waive_all, or cancel_all' });
     }
 
     if (action === 'waive' && !reason) {
@@ -540,6 +541,89 @@ router.patch('/api/bookings/:id/payments', isStaffOrAdmin, async (req: Request, 
         message: `Payment ${action === 'confirm' ? 'confirmed' : 'waived'} for participant`,
         participantId,
         newStatus
+      });
+    }
+
+    if (action === 'cancel_all') {
+      let cancelledCount = 0;
+      let failedCount = 0;
+
+      const intentIds = new Set<string>();
+
+      const spiResult = await db.execute(sql`
+        SELECT stripe_payment_intent_id FROM stripe_payment_intents
+        WHERE booking_id = ${bookingId}
+          AND status IN ('pending', 'requires_payment_method', 'requires_action', 'requires_confirmation')
+      `);
+      for (const row of spiResult.rows) {
+        if (row.stripe_payment_intent_id) {
+          intentIds.add(row.stripe_payment_intent_id as string);
+        }
+      }
+
+      if (sessionId) {
+        const bpResult = await db.execute(sql`
+          SELECT stripe_payment_intent_id FROM booking_participants
+          WHERE session_id = ${sessionId}
+            AND stripe_payment_intent_id IS NOT NULL
+            AND stripe_payment_intent_id != ''
+            AND payment_status = 'pending'
+            AND stripe_payment_intent_id NOT LIKE 'balance-%'
+        `);
+        for (const row of bpResult.rows) {
+          if (row.stripe_payment_intent_id) {
+            intentIds.add(row.stripe_payment_intent_id as string);
+          }
+        }
+      }
+
+      for (const piId of intentIds) {
+        try {
+          const result = await cancelPaymentIntent(piId);
+          if (result.success) {
+            cancelledCount++;
+          } else {
+            failedCount++;
+            logger.warn('[StaffCheckin] Failed to cancel payment intent', { extra: { piId, error: result.error } });
+          }
+        } catch (err: unknown) {
+          failedCount++;
+          logger.error('[StaffCheckin] Error cancelling payment intent', { extra: { piId, error: getErrorMessage(err) } });
+        }
+      }
+
+      if (intentIds.size > 0) {
+        const intentArray = Array.from(intentIds);
+        await db.execute(sql`
+          UPDATE stripe_payment_intents SET status = 'cancelled', updated_at = NOW()
+          WHERE stripe_payment_intent_id = ANY(${intentArray}::text[])
+        `);
+      }
+
+      if (sessionId) {
+        await db.execute(sql`
+          UPDATE booking_participants SET payment_status = 'waived'
+          WHERE session_id = ${sessionId} AND payment_status = 'pending'
+        `);
+      }
+
+      await db.execute(sql`
+        INSERT INTO booking_payment_audit
+          (booking_id, session_id, participant_id, action, staff_email, staff_name, reason, previous_status, new_status)
+        VALUES (${bookingId}, ${sessionId}, ${null}, ${'payment_cancelled'}, ${staffEmail}, ${staffName}, ${reason || `Cancelled ${cancelledCount} payment intent(s)`}, ${'pending'}, ${'waived'})
+      `);
+
+      logFromRequest(req, 'cancel_payment', 'booking', bookingId.toString(), booking.resource_name || `Booking #${bookingId}`, {
+        cancelledCount,
+        failedCount,
+        intentsCancelled: Array.from(intentIds)
+      });
+
+      return res.json({
+        success: true,
+        message: `${cancelledCount} payment(s) cancelled`,
+        cancelledCount,
+        failedCount
       });
     }
 

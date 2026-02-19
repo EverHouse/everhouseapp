@@ -58,6 +58,8 @@ export function PaymentSection({
   renderTierBadge,
 }: PaymentSectionProps) {
   const { showToast } = useToast();
+  const [showCancelConfirm, setShowCancelConfirm] = React.useState(false);
+  const [cancellingPayment, setCancellingPayment] = React.useState(false);
 
   const renderGuestPassInfo = () => {
     if (!rosterData) return null;
@@ -151,13 +153,72 @@ export function PaymentSection({
         )}
 
         {!fs.allPaid && fs.grandTotal > 0 && bookingId && !showInlinePayment && (
-          <button
-            onClick={() => setShowInlinePayment(true)}
-            className="tactile-btn w-full mt-2 py-2 px-3 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-medium transition-colors flex items-center justify-center gap-1"
-          >
-            <span className="material-symbols-outlined text-sm">payments</span>
-            Collect ${fs.grandTotal.toFixed(2)}
-          </button>
+          <div className="space-y-2 mt-2">
+            <button
+              onClick={() => setShowInlinePayment(true)}
+              className="tactile-btn w-full py-2 px-3 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-medium transition-colors flex items-center justify-center gap-1"
+            >
+              <span className="material-symbols-outlined text-sm">payments</span>
+              Collect ${fs.grandTotal.toFixed(2)}
+            </button>
+
+            {!showCancelConfirm ? (
+              <button
+                onClick={() => setShowCancelConfirm(true)}
+                disabled={cancellingPayment}
+                className="tactile-btn w-full py-2 px-3 rounded-lg border border-red-300 dark:border-red-500/30 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/10 text-sm font-medium transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
+              >
+                <span className="material-symbols-outlined text-sm">block</span>
+                Void / Cancel Fees
+              </button>
+            ) : (
+              <div className="p-2 rounded-lg border border-red-300 dark:border-red-500/30 bg-red-50 dark:bg-red-900/10 space-y-2">
+                <p className="text-xs text-red-600 dark:text-red-400 font-medium text-center">Are you sure? This will cancel all outstanding payment intents.</p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setShowCancelConfirm(false)}
+                    disabled={cancellingPayment}
+                    className="tactile-btn flex-1 py-1.5 px-3 rounded-lg border border-gray-300 dark:border-white/20 text-primary/70 dark:text-white/70 text-sm disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={async () => {
+                      if (!bookingId) return;
+                      setCancellingPayment(true);
+                      try {
+                        const res = await fetch(`/api/bookings/${bookingId}/payments`, {
+                          method: 'PATCH',
+                          headers: { 'Content-Type': 'application/json' },
+                          credentials: 'include',
+                          body: JSON.stringify({ action: 'cancel_all' })
+                        });
+                        const data = await res.json();
+                        if (res.ok && data.success) {
+                          const msg = data.failedCount > 0
+                            ? `${data.cancelledCount} cancelled, ${data.failedCount} failed — check Stripe dashboard`
+                            : (data.message || 'Payments cancelled');
+                          showToast(msg, data.failedCount > 0 ? 'warning' : 'success');
+                          handleInlineStripeSuccess();
+                        } else {
+                          showToast(data.error || 'Failed to cancel payments', 'error');
+                        }
+                      } catch (err: unknown) {
+                        showToast('Failed to cancel payments', 'error');
+                      } finally {
+                        setCancellingPayment(false);
+                        setShowCancelConfirm(false);
+                      }
+                    }}
+                    disabled={cancellingPayment}
+                    className="tactile-btn flex-1 py-1.5 px-3 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-medium disabled:opacity-50"
+                  >
+                    {cancellingPayment ? 'Cancelling...' : 'Confirm Void'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         )}
 
         {showInlinePayment && !fs.allPaid && fs.grandTotal > 0 && bookingId && (
