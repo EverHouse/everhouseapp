@@ -15,13 +15,16 @@ export const changelog: ChangelogEntry[] = [
   {
     version: "7.84.0",
     date: "2026-02-19",
-    title: "Improved Add Guest Experience & Staff Guest Visibility",
+    title: "Improved Add Guest Experience & Unified Member/Staff Views",
     changes: [
       "Improved: 'Add Guest' now shows the payment choice first — members pick 'Pay Guest Fee' or 'Use Guest Pass' before entering guest details",
       "Improved: 'Pay Guest Fee' works immediately with one tap — no need to enter guest name or email first",
       "Improved: 'Use Guest Pass' requires complete guest info before submitting, with the button disabled until all fields are filled",
       "Fixed: Guests added by members now appear correctly in the staff booking details view",
       "Fixed: When a guest is removed by a member, staff booking sheets update to reflect the removal",
+      "Fixed: Member portal now shows your actual name in the Manage Players list and Time Allocation section — previously showed email addresses",
+      "Fixed: New sessions always store the member's name (not email) as the display name, preventing the email-showing issue from recurring",
+      "Fixed: Existing bookings with email-based names are automatically corrected when viewed — a self-healing fix",
     ]
   },
   {

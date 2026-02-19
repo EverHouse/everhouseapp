@@ -272,6 +272,47 @@ export async function getBookingParticipants(
       .where(eq(bookingParticipants.sessionId, booking.session_id));
 
     participants = participantRows;
+
+    for (let i = 0; i < participants.length; i++) {
+      const p = participants[i];
+      if (p.displayName && p.displayName.includes('@')) {
+        if (p.participantType === 'owner') {
+          let ownerName = booking.owner_name;
+          if (!ownerName && booking.owner_email) {
+            const ownerLookup = await pool.query(
+              `SELECT first_name, last_name FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1`,
+              [booking.owner_email]
+            );
+            if (ownerLookup.rows.length > 0) {
+              ownerName = [ownerLookup.rows[0].first_name, ownerLookup.rows[0].last_name].filter(Boolean).join(' ') || null;
+            }
+          }
+          if (ownerName) {
+            participants[i] = { ...p, displayName: ownerName };
+            await pool.query(
+              `UPDATE booking_participants SET display_name = $1 WHERE id = $2`,
+              [ownerName, p.id]
+            );
+          }
+        } else if (p.participantType === 'member' && p.userId) {
+          const userResult = await pool.query(
+            `SELECT first_name, last_name FROM users WHERE id = $1 LIMIT 1`,
+            [p.userId]
+          );
+          if (userResult.rows.length > 0) {
+            const { first_name, last_name } = userResult.rows[0];
+            const fullName = [first_name, last_name].filter(Boolean).join(' ');
+            if (fullName) {
+              participants[i] = { ...p, displayName: fullName };
+              await pool.query(
+                `UPDATE booking_participants SET display_name = $1 WHERE id = $2`,
+                [participants[i].displayName, p.id]
+              );
+            }
+          }
+        }
+      }
+    }
   }
 
   const declaredCount = booking.declared_player_count || 1;
@@ -352,12 +393,41 @@ export async function previewRosterFees(
     existingParticipants = await getSessionParticipants(booking.session_id);
   }
 
-  const allParticipants: Array<{ participantType: string; displayName: string; email?: string; userId?: string | null }> = [...existingParticipants.map(p => ({
-    participantType: p.participantType,
-    displayName: p.displayName,
-    email: undefined as string | undefined,
-    userId: p.userId
-  }))];
+  const allParticipants: Array<{ participantType: string; displayName: string; email?: string; userId?: string | null }> = [];
+  for (const p of existingParticipants) {
+    let resolvedName = p.displayName;
+    if (resolvedName && resolvedName.includes('@')) {
+      if (p.participantType === 'owner') {
+        if (booking.owner_name) {
+          resolvedName = booking.owner_name;
+        } else if (booking.owner_email) {
+          const ownerLookup = await pool.query(
+            `SELECT first_name, last_name FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1`,
+            [booking.owner_email]
+          );
+          if (ownerLookup.rows.length > 0) {
+            const fullName = [ownerLookup.rows[0].first_name, ownerLookup.rows[0].last_name].filter(Boolean).join(' ');
+            if (fullName) resolvedName = fullName;
+          }
+        }
+      } else if (p.userId) {
+        const userResult = await pool.query(
+          `SELECT first_name, last_name FROM users WHERE id = $1 LIMIT 1`,
+          [p.userId]
+        );
+        if (userResult.rows.length > 0) {
+          const fullName = [userResult.rows[0].first_name, userResult.rows[0].last_name].filter(Boolean).join(' ');
+          if (fullName) resolvedName = fullName;
+        }
+      }
+    }
+    allParticipants.push({
+      participantType: p.participantType,
+      displayName: resolvedName,
+      email: undefined as string | undefined,
+      userId: p.userId
+    });
+  }
   for (const prov of provisionalParticipants) {
     if (prov && prov.type && prov.name) {
       allParticipants.push({
