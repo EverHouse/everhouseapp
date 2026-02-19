@@ -165,7 +165,19 @@ export async function runStartupTasks(): Promise<void> {
           'coupon.deleted',
           'credit_note.created',
           'customer.subscription.trial_will_end',
+          'customer.deleted',
           'payment_method.attached',
+          'payment_method.detached',
+          'payment_method.updated',
+          'payment_method.automatically_updated',
+          'charge.dispute.updated',
+          'checkout.session.expired',
+          'checkout.session.async_payment_failed',
+          'checkout.session.async_payment_succeeded',
+          'invoice.payment_action_required',
+          'invoice.overdue',
+          'setup_intent.succeeded',
+          'setup_intent.setup_failed',
         ];
 
         try {

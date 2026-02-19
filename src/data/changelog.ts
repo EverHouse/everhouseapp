@@ -13,6 +13,25 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.82.0",
+    date: "2026-02-19",
+    title: "Complete Stripe Webhook Coverage: 47 Event Types Now Handled",
+    isMajor: true,
+    changes: [
+      "Added: App now handles 47 Stripe event types — up from 35 — covering virtually all payment, billing, and customer activity",
+      "Added: Customer lifecycle tracking — new Stripe customers are automatically linked to member accounts, and staff are alerted if a customer is deleted externally",
+      "Added: Card removal detection — when a member's last payment method is removed, the system flags them for card update and notifies staff",
+      "Added: Card auto-update tracking — when a bank automatically updates card details (new expiry, replacement card), the system clears any 'card update needed' flags",
+      "Added: Card expiry warnings — members get notified when their card is expiring within 30 days",
+      "Added: Dispute progress tracking — staff now see real-time updates when a dispute changes status (evidence submitted, under review, won, lost)",
+      "Added: Expired checkout tracking — staff are notified when a signup link or day pass checkout times out, so they can send a new link",
+      "Added: Async payment support — bank transfers and other delayed payment methods are now tracked through completion or failure",
+      "Added: 3D Secure / SCA detection — when a payment requires extra authentication, the member is notified to complete it and staff are alerted",
+      "Added: Overdue invoice alerts — members with overdue invoices get escalated notifications, and staff see urgent alerts",
+      "Added: Payment method save tracking — successful and failed attempts to save payment methods for future use are now logged and notified",
+    ]
+  },
+  {
     version: "7.81.0",
     date: "2026-02-19",
     title: "Stripe & HubSpot Cleanup: Deletion Actually Works Now",

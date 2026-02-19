@@ -67,6 +67,7 @@ function extractResourceId(event: Stripe.Event): string | null {
   if (event.type.startsWith('customer.subscription.')) return obj.id as string;
   if (event.type.startsWith('checkout.session.')) return obj.id as string;
   if (event.type.startsWith('charge.')) return (obj.payment_intent as string) || (obj.id as string);
+  if (event.type.startsWith('setup_intent.')) return obj.id as string;
   
   return null;
 }
@@ -110,15 +111,26 @@ async function checkResourceEventOrder(
     'charge.succeeded': 11,
     'charge.refunded': 20,
     'charge.dispute.created': 25,
+    'charge.dispute.updated': 25,
     'charge.dispute.closed': 26,
     // Invoice lifecycle
     'invoice.created': 1,
     'invoice.finalized': 2,
+    'invoice.payment_action_required': 5,
     'invoice.payment_succeeded': 10,
     'invoice.payment_failed': 10,
     'invoice.paid': 11,
+    'invoice.overdue': 15,
     'invoice.voided': 20,
     'invoice.marked_uncollectible': 20,
+    // Checkout session lifecycle
+    'checkout.session.completed': 10,
+    'checkout.session.expired': 20,
+    'checkout.session.async_payment_succeeded': 15,
+    'checkout.session.async_payment_failed': 15,
+    // Setup intent lifecycle
+    'setup_intent.succeeded': 10,
+    'setup_intent.setup_failed': 10,
     // Subscription lifecycle (prevents cancelled user reactivation)
     'customer.subscription.created': 1,
     'customer.subscription.updated': 5,
@@ -327,6 +339,32 @@ export async function processStripeWebhook(
       deferredActions = await handleTrialWillEnd(client, event.data.object as Stripe.Subscription);
     } else if (event.type === 'payment_method.attached') {
       deferredActions = await handlePaymentMethodAttached(client, event.data.object as Stripe.PaymentMethod);
+    } else if (event.type === 'customer.created') {
+      deferredActions = await handleCustomerCreated(client, event.data.object as Stripe.Customer);
+    } else if (event.type === 'customer.deleted') {
+      deferredActions = await handleCustomerDeleted(client, event.data.object as Stripe.Customer);
+    } else if (event.type === 'payment_method.detached') {
+      deferredActions = await handlePaymentMethodDetached(client, event.data.object as Stripe.PaymentMethod);
+    } else if (event.type === 'payment_method.updated') {
+      deferredActions = await handlePaymentMethodUpdated(client, event.data.object as Stripe.PaymentMethod);
+    } else if (event.type === 'payment_method.automatically_updated') {
+      deferredActions = await handlePaymentMethodAutoUpdated(client, event.data.object as Stripe.PaymentMethod);
+    } else if (event.type === 'charge.dispute.updated') {
+      deferredActions = await handleChargeDisputeUpdated(client, event.data.object as Stripe.Dispute);
+    } else if (event.type === 'checkout.session.expired') {
+      deferredActions = await handleCheckoutSessionExpired(client, event.data.object as Stripe.Checkout.Session);
+    } else if (event.type === 'checkout.session.async_payment_failed') {
+      deferredActions = await handleCheckoutSessionAsyncPaymentFailed(client, event.data.object as Stripe.Checkout.Session);
+    } else if (event.type === 'checkout.session.async_payment_succeeded') {
+      deferredActions = await handleCheckoutSessionAsyncPaymentSucceeded(client, event.data.object as Stripe.Checkout.Session);
+    } else if (event.type === 'invoice.payment_action_required') {
+      deferredActions = await handleInvoicePaymentActionRequired(client, event.data.object as InvoiceWithLegacyFields);
+    } else if (event.type === 'invoice.overdue') {
+      deferredActions = await handleInvoiceOverdue(client, event.data.object as InvoiceWithLegacyFields);
+    } else if (event.type === 'setup_intent.succeeded') {
+      deferredActions = await handleSetupIntentSucceeded(client, event.data.object as Stripe.SetupIntent);
+    } else if (event.type === 'setup_intent.setup_failed') {
+      deferredActions = await handleSetupIntentFailed(client, event.data.object as Stripe.SetupIntent);
     }
 
     await client.query('COMMIT');
@@ -440,6 +478,32 @@ export async function replayStripeEvent(
       deferredActions = await handleTrialWillEnd(client, event.data.object as Stripe.Subscription);
     } else if (event.type === 'payment_method.attached') {
       deferredActions = await handlePaymentMethodAttached(client, event.data.object as Stripe.PaymentMethod);
+    } else if (event.type === 'customer.created') {
+      deferredActions = await handleCustomerCreated(client, event.data.object as Stripe.Customer);
+    } else if (event.type === 'customer.deleted') {
+      deferredActions = await handleCustomerDeleted(client, event.data.object as Stripe.Customer);
+    } else if (event.type === 'payment_method.detached') {
+      deferredActions = await handlePaymentMethodDetached(client, event.data.object as Stripe.PaymentMethod);
+    } else if (event.type === 'payment_method.updated') {
+      deferredActions = await handlePaymentMethodUpdated(client, event.data.object as Stripe.PaymentMethod);
+    } else if (event.type === 'payment_method.automatically_updated') {
+      deferredActions = await handlePaymentMethodAutoUpdated(client, event.data.object as Stripe.PaymentMethod);
+    } else if (event.type === 'charge.dispute.updated') {
+      deferredActions = await handleChargeDisputeUpdated(client, event.data.object as Stripe.Dispute);
+    } else if (event.type === 'checkout.session.expired') {
+      deferredActions = await handleCheckoutSessionExpired(client, event.data.object as Stripe.Checkout.Session);
+    } else if (event.type === 'checkout.session.async_payment_failed') {
+      deferredActions = await handleCheckoutSessionAsyncPaymentFailed(client, event.data.object as Stripe.Checkout.Session);
+    } else if (event.type === 'checkout.session.async_payment_succeeded') {
+      deferredActions = await handleCheckoutSessionAsyncPaymentSucceeded(client, event.data.object as Stripe.Checkout.Session);
+    } else if (event.type === 'invoice.payment_action_required') {
+      deferredActions = await handleInvoicePaymentActionRequired(client, event.data.object as InvoiceWithLegacyFields);
+    } else if (event.type === 'invoice.overdue') {
+      deferredActions = await handleInvoiceOverdue(client, event.data.object as InvoiceWithLegacyFields);
+    } else if (event.type === 'setup_intent.succeeded') {
+      deferredActions = await handleSetupIntentSucceeded(client, event.data.object as Stripe.SetupIntent);
+    } else if (event.type === 'setup_intent.setup_failed') {
+      deferredActions = await handleSetupIntentFailed(client, event.data.object as Stripe.SetupIntent);
     }
 
     await client.query('COMMIT');
@@ -4277,6 +4341,1004 @@ async function handlePaymentMethodAttached(client: PoolClient, paymentMethod: St
     }
   } catch (error: unknown) {
     logger.error('[Stripe Webhook] Error handling payment_method.attached:', { error });
+  }
+
+  return deferredActions;
+}
+
+export async function handleCustomerCreated(client: PoolClient, customer: Stripe.Customer): Promise<DeferredAction[]> {
+  const deferredActions: DeferredAction[] = [];
+
+  try {
+    const email = customer.email?.toLowerCase();
+    if (!email) {
+      logger.info(`[Stripe Webhook] customer.created ${customer.id} has no email, skipping user lookup`);
+      return deferredActions;
+    }
+
+    const userResult = await client.query(
+      `SELECT id, email, display_name, stripe_customer_id FROM users WHERE LOWER(email) = $1 LIMIT 1`,
+      [email]
+    );
+
+    if (userResult.rows.length === 0) {
+      logger.info(`[Stripe Webhook] customer.created ${customer.id} - no matching user for ${email} (may be created before checkout completes)`);
+      return deferredActions;
+    }
+
+    const user = userResult.rows[0];
+
+    if (!user.stripe_customer_id) {
+      await client.query(
+        `UPDATE users SET stripe_customer_id = $1 WHERE id = $2`,
+        [customer.id, user.id]
+      );
+      logger.info(`[Stripe Webhook] Linked Stripe customer ${customer.id} to user ${user.id} (${user.email})`);
+
+      deferredActions.push(async () => {
+        try {
+          await logSystemAction({
+            action: 'stripe_customer_linked',
+            entityType: 'user',
+            entityId: user.id,
+            details: { stripeCustomerId: customer.id, email: user.email },
+          });
+        } catch (err: unknown) {
+          logger.error('[Stripe Webhook] Failed to log stripe_customer_linked:', { error: getErrorMessage(err) });
+        }
+      });
+    } else if (user.stripe_customer_id !== customer.id) {
+      logger.warn(`[Stripe Webhook] Duplicate Stripe customer detected for user ${user.id} (${user.email}): existing=${user.stripe_customer_id}, new=${customer.id}`);
+
+      deferredActions.push(async () => {
+        try {
+          await notifyAllStaff(
+            'Duplicate Stripe Customer Detected',
+            `User ${user.display_name || user.email} already has Stripe customer ${user.stripe_customer_id}, but a new customer ${customer.id} was created with the same email. Please investigate.`,
+            'billing'
+          );
+        } catch (err: unknown) {
+          logger.error('[Stripe Webhook] Failed to notify staff about duplicate customer:', { error: getErrorMessage(err) });
+        }
+      });
+
+      deferredActions.push(async () => {
+        try {
+          await logSystemAction({
+            action: 'stripe_customer_linked',
+            entityType: 'user',
+            entityId: user.id,
+            details: { stripeCustomerId: customer.id, existingCustomerId: user.stripe_customer_id, duplicate: true, email: user.email },
+          });
+        } catch (err: unknown) {
+          logger.error('[Stripe Webhook] Failed to log duplicate customer action:', { error: getErrorMessage(err) });
+        }
+      });
+    } else {
+      logger.info(`[Stripe Webhook] customer.created ${customer.id} - user ${user.id} already linked to this customer`);
+    }
+  } catch (error: unknown) {
+    logger.error('[Stripe Webhook] Error handling customer.created:', { error: getErrorMessage(error) });
+  }
+
+  return deferredActions;
+}
+
+export async function handleCustomerDeleted(client: PoolClient, customer: Stripe.Customer): Promise<DeferredAction[]> {
+  const deferredActions: DeferredAction[] = [];
+
+  try {
+    const customerId = customer.id;
+    logger.info(`[Stripe Webhook] customer.deleted ${customerId} (deleted flag: ${(customer as any).deleted})`);
+
+    const userResult = await client.query(
+      `SELECT id, email, display_name FROM users WHERE stripe_customer_id = $1 LIMIT 1`,
+      [customerId]
+    );
+
+    if (userResult.rows.length === 0) {
+      logger.info(`[Stripe Webhook] customer.deleted ${customerId} - no matching user found`);
+      return deferredActions;
+    }
+
+    const user = userResult.rows[0];
+
+    await client.query(
+      `UPDATE users SET stripe_customer_id = NULL, stripe_subscription_id = NULL, billing_provider = '' WHERE id = $1`,
+      [user.id]
+    );
+
+    logger.info(`[Stripe Webhook] Cleared billing fields for user ${user.id} (${user.email}) after Stripe customer deletion`);
+
+    deferredActions.push(async () => {
+      try {
+        await notifyAllStaff(
+          'Stripe Customer Deleted',
+          `${user.display_name || user.email} - their Stripe customer was deleted externally. Billing is now disconnected.`,
+          'billing',
+          { urgent: true }
+        );
+      } catch (err: unknown) {
+        logger.error('[Stripe Webhook] Failed to notify staff about customer deletion:', { error: getErrorMessage(err) });
+      }
+    });
+
+    deferredActions.push(async () => {
+      try {
+        await logSystemAction({
+          action: 'stripe_customer_deleted',
+          entityType: 'user',
+          entityId: user.id,
+          details: { stripeCustomerId: customerId, email: user.email, displayName: user.display_name },
+        });
+      } catch (err: unknown) {
+        logger.error('[Stripe Webhook] Failed to log customer deletion:', { error: getErrorMessage(err) });
+      }
+    });
+  } catch (error: unknown) {
+    logger.error('[Stripe Webhook] Error handling customer.deleted:', { error: getErrorMessage(error) });
+  }
+
+  return deferredActions;
+}
+
+export async function handlePaymentMethodDetached(client: PoolClient, paymentMethod: Stripe.PaymentMethod): Promise<DeferredAction[]> {
+  const deferredActions: DeferredAction[] = [];
+
+  try {
+    const customerId = typeof paymentMethod.customer === 'string'
+      ? paymentMethod.customer
+      : paymentMethod.customer?.id;
+
+    if (!customerId) {
+      logger.info(`[Stripe Webhook] payment_method.detached ${paymentMethod.id} - no customer associated`);
+      return deferredActions;
+    }
+
+    const userResult = await client.query(
+      `SELECT id, email, display_name FROM users WHERE stripe_customer_id = $1 LIMIT 1`,
+      [customerId]
+    );
+
+    if (userResult.rows.length === 0) {
+      logger.info(`[Stripe Webhook] payment_method.detached ${paymentMethod.id} - no matching user for customer ${customerId}`);
+      return deferredActions;
+    }
+
+    const user = userResult.rows[0];
+
+    let hasRemainingMethods = true;
+    try {
+      const stripe = await getStripeClient();
+      const methods = await stripe.paymentMethods.list({ customer: customerId, limit: 1 });
+      hasRemainingMethods = methods.data.length > 0;
+    } catch (stripeErr: unknown) {
+      logger.error('[Stripe Webhook] Failed to check remaining payment methods:', { error: getErrorMessage(stripeErr) });
+    }
+
+    if (!hasRemainingMethods) {
+      await client.query(
+        `UPDATE users SET requires_card_update = true WHERE id = $1`,
+        [user.id]
+      );
+      logger.info(`[Stripe Webhook] No remaining payment methods for user ${user.id} (${user.email}), set requires_card_update = true`);
+
+      deferredActions.push(async () => {
+        try {
+          await notifyAllStaff(
+            'Payment Method Removed - No Methods Remaining',
+            `${user.display_name || user.email} has no remaining payment methods after detachment of ${paymentMethod.id}. They have been flagged for card update.`,
+            'billing'
+          );
+        } catch (err: unknown) {
+          logger.error('[Stripe Webhook] Failed to notify staff about payment method detach:', { error: getErrorMessage(err) });
+        }
+      });
+    }
+
+    deferredActions.push(async () => {
+      try {
+        await notifyMember(
+          user.email,
+          'Payment Method Removed',
+          'Your payment method was removed. Please add a new one to avoid billing issues.',
+          'payment_method_update',
+          { sendPush: false }
+        );
+      } catch (err: unknown) {
+        logger.error('[Stripe Webhook] Failed to notify member about payment method detach:', { error: getErrorMessage(err) });
+      }
+    });
+  } catch (error: unknown) {
+    logger.error('[Stripe Webhook] Error handling payment_method.detached:', { error: getErrorMessage(error) });
+  }
+
+  return deferredActions;
+}
+
+export async function handlePaymentMethodUpdated(client: PoolClient, paymentMethod: Stripe.PaymentMethod): Promise<DeferredAction[]> {
+  const deferredActions: DeferredAction[] = [];
+
+  try {
+    const customerId = typeof paymentMethod.customer === 'string'
+      ? paymentMethod.customer
+      : paymentMethod.customer?.id;
+
+    if (!customerId) {
+      logger.info(`[Stripe Webhook] payment_method.updated ${paymentMethod.id} - no customer associated`);
+      return deferredActions;
+    }
+
+    const userResult = await client.query(
+      `SELECT id, email, display_name FROM users WHERE stripe_customer_id = $1 LIMIT 1`,
+      [customerId]
+    );
+
+    if (userResult.rows.length === 0) {
+      logger.info(`[Stripe Webhook] payment_method.updated ${paymentMethod.id} - no matching user for customer ${customerId}`);
+      return deferredActions;
+    }
+
+    const user = userResult.rows[0];
+
+    if (paymentMethod.type === 'card' && paymentMethod.card) {
+      const { exp_month, exp_year, last4 } = paymentMethod.card;
+      const now = new Date();
+      const expiryDate = new Date(exp_year, exp_month - 1);
+      const thirtyDaysFromNow = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+
+      if (expiryDate <= thirtyDaysFromNow) {
+        deferredActions.push(async () => {
+          try {
+            await notifyMember(
+              user.email,
+              'Card Expiring Soon',
+              `Your card ending in ${last4} expires soon. Please update your payment method.`,
+              'card_expiring',
+              { sendPush: false }
+            );
+          } catch (err: unknown) {
+            logger.error('[Stripe Webhook] Failed to notify member about expiring card:', { error: getErrorMessage(err) });
+          }
+        });
+
+        deferredActions.push(async () => {
+          try {
+            await notifyAllStaff(
+              'Member Card Expiring Soon',
+              `${user.display_name || user.email}'s card ending in ${last4} expires soon (${exp_month}/${exp_year}).`,
+              'billing'
+            );
+          } catch (err: unknown) {
+            logger.error('[Stripe Webhook] Failed to notify staff about expiring card:', { error: getErrorMessage(err) });
+          }
+        });
+      }
+    }
+
+    logger.info(`[Stripe Webhook] payment_method.updated ${paymentMethod.id} for user ${user.id} (${user.email})`);
+  } catch (error: unknown) {
+    logger.error('[Stripe Webhook] Error handling payment_method.updated:', { error: getErrorMessage(error) });
+  }
+
+  return deferredActions;
+}
+
+export async function handlePaymentMethodAutoUpdated(client: PoolClient, paymentMethod: Stripe.PaymentMethod): Promise<DeferredAction[]> {
+  const deferredActions: DeferredAction[] = [];
+
+  try {
+    const customerId = typeof paymentMethod.customer === 'string'
+      ? paymentMethod.customer
+      : paymentMethod.customer?.id;
+
+    if (!customerId) {
+      logger.info(`[Stripe Webhook] payment_method auto-updated ${paymentMethod.id} - no customer associated`);
+      return deferredActions;
+    }
+
+    const userResult = await client.query(
+      `SELECT id, email, display_name, requires_card_update FROM users WHERE stripe_customer_id = $1 LIMIT 1`,
+      [customerId]
+    );
+
+    if (userResult.rows.length === 0) {
+      logger.info(`[Stripe Webhook] payment_method auto-updated ${paymentMethod.id} - no matching user for customer ${customerId}`);
+      return deferredActions;
+    }
+
+    const user = userResult.rows[0];
+
+    if (user.requires_card_update) {
+      await client.query(
+        `UPDATE users SET requires_card_update = false WHERE id = $1`,
+        [user.id]
+      );
+      logger.info(`[Stripe Webhook] Cleared requires_card_update for user ${user.id} after auto-update`);
+    }
+
+    deferredActions.push(async () => {
+      try {
+        await notifyMember(
+          user.email,
+          'Card Details Auto-Updated',
+          'Your card details were automatically updated by your bank. No action needed.',
+          'billing_alert',
+          { sendPush: false }
+        );
+      } catch (err: unknown) {
+        logger.error('[Stripe Webhook] Failed to notify member about auto-updated card:', { error: getErrorMessage(err) });
+      }
+    });
+
+    deferredActions.push(async () => {
+      try {
+        await logSystemAction({
+          action: 'payment_method_auto_updated',
+          entityType: 'user',
+          entityId: user.id,
+          details: { paymentMethodId: paymentMethod.id, stripeCustomerId: customerId, email: user.email },
+        });
+      } catch (err: unknown) {
+        logger.error('[Stripe Webhook] Failed to log auto-updated payment method:', { error: getErrorMessage(err) });
+      }
+    });
+
+    deferredActions.push(async () => {
+      try {
+        await notifyAllStaff(
+          'Payment Method Auto-Updated',
+          `${user.display_name || user.email}'s card was automatically updated by their bank (payment method ${paymentMethod.id}).`,
+          'billing'
+        );
+      } catch (err: unknown) {
+        logger.error('[Stripe Webhook] Failed to notify staff about auto-updated card:', { error: getErrorMessage(err) });
+      }
+    });
+
+    logger.info(`[Stripe Webhook] payment_method auto-updated ${paymentMethod.id} for user ${user.id} (${user.email})`);
+  } catch (error: unknown) {
+    logger.error('[Stripe Webhook] Error handling payment_method auto-updated:', { error: getErrorMessage(error) });
+  }
+
+  return deferredActions;
+}
+
+export async function handleChargeDisputeUpdated(client: PoolClient, dispute: Stripe.Dispute): Promise<DeferredAction[]> {
+  const deferredActions: DeferredAction[] = [];
+
+  try {
+    const { id, amount, payment_intent, reason, status, evidence_details } = dispute;
+
+    const paymentIntentId = typeof payment_intent === 'string'
+      ? payment_intent
+      : payment_intent?.id || null;
+
+    if (paymentIntentId) {
+      await client.query(
+        `UPDATE terminal_payments SET dispute_status = $1 WHERE stripe_payment_intent_id = $2`,
+        [status, paymentIntentId]
+      );
+    }
+
+    const statusDescriptions: Record<string, string> = {
+      'needs_response': 'Needs Response',
+      'under_review': 'Under Review',
+      'won': 'Won',
+      'lost': 'Lost',
+      'warning_needs_response': 'Warning - Needs Response',
+      'warning_under_review': 'Warning - Under Review',
+      'warning_closed': 'Warning - Closed',
+      'charge_refunded': 'Charge Refunded',
+    };
+
+    const statusDescription = statusDescriptions[status] || status;
+
+    logger.info(`[Stripe Webhook] Dispute ${id} updated: status=${status} (${statusDescription}), amount=$${(amount / 100).toFixed(2)}, reason=${reason}`);
+
+    deferredActions.push(async () => {
+      try {
+        await notifyAllStaff(
+          'Dispute Status Updated',
+          `Dispute ${id} status changed to ${statusDescription}. Amount: $${(amount / 100).toFixed(2)}. Reason: ${reason || 'unknown'}.${paymentIntentId ? ` Payment Intent: ${paymentIntentId}` : ''}`,
+          'billing',
+          { urgent: status === 'needs_response' || status === 'warning_needs_response' }
+        );
+      } catch (err: unknown) {
+        logger.error('[Stripe Webhook] Failed to notify staff about dispute update:', { error: getErrorMessage(err) });
+      }
+    });
+
+    deferredActions.push(async () => {
+      try {
+        await logSystemAction({
+          action: 'charge_dispute_updated',
+          entityType: 'dispute',
+          entityId: id,
+          details: {
+            status,
+            statusDescription,
+            amount: amount / 100,
+            reason,
+            paymentIntentId,
+            evidenceDueBy: evidence_details?.due_by ? new Date(evidence_details.due_by * 1000).toISOString() : null,
+          },
+        });
+      } catch (err: unknown) {
+        logger.error('[Stripe Webhook] Failed to log dispute update:', { error: getErrorMessage(err) });
+      }
+    });
+  } catch (error: unknown) {
+    logger.error('[Stripe Webhook] Error handling charge.dispute.updated:', { error: getErrorMessage(error) });
+  }
+
+  return deferredActions;
+}
+
+// --- Checkout, Invoice & Setup Intent Handlers ---
+
+async function handleCheckoutSessionExpired(client: PoolClient, session: Stripe.Checkout.Session): Promise<DeferredAction[]> {
+  const deferredActions: DeferredAction[] = [];
+
+  try {
+    const email = session.customer_email?.toLowerCase() || null;
+    const customerId = typeof session.customer === 'string' ? session.customer : session.customer?.id || null;
+    const metadata = session.metadata || {};
+    const purpose = metadata.purpose || 'unknown';
+    const source = metadata.source || '';
+    const tierSlug = metadata.tier_slug || '';
+
+    let userEmail = email;
+    if (!userEmail && customerId) {
+      const userResult = await client.query(
+        `SELECT email FROM users WHERE stripe_customer_id = $1 LIMIT 1`,
+        [customerId]
+      );
+      if (userResult.rows.length > 0) {
+        userEmail = userResult.rows[0].email;
+      }
+    }
+
+    const displayEmail = userEmail || email || customerId || 'unknown';
+    logger.info(`[Stripe Webhook] Checkout session expired: ${session.id}, email: ${displayEmail}, purpose: ${purpose}, source: ${source}, tier: ${tierSlug}`);
+
+    if (purpose === 'day_pass') {
+      deferredActions.push(async () => {
+        try {
+          await notifyAllStaff(
+            'Day Pass Checkout Expired',
+            `Day pass checkout expired for ${displayEmail}. Session: ${session.id}`,
+            'billing',
+            { sendPush: false }
+          );
+        } catch (err: unknown) {
+          logger.error('[Stripe Webhook] Failed to notify staff about expired day pass checkout:', { error: getErrorMessage(err) });
+        }
+      });
+    }
+
+    if (source === 'staff_invite' || source === 'activation_link') {
+      deferredActions.push(async () => {
+        try {
+          await notifyAllStaff(
+            'Signup Checkout Expired',
+            `Signup checkout expired for ${displayEmail} — they may need a new link. Source: ${source}, Session: ${session.id}`,
+            'billing',
+            { sendPush: true }
+          );
+        } catch (err: unknown) {
+          logger.error('[Stripe Webhook] Failed to notify staff about expired signup checkout:', { error: getErrorMessage(err) });
+        }
+      });
+    }
+
+    deferredActions.push(async () => {
+      try {
+        await logSystemAction({
+          action: 'checkout_session_expired',
+          entityType: 'checkout_session',
+          entityId: session.id,
+          details: {
+            email: displayEmail,
+            purpose,
+            source,
+            tierSlug,
+            customerId,
+          },
+        });
+      } catch (err: unknown) {
+        logger.error('[Stripe Webhook] Failed to log checkout session expired:', { error: getErrorMessage(err) });
+      }
+    });
+  } catch (error: unknown) {
+    logger.error('[Stripe Webhook] Error handling checkout.session.expired:', { error: getErrorMessage(error) });
+  }
+
+  return deferredActions;
+}
+
+async function handleCheckoutSessionAsyncPaymentFailed(client: PoolClient, session: Stripe.Checkout.Session): Promise<DeferredAction[]> {
+  const deferredActions: DeferredAction[] = [];
+
+  try {
+    const email = session.customer_email?.toLowerCase() || null;
+    const customerId = typeof session.customer === 'string' ? session.customer : session.customer?.id || null;
+    const metadata = session.metadata || {};
+    const purpose = metadata.purpose || 'unknown';
+    const description = metadata.description || purpose;
+
+    let userEmail = email;
+    if (!userEmail && customerId) {
+      const userResult = await client.query(
+        `SELECT email FROM users WHERE stripe_customer_id = $1 LIMIT 1`,
+        [customerId]
+      );
+      if (userResult.rows.length > 0) {
+        userEmail = userResult.rows[0].email;
+      }
+    }
+
+    const displayEmail = userEmail || email || customerId || 'unknown';
+    logger.info(`[Stripe Webhook] Checkout session async payment failed: ${session.id}, email: ${displayEmail}, purpose: ${purpose}`);
+
+    if (userEmail) {
+      deferredActions.push(async () => {
+        try {
+          await notifyMember({
+            userEmail: userEmail!,
+            title: 'Payment Failed',
+            message: `Your payment for ${description} could not be completed. Please try again or use a different payment method.`,
+            type: 'payment_failed',
+          });
+        } catch (err: unknown) {
+          logger.error('[Stripe Webhook] Failed to notify member about async payment failure:', { error: getErrorMessage(err) });
+        }
+      });
+    }
+
+    deferredActions.push(async () => {
+      try {
+        await notifyAllStaff(
+          'Async Payment Failed',
+          `Async payment failed for ${displayEmail}. Purpose: ${purpose}, Session: ${session.id}`,
+          'billing',
+          { sendPush: true }
+        );
+      } catch (err: unknown) {
+        logger.error('[Stripe Webhook] Failed to notify staff about async payment failure:', { error: getErrorMessage(err) });
+      }
+    });
+
+    deferredActions.push(async () => {
+      try {
+        await logSystemAction({
+          action: 'checkout_async_payment_failed',
+          entityType: 'checkout_session',
+          entityId: session.id,
+          details: {
+            email: displayEmail,
+            purpose,
+            customerId,
+          },
+        });
+      } catch (err: unknown) {
+        logger.error('[Stripe Webhook] Failed to log async payment failure:', { error: getErrorMessage(err) });
+      }
+    });
+  } catch (error: unknown) {
+    logger.error('[Stripe Webhook] Error handling checkout.session.async_payment_failed:', { error: getErrorMessage(error) });
+  }
+
+  return deferredActions;
+}
+
+async function handleCheckoutSessionAsyncPaymentSucceeded(client: PoolClient, session: Stripe.Checkout.Session): Promise<DeferredAction[]> {
+  const deferredActions: DeferredAction[] = [];
+
+  try {
+    const email = session.customer_email?.toLowerCase() || null;
+    const customerId = typeof session.customer === 'string' ? session.customer : session.customer?.id || null;
+    const metadata = session.metadata || {};
+    const purpose = metadata.purpose || 'unknown';
+    const amountTotal = session.amount_total || 0;
+
+    let userEmail = email;
+    let userName = '';
+    if (!userEmail && customerId) {
+      const userResult = await client.query(
+        `SELECT email, display_name FROM users WHERE stripe_customer_id = $1 LIMIT 1`,
+        [customerId]
+      );
+      if (userResult.rows.length > 0) {
+        userEmail = userResult.rows[0].email;
+        userName = userResult.rows[0].display_name || '';
+      }
+    } else if (userEmail) {
+      const userResult = await client.query(
+        `SELECT display_name FROM users WHERE LOWER(email) = $1 LIMIT 1`,
+        [userEmail]
+      );
+      if (userResult.rows.length > 0) {
+        userName = userResult.rows[0].display_name || '';
+      }
+    }
+
+    const displayEmail = userEmail || email || customerId || 'unknown';
+    logger.info(`[Stripe Webhook] Checkout session async payment succeeded: ${session.id}, email: ${displayEmail}, purpose: ${purpose}, amount: $${(amountTotal / 100).toFixed(2)}`);
+
+    if (purpose === 'day_pass') {
+      try {
+        await recordDayPassPurchaseFromWebhook(client, session);
+        logger.info(`[Stripe Webhook] Recorded day pass purchase from async payment for ${displayEmail}`);
+      } catch (err: unknown) {
+        logger.error('[Stripe Webhook] Failed to record day pass from async payment:', { error: getErrorMessage(err) });
+      }
+    } else {
+      logger.info(`[Stripe Webhook] Async payment succeeded for non-day-pass purpose '${purpose}' — subscription handler likely already activated membership`);
+    }
+
+    if (userEmail) {
+      deferredActions.push(async () => {
+        try {
+          await notifyMember({
+            userEmail: userEmail!,
+            title: 'Payment Confirmed',
+            message: 'Your payment has been confirmed!',
+            type: 'payment_success',
+          });
+        } catch (err: unknown) {
+          logger.error('[Stripe Webhook] Failed to notify member about async payment success:', { error: getErrorMessage(err) });
+        }
+      });
+    }
+
+    deferredActions.push(async () => {
+      try {
+        await notifyAllStaff(
+          'Async Payment Succeeded',
+          `Async payment confirmed for ${displayEmail}. Purpose: ${purpose}, Amount: $${(amountTotal / 100).toFixed(2)}, Session: ${session.id}`,
+          'billing',
+          { sendPush: false }
+        );
+      } catch (err: unknown) {
+        logger.error('[Stripe Webhook] Failed to notify staff about async payment success:', { error: getErrorMessage(err) });
+      }
+    });
+
+    deferredActions.push(async () => {
+      try {
+        await logSystemAction({
+          action: 'checkout_async_payment_succeeded',
+          entityType: 'checkout_session',
+          entityId: session.id,
+          details: {
+            email: displayEmail,
+            purpose,
+            amount: amountTotal / 100,
+            customerId,
+          },
+        });
+      } catch (err: unknown) {
+        logger.error('[Stripe Webhook] Failed to log async payment success:', { error: getErrorMessage(err) });
+      }
+    });
+
+    deferredActions.push(async () => {
+      try {
+        await upsertTransactionCache({
+          stripeId: session.id,
+          objectType: 'payment_intent',
+          amountCents: amountTotal,
+          currency: session.currency || 'usd',
+          status: 'succeeded',
+          createdAt: new Date((session.created || Math.floor(Date.now() / 1000)) * 1000),
+          customerId,
+          customerEmail: userEmail || email,
+          customerName: userName || null,
+          description: `Async payment: ${purpose}`,
+          metadata,
+          source: 'webhook',
+        });
+      } catch (err: unknown) {
+        logger.error('[Stripe Webhook] Failed to cache async payment transaction:', { error: getErrorMessage(err) });
+      }
+    });
+  } catch (error: unknown) {
+    logger.error('[Stripe Webhook] Error handling checkout.session.async_payment_succeeded:', { error: getErrorMessage(error) });
+  }
+
+  return deferredActions;
+}
+
+async function handleInvoicePaymentActionRequired(client: PoolClient, invoice: InvoiceWithLegacyFields): Promise<DeferredAction[]> {
+  const deferredActions: DeferredAction[] = [];
+
+  try {
+    const customerId = typeof invoice.customer === 'string' ? invoice.customer : invoice.customer?.id || null;
+    if (!customerId) {
+      logger.info(`[Stripe Webhook] invoice.payment_action_required ${invoice.id} has no customer, skipping`);
+      return deferredActions;
+    }
+
+    const userResult = await client.query(
+      `SELECT email, display_name FROM users WHERE stripe_customer_id = $1 LIMIT 1`,
+      [customerId]
+    );
+
+    const userEmail = userResult.rows[0]?.email;
+    const displayEmail = userEmail || customerId;
+
+    logger.info(`[Stripe Webhook] Invoice payment action required: ${invoice.id}, customer: ${customerId}, email: ${displayEmail}`);
+
+    if (userEmail) {
+      deferredActions.push(async () => {
+        try {
+          await notifyMember({
+            userEmail,
+            title: 'Payment Authentication Required',
+            message: 'Your payment requires additional authentication. Please click the link in your email or visit your billing portal to complete the payment.',
+            type: 'billing_alert',
+          });
+        } catch (err: unknown) {
+          logger.error('[Stripe Webhook] Failed to notify member about payment action required:', { error: getErrorMessage(err) });
+        }
+      });
+    }
+
+    deferredActions.push(async () => {
+      try {
+        await notifyAllStaff(
+          'Payment Authentication Required',
+          `Payment for ${displayEmail} requires 3D Secure authentication. Invoice: ${invoice.id}`,
+          'billing',
+          { sendPush: false }
+        );
+      } catch (err: unknown) {
+        logger.error('[Stripe Webhook] Failed to notify staff about payment action required:', { error: getErrorMessage(err) });
+      }
+    });
+
+    deferredActions.push(async () => {
+      try {
+        await logSystemAction({
+          action: 'invoice_payment_action_required',
+          entityType: 'invoice',
+          entityId: invoice.id,
+          details: {
+            email: displayEmail,
+            customerId,
+            hostedInvoiceUrl: invoice.hosted_invoice_url || null,
+          },
+        });
+      } catch (err: unknown) {
+        logger.error('[Stripe Webhook] Failed to log payment action required:', { error: getErrorMessage(err) });
+      }
+    });
+  } catch (error: unknown) {
+    logger.error('[Stripe Webhook] Error handling invoice.payment_action_required:', { error: getErrorMessage(error) });
+  }
+
+  return deferredActions;
+}
+
+async function handleInvoiceOverdue(client: PoolClient, invoice: InvoiceWithLegacyFields): Promise<DeferredAction[]> {
+  const deferredActions: DeferredAction[] = [];
+
+  try {
+    const customerId = typeof invoice.customer === 'string' ? invoice.customer : invoice.customer?.id || null;
+    if (!customerId) {
+      logger.info(`[Stripe Webhook] invoice.overdue ${invoice.id} has no customer, skipping`);
+      return deferredActions;
+    }
+
+    const amountDue = invoice.amount_due || 0;
+
+    const userResult = await client.query(
+      `SELECT email, display_name, billing_provider FROM users WHERE stripe_customer_id = $1 LIMIT 1`,
+      [customerId]
+    );
+
+    if (userResult.rows.length === 0) {
+      logger.info(`[Stripe Webhook] invoice.overdue ${invoice.id} — no user found for customer ${customerId}`);
+      return deferredActions;
+    }
+
+    const user = userResult.rows[0];
+    const userEmail = user.email;
+    const billingProvider = user.billing_provider;
+
+    if (billingProvider && billingProvider !== 'stripe') {
+      logger.info(`[Stripe Webhook] Skipping invoice.overdue for ${userEmail} — billing_provider is '${billingProvider}', not 'stripe'`);
+      return deferredActions;
+    }
+
+    logger.info(`[Stripe Webhook] Invoice overdue: ${invoice.id}, email: ${userEmail}, amount: $${(amountDue / 100).toFixed(2)}`);
+
+    deferredActions.push(async () => {
+      try {
+        await notifyMember({
+          userEmail,
+          title: 'Overdue Invoice',
+          message: `You have an overdue invoice of $${(amountDue / 100).toFixed(2)}. Please update your payment method to avoid service interruption.`,
+          type: 'outstanding_balance',
+        });
+      } catch (err: unknown) {
+        logger.error('[Stripe Webhook] Failed to notify member about overdue invoice:', { error: getErrorMessage(err) });
+      }
+    });
+
+    deferredActions.push(async () => {
+      try {
+        await notifyAllStaff(
+          'Overdue Invoice',
+          `Overdue invoice for ${userEmail}: $${(amountDue / 100).toFixed(2)}. Invoice ${invoice.id}`,
+          'billing',
+          { urgent: true, sendPush: true }
+        );
+      } catch (err: unknown) {
+        logger.error('[Stripe Webhook] Failed to notify staff about overdue invoice:', { error: getErrorMessage(err) });
+      }
+    });
+
+    deferredActions.push(async () => {
+      try {
+        await logSystemAction({
+          action: 'invoice_overdue',
+          entityType: 'invoice',
+          entityId: invoice.id,
+          details: {
+            email: userEmail,
+            amount: amountDue / 100,
+            customerId,
+          },
+        });
+      } catch (err: unknown) {
+        logger.error('[Stripe Webhook] Failed to log overdue invoice:', { error: getErrorMessage(err) });
+      }
+    });
+  } catch (error: unknown) {
+    logger.error('[Stripe Webhook] Error handling invoice.overdue:', { error: getErrorMessage(error) });
+  }
+
+  return deferredActions;
+}
+
+async function handleSetupIntentSucceeded(client: PoolClient, setupIntent: Stripe.SetupIntent): Promise<DeferredAction[]> {
+  const deferredActions: DeferredAction[] = [];
+
+  try {
+    const customerId = typeof setupIntent.customer === 'string' ? setupIntent.customer : setupIntent.customer?.id || null;
+    if (!customerId) {
+      logger.info(`[Stripe Webhook] setup_intent.succeeded ${setupIntent.id} has no customer, skipping`);
+      return deferredActions;
+    }
+
+    logger.info(`[Stripe Webhook] Setup intent succeeded: ${setupIntent.id}, customer: ${customerId}`);
+
+    const userResult = await client.query(
+      `SELECT id, email, display_name, requires_card_update FROM users WHERE stripe_customer_id = $1 LIMIT 1`,
+      [customerId]
+    );
+
+    if (userResult.rows.length === 0) {
+      logger.info(`[Stripe Webhook] setup_intent.succeeded — no user found for customer ${customerId}`);
+      return deferredActions;
+    }
+
+    const user = userResult.rows[0];
+
+    if (user.requires_card_update) {
+      await client.query(
+        `UPDATE users SET requires_card_update = false, updated_at = NOW() WHERE id = $1`,
+        [user.id]
+      );
+      logger.info(`[Stripe Webhook] Cleared requires_card_update for user ${user.email} (setup intent succeeded)`);
+    }
+
+    deferredActions.push(async () => {
+      try {
+        await notifyMember({
+          userEmail: user.email,
+          title: 'Payment Method Saved',
+          message: 'Your payment method has been saved successfully.',
+          type: 'billing_alert',
+        });
+      } catch (err: unknown) {
+        logger.error('[Stripe Webhook] Failed to notify member about setup intent success:', { error: getErrorMessage(err) });
+      }
+    });
+
+    deferredActions.push(async () => {
+      try {
+        await logSystemAction({
+          action: 'setup_intent_succeeded',
+          entityType: 'setup_intent',
+          entityId: setupIntent.id,
+          details: {
+            email: user.email,
+            customerId,
+            clearedCardUpdate: user.requires_card_update || false,
+          },
+        });
+      } catch (err: unknown) {
+        logger.error('[Stripe Webhook] Failed to log setup intent success:', { error: getErrorMessage(err) });
+      }
+    });
+  } catch (error: unknown) {
+    logger.error('[Stripe Webhook] Error handling setup_intent.succeeded:', { error: getErrorMessage(error) });
+  }
+
+  return deferredActions;
+}
+
+async function handleSetupIntentFailed(client: PoolClient, setupIntent: Stripe.SetupIntent): Promise<DeferredAction[]> {
+  const deferredActions: DeferredAction[] = [];
+
+  try {
+    const customerId = typeof setupIntent.customer === 'string' ? setupIntent.customer : setupIntent.customer?.id || null;
+    if (!customerId) {
+      logger.info(`[Stripe Webhook] setup_intent.setup_failed ${setupIntent.id} has no customer, skipping`);
+      return deferredActions;
+    }
+
+    const errorMessage = setupIntent.last_setup_error?.message || 'Unknown error';
+
+    logger.info(`[Stripe Webhook] Setup intent failed: ${setupIntent.id}, customer: ${customerId}, error: ${errorMessage}`);
+
+    const userResult = await client.query(
+      `SELECT email, display_name FROM users WHERE stripe_customer_id = $1 LIMIT 1`,
+      [customerId]
+    );
+
+    const userEmail = userResult.rows[0]?.email;
+    const displayEmail = userEmail || customerId;
+
+    if (userEmail) {
+      deferredActions.push(async () => {
+        try {
+          await notifyMember({
+            userEmail,
+            title: 'Payment Method Failed',
+            message: `We couldn't save your payment method: ${errorMessage}. Please try again.`,
+            type: 'payment_failed',
+          });
+        } catch (err: unknown) {
+          logger.error('[Stripe Webhook] Failed to notify member about setup intent failure:', { error: getErrorMessage(err) });
+        }
+      });
+    }
+
+    deferredActions.push(async () => {
+      try {
+        await notifyAllStaff(
+          'Setup Intent Failed',
+          `Payment method setup failed for ${displayEmail}. Error: ${errorMessage}. Setup Intent: ${setupIntent.id}`,
+          'billing',
+          { sendPush: false }
+        );
+      } catch (err: unknown) {
+        logger.error('[Stripe Webhook] Failed to notify staff about setup intent failure:', { error: getErrorMessage(err) });
+      }
+    });
+
+    deferredActions.push(async () => {
+      try {
+        await logSystemAction({
+          action: 'setup_intent_failed',
+          entityType: 'setup_intent',
+          entityId: setupIntent.id,
+          details: {
+            email: displayEmail,
+            customerId,
+            error: errorMessage,
+          },
+        });
+      } catch (err: unknown) {
+        logger.error('[Stripe Webhook] Failed to log setup intent failure:', { error: getErrorMessage(err) });
+      }
+    });
+  } catch (error: unknown) {
+    logger.error('[Stripe Webhook] Error handling setup_intent.setup_failed:', { error: getErrorMessage(error) });
   }
 
   return deferredActions;
