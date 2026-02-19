@@ -13,6 +13,18 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.84.0",
+    date: "2026-02-19",
+    title: "Improved Add Guest Experience & Staff Guest Visibility",
+    changes: [
+      "Improved: 'Add Guest' now shows the payment choice first — members pick 'Pay Guest Fee' or 'Use Guest Pass' before entering guest details",
+      "Improved: 'Pay Guest Fee' works immediately with one tap — no need to enter guest name or email first",
+      "Improved: 'Use Guest Pass' requires complete guest info before submitting, with the button disabled until all fields are filled",
+      "Fixed: Guests added by members now appear correctly in the staff booking details view",
+      "Fixed: When a guest is removed by a member, staff booking sheets update to reflect the removal",
+    ]
+  },
+  {
     version: "7.83.0",
     date: "2026-02-19",
     title: "NFC Tap Check-In: Members Can Check In by Tapping Their Phone",
