@@ -115,9 +115,25 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
       refresh();
     };
 
+    const handleWalkinCheckin = (event: CustomEvent) => {
+      const detail = event.detail?.data;
+      if (detail) {
+        setCheckinConfirmation({
+          isOpen: true,
+          memberName: detail.memberName || 'Member',
+          pinnedNotes: detail.pinnedNotes || [],
+          tier: detail.tier,
+          membershipStatus: detail.membershipStatus
+        });
+        refresh();
+      }
+    };
+
     window.addEventListener('booking-auto-confirmed', handleBookingAutoConfirmed as EventListener);
+    window.addEventListener('walkin-checkin', handleWalkinCheckin as EventListener);
     return () => {
       window.removeEventListener('booking-auto-confirmed', handleBookingAutoConfirmed as EventListener);
+      window.removeEventListener('walkin-checkin', handleWalkinCheckin as EventListener);
     };
   }, [showToast, refresh]);
 

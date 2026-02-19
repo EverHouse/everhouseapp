@@ -101,6 +101,7 @@ export type AuditAction =
   | 'review_waiver'
   | 'direct_add_participant'
   | 'qr_walkin_checkin'
+  | 'nfc_walkin_checkin'
   | 'scan_id'
   | 'save_id_image'
   | 'delete_id_image'

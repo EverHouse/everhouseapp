@@ -6,5 +6,6 @@ export const walkInVisits = pgTable('walk_in_visits', {
   memberId: integer('member_id'),
   checkedInBy: varchar('checked_in_by', { length: 255 }),
   checkedInByName: varchar('checked_in_by_name', { length: 255 }),
+  source: varchar('source', { length: 50 }),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });

@@ -56,6 +56,7 @@ import authGoogleRouter from '../routes/auth-google';
 import idScannerRouter from '../routes/idScanner';
 import emailTemplatesRouter from '../routes/emailTemplates';
 import monitoringRouter from '../routes/monitoring';
+import nfcCheckinRouter from '../routes/nfcCheckin';
 import { registerObjectStorageRoutes } from '../replit_integrations/object_storage';
 
 export function registerRoutes(app: Express): void {
@@ -115,5 +116,6 @@ export function registerRoutes(app: Express): void {
   app.use(idScannerRouter);
   app.use(emailTemplatesRouter);
   app.use(monitoringRouter);
+  app.use(nfcCheckinRouter);
   registerObjectStorageRoutes(app);
 }

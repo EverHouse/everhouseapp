@@ -199,6 +199,11 @@ export function useStaffWebSocket(options: UseStaffWebSocketOptions = {}) {
             });
           }
           
+          if (message.type === 'walkin_checkin') {
+            console.log('[StaffWebSocket] Received walkin_checkin:', message.data?.memberName);
+            window.dispatchEvent(new CustomEvent('walkin-checkin', { detail: message }));
+          }
+
           if (message.type === 'directory_update') {
             console.log('[StaffWebSocket] Received directory_update:', message.action);
             window.dispatchEvent(new CustomEvent('directory-update', { detail: message }));

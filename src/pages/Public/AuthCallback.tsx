@@ -40,6 +40,13 @@ const AuthCallback: React.FC = () => {
           } catch (err: unknown) {
             console.error('Failed to check staff/admin status');
           }
+          const nfcRedirect = sessionStorage.getItem('nfc_checkin_redirect');
+          if (nfcRedirect) {
+            sessionStorage.removeItem('nfc_checkin_redirect');
+            startNavigation();
+            navigate('/nfc-checkin');
+            return;
+          }
           startNavigation();
           navigate('/dashboard');
         } else {

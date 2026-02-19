@@ -19,6 +19,7 @@ import { updateHubSpotContactVisitCount } from '../core/memberSync';
 import { ensureSessionForBooking } from '../core/bookingService/sessionManager';
 import { sendFirstVisitConfirmationEmail } from '../emails/firstVisitEmail';
 import { getErrorMessage } from '../utils/errorUtils';
+import { processWalkInCheckin } from '../core/walkInCheckinService';
 
 const router = Router();
 
@@ -1393,75 +1394,36 @@ router.post('/api/staff/qr-checkin', isStaffOrAdmin, async (req: Request, res: R
     const staffEmail = sessionUser?.email || 'unknown';
     const staffName = sessionUser?.name || null;
 
-    const memberResult = await db.execute(sql`
-      SELECT u.id, u.email, u.first_name, u.last_name, u.membership_status, u.tier, u.hubspot_id, u.lifetime_visits
-      FROM users u
-      WHERE u.id = ${memberId}
-      LIMIT 1
-    `);
+    const result = await processWalkInCheckin({
+      memberId,
+      checkedInBy: staffEmail,
+      checkedInByName: staffName,
+      source: 'qr'
+    });
 
-    if (memberResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Member not found' });
+    if (result.alreadyCheckedIn) {
+      return res.status(409).json({ error: result.error, alreadyCheckedIn: true });
     }
 
-    const member = memberResult.rows[0];
-    const displayName = [member.first_name, member.last_name].filter(Boolean).join(' ') || member.email.split('@')[0];
-
-    const recentCheckin = await db.execute(sql`SELECT id, created_at FROM walk_in_visits WHERE member_email = ${member.email} AND created_at > NOW() - INTERVAL '2 minutes' LIMIT 1`);
-    if (recentCheckin.rows.length > 0) {
-      return res.status(409).json({ error: 'This member was already checked in less than 2 minutes ago', alreadyCheckedIn: true });
+    if (!result.success) {
+      return res.status(result.error === 'Member not found' ? 404 : 500).json({ error: result.error });
     }
 
-    const updateResult = await db.execute(sql`UPDATE users SET lifetime_visits = COALESCE(lifetime_visits, 0) + 1 WHERE id = ${memberId} RETURNING lifetime_visits`);
-    const newVisitCount = updateResult.rows[0]?.lifetime_visits || 1;
-
-    if (member.hubspot_id) {
-      updateHubSpotContactVisitCount(member.hubspot_id, newVisitCount)
-        .catch(err => logger.error('[QR Checkin] Failed to sync visit count to HubSpot:', { extra: { err } }));
-    }
-
-    try { broadcastMemberStatsUpdated(member.email, { lifetimeVisits: newVisitCount }); } catch (err: unknown) {logger.error('[Broadcast] Stats update error:', err); }
-
-    notifyMember({
-      userEmail: member.email,
-      title: 'Check-In Complete',
-      message: "Welcome back! You've been checked in by staff.",
-      type: 'booking',
-      relatedType: 'booking'
-    }).catch(err => logger.error('[QR Checkin] Failed to send notification:', { extra: { err } }));
-
-    await db.execute(sql`INSERT INTO walk_in_visits (member_email, checked_in_by, checked_in_by_name, created_at)
-       VALUES (${member.email}, ${staffEmail}, ${staffName}, NOW())`);
-
-    if (newVisitCount === 1 && member.membership_status?.toLowerCase() === 'trialing') {
-      sendFirstVisitConfirmationEmail(member.email, { firstName: member.first_name || undefined })
-        .then(() => logger.info('[QR Checkin] Sent first visit confirmation email to trial member:', { extra: { email: member.email } }))
-        .catch(err => logger.error('[QR Checkin] Failed to send first visit confirmation email:', { extra: { err } }));
-    }
-
-    const pinnedNotesResult = await db.execute(sql`SELECT content, created_by_name FROM member_notes WHERE member_email = ${member.email} AND is_pinned = true ORDER BY created_at DESC`);
-    const pinnedNotes = pinnedNotesResult.rows.map(n => ({
-      content: n.content,
-      createdBy: n.created_by_name || 'Staff'
-    }));
-
-    logFromRequest(req, 'qr_walkin_checkin', 'member', memberId, displayName, {
-      memberEmail: member.email,
-      tier: member.tier,
-      lifetimeVisits: newVisitCount,
+    logFromRequest(req, 'qr_walkin_checkin', 'member', memberId, result.memberName, {
+      memberEmail: result.memberEmail,
+      tier: result.tier,
+      lifetimeVisits: result.lifetimeVisits,
       type: 'walk_in'
     });
 
-    logger.info('[QR Checkin] Walk-in check-in: () by . Visit #', { extra: { displayName, memberEmail: member.email, staffEmail, newVisitCount } });
-
     res.json({
       success: true,
-      memberName: displayName,
-      memberEmail: member.email,
-      tier: member.tier,
-      lifetimeVisits: newVisitCount,
-      pinnedNotes,
-      membershipStatus: member.membership_status
+      memberName: result.memberName,
+      memberEmail: result.memberEmail,
+      tier: result.tier,
+      lifetimeVisits: result.lifetimeVisits,
+      pinnedNotes: result.pinnedNotes,
+      membershipStatus: result.membershipStatus
     });
   } catch (error: unknown) {
     logAndRespond(req, res, 500, 'Failed to process QR check-in', error);
