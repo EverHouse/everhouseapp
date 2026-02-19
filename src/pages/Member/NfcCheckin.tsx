@@ -1,16 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useData } from '../../contexts/DataContext';
-import { playSound } from '../../utils/sounds';
 
-type CheckinState = 'loading' | 'checking_in' | 'success' | 'already_checked_in' | 'not_logged_in' | 'error';
+type CheckinState = 'loading' | 'checking_in' | 'not_logged_in' | 'error';
 
 const NfcCheckin: React.FC = () => {
   const { user, sessionChecked } = useData();
   const navigate = useNavigate();
   const [state, setState] = useState<CheckinState>('loading');
-  const [memberName, setMemberName] = useState('');
-  const [tier, setTier] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
   const checkinAttemptedRef = useRef(false);
   const [retryCount, setRetryCount] = useState(0);
@@ -36,14 +33,11 @@ const NfcCheckin: React.FC = () => {
       .then(async (res) => {
         const data = await res.json();
         if (res.ok && data.success) {
-          setMemberName(data.memberName);
-          setTier(data.tier);
-          setState('success');
-          playSound('checkinSuccess');
+          sessionStorage.setItem('nfc_checkin_result', JSON.stringify({ type: 'success', memberName: data.memberName, tier: data.tier }));
+          navigate('/dashboard', { replace: true });
         } else if (data.alreadyCheckedIn) {
-          setMemberName(data.memberName || user.firstName || '');
-          setState('already_checked_in');
-          playSound('tap');
+          sessionStorage.setItem('nfc_checkin_result', JSON.stringify({ type: 'already_checked_in', memberName: data.memberName || user.firstName || '' }));
+          navigate('/dashboard', { replace: true });
         } else {
           setErrorMessage(data.error || 'Check-in failed');
           setState('error');
@@ -53,7 +47,7 @@ const NfcCheckin: React.FC = () => {
         setErrorMessage('Unable to connect. Please try again.');
         setState('error');
       });
-  }, [sessionChecked, user, retryCount]);
+  }, [sessionChecked, user, retryCount, navigate]);
 
   const handleLoginRedirect = () => {
     const currentPath = window.location.pathname + window.location.search;
@@ -80,43 +74,6 @@ const NfcCheckin: React.FC = () => {
             </div>
             <p className="text-white/80 text-lg font-medium">Checking you in...</p>
             <p className="text-white/40 text-sm mt-1">Just a moment</p>
-          </div>
-        )}
-
-        {state === 'success' && (
-          <div className="rounded-2xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-300">
-            <div className="bg-gradient-to-br from-primary via-primary/95 to-primary/85 p-8 text-center">
-              <div className="w-16 h-16 rounded-full bg-white/20 flex items-center justify-center mx-auto mb-4">
-                <span className="material-symbols-outlined text-4xl text-white">check_circle</span>
-              </div>
-              <h1 className="text-2xl font-bold text-white mb-1">Welcome, {memberName}!</h1>
-              <p className="text-white/80 text-sm font-medium">You're checked in</p>
-              {tier && (
-                <div className="mt-3 inline-flex items-center px-3 py-1 rounded-full bg-white/15 text-white/90 text-xs font-semibold uppercase tracking-wider">
-                  {tier}
-                </div>
-              )}
-            </div>
-            <div className="bg-white p-4 text-center">
-              <p className="text-gray-500 text-sm">Enjoy your visit!</p>
-            </div>
-          </div>
-        )}
-
-        {state === 'already_checked_in' && (
-          <div className="rounded-2xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-300">
-            <div className="bg-gradient-to-br from-blue-600 via-blue-500 to-blue-700 p-8 text-center">
-              <div className="w-16 h-16 rounded-full bg-white/20 flex items-center justify-center mx-auto mb-4">
-                <span className="material-symbols-outlined text-4xl text-white">info</span>
-              </div>
-              <h1 className="text-2xl font-bold text-white mb-1">Already Checked In</h1>
-              <p className="text-white/80 text-sm font-medium">
-                {memberName ? `${memberName}, you` : 'You'} were already checked in just now
-              </p>
-            </div>
-            <div className="bg-white p-4 text-center">
-              <p className="text-gray-500 text-sm">No need to tap again</p>
-            </div>
           </div>
         )}
 

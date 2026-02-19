@@ -31,6 +31,7 @@ import { apiRequest } from '../../lib/apiRequest';
 import { AnimatedPage } from '../../components/motion';
 import { useAutoAnimate } from '@formkit/auto-animate/react';
 import FirstLoginWelcomeModal from '../../components/FirstLoginWelcomeModal';
+import NfcCheckinWelcomeModal from '../../components/NfcCheckinWelcomeModal';
 
 const GUEST_CHECKIN_FIELDS = [
   { name: 'guest_firstname', label: 'Guest First Name', type: 'text' as const, required: true, placeholder: 'John' },
@@ -209,6 +210,7 @@ const Dashboard: React.FC = () => {
   const [overagePaymentBooking, setOveragePaymentBooking] = useState<{ id: number; amount: number; minutes: number } | null>(null);
   const [isPayingOverage, setIsPayingOverage] = useState(false);
   const [showFirstLoginModal, setShowFirstLoginModal] = useState(false);
+  const [nfcCheckinData, setNfcCheckinData] = useState<{ type: 'success' | 'already_checked_in', memberName: string, tier?: string | null } | null>(null);
 
   const isStaffOrAdminProfile = user?.role === 'admin' || user?.role === 'staff';
   const { permissions: tierPermissions } = useTierPermissions(user?.tier);
@@ -288,6 +290,17 @@ const Dashboard: React.FC = () => {
       }
     }
   }, [user?.email]);
+
+  useEffect(() => {
+    const stored = sessionStorage.getItem('nfc_checkin_result');
+    if (stored) {
+      sessionStorage.removeItem('nfc_checkin_result');
+      try {
+        const data = JSON.parse(stored);
+        setNfcCheckinData(data);
+      } catch {}
+    }
+  }, []);
 
   const allItems = [
     ...dbBookings.map(b => {
@@ -1374,6 +1387,12 @@ const Dashboard: React.FC = () => {
       isOpen={showFirstLoginModal}
       onClose={() => setShowFirstLoginModal(false)}
       firstName={user?.name?.split(' ')[0]}
+    />
+
+    <NfcCheckinWelcomeModal
+      isOpen={!!nfcCheckinData}
+      onClose={() => setNfcCheckinData(null)}
+      checkinData={nfcCheckinData}
     />
     </>
   )}
