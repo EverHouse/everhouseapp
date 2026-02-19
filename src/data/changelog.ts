@@ -13,6 +13,17 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.82.1",
+    date: "2026-02-19",
+    title: "Staff Fee Exemption Fix: Golf Instructors No Longer Charged",
+    changes: [
+      "Fixed: Golf instructors were incorrectly being charged overage and guest fees for bookings — they are now properly treated as staff with $0 fees like all other staff and admin members",
+      "Fixed: Staff, admin, and golf instructor members could have prepayment charges created for their bookings in edge cases — a safety check now blocks this at the payment level",
+      "Fixed: Members with unlimited-access tiers are now also protected from accidental prepayment charges",
+      "Improved: All three staff roles (staff, admin, golf instructor) are now consistently recognized across the fee calculation and prepayment systems",
+    ]
+  },
+  {
     version: "7.82.0",
     date: "2026-02-19",
     title: "Complete Stripe Webhook Coverage: 47 Event Types Now Handled",

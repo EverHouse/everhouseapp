@@ -77,7 +77,7 @@ Charged per non-member participant at `PRICING.GUEST_FEE_CENTS` (flat rate, defa
 **Exemptions (in evaluation order):**
 
 1. Conference room bookings → no guest fees at all (guests are skipped).
-2. Staff/admin in a guest slot ("Pro in the Slot" rule) → $0, `isStaff = true`.
+2. Staff/admin/golf_instructor in a guest slot ("Pro in the Slot" rule) → $0, `isStaff = true`.
 3. Participant has a `userId` (actually a member marked as guest) → $0 (member misclassification guard).
 4. Real named guest with an available guest pass and `hasGuestPassBenefit` → fee waived, `guestPassUsed = true`, decrement `guestPassesRemaining`.
 5. All other guests → charged `PRICING.GUEST_FEE_CENTS`.
@@ -93,6 +93,7 @@ When `computeFeeBreakdown` determines fees > $0, the approval flow can trigger `
 **Prepayment flow:**
 
 1. Skip if `totalFeeCents <= 0`.
+1b. Safety net: skip if user is staff/admin/golf_instructor or has an unlimited-access tier (single DB query check).
 2. Check for existing non-cancelled prepayment intents for the session (by `session_id`) or booking (by `booking_id`). If found, skip to prevent duplicate charges.
 3. Get or create a Stripe customer for the member.
 4. Call `createBalanceAwarePayment()` — this checks the member's Stripe customer balance (account credit) first:

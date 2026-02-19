@@ -48,7 +48,8 @@ export async function createPrepaymentIntent(
     );
     if (exemptCheck.rows.length > 0) {
       const { role, tier, unlimited_access } = exemptCheck.rows[0];
-      if (['staff', 'admin', 'golf_instructor'].includes(role) || unlimited_access) {
+      const normalizedRole = (role || '').toLowerCase();
+      if (['staff', 'admin', 'golf_instructor'].includes(normalizedRole) || unlimited_access) {
         logger.info('[Prepayment] Skipping - exempt from fees', { 
           extra: { userEmail, role, tier, unlimited_access, bookingId } 
         });
