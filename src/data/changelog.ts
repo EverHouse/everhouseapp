@@ -13,6 +13,16 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.80.0",
+    date: "2026-02-19",
+    title: "Stripe Webhook: Auto-Activate New Members",
+    changes: [
+      "Fixed: New Stripe subscriptions now automatically create and activate members in the Directory — no more manual sync button clicks needed",
+      "Fixed: Stripe webhook was only receiving customer and payment events, but not subscription, invoice, or checkout events — all 34 event types are now properly registered",
+      "Improved: On every server start, the app checks that the Stripe webhook has all required event types and adds any missing ones automatically",
+    ]
+  },
+  {
     version: "7.79.0",
     date: "2026-02-19",
     title: "Trackman CSV Import: No More Fake Outstanding Fees",

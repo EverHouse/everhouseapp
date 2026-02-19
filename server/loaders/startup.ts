@@ -127,8 +127,67 @@ export async function runStartupTasks(): Promise<void> {
       if (replitDomains) {
         const webhookUrl = `https://${replitDomains}/api/stripe/webhook`;
         logger.info('[Stripe] Setting up managed webhook...');
-        await retryWithBackoff(() => (stripeSync as any).findOrCreateManagedWebhook(webhookUrl), 'Stripe webhook setup');
+        const result = await retryWithBackoff(() => (stripeSync as any).findOrCreateManagedWebhook(webhookUrl), 'Stripe webhook setup');
         logger.info('[Stripe] Webhook configured');
+
+        const requiredEvents = [
+          'customer.created',
+          'customer.updated',
+          'customer.subscription.created',
+          'customer.subscription.updated',
+          'customer.subscription.deleted',
+          'customer.subscription.paused',
+          'customer.subscription.resumed',
+          'payment_intent.created',
+          'payment_intent.succeeded',
+          'payment_intent.payment_failed',
+          'payment_intent.canceled',
+          'payment_intent.processing',
+          'payment_intent.requires_action',
+          'invoice.payment_succeeded',
+          'invoice.payment_failed',
+          'invoice.created',
+          'invoice.finalized',
+          'invoice.updated',
+          'invoice.voided',
+          'invoice.marked_uncollectible',
+          'checkout.session.completed',
+          'charge.refunded',
+          'charge.dispute.created',
+          'charge.dispute.closed',
+          'product.created',
+          'product.updated',
+          'product.deleted',
+          'price.created',
+          'price.updated',
+          'coupon.created',
+          'coupon.updated',
+          'coupon.deleted',
+          'credit_note.created',
+        ];
+
+        try {
+          const webhookObj = result?.webhook || result;
+          if (webhookObj?.id) {
+            const currentEvents = webhookObj.enabled_events || [];
+            const missingEvents = requiredEvents.filter(
+              (e: string) => !currentEvents.includes(e) && !currentEvents.includes('*')
+            );
+            if (missingEvents.length > 0) {
+              logger.info(`[Stripe] Webhook missing ${missingEvents.length} event types, updating...`, { extra: { missingEvents } });
+              const { getStripeClient } = await import('../core/stripe/client');
+              const stripe = await getStripeClient();
+              await stripe.webhookEndpoints.update(webhookObj.id, {
+                enabled_events: requiredEvents as any,
+              });
+              logger.info('[Stripe] Webhook events updated successfully');
+            } else {
+              logger.info('[Stripe] Webhook already has all required events');
+            }
+          }
+        } catch (webhookUpdateErr: unknown) {
+          logger.error('[Stripe] Failed to update webhook events (non-fatal)', { error: webhookUpdateErr instanceof Error ? webhookUpdateErr : new Error(String(webhookUpdateErr)) });
+        }
       }
       
       startupHealth.stripe = 'ok';
