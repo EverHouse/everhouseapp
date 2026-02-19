@@ -1,5 +1,6 @@
 import { schedulerTracker } from '../core/schedulerTracker';
-import { pool } from '../core/db';
+import { db } from '../db';
+import { sql } from 'drizzle-orm';
 import { getPacificHour } from '../utils/dateUtils';
 import { sendOnboardingNudge24h, sendOnboardingNudge72h, sendOnboardingNudge7d } from '../emails/onboardingNudgeEmails';
 import { logger } from '../core/logger';
@@ -13,7 +14,7 @@ async function processOnboardingNudges(): Promise<void> {
 
     logger.info('[Onboarding Nudge] Starting onboarding nudge check...');
 
-    const membersResult = await pool.query(`
+    const membersResult = await db.execute(sql`
       SELECT id, email, first_name, created_at, onboarding_nudge_count
       FROM users
       WHERE membership_status IN ('active', 'trialing')
@@ -52,10 +53,7 @@ async function processOnboardingNudges(): Promise<void> {
       }
 
       if (sendResult.success) {
-        await pool.query(
-          `UPDATE users SET onboarding_nudge_count = onboarding_nudge_count + 1, onboarding_last_nudge_at = NOW(), updated_at = NOW() WHERE id = $1`,
-          [member.id]
-        );
+        await db.execute(sql`UPDATE users SET onboarding_nudge_count = onboarding_nudge_count + 1, onboarding_last_nudge_at = NOW(), updated_at = NOW() WHERE id = ${member.id}`);
         logger.info(`[Onboarding Nudge] Sent nudge #${currentNudgeCount + 1} to ${member.email}`);
       } else {
         logger.warn(`[Onboarding Nudge] Failed to send to ${member.email}: ${sendResult.error}`);

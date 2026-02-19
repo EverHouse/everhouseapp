@@ -8,13 +8,18 @@ import subprocess
 import sys
 import os
 import json
+import re
 from pathlib import Path
 
-def run_cmd(cmd: str) -> str:
-    """Run shell command and return output."""
+def run_cmd(cmd: list, capture_stderr: bool = False) -> str:
+    """Run command with argument list and return output."""
     try:
-        result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
-        return result.stdout + result.stderr
+        if capture_stderr:
+            result = subprocess.run(cmd, shell=False, capture_output=True, text=True)
+            return result.stdout + result.stderr
+        else:
+            result = subprocess.run(cmd, shell=False, capture_output=True, text=True, stderr=subprocess.DEVNULL)
+            return result.stdout
     except Exception as e:
         return str(e)
 
@@ -23,8 +28,8 @@ def check_versions():
     print("\n📦 Versions:")
     print("-" * 40)
     
-    ts_version = run_cmd("npx tsc --version 2>/dev/null").strip()
-    node_version = run_cmd("node -v 2>/dev/null").strip()
+    ts_version = run_cmd(["npx", "tsc", "--version"]).strip()
+    node_version = run_cmd(["node", "-v"]).strip()
     
     print(f"  TypeScript: {ts_version or 'Not found'}")
     print(f"  Node.js: {node_version or 'Not found'}")
@@ -134,7 +139,10 @@ def check_type_errors():
     print("\n🔍 Type Check:")
     print("-" * 40)
     
-    result = run_cmd("npx tsc --noEmit 2>&1 | head -20")
+    result = run_cmd(["npx", "tsc", "--noEmit"], capture_stderr=True)
+    # Take first 20 lines
+    lines = result.split('\n')[:20]
+    result = '\n'.join(lines)
     if "error TS" in result:
         errors = result.count("error TS")
         print(f"  ❌ {errors}+ type errors found")
@@ -147,11 +155,14 @@ def check_any_usage():
     print("\n⚠️ 'any' Type Usage:")
     print("-" * 40)
     
-    result = run_cmd("grep -r ': any' --include='*.ts' --include='*.tsx' src/ 2>/dev/null | wc -l")
-    count = result.strip()
-    if count and count != "0":
+    result = run_cmd(["grep", "-r", ": any", "--include=*.ts", "--include=*.tsx", "src/"])
+    lines = result.strip().split('\n') if result.strip() else []
+    count = len([l for l in lines if l])
+    if count > 0:
         print(f"  ⚠️ Found {count} occurrences of ': any'")
-        sample = run_cmd("grep -rn ': any' --include='*.ts' --include='*.tsx' src/ 2>/dev/null | head -5")
+        # Show first 5 lines
+        sample_lines = lines[:5]
+        sample = '\n'.join(sample_lines)
         if sample:
             print(sample)
     else:
@@ -162,9 +173,12 @@ def check_type_assertions():
     print("\n⚠️ Type Assertions (as):")
     print("-" * 40)
     
-    result = run_cmd("grep -r ' as ' --include='*.ts' --include='*.tsx' src/ 2>/dev/null | grep -v 'import' | wc -l")
-    count = result.strip()
-    if count and count != "0":
+    result = run_cmd(["grep", "-r", " as ", "--include=*.ts", "--include=*.tsx", "src/"])
+    # Filter out import lines and count
+    lines = result.strip().split('\n') if result.strip() else []
+    filtered = [l for l in lines if l and 'import' not in l]
+    count = len(filtered)
+    if count > 0:
         print(f"  ⚠️ Found {count} type assertions")
     else:
         print("  ✅ No type assertions found")
@@ -174,9 +188,12 @@ def check_performance():
     print("\n⏱️ Type Check Performance:")
     print("-" * 40)
     
-    result = run_cmd("npx tsc --extendedDiagnostics --noEmit 2>&1 | grep -E 'Check time|Files:|Lines:|Nodes:'")
-    if result.strip():
-        for line in result.strip().split('\n'):
+    result = run_cmd(["npx", "tsc", "--extendedDiagnostics", "--noEmit"], capture_stderr=True)
+    # Filter for relevant lines
+    pattern = re.compile(r'Check time|Files:|Lines:|Nodes:')
+    matching_lines = [line for line in result.split('\n') if pattern.search(line)]
+    if matching_lines:
+        for line in matching_lines:
             print(f"  {line}")
     else:
         print("  ⚠️ Could not measure performance")

@@ -1,13 +1,14 @@
 import { Router } from 'express';
 import { isStaffOrAdmin } from '../../core/middleware';
-import { pool } from '../../core/db';
+import { db } from '../../db';
+import { sql } from 'drizzle-orm';
 import { logger } from '../../core/logger';
 
 const router = Router();
 
 router.get('/api/admin/applications', isStaffOrAdmin, async (req, res) => {
   try {
-    const result = await pool.query(`
+    const result = await db.execute(sql`
       SELECT 
         fs.id, fs.first_name, fs.last_name, fs.email, fs.phone,
         fs.message, fs.metadata, fs.status, fs.notes,
@@ -47,10 +48,7 @@ router.put('/api/admin/applications/:id/status', isStaffOrAdmin, async (req, res
       return res.status(400).json({ error: 'Invalid status' });
     }
 
-    await pool.query(
-      `UPDATE form_submissions SET status = $1, notes = COALESCE($2, notes), updated_at = NOW() WHERE id = $3 AND form_type = 'membership'`,
-      [status, notes || null, id]
-    );
+    await db.execute(sql`UPDATE form_submissions SET status = ${status}, notes = COALESCE(${notes || null}, notes), updated_at = NOW() WHERE id = ${id} AND form_type = 'membership'`);
 
     res.json({ success: true });
   } catch (error: unknown) {
@@ -66,10 +64,7 @@ router.post('/api/admin/applications/:id/send-invite', isStaffOrAdmin, async (re
 
     if (!tierId) return res.status(400).json({ error: 'Tier ID required' });
 
-    const appResult = await pool.query(
-      `SELECT id, email, first_name, last_name FROM form_submissions WHERE id = $1 AND form_type = 'membership'`,
-      [id]
-    );
+    const appResult = await db.execute(sql`SELECT id, email, first_name, last_name FROM form_submissions WHERE id = ${id} AND form_type = 'membership'`);
 
     if (appResult.rows.length === 0) {
       return res.status(404).json({ error: 'Application not found' });
@@ -96,10 +91,7 @@ router.post('/api/admin/applications/:id/send-invite', isStaffOrAdmin, async (re
       return res.status(internalRes.status).json(errData);
     }
 
-    await pool.query(
-      `UPDATE form_submissions SET status = 'invited', updated_at = NOW() WHERE id = $1`,
-      [id]
-    );
+    await db.execute(sql`UPDATE form_submissions SET status = 'invited', updated_at = NOW() WHERE id = ${id}`);
 
     const data = await internalRes.json();
     res.json({ success: true, checkoutUrl: data.checkoutUrl });

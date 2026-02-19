@@ -91,7 +91,7 @@ router.get('/api/bookings/:id/staff-checkin-context', isStaffOrAdmin, async (req
       return res.status(400).json({ error: 'Invalid booking ID' });
     }
 
-    const result = await pool.query(`
+    const result = await db.execute(sql`
       SELECT 
         br.id as booking_id,
         br.session_id,
@@ -112,8 +112,8 @@ router.get('/api/bookings/:id/staff-checkin-context', isStaffOrAdmin, async (req
       FROM booking_requests br
       LEFT JOIN resources r ON br.resource_id = r.id
       LEFT JOIN users u ON LOWER(u.email) = LOWER(br.user_email)
-      WHERE br.id = $1
-    `, [bookingId]);
+      WHERE br.id = ${bookingId}
+    `);
 
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Booking not found' });
@@ -132,7 +132,7 @@ router.get('/api/bookings/:id/staff-checkin-context', isStaffOrAdmin, async (req
            new Date(`2000-01-01T${booking.start_time}`).getTime()) / 60000
         );
         
-        const userResult = await pool.query(`SELECT id FROM users WHERE LOWER(email) = LOWER($1)`, [booking.owner_email]);
+        const userResult = await db.execute(sql`SELECT id FROM users WHERE LOWER(email) = LOWER(${booking.owner_email})`);
         const userId = userResult.rows[0]?.id || null;
 
         const sessionResult = await ensureSessionForBooking({
@@ -151,21 +151,21 @@ router.get('/api/bookings/:id/staff-checkin-context', isStaffOrAdmin, async (req
         
         if (sessionId) {
           const playerCount = booking.declared_player_count || 1;
-          const existingGuests = await pool.query(`
+          const existingGuests = await db.execute(sql`
             SELECT COUNT(*) as count FROM booking_participants 
-            WHERE session_id = $1 AND participant_type = 'guest'
-          `, [sessionId]);
+            WHERE session_id = ${sessionId} AND participant_type = 'guest'
+          `);
           const existingGuestCount = parseInt(existingGuests.rows[0]?.count || '0');
           
           const guestsToCreate = playerCount - 1 - existingGuestCount;
           if (guestsToCreate > 0) {
             const guestNumbers = Array.from({length: guestsToCreate}, (_, i) => existingGuestCount + i + 2);
             const guestNames = guestNumbers.map(n => `Guest ${n}`);
-            await pool.query(`
+            await db.execute(sql`
               INSERT INTO booking_participants (session_id, user_id, participant_type, display_name, payment_status, slot_duration)
-              SELECT $1, NULL, 'guest', name, 'pending', $2
-              FROM unnest($3::text[]) AS t(name)
-            `, [sessionId, bookingDuration, guestNames]);
+              SELECT ${sessionId}, NULL, 'guest', name, 'pending', ${bookingDuration}
+              FROM unnest(${guestNames}::text[]) AS t(name)
+            `);
           }
           
           await recalculateSessionFees(sessionId, 'checkin');
@@ -181,30 +181,30 @@ router.get('/api/bookings/:id/staff-checkin-context', isStaffOrAdmin, async (req
       // Matches by email to handle cases where user_id may differ
       try {
         // Get all valid emails from booking_members (lowercased for comparison)
-        const validMembersResult = await pool.query(`
+        const validMembersResult = await db.execute(sql`
           SELECT LOWER(user_email) as email
           FROM booking_members
-          WHERE booking_id = $1 AND user_email IS NOT NULL
-        `, [bookingId]);
+          WHERE booking_id = ${bookingId} AND user_email IS NOT NULL
+        `);
         
         const validEmails = new Set(validMembersResult.rows.map(r => r.email));
         
         // Also get the owner email to exclude from cleanup
-        const ownerResult = await pool.query(`
-          SELECT LOWER(user_email) as email FROM booking_requests WHERE id = $1
-        `, [bookingId]);
+        const ownerResult = await db.execute(sql`
+          SELECT LOWER(user_email) as email FROM booking_requests WHERE id = ${bookingId}
+        `);
         const ownerEmail = ownerResult.rows[0]?.email;
         if (ownerEmail) {
           validEmails.add(ownerEmail);
         }
         
         // Get all member participants for this session with their emails
-        const memberParticipants = await pool.query(`
+        const memberParticipants = await db.execute(sql`
           SELECT bp.id, bp.display_name, bp.user_id, LOWER(u.email) as email
           FROM booking_participants bp
           LEFT JOIN users u ON bp.user_id = u.id
-          WHERE bp.session_id = $1 AND bp.participant_type = 'member'
-        `, [sessionId]);
+          WHERE bp.session_id = ${sessionId} AND bp.participant_type = 'member'
+        `);
         
         // Find orphaned participants:
         // 1. Member participants whose email is not in the valid set
@@ -227,9 +227,9 @@ router.get('/api/bookings/:id/staff-checkin-context', isStaffOrAdmin, async (req
         
         // Delete orphaned participants
         if (orphanedIds.length > 0) {
-          await pool.query(`
-            DELETE FROM booking_participants WHERE id = ANY($1::int[])
-          `, [orphanedIds]);
+          await db.execute(sql`
+            DELETE FROM booking_participants WHERE id = ANY(${orphanedIds}::int[])
+          `);
           
           logger.info('[Checkin Context Sync] Cleaned up  orphaned participants for booking', { extra: { length: orphanedIds.length, bookingId, orphanedNames } });
           // Recalculate fees after cleanup
@@ -239,7 +239,7 @@ router.get('/api/bookings/:id/staff-checkin-context', isStaffOrAdmin, async (req
         logger.warn('[Checkin Context Sync] Non-blocking sync cleanup failed for booking', { extra: { bookingId, error: getErrorMessage(syncError) } });
       }
       
-      const participantsResult = await pool.query(`
+      const participantsResult = await db.execute(sql`
         SELECT 
           bp.id as participant_id,
           bp.display_name,
@@ -250,7 +250,7 @@ router.get('/api/bookings/:id/staff-checkin-context', isStaffOrAdmin, async (req
           bp.used_guest_pass,
           COALESCE(bp.cached_fee_cents, 0)::numeric / 100.0 as cached_total_fee
         FROM booking_participants bp
-        WHERE bp.session_id = $1
+        WHERE bp.session_id = ${sessionId}
         ORDER BY 
           CASE bp.participant_type 
             WHEN 'owner' THEN 1 
@@ -258,7 +258,7 @@ router.get('/api/bookings/:id/staff-checkin-context', isStaffOrAdmin, async (req
             WHEN 'guest' THEN 3 
           END,
           bp.created_at
-      `, [sessionId]);
+      `);
 
       // Compute fees in-memory for display, but DO NOT write to DB on GET request
       // This avoids the anti-pattern of writes during read operations
@@ -275,13 +275,13 @@ router.get('/api/bookings/:id/staff-checkin-context', isStaffOrAdmin, async (req
       }
       
       const prepaidParticipantIds = new Set<number>();
-      const snapshotResult = await pool.query(`
+      const snapshotResult = await db.execute(sql`
         SELECT participant_fees
         FROM booking_fee_snapshots
-        WHERE booking_id = $1
+        WHERE booking_id = ${bookingId}
           AND status = 'completed'
           AND stripe_payment_intent_id IS NOT NULL
-      `, [bookingId]);
+      `);
       
       for (const row of snapshotResult.rows) {
         const fees = row.participant_fees;
@@ -342,13 +342,13 @@ router.get('/api/bookings/:id/staff-checkin-context', isStaffOrAdmin, async (req
       }
     }
 
-    const auditResult = await pool.query(`
+    const auditResult = await db.execute(sql`
       SELECT action, staff_email, staff_name, reason, created_at
       FROM booking_payment_audit
-      WHERE booking_id = $1
+      WHERE booking_id = ${bookingId}
       ORDER BY created_at DESC
       LIMIT 20
-    `, [bookingId]);
+    `);
 
     const overageMinutes = booking.overage_minutes || 0;
     const overageFeeCents = booking.overage_fee_cents || 0;
@@ -414,12 +414,12 @@ router.patch('/api/bookings/:id/payments', isStaffOrAdmin, async (req: Request, 
       return res.status(400).json({ error: 'Reason required for waiving payment' });
     }
 
-    const bookingResult = await pool.query(`
+    const bookingResult = await db.execute(sql`
       SELECT br.session_id, br.user_email as owner_email, r.name as resource_name
       FROM booking_requests br
       LEFT JOIN resources r ON br.resource_id = r.id
-      WHERE br.id = $1
-    `, [bookingId]);
+      WHERE br.id = ${bookingId}
+    `);
 
     if (bookingResult.rows.length === 0) {
       return res.status(404).json({ error: 'Booking not found' });
@@ -446,13 +446,10 @@ router.patch('/api/bookings/:id/payments', isStaffOrAdmin, async (req: Request, 
 
       const newStatus = action === 'confirm' ? 'paid' : 'waived';
       
-      const participantResult = await pool.query(
-        `SELECT bp.payment_status, bp.participant_type, bp.display_name, bs.session_date
+      const participantResult = await db.execute(sql`SELECT bp.payment_status, bp.participant_type, bp.display_name, bs.session_date
          FROM booking_participants bp
          LEFT JOIN booking_sessions bs ON bp.session_id = bs.id
-         WHERE bp.id = $1`,
-        [participantId]
-      );
+         WHERE bp.id = ${participantId}`);
       
       const participant = participantResult.rows[0];
       const previousStatus = participant?.payment_status || 'pending';
@@ -494,21 +491,11 @@ router.patch('/api/bookings/:id/payments', isStaffOrAdmin, async (req: Request, 
           });
         }
         
-        await pool.query(`
+        await db.execute(sql`
           INSERT INTO booking_payment_audit 
             (booking_id, session_id, participant_id, action, staff_email, staff_name, reason, previous_status, new_status)
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-        `, [
-          bookingId,
-          sessionId,
-          participantId,
-          'guest_pass_used',
-          staffEmail,
-          staffName,
-          `Guest pass consumed for ${guestName}. ${consumeResult.passesRemaining} passes remaining.`,
-          previousStatus,
-          'waived'
-        ]);
+          VALUES (${bookingId}, ${sessionId}, ${participantId}, ${'guest_pass_used'}, ${staffEmail}, ${staffName}, ${`Guest pass consumed for ${guestName}. ${consumeResult.passesRemaining} passes remaining.`}, ${previousStatus}, ${'waived'})
+        `);
 
         logFromRequest(req, 'update_payment_status', 'booking', bookingId.toString(), booking.resource_name || `Booking #${bookingId}`, {
           participantId,
@@ -532,26 +519,13 @@ router.patch('/api/bookings/:id/payments', isStaffOrAdmin, async (req: Request, 
         });
       }
 
-      await pool.query(
-        `UPDATE booking_participants SET payment_status = $1 WHERE id = $2`,
-        [newStatus, participantId]
-      );
+      await db.execute(sql`UPDATE booking_participants SET payment_status = ${newStatus} WHERE id = ${participantId}`);
 
-      await pool.query(`
+      await db.execute(sql`
         INSERT INTO booking_payment_audit 
           (booking_id, session_id, participant_id, action, staff_email, staff_name, reason, previous_status, new_status)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-      `, [
-        bookingId,
-        sessionId,
-        participantId,
-        action === 'confirm' ? 'payment_confirmed' : 'payment_waived',
-        staffEmail,
-        staffName,
-        reason || null,
-        previousStatus,
-        newStatus
-      ]);
+        VALUES (${bookingId}, ${sessionId}, ${participantId}, ${action === 'confirm' ? 'payment_confirmed' : 'payment_waived'}, ${staffEmail}, ${staffName}, ${reason || null}, ${previousStatus}, ${newStatus})
+      `);
 
       logFromRequest(req, 'update_payment_status', 'booking', bookingId.toString(), booking.resource_name || `Booking #${bookingId}`, {
         participantId,
@@ -564,12 +538,9 @@ router.patch('/api/bookings/:id/payments', isStaffOrAdmin, async (req: Request, 
 
       if (action === 'waive') {
         try {
-          const participantEmailResult = await pool.query(
-            `SELECT bp.user_email, bp.display_name, bp.cached_fee_cents
+          const participantEmailResult = await db.execute(sql`SELECT bp.user_email, bp.display_name, bp.cached_fee_cents
              FROM booking_participants bp
-             WHERE bp.id = $1`,
-            [participantId]
-          );
+             WHERE bp.id = ${participantId}`);
           
           if (participantEmailResult.rows[0]) {
             const { user_email, display_name, cached_fee_cents } = participantEmailResult.rows[0];
@@ -608,27 +579,21 @@ router.patch('/api/bookings/:id/payments', isStaffOrAdmin, async (req: Request, 
 
       const newStatus = action === 'confirm_all' ? 'paid' : 'waived';
 
-      const pendingParticipants = await pool.query(
-        `SELECT id, payment_status FROM booking_participants 
-         WHERE session_id = $1 AND payment_status = 'pending'`,
-        [sessionId]
-      );
+      const pendingParticipants = await db.execute(sql`SELECT id, payment_status FROM booking_participants 
+         WHERE session_id = ${sessionId} AND payment_status = 'pending'`);
 
       const pendingIds = pendingParticipants.rows.map(p => p.id);
       const previousStatuses = pendingParticipants.rows.map(p => p.payment_status);
       if (pendingIds.length > 0) {
-        await pool.query(
-          `UPDATE booking_participants SET payment_status = $1 WHERE id = ANY($2::int[])`,
-          [newStatus, pendingIds]
-        );
+        await db.execute(sql`UPDATE booking_participants SET payment_status = ${newStatus} WHERE id = ANY(${pendingIds}::int[])`);
 
         const auditAction = action === 'confirm_all' ? 'payment_confirmed' : 'payment_waived';
-        await pool.query(`
+        await db.execute(sql`
           INSERT INTO booking_payment_audit 
             (booking_id, session_id, participant_id, action, staff_email, staff_name, reason, previous_status, new_status)
-          SELECT $1, $2, pid, $3, $4, $5, $6, prev_status, $7
-          FROM unnest($8::int[], $9::text[]) AS t(pid, prev_status)
-        `, [bookingId, sessionId, auditAction, staffEmail, staffName, reason || null, newStatus, pendingIds, previousStatuses]);
+          SELECT ${bookingId}, ${sessionId}, pid, ${auditAction}, ${staffEmail}, ${staffName}, ${reason || null}, prev_status, ${newStatus}
+          FROM unnest(${pendingIds}::int[], ${previousStatuses}::text[]) AS t(pid, prev_status)
+        `);
       }
 
       if (action === 'confirm_all') {
@@ -713,12 +678,9 @@ router.patch('/api/bookings/:id/payments', isStaffOrAdmin, async (req: Request, 
 
       if (action === 'waive_all' && pendingParticipants.rows.length > 0) {
         try {
-          const totalWaivedResult = await pool.query(
-            `SELECT COALESCE(SUM(COALESCE(cached_fee_cents, 0)), 0) as total_cents
+          const totalWaivedResult = await db.execute(sql`SELECT COALESCE(SUM(COALESCE(cached_fee_cents, 0)), 0) as total_cents
              FROM booking_participants
-             WHERE id = ANY($1)`,
-            [pendingParticipants.rows.map(p => p.id)]
-          );
+             WHERE id = ANY(${pendingParticipants.rows.map(p => p.id)}::int[])`);
           const totalWaived = (parseInt(totalWaivedResult.rows[0]?.total_cents) || 0) / 100;
           const ownerName = await getMemberDisplayName(booking.owner_email);
           
@@ -1042,7 +1004,7 @@ router.post('/api/bookings/bulk-review-all-waivers', isStaffOrAdmin, async (req:
 
 router.get('/api/bookings/stale-waivers', isStaffOrAdmin, async (req: Request, res: Response) => {
   try {
-    const result = await pool.query(`
+    const result = await db.execute(sql`
       SELECT bp.id, bp.display_name, bp.created_at, bp.session_id,
              br.id as request_id, br.request_date, br.start_time, br.end_time,
              br.user_name as booking_owner,
@@ -1085,11 +1047,11 @@ router.post('/api/bookings/:id/staff-direct-add', isStaffOrAdmin, async (req: Re
       return res.status(400).json({ error: 'participantType must be member or guest' });
     }
 
-    const bookingResult = await pool.query(`
+    const bookingResult = await db.execute(sql`
       SELECT br.session_id, br.resource_id, br.request_date, br.user_email as owner_email, br.user_name, br.start_time, br.end_time
       FROM booking_requests br
-      WHERE br.id = $1
-    `, [bookingId]);
+      WHERE br.id = ${bookingId}
+    `);
 
     if (bookingResult.rows.length === 0) {
       return res.status(404).json({ error: 'Booking not found' });
@@ -1123,12 +1085,12 @@ router.post('/api/bookings/:id/staff-direct-add', isStaffOrAdmin, async (req: Re
     }
 
     if (participantType === 'guest') {
-      const ownerTierResult = await pool.query(`
+      const ownerTierResult = await db.execute(sql`
         SELECT mt.name as tier_name, mt.guest_passes_per_month as guest_passes
         FROM users u
         LEFT JOIN membership_tiers mt ON u.tier_id = mt.id
-        WHERE LOWER(u.email) = LOWER($1)
-      `, [booking.owner_email]);
+        WHERE LOWER(u.email) = LOWER(${booking.owner_email})
+      `);
 
       if (ownerTierResult.rows.length > 0) {
         const ownerTier = ownerTierResult.rows[0];
@@ -1149,11 +1111,11 @@ router.post('/api/bookings/:id/staff-direct-add', isStaffOrAdmin, async (req: Re
       // Check if guest email matches an existing member
       let matchedMember: { id: string; name: string; email: string } | null = null;
       if (guestEmail) {
-        const memberCheck = await pool.query(`
+        const memberCheck = await db.execute(sql`
           SELECT id, COALESCE(name, email) as name, email 
           FROM users 
-          WHERE LOWER(email) = LOWER($1) AND archived_at IS NULL
-        `, [guestEmail]);
+          WHERE LOWER(email) = LOWER(${guestEmail}) AND archived_at IS NULL
+        `);
         if (memberCheck.rows.length > 0) {
           matchedMember = memberCheck.rows[0];
         }
@@ -1162,10 +1124,10 @@ router.post('/api/bookings/:id/staff-direct-add', isStaffOrAdmin, async (req: Re
       // If we found a matching member, add them as a member participant instead
       if (matchedMember) {
         // Check if already in roster
-        const existingCheck = await pool.query(`
+        const existingCheck = await db.execute(sql`
           SELECT id FROM booking_participants 
-          WHERE session_id = $1 AND user_id = $2
-        `, [sessionId, matchedMember.id]);
+          WHERE session_id = ${sessionId} AND user_id = ${matchedMember.id}
+        `);
         
         if (existingCheck.rows.length > 0) {
           return res.status(400).json({ 
@@ -1173,48 +1135,38 @@ router.post('/api/bookings/:id/staff-direct-add', isStaffOrAdmin, async (req: Re
           });
         }
 
-        await pool.query(`
+        await db.execute(sql`
           INSERT INTO booking_participants 
             (session_id, user_id, participant_type, display_name, invite_status, payment_status, slot_duration)
-          VALUES ($1, $2, 'member', $3, 'accepted', 'pending', $4)
-        `, [sessionId, matchedMember.id, matchedMember.name, slotDuration]);
+          VALUES (${sessionId}, ${matchedMember.id}, 'member', ${matchedMember.name}, 'accepted', 'pending', ${slotDuration})
+        `);
 
-        await pool.query(`
+        await db.execute(sql`
           INSERT INTO booking_payment_audit 
             (booking_id, session_id, action, staff_email, staff_name, reason, metadata)
-          VALUES ($1, $2, 'staff_direct_add', $3, $4, $5, $6)
-        `, [
-          bookingId,
-          sessionId,
-          staffEmail,
-          staffName,
-          overrideReason || 'Staff direct add - matched to member',
-          JSON.stringify({ participantType: 'member', guestEmail, matchedUserId: matchedMember.id, matchedName: matchedMember.name })
-        ]);
+          VALUES (${bookingId}, ${sessionId}, 'staff_direct_add', ${staffEmail}, ${staffName}, ${overrideReason || 'Staff direct add - matched to member'}, ${JSON.stringify({ participantType: 'member', guestEmail, matchedUserId: matchedMember.id, matchedName: matchedMember.name })})
+        `);
 
         try {
           await recalculateSessionFees(sessionId, 'staff_add_member');
           
           // Create prepayment intent for any new fees (e.g., overage)
           try {
-            const feeResult = await pool.query(`
+            const feeResult = await db.execute(sql`
               SELECT SUM(COALESCE(cached_fee_cents, 0)) as total_cents,
                      SUM(CASE WHEN participant_type = 'owner' THEN COALESCE(cached_fee_cents, 0) ELSE 0 END) as overage_cents,
                      SUM(CASE WHEN participant_type = 'guest' THEN COALESCE(cached_fee_cents, 0) ELSE 0 END) as guest_cents
               FROM booking_participants
-              WHERE session_id = $1
-            `, [sessionId]);
+              WHERE session_id = ${sessionId}
+            `);
             
             const totalCents = parseInt(feeResult.rows[0]?.total_cents || '0');
             const overageCents = parseInt(feeResult.rows[0]?.overage_cents || '0');
             const guestCents = parseInt(feeResult.rows[0]?.guest_cents || '0');
             
             if (totalCents > 0) {
-              const ownerResult = await pool.query(
-                `SELECT id, COALESCE(first_name || ' ' || last_name, email) as name 
-                 FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1`,
-                [booking.owner_email]
-              );
+              const ownerResult = await db.execute(sql`SELECT id, COALESCE(first_name || ' ' || last_name, email) as name 
+                 FROM users WHERE LOWER(email) = LOWER(${booking.owner_email}) LIMIT 1`);
               const owner = ownerResult.rows[0];
               
               const prepayResult = await createPrepaymentIntent({
@@ -1227,10 +1179,7 @@ router.post('/api/bookings/:id/staff-direct-add', isStaffOrAdmin, async (req: Re
                 feeBreakdown: { overageCents, guestCents }
               });
               if (prepayResult?.paidInFull) {
-                await pool.query(
-                  `UPDATE booking_participants SET payment_status = 'paid' WHERE session_id = $1 AND payment_status = 'pending'`,
-                  [sessionId]
-                );
+                await db.execute(sql`UPDATE booking_participants SET payment_status = 'paid' WHERE session_id = ${sessionId} AND payment_status = 'pending'`);
                 logger.info('[Staff Add Member] Prepayment fully covered by credit', { extra: { sessionId, amountDollars: (totalCents/100).toFixed(2) } });
               } else {
                 logger.info('[Staff Add Member] Created prepayment intent', { extra: { sessionId, amountDollars: (totalCents/100).toFixed(2) } });
@@ -1262,24 +1211,17 @@ router.post('/api/bookings/:id/staff-direct-add', isStaffOrAdmin, async (req: Re
       }
 
       // No matching member - add as true guest
-      await pool.query(`
+      await db.execute(sql`
         INSERT INTO booking_participants 
           (session_id, participant_type, display_name, invite_status, payment_status, cached_fee_cents, slot_duration)
-        VALUES ($1, 'guest', $2, 'accepted', 'pending', ${PRICING.GUEST_FEE_CENTS}, $3)
-      `, [sessionId, guestName, slotDuration]);
+        VALUES (${sessionId}, 'guest', ${guestName}, 'accepted', 'pending', ${PRICING.GUEST_FEE_CENTS}, ${slotDuration})
+      `);
 
-      await pool.query(`
+      await db.execute(sql`
         INSERT INTO booking_payment_audit 
           (booking_id, session_id, action, staff_email, staff_name, reason, metadata)
-        VALUES ($1, $2, 'staff_direct_add', $3, $4, $5, $6)
-      `, [
-        bookingId,
-        sessionId,
-        staffEmail,
-        staffName,
-        overrideReason || 'Staff direct add',
-        JSON.stringify({ participantType: 'guest', guestName, guestEmail: guestEmail || null })
-      ]);
+        VALUES (${bookingId}, ${sessionId}, 'staff_direct_add', ${staffEmail}, ${staffName}, ${overrideReason || 'Staff direct add'}, ${JSON.stringify({ participantType: 'guest', guestName, guestEmail: guestEmail || null })})
+      `);
 
       // Recalculate fees to update all participant fees
       try {
@@ -1287,24 +1229,21 @@ router.post('/api/bookings/:id/staff-direct-add', isStaffOrAdmin, async (req: Re
         
         // Create prepayment intent for the new fees
         try {
-          const feeResult = await pool.query(`
+          const feeResult = await db.execute(sql`
             SELECT SUM(COALESCE(cached_fee_cents, 0)) as total_cents,
                    SUM(CASE WHEN participant_type = 'owner' THEN COALESCE(cached_fee_cents, 0) ELSE 0 END) as overage_cents,
                    SUM(CASE WHEN participant_type = 'guest' THEN COALESCE(cached_fee_cents, 0) ELSE 0 END) as guest_cents
             FROM booking_participants
-            WHERE session_id = $1
-          `, [sessionId]);
+            WHERE session_id = ${sessionId}
+          `);
           
           const totalCents = parseInt(feeResult.rows[0]?.total_cents || '0');
           const overageCents = parseInt(feeResult.rows[0]?.overage_cents || '0');
           const guestCents = parseInt(feeResult.rows[0]?.guest_cents || '0');
           
           if (totalCents > 0) {
-            const ownerResult = await pool.query(
-              `SELECT id, COALESCE(first_name || ' ' || last_name, email) as name 
-               FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1`,
-              [booking.owner_email]
-            );
+            const ownerResult = await db.execute(sql`SELECT id, COALESCE(first_name || ' ' || last_name, email) as name 
+               FROM users WHERE LOWER(email) = LOWER(${booking.owner_email}) LIMIT 1`);
             const owner = ownerResult.rows[0];
             
             const prepayResult = await createPrepaymentIntent({
@@ -1317,10 +1256,7 @@ router.post('/api/bookings/:id/staff-direct-add', isStaffOrAdmin, async (req: Re
               feeBreakdown: { overageCents, guestCents }
             });
             if (prepayResult?.paidInFull) {
-              await pool.query(
-                `UPDATE booking_participants SET payment_status = 'paid' WHERE session_id = $1 AND payment_status = 'pending'`,
-                [sessionId]
-              );
+              await db.execute(sql`UPDATE booking_participants SET payment_status = 'paid' WHERE session_id = ${sessionId} AND payment_status = 'pending'`);
               logger.info('[Staff Add Guest] Prepayment fully covered by credit', { extra: { sessionId, amountDollars: (totalCents/100).toFixed(2) } });
             } else {
               logger.info('[Staff Add Guest] Created prepayment intent', { extra: { sessionId, amountDollars: (totalCents/100).toFixed(2) } });
@@ -1352,12 +1288,12 @@ router.post('/api/bookings/:id/staff-direct-add', isStaffOrAdmin, async (req: Re
         return res.status(400).json({ error: 'memberEmail required for member participant' });
       }
 
-      const memberResult = await pool.query(`
+      const memberResult = await db.execute(sql`
         SELECT u.id, u.email, u.name, mt.name as tier_name, mt.can_book_simulators
         FROM users u
         LEFT JOIN membership_tiers mt ON u.tier_id = mt.id
-        WHERE LOWER(u.email) = LOWER($1)
-      `, [memberEmail]);
+        WHERE LOWER(u.email) = LOWER(${memberEmail})
+      `);
 
       if (memberResult.rows.length === 0) {
         return res.status(404).json({ error: 'Member not found' });
@@ -1365,10 +1301,7 @@ router.post('/api/bookings/:id/staff-direct-add', isStaffOrAdmin, async (req: Re
 
       const member = memberResult.rows[0];
 
-      const existingParticipant = await pool.query(
-        `SELECT id FROM booking_participants WHERE session_id = $1 AND user_id = $2`,
-        [sessionId, member.id]
-      );
+      const existingParticipant = await db.execute(sql`SELECT id FROM booking_participants WHERE session_id = ${sessionId} AND user_id = ${member.id}`);
 
       if (existingParticipant.rows.length > 0) {
         return res.status(400).json({ error: 'Member is already in this booking' });
@@ -1386,51 +1319,37 @@ router.post('/api/bookings/:id/staff-direct-add', isStaffOrAdmin, async (req: Re
       }
 
       // Check if there's a guest entry with matching name that should be converted
-      const matchingGuest = await pool.query(
-        `SELECT bp.id, bp.display_name
+      const matchingGuest = await db.execute(sql`SELECT bp.id, bp.display_name
          FROM booking_participants bp
          LEFT JOIN guests g ON bp.guest_id = g.id
-         WHERE bp.session_id = $1 
+         WHERE bp.session_id = ${sessionId} 
            AND bp.participant_type = 'guest'
-           AND (LOWER(bp.display_name) = LOWER($2) OR LOWER(g.email) = LOWER($3))`,
-        [sessionId, member.name || '', member.email]
-      );
+           AND (LOWER(bp.display_name) = LOWER(${member.name || ''}) OR LOWER(g.email) = LOWER(${member.email}))`);
       
       if (matchingGuest.rowCount && matchingGuest.rowCount > 0) {
         // Remove the guest entry since this person is actually a member
         const guestIds = matchingGuest.rows.map(r => r.id);
-        await pool.query(
-          `DELETE FROM booking_participants WHERE id = ANY($1)`,
-          [guestIds]
-        );
+        await db.execute(sql`DELETE FROM booking_participants WHERE id = ANY(${guestIds}::int[])`);
         logger.info('[Staff Add Member] Removed duplicate guest entries for member in session', { extra: { guestIdsLength: guestIds.length, memberEmail: member.email, sessionId } });
       }
       
-      await pool.query(`
+      await db.execute(sql`
         INSERT INTO booking_participants 
           (session_id, user_id, participant_type, display_name, invite_status, payment_status, slot_duration)
-        VALUES ($1, $2, 'member', $3, 'accepted', 'pending', $4)
-      `, [sessionId, member.id, member.name || member.email, slotDuration]);
+        VALUES (${sessionId}, ${member.id}, 'member', ${member.name || member.email}, 'accepted', 'pending', ${slotDuration})
+      `);
 
-      await pool.query(`
+      await db.execute(sql`
         INSERT INTO booking_payment_audit 
           (booking_id, session_id, action, staff_email, staff_name, reason, metadata)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
-      `, [
-        bookingId,
-        sessionId,
-        tierOverrideApplied ? 'tier_override' : 'staff_direct_add',
-        staffEmail,
-        staffName,
-        overrideReason || 'Staff direct add',
-        JSON.stringify({ 
+        VALUES (${bookingId}, ${sessionId}, ${tierOverrideApplied ? 'tier_override' : 'staff_direct_add'}, ${staffEmail}, ${staffName}, ${overrideReason || 'Staff direct add'}, ${JSON.stringify({ 
           participantType: 'member', 
           memberEmail: member.email,
           memberName: member.name,
           tierName: member.tier_name,
           tierOverrideApplied
-        })
-      ]);
+        })})
+      `);
 
       // Recalculate fees to update all participant fees
       try {
@@ -1474,21 +1393,12 @@ router.post('/api/staff/qr-checkin', isStaffOrAdmin, async (req: Request, res: R
     const staffEmail = sessionUser?.email || 'unknown';
     const staffName = sessionUser?.name || null;
 
-    const memberResult = await pool.query<{
-      id: string;
-      email: string;
-      first_name: string | null;
-      last_name: string | null;
-      membership_status: string | null;
-      tier: string | null;
-      hubspot_id: string | null;
-      lifetime_visits: number | null;
-    }>(`
+    const memberResult = await db.execute(sql`
       SELECT u.id, u.email, u.first_name, u.last_name, u.membership_status, u.tier, u.hubspot_id, u.lifetime_visits
       FROM users u
-      WHERE u.id = $1
+      WHERE u.id = ${memberId}
       LIMIT 1
-    `, [memberId]);
+    `);
 
     if (memberResult.rows.length === 0) {
       return res.status(404).json({ error: 'Member not found' });
@@ -1497,18 +1407,12 @@ router.post('/api/staff/qr-checkin', isStaffOrAdmin, async (req: Request, res: R
     const member = memberResult.rows[0];
     const displayName = [member.first_name, member.last_name].filter(Boolean).join(' ') || member.email.split('@')[0];
 
-    const recentCheckin = await pool.query(
-      `SELECT id, created_at FROM walk_in_visits WHERE member_email = $1 AND created_at > NOW() - INTERVAL '2 minutes' LIMIT 1`,
-      [member.email]
-    );
+    const recentCheckin = await db.execute(sql`SELECT id, created_at FROM walk_in_visits WHERE member_email = ${member.email} AND created_at > NOW() - INTERVAL '2 minutes' LIMIT 1`);
     if (recentCheckin.rows.length > 0) {
       return res.status(409).json({ error: 'This member was already checked in less than 2 minutes ago', alreadyCheckedIn: true });
     }
 
-    const updateResult = await pool.query<{ lifetime_visits: number }>(
-      `UPDATE users SET lifetime_visits = COALESCE(lifetime_visits, 0) + 1 WHERE id = $1 RETURNING lifetime_visits`,
-      [memberId]
-    );
+    const updateResult = await db.execute(sql`UPDATE users SET lifetime_visits = COALESCE(lifetime_visits, 0) + 1 WHERE id = ${memberId} RETURNING lifetime_visits`);
     const newVisitCount = updateResult.rows[0]?.lifetime_visits || 1;
 
     if (member.hubspot_id) {
@@ -1526,11 +1430,8 @@ router.post('/api/staff/qr-checkin', isStaffOrAdmin, async (req: Request, res: R
       relatedType: 'booking'
     }).catch(err => logger.error('[QR Checkin] Failed to send notification:', { extra: { err } }));
 
-    await pool.query(
-      `INSERT INTO walk_in_visits (member_email, checked_in_by, checked_in_by_name, created_at)
-       VALUES ($1, $2, $3, NOW())`,
-      [member.email, staffEmail, staffName]
-    );
+    await db.execute(sql`INSERT INTO walk_in_visits (member_email, checked_in_by, checked_in_by_name, created_at)
+       VALUES (${member.email}, ${staffEmail}, ${staffName}, NOW())`);
 
     if (newVisitCount === 1 && member.membership_status?.toLowerCase() === 'trialing') {
       sendFirstVisitConfirmationEmail(member.email, { firstName: member.first_name || undefined })
@@ -1538,10 +1439,7 @@ router.post('/api/staff/qr-checkin', isStaffOrAdmin, async (req: Request, res: R
         .catch(err => logger.error('[QR Checkin] Failed to send first visit confirmation email:', { extra: { err } }));
     }
 
-    const pinnedNotesResult = await pool.query<{ content: string; created_by_name: string | null }>(
-      `SELECT content, created_by_name FROM member_notes WHERE member_email = $1 AND is_pinned = true ORDER BY created_at DESC`,
-      [member.email]
-    );
+    const pinnedNotesResult = await db.execute(sql`SELECT content, created_by_name FROM member_notes WHERE member_email = ${member.email} AND is_pinned = true ORDER BY created_at DESC`);
     const pinnedNotes = pinnedNotesResult.rows.map(n => ({
       content: n.content,
       createdBy: n.created_by_name || 'Staff'

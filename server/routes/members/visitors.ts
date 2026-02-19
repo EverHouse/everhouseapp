@@ -49,53 +49,37 @@ router.get('/api/visitors', isStaffOrAdmin, async (req, res) => {
     const safeSortOrder = validSortOrders.includes(sortOrder as typeof validSortOrders[number]) ? sortOrder : 'DESC';
     const validColumns = [...Object.values(sortColumnMap), 'last_purchase_date'];
     const safeSortColumn = validColumns.includes(sortColumn) ? sortColumn : 'last_purchase_date';
+    // SAFE: safeSortColumn and safeSortOrder are validated against hardcoded whitelists above (validColumns, validSortOrders)
+    // sql.raw() is required here because these are column expressions and SQL keywords, not parameterizable values
     const orderByClause = sql.raw(`${safeSortColumn} ${safeSortOrder}${nullsLast}`);
     
     const showArchived = (req.query.archived as string) === 'true';
-    const archiveCondition = showArchived ? 'AND u.archived_at IS NOT NULL' : 'AND u.archived_at IS NULL';
+    const archiveClause = showArchived 
+      ? sql`AND u.archived_at IS NOT NULL` 
+      : sql`AND u.archived_at IS NULL`;
     
-    let sourceCondition = '';
+    let sourceClause = sql``;
     if (sourceFilter === 'stripe') {
-      sourceCondition = `AND u.stripe_customer_id IS NOT NULL 
+      sourceClause = sql`AND u.stripe_customer_id IS NOT NULL 
         AND u.mindbody_client_id IS NULL 
         AND u.legacy_source IS DISTINCT FROM 'mindbody_import'
         AND u.data_source IS DISTINCT FROM 'APP'`;
     } else if (sourceFilter === 'mindbody') {
-      sourceCondition = `AND (u.mindbody_client_id IS NOT NULL OR u.legacy_source = 'mindbody_import')`;
+      sourceClause = sql`AND (u.mindbody_client_id IS NOT NULL OR u.legacy_source = 'mindbody_import')`;
     } else if (sourceFilter === 'hubspot') {
-      sourceCondition = `AND u.hubspot_id IS NOT NULL 
+      sourceClause = sql`AND u.hubspot_id IS NOT NULL 
         AND u.stripe_customer_id IS NULL 
         AND u.mindbody_client_id IS NULL
         AND u.legacy_source IS DISTINCT FROM 'mindbody_import'
         AND u.data_source IS DISTINCT FROM 'APP'`;
     } else if (sourceFilter === 'APP') {
-      sourceCondition = `AND u.data_source = 'APP'`;
+      sourceClause = sql`AND u.data_source = 'APP'`;
     }
     
-    let typeConditionCount = '';
-    let typeConditionMain = '';
-    if (typeFilter === 'day_pass') {
-      typeConditionCount = "AND computed_type = 'day_pass'";
-      typeConditionMain = "AND effective_type = 'day_pass'";
-    } else if (typeFilter === 'guest') {
-      typeConditionCount = "AND computed_type = 'guest'";
-      typeConditionMain = "AND effective_type = 'guest'";
-    } else if (typeFilter === 'lead') {
-      typeConditionCount = "AND computed_type = 'lead'";
-      typeConditionMain = "AND effective_type = 'lead'";
-    } else if (typeFilter === 'classpass') {
-      typeConditionCount = "AND computed_type = 'classpass'";
-      typeConditionMain = "AND effective_type = 'classpass'";
-    } else if (typeFilter === 'sim_walkin') {
-      typeConditionCount = "AND computed_type = 'sim_walkin'";
-      typeConditionMain = "AND effective_type = 'sim_walkin'";
-    } else if (typeFilter === 'private_lesson') {
-      typeConditionCount = "AND computed_type = 'private_lesson'";
-      typeConditionMain = "AND effective_type = 'private_lesson'";
-    } else if (typeFilter === 'NEW') {
-      typeConditionCount = "AND computed_type = 'NEW'";
-      typeConditionMain = "AND effective_type = 'NEW'";
-    }
+    const validTypeFilters = ['day_pass', 'guest', 'lead', 'classpass', 'sim_walkin', 'private_lesson', 'NEW'] as const;
+    const safeTypeFilter = validTypeFilters.includes(typeFilter as typeof validTypeFilters[number]) ? (typeFilter as string) : null;
+    const typeClauseCount = safeTypeFilter ? sql`AND computed_type = ${safeTypeFilter}` : sql``;
+    const typeClauseMain = safeTypeFilter ? sql`AND effective_type = ${safeTypeFilter}` : sql``;
     
     const searchPattern = searchTerm ? `%${searchTerm}%` : null;
     const searchClause = searchPattern
@@ -149,13 +133,13 @@ router.get('/api/visitors', isStaffOrAdmin, async (req, res) => {
         LEFT JOIN guest_appearances ga ON LOWER(u.email) = ga.email
         WHERE (u.role = 'visitor' OR u.membership_status = 'visitor' OR u.membership_status = 'non-member')
         AND u.role NOT IN ('admin', 'staff')
-        ${sql.raw(archiveCondition)}
-        ${sql.raw(sourceCondition)}
+        ${archiveClause}
+        ${sourceClause}
         ${searchClause}
       )
       SELECT COUNT(*)::int as total
       FROM visitor_data
-      WHERE 1=1 ${sql.raw(typeConditionCount)}
+      WHERE 1=1 ${typeClauseCount}
     `);
     const totalCount = (countResult.rows[0] as Record<string, unknown>)?.total || 0;
     
@@ -242,13 +226,13 @@ router.get('/api/visitors', isStaffOrAdmin, async (req, res) => {
         ) guest_agg ON LOWER(u.email) = guest_agg.email
         WHERE (u.role = 'visitor' OR u.membership_status = 'visitor' OR u.membership_status = 'non-member')
         AND u.role NOT IN ('admin', 'staff')
-        ${sql.raw(archiveCondition)}
-        ${sql.raw(sourceCondition)}
+        ${archiveClause}
+        ${sourceClause}
         ${searchClause}
       )
       SELECT *, effective_type as computed_type
       FROM visitor_base
-      WHERE 1=1 ${sql.raw(typeConditionMain)}
+      WHERE 1=1 ${typeClauseMain}
       ORDER BY ${orderByClause}
       LIMIT ${pageLimit}
       OFFSET ${pageOffset}
@@ -656,30 +640,24 @@ router.get('/api/visitors/search', isStaffOrAdmin, async (req, res) => {
     const shouldIncludeStaff = includeStaff === 'true';
     const shouldIncludeMembers = includeMembers === 'true';
     
-    // Build role/status filter based on flags
-    // Default: only visitors
-    // includeStaff: also search staff/admin users (for booking assignment)
-    // includeMembers: also search active members
-    // Note: Always include users who are in staff_users table (instructors, staff, admins)
-    // even if their users.membership_status is 'non-member'
-    let roleCondition = `(role = 'visitor' OR membership_status = 'visitor')`;
+    let roleClause = sql`(u.role = 'visitor' OR u.membership_status = 'visitor')`;
     if (shouldIncludeStaff && shouldIncludeMembers) {
-      roleCondition = `(
-        role = 'visitor' OR membership_status = 'visitor'
-        OR role IN ('staff', 'admin')
-        OR membership_status IN ('active', 'trialing', 'past_due')
+      roleClause = sql`(
+        u.role = 'visitor' OR u.membership_status = 'visitor'
+        OR u.role IN ('staff', 'admin')
+        OR u.membership_status IN ('active', 'trialing', 'past_due')
         OR EXISTS (SELECT 1 FROM staff_users su2 WHERE LOWER(su2.email) = LOWER(u.email) AND su2.is_active = true)
       )`;
     } else if (shouldIncludeStaff) {
-      roleCondition = `(
-        role = 'visitor' OR membership_status = 'visitor'
-        OR role IN ('staff', 'admin')
+      roleClause = sql`(
+        u.role = 'visitor' OR u.membership_status = 'visitor'
+        OR u.role IN ('staff', 'admin')
         OR EXISTS (SELECT 1 FROM staff_users su2 WHERE LOWER(su2.email) = LOWER(u.email) AND su2.is_active = true)
       )`;
     } else if (shouldIncludeMembers) {
-      roleCondition = `(
-        role = 'visitor' OR membership_status = 'visitor'
-        OR membership_status IN ('active', 'trialing', 'past_due')
+      roleClause = sql`(
+        u.role = 'visitor' OR u.membership_status = 'visitor'
+        OR u.membership_status IN ('active', 'trialing', 'past_due')
       )`;
     }
     
@@ -688,7 +666,7 @@ router.get('/api/visitors/search', isStaffOrAdmin, async (req, res) => {
              su.role as staff_role, su.is_active as is_staff_active
       FROM users u
       LEFT JOIN staff_users su ON LOWER(u.email) = LOWER(su.email) AND su.is_active = true
-      WHERE ${sql.raw(roleCondition.replace(/role/g, 'u.role').replace(/membership_status/g, 'u.membership_status').replace(/archived_at/g, 'u.archived_at'))}
+      WHERE ${roleClause}
       AND u.archived_at IS NULL
       AND (
         LOWER(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')) LIKE ${searchTerm}
