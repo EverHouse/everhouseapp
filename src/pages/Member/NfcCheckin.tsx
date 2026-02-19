@@ -5,13 +5,14 @@ import PwaSmartBanner from '../../components/PwaSmartBanner';
 
 type CheckinState = 'loading' | 'checking_in' | 'not_logged_in' | 'error';
 
+const AUTO_REDIRECT_DELAY = 3000;
+
 const NfcCheckin: React.FC = () => {
   const { user, sessionChecked } = useData();
   const navigate = useNavigate();
   const [state, setState] = useState<CheckinState>('loading');
   const [errorMessage, setErrorMessage] = useState('');
   const checkinAttemptedRef = useRef(false);
-  const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
     if (!sessionChecked) return;
@@ -48,7 +49,15 @@ const NfcCheckin: React.FC = () => {
         setErrorMessage('Unable to connect. Please try again.');
         setState('error');
       });
-  }, [sessionChecked, user, retryCount, navigate]);
+  }, [sessionChecked, user, navigate]);
+
+  useEffect(() => {
+    if (state !== 'error') return;
+    const timer = setTimeout(() => {
+      navigate('/dashboard', { replace: true });
+    }, AUTO_REDIRECT_DELAY);
+    return () => clearTimeout(timer);
+  }, [state, navigate]);
 
   const handleLoginRedirect = () => {
     const currentPath = window.location.pathname + window.location.search;
@@ -105,16 +114,9 @@ const NfcCheckin: React.FC = () => {
               <div className="w-16 h-16 rounded-full bg-white/20 flex items-center justify-center mx-auto mb-4">
                 <span className="material-symbols-outlined text-4xl text-yellow-300">warning</span>
               </div>
-              <h1 className="text-xl font-bold text-white mb-2">Check-In Failed</h1>
+              <h1 className="text-xl font-bold text-white mb-2">Check-In Issue</h1>
               <p className="text-white/80 text-sm">{errorMessage}</p>
-            </div>
-            <div className="bg-white p-4 text-center">
-              <button
-                onClick={() => { checkinAttemptedRef.current = false; setState('loading'); setRetryCount(c => c + 1); }}
-                className="text-primary font-medium text-sm hover:underline"
-              >
-                Try Again
-              </button>
+              <p className="text-white/50 text-xs mt-3">Redirecting to your dashboard...</p>
             </div>
           </div>
         )}
