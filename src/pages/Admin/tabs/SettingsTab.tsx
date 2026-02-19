@@ -35,6 +35,7 @@ const SettingsTab: React.FC = () => {
   const queryClient = useQueryClient();
   const [success, setSuccess] = useState<string | null>(null);
   const [hasChanges, setHasChanges] = useState(false);
+  const [copied, setCopied] = useState(false);
   
   const [settings, setSettings] = useState<SettingsState>({
     clubName: 'Ever Club',
@@ -291,6 +292,50 @@ const SettingsTab: React.FC = () => {
               }}
               size="md"
             />
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-white/60 dark:bg-white/5 backdrop-blur-lg rounded-2xl p-6 border border-primary/10 dark:border-white/20">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="w-10 h-10 rounded-xl bg-primary/10 dark:bg-white/10 flex items-center justify-center">
+            <span aria-hidden="true" className="material-symbols-outlined text-primary dark:text-white">nfc</span>
+          </div>
+          <div>
+            <h3 className="text-lg font-bold text-primary dark:text-white">NFC Check-In Setup</h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400">Generate URLs for NFC tag programming</p>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600 dark:text-gray-300">
+            Program this URL into NFC tags (NTAG215/216) using a free app like NFC Tools. Members tap the tag with their phone to check in.
+          </p>
+
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              readOnly
+              value={`${window.location.origin}/nfc-checkin`}
+              className="flex-1 px-4 py-3 rounded-lg border border-gray-200 dark:border-white/25 bg-gray-50 dark:bg-black/30 text-primary dark:text-white text-sm font-mono select-all"
+            />
+            <button
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(`${window.location.origin}/nfc-checkin`);
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 2000);
+                } catch (err) {
+                  console.error('Failed to copy:', err);
+                }
+              }}
+              className="tactile-btn px-4 py-3 rounded-lg bg-primary dark:bg-accent text-white dark:text-primary font-medium text-sm hover:opacity-90 transition-opacity whitespace-nowrap flex items-center gap-2"
+            >
+              <span aria-hidden="true" className="material-symbols-outlined text-base">
+                {copied ? 'check_circle' : 'content_copy'}
+              </span>
+              {copied ? 'Copied!' : 'Copy URL'}
+            </button>
           </div>
         </div>
       </div>
