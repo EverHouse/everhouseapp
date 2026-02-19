@@ -30,7 +30,7 @@ import QrScannerModal from './modals/QrScannerModal';
 import CheckInConfirmationModal from './modals/CheckInConfirmationModal';
 import { TrackmanBookingModal } from './modals/TrackmanBookingModal';
 import { UnifiedBookingSheet } from './modals/UnifiedBookingSheet';
-import { StaffManualBookingModal, type StaffManualBookingData } from './modals/StaffManualBookingModal';
+import { StaffManualBookingModal } from './modals/StaffManualBookingModal';
 import { NewUserDrawer } from './drawers/NewUserDrawer';
 import type { SelectedMember } from '../shared/MemberSearchInput';
 import { tabToPath } from '../../pages/Admin/layout/types';
@@ -487,29 +487,6 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
     refresh();
   }, [refresh]);
 
-  const handleManualBookingSubmit = useCallback(async (bookingData: StaffManualBookingData) => {
-    const response = await fetch('/api/staff/manual-booking', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({
-        hostMemberId: bookingData.hostMember.id,
-        resourceId: bookingData.resourceId,
-        requestDate: bookingData.requestDate,
-        startTime: bookingData.startTime,
-        durationMinutes: bookingData.durationMinutes,
-        declaredPlayerCount: bookingData.declaredPlayerCount,
-        participants: bookingData.participants,
-        trackman_booking_id: bookingData.trackmanBookingId
-      })
-    });
-    
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({}));
-      throw new Error(error.error || 'Failed to create booking');
-    }
-    refresh();
-  }, [refresh]);
 
   const handleRefresh = useCallback(async () => {
     await refresh();
@@ -1002,8 +979,6 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
           setManualBookingModalOpen(false);
           setPrefillHostMember(null);
         }}
-        onSubmit={handleManualBookingSubmit}
-        defaultHostMember={prefillHostMember}
       />
 
       <AnnouncementFormDrawer

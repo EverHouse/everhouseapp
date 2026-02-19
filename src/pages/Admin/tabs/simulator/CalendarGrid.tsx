@@ -418,16 +418,14 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
                                     return (
                                         <div
                                             key={`${resource.id}-${slot}`}
-                                            title={closure ? `CLOSED: ${closure.title}` : eventBlock ? `EVENT BLOCK: ${eventBlock.closureTitle || eventBlock.blockType || 'Blocked'}` : booking ? `${bookingDisplayName}${isUnmatched ? ' (UNMATCHED - Click to assign member)' : isInactiveMember ? ' (Inactive Member)' : ''} - Click for details` : pendingRequest ? `PENDING: ${pendingRequest.user_name || 'Request'} - Awaiting Trackman sync` : `${resource.type === 'conference_room' ? 'Conference Room' : resource.name} - ${formatTime12Hour(slot)} (Available)`}
-                                            onClick={closure || eventBlock ? undefined : isEmptyCell ? () => {
+                                            title={closure ? `CLOSED: ${closure.title}` : eventBlock ? `EVENT BLOCK: ${eventBlock.closureTitle || eventBlock.blockType || 'Blocked'}` : booking ? `${bookingDisplayName}${isUnmatched ? ' (UNMATCHED - Click to assign member)' : isInactiveMember ? ' (Inactive Member)' : ''} - Click for details` : pendingRequest ? `PENDING: ${pendingRequest.user_name || 'Request'} - Awaiting Trackman sync` : isConference ? `Book ${formatTime12Hour(slot)}` : `${resource.name} - ${formatTime12Hour(slot)}`}
+                                            onClick={closure || eventBlock ? undefined : isEmptyCell ? (isConference ? () => {
                                                 setStaffManualBookingDefaults({
-                                                    resourceId: resource.id,
                                                     startTime: slot,
                                                     date: calendarDate,
-                                                    initialMode: resource.type === 'conference_room' ? 'conference' : 'member'
                                                 });
                                                 setStaffManualBookingModalOpen(true);
-                                            } : booking ? () => setBookingSheet({
+                                            } : undefined) : booking ? () => setBookingSheet({
                                                 isOpen: true,
                                                 trackmanBookingId: booking.trackman_booking_id || null,
                                                 bookingId: booking.id,
@@ -467,7 +465,7 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
                                                                     : 'group relative hover:scale-105 hover:z-10 bg-green-100 dark:bg-green-500/20 border border-green-300 dark:border-green-500/30 cursor-pointer hover:bg-green-200 dark:hover:bg-green-500/30' 
                                                         : pendingRequest
                                                                 ? 'bg-blue-50 dark:bg-blue-500/10 border-2 border-dashed border-blue-400 dark:border-blue-400/50 cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-500/20'
-                                                                : 'bg-white dark:bg-white/5 border border-gray-200 dark:border-white/15 cursor-pointer hover:bg-gray-100 dark:hover:bg-white/10'
+                                                                : isConference ? 'bg-white dark:bg-white/5 border border-gray-200 dark:border-white/15 cursor-pointer hover:bg-purple-50 dark:hover:bg-purple-500/10' : 'bg-white dark:bg-white/5 border border-gray-200 dark:border-white/15'
                                             } transition-all duration-fast`}
                                             style={isEmptyCell ? {
                                                 backgroundImage: isDark 

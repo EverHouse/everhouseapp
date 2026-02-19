@@ -69,7 +69,6 @@ export interface BookingRequestsPanelProps {
     guestFeeDollars?: number;
     overageRatePerBlockDollars?: number;
     tierMinutes?: Record<string, number>;
-    optimisticNewBooking: BookingRequest | null;
     startDate: string;
     endDate: string;
     queryClient: { setQueryData: (key: unknown, updater: unknown) => void; invalidateQueries: (opts: { queryKey: unknown }) => void };
@@ -100,7 +99,6 @@ const BookingRequestsPanel: React.FC<BookingRequestsPanelProps> = ({
     handleRefresh,
     showToast,
     confirm,
-    optimisticNewBooking,
     startDate,
     endDate,
     queryClient,

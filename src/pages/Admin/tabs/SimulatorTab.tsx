@@ -11,11 +11,10 @@ import { useTheme } from '../../../contexts/ThemeContext';
 import { TabType, tabToPath } from '../layout/types';
 import { TrackmanBookingModal } from '../../../components/staff-command-center/modals/TrackmanBookingModal';
 import { UnifiedBookingSheet } from '../../../components/staff-command-center/modals/UnifiedBookingSheet';
-import { StaffManualBookingModal, type StaffManualBookingData } from '../../../components/staff-command-center/modals/StaffManualBookingModal';
+import { StaffManualBookingModal } from '../../../components/staff-command-center/modals/StaffManualBookingModal';
 import { RescheduleBookingModal } from '../../../components/booking/RescheduleBookingModal';
 import { useBookingActions } from '../../../hooks/useBookingActions';
 import { AnimatedPage } from '../../../components/motion';
-import FloatingActionButton from '../../../components/FloatingActionButton';
 import { useConfirmDialog } from '../../../components/ConfirmDialog';
 import { SimulatorTabSkeleton } from '../../../components/skeletons';
 import {
@@ -229,15 +228,11 @@ const SimulatorTab: React.FC = () => {
     const [staffManualBookingModalOpen, setStaffManualBookingModalOpen] = useState(false);
     const checkinInProgressRef = useRef<Set<number>>(new Set());
     const [staffManualBookingDefaults, setStaffManualBookingDefaults] = useState<{
-        resourceId?: number;
         startTime?: string;
         date?: string;
-        initialMode?: 'member' | 'lesson' | 'conference';
     }>({});
     
     const [actionInProgress, setActionInProgress] = useState<Record<string, string>>({});
-    const [isCreatingBooking, setIsCreatingBooking] = useState(false);
-    const [optimisticNewBooking, setOptimisticNewBooking] = useState<BookingRequest | null>(null);
     
     const calendarColRef = useRef<HTMLDivElement>(null);
     const [queueMaxHeight, setQueueMaxHeight] = useState<number | null>(null);
@@ -412,78 +407,6 @@ const SimulatorTab: React.FC = () => {
             isRelink: event.isRelink
         });
     }, []);
-
-    const handleStaffManualBookingSubmit = useCallback(async (data: StaffManualBookingData) => {
-        const requestParticipants = data.participants.map(p => ({
-            type: p.type,
-            email: p.member?.email || p.email || '',
-            userId: p.member?.id,
-            name: p.member?.name || p.name
-        })).filter(p => p.email || p.userId);
-
-        setIsCreatingBooking(true);
-        
-        const [startHour, startMin] = data.startTime.split(':').map(Number);
-        const endTotalMins = startHour * 60 + startMin + data.durationMinutes;
-        const endHour = Math.floor(endTotalMins / 60) % 24;
-        const endMin = endTotalMins % 60;
-        const endTime = `${endHour.toString().padStart(2, '0')}:${endMin.toString().padStart(2, '0')}`;
-        
-        const optimisticId = `creating-${Date.now()}`;
-        const optimisticBooking: BookingRequest = {
-            id: optimisticId,
-            user_email: data.hostMember.email,
-            user_name: data.hostMember.name,
-            resource_id: data.resourceId,
-            bay_name: resources?.find(r => r.id === data.resourceId)?.name || null,
-            resource_preference: null,
-            request_date: data.requestDate,
-            start_time: data.startTime + ':00',
-            end_time: endTime + ':00',
-            duration_minutes: data.durationMinutes,
-            notes: null,
-            status: 'confirmed',
-            staff_notes: null,
-            suggested_time: null,
-            created_at: new Date().toISOString(),
-            source: 'booking'
-        };
-        setOptimisticNewBooking(optimisticBooking);
-        
-        setStaffManualBookingModalOpen(false);
-
-        try {
-            const res = await fetch('/api/staff/manual-booking', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify({
-                    user_email: data.hostMember.email,
-                    user_name: data.hostMember.name,
-                    resource_id: data.resourceId,
-                    request_date: data.requestDate,
-                    start_time: data.startTime + ':00',
-                    duration_minutes: data.durationMinutes,
-                    declared_player_count: data.declaredPlayerCount,
-                    request_participants: requestParticipants,
-                    trackman_booking_id: data.trackmanBookingId
-                })
-            });
-
-            if (!res.ok) {
-                const error = await res.json().catch(() => ({}));
-                throw new Error(error.error || 'Failed to create booking');
-            }
-
-            showToast('Booking created successfully', 'success');
-            handleRefresh();
-        } catch (err: unknown) {
-            showToast((err instanceof Error ? err.message : String(err)) || 'Failed to create booking', 'error');
-        } finally {
-            setIsCreatingBooking(false);
-            setOptimisticNewBooking(null);
-        }
-    }, [showToast, handleRefresh, resources]);
 
     const unmatchedBookings = useMemo(() => {
         const today = getTodayPacific();
@@ -838,11 +761,7 @@ const SimulatorTab: React.FC = () => {
             return d.toISOString().split('T')[0];
         })();
         
-        const bookingsToFilter = optimisticNewBooking 
-            ? [...approvedBookings, optimisticNewBooking]
-            : approvedBookings;
-        
-        return bookingsToFilter
+        return approvedBookings
             .filter(b => {
                 const isScheduledStatus = b.status === 'approved' || b.status === 'confirmed';
                 const isCheckedInToday = b.status === 'attended' && b.request_date === today;
@@ -859,7 +778,7 @@ const SimulatorTab: React.FC = () => {
                 }
                 return a.start_time.localeCompare(b.start_time);
             });
-    }, [approvedBookings, scheduledFilter, optimisticNewBooking]);
+    }, [approvedBookings, scheduledFilter]);
 
     const isBookingUnmatched = useCallback((booking: BookingRequest): boolean => {
         const email = (booking.user_email || '').toLowerCase();
@@ -1112,7 +1031,6 @@ const SimulatorTab: React.FC = () => {
                         guestFeeDollars={guestFeeDollars}
                         overageRatePerBlockDollars={overageRatePerBlockDollars}
                         tierMinutes={tierMinutes}
-                        optimisticNewBooking={optimisticNewBooking}
                         startDate={startDate}
                         endDate={endDate}
                         queryClient={queryClient as any}
@@ -1533,11 +1451,8 @@ const SimulatorTab: React.FC = () => {
                 setStaffManualBookingModalOpen(false);
                 setStaffManualBookingDefaults({});
               }}
-              onSubmit={handleStaffManualBookingSubmit}
-              defaultResourceId={staffManualBookingDefaults.resourceId}
               defaultStartTime={staffManualBookingDefaults.startTime}
               defaultDate={staffManualBookingDefaults.date}
-              initialMode={staffManualBookingDefaults.initialMode}
             />
 
             <UnifiedBookingSheet
@@ -1736,12 +1651,6 @@ const SimulatorTab: React.FC = () => {
             </ModalShell>
                 </div>
 
-                <FloatingActionButton
-                  onClick={() => setStaffManualBookingModalOpen(true)}
-                  icon="add"
-                  color="brand"
-                  label="Create Booking for Member"
-                />
                 <ConfirmDialogComponent />
             </AnimatedPage>
     );
