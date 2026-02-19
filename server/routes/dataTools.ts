@@ -236,7 +236,7 @@ router.post('/api/data-tools/resync-member', isAdmin, async (req: Request, res: 
       WHERE id = ${user.id}`);
     
     syncCustomerMetadataToStripe(normalizedEmail).catch((err) => {
-      console.error('[DataTools] Background Stripe sync after HubSpot resync failed:', err);
+      logger.error('[DataTools] Background Stripe sync after HubSpot resync failed:', { error: err });
     });
     
     await db.insert(billingAuditLog).values({

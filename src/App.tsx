@@ -123,7 +123,7 @@ const AdminDashboard = lazy(() => import('./pages/Admin/AdminDashboard'));
 const DataIntegrity = lazy(() => import('./pages/Admin/DataIntegrity'));
 const Checkout = lazy(() => import('./pages/Checkout'));
 
-const StaffCommandCenter = lazy(() => import('./components/StaffCommandCenter'));
+const StaffCommandCenter = lazy(() => import('./components/staff-command-center/StaffCommandCenter'));
 const SimulatorTab = lazy(() => import('./pages/Admin/tabs/SimulatorTab'));
 const DirectoryTab = lazy(() => import('./pages/Admin/tabs/DirectoryTab'));
 const EventsTab = lazy(() => import('./pages/Admin/tabs/EventsTab'));
