@@ -137,6 +137,7 @@ export const ADMIN_LINKS = [
   { id: 'inquiries' as const, icon: 'mail', label: 'Inquiries' },
   { id: 'applications' as const, icon: 'how_to_reg', label: 'Applications' },
   { id: 'changelog' as const, icon: 'history', label: 'Version History' },
+  { id: 'settings' as const, icon: 'settings', label: 'Settings' },
 ];
 
 export const ADMIN_ROUTE_LINKS = [
