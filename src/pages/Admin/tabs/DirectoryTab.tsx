@@ -1796,21 +1796,12 @@ const DirectoryTab: React.FC = () => {
                                                     {[member.first_name, member.last_name].filter(Boolean).join(' ') || 'Unknown'}
                                                 </h4>
                                                 <p className="text-xs text-gray-500 dark:text-gray-400">{member.email}</p>
-                                                {member.job_title && <p className="text-xs text-gray-500 dark:text-gray-400">{member.job_title}</p>}
+                                                {member.phone && <p className="text-xs text-gray-500 dark:text-gray-400">{formatPhoneNumber(member.phone)}</p>}
                                             </div>
                                             <RoleBadge role={member.role} />
                                         </div>
                                         <div className="flex items-center justify-between gap-3 mt-3 pt-3 border-t border-gray-50 dark:border-white/20">
-                                            <div className="flex items-center gap-1.5 flex-wrap">
-                                                {member.tier && <TierBadge tier={member.tier} size="sm" membershipStatus={member.membership_status} />}
-                                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                                    member.is_active 
-                                                        ? 'bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400' 
-                                                        : 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400'
-                                                }`}>
-                                                    {member.is_active ? 'Active' : 'Inactive'}
-                                                </span>
-                                            </div>
+                                            <p className="text-xs text-gray-500 dark:text-gray-400">{member.job_title || '-'}</p>
                                             <span className="material-symbols-outlined text-gray-400 text-[16px]">chevron_right</span>
                                         </div>
                                     </div>
