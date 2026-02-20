@@ -5,6 +5,7 @@ import { eq, sql } from 'drizzle-orm';
 import { logger } from './logger';
 import { normalizeEmail } from './utils/emailNormalization';
 import { getStripeClient } from './stripe/client';
+import { getHubSpotClient } from './integrations';
 
 export interface MergePreview {
   primaryUser: {
@@ -719,6 +720,32 @@ export async function executeMerge(
     logger.info('[UserMerge] Successfully merged users', {
       extra: { primaryUserId, secondaryUserId, performedBy, recordsMerged }
     });
+    
+    const primaryHubspotId = primaryUser.hubspotId || (transferHubspotId ? secondaryUser.hubspotId : null);
+    const secondaryHubspotId = transferHubspotId ? null : secondaryUser.hubspotId;
+    
+    if (primaryHubspotId && secondaryHubspotId && primaryHubspotId !== secondaryHubspotId) {
+      try {
+        const hubspot = await getHubSpotClient();
+        if (hubspot) {
+          await hubspot.apiRequest({
+            method: 'POST',
+            path: '/crm/v3/objects/contacts/merge',
+            body: {
+              primaryObjectId: primaryHubspotId,
+              objectIdToMerge: secondaryHubspotId
+            }
+          });
+          logger.info('[UserMerge] HubSpot contacts merged automatically', {
+            extra: { primaryHubspotId, secondaryHubspotId }
+          });
+        }
+      } catch (hubspotErr: unknown) {
+        logger.warn('[UserMerge] Failed to merge HubSpot contacts (merge them manually in HubSpot)', {
+          extra: { error: hubspotErr, primaryHubspotId, secondaryHubspotId }
+        });
+      }
+    }
     
     return {
       success: true,
