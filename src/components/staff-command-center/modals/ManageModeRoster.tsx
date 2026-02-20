@@ -86,7 +86,7 @@ export function ManageModeRoster({
     return (
       <div 
         key={member.id}
-        className={`relative tactile-row p-3 rounded-xl border transition-all duration-fast ${
+        className={`relative p-3 rounded-xl border transition-all duration-fast ${
           isOwner 
             ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-700'
             : isGuestSlot
@@ -149,10 +149,10 @@ export function ManageModeRoster({
           {isOwner ? (
             <button
               onClick={() => setReassignSearchOpen(!reassignSearchOpen)}
-              className="p-1.5 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-500 transition-colors flex-shrink-0"
+              className="p-2.5 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/30 active:bg-blue-200 dark:active:bg-blue-900/50 text-blue-500 transition-colors flex-shrink-0"
               title="Reassign Owner"
             >
-              <span className="material-symbols-outlined text-sm">swap_horiz</span>
+              <span className="material-symbols-outlined text-base">swap_horiz</span>
             </button>
           ) : (
             <button
@@ -164,10 +164,10 @@ export function ManageModeRoster({
                 }
               }}
               disabled={isUnlinking || isRemoving}
-              className="p-1.5 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 text-red-500 transition-colors flex-shrink-0"
+              className="p-2.5 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 active:bg-red-200 dark:active:bg-red-900/50 text-red-500 transition-colors flex-shrink-0 disabled:opacity-50"
               title="Remove"
             >
-              <span className="material-symbols-outlined text-sm">close</span>
+              <span className="material-symbols-outlined text-base">close</span>
             </button>
           )}
         </div>

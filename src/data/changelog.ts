@@ -23,6 +23,8 @@ export const changelog: ChangelogEntry[] = [
       "Changed: Bookings page Import button now shows the Trackman logo icon instead of text — cleaner look that fits within the card",
       "Fixed: Bookings page Guide and Import buttons now match heights with identical styling",
       "Changed: Booking cards that show 'Paid' now display a 'Check In' button instead — since the booking is already paid, the next logical action is to check them in",
+      "Fixed: Player slot cards no longer scale down when tapped — this was causing the reassign/remove buttons to shift position mid-tap, making them hard to press on mobile",
+      "Fixed: Reassign and remove buttons on player slots now have larger touch targets (40px vs 28px) for easier tapping",
       "Fixed: Active/Former Members tab column header hover highlights now fill the full height of the header bar — no more gaps on top/bottom when hovering",
       "Fixed: Sort icons now stay contained within their column's highlighted area — no more overlapping into adjacent headers",
       "Fixed: Column widths rebalanced so narrower columns (Visits, Joined, Last Visit) have enough room for both the label text and sort icon",
