@@ -172,6 +172,7 @@ export interface PreviewFeesResult {
   ownerFees: PreviewFeesOwnerFees;
   guestPasses: PreviewFeesGuestPasses;
   unifiedBreakdown?: FeeBreakdown;
+  allPaid?: boolean;
 }
 
 export interface SessionUser {
@@ -566,6 +567,46 @@ export async function previewRosterFees(
   const overageMinutes = overageFee > 0 ? Math.ceil(overageFee / PRICING.OVERAGE_RATE_DOLLARS) * PRICING.OVERAGE_BLOCK_MINUTES : 0;
   const minutesWithinAllowance = Math.max(0, totalOwnerResponsibleMinutes - overageMinutes);
 
+  let allPaid = false;
+  if (booking.session_id) {
+    const [paidCheck, feeSnapshotCheck] = await Promise.all([
+      pool.query(
+        `SELECT 
+           COUNT(*) FILTER (WHERE payment_status = 'paid') as paid_count,
+           COUNT(*) FILTER (WHERE cached_fee_cents > 0) as total_with_fees,
+           COUNT(*) FILTER (WHERE payment_status = 'pending' OR (payment_status IS NULL AND cached_fee_cents > 0)) as pending_count
+         FROM booking_participants 
+         WHERE session_id = $1`,
+        [booking.session_id]
+      ),
+      pool.query(
+        `SELECT id, total_cents FROM fee_snapshots WHERE session_id = $1 AND status = 'completed' ORDER BY created_at DESC LIMIT 1`,
+        [booking.session_id]
+      ),
+    ]);
+
+    const paidCount = parseInt(paidCheck.rows[0]?.paid_count || '0');
+    const totalWithFees = parseInt(paidCheck.rows[0]?.total_with_fees || '0');
+    const pendingCount = parseInt(paidCheck.rows[0]?.pending_count || '0');
+    const hasCompletedFeeSnapshot = feeSnapshotCheck.rows.length > 0;
+    const hasPaidFees = paidCount > 0;
+    const hasOriginalFees = totalWithFees > 0;
+
+    allPaid = (hasCompletedFeeSnapshot && pendingCount === 0) || (hasOriginalFees && pendingCount === 0 && hasPaidFees);
+
+    if (allPaid) {
+      const overageCheck = await pool.query(
+        `SELECT overage_fee_cents, overage_paid FROM booking_requests WHERE id = $1`,
+        [booking.booking_id]
+      );
+      const overageFeeCents = parseInt(overageCheck.rows[0]?.overage_fee_cents || '0');
+      const overagePaid = overageCheck.rows[0]?.overage_paid ?? false;
+      if (overageFeeCents > 0 && !overagePaid) {
+        allPaid = false;
+      }
+    }
+  }
+
   return {
     booking: {
       id: booking.booking_id,
@@ -613,6 +654,7 @@ export async function previewRosterFees(
       afterBooking: Math.max(0, breakdown.totals.guestPassesAvailable - guestCount),
     },
     unifiedBreakdown: breakdown,
+    allPaid,
   };
 }
 
@@ -721,6 +763,7 @@ async function buildFallbackPreview(params: FallbackPreviewParams): Promise<Prev
       usedThisBooking: guestCount,
       afterBooking: Math.max(0, guestPassesRemaining - guestCount),
     },
+    allPaid: false,
   };
 }
 

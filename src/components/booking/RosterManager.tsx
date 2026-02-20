@@ -106,6 +106,7 @@ interface FeePreviewResponse {
     usedThisBooking: number;
     afterBooking: number;
   };
+  allPaid?: boolean;
 }
 
 interface Member {
@@ -362,13 +363,14 @@ const RosterManager: React.FC<RosterManagerProps> = ({
   }, [participants]);
 
   const hasUnpaidFees = useMemo(() => {
+    if (!feePreview) return false;
+    if (feePreview.allPaid) return false;
+
     const hasPendingGuests = pendingGuestFees.count > 0;
-    const ownerParticipant = participants.find(p => p.participantType === 'owner');
-    const hasUnpaidOverage = ownerParticipant && 
-      (ownerParticipant.paymentStatus === 'pending' || ownerParticipant.paymentStatus === null) &&
-      (feePreview?.ownerFees?.estimatedOverageFee ?? 0) > 0;
-    return hasPendingGuests || !!hasUnpaidOverage;
-  }, [pendingGuestFees, participants, feePreview]);
+    const estimatedTotal = feePreview?.ownerFees?.estimatedTotalFees ?? 0;
+    const estimatedOverage = feePreview?.ownerFees?.estimatedOverageFee ?? 0;
+    return hasPendingGuests || estimatedOverage > 0 || estimatedTotal > 0;
+  }, [feePreview, pendingGuestFees]);
 
   const handlePaymentSuccess = useCallback(() => {
     setShowPaymentModal(false);
