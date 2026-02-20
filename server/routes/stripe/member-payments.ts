@@ -429,9 +429,9 @@ router.post('/api/member/bookings/:id/confirm-payment', isAuthenticated, async (
       if (participantIds.length > 0) {
         await client.query(
           `UPDATE booking_participants 
-           SET payment_status = 'paid', updated_at = NOW()
+           SET payment_status = 'paid', paid_at = NOW(), updated_at = NOW(), stripe_payment_intent_id = $2, cached_fee_cents = 0
            WHERE id = ANY($1::int[])`,
-          [participantIds]
+          [participantIds, paymentIntentId]
         );
       }
 
