@@ -198,13 +198,13 @@ interface SortableHeaderProps {
 
 const SortableHeader: React.FC<SortableHeaderProps> = ({ field, label, className = '', width, currentSortField, onSort, getSortIcon }) => (
     <div 
-        className={`p-4 font-semibold text-gray-600 dark:text-gray-300 text-sm cursor-pointer hover:bg-gray-100 dark:hover:bg-white/10 transition-colors select-none tactile-btn ${className}`}
+        className={`px-4 py-3 font-semibold text-gray-600 dark:text-gray-300 text-sm cursor-pointer hover:bg-gray-100 dark:hover:bg-white/10 transition-colors select-none tactile-btn ${className}`}
         style={{ width }}
         onClick={() => onSort(field)}
     >
         <div className="flex items-center gap-1">
             {label}
-            <span className={`material-symbols-outlined text-[16px] ${currentSortField === field ? 'text-primary dark:!text-lavender' : 'text-gray-400'}`}>
+            <span className={`material-symbols-outlined text-[16px] ${currentSortField === field ? 'text-[#293515] dark:!text-[#CCB8E4]' : 'text-gray-400'}`}>
                 {getSortIcon(field)}
             </span>
         </div>
@@ -1623,38 +1623,42 @@ const DirectoryTab: React.FC = () => {
                     <div className="hidden md:block flex-1 min-h-0 relative">
                         <div className="h-full overflow-y-auto">
                             <table className="w-full">
-                                <thead className="sticky top-0 bg-gray-50 dark:bg-surface-dark z-10">
-                                    <tr className="border-b border-gray-200 dark:border-white/20">
-                                        {([
-                                            ['name', 'Name'],
-                                            ['email', 'Email'],
-                                            ['type', 'Type'],
-                                            ['source', 'Source'],
-                                            ['purchases', 'Purchases'],
-                                            ['lastActivity', 'Last Activity'],
-                                        ] as [VisitorSortField, string][]).map(([field, label]) => (
-                                            <th
-                                                key={field + label}
-                                                className="p-3 text-left text-xs font-bold text-gray-600 dark:text-gray-400 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-white/10 transition-colors select-none tactile-btn"
-                                                onClick={() => {
-                                                    if (visitorSortField === field) {
-                                                        setVisitorSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
-                                                    } else {
-                                                        setVisitorSortField(field);
-                                                        setVisitorSortDirection(field === 'name' || field === 'email' || field === 'type' || field === 'source' ? 'asc' : 'desc');
-                                                    }
-                                                }}
-                                            >
-                                                <div className="flex items-center gap-1 whitespace-nowrap">
-                                                    {label}
-                                                    {visitorSortField === field && (
-                                                        <span className="material-symbols-outlined text-[14px] text-primary dark:!text-lavender">
-                                                            {visitorSortDirection === 'asc' ? 'arrow_upward' : 'arrow_downward'}
-                                                        </span>
-                                                    )}
-                                                </div>
-                                            </th>
-                                        ))}
+                                <thead className="sticky top-0 z-10">
+                                    <tr>
+                                        <td colSpan={6} className="p-0">
+                                            <div className="flex items-center bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl overflow-hidden">
+                                                {([
+                                                    ['name', 'Name'],
+                                                    ['email', 'Email'],
+                                                    ['type', 'Type'],
+                                                    ['source', 'Source'],
+                                                    ['purchases', 'Purchases'],
+                                                    ['lastActivity', 'Last Activity'],
+                                                ] as [VisitorSortField, string][]).map(([field, label]) => (
+                                                    <div
+                                                        key={field + label}
+                                                        className="flex-1 px-3 py-3 text-left text-xs font-bold text-gray-600 dark:text-gray-400 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-white/10 transition-colors select-none tactile-btn"
+                                                        onClick={() => {
+                                                            if (visitorSortField === field) {
+                                                                setVisitorSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+                                                            } else {
+                                                                setVisitorSortField(field);
+                                                                setVisitorSortDirection(field === 'name' || field === 'email' || field === 'type' || field === 'source' ? 'asc' : 'desc');
+                                                            }
+                                                        }}
+                                                    >
+                                                        <div className="flex items-center gap-1 whitespace-nowrap">
+                                                            {label}
+                                                            {visitorSortField === field && (
+                                                                <span className="material-symbols-outlined text-[14px] text-[#293515] dark:!text-[#CCB8E4]">
+                                                                    {visitorSortDirection === 'asc' ? 'arrow_upward' : 'arrow_downward'}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </td>
                                     </tr>
                                 </thead>
                                 <tbody ref={visitorsTbodyParent}>
@@ -1801,13 +1805,17 @@ const DirectoryTab: React.FC = () => {
                                 ))}
                             </div>
                             <table className="hidden md:table w-full">
-                                <thead className="sticky top-0 bg-gray-50 dark:bg-surface-dark z-10">
-                                    <tr className="border-b border-gray-200 dark:border-white/20">
-                                        <th className="p-3 text-left text-xs font-bold text-gray-600 dark:text-gray-400 uppercase">Name</th>
-                                        <th className="p-3 text-left text-xs font-bold text-gray-600 dark:text-gray-400 uppercase">Email</th>
-                                        <th className="p-3 text-left text-xs font-bold text-gray-600 dark:text-gray-400 uppercase">Role</th>
-                                        <th className="p-3 text-left text-xs font-bold text-gray-600 dark:text-gray-400 uppercase">Job Title</th>
-                                        <th className="p-3 text-left text-xs font-bold text-gray-600 dark:text-gray-400 uppercase">Status</th>
+                                <thead className="sticky top-0 z-10">
+                                    <tr>
+                                        <td colSpan={5} className="p-0">
+                                            <div className="flex items-center bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl overflow-hidden">
+                                                <div className="flex-1 px-3 py-3 text-left text-xs font-bold text-gray-600 dark:text-gray-400 uppercase">Name</div>
+                                                <div className="flex-1 px-3 py-3 text-left text-xs font-bold text-gray-600 dark:text-gray-400 uppercase">Email</div>
+                                                <div className="flex-1 px-3 py-3 text-left text-xs font-bold text-gray-600 dark:text-gray-400 uppercase">Role</div>
+                                                <div className="flex-1 px-3 py-3 text-left text-xs font-bold text-gray-600 dark:text-gray-400 uppercase">Job Title</div>
+                                                <div className="flex-1 px-3 py-3 text-left text-xs font-bold text-gray-600 dark:text-gray-400 uppercase">Status</div>
+                                            </div>
+                                        </td>
                                     </tr>
                                 </thead>
                                 <tbody ref={teamTbodyParent}>
@@ -1945,16 +1953,16 @@ const DirectoryTab: React.FC = () => {
                         </div>
 
                         <div className="hidden md:block relative">
-                            <div className="flex items-center bg-gray-50 dark:bg-white/5 border-b border-gray-200 dark:border-white/20">
+                            <div className="flex items-center bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl overflow-hidden">
                                 <SortableHeader field="name" label="Name" width="14%" currentSortField={sortField} onSort={handleSort} getSortIcon={getSortIcon} />
                                 <SortableHeader field="tier" label={memberTab === 'former' ? 'Last Tier' : 'Tier'} width="12%" currentSortField={sortField} onSort={handleSort} getSortIcon={getSortIcon} />
-                                <div className="p-4 font-semibold text-gray-600 dark:text-gray-300 text-sm" style={{ width: '10%' }}>Status</div>
+                                <div className="px-4 py-3 font-semibold text-gray-600 dark:text-gray-300 text-sm" style={{ width: '10%' }}>Status</div>
                                 <SortableHeader field="visits" label="Visits" width="7%" className="text-center" currentSortField={sortField} onSort={handleSort} getSortIcon={getSortIcon} />
                                 <SortableHeader field="joinDate" label="Joined" width="9%" currentSortField={sortField} onSort={handleSort} getSortIcon={getSortIcon} />
                                 <SortableHeader field="lastVisit" label="Last Visit" width="9%" currentSortField={sortField} onSort={handleSort} getSortIcon={getSortIcon} />
-                                <div className="p-4 font-semibold text-gray-600 dark:text-gray-300 text-sm" style={{ width: memberTab === 'former' ? '28%' : '39%' }}>Email</div>
+                                <div className="px-4 py-3 font-semibold text-gray-600 dark:text-gray-300 text-sm" style={{ width: memberTab === 'former' ? '28%' : '39%' }}>Email</div>
                                 {memberTab === 'former' && (
-                                    <div className="p-4 font-semibold text-gray-600 dark:text-gray-300 text-sm" style={{ width: '13%' }}>Reactivation</div>
+                                    <div className="px-4 py-3 font-semibold text-gray-600 dark:text-gray-300 text-sm" style={{ width: '13%' }}>Reactivation</div>
                                 )}
                             </div>
                             <div ref={membersDesktopParent}>
