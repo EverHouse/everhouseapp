@@ -361,6 +361,15 @@ const RosterManager: React.FC<RosterManagerProps> = ({
     };
   }, [participants]);
 
+  const hasUnpaidFees = useMemo(() => {
+    const hasPendingGuests = pendingGuestFees.count > 0;
+    const ownerParticipant = participants.find(p => p.participantType === 'owner');
+    const hasUnpaidOverage = ownerParticipant && 
+      (ownerParticipant.paymentStatus === 'pending' || ownerParticipant.paymentStatus === null) &&
+      (feePreview?.ownerFees?.estimatedOverageFee ?? 0) > 0;
+    return hasPendingGuests || !!hasUnpaidOverage;
+  }, [pendingGuestFees, participants, feePreview]);
+
   const handlePaymentSuccess = useCallback(() => {
     setShowPaymentModal(false);
     showToast('Payment successful! Guest fees have been paid.', 'success');
@@ -565,7 +574,7 @@ const RosterManager: React.FC<RosterManagerProps> = ({
                 </>
               )}
 
-              {isOwner && ((feePreview?.ownerFees?.estimatedTotalFees ?? 0) > 0 || pendingGuestFees.count > 0 || (feePreview?.ownerFees?.estimatedOverageFee ?? 0) > 0) && (
+              {isOwner && hasUnpaidFees && (
                 <div className={`mt-4 pt-4 border-t ${isDark ? 'border-white/10' : 'border-black/5'}`}>
                   <div className="flex items-center justify-between mb-3">
                     <div>
@@ -582,7 +591,7 @@ const RosterManager: React.FC<RosterManagerProps> = ({
                       ${(feePreview?.ownerFees?.estimatedTotalFees ?? ((feePreview?.ownerFees?.estimatedOverageFee ?? 0) + (feePreview?.ownerFees?.estimatedGuestFees ?? 0))).toFixed(2)}
                     </span>
                   </div>
-                  {(booking?.status === 'confirmed' || booking?.status === 'approved') && (feePreview?.ownerFees?.estimatedTotalFees ?? ((feePreview?.ownerFees?.estimatedOverageFee ?? 0) + (feePreview?.ownerFees?.estimatedGuestFees ?? 0))) > 0 ? (
+                  {(booking?.status === 'confirmed' || booking?.status === 'approved') ? (
                     <button
                       onClick={() => {
                         haptic.light();
@@ -593,11 +602,27 @@ const RosterManager: React.FC<RosterManagerProps> = ({
                       <span className="material-symbols-outlined text-lg">credit_card</span>
                       Pay Now
                     </button>
-                  ) : (booking?.status !== 'confirmed' && booking?.status !== 'approved') ? (
+                  ) : (
                     <p className={`text-xs text-center ${isDark ? 'text-white/50' : 'text-[#293515]/50'}`}>
                       Pay now or at check-in once booking is approved
                     </p>
-                  ) : null}
+                  )}
+                </div>
+              )}
+
+              {isOwner && !hasUnpaidFees && (feePreview?.ownerFees?.estimatedTotalFees ?? 0) > 0 && (
+                <div className={`mt-4 pt-4 border-t ${isDark ? 'border-white/10' : 'border-black/5'}`}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className={`material-symbols-outlined text-lg ${isDark ? 'text-green-400' : 'text-green-600'}`}>check_circle</span>
+                      <span className={`text-sm font-semibold ${isDark ? 'text-green-400' : 'text-green-600'}`}>
+                        Fees Paid
+                      </span>
+                    </div>
+                    <span className={`text-lg font-bold ${isDark ? 'text-green-400' : 'text-green-600'}`}>
+                      ${(feePreview?.ownerFees?.estimatedTotalFees ?? 0).toFixed(2)}
+                    </span>
+                  </div>
                 </div>
               )}
             </div>
