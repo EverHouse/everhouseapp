@@ -3,6 +3,7 @@ import { Router, Request, Response } from 'express';
 import { isStaffOrAdmin } from '../../core/middleware';
 import { getStripeClient } from '../../core/stripe/client';
 import { createInvoiceWithLineItems, confirmPaymentSuccess, type CartLineItem } from '../../core/stripe/payments';
+import { createDraftBookingFeeInvoice, type BookingFeeLineItem } from '../../core/stripe/invoices';
 import { logFromRequest } from '../../core/auditLog';
 import { pool } from '../../core/db';
 import { getErrorMessage, getErrorCode } from '../../utils/errorUtils';
@@ -280,6 +281,56 @@ router.post('/api/stripe/terminal/process-payment', isStaffOrAdmin, async (req: 
         });
       }
     } else {
+      if (isBookingFee && customerId && metadata?.sessionId) {
+        try {
+          const sessionIdVal = parseInt(metadata.sessionId);
+          const bookingIdVal = metadata?.bookingId ? parseInt(metadata.bookingId) : 0;
+
+          const participantRows = await pool.query(
+            `SELECT id, display_name, participant_type, cached_fee_cents
+             FROM booking_participants
+             WHERE session_id = $1 AND payment_status = 'pending' AND cached_fee_cents > 0`,
+            [sessionIdVal]
+          );
+
+          if (participantRows.rows.length > 0) {
+            const feeLineItems: BookingFeeLineItem[] = participantRows.rows.map((r: { id: number; display_name: string; participant_type: string; cached_fee_cents: number }) => {
+              const isGuest = r.participant_type === 'guest';
+              return {
+                participantId: r.id,
+                displayName: r.display_name || (isGuest ? 'Guest' : 'Member'),
+                participantType: r.participant_type as 'owner' | 'member' | 'guest',
+                overageCents: isGuest ? 0 : r.cached_fee_cents,
+                guestCents: isGuest ? r.cached_fee_cents : 0,
+                totalCents: r.cached_fee_cents,
+              };
+            });
+
+            const trackmanLookup = await pool.query(
+              'SELECT trackman_booking_id FROM booking_requests WHERE id = $1',
+              [bookingIdVal]
+            );
+            const trackmanBookingId = trackmanLookup.rows[0]?.trackman_booking_id || null;
+
+            const draftResult = await createDraftBookingFeeInvoice({
+              customerId,
+              bookingId: bookingIdVal,
+              sessionId: sessionIdVal,
+              trackmanBookingId: trackmanBookingId ? String(trackmanBookingId) : null,
+              feeLineItems,
+              metadata: finalMetadata,
+              purpose: 'booking_fee',
+            });
+
+            invoiceId = draftResult.invoiceId;
+            finalMetadata.draftInvoiceId = draftResult.invoiceId;
+            logger.info('[Terminal] Created draft booking fee invoice for terminal payment', { extra: { invoiceId: draftResult.invoiceId, sessionId: sessionIdVal, bookingId: bookingIdVal } });
+          }
+        } catch (draftErr: unknown) {
+          logger.warn('[Terminal] Could not create draft booking fee invoice (non-blocking)', { extra: { detail: getErrorMessage(draftErr) } });
+        }
+      }
+
       paymentIntent = await stripe.paymentIntents.create({
         amount: Math.round(amount),
         currency,

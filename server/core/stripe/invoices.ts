@@ -388,6 +388,7 @@ export interface BookingFeeInvoiceResult {
   paymentIntentId: string;
   clientSecret: string;
   status: string;
+  paidInFull?: boolean;
   hostedInvoiceUrl: string | null;
   invoicePdf: string | null;
   amountFromBalance?: number;
@@ -479,6 +480,29 @@ export async function createBookingFeeInvoice(
 
     const finalizedInvoice = await stripe.invoices.finalizeInvoice(invoice.id);
 
+    if (finalizedInvoice.status === 'paid') {
+      const paidInvoice = await stripe.invoices.retrieve(invoice.id, { expand: ['lines.data'] });
+      const startingBalance = paidInvoice.starting_balance || 0;
+      const endingBalance = paidInvoice.ending_balance || 0;
+      const amountFromBalance = Math.max(0, Math.abs(startingBalance) - Math.abs(endingBalance));
+
+      logger.info(`[Stripe Invoices] Booking fee invoice ${invoice.id} fully paid via customer balance: $${(totalCents / 100).toFixed(2)}`, {
+        extra: { bookingId, sessionId, amountFromBalance }
+      });
+
+      return {
+        invoiceId: invoice.id,
+        paymentIntentId: `invoice-balance-${invoice.id}`,
+        clientSecret: '',
+        status: 'succeeded',
+        paidInFull: true,
+        hostedInvoiceUrl: paidInvoice.hosted_invoice_url,
+        invoicePdf: paidInvoice.invoice_pdf,
+        amountFromBalance,
+        amountCharged: 0,
+      };
+    }
+
     const invoicePiId = typeof (finalizedInvoice as unknown as { payment_intent: string | Stripe.PaymentIntent | null }).payment_intent === 'string'
       ? (finalizedInvoice as unknown as { payment_intent: string }).payment_intent
       : ((finalizedInvoice as unknown as { payment_intent: Stripe.PaymentIntent | null }).payment_intent)?.id;
@@ -548,6 +572,147 @@ export async function createBookingFeeInvoice(
       logger.error(`[Stripe Invoices] Failed to clean up invoice ${invoice.id}:`, { extra: { detail: getErrorMessage(cleanupErr) } });
     }
     throw error;
+  }
+}
+
+export async function createDraftBookingFeeInvoice(
+  params: CreateBookingFeeInvoiceParams
+): Promise<{ invoiceId: string }> {
+  const stripe = await getStripeClient();
+  const {
+    customerId,
+    bookingId,
+    sessionId,
+    trackmanBookingId,
+    feeLineItems,
+    metadata = {},
+    purpose = 'booking_fee',
+  } = params;
+
+  const totalOverageCents = feeLineItems.reduce((sum, li) => sum + li.overageCents, 0);
+  const totalGuestCents = feeLineItems.reduce((sum, li) => sum + li.guestCents, 0);
+
+  const bookingRef = trackmanBookingId ? `TM-${trackmanBookingId}` : `#${bookingId}`;
+  const description = `Booking ${bookingRef} fees - Overage: $${(totalOverageCents / 100).toFixed(2)}, Guest fees: $${(totalGuestCents / 100).toFixed(2)}`;
+
+  const invoiceMetadata: Record<string, string> = {
+    ...metadata,
+    source: 'ever_house_app',
+    purpose,
+    bookingId: bookingId.toString(),
+    sessionId: sessionId.toString(),
+    overageCents: totalOverageCents.toString(),
+    guestCents: totalGuestCents.toString(),
+    terminalDraft: 'true',
+  };
+  if (trackmanBookingId) {
+    invoiceMetadata.trackmanBookingId = String(trackmanBookingId);
+  }
+
+  const invoice = await stripe.invoices.create({
+    customer: customerId,
+    auto_advance: false,
+    collection_method: 'charge_automatically',
+    description,
+    metadata: invoiceMetadata,
+    pending_invoice_items_behavior: 'exclude',
+  });
+
+  for (const li of feeLineItems) {
+    if (li.totalCents <= 0) continue;
+
+    if (li.overageCents > 0) {
+      const overageDesc = li.participantType === 'owner'
+        ? `Overage fee — ${li.displayName}`
+        : `Overage fee — ${li.displayName} (${li.participantType})`;
+      await stripe.invoiceItems.create({
+        customer: customerId,
+        invoice: invoice.id,
+        amount: li.overageCents,
+        currency: 'usd',
+        description: overageDesc,
+        metadata: {
+          participantId: li.participantId?.toString() || '',
+          feeType: 'overage',
+          participantType: li.participantType,
+        },
+      });
+    }
+
+    if (li.guestCents > 0) {
+      await stripe.invoiceItems.create({
+        customer: customerId,
+        invoice: invoice.id,
+        amount: li.guestCents,
+        currency: 'usd',
+        description: `Guest fee — ${li.displayName}`,
+        metadata: {
+          participantId: li.participantId?.toString() || '',
+          feeType: 'guest',
+          participantType: li.participantType,
+        },
+      });
+    }
+  }
+
+  logger.info(`[Stripe Invoices] Created DRAFT booking fee invoice ${invoice.id} for terminal payment`, {
+    extra: { bookingId, sessionId, lineItems: feeLineItems.length }
+  });
+
+  return { invoiceId: invoice.id };
+}
+
+export async function finalizeInvoicePaidOutOfBand(invoiceId: string): Promise<{
+  success: boolean;
+  hostedInvoiceUrl?: string | null;
+  invoicePdf?: string | null;
+  error?: string;
+}> {
+  try {
+    const stripe = await getStripeClient();
+    const invoice = await stripe.invoices.retrieve(invoiceId);
+
+    if (invoice.status === 'paid') {
+      return {
+        success: true,
+        hostedInvoiceUrl: invoice.hosted_invoice_url,
+        invoicePdf: invoice.invoice_pdf,
+      };
+    }
+
+    if (invoice.status !== 'draft') {
+      return { success: false, error: `Invoice ${invoiceId} is in unexpected status: ${invoice.status}` };
+    }
+
+    const finalized = await stripe.invoices.finalizeInvoice(invoiceId);
+
+    const rawPi = finalized.payment_intent;
+    const piId = typeof rawPi === 'string' ? rawPi : rawPi?.id;
+
+    if (piId) {
+      try {
+        await stripe.paymentIntents.cancel(piId);
+      } catch (cancelErr: unknown) {
+        logger.warn(`[Stripe Invoices] Could not cancel invoice PI ${piId} for out-of-band payment`, { extra: { detail: getErrorMessage(cancelErr) } });
+      }
+    }
+
+    const paidInvoice = await stripe.invoices.pay(invoiceId, {
+      paid_out_of_band: true,
+    });
+
+    logger.info(`[Stripe Invoices] Invoice ${invoiceId} finalized and marked paid out-of-band`, {
+      extra: { status: paidInvoice.status }
+    });
+
+    return {
+      success: true,
+      hostedInvoiceUrl: paidInvoice.hosted_invoice_url,
+      invoicePdf: paidInvoice.invoice_pdf,
+    };
+  } catch (error: unknown) {
+    logger.error(`[Stripe Invoices] Error finalizing invoice ${invoiceId} out-of-band:`, { error: error });
+    return { success: false, error: getErrorMessage(error) };
   }
 }
 

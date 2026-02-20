@@ -18,6 +18,7 @@ import { computeFeeBreakdown } from '../billing/unifiedFeeService';
 import { logPaymentFailure, logWebhookFailure } from '../monitoring';
 import { sendErrorAlert } from '../errorAlerts';
 import { logSystemAction } from '../auditLog';
+import { finalizeInvoicePaidOutOfBand } from './invoices';
 import { queueJobInTransaction } from '../jobQueue';
 import { pullTierFeaturesFromStripe, pullCafeItemsFromStripe } from './products';
 import { clearTierCache } from '../tierService';
@@ -1294,6 +1295,22 @@ async function handlePaymentIntentSucceeded(client: PoolClient, paymentIntent: S
       email: metadata?.email || ''
     }, { webhookEventId: id, priority: 2, maxRetries: 5 });
     logger.info(`[Stripe Webhook] Queued credit consumption of $${(creditToConsume / 100).toFixed(2)} for ${metadata?.email || 'unknown'}`);
+  }
+
+  if (metadata?.draftInvoiceId) {
+    const draftInvoiceId = metadata.draftInvoiceId;
+    deferredActions.push(async () => {
+      try {
+        const result = await finalizeInvoicePaidOutOfBand(draftInvoiceId);
+        if (result.success) {
+          logger.info(`[Stripe Webhook] Draft invoice ${draftInvoiceId} finalized and marked paid out-of-band for terminal PI ${id}`);
+        } else {
+          logger.error(`[Stripe Webhook] Failed to finalize draft invoice ${draftInvoiceId}: ${result.error}`);
+        }
+      } catch (invoiceErr: unknown) {
+        logger.error(`[Stripe Webhook] Error finalizing draft invoice ${draftInvoiceId}:`, { error: invoiceErr });
+      }
+    });
   }
 
   // Audit log for successful payment

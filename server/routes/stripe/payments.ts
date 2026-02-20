@@ -215,6 +215,7 @@ router.post('/api/stripe/create-payment-intent', isStaffOrAdmin, async (req: Req
     let snapshotId: number | null = null;
     let serverFees: Array<{id: number; amountCents: number}> = [];
     let serverTotal = Math.round(amountCents);
+    let pendingFees: Array<{ participantId?: number; displayName: string; participantType: string; overageCents: number; guestCents: number; totalCents: number }> = [];
     const isBookingPayment = bookingId && sessionId && participantFees && Array.isArray(participantFees) && participantFees.length > 0;
 
     if (isBookingPayment) {
@@ -290,7 +291,7 @@ router.post('/api/stripe/create-payment-intent', isStaffOrAdmin, async (req: Req
         return res.status(500).json({ error: 'Failed to calculate fees' });
       }
 
-      const pendingFees = feeBreakdown.participants.filter(p => 
+      pendingFees = feeBreakdown.participants.filter(p => 
         p.participantId && requestedIds.includes(p.participantId) && p.totalCents > 0
       );
       
@@ -356,72 +357,99 @@ router.post('/api/stripe/create-payment-intent', isStaffOrAdmin, async (req: Req
     
     if (isBookingPayment) {
       const { customerId: stripeCustomerId } = await getOrCreateStripeCustomer(resolvedUserId, email, memberName || email.split('@')[0]);
-      
-      let balanceResult;
+
+      const participantDetails = await pool.query(
+        `SELECT id, display_name, participant_type FROM booking_participants WHERE id = ANY($1::int[])`,
+        [serverFees.map(f => f.id)]
+      );
+
+      const feeLineItems: BookingFeeLineItem[] = [];
+      for (const detail of participantDetails.rows) {
+        const fee = pendingFees.find(f => f.participantId === detail.id);
+        if (!fee || fee.totalCents <= 0) continue;
+        feeLineItems.push({
+          participantId: detail.id,
+          displayName: detail.display_name || (detail.participant_type === 'guest' ? 'Guest' : 'Member'),
+          participantType: detail.participant_type as 'owner' | 'member' | 'guest',
+          overageCents: fee.overageCents || 0,
+          guestCents: fee.guestCents || 0,
+          totalCents: fee.totalCents,
+        });
+      }
+
+      let invoiceResult;
       try {
-        balanceResult = await createBalanceAwarePayment({
-          stripeCustomerId,
-          userId: resolvedUserId,
-          email,
-          memberName: memberName || email.split('@')[0],
-          amountCents: serverTotal,
-          purpose,
-          description: finalDescription,
+        invoiceResult = await createBookingFeeInvoice({
+          customerId: stripeCustomerId,
           bookingId,
           sessionId,
-          metadata: Object.keys(metadata).length > 0 ? metadata : undefined
+          trackmanBookingId: trackmanId ? String(trackmanId) : null,
+          feeLineItems,
+          metadata,
+          purpose: 'booking_fee',
         });
       } catch (stripeErr: unknown) {
         if (snapshotId) {
           await db.execute(sql`DELETE FROM booking_fee_snapshots WHERE id = ${snapshotId}`);
-          logger.info('[Stripe] Deleted orphaned snapshot after PaymentIntent creation failed', { extra: { snapshotId } });
+          logger.info('[Stripe] Deleted orphaned snapshot after invoice creation failed', { extra: { snapshotId } });
         }
         throw stripeErr;
       }
 
-      if (balanceResult.error) {
+      if (invoiceResult.paidInFull) {
         if (snapshotId) {
-          await db.execute(sql`DELETE FROM booking_fee_snapshots WHERE id = ${snapshotId}`);
-        }
-        return res.status(500).json({ error: balanceResult.error });
-      }
-
-      if (balanceResult.paidInFull) {
-        if (snapshotId) {
-          const balanceTrackingId = 'balance-' + balanceResult.balanceTransactionId;
-          await db.execute(sql`UPDATE booking_fee_snapshots SET stripe_payment_intent_id = ${balanceTrackingId}, status = 'paid' WHERE id = ${snapshotId}`);
+          await db.execute(sql`UPDATE booking_fee_snapshots SET stripe_payment_intent_id = ${invoiceResult.paymentIntentId}, status = 'paid' WHERE id = ${snapshotId}`);
         }
 
-        logFromRequest(req, 'record_charge', 'payment', 'balance-' + balanceResult.balanceTransactionId, email, {
+        await pool.query(
+          `INSERT INTO stripe_payment_intents 
+           (user_id, stripe_payment_intent_id, stripe_customer_id, amount_cents, purpose, booking_id, session_id, description, status)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+           ON CONFLICT (stripe_payment_intent_id) DO NOTHING`,
+          [resolvedUserId || email, invoiceResult.paymentIntentId, stripeCustomerId, serverTotal, purpose, bookingId, sessionId, finalDescription, 'succeeded']
+        );
+
+        logFromRequest(req, 'record_charge', 'payment', invoiceResult.paymentIntentId, email, {
           amount: serverTotal,
           description: description,
-          paidByCredit: true
+          paidByCredit: true,
+          invoiceId: invoiceResult.invoiceId
         });
 
         return res.json({
           paidInFull: true,
-          balanceApplied: balanceResult.balanceApplied,
-          paymentIntentId: 'balance-' + balanceResult.balanceTransactionId
+          balanceApplied: invoiceResult.amountFromBalance || serverTotal,
+          paymentIntentId: invoiceResult.paymentIntentId,
+          invoiceId: invoiceResult.invoiceId
         });
       }
 
       if (snapshotId) {
-        await db.execute(sql`UPDATE booking_fee_snapshots SET stripe_payment_intent_id = ${balanceResult.paymentIntentId} WHERE id = ${snapshotId}`);
+        await db.execute(sql`UPDATE booking_fee_snapshots SET stripe_payment_intent_id = ${invoiceResult.paymentIntentId} WHERE id = ${snapshotId}`);
       }
 
-      logFromRequest(req, 'record_charge', 'payment', balanceResult.paymentIntentId!, email, {
+      await pool.query(
+        `INSERT INTO stripe_payment_intents 
+         (user_id, stripe_payment_intent_id, stripe_customer_id, amount_cents, purpose, booking_id, session_id, description, status)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+         ON CONFLICT (stripe_payment_intent_id) DO NOTHING`,
+        [resolvedUserId || email, invoiceResult.paymentIntentId, stripeCustomerId, serverTotal, purpose, bookingId, sessionId, finalDescription, 'pending']
+      );
+
+      logFromRequest(req, 'record_charge', 'payment', invoiceResult.paymentIntentId, email, {
         amount: serverTotal,
         description: description,
-        balanceApplied: balanceResult.balanceApplied
+        invoiceId: invoiceResult.invoiceId
       });
       
       return res.json({
-        paymentIntentId: balanceResult.paymentIntentId,
-        clientSecret: balanceResult.clientSecret,
+        paymentIntentId: invoiceResult.paymentIntentId,
+        clientSecret: invoiceResult.clientSecret,
         customerId: stripeCustomerId,
+        invoiceId: invoiceResult.invoiceId,
         paidInFull: false,
-        balanceApplied: balanceResult.balanceApplied,
-        remainingCents: balanceResult.remainingCents
+        balanceApplied: 0,
+        remainingCents: serverTotal
       });
     }
 
