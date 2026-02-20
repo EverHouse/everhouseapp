@@ -1907,8 +1907,9 @@ router.get('/api/stripe/transactions/today', isStaffOrAdmin, async (req: Request
         const email = ch.billing_details?.email || (typeof ch.customer === 'object' && ch.customer && !('deleted' in ch.customer) ? ch.customer.email : '') || '';
         const stripeName = (typeof ch.customer === 'object' && ch.customer && !('deleted' in ch.customer) ? ch.customer.name : undefined) || ch.billing_details?.name || undefined;
         const dbName = email ? memberNameMap.get(email.toLowerCase()) : undefined;
+        const piId = typeof ch.payment_intent === 'string' ? ch.payment_intent : ch.payment_intent?.id;
         return {
-          id: ch.id,
+          id: piId || ch.id,
           amount: ch.amount,
           status: 'succeeded' as const,
           description: ch.description || 'Payment',

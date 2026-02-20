@@ -680,18 +680,36 @@ export async function finalizeInvoicePaidOutOfBand(invoiceId: string): Promise<{
       };
     }
 
-    if (invoice.status !== 'draft') {
+    if (invoice.status !== 'draft' && invoice.status !== 'open') {
       return { success: false, error: `Invoice ${invoiceId} is in unexpected status: ${invoice.status}` };
     }
 
-    const finalized = await stripe.invoices.finalizeInvoice(invoiceId);
+    let openInvoice: Stripe.Invoice;
+    if (invoice.status === 'draft') {
+      openInvoice = await stripe.invoices.finalizeInvoice(invoiceId);
+    } else {
+      openInvoice = invoice;
+    }
 
-    const rawPi = finalized.payment_intent;
+    const rawPi = openInvoice.payment_intent;
     const piId = typeof rawPi === 'string' ? rawPi : rawPi?.id;
 
     if (piId) {
       try {
-        await stripe.paymentIntents.cancel(piId);
+        const existingPi = await stripe.paymentIntents.retrieve(piId);
+        if (existingPi.status === 'succeeded') {
+          logger.info(`[Stripe Invoices] Invoice PI ${piId} already succeeded — invoice may have been auto-collected. Skipping OOB.`, { extra: { invoiceId } });
+          const freshInvoice = await stripe.invoices.retrieve(invoiceId);
+          if (freshInvoice.status === 'paid') {
+            return {
+              success: true,
+              hostedInvoiceUrl: freshInvoice.hosted_invoice_url,
+              invoicePdf: freshInvoice.invoice_pdf,
+            };
+          }
+        } else if (existingPi.status !== 'canceled') {
+          await stripe.paymentIntents.cancel(piId);
+        }
       } catch (cancelErr: unknown) {
         logger.warn(`[Stripe Invoices] Could not cancel invoice PI ${piId} for out-of-band payment`, { extra: { detail: getErrorMessage(cancelErr) } });
       }

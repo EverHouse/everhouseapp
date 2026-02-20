@@ -419,15 +419,34 @@ router.get('/api/stripe/terminal/payment-status/:paymentIntentId', isStaffOrAdmi
     
     const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId as string);
 
-    if (paymentIntent.status === 'succeeded' && paymentIntent.metadata?.invoice_id) {
+    const draftInvoiceId = paymentIntent.metadata?.draftInvoiceId || paymentIntent.metadata?.invoice_id;
+    if (paymentIntent.status === 'succeeded' && draftInvoiceId) {
       try {
-        const inv = await stripe.invoices.retrieve(paymentIntent.metadata.invoice_id);
-        if (inv.status === 'open') {
-          await stripe.invoices.voidInvoice(paymentIntent.metadata.invoice_id);
-          logger.info('[Terminal] Voided invoice after terminal PI succeeded (prevents phantom OOB charge)', { extra: { invoiceId: paymentIntent.metadata.invoice_id, paymentIntentId } });
+        const inv = await stripe.invoices.retrieve(draftInvoiceId);
+        if (inv.status === 'draft' || inv.status === 'open') {
+          const { finalizeInvoicePaidOutOfBand } = await import('../../core/stripe/invoices');
+          const oobResult = await finalizeInvoicePaidOutOfBand(draftInvoiceId);
+          if (oobResult.success) {
+            try {
+              await stripe.invoices.update(draftInvoiceId, {
+                metadata: {
+                  ...(inv.metadata || {}),
+                  terminalPaymentIntentId: paymentIntentId as string,
+                  paidVia: 'terminal',
+                },
+              });
+            } catch (metaErr: unknown) {
+              logger.warn('[Terminal] Could not update invoice metadata after OOB payment', { extra: { detail: getErrorMessage(metaErr) } });
+            }
+            logger.info('[Terminal] Invoice finalized and marked paid (out-of-band) after terminal payment', { extra: { invoiceId: draftInvoiceId, paymentIntentId } });
+          } else {
+            logger.warn('[Terminal] Could not finalize invoice out-of-band', { extra: { invoiceId: draftInvoiceId, error: oobResult.error } });
+          }
+        } else if (inv.status === 'paid') {
+          logger.info('[Terminal] Invoice already paid, no action needed', { extra: { invoiceId: draftInvoiceId } });
         }
       } catch (invErr: unknown) {
-        logger.warn('[Terminal] Could not void invoice', { extra: { invoice_id: paymentIntent.metadata.invoice_id, error: getErrorMessage(invErr) } });
+        logger.warn('[Terminal] Could not process invoice after terminal payment', { extra: { invoiceId: draftInvoiceId, error: getErrorMessage(invErr) } });
       }
     }
 
@@ -492,6 +511,22 @@ router.post('/api/stripe/terminal/cancel-payment', isStaffOrAdmin, async (req: R
         } else if (pi.status !== 'canceled') {
           await stripe.paymentIntents.cancel(paymentIntentId);
           logger.info('[Terminal] Canceled PaymentIntent', { extra: { paymentIntentId } });
+        }
+
+        const draftInvId = pi.metadata?.draftInvoiceId || pi.metadata?.invoice_id;
+        if (draftInvId && !paymentAlreadySucceeded) {
+          try {
+            const draftInv = await stripe.invoices.retrieve(draftInvId);
+            if (draftInv.status === 'draft') {
+              await stripe.invoices.del(draftInvId);
+              logger.info('[Terminal] Deleted draft invoice after payment cancellation', { extra: { invoiceId: draftInvId } });
+            } else if (draftInv.status === 'open') {
+              await stripe.invoices.voidInvoice(draftInvId);
+              logger.info('[Terminal] Voided open invoice after payment cancellation', { extra: { invoiceId: draftInvId } });
+            }
+          } catch (invCleanupErr: unknown) {
+            logger.warn('[Terminal] Could not clean up draft invoice after cancel', { extra: { invoiceId: draftInvId, error: getErrorMessage(invCleanupErr) } });
+          }
         }
       } catch (piErr: unknown) {
         logger.warn('[Terminal] Could not cancel PaymentIntent', { extra: { piErr: getErrorMessage(piErr) } });
