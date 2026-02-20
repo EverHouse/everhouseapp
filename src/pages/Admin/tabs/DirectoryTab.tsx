@@ -1037,8 +1037,9 @@ const DirectoryTab: React.FC = () => {
                             >
                                 <span className="material-symbols-outlined text-[20px]">swap_vert</span>
                             </button>
-                            {sortOpen && (
-                                <div className="absolute right-0 top-full mt-1 glass-panel rounded-xl p-2 z-30 min-w-[180px] !bg-[#f5f5f0] dark:!bg-[#1a1a1a]">
+                            <div className={`absolute right-0 top-full mt-1 glass-panel rounded-xl p-2 z-30 min-w-[180px] !bg-[#f5f5f0] dark:!bg-[#1a1a1a] transition-all duration-200 origin-top-right ${
+                                    sortOpen ? 'opacity-100 scale-100' : 'opacity-0 scale-95 pointer-events-none'
+                                }`}>
                                     <div className="flex items-center justify-between px-2 py-1 mb-1">
                                         <span className="text-[11px] font-bold text-gray-500 dark:text-white/50 uppercase tracking-wider">Sort By</span>
                                         <button
@@ -1066,7 +1067,7 @@ const DirectoryTab: React.FC = () => {
                                         </button>
                                     ))}
                                 </div>
-                            )}
+                            </div>
                         </div>
                         <button
                             onClick={() => { setFiltersOpen(!filtersOpen); setSortOpen(false); }}
@@ -1082,8 +1083,9 @@ const DirectoryTab: React.FC = () => {
                             {activeFilterCount > 0 && <span className="sm:hidden min-w-[18px] h-[18px] rounded-full bg-primary dark:bg-lavender text-white text-[10px] font-bold flex items-center justify-center">{activeFilterCount}</span>}
                         </button>
 
-                        {filtersOpen && (
-                            <div className="absolute left-0 right-0 top-full mt-1 glass-panel rounded-xl p-4 space-y-3 z-30 transition-all duration-200 !bg-[#f5f5f0] dark:!bg-[#1a1a1a]">
+                        <div className={`absolute left-0 right-0 top-full mt-1 glass-panel rounded-xl p-4 space-y-3 z-30 !bg-[#f5f5f0] dark:!bg-[#1a1a1a] transition-all duration-200 origin-top ${
+                                filtersOpen ? 'opacity-100 scale-100' : 'opacity-0 scale-95 pointer-events-none'
+                            }`}>
                                 <div className="flex items-center justify-between">
                                     <span className="text-xs font-bold text-gray-500 dark:text-white/50 uppercase tracking-wider">Filters</span>
                                     {activeFilterCount > 0 && (
@@ -1258,7 +1260,7 @@ const DirectoryTab: React.FC = () => {
                                     </div>
                                 )}
                             </div>
-                        )}
+                        </div>
                     </div>
                 )}
 
@@ -1382,8 +1384,9 @@ const DirectoryTab: React.FC = () => {
                                 {activeFilterCount > 0 && <span className="sm:hidden min-w-[18px] h-[18px] rounded-full bg-primary dark:bg-lavender text-white text-[10px] font-bold flex items-center justify-center">{activeFilterCount}</span>}
                             </button>
 
-                            {filtersOpen && (
-                                <div className="absolute left-0 right-0 top-full mt-1 glass-panel rounded-xl p-4 space-y-3 z-30 transition-all duration-200 !bg-[#f5f5f0] dark:!bg-[#1a1a1a]">
+                            <div className={`absolute left-0 right-0 top-full mt-1 glass-panel rounded-xl p-4 space-y-3 z-30 !bg-[#f5f5f0] dark:!bg-[#1a1a1a] transition-all duration-200 origin-top ${
+                                    filtersOpen ? 'opacity-100 scale-100' : 'opacity-0 scale-95 pointer-events-none'
+                                }`}>
                                     <div className="flex items-center justify-between">
                                         <span className="text-xs font-bold text-gray-500 dark:text-white/50 uppercase tracking-wider">Filters</span>
                                         {activeFilterCount > 0 && (
@@ -1473,7 +1476,7 @@ const DirectoryTab: React.FC = () => {
                                         </div>
                                     </div>
                                 </div>
-                            )}
+                            </div>
                         </div>
 
                         {activeFilters.length > 0 && (
