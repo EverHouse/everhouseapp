@@ -1218,6 +1218,8 @@ router.post('/api/stripe/staff/charge-saved-card', isStaffOrAdmin, async (req: R
     let adjustedDescription = staffChargeDescription;
     const chargeMetadata: Record<string, string> = {
       type: 'staff_saved_card_charge',
+      purpose: 'booking_fee',
+      source: 'ever_house_app',
       staffEmail: staffEmail,
       staffName: staffName || '',
       memberEmail: member.email,
@@ -1449,6 +1451,7 @@ router.post('/api/stripe/staff/charge-saved-card-pos', isStaffOrAdmin, async (re
           cartItems: cartItems as CartLineItem[],
           metadata: {
             type: 'staff_pos_saved_card',
+            purpose: 'pos_purchase',
             staffEmail,
             staffName: staffName || staffEmail,
             memberId: member.id?.toString() || '',
@@ -1507,6 +1510,7 @@ router.post('/api/stripe/staff/charge-saved-card-pos', isStaffOrAdmin, async (re
       description: description || 'POS purchase',
       metadata: {
         type: 'staff_pos_saved_card',
+        purpose: 'pos_purchase',
         staffEmail,
         staffName: staffName || staffEmail,
         memberId: member.id?.toString() || '',
@@ -1516,7 +1520,7 @@ router.post('/api/stripe/staff/charge-saved-card-pos', isStaffOrAdmin, async (re
         productId: productId || ''
       }
     }, {
-      idempotencyKey: `pos_saved_card_${member.id}_${numericAmount}_${productId || 'none'}_${Math.floor(Date.now() / 30000)}`
+      idempotencyKey: `pos_saved_card_${member.id}_${numericAmount}_${productId || 'none'}_${Math.floor(Date.now() / 300000)}`
     });
 
     if (paymentIntent.status === 'succeeded') {

@@ -643,6 +643,8 @@ router.put('/api/admin/trackman/unmatched/:id/resolve', isStaffOrAdmin, async (r
                 description: `Day Pass - Golf Simulator (${bookingDateStr})`,
                 metadata: {
                   type: 'day_pass',
+                  purpose: 'day_pass_purchase',
+                  source: 'trackman_resolve',
                   product_slug: 'day-pass-golf-sim',
                   booking_id: String(booking.id),
                   booking_date: bookingDateStr,
@@ -670,6 +672,8 @@ router.put('/api/admin/trackman/unmatched/:id/resolve', isStaffOrAdmin, async (r
                 days_until_due: 1,
                 metadata: {
                   type: 'day_pass',
+                  purpose: 'day_pass_purchase',
+                  source: 'trackman_resolve',
                   product_slug: 'day-pass-golf-sim',
                   booking_id: booking.id.toString(),
                   booking_date: bookingDateStr,
