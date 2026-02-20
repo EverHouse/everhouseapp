@@ -1943,12 +1943,21 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
               });
               
               if (!isPrimary && guestInfo?.name) {
-                await pool.query(
-                  `INSERT INTO booking_guests (booking_id, guest_name, slot_number, trackman_booking_id)
-                   VALUES ($1, $2, $3, $4)
-                   ON CONFLICT DO NOTHING`,
-                  [existing.id, guestInfo.name, slot, row.bookingId]
+                const dupCheck = await pool.query(
+                  `SELECT id FROM booking_guests WHERE booking_id = $1 AND (
+                    (guest_name IS NOT NULL AND LOWER(TRIM(guest_name)) = LOWER(TRIM($2)))
+                    OR (guest_email IS NOT NULL AND $3 IS NOT NULL AND LOWER(TRIM(guest_email)) = LOWER(TRIM($3)))
+                  )`,
+                  [existing.id, guestInfo.name, guestInfo.email || null]
                 );
+                if (dupCheck.rows.length === 0) {
+                  await pool.query(
+                    `INSERT INTO booking_guests (booking_id, guest_name, slot_number, trackman_booking_id)
+                     VALUES ($1, $2, $3, $4)
+                     ON CONFLICT DO NOTHING`,
+                    [existing.id, guestInfo.name, slot, row.bookingId]
+                  );
+                }
               }
             }
             
@@ -1977,8 +1986,12 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
               
               if (guest.name) {
                 const existingGuest = await pool.query(
-                  `SELECT id FROM booking_guests WHERE booking_id = $1 AND slot_number = $2`,
-                  [existing.id, slot.slotNumber]
+                  `SELECT id FROM booking_guests WHERE booking_id = $1 AND (
+                    slot_number = $2
+                    OR (guest_name IS NOT NULL AND LOWER(TRIM(guest_name)) = LOWER(TRIM($3)))
+                    OR (guest_email IS NOT NULL AND $4 IS NOT NULL AND LOWER(TRIM(guest_email)) = LOWER(TRIM($4)))
+                  )`,
+                  [existing.id, slot.slotNumber, guest.name, guest.email || null]
                 );
                 if (existingGuest.rows.length === 0) {
                   await pool.query(
@@ -2317,8 +2330,12 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
                     const guestSlotNumber = gi + 2;
                     if (guestSlotNumber <= targetPlayerCount && guest.name) {
                       const existingGuest = await pool.query(
-                        `SELECT id FROM booking_guests WHERE booking_id = $1 AND slot_number = $2`,
-                        [existing.id, guestSlotNumber]
+                        `SELECT id FROM booking_guests WHERE booking_id = $1 AND (
+                          slot_number = $2
+                          OR (guest_name IS NOT NULL AND LOWER(TRIM(guest_name)) = LOWER(TRIM($3)))
+                          OR (guest_email IS NOT NULL AND $4 IS NOT NULL AND LOWER(TRIM(guest_email)) = LOWER(TRIM($4)))
+                        )`,
+                        [existing.id, guestSlotNumber, guest.name, guest.email || null]
                       );
                       if (existingGuest.rows.length === 0) {
                         await pool.query(
@@ -2526,8 +2543,12 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
                   const guestSlotNumber = gi + 2;
                   if (guestSlotNumber <= targetPlayerCount && guest.name) {
                     const existingGuest = await pool.query(
-                      `SELECT id FROM booking_guests WHERE booking_id = $1 AND slot_number = $2`,
-                      [existing.id, guestSlotNumber]
+                      `SELECT id FROM booking_guests WHERE booking_id = $1 AND (
+                        slot_number = $2
+                        OR (guest_name IS NOT NULL AND LOWER(TRIM(guest_name)) = LOWER(TRIM($3)))
+                        OR (guest_email IS NOT NULL AND $4 IS NOT NULL AND LOWER(TRIM(guest_email)) = LOWER(TRIM($4)))
+                      )`,
+                      [existing.id, guestSlotNumber, guest.name, guest.email || null]
                     );
                     if (existingGuest.rows.length === 0) {
                       await pool.query(
@@ -2667,12 +2688,21 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
                     );
 
                     if (guestInfo?.name) {
-                      await pool.query(
-                        `INSERT INTO booking_guests (booking_id, guest_name, guest_email, slot_number, trackman_booking_id)
-                         VALUES ($1, $2, $3, $4, $5)
-                         ON CONFLICT DO NOTHING`,
-                        [existingGhost.id, guestInfo.name, guestInfo.email || null, slot, row.bookingId]
+                      const ghostDupCheck = await pool.query(
+                        `SELECT id FROM booking_guests WHERE booking_id = $1 AND (
+                          (guest_name IS NOT NULL AND LOWER(TRIM(guest_name)) = LOWER(TRIM($2)))
+                          OR (guest_email IS NOT NULL AND $3 IS NOT NULL AND LOWER(TRIM(guest_email)) = LOWER(TRIM($3)))
+                        )`,
+                        [existingGhost.id, guestInfo.name, guestInfo.email || null]
                       );
+                      if (ghostDupCheck.rows.length === 0) {
+                        await pool.query(
+                          `INSERT INTO booking_guests (booking_id, guest_name, guest_email, slot_number, trackman_booking_id)
+                           VALUES ($1, $2, $3, $4, $5)
+                           ON CONFLICT DO NOTHING`,
+                          [existingGhost.id, guestInfo.name, guestInfo.email || null, slot, row.bookingId]
+                        );
+                      }
                     }
                   }
 
