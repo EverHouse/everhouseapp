@@ -162,62 +162,44 @@ const RosterManager: React.FC<RosterManagerProps> = ({
 
   const remainingSlots = apiRemainingSlots;
 
-  const fetchParticipants = useCallback(async () => {
+  const fetchAllBookingData = useCallback(async () => {
     if (removingRef.current) return;
     try {
-      const { ok, data, error } = await apiRequest<ParticipantsResponse>(
-        `/api/bookings/${bookingId}/participants`
-      );
-      
+      const [participantsRes, feeRes] = await Promise.all([
+        apiRequest<ParticipantsResponse>(`/api/bookings/${bookingId}/participants`),
+        apiRequest<FeePreviewResponse>(
+          `/api/bookings/${bookingId}/participants/preview-fees`,
+          { method: 'POST', headers: { 'Content-Type': 'application/json' } }
+        )
+      ]);
+
       if (removingRef.current) return;
-      if (ok && data) {
-        setParticipants(data.participants);
-        setBooking(data.booking);
-        setGuestPassesRemaining(data.guestPassesRemaining);
-        // Use API values which account for owner as participant
-        if (data.declaredPlayerCount) {
-          setApiDeclaredPlayerCount(data.declaredPlayerCount);
-        }
-        if (typeof data.remainingSlots === 'number') {
-          setApiRemainingSlots(data.remainingSlots);
-        }
-        if (typeof data.currentParticipantCount === 'number') {
-          setApiCurrentParticipantCount(data.currentParticipantCount);
-        }
+
+      if (participantsRes.ok && participantsRes.data) {
+        const d = participantsRes.data;
+        setParticipants(d.participants);
+        setBooking(d.booking);
+        setGuestPassesRemaining(d.guestPassesRemaining);
+        if (d.declaredPlayerCount) setApiDeclaredPlayerCount(d.declaredPlayerCount);
+        if (typeof d.remainingSlots === 'number') setApiRemainingSlots(d.remainingSlots);
+        if (typeof d.currentParticipantCount === 'number') setApiCurrentParticipantCount(d.currentParticipantCount);
       } else {
-        console.error('[RosterManager] Failed to fetch participants:', error);
+        console.error('[RosterManager] Failed to fetch participants:', participantsRes.error);
+      }
+
+      if (feeRes.ok && feeRes.data) {
+        setFeePreview(feeRes.data);
       }
     } catch (err: unknown) {
-      console.error('[RosterManager] Error fetching participants:', err);
+      console.error('[RosterManager] Error fetching booking data:', err);
     } finally {
       setLoading(false);
     }
   }, [bookingId]);
 
-  const fetchFeePreview = useCallback(async () => {
-    try {
-      const { ok, data } = await apiRequest<FeePreviewResponse>(
-        `/api/bookings/${bookingId}/participants/preview-fees`,
-        { method: 'POST', headers: { 'Content-Type': 'application/json' } }
-      );
-      
-      if (ok && data) {
-        setFeePreview(data);
-      }
-    } catch (err: unknown) {
-      console.error('[RosterManager] Error fetching fee preview:', err);
-    }
-  }, [bookingId]);
-
   useEffect(() => {
-    fetchParticipants();
-  }, [fetchParticipants]);
-
-  useEffect(() => {
-    if (participants.length > 0) {
-      fetchFeePreview();
-    }
-  }, [participants, fetchFeePreview]);
+    fetchAllBookingData();
+  }, [fetchAllBookingData]);
 
   const searchMembers = useCallback(async (query: string) => {
     if (query.length < 2) {
@@ -276,7 +258,7 @@ const RosterManager: React.FC<RosterManagerProps> = ({
         setShowAddMemberModal(false);
         setMemberSearch('');
         setSearchResults([]);
-        await fetchParticipants();
+        await fetchAllBookingData();
         onUpdate?.();
       } else {
         haptic.error();
@@ -317,22 +299,65 @@ const RosterManager: React.FC<RosterManagerProps> = ({
     setRemovingId(participantId);
     removingRef.current = true;
     haptic.light();
-    
+
     const previousParticipants = [...participants];
-    setParticipants(prev => prev.filter(p => p.id !== participantId));
+    const previousCount = apiCurrentParticipantCount;
+    const previousSlots = apiRemainingSlots;
+    const previousFeePreview = feePreview;
+
+    const newParticipants = participants.filter(p => p.id !== participantId);
+    setParticipants(newParticipants);
+    setApiCurrentParticipantCount(prev => Math.max(1, prev - 1));
+    setApiRemainingSlots(prev => prev + 1);
+
+    if (feePreview) {
+      const removedParticipant = participants.find(p => p.id === participantId);
+      const newAllocations = feePreview.timeAllocation.allocations.filter(
+        a => a.displayName !== removedParticipant?.displayName
+      );
+      const newTotalParticipants = newAllocations.length;
+      const totalMinutes = feePreview.timeAllocation.totalMinutes;
+      const newMinutesPerParticipant = newTotalParticipants > 0
+        ? Math.floor(totalMinutes / Math.max(newTotalParticipants, apiDeclaredPlayerCount))
+        : totalMinutes;
+      const updatedAllocations = newAllocations.map(a => ({
+        ...a,
+        minutes: newMinutesPerParticipant
+      }));
+
+      const wasGuest = removedParticipant?.participantType === 'guest';
+      setFeePreview({
+        ...feePreview,
+        participants: {
+          ...feePreview.participants,
+          total: Math.max(1, feePreview.participants.total - 1),
+          guests: wasGuest ? Math.max(0, feePreview.participants.guests - 1) : feePreview.participants.guests,
+          members: !wasGuest ? Math.max(0, feePreview.participants.members - 1) : feePreview.participants.members,
+        },
+        timeAllocation: {
+          ...feePreview.timeAllocation,
+          minutesPerParticipant: newMinutesPerParticipant,
+          allocations: updatedAllocations,
+        },
+      });
+    }
+
     haptic.success();
     showToast(`${displayName} removed from booking`, 'success');
-    
+
     try {
       const { ok, error } = await apiRequest(
         `/api/bookings/${bookingId}/participants/${participantId}`,
         { method: 'DELETE' }
       );
-      
+
       if (!ok) {
         const isAbort = (error || '').toLowerCase().includes('abort');
         if (!isAbort) {
           setParticipants(previousParticipants);
+          setApiCurrentParticipantCount(previousCount);
+          setApiRemainingSlots(previousSlots);
+          setFeePreview(previousFeePreview);
           haptic.error();
           showToast(error || 'Failed to remove participant', 'error');
         }
@@ -341,12 +366,11 @@ const RosterManager: React.FC<RosterManagerProps> = ({
       // Network error — optimistic state likely correct, don't rollback
     } finally {
       setRemovingId(null);
-      removingRef.current = false;
-      // Delay the refresh so the server has time to commit
       setTimeout(() => {
-        fetchParticipants();
+        removingRef.current = false;
+        fetchAllBookingData();
         onUpdate?.();
-      }, 500);
+      }, 600);
     }
   };
 
@@ -397,9 +421,9 @@ const RosterManager: React.FC<RosterManagerProps> = ({
     setShowPaymentModal(false);
     showToast('Payment successful! Guest fees have been paid.', 'success');
     haptic.success();
-    fetchParticipants();
+    fetchAllBookingData();
     onUpdate?.();
-  }, [showToast, fetchParticipants, onUpdate]);
+  }, [showToast, fetchAllBookingData, onUpdate]);
 
   if (loading) {
     return (
@@ -807,12 +831,12 @@ const RosterManager: React.FC<RosterManagerProps> = ({
             setShowGuestPaymentChoiceModal(false);
             onUpdate?.();
             setTimeout(() => {
-              fetchParticipants();
+              fetchAllBookingData();
             }, 1500);
           }}
           onError={(error: string) => {
             showToast(error, 'error');
-            fetchParticipants();
+            fetchAllBookingData();
           }}
           onClose={() => {
             setShowGuestPaymentChoiceModal(false);
