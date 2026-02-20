@@ -580,7 +580,7 @@ export async function previewRosterFees(
         [booking.session_id]
       ),
       pool.query(
-        `SELECT id, total_cents FROM fee_snapshots WHERE session_id = $1 AND status = 'completed' ORDER BY created_at DESC LIMIT 1`,
+        `SELECT id, total_cents FROM booking_fee_snapshots WHERE session_id = $1 AND status IN ('completed', 'paid') ORDER BY created_at DESC LIMIT 1`,
         [booking.session_id]
       ),
     ]);
@@ -592,7 +592,7 @@ export async function previewRosterFees(
     const hasPaidFees = paidCount > 0;
     const hasOriginalFees = totalWithFees > 0;
 
-    allPaid = (hasCompletedFeeSnapshot && pendingCount === 0) || (hasOriginalFees && pendingCount === 0 && hasPaidFees);
+    allPaid = (hasCompletedFeeSnapshot && pendingCount === 0) || (pendingCount === 0 && hasPaidFees);
 
     if (allPaid) {
       const overageCheck = await pool.query(

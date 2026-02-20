@@ -181,7 +181,7 @@ router.get('/api/approved-bookings', isStaffOrAdmin, async (req, res) => {
       const feeSnapshotResult = await pool.query(`
         SELECT br.id as booking_id, bfs.created_at as snapshot_created_at
         FROM booking_requests br
-        INNER JOIN booking_fee_snapshots bfs ON bfs.session_id = br.session_id AND bfs.status = 'completed'
+        INNER JOIN booking_fee_snapshots bfs ON bfs.session_id = br.session_id AND bfs.status IN ('completed', 'paid')
         WHERE br.id = ANY($1)
       `, [bookingIds]);
       feeSnapshotPaidSet = new Set<number>(feeSnapshotResult.rows.map((r: { booking_id: number }) => r.booking_id));

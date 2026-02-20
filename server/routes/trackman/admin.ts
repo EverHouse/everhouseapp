@@ -2105,7 +2105,7 @@ router.get('/api/admin/booking/:id/members', isStaffOrAdmin, async (req, res) =>
     let hasCompletedFeeSnapshot = false;
     let snapshotTotalCents = 0;
     if (sessionId) {
-      const snapshotCheck = await db.execute(sql`SELECT id, total_cents FROM booking_fee_snapshots WHERE session_id = ${sessionId} AND status = 'completed' ORDER BY created_at DESC LIMIT 1`);
+      const snapshotCheck = await db.execute(sql`SELECT id, total_cents FROM booking_fee_snapshots WHERE session_id = ${sessionId} AND status IN ('completed', 'paid') ORDER BY created_at DESC LIMIT 1`);
       if (snapshotCheck.rows.length > 0) {
         hasCompletedFeeSnapshot = true;
         snapshotTotalCents = parseInt((snapshotCheck.rows[0] as DbRow).total_cents as string) || 0;
@@ -2328,7 +2328,7 @@ router.get('/api/admin/booking/:id/members', isStaffOrAdmin, async (req, res) =>
       grandTotal = Math.max(grandTotal, snapshotTotalCents / 100);
     }
     
-    const allPaid = (hasCompletedFeeSnapshot && pendingFeeCount === 0) || (hasOriginalFees && grandTotal === 0 && hasPaidFees);
+    const allPaid = (hasCompletedFeeSnapshot && pendingFeeCount === 0) || (pendingFeeCount === 0 && hasPaidFees);
     
     const isOwnerStaff = ownerEmail ? staffEmailSet.has(String(ownerEmail).toLowerCase()) : false;
     

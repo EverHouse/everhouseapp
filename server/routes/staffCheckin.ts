@@ -708,7 +708,7 @@ router.patch('/api/bookings/:id/payments', isStaffOrAdmin, async (req: Request, 
         try {
           await snapshotClient.query('BEGIN');
           const existingSnapshot = await snapshotClient.query(
-            `SELECT id FROM booking_fee_snapshots WHERE session_id = $1 AND status = 'completed' LIMIT 1`,
+            `SELECT id FROM booking_fee_snapshots WHERE session_id = $1 AND status IN ('completed', 'paid') LIMIT 1`,
             [sessionId]
           );
           if (existingSnapshot.rows.length === 0) {

@@ -367,10 +367,14 @@ const RosterManager: React.FC<RosterManagerProps> = ({
     if (feePreview.allPaid) return false;
 
     const hasPendingGuests = pendingGuestFees.count > 0;
-    const estimatedTotal = feePreview?.ownerFees?.estimatedTotalFees ?? 0;
-    const estimatedOverage = feePreview?.ownerFees?.estimatedOverageFee ?? 0;
-    return hasPendingGuests || estimatedOverage > 0 || estimatedTotal > 0;
-  }, [feePreview, pendingGuestFees]);
+
+    const ownerParticipant = participants.find(p => p.participantType === 'owner');
+    const ownerHasUnpaidFee = ownerParticipant && 
+      (ownerParticipant.paymentStatus === 'pending' || ownerParticipant.paymentStatus === null) &&
+      (feePreview?.ownerFees?.estimatedOverageFee ?? 0) > 0;
+
+    return hasPendingGuests || !!ownerHasUnpaidFee;
+  }, [feePreview, pendingGuestFees, participants]);
 
   const handlePaymentSuccess = useCallback(() => {
     setShowPaymentModal(false);
