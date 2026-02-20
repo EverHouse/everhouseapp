@@ -1,5 +1,6 @@
 import { BookingContextType, ManageModeRosterData, FetchedContext } from './bookingSheetTypes';
 import TrackmanIcon from '../../icons/TrackmanIcon';
+import { formatTime12Hour } from '../../memberProfile/memberProfileTypes';
 
 const formatDateForDisplay = (dateStr: string): string => {
   if (!dateStr) return 'No Date';
@@ -85,7 +86,7 @@ export function SheetHeader({
             {(bookingContext?.startTime && bookingContext?.endTime) ? (
               <div className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-primary/60 dark:text-white/60 text-base">schedule</span>
-                <span className="text-primary/80 dark:text-white/80">{bookingContext.startTime} - {bookingContext.endTime}</span>
+                <span className="text-primary/80 dark:text-white/80">{formatTime12Hour(bookingContext.startTime)} - {formatTime12Hour(bookingContext.endTime)}</span>
               </div>
             ) : (timeSlot || fetchedContext?.timeSlot) ? (
               <div className="flex items-center gap-2">
