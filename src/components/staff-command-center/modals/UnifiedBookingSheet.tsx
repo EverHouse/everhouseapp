@@ -86,15 +86,7 @@ export function UnifiedBookingSheet(props: UnifiedBookingSheetProps) {
 
     const manageModeTitle = ownerName || logic.fetchedContext?.ownerName || 'Booking Details';
 
-    const handleManagedClose = async () => {
-      if (logic.rosterDirty && bookingId) {
-        try {
-          await fetch(`/api/admin/booking/${bookingId}/recalculate-fees`, {
-            method: 'POST',
-            credentials: 'include'
-          });
-        } catch {}
-      }
+    const handleManagedClose = () => {
       onClose();
     };
 
@@ -205,29 +197,14 @@ export function UnifiedBookingSheet(props: UnifiedBookingSheetProps) {
                 </div>
               )}
 
-              {!logic.isConferenceRoom && (
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-xs">
-                    {logic.rosterData?.tierLimits?.guest_passes_per_month && (
-                      <>
-                        <span className="material-symbols-outlined text-emerald-500 text-sm">redeem</span>
-                        <span className="text-primary/70 dark:text-white/70">
-                          Guest Passes: <span className="font-semibold text-primary dark:text-white">
-                            {logic.rosterData.ownerGuestPassesRemaining}/{logic.rosterData.tierLimits.guest_passes_per_month}
-                          </span> remaining
-                        </span>
-                      </>
-                    )}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={logic.handleRecalculateOnly}
-                    disabled={logic.savingChanges}
-                    className="tactile-btn flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-green-600 hover:bg-green-700 text-white transition-colors disabled:opacity-50"
-                  >
-                    <span className="material-symbols-outlined text-sm">calculate</span>
-                    {logic.savingChanges ? 'Recalculating...' : 'Recalculate Fees'}
-                  </button>
+              {!logic.isConferenceRoom && logic.rosterData?.tierLimits?.guest_passes_per_month && (
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="material-symbols-outlined text-emerald-500 text-sm">redeem</span>
+                  <span className="text-primary/70 dark:text-white/70">
+                    Guest Passes: <span className="font-semibold text-primary dark:text-white">
+                      {logic.rosterData.ownerGuestPassesRemaining}/{logic.rosterData.tierLimits.guest_passes_per_month}
+                    </span> remaining
+                  </span>
                 </div>
               )}
 

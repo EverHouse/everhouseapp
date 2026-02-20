@@ -110,7 +110,6 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
   const [isLoadingRoster, setIsLoadingRoster] = useState(false);
   const [rosterError, setRosterError] = useState<string | null>(null);
   const [editingPlayerCount, setEditingPlayerCount] = useState<number>(declaredPlayerCount || 1);
-  const [rosterDirty, setRosterDirty] = useState(false);
   const [isUpdatingPlayerCount, setIsUpdatingPlayerCount] = useState(false);
   const [manageModeGuestForm, setManageModeGuestForm] = useState<number | null>(null);
   const [manageModeGuestData, setManageModeGuestData] = useState({ firstName: '', lastName: '', email: '', phone: '' });
@@ -626,14 +625,13 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ playerCount: newCount, deferFeeRecalc: true })
+        body: JSON.stringify({ playerCount: newCount })
       });
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
         throw new Error(errData.error || 'Failed to update player count');
       }
       setEditingPlayerCount(newCount);
-      setRosterDirty(true);
       showToast(`Player count updated to ${newCount}`, 'success');
       await fetchRosterData();
     } catch (err: unknown) {
@@ -651,14 +649,13 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ memberEmail, deferFeeRecalc: true })
+        body: JSON.stringify({ memberEmail })
       });
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
         throw new Error(errData.error || 'Failed to link member');
       }
       showToast('Member linked successfully', 'success');
-      setRosterDirty(true);
       await fetchRosterData();
     } catch (err: unknown) {
       showToast((err instanceof Error ? err.message : String(err)) || 'Failed to link member', 'error');
@@ -673,7 +670,7 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
     membersSnapshotRef.current = rosterData ? [...rosterData.members] : [];
     setUnlinkingSlotId(slotId);
     try {
-      const res = await fetch(`/api/admin/booking/${bookingId}/members/${slotId}/unlink?deferFeeRecalc=true`, {
+      const res = await fetch(`/api/admin/booking/${bookingId}/members/${slotId}/unlink`, {
         method: 'PUT',
         credentials: 'include'
       });
@@ -682,7 +679,6 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
         throw new Error(errData.error || 'Failed to unlink member');
       }
       showToast('Member removed', 'success');
-      setRosterDirty(true);
       await fetchRosterData();
     } catch (err: unknown) {
       showToast((err instanceof Error ? err.message : String(err)) || 'Failed to unlink member', 'error');
@@ -705,7 +701,6 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
       };
       if (manageModeGuestData.phone) body.guestPhone = manageModeGuestData.phone;
       if (forceAddAsGuest) body.forceAddAsGuest = true;
-      body.deferFeeRecalc = true;
 
       const res = await fetch(`/api/admin/booking/${bookingId}/guests`, {
         method: 'POST',
@@ -738,7 +733,6 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
       }
 
       showToast('Guest added successfully', 'success');
-      setRosterDirty(true);
       setManageModeGuestForm(null);
       setManageModeGuestData({ firstName: '', lastName: '', email: '', phone: '' });
       setMemberMatchWarning(null);
@@ -840,7 +834,7 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
     if (!bookingId) return;
     setRemovingGuestId(guestId);
     try {
-      const res = await fetch(`/api/admin/booking/${bookingId}/guests/${guestId}?deferFeeRecalc=true`, {
+      const res = await fetch(`/api/admin/booking/${bookingId}/guests/${guestId}`, {
         method: 'DELETE',
         credentials: 'include'
       });
@@ -849,7 +843,6 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
         throw new Error(errData.error || 'Failed to remove guest');
       }
       showToast('Guest removed', 'success');
-      setRosterDirty(true);
       await fetchRosterData();
     } catch (err: unknown) {
       showToast((err instanceof Error ? err.message : String(err)) || 'Failed to remove guest', 'error');
@@ -877,13 +870,6 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
   const handleManageModeSave = async () => {
     setSavingChanges(true);
     try {
-      if (bookingId && rosterDirty) {
-        await fetch(`/api/admin/booking/${bookingId}/recalculate-fees`, {
-          method: 'POST',
-          credentials: 'include'
-        });
-        setRosterDirty(false);
-      }
       if (checkinMode && bookingId) {
         const result = await checkInBooking(bookingId);
         if (!result.success) {
@@ -899,25 +885,6 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
       }
     } catch (err: unknown) {
       showToast((err instanceof Error ? err.message : String(err)) || 'Failed to save changes', 'error');
-    } finally {
-      setSavingChanges(false);
-    }
-  };
-
-  const handleRecalculateOnly = async () => {
-    setSavingChanges(true);
-    try {
-      if (bookingId) {
-        await fetch(`/api/admin/booking/${bookingId}/recalculate-fees`, {
-          method: 'POST',
-          credentials: 'include'
-        });
-        setRosterDirty(false);
-        await fetchRosterData();
-        showToast('Fees recalculated', 'success');
-      }
-    } catch (err: unknown) {
-      showToast('Failed to recalculate fees', 'error');
     } finally {
       setSavingChanges(false);
     }
@@ -1269,7 +1236,6 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
       });
       if (res.ok) {
         showToast('Guest added', 'success');
-        setRosterDirty(true);
         await fetchRosterData();
       } else {
         const data = await res.json().catch(() => ({}));
@@ -1422,14 +1388,12 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
     handleManageModeRemoveGuest,
     handleManageModeMemberMatchResolve,
     handleManageModeSave,
-    handleRecalculateOnly,
     handleFinalizeBooking,
     handleMarkAsEvent,
     executeMarkAsEvent,
     handleAssignToStaff,
     deleting,
     handleDeleteBooking,
-    rosterDirty,
     reassignSearchOpen,
     setReassignSearchOpen,
     isReassigningOwner,
