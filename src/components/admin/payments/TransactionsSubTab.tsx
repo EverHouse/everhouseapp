@@ -121,7 +121,8 @@ const DailySummaryCard: React.FC<SectionProps> = ({ onClose, variant = 'modal' }
   };
 
   const categoryLabels: Record<string, { label: string; icon: string }> = {
-    guest_fee: { label: 'Guest Fees', icon: 'person_add' },
+    bookingFee: { label: 'Booking Fees', icon: 'sports_golf' },
+    guestFee: { label: 'Guest Fees', icon: 'person_add' },
     overage: { label: 'Overages', icon: 'schedule' },
     merchandise: { label: 'Merchandise', icon: 'shopping_bag' },
     membership: { label: 'Memberships', icon: 'card_membership' },

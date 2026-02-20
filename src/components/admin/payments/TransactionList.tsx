@@ -196,7 +196,7 @@ const RecentTransactionsSection = forwardRef<TransactionListRef, SectionProps>((
           >
             <span className="material-symbols-outlined text-primary/60 dark:text-white/60 text-lg">sticky_note_2</span>
           </button>
-          {tx.status === 'succeeded' && (
+          {tx.status === 'succeeded' && tx.id.startsWith('pi_') && (
             <button
               type="button"
               onClick={() => {

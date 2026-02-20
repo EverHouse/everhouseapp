@@ -1814,10 +1814,16 @@ router.get('/api/stripe/transactions/today', isStaffOrAdmin, async (req: Request
 
     const startOfDay = getPacificMidnightUTC();
 
-    const [paymentIntents, passRedemptions] = await Promise.all([
+    const startTs = Math.floor(startOfDay.getTime() / 1000);
+    const [paymentIntents, charges, passRedemptions] = await Promise.all([
       stripe.paymentIntents.list({
-        created: { gte: Math.floor(startOfDay.getTime() / 1000) },
-        limit: 50,
+        created: { gte: startTs },
+        limit: 100,
+        expand: ['data.customer'],
+      }),
+      stripe.charges.list({
+        created: { gte: startTs },
+        limit: 100,
         expand: ['data.customer'],
       }),
       db.select({
@@ -1851,16 +1857,22 @@ router.get('/api/stripe/transactions/today', isStaffOrAdmin, async (req: Request
       return undefined;
     };
 
-    const emails = paymentIntents.data
-      .map(getPaymentEmail)
+    const chargeEmails = charges.data
+      .map(ch => ch.billing_details?.email || (typeof ch.customer === 'object' && ch.customer && !('deleted' in ch.customer) ? ch.customer.email : null))
       .filter((e): e is string => !!e);
+
+    const emails = [
+      ...paymentIntents.data.map(getPaymentEmail).filter((e): e is string => !!e),
+      ...chargeEmails
+    ];
+    const uniqueEmails = [...new Set(emails)];
     
     const memberNameMap = new Map<string, string>();
-    if (emails.length > 0) {
+    if (uniqueEmails.length > 0) {
       const memberResults = await db
         .select({ email: users.email, firstName: users.firstName, lastName: users.lastName })
         .from(users)
-        .where(inArray(users.email, emails));
+        .where(inArray(users.email, uniqueEmails));
       for (const m of memberResults) {
         if (m.email) {
           const name = [m.firstName, m.lastName].filter(Boolean).join(' ');
@@ -1868,6 +1880,8 @@ router.get('/api/stripe/transactions/today', isStaffOrAdmin, async (req: Request
         }
       }
     }
+
+    const piIds = new Set(paymentIntents.data.map(pi => pi.id));
 
     const stripeTransactions = paymentIntents.data
       .filter(pi => pi.status === 'succeeded' || pi.status === 'processing')
@@ -1884,6 +1898,24 @@ router.get('/api/stripe/transactions/today', isStaffOrAdmin, async (req: Request
           memberName: dbName || stripeName || email || 'Unknown',
           createdAt: new Date(pi.created * 1000).toISOString(),
           type: pi.metadata?.purpose || 'payment'
+        };
+      });
+
+    const chargeTransactions = charges.data
+      .filter(ch => ch.paid && !ch.refunded && !(ch.payment_intent && piIds.has(ch.payment_intent as string)))
+      .map(ch => {
+        const email = ch.billing_details?.email || (typeof ch.customer === 'object' && ch.customer && !('deleted' in ch.customer) ? ch.customer.email : '') || '';
+        const stripeName = (typeof ch.customer === 'object' && ch.customer && !('deleted' in ch.customer) ? ch.customer.name : undefined) || ch.billing_details?.name || undefined;
+        const dbName = email ? memberNameMap.get(email.toLowerCase()) : undefined;
+        return {
+          id: ch.id,
+          amount: ch.amount,
+          status: 'succeeded' as const,
+          description: ch.description || 'Payment',
+          memberEmail: email,
+          memberName: dbName || stripeName || email || 'Unknown',
+          createdAt: new Date(ch.created * 1000).toISOString(),
+          type: 'payment'
         };
       });
 
@@ -1906,7 +1938,7 @@ router.get('/api/stripe/transactions/today', isStaffOrAdmin, async (req: Request
       };
     });
 
-    const allTransactions = [...stripeTransactions, ...passRedemptionTransactions]
+    const allTransactions = [...stripeTransactions, ...chargeTransactions, ...passRedemptionTransactions]
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
     res.json(allTransactions);
@@ -2671,6 +2703,7 @@ router.get('/api/payments/daily-summary', isStaffOrAdmin, async (req: Request, r
     logger.info('[Daily Summary] Fetched PaymentIntents and Charges for', { extra: { allPaymentIntentsLength: allPaymentIntents.length, allChargesLength: allCharges.length, today } });
 
     const breakdown: Record<string, number> = {
+      bookingFee: 0,
       guestFee: 0,
       overage: 0,
       merchandise: 0,
@@ -2683,28 +2716,33 @@ router.get('/api/payments/daily-summary', isStaffOrAdmin, async (req: Request, r
     let transactionCount = 0;
     const processedIds = new Set<string>();
 
+    const categorizePurpose = (purpose: string, description?: string | null): string => {
+      if (purpose === 'guest_fee') return 'guestFee';
+      if (purpose === 'overage_fee') return 'overage';
+      if (purpose === 'one_time_purchase') return 'merchandise';
+      if (purpose === 'booking_fee' || purpose === 'booking_payment') return 'bookingFee';
+      if (purpose === 'membership_renewal' || purpose === 'membership') return 'membership';
+      const desc = (description || '').toLowerCase();
+      if (desc.includes('subscription') || desc.includes('membership')) return 'membership';
+      if (desc.includes('booking') || desc.includes('simulator') || desc.includes('bay')) return 'bookingFee';
+      if (desc.includes('guest')) return 'guestFee';
+      if (desc.includes('overage')) return 'overage';
+      return 'other';
+    };
+
     for (const pi of allPaymentIntents) {
       if (pi.status !== 'succeeded') continue;
       processedIds.add(pi.id);
       
       const purpose = pi.metadata?.purpose || 'other';
       const cents = pi.amount || 0;
+      const category = categorizePurpose(purpose, pi.description);
       
       transactionCount += 1;
-      
-      if (purpose === 'guest_fee') {
-        breakdown.guestFee += cents;
-      } else if (purpose === 'overage_fee') {
-        breakdown.overage += cents;
-      } else if (purpose === 'one_time_purchase') {
-        breakdown.merchandise += cents;
-      } else if (pi.description?.toLowerCase().includes('subscription') || pi.description?.toLowerCase().includes('membership')) {
-        breakdown.membership += cents;
-      } else {
-        breakdown.other += cents;
-      }
+      breakdown[category] += cents;
     }
-    
+
+    const invoiceIds = new Set<string>();
     for (const ch of allCharges) {
       if (!ch.paid || ch.refunded) continue;
       if (ch.payment_intent && processedIds.has(ch.payment_intent as string)) continue;
@@ -2713,9 +2751,19 @@ router.get('/api/payments/daily-summary', isStaffOrAdmin, async (req: Request, r
       const cents = ch.amount || 0;
       
       transactionCount += 1;
-      
-      if ((ch as any).invoice) {
-        breakdown.membership += cents;
+
+      const invoiceId = (ch as any).invoice;
+      if (invoiceId) invoiceIds.add(typeof invoiceId === 'string' ? invoiceId : invoiceId.id);
+
+      if (invoiceId) {
+        const desc = (ch.description || '').toLowerCase();
+        if (desc.includes('subscription') || desc.includes('membership')) {
+          breakdown.membership += cents;
+        } else if (desc.includes('booking') || desc.includes('simulator') || desc.includes('bay') || desc.includes('guest') || desc.includes('overage')) {
+          breakdown.bookingFee += cents;
+        } else {
+          breakdown.membership += cents;
+        }
       } else {
         breakdown.other += cents;
       }
