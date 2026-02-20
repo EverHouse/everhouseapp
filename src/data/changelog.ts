@@ -13,6 +13,30 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.89.1",
+    date: "2026-02-20",
+    title: "Dead Code Cleanup & Performance Optimization",
+    changes: [
+      "Removed: 638 orphaned conversation attachment files (455MB) that were not used by the app — significantly reduces project size",
+      "Removed: Unused billing components (BalanceCard, BalancePaymentModal) and 4 unused hooks (useBookingFilters, useAnimatedRemove, useConfetti, useOptimisticEvents) that were no longer imported anywhere",
+      "Removed: Unused CSS animation (tap-feedback keyframe) and stale server backup file",
+      "Removed: Old one-time Trackman import CSV no longer needed after initial data migration",
+    ]
+  },
+  {
+    version: "7.89",
+    date: "2026-02-20",
+    title: "Admin Directory Polish — Dark Mode, Animations & Mobile Layout",
+    isMajor: true,
+    changes: [
+      "Fixed: Directory filter popover text was unreadable in dark mode — primary green text on dark backgrounds now switches to lavender accent color automatically",
+      "Improved: Filter popovers now open and close with smooth Apple-style slide+scale animations using custom easing curves",
+      "Improved: All column header containers across Active, Former, Visitors, and Team tabs now have rounded corners with matching hover highlight heights",
+      "Improved: Mobile layout optimized — sync button shows icon-only on small screens, billing provider badges (like MINDBODY) repositioned below divider alongside tier and status badges for cleaner card layout",
+      "Fixed: Dark mode consistency across all interactive elements in the Directory — checkboxes, radio buttons, filter labels, and reset buttons all use the lavender accent color",
+    ]
+  },
+  {
     version: "7.88.1",
     date: "2026-02-20",
     title: "Glass UI Accessibility Fallbacks for iOS",
