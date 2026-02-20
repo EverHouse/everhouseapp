@@ -583,8 +583,6 @@ export async function createUnmatchedBookingRequest(
   try {
     const durationMinutes = calculateDurationMinutes(startTime, endTime);
     
-    // Pre-check availability before INSERT for better error logging
-    // FIX: If conflict with Private Event, set status to 'pending' instead of 'approved'
     let bookingStatus = 'approved';
     let conflictNote = '';
     
@@ -604,16 +602,14 @@ export async function createUnmatchedBookingRequest(
           }
         });
         
-        // If conflict is a Private Event block, downgrade to pending for staff review
-        if ((availability.conflictType as string) === 'private_event' || availability.conflictType === 'availability_block') {
-          bookingStatus = 'pending';
-          conflictNote = ` [Pending: Conflicts with ${availability.conflictTitle || 'private event'}]`;
-          logger.info('[Trackman Webhook] Downgrading to pending due to private event conflict', {
-            extra: { trackmanBookingId, conflictType: availability.conflictType, conflictTitle: availability.conflictTitle }
-          });
-        }
-        // Still attempt INSERT - DB trigger will prevent true double-booking
-        // but log this clearly so staff can investigate
+        bookingStatus = 'pending';
+        const conflictLabel = availability.conflictType === 'session'
+          ? 'existing booking session'
+          : (availability.conflictTitle || 'schedule conflict');
+        conflictNote = `[Pending: Conflicts with ${conflictLabel}]`;
+        logger.info('[Trackman Webhook] Setting to pending due to conflict — Trackman booking is valid, needs staff review', {
+          extra: { trackmanBookingId, conflictType: availability.conflictType, conflictTitle: availability.conflictTitle }
+        });
       }
     }
     

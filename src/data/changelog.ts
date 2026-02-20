@@ -13,6 +13,15 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.86.1",
+    date: "2026-02-20",
+    title: "Unmatched Booking Conflict Handling",
+    changes: [
+      "Fixed: Trackman webhook bookings that overlap with an existing booking on the same bay are now created as 'pending' instead of 'approved' — this prevents phantom 'Needs Assignment' cards from cluttering the dashboard when the time slot is already taken by a confirmed member",
+      "Fixed: Cleaned up 2 existing unmatched bookings that were incorrectly showing as active despite conflicting with real sessions (Jorge Sanchez Bay 1 11-12 PM, Noah Robles Bay 2 6-7:30 PM)",
+    ]
+  },
+  {
     version: "7.86",
     date: "2026-02-19",
     title: "Stripe Payment Integrity & Void Fees",
