@@ -1038,7 +1038,7 @@ const DirectoryTab: React.FC = () => {
                                 <span className="material-symbols-outlined text-[20px]">swap_vert</span>
                             </button>
                             {sortOpen && (
-                                <div className="absolute right-0 top-full mt-1 glass-panel rounded-xl p-2 z-30 min-w-[180px] !bg-[#f5f5f0] dark:!bg-[#1a1a1a]">
+                                <div className="absolute right-0 top-full mt-1 rounded-xl p-2 z-30 min-w-[180px] bg-white/80 dark:bg-[#141414]/80 border border-white/50 dark:border-white/15 shadow-[0_8px_32px_rgba(0,0,0,0.12)]" style={{ backdropFilter: 'blur(40px)', WebkitBackdropFilter: 'blur(40px)' }}>
                                     <div className="flex items-center justify-between px-2 py-1 mb-1">
                                         <span className="text-[11px] font-bold text-gray-500 dark:text-white/50 uppercase tracking-wider">Sort By</span>
                                         <button
@@ -1083,7 +1083,7 @@ const DirectoryTab: React.FC = () => {
                         </button>
 
                         {filtersOpen && (
-                            <div className="absolute left-0 right-0 top-full mt-1 glass-panel rounded-xl p-4 space-y-3 z-30 transition-all duration-200 !bg-[#f5f5f0] dark:!bg-[#1a1a1a]">
+                            <div className="absolute left-0 right-0 top-full mt-1 rounded-xl p-4 space-y-3 z-30 transition-all duration-200 bg-white/80 dark:bg-[#141414]/80 border border-white/50 dark:border-white/15 shadow-[0_8px_32px_rgba(0,0,0,0.12)]" style={{ backdropFilter: 'blur(40px)', WebkitBackdropFilter: 'blur(40px)' }}>
                                 <div className="flex items-center justify-between">
                                     <span className="text-xs font-bold text-gray-500 dark:text-white/50 uppercase tracking-wider">Filters</span>
                                     {activeFilterCount > 0 && (
@@ -1383,7 +1383,7 @@ const DirectoryTab: React.FC = () => {
                             </button>
 
                             {filtersOpen && (
-                                <div className="absolute left-0 right-0 top-full mt-1 glass-panel rounded-xl p-4 space-y-3 z-30 transition-all duration-200 !bg-[#f5f5f0] dark:!bg-[#1a1a1a]">
+                                <div className="absolute left-0 right-0 top-full mt-1 rounded-xl p-4 space-y-3 z-30 transition-all duration-200 bg-white/80 dark:bg-[#141414]/80 border border-white/50 dark:border-white/15 shadow-[0_8px_32px_rgba(0,0,0,0.12)]" style={{ backdropFilter: 'blur(40px)', WebkitBackdropFilter: 'blur(40px)' }}>
                                     <div className="flex items-center justify-between">
                                         <span className="text-xs font-bold text-gray-500 dark:text-white/50 uppercase tracking-wider">Filters</span>
                                         {activeFilterCount > 0 && (
