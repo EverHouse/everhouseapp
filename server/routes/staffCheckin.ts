@@ -977,7 +977,7 @@ router.post('/api/booking-participants/:id/mark-waiver-reviewed', isStaffOrAdmin
 
     await client.query('COMMIT');
 
-    res.json({ success: true, participant: { id: participantId, display_name, waiver_reviewed_at: new Date() } });
+    res.json({ success: true, participant: { id: participantId, displayName: display_name, waiverReviewedAt: new Date() } });
   } catch (error: unknown) {
     try { await client.query('ROLLBACK'); } catch {}
     logAndRespond(req, res, 500, 'Failed to mark waiver as reviewed', error);
@@ -1127,7 +1127,18 @@ router.get('/api/bookings/stale-waivers', isStaffOrAdmin, async (req: Request, r
       ORDER BY bp.created_at DESC
     `);
 
-    res.json(result.rows);
+    res.json(result.rows.map((row: Record<string, unknown>) => ({
+      id: row.id,
+      displayName: row.display_name,
+      createdAt: row.created_at,
+      sessionId: row.session_id,
+      requestId: row.request_id,
+      requestDate: row.request_date,
+      startTime: row.start_time,
+      endTime: row.end_time,
+      bookingOwner: row.booking_owner,
+      resourceName: row.resource_name
+    })));
   } catch (error: unknown) {
     logAndRespond(req, res, 500, 'Failed to get stale waivers', error);
   }

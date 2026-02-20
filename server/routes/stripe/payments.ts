@@ -635,7 +635,18 @@ router.get('/api/stripe/payments/:email', isStaffOrAdmin, async (req: Request, r
        ORDER BY spi.created_at DESC
        LIMIT 50`);
 
-    res.json({ payments: result.rows });
+    res.json({ payments: result.rows.map((row: Record<string, unknown>) => ({
+      id: row.id,
+      stripePaymentIntentId: row.stripe_payment_intent_id,
+      amountCents: row.amount_cents,
+      purpose: row.purpose,
+      bookingId: row.booking_id,
+      description: row.description,
+      status: row.status,
+      productId: row.product_id,
+      productName: row.product_name,
+      createdAt: row.created_at
+    })) });
   } catch (error: unknown) {
     logger.error('[Stripe] Error fetching payments', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to fetch payments' });
@@ -2697,7 +2708,7 @@ router.get('/api/payments/daily-summary', isStaffOrAdmin, async (req: Request, r
     logger.info('[Daily Summary] Fetched PaymentIntents and Charges for', { extra: { allPaymentIntentsLength: allPaymentIntents.length, allChargesLength: allCharges.length, today } });
 
     const breakdown: Record<string, number> = {
-      guest_fee: 0,
+      guestFee: 0,
       overage: 0,
       merchandise: 0,
       membership: 0,
@@ -2719,7 +2730,7 @@ router.get('/api/payments/daily-summary', isStaffOrAdmin, async (req: Request, r
       transactionCount += 1;
       
       if (purpose === 'guest_fee') {
-        breakdown.guest_fee += cents;
+        breakdown.guestFee += cents;
       } else if (purpose === 'overage_fee') {
         breakdown.overage += cents;
       } else if (purpose === 'one_time_purchase') {
@@ -2768,7 +2779,7 @@ router.get('/api/payments/daily-summary', isStaffOrAdmin, async (req: Request, r
         breakdown.check += cents;
       } else {
         if (category === 'guest_fee') {
-          breakdown.guest_fee += cents;
+          breakdown.guestFee += cents;
         } else if (category === 'overage') {
           breakdown.overage += cents;
         } else if (category === 'merchandise') {

@@ -5,7 +5,7 @@ interface DailySummary {
   date: string;
   totalCollected: number;
   breakdown: {
-    guest_fee: number;
+    guestFee: number;
     overage: number;
     merchandise: number;
     membership: number;
