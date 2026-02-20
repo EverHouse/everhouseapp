@@ -1328,8 +1328,10 @@ export async function checkinBooking(params: CheckinBookingParams) {
       SELECT 
         br.trackman_player_count,
         br.declared_player_count,
+        br.session_id,
         (SELECT COUNT(*) FROM booking_members bm WHERE bm.booking_id = br.id) as total_slots,
-        (SELECT COUNT(*) FROM booking_members bm WHERE bm.booking_id = br.id AND bm.user_email IS NULL) as empty_slots
+        (SELECT COUNT(*) FROM booking_members bm WHERE bm.booking_id = br.id AND bm.user_email IS NULL) as empty_slots,
+        (SELECT COUNT(*) FROM booking_participants bp WHERE bp.session_id = br.session_id) as participant_count
       FROM booking_requests br
       WHERE br.id = $1
     `, [bookingId]);
@@ -1337,19 +1339,25 @@ export async function checkinBooking(params: CheckinBookingParams) {
     if (rosterResult.rows.length > 0) {
       const roster = rosterResult.rows[0];
       const declaredCount = roster.declared_player_count || roster.trackman_player_count || 1;
-      const emptySlots = parseInt(roster.empty_slots) || 0;
-      const totalSlots = parseInt(roster.total_slots) || 0;
+      const participantCount = parseInt(roster.participant_count) || 0;
 
-      if (emptySlots > 0 && declaredCount > 1) {
-        return {
-          error: 'Roster incomplete',
-          statusCode: 402,
-          requiresRoster: true,
-          emptySlots,
-          totalSlots,
-          declaredPlayerCount: declaredCount,
-          message: `${emptySlots} player slot${emptySlots > 1 ? 's' : ''} not assigned. Staff must link members or add guests before check-in to ensure proper billing.`
-        };
+      if (roster.session_id && participantCount >= declaredCount) {
+        // Session exists with enough participants — roster is complete
+      } else {
+        const emptySlots = parseInt(roster.empty_slots) || 0;
+        const totalSlots = parseInt(roster.total_slots) || 0;
+
+        if (emptySlots > 0 && declaredCount > 1) {
+          return {
+            error: 'Roster incomplete',
+            statusCode: 402,
+            requiresRoster: true,
+            emptySlots,
+            totalSlots,
+            declaredPlayerCount: declaredCount,
+            message: `${emptySlots} player slot${emptySlots > 1 ? 's' : ''} not assigned. Staff must link members or add guests before check-in to ensure proper billing.`
+          };
+        }
       }
     }
   }
