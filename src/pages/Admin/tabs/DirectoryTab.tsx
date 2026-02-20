@@ -1029,7 +1029,7 @@ const DirectoryTab: React.FC = () => {
                                 onClick={() => { setSortOpen(!sortOpen); setFiltersOpen(false); }}
                                 className={`flex items-center justify-center w-[42px] h-[42px] rounded-xl border text-sm font-medium transition-colors cursor-pointer ${
                                     sortOpen
-                                        ? 'border-primary/50 dark:border-lavender/50 text-primary dark:!text-lavender bg-primary/5 dark:bg-lavender/5'
+                                        ? 'border-lavender/50 text-[#293515] dark:!text-[#CCB8E4] bg-primary/5 dark:bg-lavender/5'
                                         : 'border-gray-200 dark:border-white/25 bg-white dark:bg-black/20 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/10'
                                 }`}
                                 aria-label="Sort options"
@@ -1072,7 +1072,7 @@ const DirectoryTab: React.FC = () => {
                             onClick={() => { setFiltersOpen(!filtersOpen); setSortOpen(false); }}
                             className={`px-3 py-2 rounded-xl border text-sm font-medium flex items-center gap-1.5 transition-colors whitespace-nowrap cursor-pointer ${
                                 activeFilterCount > 0
-                                    ? 'border-primary/50 dark:border-lavender/50 text-primary dark:!text-lavender bg-primary/5 dark:bg-lavender/5 hover:bg-primary/10 dark:hover:bg-lavender/10'
+                                    ? 'border-lavender/50 text-[#293515] dark:!text-[#CCB8E4] bg-primary/5 dark:bg-lavender/5 hover:bg-primary/10 dark:hover:bg-lavender/10'
                                     : 'border-gray-200 dark:border-white/25 bg-white dark:bg-black/20 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/10'
                             }`}
                             aria-label="Toggle filters"
@@ -1372,7 +1372,7 @@ const DirectoryTab: React.FC = () => {
                                 onClick={() => setFiltersOpen(!filtersOpen)}
                                 className={`px-3 py-2 rounded-lg border text-sm font-medium flex items-center gap-1.5 transition-colors whitespace-nowrap cursor-pointer ${
                                     activeFilterCount > 0
-                                        ? 'border-primary/50 dark:border-lavender/50 text-primary dark:!text-lavender bg-primary/5 dark:bg-lavender/5 hover:bg-primary/10 dark:hover:bg-lavender/10'
+                                        ? 'border-lavender/50 text-[#293515] dark:!text-[#CCB8E4] bg-primary/5 dark:bg-lavender/5 hover:bg-primary/10 dark:hover:bg-lavender/10'
                                         : 'border-gray-200 dark:border-white/20 bg-white dark:bg-surface-dark text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/10'
                                 }`}
                                 aria-label="Toggle filters"
