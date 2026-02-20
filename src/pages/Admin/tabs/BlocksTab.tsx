@@ -174,14 +174,19 @@ const BlocksTab: React.FC = () => {
     // Mutations for closure reasons
     const addClosureReasonMutation = useMutation({
         mutationFn: (label: string) => postWithCredentials<ClosureReason>('/api/closure-reasons', { label: label.trim() }),
+        onMutate: async () => {
+            await queryClient.cancelQueries({ queryKey: ['closureReasons'] });
+        },
         onSuccess: () => {
             setNewReasonLabel('');
-            queryClient.invalidateQueries({ queryKey: ['closureReasons'] });
             showToast('Closure reason added', 'success');
         },
         onError: (error: any) => {
             showToast(error.message || 'Failed to add reason', 'error');
-        }
+        },
+        onSettled: () => {
+            queryClient.invalidateQueries({ queryKey: ['closureReasons'] });
+        },
     });
 
     const handleAddClosureReason = () => {
@@ -192,14 +197,19 @@ const BlocksTab: React.FC = () => {
     const updateClosureReasonMutation = useMutation({
         mutationFn: (data: { id: number; label: string; sortOrder: number }) =>
             putWithCredentials(`/api/closure-reasons/${data.id}`, { label: data.label, sort_order: data.sortOrder }),
+        onMutate: async () => {
+            await queryClient.cancelQueries({ queryKey: ['closureReasons'] });
+        },
         onSuccess: () => {
             closeReasonDrawer();
-            queryClient.invalidateQueries({ queryKey: ['closureReasons'] });
             showToast('Closure reason updated', 'success');
         },
         onError: (error: any) => {
             showToast(error.message || 'Failed to update reason', 'error');
-        }
+        },
+        onSettled: () => {
+            queryClient.invalidateQueries({ queryKey: ['closureReasons'] });
+        },
     });
 
     const deleteClosureReasonMutation = useMutation({
@@ -226,38 +236,53 @@ const BlocksTab: React.FC = () => {
 
     const reactivateClosureReasonMutation = useMutation({
         mutationFn: (id: number) => putWithCredentials(`/api/closure-reasons/${id}`, { is_active: true }),
+        onMutate: async () => {
+            await queryClient.cancelQueries({ queryKey: ['closureReasons'] });
+        },
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['closureReasons'] });
             showToast('Closure reason reactivated', 'success');
         },
         onError: (error: any) => {
             showToast(error.message || 'Failed to reactivate reason', 'error');
-        }
+        },
+        onSettled: () => {
+            queryClient.invalidateQueries({ queryKey: ['closureReasons'] });
+        },
     });
 
     const addNoticeTypeMutation = useMutation({
         mutationFn: (name: string) => postWithCredentials<NoticeType>('/api/notice-types', { name: name.trim() }),
+        onMutate: async () => {
+            await queryClient.cancelQueries({ queryKey: ['noticeTypes'] });
+        },
         onSuccess: () => {
             setNewNoticeTypeName('');
-            queryClient.invalidateQueries({ queryKey: ['noticeTypes'] });
             showToast('Notice type added', 'success');
         },
         onError: (error: any) => {
             showToast(error.message || 'Failed to add notice type', 'error');
-        }
+        },
+        onSettled: () => {
+            queryClient.invalidateQueries({ queryKey: ['noticeTypes'] });
+        },
     });
 
     const updateNoticeTypeMutation = useMutation({
         mutationFn: (data: { id: number; name: string; sortOrder: number }) =>
             putWithCredentials(`/api/notice-types/${data.id}`, { name: data.name, sort_order: data.sortOrder }),
+        onMutate: async () => {
+            await queryClient.cancelQueries({ queryKey: ['noticeTypes'] });
+        },
         onSuccess: () => {
             closeNoticeTypeDrawer();
-            queryClient.invalidateQueries({ queryKey: ['noticeTypes'] });
             showToast('Notice type updated', 'success');
         },
         onError: (error: any) => {
             showToast(error.message || 'Failed to update notice type', 'error');
-        }
+        },
+        onSettled: () => {
+            queryClient.invalidateQueries({ queryKey: ['noticeTypes'] });
+        },
     });
 
     const deleteNoticeTypeMutation = useMutation({
@@ -354,10 +379,12 @@ const BlocksTab: React.FC = () => {
                 ? putWithCredentials(url, payload)
                 : postWithCredentials(url, payload);
         },
+        onMutate: async () => {
+            await queryClient.cancelQueries({ queryKey: ['closures'] });
+        },
         onSuccess: (data: { blocks?: unknown[]; warnings?: string[] }) => {
             setIsClosureModalOpen(false);
             resetClosureForm();
-            queryClient.invalidateQueries({ queryKey: ['closures'] });
 
             if (data.warnings && data.warnings.length > 0) {
                 showToast(
@@ -373,7 +400,10 @@ const BlocksTab: React.FC = () => {
         },
         onError: (error: any) => {
             showToast(error.message || 'Failed to save notice', 'error');
-        }
+        },
+        onSettled: () => {
+            queryClient.invalidateQueries({ queryKey: ['closures'] });
+        },
     });
 
     const deleteClosureMutation = useMutation({

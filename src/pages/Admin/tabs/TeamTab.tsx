@@ -173,8 +173,10 @@ const TeamTab: React.FC = () => {
       role: StaffRole;
       created_by: string | undefined;
     }) => postWithCredentials<TeamMember>('/api/staff-users', data),
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: ['staff-users'] });
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['staff-users'] });
       setNewPerson({ firstName: '', lastName: '', email: '', phone: '', jobTitle: '', role: 'staff' });
       setIsAddingPerson(false);
       setSuccess('Team member added');
@@ -182,6 +184,9 @@ const TeamTab: React.FC = () => {
     },
     onError: (error: Error) => {
       setAddError(error.message || 'Failed to add team member');
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['staff-users'] });
     },
   });
 

@@ -280,10 +280,12 @@ const Profile: React.FC = () => {
       showToast('Profile updated', 'success');
       setEditingProfile(false);
       await refreshUser();
-      queryClient.invalidateQueries({ queryKey: ['memberOnboarding'] });
     },
     onError: (err: Error) => {
       showToast((err instanceof Error ? err.message : String(err)) || 'Failed to update profile', 'error');
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['memberOnboarding'] });
     },
   });
 

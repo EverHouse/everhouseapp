@@ -345,7 +345,10 @@ const BookGolf: React.FC = () => {
       guardian_consent?: boolean;
       conference_prepayment_id?: number;
     }) => postWithCredentials<{ id: number }>('/api/booking-requests', bookingData),
-    onSuccess: () => {
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: bookGolfKeys.all });
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: bookGolfKeys.all });
     },
   });

@@ -121,7 +121,10 @@ export function useApproveBooking() {
   return useMutation({
     mutationFn: ({ bookingId, resourceId, staffNotes }: { bookingId: number | string; resourceId?: number; staffNotes?: string }) =>
       postWithCredentials<{ success: boolean }>(`/api/booking-requests/${bookingId}/approve`, { resourceId, staffNotes }),
-    onSuccess: () => {
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: bookingsKeys.all });
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: bookingsKeys.all });
     },
   });
@@ -132,7 +135,10 @@ export function useDeclineBooking() {
   return useMutation({
     mutationFn: ({ bookingId, reason }: { bookingId: number | string; reason?: string }) =>
       postWithCredentials<{ success: boolean }>(`/api/booking-requests/${bookingId}/decline`, { reason }),
-    onSuccess: () => {
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: bookingsKeys.all });
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: bookingsKeys.all });
     },
   });
@@ -143,7 +149,10 @@ export function useCancelBooking() {
   return useMutation({
     mutationFn: ({ bookingId, reason }: { bookingId: number | string; reason?: string }) =>
       postWithCredentials<{ success: boolean }>(`/api/bookings/${bookingId}/cancel`, { reason }),
-    onSuccess: () => {
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: bookingsKeys.all });
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: bookingsKeys.all });
     },
   });
@@ -154,7 +163,10 @@ export function useCheckInBooking() {
   return useMutation({
     mutationFn: ({ sessionId, actualPlayerCount, waiverWaived }: { sessionId: number; actualPlayerCount?: number; waiverWaived?: boolean }) =>
       postWithCredentials<{ success: boolean }>(`/api/bookings/sessions/${sessionId}/check-in`, { actualPlayerCount, waiverWaived }),
-    onSuccess: () => {
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: bookingsKeys.all });
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: bookingsKeys.all });
     },
   });
@@ -165,7 +177,10 @@ export function useCheckOutBooking() {
   return useMutation({
     mutationFn: ({ sessionId, actualEndTime }: { sessionId: number; actualEndTime?: string }) =>
       postWithCredentials<{ success: boolean }>(`/api/bookings/sessions/${sessionId}/check-out`, { actualEndTime }),
-    onSuccess: () => {
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: bookingsKeys.all });
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: bookingsKeys.all });
     },
   });
@@ -186,7 +201,10 @@ export function useCreateManualBooking() {
       source?: string;
       trackmanBookingId?: string;
     }) => postWithCredentials<{ id: number }>('/api/bookings/manual', data),
-    onSuccess: () => {
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: bookingsKeys.all });
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: bookingsKeys.all });
     },
   });
@@ -347,7 +365,11 @@ export function useUpdateBookingStatus() {
       
       return response.json();
     },
-    onSuccess: () => {
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: bookingsKeys.all });
+      await queryClient.cancelQueries({ queryKey: simulatorKeys.all });
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: bookingsKeys.all });
       queryClient.invalidateQueries({ queryKey: simulatorKeys.all });
     },
@@ -376,7 +398,11 @@ export function useCancelBookingWithOptimistic() {
       
       return response.json();
     },
-    onSuccess: () => {
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: bookingsKeys.all });
+      await queryClient.cancelQueries({ queryKey: simulatorKeys.all });
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: bookingsKeys.all });
       queryClient.invalidateQueries({ queryKey: simulatorKeys.all });
     },
@@ -421,10 +447,16 @@ export function useApproveBookingRequest() {
       
       return response.json();
     },
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: bookingsKeys.all });
+      await queryClient.cancelQueries({ queryKey: simulatorKeys.all });
+    },
     onSuccess: () => {
+      window.dispatchEvent(new CustomEvent('booking-action-completed'));
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: bookingsKeys.all });
       queryClient.invalidateQueries({ queryKey: simulatorKeys.all });
-      window.dispatchEvent(new CustomEvent('booking-action-completed'));
     },
   });
 }
@@ -470,10 +502,16 @@ export function useDeclineBookingRequest() {
       
       return response.json();
     },
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: bookingsKeys.all });
+      await queryClient.cancelQueries({ queryKey: simulatorKeys.all });
+    },
     onSuccess: () => {
+      window.dispatchEvent(new CustomEvent('booking-action-completed'));
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: bookingsKeys.all });
       queryClient.invalidateQueries({ queryKey: simulatorKeys.all });
-      window.dispatchEvent(new CustomEvent('booking-action-completed'));
     },
   });
 }
