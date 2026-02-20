@@ -82,7 +82,7 @@ async function fetchFormSubmissions(
       },
     });
 
-    if (response.status === 403) {
+    if (response.status === 403 || response.status === 401) {
       throw new Error('HUBSPOT_FORMS_ACCESS_DENIED');
     }
 
@@ -156,7 +156,7 @@ export async function syncHubSpotFormSubmissions(): Promise<{
         const errMsg = getErrorMessage(err);
         if (errMsg.includes('HUBSPOT_FORMS_ACCESS_DENIED')) {
           if (!formSyncAccessDeniedLogged) {
-            logger.warn('[HubSpot FormSync] Access denied (403) - token may lack "forms" scope. Skipping remaining forms.');
+            logger.warn('[HubSpot FormSync] Access denied (401/403) - HubSpot private app token may lack "forms" scope. Add the "forms" scope in HubSpot Settings > Integrations > Private Apps. Skipping form sync until next restart.');
             formSyncAccessDeniedLogged = true;
           }
           break;
