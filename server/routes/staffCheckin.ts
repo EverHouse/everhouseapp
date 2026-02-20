@@ -879,6 +879,10 @@ router.get('/api/bookings/overdue-payments', isStaffOrAdmin, async (req: Request
         WHERE br.request_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
           AND br.request_date >= (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date - INTERVAL '30 days'
           AND br.session_id IS NOT NULL
+          AND NOT EXISTS (
+            SELECT 1 FROM booking_fee_snapshots bfs 
+            WHERE bfs.session_id = br.session_id AND bfs.status = 'completed'
+          )
         GROUP BY br.id, br.session_id, br.user_email, br.user_name, 
                  br.request_date, br.start_time, br.end_time, r.name, br.declared_player_count
         HAVING SUM(
