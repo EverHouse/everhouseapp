@@ -993,6 +993,25 @@ export async function createSessionWithUsageTracking(
         }
       }
       
+      if (billingResult.guestPassesUsed > 0) {
+        const guestParticipantIds = linkedParticipants
+          .filter(p => p.participantType === 'guest')
+          .slice(0, billingResult.guestPassesUsed)
+          .map(p => p.id);
+        
+        if (guestParticipantIds.length > 0) {
+          await tx.execute(sql`
+            UPDATE booking_participants 
+            SET used_guest_pass = true, payment_status = 'paid'
+            WHERE id = ANY(${guestParticipantIds}::int[])
+          `);
+          
+          logger.info('[createSessionWithUsageTracking] Marked guest participants with used_guest_pass=true', {
+            extra: { sessionId: session.id, guestParticipantIds, count: guestParticipantIds.length }
+          });
+        }
+      }
+
       return { session, linkedParticipants, ledgerEntriesCreated };
     };
     

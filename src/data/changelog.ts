@@ -24,6 +24,8 @@ export const changelog: ChangelogEntry[] = [
       "Fixed: Staff-assigned Trackman bookings now properly calculate guest fees — guest participants are inserted into the billing system before fee calculation runs",
       "Improved: Guest participants added without a guest pass are tracked with 'pending' payment status until fees are settled at check-in or via prepayment",
       "Fixed: Fee calculation now correctly charges the $25 guest fee when a member chooses 'Pay Guest Fee' instead of using a guest pass — previously the fee engine would automatically apply an available pass even when the member explicitly chose to pay",
+      "Fixed: Guest pass consumption now uses a three-state system (NULL=auto-decide, true=pass used, false=charge fee) — prevents staff-added guests and empty slots from incorrectly burning member passes",
+      "Fixed: Session creation now correctly marks guest participants with used_guest_pass=true after pass deduction, preventing fee recalculation from double-charging",
       "Cleaned up: Removed 3 orphaned backend routes and ~370 lines of dead code from the old per-guest Stripe checkout system",
     ]
   },

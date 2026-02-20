@@ -2447,8 +2447,8 @@ router.post('/api/admin/booking/:id/guests', isStaffOrAdmin, async (req, res) =>
       const durationMinutes = booking.duration_minutes || 60;
       const declaredPlayerCount = booking.declared_player_count || 1;
       const slotDuration = Math.floor(Number(durationMinutes)/ Math.max(declaredPlayerCount as number, 1));
-      await db.execute(sql`INSERT INTO booking_participants (session_id, participant_type, display_name, payment_status, slot_duration)
-         VALUES (${sessionId}, 'guest', ${guestName.trim()}, 'pending', ${slotDuration})`);
+      await db.execute(sql`INSERT INTO booking_participants (session_id, participant_type, display_name, payment_status, used_guest_pass, slot_duration)
+         VALUES (${sessionId}, 'guest', ${guestName.trim()}, 'pending', false, ${slotDuration})`);
       logger.info('[AddGuest] Created booking_participant for guest in session', { extra: { bookingId, sessionId, guestName: guestName.trim() } });
 
       if (req.body.deferFeeRecalc !== true) {

@@ -327,7 +327,7 @@ export const bookingParticipants = pgTable("booking_participants", {
   expiredReason: varchar("expired_reason"),
   stripePaymentIntentId: varchar("stripe_payment_intent_id"),
   paidAt: timestamp("paid_at"),
-  usedGuestPass: boolean("used_guest_pass").default(false),
+  usedGuestPass: boolean("used_guest_pass"),
   waiverReviewedAt: timestamp("waiver_reviewed_at"),
   cachedFeeCents: integer("cached_fee_cents"),
   createdAt: timestamp("created_at").defaultNow(),

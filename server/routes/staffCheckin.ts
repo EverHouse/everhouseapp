@@ -1320,8 +1320,8 @@ router.post('/api/bookings/:id/staff-direct-add', isStaffOrAdmin, async (req: Re
       // No matching member - add as true guest
       await db.execute(sql`
         INSERT INTO booking_participants 
-          (session_id, participant_type, display_name, invite_status, payment_status, cached_fee_cents, slot_duration)
-        VALUES (${sessionId}, 'guest', ${guestName}, 'accepted', 'pending', ${PRICING.GUEST_FEE_CENTS}, ${slotDuration})
+          (session_id, participant_type, display_name, invite_status, payment_status, cached_fee_cents, used_guest_pass, slot_duration)
+        VALUES (${sessionId}, 'guest', ${guestName}, 'accepted', 'pending', ${PRICING.GUEST_FEE_CENTS}, false, ${slotDuration})
       `);
 
       await db.execute(sql`
