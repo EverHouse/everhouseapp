@@ -4,19 +4,23 @@
 The Ever Club Members App is a private members club application for golf and wellness centers. Its primary purpose is to streamline golf simulator bookings, wellness service appointments, and club event management. The application aims to boost member engagement, optimize operational workflows, and provide a unified digital experience. The long-term vision is to establish it as a central digital hub for private members clubs, offering comprehensive tools for membership management, facility booking, and community building to enhance member satisfaction and operational efficiency.
 
 ## User Preferences
-- **CRITICAL: Communication Style** - The founder is non-technical. Always explain changes in plain English, focusing on how they affect the member/staff experience or business operations. Avoid jargon like "ORM," "WebSocket," "orchestration," "middleware," etc. If a technical term is necessary, explain it simply first (e.g., "the notification system" instead of "WebSocket server").
-- **CRITICAL: Pacific Timezone (America/Los_Angeles) is THE FIRST PRIORITY for any date/time operations.** All time comparisons must use Pacific time utilities, never local server time.
-- **CRITICAL: Changelog Updates** - Update `src/data/changelog.ts` after EVERY significant change, not just when asked. Each feature or fix should be documented immediately. Bump version numbers appropriately (patch for fixes, minor for features, major for breaking/significant changes). Mark major releases with `isMajor: true`.
-- **CRITICAL: Staff Activity Logging** - ALL staff actions must be logged to the audit system using `logFromRequest()` from `server/core/auditLog.ts`. When adding new staff features, always add audit logging with appropriate action type, resource type, resource ID/name, and relevant details. Add new action types to `AuditAction` type if needed. This ensures all staff activity appears in the Staff Activity feed on the Changelog page.
-- **CRITICAL: Load Skills Before Answering** - Before answering questions about, debugging, or modifying any system covered by a skill (see Skill Auto-Update Protocol table at bottom), ALWAYS read the relevant SKILL.md file first. Match the user's question to the skill by topic: bookings → booking-flow, payments/webhooks → stripe-webhook-flow, members → member-lifecycle, HubSpot → hubspot-sync, fees → fee-calculation, data checks → data-integrity-monitoring, check-in → checkin-flow, notifications → notification-system, guest passes → guest-pass-system, scheduled jobs → scheduler-jobs. Load the skill BEFORE searching code or answering. Read reference files in the skill's `references/` folder when deeper detail is needed.
-- **HIGH PRIORITY: API/Frontend Field Name Consistency** - When creating or modifying API endpoints, ALWAYS ensure the response field names EXACTLY match the frontend TypeScript interface expectations. Before returning `res.json({...})`, verify field names against the corresponding frontend interface. Common mismatches to avoid: `visits` vs `visitHistory`, `bookings` vs `bookingHistory`, `eventRsvps` vs `eventRsvpHistory`, `wellness` vs `wellnessHistory`, `guestPass` vs `guestPassInfo`, `guestCheckIns` vs `guestCheckInsHistory`, `estimatedOverageFee` vs `overageFee`, `dailyAllowance` vs `includedDailyMinutes`, `estimatedTotalFees` vs `totalFees`. When in doubt, search for the frontend interface definition and match it exactly.
-- I prefer simple language.
-- I like functional programming.
-- I want iterative development.
-- Ask before making major changes.
-- I prefer detailed explanations.
-- Do not make changes to the folder `Z`.
-- Do not make changes to the file `Y`.
+CRITICAL: Skill-Driven Development - We have an extensive library of custom skills installed. Before answering questions, debugging, or modifying any system, you MUST identify and load the relevant skill (e.g., booking-flow, stripe-webhook-flow, fee-calculation, react-dev). Rely on your skills as the single source of truth for architectural rules.
+
+CRITICAL: Mandatory Verification - You must NEVER complete a task or claim to be done without first explicitly invoking the verification-before-completion skill to check for Vite compilation errors, TypeScript warnings, and dev server health.
+
+Communication Style - The founder is non-technical. Always explain changes in plain English, focusing on the business/member impact. Avoid unnecessary technical jargon.
+
+Development Approach - Prefer iterative development. Ask before making major architectural changes. Write functional, clean code (utilize your clean-code skill).
+
+System Non-Negotiables:
+
+Timezone: All date/time operations must strictly prioritize Pacific Time (America/Los_Angeles).
+
+Changelog: Update src/data/changelog.ts after EVERY significant change.
+
+Audit Logging: ALL staff actions must be logged using logFromRequest() from server/core/auditLog.ts.
+
+API/Frontend Consistency: Ensure API response field names EXACTLY match frontend TypeScript interfaces to avoid data mapping errors.
 
 ## System Architecture
 The application is built with a React 19 frontend (Vite, Tailwind CSS) and an Express.js backend, utilizing a PostgreSQL database.
