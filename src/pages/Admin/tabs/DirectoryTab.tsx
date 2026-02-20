@@ -73,7 +73,7 @@ type MemberTab = 'active' | 'former' | 'visitors' | 'team';
 
 type VisitorType = 'all' | 'NEW' | 'classpass' | 'sim_walkin' | 'private_lesson' | 'day_pass' | 'guest' | 'lead';
 type VisitorSource = 'all' | 'mindbody' | 'hubspot' | 'stripe' | 'APP';
-type VisitorSortField = 'name' | 'type' | 'source' | 'lastActivity' | 'createdAt' | 'purchases';
+type VisitorSortField = 'name' | 'email' | 'type' | 'source' | 'lastActivity' | 'createdAt' | 'purchases';
 
 type StaffRole = 'staff' | 'admin' | 'golf_instructor';
 
@@ -643,6 +643,14 @@ const DirectoryTab: React.FC = () => {
                     else if (!nameA) comparison = 1;
                     else if (!nameB) comparison = -1;
                     else comparison = nameA.localeCompare(nameB);
+                    break;
+                case 'email':
+                    const emailA = (a.email || '').toLowerCase();
+                    const emailB = (b.email || '').toLowerCase();
+                    if (!emailA && !emailB) comparison = 0;
+                    else if (!emailA) comparison = 1;
+                    else if (!emailB) comparison = -1;
+                    else comparison = emailA.localeCompare(emailB);
                     break;
                 case 'type':
                     const typeA = a.type || '';
@@ -1448,31 +1456,36 @@ const DirectoryTab: React.FC = () => {
                             <table className="w-full">
                                 <thead className="sticky top-0 bg-gray-50 dark:bg-surface-dark z-10">
                                     <tr className="border-b border-gray-200 dark:border-white/20">
-                                        <th className="p-3 text-left text-xs font-bold text-gray-600 dark:text-gray-400 uppercase">Name</th>
-                                        <th className="p-3 text-left text-xs font-bold text-gray-600 dark:text-gray-400 uppercase">Email</th>
-                                        <th className="p-3 text-left text-xs font-bold text-gray-600 dark:text-gray-400 uppercase">Type</th>
-                                        <th className="p-3 text-left text-xs font-bold text-gray-600 dark:text-gray-400 uppercase">Source</th>
-                                        <th 
-                                            className="p-3 text-left text-xs font-bold text-gray-600 dark:text-gray-400 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-white/10 transition-colors select-none tactile-btn"
-                                            onClick={() => {
-                                                if (visitorSortField === 'purchases') {
-                                                    setVisitorSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
-                                                } else {
-                                                    setVisitorSortField('purchases');
-                                                    setVisitorSortDirection('desc');
-                                                }
-                                            }}
-                                        >
-                                            <div className="flex items-center gap-1">
-                                                Purchases
-                                                {visitorSortField === 'purchases' && (
-                                                    <span className="material-symbols-outlined text-[14px] text-primary dark:text-lavender">
-                                                        {visitorSortDirection === 'asc' ? 'arrow_upward' : 'arrow_downward'}
-                                                    </span>
-                                                )}
-                                            </div>
-                                        </th>
-                                        <th className="p-3 text-left text-xs font-bold text-gray-600 dark:text-gray-400 uppercase">Last Activity</th>
+                                        {([
+                                            ['name', 'Name'],
+                                            ['email', 'Email'],
+                                            ['type', 'Type'],
+                                            ['source', 'Source'],
+                                            ['purchases', 'Purchases'],
+                                            ['lastActivity', 'Last Activity'],
+                                        ] as [VisitorSortField, string][]).map(([field, label]) => (
+                                            <th
+                                                key={field + label}
+                                                className="p-3 text-left text-xs font-bold text-gray-600 dark:text-gray-400 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-white/10 transition-colors select-none tactile-btn"
+                                                onClick={() => {
+                                                    if (visitorSortField === field) {
+                                                        setVisitorSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+                                                    } else {
+                                                        setVisitorSortField(field);
+                                                        setVisitorSortDirection(field === 'name' || field === 'email' || field === 'type' || field === 'source' ? 'asc' : 'desc');
+                                                    }
+                                                }}
+                                            >
+                                                <div className="flex items-center gap-1 whitespace-nowrap">
+                                                    {label}
+                                                    {visitorSortField === field && (
+                                                        <span className="material-symbols-outlined text-[14px] text-primary dark:text-lavender">
+                                                            {visitorSortDirection === 'asc' ? 'arrow_upward' : 'arrow_downward'}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </th>
+                                        ))}
                                     </tr>
                                 </thead>
                                 <tbody ref={visitorsTbodyParent}>
