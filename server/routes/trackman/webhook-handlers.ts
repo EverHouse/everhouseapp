@@ -23,7 +23,6 @@ import { resolveLinkedEmail, findMemberByEmail, logWebhookEvent } from './webhoo
 import { 
   updateBaySlotCache, 
   createBookingForMember, 
-  linkByExternalBookingId,
   refundGuestPassesForCancelledBooking
 } from './webhook-billing';
 import { refundGuestPass } from '../guestPasses';
