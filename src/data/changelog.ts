@@ -13,6 +13,14 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.89.2",
+    date: "2026-02-20",
+    title: "Visitors Tab Column Alignment Fix",
+    changes: [
+      "Fixed: Directory Visitors tab column headers (Name, Email, Type, Source, Purchases, Last Activity) now properly align with the data rows below them — headers and cells use matched percentage widths with fixed table layout",
+    ]
+  },
+  {
     version: "7.89.1",
     date: "2026-02-20",
     title: "Dead Code Cleanup & Performance Optimization",

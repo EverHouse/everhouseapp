@@ -1625,22 +1625,31 @@ const DirectoryTab: React.FC = () => {
                 {!visitorsLoading && !visitorsError && memberTab === 'visitors' && visitors.length > 0 && (
                     <div className="hidden md:block flex-1 min-h-0 relative">
                         <div className="h-full overflow-y-auto">
-                            <table className="w-full">
+                            <table className="w-full" style={{ tableLayout: 'fixed' }}>
+                                <colgroup>
+                                    <col style={{ width: '20%' }} />
+                                    <col style={{ width: '28%' }} />
+                                    <col style={{ width: '12%' }} />
+                                    <col style={{ width: '14%' }} />
+                                    <col style={{ width: '12%' }} />
+                                    <col style={{ width: '14%' }} />
+                                </colgroup>
                                 <thead className="sticky top-0 z-10">
                                     <tr>
                                         <td colSpan={6} className="p-0">
                                             <div className="flex items-center bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl overflow-hidden">
                                                 {([
-                                                    ['name', 'Name'],
-                                                    ['email', 'Email'],
-                                                    ['type', 'Type'],
-                                                    ['source', 'Source'],
-                                                    ['purchases', 'Purchases'],
-                                                    ['lastActivity', 'Last Activity'],
-                                                ] as [VisitorSortField, string][]).map(([field, label]) => (
+                                                    ['name', 'Name', '20%'],
+                                                    ['email', 'Email', '28%'],
+                                                    ['type', 'Type', '12%'],
+                                                    ['source', 'Source', '14%'],
+                                                    ['purchases', 'Purchases', '12%'],
+                                                    ['lastActivity', 'Last Activity', '14%'],
+                                                ] as [VisitorSortField, string, string][]).map(([field, label, width]) => (
                                                     <div
                                                         key={field + label}
-                                                        className="flex-1 px-3 py-3 text-left text-xs font-bold text-gray-600 dark:text-gray-400 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-white/10 transition-colors select-none tactile-btn"
+                                                        style={{ width }}
+                                                        className="px-3 py-3 text-left text-xs font-bold text-gray-600 dark:text-gray-400 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-white/10 transition-colors select-none tactile-btn"
                                                         onClick={() => {
                                                             if (visitorSortField === field) {
                                                                 setVisitorSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
@@ -1671,11 +1680,11 @@ const DirectoryTab: React.FC = () => {
                                             onClick={() => openVisitorDetails(v)}
                                             className="border-b border-gray-100 dark:border-white/10 hover:bg-gray-50 dark:hover:bg-white/5 cursor-pointer"
                                         >
-                                            <td className="p-3 font-medium text-primary dark:text-white">
+                                            <td style={{ width: '20%' }} className="p-3 font-medium text-primary dark:text-white">
                                                 {[v.firstName, v.lastName].filter(Boolean).join(' ') || 'Unknown'}
                                             </td>
-                                            <td className="p-3 text-sm text-gray-600 dark:text-gray-400">{v.email || '-'}</td>
-                                            <td className="p-3">
+                                            <td style={{ width: '28%' }} className="p-3 text-sm text-gray-600 dark:text-gray-400 truncate max-w-0">{v.email || '-'}</td>
+                                            <td style={{ width: '12%' }} className="p-3">
                                                 <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
                                                     v.type === 'classpass' 
                                                         ? 'bg-[#e8ecd8] dark:bg-[#6b7a3d]/20 text-[#5a6a2c] dark:text-[#a8b87a]'
@@ -1697,7 +1706,7 @@ const DirectoryTab: React.FC = () => {
                                                         : 'Lead'}
                                                 </span>
                                             </td>
-                                            <td className="p-3">
+                                            <td style={{ width: '14%' }} className="p-3">
                                                 <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
                                                     v.source === 'hubspot' ? 'bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-400' :
                                                     v.source === 'stripe' ? 'bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-400' :
@@ -1707,8 +1716,8 @@ const DirectoryTab: React.FC = () => {
                                                     {v.source === 'hubspot' ? 'HubSpot' : v.source === 'stripe' ? 'Stripe' : v.source === 'mindbody' ? 'MindBody' : 'App'}
                                                 </span>
                                             </td>
-                                            <td className="p-3 text-sm text-gray-600 dark:text-gray-400">{v.purchaseCount || 0}</td>
-                                            <td className="p-3 text-sm text-gray-500 dark:text-gray-400">{formatJoinDate(v.lastActivityAt || v.lastPurchaseDate)}</td>
+                                            <td style={{ width: '12%' }} className="p-3 text-sm text-gray-600 dark:text-gray-400">{v.purchaseCount || 0}</td>
+                                            <td style={{ width: '14%' }} className="p-3 text-sm text-gray-500 dark:text-gray-400">{formatJoinDate(v.lastActivityAt || v.lastPurchaseDate)}</td>
                                         </tr>
                                     ))}
                                 </tbody>
