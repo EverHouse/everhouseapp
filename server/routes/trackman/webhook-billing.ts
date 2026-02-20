@@ -622,13 +622,17 @@ export async function linkByExternalBookingId(
     const memberName = booking.user_name;
     
     const normalizedStatus = status.toLowerCase();
+    const isCancellation = normalizedStatus === 'cancelled' || normalizedStatus === 'canceled';
     let newStatus = booking.current_status;
-    if (normalizedStatus === 'attended') {
+    if (isCancellation) {
+      // Don't set status to 'cancelled' here — cancelBookingByTrackmanId handles the full
+      // cancellation lifecycle (refunds, notifications, availability broadcasts).
+      // We just link the trackman ID and preserve the current status.
+      newStatus = booking.current_status;
+    } else if (normalizedStatus === 'attended') {
       newStatus = 'attended';
     } else if (normalizedStatus === 'confirmed' || normalizedStatus === 'booked') {
       newStatus = 'approved';
-    } else if (normalizedStatus === 'cancelled' || normalizedStatus === 'canceled') {
-      newStatus = 'cancelled';
     }
     
     const durationMinutes = calculateDurationMinutes(startTime, endTime);

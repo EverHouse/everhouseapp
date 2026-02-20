@@ -1045,16 +1045,10 @@ export async function handleBookingUpdate(payload: TrackmanWebhookPayload): Prom
   let matchedBookingId: number | undefined;
   
   if (isCancel) {
+    // cancelBookingByTrackmanId handles availability broadcast, member notification, and staff notification internally
     const cancelResult = await cancelBookingByTrackmanId(normalized.trackmanBookingId);
     if (cancelResult.cancelled) {
       matchedBookingId = cancelResult.bookingId;
-      
-      // Broadcast availability update for real-time calendar refresh
-      broadcastAvailabilityUpdate({
-        resourceId,
-        date: startParsed.date,
-        action: 'cancelled',
-      });
       
       logger.info('[Trackman Webhook] Handled booking cancellation', {
         extra: { trackmanBookingId: normalized.trackmanBookingId, bookingId: cancelResult.bookingId }
