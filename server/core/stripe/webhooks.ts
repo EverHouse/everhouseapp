@@ -1611,6 +1611,16 @@ async function handleInvoicePaymentSucceeded(client: PoolClient, invoice: Invoic
   const invoiceCustomerId = typeof invoice.customer === 'string' ? invoice.customer : invoice.customer?.id;
   const invoiceCustomerName = typeof invoice.customer === 'object' ? (invoice.customer as Stripe.Customer)?.name : undefined;
   
+  const invoiceLineDescriptions = (invoice.lines?.data || [])
+    .map(line => line.description)
+    .filter((d): d is string => !!d);
+  const rawDescription = invoiceLineDescriptions.length > 0
+    ? invoiceLineDescriptions.join(', ')
+    : (invoice.description || 'Invoice payment');
+  const invoiceDescription = rawDescription.length > 480
+    ? rawDescription.substring(0, 477) + '...'
+    : rawDescription;
+
   deferredActions.push(async () => {
     await upsertTransactionCache({
       stripeId: invoice.id,
@@ -1622,13 +1632,28 @@ async function handleInvoicePaymentSucceeded(client: PoolClient, invoice: Invoic
       customerId: invoiceCustomerId,
       customerEmail: invoiceEmail,
       customerName: invoiceCustomerName,
-      description: invoice.lines?.data?.[0]?.description || 'Invoice payment',
+      description: invoiceDescription,
       metadata: invoice.metadata as Record<string, string>,
       source: 'webhook',
       invoiceId: invoice.id,
       paymentIntentId: typeof invoice.payment_intent === 'string' ? invoice.payment_intent : invoice.payment_intent?.id,
     });
   });
+
+  const invoicePiId = typeof invoice.payment_intent === 'string' ? invoice.payment_intent : invoice.payment_intent?.id;
+  if (invoicePiId) {
+    deferredActions.push(async () => {
+      try {
+        const stripe = await getStripeClient();
+        await stripe.paymentIntents.update(invoicePiId, {
+          description: `Payment for: ${invoiceDescription}`,
+        });
+        logger.info(`[Stripe Webhook] Updated payment intent ${invoicePiId} description to: ${invoiceDescription}`);
+      } catch (piUpdateErr: unknown) {
+        logger.warn(`[Stripe Webhook] Failed to update payment intent description for ${invoicePiId}`, { error: piUpdateErr });
+      }
+    });
+  }
   
   if (!invoice.subscription) {
     logger.info(`[Stripe Webhook] Skipping one-time invoice ${invoice.id} (no subscription)`);
