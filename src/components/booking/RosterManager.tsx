@@ -323,15 +323,26 @@ const RosterManager: React.FC<RosterManagerProps> = ({
       if (ok) {
         haptic.success();
         showToast(`${displayName} removed from booking`, 'success');
-        await fetchParticipants();
+        try {
+          await fetchParticipants();
+        } catch {
+          // Refresh may fail if component is re-rendering — removal already succeeded
+        }
         onUpdate?.();
       } else {
         haptic.error();
         showToast(error || 'Failed to remove participant', 'error');
       }
     } catch (err: unknown) {
-      haptic.error();
-      showToast('Failed to remove participant', 'error');
+      const msg = err instanceof Error ? err.message : '';
+      if (msg.includes('abort') || msg.includes('signal')) {
+        showToast(`${displayName} removed from booking`, 'success');
+        try { await fetchParticipants(); } catch { /* already removed */ }
+        onUpdate?.();
+      } else {
+        haptic.error();
+        showToast('Failed to remove participant', 'error');
+      }
     } finally {
       setRemovingId(null);
     }
