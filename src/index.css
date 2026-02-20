@@ -2006,13 +2006,6 @@ html.dark .border-accessible {
   opacity: 1;
 }
 
-/* Quick Tap Feedback Animation */
-@keyframes tap-feedback {
-  0% { transform: scale(1); }
-  50% { transform: scale(var(--tap-scale)); }
-  100% { transform: scale(1); }
-}
-
 /* Skeleton Shimmer - Standardized */
 @keyframes shimmer {
   0% {
