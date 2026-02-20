@@ -3,75 +3,106 @@
 ## Overview
 The Ever Club Members App is a private members club application for golf and wellness centers. Its primary purpose is to streamline golf simulator bookings, wellness service appointments, and club event management. The application aims to boost member engagement, optimize operational workflows, and provide a unified digital experience. The long-term vision is to establish it as a central digital hub for private members clubs, offering comprehensive tools for membership management, facility booking, and community building to enhance member satisfaction and operational efficiency.
 
+## The Prime Directive
+Before every task, you MUST:
+1. **Load Skills**: Identify the specific domain (e.g., `postgres-drizzle`, `ui-ux-pro-max`, `fee-calculation`) and load the relevant skill.
+2. **Boundary Check**: Verify the Camel-to-Snake data map below. Never assume column names.
+3. **Verification**: You are forbidden from claiming "Done" without running `verification-before-completion`. Evidence of success (logs/build status) is mandatory.
+
 ## User Preferences
-CRITICAL: Skill-Driven Development - We have an extensive library of custom skills installed. Before answering questions, debugging, or modifying any system, you MUST identify and load the relevant skill (e.g., booking-flow, stripe-webhook-flow, fee-calculation, react-dev). Rely on your skills as the single source of truth for architectural rules.
+- **Skill-Driven Development**: We have an extensive library of custom skills installed. Before answering questions, debugging, or modifying any system, you MUST identify and load the relevant skill (e.g., booking-flow, stripe-webhook-flow, fee-calculation, react-dev). Rely on your skills as the single source of truth for architectural rules.
+- **Communication Style**: The founder is non-technical. Always explain changes in plain English, focusing on the business/member impact. Avoid unnecessary technical jargon.
+- **Development Approach**: Prefer iterative development. Ask before making major architectural changes. Write functional, clean code (utilize your clean-code skill).
 
-CRITICAL: Mandatory Verification - You must NEVER complete a task or claim to be done without first explicitly invoking the verification-before-completion skill to check for Vite compilation errors, TypeScript warnings, and dev server health.
+### System Non-Negotiables
+- **Timezone**: All date/time operations must strictly use Pacific Time (`America/Los_Angeles`).
+- **Changelog**: Update `src/data/changelog.ts` after EVERY significant change.
+- **Audit Logging**: ALL staff actions must be logged using `logFromRequest()` from `server/core/auditLog.ts`.
+- **API/Frontend Consistency**: Ensure API response field names EXACTLY match frontend TypeScript interfaces.
 
-Communication Style - The founder is non-technical. Always explain changes in plain English, focusing on the business/member impact. Avoid unnecessary technical jargon.
+## Core Architecture & Data Flow
 
-Development Approach - Prefer iterative development. Ask before making major architectural changes. Write functional, clean code (utilize your clean-code skill).
+### Camel-to-Snake Boundary Map
+AI-generated casing mismatches are a critical source of bugs. Strictly adhere to this boundary map:
 
-System Non-Negotiables:
+| Layer | Casing Style | Enforcement Rule |
+| :--- | :--- | :--- |
+| **Database (PostgreSQL)** | `snake_case` | Tables and columns MUST be lowercase with underscores. |
+| **ORM (Drizzle)** | `camelCase` | Schemas MUST bridge DB columns to TS properties (e.g., `firstName: text('first_name')`). |
+| **API / JSON** | `camelCase` | All `res.json()` payloads must be camelCase. **NEVER** leak raw DB rows. |
+| **Frontend (React/TS)** | `camelCase` | Component props and state must be strictly typed. No `as any`. |
 
-Timezone: All date/time operations must strictly prioritize Pacific Time (America/Los_Angeles).
-
-Changelog: Update src/data/changelog.ts after EVERY significant change.
-
-Audit Logging: ALL staff actions must be logged using logFromRequest() from server/core/auditLog.ts.
-
-API/Frontend Consistency: Ensure API response field names EXACTLY match frontend TypeScript interfaces to avoid data mapping errors.
-
-## System Architecture & Implementation
-Our system architecture, UI/UX, and external integrations are strictly governed by our installed Agent Skills. Do not guess or assume implementation details—always load the associated skill first.
-
-UI/UX & Frontend
-Design System & Styling: Liquid Glass UI, Tailwind CSS v4, dark mode. Required Skills: ui-ux-pro-max, frontend-design, tailwind-design-system.
-
-Interactions & Motion: Spring-physics, drag-to-dismiss. Required Skills: interaction-design, auto-animate.
-
-React & Framework: React 19, Vite, state management (Zustand/TanStack). Required Skills: react-dev, vite, vercel-react-best-practices.
-
-Core Domain & Technical Implementation
-Project Map: Always consult project-architecture before touching, moving, or planning files.
-
-Booking & Scheduling: "Request & Hold" model, unified participants, calendar sync. Required Skills: booking-flow, booking-import-standards.
-
-Fees & Billing: Unified fee service, dynamic pricing, prepayment, guest fees. Required Skills: fee-calculation, billing-automation.
-
-Database & Data Integrity: PostgreSQL, Supabase Realtime, Drizzle ORM. Required Skills: postgres-drizzle, supabase-postgres-best-practices, data-integrity-monitoring.
-
-Member Lifecycle & Check-In: Tiers, QR/NFC check-in, onboarding. Required Skills: member-lifecycle, checkin-flow, guest-pass-system.
-
-Maintenance: Required Skills: scheduler-jobs.
-
-External Dependencies & Integrations
-Payments (Stripe): Terminal, subscriptions. Required Skills: stripe-integration, stripe-webhook-flow.
-
-CRM (HubSpot): Two-way sync, form submissions. Required Skills: hubspot-integration, hubspot-sync.
-
-Communications: In-app, push, email. Required Skills: resend, notification-system, email-best-practices.
-
-Other: Trackman (Booking CSV/webhooks), Eventbrite, Google Sheets, OpenAI Vision (ID scanning).
-
-Future Considerations
-Consult strategy-advisor and brainstorming before proposing major architectural shifts (e.g., Stripe Agent Toolkit integration).
-
-### Data Flow & Type Casing
-AI-generated casing mismatches are a critical source of bugs. You must strictly adhere to these boundaries:
-- **Database Level**: PostgreSQL strictly uses `snake_case` for all tables and columns.
-- **Application Level**: All TypeScript/JavaScript code (both frontend and backend) strictly uses `camelCase`.
-- **The Drizzle Boundary**: Drizzle ORM is responsible for the translation. Always define schemas mapping `snake_case` DB columns to `camelCase` TS properties (e.g., `firstName: text('first_name')`).
-- **The API Boundary**: All backend API responses MUST be serialized into `camelCase` before being sent to the client. Never leak `snake_case` database columns into React frontend components.
+Additional rules:
 - **TypeScript Mismatches**: Never forcefully cast types with `as any`. If frontend interfaces and backend Drizzle inferred types mismatch, fix the underlying schema or DTO rather than bypassing the compiler.
-- **External Property Mappings (HubSpot)**: Never hallucinate CRM internal property names (e.g., `membership_status`, `billing_provider`). These must exactly match HubSpot's strict internal naming conventions. Always consult the hubspot-sync skill for the exact, up-to-date property dictionary before writing sync payloads.
+- **External Property Mappings (HubSpot)**: Never hallucinate CRM internal property names. Always consult the `hubspot-sync` skill for the exact, up-to-date property dictionary before writing sync payloads.
 
-### Environment & Reference Variables
-Do not guess or hallucinate environment variables. We use specific naming conventions across the stack. Refer to the Replit Secrets and Configurations panel for actual values, but strictly use these keys in the code:
-Frontend (Vite/React): import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_ANON_KEY
+### SQL Security
+- All database queries MUST use Drizzle ORM query builders or parameterized `sql` template literals.
+- Raw string-interpolated SQL is forbidden. This was enforced via a 51-file refactoring pass (Feb 2026).
 
-Backend/Server Core: process.env.SUPABASE_URL, process.env.SERVICE_ROLE_KEY, process.env.SESSION_SECRET
+## UI/UX & Interaction Standards
+We use a **Liquid Glass UI** system. Follow these rules to ensure consistency:
 
-Feature Flags & App State: process.env.DEV_LOGIN_ENABLED, process.env.ENABLE_TEST_LOGIN, process.env.ENABLE_CORPORATE_BILLING, process.env.NODE_ENV
+### Sheet/Modal Design
+- **Header**: Contains title and close "X".
+- **Body**: Scrollable area for data entry (e.g., Player Slots).
+- **Sticky Footer**: Fixed at bottom. Contains Primary Action and Secondary Actions.
 
-Integrations: process.env.HUBSPOT_PORTAL_ID, process.env.HUBSPOT_PRIVATE_APP_TOKEN, process.env.RESEND_API_KEY, process.env.VAPID_PUBLIC_KEY, process.env.VAPID_PRIVATE_KEY
+### Button Hierarchy & Logic
+- **Primary Action**: Determined by payment status — "Collect" if balance > $0, "Check In" if $0 balance.
+- **Secondary Actions**: Reschedule and Cancel, rendered as ghost text links below the primary button.
+- **Destructive Actions**: "Void All Payments" lives inside the payment drawer, not the main footer.
+- Buttons inside scrollable bodies MUST have `type="button"` to avoid accidental form submission.
+- Only the final action in the Sticky Footer should handle the sheet's lifecycle.
+
+### Fee Recalculation
+- All roster changes (add/remove guest, link/unlink member, player count update) trigger **automatic server-side fee recalculation**. There is no manual "Recalculate" button — fees update in real time.
+- Visual Feedback: Use subtle loading states (opacity or skeleton) in the Financial Summary while background math is updating.
+
+## System Architecture & Skill Map
+Our system architecture, UI/UX, and external integrations are strictly governed by our installed Agent Skills. Do not guess or assume implementation details — always load the associated skill first.
+
+### UI/UX & Frontend
+- **Design System & Styling**: Liquid Glass UI, Tailwind CSS v4, dark mode. Skills: `ui-ux-pro-max`, `frontend-design`, `tailwind-design-system`.
+- **Interactions & Motion**: Spring-physics, drag-to-dismiss. Skills: `interaction-design`, `auto-animate`.
+- **React & Framework**: React 19, Vite, state management (Zustand/TanStack). Skills: `react-dev`, `vite`, `vercel-react-best-practices`.
+
+### Core Domain
+- **Project Map**: Always consult `project-architecture` before touching, moving, or planning files.
+- **Booking & Scheduling**: "Request & Hold" model, unified participants, calendar sync. Skills: `booking-flow`, `booking-import-standards`.
+- **Fees & Billing**: Unified fee service, dynamic pricing, prepayment, guest fees. Skills: `fee-calculation`, `billing-automation`.
+- **Database & Data Integrity**: PostgreSQL, Supabase Realtime, Drizzle ORM. Skills: `postgres-drizzle`, `supabase-postgres-best-practices`, `data-integrity-monitoring`.
+- **Member Lifecycle & Check-In**: Tiers, QR/NFC check-in, onboarding. Skills: `member-lifecycle`, `checkin-flow`, `guest-pass-system`.
+- **Maintenance**: Skills: `scheduler-jobs`.
+
+### External Integrations
+- **Stripe**: Terminal, subscriptions. The "Stripe Wins" rule applies — all billing authority comes from Stripe webhooks. Skills: `stripe-integration`, `stripe-webhook-flow`.
+- **HubSpot**: Two-way sync, form submissions. Never guess internal property names — consult `hubspot-sync` skill dictionary. Skills: `hubspot-integration`, `hubspot-sync`.
+- **Communications**: In-app, push, email via Resend. All inbound emails handled via webhooks targeting `/api/webhooks/resend-inbound`. Skills: `resend`, `notification-system`, `email-best-practices`.
+- **Other**: Trackman (Booking CSV/webhooks), Eventbrite, Google Sheets, OpenAI Vision (ID scanning).
+
+### Future Considerations
+Consult `strategy-advisor` and `brainstorming` before proposing major architectural shifts.
+
+## Environment & Reference Variables
+Do not guess or hallucinate environment variables. Use these exact keys:
+
+- **Frontend (Vite/React)**: `import.meta.env.VITE_SUPABASE_URL`, `import.meta.env.VITE_SUPABASE_ANON_KEY`
+- **Backend/Server Core**: `process.env.SUPABASE_URL`, `process.env.SERVICE_ROLE_KEY`, `process.env.SESSION_SECRET`
+- **Feature Flags**: `process.env.DEV_LOGIN_ENABLED`, `process.env.ENABLE_TEST_LOGIN`, `process.env.ENABLE_CORPORATE_BILLING`, `process.env.NODE_ENV`
+- **Integrations**: `process.env.HUBSPOT_PORTAL_ID`, `process.env.HUBSPOT_PRIVATE_APP_TOKEN`, `process.env.RESEND_API_KEY`, `process.env.VAPID_PUBLIC_KEY`, `process.env.VAPID_PRIVATE_KEY`
+
+## Pre-Completion Checklist
+Before marking any task as done:
+- [ ] No `snake_case` properties are present in the React Frontend.
+- [ ] No `ECONNREFUSED` errors in the server logs.
+- [ ] `npm run build` passes with zero TypeScript errors.
+- [ ] All staff actions are logged via `logFromRequest()`.
+- [ ] Vite dev server is running without compilation errors.
+
+## Recent Changes
+- **Feb 20, 2026**: Merged engineering standards into replit.md — added Prime Directive, Camel-to-Snake boundary table, UI/UX interaction standards, pre-completion checklist.
+- **Feb 20, 2026**: Removed manual "Recalculate Fees" button and deferred fee recalculation pattern. Server now auto-recalculates fees immediately on every roster change.
+- **Feb 20, 2026**: Finalized Booking Details sheet layout — smart primary button logic (Collect if unpaid, Check In if $0 balance), secondary actions as ghost text links, Void All Payments inside payment drawer.
+- **Feb 20, 2026**: Fixed all missing `type="button"` attributes in PaymentSection.tsx.
+- **Feb 2026**: Completed 51-file SQL security refactoring — all raw SQL replaced with Drizzle ORM query builders or parameterized sql template literals. Fixed 4 snake_case-to-camelCase boundary violations in API responses.
