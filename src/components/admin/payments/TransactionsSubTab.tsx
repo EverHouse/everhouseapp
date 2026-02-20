@@ -690,10 +690,12 @@ const FutureBookingsSection: React.FC<SectionProps> = ({ onClose, variant = 'mod
       <UnifiedBookingSheet
         isOpen={bookingSheet.isOpen}
         onClose={() => setBookingSheet({ isOpen: false, bookingId: null })}
+        mode="manage"
         bookingId={bookingSheet.bookingId || undefined}
         onSuccess={() => {
           setBookingSheet({ isOpen: false, bookingId: null });
         }}
+        onRosterUpdated={() => {}}
       />
     </>
   );
