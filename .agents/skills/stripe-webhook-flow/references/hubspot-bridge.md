@@ -34,18 +34,18 @@ Webhook handlers do NOT call HubSpot directly inside the database transaction. I
 | `billing_provider` | `users.billing_provider` | `DB_BILLING_PROVIDER_TO_HUBSPOT` map (e.g., `stripe` → `stripe`, `family_addon` → `stripe`, `comped` → `Comped`) |
 | `membership_tier` | `users.tier` | `denormalizeTierForHubSpot()` via `DB_TIER_TO_HUBSPOT` (e.g., `core` → `Core Membership`, `premium-founding` → `Premium Membership Founding Members`) |
 | `lifecyclestage` | derived from status | Active/trialing/past_due → `customer`; all others → `other` |
-| `member_since` | `users.join_date` | ISO date string, midnight UTC |
-| `billing_group_role` | webhook context | `Primary` or `Sub-member` |
+| `membership_start_date` | `users.join_date` | Midnight UTC timestamp (milliseconds as string) |
+| `membership_billing_type` | webhook context | `Primary` or `Sub-member` |
 
 Stripe-specific contact fields (passed when available):
 
 | HubSpot Property | Source |
 |---|---|
 | `stripe_customer_id` | Stripe customer ID |
-| `stripe_created_date` | Stripe customer creation date |
-| `stripe_delinquent` | Stripe customer delinquent flag |
+| `stripe_created_date` | Stripe customer creation date (midnight UTC timestamp in milliseconds) |
+| `stripe_delinquent` | Stripe customer delinquent flag (`'true'` / `'false'` string) |
 | `stripe_discount_id` | Active Stripe discount/coupon ID |
-| `stripe_pricing_interval` | monthly/yearly from subscription price |
+| `stripe_pricing_interval_of_last_active_subscription` | `monthly` or `yearly` from subscription price |
 
 `findOrCreateHubSpotContact(email, firstName, lastName, phone, tier)` creates or finds the contact in HubSpot. Searches by email first; creates if not found.
 

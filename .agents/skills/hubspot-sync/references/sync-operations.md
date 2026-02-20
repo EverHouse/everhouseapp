@@ -428,3 +428,91 @@ group-lessons, group_lessons → Group Lessons Membership
 - **ACTIVE_STATUSES:** `['active', 'trialing', 'past_due']` — statuses considered "in good standing".
 - **CHURNED_STATUSES:** `['terminated', 'cancelled', 'non-member']` — statuses indicating member has left.
 - **INACTIVE_STATUSES:** `['pending', 'declined', 'suspended', 'expired', 'froze', 'frozen']` — statuses with billing or account issues.
+
+## Property Dictionary — Ground Truth Reference
+
+Source of truth: `server/core/hubspot/constants.ts` and `server/core/hubspot/stages.ts`. Do NOT guess or hallucinate property names. Use ONLY the exact names listed below.
+
+### HubSpot Contact Properties Written by syncMemberToHubSpot
+
+These are the exact HubSpot API property keys set in `syncMemberToHubSpot` (in `server/core/hubspot/stages.ts`):
+
+| HubSpot Property Key (exact) | Source | Transform / Notes |
+|---|---|---|
+| `membership_status` | `users.membership_status` | Via `DB_STATUS_TO_HUBSPOT_STATUS` map. Skipped for Mindbody-billed members. |
+| `lifecyclestage` | Derived from status | `customer` if status in [active, trialing, past_due]; `other` otherwise |
+| `billing_provider` | `users.billing_provider` | Via `DB_BILLING_PROVIDER_TO_HUBSPOT` map. Fallback: `'Manual'` |
+| `membership_tier` | `users.tier` | Via `denormalizeTierForHubSpot()` / `DB_TIER_TO_HUBSPOT` map |
+| `membership_start_date` | `users.join_date` | Midnight UTC timestamp (milliseconds as string) |
+| `stripe_customer_id` | Stripe customer ID | Only in live Stripe environment |
+| `stripe_created_date` | Stripe customer creation | Midnight UTC timestamp (milliseconds as string). Only in live Stripe environment |
+| `stripe_delinquent` | Stripe delinquent flag | `'true'` or `'false'` string. Only in live Stripe environment |
+| `stripe_discount_id` | Active Stripe discount/coupon ID | Only in live Stripe environment |
+| `stripe_pricing_interval_of_last_active_subscription` | Subscription price interval | `monthly` or `yearly`. Only in live Stripe environment |
+| `membership_billing_type` | Billing group role | `Primary` or `Sub-member` |
+
+### HubSpot Contact Properties Read by syncAllMembersFromHubSpot
+
+These are the exact HubSpot property keys fetched during inbound member sync (in `server/core/memberSync.ts`):
+
+| HubSpot Property Key (exact) | Local DB Column | Notes |
+|---|---|---|
+| `firstname` | `first_name` | COALESCE (only overwrite if non-null) |
+| `lastname` | `last_name` | COALESCE |
+| `email` | `email` | Primary key for upsert, always lowercased |
+| `phone` | `phone` | COALESCE |
+| `membership_tier` | `tier` | Normalized via `normalizeTierName`; unrecognized tiers preserved |
+| `membership_status` | `membership_status` | Lowercased. Skipped for Stripe-billed and visitor users |
+| `membership_discount_reason` | `discount_code` | |
+| `mindbody_client_id` | `mindbody_client_id` | |
+| `membership_start_date` | `join_date` | Preferred over `createdate` |
+| `createdate` | (fallback for join_date) | Used when `membership_start_date` is absent |
+| `eh_email_updates_opt_in` | `email_opt_in` | Parsed as boolean |
+| `eh_sms_updates_opt_in` | `sms_opt_in` | |
+| `hs_sms_promotional` | `sms_promo_opt_in` | Granular SMS consent |
+| `hs_sms_customer_updates` | `sms_transactional_opt_in` | |
+| `hs_sms_reminders` | `sms_reminders_opt_in` | |
+| `address` | `street_address` | COALESCE |
+| `city` | `city` | COALESCE |
+| `state` | `state` | COALESCE |
+| `zip` | `zip_code` | COALESCE |
+| `date_of_birth` | `date_of_birth` | YYYY-MM-DD format. COALESCE |
+| `stripe_delinquent` | `stripe_delinquent` | |
+| `hs_calculated_full_name` | (display only) | |
+| `company` | (display only) | |
+| `membership_notes` | (notes sync) | Hashed for change detection |
+| `message` | (notes sync) | Combined with `membership_notes` |
+| `total_visit_count` | (display only) | |
+| `hs_merged_object_ids` | `user_linked_emails` | Batch-fetched for email dedup |
+
+### Canonical DB Status Values
+
+Valid values for `users.membership_status` in the database:
+
+`active`, `trialing`, `past_due`, `suspended`, `frozen`, `paused`, `cancelled`, `terminated`, `pending`, `inactive`, `archived`, `non-member`, `merged`, `expired`, `former_member`, `deleted`
+
+### Canonical DB Billing Provider Values
+
+Valid values for `users.billing_provider` in the database:
+
+`stripe`, `mindbody`, `manual`, `comped`, `none`, `family_addon`
+
+### Canonical DB Tier Slugs
+
+Normalized tier values stored in `users.tier`:
+
+`core`, `core-founding`, `premium`, `premium-founding`, `social`, `social-founding`, `vip`, `corporate`, `group-lessons`
+
+### HubSpot Contact membership_status Enum Values
+
+Valid enum values for the `membership_status` property on HubSpot contacts (TypeScript type: `ContactMembershipStatus`):
+
+`Active`, `trialing`, `past_due`, `Pending`, `Declined`, `Suspended`, `Expired`, `Froze`, `Terminated`, `Non-Member`
+
+Note the mixed casing — this matches exactly what HubSpot expects.
+
+### HubSpot membership_tier Dropdown Labels
+
+Valid values for the `membership_tier` property on HubSpot contacts:
+
+`Core Membership`, `Core Membership Founding Members`, `Premium Membership`, `Premium Membership Founding Members`, `Social Membership`, `Social Membership Founding Members`, `VIP Membership`, `Corporate Membership`, `Group Lessons Membership`

@@ -233,3 +233,61 @@ Stripe webhooks use deduplication and priority-based ordering (`server/core/stri
   - Special case: `subscription.created` after `subscription.deleted` is blocked to prevent ghost reactivation
 - All DB mutations run in transactions; non-critical side effects (HubSpot sync, notifications, emails) are deferred and executed after the transaction commits
 - Failed deferred actions are logged but do not roll back the core state change
+
+## Property Dictionary — Ground Truth Reference
+
+Do NOT guess or hallucinate property names or enum values. Use ONLY the exact values listed below. Source of truth: `server/core/hubspot/constants.ts`.
+
+### DB membership_status Values
+
+Valid values for `users.membership_status` in the database:
+
+| DB Value | Meaning | HubSpot Equivalent |
+|---|---|---|
+| `active` | Paying member with full access | `Active` |
+| `trialing` | Free trial member (7-day Stripe trial) | `trialing` |
+| `past_due` | Payment failed; grace period; still has access | `past_due` |
+| `suspended` | Admin-initiated pause | `Suspended` |
+| `frozen` | Stripe `customer.subscription.paused` automatic | `Froze` |
+| `paused` | Trial ended without conversion | (no HubSpot equivalent) |
+| `cancelled` | Subscription deleted in Stripe | `Terminated` |
+| `terminated` | Grace period expired after 3 days | `Terminated` |
+| `pending` | Stripe subscription incomplete | `Pending` |
+| `inactive` | Catch-all deactivation | `Suspended` |
+| `archived` | Soft-deleted by staff | (not synced) |
+| `non-member` | Tier cleared by admin | `Non-Member` |
+| `merged` | Duplicate merged into another user | (not synced) |
+| `expired` | Membership expired | `Expired` |
+| `former_member` | Former member | `Terminated` |
+| `deleted` | Deleted | `Terminated` |
+
+### DB billing_provider Values
+
+| DB Value | HubSpot Equivalent | Description |
+|---|---|---|
+| `stripe` | `stripe` | Stripe-managed billing |
+| `mindbody` | `mindbody` | Legacy Mindbody billing |
+| `manual` | `manual` | Staff-managed billing |
+| `comped` | `Comped` | Complimentary membership |
+| `none` | `None` | No billing provider |
+| `family_addon` | `stripe` | Family add-on (maps to Stripe in HubSpot) |
+
+### Status Categories
+
+- **ACTIVE_STATUSES:** `['active', 'trialing', 'past_due']`
+- **CHURNED_STATUSES:** `['terminated', 'cancelled', 'non-member']`
+- **INACTIVE_STATUSES:** `['pending', 'declined', 'suspended', 'expired', 'froze', 'frozen']`
+
+### DB Tier Slugs → HubSpot Labels
+
+| DB Slug | HubSpot Label |
+|---|---|
+| `core` | `Core Membership` |
+| `core-founding` | `Core Membership Founding Members` |
+| `premium` | `Premium Membership` |
+| `premium-founding` | `Premium Membership Founding Members` |
+| `social` | `Social Membership` |
+| `social-founding` | `Social Membership Founding Members` |
+| `vip` | `VIP Membership` |
+| `corporate` | `Corporate Membership` |
+| `group-lessons` | `Group Lessons Membership` |
