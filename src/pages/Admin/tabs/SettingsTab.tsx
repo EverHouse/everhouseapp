@@ -102,11 +102,16 @@ const SettingsTab: React.FC = () => {
         body: JSON.stringify({ settings: payload }),
       });
     },
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: ['settings'] });
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['settings'] });
       setHasChanges(false);
       setSuccess('Settings saved successfully');
       setTimeout(() => setSuccess(null), 3000);
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['settings'] });
     },
   });
 

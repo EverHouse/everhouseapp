@@ -220,8 +220,10 @@ const TiersTab: React.FC = () => {
                 body: JSON.stringify(payload),
             });
         },
+        onMutate: async () => {
+            await queryClient.cancelQueries({ queryKey: ['membership-tiers'] });
+        },
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['membership-tiers'] });
             setSuccessMessage(`Tier ${isCreating ? 'created' : 'updated'} successfully`);
             setTimeout(() => {
                 setIsEditing(false);
@@ -231,6 +233,9 @@ const TiersTab: React.FC = () => {
         },
         onError: (err: Error) => {
             setError((err instanceof Error ? err.message : String(err)) || `Failed to ${isCreating ? 'create' : 'save'} tier`);
+        },
+        onSettled: () => {
+            queryClient.invalidateQueries({ queryKey: ['membership-tiers'] });
         },
     });
 

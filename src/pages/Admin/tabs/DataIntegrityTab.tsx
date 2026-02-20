@@ -388,10 +388,12 @@ const DataIntegrityTab: React.FC = () => {
         duration: params.duration,
         reason: params.reason,
       }),
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: ['data-integrity'] });
+    },
     onSuccess: (_data, variables) => {
       showToast('Issue ignored successfully', 'success');
       closeIgnoreModal();
-      queryClient.invalidateQueries({ queryKey: ['data-integrity', 'ignores'] });
       queryClient.setQueryData(['data-integrity', 'cached'], (old: CachedResultsResponse | undefined) => {
         if (!old?.hasCached) return old;
         return {
@@ -411,18 +413,26 @@ const DataIntegrityTab: React.FC = () => {
     onError: (err: Error) => {
       showToast((err instanceof Error ? err.message : String(err)) || 'Failed to ignore issue', 'error');
     },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['data-integrity', 'ignores'] });
+    },
   });
 
   const unignoreIssueMutation = useMutation({
     mutationFn: (issueKey: string) => 
       deleteWithCredentials<{ success: boolean }>(`/api/data-integrity/ignore/${encodeURIComponent(issueKey)}`),
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: ['data-integrity'] });
+    },
     onSuccess: () => {
       showToast('Issue un-ignored successfully', 'success');
-      queryClient.invalidateQueries({ queryKey: ['data-integrity', 'ignores'] });
-      queryClient.invalidateQueries({ queryKey: ['data-integrity', 'cached'] });
     },
     onError: (err: Error) => {
       showToast((err instanceof Error ? err.message : String(err)) || 'Failed to un-ignore issue', 'error');
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['data-integrity', 'ignores'] });
+      queryClient.invalidateQueries({ queryKey: ['data-integrity', 'cached'] });
     },
   });
 
@@ -433,10 +443,12 @@ const DataIntegrityTab: React.FC = () => {
         duration: params.duration,
         reason: params.reason,
       }),
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: ['data-integrity'] });
+    },
     onSuccess: (data, variables) => {
       showToast(`${data.total} issues excluded successfully`, 'success');
       closeBulkIgnoreModal();
-      queryClient.invalidateQueries({ queryKey: ['data-integrity', 'ignores'] });
       const ignoredKeys = new Set(variables.issueKeys);
       queryClient.setQueryData(['data-integrity', 'cached'], (old: CachedResultsResponse | undefined) => {
         if (!old?.hasCached) return old;
@@ -456,6 +468,9 @@ const DataIntegrityTab: React.FC = () => {
     },
     onError: (err: Error) => {
       showToast((err instanceof Error ? err.message : String(err)) || 'Failed to exclude issues', 'error');
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['data-integrity', 'ignores'] });
     },
   });
 
