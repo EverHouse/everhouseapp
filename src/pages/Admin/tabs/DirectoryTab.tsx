@@ -1879,21 +1879,7 @@ const DirectoryTab: React.FC = () => {
                                                             </span>
                                                         )}
                                                     </div>
-                                                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                                                        {m.email}
-                                                        {memberTab === 'active' && m.billingProvider && (
-                                                            <span className={`ml-1.5 inline-flex px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${
-                                                                m.billingProvider === 'stripe' ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300' :
-                                                                m.billingProvider === 'mindbody' ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300' :
-                                                                m.billingProvider === 'comped' ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300' :
-                                                                m.billingProvider === 'family_addon' ? 'bg-pink-100 dark:bg-pink-900/30 text-pink-700 dark:text-pink-300' :
-                                                                m.billingProvider === 'manual' ? 'bg-gray-100 dark:bg-gray-700/30 text-gray-600 dark:text-gray-300' :
-                                                                'bg-gray-100 dark:bg-gray-700/30 text-gray-600 dark:text-gray-300'
-                                                            }`}>
-                                                                {m.billingProvider === 'family_addon' ? 'Family' : m.billingProvider}
-                                                            </span>
-                                                        )}
-                                                    </p>
+                                                    <p className="text-xs text-gray-500 dark:text-gray-400">{m.email}</p>
                                                     {m.phone && <p className="text-xs text-gray-500 dark:text-gray-400">{formatPhoneNumber(m.phone)}</p>}
                                                 </div>
                                                 <div className="text-right">
@@ -1918,6 +1904,18 @@ const DirectoryTab: React.FC = () => {
                                                     {m.membershipStatus && (
                                                         <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${getMemberStatusBadgeClass(m.membershipStatus)}`}>
                                                             {getMemberStatusLabel(m.membershipStatus)}
+                                                        </span>
+                                                    )}
+                                                    {memberTab === 'active' && m.billingProvider && (
+                                                        <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${
+                                                            m.billingProvider === 'stripe' ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300' :
+                                                            m.billingProvider === 'mindbody' ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300' :
+                                                            m.billingProvider === 'comped' ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300' :
+                                                            m.billingProvider === 'family_addon' ? 'bg-pink-100 dark:bg-pink-900/30 text-pink-700 dark:text-pink-300' :
+                                                            m.billingProvider === 'manual' ? 'bg-gray-100 dark:bg-gray-700/30 text-gray-600 dark:text-gray-300' :
+                                                            'bg-gray-100 dark:bg-gray-700/30 text-gray-600 dark:text-gray-300'
+                                                        }`}>
+                                                            {m.billingProvider === 'family_addon' ? 'Family' : m.billingProvider}
                                                         </span>
                                                     )}
                                                     {isAdmin && memberTab === 'active' && !getDisplayTier(m) && !isMemberPendingUpdate(m.email) && (
