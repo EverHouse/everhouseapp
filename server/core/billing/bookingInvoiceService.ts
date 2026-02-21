@@ -296,6 +296,55 @@ export async function finalizeAndPayInvoice(params: {
     };
   }
 
+  const existingPiResult = await pool.query(
+    `SELECT spi.stripe_payment_intent_id, spi.amount_cents
+     FROM stripe_payment_intents spi
+     WHERE spi.booking_id = $1 AND spi.status = 'succeeded'
+     AND spi.purpose IN ('booking_fee', 'overage_fee')
+     ORDER BY spi.created_at DESC LIMIT 1`,
+    [bookingId]
+  );
+
+  if (existingPiResult.rows.length > 0) {
+    const existingPi = existingPiResult.rows[0];
+    try {
+      const stripePi = await stripe.paymentIntents.retrieve(existingPi.stripe_payment_intent_id);
+      const pmTypes = stripePi.payment_method_types || [];
+      const isTerminal = pmTypes.includes('card_present') || pmTypes.includes('interac_present');
+      const invoiceTotal = invoice.amount_due || invoice.total || 0;
+
+      if (isTerminal && stripePi.status === 'succeeded' && invoiceTotal > 0 && stripePi.amount >= invoiceTotal) {
+        logger.info('[BookingInvoice] Terminal payment already covers invoice, settling OOB instead of new charge', {
+          extra: { bookingId, existingPiId: existingPi.stripe_payment_intent_id, piAmount: stripePi.amount, invoiceTotal }
+        });
+
+        const oobResult = await finalizeInvoicePaidOutOfBand({
+          bookingId,
+          terminalPaymentIntentId: existingPi.stripe_payment_intent_id,
+          paidVia: 'terminal',
+        });
+
+        if (oobResult.success) {
+          return {
+            invoiceId,
+            paymentIntentId: existingPi.stripe_payment_intent_id,
+            clientSecret: '',
+            status: 'succeeded',
+            paidInFull: true,
+            hostedInvoiceUrl: oobResult.hostedInvoiceUrl || null,
+            invoicePdf: oobResult.invoicePdf || null,
+            amountFromBalance: 0,
+            amountCharged: 0,
+          };
+        }
+      }
+    } catch (piCheckErr: unknown) {
+      logger.warn('[BookingInvoice] Could not verify existing PI for terminal detection', {
+        extra: { bookingId, piId: existingPi.stripe_payment_intent_id, error: getErrorMessage(piCheckErr) }
+      });
+    }
+  }
+
   if (invoice.status !== 'draft' && invoice.status !== 'open') {
     throw new Error(`Invoice ${invoiceId} is in unexpected status: ${invoice.status}`);
   }
@@ -420,7 +469,8 @@ export async function finalizeInvoicePaidOutOfBand(params: {
 
     let openInvoice: Stripe.Invoice;
     if (invoice.status === 'draft') {
-      openInvoice = await stripe.invoices.finalizeInvoice(invoiceId);
+      await stripe.invoices.update(invoiceId, { auto_advance: false });
+      openInvoice = await stripe.invoices.finalizeInvoice(invoiceId, { auto_advance: false });
     } else {
       openInvoice = invoice;
     }
@@ -439,6 +489,25 @@ export async function finalizeInvoicePaidOutOfBand(params: {
               invoicePdf: freshInvoice.invoice_pdf,
             };
           }
+        } else if (existingPi.status === 'processing') {
+          logger.warn('[BookingInvoice] Auto-generated PI is processing, waiting before OOB payment', {
+            extra: { piId, invoiceId, bookingId }
+          });
+          await new Promise(resolve => setTimeout(resolve, 3000));
+          const recheckPi = await stripe.paymentIntents.retrieve(piId);
+          if (recheckPi.status === 'succeeded') {
+            const freshInvoice = await stripe.invoices.retrieve(invoiceId);
+            if (freshInvoice.status === 'paid') {
+              return {
+                success: true,
+                invoiceId,
+                hostedInvoiceUrl: freshInvoice.hosted_invoice_url,
+                invoicePdf: freshInvoice.invoice_pdf,
+              };
+            }
+          } else if (recheckPi.status !== 'canceled') {
+            await stripe.paymentIntents.cancel(piId);
+          }
         } else if (existingPi.status !== 'canceled') {
           await stripe.paymentIntents.cancel(piId);
         }
@@ -447,6 +516,19 @@ export async function finalizeInvoicePaidOutOfBand(params: {
           extra: { piId, error: getErrorMessage(cancelErr) }
         });
       }
+    }
+
+    const preOobInvoice = await stripe.invoices.retrieve(invoiceId);
+    if (preOobInvoice.status === 'paid') {
+      logger.info('[BookingInvoice] Invoice already paid before OOB step, skipping', {
+        extra: { bookingId, invoiceId }
+      });
+      return {
+        success: true,
+        invoiceId,
+        hostedInvoiceUrl: preOobInvoice.hosted_invoice_url,
+        invoicePdf: preOobInvoice.invoice_pdf,
+      };
     }
 
     await stripe.invoices.pay(invoiceId, { paid_out_of_band: true });

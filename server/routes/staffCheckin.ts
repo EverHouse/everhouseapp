@@ -25,6 +25,8 @@ import { finalizeInvoicePaidOutOfBand, voidBookingInvoice, syncBookingInvoice, g
 
 const router = Router();
 
+const settlementInFlight = new Set<number>();
+
 async function getMemberDisplayName(email: string): Promise<string> {
   try {
     const normalizedEmail = email.toLowerCase();
@@ -45,6 +47,12 @@ async function getMemberDisplayName(email: string): Promise<string> {
 async function settleBookingInvoiceAfterCheckin(bookingId: number, sessionId: number | null): Promise<void> {
   if (!sessionId) return;
   
+  if (settlementInFlight.has(bookingId)) {
+    logger.info('[StaffCheckin] Settlement already in-flight for booking, skipping duplicate', { extra: { bookingId } });
+    return;
+  }
+  settlementInFlight.add(bookingId);
+
   try {
     const resourceResult = await pool.query(
       `SELECT r.type FROM resources r JOIN booking_requests br ON br.resource_id = r.id WHERE br.id = $1`,
@@ -112,6 +120,8 @@ async function settleBookingInvoiceAfterCheckin(bookingId: number, sessionId: nu
     logger.warn('[StaffCheckin] Non-blocking: settleBookingInvoiceAfterCheckin failed', {
       extra: { bookingId, sessionId, error: (err as Error).message }
     });
+  } finally {
+    settlementInFlight.delete(bookingId);
   }
 }
 
