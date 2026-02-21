@@ -20,7 +20,6 @@ import {
   cancelPaymentIntent,
   getOrCreateStripeCustomer,
   createInvoiceWithLineItems,
-  createBookingFeeInvoice,
   type CartLineItem,
   type BookingFeeLineItem
 } from '../../core/stripe';
@@ -40,7 +39,7 @@ import { broadcastBillingUpdate, sendNotificationToUser } from '../../core/webso
 import { alertOnExternalServiceError } from '../../core/errorAlerts';
 import { getErrorMessage, getErrorCode } from '../../utils/errorUtils';
 import { normalizeTierName } from '../../utils/tierUtils';
-import { getBookingInvoiceId, finalizeAndPayInvoice } from '../../core/billing/bookingInvoiceService';
+import { getBookingInvoiceId, finalizeAndPayInvoice, createDraftInvoiceForBooking, finalizeInvoicePaidOutOfBand } from '../../core/billing/bookingInvoiceService';
 
 interface DbMemberRow {
   id: string;
@@ -380,15 +379,21 @@ router.post('/api/stripe/create-payment-intent', isStaffOrAdmin, async (req: Req
 
       let invoiceResult;
       try {
-        invoiceResult = await createBookingFeeInvoice({
-          customerId: stripeCustomerId,
-          bookingId,
-          sessionId,
-          trackmanBookingId: trackmanId ? String(trackmanId) : null,
-          feeLineItems,
-          metadata,
-          purpose: 'booking_fee',
-        });
+        const existingInvoiceId = await getBookingInvoiceId(bookingId);
+        if (existingInvoiceId) {
+          invoiceResult = await finalizeAndPayInvoice({ bookingId });
+        } else {
+          await createDraftInvoiceForBooking({
+            customerId: stripeCustomerId,
+            bookingId,
+            sessionId,
+            trackmanBookingId: trackmanId ? String(trackmanId) : null,
+            feeLineItems,
+            metadata,
+            purpose: 'booking_fee',
+          });
+          invoiceResult = await finalizeAndPayInvoice({ bookingId });
+        }
       } catch (stripeErr: unknown) {
         if (snapshotId) {
           await db.execute(sql`DELETE FROM booking_fee_snapshots WHERE id = ${snapshotId}`);
@@ -1229,7 +1234,7 @@ router.post('/api/stripe/staff/charge-saved-card', isStaffOrAdmin, async (req: R
     }
     
     if (!invoiceResult) {
-      invoiceResult = await createBookingFeeInvoice({
+      await createDraftInvoiceForBooking({
         customerId: member.stripe_customer_id,
         bookingId: resolvedBookingId,
         sessionId: resolvedSessionId,
@@ -1244,8 +1249,11 @@ router.post('/api/stripe/staff/charge-saved-card', isStaffOrAdmin, async (req: R
           participantIds: JSON.stringify(participantIds),
         },
         purpose: 'booking_fee',
-        offSession: true,
+      });
+      invoiceResult = await finalizeAndPayInvoice({
+        bookingId: resolvedBookingId,
         paymentMethodId: paymentMethod.id,
+        offSession: true,
       });
     }
 
@@ -1272,10 +1280,10 @@ router.post('/api/stripe/staff/charge-saved-card', isStaffOrAdmin, async (req: R
 
         await txClient.query(
           `INSERT INTO stripe_payment_intents 
-            (payment_intent_id, member_email, member_id, amount_cents, status, purpose, description, created_by)
-           VALUES ($1, $2, $3, $4, 'succeeded', 'booking_fee', 'Staff charged via invoice', $5)
-           ON CONFLICT (payment_intent_id) DO UPDATE SET status = 'succeeded', updated_at = NOW()`,
-          [invoiceResult.paymentIntentId, member.email, member.id, authoritativeAmountCents, staffEmail]
+            (user_id, stripe_payment_intent_id, stripe_customer_id, amount_cents, status, purpose, description, booking_id, session_id)
+           VALUES ($1, $2, $3, $4, 'succeeded', 'booking_fee', 'Staff charged via invoice', $5, $6)
+           ON CONFLICT (stripe_payment_intent_id) DO UPDATE SET status = 'succeeded', updated_at = NOW()`,
+          [member.id, invoiceResult.paymentIntentId, member.stripe_customer_id, authoritativeAmountCents, resolvedBookingId, resolvedSessionId]
         );
 
         const staffActionDetails = JSON.stringify({
@@ -1389,7 +1397,8 @@ router.post('/api/stripe/staff/mark-booking-paid', isStaffOrAdmin, async (req: R
         `UPDATE booking_participants 
          SET payment_status = 'paid', 
              paid_at = NOW(),
-             updated_at = NOW()
+             updated_at = NOW(),
+             cached_fee_cents = 0
          WHERE id IN (${idPlaceholders})`,
         safeParticipantIds
       );
