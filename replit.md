@@ -66,19 +66,21 @@ We use a **Liquid Glass UI** system.
 - **Member Lifecycle & Check-In**: Tiers, QR/NFC check-in, onboarding.
 
 ## Recent Changes
-- **Feb 21, 2026**: Database table consolidation — Reduced tables from 82 to 77 by merging redundant tables:
-  1. `app_settings` → merged into `system_settings` (added `category`, `updated_by` columns)
-  2. `trackman_webhook_dedup` → merged into `trackman_webhook_events` (added `dedup_key` column with unique index)
-  3. Four audit tables (`billing_audit_log`, `booking_payment_audit`, `integrity_audit_log`) → merged into unified `admin_audit_log` with JSONB `details` column. Helper functions in `server/core/auditLog.ts`: `logBillingAudit()`, `logPaymentAudit()`, `logIntegrityAudit()`.
-  All existing data was migrated before dropping old tables.
-- **Feb 21, 2026**: Dependency & dead code cleanup — Removed unused npm packages (`@modelcontextprotocol/sdk`). Moved 11 dev-only packages to devDependencies (`@vitest/ui`, `drizzle-kit`, `postcss`, `tailwindcss`, `@tailwindcss/postcss`, `vite-plugin-compression`, `vitest`, 4x `@types/*`). Deleted 3 dead code files: `server/routes/mcp.ts` (empty), `server/utils/calendarSync.ts` (superseded), `server/utils/stringUtils.ts` (superseded by emailNormalization.ts).
-- **Feb 21, 2026**: Project root cleanup — Removed 30+ dead/outdated files. See changelog for full list.
-- **Feb 21, 2026**: Ghost column fix (v7.95.0) + CI guard. See changelog for details.
-- **Feb 21, 2026**: Fixed 4 pre-existing bugs found during consolidation audit:
-  1. Member-cancel refund fix — session lookup now uses `booking_requests.session_id` directly instead of broken `trackman_booking_id` join that failed for app-created bookings.
-  2. Cross-midnight tsrange fix — overlap detection queries now handle sessions spanning midnight (e.g., 23:00–01:00) by adding `INTERVAL '1 day'` when end_time < start_time.
-  3. Guest pass refund on member-cancel — approved bookings with consumed guest passes now properly refund passes, matching the staff-cancel behavior.
-  4. UUID vs email fix in usage tracking — `recordUsage()` now detects email-format `memberId` inputs and routes to `getMemberTierByEmail()` instead of crashing on UUID cast.
+- **Feb 21, 2026**: v7.99.0 — Booking Safety & Payment Integrity Fixes (11 bugs):
+  1. Conference room prepayments now properly refunded on cancellation (succeeded charges get refund, not cancel).
+  2. Trackman participant linking now inserts participants into DB before sending notifications.
+  3. First-time guest pass users auto-initialized instead of crashing staff approvals.
+  4. Guest pass hold failures now block booking creation (402 error) instead of creating un-approvable requests.
+  5. Dev-confirm returns error on session creation failure instead of creating ghost bookings.
+  6. Declined invitations excluded from conflict detection (no longer lock schedules).
+  7. completeCancellation now refunds fee snapshot payments (matching cancelBooking).
+  8. Reconciliation uses idempotency-guarded recordUsage() instead of raw SQL.
+  9. Partial unique index on booking_participants(session_id, user_id) prevents roster duplication.
+  10. Guest pass refund restricted to passes where used_guest_pass=true (no longer refunds paid guests).
+  11. Check-in fee recalc guard catches zeroed-out cached fees (not just NULL).
+- **Feb 21, 2026**: v7.98.0 — Critical Billing & Booking Bug Fixes (6 bugs):
+  Fee calculator SQL fan-out, usage tracking idempotency aggregation, participant linking substring matching, conference room usage limits, cancellation notes appending, reconciliation date filtering.
+- **Feb 21, 2026**: Database table consolidation, dependency cleanup, dead code removal, ghost column fix. See changelog for full details.
 
 ## External Dependencies
 - **Stripe**: Terminal, subscriptions, webhooks for billing authority.
