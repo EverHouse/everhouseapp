@@ -375,6 +375,21 @@ async function initializeApp() {
         }
       }
     }));
+
+    app.use('/assets/', async (req, res, next) => {
+      if (req.path.endsWith('.js') || req.path.endsWith('.css') || req.path.endsWith('.js.br') || req.path.endsWith('.css.br')) {
+        const fs = await import('fs');
+        const filePath = path.join(__dirname, '../dist/assets', req.path);
+        if (!fs.existsSync(filePath)) {
+          logger.info(`[Stale Asset] 404 for /assets${req.path} - sending reload response`);
+          res.status(200).setHeader('Content-Type', 'text/html').send(
+            '<!DOCTYPE html><html><head><script>window.location.reload()</script></head><body></body></html>'
+          );
+          return;
+        }
+      }
+      next();
+    });
   } else {
     app.get('/', (req, res) => {
       const devDomain = process.env.REPLIT_DEV_DOMAIN;
