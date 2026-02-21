@@ -503,6 +503,10 @@ export async function voidBookingInvoice(bookingId: number): Promise<{
       logger.info('[BookingInvoice] Voided open invoice for cancelled booking', {
         extra: { bookingId, invoiceId }
       });
+    } else if (invoice.status === 'void' || invoice.status === 'uncollectible') {
+      logger.info('[BookingInvoice] Invoice already voided or uncollectible, clearing reference', {
+        extra: { bookingId, invoiceId, status: invoice.status }
+      });
     } else if (invoice.status === 'paid') {
       logger.warn('[BookingInvoice] Cannot void paid invoice', {
         extra: { bookingId, invoiceId }

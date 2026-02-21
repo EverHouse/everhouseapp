@@ -91,6 +91,22 @@ export async function createPrepaymentIntent(
       return null;
     }
 
+    const resourceTypeResult = await pool.query(
+      `SELECT COALESCE(r.type, 'simulator') as resource_type
+       FROM booking_requests br
+       LEFT JOIN resources r ON br.resource_id = r.id
+       WHERE br.id = $1 LIMIT 1`,
+      [bookingId]
+    );
+    const resourceType = resourceTypeResult.rows[0]?.resource_type || 'simulator';
+
+    if (resourceType === 'conference_room') {
+      logger.info('[Prepayment] Skipping - conference room bookings do not use invoices', { 
+        extra: { bookingId, resourceType } 
+      });
+      return null;
+    }
+
     const trackmanResult = await pool.query(
       `SELECT trackman_booking_id FROM booking_requests WHERE id = $1 LIMIT 1`,
       [bookingId]
