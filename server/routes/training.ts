@@ -133,7 +133,7 @@ export const TRAINING_SEED_DATA = [
       { title: 'Guest Pass Status', content: `Green badge = Member has guest passes available, no fee charged. Blue badge = No passes remaining, $${PRICING.GUEST_FEE_DOLLARS} guest fee applies. Guest passes are applied automatically when available.` },
       { title: 'Removing Players', content: 'Tap the X button on any non-owner player to remove them from the booking. If a guest pass was used, it is automatically refunded when the guest is removed.' },
       { title: 'Time Split', content: 'Simulator time is divided equally among all participants. For example, a 60-minute booking with 3 players gives each person 20 minutes of allocated time. Fees are calculated based on each person\'s share.' },
-      { title: 'Check-In Requirement', content: 'Check-in is disabled until all player slots are filled. This ensures accurate billing for all participants.' },
+      { title: 'Check-In Requirement', content: 'Check-in is disabled until all player slots are filled. If the roster is incomplete, you\'ll see a prompt to add the remaining players before proceeding. After the booking\'s invoice has been paid, the roster is locked and cannot be changed unless an admin overrides it with a reason.' },
     ]
   },
   {
@@ -144,6 +144,7 @@ export const TRAINING_SEED_DATA = [
     sortOrder: 7,
     isAdminOnly: false,
     steps: [
+      { title: 'Currently Unavailable', content: 'The Reschedule feature is temporarily hidden while we make improvements. The functionality is preserved behind the scenes and will be re-enabled in a future update. If a booking needs to be moved, cancel the existing booking and create a new one.', pageIcon: 'info' },
       { title: 'When to Reschedule', content: 'Use reschedule when a member needs to move their booking to a different bay, date, or time. The member\'s roster, guest passes, and booking details stay intact.', pageIcon: 'event_repeat' },
       { title: 'Start Reschedule', content: 'Open the booking details modal for any upcoming simulator booking. Tap the "Reschedule" button to begin.', pageIcon: 'edit_calendar' },
       { title: 'Pick New Slot', content: 'Select the new bay, date, and time for the booking. The system checks for conflicts and shows a warning if the new slot has a different duration (which may affect fees).', pageIcon: 'calendar_month' },
@@ -202,7 +203,9 @@ export const TRAINING_SEED_DATA = [
       { title: 'Card on File', content: 'If the member has a saved card in Stripe, you\'ll see their card brand and last 4 digits. Tap to charge instantly without needing the card reader.' },
       { title: 'Waiving Fees', content: 'To waive fees, select "Waive All Fees" and enter a reason. The reason is required and logged for accountability.' },
       { title: 'Payment Audit Trail', content: 'All payment actions are logged with your name and timestamp for accountability. These appear in the Staff Activity feed.' },
-      { title: 'Prepayment', content: 'After a booking is approved or linked to Trackman, the member receives a prepayment request for expected fees (overage, guests). Members can pay from their dashboard. Check-in is blocked until fees are paid. If the booking is cancelled, any prepayment is automatically refunded.', pageIcon: 'payment' },
+      { title: 'Prepayment', content: 'After a booking is approved or linked to Trackman, the member receives an itemized invoice for expected fees (overage and guest fees). Members can pay from their dashboard before the session. If fees change due to roster edits, the invoice updates automatically. If the booking is cancelled, the invoice is voided.', pageIcon: 'payment' },
+      { title: 'Itemized Invoices', content: 'Each simulator booking generates a single Stripe invoice with line items for each fee (overage per member, guest fee per guest). Members can view and download PDF invoices from their dashboard. The invoice updates automatically when the roster changes.', pageIcon: 'receipt_long' },
+      { title: 'Roster Lock After Payment', content: 'Once a booking\'s invoice has been paid, the roster is locked — you cannot add or remove players. If changes are needed after payment, an admin can override the lock by providing a reason. The override is logged for accountability.', pageIcon: 'lock' },
     ]
   },
   {

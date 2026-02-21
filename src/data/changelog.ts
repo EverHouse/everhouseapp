@@ -13,6 +13,17 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.91.1",
+    date: "2026-02-21",
+    title: "Training Guide & Invoice Gap Fix",
+    changes: [
+      "Updated: Training guide now reflects one-invoice-per-booking architecture — updated Check-In & Billing, Players & Guests, and Reschedule sections",
+      "Added: Itemized Invoices and Roster Lock After Payment training steps",
+      "Updated: Reschedule training section now notes the feature is temporarily unavailable",
+      "Fixed: Bookings approved with $0 fees now correctly create a draft invoice when roster changes add fees later",
+    ]
+  },
+  {
     version: "7.91.0",
     date: "2026-02-21",
     title: "One Invoice Per Booking & Roster Lock",
