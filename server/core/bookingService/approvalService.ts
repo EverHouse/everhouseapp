@@ -20,6 +20,7 @@ import { getCalendarNameForBayAsync } from '../../routes/bays/helpers';
 import { getCalendarIdByName, createCalendarEventOnCalendar, deleteCalendarEvent } from '../calendar/index';
 import { releaseGuestPassHold } from '../billing/guestPassHoldService';
 import { createPrepaymentIntent } from '../billing/prepaymentService';
+import { voidBookingInvoice } from '../billing/bookingInvoiceService';
 import { getErrorMessage, getErrorStatusCode } from '../../utils/errorUtils';
 
 type SqlQueryParam = string | number | boolean | null | Date;
@@ -751,6 +752,10 @@ export async function declineBooking(params: DeclineBookingParams) {
 
   await releaseGuestPassHold(bookingId);
 
+  voidBookingInvoice(bookingId).catch(err => {
+    logger.warn('[Decline] Non-blocking: failed to void draft invoice', { extra: { bookingId, error: getErrorMessage(err) } });
+  });
+
   sendPushNotification(updated.userEmail, {
     title: 'Booking Request Update',
     body: declineMessage,
@@ -1158,6 +1163,10 @@ export async function handleCancelPostTransaction(
   isConfRoom: boolean
 ) {
   await releaseGuestPassHold(bookingId);
+
+  voidBookingInvoice(bookingId).catch(err => {
+    logger.warn('[Cancel] Non-blocking: failed to void draft invoice', { extra: { bookingId, error: getErrorMessage(err) } });
+  });
 
   if (bookingData?.calendarEventId) {
     try {
