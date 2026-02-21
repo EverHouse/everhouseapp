@@ -3480,7 +3480,9 @@ router.post('/api/trackman/admin/cleanup-lessons', isStaffOrAdmin, async (req, r
               updated_at = NOW()
           WHERE id = ${booking.id}`);
 
-        await db.execute(sql`DELETE FROM booking_participants WHERE booking_id = ${booking.id}`);
+        await db.execute(sql`DELETE FROM booking_participants WHERE session_id IN (
+          SELECT id FROM booking_sessions WHERE trackman_booking_id = ${booking.trackman_booking_id}
+        )`);
 
         await db.execute(sql`DELETE FROM usage_ledger WHERE booking_id = ${booking.id}`);
 
@@ -3496,7 +3498,7 @@ router.post('/api/trackman/admin/cleanup-lessons', isStaffOrAdmin, async (req, r
           }
         }
 
-        await db.execute(sql`DELETE FROM booking_sessions WHERE booking_id = ${booking.id}`);
+        await db.execute(sql`DELETE FROM booking_sessions WHERE trackman_booking_id = ${booking.trackman_booking_id}`);
       }
 
       log(`[Lesson Cleanup] ${blockAlreadyExists ? 'Block exists, cleaned up booking' : 'Converted Booking'} #${booking.id} (${booking.user_name}).`);

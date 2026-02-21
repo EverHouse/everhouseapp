@@ -13,6 +13,17 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.95.0",
+    date: "2026-02-21",
+    title: "Fix Ghost Column References in SQL Queries",
+    changes: [
+      "Fixed: Member cancel flow session lookup — was referencing non-existent bs.booking_id, now uses trackman_booking_id JOIN",
+      "Fixed: Stripe payment participant query — bs.booking_id replaced with proper booking_requests JOIN for booking_id",
+      "Fixed: Stripe webhook refund audit log — bs.booking_id replaced with booking_requests JOIN",
+      "Fixed: Trackman admin lesson cleanup — booking_sessions and booking_participants deletion now uses trackman_booking_id and session_id respectively",
+    ]
+  },
+  {
     version: "7.94.0",
     date: "2026-02-21",
     title: "Legacy Table Migration Complete",

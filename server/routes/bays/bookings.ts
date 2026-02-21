@@ -1217,7 +1217,7 @@ router.put('/api/booking-requests/:id/member-cancel', async (req, res) => {
     try {
       sessionResult = await pool.query(
         `SELECT bs.id as session_id FROM booking_sessions bs 
-         JOIN booking_requests br ON bs.booking_id = br.id
+         JOIN booking_requests br ON bs.trackman_booking_id = br.trackman_booking_id
          WHERE br.id = $1`,
         [bookingId]
       );

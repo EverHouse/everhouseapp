@@ -670,8 +670,10 @@ async function handleChargeRefunded(client: PoolClient, charge: Stripe.Charge): 
         await client.query(
           `INSERT INTO booking_payment_audit 
            (booking_id, session_id, participant_id, action, staff_email, staff_name, amount_affected, payment_method, metadata)
-           SELECT bs.booking_id, $1, $2, 'refund_processed', 'system', 'Stripe Webhook', 0, 'stripe', $3
-           FROM booking_sessions bs WHERE bs.id = $1`,
+           SELECT br.id, $1, $2, 'refund_processed', 'system', 'Stripe Webhook', 0, 'stripe', $3
+           FROM booking_sessions bs
+           JOIN booking_requests br ON br.trackman_booking_id = bs.trackman_booking_id
+           WHERE bs.id = $1`,
           [row.session_id, row.id, JSON.stringify({ stripePaymentIntentId: paymentIntentId })]
         );
         
