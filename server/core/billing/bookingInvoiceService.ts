@@ -612,11 +612,67 @@ export async function recreateDraftInvoiceFromBooking(bookingId: number): Promis
 export async function syncBookingInvoice(bookingId: number, sessionId: number): Promise<void> {
   try {
     const invoiceResult = await pool.query(
-      `SELECT stripe_invoice_id FROM booking_requests WHERE id = $1 LIMIT 1`,
+      `SELECT stripe_invoice_id, user_email, trackman_booking_id, status FROM booking_requests WHERE id = $1 LIMIT 1`,
       [bookingId]
     );
-    const stripeInvoiceId = invoiceResult.rows[0]?.stripe_invoice_id;
-    if (!stripeInvoiceId) return;
+    const booking = invoiceResult.rows[0];
+    if (!booking) return;
+    const stripeInvoiceId = booking.stripe_invoice_id;
+
+    if (!stripeInvoiceId) {
+      if (booking.status !== 'approved') return;
+
+      const participantResult = await pool.query(
+        `SELECT id, display_name, participant_type, cached_fee_cents
+         FROM booking_participants
+         WHERE session_id = $1 AND cached_fee_cents > 0`,
+        [sessionId]
+      );
+
+      const totalFees = participantResult.rows.reduce((sum: number, r: { cached_fee_cents: number }) => sum + r.cached_fee_cents, 0);
+      if (totalFees <= 0) return;
+
+      const { getOrCreateStripeCustomer } = await import('../stripe/customers');
+      const userResult = await pool.query(
+        `SELECT id, first_name, last_name FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1`,
+        [booking.user_email]
+      );
+      const user = userResult.rows[0];
+      if (!user) {
+        logger.warn('[BookingInvoice] syncBookingInvoice: no user found, cannot create draft invoice', { extra: { bookingId, email: booking.user_email } });
+        return;
+      }
+
+      const memberName = [user.first_name, user.last_name].filter(Boolean).join(' ') || booking.user_email;
+      const { customerId } = await getOrCreateStripeCustomer(user.id, booking.user_email, memberName);
+
+      const feeLineItems: BookingFeeLineItem[] = participantResult.rows.map((row: { id: number; display_name: string; participant_type: string; cached_fee_cents: number }) => {
+        const totalCents = row.cached_fee_cents;
+        const isGuest = row.participant_type === 'guest';
+        return {
+          participantId: row.id,
+          displayName: row.display_name || 'Unknown',
+          participantType: row.participant_type as 'owner' | 'member' | 'guest',
+          overageCents: isGuest ? 0 : totalCents,
+          guestCents: isGuest ? totalCents : 0,
+          totalCents,
+        };
+      });
+
+      const draftResult = await createDraftInvoiceForBooking({
+        customerId,
+        bookingId,
+        sessionId,
+        trackmanBookingId: booking.trackman_booking_id || null,
+        feeLineItems,
+        purpose: 'booking_fee',
+      });
+
+      logger.info('[BookingInvoice] syncBookingInvoice created draft invoice (none existed, fees > $0)', {
+        extra: { bookingId, sessionId, invoiceId: draftResult.invoiceId, totalCents: draftResult.totalCents }
+      });
+      return;
+    }
 
     const stripe = await getStripeClient();
     const invoice = await stripe.invoices.retrieve(stripeInvoiceId);
