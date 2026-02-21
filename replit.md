@@ -74,6 +74,11 @@ We use a **Liquid Glass UI** system.
 - **Feb 21, 2026**: Dependency & dead code cleanup — Removed unused npm packages (`@modelcontextprotocol/sdk`). Moved 11 dev-only packages to devDependencies (`@vitest/ui`, `drizzle-kit`, `postcss`, `tailwindcss`, `@tailwindcss/postcss`, `vite-plugin-compression`, `vitest`, 4x `@types/*`). Deleted 3 dead code files: `server/routes/mcp.ts` (empty), `server/utils/calendarSync.ts` (superseded), `server/utils/stringUtils.ts` (superseded by emailNormalization.ts).
 - **Feb 21, 2026**: Project root cleanup — Removed 30+ dead/outdated files. See changelog for full list.
 - **Feb 21, 2026**: Ghost column fix (v7.95.0) + CI guard. See changelog for details.
+- **Feb 21, 2026**: Fixed 4 pre-existing bugs found during consolidation audit:
+  1. Member-cancel refund fix — session lookup now uses `booking_requests.session_id` directly instead of broken `trackman_booking_id` join that failed for app-created bookings.
+  2. Cross-midnight tsrange fix — overlap detection queries now handle sessions spanning midnight (e.g., 23:00–01:00) by adding `INTERVAL '1 day'` when end_time < start_time.
+  3. Guest pass refund on member-cancel — approved bookings with consumed guest passes now properly refund passes, matching the staff-cancel behavior.
+  4. UUID vs email fix in usage tracking — `recordUsage()` now detects email-format `memberId` inputs and routes to `getMemberTierByEmail()` instead of crashing on UUID cast.
 
 ## External Dependencies
 - **Stripe**: Terminal, subscriptions, webhooks for billing authority.
