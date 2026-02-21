@@ -13,6 +13,20 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.98.0",
+    date: "2026-02-21",
+    title: "Critical Billing & Booking Bug Fixes",
+    isMajor: true,
+    changes: [
+      "Fixed: SQL fan-out in fee calculator was multiplying ledger fees across all guest participants, causing massive overcharging (e.g., $100 billed as $400 with 3 guests)",
+      "Fixed: Idempotency guard in usage tracking silently discarded guest fees or overage fees when multiple entries shared the same member ID — fees now aggregated per member before recording",
+      "Fixed: Loose substring matching in participant linking incorrectly stripped guests whose names were substrings of the owner (e.g., guest 'John' removed when owner is 'John Smith')",
+      "Fixed: Conference room auto-confirm bypassed daily usage limits — now properly tracks time via usage ledger with graceful fallback on failure",
+      "Fixed: Member cancellations of Trackman-linked bookings overwrote existing staff notes instead of appending",
+      "Fixed: Trackman reconciliation dashboard stats showed lifetime totals instead of respecting selected date filters",
+    ]
+  },
+  {
     version: "7.97.0",
     date: "2026-02-21",
     title: "Dead Code Removal",
