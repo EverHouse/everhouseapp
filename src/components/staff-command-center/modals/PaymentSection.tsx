@@ -308,8 +308,15 @@ export function InlinePaymentBody({
   const { showToast } = useToast();
   const [showCancelConfirm, setShowCancelConfirm] = React.useState(false);
   const [cancellingPayment, setCancellingPayment] = React.useState(false);
-
   const fs = rosterData?.financialSummary;
+
+  const scrollRef = React.useCallback((node: HTMLDivElement | null) => {
+    if (node) {
+      requestAnimationFrame(() => {
+        node.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      });
+    }
+  }, []);
 
   if (!showInlinePayment || !fs || !bookingId) return null;
 
@@ -607,7 +614,7 @@ export function InlinePaymentBody({
   };
 
   return (
-    <div className="p-3 rounded-xl border border-blue-200 dark:border-blue-500/20 bg-blue-50/50 dark:bg-blue-900/10 space-y-2">
+    <div ref={scrollRef} className="p-3 rounded-xl border border-blue-200 dark:border-blue-500/20 bg-blue-50/50 dark:bg-blue-900/10 space-y-2">
       <div className="flex items-center justify-between mb-1">
         <span className="text-sm font-medium text-primary dark:text-white flex items-center gap-1.5">
           <span className="material-symbols-outlined text-blue-600 dark:text-blue-400 text-lg">payments</span>
