@@ -967,10 +967,66 @@ export async function createSessionWithUsageTracking(
               extra: { bookingId: request.bookingId, ownerEmail: request.ownerEmail, passesConverted: passesToConvert }
             });
           } else {
-            throw new Error(
-              `No guest pass holds found for booking ${request.bookingId}. ` +
-              `Expected ${passesNeeded} passes. Transaction rolled back.`
-            );
+            // Hold was lost (transient DB error during booking creation) — fall back to direct deduction
+            logger.warn('[createSessionWithUsageTracking] No guest pass holds found, falling back to direct deduction', {
+              extra: { bookingId: request.bookingId, passesNeeded }
+            });
+            
+            const passCheck = await tx.execute(sql`
+              SELECT id, passes_total, passes_used FROM guest_passes 
+              WHERE LOWER(member_email) = ${emailLower}
+              FOR UPDATE
+            `);
+            
+            if (passCheck.rows && passCheck.rows.length > 0) {
+              const passRow = passCheck.rows[0] as Record<string, unknown>;
+              const passes_total = passRow.passes_total as number;
+              const passes_used = passRow.passes_used as number;
+              const available = passes_total - passes_used;
+              
+              if (available < passesNeeded) {
+                throw new Error(
+                  `Insufficient guest passes: have ${available}, need ${passesNeeded}. Transaction rolled back.`
+                );
+              }
+              
+              await tx.execute(sql`
+                UPDATE guest_passes 
+                SET passes_used = passes_used + ${passesNeeded}
+                WHERE LOWER(member_email) = ${emailLower}
+              `);
+              
+              logger.info('[createSessionWithUsageTracking] Directly deducted guest passes (hold fallback)', {
+                extra: { bookingId: request.bookingId, ownerEmail: request.ownerEmail, passesDeducted: passesNeeded }
+              });
+            } else {
+              // First-time guest pass user (hold fallback) — create record with tier allocation
+              const tierResult = await tx.execute(sql`
+                SELECT mt.guest_passes_per_month 
+                FROM users u 
+                JOIN membership_tiers mt ON u.tier = mt.name 
+                WHERE LOWER(u.email) = ${emailLower}
+              `);
+              const monthlyAllocation = tierResult.rows?.[0] 
+                ? (tierResult.rows[0] as Record<string, unknown>).guest_passes_per_month as number || 0 
+                : 0;
+              
+              if (monthlyAllocation < passesNeeded) {
+                logger.info('[createSessionWithUsageTracking] Member tier has insufficient guest pass allocation, guests will be charged as paid', {
+                  extra: { ownerEmail: request.ownerEmail, monthlyAllocation, passesNeeded }
+                });
+                // Don't throw — guests will be billed via fee calculator as paid guests
+              } else {
+                await tx.execute(sql`
+                  INSERT INTO guest_passes (member_email, passes_total, passes_used)
+                  VALUES (${emailLower}, ${monthlyAllocation}, ${passesNeeded})
+                `);
+                
+                logger.info('[createSessionWithUsageTracking] Created guest pass record for first-time user (hold fallback)', {
+                  extra: { ownerEmail: request.ownerEmail, monthlyAllocation, passesDeducted: passesNeeded }
+                });
+              }
+            }
           }
         } else {
           // Path 2: Staff/Trackman flow without holds - direct atomic deduction
@@ -1003,10 +1059,32 @@ export async function createSessionWithUsageTracking(
               extra: { ownerEmail: request.ownerEmail, passesDeducted: passesNeeded }
             });
           } else {
-            throw new Error(
-              `No guest pass record found for ${request.ownerEmail}. ` +
-              `Expected ${passesNeeded} passes. Transaction rolled back.`
-            );
+            // First-time guest pass user — create record with tier allocation
+            const tierResult = await tx.execute(sql`
+              SELECT mt.guest_passes_per_month 
+              FROM users u 
+              JOIN membership_tiers mt ON u.tier = mt.name 
+              WHERE LOWER(u.email) = ${emailLower}
+            `);
+            const monthlyAllocation = tierResult.rows?.[0] 
+              ? (tierResult.rows[0] as Record<string, unknown>).guest_passes_per_month as number || 0 
+              : 0;
+            
+            if (monthlyAllocation < passesNeeded) {
+              logger.info('[createSessionWithUsageTracking] Member tier has insufficient guest pass allocation, guests will be charged as paid', {
+                extra: { ownerEmail: request.ownerEmail, monthlyAllocation, passesNeeded }
+              });
+              // Don't throw — guests will be billed via fee calculator as paid guests
+            } else {
+              await tx.execute(sql`
+                INSERT INTO guest_passes (member_email, passes_total, passes_used)
+                VALUES (${emailLower}, ${monthlyAllocation}, ${passesNeeded})
+              `);
+              
+              logger.info('[createSessionWithUsageTracking] Created guest pass record for first-time user', {
+                extra: { ownerEmail: request.ownerEmail, monthlyAllocation, passesDeducted: passesNeeded }
+              });
+            }
           }
         }
       }

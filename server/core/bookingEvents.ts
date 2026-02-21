@@ -350,6 +350,22 @@ export async function linkAndNotifyParticipants(
           .where(sql`LOWER(${users.email}) = ${email}`);
         
         existingEmails.add(email);
+
+        if (bpSessionId && member?.id) {
+          try {
+            await db.insert(bookingParticipants).values({
+              sessionId: bpSessionId,
+              userId: member.id,
+              participantType: 'member',
+              displayName: `${member.firstName || ''} ${member.lastName || ''}`.trim() || email,
+              inviteStatus: 'accepted',
+              createdAt: new Date()
+            }).onConflictDoNothing();
+          } catch (insertErr: unknown) {
+            logger.error('[BookingEvents] Failed to insert member participant', { error: insertErr });
+          }
+        }
+
         result.linkedMembers++;
         
         try {
@@ -378,6 +394,22 @@ export async function linkAndNotifyParticipants(
         if (existingGuestEmails.has(email)) continue;
         
         existingGuestEmails.add(email);
+
+        if (bpSessionId) {
+          try {
+            await db.insert(bookingParticipants).values({
+              sessionId: bpSessionId,
+              userId: null,
+              participantType: 'guest',
+              displayName: participant.name || email,
+              inviteStatus: 'accepted',
+              createdAt: new Date()
+            });
+          } catch (insertErr: unknown) {
+            logger.error('[BookingEvents] Failed to insert guest participant', { error: insertErr });
+          }
+        }
+
         result.linkedGuests++;
       }
     }

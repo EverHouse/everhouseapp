@@ -177,6 +177,7 @@ export async function findConflictingBookings(
       JOIN users u ON bp.user_id = u.id
       LEFT JOIN resources r ON br.resource_id = r.id
       WHERE LOWER(u.email) = LOWER($1)
+        AND bp.invite_status = 'accepted'
         AND br.request_date = $2
         AND br.status IN (${statusPlaceholders})
         ${excludeBookingId ? `AND br.id != $${excludeIdPlaceholder}` : ''}

@@ -878,9 +878,25 @@ export async function cancelBooking(params: CancelBookingParams) {
 
       for (const row of otherIntents.rows) {
         try {
-          await cancelPaymentIntent(row.stripe_payment_intent_id);
-          logger.info('[Staff Cancel] Cancelled orphan payment intent for booking', { extra: { rowStripe_payment_intent_id: row.stripe_payment_intent_id, bookingId } });
+          const pi = await stripe.paymentIntents.retrieve(row.stripe_payment_intent_id);
+          if (pi.status === 'succeeded' && pi.latest_charge) {
+            await stripe.refunds.create({
+              charge: typeof pi.latest_charge === 'string' ? pi.latest_charge : (pi.latest_charge as Stripe.Charge).id,
+              reason: 'requested_by_customer'
+            }, {
+              idempotencyKey: `refund_staff_cancel_orphan_${bookingId}_${row.stripe_payment_intent_id}`
+            });
+            logger.info('[Staff Cancel] Refunded succeeded orphan payment intent', { 
+              extra: { paymentIntentId: row.stripe_payment_intent_id, bookingId, amount: (pi.amount / 100).toFixed(2) } 
+            });
+          } else if (pi.status !== 'canceled') {
+            await cancelPaymentIntent(row.stripe_payment_intent_id);
+            logger.info('[Staff Cancel] Cancelled orphan payment intent', { extra: { paymentIntentId: row.stripe_payment_intent_id, bookingId } });
+          }
         } catch (cancelErr: unknown) {
+          logger.error('[Staff Cancel] Failed to handle orphan payment intent', { 
+            extra: { paymentIntentId: row.stripe_payment_intent_id, error: getErrorMessage(cancelErr) } 
+          });
         }
       }
 
@@ -924,7 +940,11 @@ export async function cancelBooking(params: CancelBookingParams) {
       .where(eq(bookingRequests.id, bookingId));
 
     if (sessionResult[0]?.sessionId) {
-      const guestParticipants = await tx.select({ id: bookingParticipants.id, displayName: bookingParticipants.displayName })
+      const guestParticipants = await tx.select({ 
+        id: bookingParticipants.id, 
+        displayName: bookingParticipants.displayName,
+        usedGuestPass: bookingParticipants.usedGuestPass
+      })
         .from(bookingParticipants)
         .where(and(
           eq(bookingParticipants.sessionId, sessionResult[0].sessionId),
@@ -932,7 +952,9 @@ export async function cancelBooking(params: CancelBookingParams) {
         ));
 
       for (const guest of guestParticipants) {
-        await refundGuestPass(existing.userEmail, guest.displayName || undefined, false);
+        if (guest.usedGuestPass) {
+          await refundGuestPass(existing.userEmail, guest.displayName || undefined, false);
+        }
       }
 
       if (guestParticipants.length > 0) {
@@ -1313,13 +1335,13 @@ export async function checkinBooking(params: CheckinBookingParams) {
     const nullFeesCheck = await pool.query(`
       SELECT COUNT(*) as null_count
       FROM booking_participants bp
-      WHERE bp.session_id = $1 AND bp.payment_status = 'pending' AND bp.cached_fee_cents IS NULL
+      WHERE bp.session_id = $1 AND bp.payment_status = 'pending' AND (bp.cached_fee_cents IS NULL OR bp.cached_fee_cents = 0)
     `, [existing.session_id]);
 
     if (parseInt(nullFeesCheck.rows[0]?.null_count) > 0) {
       try {
         await recalculateSessionFees(existing.session_id, 'checkin');
-        logger.info('[Check-in Guard] Recalculated fees for session - some participants had NULL cached_fee_cents', { extra: { existingSession_id: existing.session_id } });
+        logger.info('[Check-in Guard] Recalculated fees for session - some participants had NULL or zero cached_fee_cents', { extra: { existingSession_id: existing.session_id } });
       } catch (recalcError: unknown) {
         logger.error('[Check-in Guard] Failed to recalculate fees for session', { extra: { session_id: existing.session_id, recalcError } });
       }
@@ -1542,6 +1564,13 @@ export async function devConfirmBooking(params: DevConfirmParams) {
     });
     sessionId = sessionResult.sessionId || null;
 
+    if (!sessionId) {
+      logger.error('[Dev Confirm] Session creation failed — cannot approve without billing session', {
+        extra: { bookingId, resourceId: booking.resource_id }
+      });
+      return { error: 'Failed to create billing session. Cannot approve booking without billing.', statusCode: 500 };
+    }
+
     if (sessionId) {
       const requestParticipants = booking.request_participants as Array<{
         email?: string;
@@ -1594,7 +1623,7 @@ export async function devConfirmBooking(params: DevConfirmParams) {
             await pool.query(
               `INSERT INTO booking_participants (session_id, user_id, participant_type, display_name, created_at)
                VALUES ($1, $2, $3, $4, NOW())
-               ON CONFLICT DO NOTHING`,
+               ON CONFLICT (session_id, user_id) DO NOTHING`,
               [sessionId, resolvedUserId, participantType, resolvedName]
             );
             participantsCreated++;
@@ -1754,6 +1783,53 @@ export async function completeCancellation(params: CompleteCancellationParams) {
     logger.error('[Complete Cancellation] Failed to query pending intents', { extra: { err } });
   }
 
+  // Refund fee snapshot payments (check-in register payments)
+  try {
+    const stripe = await getStripeClient();
+    const allSnapshots = await pool.query(
+      `SELECT id, stripe_payment_intent_id, status as snapshot_status, total_cents
+       FROM booking_fee_snapshots 
+       WHERE booking_id = $1 AND stripe_payment_intent_id IS NOT NULL`,
+      [bookingId]
+    );
+
+    for (const snapshot of allSnapshots.rows) {
+      try {
+        const pi = await stripe.paymentIntents.retrieve(snapshot.stripe_payment_intent_id);
+
+        if (pi.status === 'succeeded') {
+          const refund = await stripe.refunds.create({
+            payment_intent: snapshot.stripe_payment_intent_id,
+            reason: 'requested_by_customer'
+          }, {
+            idempotencyKey: `refund_complete_cancel_snapshot_${bookingId}_${snapshot.stripe_payment_intent_id}`
+          });
+          logger.info('[Complete Cancellation] Refunded fee snapshot payment', { 
+            extra: { 
+              paymentIntentId: snapshot.stripe_payment_intent_id, 
+              bookingId, 
+              amount: (pi.amount / 100).toFixed(2),
+              refundId: refund.id 
+            } 
+          });
+        } else if (['requires_payment_method', 'requires_confirmation', 'requires_action', 'processing'].includes(pi.status)) {
+          await stripe.paymentIntents.cancel(snapshot.stripe_payment_intent_id);
+          logger.info('[Complete Cancellation] Cancelled pending fee snapshot payment', {
+            extra: { paymentIntentId: snapshot.stripe_payment_intent_id, bookingId }
+          });
+        }
+      } catch (snapErr: unknown) {
+        errors.push(`Failed to handle fee snapshot ${snapshot.stripe_payment_intent_id?.substring(0, 8)}: ${getErrorMessage(snapErr)}`);
+        logger.error('[Complete Cancellation] Failed to handle fee snapshot', { 
+          extra: { stripe_payment_intent_id: snapshot.stripe_payment_intent_id, error: getErrorMessage(snapErr) } 
+        });
+      }
+    }
+  } catch (snapshotErr: unknown) {
+    errors.push(`Failed to query fee snapshots: ${getErrorMessage(snapshotErr)}`);
+    logger.error('[Complete Cancellation] Failed to query fee snapshots', { extra: { snapshotErr } });
+  }
+
   if (existing.sessionId) {
     try {
       await pool.query(
@@ -1816,11 +1892,12 @@ export async function completeCancellation(params: CompleteCancellationParams) {
 
     try {
       const guestParticipants = await pool.query(
-        `SELECT id, display_name FROM booking_participants 
+        `SELECT id, display_name, used_guest_pass FROM booking_participants 
          WHERE session_id = $1 AND participant_type = 'guest'`,
         [existing.sessionId]
       );
       for (const guest of guestParticipants.rows) {
+        if (!guest.used_guest_pass) continue;
         try {
           await refundGuestPass(existing.userEmail || '', guest.display_name || undefined, false);
         } catch (guestErr: unknown) {

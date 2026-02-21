@@ -3,6 +3,7 @@ import { logger } from '../logger';
 import { getTierLimits, getMemberTierByEmail } from '../tierService';
 import { PRICING } from '../billing/pricingConfig';
 import { logPaymentAudit } from '../auditLog';
+import { recordUsage } from './sessionManager';
 
 export interface ReconciliationResult {
   bookingId: number;
@@ -362,17 +363,17 @@ export async function adjustLedgerForReconciliation(
     const feeAdjustment = calculatePotentialFeeAdjustment(durationMinutes, declaredCount, actualCount, overageRate);
     
     if (booking.session_id && feeAdjustment > 0) {
-      await pool.query(
-        `INSERT INTO usage_ledger 
-         (session_id, member_id, minutes_charged, overage_fee, tier_at_booking, payment_method, source)
-         VALUES ($1, $2, $3, $4, $5, 'unpaid', 'staff_manual')`,
-        [
-          booking.session_id,
-          booking.user_email,
-          0,
-          feeAdjustment.toString(),
-          booking.tier || 'unknown'
-        ]
+      await recordUsage(
+        booking.session_id,
+        {
+          memberId: booking.user_email,
+          minutesCharged: 0,
+          overageFee: feeAdjustment,
+          guestFee: 0,
+          tierAtBooking: booking.tier || 'unknown',
+          paymentMethod: 'unpaid',
+        },
+        'staff_manual'
       );
     }
     

@@ -13,6 +13,25 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.99.0",
+    date: "2026-02-21",
+    title: "Booking Safety & Payment Integrity Fixes",
+    isMajor: true,
+    changes: [
+      "Fixed: Conference room prepayments were silently lost on cancellation — succeeded Stripe charges are now properly refunded instead of attempting invalid cancel operations",
+      "Fixed: Trackman participant linking sent push notifications without actually writing to the database — members saw 'Added to Booking' but nothing appeared in their app",
+      "Fixed: First-time guest pass users crashed staff approvals — system now auto-creates guest pass records on first use based on tier allocation",
+      "Fixed: Members could request bookings with guests they had no passes for — hold failures now block the booking with a clear error instead of creating un-approvable requests",
+      "Fixed: Dev-confirm could create 'ghost bookings' (approved with no billing session) — now returns an error if session creation fails",
+      "Fixed: Declined booking invitations still blocked the member's schedule — conflict detection now correctly skips declined invites",
+      "Fixed: completeCancellation trapped check-in payments — now queries and refunds fee snapshot payments matching cancelBooking behavior",
+      "Fixed: Reconciliation 'Adjust Ledger' button could double-charge members on re-click — now uses idempotency-guarded usage recording",
+      "Fixed: Roster duplication via ON CONFLICT DO NOTHING without a unique constraint — added partial unique index on booking_participants(session_id, user_id)",
+      "Fixed: Cancellation refunded guest passes for ALL guests including those who paid cash — now only refunds passes where used_guest_pass is true",
+      "Fixed: Check-in guard skipped fee recalculation when cached fees were zeroed out (vs NULL) — now catches both states",
+    ]
+  },
+  {
     version: "7.98.0",
     date: "2026-02-21",
     title: "Critical Billing & Booking Bug Fixes",

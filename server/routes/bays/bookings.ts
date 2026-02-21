@@ -770,7 +770,7 @@ router.post('/api/booking-requests', async (req, res) => {
           client
         );
         if (!holdResult.success) {
-          logger.info('[Booking] Guest pass hold not created (non-blocking)', { extra: { holdResultError: holdResult.error } });
+          throw new Error(`Guest pass hold failed: ${holdResult.error || 'Insufficient guest passes available'}`);
         }
       }
       
@@ -1005,6 +1005,10 @@ router.post('/api/booking-requests', async (req, res) => {
       logger.error('[BookingRequest] Post-commit operations failed', { extra: { postCommitError } });
     }
   } catch (error: unknown) {
+    const errMsg = error instanceof Error ? error.message : String(error);
+    if (errMsg.includes('Guest pass hold failed:')) {
+      return res.status(402).json({ error: errMsg });
+    }
     const { isConstraintError } = await import('../../core/db');
     const constraint = isConstraintError(error);
     if (constraint.type === 'unique') {
