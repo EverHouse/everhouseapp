@@ -235,6 +235,7 @@ export const bookingSessions = pgTable("booking_sessions", {
 }, (table) => [
   index("booking_sessions_resource_date_idx").on(table.resourceId, table.sessionDate),
   index("booking_sessions_trackman_idx").on(table.trackmanBookingId),
+  uniqueIndex("booking_sessions_resource_datetime_unique").on(table.resourceId, table.sessionDate, table.startTime, table.endTime),
 ]);
 
 // Guests table - persistent guest tracking across bookings
@@ -291,11 +292,15 @@ export const bookingParticipants = pgTable("booking_participants", {
   usedGuestPass: boolean("used_guest_pass"),
   waiverReviewedAt: timestamp("waiver_reviewed_at"),
   cachedFeeCents: integer("cached_fee_cents"),
+  refundedAt: timestamp("refunded_at", { withTimezone: true }),
   createdAt: timestamp("created_at").defaultNow(),
 }, (table) => [
   index("booking_participants_session_idx").on(table.sessionId),
   index("booking_participants_user_idx").on(table.userId),
   index("booking_participants_guest_idx").on(table.guestId),
+  uniqueIndex("booking_participants_session_user_unique_idx")
+    .on(table.sessionId, table.userId)
+    .where(sql`user_id IS NOT NULL`),
 ]);
 
 export type BookingSession = typeof bookingSessions.$inferSelect;

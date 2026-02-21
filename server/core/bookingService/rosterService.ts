@@ -1,7 +1,6 @@
 import { db } from '../../db';
-import { pool } from '../db';
-import { bookingParticipants, bookingRequests } from '../../../shared/schema';
-import { eq } from 'drizzle-orm';
+import { bookingParticipants, bookingRequests, users, resources } from '../../../shared/schema';
+import { eq, sql, and } from 'drizzle-orm';
 import { logger } from '../logger';
 import {
   createOrFindGuest,
@@ -202,8 +201,7 @@ export async function isStaffOrAdminCheck(email: string): Promise<boolean> {
 }
 
 export async function getBookingWithSession(bookingId: number): Promise<BookingWithSession | null> {
-  const result = await pool.query(
-    `SELECT 
+  const result = await db.execute(sql`SELECT 
       br.id as booking_id,
       br.user_email as owner_email,
       br.user_name as owner_name,
@@ -224,9 +222,7 @@ export async function getBookingWithSession(bookingId: number): Promise<BookingW
     FROM booking_requests br
     LEFT JOIN resources r ON br.resource_id = r.id
     LEFT JOIN users u ON LOWER(br.user_email) = LOWER(u.email)
-    WHERE br.id = $1`,
-    [bookingId]
-  );
+    WHERE br.id = ${bookingId}`);
   return (result.rows[0] as BookingWithSession) || null;
 }
 
@@ -244,14 +240,11 @@ export async function getBookingParticipants(
   const isStaff = await isStaffOrAdminCheck(userEmail);
 
   if (!isOwner && !isStaff) {
-    const participantCheck = await pool.query(
-      `SELECT 1 FROM booking_participants bp
+    const participantCheck = await db.execute(sql`SELECT 1 FROM booking_participants bp
        JOIN booking_sessions bs ON bp.session_id = bs.id
        JOIN booking_requests br ON br.session_id = bs.id
-       WHERE br.id = $1 AND bp.user_id = $2
-       LIMIT 1`,
-      [bookingId, sessionUser.id || userEmail]
-    );
+       WHERE br.id = ${bookingId} AND bp.user_id = ${sessionUser.id || userEmail}
+       LIMIT 1`);
     if (participantCheck.rows.length === 0) {
       throw Object.assign(new Error('Access denied'), { statusCode: 403 });
     }
@@ -282,35 +275,33 @@ export async function getBookingParticipants(
         if (p.participantType === 'owner') {
           let ownerName = booking.owner_name;
           if (!ownerName && booking.owner_email) {
-            const ownerLookup = await pool.query(
-              `SELECT first_name, last_name FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1`,
-              [booking.owner_email]
-            );
-            if (ownerLookup.rows.length > 0) {
-              ownerName = [ownerLookup.rows[0].first_name, ownerLookup.rows[0].last_name].filter(Boolean).join(' ') || null;
+            const ownerLookup = await db.select({ firstName: users.firstName, lastName: users.lastName })
+              .from(users)
+              .where(sql`LOWER(${users.email}) = LOWER(${booking.owner_email})`)
+              .limit(1);
+            if (ownerLookup.length > 0) {
+              ownerName = [ownerLookup[0].firstName, ownerLookup[0].lastName].filter(Boolean).join(' ') || null;
             }
           }
           if (ownerName) {
             participants[i] = { ...p, displayName: ownerName };
-            await pool.query(
-              `UPDATE booking_participants SET display_name = $1 WHERE id = $2`,
-              [ownerName, p.id]
-            );
+            await db.update(bookingParticipants)
+              .set({ displayName: ownerName })
+              .where(eq(bookingParticipants.id, p.id));
           }
         } else if (p.participantType === 'member' && p.userId) {
-          const userResult = await pool.query(
-            `SELECT first_name, last_name FROM users WHERE id = $1 LIMIT 1`,
-            [p.userId]
-          );
-          if (userResult.rows.length > 0) {
-            const { first_name, last_name } = userResult.rows[0];
-            const fullName = [first_name, last_name].filter(Boolean).join(' ');
+          const userResult = await db.select({ firstName: users.firstName, lastName: users.lastName })
+            .from(users)
+            .where(eq(users.id, p.userId))
+            .limit(1);
+          if (userResult.length > 0) {
+            const { firstName, lastName } = userResult[0];
+            const fullName = [firstName, lastName].filter(Boolean).join(' ');
             if (fullName) {
               participants[i] = { ...p, displayName: fullName };
-              await pool.query(
-                `UPDATE booking_participants SET display_name = $1 WHERE id = $2`,
-                [participants[i].displayName, p.id]
-              );
+              await db.update(bookingParticipants)
+                .set({ displayName: participants[i].displayName })
+                .where(eq(bookingParticipants.id, p.id));
             }
           }
         }
@@ -329,11 +320,11 @@ export async function getBookingParticipants(
 
   let resourceTypeForRoster = 'simulator';
   if (booking.resource_id) {
-    const resourceResult = await pool.query(
-      'SELECT type FROM resources WHERE id = $1',
-      [booking.resource_id]
-    );
-    resourceTypeForRoster = resourceResult.rows[0]?.type || 'simulator';
+    const resourceResult = await db.select({ type: resources.type })
+      .from(resources)
+      .where(eq(resources.id, booking.resource_id))
+      .limit(1);
+    resourceTypeForRoster = resourceResult[0]?.type || 'simulator';
   }
 
   if (ownerTier) {
@@ -404,22 +395,22 @@ export async function previewRosterFees(
         if (booking.owner_name) {
           resolvedName = booking.owner_name;
         } else if (booking.owner_email) {
-          const ownerLookup = await pool.query(
-            `SELECT first_name, last_name FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1`,
-            [booking.owner_email]
-          );
-          if (ownerLookup.rows.length > 0) {
-            const fullName = [ownerLookup.rows[0].first_name, ownerLookup.rows[0].last_name].filter(Boolean).join(' ');
+          const ownerLookup = await db.select({ firstName: users.firstName, lastName: users.lastName })
+            .from(users)
+            .where(sql`LOWER(${users.email}) = LOWER(${booking.owner_email})`)
+            .limit(1);
+          if (ownerLookup.length > 0) {
+            const fullName = [ownerLookup[0].firstName, ownerLookup[0].lastName].filter(Boolean).join(' ');
             if (fullName) resolvedName = fullName;
           }
         }
       } else if (p.userId) {
-        const userResult = await pool.query(
-          `SELECT first_name, last_name FROM users WHERE id = $1 LIMIT 1`,
-          [p.userId]
-        );
-        if (userResult.rows.length > 0) {
-          const fullName = [userResult.rows[0].first_name, userResult.rows[0].last_name].filter(Boolean).join(' ');
+        const userResult = await db.select({ firstName: users.firstName, lastName: users.lastName })
+          .from(users)
+          .where(eq(users.id, p.userId))
+          .limit(1);
+        if (userResult.length > 0) {
+          const fullName = [userResult[0].firstName, userResult[0].lastName].filter(Boolean).join(' ');
           if (fullName) resolvedName = fullName;
         }
       }
@@ -449,14 +440,14 @@ export async function previewRosterFees(
   let resourceCapacity: number | null = null;
   let isConferenceRoom = false;
   if (booking.resource_id) {
-    const resourceResult = await pool.query(
-      'SELECT capacity, type FROM resources WHERE id = $1',
-      [booking.resource_id]
-    );
-    if (resourceResult.rows[0]?.capacity) {
-      resourceCapacity = resourceResult.rows[0].capacity;
+    const resourceResult = await db.select({ capacity: resources.capacity, type: resources.type })
+      .from(resources)
+      .where(eq(resources.id, booking.resource_id))
+      .limit(1);
+    if (resourceResult[0]?.capacity) {
+      resourceCapacity = resourceResult[0].capacity;
     }
-    isConferenceRoom = resourceResult.rows[0]?.type === 'conference_room';
+    isConferenceRoom = resourceResult[0]?.type === 'conference_room';
   }
 
   const ownerInAll = allParticipants.some(p => p.participantType === 'owner');
@@ -570,24 +561,18 @@ export async function previewRosterFees(
   let allPaid = false;
   if (booking.session_id) {
     const [paidCheck, feeSnapshotCheck] = await Promise.all([
-      pool.query(
-        `SELECT 
+      db.execute(sql`SELECT 
            COUNT(*) FILTER (WHERE payment_status = 'paid') as paid_count,
            COUNT(*) FILTER (WHERE cached_fee_cents > 0) as total_with_fees,
            COUNT(*) FILTER (WHERE payment_status = 'pending' OR (payment_status IS NULL AND cached_fee_cents > 0)) as pending_count
          FROM booking_participants 
-         WHERE session_id = $1`,
-        [booking.session_id]
-      ),
-      pool.query(
-        `SELECT id, total_cents FROM booking_fee_snapshots WHERE session_id = $1 AND status IN ('completed', 'paid') ORDER BY created_at DESC LIMIT 1`,
-        [booking.session_id]
-      ),
+         WHERE session_id = ${booking.session_id}`),
+      db.execute(sql`SELECT id, total_cents FROM booking_fee_snapshots WHERE session_id = ${booking.session_id} AND status IN ('completed', 'paid') ORDER BY created_at DESC LIMIT 1`),
     ]);
 
-    const paidCount = parseInt(paidCheck.rows[0]?.paid_count || '0');
-    const totalWithFees = parseInt(paidCheck.rows[0]?.total_with_fees || '0');
-    const pendingCount = parseInt(paidCheck.rows[0]?.pending_count || '0');
+    const paidCount = parseInt((paidCheck.rows[0] as Record<string, string>)?.paid_count || '0');
+    const totalWithFees = parseInt((paidCheck.rows[0] as Record<string, string>)?.total_with_fees || '0');
+    const pendingCount = parseInt((paidCheck.rows[0] as Record<string, string>)?.pending_count || '0');
     const hasCompletedFeeSnapshot = feeSnapshotCheck.rows.length > 0;
     const hasPaidFees = paidCount > 0;
     const hasOriginalFees = totalWithFees > 0;
@@ -855,26 +840,20 @@ export async function addParticipant(params: AddParticipantParams): Promise<AddP
     throw createServiceError('Only the booking owner or staff can add participants', 403);
   }
 
-  const client = await pool.connect();
   let newRosterVersion: number;
 
-  try {
-    await client.query('BEGIN');
-
-    const lockedBooking = await client.query(
-      `SELECT roster_version FROM booking_requests WHERE id = $1 FOR UPDATE`,
-      [bookingId]
-    );
+  return await db.transaction(async (tx) => {
+    const lockedBooking = await tx.execute(sql`
+      SELECT roster_version FROM booking_requests WHERE id = ${bookingId} FOR UPDATE
+    `);
 
     if (!lockedBooking.rows.length) {
-      await client.query('ROLLBACK');
       throw createServiceError('Booking not found', 404);
     }
 
-    const currentVersion = lockedBooking.rows[0].roster_version ?? 0;
+    const currentVersion = (lockedBooking.rows[0] as Record<string, number>).roster_version ?? 0;
 
     if (rosterVersion !== undefined && currentVersion !== rosterVersion) {
-      await client.query('ROLLBACK');
       throw createServiceError('Roster was modified by another user', 409, {
         code: 'ROSTER_CONFLICT',
         currentVersion
@@ -897,12 +876,11 @@ export async function addParticipant(params: AddParticipantParams): Promise<AddP
         ownerEmail: booking.owner_email,
         source: 'staff_manual',
         createdBy: userEmail
-      }, client);
+      }, tx);
 
       sessionId = sessionResult.sessionId || null;
 
       if (!sessionId || sessionResult.error) {
-        await client.query('ROLLBACK');
         throw createServiceError('Failed to create billing session for this booking. Staff has been notified.', 500);
       }
 
@@ -917,7 +895,6 @@ export async function addParticipant(params: AddParticipantParams): Promise<AddP
     const effectiveCount = ownerInParticipants ? existingParticipants.length : (1 + existingParticipants.length);
 
     if (effectiveCount >= declaredCount) {
-      await client.query('ROLLBACK');
       throw createServiceError('Cannot add more participants. Maximum slot limit reached.', 400, {
         declaredPlayerCount: declaredCount,
         currentCount: effectiveCount
@@ -929,21 +906,24 @@ export async function addParticipant(params: AddParticipantParams): Promise<AddP
     let matchingGuestName: string | null = null;
 
     if (type === 'member') {
-      const memberResult = await pool.query(
-        `SELECT id, email, first_name, last_name FROM users WHERE id = $1 OR LOWER(email) = LOWER($1) LIMIT 1`,
-        [userId]
-      );
+      const memberResult = await db.select({
+        id: users.id,
+        email: users.email,
+        firstName: users.firstName,
+        lastName: users.lastName
+      }).from(users)
+        .where(sql`${users.id} = ${userId} OR LOWER(${users.email}) = LOWER(${userId})`)
+        .limit(1);
 
-      if (memberResult.rows.length === 0) {
-        await client.query('ROLLBACK');
+      if (memberResult.length === 0) {
         throw createServiceError('Member not found', 404);
       }
 
       memberInfo = {
-        id: memberResult.rows[0].id,
-        email: memberResult.rows[0].email,
-        firstName: memberResult.rows[0].first_name,
-        lastName: memberResult.rows[0].last_name
+        id: memberResult[0].id,
+        email: memberResult[0].email!,
+        firstName: memberResult[0].firstName!,
+        lastName: memberResult[0].lastName!
       };
 
       const existingMember = existingParticipants.find(p =>
@@ -951,7 +931,6 @@ export async function addParticipant(params: AddParticipantParams): Promise<AddP
         p.userId?.toLowerCase() === memberInfo!.email?.toLowerCase()
       );
       if (existingMember) {
-        await client.query('ROLLBACK');
         throw createServiceError('This member is already a participant', 400);
       }
 
@@ -1015,7 +994,6 @@ export async function addParticipant(params: AddParticipantParams): Promise<AddP
           }
         });
 
-        await client.query('ROLLBACK');
         throw createServiceError(
           `This member has a scheduling conflict with another booking on ${booking.request_date}`,
           409,
@@ -1050,7 +1028,6 @@ export async function addParticipant(params: AddParticipantParams): Promise<AddP
       const socialCheck = await enforceSocialTierRules(ownerTier, participantsForValidation);
 
       if (!socialCheck.allowed) {
-        await client.query('ROLLBACK');
         throw createServiceError(
           socialCheck.reason || 'Social tier members cannot bring guests',
           403,
@@ -1080,7 +1057,6 @@ export async function addParticipant(params: AddParticipantParams): Promise<AddP
         await ensureGuestPassRecord(booking.owner_email, ownerTier || undefined);
         const guestPassResult = await useGuestPass(booking.owner_email, guest!.name, true);
         if (!guestPassResult.success) {
-          await client.query('ROLLBACK');
           throw createServiceError(
             guestPassResult.error || 'No guest passes remaining',
             400,
@@ -1116,21 +1092,18 @@ export async function addParticipant(params: AddParticipantParams): Promise<AddP
     let guestPassesRemaining: number | undefined;
     if (type === 'guest' && newParticipant) {
       if (params.useGuestPass !== false) {
-        await client.query(
-          `UPDATE booking_participants SET payment_status = 'paid', used_guest_pass = true WHERE id = $1`,
-          [newParticipant.id]
-        );
+        await tx.update(bookingParticipants)
+          .set({ paymentStatus: 'paid' as const, usedGuestPass: true })
+          .where(eq(bookingParticipants.id, newParticipant.id));
 
-        const passResult = await client.query(
-          `SELECT passes_total - passes_used as remaining FROM guest_passes WHERE LOWER(member_email) = LOWER($1)`,
-          [booking.owner_email]
-        );
-        guestPassesRemaining = passResult.rows[0]?.remaining ?? 0;
+        const passResult = await tx.execute(sql`
+          SELECT passes_total - passes_used as remaining FROM guest_passes WHERE LOWER(member_email) = LOWER(${booking.owner_email})
+        `);
+        guestPassesRemaining = (passResult.rows[0] as Record<string, number>)?.remaining ?? 0;
       } else {
-        await client.query(
-          `UPDATE booking_participants SET payment_status = 'pending', used_guest_pass = false WHERE id = $1`,
-          [newParticipant.id]
-        );
+        await tx.update(bookingParticipants)
+          .set({ paymentStatus: 'pending' as const, usedGuestPass: false })
+          .where(eq(bookingParticipants.id, newParticipant.id));
       }
     }
 
@@ -1159,14 +1132,13 @@ export async function addParticipant(params: AddParticipantParams): Promise<AddP
       }
 
       if (matchingGuestId !== null) {
-        const guestCheckResult = await client.query(
-          `SELECT id, display_name, used_guest_pass FROM booking_participants 
-           WHERE id = $1 AND session_id = $2 AND participant_type = 'guest' LIMIT 1`,
-          [matchingGuestId, sessionId]
-        );
+        const guestCheckResult = await tx.execute(sql`
+          SELECT id, display_name, used_guest_pass FROM booking_participants 
+          WHERE id = ${matchingGuestId} AND session_id = ${sessionId} AND participant_type = 'guest' LIMIT 1
+        `);
 
         if (guestCheckResult.rows.length > 0) {
-          const guestToRemove = guestCheckResult.rows[0];
+          const guestToRemove = guestCheckResult.rows[0] as Record<string, unknown>;
           logger.info('[rosterService] Removing matching guest after successful member add', {
             extra: {
               bookingId,
@@ -1177,15 +1149,13 @@ export async function addParticipant(params: AddParticipantParams): Promise<AddP
             }
           });
 
-          await client.query(
-            `DELETE FROM booking_participants WHERE id = $1`,
-            [guestToRemove.id]
-          );
+          await tx.delete(bookingParticipants)
+            .where(eq(bookingParticipants.id, guestToRemove.id as number));
 
           if (guestToRemove.used_guest_pass === true) {
             const refundResult = await refundGuestPass(
               booking.owner_email,
-              guestToRemove.display_name || undefined,
+              guestToRemove.display_name as string || undefined,
               true
             );
 
@@ -1242,29 +1212,30 @@ export async function addParticipant(params: AddParticipantParams): Promise<AddP
 
         if (Number(recalcResult.billingResult.totalFees) > 0) {
           try {
-            const ownerResult = await pool.query(
-              `SELECT u.id, u.email, u.first_name, u.last_name 
-               FROM users u 
-               WHERE LOWER(u.email) = LOWER($1)
-               LIMIT 1`,
-              [booking.owner_email]
-            );
+            const ownerResult = await db.select({
+              id: users.id,
+              email: users.email,
+              firstName: users.firstName,
+              lastName: users.lastName
+            }).from(users)
+              .where(sql`LOWER(${users.email}) = LOWER(${booking.owner_email})`)
+              .limit(1);
 
-            const owner = ownerResult.rows[0];
+            const owner = ownerResult[0];
             const ownerUserId = owner?.id || null;
-            const ownerName = owner ? `${owner.first_name || ''} ${owner.last_name || ''}`.trim() || booking.owner_email : booking.owner_email;
+            const ownerName = owner ? `${owner.firstName || ''} ${owner.lastName || ''}`.trim() || booking.owner_email : booking.owner_email;
 
-            const feeResult = await pool.query(`
+            const feeResult = await db.execute(sql`
               SELECT SUM(COALESCE(cached_fee_cents, 0)) as total_cents,
                      SUM(CASE WHEN participant_type = 'owner' THEN COALESCE(cached_fee_cents, 0) ELSE 0 END) as overage_cents,
                      SUM(CASE WHEN participant_type = 'guest' THEN COALESCE(cached_fee_cents, 0) ELSE 0 END) as guest_cents
               FROM booking_participants
-              WHERE session_id = $1
-            `, [sessionId]);
+              WHERE session_id = ${sessionId}
+            `);
 
-            const totalCents = parseInt(feeResult.rows[0]?.total_cents || '0');
-            const overageCents = parseInt(feeResult.rows[0]?.overage_cents || '0');
-            const guestCents = parseInt(feeResult.rows[0]?.guest_cents || '0');
+            const totalCents = parseInt((feeResult.rows[0] as Record<string, string>)?.total_cents || '0');
+            const overageCents = parseInt((feeResult.rows[0] as Record<string, string>)?.overage_cents || '0');
+            const guestCents = parseInt((feeResult.rows[0] as Record<string, string>)?.guest_cents || '0');
 
             if (totalCents > 0) {
               const prepayResult = await createPrepaymentIntent({
@@ -1278,10 +1249,12 @@ export async function addParticipant(params: AddParticipantParams): Promise<AddP
               });
 
               if (prepayResult?.paidInFull) {
-                await pool.query(
-                  `UPDATE booking_participants SET payment_status = 'paid' WHERE session_id = $1 AND payment_status = 'pending'`,
-                  [sessionId]
-                );
+                await db.update(bookingParticipants)
+                  .set({ paymentStatus: 'paid' })
+                  .where(and(
+                    eq(bookingParticipants.sessionId, sessionId),
+                    eq(bookingParticipants.paymentStatus, 'pending')
+                  ));
                 logger.info('[rosterService] Prepayment fully covered by credit', {
                   extra: { sessionId, bookingId, totalCents }
                 });
@@ -1306,14 +1279,11 @@ export async function addParticipant(params: AddParticipantParams): Promise<AddP
       }
     }
 
-    await client.query(
-      `UPDATE booking_requests SET roster_version = COALESCE(roster_version, 0) + 1 WHERE id = $1`,
-      [bookingId]
-    );
+    await tx.update(bookingRequests)
+      .set({ rosterVersion: sql`COALESCE(roster_version, 0) + 1` })
+      .where(eq(bookingRequests.id, bookingId));
 
-    newRosterVersion = (lockedBooking.rows[0].roster_version ?? 0) + 1;
-
-    await client.query('COMMIT');
+    newRosterVersion = currentVersion + 1;
 
     return {
       participant: newParticipant,
@@ -1321,12 +1291,7 @@ export async function addParticipant(params: AddParticipantParams): Promise<AddP
       ...(type === 'guest' && { guestPassesRemaining }),
       newRosterVersion
     };
-  } catch (txError: unknown) {
-    try { await client.query('ROLLBACK'); } catch (_) { /* already rolled back */ }
-    throw txError;
-  } finally {
-    client.release();
-  }
+  });
 }
 
 // ─── removeParticipant ─────────────────────────────────────────
@@ -1365,11 +1330,11 @@ export async function removeParticipant(params: RemoveParticipantParams): Promis
 
   let isSelf = false;
   if (participant.userId) {
-    const userResult = await pool.query(
-      `SELECT id FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1`,
-      [userEmail]
-    );
-    if (userResult.rows.length > 0 && userResult.rows[0].id === participant.userId) {
+    const userResult = await db.select({ id: users.id })
+      .from(users)
+      .where(sql`LOWER(${users.email}) = LOWER(${userEmail})`)
+      .limit(1);
+    if (userResult.length > 0 && userResult[0].id === participant.userId) {
       isSelf = true;
     }
   }
@@ -1382,26 +1347,20 @@ export async function removeParticipant(params: RemoveParticipantParams): Promis
     throw createServiceError('Cannot remove the booking owner', 400);
   }
 
-  const client = await pool.connect();
   let newRosterVersion: number;
 
-  try {
-    await client.query('BEGIN');
-
-    const lockedBooking = await client.query(
-      `SELECT roster_version FROM booking_requests WHERE id = $1 FOR UPDATE`,
-      [bookingId]
-    );
+  return await db.transaction(async (tx) => {
+    const lockedBooking = await tx.execute(sql`
+      SELECT roster_version FROM booking_requests WHERE id = ${bookingId} FOR UPDATE
+    `);
 
     if (!lockedBooking.rows.length) {
-      await client.query('ROLLBACK');
       throw createServiceError('Booking not found', 404);
     }
 
-    const currentVersion = lockedBooking.rows[0].roster_version ?? 0;
+    const currentVersion = (lockedBooking.rows[0] as Record<string, number>).roster_version ?? 0;
 
     if (rosterVersion !== undefined && currentVersion !== rosterVersion) {
-      await client.query('ROLLBACK');
       throw createServiceError('Roster was modified by another user', 409, {
         code: 'ROSTER_CONFLICT',
         currentVersion
@@ -1437,10 +1396,8 @@ export async function removeParticipant(params: RemoveParticipantParams): Promis
       }
     }
 
-    await client.query(
-      `DELETE FROM booking_participants WHERE id = $1`,
-      [participantId]
-    );
+    await tx.delete(bookingParticipants)
+      .where(eq(bookingParticipants.id, participantId));
 
     logger.info('[rosterService] Participant removed', {
       extra: {
@@ -1481,26 +1438,18 @@ export async function removeParticipant(params: RemoveParticipantParams): Promis
       }
     }
 
-    await client.query(
-      `UPDATE booking_requests SET roster_version = COALESCE(roster_version, 0) + 1 WHERE id = $1`,
-      [bookingId]
-    );
+    await tx.update(bookingRequests)
+      .set({ rosterVersion: sql`COALESCE(roster_version, 0) + 1` })
+      .where(eq(bookingRequests.id, bookingId));
 
-    newRosterVersion = (lockedBooking.rows[0].roster_version ?? 0) + 1;
-
-    await client.query('COMMIT');
+    newRosterVersion = currentVersion + 1;
 
     return {
       message: 'Participant removed successfully',
       ...(participant.participantType === 'guest' && guestPassesRemaining !== undefined && { guestPassesRemaining }),
       newRosterVersion
     };
-  } catch (txError: unknown) {
-    try { await client.query('ROLLBACK'); } catch (_) { /* already rolled back */ }
-    throw txError;
-  } finally {
-    client.release();
-  }
+  });
 }
 
 // ─── updateDeclaredPlayerCount ─────────────────────────────────
@@ -1515,31 +1464,25 @@ export async function updateDeclaredPlayerCount(params: UpdatePlayerCountParams)
     logger.warn('[rosterService] Roster lock check failed (non-blocking)', { extra: { bookingId, error: getErrorMessage(lockErr) } });
   }
 
-  const client = await pool.connect();
-  try {
-    await client.query('BEGIN');
-
+  return await db.transaction(async (tx) => {
     // Step 1: SELECT booking info (inside transaction for consistency)
-    const bookingResult = await client.query(`
+    const bookingResult = await tx.execute(sql`
       SELECT br.id, br.declared_player_count, br.session_id, br.user_email, br.status
       FROM booking_requests br
-      WHERE br.id = $1
-    `, [bookingId]);
+      WHERE br.id = ${bookingId}
+    `);
 
     if (bookingResult.rows.length === 0) {
-      await client.query('ROLLBACK');
       throw createServiceError('Booking not found', 404);
     }
 
-    const booking = bookingResult.rows[0];
-    const previousCount = booking.declared_player_count || 1;
+    const booking = bookingResult.rows[0] as Record<string, unknown>;
+    const previousCount = (booking.declared_player_count as number) || 1;
 
     // Step 2: UPDATE declared_player_count
-    await client.query(`
-      UPDATE booking_requests 
-      SET declared_player_count = $1
-      WHERE id = $2
-    `, [playerCount, bookingId]);
+    await tx.update(bookingRequests)
+      .set({ declaredPlayerCount: playerCount })
+      .where(eq(bookingRequests.id, bookingId));
 
     if (booking.session_id) {
       logger.info('[rosterService] Skipping legacy booking_members sync for session-based booking', {
@@ -1547,16 +1490,13 @@ export async function updateDeclaredPlayerCount(params: UpdatePlayerCountParams)
       });
     }
 
-    // Commit the transaction
-    await client.query('COMMIT');
-
     // Step 5 (OUTSIDE transaction): Recalculate fees - non-critical, fire-and-forget
     if (!params.deferFeeRecalc) {
       if (booking.session_id) {
         try {
-          await recalculateSessionFees(booking.session_id, 'roster_update');
+          await recalculateSessionFees(booking.session_id as number, 'roster_update');
 
-          syncBookingInvoice(bookingId, booking.session_id).catch(err => {
+          syncBookingInvoice(bookingId, booking.session_id as number).catch(err => {
             logger.warn('[rosterService] Non-blocking: draft invoice sync failed after roster change', { extra: { error: getErrorMessage(err), bookingId, sessionId: booking.session_id } });
           });
         } catch (feeError: unknown) {
@@ -1578,17 +1518,7 @@ export async function updateDeclaredPlayerCount(params: UpdatePlayerCountParams)
       newCount: playerCount,
       feesRecalculated: !!booking.session_id
     };
-  } catch (error: unknown) {
-    await client.query('ROLLBACK');
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    logger.error('[rosterService] Transaction failed while updating player count', {
-      error: error as Error,
-      extra: { bookingId, playerCount, errorMessage }
-    });
-    throw error;
-  } finally {
-    client.release();
-  }
+  });
 }
 
 // ─── Batch Roster Update ──────────────────────────────────────
@@ -1635,28 +1565,22 @@ export async function applyRosterBatch(params: BatchRosterUpdateParams): Promise
     throw createServiceError('Only staff or admin can perform batch roster updates', 403);
   }
 
-  const client = await pool.connect();
   const operationResults: Array<{ type: string; success: boolean; error?: string }> = [];
   let sessionId = booking.session_id;
   let newRosterVersion: number;
 
-  try {
-    await client.query('BEGIN');
-
-    const lockedBooking = await client.query(
-      `SELECT roster_version FROM booking_requests WHERE id = $1 FOR UPDATE`,
-      [bookingId]
-    );
+  await db.transaction(async (tx) => {
+    const lockedBooking = await tx.execute(sql`
+      SELECT roster_version FROM booking_requests WHERE id = ${bookingId} FOR UPDATE
+    `);
 
     if (!lockedBooking.rows.length) {
-      await client.query('ROLLBACK');
       throw createServiceError('Booking not found', 404);
     }
 
-    const currentVersion = lockedBooking.rows[0].roster_version ?? 0;
+    const currentVersion = (lockedBooking.rows[0] as Record<string, number>).roster_version ?? 0;
 
     if (currentVersion !== rosterVersion) {
-      await client.query('ROLLBACK');
       throw createServiceError('Roster was modified by another user', 409, {
         code: 'ROSTER_CONFLICT',
         currentVersion
@@ -1677,12 +1601,11 @@ export async function applyRosterBatch(params: BatchRosterUpdateParams): Promise
         ownerEmail: booking.owner_email,
         source: 'staff_manual',
         createdBy: staffEmail
-      }, client);
+      }, tx);
 
       sessionId = sessionResult.sessionId || null;
 
       if (!sessionId || sessionResult.error) {
-        await client.query('ROLLBACK');
         throw createServiceError('Failed to create billing session for this booking. Staff has been notified.', 500);
       }
 
@@ -1703,16 +1626,14 @@ export async function applyRosterBatch(params: BatchRosterUpdateParams): Promise
               break;
             }
 
-            const prevResult = await client.query(
-              `SELECT declared_player_count FROM booking_requests WHERE id = $1`,
-              [bookingId]
-            );
-            const previousCount = prevResult.rows[0]?.declared_player_count || 1;
+            const prevResult = await tx.execute(sql`
+              SELECT declared_player_count FROM booking_requests WHERE id = ${bookingId}
+            `);
+            const previousCount = (prevResult.rows[0] as Record<string, number>)?.declared_player_count || 1;
 
-            await client.query(
-              `UPDATE booking_requests SET declared_player_count = $1 WHERE id = $2`,
-              [pc, bookingId]
-            );
+            await tx.update(bookingRequests)
+              .set({ declaredPlayerCount: pc })
+              .where(eq(bookingRequests.id, bookingId));
 
             logger.info('[rosterService:batch] Player count updated', {
               extra: { bookingId, previousCount, newCount: pc }
@@ -1727,18 +1648,17 @@ export async function applyRosterBatch(params: BatchRosterUpdateParams): Promise
               break;
             }
 
-            const partResult = await client.query(
-              `SELECT id, user_id, guest_id, participant_type, display_name, used_guest_pass
-               FROM booking_participants WHERE id = $1 AND session_id = $2 LIMIT 1`,
-              [op.participantId, sessionId]
-            );
+            const partResult = await tx.execute(sql`
+              SELECT id, user_id, guest_id, participant_type, display_name, used_guest_pass
+              FROM booking_participants WHERE id = ${op.participantId} AND session_id = ${sessionId} LIMIT 1
+            `);
 
             if (partResult.rows.length === 0) {
               operationResults.push({ type: op.type, success: false, error: 'Participant not found in this session' });
               break;
             }
 
-            const participant = partResult.rows[0];
+            const participant = partResult.rows[0] as Record<string, unknown>;
 
             if (participant.participant_type === 'owner') {
               operationResults.push({ type: op.type, success: false, error: 'Cannot remove the booking owner' });
@@ -1747,7 +1667,7 @@ export async function applyRosterBatch(params: BatchRosterUpdateParams): Promise
 
             if (participant.participant_type === 'guest') {
               try {
-                await refundGuestPass(booking.owner_email, participant.display_name || undefined, true);
+                await refundGuestPass(booking.owner_email, participant.display_name as string || undefined, true);
               } catch (refundErr: unknown) {
                 logger.warn('[rosterService:batch] Failed to refund guest pass (non-blocking)', {
                   error: refundErr as Error,
@@ -1756,10 +1676,8 @@ export async function applyRosterBatch(params: BatchRosterUpdateParams): Promise
               }
             }
 
-            await client.query(
-              `DELETE FROM booking_participants WHERE id = $1`,
-              [op.participantId]
-            );
+            await tx.delete(bookingParticipants)
+              .where(eq(bookingParticipants.id, op.participantId));
 
             logger.info('[rosterService:batch] Participant removed', {
               extra: { bookingId, participantId: op.participantId, participantType: participant.participant_type }
@@ -1774,21 +1692,25 @@ export async function applyRosterBatch(params: BatchRosterUpdateParams): Promise
               break;
             }
 
-            const memberResult = await pool.query(
-              `SELECT id, email, first_name, last_name FROM users WHERE id = $1 OR LOWER(email) = LOWER($1) LIMIT 1`,
-              [op.memberIdOrEmail]
-            );
+            const memberResult = await db.select({
+              id: users.id,
+              email: users.email,
+              firstName: users.firstName,
+              lastName: users.lastName
+            }).from(users)
+              .where(sql`${users.id} = ${op.memberIdOrEmail} OR LOWER(${users.email}) = LOWER(${op.memberIdOrEmail})`)
+              .limit(1);
 
-            if (memberResult.rows.length === 0) {
+            if (memberResult.length === 0) {
               operationResults.push({ type: op.type, success: false, error: 'Member not found' });
               break;
             }
 
             const memberInfo = {
-              id: memberResult.rows[0].id,
-              email: memberResult.rows[0].email,
-              firstName: memberResult.rows[0].first_name,
-              lastName: memberResult.rows[0].last_name
+              id: memberResult[0].id,
+              email: memberResult[0].email!,
+              firstName: memberResult[0].firstName!,
+              lastName: memberResult[0].lastName!
             };
 
             const existingParticipants = await getSessionParticipants(sessionId!);
@@ -1840,22 +1762,19 @@ export async function applyRosterBatch(params: BatchRosterUpdateParams): Promise
             }
 
             if (matchingGuest) {
-              const guestCheckResult = await client.query(
-                `SELECT id, display_name, used_guest_pass FROM booking_participants 
-                 WHERE id = $1 AND session_id = $2 AND participant_type = 'guest' LIMIT 1`,
-                [matchingGuest.id, sessionId]
-              );
+              const guestCheckResult = await tx.execute(sql`
+                SELECT id, display_name, used_guest_pass FROM booking_participants 
+                WHERE id = ${matchingGuest.id} AND session_id = ${sessionId} AND participant_type = 'guest' LIMIT 1
+              `);
 
               if (guestCheckResult.rows.length > 0) {
-                const guestToRemove = guestCheckResult.rows[0];
-                await client.query(
-                  `DELETE FROM booking_participants WHERE id = $1`,
-                  [guestToRemove.id]
-                );
+                const guestToRemove = guestCheckResult.rows[0] as Record<string, unknown>;
+                await tx.delete(bookingParticipants)
+                  .where(eq(bookingParticipants.id, guestToRemove.id as number));
 
                 if (guestToRemove.used_guest_pass === true) {
                   try {
-                    await refundGuestPass(booking.owner_email, guestToRemove.display_name || undefined, true);
+                    await refundGuestPass(booking.owner_email, guestToRemove.display_name as string || undefined, true);
                   } catch (refundErr: unknown) {
                     logger.warn('[rosterService:batch] Failed to refund guest pass on replacement (non-blocking)', {
                       error: refundErr as Error,
@@ -1922,10 +1841,9 @@ export async function applyRosterBatch(params: BatchRosterUpdateParams): Promise
             }]);
 
             if (newGuestParticipant) {
-              await client.query(
-                `UPDATE booking_participants SET payment_status = 'paid' WHERE id = $1`,
-                [newGuestParticipant.id]
-              );
+              await tx.update(bookingParticipants)
+                .set({ paymentStatus: 'paid' as const })
+                .where(eq(bookingParticipants.id, newGuestParticipant.id));
             }
 
             logger.info('[rosterService:batch] Guest added', {
@@ -1948,20 +1866,12 @@ export async function applyRosterBatch(params: BatchRosterUpdateParams): Promise
       }
     }
 
-    await client.query(
-      `UPDATE booking_requests SET roster_version = COALESCE(roster_version, 0) + 1 WHERE id = $1`,
-      [bookingId]
-    );
+    await tx.update(bookingRequests)
+      .set({ rosterVersion: sql`COALESCE(roster_version, 0) + 1` })
+      .where(eq(bookingRequests.id, bookingId));
 
     newRosterVersion = currentVersion + 1;
-
-    await client.query('COMMIT');
-  } catch (txError: unknown) {
-    try { await client.query('ROLLBACK'); } catch (_) { /* already rolled back */ }
-    throw txError;
-  } finally {
-    client.release();
-  }
+  });
 
   let feesRecalculated = false;
   if (sessionId) {
@@ -1990,29 +1900,30 @@ export async function applyRosterBatch(params: BatchRosterUpdateParams): Promise
 
       if (Number(recalcResult.billingResult.totalFees) > 0) {
         try {
-          const ownerResult = await pool.query(
-            `SELECT u.id, u.email, u.first_name, u.last_name 
-             FROM users u 
-             WHERE LOWER(u.email) = LOWER($1)
-             LIMIT 1`,
-            [booking.owner_email]
-          );
+          const ownerResult = await db.select({
+            id: users.id,
+            email: users.email,
+            firstName: users.firstName,
+            lastName: users.lastName
+          }).from(users)
+            .where(sql`LOWER(${users.email}) = LOWER(${booking.owner_email})`)
+            .limit(1);
 
-          const owner = ownerResult.rows[0];
+          const owner = ownerResult[0];
           const ownerUserId = owner?.id || null;
-          const ownerName = owner ? `${owner.first_name || ''} ${owner.last_name || ''}`.trim() || booking.owner_email : booking.owner_email;
+          const ownerName = owner ? `${owner.firstName || ''} ${owner.lastName || ''}`.trim() || booking.owner_email : booking.owner_email;
 
-          const feeResult = await pool.query(`
+          const feeResult = await db.execute(sql`
             SELECT SUM(COALESCE(cached_fee_cents, 0)) as total_cents,
                    SUM(CASE WHEN participant_type = 'owner' THEN COALESCE(cached_fee_cents, 0) ELSE 0 END) as overage_cents,
                    SUM(CASE WHEN participant_type = 'guest' THEN COALESCE(cached_fee_cents, 0) ELSE 0 END) as guest_cents
             FROM booking_participants
-            WHERE session_id = $1
-          `, [sessionId]);
+            WHERE session_id = ${sessionId}
+          `);
 
-          const totalCents = parseInt(feeResult.rows[0]?.total_cents || '0');
-          const overageCents = parseInt(feeResult.rows[0]?.overage_cents || '0');
-          const guestCents = parseInt(feeResult.rows[0]?.guest_cents || '0');
+          const totalCents = parseInt((feeResult.rows[0] as Record<string, string>)?.total_cents || '0');
+          const overageCents = parseInt((feeResult.rows[0] as Record<string, string>)?.overage_cents || '0');
+          const guestCents = parseInt((feeResult.rows[0] as Record<string, string>)?.guest_cents || '0');
 
           if (totalCents > 0) {
             const prepayResult = await createPrepaymentIntent({
@@ -2026,10 +1937,12 @@ export async function applyRosterBatch(params: BatchRosterUpdateParams): Promise
             });
 
             if (prepayResult?.paidInFull) {
-              await pool.query(
-                `UPDATE booking_participants SET payment_status = 'paid' WHERE session_id = $1 AND payment_status = 'pending'`,
-                [sessionId]
-              );
+              await db.update(bookingParticipants)
+                .set({ paymentStatus: 'paid' })
+                .where(and(
+                  eq(bookingParticipants.sessionId, sessionId!),
+                  eq(bookingParticipants.paymentStatus, 'pending')
+                ));
               logger.info('[rosterService:batch] Prepayment fully covered by credit', {
                 extra: { sessionId, bookingId, totalCents }
               });

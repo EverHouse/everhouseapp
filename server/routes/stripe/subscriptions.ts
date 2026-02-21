@@ -1,10 +1,9 @@
 import { logger } from '../../core/logger';
 import { Router, Request, Response } from 'express';
 import { isStaffOrAdmin } from '../../core/middleware';
-import { pool } from '../../core/db';
 import { db } from '../../db';
-import { membershipTiers } from '../../../shared/schema';
-import { eq } from 'drizzle-orm';
+import { membershipTiers, users } from '../../../shared/schema';
+import { eq, sql } from 'drizzle-orm';
 import Stripe from 'stripe';
 import {
   createSubscription,
@@ -78,12 +77,9 @@ router.post('/api/stripe/subscriptions', isStaffOrAdmin, async (req: Request, re
         });
         broadcastBillingUpdate({ action: 'subscription_created', memberEmail });
       } else {
-        const memberLookup = await pool.query(
-          'SELECT email FROM users WHERE stripe_customer_id = $1',
-          [customerId]
-        );
-        if (memberLookup.rows.length > 0) {
-          const email = memberLookup.rows[0].email;
+        const memberLookup = await db.select({ email: users.email }).from(users).where(eq(users.stripeCustomerId, customerId));
+        if (memberLookup.length > 0) {
+          const email = memberLookup[0].email;
           sendNotificationToUser(email, {
             type: 'billing_update',
             title: 'Subscription Started',
@@ -111,10 +107,7 @@ router.delete('/api/stripe/subscriptions/:subscriptionId', isStaffOrAdmin, async
   try {
     const { subscriptionId } = req.params;
     
-    const memberLookup = await pool.query(
-      'SELECT email FROM users WHERE stripe_subscription_id = $1',
-      [subscriptionId]
-    );
+    const memberLookup = await db.select({ email: users.email }).from(users).where(eq(users.stripeSubscriptionId, subscriptionId as string));
     
     const result = await cancelSubscription(subscriptionId as string);
     
@@ -123,8 +116,8 @@ router.delete('/api/stripe/subscriptions/:subscriptionId', isStaffOrAdmin, async
     }
     
     try {
-      if (memberLookup.rows.length > 0) {
-        const memberEmail = memberLookup.rows[0].email;
+      if (memberLookup.length > 0) {
+        const memberEmail = memberLookup[0].email;
         sendNotificationToUser(memberEmail, {
           type: 'billing_update',
           title: 'Subscription Cancelled',
@@ -206,18 +199,19 @@ router.post('/api/stripe/subscriptions/create-for-member', isStaffOrAdmin, async
       return res.status(400).json({ error: 'memberEmail and tierName are required' });
     }
     
-    const memberResult = await pool.query(
-      'SELECT id, email, first_name, last_name, tier, stripe_customer_id, billing_provider, stripe_subscription_id FROM users WHERE LOWER(email) = $1',
-      [memberEmail.toLowerCase()]
-    );
+    const memberResult = await db.select({
+      id: users.id, email: users.email, firstName: users.firstName, lastName: users.lastName,
+      tier: users.tier, stripeCustomerId: users.stripeCustomerId, billingProvider: users.billingProvider,
+      stripeSubscriptionId: users.stripeSubscriptionId,
+    }).from(users).where(sql`LOWER(${users.email}) = ${memberEmail.toLowerCase()}`);
     
-    if (memberResult.rows.length === 0) {
+    if (memberResult.length === 0) {
       return res.status(404).json({ error: 'Member not found' });
     }
     
-    const member = memberResult.rows[0];
+    const member = memberResult[0];
     
-    if (member.stripe_subscription_id) {
+    if (member.stripeSubscriptionId) {
       return res.status(400).json({ error: 'Member already has an active subscription' });
     }
     
@@ -236,7 +230,7 @@ router.post('/api/stripe/subscriptions/create-for-member', isStaffOrAdmin, async
       return res.status(400).json({ error: `The "${tierName}" tier is not set up in Stripe yet. Run "Sync to Stripe" from Products & Pricing first.` });
     }
     
-    const memberName = `${member.first_name || ''} ${member.last_name || ''}`.trim() || member.email;
+    const memberName = `${member.firstName || ''} ${member.lastName || ''}`.trim() || member.email;
     const { customerId } = await getOrCreateStripeCustomer(
       member.id.toString(),
       member.email,
@@ -268,16 +262,13 @@ router.post('/api/stripe/subscriptions/create-for-member', isStaffOrAdmin, async
     const memberStatus = (subStatus === 'active' || subStatus === 'trialing') ? 'active' : 'pending';
     
     try {
-      await pool.query(
-        `UPDATE users SET 
-          billing_provider = 'stripe',
-          tier = $1,
-          stripe_subscription_id = $2,
-          membership_status = $4,
-          updated_at = NOW()
-        WHERE id = $3`,
-        [tierName, stripeSubscription?.subscriptionId, member.id, memberStatus]
-      );
+      await db.update(users).set({
+        billingProvider: 'stripe',
+        tier: tierName,
+        stripeSubscriptionId: stripeSubscription?.subscriptionId,
+        membershipStatus: memberStatus,
+        updatedAt: new Date(),
+      }).where(eq(users.id, member.id));
     } catch (dbError) {
       // Database update failed after Stripe subscription was created
       // Roll back the Stripe subscription to prevent charging the customer without granting access
@@ -309,7 +300,7 @@ router.post('/api/stripe/subscriptions/create-for-member', isStaffOrAdmin, async
         tier: tierName,
         subscriptionId: subscriptionResult.subscription?.subscriptionId,
         customerId,
-        previousBillingProvider: member.billing_provider,
+        previousBillingProvider: member.billingProvider,
         previousTier: member.tier
       }
     });
@@ -362,16 +353,16 @@ router.post('/api/stripe/subscriptions/create-new-member', isStaffOrAdmin, async
     const resolved = await resolveUserByEmail(email);
 
     const existingUser = resolved
-      ? await pool.query(
-          `SELECT id, first_name, last_name, membership_status, created_at, archived_at, stripe_customer_id 
-           FROM users WHERE id = $1`,
-          [resolved.userId]
-        )
-      : await pool.query(
-          `SELECT id, first_name, last_name, membership_status, created_at, archived_at, stripe_customer_id 
-           FROM users WHERE LOWER(email) = $1`,
-          [email.toLowerCase()]
-        );
+      ? await db.select({
+          id: users.id, firstName: users.firstName, lastName: users.lastName,
+          membershipStatus: users.membershipStatus, createdAt: users.createdAt,
+          archivedAt: users.archivedAt, stripeCustomerId: users.stripeCustomerId,
+        }).from(users).where(eq(users.id, resolved.userId))
+      : await db.select({
+          id: users.id, firstName: users.firstName, lastName: users.lastName,
+          membershipStatus: users.membershipStatus, createdAt: users.createdAt,
+          archivedAt: users.archivedAt, stripeCustomerId: users.stripeCustomerId,
+        }).from(users).where(sql`LOWER(${users.email}) = ${email.toLowerCase()}`);
 
     if (resolved && resolved.matchType !== 'direct') {
       logger.info('[Stripe] Email resolved to existing user via', { extra: { email, resolvedPrimaryEmail: resolved.primaryEmail, resolvedMatchType: resolved.matchType } });
@@ -379,33 +370,33 @@ router.post('/api/stripe/subscriptions/create-new-member', isStaffOrAdmin, async
     
     let existingUserId: string | null = null;
     
-    if (existingUser.rows.length > 0) {
-      const existing = existingUser.rows[0];
-      if (existing.archived_at && ['non-member', 'visitor', null].includes(existing.membership_status)) {
+    if (existingUser.length > 0) {
+      const existing = existingUser[0];
+      if (existing.archivedAt && ['non-member', 'visitor', null].includes(existing.membershipStatus)) {
         existingUserId = existing.id;
         logger.info('[Stripe] Unarchiving user for new membership creation', { extra: { email } });
-      } else if (existing.membership_status === 'pending') {
+      } else if (existing.membershipStatus === 'pending') {
         existingUserId = existing.id;
         logger.info('[Stripe] Reusing pending user () for new membership creation', { extra: { email, existingId: existing.id } });
-        if (existing.stripe_customer_id) {
+        if (existing.stripeCustomerId) {
           try {
             const stripeClient = await getStripeClient();
-            const subs = await stripeClient.subscriptions.list({ customer: existing.stripe_customer_id, status: 'all', limit: 10 });
+            const subs = await stripeClient.subscriptions.list({ customer: existing.stripeCustomerId, status: 'all', limit: 10 });
             for (const sub of subs.data) {
               if (['active', 'trialing', 'past_due', 'incomplete'].includes(sub.status)) {
                 await stripeClient.subscriptions.cancel(sub.id);
                 logger.info('[Stripe] Cancelled stale subscription during pending user reuse', { extra: { subId: sub.id } });
               }
             }
-            await stripeClient.customers.del(existing.stripe_customer_id);
-            logger.info('[Stripe] Deleted stale Stripe customer during pending user reuse', { extra: { existingStripe_customer_id: existing.stripe_customer_id } });
+            await stripeClient.customers.del(existing.stripeCustomerId);
+            logger.info('[Stripe] Deleted stale Stripe customer during pending user reuse', { extra: { existingStripe_customer_id: existing.stripeCustomerId } });
           } catch (cleanupErr: unknown) {
             logger.error('[Stripe] Failed to cleanup stale Stripe data for pending user:', { extra: { error: getErrorMessage(cleanupErr) } });
           }
-          await pool.query('UPDATE users SET stripe_customer_id = NULL, stripe_subscription_id = NULL WHERE id = $1', [existing.id]);
+          await db.update(users).set({ stripeCustomerId: null, stripeSubscriptionId: null }).where(eq(users.id, existing.id));
         }
       } else {
-        const name = [existing.first_name, existing.last_name].filter(Boolean).join(' ') || email;
+        const name = [existing.firstName, existing.lastName].filter(Boolean).join(' ') || email;
         return res.status(400).json({ 
           error: 'A member with this email already exists',
           existingUserName: name
@@ -432,22 +423,30 @@ router.post('/api/stripe/subscriptions/create-new-member', isStaffOrAdmin, async
     const memberName = `${firstName || ''} ${lastName || ''}`.trim() || email;
     
     if (existingUserId) {
-      await pool.query(
-        `UPDATE users SET archived_at = NULL, archived_by = NULL, first_name = COALESCE($2, first_name), last_name = COALESCE($3, last_name), phone = COALESCE($4, phone), date_of_birth = COALESCE($5, date_of_birth), street_address = COALESCE($6, street_address), city = COALESCE($7, city), state = COALESCE($8, state), zip_code = COALESCE($9, zip_code), tier = $10, membership_status = 'pending', billing_provider = 'stripe', updated_at = NOW() WHERE id = $1`,
-        [existingUserId, firstName || null, lastName || null, phone || null, dob || null, streetAddress || null, city || null, state || null, zipCode || null, tier.name]
-      );
+      await db.execute(sql`UPDATE users SET archived_at = NULL, archived_by = NULL, first_name = COALESCE(${firstName || null}, first_name), last_name = COALESCE(${lastName || null}, last_name), phone = COALESCE(${phone || null}, phone), date_of_birth = COALESCE(${dob || null}, date_of_birth), street_address = COALESCE(${streetAddress || null}, street_address), city = COALESCE(${city || null}, city), state = COALESCE(${state || null}, state), zip_code = COALESCE(${zipCode || null}, zip_code), tier = ${tier.name}, membership_status = 'pending', billing_provider = 'stripe', updated_at = NOW() WHERE id = ${existingUserId}`);
       logger.info('[Stripe] Unarchived and updated existing user with tier', { extra: { email, tierName: tier.name } });
     } else {
-      const exclusionCheck = await pool.query('SELECT 1 FROM sync_exclusions WHERE email = $1', [email.toLowerCase()]);
+      const exclusionCheck = await db.execute(sql`SELECT 1 FROM sync_exclusions WHERE email = ${email.toLowerCase()}`);
       if (exclusionCheck.rows.length > 0) {
         logger.warn('[Stripe] Blocked subscription creation for permanently deleted member', { extra: { email } });
         return res.status(400).json({ error: 'This email belongs to a previously removed member and cannot be re-used for a new membership.' });
       }
-      await pool.query(
-        `INSERT INTO users (id, email, first_name, last_name, phone, date_of_birth, tier, membership_status, billing_provider, street_address, city, state, zip_code, created_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending', 'stripe', $8, $9, $10, $11, NOW())`,
-        [userId, email.toLowerCase(), firstName || null, lastName || null, phone || null, dob || null, tier.name, streetAddress || null, city || null, state || null, zipCode || null]
-      );
+      await db.insert(users).values({
+        id: userId,
+        email: email.toLowerCase(),
+        firstName: firstName || null,
+        lastName: lastName || null,
+        phone: phone || null,
+        dateOfBirth: dob || null,
+        tier: tier.name,
+        membershipStatus: 'pending',
+        billingProvider: 'stripe',
+        streetAddress: streetAddress || null,
+        city: city || null,
+        state: state || null,
+        zipCode: zipCode || null,
+        createdAt: new Date(),
+      });
       logger.info('[Stripe] Created pending user with tier', { extra: { email, tierName: tier.name } });
     }
     
@@ -458,10 +457,7 @@ router.post('/api/stripe/subscriptions/create-new-member', isStaffOrAdmin, async
       tier.name
     );
     
-    await pool.query(
-      'UPDATE users SET stripe_customer_id = $1 WHERE id = $2',
-      [customerId, userId]
-    );
+    await db.update(users).set({ stripeCustomerId: customerId }).where(eq(users.id, userId));
     
     const subscriptionResult = await createSubscription({
       customerId,
@@ -480,21 +476,18 @@ router.post('/api/stripe/subscriptions/create-new-member', isStaffOrAdmin, async
     
     if (!subscriptionResult.success) {
       if (!existingUserId) {
-        await pool.query('DELETE FROM users WHERE id = $1', [userId]);
+        await db.delete(users).where(eq(users.id, userId));
       } else {
-        await pool.query(
-          `UPDATE users SET membership_status = 'non-member', tier = NULL, billing_provider = NULL, archived_at = NOW(), archived_by = 'system_rollback', updated_at = NOW() WHERE id = $1`,
-          [userId]
-        );
+        await db.update(users).set({
+          membershipStatus: 'non-member', tier: null, billingProvider: null,
+          archivedAt: new Date(), archivedBy: 'system_rollback', updatedAt: new Date(),
+        }).where(eq(users.id, userId));
       }
       return res.status(500).json({ error: subscriptionResult.error || 'Failed to create subscription' });
     }
     
     try {
-      await pool.query(
-        'UPDATE users SET stripe_subscription_id = $1 WHERE id = $2',
-        [subscriptionResult.subscription?.subscriptionId, userId]
-      );
+      await db.update(users).set({ stripeSubscriptionId: subscriptionResult.subscription?.subscriptionId }).where(eq(users.id, userId));
     } catch (dbError: unknown) {
       logger.error('[Stripe] DB update failed after subscription creation. Rolling back...', { extra: { dbError: getErrorMessage(dbError) } });
       if (subscriptionResult.subscription?.subscriptionId) {
@@ -502,12 +495,12 @@ router.post('/api/stripe/subscriptions/create-new-member', isStaffOrAdmin, async
           await cancelSubscription(subscriptionResult.subscription.subscriptionId);
           logger.info('[Stripe] Emergency rollback: cancelled subscription', { extra: { subscriptionResultSubscriptionSubscriptionId: subscriptionResult.subscription.subscriptionId } });
           if (!existingUserId) {
-            await pool.query('DELETE FROM users WHERE id = $1', [userId]);
+            await db.delete(users).where(eq(users.id, userId));
           } else {
-            await pool.query(
-              `UPDATE users SET membership_status = 'non-member', tier = NULL, billing_provider = NULL, archived_at = NOW(), archived_by = 'system_rollback', updated_at = NOW() WHERE id = $1`,
-              [userId]
-            );
+            await db.update(users).set({
+              membershipStatus: 'non-member', tier: null, billingProvider: null,
+              archivedAt: new Date(), archivedBy: 'system_rollback', updatedAt: new Date(),
+            }).where(eq(users.id, userId));
           }
           return res.status(500).json({ 
             error: 'System error during activation. Payment has been voided. Please try again.' 
@@ -520,12 +513,12 @@ router.post('/api/stripe/subscriptions/create-new-member', isStaffOrAdmin, async
         }
       }
       if (!existingUserId) {
-        await pool.query('DELETE FROM users WHERE id = $1', [userId]);
+        await db.delete(users).where(eq(users.id, userId));
       } else {
-        await pool.query(
-          `UPDATE users SET membership_status = 'non-member', tier = NULL, billing_provider = NULL, archived_at = NOW(), archived_by = 'system_rollback', updated_at = NOW() WHERE id = $1`,
-          [userId]
-        );
+        await db.update(users).set({
+          membershipStatus: 'non-member', tier: null, billingProvider: null,
+          archivedAt: new Date(), archivedBy: 'system_rollback', updatedAt: new Date(),
+        }).where(eq(users.id, userId));
       }
       return res.status(500).json({ 
         error: 'System error during activation. Please try again.' 
@@ -642,35 +635,23 @@ router.post('/api/stripe/subscriptions/confirm-inline-payment', isStaffOrAdmin, 
     let tierName = '';
     
     if (userId) {
-      const userResult = await pool.query(
-        `SELECT email, tier FROM users WHERE id = $1`,
-        [userId]
-      );
+      const userResult = await db.select({ email: users.email, tier: users.tier }).from(users).where(eq(users.id, userId));
       
-      if (userResult.rows.length > 0) {
-        userEmail = userResult.rows[0].email;
-        tierName = userResult.rows[0].tier;
+      if (userResult.length > 0) {
+        userEmail = userResult[0].email;
+        tierName = userResult[0].tier;
         
-        await pool.query(
-          `UPDATE users SET membership_status = 'active', billing_provider = 'stripe', updated_at = NOW() WHERE id = $1`,
-          [userId]
-        );
+        await db.update(users).set({ membershipStatus: 'active', billingProvider: 'stripe', updatedAt: new Date() }).where(eq(users.id, userId));
         logger.info('[Stripe Subscriptions] Activated member', { extra: { userEmail } });
       }
     } else if (paymentIntent.customer) {
-      const custResult = await pool.query(
-        `SELECT id, email, tier FROM users WHERE stripe_customer_id = $1`,
-        [paymentIntent.customer]
-      );
+      const custResult = await db.select({ id: users.id, email: users.email, tier: users.tier }).from(users).where(eq(users.stripeCustomerId, paymentIntent.customer as string));
       
-      if (custResult.rows.length > 0) {
-        userEmail = custResult.rows[0].email;
-        tierName = custResult.rows[0].tier;
+      if (custResult.length > 0) {
+        userEmail = custResult[0].email;
+        tierName = custResult[0].tier;
         
-        await pool.query(
-          `UPDATE users SET membership_status = 'active', billing_provider = 'stripe', updated_at = NOW() WHERE stripe_customer_id = $1`,
-          [paymentIntent.customer]
-        );
+        await db.update(users).set({ membershipStatus: 'active', billingProvider: 'stripe', updatedAt: new Date() }).where(eq(users.stripeCustomerId, paymentIntent.customer as string));
         logger.info('[Stripe Subscriptions] Activated member via customer ID', { extra: { userEmail } });
       }
     }
@@ -742,16 +723,16 @@ router.post('/api/stripe/subscriptions/send-activation-link', isStaffOrAdmin, as
     const resolved = await resolveUserByEmail(email);
 
     const existingUser = resolved
-      ? await pool.query(
-          `SELECT id, first_name, last_name, membership_status, created_at, archived_at, stripe_subscription_id, tier 
-           FROM users WHERE id = $1`,
-          [resolved.userId]
-        )
-      : await pool.query(
-          `SELECT id, first_name, last_name, membership_status, created_at, archived_at, stripe_subscription_id, tier 
-           FROM users WHERE LOWER(email) = $1`,
-          [email.toLowerCase()]
-        );
+      ? await db.select({
+          id: users.id, firstName: users.firstName, lastName: users.lastName,
+          membershipStatus: users.membershipStatus, createdAt: users.createdAt,
+          archivedAt: users.archivedAt, stripeSubscriptionId: users.stripeSubscriptionId, tier: users.tier,
+        }).from(users).where(eq(users.id, resolved.userId))
+      : await db.select({
+          id: users.id, firstName: users.firstName, lastName: users.lastName,
+          membershipStatus: users.membershipStatus, createdAt: users.createdAt,
+          archivedAt: users.archivedAt, stripeSubscriptionId: users.stripeSubscriptionId, tier: users.tier,
+        }).from(users).where(sql`LOWER(${users.email}) = ${email.toLowerCase()}`);
 
     if (resolved && resolved.matchType !== 'direct') {
       logger.info('[Activation Link] Email resolved to existing user via', { extra: { email, resolvedPrimaryEmail: resolved.primaryEmail, resolvedMatchType: resolved.matchType } });
@@ -760,22 +741,22 @@ router.post('/api/stripe/subscriptions/send-activation-link', isStaffOrAdmin, as
     let existingUserId: string | null = null;
     let isResend = false;
     
-    if (existingUser.rows.length > 0) {
-      const existing = existingUser.rows[0];
-      if (existing.archived_at && ['non-member', 'visitor', null].includes(existing.membership_status)) {
+    if (existingUser.length > 0) {
+      const existing = existingUser[0];
+      if (existing.archivedAt && ['non-member', 'visitor', null].includes(existing.membershipStatus)) {
         existingUserId = existing.id;
         logger.info('[Activation Link] Unarchiving user for new membership creation', { extra: { email } });
-      } else if (existing.membership_status === 'pending') {
-        const name = [existing.first_name, existing.last_name].filter(Boolean).join(' ') || email;
+      } else if (existing.membershipStatus === 'pending') {
+        const name = [existing.firstName, existing.lastName].filter(Boolean).join(' ') || email;
         return res.status(400).json({ 
-          error: `This email has an incomplete signup from ${new Date(existing.created_at).toLocaleDateString()}. Clean it up to proceed.`,
+          error: `This email has an incomplete signup from ${new Date(existing.createdAt).toLocaleDateString()}. Clean it up to proceed.`,
           isPendingUser: true,
           existingUserId: existing.id,
           existingUserName: name,
           canCleanup: true
         });
-      } else if (existing.membership_status === 'active' && existing.stripe_subscription_id) {
-        const name = [existing.first_name, existing.last_name].filter(Boolean).join(' ') || email;
+      } else if (existing.membershipStatus === 'active' && existing.stripeSubscriptionId) {
+        const name = [existing.firstName, existing.lastName].filter(Boolean).join(' ') || email;
         return res.status(400).json({ 
           error: `${name} is already an active member with a ${existing.tier} subscription. No activation link is needed.`,
           isAlreadyActive: true
@@ -783,7 +764,7 @@ router.post('/api/stripe/subscriptions/send-activation-link', isStaffOrAdmin, as
       } else {
         existingUserId = existing.id;
         isResend = true;
-        logger.info('[Activation Link] Resending activation link for existing user (status: , has subscription: )', { extra: { email, existingMembership_status: existing.membership_status, existingStripe_subscription_id: !!existing.stripe_subscription_id } });
+        logger.info('[Activation Link] Resending activation link for existing user (status: , has subscription: )', { extra: { email, existingMembership_status: existing.membershipStatus, existingStripe_subscription_id: !!existing.stripeSubscriptionId } });
       }
     }
     
@@ -806,22 +787,30 @@ router.post('/api/stripe/subscriptions/send-activation-link', isStaffOrAdmin, as
     const memberName = `${firstName || ''} ${lastName || ''}`.trim() || email;
     
     if (existingUserId) {
-      await pool.query(
-        `UPDATE users SET archived_at = NULL, archived_by = NULL, first_name = COALESCE($2, first_name), last_name = COALESCE($3, last_name), phone = COALESCE($4, phone), date_of_birth = COALESCE($5, date_of_birth), street_address = COALESCE($6, street_address), city = COALESCE($7, city), state = COALESCE($8, state), zip_code = COALESCE($9, zip_code), tier = $10, membership_status = 'pending', billing_provider = 'stripe', updated_at = NOW() WHERE id = $1`,
-        [existingUserId, firstName || null, lastName || null, phone || null, dob || null, streetAddress || null, city || null, state || null, zipCode || null, tier.name]
-      );
+      await db.execute(sql`UPDATE users SET archived_at = NULL, archived_by = NULL, first_name = COALESCE(${firstName || null}, first_name), last_name = COALESCE(${lastName || null}, last_name), phone = COALESCE(${phone || null}, phone), date_of_birth = COALESCE(${dob || null}, date_of_birth), street_address = COALESCE(${streetAddress || null}, street_address), city = COALESCE(${city || null}, city), state = COALESCE(${state || null}, state), zip_code = COALESCE(${zipCode || null}, zip_code), tier = ${tier.name}, membership_status = 'pending', billing_provider = 'stripe', updated_at = NOW() WHERE id = ${existingUserId}`);
       logger.info('[Activation Link] user with tier', { extra: { isResend_Updated_existing_Unarchived_and_updated_existing: isResend ? 'Updated existing' : 'Unarchived and updated existing', email, tierName: tier.name } });
     } else {
-      const exclusionCheck2 = await pool.query('SELECT 1 FROM sync_exclusions WHERE email = $1', [email.toLowerCase()]);
+      const exclusionCheck2 = await db.execute(sql`SELECT 1 FROM sync_exclusions WHERE email = ${email.toLowerCase()}`);
       if (exclusionCheck2.rows.length > 0) {
         logger.warn('[Stripe] Blocked activation link for permanently deleted member', { extra: { email } });
         return res.status(400).json({ error: 'This email belongs to a previously removed member and cannot be re-used for a new membership.' });
       }
-      await pool.query(
-        `INSERT INTO users (id, email, first_name, last_name, phone, date_of_birth, tier, membership_status, billing_provider, street_address, city, state, zip_code, created_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending', 'stripe', $8, $9, $10, $11, NOW())`,
-        [userId, email.toLowerCase(), firstName || null, lastName || null, phone || null, dob || null, tier.name, streetAddress || null, city || null, state || null, zipCode || null]
-      );
+      await db.insert(users).values({
+        id: userId,
+        email: email.toLowerCase(),
+        firstName: firstName || null,
+        lastName: lastName || null,
+        phone: phone || null,
+        dateOfBirth: dob || null,
+        tier: tier.name,
+        membershipStatus: 'pending',
+        billingProvider: 'stripe',
+        streetAddress: streetAddress || null,
+        city: city || null,
+        state: state || null,
+        zipCode: zipCode || null,
+        createdAt: new Date(),
+      });
       logger.info('[Activation Link] Created pending user with tier', { extra: { email, tierName: tier.name } });
     }
     
@@ -832,10 +821,7 @@ router.post('/api/stripe/subscriptions/send-activation-link', isStaffOrAdmin, as
       tier.name
     );
     
-    await pool.query(
-      'UPDATE users SET stripe_customer_id = $1 WHERE id = $2',
-      [customerId, userId]
-    );
+    await db.update(users).set({ stripeCustomerId: customerId }).where(eq(users.id, userId));
     
     const stripe = await getStripeClient();
     
@@ -941,30 +927,29 @@ router.delete('/api/stripe/subscriptions/cleanup-pending/:userId', isStaffOrAdmi
     const { userId } = req.params;
     const sessionUser = getSessionUser(req);
     
-    const userResult = await pool.query(
-      `SELECT id, email, first_name, last_name, membership_status, stripe_customer_id, id_image_url 
-       FROM users WHERE id = $1`,
-      [userId]
-    );
+    const userResult = await db.select({
+      id: users.id, email: users.email, firstName: users.firstName, lastName: users.lastName,
+      membershipStatus: users.membershipStatus, stripeCustomerId: users.stripeCustomerId, idImageUrl: users.idImageUrl,
+    }).from(users).where(eq(users.id, userId));
     
-    if (userResult.rows.length === 0) {
+    if (userResult.length === 0) {
       return res.status(404).json({ error: 'User not found' });
     }
     
-    const user = userResult.rows[0];
+    const user = userResult[0];
     
-    if (user.membership_status !== 'pending') {
+    if (user.membershipStatus !== 'pending') {
       return res.status(400).json({ 
-        error: `Cannot cleanup user with status "${user.membership_status}". Only pending users can be cleaned up.`
+        error: `Cannot cleanup user with status "${user.membershipStatus}". Only pending users can be cleaned up.`
       });
     }
     
-    if (user.stripe_customer_id) {
+    if (user.stripeCustomerId) {
       try {
         const stripe = await getStripeClient();
         
         const subscriptions = await stripe.subscriptions.list({
-          customer: user.stripe_customer_id,
+          customer: user.stripeCustomerId,
           status: 'all',
           limit: 10
         });
@@ -981,28 +966,28 @@ router.delete('/api/stripe/subscriptions/cleanup-pending/:userId', isStaffOrAdmi
           }
         }
         
-        await stripe.customers.del(user.stripe_customer_id);
-        logger.info('[Stripe] Deleted Stripe customer for pending user cleanup', { extra: { userStripe_customer_id: user.stripe_customer_id } });
+        await stripe.customers.del(user.stripeCustomerId);
+        logger.info('[Stripe] Deleted Stripe customer for pending user cleanup', { extra: { userStripe_customer_id: user.stripeCustomerId } });
       } catch (stripeErr: unknown) {
         logger.error('[Stripe] Failed to delete Stripe customer during cleanup:', { extra: { error: getErrorMessage(stripeErr) } });
       }
     }
     
-    if (user.id_image_url) {
+    if (user.idImageUrl) {
       try {
-        await pool.query('UPDATE users SET id_image_url = NULL WHERE id = $1', [userId]);
+        await db.update(users).set({ idImageUrl: null }).where(eq(users.id, userId));
       } catch (idErr: unknown) {
         logger.error('[Stripe] Failed to clear ID image during cleanup:', { extra: { error: getErrorMessage(idErr) } });
       }
     }
     
-    await pool.query('DELETE FROM users WHERE id = $1', [userId]);
+    await db.delete(users).where(eq(users.id, userId));
     
-    const userName = [user.first_name, user.last_name].filter(Boolean).join(' ') || user.email;
+    const userName = [user.firstName, user.lastName].filter(Boolean).join(' ') || user.email;
     logger.info('[Stripe] Cleaned up pending user () by', { extra: { userEmail: user.email, userName, sessionUser: sessionUser?.email } });
     
     logFromRequest(req, 'cleanup_pending_user', 'member', user.email,
-      userName, { status: user.membership_status });
+      userName, { status: user.membershipStatus });
     
     res.json({ 
       success: true, 

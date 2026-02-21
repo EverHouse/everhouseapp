@@ -1,7 +1,6 @@
 import { db } from '../../db';
-import { pool } from '../db';
-import { bookingRequests, resources, notifications, users, bookingParticipants } from '../../../shared/schema';
-import { eq, and, or, gt, lt, lte, gte, ne, sql } from 'drizzle-orm';
+import { bookingRequests, resources, notifications, users, bookingParticipants, stripePaymentIntents } from '../../../shared/schema';
+import { eq, and, or, gt, lt, lte, gte, ne, sql, isNull, isNotNull } from 'drizzle-orm';
 import { sendPushNotification } from '../../routes/push';
 import { formatNotificationDateTime, formatDateDisplayWithDay, formatTime12Hour } from '../../utils/dateUtils';
 import { logger } from '../logger';
@@ -444,10 +443,12 @@ export async function approveBooking(params: ApproveBookingParams) {
               feeBreakdown: { overageCents: breakdown.totals.overageCents, guestCents: breakdown.totals.guestCents }
             });
             if (prepayResult?.paidInFull) {
-              await pool.query(
-                `UPDATE booking_participants SET payment_status = 'paid' WHERE session_id = $1 AND payment_status = 'pending'`,
-                [createdSessionId]
-              );
+              await tx.update(bookingParticipants)
+                .set({ paymentStatus: 'paid' })
+                .where(and(
+                  eq(bookingParticipants.sessionId, createdSessionId),
+                  eq(bookingParticipants.paymentStatus, 'pending')
+                ));
               logger.info('[Booking Approval] Prepayment fully covered by credit for session', { extra: { createdSessionId } });
             }
           } catch (prepayError: unknown) {
@@ -617,11 +618,14 @@ async function notifyApprovalParticipants(bookingId: number, updated: BookingUpd
 
       const notificationMsg = `${ownerName} has added you to their simulator booking on ${formattedDate} at ${formattedTime}.`;
 
-      await pool.query(
-        `INSERT INTO notifications (user_email, title, message, type, related_type, related_id, created_at)
-         VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
-        [participantEmail, 'Added to Booking', notificationMsg, 'booking', 'booking', bookingId]
-      );
+      await db.insert(notifications).values({
+        userEmail: participantEmail,
+        title: 'Added to Booking',
+        message: notificationMsg,
+        type: 'booking',
+        relatedType: 'booking',
+        relatedId: bookingId
+      });
 
       sendNotificationToUser(participantEmail, {
         type: 'notification',
@@ -818,12 +822,11 @@ export async function cancelBooking(params: CancelBookingParams) {
     try {
       const stripe = await getStripeClient();
 
-      const allSnapshots = await pool.query(
-        `SELECT id, stripe_payment_intent_id, status as snapshot_status, total_cents
+      const allSnapshots = await tx.execute(sql`
+        SELECT id, stripe_payment_intent_id, status as snapshot_status, total_cents
          FROM booking_fee_snapshots 
-         WHERE booking_id = $1 AND stripe_payment_intent_id IS NOT NULL`,
-        [bookingId]
-      );
+         WHERE booking_id = ${bookingId} AND stripe_payment_intent_id IS NOT NULL
+      `);
 
       for (const snapshot of allSnapshots.rows) {
         try {
@@ -861,16 +864,15 @@ export async function cancelBooking(params: CancelBookingParams) {
         }
       }
 
-      const otherIntents = await pool.query(
-        `SELECT stripe_payment_intent_id 
+      const otherIntents = await tx.execute(sql`
+        SELECT stripe_payment_intent_id 
          FROM stripe_payment_intents 
-         WHERE booking_id = $1 
+         WHERE booking_id = ${bookingId} 
          AND stripe_payment_intent_id NOT IN (
            SELECT stripe_payment_intent_id FROM booking_fee_snapshots 
-           WHERE booking_id = $1 AND stripe_payment_intent_id IS NOT NULL
-         )`,
-        [bookingId]
-      );
+           WHERE booking_id = ${bookingId} AND stripe_payment_intent_id IS NOT NULL
+         )
+      `);
 
       for (const row of otherIntents.rows) {
         try {
@@ -897,17 +899,22 @@ export async function cancelBooking(params: CancelBookingParams) {
       }
 
       if (existing.sessionId) {
-        await pool.query(
-          `UPDATE booking_participants SET payment_status = 'refunded' 
-           WHERE session_id = $1 AND payment_status = 'paid'`,
-          [existing.sessionId]
-        );
+        await tx.update(bookingParticipants)
+          .set({ paymentStatus: 'refunded' })
+          .where(and(
+            eq(bookingParticipants.sessionId, existing.sessionId),
+            eq(bookingParticipants.paymentStatus, 'paid')
+          ));
 
-        await pool.query(
-          `UPDATE booking_participants SET payment_status = 'waived' 
-           WHERE session_id = $1 AND (payment_status = 'pending' OR payment_status IS NULL)`,
-          [existing.sessionId]
-        );
+        await tx.update(bookingParticipants)
+          .set({ paymentStatus: 'waived' })
+          .where(and(
+            eq(bookingParticipants.sessionId, existing.sessionId),
+            or(
+              eq(bookingParticipants.paymentStatus, 'pending'),
+              isNull(bookingParticipants.paymentStatus)
+            )
+          ));
         logger.info('[Staff Cancel] Cleared pending fees for session', { extra: { existingSessionId: existing.sessionId } });
       }
     } catch (cancelIntentsErr: unknown) {
@@ -957,22 +964,26 @@ export async function cancelBooking(params: CancelBookingParams) {
         logger.info('[bays] Refunded guest pass(es) for cancelled booking', { extra: { guestParticipantsLength: guestParticipants.length, bookingId } });
       }
 
-      const paidParticipants = await pool.query(
-        `SELECT id, stripe_payment_intent_id, cached_fee_cents, display_name
-         FROM booking_participants 
-         WHERE session_id = $1 
-         AND payment_status = 'paid' 
-         AND stripe_payment_intent_id IS NOT NULL 
-         AND stripe_payment_intent_id != ''
-         AND stripe_payment_intent_id NOT LIKE 'balance-%'`,
-        [sessionResult[0].sessionId]
-      );
+      const paidParticipants = await tx.select({
+        id: bookingParticipants.id,
+        stripePaymentIntentId: bookingParticipants.stripePaymentIntentId,
+        cachedFeeCents: bookingParticipants.cachedFeeCents,
+        displayName: bookingParticipants.displayName
+      })
+        .from(bookingParticipants)
+        .where(and(
+          eq(bookingParticipants.sessionId, sessionResult[0].sessionId),
+          eq(bookingParticipants.paymentStatus, 'paid'),
+          isNotNull(bookingParticipants.stripePaymentIntentId),
+          ne(bookingParticipants.stripePaymentIntentId, ''),
+          sql`${bookingParticipants.stripePaymentIntentId} NOT LIKE 'balance-%'`
+        ));
 
-      if (paidParticipants.rows.length > 0) {
+      if (paidParticipants.length > 0) {
         const stripe = await getStripeClient();
-        for (const participant of paidParticipants.rows) {
+        for (const participant of paidParticipants) {
           try {
-            const pi = await stripe.paymentIntents.retrieve(participant.stripe_payment_intent_id);
+            const pi = await stripe.paymentIntents.retrieve(participant.stripePaymentIntentId!);
             if (pi.status === 'succeeded' && pi.latest_charge) {
               const refund = await stripe.refunds.create({
                 charge: pi.latest_charge as string,
@@ -983,9 +994,9 @@ export async function cancelBooking(params: CancelBookingParams) {
                   participantId: participant.id.toString()
                 }
               }, {
-                idempotencyKey: `refund_staff_cancel_participant_${bookingId}_${participant.stripe_payment_intent_id}`
+                idempotencyKey: `refund_staff_cancel_participant_${bookingId}_${participant.stripePaymentIntentId}`
               });
-              logger.info('[Staff Cancel] Refunded guest fee for : $, refund', { extra: { participantDisplay_name: participant.display_name, participantCached_fee_cents_100_ToFixed_2: (participant.cached_fee_cents / 100).toFixed(2), refundId: refund.id } });
+              logger.info('[Staff Cancel] Refunded guest fee for : $, refund', { extra: { participantDisplay_name: participant.displayName, participantCached_fee_cents_100_ToFixed_2: ((participant.cachedFeeCents || 0) / 100).toFixed(2), refundId: refund.id } });
             }
           } catch (refundErr: unknown) {
             logger.error('[Staff Cancel] Failed to refund participant', { extra: { id: participant.id, error: getErrorMessage(refundErr) } });
@@ -994,13 +1005,12 @@ export async function cancelBooking(params: CancelBookingParams) {
       }
 
       try {
-        await pool.query(
-          `UPDATE booking_participants 
-           SET cached_fee_cents = 0, payment_status = 'waived'
-           WHERE session_id = $1 
-           AND payment_status = 'pending'`,
-          [sessionResult[0].sessionId]
-        );
+        await tx.update(bookingParticipants)
+          .set({ cachedFeeCents: 0, paymentStatus: 'waived' })
+          .where(and(
+            eq(bookingParticipants.sessionId, sessionResult[0].sessionId),
+            eq(bookingParticipants.paymentStatus, 'pending')
+          ));
         logger.info('[Staff Cancel] Cleared pending fees for session', { extra: { sessionResult_0_SessionId: sessionResult[0].sessionId } });
       } catch (feeCleanupErr: unknown) {
         logger.error('[Staff Cancel] Failed to clear pending fees (non-blocking)', { extra: { feeCleanupErr } });
@@ -1226,17 +1236,25 @@ export async function checkinBooking(params: CheckinBookingParams) {
   const validStatuses = ['attended', 'no_show'];
   const newStatus = validStatuses.includes(targetStatus || '') ? targetStatus! : 'attended';
 
-  const existingResult = await pool.query(`
-    SELECT br.status, br.user_email, br.session_id, br.resource_id, br.request_date, br.start_time, br.end_time, br.declared_player_count, br.user_name
-    FROM booking_requests br
-    WHERE br.id = $1
-  `, [bookingId]);
+  const existingResult = await db.select({
+    status: bookingRequests.status,
+    user_email: bookingRequests.userEmail,
+    session_id: bookingRequests.sessionId,
+    resource_id: bookingRequests.resourceId,
+    request_date: bookingRequests.requestDate,
+    start_time: bookingRequests.startTime,
+    end_time: bookingRequests.endTime,
+    declared_player_count: bookingRequests.declaredPlayerCount,
+    user_name: bookingRequests.userName
+  })
+    .from(bookingRequests)
+    .where(eq(bookingRequests.id, bookingId));
 
-  if (existingResult.rows.length === 0) {
+  if (existingResult.length === 0) {
     return { error: 'Booking not found', statusCode: 404 };
   }
 
-  const existing = existingResult.rows[0];
+  const existing: Record<string, any> = existingResult[0];
   const currentStatus = existing.status;
 
   if (currentStatus === newStatus) {
@@ -1245,8 +1263,11 @@ export async function checkinBooking(params: CheckinBookingParams) {
 
   if (newStatus === 'attended' && !existing.session_id && existing.resource_id) {
     try {
-      const userResult = await pool.query(`SELECT id FROM users WHERE LOWER(email) = LOWER($1)`, [existing.user_email]);
-      const userId = userResult.rows[0]?.id || null;
+      const userResult = await db.select({ id: users.id })
+        .from(users)
+        .where(eq(sql`LOWER(${users.email})`, existing.user_email?.toLowerCase()))
+        .limit(1);
+      const userId = userResult[0]?.id || null;
 
       const sessionResult = await ensureSessionForBooking({
         bookingId,
@@ -1280,7 +1301,7 @@ export async function checkinBooking(params: CheckinBookingParams) {
   }
 
   if (newStatus === 'attended' && !skipRosterCheck) {
-    const rosterResult = await pool.query(`
+    const rosterResult = await db.execute(sql`
       SELECT 
         br.trackman_player_count,
         br.declared_player_count,
@@ -1289,11 +1310,11 @@ export async function checkinBooking(params: CheckinBookingParams) {
         0 as empty_slots,
         (SELECT COUNT(*) FROM booking_participants bp WHERE bp.session_id = br.session_id) as participant_count
       FROM booking_requests br
-      WHERE br.id = $1
-    `, [bookingId]);
+      WHERE br.id = ${bookingId}
+    `);
 
     if (rosterResult.rows.length > 0) {
-      const roster = rosterResult.rows[0];
+      const roster = rosterResult.rows[0] as Record<string, any>;
       const declaredCount = roster.declared_player_count || roster.trackman_player_count || 1;
       const participantCount = parseInt(roster.participant_count) || 0;
 
@@ -1328,13 +1349,13 @@ export async function checkinBooking(params: CheckinBookingParams) {
   }
 
   if (newStatus === 'attended' && existing.session_id) {
-    const nullFeesCheck = await pool.query(`
+    const nullFeesCheck = await db.execute(sql`
       SELECT COUNT(*) as null_count
       FROM booking_participants bp
-      WHERE bp.session_id = $1 AND bp.payment_status = 'pending' AND (bp.cached_fee_cents IS NULL OR bp.cached_fee_cents = 0)
-    `, [existing.session_id]);
+      WHERE bp.session_id = ${existing.session_id} AND bp.payment_status = 'pending' AND (bp.cached_fee_cents IS NULL OR bp.cached_fee_cents = 0)
+    `);
 
-    if (parseInt(nullFeesCheck.rows[0]?.null_count) > 0) {
+    if (parseInt((nullFeesCheck.rows[0] as any)?.null_count) > 0) {
       try {
         await recalculateSessionFees(existing.session_id, 'checkin');
         logger.info('[Check-in Guard] Recalculated fees for session - some participants had NULL or zero cached_fee_cents', { extra: { existingSession_id: existing.session_id } });
@@ -1343,7 +1364,7 @@ export async function checkinBooking(params: CheckinBookingParams) {
       }
     }
 
-    const balanceResult = await pool.query(`
+    const balanceResult = await db.execute(sql`
       SELECT 
         bp.id as participant_id,
         bp.display_name,
@@ -1351,13 +1372,13 @@ export async function checkinBooking(params: CheckinBookingParams) {
         bp.payment_status,
         COALESCE(bp.cached_fee_cents, 0)::numeric / 100.0 as fee_amount
       FROM booking_participants bp
-      WHERE bp.session_id = $1 AND bp.payment_status = 'pending'
-    `, [existing.session_id]);
+      WHERE bp.session_id = ${existing.session_id} AND bp.payment_status = 'pending'
+    `);
 
     let totalOutstanding = 0;
     const unpaidParticipants: Array<{ id: number; name: string; amount: number }> = [];
 
-    for (const p of balanceResult.rows) {
+    for (const p of balanceResult.rows as any[]) {
       const amount = parseFloat(p.fee_amount);
       if (amount > 0) {
         totalOutstanding += amount;
@@ -1370,12 +1391,12 @@ export async function checkinBooking(params: CheckinBookingParams) {
     }
 
     if (totalOutstanding > 0) {
-      const prepaidResult = await pool.query(`
+      const prepaidResult = await db.execute(sql`
         SELECT COALESCE(SUM(amount_cents), 0)::numeric / 100.0 as prepaid_total
         FROM conference_prepayments
-        WHERE booking_id = $1 AND status IN ('succeeded', 'completed')
-      `, [bookingId]);
-      const prepaidTotal = parseFloat(prepaidResult.rows[0]?.prepaid_total || '0');
+        WHERE booking_id = ${bookingId} AND status IN ('succeeded', 'completed')
+      `);
+      const prepaidTotal = parseFloat((prepaidResult.rows[0] as any)?.prepaid_total || '0');
       if (prepaidTotal > 0) {
         totalOutstanding = Math.max(0, totalOutstanding - prepaidTotal);
         logger.info('[Check-in Guard] Deducted conference prepayment from outstanding balance', {
@@ -1422,10 +1443,9 @@ export async function checkinBooking(params: CheckinBookingParams) {
 
     if (confirmPayment && totalOutstanding > 0) {
       for (const p of unpaidParticipants) {
-        await pool.query(
-          `UPDATE booking_participants SET payment_status = 'paid' WHERE id = $1`,
-          [p.id]
-        );
+        await db.update(bookingParticipants)
+          .set({ paymentStatus: 'paid' })
+          .where(eq(bookingParticipants.id, p.id));
 
         await logPaymentAudit({
           bookingId,
@@ -1470,15 +1490,14 @@ export async function checkinBooking(params: CheckinBookingParams) {
 
   const booking = result[0];
   if (newStatus === 'attended' && booking.userEmail) {
-    const updateResult = await pool.query<{ lifetime_visits: number; hubspot_id: string | null }>(
-      `UPDATE users 
+    const updateResult = await db.execute(sql`
+      UPDATE users 
        SET lifetime_visits = COALESCE(lifetime_visits, 0) + 1 
-       WHERE email = $1
-       RETURNING lifetime_visits, hubspot_id`,
-      [booking.userEmail]
-    );
+       WHERE email = ${booking.userEmail}
+       RETURNING lifetime_visits, hubspot_id
+    `);
 
-    const updatedUser = updateResult.rows[0];
+    const updatedUser = updateResult.rows[0] as { lifetime_visits: number; hubspot_id: string | null } | undefined;
     if (updatedUser?.hubspot_id && updatedUser.lifetime_visits) {
       updateHubSpotContactVisitCount(updatedUser.hubspot_id, updatedUser.lifetime_visits)
         .catch(err => logger.error('[Bays] Failed to sync visit count to HubSpot:', { extra: { err } }));
@@ -1494,11 +1513,13 @@ export async function checkinBooking(params: CheckinBookingParams) {
     const formattedDate = formatDateDisplayWithDay(dateStr);
     const formattedTime = formatTime12Hour(booking.startTime);
 
-    await pool.query(
-      `INSERT INTO notifications (user_email, title, message, type, related_type, created_at)
-       VALUES ($1, $2, $3, $4, $5, NOW())`,
-      [booking.userEmail, 'Check-In Complete', `Thanks for visiting! Your session on ${formattedDate} at ${formattedTime} has been checked in.`, 'booking', 'booking']
-    );
+    await db.insert(notifications).values({
+      userEmail: booking.userEmail,
+      title: 'Check-In Complete',
+      message: `Thanks for visiting! Your session on ${formattedDate} at ${formattedTime} has been checked in.`,
+      type: 'booking',
+      relatedType: 'booking'
+    });
 
     sendNotificationToUser(booking.userEmail, {
       type: 'notification',
@@ -1515,11 +1536,13 @@ export async function checkinBooking(params: CheckinBookingParams) {
     const formattedDate = formatDateDisplayWithDay(noShowDateStr);
     const formattedTime = formatTime12Hour(booking.startTime);
 
-    await pool.query(
-      `INSERT INTO notifications (user_email, title, message, type, related_type, created_at)
-       VALUES ($1, $2, $3, $4, $5, NOW())`,
-      [booking.userEmail, 'Missed Booking', `You were marked as a no-show for your booking on ${formattedDate} at ${formattedTime}. If this was in error, please contact staff.`, 'booking', 'booking']
-    );
+    await db.insert(notifications).values({
+      userEmail: booking.userEmail,
+      title: 'Missed Booking',
+      message: `You were marked as a no-show for your booking on ${formattedDate} at ${formattedTime}. If this was in error, please contact staff.`,
+      type: 'booking',
+      relatedType: 'booking'
+    });
 
     sendNotificationToUser(booking.userEmail, {
       type: 'notification',
@@ -1540,28 +1563,24 @@ interface DevConfirmParams {
 export async function devConfirmBooking(params: DevConfirmParams) {
   const { bookingId, staffEmail } = params;
 
-  const bookingResult = await pool.query(
-    `SELECT br.*, u.id as user_id, u.stripe_customer_id, u.tier
+  const bookingResult = await db.execute(sql`
+    SELECT br.*, u.id as user_id, u.stripe_customer_id, u.tier
      FROM booking_requests br
      LEFT JOIN users u ON LOWER(u.email) = LOWER(br.user_email)
-     WHERE br.id = $1`,
-    [bookingId]
-  );
+     WHERE br.id = ${bookingId}
+  `);
 
   if (bookingResult.rows.length === 0) {
     return { error: 'Booking not found', statusCode: 404 };
   }
 
-  const booking = bookingResult.rows[0];
+  const booking = bookingResult.rows[0] as Record<string, any>;
 
   if (booking.status !== 'pending' && booking.status !== 'pending_approval') {
     return { error: `Booking is already ${booking.status}`, statusCode: 400 };
   }
 
-  const client = await pool.connect();
-  try {
-    await client.query('BEGIN');
-
+  const { sessionId, totalFeeCents, dateStr, timeStr } = await db.transaction(async (tx) => {
     let sessionId = booking.session_id;
     let totalFeeCents = 0;
 
@@ -1584,8 +1603,7 @@ export async function devConfirmBooking(params: DevConfirmParams) {
         logger.error('[Dev Confirm] Session creation failed — cannot approve without billing session', {
           extra: { bookingId, resourceId: booking.resource_id }
         });
-        await client.query('ROLLBACK');
-        return { error: 'Failed to create billing session. Cannot approve booking without billing.', statusCode: 500 };
+        throw { statusCode: 500, error: 'Failed to create billing session. Cannot approve booking without billing.' };
       }
 
       if (sessionId) {
@@ -1607,26 +1625,24 @@ export async function devConfirmBooking(params: DevConfirmParams) {
             let participantType = rp.type === 'member' ? 'member' : 'guest';
 
             if (resolvedUserId && !resolvedName) {
-              const userResult = await client.query(
-                `SELECT name, first_name, last_name, email FROM users WHERE id = $1`,
-                [resolvedUserId]
-              );
+              const userResult = await tx.execute(sql`
+                SELECT name, first_name, last_name, email FROM users WHERE id = ${resolvedUserId}
+              `);
               if (userResult.rows.length > 0) {
-                const u = userResult.rows[0];
+                const u = userResult.rows[0] as Record<string, any>;
                 resolvedName = u.name || `${u.first_name || ''} ${u.last_name || ''}`.trim() || u.email || 'Member';
               }
             }
 
             if (!resolvedUserId && rp.email) {
-              const userResult = await client.query(
-                `SELECT id, name, first_name, last_name FROM users WHERE LOWER(email) = LOWER($1)`,
-                [rp.email]
-              );
+              const userResult = await tx.execute(sql`
+                SELECT id, name, first_name, last_name FROM users WHERE LOWER(email) = LOWER(${rp.email})
+              `);
               if (userResult.rows.length > 0) {
-                resolvedUserId = userResult.rows[0].id;
+                resolvedUserId = (userResult.rows[0] as any).id;
                 participantType = 'member';
                 if (!resolvedName) {
-                  const u = userResult.rows[0];
+                  const u = userResult.rows[0] as Record<string, any>;
                   resolvedName = u.name || `${u.first_name || ''} ${u.last_name || ''}`.trim();
                 }
               }
@@ -1637,12 +1653,11 @@ export async function devConfirmBooking(params: DevConfirmParams) {
             }
 
             try {
-              await client.query(
-                `INSERT INTO booking_participants (session_id, user_id, participant_type, display_name, created_at)
-                 VALUES ($1, $2, $3, $4, NOW())
-                 ON CONFLICT (session_id, user_id) DO NOTHING`,
-                [sessionId, resolvedUserId, participantType, resolvedName]
-              );
+              await tx.execute(sql`
+                INSERT INTO booking_participants (session_id, user_id, participant_type, display_name, created_at)
+                 VALUES (${sessionId}, ${resolvedUserId}, ${participantType}, ${resolvedName}, NOW())
+                 ON CONFLICT (session_id, user_id) DO NOTHING
+              `);
               participantsCreated++;
             } catch (partErr: unknown) {
               logger.error('[Dev Confirm] Failed to create participant', { extra: { partErr } });
@@ -1662,15 +1677,14 @@ export async function devConfirmBooking(params: DevConfirmParams) {
       }
     }
 
-    await client.query(
-      `UPDATE booking_requests 
+    await tx.execute(sql`
+      UPDATE booking_requests 
        SET status = 'approved', 
-           session_id = COALESCE(session_id, $2),
+           session_id = COALESCE(session_id, ${sessionId}),
            notes = COALESCE(notes, '') || E'\n[Dev confirmed]',
            updated_at = NOW()
-       WHERE id = $1`,
-      [bookingId, sessionId]
-    );
+       WHERE id = ${bookingId}
+    `);
 
     const dateStr = typeof booking.request_date === 'string'
       ? booking.request_date
@@ -1679,49 +1693,47 @@ export async function devConfirmBooking(params: DevConfirmParams) {
       ? booking.start_time.substring(0, 5)
       : booking.start_time;
 
-    await client.query(
-      `INSERT INTO notifications (user_email, title, message, type, related_type, created_at)
-       VALUES ($1, $2, $3, $4, $5, NOW())`,
-      [
-        booking.user_email,
-        'Booking Confirmed',
-        `Your simulator booking for ${dateStr} at ${timeStr} has been confirmed.`,
-        'booking',
-        'booking'
-      ]
-    );
+    await tx.insert(notifications).values({
+      userEmail: booking.user_email,
+      title: 'Booking Confirmed',
+      message: `Your simulator booking for ${dateStr} at ${timeStr} has been confirmed.`,
+      type: 'booking',
+      relatedType: 'booking'
+    });
 
     if (booking.user_email) {
       try {
-        const participantsResult = await client.query(
-          `SELECT u.email as user_email, u.first_name, u.last_name 
+        const participantsResult = await tx.execute(sql`
+          SELECT u.email as user_email, u.first_name, u.last_name 
            FROM booking_participants bp
            JOIN booking_sessions bs ON bp.session_id = bs.id
            JOIN booking_requests br2 ON br2.session_id = bs.id
            LEFT JOIN users u ON bp.user_id = u.id
-           WHERE br2.id = $1 
+           WHERE br2.id = ${bookingId} 
              AND bp.participant_type != 'owner'
              AND u.email IS NOT NULL 
              AND u.email != ''
-             AND LOWER(u.email) != LOWER($2)`,
-          [bookingId, booking.user_email]
-        );
+             AND LOWER(u.email) != LOWER(${booking.user_email})
+        `);
 
         const ownerName = booking.user_name || booking.user_email?.split('@')[0] || 'A member';
         const formattedDate = formatDateDisplayWithDay(dateStr);
         const formattedTime = formatTime12Hour(timeStr);
 
-        for (const participant of participantsResult.rows) {
+        for (const participant of participantsResult.rows as any[]) {
           const participantEmail = participant.user_email?.toLowerCase();
           if (!participantEmail) continue;
 
           const notificationMsg = `${ownerName} has added you to their simulator booking on ${formattedDate} at ${formattedTime}.`;
 
-          await client.query(
-            `INSERT INTO notifications (user_email, title, message, type, related_type, related_id, created_at)
-             VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
-            [participantEmail, 'Added to Booking', notificationMsg, 'booking', 'booking', bookingId]
-          );
+          await tx.insert(notifications).values({
+            userEmail: participantEmail,
+            title: 'Added to Booking',
+            message: notificationMsg,
+            type: 'booking',
+            relatedType: 'booking',
+            relatedId: bookingId
+          });
 
           sendNotificationToUser(participantEmail, {
             type: 'notification',
@@ -1737,23 +1749,17 @@ export async function devConfirmBooking(params: DevConfirmParams) {
       }
     }
 
-    await client.query('COMMIT');
+    return { sessionId, totalFeeCents, dateStr, timeStr };
+  });
 
-    sendNotificationToUser(booking.user_email, {
-      type: 'notification',
-      title: 'Booking Confirmed',
-      message: `Your simulator booking for ${dateStr} at ${timeStr} has been confirmed.`,
-      data: { bookingId: bookingId.toString(), eventType: 'booking_confirmed' }
-    }, { action: 'booking_confirmed', bookingId, triggerSource: 'approval.ts' });
+  sendNotificationToUser(booking.user_email, {
+    type: 'notification',
+    title: 'Booking Confirmed',
+    message: `Your simulator booking for ${dateStr} at ${timeStr} has been confirmed.`,
+    data: { bookingId: bookingId.toString(), eventType: 'booking_confirmed' }
+  }, { action: 'booking_confirmed', bookingId, triggerSource: 'approval.ts' });
 
-    return { success: true, bookingId, sessionId, totalFeeCents, booking, dateStr, timeStr };
-  } catch (txError: unknown) {
-    await client.query('ROLLBACK');
-    logger.error('[Dev Confirm] Transaction failed, rolling back', { extra: { txError, bookingId } });
-    throw txError;
-  } finally {
-    client.release();
-  }
+  return { success: true, bookingId, sessionId, totalFeeCents, booking, dateStr, timeStr };
 }
 
 interface CompleteCancellationParams {
@@ -1790,17 +1796,17 @@ export async function completeCancellation(params: CompleteCancellationParams) {
   const errors: string[] = [];
 
   try {
-    const pendingIntents = await pool.query(
-      `SELECT stripe_payment_intent_id 
-       FROM stripe_payment_intents 
-       WHERE booking_id = $1 AND status IN ('pending', 'requires_payment_method', 'requires_action', 'requires_confirmation')`,
-      [bookingId]
-    );
-    for (const row of pendingIntents.rows) {
+    const pendingIntents = await db.select({ stripePaymentIntentId: stripePaymentIntents.stripePaymentIntentId })
+      .from(stripePaymentIntents)
+      .where(and(
+        eq(stripePaymentIntents.bookingId, bookingId),
+        sql`${stripePaymentIntents.status} IN ('pending', 'requires_payment_method', 'requires_action', 'requires_confirmation')`
+      ));
+    for (const row of pendingIntents) {
       try {
-        await cancelPaymentIntent(row.stripe_payment_intent_id);
+        await cancelPaymentIntent(row.stripePaymentIntentId);
       } catch (cancelErr: unknown) {
-        errors.push(`Failed to cancel payment intent ${row.stripe_payment_intent_id.substring(0, 8)}: ${getErrorMessage(cancelErr)}`);
+        errors.push(`Failed to cancel payment intent ${row.stripePaymentIntentId.substring(0, 8)}: ${getErrorMessage(cancelErr)}`);
         logger.error('[Complete Cancellation] Failed to cancel payment intent:', { extra: { error: getErrorMessage(cancelErr) } });
       }
     }
@@ -1812,14 +1818,13 @@ export async function completeCancellation(params: CompleteCancellationParams) {
   // Refund fee snapshot payments (check-in register payments)
   try {
     const stripe = await getStripeClient();
-    const allSnapshots = await pool.query(
-      `SELECT id, stripe_payment_intent_id, status as snapshot_status, total_cents
+    const allSnapshots = await db.execute(sql`
+      SELECT id, stripe_payment_intent_id, status as snapshot_status, total_cents
        FROM booking_fee_snapshots 
-       WHERE booking_id = $1 AND stripe_payment_intent_id IS NOT NULL`,
-      [bookingId]
-    );
+       WHERE booking_id = ${bookingId} AND stripe_payment_intent_id IS NOT NULL
+    `);
 
-    for (const snapshot of allSnapshots.rows) {
+    for (const snapshot of allSnapshots.rows as any[]) {
       try {
         const pi = await stripe.paymentIntents.retrieve(snapshot.stripe_payment_intent_id);
 
@@ -1858,35 +1863,39 @@ export async function completeCancellation(params: CompleteCancellationParams) {
 
   if (existing.sessionId) {
     try {
-      await pool.query(
-        `UPDATE booking_participants 
-         SET cached_fee_cents = 0, payment_status = 'waived'
-         WHERE session_id = $1 AND payment_status = 'pending'`,
-        [existing.sessionId]
-      );
+      await db.update(bookingParticipants)
+        .set({ cachedFeeCents: 0, paymentStatus: 'waived' })
+        .where(and(
+          eq(bookingParticipants.sessionId, existing.sessionId),
+          eq(bookingParticipants.paymentStatus, 'pending')
+        ));
     } catch (clearErr: unknown) {
       errors.push(`Failed to clear pending fees: ${getErrorMessage(clearErr)}`);
       logger.error('[Complete Cancellation] Failed to clear pending fees', { extra: { clearErr } });
     }
 
     try {
-      const paidParticipants = await pool.query(
-        `SELECT id, stripe_payment_intent_id, cached_fee_cents, display_name
-         FROM booking_participants 
-         WHERE session_id = $1 
-         AND payment_status = 'paid' 
-         AND stripe_payment_intent_id IS NOT NULL 
-         AND stripe_payment_intent_id != ''
-         AND stripe_payment_intent_id NOT LIKE 'balance-%'
-         AND refunded_at IS NULL`,
-        [existing.sessionId]
-      );
+      const paidParticipants = await db.select({
+        id: bookingParticipants.id,
+        stripePaymentIntentId: bookingParticipants.stripePaymentIntentId,
+        cachedFeeCents: bookingParticipants.cachedFeeCents,
+        displayName: bookingParticipants.displayName
+      })
+        .from(bookingParticipants)
+        .where(and(
+          eq(bookingParticipants.sessionId, existing.sessionId),
+          eq(bookingParticipants.paymentStatus, 'paid'),
+          isNotNull(bookingParticipants.stripePaymentIntentId),
+          ne(bookingParticipants.stripePaymentIntentId, ''),
+          sql`${bookingParticipants.stripePaymentIntentId} NOT LIKE 'balance-%'`,
+          isNull(bookingParticipants.refundedAt)
+        ));
 
-      if (paidParticipants.rows.length > 0) {
+      if (paidParticipants.length > 0) {
         const stripe = await getStripeClient();
-        for (const participant of paidParticipants.rows) {
+        for (const participant of paidParticipants) {
           try {
-            const pi = await stripe.paymentIntents.retrieve(participant.stripe_payment_intent_id);
+            const pi = await stripe.paymentIntents.retrieve(participant.stripePaymentIntentId!);
             if (pi.status === 'succeeded' && pi.latest_charge) {
               const refund = await stripe.refunds.create({
                 charge: typeof pi.latest_charge === 'string' ? pi.latest_charge : (pi.latest_charge as Stripe.Charge).id,
@@ -1897,16 +1906,15 @@ export async function completeCancellation(params: CompleteCancellationParams) {
                   participantId: participant.id.toString()
                 }
               }, {
-                idempotencyKey: `refund_deny_participant_${bookingId}_${participant.stripe_payment_intent_id}`
+                idempotencyKey: `refund_deny_participant_${bookingId}_${participant.stripePaymentIntentId}`
               });
-              await pool.query(
-                `UPDATE booking_participants SET refunded_at = NOW(), payment_status = 'waived' WHERE id = $1`,
-                [participant.id]
-              );
-              logger.info('[Complete Cancellation] Refunded : $', { extra: { participantDisplay_name: participant.display_name, participantCached_fee_cents_100_ToFixed_2: (participant.cached_fee_cents / 100).toFixed(2) } });
+              await db.update(bookingParticipants)
+                .set({ refundedAt: new Date(), paymentStatus: 'waived' })
+                .where(eq(bookingParticipants.id, participant.id));
+              logger.info('[Complete Cancellation] Refunded : $', { extra: { participantDisplay_name: participant.displayName, participantCached_fee_cents_100_ToFixed_2: ((participant.cachedFeeCents || 0) / 100).toFixed(2) } });
             }
           } catch (refundErr: unknown) {
-            errors.push(`Failed to refund ${participant.display_name}: ${getErrorMessage(refundErr)}`);
+            errors.push(`Failed to refund ${participant.displayName}: ${getErrorMessage(refundErr)}`);
             logger.error('[Complete Cancellation] Failed to refund participant', { extra: { id: participant.id, error: getErrorMessage(refundErr) } });
           }
         }
@@ -1917,17 +1925,22 @@ export async function completeCancellation(params: CompleteCancellationParams) {
     }
 
     try {
-      const guestParticipants = await pool.query(
-        `SELECT id, display_name, used_guest_pass FROM booking_participants 
-         WHERE session_id = $1 AND participant_type = 'guest'`,
-        [existing.sessionId]
-      );
-      for (const guest of guestParticipants.rows) {
-        if (!guest.used_guest_pass) continue;
+      const guestParticipants = await db.select({
+        id: bookingParticipants.id,
+        displayName: bookingParticipants.displayName,
+        usedGuestPass: bookingParticipants.usedGuestPass
+      })
+        .from(bookingParticipants)
+        .where(and(
+          eq(bookingParticipants.sessionId, existing.sessionId),
+          eq(bookingParticipants.participantType, 'guest')
+        ));
+      for (const guest of guestParticipants) {
+        if (!guest.usedGuestPass) continue;
         try {
-          await refundGuestPass(existing.userEmail || '', guest.display_name || undefined, false);
+          await refundGuestPass(existing.userEmail || '', guest.displayName || undefined, false);
         } catch (guestErr: unknown) {
-          errors.push(`Failed to refund guest pass for ${guest.display_name}: ${getErrorMessage(guestErr)}`);
+          errors.push(`Failed to refund guest pass for ${guest.displayName}: ${getErrorMessage(guestErr)}`);
           logger.error('[Complete Cancellation] Failed to refund guest pass', { extra: { guestErr } });
         }
       }

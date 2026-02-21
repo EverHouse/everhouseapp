@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { index, uniqueIndex, jsonb, pgTable, timestamp, varchar, serial, boolean, text, date, time, integer, numeric } from "drizzle-orm/pg-core";
+import { check, index, uniqueIndex, jsonb, pgTable, timestamp, varchar, serial, boolean, text, date, time, integer, numeric } from "drizzle-orm/pg-core";
 
 // Membership tiers table - centralized tier configuration for marketing and logic
 export const membershipTiers = pgTable("membership_tiers", {
@@ -64,6 +64,8 @@ export const guestPasses = pgTable("guest_passes", {
   createdAt: timestamp("created_at").defaultNow(),
 }, (table) => [
   index("guest_passes_member_email_idx").on(table.memberEmail),
+  check("guest_passes_usage_check", sql`passes_used <= passes_total`),
+  check("guest_passes_non_negative_check", sql`passes_used >= 0`),
 ]);
 
 // Member notes table - staff notes about members
