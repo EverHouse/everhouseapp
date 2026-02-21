@@ -101,6 +101,7 @@ Before marking any task as done:
 - [ ] Vite dev server is running without compilation errors.
 
 ## Recent Changes
+- **Feb 21, 2026**: Implemented "one invoice per booking" architecture for simulator bookings. Draft invoice created at booking approval, updated on roster changes (member portal + staff edits), finalized+paid via member portal, staff saved-card, terminal (OOB), or cash/confirm. Eliminates duplicate/voided invoices. New `bookingInvoiceService.ts` manages full lifecycle. Added `stripe_invoice_id` column to `booking_requests`. New staff route `POST /api/stripe/staff/mark-booking-paid` for cash payments.
 - **Feb 20, 2026**: Migrated booking fee payments from raw PaymentIntents to Stripe Invoices with itemized line items. Each overage fee and guest fee is a separate line item. Members get downloadable invoice PDFs. Affected files: `server/core/stripe/invoices.ts`, `server/core/billing/prepaymentService.ts`, `server/routes/stripe/member-payments.ts`, `server/routes/stripe/payments.ts`.
 - **Feb 20, 2026**: Merged engineering standards into replit.md — added Prime Directive, Camel-to-Snake boundary table, UI/UX interaction standards, pre-completion checklist.
 - **Feb 20, 2026**: Removed manual "Recalculate Fees" button and deferred fee recalculation pattern. Server now auto-recalculates fees immediately on every roster change.
