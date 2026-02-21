@@ -3,7 +3,7 @@ import { SheetHeader } from './SheetHeader';
 import { PaymentSummaryBody, PaymentActionFooter } from './PaymentSection';
 import { AssignModeSlots } from './AssignModeSlots';
 import { ManageModeRoster } from './ManageModeRoster';
-import { AssignModeFooter } from './AssignModeFooter';
+import { AssignModeFooter, AssignModeSecondaryActions } from './AssignModeFooter';
 import { ErrorBoundary } from '../../ErrorBoundary';
 import { useUnifiedBookingLogic } from './useUnifiedBookingLogic';
 import { isPlaceholderEmail } from './bookingSheetTypes';
@@ -265,28 +265,11 @@ export function UnifiedBookingSheet(props: UnifiedBookingSheetProps) {
     <AssignModeFooter
       hasOwner={logic.hasOwner}
       linking={logic.linking}
-      markingAsEvent={logic.markingAsEvent}
-      isLoadingNotices={logic.isLoadingNotices}
-      showNoticeSelection={logic.showNoticeSelection}
-      setShowNoticeSelection={logic.setShowNoticeSelection}
-      overlappingNotices={logic.overlappingNotices}
-      showStaffList={logic.showStaffList}
-      setShowStaffList={logic.setShowStaffList}
-      staffList={logic.staffList}
-      isLoadingStaff={logic.isLoadingStaff}
-      assigningToStaff={logic.assigningToStaff}
       feeEstimate={logic.feeEstimate}
       isCalculatingFees={logic.isCalculatingFees}
       isConferenceRoom={logic.isConferenceRoom}
       onClose={onClose}
       handleFinalizeBooking={logic.handleFinalizeBooking}
-      handleMarkAsEvent={logic.handleMarkAsEvent}
-      executeMarkAsEvent={logic.executeMarkAsEvent}
-      handleAssignToStaff={logic.handleAssignToStaff as any}
-      getRoleBadge={logic.getRoleBadge}
-      onDeleteBooking={logic.handleDeleteBooking}
-      deleting={logic.deleting}
-      matchedBookingId={props.matchedBookingId}
     />
   );
 
@@ -365,6 +348,25 @@ export function UnifiedBookingSheet(props: UnifiedBookingSheetProps) {
             </label>
           </div>
         )}
+
+        <AssignModeSecondaryActions
+          markingAsEvent={logic.markingAsEvent}
+          isLoadingNotices={logic.isLoadingNotices}
+          showNoticeSelection={logic.showNoticeSelection}
+          setShowNoticeSelection={logic.setShowNoticeSelection}
+          overlappingNotices={logic.overlappingNotices}
+          showStaffList={logic.showStaffList}
+          setShowStaffList={logic.setShowStaffList}
+          staffList={logic.staffList}
+          isLoadingStaff={logic.isLoadingStaff}
+          assigningToStaff={logic.assigningToStaff}
+          handleMarkAsEvent={logic.handleMarkAsEvent}
+          executeMarkAsEvent={logic.executeMarkAsEvent}
+          handleAssignToStaff={logic.handleAssignToStaff as any}
+          getRoleBadge={logic.getRoleBadge}
+          onDeleteBooking={logic.handleDeleteBooking}
+          deleting={logic.deleting}
+        />
       </div>
     </SlideUpDrawer>
   );

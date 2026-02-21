@@ -3,6 +3,14 @@ import React from 'react';
 interface AssignModeFooterProps {
   hasOwner: boolean;
   linking: boolean;
+  feeEstimate: { totalCents: number; overageCents: number; guestCents: number } | null;
+  isCalculatingFees: boolean;
+  isConferenceRoom: boolean;
+  onClose: () => void;
+  handleFinalizeBooking: () => Promise<void>;
+}
+
+export interface AssignModeSecondaryActionsProps {
   markingAsEvent: boolean;
   isLoadingNotices: boolean;
   showNoticeSelection: boolean;
@@ -13,45 +21,22 @@ interface AssignModeFooterProps {
   staffList: Array<{id: string; email: string; first_name: string; last_name: string; role: string; user_id: string | null}>;
   isLoadingStaff: boolean;
   assigningToStaff: boolean;
-  feeEstimate: { totalCents: number; overageCents: number; guestCents: number } | null;
-  isCalculatingFees: boolean;
-  isConferenceRoom: boolean;
-  onClose: () => void;
-  handleFinalizeBooking: () => Promise<void>;
   handleMarkAsEvent: () => Promise<void>;
   executeMarkAsEvent: (existingClosureId?: number) => Promise<void>;
   handleAssignToStaff: (staff: { id: string | number; name: string; email: string }) => Promise<void>;
   getRoleBadge: (role: string) => React.ReactNode;
   onDeleteBooking?: () => Promise<void>;
   deleting?: boolean;
-  matchedBookingId?: number | string;
 }
 
 export function AssignModeFooter({
   hasOwner,
   linking,
-  markingAsEvent,
-  isLoadingNotices,
-  showNoticeSelection,
-  setShowNoticeSelection,
-  overlappingNotices,
-  showStaffList,
-  setShowStaffList,
-  staffList,
-  isLoadingStaff,
-  assigningToStaff,
   feeEstimate,
   isCalculatingFees,
   isConferenceRoom,
   onClose,
   handleFinalizeBooking,
-  handleMarkAsEvent,
-  executeMarkAsEvent,
-  handleAssignToStaff,
-  getRoleBadge,
-  onDeleteBooking,
-  deleting,
-  matchedBookingId,
 }: AssignModeFooterProps) {
   return (
     <div className="p-4 space-y-2">
@@ -107,7 +92,30 @@ export function AssignModeFooter({
           )}
         </button>
       </div>
+    </div>
+  );
+}
 
+export function AssignModeSecondaryActions({
+  markingAsEvent,
+  isLoadingNotices,
+  showNoticeSelection,
+  setShowNoticeSelection,
+  overlappingNotices,
+  showStaffList,
+  setShowStaffList,
+  staffList,
+  isLoadingStaff,
+  assigningToStaff,
+  handleMarkAsEvent,
+  executeMarkAsEvent,
+  handleAssignToStaff,
+  getRoleBadge,
+  onDeleteBooking,
+  deleting,
+}: AssignModeSecondaryActionsProps) {
+  return (
+    <div className="space-y-2 pt-2 border-t border-primary/10 dark:border-white/10">
       <button
         onClick={handleMarkAsEvent}
         disabled={markingAsEvent || isLoadingNotices}
