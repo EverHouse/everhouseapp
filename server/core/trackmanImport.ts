@@ -1726,6 +1726,7 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
         .where(eq(bookingRequests.trackmanBookingId, row.bookingId))
         .limit(1);
       
+      let freedCancelledBooking = false;
       if (existingBooking.length > 0) {
         // Booking already exists - update with latest data from CSV (backfill webhook-created bookings)
         const existing = existingBooking[0];
@@ -1738,6 +1739,42 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
         }
         
         const isCancelledInApp = existing.status === 'cancelled' || existing.status === 'cancellation_pending';
+        
+        if (isCancelledInApp && row.status.toLowerCase() !== 'cancelled' && row.status.toLowerCase() !== 'canceled') {
+          let hasPaidFees = false;
+          if (existing.sessionId) {
+            try {
+              const paidCheck = await pool.query(
+                `SELECT EXISTS(
+                  SELECT 1 FROM booking_fee_snapshots WHERE session_id = $1 AND status IN ('completed', 'paid')
+                ) AS has_paid,
+                EXISTS(
+                  SELECT 1 FROM booking_participants WHERE session_id = $1 AND payment_status = 'paid'
+                ) AS has_paid_participants`,
+                [existing.sessionId]
+              );
+              hasPaidFees = paidCheck.rows[0]?.has_paid || paidCheck.rows[0]?.has_paid_participants;
+            } catch { hasPaidFees = true; }
+          }
+          if (hasPaidFees) {
+            process.stderr.write(`[Trackman Import] SKIPPED free: Cancelled booking #${existing.id} (Trackman ID: ${row.bookingId}) has completed payments — not safe to create duplicate\n`);
+          } else {
+            await db.update(bookingRequests)
+              .set({ trackmanBookingId: null })
+              .where(eq(bookingRequests.id, existing.id));
+            if (existing.sessionId) {
+              await pool.query(
+                `UPDATE booking_sessions SET trackman_booking_id = NULL WHERE id = $1`,
+                [existing.sessionId]
+              );
+            }
+            process.stderr.write(`[Trackman Import] FREED: Cleared trackman_booking_id from cancelled booking #${existing.id} (Trackman ID: ${row.bookingId}) — will create fresh booking with correct owner\n`);
+            freedCancelledBooking = true;
+          }
+        }
+        
+        if (!freedCancelledBooking) {
+        
         const isFinalized = ['attended', 'no_show'].includes(existing.status || '');
         let hasCompletedPayments = false;
         if (existing.sessionId) {
@@ -1766,16 +1803,6 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
         // Build update object with changed fields
         const updateFields: Record<string, unknown> = {};
         let changes: string[] = [];
-        
-        if (isCancelledInApp && row.status.toLowerCase() !== 'cancelled' && row.status.toLowerCase() !== 'canceled') {
-          if (hasCompletedPayments) {
-            process.stderr.write(`[Trackman Import] SKIPPED reactivation: Booking #${existing.id} (Trackman ID: ${row.bookingId}) was cancelled but has completed payments — not safe to reactivate\n`);
-          } else {
-            updateFields.status = 'approved';
-            changes.push(`reactivated: ${existing.status} -> approved (still exists in Trackman)`);
-            process.stderr.write(`[Trackman Import] REACTIVATED: Booking #${existing.id} (Trackman ID: ${row.bookingId}) was cancelled in app but still active in Trackman CSV\n`);
-          }
-        }
         
         // Check if bay/resource changed
         if (parsedBayId && existing.resourceId !== parsedBayId) {
@@ -2123,10 +2150,11 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
         }
         
         continue;
-      }
+      } // end if (!freedCancelledBooking)
+      } // end if existingBooking.length > 0
       // PRIORITY 1: Merge with webhook-created placeholder/ghost bookings
       // Look for existing bookings at same simulator/time that are unmatched or unknown
-      if (!existingBooking.length && parsedBayId && bookingDate && startTime) {
+      if ((!existingBooking.length || freedCancelledBooking) && parsedBayId && bookingDate && startTime) {
         const placeholderBooking = await pool.query(
           `SELECT id, user_email, user_name, status, session_id, trackman_booking_id, origin,
                   ABS(EXTRACT(EPOCH FROM (start_time::time - $3::time))) as time_diff_seconds

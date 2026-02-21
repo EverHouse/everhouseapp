@@ -21,7 +21,7 @@ export const changelog: ChangelogEntry[] = [
       "Added: Itemized Invoices and Roster Lock After Payment training steps",
       "Updated: Reschedule training section now notes the feature is temporarily unavailable",
       "Fixed: Bookings approved with $0 fees now correctly create a draft invoice when roster changes add fees later",
-      "Fixed: CSV import now reactivates cancelled bookings when they still exist in Trackman — previously cancelled bookings were skipped and never re-added",
+      "Fixed: CSV import now creates fresh bookings when cancelled bookings still exist in Trackman — clears old Trackman ID from cancelled record and creates new booking with correct owner/participants from CSV data",
       "Fixed: CSV import payment status check no longer crashes on 'refunded' enum value — was causing all bookings to be treated as frozen",
       "Fixed: Post-import fee cleanup query corrected (booking_participants has no booking_id column)",
     ]
