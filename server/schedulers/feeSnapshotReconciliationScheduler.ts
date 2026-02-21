@@ -199,6 +199,18 @@ async function cancelAbandonedPaymentIntents(): Promise<{ cancelled: number; err
           throw txErr;
         }
 
+        // Void associated booking invoice if it exists
+        if (spi.booking_id) {
+          try {
+            const { voidBookingInvoice, recreateDraftInvoiceFromBooking } = await import('../core/billing/bookingInvoiceService');
+            await voidBookingInvoice(spi.booking_id);
+            await recreateDraftInvoiceFromBooking(spi.booking_id);
+            logger.info(`[Abandoned PI Cleanup] Voided invoice and re-created draft for booking ${spi.booking_id}`);
+          } catch (invoiceErr: unknown) {
+            logger.warn(`[Abandoned PI Cleanup] Failed to void/recreate invoice for booking ${spi.booking_id}`, { extra: { error: String(invoiceErr) } });
+          }
+        }
+
         logger.info(`[Abandoned PI Cleanup] Cancelled and cleaned up payment intent ${spi.stripe_payment_intent_id}`);
         schedulerTracker.recordRun('Fee Snapshot Reconciliation', true);
         cancelled++;

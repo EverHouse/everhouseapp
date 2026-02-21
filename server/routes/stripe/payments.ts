@@ -39,7 +39,7 @@ import { broadcastBillingUpdate, sendNotificationToUser } from '../../core/webso
 import { alertOnExternalServiceError } from '../../core/errorAlerts';
 import { getErrorMessage, getErrorCode } from '../../utils/errorUtils';
 import { normalizeTierName } from '../../utils/tierUtils';
-import { getBookingInvoiceId, finalizeAndPayInvoice, createDraftInvoiceForBooking, finalizeInvoicePaidOutOfBand } from '../../core/billing/bookingInvoiceService';
+import { getBookingInvoiceId, finalizeAndPayInvoice, createDraftInvoiceForBooking, finalizeInvoicePaidOutOfBand, recreateDraftInvoiceFromBooking } from '../../core/billing/bookingInvoiceService';
 
 interface DbMemberRow {
   id: string;
@@ -570,6 +570,20 @@ router.post('/api/stripe/cancel-payment', isStaffOrAdmin, async (req: Request, r
 
     if (!result.success) {
       return res.status(400).json({ error: result.error });
+    }
+
+    // Void the associated booking invoice if this PI was for a booking
+    try {
+      const piBookingResult = await db.execute(sql`SELECT booking_id FROM stripe_payment_intents WHERE stripe_payment_intent_id = ${paymentIntentId} AND booking_id IS NOT NULL LIMIT 1`);
+      if (piBookingResult.rows.length > 0) {
+        const piBookingId = (piBookingResult.rows[0] as Record<string, unknown>).booking_id as number;
+        const { voidBookingInvoice, recreateDraftInvoiceFromBooking } = await import('../../core/billing/bookingInvoiceService');
+        await voidBookingInvoice(piBookingId);
+        await recreateDraftInvoiceFromBooking(piBookingId);
+        logger.info('[Stripe] Voided invoice and re-created draft after staff cancelled payment', { extra: { bookingId: piBookingId, paymentIntentId } });
+      }
+    } catch (invoiceErr: unknown) {
+      logger.warn('[Stripe] Failed to void/recreate invoice after payment cancellation', { extra: { paymentIntentId, error: String(invoiceErr) } });
     }
 
     res.json({ success: true });

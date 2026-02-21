@@ -1488,6 +1488,16 @@ router.post('/api/member/bookings/:bookingId/cancel-payment', isAuthenticated, a
 
     if (result.success) {
       logger.info('[Member Payment] User cancelled abandoned PI for booking', { extra: { sessionUserEmail: sessionUser.email, paymentIntentId, bookingId } });
+
+      // Void the finalized invoice and re-create draft for next payment attempt
+      try {
+        const { voidBookingInvoice, recreateDraftInvoiceFromBooking } = await import('../../core/billing/bookingInvoiceService');
+        await voidBookingInvoice(bookingId);
+        await recreateDraftInvoiceFromBooking(bookingId);
+        logger.info('[Member Payment] Voided invoice and re-created draft after abandoned payment', { extra: { bookingId } });
+      } catch (invoiceErr: unknown) {
+        logger.warn('[Member Payment] Failed to void/recreate invoice after payment cancellation', { extra: { bookingId, error: String(invoiceErr) } });
+      }
     }
 
     res.json({ success: result.success });
