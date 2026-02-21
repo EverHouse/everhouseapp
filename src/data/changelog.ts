@@ -13,6 +13,23 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.91.0",
+    date: "2026-02-21",
+    title: "One Invoice Per Booking & Roster Lock",
+    isMajor: true,
+    changes: [
+      "Upgraded: Each simulator booking now has exactly one Stripe invoice throughout its lifecycle — draft at approval, updated on roster changes, finalized at payment",
+      "Added: Roster lock after invoice is paid — editing players is blocked once payment is collected, with staff admin override requiring a reason",
+      "Added: Invoice auto-creation when Trackman auto-approves bookings (simulator only, conference rooms excluded)",
+      "Added: Invoice auto-void when bookings are cancelled via Trackman webhook",
+      "Added: Invoice auto-sync when Trackman detects duration changes or staff reschedules a booking",
+      "Added: Bay change detection from Trackman — when a booking moves bays, both booking and session records update and availability refreshes for old and new bays",
+      "Added: Staff notifications when paid invoices need attention (roster changes after payment, void attempts on paid invoices)",
+      "Added: Check-in payment settlement — invoice is finalized as paid (OOB) when staff confirms, voided when all fees are waived, or synced on partial actions",
+      "Removed: Reschedule UI hidden from staff and member surfaces (backend routes preserved for future measured rollout)",
+    ]
+  },
+  {
     version: "7.90.0",
     date: "2026-02-20",
     title: "Invoice-Based Payment Processing",

@@ -22,7 +22,7 @@ export function BookingActions({
   bookingContext,
   rosterData,
   onCheckIn,
-  onReschedule,
+  onReschedule: _onReschedule,
   onCancelBooking,
   ownerName,
   ownerEmail,
@@ -58,7 +58,7 @@ export function BookingActions({
     }
   };
 
-  if (!(onCheckIn || onReschedule || onCancelBooking) || !bookingId) {
+  if (!(onCheckIn || onCancelBooking) || !bookingId) {
     return null;
   }
 
@@ -99,24 +99,6 @@ export function BookingActions({
           >
             <span className="material-symbols-outlined text-sm">check_circle</span>
             Checked In
-          </button>
-        )}
-        {onReschedule && effectiveStatus !== 'cancelled' && !checkedIn && (
-          <button
-            onClick={() => onReschedule({
-              id: bookingId,
-              requestDate: bookingContext?.requestDate || fetchedContext?.bookingDate || '',
-              startTime: bookingContext?.startTime || '',
-              endTime: bookingContext?.endTime || '',
-              resourceId: bookingContext?.resourceId || fetchedContext?.resourceId || 0,
-              resourceName: bookingContext?.resourceName || bayName || fetchedContext?.bayName,
-              userName: ownerName || fetchedContext?.ownerName,
-              userEmail: ownerEmail || fetchedContext?.ownerEmail,
-            })}
-            className="tactile-btn flex-1 py-2 px-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium flex items-center justify-center gap-1.5 transition-colors"
-          >
-            <span className="material-symbols-outlined text-sm">event_repeat</span>
-            Reschedule
           </button>
         )}
         {onCancelBooking && effectiveStatus !== 'cancelled' && effectiveStatus !== 'cancellation_pending' && !checkedIn && (

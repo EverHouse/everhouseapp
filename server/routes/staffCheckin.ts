@@ -21,6 +21,7 @@ import { ensureSessionForBooking } from '../core/bookingService/sessionManager';
 import { sendFirstVisitConfirmationEmail } from '../emails/firstVisitEmail';
 import { getErrorMessage } from '../utils/errorUtils';
 import { processWalkInCheckin } from '../core/walkInCheckinService';
+import { finalizeInvoicePaidOutOfBand, voidBookingInvoice, syncBookingInvoice, getBookingInvoiceId } from '../core/billing/bookingInvoiceService';
 
 const router = Router();
 
@@ -39,6 +40,79 @@ async function getMemberDisplayName(email: string): Promise<string> {
     logger.error('[StaffCheckin] Error looking up member name', { error: error instanceof Error ? error : new Error(String(error)) });
   }
   return email.split('@')[0];
+}
+
+async function settleBookingInvoiceAfterCheckin(bookingId: number, sessionId: number | null): Promise<void> {
+  if (!sessionId) return;
+  
+  try {
+    const resourceResult = await pool.query(
+      `SELECT r.type FROM resources r JOIN booking_requests br ON br.resource_id = r.id WHERE br.id = $1`,
+      [bookingId]
+    );
+    if (resourceResult.rows[0]?.type === 'conference_room') return;
+    
+    const invoiceId = await getBookingInvoiceId(bookingId);
+    if (!invoiceId) return;
+    
+    const participantResult = await pool.query(
+      `SELECT payment_status, cached_fee_cents FROM booking_participants WHERE session_id = $1`,
+      [sessionId]
+    );
+    
+    const participants = participantResult.rows;
+    const allSettled = participants.every((p: { payment_status: string }) => 
+      p.payment_status === 'paid' || p.payment_status === 'waived'
+    );
+    
+    if (!allSettled) {
+      syncBookingInvoice(bookingId, sessionId).catch((err: unknown) => {
+        logger.warn('[StaffCheckin] Non-blocking: Failed to sync invoice after partial action', {
+          extra: { bookingId, sessionId, error: (err as Error).message }
+        });
+      });
+      return;
+    }
+    
+    const anyPaid = participants.some((p: { payment_status: string; cached_fee_cents: number }) => 
+      p.payment_status === 'paid' && (p.cached_fee_cents || 0) > 0
+    );
+    
+    if (anyPaid) {
+      try {
+        const userResult = await pool.query(
+          `SELECT u.stripe_customer_id FROM users u 
+           JOIN booking_requests br ON LOWER(u.email) = LOWER(br.user_email) 
+           WHERE br.id = $1 LIMIT 1`,
+          [bookingId]
+        );
+        const customerId = userResult.rows[0]?.stripe_customer_id;
+        if (customerId) {
+          await finalizeInvoicePaidOutOfBand({
+            bookingId,
+            paidVia: 'cash',
+          });
+          logger.info('[StaffCheckin] Finalized invoice as paid OOB after check-in confirm', {
+            extra: { bookingId, invoiceId }
+          });
+        }
+      } catch (finalizeErr: unknown) {
+        logger.warn('[StaffCheckin] Non-blocking: Failed to finalize invoice OOB', {
+          extra: { bookingId, invoiceId, error: (finalizeErr as Error).message }
+        });
+      }
+    } else {
+      voidBookingInvoice(bookingId).catch((err: unknown) => {
+        logger.warn('[StaffCheckin] Non-blocking: Failed to void invoice after all waived', {
+          extra: { bookingId, error: (err as Error).message }
+        });
+      });
+    }
+  } catch (err: unknown) {
+    logger.warn('[StaffCheckin] Non-blocking: settleBookingInvoiceAfterCheckin failed', {
+      extra: { bookingId, sessionId, error: (err as Error).message }
+    });
+  }
 }
 
 interface ParticipantFee {
@@ -481,6 +555,8 @@ router.patch('/api/bookings/:id/payments', isStaffOrAdmin, async (req: Request, 
           try { broadcastMemberStatsUpdated(booking.owner_email, { guestPasses: consumeResult.passesRemaining }); } catch (err: unknown) {logger.error('[Broadcast] Stats update error:', err); }
         }
         
+        settleBookingInvoiceAfterCheckin(bookingId, sessionId).catch(() => {});
+
         return res.json({ 
           success: true, 
           message: `Guest pass used for ${guestName}. ${consumeResult.passesRemaining} passes remaining.`,
@@ -535,6 +611,8 @@ router.patch('/api/bookings/:id/payments', isStaffOrAdmin, async (req: Request, 
           logger.error('[StaffCheckin] Failed to send waiver notification', { extra: { notifyErr } });
         }
       }
+
+      settleBookingInvoiceAfterCheckin(bookingId, sessionId).catch(() => {});
 
       return res.json({ 
         success: true, 
@@ -817,6 +895,8 @@ router.patch('/api/bookings/:id/payments', isStaffOrAdmin, async (req: Request, 
         newStatus: newStatus,
         reason: reason || null
       });
+
+      settleBookingInvoiceAfterCheckin(bookingId, sessionId).catch(() => {});
 
       return res.json({ 
         success: true, 

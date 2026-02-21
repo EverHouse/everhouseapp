@@ -12,6 +12,7 @@ import { sendPushNotification } from '../push';
 import { formatTime12Hour } from '../../utils/dateUtils';
 import { checkClosureConflict, checkAvailabilityBlockConflict } from '../../core/bookingValidation';
 import { sendBookingRescheduleEmail } from '../../emails/bookingEmails';
+import { syncBookingInvoice } from '../../core/billing/bookingInvoiceService';
 
 const router = Router();
 
@@ -207,6 +208,12 @@ router.post('/api/admin/booking/:id/reschedule/confirm', isStaffOrAdmin, async (
         await recalculateSessionFees(updated.session_id as number, 'reschedule');
         logger.info('[Reschedule] Recalculated session fees after reschedule', {
           extra: { bookingId, sessionId: updated.session_id }
+        });
+        // Sync draft invoice with new fees after reschedule (non-blocking)
+        syncBookingInvoice(bookingId, updated.session_id as number).catch((syncErr: unknown) => {
+          logger.warn('[Reschedule] Non-blocking: Failed to sync invoice after reschedule', {
+            extra: { bookingId, sessionId: updated.session_id, error: (syncErr as Error).message }
+          });
         });
       } catch (feeErr: unknown) {
         logger.warn('[Reschedule] Fee recalculation failed (non-blocking)', {

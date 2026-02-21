@@ -2,6 +2,7 @@ import { getStripeClient } from '../stripe/client';
 import { pool } from '../db';
 import { logger } from '../logger';
 import { getErrorMessage } from '../../utils/errorUtils';
+import { notifyAllStaff } from '../notificationService';
 import type Stripe from 'stripe';
 import type { BookingFeeLineItem } from '../stripe/invoices';
 
@@ -511,6 +512,12 @@ export async function voidBookingInvoice(bookingId: number): Promise<{
       logger.warn('[BookingInvoice] Cannot void paid invoice', {
         extra: { bookingId, invoiceId }
       });
+      notifyAllStaff(
+        'Paid Invoice — Refund May Be Needed',
+        `Attempted to void invoice ${invoiceId} for booking #${bookingId}, but it is already paid. A refund may be needed.`,
+        'warning',
+        { relatedId: bookingId, relatedType: 'booking' }
+      ).catch(() => {});
       return { success: false, error: 'Invoice already paid' };
     }
 
@@ -615,7 +622,28 @@ export async function syncBookingInvoice(bookingId: number, sessionId: number): 
 
     const stripe = await getStripeClient();
     const invoice = await stripe.invoices.retrieve(stripeInvoiceId);
-    if (invoice.status !== 'draft') return;
+    if (invoice.status !== 'draft') {
+      if (invoice.status === 'open') {
+        logger.warn('[BookingInvoice] syncBookingInvoice skipped: invoice is open (already finalized). Manual review may be needed.', {
+          extra: { bookingId, invoiceId: stripeInvoiceId }
+        });
+      } else if (invoice.status === 'paid') {
+        logger.warn('[BookingInvoice] syncBookingInvoice skipped: invoice already paid. Roster changed after payment — staff review needed.', {
+          extra: { bookingId, invoiceId: stripeInvoiceId }
+        });
+        notifyAllStaff(
+          'Roster Changed After Payment',
+          `Booking #${bookingId} roster was modified after invoice ${stripeInvoiceId} was already paid. Staff review needed.`,
+          'warning',
+          { relatedId: bookingId, relatedType: 'booking' }
+        ).catch(() => {});
+      } else if (invoice.status === 'void' || invoice.status === 'uncollectible') {
+        logger.info('[BookingInvoice] syncBookingInvoice skipped: invoice is void/uncollectible', {
+          extra: { bookingId, invoiceId: stripeInvoiceId }
+        });
+      }
+      return;
+    }
 
     const participantResult = await pool.query(
       `SELECT id, display_name, participant_type, cached_fee_cents
@@ -658,6 +686,26 @@ export async function syncBookingInvoice(bookingId: number, sessionId: number): 
     logger.warn('[BookingInvoice] Non-blocking: syncBookingInvoice failed', {
       extra: { error: getErrorMessage(err), bookingId, sessionId }
     });
+  }
+}
+
+export async function isBookingInvoicePaid(bookingId: number): Promise<{ locked: boolean; invoiceId?: string; reason?: string }> {
+  try {
+    const result = await pool.query(
+      `SELECT stripe_invoice_id FROM booking_requests WHERE id = $1 LIMIT 1`,
+      [bookingId]
+    );
+    const invoiceId = result.rows[0]?.stripe_invoice_id;
+    if (!invoiceId) return { locked: false };
+
+    const stripe = await getStripeClient();
+    const invoice = await stripe.invoices.retrieve(invoiceId);
+    if (invoice.status === 'paid') {
+      return { locked: true, invoiceId, reason: 'Invoice has been paid' };
+    }
+    return { locked: false };
+  } catch {
+    return { locked: false };
   }
 }
 

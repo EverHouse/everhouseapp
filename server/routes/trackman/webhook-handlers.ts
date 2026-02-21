@@ -32,6 +32,7 @@ import { createSessionWithUsageTracking, ensureSessionForBooking } from '../../c
 import { recalculateSessionFees } from '../../core/billing/unifiedFeeService';
 import { logSystemAction } from '../../core/auditLog';
 import { createPrepaymentIntent } from '../../core/billing/prepaymentService';
+import { createDraftInvoiceForBooking, voidBookingInvoice } from '../../core/billing/bookingInvoiceService';
 
 export async function tryAutoApproveBooking(
   customerEmail: string,
@@ -125,6 +126,56 @@ export async function tryAutoApproveBooking(
     logger.info('[Trackman Webhook] Auto-approved pending booking', {
       extra: { bookingId, trackmanBookingId, email: customerEmail, date: slotDate, time: startTime, sessionId: createdSessionId }
     });
+    
+    // Create draft invoice for one-invoice-per-booking model (non-blocking)
+    if (createdSessionId) {
+      try {
+        const resourceResult = await pool.query(
+          `SELECT r.type FROM resources r JOIN booking_requests br ON br.resource_id = r.id WHERE br.id = $1`,
+          [bookingId]
+        );
+        const resourceType = resourceResult.rows[0]?.type;
+        if (resourceType !== 'conference_room') {
+          const participantResult = await pool.query(
+            `SELECT id, display_name, participant_type, cached_fee_cents
+             FROM booking_participants
+             WHERE session_id = $1 AND cached_fee_cents > 0`,
+            [createdSessionId]
+          );
+          if (participantResult.rows.length > 0) {
+            const userResult = await pool.query(
+              `SELECT stripe_customer_id FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1`,
+              [customerEmail]
+            );
+            const stripeCustomerId = userResult.rows[0]?.stripe_customer_id;
+            if (stripeCustomerId) {
+              const feeLineItems = participantResult.rows.map((row: any) => ({
+                participantId: row.id,
+                displayName: row.display_name || 'Unknown',
+                participantType: row.participant_type as 'owner' | 'member' | 'guest',
+                overageCents: row.participant_type === 'guest' ? 0 : row.cached_fee_cents,
+                guestCents: row.participant_type === 'guest' ? row.cached_fee_cents : 0,
+                totalCents: row.cached_fee_cents,
+              }));
+              const trackmanBookingIdForInvoice = trackmanBookingId;
+              await createDraftInvoiceForBooking({
+                customerId: stripeCustomerId,
+                bookingId,
+                sessionId: createdSessionId,
+                trackmanBookingId: trackmanBookingIdForInvoice,
+                feeLineItems,
+                purpose: 'booking_fee',
+              });
+              logger.info('[Trackman Webhook] Created draft invoice for auto-approved booking', { extra: { bookingId, sessionId: createdSessionId } });
+            }
+          }
+        }
+      } catch (invoiceErr: unknown) {
+        logger.warn('[Trackman Webhook] Non-blocking: Failed to create draft invoice for auto-approved booking', {
+          extra: { bookingId, error: (invoiceErr as Error).message }
+        });
+      }
+    }
     
     return { matched: true, bookingId, resourceId, sessionId: createdSessionId };
   } catch (e: unknown) {
@@ -243,6 +294,13 @@ export async function cancelBookingByTrackmanId(
     } catch (cancelIntentsErr: unknown) {
       logger.warn('[Trackman Webhook] Failed to cancel pending payment intents', { error: cancelIntentsErr as Error });
     }
+    
+    // Void any draft/open invoice for this booking (non-blocking)
+    voidBookingInvoice(bookingId).catch((err: unknown) => {
+      logger.warn('[Trackman Webhook] Non-blocking: Failed to void booking invoice', {
+        extra: { bookingId, error: (err as Error).message }
+      });
+    });
     
     // Refund already-paid participant fees
     if (booking.session_id) {

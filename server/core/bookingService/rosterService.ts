@@ -39,7 +39,7 @@ import { useGuestPass, refundGuestPass, ensureGuestPassRecord } from '../../rout
 import { getErrorMessage } from '../../utils/errorUtils';
 import type { FeeBreakdown } from '../../../shared/models/billing';
 import type { BookingParticipant } from '../../../shared/models/scheduling';
-import { syncBookingInvoice } from '../billing/bookingInvoiceService';
+import { syncBookingInvoice, isBookingInvoicePaid } from '../billing/bookingInvoiceService';
 
 export interface BookingWithSession {
   booking_id: number;
@@ -823,6 +823,20 @@ function createServiceError(message: string, statusCode: number, extra?: Record<
   return err;
 }
 
+async function enforceRosterLock(bookingId: number, options?: { forceOverride?: boolean; overrideReason?: string; staffEmail?: string }): Promise<void> {
+  if (options?.forceOverride && options?.overrideReason) {
+    logger.warn('[RosterService] Roster lock overridden by staff', {
+      extra: { bookingId, staffEmail: options.staffEmail, overrideReason: options.overrideReason }
+    });
+    return;
+  }
+
+  const lockStatus = await isBookingInvoicePaid(bookingId);
+  if (lockStatus.locked) {
+    throw new Error(`ROSTER_LOCKED: ${lockStatus.reason}. Booking ID: ${bookingId}`);
+  }
+}
+
 // ─── addParticipant ────────────────────────────────────────────
 
 export async function addParticipant(params: AddParticipantParams): Promise<AddParticipantResult> {
@@ -831,6 +845,13 @@ export async function addParticipant(params: AddParticipantParams): Promise<AddP
   const booking = await getBookingWithSession(bookingId);
   if (!booking) {
     throw createServiceError('Booking not found', 404);
+  }
+
+  try {
+    await enforceRosterLock(bookingId);
+  } catch (lockErr: unknown) {
+    if (lockErr instanceof Error && lockErr.message.startsWith('ROSTER_LOCKED:')) throw lockErr;
+    logger.warn('[rosterService] Roster lock check failed (non-blocking)', { extra: { bookingId, error: getErrorMessage(lockErr) } });
   }
 
   const isOwner = booking.owner_email?.toLowerCase() === userEmail;
@@ -1372,6 +1393,13 @@ export async function removeParticipant(params: RemoveParticipantParams): Promis
     throw createServiceError('Booking not found', 404);
   }
 
+  try {
+    await enforceRosterLock(bookingId);
+  } catch (lockErr: unknown) {
+    if (lockErr instanceof Error && lockErr.message.startsWith('ROSTER_LOCKED:')) throw lockErr;
+    logger.warn('[rosterService] Roster lock check failed (non-blocking)', { extra: { bookingId, error: getErrorMessage(lockErr) } });
+  }
+
   if (!booking.session_id) {
     throw createServiceError('Booking does not have an active session', 400);
   }
@@ -1566,6 +1594,13 @@ export async function removeParticipant(params: RemoveParticipantParams): Promis
 export async function updateDeclaredPlayerCount(params: UpdatePlayerCountParams): Promise<UpdatePlayerCountResult> {
   const { bookingId, playerCount, staffEmail } = params;
 
+  try {
+    await enforceRosterLock(bookingId);
+  } catch (lockErr: unknown) {
+    if (lockErr instanceof Error && lockErr.message.startsWith('ROSTER_LOCKED:')) throw lockErr;
+    logger.warn('[rosterService] Roster lock check failed (non-blocking)', { extra: { bookingId, error: getErrorMessage(lockErr) } });
+  }
+
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -1711,6 +1746,13 @@ export async function applyRosterBatch(params: BatchRosterUpdateParams): Promise
   const booking = await getBookingWithSession(bookingId);
   if (!booking) {
     throw createServiceError('Booking not found', 404);
+  }
+
+  try {
+    await enforceRosterLock(bookingId);
+  } catch (lockErr: unknown) {
+    if (lockErr instanceof Error && lockErr.message.startsWith('ROSTER_LOCKED:')) throw lockErr;
+    logger.warn('[rosterService] Roster lock check failed (non-blocking)', { extra: { bookingId, error: getErrorMessage(lockErr) } });
   }
 
   const isStaff = await isStaffOrAdminCheck(staffEmail);

@@ -1,6 +1,6 @@
 import { pool } from '../../core/db';
 import { logger } from '../../core/logger';
-import { sendNotificationToUser, broadcastToStaff } from '../../core/websocket';
+import { sendNotificationToUser, broadcastToStaff, broadcastAvailabilityUpdate } from '../../core/websocket';
 import { notifyAllStaff, notifyMember } from '../../core/notificationService';
 import { refundGuestPass } from '../guestPasses';
 import { calculateFullSessionBilling, Participant } from '../../core/bookingService/usageCalculator';
@@ -10,6 +10,7 @@ import { getMemberTierByEmail } from '../../core/tierService';
 import { linkAndNotifyParticipants } from '../../core/bookingEvents';
 import { calculateDurationMinutes, NormalizedBookingFields } from './webhook-helpers';
 import { createPrepaymentIntent } from '../../core/billing/prepaymentService';
+import { syncBookingInvoice } from '../../core/billing/bookingInvoiceService';
 
 export async function updateBaySlotCache(
   trackmanBookingId: string,
@@ -63,7 +64,7 @@ export async function createBookingForMember(
 ): Promise<{ success: boolean; bookingId?: number; updated?: boolean }> {
   try {
     const existingBooking = await pool.query(
-      `SELECT id, duration_minutes, session_id FROM booking_requests WHERE trackman_booking_id = $1`,
+      `SELECT id, duration_minutes, session_id, resource_id FROM booking_requests WHERE trackman_booking_id = $1`,
       [trackmanBookingId]
     );
     
@@ -71,33 +72,115 @@ export async function createBookingForMember(
       const oldDuration = existingBooking.rows[0].duration_minutes;
       const newDuration = calculateDurationMinutes(startTime, endTime);
       
+      const oldResourceId = existingBooking.rows[0].resource_id;
+      const bayChanged = resourceId && oldResourceId && resourceId !== oldResourceId;
+
       if (oldDuration !== newDuration) {
         const bookingId = existingBooking.rows[0].id;
         const sessionId = existingBooking.rows[0].session_id;
         
-        await pool.query(
-          `UPDATE booking_requests 
-           SET start_time = $1, end_time = $2, duration_minutes = $3, 
-               trackman_player_count = $4, last_trackman_sync_at = NOW(), updated_at = NOW()
-           WHERE id = $5`,
-          [startTime, endTime, newDuration, playerCount, bookingId]
-        );
-        
-        if (sessionId) {
+        if (bayChanged) {
+          await pool.query(
+            `UPDATE booking_requests 
+             SET start_time = $1, end_time = $2, duration_minutes = $3, 
+                 trackman_player_count = $4, resource_id = $6, last_trackman_sync_at = NOW(), updated_at = NOW()
+             WHERE id = $5`,
+            [startTime, endTime, newDuration, playerCount, bookingId, resourceId]
+          );
+          if (sessionId) {
+            await pool.query(
+              'UPDATE booking_sessions SET start_time = $1, end_time = $2, resource_id = $4 WHERE id = $3',
+              [startTime, endTime, sessionId, resourceId]
+            );
+          }
           try {
+            broadcastAvailabilityUpdate({ resourceId: oldResourceId, resourceType: 'simulator', date: slotDate, action: 'cancelled' });
+            broadcastAvailabilityUpdate({ resourceId: resourceId, resourceType: 'simulator', date: slotDate, action: 'booked' });
+          } catch (broadcastErr: unknown) {
+            logger.warn('[Trackman Webhook] Failed to broadcast bay change availability update', {
+              extra: { bookingId, error: (broadcastErr as Error).message }
+            });
+          }
+        } else {
+          await pool.query(
+            `UPDATE booking_requests 
+             SET start_time = $1, end_time = $2, duration_minutes = $3, 
+                 trackman_player_count = $4, last_trackman_sync_at = NOW(), updated_at = NOW()
+             WHERE id = $5`,
+            [startTime, endTime, newDuration, playerCount, bookingId]
+          );
+          if (sessionId) {
             await pool.query(
               'UPDATE booking_sessions SET start_time = $1, end_time = $2 WHERE id = $3',
               [startTime, endTime, sessionId]
             );
+          }
+        }
+        
+        if (sessionId) {
+          try {
             await recalculateSessionFees(sessionId, 'trackman_webhook');
             logger.info('[Trackman Webhook] Recalculated fees after duration change', {
-              extra: { sessionId }
+              extra: { sessionId, bayChanged }
+            });
+            syncBookingInvoice(bookingId, sessionId).catch((syncErr: unknown) => {
+              logger.warn('[Trackman Webhook] Non-blocking: Failed to sync invoice after duration change', {
+                extra: { bookingId, sessionId, error: (syncErr as Error).message }
+              });
             });
           } catch (recalcErr: unknown) {
             logger.warn('[Trackman Webhook] Failed to recalculate fees', { 
               extra: { sessionId } 
             });
           }
+        }
+        
+        return { success: true, bookingId, updated: true };
+      }
+      
+      if (bayChanged) {
+        const bookingId = existingBooking.rows[0].id;
+        const sessionId = existingBooking.rows[0].session_id;
+        
+        await pool.query(
+          `UPDATE booking_requests SET resource_id = $1, updated_at = NOW() WHERE id = $2`,
+          [resourceId, bookingId]
+        );
+        
+        if (sessionId) {
+          await pool.query(
+            `UPDATE booking_sessions SET resource_id = $1 WHERE id = $2`,
+            [resourceId, sessionId]
+          );
+        }
+        
+        logger.info('[Trackman Webhook] Bay change detected - updated resource_id', {
+          extra: { 
+            bookingId, 
+            trackmanBookingId, 
+            oldResourceId, 
+            newResourceId: resourceId,
+            sessionId 
+          }
+        });
+        
+        try {
+          broadcastAvailabilityUpdate({
+            resourceId: oldResourceId,
+            resourceType: 'simulator',
+            date: slotDate,
+            action: 'cancelled'
+          });
+          broadcastAvailabilityUpdate({
+            resourceId: resourceId,
+            resourceType: 'simulator',
+            date: slotDate,
+            action: 'booked'
+          });
+        } catch (broadcastErr: unknown) {
+          logger.warn('[Trackman Webhook] Failed to broadcast bay change availability update', {
+            extra: { bookingId, error: (broadcastErr as Error).message }
+          });
         }
         
         return { success: true, bookingId, updated: true };

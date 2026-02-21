@@ -155,7 +155,7 @@ export function PaymentActionFooter({
   savingChanges,
   handleManageModeSave,
   onCheckIn,
-  onReschedule,
+  onReschedule: _onReschedule,
   onCancelBooking,
   bookingContext,
   bookingStatus,
@@ -196,28 +196,6 @@ export function PaymentActionFooter({
 
   const renderSecondaryActions = () => (
     <div className="flex items-center justify-center gap-4 mt-2">
-      {onReschedule && bookingStatus !== 'cancelled' && (
-        <button
-          type="button"
-          onClick={() => {
-            if (!bookingId) return;
-            onReschedule({
-              id: bookingId,
-              requestDate: bookingContext?.requestDate || bookingDate || '',
-              startTime: bookingContext?.startTime || '',
-              endTime: bookingContext?.endTime || '',
-              resourceId: bookingContext?.resourceId || 0,
-              resourceName: bookingContext?.resourceName || bayName || '',
-              userName: ownerName || '',
-              userEmail: ownerEmail || '',
-            });
-          }}
-          className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium flex items-center gap-1"
-        >
-          <span className="material-symbols-outlined text-sm">event_repeat</span>
-          Reschedule
-        </button>
-      )}
       {onCancelBooking && bookingStatus !== 'cancelled' && bookingStatus !== 'cancellation_pending' && (
         <button
           type="button"
