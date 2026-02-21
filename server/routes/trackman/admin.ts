@@ -1110,7 +1110,7 @@ router.get('/api/admin/trackman/matched', isStaffOrAdmin, async (req, res) => {
                    AND br.user_email NOT LIKE '%unmatched@%'
               THEN 1
               ELSE 0
-            END + COALESCE((SELECT COUNT(*) FROM booking_members bm WHERE bm.booking_id = br.id AND bm.user_email IS NOT NULL AND bm.user_email != '' AND bm.is_primary = false), 0)
+            END + COALESCE((SELECT COUNT(*) FROM booking_participants bp2 INNER JOIN booking_requests br2 ON br2.session_id = bp2.session_id WHERE br2.id = br.id AND bp2.user_id IS NOT NULL AND bp2.participant_type = 'member'), 0)
         END as filled_slots
        FROM booking_requests br
        LEFT JOIN users u ON LOWER(br.user_email) = LOWER(u.email)
@@ -1839,14 +1839,20 @@ router.get('/api/admin/booking/:id/members', isStaffOrAdmin, async (req, res) =>
       guestPassesRemainingAfterBooking = ownerGuestPassesRemaining - guestPassesUsedThisBooking;
 
     } else {
-      let membersResult = await db.execute(sql`SELECT bm.*, u.first_name, u.last_name, u.email as member_email, u.tier as user_tier, u.membership_status
-         FROM booking_members bm
-         LEFT JOIN users u ON LOWER(bm.user_email) = LOWER(u.email)
-         WHERE bm.booking_id = ${id}
-         ORDER BY bm.slot_number`);
+      let membersResult = await db.execute(sql`SELECT bp.*, u.first_name, u.last_name, u.email as member_email, u.tier as user_tier, u.membership_status
+         FROM booking_participants bp
+         INNER JOIN booking_requests br2 ON br2.session_id = bp.session_id
+         LEFT JOIN users u ON bp.user_id = u.id
+         WHERE br2.id = ${id} AND bp.participant_type IN ('owner', 'member')
+         ORDER BY bp.id`);
 
 
-      const guestsResult = await db.execute(sql`SELECT * FROM booking_guests WHERE booking_id = ${id} ORDER BY slot_number`);
+      const guestsResult = await db.execute(sql`SELECT bp.id, bp.display_name as guest_name, g.email as guest_email, bp.session_id
+         FROM booking_participants bp
+         INNER JOIN booking_requests br2 ON br2.session_id = bp.session_id
+         LEFT JOIN guests g ON g.id = bp.guest_id
+         WHERE br2.id = ${id} AND bp.participant_type = 'guest'
+         ORDER BY bp.id`);
 
       const legacyTotalMemberSlots = membersResult.rows.length;
       const actualGuestCount = guestsResult.rows.length;
@@ -1866,7 +1872,7 @@ router.get('/api/admin/booking/:id/members', isStaffOrAdmin, async (req, res) =>
       }
 
       effectiveGuestCount = actualGuestCount > 0 ? actualGuestCount : (legacyGuestCount as number);
-      filledMemberSlots = membersResult.rows.filter((row: DbRow) => row.user_email).length;
+      filledMemberSlots = membersResult.rows.filter((row: DbRow) => row.user_id).length;
       totalMemberSlots = legacyTotalMemberSlots;
       actualPlayerCount = Number(filledMemberSlots) + Number(effectiveGuestCount);
       playerCountMismatch = actualPlayerCount !== expectedPlayerCount;
@@ -2486,31 +2492,7 @@ router.delete('/api/admin/booking/:id/guests/:guestId', isStaffOrAdmin, async (r
     let guestDisplayName = 'Unknown guest';
     let guestFound = false;
 
-    const guestBookingResult = await db.execute(sql`SELECT id, guest_name, guest_email FROM booking_guests WHERE id = ${guestId} AND booking_id = ${bookingId}`);
-
-    if (guestBookingResult.rowCount && guestBookingResult.rowCount > 0) {
-      guestFound = true;
-      const guestRecord = guestBookingResult.rows[0] as DbRow;
-      guestDisplayName = (guestRecord.guest_name as string) || guestDisplayName;
-
-      if (sessionId) {
-        const participantResult = await db.execute(sql`SELECT id, used_guest_pass FROM booking_participants 
-           WHERE session_id = ${sessionId} AND participant_type = 'guest' AND display_name = ${guestDisplayName}`);
-
-        if (participantResult.rowCount && participantResult.rowCount > 0) {
-          const participant = participantResult.rows[0] as DbRow;
-          if (participant.used_guest_pass === true && booking.owner_email) {
-            try {
-              await refundGuestPassForParticipant(participant.id as number, booking.owner_email as string, guestDisplayName);
-              logger.info('[RemoveGuest] Guest pass refunded for', { extra: { guestDisplayName } });
-            } catch (err: unknown) {
-              logger.error('[RemoveGuest] Failed to refund guest pass', { extra: { err } });
-            }
-          }
-          await db.execute(sql`DELETE FROM booking_participants WHERE id = ${participant.id}`);
-        }
-      }
-    } else if (sessionId) {
+    if (sessionId) {
       const participantResult = await db.execute(sql`SELECT id, display_name, used_guest_pass FROM booking_participants WHERE id = ${guestId} AND session_id = ${sessionId} AND participant_type = 'guest'`);
 
       if (participantResult.rowCount && participantResult.rowCount > 0) {
@@ -2530,7 +2512,7 @@ router.delete('/api/admin/booking/:id/guests/:guestId', isStaffOrAdmin, async (r
     }
 
     if (!guestFound) {
-      return res.status(404).json({ error: 'Guest not found in booking_guests or booking_participants' });
+      return res.status(404).json({ error: 'Guest not found in booking_participants' });
     }
 
     if (booking.guest_count && Number(booking.guest_count) > 0) {
@@ -2569,20 +2551,6 @@ router.put('/api/admin/booking/:bookingId/members/:slotId/link', isStaffOrAdmin,
     
     if (!memberEmail) {
       return res.status(400).json({ error: 'memberEmail is required' });
-    }
-    
-    const slotResult = await db.execute(sql`SELECT * FROM booking_members WHERE id = ${slotId} AND booking_id = ${bookingId}`);
-    
-    if (slotResult.rowCount === 0) {
-      return res.status(404).json({ error: 'Slot not found' });
-    }
-    
-    const slot = slotResult.rows[0] as DbRow;
-    if (slot.user_email) {
-      if (String(slot.user_email).toLowerCase() === memberEmail.toLowerCase()) {
-        return res.json({ success: true, message: 'Member already linked to this slot' });
-      }
-      return res.status(400).json({ error: 'Slot is already linked to a different member' });
     }
     
     const bookingResult = await db.execute(sql`SELECT request_date, start_time, end_time, status, session_id FROM booking_requests WHERE id = ${bookingId}`);
@@ -2681,41 +2649,35 @@ router.put('/api/admin/booking/:bookingId/members/:slotId/unlink', isStaffOrAdmi
   try {
     const { bookingId, slotId } = req.params;
     
-    const slotResult = await db.execute(sql`SELECT * FROM booking_members WHERE id = ${slotId} AND booking_id = ${bookingId}`);
+    const bookingResult = await db.execute(sql`SELECT session_id FROM booking_requests WHERE id = ${bookingId}`);
     
-    if (slotResult.rowCount === 0) {
+    if (!(bookingResult.rows[0] as DbRow)?.session_id) {
+      return res.status(404).json({ error: 'Booking has no session - cannot unlink participant' });
+    }
+    
+    const sessionId = (bookingResult.rows[0] as DbRow).session_id;
+    
+    const participantResult = await db.execute(sql`SELECT bp.id, u.email as member_email FROM booking_participants bp LEFT JOIN users u ON bp.user_id = u.id WHERE bp.id = ${slotId} AND bp.session_id = ${sessionId} AND bp.participant_type = 'member'`);
+    
+    if (participantResult.rowCount === 0) {
       return res.status(404).json({ error: 'Slot not found' });
     }
     
-    const slot = slotResult.rows[0] as DbRow;
-    if (!slot.user_email) {
+    const slot = participantResult.rows[0] as DbRow;
+    if (!slot.member_email) {
       return res.status(400).json({ error: 'Slot is already empty' });
     }
     
-    const memberEmail = slot.user_email;
+    const memberEmail = slot.member_email;
     
-    const bookingResult = await db.execute(sql`SELECT session_id FROM booking_requests WHERE id = ${bookingId}`);
+    await db.execute(sql`DELETE FROM booking_participants WHERE id = ${slotId} AND participant_type = 'member'`);
     
-    if ((bookingResult.rows[0] as DbRow)?.session_id) {
-      const sessionId = (bookingResult.rows[0] as DbRow).session_id;
-      
-      const userResult = await db.execute(sql`SELECT id FROM users WHERE LOWER(email) = LOWER(${memberEmail}) LIMIT 1`);
-      
-      if (userResult.rows.length > 0) {
-        const userId = (userResult.rows[0] as DbRow).id;
-        await db.execute(sql`DELETE FROM booking_participants 
-           WHERE session_id = ${sessionId} AND user_id = ${userId} AND participant_type = 'member'`);
-        
-        if (req.query.deferFeeRecalc !== 'true') {
-          try {
-            const { recalculateSessionFees } = await import('../../core/billing/unifiedFeeService');
-            await recalculateSessionFees(sessionId as number, 'roster_update');
-          } catch (feeError: unknown) {
-            logger.warn('[unlink] Failed to recalculate session fees (non-blocking)', { extra: { feeError } });
-          }
-        }
-      } else {
-        logger.warn('[unlink] No user found for email - booking_members may be out of sync with users table', { extra: { memberEmail } });
+    if (req.query.deferFeeRecalc !== 'true') {
+      try {
+        const { recalculateSessionFees } = await import('../../core/billing/unifiedFeeService');
+        await recalculateSessionFees(sessionId as number, 'roster_update');
+      } catch (feeError: unknown) {
+        logger.warn('[unlink] Failed to recalculate session fees (non-blocking)', { extra: { feeError } });
       }
     }
     

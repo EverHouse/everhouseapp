@@ -126,11 +126,14 @@ async function gatherMemberData(email: string): Promise<MemberDataExport> {
       br.id, br.request_date, br.start_time, br.end_time, 
       br.duration_minutes, br.status, br.notes, br.created_at,
       r.name as resource_name, r.type as resource_type,
-      bm.is_primary, bm.status as member_status, bm.added_at
-    FROM booking_members bm
-    JOIN booking_requests br ON bm.booking_id = br.id
+      CASE WHEN bp.participant_type = 'owner' THEN true ELSE false END as is_primary,
+      bp.invite_status as member_status, bp.created_at as added_at
+    FROM booking_participants bp
+    JOIN booking_sessions bs ON bp.session_id = bs.id
+    JOIN booking_requests br ON br.session_id = bs.id
+    JOIN users u_bp ON bp.user_id = u_bp.id
     LEFT JOIN resources r ON br.resource_id = r.id
-    WHERE LOWER(bm.user_email) = ${normalizedEmail}
+    WHERE LOWER(u_bp.email) = ${normalizedEmail}
       AND LOWER(br.user_email) != ${normalizedEmail}
     ORDER BY br.request_date DESC
   `);
@@ -180,10 +183,15 @@ async function gatherMemberData(email: string): Promise<MemberDataExport> {
   `);
   
   const bookingMembershipsResult = await db.execute(sql`
-    SELECT booking_id, is_primary, status, added_at, updated_at
-    FROM booking_members 
-    WHERE LOWER(user_email) = ${normalizedEmail}
-    ORDER BY added_at DESC
+    SELECT br.id as booking_id, 
+      CASE WHEN bp.participant_type = 'owner' THEN true ELSE false END as is_primary, 
+      bp.invite_status as status, bp.created_at as added_at, bp.created_at as updated_at
+    FROM booking_participants bp
+    JOIN booking_sessions bs ON bp.session_id = bs.id
+    JOIN booking_requests br ON br.session_id = bs.id
+    JOIN users u_bp ON bp.user_id = u_bp.id
+    WHERE LOWER(u_bp.email) = ${normalizedEmail}
+    ORDER BY bp.created_at DESC
   `);
   
   const guestCheckInsResult = await db.execute(sql`

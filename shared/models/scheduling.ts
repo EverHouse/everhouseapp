@@ -207,41 +207,6 @@ export const closureReasons = pgTable("closure_reasons", {
 export type ClosureReason = typeof closureReasons.$inferSelect;
 export type InsertClosureReason = typeof closureReasons.$inferInsert;
 
-// Booking members junction table - links multiple members to a single booking
-export const bookingMembers = pgTable("booking_members", {
-  id: serial("id").primaryKey(),
-  bookingId: integer("booking_id").notNull(),
-  userEmail: varchar("user_email"), // nullable - empty slot until linked
-  slotNumber: integer("slot_number").notNull(), // 1, 2, 3, etc.
-  isPrimary: boolean("is_primary").default(false),
-  trackmanBookingId: varchar("trackman_booking_id"),
-  linkedAt: timestamp("linked_at"), // when the member was linked to this slot
-  linkedBy: varchar("linked_by"), // who linked this member (admin email)
-  createdAt: timestamp("created_at").defaultNow(),
-}, (table) => [
-  index("booking_members_booking_id_idx").on(table.bookingId),
-  index("booking_members_user_email_idx").on(table.userEmail),
-  uniqueIndex("booking_members_booking_slot_idx").on(table.bookingId, table.slotNumber),
-]);
-
-// Booking guests table - tracks guests (non-members) on bookings
-export const bookingGuests = pgTable("booking_guests", {
-  id: serial("id").primaryKey(),
-  bookingId: integer("booking_id").notNull(),
-  guestName: varchar("guest_name"),
-  guestEmail: varchar("guest_email"), // nullable
-  slotNumber: integer("slot_number").notNull(),
-  trackmanBookingId: varchar("trackman_booking_id"),
-  createdAt: timestamp("created_at").defaultNow(),
-}, (table) => [
-  index("booking_guests_booking_id_idx").on(table.bookingId),
-]);
-
-export type BookingMember = typeof bookingMembers.$inferSelect;
-export type InsertBookingMember = typeof bookingMembers.$inferInsert;
-export type BookingGuest = typeof bookingGuests.$inferSelect;
-export type InsertBookingGuest = typeof bookingGuests.$inferInsert;
-
 export type Tour = typeof tours.$inferSelect;
 export type InsertTour = typeof tours.$inferInsert;
 export type TrackmanUnmatchedBooking = typeof trackmanUnmatchedBookings.$inferSelect;

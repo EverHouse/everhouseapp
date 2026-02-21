@@ -194,7 +194,7 @@ export async function previewEmailChangeImpact(
     { table: 'billing_groups', column: 'primary_email' },
     { table: 'group_members', column: 'member_email' },
     { table: 'booking_requests', column: 'user_email' },
-    { table: 'booking_members', column: 'user_email' },
+    { table: 'booking_participants', column: 'user_id' },
     { table: 'billing_audit_log', column: 'member_email' },
     { table: 'legacy_purchases', column: 'member_email' },
     { table: 'usage_ledger', column: 'member_id' },

@@ -219,10 +219,12 @@ router.get('/api/visitors', isStaffOrAdmin, async (req, res) => {
           GROUP BY LOWER(member_email)
         ) lp_agg ON LOWER(u.email) = lp_agg.email
         LEFT JOIN (
-          SELECT LOWER(bg.guest_email) as email, COUNT(DISTINCT bg.id)::int as guest_count, MAX(br.start_time) as last_guest_date
-          FROM booking_guests bg
-          LEFT JOIN booking_requests br ON bg.booking_id = br.id
-          GROUP BY LOWER(bg.guest_email)
+          SELECT LOWER(COALESCE(g.email, '')) as email, COUNT(DISTINCT bp.id)::int as guest_count, MAX(bs.session_date) as last_guest_date
+          FROM booking_participants bp
+          JOIN booking_sessions bs ON bp.session_id = bs.id
+          LEFT JOIN guests g ON bp.guest_id = g.id
+          WHERE bp.participant_type = 'guest'
+          GROUP BY LOWER(COALESCE(g.email, ''))
         ) guest_agg ON LOWER(u.email) = guest_agg.email
         WHERE (u.role = 'visitor' OR u.membership_status = 'visitor' OR u.membership_status = 'non-member')
         AND u.role NOT IN ('admin', 'staff')
@@ -744,17 +746,22 @@ router.post('/api/visitors/backfill-types', isAdmin, async (req, res) => {
       SET 
         visitor_type = 'guest',
         last_activity_at = COALESCE(
-          (SELECT MAX(br.start_time) FROM booking_guests bg 
-           JOIN booking_requests br ON bg.booking_id = br.id 
-           WHERE LOWER(bg.guest_email) = LOWER(u.email)),
+          (SELECT MAX(br.start_time) FROM booking_participants bp
+           JOIN booking_sessions bs ON bp.session_id = bs.id
+           JOIN booking_requests br ON br.session_id = bs.id
+           JOIN guests g ON bp.guest_id = g.id
+           WHERE LOWER(g.email) = LOWER(u.email)
+           AND bp.participant_type = 'guest'),
           u.last_activity_at
         ),
         last_activity_source = 'guest_pass',
         updated_at = NOW()
       FROM (
-        SELECT DISTINCT LOWER(guest_email) as email
-        FROM booking_guests
-        WHERE guest_email IS NOT NULL
+        SELECT DISTINCT LOWER(g.email) as email
+        FROM booking_participants bp
+        JOIN guests g ON bp.guest_id = g.id
+        WHERE bp.participant_type = 'guest'
+        AND g.email IS NOT NULL
       ) bg
       WHERE LOWER(u.email) = bg.email
       AND (u.role = 'visitor' OR u.membership_status IN ('visitor', 'non-member'))

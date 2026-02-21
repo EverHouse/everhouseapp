@@ -236,18 +236,6 @@ export async function ensureDatabaseConstraints() {
       END $$;
     `);
     
-    await db.execute(sql`
-      DO $$
-      BEGIN
-        IF NOT EXISTS (
-          SELECT 1 FROM information_schema.columns 
-          WHERE table_name = 'booking_guests' AND column_name = 'guest_phone'
-        ) THEN
-          ALTER TABLE booking_guests ADD COLUMN guest_phone VARCHAR(50);
-        END IF;
-      END $$;
-    `);
-
     try {
       await db.execute(sql`
         CREATE OR REPLACE FUNCTION prevent_booking_session_overlap()

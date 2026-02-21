@@ -229,7 +229,7 @@ router.get('/api/my-visits', isAuthenticated, async (req, res) => {
         SELECT 
           br.id as visit_id,
           'booking' as visit_type,
-          'Player' as role,
+          CASE WHEN bp.participant_type = 'guest' THEN 'Guest' ELSE 'Player' END as role,
           br.request_date::text as date,
           br.start_time::text as start_time,
           br.end_time::text as end_time,
@@ -238,33 +238,17 @@ router.get('/api/my-visits', isAuthenticated, async (req, res) => {
           CASE WHEN r.type = 'conference_room' OR LOWER(r.name) LIKE '%conference%' THEN 'Conference Room' ELSE 'Golf Simulator' END as category,
           COALESCE(host_user.first_name || ' ' || host_user.last_name, br.user_name) as invited_by
         FROM booking_requests br
-        JOIN booking_members bm ON br.id = bm.booking_id
+        JOIN booking_sessions bs ON br.session_id = bs.id
+        JOIN booking_participants bp ON bp.session_id = bs.id
+        LEFT JOIN users bp_user ON bp.user_id = bp_user.id
+        LEFT JOIN guests bp_guest ON bp.guest_id = bp_guest.id
         LEFT JOIN resources r ON br.resource_id = r.id
         LEFT JOIN users host_user ON LOWER(br.user_email) = LOWER(host_user.email)
-        WHERE LOWER(bm.user_email) = ${targetEmail}
-          AND (bm.is_primary IS NOT TRUE OR bm.is_primary IS NULL)
+        WHERE (
+          (bp.participant_type IN ('member', 'guest') AND LOWER(COALESCE(bp_user.email, bp_guest.email, '')) = ${targetEmail})
+        )
+          AND bp.participant_type != 'owner'
           AND LOWER(br.user_email) != ${targetEmail}
-          AND br.request_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
-          AND br.status NOT IN ('cancelled', 'declined', 'cancellation_pending')
-        
-        UNION ALL
-        
-        SELECT 
-          br.id as visit_id,
-          'booking' as visit_type,
-          'Guest' as role,
-          br.request_date::text as date,
-          br.start_time::text as start_time,
-          br.end_time::text as end_time,
-          COALESCE(r.name, br.resource_preference, 'Simulator') as resource_name,
-          NULL as location,
-          CASE WHEN r.type = 'conference_room' OR LOWER(r.name) LIKE '%conference%' THEN 'Conference Room' ELSE 'Golf Simulator' END as category,
-          COALESCE(host_user.first_name || ' ' || host_user.last_name, br.user_name) as invited_by
-        FROM booking_requests br
-        JOIN booking_guests bg ON br.id = bg.booking_id
-        LEFT JOIN resources r ON br.resource_id = r.id
-        LEFT JOIN users host_user ON LOWER(br.user_email) = LOWER(host_user.email)
-        WHERE LOWER(bg.guest_email) = ${targetEmail}
           AND br.request_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
           AND br.status NOT IN ('cancelled', 'declined', 'cancellation_pending')
         

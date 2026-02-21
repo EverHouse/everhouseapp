@@ -1,7 +1,7 @@
 import { db } from '../db';
 import { getErrorMessage, getErrorCode } from '../utils/errorUtils';
 import { pool } from './db';
-import { users, bookingRequests, trackmanUnmatchedBookings, trackmanImportRuns, notifications, bookingMembers, bookingSessions, bookingParticipants, usageLedger, guests as guestsTable, availabilityBlocks, facilityClosures } from '../../shared/schema';
+import { users, bookingRequests, trackmanUnmatchedBookings, trackmanImportRuns, notifications, bookingSessions, bookingParticipants, usageLedger, guests as guestsTable, availabilityBlocks, facilityClosures } from '../../shared/schema';
 import { eq, or, ilike, sql, and } from 'drizzle-orm';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -1971,51 +1971,6 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
           matchedRows++;
         }
         
-        // BACKFILL: Create/populate booking_members and booking_guests for ALL bookings
-        // Handles both webhook-originated and CSV-imported bookings
-        if (row.playerCount >= 1) {
-          const requestPlayerCount = existing.declaredPlayerCount || 0;
-          const targetPlayerCount = requestPlayerCount > 0 ? requestPlayerCount : row.playerCount;
-          
-          const existingMembers = await db.select({ 
-            id: bookingMembers.id, 
-            slotNumber: bookingMembers.slotNumber,
-            userEmail: bookingMembers.userEmail 
-          })
-            .from(bookingMembers)
-            .where(eq(bookingMembers.bookingId, existing.id));
-          
-          const existingSlotNumbers = new Set(existingMembers.map(m => m.slotNumber));
-          const slotsToCreate: number[] = [];
-          for (let slot = 1; slot <= targetPlayerCount; slot++) {
-            if (!existingSlotNumbers.has(slot)) {
-              slotsToCreate.push(slot);
-            }
-          }
-          
-          const parsedPlayers = parseNotesForPlayers(row.notes);
-          const guestPlayers = parsedPlayers.filter(p => p.type === 'guest');
-          
-          if (slotsToCreate.length > 0) {
-            for (const slot of slotsToCreate) {
-              const isPrimary = slot === 1;
-              const guestIndex = slot - 2;
-              const guestInfo = guestIndex >= 0 ? guestPlayers[guestIndex] : null;
-              
-              if (!isPrimary && guestInfo?.name) {
-              }
-            }
-            
-            process.stderr.write(`[Trackman Import] Created ${slotsToCreate.length} player slots (${slotsToCreate.join(',')}) for booking #${existing.id} (target: ${targetPlayerCount})\n`);
-          }
-          
-          
-          const emptyGuestSlots = existingMembers
-            .filter(m => m.slotNumber > 1 && !m.userEmail)
-            .sort((a, b) => a.slotNumber - b.slotNumber);
-          
-        }
-        
         // BACKFILL: Create session and participants for WEBHOOK-ORIGINATED bookings if missing
         // Only backfill if we have confirmed ownership and required fields
         if (isWebhookCreated && !existing.sessionId && parsedBayId && bookingDate && startTime) {
@@ -2512,18 +2467,6 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
             process.stderr.write(`[Trackman Import] UPDATED ghost booking #${existingGhost.id} (trackman_booking_id=${row.bookingId}) instead of creating duplicate${matchedEmail ? `, assigned to ${matchedEmail}` : ''}\n`);
 
             if (matchedEmail) {
-              try {
-                const existingMembers = await pool.query(
-                  `SELECT id FROM booking_members WHERE booking_id = $1`,
-                  [existingGhost.id]
-                );
-
-                if (existingMembers.rows.length === 0) {
-                }
-              } catch (memberErr: unknown) {
-                process.stderr.write(`[Trackman Import] Failed to create booking_members for ghost booking #${existingGhost.id}: ${getErrorMessage(memberErr)}\n`);
-              }
-
               if (parsedBayId && bookingDate && startTime && !existingGhost.sessionId) {
                 try {
                   const ghostParsedPlayersForSession = parseNotesForPlayers(row.notes);
@@ -2700,7 +2643,7 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
                     }
                     
                     resolvedMemberEmail = matchedMember.email;
-                    process.stderr.write(`[Trackman Import] Name-matched "${memberName}" to ${matchedMember.email} for booking_members\n`);
+                    process.stderr.write(`[Trackman Import] Name-matched "${memberName}" to ${matchedMember.email} for booking_participants\n`);
                   }
                 }
               }
@@ -2753,7 +2696,7 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
                 ownerNameNormalized.includes(guestNameNormalized) ||
                 guestNameNormalized.includes(ownerNameNormalized.split(' ')[0])
               )) {
-                process.stderr.write(`[Trackman Import] Skipping booking_guests entry for "${guest.name}" - matches owner name "${row.userName || matchedEmail}"\n`);
+                process.stderr.write(`[Trackman Import] Skipping guest entry for "${guest.name}" - matches owner name "${row.userName || matchedEmail}"\n`);
                 continue;
               }
               
@@ -3361,7 +3304,7 @@ async function insertBookingIfNotExists(
         ownerNameNormalized.includes(guestNameNormalized) ||
         guestNameNormalized.includes(ownerNameNormalized.split(' ')[0])
       )) {
-        process.stderr.write(`[Trackman Import] Skipping booking_guests entry for "${guests[i].name}" - matches owner name "${booking.userName || memberEmail}"\n`);
+        process.stderr.write(`[Trackman Import] Skipping guest entry for "${guests[i].name}" - matches owner name "${booking.userName || memberEmail}"\n`);
         continue;
       }
       

@@ -5,8 +5,7 @@ import { pool } from '../../core/db';
 import { 
   users, 
   bookingRequests, 
-  bookingMembers, 
-  bookingGuests, 
+  bookingParticipants,
   resources, 
   events, 
   eventRsvps, 
@@ -118,14 +117,9 @@ router.get('/api/members/:email/details', isAuthenticated, memberLookupRateLimit
             AND status NOT IN ('cancelled', 'declined', 'cancellation_pending')
           UNION
           SELECT br.id as booking_id FROM booking_requests br
-          JOIN booking_members bm ON br.id = bm.booking_id
-          WHERE LOWER(bm.user_email) = ${normalizedEmail}
-            AND br.request_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
-            AND br.status NOT IN ('cancelled', 'declined', 'cancellation_pending')
-          UNION
-          SELECT br.id as booking_id FROM booking_requests br
-          JOIN booking_guests bg ON br.id = bg.booking_id
-          WHERE LOWER(bg.guest_email) = ${normalizedEmail}
+          JOIN booking_participants bp ON bp.session_id = br.session_id
+          JOIN users u ON bp.user_id = u.id
+          WHERE LOWER(u.email) = ${normalizedEmail}
             AND br.request_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
             AND br.status NOT IN ('cancelled', 'declined', 'cancellation_pending')
         ) all_bookings
@@ -156,16 +150,20 @@ router.get('/api/members/:email/details', isAuthenticated, memberLookupRateLimit
             AND status NOT IN ('cancelled', 'declined', 'cancellation_pending')
             AND request_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
           UNION ALL
-          SELECT MAX(br.request_date) as last_date FROM booking_guests bg
-          JOIN booking_requests br ON bg.booking_id = br.id
-          WHERE LOWER(bg.guest_email) = ${normalizedEmail} 
+          SELECT MAX(br.request_date) as last_date FROM booking_participants bp
+          JOIN users u ON bp.user_id = u.id
+          JOIN booking_requests br ON bp.session_id = br.session_id
+          WHERE LOWER(u.email) = ${normalizedEmail}
+            AND bp.participant_type = 'guest'
             AND br.status NOT IN ('cancelled', 'declined', 'cancellation_pending')
             AND br.request_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
           UNION ALL
-          SELECT MAX(br.request_date) as last_date FROM booking_members bm
-          JOIN booking_requests br ON bm.booking_id = br.id
-          WHERE LOWER(bm.user_email) = ${normalizedEmail} 
-            AND bm.is_primary IS NOT TRUE 
+          SELECT MAX(br.request_date) as last_date FROM booking_participants bp
+          JOIN users u ON bp.user_id = u.id
+          JOIN booking_requests br ON bp.session_id = br.session_id
+          WHERE LOWER(u.email) = ${normalizedEmail} 
+            AND bp.participant_type != 'owner'
+            AND bp.participant_type != 'guest'
             AND br.status NOT IN ('cancelled', 'declined', 'cancellation_pending')
             AND br.request_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
           UNION ALL
@@ -329,15 +327,14 @@ router.get('/api/members/:email/history', isStaffOrAdmin, async (req, res) => {
       .leftJoin(resources, eq(bookingRequests.resourceId, resources.id))
       .where(or(
         sql`LOWER(${bookingRequests.userEmail}) = ${normalizedEmail}`,
-        sql`${bookingRequests.id} IN (SELECT booking_id FROM booking_members WHERE LOWER(user_email) = ${normalizedEmail})`
+        sql`${bookingRequests.sessionId} IN (SELECT bp.session_id FROM booking_participants bp JOIN users u ON bp.user_id = u.id WHERE LOWER(u.email) = ${normalizedEmail})`
       ))
       .orderBy(desc(bookingRequests.requestDate), desc(bookingRequests.startTime))
       .limit(100);
     
-    // Batch fetch all counts in a single query instead of N+1 queries per booking
     const bookingIds = bookingHistory.map(b => b.id);
+    const historySessionIds = bookingHistory.filter(b => b.sessionId).map(b => b.sessionId!);
     
-    // Build counts map with a single batch query
     type BookingCounts = {
       memberSlotsCount: number;
       additionalMemberCount: number;
@@ -346,39 +343,41 @@ router.get('/api/members/:email/history', isStaffOrAdmin, async (req, res) => {
     };
     const countsMap = new Map<number, BookingCounts>();
     
-    if (bookingIds.length > 0) {
-      // Build properly parameterized ARRAY[] using sql.join for safety
-      const bookingIdsSql = sql.join(bookingIds.map(id => sql`${id}`), sql`, `);
+    if (historySessionIds.length > 0) {
+      const sessionIdsSql = sql.join(historySessionIds.map(id => sql`${id}`), sql`, `);
       const batchCountsResult = await db.execute(sql`
         WITH member_counts AS (
           SELECT 
-            booking_id,
+            bp.session_id,
             COUNT(*)::int as total_slots,
-            COUNT(*) FILTER (WHERE user_email IS NOT NULL)::int as filled_slots,
-            COUNT(*) FILTER (WHERE user_email IS NOT NULL AND is_primary IS NOT TRUE)::int as additional_members,
-            BOOL_OR(is_primary = true AND LOWER(user_email) = ${normalizedEmail}) as is_primary_member
-          FROM booking_members
-          WHERE booking_id = ANY(ARRAY[${bookingIdsSql}]::int[])
-          GROUP BY booking_id
+            COUNT(*) FILTER (WHERE bp.user_id IS NOT NULL)::int as filled_slots,
+            COUNT(*) FILTER (WHERE bp.user_id IS NOT NULL AND bp.participant_type != 'owner')::int as additional_members,
+            BOOL_OR(bp.participant_type = 'owner' AND LOWER(u.email) = ${normalizedEmail}) as is_primary_member
+          FROM booking_participants bp
+          LEFT JOIN users u ON bp.user_id = u.id
+          WHERE bp.session_id = ANY(ARRAY[${sessionIdsSql}]::int[])
+            AND bp.participant_type != 'guest'
+          GROUP BY bp.session_id
         ),
         guest_counts AS (
-          SELECT booking_id, COUNT(*)::int as guest_count
-          FROM booking_guests
-          WHERE booking_id = ANY(ARRAY[${bookingIdsSql}]::int[])
-          GROUP BY booking_id
+          SELECT session_id, COUNT(*)::int as guest_count
+          FROM booking_participants
+          WHERE session_id = ANY(ARRAY[${sessionIdsSql}]::int[])
+            AND participant_type = 'guest'
+          GROUP BY session_id
         )
         SELECT 
-          COALESCE(mc.booking_id, gc.booking_id) as booking_id,
+          COALESCE(mc.session_id, gc.session_id) as session_id,
           COALESCE(mc.total_slots, 0) as member_slots_count,
           COALESCE(mc.additional_members, 0) as additional_member_count,
           COALESCE(gc.guest_count, 0) as guest_count,
           COALESCE(mc.is_primary_member, false) as is_primary_via_member_slot
         FROM member_counts mc
-        FULL OUTER JOIN guest_counts gc ON mc.booking_id = gc.booking_id
+        FULL OUTER JOIN guest_counts gc ON mc.session_id = gc.session_id
       `);
       
       for (const row of (batchCountsResult as { rows?: Record<string, unknown>[] }).rows || []) {
-        countsMap.set(row.booking_id as number, {
+        countsMap.set(row.session_id as number, {
           memberSlotsCount: (row.member_slots_count as number) || 0,
           additionalMemberCount: (row.additional_member_count as number) || 0,
           guestCount: (row.guest_count as number) || 0,
@@ -390,7 +389,7 @@ router.get('/api/members/:email/history', isStaffOrAdmin, async (req, res) => {
     // Enrich bookings using the pre-fetched counts (no additional queries)
     const enrichedBookingHistory = bookingHistory.map((booking) => {
       const isPrimaryViaBookingRequest = booking.userEmail?.toLowerCase() === normalizedEmail;
-      const counts = countsMap.get(booking.id) || {
+      const counts = (booking.sessionId ? countsMap.get(booking.sessionId) : undefined) || {
         memberSlotsCount: 0,
         additionalMemberCount: 0,
         guestCount: 0,
@@ -488,8 +487,7 @@ router.get('/api/members/:email/history', isStaffOrAdmin, async (req, res) => {
       .where(and(
         or(
           sql`LOWER(${bookingRequests.userEmail}) = ${normalizedEmail}`,
-          sql`${bookingRequests.id} IN (SELECT booking_id FROM booking_members WHERE LOWER(user_email) = ${normalizedEmail})`,
-          sql`${bookingRequests.id} IN (SELECT booking_id FROM booking_guests WHERE LOWER(guest_email) = ${normalizedEmail})`
+          sql`${bookingRequests.sessionId} IN (SELECT bp.session_id FROM booking_participants bp JOIN users u ON bp.user_id = u.id WHERE LOWER(u.email) = ${normalizedEmail})`
         ),
         or(
           eq(bookingRequests.status, 'attended'),
@@ -515,9 +513,13 @@ router.get('/api/members/:email/history', isStaffOrAdmin, async (req, res) => {
       hostEmail: bookingRequests.userEmail,
     })
       .from(bookingRequests)
-      .innerJoin(bookingGuests, eq(bookingRequests.id, bookingGuests.bookingId))
+      .innerJoin(bookingParticipants, eq(bookingRequests.sessionId, bookingParticipants.sessionId))
+      .innerJoin(users, eq(bookingParticipants.userId, users.id))
       .leftJoin(resources, eq(bookingRequests.resourceId, resources.id))
-      .where(sql`LOWER(${bookingGuests.guestEmail}) = ${normalizedEmail}`)
+      .where(and(
+        sql`LOWER(${users.email}) = ${normalizedEmail}`,
+        eq(bookingParticipants.participantType, 'guest')
+      ))
       .orderBy(desc(bookingRequests.requestDate));
     
     const walkInResult = await pool.query(`
@@ -576,20 +578,23 @@ router.get('/api/members/:email/guests', isStaffOrAdmin, async (req, res) => {
     const normalizedEmail = decodeURIComponent(email as string).toLowerCase();
     
     const guestHistory = await db.select({
-      id: bookingGuests.id,
-      bookingId: bookingGuests.bookingId,
-      guestName: bookingGuests.guestName,
-      guestEmail: bookingGuests.guestEmail,
-      slotNumber: bookingGuests.slotNumber,
-      createdAt: bookingGuests.createdAt,
+      id: bookingParticipants.id,
+      bookingId: bookingRequests.id,
+      guestName: bookingParticipants.displayName,
+      guestEmail: sql<string | null>`NULL`,
+      slotNumber: sql<number>`0`,
+      createdAt: bookingParticipants.createdAt,
       visitDate: bookingRequests.requestDate,
       startTime: bookingRequests.startTime,
       resourceName: resources.name,
     })
-      .from(bookingGuests)
-      .innerJoin(bookingRequests, eq(bookingGuests.bookingId, bookingRequests.id))
+      .from(bookingParticipants)
+      .innerJoin(bookingRequests, eq(bookingParticipants.sessionId, bookingRequests.sessionId))
       .leftJoin(resources, eq(bookingRequests.resourceId, resources.id))
-      .where(sql`LOWER(${bookingRequests.userEmail}) = ${normalizedEmail}`)
+      .where(and(
+        sql`LOWER(${bookingRequests.userEmail}) = ${normalizedEmail}`,
+        eq(bookingParticipants.participantType, 'guest')
+      ))
       .orderBy(desc(bookingRequests.requestDate), desc(bookingRequests.startTime));
     
     res.json(guestHistory);
@@ -666,10 +671,11 @@ router.get('/api/members/:email/cascade-preview', isStaffOrAdmin, async (req, re
     
     const bookingsResult = await db.execute(sql`
       SELECT COUNT(DISTINCT br.id)::int as count FROM booking_requests br
-      LEFT JOIN booking_members bm ON br.id = bm.booking_id
+      LEFT JOIN booking_participants bp ON bp.session_id = br.session_id
+      LEFT JOIN users u ON bp.user_id = u.id
       WHERE (
         LOWER(br.user_email) = ${normalizedEmail}
-        OR LOWER(bm.user_email) = ${normalizedEmail}
+        OR LOWER(u.email) = ${normalizedEmail}
       )
       AND br.archived_at IS NULL
     `);

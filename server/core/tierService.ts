@@ -174,59 +174,32 @@ export async function getDailyParticipantMinutes(email: string, date: string, ex
       paramIdx++;
     }
 
-    const [membersResult, participantsResult] = await Promise.all([
-      pool.query(
-        `SELECT COALESCE(SUM(
-           br.duration_minutes::float / GREATEST(
-             COALESCE(
-               NULLIF(br.declared_player_count, 0),
-               NULLIF(br.trackman_player_count, 0),
-               (SELECT COUNT(*) FROM booking_members bm2 WHERE bm2.booking_id = br.id AND bm2.user_email IS NOT NULL),
-               GREATEST(COALESCE(br.guest_count, 0) + 1, 1)
-             ),
-             1
-           )
-         ), 0) as total_minutes
-         FROM booking_members bm
-         JOIN booking_requests br ON bm.booking_id = br.id
-         WHERE LOWER(bm.user_email) = LOWER($1)
-           AND br.request_date = $2
-           AND br.status IN ('pending', 'approved', 'attended')
-           AND LOWER(br.user_email) != LOWER($1)
-           ${excludeClause}
-           ${resourceTypeClause}`,
-        baseParams
-      ),
-      pool.query(
-        `SELECT COALESCE(SUM(
-           br.duration_minutes::float / GREATEST(
-             COALESCE(
-               NULLIF(br.declared_player_count, 0),
-               NULLIF(br.trackman_player_count, 0),
-               (SELECT COUNT(*) FROM booking_participants bp2 WHERE bp2.session_id = br.session_id),
-               GREATEST(COALESCE(br.guest_count, 0) + 1, 1)
-             ),
-             1
-           )
-         ), 0) as total_minutes
-         FROM booking_participants bp
-         JOIN booking_sessions bs ON bp.session_id = bs.id
-         JOIN booking_requests br ON br.session_id = bs.id
-         JOIN users u ON bp.user_id = u.id
-         WHERE LOWER(u.email) = LOWER($1)
-           AND br.request_date = $2
-           AND br.status IN ('pending', 'approved', 'attended')
-           AND LOWER(br.user_email) != LOWER($1)
-           ${excludeClause}
-           ${resourceTypeClause}`,
-        baseParams
-      )
-    ]);
+    const participantsResult = await pool.query(
+      `SELECT COALESCE(SUM(
+         br.duration_minutes::float / GREATEST(
+           COALESCE(
+             NULLIF(br.declared_player_count, 0),
+             NULLIF(br.trackman_player_count, 0),
+             (SELECT COUNT(*) FROM booking_participants bp2 WHERE bp2.session_id = br.session_id),
+             GREATEST(COALESCE(br.guest_count, 0) + 1, 1)
+           ),
+           1
+         )
+       ), 0) as total_minutes
+       FROM booking_participants bp
+       JOIN booking_sessions bs ON bp.session_id = bs.id
+       JOIN booking_requests br ON br.session_id = bs.id
+       JOIN users u ON bp.user_id = u.id
+       WHERE LOWER(u.email) = LOWER($1)
+         AND br.request_date = $2
+         AND br.status IN ('pending', 'approved', 'attended')
+         AND LOWER(br.user_email) != LOWER($1)
+         ${excludeClause}
+         ${resourceTypeClause}`,
+      baseParams
+    );
 
-    const membersMinutes = parseFloat(membersResult.rows[0].total_minutes) || 0;
-    const participantsMinutes = parseFloat(participantsResult.rows[0].total_minutes) || 0;
-
-    return Math.max(membersMinutes, participantsMinutes);
+    return parseFloat(participantsResult.rows[0].total_minutes) || 0;
   } catch (error: unknown) {
     logger.error('[getDailyParticipantMinutes] Error:', { error: error });
     return 0;
@@ -264,7 +237,7 @@ export async function getTotalDailyUsageMinutes(
              COALESCE(
                NULLIF(declared_player_count, 0),
                NULLIF(trackman_player_count, 0),
-               (SELECT COUNT(*) FROM booking_members bm WHERE bm.booking_id = br.id AND bm.user_email IS NOT NULL),
+               (SELECT COUNT(*) FROM booking_participants bp WHERE bp.session_id = br.session_id),
                GREATEST(COALESCE(guest_count, 0) + 1, 1)
              ),
              1

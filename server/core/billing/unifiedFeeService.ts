@@ -148,27 +148,32 @@ async function loadSessionData(sessionId?: number, bookingId?: number): Promise<
       }));
     }
     
-    // If no participants from session, try booking_members table
+    // If no participants from session, try booking_participants via booking_requests.session_id
     if (participants.length === 0 && session.booking_id) {
-      const bookingMembersResult = await pool.query(
+      const bpFallbackResult = await pool.query(
         `SELECT 
-          bm.id as participant_id,
-          u.id as user_id,
-          bm.user_email as email,
-          COALESCE(NULLIF(TRIM(CONCAT_WS(' ', u.first_name, u.last_name)), ''), bm.user_email) as display_name,
-          CASE WHEN bm.user_email = $2 THEN 'owner' ELSE 'member' END as participant_type
-         FROM booking_members bm
-         LEFT JOIN users u ON LOWER(u.email) = LOWER(bm.user_email)
-         WHERE bm.booking_id = $1
-         ORDER BY bm.user_email = $2 DESC, bm.created_at ASC`,
-        [session.booking_id, session.host_email]
+          bp.id as participant_id,
+          bp.user_id,
+          bp.guest_id,
+          u.email,
+          bp.display_name,
+          bp.participant_type,
+          bp.used_guest_pass
+         FROM booking_participants bp
+         JOIN booking_requests br ON br.session_id = bp.session_id
+         LEFT JOIN users u ON bp.user_id = u.id
+         WHERE br.id = $1
+         ORDER BY bp.participant_type = 'owner' DESC, bp.created_at ASC`,
+        [session.booking_id]
       );
-      participants = bookingMembersResult.rows.map(row => ({
+      participants = bpFallbackResult.rows.map(row => ({
         participantId: row.participant_id,
         userId: row.user_id,
+        guestId: row.guest_id,
         email: row.email,
         displayName: row.display_name,
-        participantType: row.participant_type as 'owner' | 'member' | 'guest'
+        participantType: row.participant_type as 'owner' | 'member' | 'guest',
+        usedGuestPass: row.used_guest_pass ?? undefined
       }));
     }
     
@@ -414,19 +419,21 @@ export async function computeFeeBreakdown(params: FeeComputeParams): Promise<Fee
             ${resourceTypeClause}
         ),
         member_bookings AS (
-          -- Bookings where the member is a participant (via booking_members table)
+          -- Bookings where the member is a participant (via booking_participants -> booking_sessions)
           -- Exclude bookings where they are already the owner to prevent double-counting
           -- Only count bookings that start EARLIER than current booking
           -- Filter by resource type (simulator vs conference_room) for separate allowances
-          SELECT LOWER(bm.user_email) as identifier,
+          SELECT LOWER(u.email) as identifier,
                  br.id as booking_id,
                  FLOOR(br.duration_minutes::float / GREATEST(1, COALESCE(br.declared_player_count, 1))) as minutes_share
-          FROM booking_members bm
-          JOIN booking_requests br ON bm.booking_id = br.id
-          WHERE LOWER(bm.user_email) = ANY($1::text[])
+          FROM booking_participants bp
+          JOIN booking_sessions bs ON bp.session_id = bs.id
+          JOIN booking_requests br ON br.session_id = bs.id
+          JOIN users u ON bp.user_id = u.id
+          WHERE LOWER(u.email) = ANY($1::text[])
             AND br.request_date = $2
             AND br.status IN ('pending', 'approved', 'attended')
-            AND LOWER(bm.user_email) != LOWER(br.user_email)
+            AND LOWER(u.email) != LOWER(br.user_email)
             ${timeFilterClause}
             ${resourceTypeClause}
         ),

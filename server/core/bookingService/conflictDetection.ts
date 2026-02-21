@@ -171,10 +171,12 @@ export async function findConflictingBookings(
         br.end_time,
         br.user_name as owner_name,
         br.user_email as owner_email
-      FROM booking_members bm
-      JOIN booking_requests br ON bm.booking_id = br.id
+      FROM booking_participants bp
+      JOIN booking_sessions bs ON bp.session_id = bs.id
+      JOIN booking_requests br ON br.session_id = bs.id
+      JOIN users u ON bp.user_id = u.id
       LEFT JOIN resources r ON br.resource_id = r.id
-      WHERE LOWER(bm.user_email) = LOWER($1)
+      WHERE LOWER(u.email) = LOWER($1)
         AND br.request_date = $2
         AND br.status IN (${statusPlaceholders})
         ${excludeBookingId ? `AND br.id != $${excludeIdPlaceholder}` : ''}

@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { db } from '../../db';
 import { pool } from '../../core/db';
-import { bookingRequests, resources, users, bookingMembers, bookingGuests, bookingParticipants, notifications } from '../../../shared/schema';
+import { bookingRequests, resources, users, bookingParticipants, notifications } from '../../../shared/schema';
 import { eq, and, or, ne, desc, sql, SQL } from 'drizzle-orm';
 import { sendPushNotification } from '../push';
 import { checkDailyBookingLimit, getMemberTierByEmail, getTierLimits, getDailyBookedMinutes } from '../../core/tierService';
@@ -107,7 +107,7 @@ router.get('/api/booking-requests', async (req, res) => {
       conditions.push(
         or(
           sql`LOWER(${bookingRequests.userEmail}) = ${userEmailLower}`,
-          sql`${bookingRequests.id} IN (SELECT booking_id FROM booking_members WHERE LOWER(user_email) = ${userEmailLower})`
+          sql`${bookingRequests.sessionId} IN (SELECT bp.session_id FROM booking_participants bp JOIN users u ON bp.user_id = u.id WHERE LOWER(u.email) = ${userEmailLower})`
         )
       );
     }
@@ -200,42 +200,52 @@ router.get('/api/booking-requests', async (req, res) => {
     }
     
     const bookingIds = result.map(b => b.id);
+    const sessionIds = result.filter(b => b.session_id).map(b => b.session_id!);
     const requestingUserEmail = (user_email as string)?.toLowerCase();
     
-    const memberSlotsCounts = await db.select({
-      bookingId: bookingMembers.bookingId,
+    const memberSlotsCounts = sessionIds.length > 0 ? await db.select({
+      sessionId: bookingParticipants.sessionId,
       totalSlots: sql<number>`count(*)::int`,
-      filledSlots: sql<number>`count(${bookingMembers.userEmail})::int`
+      filledSlots: sql<number>`count(${bookingParticipants.userId})::int`
     })
-    .from(bookingMembers)
-    .where(sql`${bookingMembers.bookingId} IN (${sql.join(bookingIds.map(id => sql`${id}`), sql`, `)})`)
-    .groupBy(bookingMembers.bookingId);
+    .from(bookingParticipants)
+    .where(sql`${bookingParticipants.sessionId} IN (${sql.join(sessionIds.map(id => sql`${id}`), sql`, `)})`)
+    .groupBy(bookingParticipants.sessionId) : [];
     
-    const guestCounts = await db.select({
-      bookingId: bookingGuests.bookingId,
+    const guestCounts = sessionIds.length > 0 ? await db.select({
+      sessionId: bookingParticipants.sessionId,
       count: sql<number>`count(*)::int`
     })
-    .from(bookingGuests)
-    .where(sql`${bookingGuests.bookingId} IN (${sql.join(bookingIds.map(id => sql`${id}`), sql`, `)})`)
-    .groupBy(bookingGuests.bookingId);
+    .from(bookingParticipants)
+    .where(and(
+      sql`${bookingParticipants.sessionId} IN (${sql.join(sessionIds.map(id => sql`${id}`), sql`, `)})`,
+      eq(bookingParticipants.participantType, 'guest')
+    ))
+    .groupBy(bookingParticipants.sessionId) : [];
     
-    const memberDetails = await db.select({
-      bookingId: bookingMembers.bookingId,
-      userEmail: bookingMembers.userEmail,
-      isPrimary: bookingMembers.isPrimary,
+    const memberDetails = sessionIds.length > 0 ? await db.select({
+      sessionId: bookingParticipants.sessionId,
+      userEmail: users.email,
+      isPrimary: sql<boolean>`${bookingParticipants.participantType} = 'owner'`,
       firstName: users.firstName,
       lastName: users.lastName
     })
-    .from(bookingMembers)
-    .leftJoin(users, sql`LOWER(${bookingMembers.userEmail}) = LOWER(${users.email})`)
-    .where(sql`${bookingMembers.bookingId} IN (${sql.join(bookingIds.map(id => sql`${id}`), sql`, `)})`);
+    .from(bookingParticipants)
+    .leftJoin(users, eq(bookingParticipants.userId, users.id))
+    .where(and(
+      sql`${bookingParticipants.sessionId} IN (${sql.join(sessionIds.map(id => sql`${id}`), sql`, `)})`,
+      sql`${bookingParticipants.participantType} != 'guest'`
+    )) : [];
     
-    const guestDetails = await db.select({
-      bookingId: bookingGuests.bookingId,
-      guestName: bookingGuests.guestName
+    const guestDetails = sessionIds.length > 0 ? await db.select({
+      sessionId: bookingParticipants.sessionId,
+      guestName: bookingParticipants.displayName
     })
-    .from(bookingGuests)
-    .where(sql`${bookingGuests.bookingId} IN (${sql.join(bookingIds.map(id => sql`${id}`), sql`, `)})`);
+    .from(bookingParticipants)
+    .where(and(
+      sql`${bookingParticipants.sessionId} IN (${sql.join(sessionIds.map(id => sql`${id}`), sql`, `)})`,
+      eq(bookingParticipants.participantType, 'guest')
+    )) : [];
     
     let inviteStatusMap = new Map<string, string>();
     if (requestingUserEmail && !isStaffRequest) {
@@ -260,8 +270,8 @@ router.get('/api/booking-requests', async (req, res) => {
       }
     }
     
-    const memberCountsMap = new Map(memberSlotsCounts.map(m => [m.bookingId, { total: m.totalSlots, filled: m.filledSlots }]));
-    const guestCountsMap = new Map(guestCounts.map(g => [g.bookingId, g.count]));
+    const memberCountsMap = new Map(memberSlotsCounts.map(m => [m.sessionId, { total: m.totalSlots, filled: m.filledSlots }]));
+    const guestCountsMap = new Map(guestCounts.map(g => [g.sessionId, g.count]));
     
     const pendingBookings = result.filter(b => b.status === 'pending' || b.status === 'pending_approval');
     const conflictMap = new Map<number, { hasConflict: boolean; conflictingName: string | null }>();
@@ -315,12 +325,12 @@ router.get('/api/booking-requests', async (req, res) => {
     
     const memberDetailsMap = new Map<number, Array<{ name: string; type: 'member'; isPrimary: boolean }>>();
     for (const m of memberDetails) {
-      if (!memberDetailsMap.has(m.bookingId)) {
-        memberDetailsMap.set(m.bookingId, []);
+      if (!memberDetailsMap.has(m.sessionId)) {
+        memberDetailsMap.set(m.sessionId, []);
       }
       if (m.userEmail) {
         const fullName = [m.firstName, m.lastName].filter(Boolean).join(' ');
-        memberDetailsMap.get(m.bookingId)!.push({
+        memberDetailsMap.get(m.sessionId)!.push({
           name: fullName || m.userEmail,
           type: 'member',
           isPrimary: m.isPrimary || false
@@ -330,18 +340,18 @@ router.get('/api/booking-requests', async (req, res) => {
     
     const guestDetailsMap = new Map<number, Array<{ name: string; type: 'guest' }>>();
     for (const g of guestDetails) {
-      if (!guestDetailsMap.has(g.bookingId)) {
-        guestDetailsMap.set(g.bookingId, []);
+      if (!guestDetailsMap.has(g.sessionId)) {
+        guestDetailsMap.set(g.sessionId, []);
       }
-      guestDetailsMap.get(g.bookingId)!.push({
+      guestDetailsMap.get(g.sessionId)!.push({
         name: g.guestName || 'Guest',
         type: 'guest'
       });
     }
     
     const enrichedResult = result.map((booking) => {
-      const memberCounts = memberCountsMap.get(booking.id) || { total: 0, filled: 0 };
-      const actualGuestCount = guestCountsMap.get(booking.id) || 0;
+      const memberCounts = (booking.session_id ? memberCountsMap.get(booking.session_id) : undefined) || { total: 0, filled: 0 };
+      const actualGuestCount = (booking.session_id ? guestCountsMap.get(booking.session_id) : undefined) || 0;
       
       const legacyGuestCount = booking.guest_count || 0;
       const trackmanPlayerCount = booking.trackman_player_count;
@@ -363,8 +373,8 @@ router.get('/api/booking-requests', async (req, res) => {
         ? (inviteStatusMap.get(String(booking.session_id)) || null)
         : null;
       
-      const members = memberDetailsMap.get(booking.id) || [];
-      const guests = guestDetailsMap.get(booking.id) || [];
+      const members = (booking.session_id ? memberDetailsMap.get(booking.session_id) : undefined) || [];
+      const guests = (booking.session_id ? guestDetailsMap.get(booking.session_id) : undefined) || [];
       const nonPrimaryMembers = members.filter(m => !m.isPrimary);
       const participants: Array<{ name: string; type: 'member' | 'guest' }> = [
         ...nonPrimaryMembers.map(m => ({ name: m.name, type: 'member' as const })),

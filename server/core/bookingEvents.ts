@@ -1,5 +1,5 @@
 import { db } from '../db';
-import { notifications, staffUsers, bookingRequests, bookingMembers, bookingGuests, users } from '../../shared/schema';
+import { notifications, staffUsers, bookingRequests, bookingParticipants, users } from '../../shared/schema';
 import { eq, and, or, sql } from 'drizzle-orm';
 import { sendNotificationToUser, broadcastToStaff, broadcastBookingEvent } from './websocket';
 import { sendPushNotification, sendPushNotificationToStaff } from '../routes/push';
@@ -284,25 +284,49 @@ export async function linkAndNotifyParticipants(
     
     const ownerEmail = booking.userEmail?.toLowerCase()?.trim();
     
-    const existingMembers = await db.select({ userEmail: bookingMembers.userEmail })
-      .from(bookingMembers)
-      .where(eq(bookingMembers.bookingId, bookingId));
-    const existingEmails = new Set(existingMembers.map(m => m.userEmail?.toLowerCase()).filter(Boolean));
-    
-    const existingGuestsQuery = await db.select({ guestEmail: bookingGuests.guestEmail })
-      .from(bookingGuests)
-      .where(eq(bookingGuests.bookingId, bookingId));
-    const existingGuestEmails = new Set(existingGuestsQuery.map(g => g.guestEmail?.toLowerCase()).filter(Boolean));
+    const bookingForSession = await db.select({ sessionId: bookingRequests.sessionId })
+      .from(bookingRequests)
+      .where(eq(bookingRequests.id, bookingId))
+      .limit(1);
+    const bpSessionId = bookingForSession[0]?.sessionId;
+
+    let existingEmails = new Set<string>();
+    let existingGuestEmails = new Set<string>();
+
+    if (bpSessionId) {
+      const existingParticipants = await db.select({
+        email: users.email,
+        participantType: bookingParticipants.participantType,
+        guestEmail: sql<string | null>`(SELECT g.email FROM guests g WHERE g.id = ${bookingParticipants.guestId})`
+      })
+        .from(bookingParticipants)
+        .leftJoin(users, eq(bookingParticipants.userId, users.id))
+        .where(eq(bookingParticipants.sessionId, bpSessionId));
+
+      existingEmails = new Set(
+        existingParticipants
+          .filter(p => p.participantType !== 'guest' && p.email)
+          .map(p => p.email!.toLowerCase())
+      );
+      existingGuestEmails = new Set(
+        existingParticipants
+          .filter(p => p.participantType === 'guest' && p.guestEmail)
+          .map(p => p.guestEmail!.toLowerCase())
+      );
+    }
     
     const processedEmails = new Set<string>([...existingEmails, ...existingGuestEmails]);
     if (ownerEmail) {
       processedEmails.add(ownerEmail);
     }
     
-    const highestSlotResult = await db.select({ maxSlot: sql<number>`COALESCE(MAX(${bookingMembers.slotNumber}), 1)` })
-      .from(bookingMembers)
-      .where(eq(bookingMembers.bookingId, bookingId));
-    let nextSlot = (highestSlotResult[0]?.maxSlot || 1) + 1;
+    let nextSlot = 2;
+    if (bpSessionId) {
+      const participantCountResult = await db.select({ count: sql<number>`COUNT(*)` })
+        .from(bookingParticipants)
+        .where(eq(bookingParticipants.sessionId, bpSessionId));
+      nextSlot = (participantCountResult[0]?.count || 1) + 1;
+    }
     
     const linkedBy = options?.linkedBy || 'auto_link';
     const bayName = options?.bayName || 'Bay';

@@ -1,6 +1,6 @@
 import { db } from '../../db';
 import { pool } from '../db';
-import { bookingRequests, resources, notifications, users, bookingMembers, bookingParticipants } from '../../../shared/schema';
+import { bookingRequests, resources, notifications, users, bookingParticipants } from '../../../shared/schema';
 import { eq, and, or, gt, lt, lte, gte, ne, sql } from 'drizzle-orm';
 import { sendPushNotification } from '../../routes/push';
 import { formatNotificationDateTime, formatDateDisplayWithDay, formatTime12Hour } from '../../utils/dateUtils';
@@ -491,7 +491,6 @@ export async function approveBooking(params: ApproveBookingParams) {
     url: '/sims'
   }).catch(err => logger.error('Push notification failed:', { extra: { err } }));
 
-  populateBookingMembers(bookingId, updated as any);
   notifyLinkedMembers(bookingId, updated as any);
 
   bookingEvents.publish('booking_approved', {
@@ -526,54 +525,22 @@ export async function approveBooking(params: ApproveBookingParams) {
   return { updated, isConferenceRoom };
 }
 
-async function populateBookingMembers(bookingId: number, updated: BookingUpdateResult) {
-  try {
-    const requestParticipants = updated.requestParticipants as Array<{
-      email?: string;
-      type: 'member' | 'guest';
-      userId?: string;
-      name?: string;
-    }> | null;
-
-    if (requestParticipants && Array.isArray(requestParticipants) && requestParticipants.length > 0) {
-      const ownerUserId = updated.userId;
-      const ownerEmailLower = updated.userEmail?.toLowerCase();
-
-      for (let i = 0; i < requestParticipants.length; i++) {
-        const rp = requestParticipants[i];
-        if (!rp || typeof rp !== 'object') continue;
-
-        const slotNumber = i + 2;
-
-        let participantEmail = rp.email?.toLowerCase()?.trim() || '';
-        if (!participantEmail && rp.userId) {
-          const userResult = await db.select({ email: users.email })
-            .from(users)
-            .where(eq(users.id, rp.userId))
-            .limit(1);
-          if (userResult.length > 0) {
-            participantEmail = userResult[0].email?.toLowerCase() || '';
-          }
-        }
-
-        if (participantEmail && participantEmail === ownerEmailLower) continue;
-        if (rp.userId && ownerUserId && rp.userId === ownerUserId) continue;
-
-      }
-    }
-  } catch (err: unknown) {
-    logger.error('[Booking Approval] Failed to populate booking_members', { extra: { err } });
-  }
-}
-
 async function notifyLinkedMembers(bookingId: number, updated: BookingUpdateResult) {
   try {
-    const linkedMembers = await db.select({ userEmail: bookingMembers.userEmail })
-      .from(bookingMembers)
+    const sessionResult = await db.select({ sessionId: bookingRequests.sessionId })
+      .from(bookingRequests)
+      .where(eq(bookingRequests.id, bookingId))
+      .limit(1);
+    const sessionId = sessionResult[0]?.sessionId;
+    if (!sessionId) return;
+
+    const linkedMembers = await db.select({ userEmail: users.email })
+      .from(bookingParticipants)
+      .innerJoin(users, eq(bookingParticipants.userId, users.id))
       .where(and(
-        eq(bookingMembers.bookingId, bookingId),
-        sql`${bookingMembers.userEmail} IS NOT NULL`,
-        sql`${bookingMembers.isPrimary} IS NOT TRUE`
+        eq(bookingParticipants.sessionId, sessionId),
+        sql`${bookingParticipants.participantType} != 'owner'`,
+        sql`${users.email} IS NOT NULL`
       ));
 
     for (const member of linkedMembers) {
@@ -1299,8 +1266,8 @@ export async function checkinBooking(params: CheckinBookingParams) {
         br.trackman_player_count,
         br.declared_player_count,
         br.session_id,
-        (SELECT COUNT(*) FROM booking_members bm WHERE bm.booking_id = br.id) as total_slots,
-        (SELECT COUNT(*) FROM booking_members bm WHERE bm.booking_id = br.id AND bm.user_email IS NULL) as empty_slots,
+        (SELECT COUNT(*) FROM booking_participants bp WHERE bp.session_id = br.session_id) as total_slots,
+        0 as empty_slots,
         (SELECT COUNT(*) FROM booking_participants bp WHERE bp.session_id = br.session_id) as participant_count
       FROM booking_requests br
       WHERE br.id = $1
@@ -1687,14 +1654,16 @@ export async function devConfirmBooking(params: DevConfirmParams) {
   if (booking.user_email) {
     try {
       const participantsResult = await pool.query(
-        `SELECT bm.user_email, u.first_name, u.last_name 
-         FROM booking_members bm
-         LEFT JOIN users u ON LOWER(u.email) = LOWER(bm.user_email)
-         WHERE bm.booking_id = $1 
-           AND bm.user_email IS NOT NULL 
-           AND bm.user_email != ''
-           AND bm.is_primary = false
-           AND LOWER(bm.user_email) != LOWER($2)`,
+        `SELECT u.email as user_email, u.first_name, u.last_name 
+         FROM booking_participants bp
+         JOIN booking_sessions bs ON bp.session_id = bs.id
+         JOIN booking_requests br2 ON br2.session_id = bs.id
+         LEFT JOIN users u ON bp.user_id = u.id
+         WHERE br2.id = $1 
+           AND bp.participant_type != 'owner'
+           AND u.email IS NOT NULL 
+           AND u.email != ''
+           AND LOWER(u.email) != LOWER($2)`,
         [bookingId, booking.user_email]
       );
 

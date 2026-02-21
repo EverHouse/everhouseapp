@@ -27,8 +27,7 @@ function isPlaceholderEmail(email: string | null): boolean {
 async function checkUserHasHistoricalData(userId: string): Promise<{ hasData: boolean; reason: string }> {
   const checks = [
     { table: 'booking_requests', column: 'user_id', name: 'bookings' },
-    { table: 'booking_members', column: 'user_id', name: 'booking participations' },
-    { table: 'booking_participants', column: 'user_id', name: 'booking roster entries' },
+    { table: 'booking_participants', column: 'user_id', name: 'booking participations' },
     { table: 'visits', column: 'user_id', name: 'visits' },
     { table: 'booking_fee_snapshots', column: 'user_id', name: 'fee records' },
     { table: 'stripe_transaction_cache', column: 'user_id', name: 'payment transactions' }

@@ -1419,14 +1419,9 @@ router.post('/api/data-tools/sync-visit-counts', isAdmin, async (req: Request, r
                 AND status NOT IN ('cancelled', 'declined', 'cancellation_pending')
               UNION
               SELECT br.id as booking_id FROM booking_requests br
-              JOIN booking_members bm ON br.id = bm.booking_id
-              WHERE LOWER(bm.user_email) = ${normalizedEmail}
-                AND br.request_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
-                AND br.status NOT IN ('cancelled', 'declined', 'cancellation_pending')
-              UNION
-              SELECT br.id as booking_id FROM booking_requests br
-              JOIN booking_guests bg ON br.id = bg.booking_id
-              WHERE LOWER(bg.guest_email) = ${normalizedEmail}
+              JOIN booking_participants bp ON bp.session_id = br.session_id
+              JOIN users u ON bp.user_id = u.id
+              WHERE LOWER(u.email) = ${normalizedEmail}
                 AND br.request_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
                 AND br.status NOT IN ('cancelled', 'declined', 'cancellation_pending')
             ) all_bookings
@@ -2467,8 +2462,6 @@ async function runVisitorArchiveInBackground(dryRun: boolean, staffEmail: string
         AND u.role NOT IN ('admin', 'staff', 'golf_instructor')
         AND NOT EXISTS (SELECT 1 FROM staff_users su WHERE LOWER(su.email) = LOWER(u.email) AND su.is_active = true)
         AND NOT EXISTS (SELECT 1 FROM booking_requests br WHERE LOWER(br.user_email) = LOWER(u.email))
-        AND NOT EXISTS (SELECT 1 FROM booking_guests bg WHERE LOWER(bg.guest_email) = LOWER(u.email))
-        AND NOT EXISTS (SELECT 1 FROM booking_members bm WHERE LOWER(bm.user_email) = LOWER(u.email))
         AND NOT EXISTS (SELECT 1 FROM booking_participants bp WHERE bp.user_id = u.id)
         AND NOT EXISTS (SELECT 1 FROM walk_in_visits w WHERE LOWER(w.member_email) = LOWER(u.email))
         AND NOT EXISTS (SELECT 1 FROM event_rsvps er WHERE LOWER(er.user_email) = LOWER(u.email))

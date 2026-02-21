@@ -13,6 +13,22 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.94.0",
+    date: "2026-02-21",
+    title: "Legacy Table Migration Complete",
+    isMajor: true,
+    changes: [
+      "Removed: booking_members table — all member roster queries now use booking_participants exclusively",
+      "Removed: booking_guests table — all guest roster queries now use booking_participants exclusively",
+      "Migrated: 20+ files across backend updated to read from booking_participants instead of legacy tables",
+      "Removed: Dead populateBookingMembers function from approval service — was a no-op since v7.92.0",
+      "Removed: Trackman import backfill logic for booking_members/booking_guests — no longer needed",
+      "Removed: booking_guests schema migration check from db-init — table no longer exists",
+      "Improved: Conflict detection, tier service, fee calculations all now use booking_participants directly",
+      "Cleaned: All Drizzle schema definitions and type exports for legacy tables removed",
+    ]
+  },
+  {
     version: "7.93.0",
     date: "2026-02-21",
     title: "Overage Payment Migration to Invoice System",

@@ -48,18 +48,12 @@ export function registerAuthRoutes(app: Express): void {
              AND br.request_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
              AND br.status NOT IN ('cancelled', 'declined', 'cancellation_pending')
            UNION
-           -- As added player
+           -- As added player or guest (via booking_participants)
            SELECT br.id FROM booking_requests br
-           JOIN booking_members bm ON br.id = bm.booking_id
-           WHERE LOWER(bm.user_email) = LOWER(${user.email})
-             AND bm.is_primary IS NOT TRUE
-             AND br.request_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
-             AND br.status NOT IN ('cancelled', 'declined', 'cancellation_pending')
-           UNION
-           -- As guest
-           SELECT br.id FROM booking_requests br
-           JOIN booking_guests bg ON br.id = bg.booking_id
-           WHERE LOWER(bg.guest_email) = LOWER(${user.email})
+           JOIN booking_participants bp ON bp.session_id = br.session_id
+           JOIN users u ON bp.user_id = u.id
+           WHERE LOWER(u.email) = LOWER(${user.email})
+             AND bp.participant_type != 'owner'
              AND br.request_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
              AND br.status NOT IN ('cancelled', 'declined', 'cancellation_pending')
          ) unified_bookings
@@ -96,16 +90,11 @@ export function registerAuthRoutes(app: Express): void {
            SELECT MAX(request_date) as last_date FROM booking_requests
            WHERE LOWER(user_email) = LOWER(${user.email}) AND request_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date AND status NOT IN ('cancelled', 'declined', 'cancellation_pending')
            UNION ALL
-           -- Bookings as player
+           -- Bookings as player or guest (via booking_participants)
            SELECT MAX(br.request_date) as last_date FROM booking_requests br
-           JOIN booking_members bm ON br.id = bm.booking_id
-           WHERE LOWER(bm.user_email) = LOWER(${user.email}) AND bm.is_primary IS NOT TRUE
-             AND br.request_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date AND br.status NOT IN ('cancelled', 'declined', 'cancellation_pending')
-           UNION ALL
-           -- Bookings as guest
-           SELECT MAX(br.request_date) as last_date FROM booking_requests br
-           JOIN booking_guests bg ON br.id = bg.booking_id
-           WHERE LOWER(bg.guest_email) = LOWER(${user.email})
+           JOIN booking_participants bp ON bp.session_id = br.session_id
+           JOIN users u ON bp.user_id = u.id
+           WHERE LOWER(u.email) = LOWER(${user.email}) AND bp.participant_type != 'owner'
              AND br.request_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date AND br.status NOT IN ('cancelled', 'declined', 'cancellation_pending')
            UNION ALL
            -- Events

@@ -1,7 +1,7 @@
 import { eq, and, or, sql, desc, asc, ne } from 'drizzle-orm';
 import { db } from '../db';
 import { pool } from './db';
-import { resources, users, facilityClosures, notifications, bookingRequests, bookingParticipants, bookingMembers, staffUsers, availabilityBlocks, trackmanUnmatchedBookings, userLinkedEmails } from '../../shared/schema';
+import { resources, users, facilityClosures, notifications, bookingRequests, bookingParticipants, staffUsers, availabilityBlocks, trackmanUnmatchedBookings, userLinkedEmails } from '../../shared/schema';
 import { isAuthorizedForMemberBooking } from './bookingAuth';
 import { createCalendarEventOnCalendar, getCalendarIdByName, deleteCalendarEvent, CALENDAR_CONFIG } from './calendar/index';
 import { logger } from './logger';
@@ -26,7 +26,7 @@ import { normalizeToISODate } from '../utils/dateNormalize';
 export interface CancellationCascadeResult {
   participantsNotified: number;
   guestPassesRefunded: number;
-  bookingMembersRemoved: number;
+  bookingParticipantsRemoved: number;
   prepaymentRefunds: number;
   errors: string[];
 }
@@ -43,7 +43,7 @@ export async function handleCancellationCascade(
   const result: CancellationCascadeResult = {
     participantsNotified: 0,
     guestPassesRefunded: 0,
-    bookingMembersRemoved: 0,
+    bookingParticipantsRemoved: 0,
     prepaymentRefunds: 0,
     errors: []
   };
@@ -452,7 +452,7 @@ export async function fetchBookings(params: {
     const userEmail = params.userEmail.toLowerCase();
     conditions.push(or(
       eq(bookingRequests.userEmail, userEmail),
-      sql`${bookingRequests.id} IN (SELECT booking_id FROM booking_members WHERE LOWER(user_email) = ${userEmail})`
+      sql`${bookingRequests.id} IN (SELECT br2.id FROM booking_requests br2 INNER JOIN booking_participants bp ON bp.session_id = br2.session_id INNER JOIN users u ON u.id = bp.user_id WHERE LOWER(u.email) = ${userEmail})`
     ));
   }
   if (params.date) {
@@ -1882,18 +1882,13 @@ export async function getCascadePreview(bookingId: number) {
     participantsCount = participantsResult[0]?.count || 0;
   }
   
-  const membersResult = await db.select({ count: sql<number>`count(*)::int` })
-    .from(bookingMembers)
-    .where(eq(bookingMembers.bookingId, bookingId));
-  membersCount = membersResult[0]?.count || 0;
-  
   return {
     bookingId,
     relatedData: {
       participants: participantsCount,
-      linkedMembers: membersCount
+      linkedMembers: participantsCount
     },
-    hasRelatedData: participantsCount > 0 || membersCount > 0
+    hasRelatedData: participantsCount > 0
   };
 }
 
@@ -2008,7 +2003,7 @@ export async function deleteBooking(bookingId: number, archivedBy: string, hardD
         archivedBy,
         participantsNotified: cascadeResult.participantsNotified,
         guestPassesRefunded: cascadeResult.guestPassesRefunded,
-        bookingMembersRemoved: cascadeResult.bookingMembersRemoved,
+        bookingParticipantsRemoved: cascadeResult.bookingParticipantsRemoved,
         prepaymentRefunds: cascadeResult.prepaymentRefunds,
         cascadeErrors: cascadeResult.errors.length
       }
@@ -2190,7 +2185,7 @@ export async function memberCancelBooking(bookingId: number, userEmail: string, 
       bookingId,
       participantsNotified: cascadeResult.participantsNotified,
       guestPassesRefunded: cascadeResult.guestPassesRefunded,
-      bookingMembersRemoved: cascadeResult.bookingMembersRemoved,
+      bookingParticipantsRemoved: cascadeResult.bookingParticipantsRemoved,
       prepaymentRefunds: cascadeResult.prepaymentRefunds,
       cascadeErrors: cascadeResult.errors.length
     }

@@ -82,7 +82,7 @@ router.get('/api/member/dashboard-data', isAuthenticated, async (req, res) => {
           ),
           or(
             eq(bookingRequests.userEmail, userEmail),
-            sql`${bookingRequests.id} IN (SELECT booking_id FROM booking_members WHERE LOWER(user_email) = ${userEmail})`,
+            sql`${bookingRequests.sessionId} IN (SELECT bp.session_id FROM booking_participants bp JOIN users u ON bp.user_id = u.id WHERE LOWER(u.email) = ${userEmail})`,
             sql`${bookingRequests.id} IN (
               SELECT br2.id FROM booking_requests br2
               JOIN booking_sessions bs ON bs.id = br2.session_id
@@ -202,7 +202,7 @@ router.get('/api/member/dashboard-data', isAuthenticated, async (req, res) => {
         const conditions = [
           or(
             sql`LOWER(${bookingRequests.userEmail}) = ${userEmail}`,
-            sql`${bookingRequests.id} IN (SELECT booking_id FROM booking_members WHERE LOWER(user_email) = ${userEmail})`
+            sql`${bookingRequests.sessionId} IN (SELECT bp.session_id FROM booking_participants bp JOIN users u ON bp.user_id = u.id WHERE LOWER(u.email) = ${userEmail})`
           )
         ];
         

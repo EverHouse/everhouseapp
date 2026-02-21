@@ -251,18 +251,24 @@ router.get('/api/members/directory', isStaffOrAdmin, async (req, res) => {
               AND status NOT IN ('cancelled', 'declined', 'cancellation_pending')
               AND request_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
             UNION ALL
-            SELECT LOWER(bg.guest_email) as email, br.id as booking_id, br.request_date as last_date
-            FROM booking_guests bg
-            JOIN booking_requests br ON bg.booking_id = br.id
-            WHERE LOWER(bg.guest_email) IN (${sql.join(memberEmails.map(e => sql`${e}`), sql`, `)})
+            SELECT LOWER(u_bp.email) as email, br.id as booking_id, br.request_date as last_date
+            FROM booking_participants bp
+            JOIN booking_sessions bs ON bp.session_id = bs.id
+            JOIN booking_requests br ON br.session_id = bs.id
+            LEFT JOIN users u_bp ON bp.user_id = u_bp.id
+            WHERE bp.participant_type = 'guest'
+              AND LOWER(COALESCE(u_bp.email, '')) IN (${sql.join(memberEmails.map(e => sql`${e}`), sql`, `)})
               AND br.status NOT IN ('cancelled', 'declined', 'cancellation_pending')
               AND br.request_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
             UNION ALL
-            SELECT LOWER(bm.user_email) as email, br.id as booking_id, br.request_date as last_date
-            FROM booking_members bm
-            JOIN booking_requests br ON bm.booking_id = br.id
-            WHERE LOWER(bm.user_email) IN (${sql.join(memberEmails.map(e => sql`${e}`), sql`, `)})
-              AND bm.is_primary IS NOT TRUE
+            SELECT LOWER(u_bp2.email) as email, br.id as booking_id, br.request_date as last_date
+            FROM booking_participants bp2
+            JOIN booking_sessions bs2 ON bp2.session_id = bs2.id
+            JOIN booking_requests br ON br.session_id = bs2.id
+            JOIN users u_bp2 ON bp2.user_id = u_bp2.id
+            WHERE bp2.participant_type = 'member'
+              AND LOWER(u_bp2.email) IN (${sql.join(memberEmails.map(e => sql`${e}`), sql`, `)})
+              AND LOWER(u_bp2.email) != LOWER(br.user_email)
               AND br.status NOT IN ('cancelled', 'declined', 'cancellation_pending')
               AND br.request_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
             UNION ALL
