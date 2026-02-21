@@ -13,6 +13,18 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.4.0",
+    date: "2026-02-21",
+    title: "Duplicate Payment Prevention & Invoice Settlement Safety",
+    isMajor: true,
+    changes: [
+      "Fixed: Terminal payments (card reader) could trigger duplicate charges when staff clicked 'Collect' — system now detects existing terminal payments and settles the invoice without creating new charges",
+      "Fixed: Invoice finalization race condition where Stripe auto-charged the customer's default card before the system could cancel the auto-generated payment intent — invoices now finalized with auto_advance disabled",
+      "Fixed: Rapid 'Confirm All' clicks could trigger multiple concurrent invoice settlement attempts — added booking-level deduplication lock",
+      "Fixed: Invoice paid-out-of-band flow could charge even after the invoice was already paid by a concurrent process — added pre-payment invoice status verification",
+    ]
+  },
+  {
     version: "8.1.0",
     date: "2026-02-21",
     title: "Race Conditions, Billing Math & Data Integrity Fixes",

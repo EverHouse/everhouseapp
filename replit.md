@@ -66,6 +66,11 @@ We use a **Liquid Glass UI** system.
 - **Member Lifecycle & Check-In**: Tiers, QR/NFC check-in, onboarding.
 
 ## Recent Changes
+- **Feb 21, 2026**: v8.4.0 — Duplicate Payment Prevention & Invoice Settlement Safety:
+  1. Terminal payment detection in `finalizeAndPayInvoice` — verifies via Stripe API if existing PI is card_present before settling invoice OOB, preventing double-charge when staff clicks "Collect" after terminal payment.
+  2. Invoice finalization race condition fixed — `auto_advance: false` set before finalization in `finalizeInvoicePaidOutOfBand` to prevent Stripe auto-charging.
+  3. Booking-level settlement deduplication lock (`settlementInFlight` Set) prevents concurrent `settleBookingInvoiceAfterCheckin` calls from rapid clicks.
+  4. Pre-OOB invoice status check prevents charging already-paid invoices in `finalizeInvoicePaidOutOfBand`.
 - **Feb 21, 2026**: v8.3.0 — Cancellation Logic Centralization & Transaction Resilience:
   1. Created unified BookingStateService consolidating 3 fragmented cancellation paths (staff cancel, member cancel, Trackman webhook cancel) into a single service with consistent behavior.
   2. Moved all Stripe API calls (refunds, payment intent cancellations) outside database transactions using SideEffectsManifest pattern — DB locks no longer held while waiting for external APIs.
