@@ -16,9 +16,11 @@ const HUBSPOT_FORMS: Record<string, string> = {
 
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 let formSyncAccessDeniedLogged = false;
+let formSyncAccessDeniedUntil = 0;
 
 export function resetFormSyncAccessDeniedFlag(): void {
   formSyncAccessDeniedLogged = false;
+  formSyncAccessDeniedUntil = 0;
 }
 
 interface HubSpotSubmissionValue {
@@ -119,6 +121,10 @@ export async function syncHubSpotFormSubmissions(): Promise<{
     errors: [] as string[],
   };
 
+  if (Date.now() < formSyncAccessDeniedUntil) {
+    return result;
+  }
+
   try {
     let accessToken: string;
     let authSource: string;
@@ -159,8 +165,9 @@ export async function syncHubSpotFormSubmissions(): Promise<{
       } catch (err: unknown) {
         const errMsg = getErrorMessage(err);
         if (errMsg.includes('HUBSPOT_FORMS_ACCESS_DENIED')) {
+          formSyncAccessDeniedUntil = Date.now() + 24 * 60 * 60 * 1000;
           if (!formSyncAccessDeniedLogged) {
-            logger.warn('[HubSpot FormSync] Access denied (401/403) - HubSpot private app token may lack "forms" scope. Add the "forms" scope in HubSpot Settings > Integrations > Private Apps. Skipping form sync until next restart.');
+            logger.warn('[HubSpot FormSync] Access denied (401/403) - HubSpot private app token may lack "forms" scope. Add the "forms" scope in HubSpot Settings > Integrations > Private Apps. Suppressing retries for 24 hours.');
             formSyncAccessDeniedLogged = true;
           }
           break;

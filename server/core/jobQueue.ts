@@ -275,17 +275,23 @@ export function startJobProcessor(intervalMs: number = 5000): void {
     return;
   }
   
-  logger.info(`[Startup] Job queue processor enabled (runs every ${intervalMs / 1000}s)`);
+  logger.info(`[Startup] Job queue processor enabled (runs every ${intervalMs / 1000}s, starting after 15s warmup)`);
   
-  processingInterval = setInterval(async () => {
-    try {
-      await processJobs();
-      schedulerTracker.recordRun('Job Queue Processor', true);
-    } catch (error: unknown) {
-      logger.error('[JobQueue] Processing error:', { error: error });
-      schedulerTracker.recordRun('Job Queue Processor', false, String(error));
-    }
-  }, intervalMs);
+  setTimeout(() => {
+    processJobs().catch(err => {
+      logger.error('[JobQueue] Initial job scan error:', { error: err });
+    });
+    
+    processingInterval = setInterval(async () => {
+      try {
+        await processJobs();
+        schedulerTracker.recordRun('Job Queue Processor', true);
+      } catch (error: unknown) {
+        logger.error('[JobQueue] Processing error:', { error: error });
+        schedulerTracker.recordRun('Job Queue Processor', false, String(error));
+      }
+    }, intervalMs);
+  }, 15000);
 }
 
 export function stopJobProcessor(): void {

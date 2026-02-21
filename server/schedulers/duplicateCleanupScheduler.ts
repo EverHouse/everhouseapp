@@ -81,7 +81,7 @@ async function checkAndRunCleanup(): Promise<void> {
 }
 
 export function startDuplicateCleanupScheduler(): void {
-  logger.info('[Startup] Duplicate cleanup scheduler enabled (runs at 4am Pacific and on startup)');
+  logger.info('[Startup] Duplicate cleanup scheduler enabled (runs at 4am Pacific and on startup with 30s delay)');
   
   setTimeout(async () => {
     try {
@@ -97,7 +97,7 @@ export function startDuplicateCleanupScheduler(): void {
       logger.error('[Duplicate Cleanup] Startup cleanup error:', { error: error as Error });
       schedulerTracker.recordRun('Duplicate Cleanup', false, String(error));
     }
-  }, 10000);
+  }, 30000);
   
   setInterval(checkAndRunCleanup, 60 * 60 * 1000);
 }

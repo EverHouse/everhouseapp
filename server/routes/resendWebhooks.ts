@@ -46,9 +46,24 @@ async function ensureEmailEventsTable() {
   `).catch(() => {});
 }
 
-ensureEmailEventsTable().catch(err => {
-  logger.error('Failed to create email_events table', { error: err });
-});
+async function initEmailEventsWithRetry(maxRetries = 3) {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      await ensureEmailEventsTable();
+      return;
+    } catch (err) {
+      if (attempt === maxRetries) {
+        logger.error('Failed to create email_events table after retries', { error: err });
+        return;
+      }
+      const delay = Math.pow(2, attempt) * 1000;
+      logger.info(`[Email Events] Table init failed (attempt ${attempt}/${maxRetries}), retrying in ${delay/1000}s...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+}
+
+initEmailEventsWithRetry();
 
 async function handleEmailDelivered(event: ResendEmailEvent) {
   const { email_id, to, subject } = event.data;
