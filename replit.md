@@ -66,6 +66,13 @@ We use a **Liquid Glass UI** system.
 - **Member Lifecycle & Check-In**: Tiers, QR/NFC check-in, onboarding.
 
 ## Recent Changes
+- **Feb 21, 2026**: v8.2.0 — Drizzle ORM Migration & Database Integrity Hardening:
+  1. Migrated 107+ pool.query calls across 4 critical files to Drizzle ORM (approvalService, subscriptions, member-payments, rosterService).
+  2. Converted 8 manual pool.connect() transaction blocks to db.transaction() for automatic BEGIN/COMMIT/ROLLBACK.
+  3. Added UNIQUE index on booking_sessions (resource_id, session_date, start_time, end_time) to prevent double-booking at DB level.
+  4. Added partial UNIQUE index on booking_participants (session_id, user_id) for active participants to prevent roster duplication.
+  5. Added CHECK constraints on guest_passes (passes_used >= 0, passes_used <= passes_total) to prevent negative/over-allocation.
+  6. All parameterized queries now use Drizzle sql template literals (no raw string interpolation).
 - **Feb 21, 2026**: v8.1.0 — Race Conditions, Billing Math & Data Integrity Fixes (6 bugs):
   1. Advisory lock prevents concurrent double-booking of same bay.
   2. Reconciliation math uses flat guest fees instead of absurd time-based formula.
