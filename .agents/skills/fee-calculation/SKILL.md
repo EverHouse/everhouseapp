@@ -111,7 +111,9 @@ When roster changes trigger fee recalculation (via `recalculateSessionFees()`), 
 - Builds `BookingFeeLineItem[]` with per-participant overage and guest fee breakdowns.
 - Calls `updateDraftInvoiceLineItems()` to replace all invoice line items.
 - If total fees drop to $0, deletes the draft invoice and clears `stripe_invoice_id`.
+- **$0→$X fee transition**: If no invoice exists yet (e.g., booking was approved with $0 fees) but current fees are > $0, `syncBookingInvoice` creates a new draft invoice on-the-fly using the stored `stripe_customer_id` from the users table. This handles the case where a booking starts with no guests/overage but gains fees through later roster edits.
 - Guards: skips if invoice is already `paid`, `open`, `void`, or `uncollectible` (logs warning and notifies staff for paid/open invoices).
+- Guards: skips non-approved bookings and conference room bookings (checked via `resources.type` JOIN).
 
 Conference room bookings are excluded from invoice sync (they use a separate prepayment flow without the booking approval lifecycle).
 

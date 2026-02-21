@@ -227,7 +227,7 @@ Resource type?
 
 11. **Post-commit notifications**: Booking creation sends the HTTP response BEFORE executing post-commit operations (staff notifications, event publishing, availability broadcast). This ensures the client gets a success response even if notifications fail.
 
-12. **One invoice per booking**: Each simulator booking has at most one Stripe invoice (`booking_requests.stripe_invoice_id`). Draft created at approval, updated on roster changes, finalized at payment. Conference rooms are excluded (they use a separate prepayment flow). The invoice lifecycle is managed by `bookingInvoiceService.ts`.
+12. **One invoice per booking**: Each simulator booking has at most one Stripe invoice (`booking_requests.stripe_invoice_id`). Draft created at approval (if fees > $0), updated on roster changes, finalized at payment. If a booking is approved with $0 fees (no invoice created) and later gains fees through roster edits, `syncBookingInvoice()` creates the draft invoice on-the-fly. Conference rooms are excluded (checked via `resources.type` JOIN). The invoice lifecycle is managed by `bookingInvoiceService.ts`.
 
 13. **Roster lock after paid invoice**: Once a booking's Stripe invoice is paid, roster edits (add/remove participant, change player count) are blocked via `enforceRosterLock()`. Staff can override with a reason (logged via audit). The lock is fail-open: if the Stripe API check fails, edits proceed.
 
