@@ -13,6 +13,15 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.97.0",
+    date: "2026-02-21",
+    title: "Dead Code Removal",
+    changes: [
+      "Deleted: RescheduleBookingModal.tsx (377 lines) — orphaned component, reschedule UI was previously hidden from all surfaces",
+      "Deleted: shared/models/walkInVisits.ts — unused Drizzle schema file (walk_in_visits table is used via raw SQL, schema model was never imported)",
+    ]
+  },
+  {
     version: "7.96.0",
     date: "2026-02-21",
     title: "Dependency & Dead Code Cleanup",
