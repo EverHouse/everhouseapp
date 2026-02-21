@@ -61,7 +61,6 @@ interface BookingUpdateResult {
   calendarEventId: string | null;
   trackmanBookingId: string | null;
   sessionId: number | null;
-  overagePaymentIntentId: string | null;
   requestParticipants: Array<{ email?: string; type: 'member' | 'guest'; userId?: string; name?: string }> | null;
   memberNotes: string | null;
   notes: string | null;
@@ -74,7 +73,6 @@ interface CancelBookingData {
   requestDate: string;
   startTime: string;
   calendarEventId: string | null;
-  overagePaymentIntentId: string | null;
   sessionId: number | null;
   status: string | null;
 }
@@ -788,9 +786,6 @@ export async function cancelBooking(params: CancelBookingParams) {
       status: bookingRequests.status,
       resourceId: bookingRequests.resourceId,
       trackmanBookingId: bookingRequests.trackmanBookingId,
-      overagePaymentIntentId: bookingRequests.overagePaymentIntentId,
-      overagePaid: bookingRequests.overagePaid,
-      overageFeeCents: bookingRequests.overageFeeCents,
       sessionId: bookingRequests.sessionId,
       staffNotes: bookingRequests.staffNotes
     })
@@ -854,35 +849,7 @@ export async function cancelBooking(params: CancelBookingParams) {
       isConferenceRoom = resource?.type === 'conference_room';
     }
 
-    let overageRefundResult: { cancelled?: boolean; refunded?: boolean; amount?: number; error?: string } = {};
-    if (existing.overagePaymentIntentId) {
-      try {
-        if (existing.overagePaid) {
-          const stripe = await getStripeClient();
-          const paymentIntent = await stripe.paymentIntents.retrieve(existing.overagePaymentIntentId);
-          if (paymentIntent.status === 'succeeded' && paymentIntent.latest_charge) {
-            const refund = await stripe.refunds.create({
-              charge: paymentIntent.latest_charge as string,
-              reason: 'requested_by_customer'
-            }, {
-              idempotencyKey: `refund_staff_cancel_overage_${bookingId}_${existing.overagePaymentIntentId}`
-            });
-            logger.info('[Staff Cancel] Refunded overage payment for booking , refund', { extra: { existingOveragePaymentIntentId: existing.overagePaymentIntentId, bookingId, refundId: refund.id } });
-            overageRefundResult = { refunded: true, amount: (existing.overageFeeCents || 0) / 100 };
-          }
-        } else {
-          await cancelPaymentIntent(existing.overagePaymentIntentId);
-          logger.info('[Staff Cancel] Cancelled overage payment intent for booking', { extra: { existingOveragePaymentIntentId: existing.overagePaymentIntentId, bookingId } });
-          overageRefundResult = { cancelled: true };
-        }
-        await tx.update(bookingRequests)
-          .set({ overagePaymentIntentId: null, overageFeeCents: 0, overageMinutes: 0 })
-          .where(eq(bookingRequests.id, bookingId));
-      } catch (paymentErr: unknown) {
-        logger.error('[Staff Cancel] Failed to handle overage payment (non-blocking)', { extra: { paymentErr } });
-        overageRefundResult = { error: getErrorMessage(paymentErr) };
-      }
-    }
+    const overageRefundResult: { cancelled?: boolean; refunded?: boolean; amount?: number; error?: string } = {};
 
     try {
       const stripe = await getStripeClient();
@@ -1783,9 +1750,6 @@ export async function completeCancellation(params: CompleteCancellationParams) {
     resourceId: bookingRequests.resourceId,
     trackmanBookingId: bookingRequests.trackmanBookingId,
     sessionId: bookingRequests.sessionId,
-    overagePaymentIntentId: bookingRequests.overagePaymentIntentId,
-    overagePaid: bookingRequests.overagePaid,
-    overageFeeCents: bookingRequests.overageFeeCents
   })
     .from(bookingRequests)
     .where(eq(bookingRequests.id, bookingId));
@@ -1799,36 +1763,6 @@ export async function completeCancellation(params: CompleteCancellationParams) {
   }
 
   const errors: string[] = [];
-
-  if (existing.overagePaymentIntentId) {
-    try {
-      const stripe = await getStripeClient();
-      if (existing.overagePaid) {
-        const paymentIntent = await stripe.paymentIntents.retrieve(existing.overagePaymentIntentId);
-        if (paymentIntent.status === 'succeeded' && paymentIntent.latest_charge) {
-          await stripe.refunds.create({
-            charge: paymentIntent.latest_charge as string,
-            reason: 'requested_by_customer'
-          }, {
-            idempotencyKey: `refund_deny_overage_${bookingId}_${existing.overagePaymentIntentId}`
-          });
-        }
-      } else {
-        await cancelPaymentIntent(existing.overagePaymentIntentId);
-      }
-    } catch (paymentErr: unknown) {
-      errors.push(`Overage refund failed: ${getErrorMessage(paymentErr)}`);
-      logger.error('[Complete Cancellation] Failed to handle overage payment', { extra: { paymentErr } });
-    }
-
-    try {
-      await db.update(bookingRequests)
-        .set({ overagePaymentIntentId: null, overageFeeCents: 0 })
-        .where(eq(bookingRequests.id, bookingId));
-    } catch (clearErr: unknown) {
-      logger.error('[Complete Cancellation] Failed to clear overage fields', { extra: { clearErr } });
-    }
-  }
 
   try {
     const pendingIntents = await pool.query(

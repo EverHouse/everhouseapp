@@ -595,13 +595,8 @@ export async function previewRosterFees(
     allPaid = (hasCompletedFeeSnapshot && pendingCount === 0) || (pendingCount === 0 && hasPaidFees);
 
     if (allPaid) {
-      const overageCheck = await pool.query(
-        `SELECT overage_fee_cents, overage_paid FROM booking_requests WHERE id = $1`,
-        [booking.booking_id]
-      );
-      const overageFeeCents = parseInt(overageCheck.rows[0]?.overage_fee_cents || '0');
-      const overagePaid = overageCheck.rows[0]?.overage_paid ?? false;
-      if (overageFeeCents > 0 && !overagePaid) {
+      const invoicePaid = await isBookingInvoicePaid(booking.booking_id);
+      if (!invoicePaid) {
         allPaid = false;
       }
     }

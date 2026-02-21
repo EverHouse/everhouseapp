@@ -154,9 +154,6 @@ router.get('/api/booking-requests', async (req, res) => {
       guardian_relationship: bookingRequests.guardianRelationship,
       guardian_phone: bookingRequests.guardianPhone,
       guardian_consent_at: bookingRequests.guardianConsentAt,
-      overage_minutes: bookingRequests.overageMinutes,
-      overage_fee_cents: bookingRequests.overageFeeCents,
-      overage_paid: bookingRequests.overagePaid,
       is_unmatched: bookingRequests.isUnmatched,
       request_participants: bookingRequests.requestParticipants
     })
@@ -1049,8 +1046,6 @@ router.put('/api/booking-requests/:id/member-cancel', async (req, res) => {
       calendarEventId: bookingRequests.calendarEventId,
       resourceId: bookingRequests.resourceId,
       trackmanBookingId: bookingRequests.trackmanBookingId,
-      overagePaymentIntentId: bookingRequests.overagePaymentIntentId,
-      overagePaid: bookingRequests.overagePaid,
       staffNotes: bookingRequests.staffNotes
     })
       .from(bookingRequests)
@@ -1218,34 +1213,6 @@ router.put('/api/booking-requests/:id/member-cancel', async (req, res) => {
       );
     } catch (sessionErr: unknown) {
       logger.error('[Member Cancel] Failed to fetch session (non-blocking)', { extra: { sessionErr } });
-    }
-    
-    if (!shouldSkipRefund && existing.overagePaymentIntentId) {
-      try {
-        if (existing.overagePaid) {
-          const stripe = await getStripeClient();
-          const paymentIntent = await stripe.paymentIntents.retrieve(existing.overagePaymentIntentId);
-          if (paymentIntent.status === 'succeeded' && paymentIntent.latest_charge) {
-            const refund = await stripe.refunds.create({
-              charge: paymentIntent.latest_charge as string,
-              reason: 'requested_by_customer'
-            }, {
-              idempotencyKey: `refund_cancel_${bookingId}_${existing.overagePaymentIntentId}`
-            });
-            refundedAmountCents += refund.amount;
-            refundType = 'overage';
-            logger.info('[Member Cancel] Refunded overage payment for booking , refund', { extra: { existingOveragePaymentIntentId: existing.overagePaymentIntentId, bookingId, refundId: refund.id } });
-          }
-        } else {
-          await cancelPaymentIntent(existing.overagePaymentIntentId);
-          logger.info('[Member Cancel] Cancelled overage payment intent for booking', { extra: { existingOveragePaymentIntentId: existing.overagePaymentIntentId, bookingId } });
-        }
-        await db.update(bookingRequests)
-          .set({ overagePaymentIntentId: null, overageFeeCents: 0, overageMinutes: 0 })
-          .where(eq(bookingRequests.id, bookingId));
-      } catch (paymentErr: unknown) {
-        logger.error('[Member Cancel] Failed to handle overage payment (non-blocking)', { extra: { paymentErr } });
-      }
     }
     
     // Cancel pending payment intents from stripe_payment_intents table

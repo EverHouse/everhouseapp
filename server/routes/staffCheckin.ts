@@ -154,10 +154,6 @@ interface CheckinContext {
     reason: string | null;
     createdAt: Date;
   }>;
-  overageMinutes: number;
-  overageFeeCents: number;
-  overagePaid: boolean;
-  hasUnpaidOverage: boolean;
 }
 
 router.get('/api/bookings/:id/staff-checkin-context', isStaffOrAdmin, async (req: Request, res: Response) => {
@@ -180,11 +176,7 @@ router.get('/api/bookings/:id/staff-checkin-context', isStaffOrAdmin, async (req
         br.end_time,
         br.member_notes,
         br.declared_player_count,
-        r.name as resource_name,
-        br.overage_minutes,
-        br.overage_fee_cents,
-        br.overage_paid,
-        br.overage_payment_intent_id
+        r.name as resource_name
       FROM booking_requests br
       LEFT JOIN resources r ON br.resource_id = r.id
       LEFT JOIN users u ON LOWER(u.email) = LOWER(br.user_email)
@@ -392,11 +384,6 @@ router.get('/api/bookings/:id/staff-checkin-context', isStaffOrAdmin, async (req
       LIMIT 20
     `);
 
-    const overageMinutes = booking.overage_minutes || 0;
-    const overageFeeCents = booking.overage_fee_cents || 0;
-    const overagePaid = booking.overage_paid ?? (overageFeeCents === 0);
-    const hasUnpaidOverage = overageFeeCents > 0 && !overagePaid;
-
     const context: CheckinContext = {
       bookingId,
       sessionId: sessionId || null,
@@ -418,11 +405,6 @@ router.get('/api/bookings/:id/staff-checkin-context', isStaffOrAdmin, async (req
         reason: a.reason,
         createdAt: a.created_at
       })),
-      overageMinutes,
-      overageFeeCents,
-      overagePaid,
-      hasUnpaidOverage,
-      ...(hasUnpaidOverage && booking.overage_payment_intent_id && { overagePaymentIntentId: booking.overage_payment_intent_id })
     };
 
     res.json(context);

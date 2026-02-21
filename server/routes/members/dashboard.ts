@@ -227,9 +227,6 @@ router.get('/api/member/dashboard-data', isAuthenticated, async (req, res) => {
           declared_player_count: bookingRequests.declaredPlayerCount,
           is_linked_member: sql<boolean>`LOWER(${bookingRequests.userEmail}) != ${userEmail}`,
           primary_booker_name: bookingRequests.userName,
-          overage_minutes: bookingRequests.overageMinutes,
-          overage_fee_cents: bookingRequests.overageFeeCents,
-          overage_paid: bookingRequests.overagePaid,
         })
         .from(bookingRequests)
         .leftJoin(resources, eq(bookingRequests.resourceId, resources.id))

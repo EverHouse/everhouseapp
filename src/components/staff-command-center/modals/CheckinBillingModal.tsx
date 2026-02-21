@@ -59,11 +59,6 @@ interface CheckinContext {
   participants: ParticipantFee[];
   totalOutstanding: number;
   hasUnpaidBalance: boolean;
-  overageMinutes?: number;
-  overageFeeCents?: number;
-  overagePaid?: boolean;
-  hasUnpaidOverage?: boolean;
-  overagePaymentIntentId?: string | null;
 }
 
 interface CheckinBillingModalProps {
@@ -93,9 +88,6 @@ export const CheckinBillingModal: React.FC<CheckinBillingModalProps> = ({
     totalAmount: number;
     description: string;
   } | null>(null);
-  const [showOveragePayment, setShowOveragePayment] = useState(false);
-  const [overageClientSecret, setOverageClientSecret] = useState<string | null>(null);
-  const [overagePaymentIntentId, setOveragePaymentIntentId] = useState<string | null>(null);
   const [savedCardInfo, setSavedCardInfo] = useState<{
     hasSavedCard: boolean;
     cardLast4?: string;
@@ -103,37 +95,6 @@ export const CheckinBillingModal: React.FC<CheckinBillingModalProps> = ({
   } | null>(null);
   const [checkingCard, setCheckingCard] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<'online' | 'terminal'>('terminal');
-
-  const cancelOverageIntent = async () => {
-    if (overagePaymentIntentId) {
-      const intentId = overagePaymentIntentId;
-      setOveragePaymentIntentId(null);
-      setOverageClientSecret(null);
-      try {
-        await fetch('/api/stripe/cancel-payment', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ paymentIntentId: intentId })
-        });
-      } catch (err: unknown) {
-        console.error('Failed to cancel overage intent:', err);
-      }
-    }
-  };
-
-  useEffect(() => {
-    return () => {
-      if (overagePaymentIntentId) {
-        fetch('/api/stripe/cancel-payment', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ paymentIntentId: overagePaymentIntentId })
-        }).catch(err => console.error('Failed to cancel overage intent on unmount:', err));
-      }
-    };
-  }, [overagePaymentIntentId]);
 
   useEffect(() => {
     console.log('[CheckinBillingModal] Props changed:', { isOpen, bookingId });
@@ -153,9 +114,6 @@ export const CheckinBillingModal: React.FC<CheckinBillingModalProps> = ({
       if (res.ok) {
         const data = await res.json();
         setContext(data);
-        if (data.overagePaymentIntentId) {
-          setOveragePaymentIntentId(data.overagePaymentIntentId);
-        }
       } else {
         setError(getApiErrorMessage(res, 'load billing context'));
       }
@@ -413,60 +371,6 @@ export const CheckinBillingModal: React.FC<CheckinBillingModalProps> = ({
     }
   };
 
-  const handleChargeOverage = async () => {
-    if (!context) return;
-    setActionInProgress('overage-payment');
-    try {
-      const res = await fetch('/api/stripe/overage/create-payment-intent', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ bookingId })
-      });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.paidInFull) {
-          showToast('Overage fee covered by account credit', 'success');
-          await handleOveragePaymentSuccess(data.paymentIntentId || 'balance');
-          return;
-        }
-        if (data.alreadyPaid) {
-          showToast('Overage already paid', 'success');
-          await handleOveragePaymentSuccess('balance');
-          return;
-        }
-        setOverageClientSecret(data.clientSecret);
-        setOveragePaymentIntentId(data.paymentIntentId);
-        setShowOveragePayment(true);
-      } else {
-        const data = await res.json();
-        showToast(data.error || 'Failed to create payment', 'error');
-      }
-    } catch (err: unknown) {
-      console.error('Failed to create overage payment:', err);
-      showToast('Failed to create payment', 'error');
-    } finally {
-      setActionInProgress(null);
-    }
-  };
-
-  const handleOveragePaymentSuccess = async (paymentIntentId?: string) => {
-    showToast('Overage payment successful!', 'success');
-    setShowOveragePayment(false);
-    setOverageClientSecret(null);
-    setOveragePaymentIntentId(null);
-    setPaymentMethod('online');
-    if (paymentIntentId) {
-      await fetch('/api/stripe/confirm-payment', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ paymentIntentId })
-      });
-    }
-    await fetchContext();
-  };
-
   const handleStripePaymentSuccess = async (paymentIntentId?: string) => {
     showToast('Payment successful - syncing...', 'success');
     setShowStripePayment(false);
@@ -545,10 +449,6 @@ export const CheckinBillingModal: React.FC<CheckinBillingModalProps> = ({
   const hasUnreviewedWaivers = context?.participants.some(p => p.waiverNeedsReview) || false;
 
   const handleClose = () => {
-    if (showOveragePayment && overagePaymentIntentId) {
-      cancelOverageIntent();
-      setShowOveragePayment(false);
-    }
     onClose();
   };
 
@@ -558,14 +458,7 @@ export const CheckinBillingModal: React.FC<CheckinBillingModalProps> = ({
 
   const footerContent = (
     <div className="px-6 py-4">
-      {showOveragePayment ? (
-        <button
-          onClick={() => { cancelOverageIntent(); setShowOveragePayment(false); setPaymentMethod('online'); }}
-          className="w-full py-2 text-primary/70 dark:text-white/70 font-medium hover:text-primary dark:hover:text-white"
-        >
-          Back
-        </button>
-      ) : showStripePayment ? (
+      {showStripePayment ? (
         <button
           onClick={() => { setShowStripePayment(false); setFrozenPaymentData(null); setPaymentMethod('online'); }}
           className="w-full py-2 text-primary/70 dark:text-white/70 font-medium hover:text-primary dark:hover:text-white"
@@ -686,69 +579,7 @@ export const CheckinBillingModal: React.FC<CheckinBillingModalProps> = ({
       stickyFooter={footerContent}
     >
       <div className="p-6">
-        {showOveragePayment && context ? (
-          <div className="space-y-4">
-            <div className="bg-red-50 dark:bg-red-900/20 rounded-xl p-4">
-              <h3 className="font-semibold text-red-800 dark:text-red-300 mb-2">Simulator Overage Payment</h3>
-              <p className="text-sm text-red-700 dark:text-red-400">
-                {context.overageMinutes} minutes over tier limit • ${((context.overageFeeCents || 0) / 100).toFixed(2)}
-              </p>
-            </div>
-            <div className="flex rounded-lg border border-primary/20 dark:border-white/20 overflow-hidden">
-              <button
-                onClick={() => setPaymentMethod('online')}
-                className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-sm font-medium transition-colors ${
-                  paymentMethod === 'online'
-                    ? 'bg-indigo-600 text-white'
-                    : 'bg-white dark:bg-white/5 text-primary/70 dark:text-white/70 hover:bg-primary/5 dark:hover:bg-white/10'
-                }`}
-              >
-                <span className="material-symbols-outlined text-base">credit_card</span>
-                Online Card
-              </button>
-              <button
-                onClick={() => setPaymentMethod('terminal')}
-                className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-sm font-medium transition-colors ${
-                  paymentMethod === 'terminal'
-                    ? 'bg-indigo-600 text-white'
-                    : 'bg-white dark:bg-white/5 text-primary/70 dark:text-white/70 hover:bg-primary/5 dark:hover:bg-white/10'
-                }`}
-              >
-                <span className="material-symbols-outlined text-base">contactless</span>
-                Card Reader
-              </button>
-            </div>
-            {paymentMethod === 'terminal' ? (
-              <TerminalPayment
-                existingPaymentIntentId={overagePaymentIntentId || undefined}
-                amount={context.overageFeeCents || 0}
-                subscriptionId={null}
-                userId={context.ownerId}
-                description={`Simulator overage fee - ${context.resourceName}`}
-                paymentMetadata={{ bookingId: String(bookingId), ownerEmail: context.ownerEmail, userId: context.ownerId, ownerName: context.ownerName, paymentType: 'overage_fee' }}
-                onSuccess={(piId) => handleOveragePaymentSuccess(piId)}
-                onError={(msg) => showToast(msg, 'error')}
-                onCancel={() => { cancelOverageIntent(); setShowOveragePayment(false); setPaymentMethod('online'); }}
-              />
-            ) : overageClientSecret ? (
-              <StripePaymentForm
-                amount={(context.overageFeeCents || 0) / 100}
-                description={`Simulator overage fee - ${context.resourceName}`}
-                userId={context.ownerId}
-                userEmail={context.ownerEmail}
-                memberName={context.ownerName}
-                purpose="overage_fee"
-                bookingId={bookingId}
-                onSuccess={handleOveragePaymentSuccess}
-                onCancel={() => { cancelOverageIntent(); setShowOveragePayment(false); setPaymentMethod('online'); }}
-              />
-            ) : (
-              <div className="flex items-center justify-center py-8">
-                <WalkingGolferSpinner size="sm" variant="dark" />
-              </div>
-            )}
-          </div>
-        ) : showStripePayment && context && frozenPaymentData ? (
+        {showStripePayment && context && frozenPaymentData ? (
           <div className="space-y-4">
             <div className="bg-primary/5 dark:bg-white/5 rounded-xl p-4">
               <h3 className="font-semibold text-primary dark:text-white mb-2">{context.ownerName}</h3>
@@ -835,29 +666,6 @@ export const CheckinBillingModal: React.FC<CheckinBillingModalProps> = ({
                 </div>
               )}
             </div>
-
-            {context.hasUnpaidOverage && context.overageFeeCents && context.overageFeeCents > 0 && (
-              <div className="bg-red-50 dark:bg-red-900/20 border-2 border-red-300 dark:border-red-700 rounded-xl p-4">
-                <div className="flex items-start gap-3">
-                  <span className="material-symbols-outlined text-red-600 dark:text-red-400 text-xl">warning</span>
-                  <div className="flex-1">
-                    <h4 className="font-semibold text-red-800 dark:text-red-300 mb-1">Simulator Overage Fee Required</h4>
-                    <p className="text-sm text-red-700 dark:text-red-400 mb-3">
-                      This booking exceeds the member's daily simulator allowance by {context.overageMinutes} minutes.
-                      Payment of ${(context.overageFeeCents / 100).toFixed(2)} is required before check-in.
-                    </p>
-                    <button
-                      onClick={handleChargeOverage}
-                      disabled={actionInProgress !== null}
-                      className="tactile-btn px-4 py-2 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700 disabled:opacity-50 flex items-center gap-2"
-                    >
-                      <span className="material-symbols-outlined text-sm">credit_card</span>
-                      {actionInProgress === 'overage-payment' ? 'Processing...' : `Charge $${(context.overageFeeCents / 100).toFixed(2)}`}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
 
             {context.participants.length > 0 && (
               <div>

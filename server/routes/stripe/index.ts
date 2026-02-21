@@ -6,7 +6,7 @@ import invoicesRouter from './invoices';
 import memberPaymentsRouter from './member-payments';
 import adminRouter from './admin';
 import couponsRouter from './coupons';
-import overageRouter from './overage';
+
 import terminalRouter from './terminal';
 
 const router = Router();
@@ -18,7 +18,7 @@ router.use(invoicesRouter);
 router.use(memberPaymentsRouter);
 router.use(adminRouter);
 router.use(couponsRouter);
-router.use(overageRouter);
+
 router.use(terminalRouter);
 
 export default router;

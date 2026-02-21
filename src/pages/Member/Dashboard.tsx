@@ -13,7 +13,6 @@ import OnboardingChecklist from '../../components/OnboardingChecklist';
 import { formatDateShort, getTodayString, getPacificHour, CLUB_TIMEZONE, formatDateTimePacific, formatMemberSince, formatTime12Hour, getNowTimePacific } from '../../utils/dateUtils';
 import { downloadICalFile } from '../../utils/icalUtils';
 import { DashboardSkeleton } from '../../components/skeletons';
-import { usePricing } from '../../hooks/usePricing';
 import { SmoothReveal } from '../../components/motion/SmoothReveal';
 import { getBaseTier } from '../../utils/permissions';
 import { getTierColor } from '../../utils/tierUtils';
@@ -112,9 +111,6 @@ interface DBBookingRequest {
   is_linked_member?: boolean;
   primary_booker_name?: string | null;
   declared_player_count?: number;
-  overage_minutes?: number;
-  overage_fee_cents?: number;
-  overage_paid?: boolean;
 }
 
 interface GuestPasses {
@@ -185,7 +181,6 @@ const Dashboard: React.FC = () => {
   const queryClient = useQueryClient();
   const { user, actualUser, viewAsUser, isViewingAs, addBooking, deleteBooking } = useData();
   const { effectiveTheme } = useTheme();
-  const { overageRatePerBlockDollars } = usePricing();
   
   const isAdminViewingAs = actualUser?.role === 'admin' && isViewingAs;
   // For View As mode, use the viewed member's email for API calls
@@ -207,8 +202,6 @@ const Dashboard: React.FC = () => {
   const [optimisticCancellingIds, setOptimisticCancellingIds] = useState<Set<number>>(new Set());
   const [optimisticCancelledIds, setOptimisticCancelledIds] = useState<Set<number>>(new Set());
   const [scheduleRef] = useAutoAnimate();
-  const [overagePaymentBooking, setOveragePaymentBooking] = useState<{ id: number; amount: number; minutes: number } | null>(null);
-  const [isPayingOverage, setIsPayingOverage] = useState(false);
   const [showFirstLoginModal, setShowFirstLoginModal] = useState(false);
   const [nfcCheckinData, setNfcCheckinData] = useState<{ type: 'success' | 'already_checked_in', memberName: string, tier?: string | null } | null>(null);
 
@@ -938,12 +931,6 @@ const Dashboard: React.FC = () => {
                   const endTime24 = 'end_time' in rawBooking ? rawBooking.end_time : '';
                   const isLinkedMember = (item as DashboardBookingItem).isLinkedMember || false;
                   
-                  const hasUnpaidOverage = 'overage_fee_cents' in rawBooking && 
-                    rawBooking.overage_fee_cents && 
-                    rawBooking.overage_fee_cents > 0 && 
-                    !rawBooking.overage_paid;
-                  const overageAmount = hasUnpaidOverage ? (rawBooking.overage_fee_cents! / 100).toFixed(2) : null;
-                  
                   const primaryBookerName = (item as DashboardBookingItem).primaryBookerName;
                   
                   const isCancellationPending = (item as DashboardBookingItem).status === 'cancellation_pending';
@@ -953,12 +940,6 @@ const Dashboard: React.FC = () => {
                     actions = [];
                   } else {
                     actions = [
-                      ...(hasUnpaidOverage && !isLinkedMember ? [{
-                        icon: 'payment',
-                        label: `Pay $${overageAmount}`,
-                        onClick: () => setOveragePaymentBooking({ id: Number(item.dbId), amount: rawBooking.overage_fee_cents!, minutes: rawBooking.overage_minutes || 0 }),
-                        highlight: true
-                      }] : []),
                       ...(isConfirmed ? [{
                         icon: 'calendar_add_on',
                         label: 'Add to Calendar',
@@ -1032,28 +1013,6 @@ const Dashboard: React.FC = () => {
                     );
                   }
                   
-                  if ((status === 'confirmed' || status === 'attended') && !isLinked) {
-                    const hasOverage = rawBooking.overage_fee_cents && rawBooking.overage_fee_cents > 0;
-                    const overagePaid = rawBooking.overage_paid;
-                    
-                    if (hasOverage) {
-                      if (overagePaid) {
-                        badges.push(
-                          <span key="payment" className="px-2 py-0.5 text-xs font-medium rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 flex items-center gap-1">
-                            <span className="material-symbols-outlined text-xs">check_circle</span>
-                            Paid
-                          </span>
-                        );
-                      } else {
-                        badges.push(
-                          <span key="payment" className="px-2 py-0.5 text-xs font-medium rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 flex items-center gap-1">
-                            <span className="material-symbols-outlined text-xs">schedule</span>
-                            ${(rawBooking.overage_fee_cents / 100).toFixed(0)} due
-                          </span>
-                        );
-                      }
-                    }
-                  }
                   
                   if (badges.length === 0) return null;
                   return <div className="flex gap-1.5 flex-wrap">{badges}</div>;
@@ -1183,86 +1142,6 @@ const Dashboard: React.FC = () => {
         queryClient.invalidateQueries({ queryKey: ['member', 'dashboard-data'] });
       }}
     />
-
-    {/* Overage Payment Modal */}
-    <ModalShell
-      isOpen={!!overagePaymentBooking}
-      onClose={() => !isPayingOverage && setOveragePaymentBooking(null)}
-      title="Pay Simulator Overage Fee"
-      size="sm"
-    >
-      {overagePaymentBooking && (
-        <div className="p-6 space-y-4">
-          <div className="text-center">
-            <p className="text-lg font-semibold text-primary dark:text-white mb-2">
-              ${(overagePaymentBooking.amount / 100).toFixed(2)}
-            </p>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              Overage: {overagePaymentBooking.minutes} minutes ({Math.ceil(overagePaymentBooking.minutes / 30)} × 30 min @ {overagePaymentBooking.minutes > 0 ? `$${Math.round((overagePaymentBooking.amount / 100) / Math.ceil(overagePaymentBooking.minutes / 30))}` : `$${overageRatePerBlockDollars}`})
-            </p>
-          </div>
-          <p className="text-sm text-gray-600 dark:text-gray-300">
-            This fee is for simulator usage exceeding your membership tier's daily allowance. Payment is required before check-in.
-          </p>
-          <div className="flex gap-3 pt-2">
-            <button
-              onClick={() => setOveragePaymentBooking(null)}
-              disabled={isPayingOverage}
-              className="flex-1 py-3 px-4 rounded-xl border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 font-medium disabled:opacity-50"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={async () => {
-                setIsPayingOverage(true);
-                try {
-                  const res = await fetch('/api/stripe/overage/create-payment-intent', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    credentials: 'include',
-                    body: JSON.stringify({ bookingId: overagePaymentBooking.id })
-                  });
-                  if (!res.ok) {
-                    const err = await res.json();
-                    throw new Error(err.error || 'Failed to create payment');
-                  }
-                  const data = await res.json();
-                  const stripe = await import('@stripe/stripe-js').then(mod => mod.loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY || ''));
-                  if (stripe && data.clientSecret) {
-                    const { error: paymentError } = await stripe.confirmPayment({
-                      clientSecret: data.clientSecret,
-                      confirmParams: {
-                        return_url: `${window.location.origin}/dashboard?overage_paid=true&booking_id=${overagePaymentBooking.id}`,
-                      },
-                    });
-                    if (paymentError) {
-                      throw new Error(paymentError.message);
-                    }
-                  }
-                } catch (err: unknown) {
-                  showToast((err instanceof Error ? err.message : String(err)) || 'Payment failed', 'error');
-                  setIsPayingOverage(false);
-                }
-              }}
-              disabled={isPayingOverage}
-              className="flex-1 py-3 px-4 rounded-xl bg-primary text-white font-medium flex items-center justify-center gap-2 disabled:opacity-50"
-            >
-              {isPayingOverage ? (
-                <>
-                  <span className="material-symbols-outlined animate-spin text-base">progress_activity</span>
-                  Processing...
-                </>
-              ) : (
-                <>
-                  <span className="material-symbols-outlined text-base">payment</span>
-                  Pay Now
-                </>
-              )}
-            </button>
-          </div>
-        </div>
-      )}
-    </ModalShell>
 
     {/* Membership Details Modal */}
     <ModalShell 

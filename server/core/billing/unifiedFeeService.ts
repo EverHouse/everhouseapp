@@ -968,27 +968,5 @@ export async function recalculateSessionFees(
   
   await applyFeeBreakdownToParticipants(sessionId, breakdown);
   
-  // Sync session fees to booking_requests for legacy compatibility
-  // This ensures member Dashboard can show Pay Now button
-  try {
-    const totalOverageMinutes = breakdown.participants.reduce((sum, p) => {
-      if (p.overageCents > 0 && p.minutesAllocated > 0) {
-        const usedAfter = (p.usedMinutesToday || 0) + p.minutesAllocated;
-        const dailyAllow = p.dailyAllowance || 0;
-        return sum + Math.max(0, usedAfter - dailyAllow);
-      }
-      return sum;
-    }, 0);
-    await pool.query(`
-      UPDATE booking_requests 
-      SET overage_fee_cents = $1, 
-          overage_minutes = $2,
-          updated_at = NOW()
-      WHERE session_id = $3
-    `, [breakdown.totals.totalCents || 0, totalOverageMinutes, sessionId]);
-  } catch (syncError: unknown) {
-    logger.warn('[UnifiedFee] Failed to sync fees to booking_requests', { sessionId, error: syncError });
-  }
-  
   return breakdown;
 }

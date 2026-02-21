@@ -249,9 +249,9 @@ router.post('/api/staff/conference-room/booking', isStaffOrAdmin, async (req: Re
         `INSERT INTO booking_requests (
           user_email, user_name, resource_id,
           request_date, start_time, duration_minutes, end_time,
-          status, origin, overage_minutes, overage_fee_cents,
+          status, origin,
           created_at, updated_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), NOW())
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())
         RETURNING id`,
         [
           normalizedEmail,
@@ -262,9 +262,7 @@ router.post('/api/staff/conference-room/booking', isStaffOrAdmin, async (req: Re
           durationMinutes,
           endTime,
           'approved',
-          'staff_manual',
-          overageMinutes,
-          overageCents
+          'staff_manual'
         ]
       );
 

@@ -13,6 +13,21 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "7.93.0",
+    date: "2026-02-21",
+    title: "Overage Payment Migration to Invoice System",
+    isMajor: true,
+    changes: [
+      "Removed: Standalone overage payment route (overage.ts) — all billing now goes through the one-invoice-per-booking system",
+      "Removed: 4 deprecated overage columns from booking_requests (overage_fee_cents, overage_minutes, overage_paid, overage_payment_intent_id) — invoice system is the single source of truth",
+      "Removed: Overage payment UI from check-in modal and member dashboard — fees are handled through the unified invoice flow",
+      "Improved: Roster lock check now uses isBookingInvoicePaid() instead of querying deprecated overage columns",
+      "Improved: Cancel/deny booking flows no longer attempt to refund standalone overage PaymentIntents — voidBookingInvoice handles all refunds",
+      "Cleaned: Removed overage fee sync from unifiedFeeService — invoice system tracks all fee changes",
+      "Cleaned: Removed overage column references from 15+ backend and frontend files",
+    ]
+  },
+  {
     version: "7.92.0",
     date: "2026-02-21",
     title: "Legacy System Cleanup",

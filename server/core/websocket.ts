@@ -976,7 +976,7 @@ export function broadcastBillingUpdate(data: {
           'payment_succeeded' | 'payment_failed' | 'invoice_paid' | 'invoice_failed' |
           'booking_payment_updated' | 'payment_refunded' | 'balance_updated' |
           'invoice_created' | 'invoice_finalized' | 'invoice_voided' |
-          'overage_paid' | 'payment_confirmed';
+          'payment_confirmed';
   customerId?: string;
   memberEmail?: string;
   memberName?: string;

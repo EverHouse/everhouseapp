@@ -1082,37 +1082,6 @@ router.post('/api/admin/bookings/:id/simulate-confirm', isStaffOrAdmin, async (r
            updated_at = NOW()
        WHERE id = ${bookingId}`);
 
-    if (Number(booking.overage_fee_cents) > 0 && booking.stripe_customer_id) {
-      try {
-        const { chargeWithBalance } = await import('../../core/stripe/payments');
-        const paymentResult = await chargeWithBalance({
-          stripeCustomerId: booking.stripe_customer_id as string,
-          email: booking.user_email as string,
-          amountCents: booking.overage_fee_cents as number,
-          purpose: 'overage_fee',
-          bookingId: bookingId,
-          description: `Simulator overage fee for ${booking.request_date}`,
-          metadata: {
-            bookingId: bookingId.toString(),
-            bayId: booking.resource_id?.toString(),
-            overageMinutes: booking.overage_minutes?.toString(),
-          }
-        });
-        
-        await db.execute(sql`UPDATE booking_requests SET overage_paid = ${paymentResult.success} WHERE id = ${bookingId}`);
-        logger.info('[Simulate Confirm] Charged overage fee via invoice (uses customer balance)', {
-          bookingId,
-          invoiceId: paymentResult.invoiceId,
-          amount: booking.overage_fee_cents,
-          amountFromBalance: paymentResult.amountFromBalance,
-          amountCharged: paymentResult.amountCharged,
-          success: paymentResult.success
-        });
-      } catch (paymentError: unknown) {
-        logger.error('[Simulate Confirm] Failed to charge overage fee', { error: paymentError instanceof Error ? paymentError : new Error(String(paymentError)) });
-      }
-    }
-
     try {
       const dateStr = typeof booking.request_date === 'string' ? booking.request_date : formatDatePacific(booking.request_date as any);
       const timeStr = typeof booking.start_time === 'string' 
@@ -1163,14 +1132,12 @@ router.post('/api/admin/bookings/:id/simulate-confirm', isStaffOrAdmin, async (r
       }
     });
 
-    // Use the calculated total fee (includes guest fees) or fall back to overage
-    const totalFeeCents = (booking as DbRow).calculatedTotalFeeCents as number || booking.overage_fee_cents || 0;
+    const totalFeeCents = (booking as DbRow).calculatedTotalFeeCents as number || 0;
     
     res.json({ 
       success: true, 
       message: 'Booking confirmed (simulated)',
       trackmanId: fakeTrackmanId,
-      overageFeeCents: booking.overage_fee_cents,
       totalFeeCents
     });
   } catch (error: unknown) {
