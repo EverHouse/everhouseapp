@@ -1737,7 +1737,8 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
           continue;
         }
         
-        const isFinalized = ['attended', 'no_show', 'cancelled', 'cancellation_pending'].includes(existing.status || '');
+        const isCancelledInApp = existing.status === 'cancelled' || existing.status === 'cancellation_pending';
+        const isFinalized = ['attended', 'no_show'].includes(existing.status || '');
         let hasCompletedPayments = false;
         if (existing.sessionId) {
           try {
@@ -1748,7 +1749,7 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
               ) AS has_snapshot,
               EXISTS(
                 SELECT 1 FROM booking_participants 
-                WHERE session_id = $1 AND payment_status IN ('paid', 'refunded')
+                WHERE session_id = $1 AND payment_status = 'paid'
               ) AS has_paid_participants`,
               [existing.sessionId]
             );
@@ -1765,6 +1766,16 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
         // Build update object with changed fields
         const updateFields: Record<string, unknown> = {};
         let changes: string[] = [];
+        
+        if (isCancelledInApp && row.status.toLowerCase() !== 'cancelled' && row.status.toLowerCase() !== 'canceled') {
+          if (hasCompletedPayments) {
+            process.stderr.write(`[Trackman Import] SKIPPED reactivation: Booking #${existing.id} (Trackman ID: ${row.bookingId}) was cancelled but has completed payments — not safe to reactivate\n`);
+          } else {
+            updateFields.status = 'approved';
+            changes.push(`reactivated: ${existing.status} -> approved (still exists in Trackman)`);
+            process.stderr.write(`[Trackman Import] REACTIVATED: Booking #${existing.id} (Trackman ID: ${row.bookingId}) was cancelled in app but still active in Trackman CSV\n`);
+          }
+        }
         
         // Check if bay/resource changed
         if (parsedBayId && existing.resourceId !== parsedBayId) {
@@ -3405,7 +3416,8 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
         )
         AND NOT EXISTS (
           SELECT 1 FROM stripe_payment_intents spi 
-          WHERE spi.booking_id = bp.booking_id AND spi.status = 'succeeded'
+          JOIN booking_sessions bs2 ON bs2.booking_request_id = spi.booking_id
+          WHERE bs2.id = bp.session_id AND spi.status = 'succeeded'
         )
     `);
     const ghostWaivedResult = await pool.query(`
