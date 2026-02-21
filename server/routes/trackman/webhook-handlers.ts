@@ -6,6 +6,10 @@ import { linkAndNotifyParticipants } from '../../core/bookingEvents';
 import { formatDatePacific, formatTimePacific } from '../../utils/dateUtils';
 import { checkUnifiedAvailability } from '../../core/bookingService/availabilityGuard';
 import { cancelPaymentIntent, getStripeClient } from '../../core/stripe';
+import { BookingStateService } from '../../core/bookingService';
+import { bookingRequests } from '../../../shared/schema';
+import { eq, and } from 'drizzle-orm';
+import { db } from '../../db';
 import {
   TrackmanWebhookPayload,
   TrackmanV2WebhookPayload,
@@ -30,9 +34,8 @@ import { getErrorMessage } from '../../utils/errorUtils';
 
 import { createSessionWithUsageTracking, ensureSessionForBooking } from '../../core/bookingService/sessionManager';
 import { recalculateSessionFees } from '../../core/billing/unifiedFeeService';
-import { logSystemAction } from '../../core/auditLog';
 import { createPrepaymentIntent } from '../../core/billing/prepaymentService';
-import { createDraftInvoiceForBooking, voidBookingInvoice } from '../../core/billing/bookingInvoiceService';
+import { createDraftInvoiceForBooking } from '../../core/billing/bookingInvoiceService';
 
 export async function tryAutoApproveBooking(
   customerEmail: string,
@@ -188,391 +191,59 @@ export async function cancelBookingByTrackmanId(
   trackmanBookingId: string
 ): Promise<{ cancelled: boolean; bookingId?: number; refundedPasses?: number; wasPendingCancellation?: boolean }> {
   try {
-    const result = await pool.query(
-      `SELECT br.id, br.user_email, br.user_name, br.status, br.session_id, 
-              br.request_date, br.start_time, br.resource_id,
-              br.is_relocating,
-              r.name as resource_name
-       FROM booking_requests br
-       LEFT JOIN resources r ON br.resource_id = r.id
-       WHERE br.trackman_booking_id = $1`,
-      [trackmanBookingId]
-    );
-    
-    if (result.rows.length === 0) {
-      return { cancelled: false };
-    }
-    
-    const booking = result.rows[0];
-    const bookingId = booking.id;
+    const [booking] = await db.select({
+      id: bookingRequests.id,
+      userEmail: bookingRequests.userEmail,
+      userName: bookingRequests.userName,
+      status: bookingRequests.status,
+      sessionId: bookingRequests.sessionId,
+      requestDate: bookingRequests.requestDate,
+      startTime: bookingRequests.startTime,
+      resourceId: bookingRequests.resourceId,
+      isRelocating: bookingRequests.isRelocating,
+      trackmanBookingId: bookingRequests.trackmanBookingId
+    }).from(bookingRequests).where(eq(bookingRequests.trackmanBookingId, trackmanBookingId));
 
-    if (booking.is_relocating) {
+    if (!booking) return { cancelled: false };
+    if (booking.status === 'cancelled') return { cancelled: true, bookingId: booking.id };
+
+    if (booking.isRelocating) {
       logger.info('[Trackman Webhook] Skipping cancellation for relocating booking', {
-        extra: { bookingId, trackmanBookingId, isRelocating: true }
+        extra: { bookingId: booking.id, trackmanBookingId, isRelocating: true }
       });
-      await pool.query(
-        `UPDATE booking_requests SET trackman_booking_id = NULL WHERE id = $1 AND trackman_booking_id = $2`,
-        [bookingId, trackmanBookingId]
-      );
+      await db.update(bookingRequests).set({ trackmanBookingId: null }).where(and(eq(bookingRequests.id, booking.id), eq(bookingRequests.trackmanBookingId, trackmanBookingId)));
       return { cancelled: false };
     }
-    const memberEmail = booking.user_email;
-    const memberName = booking.user_name || memberEmail || 'Unknown';
-    const bookingDate = booking.request_date;
-    const startTime = booking.start_time;
-    const bayName = booking.resource_name;
-    
-    if (booking.status === 'cancelled') {
-      return { cancelled: true, bookingId };
-    }
-    
+
     const wasPendingCancellation = booking.status === 'cancellation_pending';
-    
-    await pool.query(
-      `UPDATE booking_requests 
-       SET status = 'cancelled', 
-           staff_notes = COALESCE(staff_notes, '') || ' [Cancelled via Trackman webhook]',
-           updated_at = NOW()
-       WHERE id = $1`,
-      [bookingId]
-    );
-    
-    // Clear any pending fees for this booking's session
-    if (booking.session_id) {
-      const feeClient = await pool.connect();
-      try {
-        await feeClient.query('BEGIN');
-        await feeClient.query(
-          `SELECT id FROM booking_requests WHERE id = $1 FOR UPDATE`,
-          [bookingId]
-        );
-        await feeClient.query(
-          `UPDATE booking_participants 
-           SET cached_fee_cents = 0, payment_status = 'waived'
-           WHERE session_id = $1 
-           AND payment_status = 'pending'`,
-          [booking.session_id]
-        );
-        await feeClient.query(
-          `UPDATE booking_requests SET roster_version = COALESCE(roster_version, 0) + 1 WHERE id = $1`,
-          [bookingId]
-        );
-        await feeClient.query('COMMIT');
-        logger.info('[Trackman Webhook] Cleared pending fees for cancelled booking', {
-          extra: { bookingId, sessionId: booking.session_id }
-        });
-      } catch (feeErr: unknown) {
-        await feeClient.query('ROLLBACK').catch(() => {});
-        logger.warn('[Trackman Webhook] Failed to clear fees for cancelled booking', {
-          extra: { bookingId, sessionId: booking.session_id, error: (feeErr as Error).message }
-        });
-      } finally {
-        feeClient.release();
-      }
-    }
-    
-    // Cancel pending payment intents for this booking
-    try {
-      const pendingIntents = await pool.query(
-        `SELECT stripe_payment_intent_id 
-         FROM stripe_payment_intents 
-         WHERE booking_id = $1 AND status IN ('pending', 'requires_payment_method', 'requires_action', 'requires_confirmation')`,
-        [bookingId]
-      );
-      for (const row of pendingIntents.rows) {
-        try {
-          await cancelPaymentIntent(row.stripe_payment_intent_id);
-          logger.info('[Trackman Webhook] Cancelled payment intent', {
-            extra: { bookingId, paymentIntentId: row.stripe_payment_intent_id }
-          });
-        } catch (cancelErr: unknown) {
-          logger.warn('[Trackman Webhook] Failed to cancel payment intent', {
-            extra: { paymentIntentId: row.stripe_payment_intent_id, error: getErrorMessage(cancelErr) }
-          });
-        }
-      }
-    } catch (cancelIntentsErr: unknown) {
-      logger.warn('[Trackman Webhook] Failed to cancel pending payment intents', { error: cancelIntentsErr as Error });
-    }
-    
-    // Void any draft/open invoice for this booking (non-blocking)
-    voidBookingInvoice(bookingId).catch((err: unknown) => {
-      logger.warn('[Trackman Webhook] Non-blocking: Failed to void booking invoice', {
-        extra: { bookingId, error: (err as Error).message }
+
+    let result;
+    if (wasPendingCancellation) {
+      result = await BookingStateService.completePendingCancellation({
+        bookingId: booking.id,
+        staffEmail: 'trackman-webhook@system',
+        source: 'trackman_webhook'
       });
-    });
-    
-    // Refund already-paid participant fees
-    if (booking.session_id) {
-      try {
-        const paidParticipants = await pool.query(
-          `SELECT id, stripe_payment_intent_id, cached_fee_cents, display_name
-           FROM booking_participants 
-           WHERE session_id = $1 
-           AND payment_status = 'paid' 
-           AND stripe_payment_intent_id IS NOT NULL 
-           AND stripe_payment_intent_id != ''
-           AND stripe_payment_intent_id NOT LIKE 'balance-%'
-           AND refunded_at IS NULL`,
-          [booking.session_id]
-        );
-        
-        if (paidParticipants.rows.length > 0) {
-          const stripe = await getStripeClient();
-          for (const participant of paidParticipants.rows) {
-            try {
-              const pi = await stripe.paymentIntents.retrieve(participant.stripe_payment_intent_id, {
-                expand: ['latest_charge.refunds']
-              });
-              
-              // Check if already refunded in Stripe to prevent double-refund
-              const charge = pi.latest_charge as unknown as Record<string, unknown>;
-              const refunds = charge?.refunds as Record<string, unknown> | undefined;
-              const refundData = refunds?.data as unknown[] | undefined;
-              const alreadyRefunded = (refundData?.length ?? 0) > 0;
-              
-              if (alreadyRefunded) {
-                logger.info('[Trackman Webhook] Payment already refunded in Stripe, marking participant', {
-                  extra: { participantId: participant.id, paymentIntentId: participant.stripe_payment_intent_id }
-                });
-                // Update participant with roster lock
-                const alreadyRefundedClient = await pool.connect();
-                try {
-                  await alreadyRefundedClient.query('BEGIN');
-                  await alreadyRefundedClient.query(
-                    `SELECT id FROM booking_requests WHERE id = $1 FOR UPDATE`,
-                    [bookingId]
-                  );
-                  await alreadyRefundedClient.query(
-                    `UPDATE booking_participants 
-                     SET refunded_at = NOW(), payment_status = 'waived'
-                     WHERE id = $1`,
-                    [participant.id]
-                  );
-                  await alreadyRefundedClient.query(
-                    `UPDATE booking_requests SET roster_version = COALESCE(roster_version, 0) + 1 WHERE id = $1`,
-                    [bookingId]
-                  );
-                  await alreadyRefundedClient.query('COMMIT');
-                } catch (lockErr: unknown) {
-                  await alreadyRefundedClient.query('ROLLBACK').catch(() => {});
-                  throw lockErr;
-                } finally {
-                  alreadyRefundedClient.release();
-                }
-                // Update stripe_payment_intents for consistency
-                await pool.query(
-                  `UPDATE stripe_payment_intents 
-                   SET status = 'refunded', updated_at = NOW()
-                   WHERE stripe_payment_intent_id = $1 AND status != 'refunded'`,
-                  [participant.stripe_payment_intent_id]
-                );
-                // Update booking_fee_snapshots for consistency
-                await pool.query(
-                  `UPDATE booking_fee_snapshots 
-                   SET status = 'refunded'
-                   WHERE stripe_payment_intent_id = $1 AND status != 'refunded'`,
-                  [participant.stripe_payment_intent_id]
-                );
-                continue;
-              }
-              
-              if (pi.status === 'succeeded' && pi.latest_charge) {
-                const refund = await stripe.refunds.create({
-                  charge: typeof pi.latest_charge === 'string' ? pi.latest_charge : pi.latest_charge.id,
-                  reason: 'requested_by_customer',
-                  metadata: {
-                    type: 'booking_cancelled_via_trackman',
-                    bookingId: bookingId.toString(),
-                    participantId: participant.id.toString()
-                  }
-                }, {
-                  idempotencyKey: `refund_trackman_cancel_${booking.id}_${pi.id}`
-                });
-                
-                // Mark participant as refunded with roster lock
-                const refundClient = await pool.connect();
-                try {
-                  await refundClient.query('BEGIN');
-                  await refundClient.query(
-                    `SELECT id FROM booking_requests WHERE id = $1 FOR UPDATE`,
-                    [bookingId]
-                  );
-                  await refundClient.query(
-                    `UPDATE booking_participants 
-                     SET refunded_at = NOW(), payment_status = 'waived'
-                     WHERE id = $1`,
-                    [participant.id]
-                  );
-                  await refundClient.query(
-                    `UPDATE booking_requests SET roster_version = COALESCE(roster_version, 0) + 1 WHERE id = $1`,
-                    [bookingId]
-                  );
-                  await refundClient.query('COMMIT');
-                } catch (lockErr: unknown) {
-                  await refundClient.query('ROLLBACK').catch(() => {});
-                  throw lockErr;
-                } finally {
-                  refundClient.release();
-                }
-                
-                // Update stripe_payment_intents status for consistency
-                await pool.query(
-                  `UPDATE stripe_payment_intents 
-                   SET status = 'refunded', updated_at = NOW()
-                   WHERE stripe_payment_intent_id = $1`,
-                  [participant.stripe_payment_intent_id]
-                );
-                
-                // Update booking_fee_snapshots status if exists
-                await pool.query(
-                  `UPDATE booking_fee_snapshots 
-                   SET status = 'refunded'
-                   WHERE stripe_payment_intent_id = $1`,
-                  [participant.stripe_payment_intent_id]
-                );
-                
-                logger.info('[Trackman Webhook] Refunded participant fee', {
-                  extra: { 
-                    bookingId, 
-                    participantId: participant.id,
-                    displayName: participant.display_name,
-                    amount: participant.cached_fee_cents / 100,
-                    refundId: refund.id
-                  }
-                });
-              }
-            } catch (refundErr: unknown) {
-              logger.error('[Trackman Webhook] Failed to refund participant', {
-                error: refundErr as Error,
-                extra: { participantId: participant.id, paymentIntentId: participant.stripe_payment_intent_id }
-              });
-            }
-          }
-        }
-      } catch (refundParticipantsErr: unknown) {
-        logger.error('[Trackman Webhook] Failed to process participant refunds', { error: refundParticipantsErr as Error });
-      }
-    }
-    
-    const refundedPasses = await refundGuestPassesForCancelledBooking(bookingId, memberEmail);
-    
-    // Send real-time notifications to staff
-    try {
-      const formattedDate = bookingDate ? formatDatePacific(new Date(bookingDate)) : 'Unknown date';
-      const formattedTime = startTime ? formatTimePacific(startTime) : 'Unknown time';
-      const bayInfo = bayName ? ` (${bayName})` : '';
-      const refundInfo = refundedPasses && refundedPasses > 0 
-        ? `. Refunded: ${refundedPasses} guest pass${refundedPasses > 1 ? 'es' : ''}`
-        : '';
-      
-      const notificationTitle = wasPendingCancellation ? 'Cancellation Completed via TrackMan' : 'Booking Cancelled via TrackMan';
-      const notificationMessage = wasPendingCancellation
-        ? `Cancellation completed via TrackMan: ${memberName}'s booking on ${formattedDate} at ${formattedTime}${bayInfo}${refundInfo}`
-        : `Booking cancelled via TrackMan: ${memberName}'s booking on ${formattedDate} at ${formattedTime}${bayInfo}${refundInfo}`;
-      
-      await notifyAllStaff(
-        notificationTitle,
-        notificationMessage,
-        'booking_cancelled',
-        {
-          relatedId: bookingId,
-          relatedType: 'booking_request',
-          url: '/admin/bookings'
-        }
-      );
-      
-      logger.info('[Trackman Webhook] Sent staff notifications for cancelled booking', {
-        extra: { bookingId, memberEmail, refundedPasses }
-      });
-    } catch (notifyErr: unknown) {
-      logger.warn('[Trackman Webhook] Failed to send staff notifications for cancelled booking', {
-        extra: { bookingId, error: (notifyErr as Error).message }
+    } else {
+      result = await BookingStateService.cancelBooking({
+        bookingId: booking.id,
+        source: 'trackman_webhook',
+        staffNotes: '[Cancelled via Trackman webhook]'
       });
     }
-    
-    // Log audit entry for the cancellation
-    try {
-      await logSystemAction({
-        action: 'booking_cancelled_webhook',
-        resourceType: 'booking',
-        resourceId: String(bookingId),
-        resourceName: `Booking for ${memberEmail}`,
-        details: {
-          source: 'trackman_webhook',
-          trackman_booking_id: trackmanBookingId,
-          member_email: memberEmail,
-          refund_amount_cents: 0,
-          refund_type: refundedPasses ? 'guest_pass' : 'none',
-          refunded_passes: refundedPasses || 0,
-          booking_date: bookingDate,
-          booking_time: startTime,
-          bay_name: bayName
-        }
+
+    if (!result.success) {
+      logger.error('[Trackman Webhook] Failed to cancel booking', {
+        extra: { bookingId: booking.id, error: result.error }
       });
-    } catch (auditErr: unknown) {
-      logger.warn('[Trackman Webhook] Failed to log audit entry for cancelled booking', {
-        extra: { bookingId, error: (auditErr as Error).message }
-      });
+      return { cancelled: false, bookingId: booking.id };
     }
-    
-    // Notify the member that their booking was cancelled via Trackman
-    if (memberEmail) {
-      try {
-        const memberFormattedDate = bookingDate ? formatDatePacific(new Date(bookingDate)) : 'Unknown date';
-        const memberFormattedTime = startTime ? formatTimePacific(startTime) : 'Unknown time';
-        const cancelMessage = wasPendingCancellation
-          ? `Your booking on ${memberFormattedDate} at ${memberFormattedTime} has been cancelled and any charges have been refunded.`
-          : `Your booking on ${memberFormattedDate} at ${memberFormattedTime} has been cancelled. Any applicable charges have been refunded.`;
-        
-        await notifyMember(
-          {
-            userEmail: memberEmail,
-            title: 'Booking Cancelled',
-            message: cancelMessage,
-            type: 'booking_cancelled',
-            relatedId: bookingId,
-            relatedType: 'booking_request',
-            url: '/member/bookings'
-          },
-          {
-            sendPush: true,
-            sendWebSocket: true,
-            sendEmail: false
-          }
-        );
-        
-        logger.info('[Trackman Webhook] Sent cancellation notification to member', {
-          extra: { bookingId, memberEmail, wasPendingCancellation }
-        });
-      } catch (memberNotifyErr: unknown) {
-        logger.warn('[Trackman Webhook] Failed to send member cancellation notification', {
-          extra: { bookingId, memberEmail, error: (memberNotifyErr as Error).message }
-        });
-      }
-    }
-    
-    // Broadcast availability update now that the slot is freed
-    try {
-      broadcastAvailabilityUpdate({
-        resourceId: booking.resource_id || undefined,
-        resourceType: 'simulator',
-        date: bookingDate,
-        action: 'cancelled'
-      });
-    } catch (broadcastErr: unknown) {
-      logger.warn('[Trackman Webhook] Failed to broadcast availability update', {
-        extra: { bookingId, error: (broadcastErr as Error).message }
-      });
-    }
-    
-    logger.info('[Trackman Webhook] Cancelled booking via Trackman ID', {
-      extra: { bookingId, trackmanBookingId, refundedPasses, wasPendingCancellation }
-    });
-    
-    return { cancelled: true, bookingId, refundedPasses, wasPendingCancellation };
+
+    return { cancelled: true, bookingId: booking.id, wasPendingCancellation };
   } catch (e: unknown) {
-    logger.error('[Trackman Webhook] Failed to cancel booking', { error: e as Error });
+    logger.error('[Trackman Webhook] Error in cancelBookingByTrackmanId', {
+      error: e as Error, extra: { trackmanBookingId }
+    });
     return { cancelled: false };
   }
 }

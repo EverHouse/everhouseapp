@@ -66,6 +66,13 @@ We use a **Liquid Glass UI** system.
 - **Member Lifecycle & Check-In**: Tiers, QR/NFC check-in, onboarding.
 
 ## Recent Changes
+- **Feb 21, 2026**: v8.3.0 — Cancellation Logic Centralization & Transaction Resilience:
+  1. Created unified BookingStateService consolidating 3 fragmented cancellation paths (staff cancel, member cancel, Trackman webhook cancel) into a single service with consistent behavior.
+  2. Moved all Stripe API calls (refunds, payment intent cancellations) outside database transactions using SideEffectsManifest pattern — DB locks no longer held while waiting for external APIs.
+  3. Replaced ~400 lines of cancelBookingByTrackmanId (raw pool.query, manual transactions) with ~60 lines delegating to BookingStateService via Drizzle ORM.
+  4. Fixed 4 silent `.catch(() => {})` error-swallowing patterns in financial code paths (bookingInvoiceService, staffCheckin) — billing failures now properly logged.
+  5. Converted remaining pool.query in bookingInvoiceService to Drizzle ORM.
+  6. All cancellation sources (staff, member, trackman_webhook, system) now follow identical DB→SideEffects flow.
 - **Feb 21, 2026**: v8.2.0 — Drizzle ORM Migration & Database Integrity Hardening:
   1. Migrated 107+ pool.query calls across 4 critical files to Drizzle ORM (approvalService, subscriptions, member-payments, rosterService).
   2. Converted 8 manual pool.connect() transaction blocks to db.transaction() for automatic BEGIN/COMMIT/ROLLBACK.

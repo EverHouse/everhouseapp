@@ -8,15 +8,12 @@ import {
   validateTrackmanId,
   approveBooking,
   declineBooking,
-  cancelBooking,
-  handlePendingCancellation,
-  handleCancelPostTransaction,
   updateGenericStatus,
   checkinBooking,
   devConfirmBooking,
-  completeCancellation,
   formatBookingRow
 } from '../../core/bookingService/approvalService';
+import { BookingStateService } from '../../core/bookingService';
 
 const router = Router();
 
@@ -62,40 +59,29 @@ router.put('/api/booking-requests/:id', isStaffOrAdmin, async (req, res) => {
 
     if (status === 'cancelled') {
       const { cancelled_by } = req.body;
-
-      const { updated, bookingData, pushInfo, overageRefundResult, isConferenceRoom: isConfRoom, isPendingCancel, alreadyPending } = await cancelBooking({
+      const result = await BookingStateService.cancelBooking({
         bookingId,
-        staff_notes,
-        cancelled_by
+        source: cancelled_by && cancelled_by !== getSessionUser(req)?.email ? 'member' : 'staff',
+        cancelledBy: cancelled_by,
+        staffNotes: staff_notes,
+        staffEmail: getSessionUser(req)?.email
       });
-
-      if (isPendingCancel) {
-        if (alreadyPending) {
-          return res.json({ success: true, status: 'cancellation_pending' });
-        }
-
-        await handlePendingCancellation(bookingId, bookingData, pushInfo as any);
-
-        logFromRequest(req, 'cancellation_requested', 'booking', id.toString(), undefined, {
-          member_email: bookingData.userEmail,
-          trackman_booking_id: bookingData.trackmanBookingId,
-          initiated_by: 'staff'
-        });
-
+      if (!result.success) {
+        return res.status(result.statusCode || 500).json({ error: result.error });
+      }
+      const auditAction = result.status === 'cancellation_pending' ? 'cancellation_requested' : 'cancel_booking';
+      logFromRequest(req, auditAction, 'booking', id.toString(), undefined, {
+        member_email: result.bookingData.userEmail,
+        member_name: result.bookingData.userName,
+        booking_date: result.bookingData.requestDate,
+        start_time: result.bookingData.startTime,
+        status: result.status,
+        side_effect_errors: result.sideEffectErrors
+      });
+      if (result.status === 'cancellation_pending') {
         return res.json({ success: true, status: 'cancellation_pending' });
       }
-
-      await handleCancelPostTransaction(bookingId, bookingData, pushInfo as any, overageRefundResult, isConfRoom);
-
-      logFromRequest(req, 'cancel_booking', 'booking', id as string, undefined, {
-        member_email: bookingData.userEmail,
-        member_name: bookingData.userName,
-        booking_date: bookingData.requestDate,
-        start_time: bookingData.startTime,
-        refund_result: overageRefundResult
-      });
-
-      return res.json(formatBookingRow(updated as any));
+      return res.json({ success: true, status: 'cancelled', bookingId });
     }
 
     const result = await updateGenericStatus(bookingId, status, staff_notes);
@@ -198,24 +184,24 @@ router.put('/api/booking-requests/:id/complete-cancellation', isStaffOrAdmin, as
 
     const bookingId = parseInt(req.params.id as string, 10);
 
-    const result = await completeCancellation({ bookingId, staffEmail });
+    const result = await BookingStateService.completePendingCancellation({ bookingId, staffEmail, source: 'staff_manual' });
 
-    if (result.error && result.statusCode) {
-      return res.status(result.statusCode).json({ error: result.error });
+    if (!result.success) {
+      return res.status(result.statusCode || 500).json({ error: result.error });
     }
 
     logFromRequest(req, 'complete_cancellation', 'booking', req.params.id as string, staffEmail, {
-      member_email: result.existing?.userEmail,
-      trackman_booking_id: result.existing?.trackmanBookingId,
+      member_email: result.bookingData.userEmail,
+      trackman_booking_id: result.bookingData.trackmanBookingId,
       completed_manually: true,
-      cleanup_errors: result.cleanup_errors
+      cleanup_errors: result.sideEffectErrors
     });
 
     return res.json({
       success: result.success,
       status: result.status,
-      message: result.message,
-      cleanup_errors: result.cleanup_errors
+      message: 'Cancellation completed successfully',
+      cleanup_errors: result.sideEffectErrors
     });
   } catch (err: unknown) {
     logger.error('[Complete Cancellation] Error', { extra: { err } });

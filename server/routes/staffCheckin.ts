@@ -544,7 +544,9 @@ router.patch('/api/bookings/:id/payments', isStaffOrAdmin, async (req: Request, 
           try { broadcastMemberStatsUpdated(booking.owner_email, { guestPasses: consumeResult.passesRemaining }); } catch (err: unknown) {logger.error('[Broadcast] Stats update error:', err); }
         }
         
-        settleBookingInvoiceAfterCheckin(bookingId, sessionId).catch(() => {});
+        settleBookingInvoiceAfterCheckin(bookingId, sessionId).catch((err: unknown) => {
+          logger.error('[StaffCheckin] Failed to settle booking invoice after check-in', { extra: { bookingId, sessionId, error: getErrorMessage(err) } });
+        });
 
         return res.json({ 
           success: true, 

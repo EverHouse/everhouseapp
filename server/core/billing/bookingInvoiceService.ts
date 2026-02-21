@@ -1,8 +1,11 @@
 import { getStripeClient } from '../stripe/client';
 import { pool } from '../db';
+import { db } from '../../db';
 import { logger } from '../logger';
 import { getErrorMessage } from '../../utils/errorUtils';
 import { notifyAllStaff } from '../notificationService';
+import { bookingRequests } from '../../../shared/schema';
+import { eq } from 'drizzle-orm';
 import type Stripe from 'stripe';
 import type { BookingFeeLineItem } from '../stripe/invoices';
 
@@ -530,7 +533,7 @@ export async function voidBookingInvoice(bookingId: number): Promise<{
             `Failed to automatically refund paid invoice ${invoiceId} for booking #${bookingId}. Please refund manually in Stripe.`,
             'warning',
             { relatedId: bookingId, relatedType: 'booking' }
-          ).catch(() => {});
+          ).catch((err: unknown) => { logger.warn('[BookingInvoice] Failed to notify staff about refund failure', { extra: { bookingId, error: getErrorMessage(err) } }); });
           return { success: false, error: 'Failed to refund paid invoice' };
         }
       } else {
@@ -542,15 +545,12 @@ export async function voidBookingInvoice(bookingId: number): Promise<{
           `Cancelled booking #${bookingId} has a paid invoice (${invoiceId}) with no payment intent attached. Please refund manually in Stripe.`,
           'warning',
           { relatedId: bookingId, relatedType: 'booking' }
-        ).catch(() => {});
+        ).catch((err: unknown) => { logger.warn('[BookingInvoice] Failed to notify staff about manual refund', { extra: { bookingId, error: getErrorMessage(err) } }); });
         return { success: false, error: 'Invoice has no payment intent for refund' };
       }
     }
 
-    await pool.query(
-      `UPDATE booking_requests SET stripe_invoice_id = NULL, updated_at = NOW() WHERE id = $1`,
-      [bookingId]
-    );
+    await db.update(bookingRequests).set({ stripeInvoiceId: null, updatedAt: new Date() }).where(eq(bookingRequests.id, bookingId));
 
     return { success: true };
   } catch (error: unknown) {
@@ -723,7 +723,7 @@ export async function syncBookingInvoice(bookingId: number, sessionId: number): 
           `Booking #${bookingId} roster was modified after invoice ${stripeInvoiceId} was already paid. Staff review needed.`,
           'warning',
           { relatedId: bookingId, relatedType: 'booking' }
-        ).catch(() => {});
+        ).catch((err: unknown) => { logger.warn('[BookingInvoice] Failed to notify staff about roster change after payment', { extra: { bookingId, error: getErrorMessage(err) } }); });
       } else if (invoice.status === 'void' || invoice.status === 'uncollectible') {
         logger.info('[BookingInvoice] syncBookingInvoice skipped: invoice is void/uncollectible', {
           extra: { bookingId, invoiceId: stripeInvoiceId }
