@@ -24,6 +24,13 @@ interface UserRsvp {
 
 type OptimisticAction = 'rsvp' | 'cancel';
 
+const parseEventTime = (timeStr: string): { time: string; period: string } => {
+  const t = (timeStr || '').trim();
+  const m = t.match(/^(\d{1,2}(?::\d{2})?)\s*(AM|PM)$/i);
+  if (m) return { time: m[1], period: m[2].toUpperCase() };
+  return { time: t, period: '' };
+};
+
 const MemberEvents: React.FC = () => {
   const { events, isLoading, user, actualUser, isViewingAs, viewAsUser } = useData();
   const { effectiveTheme } = useTheme();
@@ -298,54 +305,55 @@ const MemberEvents: React.FC = () => {
                   <MotionListItem 
                     key={event.id}
                     index={index}
-                    className={`rounded-2xl overflow-hidden transition-all duration-fast glass-card ${isDark ? 'border-white/25' : 'border-black/10'}`}
+                    className={`rounded-xl overflow-hidden transition-all duration-fast glass-card ${isDark ? 'border-white/25' : 'border-black/10'}`}
                   >
                     <button 
                       onClick={() => handleCardClick(event.id)}
                       aria-expanded={isExpanded}
                       aria-label={`${event.title} on ${event.date} at ${event.time}. ${isExpanded ? 'Collapse' : 'Expand'} for details`}
-                      className={`w-full flex gap-4 p-4 cursor-pointer transition-colors transition-transform text-left active:scale-[0.98] ${isDark ? 'hover:bg-white/5' : 'hover:bg-black/5'}`}
+                      className={`w-full p-4 cursor-pointer transition-all duration-fast text-left ${isExpanded ? '' : 'active:scale-[0.98]'}`}
                     >
-                      <div className={`w-20 h-20 md:w-24 md:h-24 flex-shrink-0 rounded-xl overflow-hidden relative flex items-center justify-center ${isDark ? 'bg-lavender/20' : 'bg-primary/10'}`}>
-                        <span className={`material-symbols-outlined text-3xl md:text-4xl ${isDark ? 'text-lavender' : 'text-primary'}`}>
-                          {event.category === 'Golf' ? 'golf_course' : 
-                           event.category === 'Wellness' ? 'spa' : 
-                           event.category === 'Social' ? 'groups' : 'event'}
-                        </span>
-                        {event.source === 'eventbrite' && (
-                          <div className="absolute bottom-0 left-0 right-0 bg-[#F05537] text-white text-[8px] font-bold uppercase text-center py-0.5">
-                            Eventbrite
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex justify-between items-start mb-1">
-                          <h4 className={`text-base md:text-lg font-bold leading-tight truncate pr-2 ${isDark ? 'text-white' : 'text-primary'}`}>{event.title}</h4>
-                          {isPendingRsvp ? (
-                            <span className="text-[10px] font-bold uppercase tracking-wider bg-accent/60 text-brand-green px-1.5 py-0.5 rounded-md whitespace-nowrap animate-pulse flex items-center gap-1">
-                              <span className="w-1.5 h-1.5 bg-brand-green rounded-full animate-ping"></span>
-                              RSVP'ing
-                            </span>
-                          ) : isPendingCancel ? (
-                            <span className="text-[10px] font-bold uppercase tracking-wider bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded-md whitespace-nowrap animate-pulse flex items-center gap-1">
-                              <span className="w-1.5 h-1.5 bg-red-400 rounded-full animate-ping"></span>
-                              Cancelling
-                            </span>
-                          ) : isRsvpd ? (
-                            <span className="text-[10px] font-bold uppercase tracking-wider bg-accent text-brand-green px-1.5 py-0.5 rounded-md whitespace-nowrap transition-all duration-fast">Going</span>
-                          ) : event.source === 'eventbrite' ? (
-                            <span className="text-[10px] font-bold uppercase tracking-wider bg-[#F05537]/20 text-[#F05537] px-1.5 py-0.5 rounded-md whitespace-nowrap">Ticketed</span>
-                          ) : (
-                            <span className="text-[10px] font-bold uppercase tracking-wider bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded-md whitespace-nowrap">Open</span>
-                          )}
+                      <div className="flex gap-4 items-start">
+                        <div className={`w-14 h-14 flex-shrink-0 rounded-xl flex items-center justify-center ${isDark ? 'bg-lavender/20' : 'bg-primary/10'}`}>
+                          <span className={`material-symbols-outlined text-2xl ${isDark ? 'text-lavender' : 'text-primary'}`}>
+                            {event.category === 'Golf' ? 'golf_course' : 
+                             event.category === 'Wellness' ? 'spa' : 
+                             event.category === 'Social' ? 'groups' : 
+                             event.category === 'Tournaments' ? 'emoji_events' :
+                             event.category === 'Dining' ? 'restaurant' : 'event'}
+                          </span>
                         </div>
-                        <p className={`text-xs md:text-sm mb-1 ${isDark ? 'text-white/80' : 'text-primary/80'}`}>{event.date} • {event.time}</p>
-                        <p className={`text-xs md:text-sm truncate ${isDark ? 'text-white/70' : 'text-primary/70'}`}>{event.location}</p>
-                      </div>
-                      <div className="flex items-center" aria-hidden="true">
-                        <span className={`material-symbols-outlined transition-transform duration-normal ${isExpanded ? 'rotate-180' : ''} ${isDark ? 'text-white/70' : 'text-primary/70'}`}>
-                          expand_more
-                        </span>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide ${isDark ? 'bg-lavender/20 text-lavender' : 'bg-brand-green/20 text-brand-green'}`}>{event.category}</span>
+                            {event.source === 'eventbrite' && (
+                              <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide bg-[#F05537]/20 text-[#F05537]">Eventbrite</span>
+                            )}
+                            {isPendingRsvp ? (
+                              <span className="text-[10px] font-bold uppercase tracking-wider bg-accent/60 text-brand-green px-1.5 py-0.5 rounded-md whitespace-nowrap animate-pulse flex items-center gap-1">
+                                <span className="w-1.5 h-1.5 bg-brand-green rounded-full animate-ping"></span>
+                                RSVP'ing
+                              </span>
+                            ) : isPendingCancel ? (
+                              <span className="text-[10px] font-bold uppercase tracking-wider bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded-md whitespace-nowrap animate-pulse flex items-center gap-1">
+                                <span className="w-1.5 h-1.5 bg-red-400 rounded-full animate-ping"></span>
+                                Cancelling
+                              </span>
+                            ) : isRsvpd ? (
+                              <span className="text-[10px] font-bold uppercase tracking-wider bg-accent text-brand-green px-1.5 py-0.5 rounded-md whitespace-nowrap transition-all duration-fast">Going</span>
+                            ) : event.source === 'eventbrite' ? (
+                              <span className="text-[10px] font-bold uppercase tracking-wider bg-[#F05537]/20 text-[#F05537] px-1.5 py-0.5 rounded-md whitespace-nowrap">Ticketed</span>
+                            ) : (
+                              <span className="text-[10px] font-bold uppercase tracking-wider bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded-md whitespace-nowrap">Open</span>
+                            )}
+                          </div>
+                          <h3 className={`text-lg md:text-xl font-bold ${isDark ? 'text-white' : 'text-primary'}`}>{event.title}</h3>
+                        </div>
+                        <div className="flex flex-col items-end flex-shrink-0">
+                          <span className={`text-sm md:text-base font-bold ${isDark ? 'text-accent' : 'text-primary'}`}>{event.date}</span>
+                          <span className={`text-lg md:text-xl font-bold ${isDark ? 'text-white' : 'text-primary'}`}>{parseEventTime(event.time).time}</span>
+                          <span className={`text-xs md:text-sm font-medium ${isDark ? 'text-white/70' : 'text-primary/70'}`}>{parseEventTime(event.time).period}</span>
+                        </div>
                       </div>
                     </button>
 

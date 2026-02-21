@@ -623,7 +623,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       if (path.startsWith('/book')) return 'Book';
       if (path.startsWith('/member-wellness')) return 'Wellness';
       if (path.startsWith('/updates')) return 'Updates';
-      if (path.startsWith('/member-events')) return 'Calendar';
+      if (path.startsWith('/member-events')) return 'Events';
       if (path.startsWith('/history')) return 'History';
       return 'Dashboard';
   };
