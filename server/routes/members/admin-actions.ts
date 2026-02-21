@@ -657,8 +657,8 @@ router.delete('/api/members/:email/permanent', isAdmin, async (req, res) => {
     await db.execute(sql`DELETE FROM data_export_requests WHERE LOWER(user_email) = ${normalizedEmail}`);
     deletionLog.push('data_export_requests');
     
-    await db.execute(sql`DELETE FROM billing_audit_log WHERE LOWER(member_email) = ${normalizedEmail}`);
-    deletionLog.push('billing_audit_log');
+    await db.execute(sql`DELETE FROM admin_audit_log WHERE resource_type = 'billing' AND LOWER(resource_id) = ${normalizedEmail}`);
+    deletionLog.push('admin_audit_log (billing)');
     
     await db.execute(sql`DELETE FROM bug_reports WHERE LOWER(user_email) = ${normalizedEmail}`);
     deletionLog.push('bug_reports');

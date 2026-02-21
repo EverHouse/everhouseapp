@@ -2,7 +2,8 @@ import { db } from '../../db';
 import { getErrorMessage, getErrorCode } from '../../utils/errorUtils';
 import { isProduction } from '../db';
 import { getHubSpotClient } from '../integrations';
-import { hubspotDeals, billingAuditLog, hubspotLineItems } from '../../../shared/schema';
+import { hubspotDeals, hubspotLineItems } from '../../../shared/schema';
+import { logBillingAudit } from '../auditLog';
 import { eq, and } from 'drizzle-orm';
 import { retryableHubSpotRequest } from './request';
 import { validateMembershipPipeline, isValidStage } from './pipeline';
@@ -69,7 +70,7 @@ export async function updateDealStage(
       .where(eq(hubspotDeals.hubspotDealId, hubspotDealId));
     
     if (existingDeal[0]) {
-      await db.insert(billingAuditLog).values({
+      await logBillingAudit({
         memberEmail: existingDeal[0].memberEmail,
         hubspotDealId,
         actionType: 'stage_changed',
@@ -422,7 +423,7 @@ export async function syncDealStageFromMindbodyStatus(
     if (deal.hubspotContactId) {
       contactUpdated = await updateContactMembershipStatus(deal.hubspotContactId, targetContactStatus, performedBy);
       
-      await db.insert(billingAuditLog).values({
+      await logBillingAudit({
         memberEmail: deal.memberEmail,
         hubspotDealId: deal.hubspotDealId,
         actionType: 'contact_status_changed',

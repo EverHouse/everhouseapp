@@ -1,8 +1,7 @@
 import crypto from 'crypto';
 import Stripe from 'stripe';
 import { pool } from '../db';
-import { db } from '../../db';
-import { billingAuditLog } from '../../../shared/schema';
+import { logBillingAudit } from '../auditLog';
 import { getStripeClient } from './client';
 import { getOrCreateStripeCustomer } from './customers';
 import { PaymentStatusService } from '../billing/PaymentStatusService';
@@ -348,7 +347,7 @@ export async function confirmPaymentSuccess(
     if (localRecord.rows[0]) {
       const record = localRecord.rows[0];
       
-      await db.insert(billingAuditLog).values({
+      await logBillingAudit({
         memberEmail: paymentIntent.metadata.email || '',
         hubspotDealId: null,
         actionType: 'stripe_payment_succeeded',

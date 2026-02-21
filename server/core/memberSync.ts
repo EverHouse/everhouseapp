@@ -148,7 +148,7 @@ const SYNC_COOLDOWN = 5 * 60 * 1000;
 
 export async function initMemberSyncSettings(): Promise<void> {
   try {
-    const result = await db.execute(sql`SELECT value FROM app_settings WHERE key = 'last_member_sync_time'`);
+    const result = await db.execute(sql`SELECT value FROM system_settings WHERE key = 'last_member_sync_time'`);
     if (result.rows.length > 0 && result.rows[0].value) {
       lastSyncTime = parseInt(result.rows[0].value as string, 10);
       logger.info(`[MemberSync] Loaded last sync time: ${new Date(lastSyncTime).toISOString()}`);
@@ -165,7 +165,7 @@ export function getLastMemberSyncTime(): number {
 export async function setLastMemberSyncTime(time: number): Promise<void> {
   lastSyncTime = time;
   try {
-    await db.execute(sql`INSERT INTO app_settings (key, value, category, updated_at) 
+    await db.execute(sql`INSERT INTO system_settings (key, value, category, updated_at) 
        VALUES ('last_member_sync_time', ${time.toString()}, 'sync', NOW())
        ON CONFLICT (key) DO UPDATE SET value = ${time.toString()}, updated_at = NOW()`);
   } catch (err: unknown) {

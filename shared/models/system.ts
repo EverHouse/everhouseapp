@@ -4,7 +4,9 @@ import { index, uniqueIndex, jsonb, pgTable, timestamp, varchar, serial, boolean
 // System settings table - for storing app configuration like last reminder date
 export const systemSettings = pgTable("system_settings", {
   key: varchar("key").primaryKey(),
-  value: varchar("value"),
+  value: text("value"),
+  category: varchar("category", { length: 100 }).default('general'),
+  updatedBy: text("updated_by"),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
@@ -52,20 +54,8 @@ export type TrainingSection = typeof trainingSections.$inferSelect;
 export type InsertTrainingSection = typeof trainingSections.$inferInsert;
 export type IntegrityCheckHistory = typeof integrityCheckHistory.$inferSelect;
 export type InsertIntegrityCheckHistory = typeof integrityCheckHistory.$inferInsert;
-export const integrityAuditLog = pgTable("integrity_audit_log", {
-  id: serial("id").primaryKey(),
-  issueKey: text("issue_key").notNull(),
-  action: text("action").notNull(),
-  actionBy: text("action_by").notNull(),
-  actionAt: timestamp("action_at").defaultNow().notNull(),
-  resolutionMethod: text("resolution_method"),
-  notes: text("notes"),
-});
-
 export type IntegrityIssuesTracking = typeof integrityIssuesTracking.$inferSelect;
 export type InsertIntegrityIssuesTracking = typeof integrityIssuesTracking.$inferInsert;
-export type IntegrityAuditLog = typeof integrityAuditLog.$inferSelect;
-export type InsertIntegrityAuditLog = typeof integrityAuditLog.$inferInsert;
 
 export const integrityIgnores = pgTable("integrity_ignores", {
   id: serial("id").primaryKey(),
@@ -82,19 +72,6 @@ export const integrityIgnores = pgTable("integrity_ignores", {
 export type IntegrityIgnore = typeof integrityIgnores.$inferSelect;
 export type InsertIntegrityIgnore = typeof integrityIgnores.$inferInsert;
 
-export const appSettings = pgTable("app_settings", {
-  id: serial("id").primaryKey(),
-  key: varchar("key", { length: 255 }).notNull().unique(),
-  value: text("value"),
-  category: varchar("category", { length: 100 }).notNull().default('general'),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-  updatedBy: text("updated_by"),
-}, (table) => ({
-  keyIdx: uniqueIndex("app_settings_key_idx").on(table.key),
-}));
-
-export type AppSetting = typeof appSettings.$inferSelect;
-export type InsertAppSetting = typeof appSettings.$inferInsert;
 
 export const webhookProcessedEvents = pgTable("webhook_processed_events", {
   id: serial("id").primaryKey(),

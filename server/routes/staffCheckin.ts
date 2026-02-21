@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { db } from '../db';
 import { pool } from '../core/db';
-import { bookingRequests, bookingParticipants, bookingSessions, usageLedger, bookingPaymentAudit, users } from '../../shared/schema';
+import { bookingRequests, bookingParticipants, bookingSessions, usageLedger, users } from '../../shared/schema';
 import { eq, and, sql } from 'drizzle-orm';
 import { isStaffOrAdmin } from '../core/middleware';
 import { logAndRespond, logger } from '../core/logger';
@@ -12,7 +12,7 @@ import { computeFeeBreakdown, applyFeeBreakdownToParticipants, recalculateSessio
 import { consumeGuestPassForParticipant, canUseGuestPass } from '../core/billing/guestPassConsumer';
 import { createPrepaymentIntent } from '../core/billing/prepaymentService';
 import { cancelPaymentIntent } from '../core/stripe';
-import { logFromRequest } from '../core/auditLog';
+import { logFromRequest, logPaymentAudit } from '../core/auditLog';
 import { PRICING } from '../core/billing/pricingConfig';
 import { enforceSocialTierRules, type ParticipantForValidation } from '../core/bookingService/tierRules';
 import { broadcastMemberStatsUpdated } from '../core/websocket';
@@ -377,9 +377,10 @@ router.get('/api/bookings/:id/staff-checkin-context', isStaffOrAdmin, async (req
     }
 
     const auditResult = await db.execute(sql`
-      SELECT action, staff_email, staff_name, reason, created_at
-      FROM booking_payment_audit
-      WHERE booking_id = ${bookingId}
+      SELECT action, staff_email, staff_name, 
+             details->>'reason' as reason, created_at
+      FROM admin_audit_log
+      WHERE resource_type = 'payment' AND resource_id = ${bookingId.toString()}
       ORDER BY created_at DESC
       LIMIT 20
     `);
@@ -519,11 +520,17 @@ router.patch('/api/bookings/:id/payments', isStaffOrAdmin, async (req: Request, 
           });
         }
         
-        await db.execute(sql`
-          INSERT INTO booking_payment_audit 
-            (booking_id, session_id, participant_id, action, staff_email, staff_name, reason, previous_status, new_status)
-          VALUES (${bookingId}, ${sessionId}, ${participantId}, ${'guest_pass_used'}, ${staffEmail}, ${staffName}, ${`Guest pass consumed for ${guestName}. ${consumeResult.passesRemaining} passes remaining.`}, ${previousStatus}, ${'waived'})
-        `);
+        await logPaymentAudit({
+          bookingId,
+          sessionId,
+          participantId,
+          action: 'guest_pass_used',
+          staffEmail,
+          staffName,
+          reason: `Guest pass consumed for ${guestName}. ${consumeResult.passesRemaining} passes remaining.`,
+          previousStatus,
+          newStatus: 'waived',
+        });
 
         logFromRequest(req, 'update_payment_status', 'booking', bookingId.toString(), booking.resource_name || `Booking #${bookingId}`, {
           participantId,
@@ -551,11 +558,17 @@ router.patch('/api/bookings/:id/payments', isStaffOrAdmin, async (req: Request, 
 
       await db.execute(sql`UPDATE booking_participants SET payment_status = ${newStatus} WHERE id = ${participantId}`);
 
-      await db.execute(sql`
-        INSERT INTO booking_payment_audit 
-          (booking_id, session_id, participant_id, action, staff_email, staff_name, reason, previous_status, new_status)
-        VALUES (${bookingId}, ${sessionId}, ${participantId}, ${action === 'confirm' ? 'payment_confirmed' : 'payment_waived'}, ${staffEmail}, ${staffName}, ${reason || null}, ${previousStatus}, ${newStatus})
-      `);
+      await logPaymentAudit({
+        bookingId,
+        sessionId,
+        participantId,
+        action: action === 'confirm' ? 'payment_confirmed' : 'payment_waived',
+        staffEmail,
+        staffName,
+        reason: reason || null,
+        previousStatus,
+        newStatus,
+      });
 
       logFromRequest(req, 'update_payment_status', 'booking', bookingId.toString(), booking.resource_name || `Booking #${bookingId}`, {
         participantId,
@@ -667,11 +680,17 @@ router.patch('/api/bookings/:id/payments', isStaffOrAdmin, async (req: Request, 
         `);
       }
 
-      await db.execute(sql`
-        INSERT INTO booking_payment_audit
-          (booking_id, session_id, participant_id, action, staff_email, staff_name, reason, previous_status, new_status)
-        VALUES (${bookingId}, ${sessionId}, ${null}, ${'payment_cancelled'}, ${staffEmail}, ${staffName}, ${reason || `Cancelled ${cancelledCount} payment intent(s)`}, ${'pending'}, ${'waived'})
-      `);
+      await logPaymentAudit({
+        bookingId,
+        sessionId,
+        participantId: null,
+        action: 'payment_cancelled',
+        staffEmail,
+        staffName,
+        reason: reason || `Cancelled ${cancelledCount} payment intent(s)`,
+        previousStatus: 'pending',
+        newStatus: 'waived',
+      });
 
       logFromRequest(req, 'cancel_payment', 'booking', bookingId.toString(), booking.resource_name || `Booking #${bookingId}`, {
         cancelledCount,
@@ -755,12 +774,19 @@ router.patch('/api/bookings/:id/payments', isStaffOrAdmin, async (req: Request, 
         await db.execute(sql`UPDATE booking_participants SET payment_status = ${newStatus} WHERE id = ANY(${pendingIds}::int[])`);
 
         const auditAction = action === 'confirm_all' ? 'payment_confirmed' : 'payment_waived';
-        await db.execute(sql`
-          INSERT INTO booking_payment_audit 
-            (booking_id, session_id, participant_id, action, staff_email, staff_name, reason, previous_status, new_status)
-          SELECT ${bookingId}, ${sessionId}, pid, ${auditAction}, ${staffEmail}, ${staffName}, ${reason || null}, prev_status, ${newStatus}
-          FROM unnest(${pendingIds}::int[], ${previousStatuses}::text[]) AS t(pid, prev_status)
-        `);
+        for (let i = 0; i < pendingIds.length; i++) {
+          await logPaymentAudit({
+            bookingId,
+            sessionId,
+            participantId: pendingIds[i],
+            action: auditAction,
+            staffEmail,
+            staffName,
+            reason: reason || null,
+            previousStatus: previousStatuses[i],
+            newStatus,
+          });
+        }
       }
 
       if (action === 'confirm_all') {
@@ -1029,11 +1055,16 @@ router.post('/api/booking-participants/:id/mark-waiver-reviewed', isStaffOrAdmin
       WHERE id = $1
     `, [participantId]);
 
-    await client.query(`
-      INSERT INTO booking_payment_audit 
-        (booking_id, session_id, participant_id, action, staff_email, staff_name, reason, amount_affected)
-      VALUES ($1, $2, $3, 'payment_waived', $4, $5, 'Staff marked manual waiver as reviewed', 0)
-    `, [bookingId, sessionId, participantId, sessionUser.email, sessionUser.name || null]);
+    await logPaymentAudit({
+      bookingId,
+      sessionId,
+      participantId,
+      action: 'payment_waived',
+      staffEmail: sessionUser.email,
+      staffName: sessionUser.name || null,
+      reason: 'Staff marked manual waiver as reviewed',
+      amountAffected: 0,
+    });
 
     logFromRequest(req, 'review_waiver', 'waiver', participantId.toString(), display_name, {
       bookingId,
@@ -1090,11 +1121,16 @@ router.post('/api/bookings/:bookingId/mark-all-waivers-reviewed', isStaffOrAdmin
     `, [session_id]);
 
     for (const row of result.rows) {
-      await client.query(`
-        INSERT INTO booking_payment_audit 
-          (booking_id, session_id, participant_id, action, staff_email, staff_name, reason, amount_affected)
-        VALUES ($1, $2, $3, 'payment_waived', $4, $5, 'Staff marked manual waiver as reviewed', 0)
-      `, [bookingId, session_id, row.id, sessionUser.email, sessionUser.name || null]);
+      await logPaymentAudit({
+        bookingId,
+        sessionId: session_id,
+        participantId: row.id,
+        action: 'payment_waived',
+        staffEmail: sessionUser.email,
+        staffName: sessionUser.name || null,
+        reason: 'Staff marked manual waiver as reviewed',
+        amountAffected: 0,
+      });
     }
 
     logFromRequest(req, 'review_waiver', 'booking', bookingId.toString(), `Booking #${bookingId}`, {
@@ -1149,12 +1185,18 @@ router.post('/api/bookings/bulk-review-all-waivers', isStaffOrAdmin, async (req:
 
       const bookingIds = result.rows.map(r => sessionToBooking.get(r.session_id) || null);
 
-      await client.query(`
-        INSERT INTO booking_payment_audit 
-          (booking_id, session_id, participant_id, action, staff_email, staff_name, reason, amount_affected)
-        SELECT bid, sid, pid, 'payment_waived', $1, $2, 'Bulk reviewed by staff', 0
-        FROM unnest($3::int[], $4::int[], $5::int[]) AS t(bid, sid, pid)
-      `, [sessionUser.email, sessionUser.name || null, bookingIds, sessionIds, participantIds]);
+      for (let i = 0; i < participantIds.length; i++) {
+        await logPaymentAudit({
+          bookingId: bookingIds[i],
+          sessionId: sessionIds[i],
+          participantId: participantIds[i],
+          action: 'payment_waived',
+          staffEmail: sessionUser.email,
+          staffName: sessionUser.name || null,
+          reason: 'Bulk reviewed by staff',
+          amountAffected: 0,
+        });
+      }
     }
 
     const updatedCount = result.rows.length;
@@ -1325,11 +1367,15 @@ router.post('/api/bookings/:id/staff-direct-add', isStaffOrAdmin, async (req: Re
           VALUES (${sessionId}, ${matchedMember.id}, 'member', ${matchedMember.name}, 'pending', ${slotDuration})
         `);
 
-        await db.execute(sql`
-          INSERT INTO booking_payment_audit 
-            (booking_id, session_id, action, staff_email, staff_name, reason, metadata)
-          VALUES (${bookingId}, ${sessionId}, 'staff_direct_add', ${staffEmail}, ${staffName}, ${overrideReason || 'Staff direct add - matched to member'}, ${JSON.stringify({ participantType: 'member', guestEmail, matchedUserId: matchedMember.id, matchedName: matchedMember.name })})
-        `);
+        await logPaymentAudit({
+          bookingId,
+          sessionId,
+          action: 'staff_direct_add',
+          staffEmail,
+          staffName,
+          reason: overrideReason || 'Staff direct add - matched to member',
+          metadata: { participantType: 'member', guestEmail, matchedUserId: matchedMember.id, matchedName: matchedMember.name },
+        });
 
         try {
           await recalculateSessionFees(sessionId, 'staff_add_member');
@@ -1401,11 +1447,15 @@ router.post('/api/bookings/:id/staff-direct-add', isStaffOrAdmin, async (req: Re
         VALUES (${sessionId}, 'guest', ${guestName}, 'pending', ${PRICING.GUEST_FEE_CENTS}, false, ${slotDuration})
       `);
 
-      await db.execute(sql`
-        INSERT INTO booking_payment_audit 
-          (booking_id, session_id, action, staff_email, staff_name, reason, metadata)
-        VALUES (${bookingId}, ${sessionId}, 'staff_direct_add', ${staffEmail}, ${staffName}, ${overrideReason || 'Staff direct add'}, ${JSON.stringify({ participantType: 'guest', guestName, guestEmail: guestEmail || null })})
-      `);
+      await logPaymentAudit({
+        bookingId,
+        sessionId,
+        action: 'staff_direct_add',
+        staffEmail,
+        staffName,
+        reason: overrideReason || 'Staff direct add',
+        metadata: { participantType: 'guest', guestName, guestEmail: guestEmail || null },
+      });
 
       // Recalculate fees to update all participant fees
       try {
@@ -1523,17 +1573,21 @@ router.post('/api/bookings/:id/staff-direct-add', isStaffOrAdmin, async (req: Re
         VALUES (${sessionId}, ${member.id}, 'member', ${member.name || member.email}, 'pending', ${slotDuration})
       `);
 
-      await db.execute(sql`
-        INSERT INTO booking_payment_audit 
-          (booking_id, session_id, action, staff_email, staff_name, reason, metadata)
-        VALUES (${bookingId}, ${sessionId}, ${tierOverrideApplied ? 'tier_override' : 'staff_direct_add'}, ${staffEmail}, ${staffName}, ${overrideReason || 'Staff direct add'}, ${JSON.stringify({ 
+      await logPaymentAudit({
+        bookingId,
+        sessionId,
+        action: tierOverrideApplied ? 'tier_override' : 'staff_direct_add',
+        staffEmail,
+        staffName,
+        reason: overrideReason || 'Staff direct add',
+        metadata: { 
           participantType: 'member', 
           memberEmail: member.email,
           memberName: member.name,
           tierName: member.tier_name,
           tierOverrideApplied
-        })})
-      `);
+        },
+      });
 
       // Recalculate fees to update all participant fees
       try {

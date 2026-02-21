@@ -38,8 +38,9 @@ export async function updateDiscountRule(
 export async function getBillingAuditLog(memberEmail: string, limit: number = 50): Promise<any[]> {
   try {
     const result = await pool.query(
-      `SELECT * FROM billing_audit_log 
-       WHERE member_email = $1 
+      `SELECT * FROM admin_audit_log 
+       WHERE resource_type = 'billing'
+       AND resource_id = $1 
        ORDER BY created_at DESC 
        LIMIT $2`,
       [memberEmail.toLowerCase(), limit]

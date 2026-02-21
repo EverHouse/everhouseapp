@@ -4,7 +4,7 @@ import Stripe from 'stripe';
 import { isStaffOrAdmin } from '../../core/middleware';
 import { pool } from '../../core/db';
 import { db } from '../../db';
-import { billingAuditLog, passRedemptionLogs, dayPassPurchases, users } from '../../../shared/schema';
+import { passRedemptionLogs, dayPassPurchases, users } from '../../../shared/schema';
 import { eq, gte, desc, inArray, sql } from 'drizzle-orm';
 import { getSessionUser } from '../../types/session';
 import { isExpandedProduct } from '../../types/stripe-helpers';
@@ -32,7 +32,7 @@ import {
   updatePaymentStatus,
   updatePaymentStatusAndAmount
 } from '../../core/stripe/paymentRepository';
-import { logFromRequest } from '../../core/auditLog';
+import { logFromRequest, logBillingAudit } from '../../core/auditLog';
 import { sendPurchaseReceipt, PurchaseReceiptItem } from '../../emails/paymentEmails';
 import { getStaffInfo, MAX_RETRY_ATTEMPTS, GUEST_FEE_CENTS, SAVED_CARD_APPROVAL_THRESHOLD_CENTS } from './helpers';
 import { broadcastBillingUpdate, sendNotificationToUser } from '../../core/websocket';
@@ -1542,8 +1542,17 @@ router.post('/api/stripe/staff/charge-saved-card-pos', isStaffOrAdmin, async (re
         });
 
         if (paymentIntent.status === 'succeeded') {
-          await db.execute(sql`INSERT INTO billing_audit_log (payment_intent_id, member_email, member_id, amount_cents, description, staff_email, created_at)
-             VALUES (${paymentIntent.id}, ${member.email}, ${member.id}, ${numericAmount}, ${description || 'POS saved card charge'}, ${staffEmail}, NOW())`);
+          await logBillingAudit({
+            memberEmail: member.email,
+            actionType: 'pos_saved_card_charge',
+            actionDetails: {
+              paymentIntentId: paymentIntent.id,
+              memberId: member.id,
+              amountCents: numericAmount,
+              description: description || 'POS saved card charge',
+            },
+            performedBy: staffEmail,
+          });
 
           logFromRequest(req, 'charge_saved_card', 'payment', paymentIntent.id, member.email, {
             amountCents: numericAmount,
@@ -1611,11 +1620,17 @@ router.post('/api/stripe/staff/charge-saved-card-pos', isStaffOrAdmin, async (re
           [paymentIntent.id, member.email, member.id, numericAmount, description || 'POS saved card charge', staffEmail]
         );
 
-        await txClient.query(
-          `INSERT INTO billing_audit_log (payment_intent_id, member_email, member_id, amount_cents, description, staff_email, created_at)
-           VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
-          [paymentIntent.id, member.email, member.id, numericAmount, description || 'POS saved card charge', staffEmail]
-        );
+        await logBillingAudit({
+          memberEmail: member.email,
+          actionType: 'pos_saved_card_charge',
+          actionDetails: {
+            paymentIntentId: paymentIntent.id,
+            memberId: member.id,
+            amountCents: numericAmount,
+            description: description || 'POS saved card charge',
+          },
+          performedBy: staffEmail,
+        });
 
         await txClient.query('COMMIT');
       } catch (txErr: unknown) {
@@ -1890,9 +1905,8 @@ router.post('/api/payments/adjust-guest-passes', isStaffOrAdmin, async (req: Req
       logger.info('[GuestPasses] Updated : -> ()', { extra: { memberEmail, previousCount, newCount, adjustment_0: adjustment > 0 ? '+' : '', adjustment } });
     }
 
-    await db.insert(billingAuditLog).values({
+    await logBillingAudit({
       memberEmail,
-      hubspotDealId: null,
       actionType: 'guest_pass_adjustment',
       actionDetails: {
         adjustment,
@@ -2083,7 +2097,7 @@ router.post('/api/payments/add-note', isStaffOrAdmin, async (req: Request, res: 
       memberEmail = (piResult.rows[0] as Record<string, unknown>).member_email as string;
     }
 
-    await db.insert(billingAuditLog).values({
+    await logBillingAudit({
       memberEmail,
       actionType: 'payment_note_added',
       actionDetails: { paymentIntentId: transactionId, note },
@@ -2104,10 +2118,11 @@ router.get('/api/payments/:paymentIntentId/notes', isStaffOrAdmin, async (req: R
   try {
     const { paymentIntentId } = req.params;
 
-    const result = await db.execute(sql`SELECT id, action_details->>'note' as note, performed_by_name, created_at
-       FROM billing_audit_log
-       WHERE action_type = 'payment_note_added'
-         AND action_details->>'paymentIntentId' = ${paymentIntentId}
+    const result = await db.execute(sql`SELECT id, details->>'note' as note, staff_name as performed_by_name, created_at
+       FROM admin_audit_log
+       WHERE resource_type = 'billing'
+         AND action = 'payment_note_added'
+         AND details->>'paymentIntentId' = ${paymentIntentId}
        ORDER BY created_at DESC`);
 
     const notes = (result.rows as Record<string, unknown>[]).map((row) => ({
@@ -2223,9 +2238,8 @@ router.post('/api/payments/retry', isStaffOrAdmin, async (req: Request, res: Res
              requires_card_update = FALSE
          WHERE stripe_payment_intent_id = ${paymentIntentId}`);
 
-      await db.insert(billingAuditLog).values({
+      await logBillingAudit({
         memberEmail: payment.member_email || 'unknown',
-        hubspotDealId: null,
         actionType: 'payment_retry_succeeded',
         actionDetails: {
           paymentIntentId,
@@ -2257,9 +2271,8 @@ router.post('/api/payments/retry', isStaffOrAdmin, async (req: Request, res: Res
              requires_card_update = ${nowReachesLimit}
          WHERE stripe_payment_intent_id = ${paymentIntentId}`);
 
-      await db.insert(billingAuditLog).values({
+      await logBillingAudit({
         memberEmail: payment.member_email || 'unknown',
-        hubspotDealId: null,
         actionType: 'payment_retry_failed',
         actionDetails: {
           paymentIntentId,
@@ -2331,9 +2344,8 @@ router.post('/api/payments/cancel', isStaffOrAdmin, async (req: Request, res: Re
        SET status = 'canceled', updated_at = NOW()
        WHERE stripe_payment_intent_id = ${paymentIntentId}`);
 
-    await db.insert(billingAuditLog).values({
+    await logBillingAudit({
       memberEmail: payment.member_email || 'unknown',
-      hubspotDealId: null,
       actionType: 'payment_canceled',
       actionDetails: {
         paymentIntentId,
@@ -2517,27 +2529,22 @@ router.post('/api/payments/refund', isStaffOrAdmin, async (req: Request, res: Re
         logger.info('[Payments] Updated ledger and participants for session', { extra: { paymentSessionId: payment.sessionId } });
       }
 
-      await txClient.query(
-        `INSERT INTO billing_audit_log (member_email, hubspot_deal_id, action_type, action_details, new_value, performed_by, performed_by_name, created_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())`,
-        [
-          payment.memberEmail || 'unknown',
-          null,
-          'payment_refunded',
-          JSON.stringify({
-            paymentIntentId,
-            refundId: refund.id,
-            refundAmount: refundedAmount,
-            reason: reason || 'No reason provided',
-            originalAmount: payment.amountCents,
-            isPartialRefund,
-            sessionId: payment.sessionId
-          }),
-          `Refunded $${(refundedAmount / 100).toFixed(2)} of $${(payment.amountCents / 100).toFixed(2)}`,
-          staffEmail,
-          staffName
-        ]
-      );
+      await logBillingAudit({
+        memberEmail: payment.memberEmail || 'unknown',
+        actionType: 'payment_refunded',
+        actionDetails: {
+          paymentIntentId,
+          refundId: refund.id,
+          refundAmount: refundedAmount,
+          reason: reason || 'No reason provided',
+          originalAmount: payment.amountCents,
+          isPartialRefund,
+          sessionId: payment.sessionId
+        },
+        newValue: `Refunded $${(refundedAmount / 100).toFixed(2)} of $${(payment.amountCents / 100).toFixed(2)}`,
+        performedBy: staffEmail,
+        performedByName: staffName
+      });
 
       await txClient.query('COMMIT');
     } catch (txError: unknown) {
@@ -2690,9 +2697,8 @@ router.post('/api/payments/capture', isStaffOrAdmin, async (req: Request, res: R
 
     await updatePaymentStatusAndAmount(paymentIntentId, 'succeeded', capturedAmount);
 
-    await db.insert(billingAuditLog).values({
+    await logBillingAudit({
       memberEmail: payment.member_email || 'unknown',
-      hubspotDealId: null,
       actionType: 'payment_captured',
       actionDetails: {
         paymentIntentId,
@@ -2744,9 +2750,8 @@ router.post('/api/payments/void-authorization', isStaffOrAdmin, async (req: Requ
 
     await updatePaymentStatus(paymentIntentId, 'canceled');
 
-    await db.insert(billingAuditLog).values({
+    await logBillingAudit({
       memberEmail: payment.member_email || 'unknown',
-      hubspotDealId: null,
       actionType: 'authorization_voided',
       actionDetails: {
         paymentIntentId,
@@ -2883,11 +2888,12 @@ router.get('/api/payments/daily-summary', isStaffOrAdmin, async (req: Request, r
     }
 
     const offlineResult = await db.execute(sql`SELECT 
-        action_details->>'paymentMethod' as payment_method,
-        action_details->>'category' as category,
-        (action_details->>'amountCents')::int as amount_cents
-       FROM billing_audit_log
-       WHERE action_type = 'offline_payment'
+        details->>'paymentMethod' as payment_method,
+        details->>'category' as category,
+        (details->>'amountCents')::int as amount_cents
+       FROM admin_audit_log
+       WHERE resource_type = 'billing'
+         AND action = 'offline_payment'
          AND DATE(created_at AT TIME ZONE 'America/Los_Angeles') = ${today}`);
 
     for (const row of offlineResult.rows as unknown as DbOfflinePaymentRow[]) {

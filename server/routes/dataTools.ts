@@ -3,12 +3,12 @@ import { Router, Request, Response } from 'express';
 import { db } from '../db';
 import { isProduction } from '../core/db';
 import { pool } from '../core/db';
-import { users, bookingRequests, legacyPurchases, billingAuditLog, adminAuditLog } from '@shared/schema';
+import { users, bookingRequests, legacyPurchases, adminAuditLog } from '@shared/schema';
 import { eq, sql, and, gte, lte, desc, isNull, inArray } from 'drizzle-orm';
 import { isAdmin, isStaffOrAdmin } from '../core/middleware';
 import { getHubSpotClient } from '../core/integrations';
 import { retryableHubSpotRequest } from '../core/hubspot/request';
-import { logFromRequest } from '../core/auditLog';
+import { logFromRequest, logBillingAudit } from '../core/auditLog';
 import { getSessionUser } from '../types/session';
 import { broadcastToStaff } from '../core/websocket';
 import { getErrorMessage, getErrorCode, getErrorStatusCode } from '../utils/errorUtils';
@@ -240,7 +240,7 @@ router.post('/api/data-tools/resync-member', isAdmin, async (req: Request, res: 
       logger.error('[DataTools] Background Stripe sync after HubSpot resync failed:', { error: err });
     });
     
-    await db.insert(billingAuditLog).values({
+    await logBillingAudit({
       memberEmail: normalizedEmail,
       actionType: 'member_resynced_from_hubspot',
       actionDetails: {
@@ -396,7 +396,7 @@ router.post('/api/data-tools/link-guest-fee', isAdmin, async (req: Request, res:
       })
       .where(eq(legacyPurchases.id, guestFeeId));
     
-    await db.insert(billingAuditLog).values({
+    await logBillingAudit({
       memberEmail: existingFee[0].memberEmail || 'unknown',
       actionType: 'guest_fee_manually_linked',
       actionDetails: {
@@ -517,7 +517,7 @@ router.post('/api/data-tools/update-attendance', isAdmin, async (req: Request, r
         updated_at = NOW()
       WHERE id = ${bookingId}`);
     
-    await db.insert(billingAuditLog).values({
+    await logBillingAudit({
       memberEmail: (bookingRow.user_email as string) || 'unknown',
       actionType: 'attendance_manually_updated',
       previousValue: previousStatus || 'none',
@@ -567,7 +567,7 @@ router.post('/api/data-tools/mindbody-reimport', isAdmin, async (req: Request, r
       return res.status(400).json({ error: 'Date range cannot exceed 90 days' });
     }
     
-    await db.insert(billingAuditLog).values({
+    await logBillingAudit({
       memberEmail: 'system',
       actionType: 'mindbody_reimport_requested',
       actionDetails: {
@@ -601,17 +601,18 @@ router.get('/api/data-tools/audit-log', isAdmin, async (req: Request, res: Respo
     
     const logs = actionType
       ? await db.select()
-          .from(billingAuditLog)
-          .where(eq(billingAuditLog.actionType, actionType as string))
-          .orderBy(desc(billingAuditLog.createdAt))
+          .from(adminAuditLog)
+          .where(and(eq(adminAuditLog.resourceType, 'billing'), eq(adminAuditLog.action, actionType as string)))
+          .orderBy(desc(adminAuditLog.createdAt))
           .limit(parseInt(limit as string))
       : await db.select()
-          .from(billingAuditLog)
-          .orderBy(desc(billingAuditLog.createdAt))
+          .from(adminAuditLog)
+          .where(eq(adminAuditLog.resourceType, 'billing'))
+          .orderBy(desc(adminAuditLog.createdAt))
           .limit(parseInt(limit as string));
     
     res.json(logs.filter(log => 
-      ['member_resynced_from_hubspot', 'guest_fee_manually_linked', 'attendance_manually_updated', 'mindbody_reimport_requested'].includes(log.actionType)
+      ['member_resynced_from_hubspot', 'guest_fee_manually_linked', 'attendance_manually_updated', 'mindbody_reimport_requested'].includes(log.action)
     ));
   } catch (error: unknown) {
     logger.error('[DataTools] Get audit log error', { error: error instanceof Error ? error : new Error(String(error)) });
@@ -1032,7 +1033,7 @@ router.post('/api/data-tools/sync-subscription-status', isAdmin, async (req: Req
                 logger.warn('[DataTools] Failed to sync status to HubSpot for', { extra: { email: member.email, e_as_any_e: (e as Error)?.message || e } });
               }
               
-              await db.insert(billingAuditLog).values({
+              await logBillingAudit({
                 memberEmail: member.email,
                 actionType: 'subscription_status_synced',
                 previousValue: member.membership_status || 'none',
@@ -1275,7 +1276,7 @@ router.post('/api/data-tools/link-stripe-hubspot', isAdmin, async (req: Request,
           
           hubspotCreated.push({ email: member.email, contactId: result.contactId });
           
-          await db.insert(billingAuditLog).values({
+          await logBillingAudit({
             memberEmail: member.email,
             actionType: 'hubspot_contact_created_from_stripe',
             actionDetails: {
@@ -1311,7 +1312,7 @@ router.post('/api/data-tools/link-stripe-hubspot', isAdmin, async (req: Request,
           
           stripeCreated.push({ email: member.email, customerId: result.customerId });
           
-          await db.insert(billingAuditLog).values({
+          await logBillingAudit({
             memberEmail: member.email,
             actionType: 'stripe_customer_created_from_hubspot',
             actionDetails: {
@@ -1490,7 +1491,7 @@ router.post('/api/data-tools/sync-visit-counts', isAdmin, async (req: Request, r
                   newCount: appVisitCount
                 });
                 
-                await db.insert(billingAuditLog).values({
+                await logBillingAudit({
                   memberEmail: member.email,
                   actionType: 'visit_count_synced_to_hubspot',
                   previousValue: hubspotVisitCount?.toString() || 'none',
@@ -1651,7 +1652,7 @@ router.post('/api/data-tools/detect-duplicates', isAdmin, async (req: Request, r
       }
     }
     
-    await db.insert(billingAuditLog).values({
+    await logBillingAudit({
       memberEmail: 'system',
       actionType: 'duplicate_detection_run',
       actionDetails: {
@@ -1819,7 +1820,7 @@ router.post('/api/data-tools/sync-payment-status', isAdmin, async (req: Request,
                   newStatus: stripePaymentStatus
                 });
                 
-                await db.insert(billingAuditLog).values({
+                await logBillingAudit({
                   memberEmail: member.email,
                   actionType: 'payment_status_synced_to_hubspot',
                   previousValue: hubspotPaymentStatus || 'none',
@@ -1984,7 +1985,7 @@ router.post('/api/data-tools/fix-trackman-ghost-bookings', isAdmin, async (req: 
             userEmail: booking.userEmail
           });
           
-          await db.insert(billingAuditLog).values({
+          await logBillingAudit({
             memberEmail: booking.userEmail || 'unknown',
             actionType: 'ghost_booking_linked_to_existing_session',
             actionDetails: {
@@ -2123,7 +2124,7 @@ router.post('/api/data-tools/fix-trackman-ghost-bookings', isAdmin, async (req: 
           userEmail: booking.userEmail
         });
         
-        await db.insert(billingAuditLog).values({
+        await logBillingAudit({
           memberEmail: booking.userEmail || 'unknown',
           actionType: 'ghost_booking_session_created',
           actionDetails: {

@@ -17,7 +17,7 @@ import { handlePrimarySubscriptionCancelled } from './groupBilling';
 import { computeFeeBreakdown } from '../billing/unifiedFeeService';
 import { logPaymentFailure, logWebhookFailure } from '../monitoring';
 import { sendErrorAlert } from '../errorAlerts';
-import { logSystemAction } from '../auditLog';
+import { logSystemAction, logPaymentAudit } from '../auditLog';
 import { finalizeInvoicePaidOutOfBand } from './invoices';
 import { queueJobInTransaction } from '../jobQueue';
 import { pullTierFeaturesFromStripe, pullCafeItemsFromStripe } from './products';
@@ -667,15 +667,24 @@ async function handleChargeRefunded(client: PoolClient, charge: Stripe.Charge): 
       logger.info(`[Stripe Webhook] Marked ${participantUpdate.rowCount} participant(s) as refunded for PI ${paymentIntentId}`);
       
       for (const row of participantUpdate.rows) {
-        await client.query(
-          `INSERT INTO booking_payment_audit 
-           (booking_id, session_id, participant_id, action, staff_email, staff_name, amount_affected, payment_method, metadata)
-           SELECT br.id, $1, $2, 'refund_processed', 'system', 'Stripe Webhook', 0, 'stripe', $3
-           FROM booking_sessions bs
-           JOIN booking_requests br ON br.trackman_booking_id = bs.trackman_booking_id
-           WHERE bs.id = $1`,
-          [row.session_id, row.id, JSON.stringify({ stripePaymentIntentId: paymentIntentId })]
+        const bookingLookup = await client.query(
+          `SELECT br.id FROM booking_sessions bs JOIN booking_requests br ON br.trackman_booking_id = bs.trackman_booking_id WHERE bs.id = $1 LIMIT 1`,
+          [row.session_id]
         );
+        const auditBookingId = bookingLookup.rows[0]?.id;
+        if (auditBookingId) {
+          await logPaymentAudit({
+            bookingId: auditBookingId,
+            sessionId: row.session_id,
+            participantId: row.id,
+            action: 'refund_processed',
+            staffEmail: 'system',
+            staffName: 'Stripe Webhook',
+            amountAffected: 0,
+            paymentMethod: 'stripe',
+            metadata: { stripePaymentIntentId: paymentIntentId },
+          });
+        }
         
         // Send refund notification to member
         if (row.user_email) {
@@ -1092,12 +1101,17 @@ async function handlePaymentIntentSucceeded(client: PoolClient, paymentIntent: S
       logger.info(`[Stripe Webhook] Updated ${validatedParticipantIds.length} participant(s) to paid within transaction`);
       
       for (const pf of participantFees) {
-        await client.query(
-          `INSERT INTO booking_payment_audit 
-           (booking_id, session_id, participant_id, action, staff_email, staff_name, amount_affected, payment_method, metadata)
-           VALUES ($1, $2, $3, 'payment_confirmed', 'system', 'Stripe Webhook', $4, $5, $6)`,
-          [bookingId, isNaN(sessionId) ? null : sessionId, pf.id, pf.amountCents / 100, 'stripe', JSON.stringify({ stripePaymentIntentId: id })]
-        );
+        await logPaymentAudit({
+          bookingId,
+          sessionId: isNaN(sessionId) ? null : sessionId,
+          participantId: pf.id,
+          action: 'payment_confirmed',
+          staffEmail: 'system',
+          staffName: 'Stripe Webhook',
+          amountAffected: pf.amountCents / 100,
+          paymentMethod: 'stripe',
+          metadata: { stripePaymentIntentId: id },
+        });
       }
       
       const localBookingId = bookingId;
@@ -1244,34 +1258,31 @@ async function handlePaymentIntentSucceeded(client: PoolClient, paymentIntent: S
   if (!isNaN(bookingId) && bookingId > 0) {
     if (participantFees.length > 0) {
       for (const pf of participantFees) {
-        await client.query(
-          `INSERT INTO booking_payment_audit 
-           (booking_id, session_id, participant_id, action, staff_email, staff_name, amount_affected, payment_method, metadata)
-           VALUES ($1, $2, $3, 'payment_confirmed', 'system', 'Stripe Webhook', $4, $5, $6)`,
-          [
-            bookingId, 
-            isNaN(sessionId) ? null : sessionId,
-            pf.id,
-            pf.amountCents / 100,
-            'stripe',
-            JSON.stringify({ stripePaymentIntentId: id })
-          ]
-        );
+        await logPaymentAudit({
+          bookingId,
+          sessionId: isNaN(sessionId) ? null : sessionId,
+          participantId: pf.id,
+          action: 'payment_confirmed',
+          staffEmail: 'system',
+          staffName: 'Stripe Webhook',
+          amountAffected: pf.amountCents / 100,
+          paymentMethod: 'stripe',
+          metadata: { stripePaymentIntentId: id },
+        });
       }
       logger.info(`[Stripe Webhook] Created ${participantFees.length} audit record(s) for booking ${bookingId}`);
     } else {
-      await client.query(
-        `INSERT INTO booking_payment_audit 
-         (booking_id, session_id, participant_id, action, staff_email, staff_name, amount_affected, payment_method, metadata)
-         VALUES ($1, $2, NULL, 'payment_confirmed', 'system', 'Stripe Webhook', $3, $4, $5)`,
-        [
-          bookingId, 
-          isNaN(sessionId) ? null : sessionId,
-          parseFloat(amountDollars),
-          'stripe',
-          JSON.stringify({ stripePaymentIntentId: id })
-        ]
-      );
+      await logPaymentAudit({
+        bookingId,
+        sessionId: isNaN(sessionId) ? null : sessionId,
+        participantId: null,
+        action: 'payment_confirmed',
+        staffEmail: 'system',
+        staffName: 'Stripe Webhook',
+        amountAffected: parseFloat(amountDollars),
+        paymentMethod: 'stripe',
+        metadata: { stripePaymentIntentId: id },
+      });
       logger.info(`[Stripe Webhook] Created payment audit record for booking ${bookingId}`);
     }
   }

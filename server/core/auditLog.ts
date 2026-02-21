@@ -245,7 +245,27 @@ export type AuditAction =
   | 'delete_inquiry'
   | 'reconcile_group_billing'
   | 'tour_scheduled'
-  | 'view_email_template';
+  | 'view_email_template'
+  | 'line_item_added'
+  | 'line_item_removed'
+  | 'discount_applied'
+  | 'discount_overridden'
+  | 'stage_changed'
+  | 'payment_confirmed'
+  | 'payment_waived'
+  | 'tier_override'
+  | 'staff_direct_add'
+  | 'checkin_guard_triggered'
+  | 'reconciliation_adjusted'
+  | 'ignore_issue'
+  | 'resolve_issue'
+  | 'deal_stage_updated'
+  | 'deal_created'
+  | 'deal_line_item_synced'
+  | 'contact_synced'
+  | 'mindbody_import'
+  | 'email_change'
+  | 'subscription_sync';
 
 export type ActorType = 'staff' | 'member' | 'system';
 
@@ -409,6 +429,109 @@ export async function logMemberAction(params: MemberActionParams): Promise<void>
     await db.insert(adminAuditLog).values(entry);
   } catch (error: unknown) {
     logger.error('[AuditLog] Failed to log member action:', { error: error });
+  }
+}
+
+interface BillingAuditParams {
+  memberEmail: string;
+  hubspotDealId?: string | null;
+  actionType: string;
+  actionDetails?: Record<string, unknown> | null;
+  previousValue?: string | null;
+  newValue?: string | null;
+  performedBy: string;
+  performedByName?: string | null;
+}
+
+export async function logBillingAudit(params: BillingAuditParams): Promise<void> {
+  try {
+    await db.insert(adminAuditLog).values({
+      staffEmail: params.performedBy,
+      staffName: params.performedByName || null,
+      action: params.actionType,
+      resourceType: 'billing',
+      resourceId: params.memberEmail,
+      resourceName: params.memberEmail,
+      details: {
+        hubspotDealId: params.hubspotDealId,
+        previousValue: params.previousValue,
+        newValue: params.newValue,
+        ...((params.actionDetails as Record<string, unknown>) || {}),
+      },
+      actorType: 'staff',
+    });
+  } catch (error: unknown) {
+    logger.error('[AuditLog] Failed to log billing audit:', { error });
+  }
+}
+
+interface PaymentAuditParams {
+  bookingId: number;
+  sessionId?: number | null;
+  participantId?: number | null;
+  action: string;
+  staffEmail: string;
+  staffName?: string | null;
+  reason?: string | null;
+  amountAffected?: string | number | null;
+  previousStatus?: string | null;
+  newStatus?: string | null;
+  paymentMethod?: string | null;
+  metadata?: Record<string, unknown> | null;
+}
+
+export async function logPaymentAudit(params: PaymentAuditParams): Promise<void> {
+  try {
+    await db.insert(adminAuditLog).values({
+      staffEmail: params.staffEmail,
+      staffName: params.staffName || null,
+      action: params.action,
+      resourceType: 'payment',
+      resourceId: String(params.bookingId),
+      details: {
+        bookingId: params.bookingId,
+        sessionId: params.sessionId,
+        participantId: params.participantId,
+        reason: params.reason,
+        amountAffected: params.amountAffected,
+        previousStatus: params.previousStatus,
+        newStatus: params.newStatus,
+        paymentMethod: params.paymentMethod,
+        ...((params.metadata as Record<string, unknown>) || {}),
+      },
+      actorType: 'staff',
+    });
+  } catch (error: unknown) {
+    logger.error('[AuditLog] Failed to log payment audit:', { error });
+  }
+}
+
+interface IntegrityAuditParams {
+  issueKey: string;
+  action: string;
+  actionBy: string;
+  resolutionMethod?: string | null;
+  notes?: string | null;
+}
+
+export async function logIntegrityAudit(params: IntegrityAuditParams): Promise<number> {
+  try {
+    const [result] = await db.insert(adminAuditLog).values({
+      staffEmail: params.actionBy,
+      action: params.action,
+      resourceType: 'system',
+      resourceId: params.issueKey,
+      details: {
+        issueKey: params.issueKey,
+        resolutionMethod: params.resolutionMethod,
+        notes: params.notes,
+      },
+      actorType: 'staff',
+    }).returning({ id: adminAuditLog.id });
+    return result?.id ?? 0;
+  } catch (error: unknown) {
+    logger.error('[AuditLog] Failed to log integrity audit:', { error });
+    return 0;
   }
 }
 

@@ -1,7 +1,8 @@
 import { db } from '../../db';
 import { isProduction } from '../db';
 import { getHubSpotClient } from '../integrations';
-import { hubspotDeals, hubspotLineItems, hubspotProductMappings, billingAuditLog } from '../../../shared/schema';
+import { hubspotDeals, hubspotLineItems, hubspotProductMappings } from '../../../shared/schema';
+import { logBillingAudit } from '../auditLog';
 import { eq } from 'drizzle-orm';
 import { retryableHubSpotRequest } from './request';
 
@@ -81,7 +82,7 @@ export async function addLineItemToDeal(
       .limit(1);
     
     if (deal[0] && createdBy) {
-      await db.insert(billingAuditLog).values({
+      await logBillingAudit({
         memberEmail: deal[0].memberEmail,
         hubspotDealId,
         actionType: 'line_item_added',
@@ -139,7 +140,7 @@ export async function removeLineItemFromDeal(
       .limit(1);
     
     if (deal[0]) {
-      await db.insert(billingAuditLog).values({
+      await logBillingAudit({
         memberEmail: deal[0].memberEmail,
         hubspotDealId: lineItem[0].hubspotDealId,
         actionType: 'line_item_removed',

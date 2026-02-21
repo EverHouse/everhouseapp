@@ -36,7 +36,7 @@ async function cleanupDuplicateTrackmanBookings(): Promise<{ deletedCount: numbe
     logger.info(`[Duplicate Cleanup] Found ${idsToDelete.length} duplicate bookings to remove`);
     
     await client.query(
-      `DELETE FROM booking_payment_audit WHERE booking_id = ANY($1)`,
+      `DELETE FROM admin_audit_log WHERE resource_type = 'payment' AND resource_id = ANY(SELECT id::text FROM unnest($1::int[]) AS id)`,
       [idsToDelete]
     );
     await client.query(

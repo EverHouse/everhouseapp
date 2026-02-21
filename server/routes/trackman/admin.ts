@@ -2814,9 +2814,10 @@ router.delete('/api/admin/trackman/reset-data', isStaffOrAdmin, async (req, res)
     `);
     
     await client.query(`
-      DELETE FROM booking_payment_audit 
-      WHERE booking_id IN (
-        SELECT id FROM booking_requests 
+      DELETE FROM admin_audit_log 
+      WHERE resource_type = 'payment' 
+      AND resource_id IN (
+        SELECT id::text FROM booking_requests 
         WHERE trackman_booking_id IS NOT NULL
       )
     `);
@@ -3303,7 +3304,7 @@ router.post('/api/admin/trackman/cleanup-duplicates', isStaffOrAdmin, async (req
     if (idsToDelete.length > 0) {
       // First delete related records
       await client.query(
-        `DELETE FROM booking_payment_audit WHERE booking_id = ANY($1)`,
+        `DELETE FROM admin_audit_log WHERE resource_type = 'payment' AND resource_id = ANY(SELECT id::text FROM unnest($1::int[]) AS id)`,
         [idsToDelete]
       );
       await client.query(

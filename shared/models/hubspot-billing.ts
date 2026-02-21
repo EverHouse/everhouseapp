@@ -67,23 +67,6 @@ export const hubspotLineItems = pgTable("hubspot_line_items", {
   index("hubspot_line_items_deal_id_idx").on(table.hubspotDealId),
 ]);
 
-export const billingAuditLog = pgTable("billing_audit_log", {
-  id: serial("id").primaryKey(),
-  memberEmail: varchar("member_email").notNull(),
-  hubspotDealId: varchar("hubspot_deal_id"),
-  actionType: varchar("action_type").notNull(), // 'line_item_added', 'line_item_removed', 'discount_applied', 'discount_overridden', 'stage_changed'
-  actionDetails: jsonb("action_details"), // flexible JSON for action-specific data
-  previousValue: text("previous_value"),
-  newValue: text("new_value"),
-  performedBy: varchar("performed_by").notNull(),
-  performedByName: varchar("performed_by_name"),
-  createdAt: timestamp("created_at").defaultNow(),
-}, (table) => [
-  index("billing_audit_log_member_email_idx").on(table.memberEmail),
-  index("billing_audit_log_deal_id_idx").on(table.hubspotDealId),
-  index("billing_audit_log_created_at_idx").on(table.createdAt),
-]);
-
 export const hubspotFormConfigs = pgTable("hubspot_form_configs", {
   id: serial("id").primaryKey(),
   formType: varchar("form_type").notNull().unique(), // 'tour-request', 'membership', 'private-hire', etc.
@@ -105,8 +88,6 @@ export type HubspotDeal = typeof hubspotDeals.$inferSelect;
 export type InsertHubspotDeal = typeof hubspotDeals.$inferInsert;
 export type HubspotLineItem = typeof hubspotLineItems.$inferSelect;
 export type InsertHubspotLineItem = typeof hubspotLineItems.$inferInsert;
-export type BillingAuditLog = typeof billingAuditLog.$inferSelect;
-export type InsertBillingAuditLog = typeof billingAuditLog.$inferInsert;
 export type HubspotFormConfig = typeof hubspotFormConfigs.$inferSelect;
 export type InsertHubspotFormConfig = typeof hubspotFormConfigs.$inferInsert;
 

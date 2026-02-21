@@ -1,6 +1,7 @@
 import { db } from '../../db';
 import { pool } from '../db';
-import { hubspotDeals, hubspotLineItems, billingAuditLog } from '../../../shared/schema';
+import { hubspotDeals, hubspotLineItems } from '../../../shared/schema';
+import { logBillingAudit } from '../auditLog';
 import { eq } from 'drizzle-orm';
 import { getHubSpotClient } from '../integrations';
 
@@ -99,7 +100,7 @@ export async function syncPaymentToHubSpot(params: SyncPaymentParams): Promise<v
       createdByName: 'Stripe Payment'
     });
 
-    await db.insert(billingAuditLog).values({
+    await logBillingAudit({
       memberEmail: email,
       hubspotDealId,
       actionType: 'stripe_payment_synced_to_hubspot',
@@ -203,7 +204,7 @@ export async function syncDayPassToHubSpot(params: SyncDayPassParams): Promise<v
         createdByName: 'Stripe Webhook'
       });
 
-      await db.insert(billingAuditLog).values({
+      await logBillingAudit({
         memberEmail: email,
         hubspotDealId,
         actionType: 'day_pass_synced_to_hubspot',

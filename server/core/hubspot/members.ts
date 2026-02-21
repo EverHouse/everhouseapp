@@ -2,7 +2,8 @@ import { db } from '../../db';
 import { getErrorMessage, getErrorCode, getErrorStatusCode } from '../../utils/errorUtils';
 import { pool, isProduction } from '../db';
 import { getHubSpotClient } from '../integrations';
-import { hubspotDeals, hubspotLineItems, billingAuditLog } from '../../../shared/schema';
+import { hubspotDeals, hubspotLineItems } from '../../../shared/schema';
+import { logBillingAudit } from '../auditLog';
 import { eq, and } from 'drizzle-orm';
 import { retryableHubSpotRequest } from './request';
 import { HUBSPOT_STAGE_IDS, MEMBERSHIP_PIPELINE_ID, MINDBODY_TO_STAGE_MAP } from './constants';
@@ -339,7 +340,7 @@ export async function createDealForLegacyMember(
       [contactId, normalizedEmail]
     );
     
-    await db.insert(billingAuditLog).values({
+    await logBillingAudit({
       memberEmail: normalizedEmail,
       hubspotDealId: dealId,
       actionType: 'deal_created_for_legacy_member',
@@ -561,7 +562,7 @@ export async function syncNewMemberToHubSpot(input: AddMemberInput): Promise<voi
     logger.warn('[SyncMember] Failed to store deal record locally:', { error: dealError });
   }
   
-  await db.insert(billingAuditLog).values({
+  await logBillingAudit({
     memberEmail: normalizedEmail,
     hubspotDealId: dealId,
     actionType: 'member_created',
@@ -720,7 +721,7 @@ export async function createMemberWithDeal(input: AddMemberInput): Promise<AddMe
       logger.warn('[AddMember] Failed to store deal record locally (HubSpot has the deal though):', { error: dealError });
     }
     
-    await db.insert(billingAuditLog).values({
+    await logBillingAudit({
       memberEmail: normalizedEmail,
       hubspotDealId: dealId,
       actionType: 'member_created',
@@ -948,7 +949,7 @@ export async function handleTierChange(
       }
     }
     
-    await db.insert(billingAuditLog).values({
+    await logBillingAudit({
       memberEmail: normalizedEmail,
       hubspotDealId,
       actionType: 'tier_changed',
@@ -1199,7 +1200,7 @@ export async function handleMembershipCancellation(
       }
     }
     
-    await db.insert(billingAuditLog).values({
+    await logBillingAudit({
       memberEmail: normalizedEmail,
       hubspotDealId,
       actionType: 'membership_cancelled',

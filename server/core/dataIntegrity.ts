@@ -14,7 +14,7 @@ import {
   tours,
   integrityCheckHistory,
   integrityIssuesTracking,
-  integrityAuditLog,
+  adminAuditLog,
   integrityIgnores
 } from '../../shared/schema';
 import { sql, eq, isNull, lt, and, or, gte, desc, isNotNull, gt } from 'drizzle-orm';
@@ -41,6 +41,7 @@ interface MemberRow {
 }
 import { syncCustomerMetadataToStripe } from './stripe/customers';
 import { alertOnCriticalIntegrityIssues, alertOnHighIntegrityIssues } from './dataAlerts';
+import { logIntegrityAudit } from './auditLog';
 import { denormalizeTierForHubSpot } from '../utils/tierUtils';
 import { retryableHubSpotRequest } from './hubspot/request';
 
@@ -2349,13 +2350,13 @@ export interface ResolveIssueParams {
 export async function resolveIssue(params: ResolveIssueParams): Promise<{ auditLogId: number }> {
   const { issueKey, action, actionBy, resolutionMethod, notes } = params;
   
-  const [auditEntry] = await db.insert(integrityAuditLog).values({
+  const auditLogId = await logIntegrityAudit({
     issueKey,
     action,
     actionBy,
     resolutionMethod: resolutionMethod || null,
     notes: notes || null
-  }).returning({ id: integrityAuditLog.id });
+  });
   
   if (action === 'resolved' || action === 'ignored') {
     await db.update(integrityIssuesTracking)
@@ -2367,7 +2368,7 @@ export async function resolveIssue(params: ResolveIssueParams): Promise<{ auditL
       .where(eq(integrityIssuesTracking.issueKey, issueKey));
   }
   
-  return { auditLogId: auditEntry.id };
+  return { auditLogId };
 }
 
 export async function getAuditLog(limit: number = 10): Promise<Array<{
@@ -2380,11 +2381,23 @@ export async function getAuditLog(limit: number = 10): Promise<Array<{
   notes: string | null;
 }>> {
   const entries = await db.select()
-    .from(integrityAuditLog)
-    .orderBy(desc(integrityAuditLog.actionAt))
+    .from(adminAuditLog)
+    .where(eq(adminAuditLog.resourceType, 'system'))
+    .orderBy(desc(adminAuditLog.createdAt))
     .limit(limit);
   
-  return entries;
+  return entries.map(entry => {
+    const details = (entry.details || {}) as Record<string, unknown>;
+    return {
+      id: entry.id,
+      issueKey: (details.issueKey as string) || entry.resourceId || '',
+      action: entry.action,
+      actionBy: entry.staffEmail,
+      actionAt: entry.createdAt,
+      resolutionMethod: (details.resolutionMethod as string) || null,
+      notes: (details.notes as string) || null,
+    };
+  });
 }
 
 export interface SyncPushParams {

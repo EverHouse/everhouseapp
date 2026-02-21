@@ -105,12 +105,14 @@ export async function logWebhookEvent(
       }
     }
     
+    const dedupKey = trackmanBookingId ? `${trackmanBookingId}_${eventType.toLowerCase()}` : null;
+    
     const result = await pool.query(
       `INSERT INTO trackman_webhook_events 
-       (event_type, payload, trackman_booking_id, trackman_user_id, matched_booking_id, matched_user_id, processed_at, processing_error)
-       VALUES ($1, $2, $3, $4, $5, $6, NOW(), $7)
+       (event_type, payload, trackman_booking_id, trackman_user_id, matched_booking_id, matched_user_id, processed_at, processing_error, dedup_key)
+       VALUES ($1, $2, $3, $4, $5, $6, NOW(), $7, $8)
        RETURNING id`,
-      [eventType, JSON.stringify(redactedPayload), trackmanBookingId, trackmanUserId, matchedBookingId, matchedUserId, error]
+      [eventType, JSON.stringify(redactedPayload), trackmanBookingId, trackmanUserId, matchedBookingId, matchedUserId, error, dedupKey]
     );
     return result.rows[0]?.id;
   } catch (e: unknown) {

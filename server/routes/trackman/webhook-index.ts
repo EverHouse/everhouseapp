@@ -114,12 +114,8 @@ function extractTrackmanBookingId(payload: TrackmanWebhookPayload | TrackmanV2We
 async function checkWebhookIdempotency(trackmanBookingId: string, status?: string): Promise<boolean> {
   try {
     const dedupKey = status ? `${trackmanBookingId}_${status.toLowerCase()}` : trackmanBookingId;
-    const dedupResult = await db.execute(sql`INSERT INTO trackman_webhook_dedup (trackman_booking_id, received_at)
-       VALUES (${dedupKey}, NOW())
-       ON CONFLICT (trackman_booking_id) DO NOTHING
-       RETURNING id`);
-    
-    const isNewWebhook = (dedupResult.rowCount || 0) > 0;
+    const existing = await db.execute(sql`SELECT id FROM trackman_webhook_events WHERE dedup_key = ${dedupKey} LIMIT 1`);
+    const isNewWebhook = existing.rows.length === 0;
     
     if (!isNewWebhook) {
       logger.info('[Trackman Webhook] Duplicate webhook ignored - idempotency guard triggered', {

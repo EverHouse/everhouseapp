@@ -308,19 +308,19 @@ async function getUnifiedPurchasesForEmail(email: string): Promise<UnifiedPurcha
     }));
   }
   
-  // Get Cash/Check Payments from billing_audit_log
   let unifiedCashCheckPayments: UnifiedPurchase[] = [];
   
   const cashCheckResult = await pool.query(
-    `SELECT * FROM billing_audit_log 
-     WHERE member_email = $1 
-     AND action_type IN ('cash_payment_recorded', 'check_payment_recorded', 'cash_check_recorded')
+    `SELECT * FROM admin_audit_log 
+     WHERE resource_type = 'billing'
+     AND resource_id = $1 
+     AND action IN ('cash_payment_recorded', 'check_payment_recorded', 'cash_check_recorded')
      ORDER BY created_at DESC`,
     [normalizedEmail]
   );
   
   unifiedCashCheckPayments = cashCheckResult.rows.map((record: Record<string, unknown>) => {
-    const actionDetails = record.action_details || {};
+    const actionDetails = (record.details as Record<string, unknown>) || {};
     const paymentMethod = (actionDetails as any).paymentMethod || (actionDetails as any).payment_method || 'cash';
     
     return {

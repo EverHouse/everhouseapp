@@ -1,6 +1,7 @@
 import { Router, Request, Response } from "express";
 import { db } from "../db";
-import { legacyPurchases, users, billingAuditLog } from "@shared/schema";
+import { legacyPurchases, users, adminAuditLog } from "@shared/schema";
+import { logBillingAudit } from "../core/auditLog";
 import { eq, desc, sql, isNull, and, or, ilike } from "drizzle-orm";
 import { isStaffOrAdmin, isAdmin } from "../core/middleware";
 import { getSessionUser } from "../types/session";
@@ -124,7 +125,7 @@ router.post("/api/admin/mindbody/link", isStaffOrAdmin, async (req: Request, res
       .where(eq(users.id, targetMember.id));
 
     const performingUser = getSessionUser(req);
-    await db.insert(billingAuditLog).values({
+    await logBillingAudit({
       memberEmail: normalizedEmail,
       actionType: 'mindbody_link',
       actionDetails: {
@@ -158,17 +159,17 @@ router.get("/api/admin/mindbody/link-history", isStaffOrAdmin, async (req: Reque
     const limit = Math.min(parseInt(req.query.limit as string) || 20, 50);
 
     const history = await db.select({
-      id: billingAuditLog.id,
-      memberEmail: billingAuditLog.memberEmail,
-      actionDetails: billingAuditLog.actionDetails,
-      newValue: billingAuditLog.newValue,
-      performedBy: billingAuditLog.performedBy,
-      performedByName: billingAuditLog.performedByName,
-      createdAt: billingAuditLog.createdAt,
+      id: adminAuditLog.id,
+      memberEmail: adminAuditLog.resourceId,
+      actionDetails: adminAuditLog.details,
+      newValue: sql<string>`details->>'newValue'`,
+      performedBy: adminAuditLog.staffEmail,
+      performedByName: adminAuditLog.staffName,
+      createdAt: adminAuditLog.createdAt,
     })
-      .from(billingAuditLog)
-      .where(eq(billingAuditLog.actionType, 'mindbody_link'))
-      .orderBy(desc(billingAuditLog.createdAt))
+      .from(adminAuditLog)
+      .where(and(eq(adminAuditLog.resourceType, 'billing'), eq(adminAuditLog.action, 'mindbody_link')))
+      .orderBy(desc(adminAuditLog.createdAt))
       .limit(limit);
 
     res.json(history);

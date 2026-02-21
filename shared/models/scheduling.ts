@@ -298,37 +298,6 @@ export const bookingParticipants = pgTable("booking_participants", {
   index("booking_participants_guest_idx").on(table.guestId),
 ]);
 
-// Booking payment audit table - tracks staff actions on payments for audit
-export const paymentAuditActionEnum = pgEnum("payment_audit_action", [
-  "payment_confirmed", 
-  "payment_waived", 
-  "tier_override", 
-  "staff_direct_add",
-  "checkin_guard_triggered",
-  "reconciliation_adjusted"
-]);
-
-export const bookingPaymentAudit = pgTable("booking_payment_audit", {
-  id: serial("id").primaryKey(),
-  bookingId: integer("booking_id").notNull(),
-  sessionId: integer("session_id"),
-  participantId: integer("participant_id"),
-  action: paymentAuditActionEnum("action").notNull(),
-  staffEmail: varchar("staff_email").notNull(),
-  staffName: varchar("staff_name"),
-  reason: text("reason"),
-  amountAffected: numeric("amount_affected", { precision: 10, scale: 2 }),
-  previousStatus: varchar("previous_status"),
-  newStatus: varchar("new_status"),
-  paymentMethod: varchar("payment_method"),
-  metadata: jsonb("metadata"),
-  createdAt: timestamp("created_at").defaultNow(),
-}, (table) => [
-  index("booking_payment_audit_booking_idx").on(table.bookingId),
-  index("booking_payment_audit_session_idx").on(table.sessionId),
-  index("booking_payment_audit_staff_idx").on(table.staffEmail),
-]);
-
 export type BookingSession = typeof bookingSessions.$inferSelect;
 export type InsertBookingSession = typeof bookingSessions.$inferInsert;
 export type Guest = typeof guests.$inferSelect;
@@ -337,9 +306,6 @@ export type UsageLedger = typeof usageLedger.$inferSelect;
 export type InsertUsageLedger = typeof usageLedger.$inferInsert;
 export type BookingParticipant = typeof bookingParticipants.$inferSelect;
 export type InsertBookingParticipant = typeof bookingParticipants.$inferInsert;
-export type BookingPaymentAudit = typeof bookingPaymentAudit.$inferSelect;
-export type InsertBookingPaymentAudit = typeof bookingPaymentAudit.$inferInsert;
-
 // Dismissed HubSpot meetings table - tracks HubSpot meetings that were dismissed/ignored
 export const dismissedHubspotMeetings = pgTable("dismissed_hubspot_meetings", {
   id: serial("id").primaryKey(),
@@ -376,11 +342,13 @@ export const trackmanWebhookEvents = pgTable("trackman_webhook_events", {
   processingError: text("processing_error"),
   matchedBookingId: integer("matched_booking_id"),
   matchedUserId: varchar("matched_user_id"),
+  dedupKey: varchar("dedup_key"),
   createdAt: timestamp("created_at").defaultNow(),
 }, (table) => [
   index("trackman_webhook_events_type_idx").on(table.eventType),
   index("trackman_webhook_events_trackman_booking_idx").on(table.trackmanBookingId),
   index("trackman_webhook_events_created_idx").on(table.createdAt),
+  uniqueIndex("trackman_webhook_events_dedup_key_idx").on(table.dedupKey),
 ]);
 
 export const trackmanBaySlots = pgTable("trackman_bay_slots", {
@@ -402,19 +370,7 @@ export const trackmanBaySlots = pgTable("trackman_bay_slots", {
   uniqueIndex("trackman_bay_slots_unique_idx").on(table.resourceId, table.slotDate, table.startTime, table.trackmanBookingId),
 ]);
 
-export const trackmanWebhookDedup = pgTable("trackman_webhook_dedup", {
-  id: serial("id").primaryKey(),
-  trackmanBookingId: varchar("trackman_booking_id").notNull().unique(),
-  receivedAt: timestamp("received_at").defaultNow(),
-  createdAt: timestamp("created_at").defaultNow(),
-}, (table) => [
-  index("trackman_webhook_dedup_booking_idx").on(table.trackmanBookingId),
-  index("trackman_webhook_dedup_received_idx").on(table.receivedAt),
-]);
-
 export type TrackmanWebhookEvent = typeof trackmanWebhookEvents.$inferSelect;
 export type InsertTrackmanWebhookEvent = typeof trackmanWebhookEvents.$inferInsert;
 export type TrackmanBaySlot = typeof trackmanBaySlots.$inferSelect;
 export type InsertTrackmanBaySlot = typeof trackmanBaySlots.$inferInsert;
-export type TrackmanWebhookDedup = typeof trackmanWebhookDedup.$inferSelect;
-export type InsertTrackmanWebhookDedup = typeof trackmanWebhookDedup.$inferInsert;

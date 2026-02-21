@@ -175,9 +175,10 @@ async function gatherMemberData(email: string): Promise<MemberDataExport> {
   `);
   
   const billingResult = await db.execute(sql`
-    SELECT action_type, action_details, new_value, created_at
-    FROM billing_audit_log 
-    WHERE LOWER(member_email) = ${normalizedEmail}
+    SELECT action as action_type, details as action_details, details->>'newValue' as new_value, created_at
+    FROM admin_audit_log 
+    WHERE resource_type = 'billing'
+    AND LOWER(resource_id) = ${normalizedEmail}
     ORDER BY created_at DESC
     LIMIT 100
   `);

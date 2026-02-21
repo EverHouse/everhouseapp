@@ -22,6 +22,7 @@ import { releaseGuestPassHold } from '../billing/guestPassHoldService';
 import { createPrepaymentIntent } from '../billing/prepaymentService';
 import { voidBookingInvoice } from '../billing/bookingInvoiceService';
 import { getErrorMessage, getErrorStatusCode } from '../../utils/errorUtils';
+import { logPaymentAudit } from '../auditLog';
 
 type SqlQueryParam = string | number | boolean | null | Date;
 
@@ -1352,32 +1353,26 @@ export async function checkinBooking(params: CheckinBookingParams) {
 
     if (totalOutstanding > 0 && !confirmPayment) {
       if (skipPaymentCheck) {
-        await pool.query(`
-          INSERT INTO booking_payment_audit 
-            (booking_id, session_id, action, staff_email, staff_name, amount_affected, metadata)
-          VALUES ($1, $2, 'payment_check_bypassed', $3, $4, $5, $6)
-        `, [
+        await logPaymentAudit({
           bookingId,
-          existing.session_id,
+          sessionId: existing.session_id,
+          action: 'payment_check_bypassed',
           staffEmail,
           staffName,
-          totalOutstanding,
-          JSON.stringify({ unpaidParticipants, bypassed: true, reason: 'skipPaymentCheck flag used' })
-        ]);
+          amountAffected: totalOutstanding,
+          metadata: { unpaidParticipants, bypassed: true, reason: 'skipPaymentCheck flag used' },
+        });
         logger.warn('[Check-in Guard] AUDIT: Payment check bypassed by for booking , outstanding: $', { extra: { staffEmail, bookingId, totalOutstandingToFixed_2: totalOutstanding.toFixed(2) } });
       } else {
-        await pool.query(`
-          INSERT INTO booking_payment_audit 
-            (booking_id, session_id, action, staff_email, staff_name, amount_affected, metadata)
-          VALUES ($1, $2, 'checkin_guard_triggered', $3, $4, $5, $6)
-        `, [
+        await logPaymentAudit({
           bookingId,
-          existing.session_id,
+          sessionId: existing.session_id,
+          action: 'checkin_guard_triggered',
           staffEmail,
           staffName,
-          totalOutstanding,
-          JSON.stringify({ unpaidParticipants })
-        ]);
+          amountAffected: totalOutstanding,
+          metadata: { unpaidParticipants },
+        });
 
         return {
           error: 'Cannot complete check-in: All fees must be collected first',
@@ -1399,11 +1394,17 @@ export async function checkinBooking(params: CheckinBookingParams) {
           [p.id]
         );
 
-        await pool.query(`
-          INSERT INTO booking_payment_audit 
-            (booking_id, session_id, participant_id, action, staff_email, staff_name, amount_affected, previous_status, new_status)
-          VALUES ($1, $2, $3, 'payment_confirmed', $4, $5, $6, 'pending', 'paid')
-        `, [bookingId, existing.session_id, p.id, staffEmail, staffName, p.amount]);
+        await logPaymentAudit({
+          bookingId,
+          sessionId: existing.session_id,
+          participantId: p.id,
+          action: 'payment_confirmed',
+          staffEmail,
+          staffName,
+          amountAffected: p.amount,
+          previousStatus: 'pending',
+          newStatus: 'paid',
+        });
       }
 
       broadcastBillingUpdate({

@@ -2,6 +2,7 @@ import { pool } from '../db';
 import { logger } from '../logger';
 import { getTierLimits, getMemberTierByEmail } from '../tierService';
 import { PRICING } from '../billing/pricingConfig';
+import { logPaymentAudit } from '../auditLog';
 
 export interface ReconciliationResult {
   bookingId: number;
@@ -266,27 +267,23 @@ export async function markAsReconciled(
       const durationMinutes = parseInt(booking.duration_minutes) || 0;
       const feeAdjustment = calculatePotentialFeeAdjustment(durationMinutes, declaredCount, actualCount);
       
-      await pool.query(
-        `INSERT INTO booking_payment_audit 
-         (booking_id, session_id, action, staff_email, reason, amount_affected, previous_status, new_status, metadata)
-         VALUES ($1, $2, 'reconciliation_adjusted', $3, $4, $5, $6, $7, $8)`,
-        [
-          bookingId,
-          booking.session_id,
-          staffEmail,
-          notes || `Attendance reconciliation: declared ${declaredCount}, actual ${actualCount}`,
-          feeAdjustment.toString(),
-          previousStatus || 'pending',
-          status,
-          JSON.stringify({
-            declaredCount,
-            actualCount,
-            discrepancy: actualCount > declaredCount ? 'under_declared' : 'over_declared',
-            durationMinutes,
-            feeAdjustment
-          })
-        ]
-      );
+      await logPaymentAudit({
+        bookingId,
+        sessionId: booking.session_id,
+        action: 'reconciliation_adjusted',
+        staffEmail,
+        reason: notes || `Attendance reconciliation: declared ${declaredCount}, actual ${actualCount}`,
+        amountAffected: feeAdjustment.toString(),
+        previousStatus: previousStatus || 'pending',
+        newStatus: status,
+        metadata: {
+          declaredCount,
+          actualCount,
+          discrepancy: actualCount > declaredCount ? 'under_declared' : 'over_declared',
+          durationMinutes,
+          feeAdjustment
+        },
+      });
       
       logger.info('[markAsReconciled] Booking reconciled with fee adjustment', {
         extra: {

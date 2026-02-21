@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { isAuthenticated, isAdmin } from '../core/middleware';
 import { db } from '../db';
-import { appSettings } from '../../shared/schema';
+import { systemSettings } from '../../shared/schema';
 import { eq } from 'drizzle-orm';
 import { logAndRespond } from '../core/logger';
 import { getSessionUser } from '../types/session';
@@ -26,9 +26,9 @@ const DEFAULT_SETTINGS: Record<string, { value: string; category: string }> = {
 
 router.get('/api/settings', isAuthenticated, async (req, res) => {
   try {
-    const settings = await db.select().from(appSettings);
+    const settings = await db.select().from(systemSettings);
     
-    const settingsMap: Record<string, { value: string | null; category: string; updatedAt: Date }> = {};
+    const settingsMap: Record<string, { value: string | null; category: string | null; updatedAt: Date | null }> = {};
     
     for (const [key, defaultVal] of Object.entries(DEFAULT_SETTINGS)) {
       const existing = settings.find(s => s.key === key);
@@ -57,7 +57,7 @@ router.get('/api/settings/:key', isAuthenticated, async (req, res) => {
   try {
     const key = req.params.key as string;
     
-    const [setting] = await db.select().from(appSettings).where(eq(appSettings.key, key as string));
+    const [setting] = await db.select().from(systemSettings).where(eq(systemSettings.key, key as string));
     
     if (setting) {
       res.json(setting);
@@ -88,35 +88,28 @@ router.put('/api/admin/settings/:key', isAdmin, async (req, res) => {
     
     const category = DEFAULT_SETTINGS[key]?.category || 'general';
     
-    const [existing] = await db.select().from(appSettings).where(eq(appSettings.key, key as string));
-    
-    if (existing) {
-      const [updated] = await db
-        .update(appSettings)
-        .set({
-          value: String(value),
-          updatedAt: new Date(),
-          updatedBy: userEmail
-        })
-        .where(eq(appSettings.key, key as string))
-        .returning();
-      
-      logFromRequest(req, 'update_setting', 'setting', req.params.key as string, req.params.key as string, { value: req.body.value });
-      res.json(updated);
-    } else {
-      const [created] = await db
-        .insert(appSettings)
-        .values({
-          key: key as string,
+    const [result] = await db
+      .insert(systemSettings)
+      .values({
+        key: key as string,
+        value: String(value),
+        category,
+        updatedBy: userEmail,
+        updatedAt: new Date()
+      })
+      .onConflictDoUpdate({
+        target: systemSettings.key,
+        set: {
           value: String(value),
           category,
-          updatedBy: userEmail
-        })
-        .returning();
-      
-      logFromRequest(req, 'update_setting', 'setting', req.params.key as string, req.params.key as string, { value: req.body.value });
-      res.json(created);
-    }
+          updatedBy: userEmail,
+          updatedAt: new Date()
+        }
+      })
+      .returning();
+    
+    logFromRequest(req, 'update_setting', 'setting', req.params.key as string, req.params.key as string, { value: req.body.value });
+    res.json(result);
   } catch (error: unknown) {
     logAndRespond(req, res, 500, 'Failed to update setting', error, 'SETTING_UPDATE_ERROR');
   }
@@ -131,36 +124,31 @@ router.put('/api/admin/settings', isAdmin, async (req, res) => {
       return res.status(400).json({ error: 'Settings object is required' });
     }
     
-    const results: Array<typeof appSettings.$inferSelect> = [];
+    const results: Array<typeof systemSettings.$inferSelect> = [];
     
     for (const [key, value] of Object.entries(settings)) {
       const category = DEFAULT_SETTINGS[key]?.category || 'general';
       
-      const [existing] = await db.select().from(appSettings).where(eq(appSettings.key, key));
-      
-      if (existing) {
-        const [updated] = await db
-          .update(appSettings)
-          .set({
-            value: String(value),
-            updatedAt: new Date(),
-            updatedBy: userEmail
-          })
-          .where(eq(appSettings.key, key))
-          .returning();
-        results.push(updated);
-      } else {
-        const [created] = await db
-          .insert(appSettings)
-          .values({
-            key,
+      const [result] = await db
+        .insert(systemSettings)
+        .values({
+          key,
+          value: String(value),
+          category,
+          updatedBy: userEmail,
+          updatedAt: new Date()
+        })
+        .onConflictDoUpdate({
+          target: systemSettings.key,
+          set: {
             value: String(value),
             category,
-            updatedBy: userEmail
-          })
-          .returning();
-        results.push(created);
-      }
+            updatedBy: userEmail,
+            updatedAt: new Date()
+          }
+        })
+        .returning();
+      results.push(result);
     }
     
     logFromRequest(req, 'update_settings_bulk', 'settings', '', 'bulk_update', { keys: Object.keys(settings) });

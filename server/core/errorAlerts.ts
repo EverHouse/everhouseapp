@@ -54,7 +54,7 @@ async function loadDailyStateFromDb(): Promise<void> {
   if (dbLoadAttempted) return;
   dbLoadAttempted = true;
   try {
-    const result = await db.execute(sql`SELECT value FROM app_settings WHERE key = 'alert_rate_limits'`);
+    const result = await db.execute(sql`SELECT value FROM system_settings WHERE key = 'alert_rate_limits'`);
     dbAvailable = true;
     if (result.rows.length > 0 && result.rows[0].value) {
       const saved = JSON.parse(String(result.rows[0].value));
@@ -79,12 +79,7 @@ async function loadDailyStateFromDb(): Promise<void> {
 async function saveDailyStateToDb(): Promise<void> {
   if (!dbAvailable) return;
   try {
-    const exists = await db.execute(sql`SELECT 1 FROM app_settings WHERE key = 'alert_rate_limits'`);
-    if (exists.rows.length > 0) {
-      await db.execute(sql`UPDATE app_settings SET value = ${JSON.stringify(dailyState)}, updated_at = NOW() WHERE key = 'alert_rate_limits'`);
-    } else {
-      await db.execute(sql`INSERT INTO app_settings (key, value, category, updated_at) VALUES ('alert_rate_limits', ${JSON.stringify(dailyState)}, 'system', NOW())`);
-    }
+    await db.execute(sql`INSERT INTO system_settings (key, value, category, updated_at) VALUES ('alert_rate_limits', ${JSON.stringify(dailyState)}, 'system', NOW()) ON CONFLICT (key) DO UPDATE SET value = ${JSON.stringify(dailyState)}, updated_at = NOW()`);
   } catch {
     logger.warn('[ErrorAlert] Could not persist rate limits to database');
   }

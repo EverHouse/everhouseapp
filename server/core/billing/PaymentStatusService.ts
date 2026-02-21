@@ -1,6 +1,7 @@
 import { pool } from '../db';
 import { PoolClient } from 'pg';
 import { getErrorMessage } from '../../utils/errorUtils';
+import { logPaymentAudit } from '../auditLog';
 
 import { logger } from '../logger';
 export interface PaymentStatusUpdate {
@@ -92,12 +93,19 @@ export class PaymentStatusService {
               );
 
               for (const row of pendingResult.rows) {
-                await client.query(
-                  `INSERT INTO booking_payment_audit
-                    (booking_id, session_id, participant_id, action, staff_email, staff_name, amount_affected, previous_status, new_status, stripe_payment_intent_id)
-                   VALUES ($1, $2, $3, 'payment_succeeded', $4, $5, $6, 'pending', 'paid', $7)`,
-                  [piRow.booking_id, resolvedSessionId, row.id, staffEmail || 'system', staffName || 'Auto-sync', row.cached_fee_cents || 0, paymentIntentId]
-                );
+                await logPaymentAudit({
+                  bookingId: piRow.booking_id,
+                  sessionId: resolvedSessionId,
+                  participantId: row.id,
+                  action: 'payment_succeeded',
+                  staffEmail: staffEmail || 'system',
+                  staffName: staffName || 'Auto-sync',
+                  amountAffected: row.cached_fee_cents || 0,
+                  previousStatus: 'pending',
+                  newStatus: 'paid',
+                  paymentMethod: 'stripe',
+                  metadata: { stripePaymentIntentId: paymentIntentId },
+                });
               }
 
               logger.info(`[PaymentStatusService] No-snapshot fallback: updated ${pendingIds.length} participant(s) for booking ${piRow.booking_id}`);
@@ -150,16 +158,22 @@ export class PaymentStatusService {
           );
           participantsUpdated = participantIds.length;
           
-          // Create audit log entries
           for (const fee of participantFees) {
             const participantId = fee.id;
             if (participantId) {
-              await client.query(
-                `INSERT INTO booking_payment_audit 
-                  (booking_id, session_id, participant_id, action, staff_email, staff_name, amount_affected, previous_status, new_status, stripe_payment_intent_id)
-                 VALUES ($1, $2, $3, 'payment_succeeded', $4, $5, $6, 'pending', 'paid', $7)`,
-                [snapshot.booking_id, snapshot.session_id, participantId, staffEmail || 'system', staffName || 'Auto-sync', fee.amountCents || 0, paymentIntentId]
-              );
+              await logPaymentAudit({
+                bookingId: snapshot.booking_id,
+                sessionId: snapshot.session_id,
+                participantId,
+                action: 'payment_succeeded',
+                staffEmail: staffEmail || 'system',
+                staffName: staffName || 'Auto-sync',
+                amountAffected: fee.amountCents || 0,
+                previousStatus: 'pending',
+                newStatus: 'paid',
+                paymentMethod: 'stripe',
+                metadata: { stripePaymentIntentId: paymentIntentId },
+              });
             }
           }
         }
@@ -227,16 +241,22 @@ export class PaymentStatusService {
               [participantIds]
             );
             
-            // Create audit log entries
             for (const fee of participantFees) {
               const participantId = fee.id;
               if (participantId) {
-                await client.query(
-                  `INSERT INTO booking_payment_audit 
-                    (booking_id, session_id, participant_id, action, staff_email, staff_name, amount_affected, previous_status, new_status, stripe_payment_intent_id)
-                   VALUES ($1, $2, $3, 'payment_refunded', $4, $5, $6, 'paid', 'refunded', $7)`,
-                  [snapshot.booking_id, snapshot.session_id, participantId, staffEmail || 'system', staffName || 'Refund', fee.amountCents || 0, paymentIntentId]
-                );
+                await logPaymentAudit({
+                  bookingId: snapshot.booking_id,
+                  sessionId: snapshot.session_id,
+                  participantId,
+                  action: 'payment_refunded',
+                  staffEmail: staffEmail || 'system',
+                  staffName: staffName || 'Refund',
+                  amountAffected: fee.amountCents || 0,
+                  previousStatus: 'paid',
+                  newStatus: 'refunded',
+                  paymentMethod: 'stripe',
+                  metadata: { stripePaymentIntentId: paymentIntentId },
+                });
               }
             }
           }

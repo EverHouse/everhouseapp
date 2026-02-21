@@ -66,6 +66,11 @@ We use a **Liquid Glass UI** system.
 - **Member Lifecycle & Check-In**: Tiers, QR/NFC check-in, onboarding.
 
 ## Recent Changes
+- **Feb 21, 2026**: Database table consolidation — Reduced tables from 82 to 77 by merging redundant tables:
+  1. `app_settings` → merged into `system_settings` (added `category`, `updated_by` columns)
+  2. `trackman_webhook_dedup` → merged into `trackman_webhook_events` (added `dedup_key` column with unique index)
+  3. Four audit tables (`billing_audit_log`, `booking_payment_audit`, `integrity_audit_log`) → merged into unified `admin_audit_log` with JSONB `details` column. Helper functions in `server/core/auditLog.ts`: `logBillingAudit()`, `logPaymentAudit()`, `logIntegrityAudit()`.
+  All existing data was migrated before dropping old tables.
 - **Feb 21, 2026**: Dependency & dead code cleanup — Removed unused npm packages (`@modelcontextprotocol/sdk`). Moved 11 dev-only packages to devDependencies (`@vitest/ui`, `drizzle-kit`, `postcss`, `tailwindcss`, `@tailwindcss/postcss`, `vite-plugin-compression`, `vitest`, 4x `@types/*`). Deleted 3 dead code files: `server/routes/mcp.ts` (empty), `server/utils/calendarSync.ts` (superseded), `server/utils/stringUtils.ts` (superseded by emailNormalization.ts).
 - **Feb 21, 2026**: Project root cleanup — Removed 30+ dead/outdated files. See changelog for full list.
 - **Feb 21, 2026**: Ghost column fix (v7.95.0) + CI guard. See changelog for details.
