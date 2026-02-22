@@ -352,11 +352,22 @@ router.get('/api/data-integrity/placeholder-accounts', isAdmin, async (req, res)
            OR email LIKE 'classpass-%'
            OR email LIKE 'lesson-%'
            OR email LIKE 'anonymous-%'
+           OR email LIKE 'anonymous@%'
            OR email LIKE 'private-event@%'
            OR email LIKE '%@resolved%'
            OR email LIKE '%@placeholder.%'
            OR email LIKE '%@test.local%'
            OR email LIKE '%@example.com%'
+           OR email LIKE 'placeholder@%'
+           OR email LIKE 'test@%'
+           OR email LIKE 'test-admin%'
+           OR email LIKE 'test-member%'
+           OR email LIKE 'test-staff%'
+           OR email LIKE 'testaccount@%'
+           OR email LIKE 'testguest@%'
+           OR email LIKE 'notif-test-%'
+           OR email LIKE 'notification-test-%'
+           OR email LIKE '%+test%@%'
         ORDER BY created_at DESC
       `);
       

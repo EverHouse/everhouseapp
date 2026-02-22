@@ -15,12 +15,22 @@ const PLACEHOLDER_EMAIL_PATTERNS = [
   'golfnow-',
   'classpass-',
   'lesson-',
-  'anonymous-',
+  'anonymous',
   'private-event@',
   '@resolved',
   '@placeholder.',
   '@test.local',
-  '@example.com'
+  '@example.com',
+  'placeholder@',
+  'test@',
+  'test-admin',
+  'test-member',
+  'test-staff',
+  'testaccount@',
+  'testguest@',
+  'notif-test-',
+  'notification-test-',
+  '+test',
 ];
 
 export function isPlaceholderEmail(email: string): boolean {

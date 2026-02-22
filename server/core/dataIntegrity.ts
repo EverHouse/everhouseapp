@@ -135,6 +135,14 @@ export interface IssueContext {
   billingProvider?: string;
   stripeSubscriptionId?: string;
   stripeCustomerIds?: string[];
+  booking1Id?: number;
+  booking1Status?: string;
+  member1Email?: string;
+  member1Name?: string;
+  booking2Id?: number;
+  booking2Status?: string;
+  member2Email?: string;
+  member2Name?: string;
 }
 
 export interface IntegrityIssue {
@@ -2206,16 +2214,24 @@ async function checkOverlappingBookings(): Promise<IntegrityCheckResult> {
   try {
     const overlapsResult = await db.execute(sql`
       SELECT bs1.id as session1_id, bs2.id as session2_id, bs1.resource_id, bs1.session_date,
-             bs1.start_time, bs1.end_time, bs2.start_time as overlap_start, bs2.end_time as overlap_end
+             bs1.start_time, bs1.end_time, bs2.start_time as overlap_start, bs2.end_time as overlap_end,
+             br1.id as booking1_id, br1.status as booking1_status,
+             br2.id as booking2_id, br2.status as booking2_status,
+             u1.email as member1_email, u1.first_name as member1_first, u1.last_name as member1_last,
+             u2.email as member2_email, u2.first_name as member2_first, u2.last_name as member2_last,
+             r.name as resource_name
       FROM booking_sessions bs1
       JOIN booking_sessions bs2 ON bs1.resource_id = bs2.resource_id
         AND bs1.session_date = bs2.session_date
         AND bs1.id < bs2.id
         AND bs1.start_time < bs2.end_time
         AND bs2.start_time < bs1.end_time
-      WHERE EXISTS (SELECT 1 FROM booking_requests br WHERE br.session_id = bs1.id AND br.status IN ('approved', 'confirmed', 'attended'))
-        AND EXISTS (SELECT 1 FROM booking_requests br WHERE br.session_id = bs2.id AND br.status IN ('approved', 'confirmed', 'attended'))
-        AND bs1.session_date >= CURRENT_DATE - INTERVAL '30 days'
+      JOIN booking_requests br1 ON br1.session_id = bs1.id AND br1.status IN ('approved', 'confirmed', 'attended')
+      JOIN booking_requests br2 ON br2.session_id = bs2.id AND br2.status IN ('approved', 'confirmed', 'attended')
+      LEFT JOIN users u1 ON br1.user_id = u1.id
+      LEFT JOIN users u2 ON br2.user_id = u2.id
+      LEFT JOIN resources r ON bs1.resource_id = r.id
+      WHERE bs1.session_date >= CURRENT_DATE - INTERVAL '30 days'
     `);
 
     for (const row of overlapsResult.rows as Record<string, unknown>[]) {
@@ -2228,9 +2244,18 @@ async function checkOverlappingBookings(): Promise<IntegrityCheckResult> {
         suggestion: 'Two active bookings overlap on the same bay. One should be rescheduled or cancelled to prevent conflicts.',
         context: {
           resourceId: Number(row.resource_id),
+          resourceName: (row.resource_name as string) || undefined,
           startTime: (row.start_time as string) || undefined,
           endTime: (row.end_time as string) || undefined,
-          bookingDate: (row.session_date as string) || undefined
+          bookingDate: (row.session_date as string) || undefined,
+          booking1Id: Number(row.booking1_id),
+          booking1Status: (row.booking1_status as string) || undefined,
+          member1Email: (row.member1_email as string) || undefined,
+          member1Name: [row.member1_first, row.member1_last].filter(Boolean).join(' ') || undefined,
+          booking2Id: Number(row.booking2_id),
+          booking2Status: (row.booking2_status as string) || undefined,
+          member2Email: (row.member2_email as string) || undefined,
+          member2Name: [row.member2_first, row.member2_last].filter(Boolean).join(' ') || undefined,
         }
       });
     }

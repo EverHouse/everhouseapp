@@ -838,7 +838,7 @@ const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
         return (
           <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3 mb-4">
             <p className="text-xs text-blue-700 dark:text-blue-300 mb-2">
-              <strong>About:</strong> Confirmed bookings that overlap on the same bay. Open individual bookings below to reschedule or cancel one of the conflicting bookings.
+              <strong>About:</strong> Confirmed bookings that overlap on the same bay. Use the action buttons on each issue to open or cancel one of the conflicting bookings.
             </p>
           </div>
         );
@@ -1369,6 +1369,72 @@ const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
                                           <span className="material-symbols-outlined text-[16px]">cancel</span>
                                         )}
                                       </button>
+                                    </>
+                                  )}
+                                  {!issue.ignored && issue.table === 'booking_sessions' && issue.category === 'booking_issue' && (
+                                    <>
+                                      {issue.context?.booking1Id && (
+                                        <button
+                                          type="button"
+                                          onClick={() => setBookingSheet({
+                                            isOpen: true,
+                                            bookingId: issue.context!.booking1Id as number,
+                                            memberEmail: issue.context?.member1Email as string,
+                                            bookingDate: issue.context?.bookingDate as string,
+                                            timeSlot: issue.context?.startTime as string,
+                                          })}
+                                          className="p-1.5 text-blue-600 hover:bg-blue-100 dark:text-blue-400 dark:hover:bg-blue-900/30 rounded transition-colors"
+                                          title={`Open booking #${issue.context.booking1Id}${issue.context?.member1Name ? ` (${issue.context.member1Name})` : ''}`}
+                                        >
+                                          <span className="material-symbols-outlined text-[16px]">open_in_new</span>
+                                        </button>
+                                      )}
+                                      {issue.context?.booking1Id && (
+                                        <button
+                                          type="button"
+                                          onClick={() => handleCancelBooking(issue.context!.booking1Id as number)}
+                                          disabled={cancellingBookings.has(issue.context!.booking1Id as number)}
+                                          className="p-1.5 text-red-600 hover:bg-red-100 dark:text-red-400 dark:hover:bg-red-900/30 rounded transition-colors disabled:opacity-50"
+                                          title={`Cancel booking #${issue.context.booking1Id}`}
+                                        >
+                                          {cancellingBookings.has(issue.context!.booking1Id as number) ? (
+                                            <span className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>
+                                          ) : (
+                                            <span className="material-symbols-outlined text-[16px]">cancel</span>
+                                          )}
+                                        </button>
+                                      )}
+                                      {issue.context?.booking2Id && (
+                                        <button
+                                          type="button"
+                                          onClick={() => setBookingSheet({
+                                            isOpen: true,
+                                            bookingId: issue.context!.booking2Id as number,
+                                            memberEmail: issue.context?.member2Email as string,
+                                            bookingDate: issue.context?.bookingDate as string,
+                                            timeSlot: issue.context?.startTime as string,
+                                          })}
+                                          className="p-1.5 text-green-600 hover:bg-green-100 dark:text-green-400 dark:hover:bg-green-900/30 rounded transition-colors"
+                                          title={`Open booking #${issue.context.booking2Id}${issue.context?.member2Name ? ` (${issue.context.member2Name})` : ''}`}
+                                        >
+                                          <span className="material-symbols-outlined text-[16px]">open_in_new</span>
+                                        </button>
+                                      )}
+                                      {issue.context?.booking2Id && (
+                                        <button
+                                          type="button"
+                                          onClick={() => handleCancelBooking(issue.context!.booking2Id as number)}
+                                          disabled={cancellingBookings.has(issue.context!.booking2Id as number)}
+                                          className="p-1.5 text-orange-600 hover:bg-orange-100 dark:text-orange-400 dark:hover:bg-orange-900/30 rounded transition-colors disabled:opacity-50"
+                                          title={`Cancel booking #${issue.context.booking2Id}`}
+                                        >
+                                          {cancellingBookings.has(issue.context!.booking2Id as number) ? (
+                                            <span className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>
+                                          ) : (
+                                            <span className="material-symbols-outlined text-[16px]">cancel</span>
+                                          )}
+                                        </button>
+                                      )}
                                     </>
                                   )}
                                   {!issue.ignored && issue.table === 'booking_requests' && issue.category === 'billing_issue' && (

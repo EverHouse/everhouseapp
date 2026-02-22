@@ -59,6 +59,14 @@ export interface IssueContext {
   status?: string;
   resourceId?: number;
   bookingId?: number;
+  booking1Id?: number;
+  booking1Status?: string;
+  member1Email?: string;
+  member1Name?: string;
+  booking2Id?: number;
+  booking2Status?: string;
+  member2Email?: string;
+  member2Name?: string;
 }
 
 export interface IgnoreInfo {
