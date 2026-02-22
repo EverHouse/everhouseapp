@@ -55,7 +55,7 @@ router.get("/api/legacy-purchases/member/:email", isStaffOrAdmin, async (req: Re
     
     const purchases = await db.select()
       .from(legacyPurchases)
-      .where(eq(legacyPurchases.memberEmail, (email as string).toLowerCase()))
+      .where(eq(legacyPurchases.memberEmail, (email as string).trim().toLowerCase()))
       .orderBy(desc(legacyPurchases.saleDate));
     
     // Convert cents to dollars for display
@@ -382,7 +382,7 @@ async function getUnifiedPurchasesForEmail(email: string): Promise<UnifiedPurcha
 router.get("/api/members/:email/unified-purchases", isStaffOrAdmin, async (req: Request, res: Response) => {
   try {
     const { email } = req.params;
-    const purchases = await getUnifiedPurchasesForEmail(email as string);
+    const purchases = await getUnifiedPurchasesForEmail(decodeURIComponent(email as string).trim().toLowerCase());
     
     logger.info('[UnifiedPurchases] staff view for : found purchases', { extra: { email, purchasesLength: purchases.length } });
     res.json(purchases);
@@ -435,7 +435,7 @@ router.get("/api/legacy-purchases/member/:email/stats", isStaffOrAdmin, async (r
       guestSimFees: sql<number>`COUNT(*) FILTER (WHERE item_category = 'guest_sim_fee')`,
     })
       .from(legacyPurchases)
-      .where(eq(legacyPurchases.memberEmail, (email as string).toLowerCase()));
+      .where(eq(legacyPurchases.memberEmail, (email as string).trim().toLowerCase()));
     
     res.json({
       totalPurchases: stats[0]?.totalPurchases || 0,
@@ -1018,7 +1018,7 @@ router.post("/api/legacy-purchases/admin/sync-hubspot/:email", isAdmin, async (r
       hubspotId: users.hubspotId,
     })
       .from(users)
-      .where(eq(users.email, (email as string).toLowerCase()))
+      .where(eq(users.email, (email as string).trim().toLowerCase()))
       .limit(1);
     
     if (!member[0]?.hubspotId) {
@@ -1032,7 +1032,7 @@ router.post("/api/legacy-purchases/admin/sync-hubspot/:email", isAdmin, async (r
       lastPurchaseDate: sql<string>`MAX(sale_date)`,
     })
       .from(legacyPurchases)
-      .where(eq(legacyPurchases.memberEmail, (email as string).toLowerCase()));
+      .where(eq(legacyPurchases.memberEmail, (email as string).trim().toLowerCase()));
     
     const properties: Record<string, string> = {
       eh_total_purchases: String(stats[0]?.totalPurchases || 0),

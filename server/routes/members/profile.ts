@@ -25,7 +25,7 @@ import { z } from 'zod';
 const router = Router();
 
 const emailParamSchema = z.string().min(1).max(320).transform(val => {
-  const decoded = decodeURIComponent(val).toLowerCase();
+  const decoded = decodeURIComponent(val).trim().toLowerCase();
   return decoded;
 }).refine(val => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val), {
   message: 'Invalid email format'
@@ -301,7 +301,7 @@ router.put('/api/members/:email/sms-preferences', isAuthenticated, async (req, r
 router.get('/api/members/:email/history', isStaffOrAdmin, async (req, res) => {
   try {
     const { email } = req.params;
-    const normalizedEmail = decodeURIComponent(email as string).toLowerCase();
+    const normalizedEmail = decodeURIComponent(email as string).trim().toLowerCase();
     
     const bookingHistory = await db.select({
       id: bookingRequests.id,
@@ -573,7 +573,7 @@ router.get('/api/members/:email/history', isStaffOrAdmin, async (req, res) => {
 router.get('/api/members/:email/guests', isStaffOrAdmin, async (req, res) => {
   try {
     const { email } = req.params;
-    const normalizedEmail = decodeURIComponent(email as string).toLowerCase();
+    const normalizedEmail = decodeURIComponent(email as string).trim().toLowerCase();
     
     const guestHistory = await db.select({
       id: bookingParticipants.id,
@@ -655,7 +655,7 @@ router.put('/api/members/:id/role', isAdmin, async (req, res) => {
 router.get('/api/members/:email/cascade-preview', isStaffOrAdmin, async (req, res) => {
   try {
     const { email } = req.params;
-    const normalizedEmail = decodeURIComponent(email as string).toLowerCase();
+    const normalizedEmail = decodeURIComponent(email as string).trim().toLowerCase();
     
     const userResult = await db.select({ id: users.id })
       .from(users)

@@ -33,7 +33,7 @@ router.patch('/api/members/:email/tier', isStaffOrAdmin, async (req, res) => {
       return res.status(400).json({ error: `Invalid tier. Must be one of: ${TIER_NAMES.join(', ')} or empty to clear` });
     }
     
-    const normalizedEmail = decodeURIComponent(email as string).toLowerCase();
+    const normalizedEmail = decodeURIComponent(email as string).trim().toLowerCase();
     
     const userResult = await db.select({
       id: users.id,
@@ -316,7 +316,7 @@ router.post('/api/members/:id/suspend', isStaffOrAdmin, async (req, res) => {
 router.delete('/api/members/:email', isStaffOrAdmin, async (req, res) => {
   try {
     const { email } = req.params;
-    const normalizedEmail = decodeURIComponent(email as string).toLowerCase();
+    const normalizedEmail = decodeURIComponent(email as string).trim().toLowerCase();
     const sessionUser = getSessionUser(req);
     const archivedBy = sessionUser?.email || 'unknown';
     
@@ -443,7 +443,7 @@ router.delete('/api/members/:email/permanent', isAdmin, async (req, res) => {
   try {
     const { email } = req.params;
     const { deleteFromHubSpot, deleteFromStripe } = req.query;
-    const normalizedEmail = decodeURIComponent(email as string).toLowerCase();
+    const normalizedEmail = decodeURIComponent(email as string).trim().toLowerCase();
     const sessionUser = getSessionUser(req);
     
     const userResult = await db.select({ 
@@ -779,7 +779,7 @@ router.delete('/api/members/:email/permanent', isAdmin, async (req, res) => {
 router.post('/api/members/:email/anonymize', isStaffOrAdmin, async (req, res) => {
   try {
     const { email } = req.params;
-    const normalizedEmail = decodeURIComponent(email as string).toLowerCase();
+    const normalizedEmail = decodeURIComponent(email as string).trim().toLowerCase();
     const sessionUser = getSessionUser(req);
     const anonymizedBy = sessionUser?.email || 'unknown';
     

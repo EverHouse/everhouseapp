@@ -13,7 +13,7 @@ const router = Router();
 router.get('/api/members/:email/notes', isStaffOrAdmin, async (req, res) => {
   try {
     const { email } = req.params;
-    const normalizedEmail = decodeURIComponent(email as string).toLowerCase();
+    const normalizedEmail = decodeURIComponent(email as string).trim().toLowerCase();
     
     const notes = await db.select()
       .from(memberNotes)
@@ -37,7 +37,7 @@ router.post('/api/members/:email/notes', isStaffOrAdmin, async (req, res) => {
       return res.status(400).json({ error: 'Note content is required' });
     }
     
-    const normalizedEmail = decodeURIComponent(email as string).toLowerCase();
+    const normalizedEmail = decodeURIComponent(email as string).trim().toLowerCase();
     
     const result = await db.insert(memberNotes)
       .values({
@@ -63,7 +63,7 @@ router.put('/api/members/:email/notes/:noteId', isStaffOrAdmin, async (req, res)
   try {
     const { email, noteId } = req.params;
     const { content, isPinned } = req.body;
-    const normalizedEmail = decodeURIComponent(email as string).toLowerCase();
+    const normalizedEmail = decodeURIComponent(email as string).trim().toLowerCase();
     
     const updateData: Record<string, unknown> = { updatedAt: new Date() };
     if (content !== undefined) updateData.content = content.trim();
@@ -92,7 +92,7 @@ router.put('/api/members/:email/notes/:noteId', isStaffOrAdmin, async (req, res)
 router.delete('/api/members/:email/notes/:noteId', isStaffOrAdmin, async (req, res) => {
   try {
     const { email, noteId } = req.params;
-    const normalizedEmail = decodeURIComponent(email as string).toLowerCase();
+    const normalizedEmail = decodeURIComponent(email as string).trim().toLowerCase();
     
     const result = await db.delete(memberNotes)
       .where(and(

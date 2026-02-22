@@ -48,7 +48,7 @@ router.get('/api/member/dashboard-data', isAuthenticated, async (req, res) => {
       if (!isAdmin) {
         return res.status(403).json({ error: 'Only admins can view other member data' });
       }
-      userEmail = member_email.toLowerCase();
+      userEmail = (member_email as string).trim().toLowerCase();
       // Fetch the viewed member's name for proper display
       const viewedMember = await db.select({ firstName: users.firstName, lastName: users.lastName })
         .from(users)

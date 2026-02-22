@@ -16,7 +16,7 @@ const router = Router();
 router.get('/api/members/:email/communications', isStaffOrAdmin, async (req, res) => {
   try {
     const { email } = req.params;
-    const normalizedEmail = decodeURIComponent(email as string).toLowerCase();
+    const normalizedEmail = decodeURIComponent(email as string).trim().toLowerCase();
     
     const logs = await db.select()
       .from(communicationLogs)
@@ -40,7 +40,7 @@ router.post('/api/members/:email/communications', isStaffOrAdmin, async (req, re
       return res.status(400).json({ error: 'Communication type is required' });
     }
     
-    const normalizedEmail = decodeURIComponent(email as string).toLowerCase();
+    const normalizedEmail = decodeURIComponent(email as string).trim().toLowerCase();
     
     const result = await db.insert(communicationLogs)
       .values({
@@ -69,7 +69,7 @@ router.post('/api/members/:email/communications', isStaffOrAdmin, async (req, re
 router.delete('/api/members/:email/communications/:logId', isStaffOrAdmin, async (req, res) => {
   try {
     const { email, logId } = req.params;
-    const normalizedEmail = decodeURIComponent(email as string).toLowerCase();
+    const normalizedEmail = decodeURIComponent(email as string).trim().toLowerCase();
     
     const result = await db.delete(communicationLogs)
       .where(and(

@@ -86,7 +86,7 @@ router.get('/api/bookings/check-existing-staff', isStaffOrAdmin, async (req, res
     }
     
     const result = await checkExistingBookingsForStaff(
-      member_email as string,
+      (member_email as string).trim().toLowerCase(),
       date as string,
       resource_type as string
     );

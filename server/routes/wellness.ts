@@ -1018,8 +1018,9 @@ router.post('/api/wellness-enrollments', isAuthenticated, async (req, res) => {
 
 router.delete('/api/wellness-enrollments/:class_id/:user_email', isAuthenticated, async (req, res) => {
   try {
-    const { class_id, user_email } = req.params;
-    const enrollmentEmail = user_email.toLowerCase();
+    const { class_id, user_email: rawUserEmail } = req.params;
+    const user_email = decodeURIComponent(rawUserEmail as string).trim().toLowerCase();
+    const enrollmentEmail = user_email;
     
     const rawSessionEmail = getSessionUser(req)?.email;
     const sessionUserRole = getSessionUser(req)?.role;

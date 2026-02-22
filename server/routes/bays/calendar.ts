@@ -21,7 +21,7 @@ router.get('/api/conference-room-bookings', async (req, res) => {
     }
     
     const searchName = member_name as string || sessionUser.name || undefined;
-    const searchEmail = member_email as string || sessionUser.email || undefined;
+    const searchEmail = (member_email as string)?.trim()?.toLowerCase() || sessionUser?.email?.toLowerCase() || undefined;
     
     const bookings = await getConferenceRoomBookingsFromCalendar(searchName, searchEmail);
     const conferenceRoomId = await getConferenceRoomId();

@@ -338,7 +338,7 @@ router.get('/api/data-tools/available-sessions', isAdmin, async (req: Request, r
     `;
     
     if (memberEmail) {
-      queryBuilder.append(sql` AND LOWER(br.user_email) = ${(memberEmail as string).toLowerCase()}`);
+      queryBuilder.append(sql` AND LOWER(br.user_email) = ${(memberEmail as string).trim().toLowerCase()}`);
     }
     
     queryBuilder.append(sql` ORDER BY br.start_time ASC LIMIT 50`);
@@ -456,7 +456,7 @@ router.get('/api/data-tools/bookings-search', isStaffOrAdmin, async (req: Reques
     }
     
     if (memberEmail) {
-      queryBuilder.append(sql` AND LOWER(br.user_email) = ${(memberEmail as string).toLowerCase()}`);
+      queryBuilder.append(sql` AND LOWER(br.user_email) = ${(memberEmail as string).trim().toLowerCase()}`);
     }
     
     queryBuilder.append(sql` ORDER BY br.request_date DESC, br.start_time ASC LIMIT ${parseInt(limit as string) || 50}`);
@@ -623,7 +623,7 @@ router.get('/api/data-tools/audit-log', isAdmin, async (req: Request, res: Respo
 router.get('/api/data-tools/staff-activity', isAdmin, async (req: Request, res: Response) => {
   try {
     const limitParam = parseInt(req.query.limit as string) || 50;
-    const staffEmail = req.query.staff_email as string;
+    const staffEmail = (req.query.staff_email as string)?.trim()?.toLowerCase();
     const actionsParam = req.query.actions as string;
     const actorType = req.query.actor_type as string;
     

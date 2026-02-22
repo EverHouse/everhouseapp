@@ -72,7 +72,7 @@ router.get('/api/bookings/conflicts', async (req: Request, res: Response) => {
     }
 
     const userEmail = sessionUser.email?.toLowerCase() || '';
-    const isTargetSelf = memberEmail.toLowerCase() === userEmail;
+    const isTargetSelf = memberEmail.trim().toLowerCase() === userEmail;
     const isStaff = await isStaffOrAdminCheck(userEmail);
 
     if (!isTargetSelf && !isStaff) {
@@ -82,7 +82,7 @@ router.get('/api/bookings/conflicts', async (req: Request, res: Response) => {
     const excludeId = excludeBookingId ? parseInt(excludeBookingId as string) : undefined;
 
     const result = await checkMemberAvailability(
-      memberEmail,
+      memberEmail.trim().toLowerCase(),
       date,
       startTime,
       endTime,

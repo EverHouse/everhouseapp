@@ -503,11 +503,13 @@ router.post('/api/admin/linked-emails', isStaffOrAdmin, async (req: Request, res
 
 router.get('/api/admin/linked-emails/:email', isStaffOrAdmin, async (req: Request, res: Response) => {
   try {
-    const { email } = req.params;
+    const { email: rawEmail } = req.params;
     
-    if (!email) {
+    if (!rawEmail) {
       return res.status(400).json({ error: 'Email is required' });
     }
+    
+    const email = decodeURIComponent(rawEmail as string).trim().toLowerCase();
     
     const asLinked = await db.execute(sql`SELECT primary_email, linked_email, source, created_by, created_at
        FROM user_linked_emails 

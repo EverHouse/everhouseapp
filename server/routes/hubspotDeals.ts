@@ -27,8 +27,9 @@ const router = Router();
 
 router.get('/api/hubspot/deals/member/:email', isStaffOrAdmin, async (req, res) => {
   try {
-    const { email } = req.params;
-    const deal = await getMemberDealWithLineItems(email as string);
+    const { email: rawEmail } = req.params;
+    const email = decodeURIComponent(rawEmail as string).trim().toLowerCase();
+    const deal = await getMemberDealWithLineItems(email);
     
     if (!deal) {
       return res.json({ deal: null, message: 'No deal found for this member' });
@@ -158,10 +159,11 @@ router.delete('/api/hubspot/line-items/:lineItemId', isStaffOrAdmin, async (req,
 
 router.get('/api/hubspot/billing-audit/:email', isStaffOrAdmin, async (req, res) => {
   try {
-    const { email } = req.params;
+    const { email: rawEmail } = req.params;
+    const email = decodeURIComponent(rawEmail as string).trim().toLowerCase();
     const limit = parseInt(req.query.limit as string) || 50;
     
-    const auditLog = await getBillingAuditLog(email as string, limit);
+    const auditLog = await getBillingAuditLog(email, limit);
     res.json({ auditLog });
   } catch (error: unknown) {
     if (!isProduction) logger.error('Error fetching billing audit log', { error: error instanceof Error ? error : new Error(String(error)) });

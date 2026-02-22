@@ -1037,14 +1037,15 @@ router.post('/api/rsvps', isAuthenticated, async (req, res) => {
 
 router.delete('/api/rsvps/:event_id/:user_email', isAuthenticated, async (req, res) => {
   try {
-    const { event_id, user_email } = req.params;
+    const { event_id, user_email: rawUserEmail } = req.params;
+    const user_email = decodeURIComponent(rawUserEmail as string).trim().toLowerCase();
     
     const sessionUser = getSessionUser(req);
     if (!sessionUser) {
       return res.status(401).json({ error: 'Authentication required' });
     }
     const sessionEmail = sessionUser.email?.toLowerCase() || '';
-    const isOwnAction = sessionEmail === user_email.toLowerCase();
+    const isOwnAction = sessionEmail === user_email;
     const isAdminOrStaff = sessionUser.role === 'admin' || sessionUser.role === 'staff';
     if (!isOwnAction && !isAdminOrStaff) {
       return res.status(403).json({ error: 'You can only perform this action for yourself' });
