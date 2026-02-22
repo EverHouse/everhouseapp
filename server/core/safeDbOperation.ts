@@ -33,8 +33,8 @@ export async function safeDbTransaction<T>(
   } catch (error: unknown) {
     try {
       await client.query('ROLLBACK');
-    } catch {
-      // ROLLBACK failed, but we still want to report the original error
+    } catch (err) {
+      logger.warn('[safeDbTransaction] ROLLBACK failed, reporting original error', { error: err });
     }
     logger.error(`[safeDbTransaction] ${label}:`, { error: error });
     if (critical) {

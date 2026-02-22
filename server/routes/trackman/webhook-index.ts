@@ -1345,7 +1345,8 @@ router.post('/api/trackman/replay-webhooks-to-dev', isAdmin, async (req, res) =>
     
     try {
       new URL(dev_url);
-    } catch {
+    } catch (err) {
+      logger.debug('Invalid dev_url format for replay', { error: err });
       return res.status(400).json({ error: 'Invalid dev_url format' });
     }
     

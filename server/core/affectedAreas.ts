@@ -1,3 +1,4 @@
+import { logger } from './logger';
 import { db } from '../db';
 import { sql } from 'drizzle-orm';
 
@@ -76,8 +77,8 @@ export async function parseAffectedAreas(affectedAreas: string): Promise<number[
       }
       if (idSet.size > 0) return Array.from(idSet);
     }
-  } catch {
-    // Intentional: JSON.parse fallback — input may be comma-separated or plain text
+  } catch (err) {
+    logger.debug('JSON.parse fallback for affectedAreas — input may be comma-separated or plain text', { error: err });
   }
   
   if (affectedAreas.includes(',')) {

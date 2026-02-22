@@ -2616,7 +2616,7 @@ router.put('/api/admin/booking/:bookingId/members/:slotId/link', isStaffOrAdmin,
       const bookingDateTime = new Date(`${bookingDate}T${booking.start_time}`);
       
       if (bookingDateTime > now && booking.status === 'approved') {
-        const notificationMessage = `You've been added to a simulator booking on ${new Date(bookingDate as string).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}.`;
+        const notificationMessage = `You've been added to a simulator booking on ${new Date(bookingDate as string).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'America/Los_Angeles' })}.`;
         
         await db.execute(sql`INSERT INTO notifications (user_email, title, message, type, related_id, related_type)
            VALUES (${memberEmail.toLowerCase()}, ${'Added to Booking'}, ${notificationMessage}, ${'booking_approved'}, ${bookingId}, ${'booking_request'})`);

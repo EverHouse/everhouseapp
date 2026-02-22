@@ -16,7 +16,8 @@ async function syncWithRetry<T extends { error?: string }>(
   let result: T;
   try {
     result = await syncFn();
-  } catch {
+  } catch (err) {
+    logger.debug(`[Auto-sync] ${name} initial attempt threw, using fallback`, { error: err });
     result = fallback;
   }
 
@@ -33,7 +34,8 @@ async function syncWithRetry<T extends { error?: string }>(
 
   try {
     result = await syncFn();
-  } catch {
+  } catch (err) {
+    logger.debug(`[Auto-sync] ${name} retry attempt threw, using fallback`, { error: err });
     result = fallback;
   }
 

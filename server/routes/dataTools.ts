@@ -655,7 +655,7 @@ router.get('/api/data-tools/staff-activity', isAdmin, async (req: Request, res: 
     const parsedLogs = logs.map(log => ({
       ...log,
       details: typeof log.details === 'string' 
-        ? (() => { try { return JSON.parse(log.details); } catch { return log.details; } })()
+        ? (() => { try { return JSON.parse(log.details); } catch (err) { logger.debug('Failed to parse log details as JSON'); return log.details; } })()
         : log.details
     }));
     

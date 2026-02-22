@@ -53,8 +53,8 @@ export async function logAlert(event: Omit<AlertEvent, 'timestamp'>): Promise<vo
     .catch(() => {
       // Table might not exist yet - that's ok
     });
-  } catch {
-    // Silently fail if table doesn't exist
+  } catch (err) {
+    logger.debug('Failed to persist system alert, table may not exist', { error: err });
   }
 }
 

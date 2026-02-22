@@ -255,7 +255,7 @@ export async function checkDailyBookingLimit(
   
   if (bookingDate > maxBookingDate) {
     const formattedMaxDate = maxBookingDate.toLocaleDateString('en-US', { 
-      weekday: 'short', month: 'short', day: 'numeric' 
+      weekday: 'short', month: 'short', day: 'numeric', timeZone: 'America/Los_Angeles' 
     });
     return { 
       allowed: false, 

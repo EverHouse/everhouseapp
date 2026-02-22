@@ -24,6 +24,7 @@ export function getBookingConfirmationHtml(data: BookingConfirmationData): strin
     year: 'numeric',
     month: 'long',
     day: 'numeric',
+    timeZone: 'America/Los_Angeles',
   });
   
   const formattedTime = data.time.length === 5 
@@ -154,6 +155,7 @@ export function getBookingRescheduleHtml(data: BookingRescheduleData): string {
     year: 'numeric',
     month: 'long',
     day: 'numeric',
+    timeZone: 'America/Los_Angeles',
   });
 
   const formatTime = (t: string) =>

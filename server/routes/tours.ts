@@ -1087,6 +1087,7 @@ function getTourConfirmationHtml(data: { guestName: string; date: string; time: 
     year: 'numeric',
     month: 'long',
     day: 'numeric',
+    timeZone: 'America/Los_Angeles',
   });
 
   const formattedTime = data.time.length === 5

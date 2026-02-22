@@ -1725,7 +1725,7 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
                   SELECT 1 FROM booking_participants WHERE session_id = ${existing.sessionId} AND payment_status = 'paid'
                 ) AS has_paid_participants`);
               hasPaidFees = paidCheck.rows[0]?.has_paid || paidCheck.rows[0]?.has_paid_participants;
-            } catch { hasPaidFees = true; }
+            } catch (err) { logger.debug('Failed to parse fee, assuming paid', { error: err }); hasPaidFees = true; }
           }
           if (hasPaidFees) {
             process.stderr.write(`[Trackman Import] SKIPPED free: Cancelled booking #${existing.id} (Trackman ID: ${row.bookingId}) has completed payments — not safe to create duplicate\n`);

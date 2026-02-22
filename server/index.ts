@@ -231,7 +231,8 @@ async function initializeApp() {
           callback(null, true);
           return;
         }
-      } catch {
+      } catch (err) {
+        logger.debug('CORS origin parsing failed', { error: err });
       }
       callback(new Error('Not allowed by CORS'));
     };

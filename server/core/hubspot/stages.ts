@@ -17,7 +17,8 @@ async function isLiveStripeEnvironment(): Promise<boolean> {
     const { getStripeEnvironmentInfo } = await import('../stripe/client');
     const envInfo = await getStripeEnvironmentInfo();
     _isLiveStripeCache = envInfo.isLive;
-  } catch {
+  } catch (err) {
+    logger.debug('Failed to detect Stripe environment, falling back to deployment check', { error: err });
     _isLiveStripeCache = process.env.REPLIT_DEPLOYMENT === '1';
   }
   return _isLiveStripeCache;

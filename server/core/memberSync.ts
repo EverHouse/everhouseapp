@@ -1419,13 +1419,13 @@ export async function syncCommunicationLogsFromHubSpot(): Promise<{ synced: numb
                     try {
                       const contact = await hubspot.crm.contacts.basicApi.getById(contactId, ['email']);
                       memberEmail = contact.properties?.email?.toLowerCase() || null;
-                    } catch {
-                      // Contact not found
+                    } catch (err) {
+                      logger.debug('HubSpot contact not found by ID', { error: err });
                     }
                   }
                 }
-              } catch {
-                // Associations not available
+              } catch (err) {
+                logger.debug('HubSpot deal associations not available', { error: err });
               }
               
               if (!memberEmail) {
@@ -1573,13 +1573,13 @@ export async function syncCommunicationLogsFromHubSpot(): Promise<{ synced: numb
                 try {
                   const contact = await hubspot.crm.contacts.basicApi.getById(contactId, ['email']);
                   memberEmail = contact.properties?.email?.toLowerCase() || null;
-                } catch {
-                  // Contact not found
+                } catch (err) {
+                  logger.debug('HubSpot contact not found by ID for communication', { error: err });
                 }
               }
             }
-          } catch {
-            // Associations not available
+          } catch (err) {
+            logger.debug('HubSpot communication associations not available', { error: err });
           }
           
           if (!memberEmail) continue;

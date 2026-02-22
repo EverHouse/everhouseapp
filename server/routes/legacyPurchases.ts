@@ -211,7 +211,8 @@ function safeToISOString(value: Date | string | null | undefined): string {
     }
     const parsed = new Date(value);
     return isNaN(parsed.getTime()) ? '' : parsed.toISOString();
-  } catch {
+  } catch (err) {
+    logger.debug('Failed to convert value to ISO string', { error: err });
     return '';
   }
 }

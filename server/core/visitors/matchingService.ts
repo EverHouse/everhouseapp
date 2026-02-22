@@ -89,8 +89,8 @@ export async function findMatchingUser(criteria: MatchCriteria): Promise<User | 
         .where(and(ilike(userLinkedEmails.linkedEmail, trimmedEmail), sql`${users.archivedAt} IS NULL`))
         .limit(1);
       if (linkedResult.length > 0) return linkedResult[0].user;
-    } catch {
-      // Table may not exist in older schemas, continue silently
+    } catch (err) {
+      logger.debug('userLinkedEmails table may not exist in older schemas, continuing silently', { error: err });
     }
     
     // 1c. Check manuallyLinkedEmails JSONB field for linked email match

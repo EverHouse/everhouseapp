@@ -199,7 +199,8 @@ function isAllowedOrigin(origin: string | undefined): boolean {
     }
     
     return false;
-  } catch {
+  } catch (err) {
+    logger.debug('Origin validation failed', { error: err });
     return false;
   }
 }

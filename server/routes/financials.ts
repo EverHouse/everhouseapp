@@ -765,6 +765,7 @@ router.post('/api/financials/subscriptions/:subscriptionId/send-reminder', isSta
         year: 'numeric',
         month: 'long',
         day: 'numeric',
+        timeZone: 'America/Los_Angeles',
       }),
     });
 

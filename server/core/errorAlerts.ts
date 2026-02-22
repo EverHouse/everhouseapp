@@ -80,8 +80,8 @@ async function saveDailyStateToDb(): Promise<void> {
   if (!dbAvailable) return;
   try {
     await db.execute(sql`INSERT INTO system_settings (key, value, category, updated_at) VALUES ('alert_rate_limits', ${JSON.stringify(dailyState)}, 'system', NOW()) ON CONFLICT (key) DO UPDATE SET value = ${JSON.stringify(dailyState)}, updated_at = NOW()`);
-  } catch {
-    logger.warn('[ErrorAlert] Could not persist rate limits to database');
+  } catch (err) {
+    logger.warn('[ErrorAlert] Could not persist rate limits to database', { error: err });
   }
 }
 

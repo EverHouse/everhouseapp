@@ -540,7 +540,8 @@ function formatNotifDateTime(slotDate: string, time24: string): string {
     const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
     const timeStr = m === 0 ? `${h12} ${period}` : `${h12}:${String(m).padStart(2, '0')} ${period}`;
     return `${dayNames[d.getDay()]}, ${monthNames[month - 1]} ${day} at ${timeStr}`;
-  } catch {
+  } catch (err) {
+    logger.debug('Failed to format friendly date/time, using raw values', { error: err });
     return `${slotDate} at ${time24}`;
   }
 }
@@ -552,7 +553,8 @@ function calcDurationMin(startTime: string, endTime?: string): number | null {
     const [eh, em] = endTime.split(':').map(Number);
     const diff = (eh * 60 + em) - (sh * 60 + sm);
     return diff > 0 ? diff : null;
-  } catch {
+  } catch (err) {
+    logger.debug('Failed to calculate duration from time strings', { error: err });
     return null;
   }
 }

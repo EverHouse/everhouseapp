@@ -661,7 +661,7 @@ export async function assignMemberToBooking(bookingId: number, memberEmail: stri
     memberName: memberName
   });
   
-  const formattedDate = result.requestDate ? new Date(result.requestDate).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) : '';
+  const formattedDate = result.requestDate ? new Date(result.requestDate).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'America/Los_Angeles' }) : '';
   const formattedTime = result.startTime || '';
   
   if (memberEmail) {
@@ -1574,7 +1574,7 @@ export async function assignWithPlayers(
         : '';
       
       const dateStr = result.booking.requestDate 
-        ? new Date(result.booking.requestDate).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+        ? new Date(result.booking.requestDate).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'America/Los_Angeles' })
         : '';
       const timeStr = result.booking.startTime || '';
       

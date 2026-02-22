@@ -894,7 +894,7 @@ router.get('/api/member/balance', isAuthenticated, async (req: Request, res: Res
       }
       
       if (amountCents > 0) {
-        const dateStr = row.session_date ? new Date(row.session_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
+        const dateStr = row.session_date ? new Date(row.session_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/Los_Angeles' }) : '';
         breakdown.push({
           id: row.participant_id,
           sessionId: row.session_id,
@@ -909,7 +909,7 @@ router.get('/api/member/balance', isAuthenticated, async (req: Request, res: Res
     for (const row of guestResult.rows) {
       // Include all guest fees with cached_fee_cents > 0
       const amountCents = row.cached_fee_cents || GUEST_FEE_CENTS;
-      const dateStr = row.session_date ? new Date(row.session_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
+      const dateStr = row.session_date ? new Date(row.session_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/Los_Angeles' }) : '';
       breakdown.push({
         id: row.participant_id,
         sessionId: row.session_id,
@@ -959,7 +959,7 @@ router.get('/api/member/balance', isAuthenticated, async (req: Request, res: Res
                    WHERE bs.id = ${sessionId}
                 `);
                 const sData = sessionDataResult.rows[0];
-                const dateStr = sData?.session_date ? new Date(sData.session_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
+                const dateStr = sData?.session_date ? new Date(sData.session_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/Los_Angeles' }) : '';
 
                 const isGuest = sData?.participant_type === 'guest';
                 breakdown.push({
@@ -1031,7 +1031,7 @@ router.get('/api/member/balance', isAuthenticated, async (req: Request, res: Res
       const unfilledSlots = Math.max(0, declaredCount - 1 - nonOwnerCount);
       
       if (unfilledSlots > 0) {
-        const dateStr = row.session_date ? new Date(row.session_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
+        const dateStr = row.session_date ? new Date(row.session_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/Los_Angeles' }) : '';
         for (let i = 0; i < unfilledSlots; i++) {
           breakdown.push({
             id: -row.session_id * 1000 - i,
