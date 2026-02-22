@@ -677,7 +677,7 @@ async function autoMatchLegacyUnmatchedBookings(
   let matched = 0;
   let failed = 0;
 
-  const query = `
+  const queryResult = await db.execute(sql`
     SELECT tub.id, tub.booking_date, tub.start_time, tub.user_name, tub.notes
     FROM trackman_unmatched_bookings tub
     WHERE (tub.status = 'pending' OR tub.status = 'unmatched')
@@ -686,9 +686,7 @@ async function autoMatchLegacyUnmatchedBookings(
         WHERE br.trackman_booking_id = tub.trackman_booking_id::text
       )
     ORDER BY tub.booking_date DESC, tub.start_time DESC
-  `;
-  
-  const queryResult = await db.execute(sql.raw(query));
+  `);
   const rows = queryResult.rows as Array<Record<string, unknown>>;
   
   logger.info(`[AutoMatch] Processing ${rows.length} legacy unmatched bookings...`);
@@ -726,7 +724,7 @@ async function autoMatchBookingRequests(
 
   // Get unmatched booking_requests with GolfNow/lesson/visitor indicators
   // Check user_name, notes, staff_notes, and trackman_customer_notes for keywords
-  const query = `
+  const queryResult2 = await db.execute(sql`
     SELECT 
       id, 
       user_email,
@@ -767,9 +765,7 @@ async function autoMatchBookingRequests(
       )
     ORDER BY request_date DESC, start_time DESC
     LIMIT 500
-  `;
-  
-  const queryResult2 = await db.execute(sql.raw(query));
+  `);
   const rows = queryResult2.rows as Array<Record<string, unknown>>;
   
   logger.info(`[AutoMatch] Processing ${rows.length} GolfNow/walk-in booking_requests...`);

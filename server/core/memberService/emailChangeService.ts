@@ -48,13 +48,9 @@ export async function cascadeEmailChange(
         emailColumn: string,
         additionalCondition?: string
       ): Promise<number> => {
-        const query = `
-          UPDATE ${tableName}
-          SET ${emailColumn} = $1
-          WHERE LOWER(${emailColumn}) = LOWER($2)
-          ${additionalCondition || ''}
-        `;
-        const result = await tx.execute(sql.raw(query.replace('$1', `'${normalizedNewEmail}'`).replace('$2', `'${normalizedOldEmail}'`)));
+        const result = await tx.execute(
+          sql`UPDATE ${sql.raw(tableName)} SET ${sql.raw(emailColumn)} = ${normalizedNewEmail} WHERE LOWER(${sql.raw(emailColumn)}) = LOWER(${normalizedOldEmail}) ${additionalCondition ? sql.raw(additionalCondition) : sql``}`
+        );
         return result.rowCount || 0;
       };
 
@@ -192,7 +188,7 @@ export async function previewEmailChangeImpact(
   for (const { table, column } of tablesToCheck) {
     try {
       const result = await db.execute(
-        sql.raw(`SELECT COUNT(*) as count FROM ${table} WHERE LOWER(${column}) = LOWER('${email.replace(/'/g, "''")}')`)
+        sql`SELECT COUNT(*) as count FROM ${sql.raw(table)} WHERE LOWER(${sql.raw(column)}) = LOWER(${email.toLowerCase().trim()})`
       );
       const count = parseInt(result.rows[0].count, 10);
       if (count > 0) {

@@ -185,6 +185,7 @@ export async function getDailyUsageFromLedger(
         });
       }
     } catch (checkError: unknown) {
+      logger.warn('[getDailyUsageFromLedger] Ledger consistency check failed:', { error: checkError });
     }
 
     return parseInt((result.rows[0] as Record<string, unknown>).total_minutes as string) || 0;

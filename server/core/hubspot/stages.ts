@@ -212,6 +212,7 @@ export async function syncMemberToHubSpot(
           .limit(1);
         effectiveBillingProvider = userResult[0]?.billingProvider || null;
       } catch (e: unknown) {
+        logger.warn('[HubSpot Stages] Failed to fetch billingProvider for email:', { error: e });
       }
     }
 

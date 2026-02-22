@@ -680,6 +680,8 @@ router.put('/api/admin/trackman/unmatched/:id/resolve', isStaffOrAdmin, async (r
                   visitor_email: member.email as string,
                   created_via: 'trackman_resolve'
                 }
+              }, {
+                idempotencyKey: `inv_trackman_${customerId}_${booking.id}`
               });
               
               await stripe.invoiceItems.create({
@@ -688,6 +690,8 @@ router.put('/api/admin/trackman/unmatched/:id/resolve', isStaffOrAdmin, async (r
                 amount: amountCents as number,
                 currency: 'usd',
                 description: `Day Pass - Golf Simulator (${bookingDateStr})`
+              }, {
+                idempotencyKey: `invitem_trackman_${customerId}_${invoice.id}_${amountCents}`
               });
               
               await stripe.invoices.finalizeInvoice(invoice.id);

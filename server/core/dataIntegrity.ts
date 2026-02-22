@@ -1325,6 +1325,7 @@ async function checkTierReconciliation(): Promise<IntegrityCheckResult> {
           hubspotTierMap.set(contact.id, (contact.properties?.membership_tier || '').toLowerCase().trim());
         }
       } catch (batchErr: unknown) {
+        logger.warn('[DataIntegrity] HubSpot batch tier read failed:', { error: batchErr });
       }
     }
   }
