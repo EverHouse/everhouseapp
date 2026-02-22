@@ -132,6 +132,7 @@ async function checkWebhookIdempotency(trackmanBookingId: string, status?: strin
 }
 
 router.post('/api/webhooks/trackman', async (req: Request, res: Response) => {
+  try {
   logger.info('[Trackman Webhook] Received webhook', {
     extra: { 
       headers: Object.keys(req.headers).filter(h => h.startsWith('x-')),
@@ -346,6 +347,12 @@ router.post('/api/webhooks/trackman', async (req: Request, res: Response) => {
       undefined,
       getErrorMessage(error)
     );
+  }
+  } catch (error: unknown) {
+    logger.error('[Trackman Webhook] Unhandled error', { error: error instanceof Error ? error : new Error(String(error)) });
+    if (!res.headersSent) {
+      return res.status(500).json({ error: 'Internal server error' });
+    }
   }
 });
 

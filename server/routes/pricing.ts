@@ -3,10 +3,12 @@ import { PRICING, getCorporateVolumeTiers, getCorporateBasePrice } from '../core
 import { db } from '../db';
 import { membershipTiers } from '../../shared/schema';
 import { eq } from 'drizzle-orm';
+import { logger } from '../core/logger';
 
 const router = Router();
 
 router.get('/api/pricing', async (req, res) => {
+  try {
   const response: Record<string, unknown> = {
     guestFeeDollars: PRICING.GUEST_FEE_DOLLARS,
     overageRatePerBlockDollars: PRICING.OVERAGE_RATE_DOLLARS,
@@ -59,6 +61,10 @@ router.get('/api/pricing', async (req, res) => {
   }
 
   res.json(response);
+  } catch (error: unknown) {
+    logger.error('Failed to fetch pricing', { error: error instanceof Error ? error : new Error(String(error)) });
+    return res.status(500).json({ error: 'Failed to fetch pricing' });
+  }
 });
 
 export default router;

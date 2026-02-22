@@ -289,7 +289,7 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
                     <div className="absolute right-2 flex items-center gap-2">
                         {lastRefresh && (
                             <span className="text-[10px] text-gray-400 dark:text-gray-500 whitespace-nowrap hidden sm:inline">
-                                Updated {lastRefresh.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                                Updated {lastRefresh.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/Los_Angeles' })}
                             </span>
                         )}
                         <button
@@ -320,7 +320,7 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
                             }}
                             disabled={isSyncing}
                             className="p-1.5 rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-white/10 transition-colors disabled:opacity-50"
-                            title={lastRefresh ? `Refresh calendar (Last: ${lastRefresh.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })})` : 'Refresh calendar data'}
+                            title={lastRefresh ? `Refresh calendar (Last: ${lastRefresh.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/Los_Angeles' })})` : 'Refresh calendar data'}
                         >
                             <span className={`material-symbols-outlined text-lg ${isSyncing ? 'animate-spin' : ''}`}>sync</span>
                         </button>

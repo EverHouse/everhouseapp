@@ -52,6 +52,7 @@ export const MindbodyBillingSection: React.FC<MindbodyBillingSectionProps> = ({
       month: 'short',
       day: 'numeric',
       year: 'numeric',
+      timeZone: 'America/Los_Angeles',
     });
   };
 

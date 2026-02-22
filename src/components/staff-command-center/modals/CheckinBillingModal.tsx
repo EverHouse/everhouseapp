@@ -24,7 +24,8 @@ function formatBookingDate(dateStr: string | undefined): string {
   return date.toLocaleDateString('en-US', { 
     weekday: 'short', 
     month: 'short', 
-    day: 'numeric' 
+    day: 'numeric',
+    timeZone: 'America/Los_Angeles' 
   });
 }
 
@@ -416,7 +417,7 @@ export const CheckinBillingModal: React.FC<CheckinBillingModalProps> = ({
       const datePart = context.bookingDate.includes('T') ? context.bookingDate.split('T')[0] : context.bookingDate;
       const dateObj = new Date(datePart + 'T12:00:00');
       if (!isNaN(dateObj.getTime())) {
-        formattedDate = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        formattedDate = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'America/Los_Angeles' });
       }
     }
     

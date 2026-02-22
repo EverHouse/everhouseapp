@@ -218,6 +218,7 @@ const SubscriptionsSubTab: React.FC = () => {
       month: 'short',
       day: 'numeric',
       year: 'numeric',
+      timeZone: 'America/Los_Angeles',
     });
   };
 
@@ -570,6 +571,7 @@ const InvoicesSubTab: React.FC = () => {
       month: 'short',
       day: 'numeric',
       year: 'numeric',
+      timeZone: 'America/Los_Angeles',
     });
   };
 

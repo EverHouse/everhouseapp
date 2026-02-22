@@ -215,11 +215,16 @@ router.post('/api/hubspot/sync-deal-stage', isStaffOrAdmin, async (req, res) => 
 
 // Get last sync status
 router.get('/api/hubspot/sync-status', isStaffOrAdmin, async (req, res) => {
-  const lastSync = getLastMemberSyncTime();
-  res.json({ 
-    lastSyncTime: lastSync > 0 ? new Date(lastSync).toISOString() : null,
-    lastSyncTimestamp: lastSync
-  });
+  try {
+    const lastSync = getLastMemberSyncTime();
+    res.json({ 
+      lastSyncTime: lastSync > 0 ? new Date(lastSync).toISOString() : null,
+      lastSyncTimestamp: lastSync
+    });
+  } catch (error: unknown) {
+    logger.error('Failed to fetch sync status', { error: error instanceof Error ? error : new Error(String(error)) });
+    return res.status(500).json({ error: 'Failed to fetch sync status' });
+  }
 });
 
 // Manual trigger for full member sync (creates deals for all active members)

@@ -4,7 +4,7 @@ import { getPacificDateParts } from '../../utils/dateUtils';
 export const DateBlock: React.FC<{ dateStr: string; today: string }> = ({ dateStr, today }) => {
   const isToday = dateStr === today;
   const date = new Date(dateStr + 'T12:00:00');
-  const month = date.toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
+  const month = date.toLocaleDateString('en-US', { month: 'short', timeZone: 'America/Los_Angeles' }).toUpperCase();
   const day = date.getDate();
   
   return (

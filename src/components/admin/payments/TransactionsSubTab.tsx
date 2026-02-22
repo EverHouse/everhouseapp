@@ -352,7 +352,8 @@ const PendingAuthorizationsSection: React.FC<SectionProps> = ({ onClose, variant
                     month: 'short',
                     day: 'numeric',
                     hour: 'numeric',
-                    minute: '2-digit'
+                    minute: '2-digit',
+                    timeZone: 'America/Los_Angeles'
                   })}
                 </p>
               </div>
@@ -585,7 +586,7 @@ const FutureBookingsSection: React.FC<SectionProps> = ({ onClose, variant = 'mod
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr + 'T00:00:00');
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/Los_Angeles' });
   };
 
   const content = loading ? (
@@ -823,7 +824,8 @@ const FailedPaymentsSection: React.FC<SectionProps> = ({ onClose, variant = 'mod
                     month: 'short',
                     day: 'numeric',
                     hour: 'numeric',
-                    minute: '2-digit'
+                    minute: '2-digit',
+                    timeZone: 'America/Los_Angeles'
                   })}
                 </p>
               </div>
@@ -971,7 +973,7 @@ const RefundsSection: React.FC<SectionProps> = ({ onClose, variant = 'modal' }) 
           <div className="text-right flex-shrink-0">
             <p className="font-bold text-purple-600 dark:text-purple-400">${(payment.amount / 100).toFixed(2)}</p>
             <p className="text-xs text-primary/50 dark:text-white/50">
-              {new Date(payment.createdAt).toLocaleDateString()}
+              {new Date(payment.createdAt).toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' })}
             </p>
           </div>
           <span className="px-2 py-1 text-xs rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 font-medium flex-shrink-0">

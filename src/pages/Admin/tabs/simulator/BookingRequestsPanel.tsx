@@ -509,7 +509,7 @@ const BookingRequestsPanel: React.FC<BookingRequestsPanelProps> = ({
                                                         </div>
                                                         
                                                         <p className={`text-sm mb-1 ${isUnmatched ? 'text-amber-700 dark:text-amber-400' : 'text-primary/80 dark:text-white/80'}`}>
-                                                            {new Date(booking.request_date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} • {formatTime12Hour(booking.start_time)} - {formatTime12Hour(booking.end_time)}
+                                                            {new Date(booking.request_date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'America/Los_Angeles' })} • {formatTime12Hour(booking.start_time)} - {formatTime12Hour(booking.end_time)}
                                                         </p>
                                                         
                                                         {booking.trackman_booking_id && !isConferenceRoom && (

@@ -8,7 +8,7 @@ const formatDateForDisplay = (dateStr: string): string => {
   try {
     const [y, m, d] = datePart.split('-').map(Number);
     const date = new Date(y, m - 1, d);
-    return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'America/Los_Angeles' });
   } catch {
     return dateStr;
   }

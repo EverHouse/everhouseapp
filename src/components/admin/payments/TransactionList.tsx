@@ -213,7 +213,7 @@ const RecentTransactionsSection = forwardRef<TransactionListRef, SectionProps>((
           <div className="text-right flex-shrink-0">
             <p className="font-bold text-primary dark:text-white">${(tx.amount / 100).toFixed(2)}</p>
             <p className="text-xs text-primary/50 dark:text-white/50">
-              {new Date(tx.createdAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+              {new Date(tx.createdAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/Los_Angeles' })}
             </p>
           </div>
         </div>
@@ -248,7 +248,7 @@ const RecentTransactionsSection = forwardRef<TransactionListRef, SectionProps>((
                     <div key={note.id} className="p-3 rounded-lg bg-primary/5 dark:bg-white/5">
                       <p className="text-sm text-primary dark:text-white">{note.note}</p>
                       <p className="text-xs text-primary/50 dark:text-white/50 mt-1">
-                        {note.performedByName} · {new Date(note.createdAt).toLocaleString()}
+                        {note.performedByName} · {new Date(note.createdAt).toLocaleString('en-US', { timeZone: 'America/Los_Angeles' })}
                       </p>
                     </div>
                   ))

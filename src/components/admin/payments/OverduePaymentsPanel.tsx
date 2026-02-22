@@ -88,7 +88,7 @@ const OverduePaymentsPanel: React.FC<SectionProps> = ({ onClose, variant = 'moda
         >
           <div className="flex flex-col items-center justify-center min-w-[44px] h-[44px] rounded-lg bg-red-100 dark:bg-red-900/30">
             <span className="text-[10px] font-semibold text-red-600 dark:text-red-400 uppercase">
-              {new Date(payment.bookingDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'short' }).toUpperCase()}
+              {new Date(payment.bookingDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', timeZone: 'America/Los_Angeles' }).toUpperCase()}
             </span>
             <span className="text-lg font-bold text-red-600 dark:text-red-400 leading-none">
               {new Date(payment.bookingDate + 'T12:00:00').getDate()}

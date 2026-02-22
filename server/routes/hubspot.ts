@@ -545,6 +545,7 @@ async function enrichContactsWithDbData(contacts: Record<string, unknown>[]): Pr
 }
 
 router.get('/api/hubspot/contacts', isStaffOrAdmin, async (req, res) => {
+  try {
   const forceRefresh = req.query.refresh === 'true';
   const statusFilter = (req.query.status as string)?.toLowerCase() || 'active';
   const searchQuery = (req.query.search as string)?.toLowerCase().trim() || '';
@@ -668,6 +669,10 @@ router.get('/api/hubspot/contacts', isStaffOrAdmin, async (req, res) => {
   }
   
   return res.json(buildResponse([], true, true));
+  } catch (error: unknown) {
+    logger.error('Failed to fetch contacts', { error: error instanceof Error ? error : new Error(String(error)) });
+    return res.status(500).json({ error: 'Failed to fetch contacts' });
+  }
 });
 
 router.get('/api/hubspot/contacts/:id', isStaffOrAdmin, async (req, res) => {
@@ -1227,6 +1232,7 @@ router.post('/api/hubspot/sync-tiers', isStaffOrAdmin, async (req, res) => {
  * Staff/admin only with audit logging
  */
 router.put('/api/hubspot/contacts/:id/tier', isStaffOrAdmin, async (req, res) => {
+  try {
   const { id } = req.params;
   const { tier } = req.body;
   const staffUser = (req as Request & { staffUser?: { name?: string } }).staffUser;
@@ -1239,8 +1245,6 @@ router.put('/api/hubspot/contacts/:id/tier', isStaffOrAdmin, async (req, res) =>
   if (!validTiers.includes(tier)) {
     return res.status(400).json({ error: `Invalid tier. Must be one of: ${validTiers.join(', ')}` });
   }
-  
-  try {
     const hubspot = await getHubSpotClient();
     
     // Look up user by ID (UUID) first to get their email - the universal identifier
@@ -1331,6 +1335,7 @@ router.put('/api/hubspot/contacts/:id/tier', isStaffOrAdmin, async (req, res) =>
  * Raw body is captured by express.json verify function in server/index.ts
  */
 router.post('/api/hubspot/webhooks', async (req, res) => {
+  try {
   if (!validateHubSpotWebhookSignature(req)) {
     logger.warn('[HubSpot Webhook] Signature validation failed');
     return res.status(401).json({ error: 'Invalid signature' });
@@ -1448,6 +1453,12 @@ router.post('/api/hubspot/webhooks', async (req, res) => {
     }
   } catch (error: unknown) {
     logger.error('[HubSpot Webhook] Error processing event', { error: error instanceof Error ? error : new Error(String(error)) });
+  }
+  } catch (error: unknown) {
+    logger.error('[HubSpot Webhook] Unhandled error', { error: error instanceof Error ? error : new Error(String(error)) });
+    if (!res.headersSent) {
+      return res.status(500).json({ error: 'Internal server error' });
+    }
   }
 });
 

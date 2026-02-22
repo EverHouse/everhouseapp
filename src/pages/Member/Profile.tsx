@@ -1055,7 +1055,7 @@ const Profile: React.FC = () => {
             </p>
             {dataExportRequestedAt ? (
               <p className={`text-sm ml-9 ${isDark ? 'text-accent' : 'text-green-600'}`}>
-                ✓ Request submitted on {new Date(dataExportRequestedAt).toLocaleDateString()}
+                ✓ Request submitted on {new Date(dataExportRequestedAt).toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' })}
               </p>
             ) : (
               <button

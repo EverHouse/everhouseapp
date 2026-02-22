@@ -8,7 +8,7 @@ import { formatRelativeTime, formatCardTimestamp, getRelativeDateLabel } from '.
 const formatDate = (dateStr: string): string => {
     try {
         const date = new Date(dateStr);
-        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'America/Los_Angeles' });
     } catch {
         return dateStr;
     }

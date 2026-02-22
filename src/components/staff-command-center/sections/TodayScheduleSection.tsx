@@ -22,7 +22,7 @@ const NextTourWidget: React.FC<NextTourWidgetProps> = ({ nextTour, isDesktop, on
 
   const getDateDisplay = () => {
     if (nextTour) {
-      const dateStr = new Date(nextTour.tourDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+      const dateStr = new Date(nextTour.tourDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'America/Los_Angeles' });
       return nextTour.startTime ? `${dateStr} at ${formatTime12Hour(nextTour.startTime)}` : dateStr;
     }
     return '';
@@ -91,22 +91,22 @@ const NextEventWidget: React.FC<NextEventWidgetProps> = ({ nextActivityItem, nex
   const getDateDisplay = () => {
     if (isEvent && event) {
       const normalized = normalizeDateStr(event.event_date);
-      const dateStr = new Date(normalized + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+      const dateStr = new Date(normalized + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'America/Los_Angeles' });
       return event.start_time ? `${dateStr} at ${formatTime12Hour(event.start_time)}` : dateStr;
     }
     if (isWellness && wellness) {
       const normalized = normalizeDateStr(wellness.date);
-      const dateStr = new Date(normalized + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+      const dateStr = new Date(normalized + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'America/Los_Angeles' });
       return wellness.time ? `${dateStr} at ${formatTime12Hour(wellness.time)}` : dateStr;
     }
     if (useFallbackEvent && fallbackEvent) {
       const normalized = normalizeDateStr(fallbackEvent.event_date);
-      const dateStr = new Date(normalized + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+      const dateStr = new Date(normalized + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'America/Los_Angeles' });
       return fallbackEvent.start_time ? `${dateStr} at ${formatTime12Hour(fallbackEvent.start_time)}` : dateStr;
     }
     if (useFallbackWellness && fallbackWellness) {
       const normalized = normalizeDateStr(fallbackWellness.date);
-      const dateStr = new Date(normalized + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+      const dateStr = new Date(normalized + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'America/Los_Angeles' });
       return fallbackWellness.time ? `${dateStr} at ${formatTime12Hour(fallbackWellness.time)}` : dateStr;
     }
     return '';

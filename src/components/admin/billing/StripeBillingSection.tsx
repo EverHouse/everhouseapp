@@ -107,6 +107,7 @@ function formatDate(timestamp: number | string | undefined): string {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
+    timeZone: 'America/Los_Angeles',
   });
 }
 

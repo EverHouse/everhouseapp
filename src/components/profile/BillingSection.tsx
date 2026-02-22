@@ -178,7 +178,7 @@ export default function BillingSection({ isDark }: Props) {
       return 'Date unavailable';
     }
     return date.toLocaleDateString('en-US', {
-      month: 'short', day: 'numeric', year: 'numeric'
+      month: 'short', day: 'numeric', year: 'numeric', timeZone: 'America/Los_Angeles'
     });
   };
 
@@ -474,7 +474,7 @@ export default function BillingSection({ isDark }: Props) {
                           {inv.status}
                         </span>
                         <span className={`text-xs ${isDark ? 'opacity-60' : 'text-primary/60'}`}>
-                          {new Date(inv.created * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                          {new Date(inv.created * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/Los_Angeles' })}
                         </span>
                       </div>
                       <div className="flex items-center gap-2">

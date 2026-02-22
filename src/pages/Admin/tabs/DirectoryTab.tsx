@@ -179,7 +179,7 @@ const formatJoinDate = (dateStr: string | null | undefined): string => {
     try {
         const date = new Date(dateStr);
         if (isNaN(date.getTime())) return '-';
-        return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+        return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric', timeZone: 'America/Los_Angeles' });
     } catch {
         return '-';
     }
@@ -1294,7 +1294,7 @@ const DirectoryTab: React.FC = () => {
 
                 <p className="text-xs text-gray-500 dark:text-gray-400">
                     {memberTab === 'visitors' 
-                        ? `Showing ${visitors.length} of ${visitorsTotal.toLocaleString()} visitor${visitorsTotal !== 1 ? 's' : ''}`
+                        ? `Showing ${visitors.length} of ${visitorsTotal.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' })} visitor${visitorsTotal !== 1 ? 's' : ''}`
                         : memberTab === 'team'
                         ? `${filteredTeamMembers.length} team member${filteredTeamMembers.length !== 1 ? 's' : ''}`
                         : `${filteredList.length} ${memberTab === 'former' ? 'former ' : ''}member${filteredList.length !== 1 ? 's' : ''} found`
@@ -1493,7 +1493,7 @@ const DirectoryTab: React.FC = () => {
                         )}
 
                         <span className="text-sm text-gray-500 dark:text-white/60">
-                            {visitorsTotal.toLocaleString()} {visitorArchiveView === 'archived' ? 'archived' : ''} contacts
+                            {visitorsTotal.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' })} {visitorArchiveView === 'archived' ? 'archived' : ''} contacts
                         </span>
                     </div>
                 )}

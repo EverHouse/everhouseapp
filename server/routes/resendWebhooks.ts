@@ -157,6 +157,7 @@ async function handleEmailDeliveryDelayed(event: ResendEmailEvent) {
 }
 
 router.post('/api/webhooks/resend', async (req: Request, res: Response) => {
+  try {
   const svixHeaders = {
     'svix-id': req.headers['svix-id'] as string,
     'svix-timestamp': req.headers['svix-timestamp'] as string,
@@ -234,6 +235,12 @@ router.post('/api/webhooks/resend', async (req: Request, res: Response) => {
       extra: { eventType: event.type }
     });
     res.status(500).json({ error: 'Internal server error' });
+  }
+  } catch (error: unknown) {
+    logger.error('Unhandled error in Resend webhook handler', { error: error instanceof Error ? error : new Error(String(error)) });
+    if (!res.headersSent) {
+      return res.status(500).json({ error: 'Internal server error' });
+    }
   }
 });
 

@@ -350,7 +350,7 @@ function PauseDurationModal({
 
   const getResumeDate = (days: number) => {
     const date = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
-    return date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+    return date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'America/Los_Angeles' });
   };
 
   return (
@@ -676,7 +676,7 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({
         const data = await res.json();
         await fetchBillingInfo();
         setShowPauseModal(false);
-        const resumeDate = new Date(data.resumeDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+        const resumeDate = new Date(data.resumeDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'America/Los_Angeles' });
         showSuccess(`Subscription paused for ${durationDays} days. Billing resumes on ${resumeDate}.`);
       } else {
         setError(getApiErrorMessage(res, 'pause subscription'));
@@ -1296,7 +1296,7 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({
                     Member has updated payment info and is ready to migrate from MindBody
                   </p>
                   <p className={`text-xs mt-1 ${isDark ? 'text-amber-400/80' : 'text-amber-600'}`}>
-                    Migration requested on {new Date(billingInfo.billingMigrationRequestedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+                    Migration requested on {new Date(billingInfo.billingMigrationRequestedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'America/Los_Angeles' })}
                   </p>
                   <button
                     onClick={() => handleUpdateBillingSource('stripe')}

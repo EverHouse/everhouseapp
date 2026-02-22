@@ -471,7 +471,7 @@ const Corporate: React.FC = () => {
                    </div>
                    <div className="flex items-center justify-between p-4 bg-primary/5 dark:bg-white/5 rounded-2xl">
                       <span className="text-sm font-semibold text-primary dark:text-white">Estimated Monthly Total</span>
-                      <span className="text-2xl font-bold text-primary dark:text-white">${(employeeCount * getPricePerEmployee(employeeCount)).toLocaleString()}</span>
+                      <span className="text-2xl font-bold text-primary dark:text-white">${(employeeCount * getPricePerEmployee(employeeCount)).toLocaleString('en-US', { timeZone: 'America/Los_Angeles' })}</span>
                    </div>
                 </div>
              </div>

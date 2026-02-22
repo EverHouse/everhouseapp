@@ -126,7 +126,7 @@ const ClosureAlert: React.FC = () => {
   const formatDateDisplay = (dateStr: string): string => {
     if (!dateStr) return '';
     const date = new Date(dateStr + 'T12:00:00');
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/Los_Angeles' });
   };
 
   if (isLoading || activeClosures.length === 0) return null;

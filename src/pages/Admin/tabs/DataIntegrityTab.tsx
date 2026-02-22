@@ -1718,7 +1718,7 @@ const DataIntegrityTab: React.FC = () => {
               })}
             </div>
             <p className="text-xs text-gray-500 dark:text-gray-400 text-right">
-              Checked {new Date(systemHealth.timestamp).toLocaleTimeString()}
+              Checked {new Date(systemHealth.timestamp).toLocaleTimeString('en-US', { timeZone: 'America/Los_Angeles' })}
             </p>
           </div>
         ) : (
@@ -1831,7 +1831,7 @@ const DataIntegrityTab: React.FC = () => {
                   ))}
                 </div>
                 <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Last checked: {new Date(calendarStatus.timestamp).toLocaleString()}
+                  Last checked: {new Date(calendarStatus.timestamp).toLocaleString('en-US', { timeZone: 'America/Los_Angeles' })}
                 </p>
               </>
             ) : (
@@ -1896,7 +1896,7 @@ const DataIntegrityTab: React.FC = () => {
                         {historyData.history.slice(0, 10).map((entry) => (
                           <div key={entry.id} className="flex items-center justify-between text-sm">
                             <span className="text-gray-600 dark:text-gray-400">
-                              {new Date(entry.runAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                              {new Date(entry.runAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'America/Los_Angeles' })}
                             </span>
                             <div className="flex items-center gap-2">
                               <span className={`text-xs font-medium ${entry.totalIssues === 0 ? 'text-green-600 dark:text-green-400' : 'text-gray-700 dark:text-gray-300'}`}>
@@ -1962,7 +1962,7 @@ const DataIntegrityTab: React.FC = () => {
                         {entry.action}
                       </span>
                       <span className="text-[10px] text-gray-500 dark:text-gray-500">
-                        {new Date(entry.actionAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                        {new Date(entry.actionAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'America/Los_Angeles' })}
                       </span>
                     </div>
                     <p className="text-xs text-gray-700 dark:text-gray-300 font-mono truncate">{entry.issueKey}</p>

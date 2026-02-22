@@ -36,7 +36,7 @@ const formatTime12h = (time24: string): string => {
 
 const formatDateNice = (dateStr: string): string => {
   const d = new Date(dateStr + 'T12:00:00');
-  return d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+  return d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric', timeZone: 'America/Los_Angeles' });
 };
 
 const generateNext14Days = (): string[] => {
@@ -152,9 +152,9 @@ const BookTour: React.FC = () => {
 
   const getDayLabel = (dateStr: string) => {
     const d = new Date(dateStr + 'T12:00:00');
-    const dayName = d.toLocaleDateString('en-US', { weekday: 'short' });
+    const dayName = d.toLocaleDateString('en-US', { weekday: 'short', timeZone: 'America/Los_Angeles' });
     const dayNum = d.getDate();
-    const month = d.toLocaleDateString('en-US', { month: 'short' });
+    const month = d.toLocaleDateString('en-US', { month: 'short', timeZone: 'America/Los_Angeles' });
     return { dayName, dayNum, month };
   };
 

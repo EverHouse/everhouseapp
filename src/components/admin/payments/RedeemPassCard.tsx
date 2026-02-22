@@ -494,7 +494,7 @@ const RedeemDayPassSection: React.FC<SectionProps> = ({ onClose, variant = 'moda
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'America/Los_Angeles' });
   };
 
   const formatDateTime = (dateStr: string) => {
@@ -505,7 +505,8 @@ const RedeemDayPassSection: React.FC<SectionProps> = ({ onClose, variant = 'moda
       year: 'numeric',
       hour: 'numeric',
       minute: '2-digit',
-      hour12: true
+      hour12: true,
+      timeZone: 'America/Los_Angeles'
     });
   };
 
@@ -514,7 +515,8 @@ const RedeemDayPassSection: React.FC<SectionProps> = ({ onClose, variant = 'moda
     return date.toLocaleTimeString('en-US', { 
       hour: 'numeric',
       minute: '2-digit',
-      hour12: true
+      hour12: true,
+      timeZone: 'America/Los_Angeles'
     });
   };
 

@@ -242,7 +242,8 @@ const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
           const formatted = new Date(date).toLocaleDateString('en-US', { 
             month: 'short', 
             day: 'numeric', 
-            year: 'numeric' 
+            year: 'numeric',
+            timeZone: 'America/Los_Angeles'
           });
           parts.push(formatted);
         } catch {
@@ -955,7 +956,7 @@ const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
                                     <span className="font-medium text-sm">{issue.description}</span>
                                     {issue.ignored && issue.ignoreInfo && (
                                       <span className="text-[10px] bg-gray-200 dark:bg-gray-700 px-1.5 py-0.5 rounded">
-                                        Ignored until {new Date(issue.ignoreInfo.expiresAt).toLocaleDateString()}
+                                        Ignored until {new Date(issue.ignoreInfo.expiresAt).toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' })}
                                       </span>
                                     )}
                                   </div>

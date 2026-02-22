@@ -205,7 +205,7 @@ function CorporateCheckoutForm({ tier, email, initialQuantity }: CorporateChecko
                 {jobTitle && <span className="ml-2">({jobTitle})</span>}
               </div>
               <div className="text-primary dark:text-white font-medium">
-                {quantity} seats × ${pricePerSeat}/mo = ${totalMonthly.toLocaleString()}/mo
+                {quantity} seats × ${pricePerSeat}/mo = ${totalMonthly.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' })}/mo
               </div>
             </div>
             <div className="text-primary/60 dark:text-white/60 text-xs">
@@ -361,7 +361,7 @@ function CorporateCheckoutForm({ tier, email, initialQuantity }: CorporateChecko
           </div>
           <div className="border-t border-primary/10 dark:border-white/10 pt-3 flex justify-between">
             <span className="text-primary dark:text-white font-semibold">Total Monthly</span>
-            <span className="text-2xl font-bold text-accent">${totalMonthly.toLocaleString()}</span>
+            <span className="text-2xl font-bold text-accent">${totalMonthly.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' })}</span>
           </div>
         </div>
 

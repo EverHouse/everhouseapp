@@ -212,7 +212,7 @@ export function TierChangeWizard({ isOpen, onClose, memberEmail, subscriptionId,
               </p>
               <p className={`text-xs ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
                 Effective: {preview.effectiveDate && new Date(preview.effectiveDate).getFullYear() > 1970 
-                  ? new Date(preview.effectiveDate).toLocaleDateString() 
+                  ? new Date(preview.effectiveDate).toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' }) 
                   : immediate ? 'Today' : 'Next billing cycle'}
               </p>
             </div>

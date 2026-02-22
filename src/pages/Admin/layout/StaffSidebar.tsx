@@ -180,7 +180,7 @@ export const StaffSidebar: React.FC<StaffSidebarProps> = ({
 
       <div className="px-3 py-4 border-t border-white/10 flex-shrink-0">
         <p className="text-white/40 text-[10px] text-center">
-          v{getLatestVersion().version} · Updated {new Date(getLatestVersion().date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+          v{getLatestVersion().version} · Updated {new Date(getLatestVersion().date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'America/Los_Angeles' })}
         </p>
       </div>
     </aside>

@@ -37,7 +37,7 @@ const formatImportLabel = (filename: string, createdAt?: string): string => {
     const [, startDate, , endDate] = dateRangeMatch;
     const formatShort = (d: string) => {
       const date = new Date(d + 'T12:00:00');
-      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/Los_Angeles' });
     };
     const startYear = startDate.substring(0, 4);
     

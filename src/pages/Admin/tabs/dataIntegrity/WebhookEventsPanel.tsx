@@ -24,7 +24,7 @@ function formatTime(dateStr: string | null): string {
   const diff = Date.now() - d.getTime();
   if (diff < 3600000) return `${Math.round(diff / 60000)}m ago`;
   if (diff < 86400000) return `${Math.round(diff / 3600000)}h ago`;
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'America/Los_Angeles' });
 }
 
 interface Props {
@@ -150,9 +150,9 @@ const WebhookEventsPanel: React.FC<Props> = ({ isOpen, onToggle }) => {
                             {event.matchedUserId && (
                               <p className="text-gray-600 dark:text-gray-400"><strong>Matched User:</strong> {event.matchedUserId}</p>
                             )}
-                            <p className="text-gray-500 dark:text-gray-500"><strong>Created:</strong> {new Date(event.createdAt).toLocaleString()}</p>
+                            <p className="text-gray-500 dark:text-gray-500"><strong>Created:</strong> {new Date(event.createdAt).toLocaleString('en-US', { timeZone: 'America/Los_Angeles' })}</p>
                             {event.processedAt && (
-                              <p className="text-gray-500 dark:text-gray-500"><strong>Processed:</strong> {new Date(event.processedAt).toLocaleString()}</p>
+                              <p className="text-gray-500 dark:text-gray-500"><strong>Processed:</strong> {new Date(event.processedAt).toLocaleString('en-US', { timeZone: 'America/Los_Angeles' })}</p>
                             )}
                           </div>
                         </td>

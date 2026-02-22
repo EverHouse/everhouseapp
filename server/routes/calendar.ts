@@ -44,11 +44,16 @@ router.get('/api/admin/calendars', isStaffOrAdmin, async (req, res) => {
 // DEPRECATED: Golf calendar sync removed - availability is now calculated from booking_requests table
 // Use /api/availability/:date endpoint instead for golf simulator availability
 router.get('/api/calendar-availability/golf', async (req, res) => {
-  res.status(410).json({ 
-    error: 'DEPRECATED: Golf calendar availability endpoint is no longer available',
-    message: 'Golf simulator availability is now calculated from the booking database. Use /api/availability/:date instead.',
-    deprecated_at: '2026-01-06'
-  });
+  try {
+    res.status(410).json({ 
+      error: 'DEPRECATED: Golf calendar availability endpoint is no longer available',
+      message: 'Golf simulator availability is now calculated from the booking database. Use /api/availability/:date instead.',
+      deprecated_at: '2026-01-06'
+    });
+  } catch (error: unknown) {
+    logger.error('Failed to fetch calendar availability', { error: error instanceof Error ? error : new Error(String(error)) });
+    return res.status(500).json({ error: 'Failed to fetch calendar availability' });
+  }
 });
 
 router.get('/api/calendar-availability/conference', async (req, res) => {
