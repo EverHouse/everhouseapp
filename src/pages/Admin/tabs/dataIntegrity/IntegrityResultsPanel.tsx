@@ -218,6 +218,9 @@ const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
       case 'missing_relationship': return 'Missing Relationships';
       case 'sync_mismatch': return 'Sync Mismatches';
       case 'data_quality': return 'Data Quality';
+      case 'billing_issue': return 'Billing Issues';
+      case 'booking_issue': return 'Booking Issues';
+      case 'system_error': return 'System Errors';
       default: return category;
     }
   };
@@ -761,6 +764,94 @@ const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
           </div>
         );
 
+      case 'Stale Pending Bookings':
+        return (
+          <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3 mb-4">
+            <p className="text-xs text-blue-700 dark:text-blue-300 mb-2">
+              <strong>Quick Fix:</strong> Bulk cancel all stale bookings that are past their start time by more than 24 hours
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  if (confirm('Cancel ALL stale pending/approved bookings that are past their start time? This cannot be undone.')) {
+                    fixIssueMutation.mutate({ endpoint: '/api/data-integrity/fix/bulk-cancel-stale-bookings', body: {} });
+                  }
+                }}
+                disabled={fixIssueMutation.isPending}
+                className="tactile-btn px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-1"
+              >
+                {fixIssueMutation.isPending && <span className="material-symbols-outlined animate-spin text-[14px]">progress_activity</span>}
+                <span className="material-symbols-outlined text-[14px]">cancel</span>
+                Cancel All Stale Bookings
+              </button>
+            </div>
+          </div>
+        );
+
+      case 'Stuck Transitional Members':
+        return (
+          <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3 mb-4">
+            <p className="text-xs text-blue-700 dark:text-blue-300 mb-2">
+              <strong>About:</strong> These members have active Stripe subscriptions but are stuck in pending/non-member status. Use the activate button on individual issues below to fix them.
+            </p>
+          </div>
+        );
+
+      case 'Duplicate Stripe Customers':
+        return (
+          <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3 mb-4">
+            <p className="text-xs text-blue-700 dark:text-blue-300 mb-2">
+              <strong>About:</strong> Members with multiple Stripe customer records. Use the merge button on individual issues to consolidate into one customer record.
+            </p>
+          </div>
+        );
+
+      case 'Tier Reconciliation':
+        return (
+          <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3 mb-4">
+            <p className="text-xs text-blue-700 dark:text-blue-300 mb-2">
+              <strong>About:</strong> Members whose tier in the app doesn't match their Stripe subscription tier. Use the accept buttons on individual issues to resolve the mismatch.
+            </p>
+          </div>
+        );
+
+      case 'Invoice-Booking Reconciliation':
+        return (
+          <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3 mb-4">
+            <p className="text-xs text-blue-700 dark:text-blue-300 mb-2">
+              <strong>About:</strong> Bookings where participants have unpaid fees but no Stripe invoice was created. Open individual bookings below to review and create invoices.
+            </p>
+          </div>
+        );
+
+      case 'Guest Pass Accounting Drift':
+        return (
+          <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3 mb-4">
+            <p className="text-xs text-blue-700 dark:text-blue-300 mb-2">
+              <strong>About:</strong> Guest pass counts that don't match actual usage. Use recalculate buttons on individual issues, or release expired holds.
+            </p>
+          </div>
+        );
+
+      case 'Overlapping Bookings':
+        return (
+          <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3 mb-4">
+            <p className="text-xs text-blue-700 dark:text-blue-300 mb-2">
+              <strong>About:</strong> Confirmed bookings that overlap on the same bay. Open individual bookings below to reschedule or cancel one of the conflicting bookings.
+            </p>
+          </div>
+        );
+
+      case 'Orphaned Payment Intents':
+        return (
+          <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3 mb-4">
+            <p className="text-xs text-blue-700 dark:text-blue-300 mb-2">
+              <strong>About:</strong> Payment intents in Stripe that aren't linked to any booking or invoice. Cancel them to keep your Stripe account clean.
+            </p>
+          </div>
+        );
+
       default:
         return null;
     }
@@ -1248,6 +1339,206 @@ const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
                                         <span className="material-symbols-outlined text-[16px]">swap_horiz</span>
                                       </button>
                                     </>
+                                  )}
+                                  {!issue.ignored && issue.table === 'booking_requests' && issue.category === 'booking_issue' && (
+                                    <>
+                                      <button
+                                        type="button"
+                                        onClick={() => setBookingSheet({
+                                          isOpen: true,
+                                          bookingId: typeof issue.recordId === 'number' ? issue.recordId : parseInt(String(issue.recordId)),
+                                          memberEmail: issue.context?.memberEmail || issue.context?.userEmail,
+                                          bookingDate: issue.context?.bookingDate,
+                                          timeSlot: issue.context?.startTime,
+                                        })}
+                                        className="p-1.5 text-blue-600 hover:bg-blue-100 dark:text-blue-400 dark:hover:bg-blue-900/30 rounded transition-colors"
+                                        title="Open booking details"
+                                      >
+                                        <span className="material-symbols-outlined text-[16px]">open_in_new</span>
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleCancelBooking(typeof issue.recordId === 'number' ? issue.recordId : parseInt(String(issue.recordId)))}
+                                        disabled={cancellingBookings.has(typeof issue.recordId === 'number' ? issue.recordId : parseInt(String(issue.recordId)))}
+                                        className="p-1.5 text-red-600 hover:bg-red-100 dark:text-red-400 dark:hover:bg-red-900/30 rounded transition-colors disabled:opacity-50"
+                                        title="Cancel this booking"
+                                      >
+                                        {cancellingBookings.has(typeof issue.recordId === 'number' ? issue.recordId : parseInt(String(issue.recordId))) ? (
+                                          <span className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>
+                                        ) : (
+                                          <span className="material-symbols-outlined text-[16px]">cancel</span>
+                                        )}
+                                      </button>
+                                    </>
+                                  )}
+                                  {!issue.ignored && issue.table === 'booking_requests' && issue.category === 'billing_issue' && (
+                                    <button
+                                      type="button"
+                                      onClick={() => setBookingSheet({
+                                        isOpen: true,
+                                        bookingId: typeof issue.recordId === 'number' ? issue.recordId : parseInt(String(issue.recordId)),
+                                        memberEmail: issue.context?.memberEmail || issue.context?.userEmail,
+                                        bookingDate: issue.context?.bookingDate,
+                                        timeSlot: issue.context?.startTime,
+                                      })}
+                                      className="p-1.5 text-blue-600 hover:bg-blue-100 dark:text-blue-400 dark:hover:bg-blue-900/30 rounded transition-colors"
+                                      title="Open booking to review and create invoice"
+                                    >
+                                      <span className="material-symbols-outlined text-[16px]">open_in_new</span>
+                                    </button>
+                                  )}
+                                  {!issue.ignored && issue.table === 'users' && issue.category === 'sync_mismatch' && issue.context?.memberStatus && ['pending', 'non-member'].includes(issue.context.memberStatus) && (
+                                    <>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          if (issue.context?.memberEmail) handleViewProfile(issue.context.memberEmail);
+                                        }}
+                                        disabled={loadingMemberEmail === issue.context?.memberEmail}
+                                        className="p-1.5 text-blue-600 hover:bg-blue-100 dark:text-blue-400 dark:hover:bg-blue-900/30 rounded transition-colors disabled:opacity-50"
+                                        title="View member profile"
+                                      >
+                                        <span className="material-symbols-outlined text-[16px]">person</span>
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          if (confirm(`Activate "${issue.context?.memberName || 'this member'}"? Their status will change to active.`)) {
+                                            fixIssueMutation.mutate({ endpoint: '/api/data-integrity/fix/activate-stuck-member', body: { userId: issue.context?.userId } });
+                                          }
+                                        }}
+                                        disabled={fixIssueMutation.isPending}
+                                        className="p-1.5 text-green-600 hover:bg-green-100 dark:text-green-400 dark:hover:bg-green-900/30 rounded transition-colors disabled:opacity-50"
+                                        title="Activate this member"
+                                      >
+                                        {fixIssueMutation.isPending ? (
+                                          <span className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>
+                                        ) : (
+                                          <span className="material-symbols-outlined text-[16px]">check_circle</span>
+                                        )}
+                                      </button>
+                                    </>
+                                  )}
+                                  {!issue.ignored && issue.table === 'guest_passes' && issue.category === 'billing_issue' && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        if (confirm('Recalculate guest pass usage from actual booking records?')) {
+                                          fixIssueMutation.mutate({ endpoint: '/api/data-integrity/fix/recalculate-guest-passes', body: { userId: issue.context?.userId } });
+                                        }
+                                      }}
+                                      disabled={fixIssueMutation.isPending}
+                                      className="p-1.5 text-orange-600 hover:bg-orange-100 dark:text-orange-400 dark:hover:bg-orange-900/30 rounded transition-colors disabled:opacity-50"
+                                      title="Recalculate guest pass usage"
+                                    >
+                                      {fixIssueMutation.isPending ? (
+                                        <span className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>
+                                      ) : (
+                                        <span className="material-symbols-outlined text-[16px]">calculate</span>
+                                      )}
+                                    </button>
+                                  )}
+                                  {!issue.ignored && issue.table === 'guest_pass_holds' && issue.category === 'orphan_record' && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        if (confirm('Release this expired guest pass hold?')) {
+                                          fixIssueMutation.mutate({ endpoint: '/api/data-integrity/fix/release-guest-pass-hold', body: { recordId: issue.recordId } });
+                                        }
+                                      }}
+                                      disabled={fixIssueMutation.isPending}
+                                      className="p-1.5 text-red-600 hover:bg-red-100 dark:text-red-400 dark:hover:bg-red-900/30 rounded transition-colors disabled:opacity-50"
+                                      title="Release expired hold"
+                                    >
+                                      {fixIssueMutation.isPending ? (
+                                        <span className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>
+                                      ) : (
+                                        <span className="material-symbols-outlined text-[16px]">lock_open</span>
+                                      )}
+                                    </button>
+                                  )}
+                                  {!issue.ignored && issue.table === 'payment_intents' && issue.category === 'orphan_record' && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        if (confirm('Cancel this orphaned payment intent in Stripe?')) {
+                                          fixIssueMutation.mutate({ endpoint: '/api/data-integrity/fix/cancel-orphaned-pi', body: { paymentIntentId: String(issue.recordId) } });
+                                        }
+                                      }}
+                                      disabled={fixIssueMutation.isPending}
+                                      className="p-1.5 text-red-600 hover:bg-red-100 dark:text-red-400 dark:hover:bg-red-900/30 rounded transition-colors disabled:opacity-50"
+                                      title="Cancel orphaned payment intent"
+                                    >
+                                      {fixIssueMutation.isPending ? (
+                                        <span className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>
+                                      ) : (
+                                        <span className="material-symbols-outlined text-[16px]">money_off</span>
+                                      )}
+                                    </button>
+                                  )}
+                                  {!issue.ignored && issue.table === 'wellness_enrollments' && issue.category === 'orphan_record' && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        if (confirm('Delete this orphaned wellness enrollment?')) {
+                                          fixIssueMutation.mutate({ endpoint: '/api/data-integrity/fix/delete-orphan-enrollment', body: { recordId: issue.recordId } });
+                                        }
+                                      }}
+                                      disabled={fixIssueMutation.isPending}
+                                      className="p-1.5 text-red-600 hover:bg-red-100 dark:text-red-400 dark:hover:bg-red-900/30 rounded transition-colors disabled:opacity-50"
+                                      title="Delete orphaned enrollment"
+                                    >
+                                      {fixIssueMutation.isPending ? (
+                                        <span className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>
+                                      ) : (
+                                        <span className="material-symbols-outlined text-[16px]">delete</span>
+                                      )}
+                                    </button>
+                                  )}
+                                  {!issue.ignored && issue.table === 'event_rsvps' && issue.category === 'orphan_record' && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        if (confirm('Delete this orphaned event RSVP?')) {
+                                          fixIssueMutation.mutate({ endpoint: '/api/data-integrity/fix/delete-orphan-rsvp', body: { recordId: issue.recordId } });
+                                        }
+                                      }}
+                                      disabled={fixIssueMutation.isPending}
+                                      className="p-1.5 text-red-600 hover:bg-red-100 dark:text-red-400 dark:hover:bg-red-900/30 rounded transition-colors disabled:opacity-50"
+                                      title="Delete orphaned RSVP"
+                                    >
+                                      {fixIssueMutation.isPending ? (
+                                        <span className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>
+                                      ) : (
+                                        <span className="material-symbols-outlined text-[16px]">delete</span>
+                                      )}
+                                    </button>
+                                  )}
+                                  {!issue.ignored && issue.table === 'users' && issue.category === 'sync_mismatch' && issue.description?.toLowerCase().includes('tier') && issue.context?.userId && (
+                                    <>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          if (issue.context?.memberEmail) handleViewProfile(issue.context.memberEmail);
+                                        }}
+                                        disabled={loadingMemberEmail === issue.context?.memberEmail}
+                                        className="p-1.5 text-blue-600 hover:bg-blue-100 dark:text-blue-400 dark:hover:bg-blue-900/30 rounded transition-colors disabled:opacity-50"
+                                        title="View member profile"
+                                      >
+                                        <span className="material-symbols-outlined text-[16px]">person</span>
+                                      </button>
+                                    </>
+                                  )}
+                                  {!issue.ignored && issue.table === 'users' && issue.category === 'data_quality' && issue.description?.toLowerCase().includes('stripe') && issue.context?.memberEmail && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleViewProfile(issue.context!.memberEmail!)}
+                                      disabled={loadingMemberEmail === issue.context?.memberEmail}
+                                      className="p-1.5 text-blue-600 hover:bg-blue-100 dark:text-blue-400 dark:hover:bg-blue-900/30 rounded transition-colors disabled:opacity-50"
+                                      title="View member profile"
+                                    >
+                                      <span className="material-symbols-outlined text-[16px]">person</span>
+                                    </button>
                                   )}
                                   {!issue.ignored && (
                                     <button

@@ -13,6 +13,19 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.10.0",
+    date: "2026-02-22",
+    title: "Complete Inline Resolution UI for All 29 Integrity Checks",
+    changes: [
+      "Added: 9 new backend fix endpoints — cancel stale bookings (single + bulk), activate stuck members, recalculate guest passes, release expired holds, cancel orphaned payment intents, delete orphan enrollments/RSVPs, accept tier reconciliation",
+      "Added: 8 new check-level tool panels with contextual guidance for Stale Pending Bookings, Stuck Transitional Members, Duplicate Stripe Customers, Tier Reconciliation, Invoice-Booking Reconciliation, Guest Pass Accounting Drift, Overlapping Bookings, and Orphaned Payment Intents",
+      "Added: 11 new inline issue-level action buttons — Open Booking, Cancel Booking, Activate Member, View Profile, Recalculate Passes, Release Hold, Cancel PI, Delete Orphan Enrollment, Delete Orphan RSVP across all check types",
+      "Added: 3 new category labels (Billing Issues, Booking Issues, System Errors) with proper type definitions",
+      "Added: 18 new check metadata entries — all 29 checks now have user-friendly titles, descriptions, and impact explanations",
+      "Improved: Bulk 'Cancel All Stale Bookings' action with confirmation dialog and proper audit logging",
+    ]
+  },
+  {
     version: "8.9.0",
     date: "2026-02-22",
     title: "Data Integrity Hardening — 4 New Checks & Auto-Cleanup",

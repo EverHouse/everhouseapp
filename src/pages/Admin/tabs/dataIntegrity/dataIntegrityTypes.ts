@@ -56,6 +56,9 @@ export interface IssueContext {
   lastUpdate?: string;
   memberStatus?: string;
   stripeCustomerId?: string;
+  status?: string;
+  resourceId?: number;
+  bookingId?: number;
 }
 
 export interface IgnoreInfo {
@@ -66,7 +69,7 @@ export interface IgnoreInfo {
 }
 
 export interface IntegrityIssue {
-  category: 'orphan_record' | 'missing_relationship' | 'sync_mismatch' | 'data_quality';
+  category: 'orphan_record' | 'missing_relationship' | 'sync_mismatch' | 'data_quality' | 'billing_issue' | 'booking_issue' | 'system_error';
   severity: 'error' | 'warning' | 'info';
   table: string;
   recordId: number | string;

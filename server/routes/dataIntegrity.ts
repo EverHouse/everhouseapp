@@ -1161,4 +1161,214 @@ router.post('/api/data-integrity/fix/complete-booking', isAdmin, async (req: Req
   }
 });
 
+router.post('/api/data-integrity/fix/cancel-stale-booking', isAdmin, async (req: Request, res) => {
+  try {
+    const { recordId } = req.body;
+    if (!recordId) return res.status(400).json({ success: false, message: 'recordId is required' });
+
+    const result = await db.execute(sql`
+      UPDATE booking_requests 
+      SET status = 'cancelled', cancellation_reason = 'Auto-cancelled: stale booking past start time', updated_at = NOW()
+      WHERE id = ${recordId} AND status IN ('pending', 'approved')
+    `);
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ success: false, message: 'Booking not found or not in pending/approved status' });
+    }
+
+    logFromRequest(req, 'cancel_stale_booking', 'booking_request', String(recordId), `Cancelled stale booking #${recordId} via data integrity`, { bookingId: recordId });
+
+    res.json({ success: true, message: `Stale booking #${recordId} cancelled` });
+  } catch (error: unknown) {
+    logger.error('[DataIntegrity] Cancel stale booking error', { extra: { error: getErrorMessage(error) } });
+    res.status(500).json({ success: false, message: getErrorMessage(error) });
+  }
+});
+
+router.post('/api/data-integrity/fix/bulk-cancel-stale-bookings', isAdmin, async (req: Request, res) => {
+  try {
+    const result = await db.execute(sql`
+      UPDATE booking_requests
+      SET status = 'cancelled', cancellation_reason = 'Bulk auto-cancelled: stale booking past start time', updated_at = NOW()
+      WHERE status IN ('pending', 'approved')
+        AND (request_date + start_time::time) < ((NOW() AT TIME ZONE 'America/Los_Angeles') - INTERVAL '24 hours')
+        AND request_date >= CURRENT_DATE - INTERVAL '7 days'
+        AND user_email NOT LIKE '%@trackman.local'
+    `);
+
+    const count = result.rowCount || 0;
+
+    logFromRequest(req, 'bulk_cancel_stale_bookings', 'booking_request', undefined, `Bulk cancelled ${count} stale bookings via data integrity`, { cancelledCount: count });
+
+    res.json({ success: true, message: `Cancelled ${count} stale bookings`, cancelledCount: count });
+  } catch (error: unknown) {
+    logger.error('[DataIntegrity] Bulk cancel stale bookings error', { extra: { error: getErrorMessage(error) } });
+    res.status(500).json({ success: false, message: getErrorMessage(error) });
+  }
+});
+
+router.post('/api/data-integrity/fix/activate-stuck-member', isAdmin, async (req: Request, res) => {
+  try {
+    const { userId } = req.body;
+    if (!userId) return res.status(400).json({ success: false, message: 'userId is required' });
+
+    const result = await db.execute(sql`
+      UPDATE users 
+      SET membership_status = 'active', updated_at = NOW()
+      WHERE id = ${userId} AND membership_status IN ('pending', 'non-member')
+    `);
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ success: false, message: 'User not found or not in pending/non-member status' });
+    }
+
+    logFromRequest(req, 'activate_stuck_member', 'user', String(userId), `Activated stuck member #${userId} via data integrity`, { userId });
+
+    res.json({ success: true, message: `Activated stuck member #${userId}` });
+  } catch (error: unknown) {
+    logger.error('[DataIntegrity] Activate stuck member error', { extra: { error: getErrorMessage(error) } });
+    res.status(500).json({ success: false, message: getErrorMessage(error) });
+  }
+});
+
+router.post('/api/data-integrity/fix/recalculate-guest-passes', isAdmin, async (req: Request, res) => {
+  try {
+    const { userId } = req.body;
+    if (!userId) return res.status(400).json({ success: false, message: 'userId is required' });
+
+    await db.execute(sql`
+      UPDATE guest_passes gp
+      SET passes_used = COALESCE((
+        SELECT COUNT(*)
+        FROM booking_participants bp
+        JOIN booking_sessions bs ON bp.session_id = bs.id
+        JOIN booking_requests br ON bs.booking_request_id = br.id
+        WHERE bp.guest_pass_id = gp.id
+          AND bp.used_guest_pass = true
+          AND br.status NOT IN ('cancelled', 'rejected')
+      ), 0)
+      WHERE gp.user_id = ${userId}
+    `);
+
+    logFromRequest(req, 'recalculate_guest_passes', 'guest_pass', String(userId), `Recalculated guest passes for user #${userId} via data integrity`, { userId });
+
+    res.json({ success: true, message: `Recalculated guest passes for user #${userId}` });
+  } catch (error: unknown) {
+    logger.error('[DataIntegrity] Recalculate guest passes error', { extra: { error: getErrorMessage(error) } });
+    res.status(500).json({ success: false, message: getErrorMessage(error) });
+  }
+});
+
+router.post('/api/data-integrity/fix/release-guest-pass-hold', isAdmin, async (req: Request, res) => {
+  try {
+    const { recordId } = req.body;
+    if (!recordId) return res.status(400).json({ success: false, message: 'recordId is required' });
+
+    const result = await db.execute(sql`DELETE FROM guest_pass_holds WHERE id = ${recordId}`);
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ success: false, message: 'Guest pass hold not found' });
+    }
+
+    logFromRequest(req, 'release_guest_pass_hold', 'guest_pass', String(recordId), `Released guest pass hold #${recordId} via data integrity`, { holdId: recordId });
+
+    res.json({ success: true, message: `Released guest pass hold #${recordId}` });
+  } catch (error: unknown) {
+    logger.error('[DataIntegrity] Release guest pass hold error', { extra: { error: getErrorMessage(error) } });
+    res.status(500).json({ success: false, message: getErrorMessage(error) });
+  }
+});
+
+router.post('/api/data-integrity/fix/cancel-orphaned-pi', isAdmin, async (req: Request, res) => {
+  try {
+    const { paymentIntentId } = req.body;
+    if (!paymentIntentId) return res.status(400).json({ success: false, message: 'paymentIntentId is required' });
+
+    const stripe = await getStripeClient();
+    try {
+      await stripe.paymentIntents.cancel(paymentIntentId);
+    } catch (stripeError: unknown) {
+      const msg = getErrorMessage(stripeError);
+      if (msg.includes('already been canceled') || msg.includes('already_canceled') || msg.includes('cannot be canceled')) {
+        logFromRequest(req, 'cancel_orphaned_pi', 'payment_intent', paymentIntentId, `Payment intent ${paymentIntentId} was already cancelled`, { paymentIntentId, alreadyCancelled: true });
+        return res.json({ success: true, message: `Payment intent ${paymentIntentId} was already cancelled` });
+      }
+      throw stripeError;
+    }
+
+    logFromRequest(req, 'cancel_orphaned_pi', 'payment_intent', paymentIntentId, `Cancelled orphaned payment intent ${paymentIntentId} via data integrity`, { paymentIntentId });
+
+    res.json({ success: true, message: `Cancelled orphaned payment intent ${paymentIntentId}` });
+  } catch (error: unknown) {
+    logger.error('[DataIntegrity] Cancel orphaned PI error', { extra: { error: getErrorMessage(error) } });
+    res.status(500).json({ success: false, message: getErrorMessage(error) });
+  }
+});
+
+router.post('/api/data-integrity/fix/delete-orphan-enrollment', isAdmin, async (req: Request, res) => {
+  try {
+    const { recordId } = req.body;
+    if (!recordId) return res.status(400).json({ success: false, message: 'recordId is required' });
+
+    const result = await db.execute(sql`DELETE FROM wellness_enrollments WHERE id = ${recordId}`);
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ success: false, message: 'Wellness enrollment not found' });
+    }
+
+    logFromRequest(req, 'delete_orphan_enrollment', 'wellness_enrollment', String(recordId), `Deleted orphaned wellness enrollment #${recordId} via data integrity`, { enrollmentId: recordId });
+
+    res.json({ success: true, message: `Deleted orphaned wellness enrollment #${recordId}` });
+  } catch (error: unknown) {
+    logger.error('[DataIntegrity] Delete orphan enrollment error', { extra: { error: getErrorMessage(error) } });
+    res.status(500).json({ success: false, message: getErrorMessage(error) });
+  }
+});
+
+router.post('/api/data-integrity/fix/delete-orphan-rsvp', isAdmin, async (req: Request, res) => {
+  try {
+    const { recordId } = req.body;
+    if (!recordId) return res.status(400).json({ success: false, message: 'recordId is required' });
+
+    const result = await db.execute(sql`DELETE FROM event_rsvps WHERE id = ${recordId}`);
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ success: false, message: 'Event RSVP not found' });
+    }
+
+    logFromRequest(req, 'delete_orphan_rsvp', 'event_rsvp', String(recordId), `Deleted orphaned event RSVP #${recordId} via data integrity`, { rsvpId: recordId });
+
+    res.json({ success: true, message: `Deleted orphaned event RSVP #${recordId}` });
+  } catch (error: unknown) {
+    logger.error('[DataIntegrity] Delete orphan RSVP error', { extra: { error: getErrorMessage(error) } });
+    res.status(500).json({ success: false, message: getErrorMessage(error) });
+  }
+});
+
+router.post('/api/data-integrity/fix/accept-tier', isAdmin, async (req: Request, res) => {
+  try {
+    const { userId, acceptedTier, source } = req.body;
+    if (!userId) return res.status(400).json({ success: false, message: 'userId is required' });
+    if (!acceptedTier) return res.status(400).json({ success: false, message: 'acceptedTier is required' });
+    if (!source || !['app', 'stripe'].includes(source)) return res.status(400).json({ success: false, message: 'source must be "app" or "stripe"' });
+
+    const result = await db.execute(sql`
+      UPDATE users 
+      SET tier = ${acceptedTier}, updated_at = NOW()
+      WHERE id = ${userId}
+    `);
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    logFromRequest(req, 'accept_tier', 'user', String(userId), `Accepted tier "${acceptedTier}" from ${source} for user #${userId} via data integrity`, { userId, acceptedTier, source });
+
+    res.json({ success: true, message: `Accepted tier "${acceptedTier}" from ${source} for user #${userId}` });
+  } catch (error: unknown) {
+    logger.error('[DataIntegrity] Accept tier error', { extra: { error: getErrorMessage(error) } });
+    res.status(500).json({ success: false, message: getErrorMessage(error) });
+  }
+});
+
 export default router;

@@ -92,6 +92,125 @@ export const integrityCheckMetadata: IntegrityCheckMetadata[] = [
     description: 'Finds member accounts that are missing an email address.',
     impact: 'These members cannot log in, receive booking confirmations, or get club communications. They need an email added to their profile.',
     severity: 'high'
+  },
+  {
+    checkName: 'Billing Provider Hybrid State',
+    title: 'Billing Provider Hybrid State',
+    description: 'Detects members who have both a MindBody client ID and Stripe subscription, creating conflicting billing authorities.',
+    impact: 'Members may be double-billed or have unpredictable billing behavior when two systems claim ownership.',
+    severity: 'critical'
+  },
+  {
+    checkName: 'Active Bookings Without Sessions',
+    title: 'Active Bookings Without Sessions',
+    description: 'Finds confirmed or approved bookings that are missing their booking session record.',
+    impact: 'These bookings cannot be checked into, billed, or tracked properly. They appear on schedules but have no session data.',
+    severity: 'critical'
+  },
+  {
+    checkName: 'Orphaned Payment Intents',
+    title: 'Orphaned Payment Intents',
+    description: 'Identifies Stripe payment intents that are not linked to any booking or invoice in the system.',
+    impact: 'These represent unresolved charges or holds on member cards that may cause confusion or block future payments.',
+    severity: 'critical'
+  },
+  {
+    checkName: 'Invoice-Booking Reconciliation',
+    title: 'Invoice-Booking Reconciliation',
+    description: 'Detects bookings with unpaid participant fees but no Stripe invoice, and bookings with duplicate invoices.',
+    impact: 'Members may not be billed for attended sessions, causing revenue loss, or may receive duplicate charges.',
+    severity: 'critical'
+  },
+  {
+    checkName: 'Overlapping Bookings',
+    title: 'Overlapping Bookings',
+    description: 'Finds confirmed bookings that overlap on the same bay at the same time.',
+    impact: 'Two groups may show up for the same bay, causing scheduling conflicts and a poor member experience.',
+    severity: 'critical'
+  },
+  {
+    checkName: 'Guest Pass Accounting Drift',
+    title: 'Guest Pass Accounting Drift',
+    description: 'Detects guest pass records where the used count exceeds the total, or where expired holds are still in place.',
+    impact: 'Members may be unable to use their guest passes or may have incorrect remaining pass counts.',
+    severity: 'high'
+  },
+  {
+    checkName: 'Stale Pending Bookings',
+    title: 'Stale Pending Bookings',
+    description: 'Finds pending or approved bookings whose start time has passed by more than 24 hours without being confirmed or cancelled.',
+    impact: 'These stale bookings clutter the schedule and may block bay availability for future bookings.',
+    severity: 'high'
+  },
+  {
+    checkName: 'Duplicate Stripe Customers',
+    title: 'Duplicate Stripe Customers',
+    description: 'Identifies members who have multiple Stripe customer records, which can cause payment confusion.',
+    impact: 'Payments may be applied to the wrong customer record, and billing history becomes fragmented.',
+    severity: 'high'
+  },
+  {
+    checkName: 'Tier Reconciliation',
+    title: 'Tier Reconciliation',
+    description: 'Compares each member\'s tier in the app against their Stripe subscription tier to find mismatches.',
+    impact: 'Members may have incorrect pricing, access levels, or guest pass allocations if their tier is wrong.',
+    severity: 'high'
+  },
+  {
+    checkName: 'HubSpot ID Duplicates',
+    title: 'HubSpot ID Duplicates',
+    description: 'Finds multiple app members sharing the same HubSpot contact ID.',
+    impact: 'CRM sync will overwrite data unpredictably, and member communications may be sent to wrong people.',
+    severity: 'high'
+  },
+  {
+    checkName: 'Unmatched Trackman Bookings',
+    title: 'Unmatched Trackman Bookings',
+    description: 'Identifies Trackman-imported booking sessions that have not been matched to a member.',
+    impact: 'Usage tracking and billing for these sessions cannot be completed until they are assigned to a member.',
+    severity: 'medium'
+  },
+  {
+    checkName: 'MindBody Stale Sync',
+    title: 'MindBody Stale Sync',
+    description: 'Detects members with MindBody client IDs who may need migration to Stripe billing.',
+    impact: 'Legacy billing members may have outdated records that need manual review for migration.',
+    severity: 'medium'
+  },
+  {
+    checkName: 'Orphan Event RSVPs',
+    title: 'Orphan Event RSVPs',
+    description: 'Finds event RSVPs that reference events which have been deleted from the system.',
+    impact: 'These orphaned records clutter the database but have minimal operational impact.',
+    severity: 'medium'
+  },
+  {
+    checkName: 'Orphaned Fee Snapshots',
+    title: 'Orphaned Fee Snapshots',
+    description: 'Identifies fee snapshot records that are no longer linked to active bookings.',
+    impact: 'These records take up space but do not affect billing or operations.',
+    severity: 'low'
+  },
+  {
+    checkName: 'Sessions Without Participants',
+    title: 'Sessions Without Participants',
+    description: 'Finds booking sessions that have no participants assigned to them.',
+    impact: 'Empty sessions clutter the booking system and may be leftover from incomplete booking processes.',
+    severity: 'low'
+  },
+  {
+    checkName: 'Guest Passes Without Members',
+    title: 'Guest Passes Without Members',
+    description: 'Guest pass records that reference members who no longer exist in the system.',
+    impact: 'These orphaned records do not affect operations but should be cleaned up.',
+    severity: 'low'
+  },
+  {
+    checkName: 'Items Needing Review',
+    title: 'Items Needing Review',
+    description: 'Flagged items across the system that require manual staff review before processing.',
+    impact: 'Unreviewed items may contain data conflicts that need human judgment to resolve.',
+    severity: 'low'
   }
 ];
 
