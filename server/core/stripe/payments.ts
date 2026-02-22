@@ -119,9 +119,10 @@ export async function createPaymentIntent(
   if (productId) stripeMetadata.productId = productId;
   if (productName) stripeMetadata.productName = productName;
 
-  // Generate deterministic idempotency key to prevent duplicate payment intents
-  // Uses a combination of booking/session IDs, amount, and purpose for uniqueness
-  // IMPORTANT: Avoid non-deterministic values like Date.now() to ensure true idempotency
+  // Generate idempotency key to prevent duplicate payment intents
+  // Booking payments use deterministic keys (same booking = same key = dedup)
+  // Non-booking purchases (merch, cafe) use timestamp for uniqueness per transaction
+  const isBookingPayment = !!(bookingId || sessionId);
   const idempotencyComponents = [
     purpose,
     bookingId?.toString() || 'no-booking',
@@ -129,6 +130,9 @@ export async function createPaymentIntent(
     amountCents.toString(),
     metadata?.feeSnapshotId || `${userId}-${email}`.replace(/[^a-zA-Z0-9-]/g, '')
   ];
+  if (!isBookingPayment) {
+    idempotencyComponents.push(Date.now().toString());
+  }
   const idempotencyKey = `pi_${idempotencyComponents.join('_')}`;
   
   const paymentIntent = await stripe.paymentIntents.create({

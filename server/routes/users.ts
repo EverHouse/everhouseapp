@@ -332,12 +332,23 @@ router.delete('/api/admin-users/:id', isAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     
-    const adminCount = await db.select({ count: sql<number>`count(*)::int` })
+    const targetAdmin = await db.select({ isActive: staffUsers.isActive })
       .from(staffUsers)
-      .where(and(eq(staffUsers.isActive, true), eq(staffUsers.role, 'admin')));
+      .where(and(eq(staffUsers.id, parseInt(id as string)), eq(staffUsers.role, 'admin')))
+      .limit(1);
     
-    if (adminCount[0].count <= 1) {
-      return res.status(400).json({ error: 'Cannot remove the last active admin' });
+    if (targetAdmin.length === 0) {
+      return res.status(404).json({ error: 'Admin user not found' });
+    }
+    
+    if (targetAdmin[0].isActive) {
+      const adminCount = await db.select({ count: sql<number>`count(*)::int` })
+        .from(staffUsers)
+        .where(and(eq(staffUsers.isActive, true), eq(staffUsers.role, 'admin')));
+      
+      if (adminCount[0].count <= 1) {
+        return res.status(400).json({ error: 'Cannot remove the last active admin' });
+      }
     }
     
     const result = await db.delete(staffUsers)

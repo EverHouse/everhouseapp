@@ -1923,15 +1923,14 @@ async function handleInvoicePaymentFailed(client: PoolClient, invoice: InvoiceWi
     ? `${userResult.rows[0].first_name || ''} ${userResult.rows[0].last_name || ''}`.trim() || email
     : email;
 
-  try {
-    const stripe = await getStripeClient();
-    const subscription = await stripe.subscriptions.retrieve(typeof invoice.subscription === 'string' ? invoice.subscription : (invoice.subscription as Stripe.Subscription).id);
-    if (['canceled', 'incomplete_expired'].includes(subscription.status)) {
-      logger.info(`[Stripe Webhook] Skipping grace period for ${email} — subscription ${typeof invoice.subscription === 'string' ? invoice.subscription : invoice.subscription?.id} is ${subscription.status}`);
-      return deferredActions;
-    }
-  } catch (stripeErr: unknown) {
-    logger.warn(`[Stripe Webhook] Could not verify subscription ${typeof invoice.subscription === 'string' ? invoice.subscription : invoice.subscription?.id} status, continuing with grace period logic:`, { error: stripeErr });
+  const subscriptionId = typeof invoice.subscription === 'string' ? invoice.subscription : (invoice.subscription as Stripe.Subscription).id;
+  const subStatusCheck = await client.query(
+    `SELECT membership_status FROM users WHERE LOWER(email) = LOWER($1) AND stripe_subscription_id = $2`,
+    [email, subscriptionId]
+  );
+  if (subStatusCheck.rows.length > 0 && ['cancelled', 'inactive'].includes(subStatusCheck.rows[0].membership_status)) {
+    logger.info(`[Stripe Webhook] Skipping grace period for ${email} — membership already ${subStatusCheck.rows[0].membership_status} (subscription ${subscriptionId})`);
+    return deferredActions;
   }
 
   const userStatusCheck = await client.query(
@@ -2467,17 +2466,7 @@ async function handleCheckoutSessionCompleted(client: PoolClient, session: Strip
         const { findOrCreateHubSpotContact } = await import('../hubspot/members');
         const { syncMemberToHubSpot } = await import('../hubspot/stages');
         
-        // Fetch phone from Stripe customer for HubSpot sync
-        let customerPhone: string | undefined;
-        try {
-          const stripeForPhone = await getStripeClient();
-          const stripeCustomer = await stripeForPhone.customers.retrieve(customerId);
-          if (!(stripeCustomer as Stripe.DeletedCustomer).deleted) {
-            customerPhone = (stripeCustomer as Stripe.Customer).phone || undefined;
-          }
-        } catch (phoneErr: unknown) {
-          // Non-blocking
-        }
+        const customerPhone: string | undefined = undefined;
         
         await findOrCreateHubSpotContact(
           email,
@@ -2657,7 +2646,10 @@ async function handleSubscriptionCreated(client: PoolClient, subscription: Strip
       logger.info(`[Stripe Webhook] No user found for Stripe customer ${customerId}, creating user from Stripe data`);
       
       const stripe = await getStripeClient();
-      const customer = await stripe.customers.retrieve(customerId as string) as Stripe.Customer | Stripe.DeletedCustomer;
+      const customer = await Promise.race([
+        stripe.customers.retrieve(customerId as string),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Stripe customer retrieve timed out after 5s')), 5000))
+      ]) as Stripe.Customer | Stripe.DeletedCustomer;
       
       if (!customer || (customer as Stripe.DeletedCustomer).deleted) {
         logger.error(`[Stripe Webhook] Customer ${customerId} not found or deleted`);
@@ -3048,26 +3040,31 @@ async function handleSubscriptionCreated(client: PoolClient, subscription: Strip
         logger.error('[Stripe Webhook] Error during tier activation:', { error: tierActivationError });
       }
     } else {
-      // Fallback: try to match by product name
       const productId = subscription.items?.data?.[0]?.price?.product;
       if (productId) {
-        try {
-              const stripe = await getStripeClient();
-              const product = await stripe.products.retrieve(productId as string);
-              const productName = product.name?.toLowerCase() || '';
-              
-              // Match product name to tier - look for tier keywords
-              const tierKeywords = ['vip', 'premium', 'corporate', 'core', 'social'];
-              for (const keyword of tierKeywords) {
-                if (productName.includes(keyword)) {
-                  const keywordTierResult = await client.query(
+        const deferredEmail = email;
+        const deferredProductId = productId as string;
+        const deferredSubscriptionPeriodEnd = subscriptionPeriodEnd;
+        const deferredSubscriptionStatus = subscription.status;
+        deferredActions.push(async () => {
+          try {
+            const stripe = await getStripeClient();
+            const product = await stripe.products.retrieve(deferredProductId);
+            const productName = product.name?.toLowerCase() || '';
+
+            const tierKeywords = ['vip', 'premium', 'corporate', 'core', 'social'];
+            for (const keyword of tierKeywords) {
+              if (productName.includes(keyword)) {
+                const deferredClient = await pool.connect();
+                try {
+                  const keywordTierResult = await deferredClient.query(
                     'SELECT slug, name FROM membership_tiers WHERE LOWER(slug) = $1 OR LOWER(name) = $1',
                     [keyword]
                   );
                   if (keywordTierResult.rows.length > 0) {
                     const { name: tierName } = keywordTierResult.rows[0];
-                    
-                    const updateResult = await client.query(
+
+                    const updateResult = await deferredClient.query(
                       `UPDATE users SET 
                         tier = $1, 
                         membership_status = CASE 
@@ -3079,35 +3076,38 @@ async function handleSubscriptionCreated(client: PoolClient, subscription: Strip
                         updated_at = NOW() 
                       WHERE email = $2 
                       RETURNING id`,
-                      [tierName, email, subscriptionPeriodEnd, (subscription.status === 'active' || subscription.status === 'trialing') ? 'active' : 'pending']
+                      [tierName, deferredEmail, deferredSubscriptionPeriodEnd, (deferredSubscriptionStatus === 'active' || deferredSubscriptionStatus === 'trialing') ? 'active' : 'pending']
                     );
-                    
+
                     if (updateResult.rowCount && updateResult.rowCount > 0) {
-                      logger.info(`[Stripe Webhook] User activation (product name match): ${email} tier updated to ${tierName} from product "${product.name}"`);
-                      
-                      // Sync to HubSpot for product name matched tier
+                      logger.info(`[Stripe Webhook] User activation (product name match): ${deferredEmail} tier updated to ${tierName} from product "${product.name}"`);
+
                       try {
                         const { syncMemberToHubSpot } = await import('../hubspot/stages');
                         await syncMemberToHubSpot({
-                          email,
-                          status: subscription.status,
+                          email: deferredEmail,
+                          status: deferredSubscriptionStatus,
                           billingProvider: 'stripe',
                           tier: tierName,
                           memberSince: new Date(),
                           billingGroupRole: 'Primary',
                         });
-                        logger.info(`[Stripe Webhook] Synced ${email} to HubSpot: tier=${tierName}, status=${subscription.status}, billing=stripe, memberSince=now`);
+                        logger.info(`[Stripe Webhook] Synced ${deferredEmail} to HubSpot: tier=${tierName}, status=${deferredSubscriptionStatus}, billing=stripe, memberSince=now`);
                       } catch (hubspotError: unknown) {
                         logger.error('[Stripe Webhook] HubSpot sync failed for product name match:', { error: hubspotError });
                       }
                     }
                     break;
                   }
+                } finally {
+                  deferredClient.release();
                 }
               }
-        } catch (productError: unknown) {
-          logger.error('[Stripe Webhook] Error fetching product for name match:', { error: productError });
-        }
+            }
+          } catch (productError: unknown) {
+            logger.error('[Stripe Webhook] Error fetching product for name match:', { error: productError });
+          }
+        });
       } else {
         logger.warn(`[Stripe Webhook] No tier found for price ID ${priceId}`);
       }

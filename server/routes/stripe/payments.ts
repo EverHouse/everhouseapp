@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { logger } from '../../core/logger';
 import { Router, Request, Response } from 'express';
 import Stripe from 'stripe';
@@ -1559,7 +1560,7 @@ router.post('/api/stripe/staff/charge-saved-card-pos', isStaffOrAdmin, async (re
         productId: productId || ''
       }
     }, {
-      idempotencyKey: `pos_saved_card_${member.id}_${numericAmount}_${productId || 'none'}_${Math.floor(Date.now() / 300000)}`
+      idempotencyKey: `pos_saved_card_${member.id}_${numericAmount}_${randomUUID()}`
     });
 
     if (paymentIntent.status === 'succeeded') {
