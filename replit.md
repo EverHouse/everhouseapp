@@ -66,6 +66,11 @@ We use a **Liquid Glass UI** system.
 - **Member Lifecycle & Check-In**: Tiers, QR/NFC check-in, onboarding.
 
 ## Recent Changes
+- **Feb 22, 2026**: v8.8.0 — Complete Drizzle ORM Migration & Stripe Idempotency Hardening:
+  1. Migrated ~390 pool.query calls across 50+ server files to Drizzle ORM db.execute(sql`...`) — all production database queries now use parameterized template literals.
+  2. Converted 15+ pool.connect() manual transaction blocks to db.transaction() with automatic BEGIN/COMMIT/ROLLBACK.
+  3. Added Stripe idempotency keys to all remaining .create() calls in invoices.ts, groupBilling.ts, discounts.ts, coupons.ts, and memberBilling.ts.
+  4. Only 13 pool.query calls remain in excluded files (seed.ts, one-off scripts, managed integrations, session store, pool definition).
 - **Feb 22, 2026**: v8.7.0 — Code Quality & Financial Safety Hardening:
   1. Replaced 27 silent error-swallowing patterns (.catch(() => {}) and empty catch {}) with proper logging across 14 server files — billing, booking, and Stripe errors now visible for debugging.
   2. Added Stripe idempotency keys to all .create() calls (invoices, payment intents, invoice items, refunds, products, prices) — prevents double-charges and duplicate resources on network retries.

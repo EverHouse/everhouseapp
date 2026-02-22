@@ -140,14 +140,7 @@ async function runPeriodicAutoFix(): Promise<void> {
 
 async function cleanupAbandonedPendingUsers(): Promise<void> {
   try {
-    const { pool } = await import('../core/db');
-    
-    if (!pool) {
-      logger.info('[Auto-Cleanup] Database pool not ready, skipping cleanup');
-      return;
-    }
-    
-    const pendingResult = await pool.query(`
+    const pendingResult = await db.execute(sql`
       SELECT id, email FROM users 
       WHERE membership_status = 'pending' 
         AND created_at < NOW() - INTERVAL '24 hours'
@@ -159,35 +152,28 @@ async function cleanupAbandonedPendingUsers(): Promise<void> {
     let deletedCount = 0;
     
     for (const user of pendingResult.rows) {
-      const client = await pool.connect();
       try {
-        await client.query('BEGIN');
-        
-        await client.query('DELETE FROM notifications WHERE user_id = $1', [user.id]);
-        await client.query('DELETE FROM booking_participants WHERE user_id = $1::text', [user.id]);
-        await client.query('DELETE FROM booking_sessions WHERE user_id = $1', [user.id]);
-        await client.query('DELETE FROM booking_requests WHERE user_id = $1', [user.id]);
-        await client.query('DELETE FROM event_rsvps WHERE LOWER(user_email) = LOWER($1)', [user.email]);
-        await client.query('DELETE FROM wellness_enrollments WHERE LOWER(user_email) = LOWER($1)', [user.email]);
-        await client.query('DELETE FROM pending_fees WHERE user_id = $1', [user.id]);
-        await client.query('DELETE FROM user_notes WHERE user_id = $1', [user.id]);
-        await client.query('DELETE FROM guest_passes WHERE LOWER(member_email) = LOWER($1)', [user.email]);
-        
-        const deleteResult = await client.query(
-          'DELETE FROM users WHERE id = $1 RETURNING email',
-          [user.id]
-        );
-        
-        await client.query('COMMIT');
-        
-        if (deleteResult.rowCount && deleteResult.rowCount > 0) {
-          deletedCount++;
-        }
+        await db.transaction(async (tx) => {
+          await tx.execute(sql`DELETE FROM notifications WHERE user_id = ${user.id}`);
+          await tx.execute(sql`DELETE FROM booking_participants WHERE user_id = ${user.id}::text`);
+          await tx.execute(sql`DELETE FROM booking_sessions WHERE user_id = ${user.id}`);
+          await tx.execute(sql`DELETE FROM booking_requests WHERE user_id = ${user.id}`);
+          await tx.execute(sql`DELETE FROM event_rsvps WHERE LOWER(user_email) = LOWER(${user.email})`);
+          await tx.execute(sql`DELETE FROM wellness_enrollments WHERE LOWER(user_email) = LOWER(${user.email})`);
+          await tx.execute(sql`DELETE FROM pending_fees WHERE user_id = ${user.id}`);
+          await tx.execute(sql`DELETE FROM user_notes WHERE user_id = ${user.id}`);
+          await tx.execute(sql`DELETE FROM guest_passes WHERE LOWER(member_email) = LOWER(${user.email})`);
+          
+          const deleteResult = await tx.execute(
+            sql`DELETE FROM users WHERE id = ${user.id} RETURNING email`
+          );
+          
+          if (deleteResult.rowCount && deleteResult.rowCount > 0) {
+            deletedCount++;
+          }
+        });
       } catch (err: unknown) {
-        await client.query('ROLLBACK');
         logger.error(`[Auto-Cleanup] Failed to cleanup user ${user.email}:`, { error: err as Error });
-      } finally {
-        client.release();
       }
     }
     

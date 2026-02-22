@@ -1,4 +1,5 @@
-import { pool } from '../db';
+import { db } from '../../db';
+import { sql } from 'drizzle-orm';
 import { findMatchingUser, upsertVisitor } from './matchingService';
 import { updateVisitorType, VisitorType } from './typeService';
 import { getMemberTierByEmail } from '../tierService';
@@ -169,34 +170,6 @@ export async function matchBookingToPurchase(
     const minTime = `${String(minHour).padStart(2, '0')}:00:00`;
     const maxTime = `${String(maxHour).padStart(2, '0')}:59:59`;
 
-    // Query 1: Search Legacy Purchases (existing behavior)
-    const legacyQuery = `
-      SELECT 
-        lp.id as purchase_id,
-        'legacy' as source,
-        lp.item_name,
-        lp.item_category,
-        lp.sale_date,
-        lp.member_email,
-        lp.mindbody_client_id,
-        u.id as user_id,
-        u.email,
-        u.first_name,
-        u.last_name,
-        ABS(EXTRACT(EPOCH FROM (lp.sale_date::time - $3::time))) as time_diff
-      FROM legacy_purchases lp
-      LEFT JOIN users u ON LOWER(u.email) = LOWER(lp.member_email) 
-        OR u.mindbody_client_id = lp.mindbody_client_id
-      WHERE DATE(lp.sale_date) = $1
-        AND lp.item_category = ANY($2)
-        AND lp.linked_booking_session_id IS NULL
-        AND lp.linked_at IS NULL
-        AND lp.sale_date::time BETWEEN $4::time AND $5::time
-        AND (u.archived_at IS NULL OR u.id IS NULL)
-      ORDER BY time_diff ASC
-      LIMIT 1
-    `;
-
     // Query 2: FIX for "Day Pass Ignore" bug - also search day_pass_purchases table
     // GUARD: Only query day_pass_purchases when there's explicit day-pass signal in the notes
     // Check parsed bookingType or explicit keywords in notes - NOT just default fallback categories
@@ -212,9 +185,7 @@ export async function matchBookingToPurchase(
     let dayPassResult: { rows: Record<string, unknown>[] } = { rows: [] };
     
     if (shouldQueryDayPass) {
-      // Query day_pass_purchases - uses purchaser_email, status, and booking_date
-      // Apply same time window constraint as legacy to prevent false matches
-      const dayPassQuery = `
+      dayPassResult = await db.execute(sql`
         SELECT 
           dp.id as purchase_id,
           'day_pass' as source,
@@ -227,22 +198,46 @@ export async function matchBookingToPurchase(
           u.email,
           u.first_name,
           u.last_name,
-          ABS(EXTRACT(EPOCH FROM (dp.purchased_at::time - $3::time))) as time_diff
+          ABS(EXTRACT(EPOCH FROM (dp.purchased_at::time - ${startTime}::time))) as time_diff
         FROM day_pass_purchases dp
         LEFT JOIN users u ON LOWER(u.email) = LOWER(dp.purchaser_email)
-        WHERE (DATE(dp.booking_date) = $1 OR DATE(dp.purchased_at) = $1)
+        WHERE (DATE(dp.booking_date) = ${dateStr} OR DATE(dp.purchased_at) = ${dateStr})
           AND dp.status NOT IN ('redeemed', 'expired', 'cancelled')
           AND dp.remaining_uses > 0
           AND (u.archived_at IS NULL OR u.id IS NULL)
-          AND dp.purchased_at::time BETWEEN $2::time AND $4::time
+          AND dp.purchased_at::time BETWEEN ${minTime}::time AND ${maxTime}::time
         ORDER BY time_diff ASC
         LIMIT 1
-      `;
-      dayPassResult = await pool.query(dayPassQuery, [dateStr, minTime, startTime, maxTime]);
+      `);
     }
 
     // Execute legacy query
-    const legacyResult = await pool.query(legacyQuery, [dateStr, categories, startTime, minTime, maxTime]);
+    const legacyResult = await db.execute(sql`
+      SELECT 
+        lp.id as purchase_id,
+        'legacy' as source,
+        lp.item_name,
+        lp.item_category,
+        lp.sale_date,
+        lp.member_email,
+        lp.mindbody_client_id,
+        u.id as user_id,
+        u.email,
+        u.first_name,
+        u.last_name,
+        ABS(EXTRACT(EPOCH FROM (lp.sale_date::time - ${startTime}::time))) as time_diff
+      FROM legacy_purchases lp
+      LEFT JOIN users u ON LOWER(u.email) = LOWER(lp.member_email) 
+        OR u.mindbody_client_id = lp.mindbody_client_id
+      WHERE DATE(lp.sale_date) = ${dateStr}
+        AND lp.item_category = ANY(${categories})
+        AND lp.linked_booking_session_id IS NULL
+        AND lp.linked_at IS NULL
+        AND lp.sale_date::time BETWEEN ${minTime}::time AND ${maxTime}::time
+        AND (u.archived_at IS NULL OR u.id IS NULL)
+      ORDER BY time_diff ASC
+      LIMIT 1
+    `);
     
     // Pick the best match - prefer day_pass (modern) if same time, otherwise pick closest
     let row = null;
@@ -306,7 +301,7 @@ interface UnmatchedBookingDetails {
 }
 
 async function getUnmatchedBookingDetails(bookingId: number): Promise<UnmatchedBookingDetails | null> {
-  const result = await pool.query(`
+  const result = await db.execute(sql`
     SELECT 
       id,
       trackman_booking_id,
@@ -318,35 +313,37 @@ async function getUnmatchedBookingDetails(bookingId: number): Promise<UnmatchedB
       user_name,
       notes
     FROM trackman_unmatched_bookings
-    WHERE id = $1
-  `, [bookingId]);
+    WHERE id = ${bookingId}
+  `);
   
-  if (result.rows.length === 0) return null;
+  const rows = result.rows as Array<Record<string, unknown>>;
+  if (rows.length === 0) return null;
   
-  const row = result.rows[0];
+  const row = rows[0];
   return {
-    id: row.id,
-    trackmanBookingId: row.trackman_booking_id,
-    bayNumber: row.bay_number,
-    bookingDate: row.booking_date,
-    startTime: row.start_time,
-    endTime: row.end_time,
-    durationMinutes: row.duration_minutes || 60,
-    userName: row.user_name,
-    notes: row.notes
+    id: row.id as number,
+    trackmanBookingId: row.trackman_booking_id as string,
+    bayNumber: row.bay_number as string,
+    bookingDate: row.booking_date as string,
+    startTime: row.start_time as string,
+    endTime: row.end_time as string,
+    durationMinutes: (row.duration_minutes as number) || 60,
+    userName: row.user_name as string,
+    notes: row.notes as string
   };
 }
 
 async function getResourceIdByBay(bayNumber: string | null): Promise<number | null> {
   if (!bayNumber) return null;
   
-  const result = await pool.query(`
+  const result = await db.execute(sql`
     SELECT id FROM resources 
-    WHERE LOWER(name) LIKE LOWER($1) OR bay_number = $2
+    WHERE LOWER(name) LIKE LOWER(${`%${bayNumber}%`}) OR bay_number = ${bayNumber}
     LIMIT 1
-  `, [`%${bayNumber}%`, bayNumber]);
+  `);
   
-  return result.rows.length > 0 ? result.rows[0].id : null;
+  const rows = result.rows as Array<Record<string, unknown>>;
+  return rows.length > 0 ? rows[0].id as number : null;
 }
 
 async function createBookingSessionForAutoMatch(
@@ -355,14 +352,10 @@ async function createBookingSessionForAutoMatch(
   email: string,
   displayName: string
 ): Promise<number | null> {
-  const client = await pool.connect();
   try {
-    await client.query('BEGIN');
-    
     const resourceId = await getResourceIdByBay(booking.bayNumber);
     if (!resourceId) {
       logger.info(`[AutoMatch] No resource found for bay ${booking.bayNumber}, skipping session creation`);
-      await client.query('ROLLBACK');
       return null;
     }
     
@@ -378,10 +371,9 @@ async function createBookingSessionForAutoMatch(
       trackmanBookingId: booking.trackmanBookingId || undefined,
       source: 'trackman_webhook',
       createdBy: 'auto_match'
-    }, client);
+    });
     
     if (!sessionResult.sessionId || sessionResult.error) {
-      await client.query('ROLLBACK');
       return null;
     }
     
@@ -409,14 +401,10 @@ async function createBookingSessionForAutoMatch(
       logger.info(`[AutoMatch] Created session ${sessionId} for visitor ${email}`);
     }
     
-    await client.query('COMMIT');
     return sessionId;
   } catch (error: unknown) {
-    await client.query('ROLLBACK');
     logger.error('[AutoMatch] Error creating booking session:', { error: error });
     return null;
-  } finally {
-    client.release();
   }
 }
 
@@ -561,33 +549,18 @@ async function resolveBookingWithUser(
   staffEmail?: string,
   sessionId?: number | null
 ): Promise<void> {
-  const client = await pool.connect();
-  try {
-    await client.query('BEGIN');
-
-    await client.query(`
+  await db.transaction(async (tx) => {
+    await tx.execute(sql`
       UPDATE trackman_unmatched_bookings
       SET 
         status = 'resolved',
-        resolved_email = $2,
+        resolved_email = ${email},
         resolved_at = NOW(),
-        resolved_by = $3,
-        match_attempt_reason = $4
-      WHERE id = $1
-    `, [
-      bookingId, 
-      email, 
-      staffEmail || 'system',
-      sessionId ? 'auto_matched_with_session' : 'auto_matched'
-    ]);
-
-    await client.query('COMMIT');
-  } catch (error: unknown) {
-    await client.query('ROLLBACK');
-    throw error;
-  } finally {
-    client.release();
-  }
+        resolved_by = ${staffEmail || 'system'},
+        match_attempt_reason = ${sessionId ? 'auto_matched_with_session' : 'auto_matched'}
+      WHERE id = ${bookingId}
+    `);
+  });
 }
 
 // Link purchase to a real booking session (for future bookings)
@@ -597,20 +570,20 @@ async function linkPurchaseToSession(purchaseId: number | string, sessionId: num
     // Day pass uses status='redeemed', remaining_uses, and trackman_booking_id for audit trail
     // Only store actual trackman_booking_id, not sessionId (they are different identifiers)
     // Guard: prevent duplicate linking by checking trackman_booking_id not already set to different value
-    const result = await pool.query(`
+    const result = await db.execute(sql`
       UPDATE day_pass_purchases
       SET 
         status = CASE WHEN remaining_uses <= 1 THEN 'redeemed' ELSE status END,
         remaining_uses = GREATEST(0, COALESCE(remaining_uses, 1) - 1),
         trackman_booking_id = CASE 
-          WHEN $2::text IS NOT NULL THEN COALESCE(trackman_booking_id, $2)
+          WHEN ${trackmanBookingId || null}::text IS NOT NULL THEN COALESCE(trackman_booking_id, ${trackmanBookingId || null})
           ELSE trackman_booking_id
         END,
         updated_at = NOW()
-      WHERE id = $1 
+      WHERE id = ${purchaseId} 
         AND (remaining_uses > 0 OR remaining_uses IS NULL)
-        AND (trackman_booking_id IS NULL OR trackman_booking_id = $2 OR $2 IS NULL)
-    `, [purchaseId, trackmanBookingId || null]);
+        AND (trackman_booking_id IS NULL OR trackman_booking_id = ${trackmanBookingId || null} OR ${trackmanBookingId || null} IS NULL)
+    `);
     
     if (result.rowCount === 0) {
       logger.warn(`[AutoMatch] Day pass ${purchaseId} not updated - may be exhausted or already linked to different booking`);
@@ -618,13 +591,13 @@ async function linkPurchaseToSession(purchaseId: number | string, sessionId: num
       logger.info(`[AutoMatch] Linked day pass purchase ${purchaseId} to session ${sessionId}${trackmanBookingId ? ` (trackman: ${trackmanBookingId})` : ''}`);
     }
   } else {
-    await pool.query(`
+    await db.execute(sql`
       UPDATE legacy_purchases
       SET 
-        linked_booking_session_id = $2,
+        linked_booking_session_id = ${sessionId},
         linked_at = NOW()
-      WHERE id = $1
-    `, [purchaseId, sessionId]);
+      WHERE id = ${purchaseId}
+    `);
     logger.info(`[AutoMatch] Linked legacy purchase ${purchaseId} to session ${sessionId}`);
   }
 }
@@ -636,20 +609,20 @@ async function markPurchaseAsUsed(purchaseId: number | string, unmatchedBookingI
   if (source === 'day_pass') {
     // Use trackman_booking_id for audit trail (only store actual trackman ID, not synthetic values)
     // Guard: prevent duplicate linking by checking trackman_booking_id not already set to different value
-    const result = await pool.query(`
+    const result = await db.execute(sql`
       UPDATE day_pass_purchases
       SET 
         status = CASE WHEN remaining_uses <= 1 THEN 'redeemed' ELSE status END,
         remaining_uses = GREATEST(0, COALESCE(remaining_uses, 1) - 1),
         trackman_booking_id = CASE 
-          WHEN $2::text IS NOT NULL THEN COALESCE(trackman_booking_id, $2)
+          WHEN ${trackmanBookingId || null}::text IS NOT NULL THEN COALESCE(trackman_booking_id, ${trackmanBookingId || null})
           ELSE trackman_booking_id
         END,
         updated_at = NOW()
-      WHERE id = $1 
+      WHERE id = ${purchaseId} 
         AND (remaining_uses > 0 OR remaining_uses IS NULL)
-        AND (trackman_booking_id IS NULL OR trackman_booking_id = $2 OR $2 IS NULL)
-    `, [purchaseId, trackmanBookingId || null]);
+        AND (trackman_booking_id IS NULL OR trackman_booking_id = ${trackmanBookingId || null} OR ${trackmanBookingId || null} IS NULL)
+    `);
     
     if (result.rowCount === 0) {
       logger.warn(`[AutoMatch] Day pass ${purchaseId} not updated - may be exhausted or already linked to different booking`);
@@ -657,25 +630,25 @@ async function markPurchaseAsUsed(purchaseId: number | string, unmatchedBookingI
       logger.info(`[AutoMatch] Marked day pass purchase ${purchaseId} as redeemed (historical, unmatched booking ${unmatchedBookingId})`);
     }
   } else {
-    await pool.query(`
+    await db.execute(sql`
       UPDATE legacy_purchases
       SET linked_at = NOW()
-      WHERE id = $1 AND linked_at IS NULL
-    `, [purchaseId]);
+      WHERE id = ${purchaseId} AND linked_at IS NULL
+    `);
     logger.info(`[AutoMatch] Marked legacy purchase ${purchaseId} as used (historical, unmatched booking ${unmatchedBookingId})`);
   }
 }
 
 async function markBookingAsPrivateEvent(bookingId: number, staffEmail?: string): Promise<void> {
-  await pool.query(`
+  await db.execute(sql`
     UPDATE trackman_unmatched_bookings
     SET 
       status = 'resolved',
       match_attempt_reason = 'private_event',
       resolved_at = NOW(),
-      resolved_by = $2
-    WHERE id = $1
-  `, [bookingId, staffEmail || 'system']);
+      resolved_by = ${staffEmail || 'system'}
+    WHERE id = ${bookingId}
+  `);
 }
 
 /**
@@ -715,17 +688,18 @@ async function autoMatchLegacyUnmatchedBookings(
     ORDER BY tub.booking_date DESC, tub.start_time DESC
   `;
   
-  const { rows } = await pool.query(query);
+  const queryResult = await db.execute(sql.raw(query));
+  const rows = queryResult.rows as Array<Record<string, unknown>>;
   
   logger.info(`[AutoMatch] Processing ${rows.length} legacy unmatched bookings...`);
   
   for (const row of rows) {
     const result = await autoMatchSingleBooking(
-      row.id,
-      row.booking_date,
-      row.start_time,
-      row.user_name,
-      row.notes,
+      row.id as number,
+      row.booking_date as string,
+      row.start_time as string,
+      row.user_name as string,
+      row.notes as string,
       staffEmail
     );
     
@@ -795,15 +769,16 @@ async function autoMatchBookingRequests(
     LIMIT 500
   `;
   
-  const { rows } = await pool.query(query);
+  const queryResult2 = await db.execute(sql.raw(query));
+  const rows = queryResult2.rows as Array<Record<string, unknown>>;
   
   logger.info(`[AutoMatch] Processing ${rows.length} GolfNow/walk-in booking_requests...`);
   
   for (const row of rows) {
     try {
-      const isFuture = isFutureBooking(row.booking_date);
-      const userName = row.user_name || 'Visitor';
-      const allNotes = `${row.notes || ''} ${row.staff_notes || ''} ${row.trackman_customer_notes || ''}`.toLowerCase();
+      const isFuture = isFutureBooking(row.booking_date as string);
+      const userName = (row.user_name as string) || 'Visitor';
+      const allNotes = `${(row.notes as string) || ''} ${(row.staff_notes as string) || ''} ${(row.trackman_customer_notes as string) || ''}`.toLowerCase();
       const lowerName = userName.toLowerCase();
       
       // Check if this should be marked as a private event
@@ -821,17 +796,17 @@ async function autoMatchBookingRequests(
       
       if (isPrivateEventBooking) {
         // Mark as private event - clear unmatched status
-        await pool.query(`
+        await db.execute(sql`
           UPDATE booking_requests
           SET 
             is_unmatched = false,
-            staff_notes = COALESCE(staff_notes, '') || ' [Auto-resolved: Private event by ${staffEmail || 'system'}]',
+            staff_notes = COALESCE(staff_notes, '') || ${` [Auto-resolved: Private event by ${staffEmail || 'system'}]`},
             updated_at = NOW()
-          WHERE id = $1
-        `, [row.id]);
+          WHERE id = ${row.id as number}
+        `);
         
         results.push({
-          bookingId: row.id,
+          bookingId: row.id as number,
           matched: true,
           matchType: 'private_event',
           reason: `Auto-resolved as private event: ${userName}`
@@ -859,19 +834,19 @@ async function autoMatchBookingRequests(
       let lastName = '';
       
       // Try to extract real name (e.g., "Beginner Group Lesson Tim Silverman" -> "Tim Silverman")
-      const nameMatch = userName.match(/(?:lesson|group|private|beginner|advanced)\s+(.+)/i);
+      const nameMatch = (userName as string).match(/(?:lesson|group|private|beginner|advanced)\s+(.+)/i);
       if (nameMatch) {
         const extractedName = nameMatch[1].trim();
         const parts = extractedName.split(/\s+/);
         firstName = parts[0] || '';
         lastName = parts.slice(1).join(' ') || '';
       } else {
-        const nameParts = userName.split(/[,\s]+/).filter(Boolean);
+        const nameParts = (userName as string).split(/[,\s]+/).filter(Boolean);
         firstName = nameParts[0] || '';
         lastName = nameParts.slice(1).join(' ') || '';
         
         // Handle "Last, First" format
-        if (userName.includes(',')) {
+        if ((userName as string).includes(',')) {
           lastName = nameParts[0] || '';
           firstName = nameParts.slice(1).join(' ') || '';
         }
@@ -882,11 +857,11 @@ async function autoMatchBookingRequests(
       let visitor: { id: string; email: string } | null = null;
       
       if (firstName && lastName) {
-        const existingVisitorResult = await pool.query(`
+        const existingVisitorResult = await db.execute(sql`
           SELECT id, email, first_name, last_name, visitor_type
           FROM users
-          WHERE LOWER(first_name) = LOWER($1)
-            AND LOWER(last_name) = LOWER($2)
+          WHERE LOWER(first_name) = LOWER(${firstName})
+            AND LOWER(last_name) = LOWER(${lastName})
             AND (role = 'visitor' OR membership_status IN ('visitor', 'non-member'))
             AND archived_at IS NULL
             AND email NOT LIKE '%@visitors.evenhouse.club'
@@ -894,11 +869,12 @@ async function autoMatchBookingRequests(
             AND email NOT LIKE 'unmatched-%'
           ORDER BY created_at ASC
           LIMIT 1
-        `, [firstName, lastName]);
+        `);
         
-        if (existingVisitorResult.rows.length > 0) {
-          const existing = existingVisitorResult.rows[0];
-          visitor = { id: existing.id, email: existing.email };
+        const visitorRows = existingVisitorResult.rows as Array<Record<string, unknown>>;
+        if (visitorRows.length > 0) {
+          const existing = visitorRows[0];
+          visitor = { id: existing.id as string, email: existing.email as string };
           logger.info(`[AutoMatch] Found existing REAL visitor ${firstName} ${lastName} (${existing.email}) - linking booking`);
         }
       }
@@ -907,7 +883,7 @@ async function autoMatchBookingRequests(
       if (!visitor) {
         logger.info(`[AutoMatch] No existing real visitor found for "${userName}" - booking #${row.id} will remain unmatched for staff to assign`);
         results.push({
-          bookingId: row.id,
+          bookingId: row.id as number,
           matched: false,
           matchType: 'failed',
           reason: `No existing real visitor found for "${userName}" - requires manual staff assignment`
@@ -921,7 +897,7 @@ async function autoMatchBookingRequests(
         email: visitor.email,
         type: visitorType,
         activitySource: 'trackman_auto_match',
-        activityDate: new Date(row.booking_date)
+        activityDate: new Date(row.booking_date as string)
       });
       
       // For future bookings, create a session
@@ -929,15 +905,15 @@ async function autoMatchBookingRequests(
       if (isFuture && row.resource_id) {
         try {
           const sessionResult = await ensureSessionForBooking({
-            bookingId: row.id,
-            resourceId: row.resource_id,
-            sessionDate: row.booking_date,
-            startTime: row.start_time,
-            endTime: row.end_time || row.start_time,
+            bookingId: row.id as number,
+            resourceId: row.resource_id as number,
+            sessionDate: row.booking_date as string,
+            startTime: row.start_time as string,
+            endTime: (row.end_time as string) || (row.start_time as string),
             ownerEmail: visitor.email || '',
             ownerName: userName || visitor.email,
             ownerUserId: visitor.id?.toString(),
-            trackmanBookingId: row.trackman_booking_id,
+            trackmanBookingId: row.trackman_booking_id as string,
             source: 'trackman_webhook',
             createdBy: 'auto_match'
           });
@@ -946,7 +922,7 @@ async function autoMatchBookingRequests(
           if (sessionId) {
             await recordUsage(sessionId, {
               memberId: visitor.id?.toString(),
-              minutesCharged: row.duration_minutes || 60,
+              minutesCharged: (row.duration_minutes as number) || 60,
               overageFee: 0,
               guestFee: 0,
               tierAtBooking: undefined
@@ -961,38 +937,31 @@ async function autoMatchBookingRequests(
       const visitorDisplayName = `${firstName} ${lastName}`.trim() || userName;
       const matchNote = ` [Auto-matched to existing ${visitorType} visitor ${visitor.email} by ${staffEmail || 'system'}]`;
       
-      await pool.query(`
+      await db.execute(sql`
         UPDATE booking_requests
         SET 
-          user_id = $2,
-          user_email = $3,
-          user_name = $6,
+          user_id = ${visitor.id},
+          user_email = ${visitor.email},
+          user_name = ${visitorDisplayName},
           is_unmatched = false,
-          session_id = COALESCE($4, session_id),
-          staff_notes = COALESCE(staff_notes, '') || $5,
+          session_id = COALESCE(${sessionId}, session_id),
+          staff_notes = COALESCE(staff_notes, '') || ${matchNote},
           updated_at = NOW()
-        WHERE id = $1
-      `, [
-        row.id,
-        visitor.id,
-        visitor.email,
-        sessionId,
-        matchNote,
-        visitorDisplayName
-      ]);
+        WHERE id = ${row.id as number}
+      `);
       
       // Update participant display name if a session exists
-      const finalSessionId = sessionId || row.session_id;
+      const finalSessionId = sessionId || (row.session_id as number);
       if (finalSessionId) {
-        await pool.query(`
+        await db.execute(sql`
           UPDATE booking_participants 
-          SET user_id = $1, display_name = $2
-          WHERE session_id = $3 AND participant_type = 'owner'
-        `, [visitor.id, visitorDisplayName, finalSessionId]);
+          SET user_id = ${visitor.id}, display_name = ${visitorDisplayName}
+          WHERE session_id = ${finalSessionId} AND participant_type = 'owner'
+        `);
       }
       
       results.push({
-        bookingId: row.id,
+        bookingId: row.id as number,
         matched: true,
         matchType: 'name_match',
         visitorEmail: visitor.email,
@@ -1004,7 +973,7 @@ async function autoMatchBookingRequests(
     } catch (error: unknown) {
       logger.error(`[AutoMatch] Error matching booking_request #${row.id}:`, { error: error });
       results.push({
-        bookingId: row.id,
+        bookingId: row.id as number,
         matched: false,
         matchType: 'failed',
         reason: error instanceof Error ? error.message : 'Unknown error'

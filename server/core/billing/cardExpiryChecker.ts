@@ -1,5 +1,6 @@
 import { getStripeClient } from '../stripe/client';
-import { pool } from '../db';
+import { db } from '../../db';
+import { sql } from 'drizzle-orm';
 import { notifyMember, notifyAllStaff } from '../notificationService';
 import { sendCardExpiringEmail } from '../../emails/membershipEmails';
 import { getErrorMessage } from '../../utils/errorUtils';
@@ -54,9 +55,8 @@ export async function checkExpiringCards(): Promise<CheckExpiringCardsResult> {
           const cardExpiry = new Date(expYear, expMonth - 1, 28);
 
           if (cardExpiry <= sevenDaysFromNow && cardExpiry > now) {
-            const userResult = await pool.query(
-              'SELECT id, email, first_name, last_name FROM users WHERE stripe_customer_id = $1',
-              [customer.id]
+            const userResult = await db.execute(
+              sql`SELECT id, email, first_name, last_name FROM users WHERE stripe_customer_id = ${customer.id}`
             );
 
             if (userResult.rows.length === 0) {
@@ -70,13 +70,12 @@ export async function checkExpiringCards(): Promise<CheckExpiringCardsResult> {
               continue;
             }
 
-            const recentNotification = await pool.query(
-              `SELECT id FROM notifications 
-               WHERE user_email = $1 
+            const recentNotification = await db.execute(
+              sql`SELECT id FROM notifications 
+               WHERE user_email = ${userEmail} 
                AND type = 'card_expiring' 
                AND created_at > NOW() - INTERVAL '7 days'
-               LIMIT 1`,
-              [userEmail]
+               LIMIT 1`
             );
 
             if (recentNotification.rows.length > 0) {

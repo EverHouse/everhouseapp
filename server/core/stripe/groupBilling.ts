@@ -1,10 +1,9 @@
-import { pool } from '../db';
 import { db } from '../../db';
 import { billingGroups, groupMembers, familyAddOnProducts } from '../../../shared/models/hubspot-billing';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, sql } from 'drizzle-orm';
 import { getStripeClient } from './client';
 import Stripe from 'stripe';
-import { randomUUID } from 'crypto';
+import { createHash, randomUUID } from 'crypto';
 import { getCorporateVolumeTiers, getCorporateBasePrice, getFamilyDiscountPercent, updateFamilyDiscountPercent } from '../billing/pricingConfig';
 import { getErrorMessage, getErrorCode } from '../../utils/errorUtils';
 import { normalizeTierName } from '../../utils/tierUtils';
@@ -71,7 +70,7 @@ export async function getOrCreateFamilyCoupon(): Promise<string> {
             source: 'group_billing',
             type: 'family_addon',
           },
-        });
+        }, { idempotencyKey: `coupon_family_${FAMILY_COUPON_ID}_${getFamilyDiscountPercent()}` });
         logger.info(`[GroupBilling] Created FAMILY20 coupon: ${newCoupon.id}`);
         return newCoupon.id;
       }
@@ -102,6 +101,7 @@ export async function syncGroupAddOnProductsToStripe(): Promise<{
         let stripePriceId = product.stripePriceId;
         
         if (!stripeProductId) {
+          const nameHash = createHash('md5').update(product.displayName || product.tierName).digest('hex').slice(0, 8);
           const stripeProduct = await stripe.products.create({
             name: product.displayName || `Group Add-on - ${product.tierName}`,
             description: product.description || `Group add-on membership for ${product.tierName} tier`,
@@ -109,23 +109,24 @@ export async function syncGroupAddOnProductsToStripe(): Promise<{
               group_addon: 'true',
               tier_name: product.tierName,
             },
-          });
+          }, { idempotencyKey: `product_groupaddon_${nameHash}_${product.tierName}` });
           stripeProductId = stripeProduct.id;
         }
         
         if (!stripePriceId) {
+          const interval = (product.billingInterval || 'month') as 'month' | 'year';
           const stripePrice = await stripe.prices.create({
             product: stripeProductId,
             unit_amount: product.priceCents,
             currency: 'usd',
             recurring: {
-              interval: (product.billingInterval || 'month') as 'month' | 'year',
+              interval,
             },
             metadata: {
               group_addon: 'true',
               tier_name: product.tierName,
             },
-          });
+          }, { idempotencyKey: `price_${stripeProductId}_${product.priceCents}_${interval}` });
           stripePriceId = stripePrice.id;
         }
         
@@ -174,9 +175,8 @@ export async function getBillingGroupByPrimaryEmail(primaryEmail: string): Promi
       eq(groupMembers.isActive, true)
     ));
   
-  const primaryUserResult = await pool.query(
-    'SELECT first_name, last_name FROM users WHERE LOWER(email) = $1',
-    [primaryEmail.toLowerCase()]
+  const primaryUserResult = await db.execute(
+    sql`SELECT first_name, last_name FROM users WHERE LOWER(email) = ${primaryEmail.toLowerCase()}`
   );
   const primaryName = primaryUserResult.rows[0] 
     ? `${primaryUserResult.rows[0].first_name || ''} ${primaryUserResult.rows[0].last_name || ''}`.trim()
@@ -184,9 +184,8 @@ export async function getBillingGroupByPrimaryEmail(primaryEmail: string): Promi
   
   const memberEmails = members.map(m => m.memberEmail.toLowerCase());
   const allMemberUsers = memberEmails.length > 0
-    ? await pool.query(
-        'SELECT email, first_name, last_name FROM users WHERE LOWER(email) = ANY($1)',
-        [memberEmails]
+    ? await db.execute(
+        sql`SELECT email, first_name, last_name FROM users WHERE LOWER(email) = ANY(${memberEmails})`
       )
     : { rows: [] };
   const memberUserMap = new Map(
@@ -273,9 +272,8 @@ export async function createBillingGroup(params: {
       return { success: false, error: 'A billing group already exists for this member' };
     }
     
-    const primaryUserResult = await pool.query(
-      'SELECT stripe_customer_id FROM users WHERE LOWER(email) = $1',
-      [params.primaryEmail.toLowerCase()]
+    const primaryUserResult = await db.execute(
+      sql`SELECT stripe_customer_id FROM users WHERE LOWER(email) = ${params.primaryEmail.toLowerCase()}`
     );
     
     const stripeCustomerId = primaryUserResult.rows[0]?.stripe_customer_id || null;
@@ -288,9 +286,8 @@ export async function createBillingGroup(params: {
       createdByName: params.createdByName,
     }).returning({ id: billingGroups.id });
     
-    await pool.query(
-      'UPDATE users SET billing_group_id = $1 WHERE LOWER(email) = $2',
-      [result[0].id, params.primaryEmail.toLowerCase()]
+    await db.execute(
+      sql`UPDATE users SET billing_group_id = ${result[0].id} WHERE LOWER(email) = ${params.primaryEmail.toLowerCase()}`
     );
     
     return { success: true, groupId: result[0].id };
@@ -344,9 +341,8 @@ export async function createCorporateBillingGroupFromSubscription(params: {
       createdByName: 'Stripe Checkout',
     }).returning({ id: billingGroups.id });
     
-    await pool.query(
-      'UPDATE users SET billing_group_id = $1 WHERE LOWER(email) = $2',
-      [result[0].id, params.primaryEmail.toLowerCase()]
+    await db.execute(
+      sql`UPDATE users SET billing_group_id = ${result[0].id} WHERE LOWER(email) = ${params.primaryEmail.toLowerCase()}`
     );
     
     logger.info(`[GroupBilling] Auto-created corporate billing group: ${params.companyName} (ID: ${result[0].id}) for ${params.primaryEmail} with ${params.quantity} seats`);
@@ -412,9 +408,8 @@ export async function deleteBillingGroup(
       .set({ isActive: false, removedAt: new Date() })
       .where(eq(groupMembers.billingGroupId, groupId));
     
-    await pool.query(
-      'UPDATE users SET billing_group_id = NULL WHERE billing_group_id = $1',
-      [groupId]
+    await db.execute(
+      sql`UPDATE users SET billing_group_id = NULL WHERE billing_group_id = ${groupId}`
     );
     
     await db.delete(billingGroups)
@@ -444,7 +439,6 @@ export async function addGroupMember(params: {
   addedByName: string;
 }): Promise<{ success: boolean; memberId?: number; error?: string }> {
   const normalizedTier = normalizeTierName(params.memberTier);
-  const client = await pool.connect();
   
   try {
     const existingMember = await db.select()
@@ -465,13 +459,11 @@ export async function addGroupMember(params: {
     
     // Check if user exists and their billing status
     const userResult = resolvedFamily
-      ? await pool.query(
-          'SELECT id, billing_group_id, stripe_subscription_id, membership_status FROM users WHERE id = $1',
-          [resolvedFamily.userId]
+      ? await db.execute(
+          sql`SELECT id, billing_group_id, stripe_subscription_id, membership_status FROM users WHERE id = ${resolvedFamily.userId}`
         )
-      : await pool.query(
-          'SELECT id, billing_group_id, stripe_subscription_id, membership_status FROM users WHERE LOWER(email) = $1',
-          [params.memberEmail.toLowerCase()]
+      : await db.execute(
+          sql`SELECT id, billing_group_id, stripe_subscription_id, membership_status FROM users WHERE LOWER(email) = ${params.memberEmail.toLowerCase()}`
         );
     
     if (resolvedFamily && resolvedFamily.matchType !== 'direct') {
@@ -481,7 +473,7 @@ export async function addGroupMember(params: {
     let userExists = userResult.rows.length > 0;
     
     if (userExists) {
-      const user = userResult.rows[0];
+      const user = (userResult.rows as Array<Record<string, unknown>>)[0];
       
       // If user is already in a different billing group, prevent the operation
       if (user.billing_group_id !== null && user.billing_group_id !== params.billingGroupId) {
@@ -528,155 +520,105 @@ export async function addGroupMember(params: {
     
     let insertedMemberId: number | null = null;
     let stripeSubscriptionItemId: string | null = null;
+    let stripeError: unknown = null;
     
     try {
-      await client.query('BEGIN');
-      
-      const insertResult = await client.query(
-        `INSERT INTO group_members (
-          billing_group_id, member_email, member_tier, relationship,
-          stripe_subscription_item_id, stripe_price_id, add_on_price_cents,
-          added_by, added_by_name, is_active, added_at
-        ) VALUES ($1, $2, $3, $4, NULL, $5, $6, $7, $8, true, NOW())
-        RETURNING id`,
-        [
-          params.billingGroupId,
-          params.memberEmail.toLowerCase(),
-          normalizedTier,
-          params.relationship || null,
-          product.stripePriceId,
-          product.priceCents,
-          params.addedBy,
-          params.addedByName,
-        ]
-      );
-      
-      insertedMemberId = insertResult.rows[0].id;
-
-      // Create or update user account (matching addCorporateMember pattern)
-      if (userExists) {
-        const updateFields: string[] = ['billing_group_id = $1', 'tier = $2', "billing_provider = 'stripe'", "membership_status = 'active'", 'updated_at = NOW()'];
-        const updateValues: unknown[] = [params.billingGroupId, normalizedTier];
-        let paramIndex = 3;
+      await db.transaction(async (tx) => {
+        const insertResult = await tx.execute(
+          sql`INSERT INTO group_members (
+            billing_group_id, member_email, member_tier, relationship,
+            stripe_subscription_item_id, stripe_price_id, add_on_price_cents,
+            added_by, added_by_name, is_active, added_at
+          ) VALUES (${params.billingGroupId}, ${params.memberEmail.toLowerCase()}, ${normalizedTier}, ${params.relationship || null}, NULL, ${product.stripePriceId}, ${product.priceCents}, ${params.addedBy}, ${params.addedByName}, true, NOW())
+          RETURNING id`
+        );
         
-        if (params.firstName) {
-          updateFields.push(`first_name = $${paramIndex++}`);
-          updateValues.push(params.firstName);
-        }
-        if (params.lastName) {
-          updateFields.push(`last_name = $${paramIndex++}`);
-          updateValues.push(params.lastName);
-        }
-        if (params.phone) {
-          updateFields.push(`phone = $${paramIndex++}`);
-          updateValues.push(params.phone);
-        }
-        if (params.dob) {
-          updateFields.push(`date_of_birth = $${paramIndex++}`);
-          updateValues.push(params.dob);
-        }
-        if (params.streetAddress) {
-          updateFields.push(`street_address = $${paramIndex++}`);
-          updateValues.push(params.streetAddress);
-        }
-        if (params.city) {
-          updateFields.push(`city = $${paramIndex++}`);
-          updateValues.push(params.city);
-        }
-        if (params.state) {
-          updateFields.push(`state = $${paramIndex++}`);
-          updateValues.push(params.state);
-        }
-        if (params.zipCode) {
-          updateFields.push(`zip_code = $${paramIndex++}`);
-          updateValues.push(params.zipCode);
-        }
-        
-        if (resolvedFamily) {
-          updateValues.push(resolvedFamily.userId);
-          await client.query(
-            `UPDATE users SET ${updateFields.join(', ')} WHERE id = $${paramIndex}`,
-            updateValues
-          );
-          logger.info(`[GroupBilling] Updated existing user ${resolvedFamily.primaryEmail} (matched ${params.memberEmail} via ${resolvedFamily.matchType}) with family group`);
-        } else {
-          updateValues.push(params.memberEmail.toLowerCase());
-          await client.query(
-            `UPDATE users SET ${updateFields.join(', ')} WHERE LOWER(email) = $${paramIndex}`,
-            updateValues
-          );
-          logger.info(`[GroupBilling] Updated existing user ${params.memberEmail} with family group`);
-        }
-      } else {
-        const exclusionCheck = await client.query('SELECT 1 FROM sync_exclusions WHERE email = $1', [params.memberEmail.toLowerCase()]);
-        if (exclusionCheck.rows.length > 0) {
-          logger.info(`[GroupBilling] Skipping family sub-member creation for ${params.memberEmail} — permanently deleted (sync_exclusions)`);
-        } else {
-          const userId = randomUUID();
-          await client.query(
-            `INSERT INTO users (id, email, first_name, last_name, phone, date_of_birth, tier, membership_status, billing_provider, billing_group_id, street_address, city, state, zip_code, created_at)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, 'active', 'stripe', $8, $9, $10, $11, $12, NOW())`,
-            [
-              userId,
-              params.memberEmail.toLowerCase(),
-              params.firstName || null,
-              params.lastName || null,
-              params.phone || null,
-              params.dob || null,
-              normalizedTier,
-              params.billingGroupId,
-              params.streetAddress || null,
-              params.city || null,
-              params.state || null,
-              params.zipCode || null
-            ]
-          );
-          logger.info(`[GroupBilling] Created new user ${params.memberEmail} for family group with tier ${normalizedTier}`);
-        }
-      }
+        insertedMemberId = (insertResult.rows as Array<Record<string, unknown>>)[0].id as number;
 
-      if (group[0].primaryStripeSubscriptionId && product.stripePriceId) {
-        try {
-          const stripe = await getStripeClient();
+        // Create or update user account (matching addCorporateMember pattern)
+        if (userExists) {
+          const setFragments = [
+            sql`billing_group_id = ${params.billingGroupId}`,
+            sql`tier = ${normalizedTier}`,
+            sql`billing_provider = 'stripe'`,
+            sql`membership_status = 'active'`,
+            sql`updated_at = NOW()`
+          ];
           
-          const isFamilyGroup = params.relationship !== 'employee';
+          if (params.firstName) setFragments.push(sql`first_name = ${params.firstName}`);
+          if (params.lastName) setFragments.push(sql`last_name = ${params.lastName}`);
+          if (params.phone) setFragments.push(sql`phone = ${params.phone}`);
+          if (params.dob) setFragments.push(sql`date_of_birth = ${params.dob}`);
+          if (params.streetAddress) setFragments.push(sql`street_address = ${params.streetAddress}`);
+          if (params.city) setFragments.push(sql`city = ${params.city}`);
+          if (params.state) setFragments.push(sql`state = ${params.state}`);
+          if (params.zipCode) setFragments.push(sql`zip_code = ${params.zipCode}`);
           
-          const subscriptionItemParams: Stripe.SubscriptionItemCreateParams = {
-            subscription: group[0].primaryStripeSubscriptionId,
-            price: product.stripePriceId,
-            quantity: 1,
-            metadata: {
-              group_member_email: params.memberEmail.toLowerCase(),
-              billing_group_id: params.billingGroupId.toString(),
-              tier: normalizedTier,
-            },
-          };
+          const setClauses = sql.join(setFragments, sql`, `);
           
-          if (isFamilyGroup) {
-            try {
-              const couponId = await getOrCreateFamilyCoupon();
-              subscriptionItemParams.discounts = [{ coupon: couponId }];
-              logger.info(`[GroupBilling] Applying FAMILY20 coupon to family member ${params.memberEmail}`);
-            } catch (couponErr: unknown) {
-              logger.warn(`[GroupBilling] Could not apply FAMILY20 coupon: ${getErrorMessage(couponErr)}. Proceeding without discount.`);
-            }
+          if (resolvedFamily) {
+            await tx.execute(sql`UPDATE users SET ${setClauses} WHERE id = ${resolvedFamily.userId}`);
+            logger.info(`[GroupBilling] Updated existing user ${resolvedFamily.primaryEmail} (matched ${params.memberEmail} via ${resolvedFamily.matchType}) with family group`);
+          } else {
+            await tx.execute(sql`UPDATE users SET ${setClauses} WHERE LOWER(email) = ${params.memberEmail.toLowerCase()}`);
+            logger.info(`[GroupBilling] Updated existing user ${params.memberEmail} with family group`);
           }
-          
-          const subscriptionItem = await stripe.subscriptionItems.create(subscriptionItemParams);
-          stripeSubscriptionItemId = subscriptionItem.id;
-          
-          await client.query(
-            'UPDATE group_members SET stripe_subscription_item_id = $1 WHERE id = $2',
-            [stripeSubscriptionItemId, insertedMemberId]
-          );
-        } catch (stripeErr: unknown) {
-          logger.error('[GroupBilling] Stripe API failed, rolling back DB reservation:', { error: stripeErr });
-          await client.query('ROLLBACK');
-          return { success: false, error: `Failed to add billing: ${getErrorMessage(stripeErr)}` };
+        } else {
+          const exclusionCheck = await tx.execute(sql`SELECT 1 FROM sync_exclusions WHERE email = ${params.memberEmail.toLowerCase()}`);
+          if ((exclusionCheck.rows as Array<Record<string, unknown>>).length > 0) {
+            logger.info(`[GroupBilling] Skipping family sub-member creation for ${params.memberEmail} — permanently deleted (sync_exclusions)`);
+          } else {
+            const userId = randomUUID();
+            await tx.execute(
+              sql`INSERT INTO users (id, email, first_name, last_name, phone, date_of_birth, tier, membership_status, billing_provider, billing_group_id, street_address, city, state, zip_code, created_at)
+               VALUES (${userId}, ${params.memberEmail.toLowerCase()}, ${params.firstName || null}, ${params.lastName || null}, ${params.phone || null}, ${params.dob || null}, ${normalizedTier}, 'active', 'stripe', ${params.billingGroupId}, ${params.streetAddress || null}, ${params.city || null}, ${params.state || null}, ${params.zipCode || null}, NOW())`
+            );
+            logger.info(`[GroupBilling] Created new user ${params.memberEmail} for family group with tier ${normalizedTier}`);
+          }
         }
-      }
 
-      await client.query('COMMIT');
+        if (group[0].primaryStripeSubscriptionId && product.stripePriceId) {
+          try {
+            const stripe = await getStripeClient();
+            
+            const isFamilyGroup = params.relationship !== 'employee';
+            
+            const subscriptionItemParams: Stripe.SubscriptionItemCreateParams = {
+              subscription: group[0].primaryStripeSubscriptionId,
+              price: product.stripePriceId,
+              quantity: 1,
+              metadata: {
+                group_member_email: params.memberEmail.toLowerCase(),
+                billing_group_id: params.billingGroupId.toString(),
+                tier: normalizedTier,
+              },
+            };
+            
+            if (isFamilyGroup) {
+              try {
+                const couponId = await getOrCreateFamilyCoupon();
+                subscriptionItemParams.discounts = [{ coupon: couponId }];
+                logger.info(`[GroupBilling] Applying FAMILY20 coupon to family member ${params.memberEmail}`);
+              } catch (couponErr: unknown) {
+                logger.warn(`[GroupBilling] Could not apply FAMILY20 coupon: ${getErrorMessage(couponErr)}. Proceeding without discount.`);
+              }
+            }
+            
+            const subscriptionItem = await stripe.subscriptionItems.create(subscriptionItemParams, {
+              idempotencyKey: `subitem_${group[0].primaryStripeSubscriptionId}_${product.stripePriceId}_${params.memberEmail.toLowerCase()}`
+            });
+            stripeSubscriptionItemId = subscriptionItem.id;
+            
+            await tx.execute(
+              sql`UPDATE group_members SET stripe_subscription_item_id = ${stripeSubscriptionItemId} WHERE id = ${insertedMemberId}`
+            );
+          } catch (stripeErr: unknown) {
+            logger.error('[GroupBilling] Stripe API failed, rolling back DB reservation:', { error: stripeErr });
+            stripeError = stripeErr;
+            throw stripeErr;
+          }
+        }
+      });
       
       // Background sync sub-member to HubSpot
       findOrCreateHubSpotContact(
@@ -691,7 +633,10 @@ export async function addGroupMember(params: {
       return { success: true, memberId: insertedMemberId };
 
     } catch (dbErr: unknown) {
-      await client.query('ROLLBACK');
+      if (stripeError) {
+        return { success: false, error: `Failed to add billing: ${getErrorMessage(stripeError)}` };
+      }
+      
       logger.error('[GroupBilling] DB transaction failed:', { error: dbErr });
       
       if (stripeSubscriptionItemId) {
@@ -709,8 +654,6 @@ export async function addGroupMember(params: {
   } catch (err: unknown) {
     logger.error('[GroupBilling] Error adding group member:', { error: err });
     return { success: false, error: 'Operation failed. Please try again.' };
-  } finally {
-    client.release();
   }
 }
 
@@ -752,7 +695,6 @@ export async function addCorporateMember(params: {
   addedByName: string;
 }): Promise<{ success: boolean; memberId?: number; error?: string }> {
   const normalizedTier = normalizeTierName(params.memberTier);
-  const client = await pool.connect();
   
   try {
     let originalQuantity: number | null = null;
@@ -766,252 +708,197 @@ export async function addCorporateMember(params: {
     let primaryStripeSubscriptionId: string | null = null;
     
     try {
-      await client.query('BEGIN');
+      await db.transaction(async (tx) => {
 
-      const existingMemberResult = await client.query(
-        `SELECT id FROM group_members WHERE LOWER(member_email) = $1 AND is_active = true LIMIT 1`,
-        [params.memberEmail.toLowerCase()]
-      );
+        const existingMemberResult = await tx.execute(
+          sql`SELECT id FROM group_members WHERE LOWER(member_email) = ${params.memberEmail.toLowerCase()} AND is_active = true LIMIT 1`
+        );
     
-      if (existingMemberResult.rows.length > 0) {
-        await client.query('ROLLBACK');
-        return { success: false, error: 'This member is already part of a billing group' };
-      }
-    
-      // Check if user exists via linked email resolution
-      const { resolveUserByEmail: resolveCorporateEmail } = await import('./customers');
-      const resolvedCorporate = await resolveCorporateEmail(params.memberEmail);
-      
-      const userResult = resolvedCorporate
-        ? await client.query(
-            'SELECT id, billing_group_id, stripe_subscription_id, membership_status FROM users WHERE id = $1',
-            [resolvedCorporate.userId]
-          )
-        : await client.query(
-            'SELECT id, billing_group_id, stripe_subscription_id, membership_status FROM users WHERE LOWER(email) = $1',
-            [params.memberEmail.toLowerCase()]
-          );
-    
-      if (resolvedCorporate && resolvedCorporate.matchType !== 'direct') {
-        logger.info(`[GroupBilling] Email ${params.memberEmail} resolved to existing user ${resolvedCorporate.primaryEmail} via ${resolvedCorporate.matchType}`);
-      }
-    
-      if (userResult.rows.length > 0) {
-        const user = userResult.rows[0];
-      
-        // If user is already in a different billing group, prevent the operation
-        if (user.billing_group_id !== null && user.billing_group_id !== params.billingGroupId) {
-          await client.query('ROLLBACK');
-          return { 
-            success: false, 
-            error: 'User is already in a billing group. Remove them first.' 
-          };
+        if (existingMemberResult.rows.length > 0) {
+          throw Object.assign(new Error('This member is already part of a billing group'), { __earlyReturn: true, result: { success: false, error: 'This member is already part of a billing group' } });
         }
+    
+        const { resolveUserByEmail: resolveCorporateEmail } = await import('./customers');
+        const resolvedCorporate = await resolveCorporateEmail(params.memberEmail);
       
-        // Guard against dual subscriptions - if user has their own active subscription (any provider), prevent adding to group
-        const hasActiveSubscription = user.stripe_subscription_id && 
-          (user.membership_status === 'active' || user.membership_status === 'past_due');
-        if (hasActiveSubscription) {
-          await client.query('ROLLBACK');
-          return {
-            success: false,
-            error: 'User already has their own active subscription. Cancel it before adding them to a corporate plan.'
-          };
+        const userResult = resolvedCorporate
+          ? await tx.execute(
+              sql`SELECT id, billing_group_id, stripe_subscription_id, membership_status FROM users WHERE id = ${resolvedCorporate.userId}`
+            )
+          : await tx.execute(
+              sql`SELECT id, billing_group_id, stripe_subscription_id, membership_status FROM users WHERE LOWER(email) = ${params.memberEmail.toLowerCase()}`
+            );
+    
+        if (resolvedCorporate && resolvedCorporate.matchType !== 'direct') {
+          logger.info(`[GroupBilling] Email ${params.memberEmail} resolved to existing user ${resolvedCorporate.primaryEmail} via ${resolvedCorporate.matchType}`);
         }
-      }
     
-      const groupResult = await client.query(
-        `SELECT * FROM billing_groups WHERE id = $1 LIMIT 1 FOR UPDATE`,
-        [params.billingGroupId]
-      );
-    
-      if (groupResult.rows.length === 0) {
-        await client.query('ROLLBACK');
-        return { success: false, error: 'Billing group not found' };
-      }
-    
-      const group = [groupResult.rows[0]];
-      primaryStripeSubscriptionId = group[0].primary_stripe_subscription_id || null;
-    
-      const currentMembersResult = await client.query(
-        `SELECT id FROM group_members WHERE billing_group_id = $1 AND is_active = true`,
-        [params.billingGroupId]
-      );
-    
-      const newMemberCount = currentMembersResult.rows.length + 1;
-      const pricePerSeat = getCorporateVolumePrice(newMemberCount);
+        if (userResult.rows.length > 0) {
+          const user = userResult.rows[0] as Record<string, unknown>;
       
-      const insertResult = await client.query(
-        `INSERT INTO group_members (
-          billing_group_id, member_email, member_tier, relationship,
-          add_on_price_cents, added_by, added_by_name, is_active, added_at
-        ) VALUES ($1, $2, $3, 'employee', $4, $5, $6, true, NOW())
-        RETURNING id`,
-        [
-          params.billingGroupId,
-          params.memberEmail.toLowerCase(),
-          normalizedTier,
-          pricePerSeat,
-          params.addedBy,
-          params.addedByName,
-        ]
-      );
+          if (user.billing_group_id !== null && user.billing_group_id !== params.billingGroupId) {
+            throw Object.assign(new Error('User is already in a billing group. Remove them first.'), { __earlyReturn: true, result: { success: false, error: 'User is already in a billing group. Remove them first.' } });
+          }
       
-      insertedMemberId = insertResult.rows[0].id;
+          const hasActiveSubscription = user.stripe_subscription_id && 
+            (user.membership_status === 'active' || user.membership_status === 'past_due');
+          if (hasActiveSubscription) {
+            throw Object.assign(new Error('User already has their own active subscription. Cancel it before adding them to a corporate plan.'), { __earlyReturn: true, result: { success: false, error: 'User already has their own active subscription. Cancel it before adding them to a corporate plan.' } });
+          }
+        }
+    
+        const groupResult = await tx.execute(
+          sql`SELECT * FROM billing_groups WHERE id = ${params.billingGroupId} LIMIT 1 FOR UPDATE`
+        );
+    
+        if (groupResult.rows.length === 0) {
+          throw Object.assign(new Error('Billing group not found'), { __earlyReturn: true, result: { success: false, error: 'Billing group not found' } });
+        }
+    
+        const group = [groupResult.rows[0] as Record<string, unknown>];
+        primaryStripeSubscriptionId = (group[0].primary_stripe_subscription_id as string) || null;
+    
+        const currentMembersResult = await tx.execute(
+          sql`SELECT id FROM group_members WHERE billing_group_id = ${params.billingGroupId} AND is_active = true`
+        );
+    
+        const newMemberCount = currentMembersResult.rows.length + 1;
+        const pricePerSeat = getCorporateVolumePrice(newMemberCount);
       
-      const existingUserCheck = resolvedCorporate
-        ? { rows: [{ id: resolvedCorporate.userId }] }
-        : await client.query(
-            'SELECT id FROM users WHERE LOWER(email) = $1',
-            [params.memberEmail.toLowerCase()]
-          );
+        const insertResult = await tx.execute(
+          sql`INSERT INTO group_members (
+            billing_group_id, member_email, member_tier, relationship,
+            add_on_price_cents, added_by, added_by_name, is_active, added_at
+          ) VALUES (${params.billingGroupId}, ${params.memberEmail.toLowerCase()}, ${normalizedTier}, 'employee', ${pricePerSeat}, ${params.addedBy}, ${params.addedByName}, true, NOW())
+          RETURNING id`
+        );
       
-      if (existingUserCheck.rows.length > 0) {
-        const updateFields: string[] = ['billing_group_id = $1', 'tier = $2', "billing_provider = 'stripe'", "membership_status = 'active'"];
-        const updateValues: unknown[] = [params.billingGroupId, normalizedTier];
-        let paramIndex = 3;
+        insertedMemberId = (insertResult.rows as Array<Record<string, unknown>>)[0].id as number;
+      
+        const existingUserCheck = resolvedCorporate
+          ? { rows: [{ id: resolvedCorporate.userId }] }
+          : await tx.execute(
+              sql`SELECT id FROM users WHERE LOWER(email) = ${params.memberEmail.toLowerCase()}`
+            );
+      
+        if (existingUserCheck.rows.length > 0) {
+          const setFragments = [
+            sql`billing_group_id = ${params.billingGroupId}`,
+            sql`tier = ${normalizedTier}`,
+            sql`billing_provider = 'stripe'`,
+            sql`membership_status = 'active'`
+          ];
         
-        if (params.firstName) {
-          updateFields.push(`first_name = $${paramIndex++}`);
-          updateValues.push(params.firstName);
-        }
-        if (params.lastName) {
-          updateFields.push(`last_name = $${paramIndex++}`);
-          updateValues.push(params.lastName);
-        }
-        if (params.phone) {
-          updateFields.push(`phone = $${paramIndex++}`);
-          updateValues.push(params.phone);
-        }
-        if (params.dob) {
-          updateFields.push(`date_of_birth = $${paramIndex++}`);
-          updateValues.push(params.dob);
-        }
+          if (params.firstName) setFragments.push(sql`first_name = ${params.firstName}`);
+          if (params.lastName) setFragments.push(sql`last_name = ${params.lastName}`);
+          if (params.phone) setFragments.push(sql`phone = ${params.phone}`);
+          if (params.dob) setFragments.push(sql`date_of_birth = ${params.dob}`);
         
-        if (resolvedCorporate) {
-          updateValues.push(resolvedCorporate.userId);
-          await client.query(
-            `UPDATE users SET ${updateFields.join(', ')} WHERE id = $${paramIndex}`,
-            updateValues
-          );
-          logger.info(`[GroupBilling] Updated existing user ${resolvedCorporate.primaryEmail} (matched ${params.memberEmail} via ${resolvedCorporate.matchType}) with corporate group`);
-        } else {
-          updateValues.push(params.memberEmail.toLowerCase());
-          await client.query(
-            `UPDATE users SET ${updateFields.join(', ')} WHERE LOWER(email) = $${paramIndex}`,
-            updateValues
-          );
-          logger.info(`[GroupBilling] Updated existing user ${params.memberEmail} with corporate group`);
-        }
-      } else {
-        const corpExclusionCheck = await client.query('SELECT 1 FROM sync_exclusions WHERE email = $1', [params.memberEmail.toLowerCase()]);
-        if (corpExclusionCheck.rows.length > 0) {
-          logger.info(`[GroupBilling] Skipping corporate sub-member creation for ${params.memberEmail} — permanently deleted (sync_exclusions)`);
-        } else {
-          const userId = randomUUID();
-          await client.query(
-            `INSERT INTO users (id, email, first_name, last_name, phone, date_of_birth, tier, membership_status, billing_provider, billing_group_id, created_at)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, 'active', 'stripe', $8, NOW())`,
-            [
-              userId,
-              params.memberEmail.toLowerCase(),
-              params.firstName || null,
-              params.lastName || null,
-              params.phone || null,
-              params.dob || null,
-              normalizedTier,
-              params.billingGroupId
-            ]
-          );
-          logger.info(`[GroupBilling] Created new user ${params.memberEmail} with tier ${normalizedTier}`);
-        }
-      }
-
-      const hasPrePaidSeats = group[0].max_seats && group[0].max_seats > 0;
-      
-      if (hasPrePaidSeats) {
-        logger.info(`[GroupBilling] Pre-paid seats mode: ${newMemberCount} of ${group[0].max_seats} seats used (no Stripe billing change needed)`);
-      } else if (group[0].primary_stripe_subscription_id) {
-        try {
-          const stripe = await getStripeClient();
-          const subscription = await stripe.subscriptions.retrieve(group[0].primary_stripe_subscription_id, {
-            expand: ['items.data'],
-          });
-          
-          const corporateItem = subscription.items.data.find(
-            item => item.metadata?.corporate_membership === 'true'
-          );
-          
-          if (corporateItem) {
-            originalQuantity = corporateItem.quantity || 0;
-            originalPricePerSeat = corporateItem.price?.unit_amount ?? 0;
-            if (!originalPricePerSeat) {
-              logger.error(`[GroupBilling] Corporate seat price is missing from Stripe subscription item ${corporateItem.id} — cannot adjust`);
-              throw new Error('Corporate seat price not found on Stripe subscription item');
-            }
-            originalProductId = corporateItem.price?.product as string;
-            corporateItemId = corporateItem.id;
-            
-            const newPricePerSeat = getCorporateVolumePrice(newMemberCount);
-            
-            if (originalPricePerSeat !== newPricePerSeat) {
-              logger.info(`[GroupBilling] Price tier change: ${originalPricePerSeat} -> ${newPricePerSeat} cents/seat for ${newMemberCount} members`);
-              
-              // Preserve existing metadata from the old item while ensuring corporate_membership is set
-              const existingMetadata = corporateItem.metadata || {};
-              const newItem = await stripe.subscriptionItems.create({
-                subscription: group[0].primary_stripe_subscription_id,
-                price_data: {
-                  currency: 'usd',
-                  product: originalProductId,
-                  unit_amount: newPricePerSeat,
-                  recurring: { interval: 'month' },
-                },
-                quantity: newMemberCount,
-                metadata: {
-                  ...existingMetadata,
-                  corporate_membership: 'true',
-                },
-                proration_behavior: 'create_prorations',
-              });
-              
-              await stripe.subscriptionItems.del(corporateItem.id, {
-                proration_behavior: 'none',
-              });
-              
-              newStripeItemId = newItem.id;
-              corporateItemId = newItem.id;
-              priceTierChanged = true;
-            } else {
-              await stripe.subscriptionItems.update(corporateItem.id, {
-                quantity: newMemberCount,
-              });
-            }
-            stripeUpdated = true;
+          const setClauses = sql.join(setFragments, sql`, `);
+        
+          if (resolvedCorporate) {
+            await tx.execute(sql`UPDATE users SET ${setClauses} WHERE id = ${resolvedCorporate.userId}`);
+            logger.info(`[GroupBilling] Updated existing user ${resolvedCorporate.primaryEmail} (matched ${params.memberEmail} via ${resolvedCorporate.matchType}) with corporate group`);
           } else {
-            logger.info('[GroupBilling] No corporate_membership item found - assuming pre-paid seats via checkout');
+            await tx.execute(sql`UPDATE users SET ${setClauses} WHERE LOWER(email) = ${params.memberEmail.toLowerCase()}`);
+            logger.info(`[GroupBilling] Updated existing user ${params.memberEmail} with corporate group`);
           }
-        } catch (stripeErr: unknown) {
-          logger.error('[GroupBilling] Stripe API failed, rolling back DB reservation:', { error: stripeErr });
-          if (newStripeItemId) {
-            try {
-              const stripeForRollback = await getStripeClient();
-              await stripeForRollback.subscriptionItems.del(newStripeItemId, {
-                proration_behavior: 'none',
-              });
-              logger.info(`[GroupBilling] Rolled back newly created Stripe subscription item ${newStripeItemId}`);
-            } catch (rollbackErr: unknown) {
-              logger.error(`[GroupBilling] CRITICAL: Failed to delete newly created Stripe subscription item ${newStripeItemId}. Customer may be double-billed. Manual intervention required.`, { error: rollbackErr });
-            }
+        } else {
+          const corpExclusionCheck = await tx.execute(sql`SELECT 1 FROM sync_exclusions WHERE email = ${params.memberEmail.toLowerCase()}`);
+          if ((corpExclusionCheck.rows as Array<Record<string, unknown>>).length > 0) {
+            logger.info(`[GroupBilling] Skipping corporate sub-member creation for ${params.memberEmail} — permanently deleted (sync_exclusions)`);
+          } else {
+            const userId = randomUUID();
+            await tx.execute(
+              sql`INSERT INTO users (id, email, first_name, last_name, phone, date_of_birth, tier, membership_status, billing_provider, billing_group_id, created_at)
+               VALUES (${userId}, ${params.memberEmail.toLowerCase()}, ${params.firstName || null}, ${params.lastName || null}, ${params.phone || null}, ${params.dob || null}, ${normalizedTier}, 'active', 'stripe', ${params.billingGroupId}, NOW())`
+            );
+            logger.info(`[GroupBilling] Created new user ${params.memberEmail} with tier ${normalizedTier}`);
           }
-          await client.query('ROLLBACK');
-          return { success: false, error: 'Failed to update billing. Please try again.' };
         }
-      }
+
+        const hasPrePaidSeats = group[0].max_seats && (group[0].max_seats as number) > 0;
       
-      await client.query('COMMIT');
+        if (hasPrePaidSeats) {
+          logger.info(`[GroupBilling] Pre-paid seats mode: ${newMemberCount} of ${group[0].max_seats} seats used (no Stripe billing change needed)`);
+        } else if (group[0].primary_stripe_subscription_id) {
+          try {
+            const stripe = await getStripeClient();
+            const subscription = await stripe.subscriptions.retrieve(group[0].primary_stripe_subscription_id as string, {
+              expand: ['items.data'],
+            });
+          
+            const corporateItem = subscription.items.data.find(
+              item => item.metadata?.corporate_membership === 'true'
+            );
+          
+            if (corporateItem) {
+              originalQuantity = corporateItem.quantity || 0;
+              originalPricePerSeat = corporateItem.price?.unit_amount ?? 0;
+              if (!originalPricePerSeat) {
+                logger.error(`[GroupBilling] Corporate seat price is missing from Stripe subscription item ${corporateItem.id} — cannot adjust`);
+                throw new Error('Corporate seat price not found on Stripe subscription item');
+              }
+              originalProductId = corporateItem.price?.product as string;
+              corporateItemId = corporateItem.id;
+            
+              const newPricePerSeat = getCorporateVolumePrice(newMemberCount);
+            
+              if (originalPricePerSeat !== newPricePerSeat) {
+                logger.info(`[GroupBilling] Price tier change: ${originalPricePerSeat} -> ${newPricePerSeat} cents/seat for ${newMemberCount} members`);
+              
+                const existingMetadata = corporateItem.metadata || {};
+                const newItem = await stripe.subscriptionItems.create({
+                  subscription: group[0].primary_stripe_subscription_id as string,
+                  price_data: {
+                    currency: 'usd',
+                    product: originalProductId,
+                    unit_amount: newPricePerSeat,
+                    recurring: { interval: 'month' },
+                  },
+                  quantity: newMemberCount,
+                  metadata: {
+                    ...existingMetadata,
+                    corporate_membership: 'true',
+                  },
+                  proration_behavior: 'create_prorations',
+                }, { idempotencyKey: `subitem_corp_add_${group[0].primary_stripe_subscription_id}_${newPricePerSeat}_${newMemberCount}` });
+              
+                await stripe.subscriptionItems.del(corporateItem.id, {
+                  proration_behavior: 'none',
+                });
+              
+                newStripeItemId = newItem.id;
+                corporateItemId = newItem.id;
+                priceTierChanged = true;
+              } else {
+                await stripe.subscriptionItems.update(corporateItem.id, {
+                  quantity: newMemberCount,
+                });
+              }
+              stripeUpdated = true;
+            } else {
+              logger.info('[GroupBilling] No corporate_membership item found - assuming pre-paid seats via checkout');
+            }
+          } catch (stripeErr: unknown) {
+            if ((stripeErr as Record<string, unknown>)?.__earlyReturn) throw stripeErr;
+            logger.error('[GroupBilling] Stripe API failed, rolling back DB reservation:', { error: stripeErr });
+            if (newStripeItemId) {
+              try {
+                const stripeForRollback = await getStripeClient();
+                await stripeForRollback.subscriptionItems.del(newStripeItemId, {
+                  proration_behavior: 'none',
+                });
+                logger.info(`[GroupBilling] Rolled back newly created Stripe subscription item ${newStripeItemId}`);
+              } catch (rollbackErr: unknown) {
+                logger.error(`[GroupBilling] CRITICAL: Failed to delete newly created Stripe subscription item ${newStripeItemId}. Customer may be double-billed. Manual intervention required.`, { error: rollbackErr });
+              }
+            }
+            throw Object.assign(new Error('Failed to update billing. Please try again.'), { __earlyReturn: true, result: { success: false, error: 'Failed to update billing. Please try again.' } });
+          }
+        }
+      });
       
-      // Background sync sub-member to HubSpot
       findOrCreateHubSpotContact(
         params.memberEmail,
         params.firstName || '',
@@ -1024,7 +911,9 @@ export async function addCorporateMember(params: {
       return { success: true, memberId: insertedMemberId };
       
     } catch (dbErr: unknown) {
-      await client.query('ROLLBACK');
+      if ((dbErr as Record<string, unknown>)?.__earlyReturn) {
+        return (dbErr as Record<string, unknown>).result as { success: false; error: string };
+      }
       logger.error('[GroupBilling] DB transaction failed:', { error: dbErr });
       
       if (stripeUpdated && originalQuantity !== null) {
@@ -1052,7 +941,7 @@ export async function addCorporateMember(params: {
                   corporate_membership: 'true',
                 },
                 proration_behavior: 'none',
-              });
+              }, { idempotencyKey: `subitem_corp_rollback_${primaryStripeSubscriptionId}_${originalPricePerSeat}_${originalQuantity}` });
               
               await stripe.subscriptionItems.del(currentCorporateItem.id, {
                 proration_behavior: 'none',
@@ -1075,8 +964,6 @@ export async function addCorporateMember(params: {
   } catch (err: unknown) {
     logger.error('[GroupBilling] Error adding corporate member:', { error: err });
     return { success: false, error: 'Failed to add corporate member. Please try again.' };
-  } finally {
-    client.release();
   }
 }
 
@@ -1085,116 +972,106 @@ export async function removeCorporateMember(params: {
   memberEmail: string;
   removedBy: string;
 }): Promise<{ success: boolean; error?: string }> {
-  const client = await pool.connect();
-  
   try {
-    await client.query('BEGIN');
+    await db.transaction(async (tx) => {
+      const memberResult = await tx.execute(
+        sql`SELECT gm.id, gm.member_email, gm.is_active
+         FROM group_members gm
+         WHERE gm.billing_group_id = ${params.billingGroupId} AND LOWER(gm.member_email) = ${params.memberEmail.toLowerCase()}
+         FOR UPDATE`
+      );
     
-    const memberResult = await client.query(
-      `SELECT gm.id, gm.member_email, gm.is_active
-       FROM group_members gm
-       WHERE gm.billing_group_id = $1 AND LOWER(gm.member_email) = $2
-       FOR UPDATE`,
-      [params.billingGroupId, params.memberEmail.toLowerCase()]
-    );
-    
-    if (memberResult.rows.length === 0) {
-      await client.query('ROLLBACK');
-      return { success: false, error: 'Member not found in this billing group' };
-    }
-    
-    const memberRecord = memberResult.rows[0];
-    
-    if (!memberRecord.is_active) {
-      await client.query('ROLLBACK');
-      return { success: false, error: 'Member is already inactive' };
-    }
-    
-    await client.query(
-      `UPDATE group_members SET is_active = false, removed_at = NOW() WHERE id = $1`,
-      [memberRecord.id]
-    );
-    
-    await client.query(
-      'UPDATE users SET billing_group_id = NULL WHERE LOWER(email) = $1',
-      [params.memberEmail.toLowerCase()]
-    );
-    
-    const groupResult = await client.query(
-      `SELECT id, primary_stripe_subscription_id FROM billing_groups WHERE id = $1 FOR UPDATE`,
-      [params.billingGroupId]
-    );
-    const group = groupResult.rows;
-    
-    if (group.length > 0 && group[0].primary_stripe_subscription_id) {
-      try {
-        const remainingResult = await client.query(
-          `SELECT COUNT(*) as cnt FROM group_members WHERE billing_group_id = $1 AND is_active = true`,
-          [params.billingGroupId]
-        );
-        
-        const newMemberCount = Math.max(parseInt(remainingResult.rows[0].cnt, 10), 5);
-        const newPricePerSeat = getCorporateVolumePrice(newMemberCount);
-        
-        const stripe = await getStripeClient();
-        const subscription = await stripe.subscriptions.retrieve(group[0].primary_stripe_subscription_id, {
-          expand: ['items.data'],
-        });
-        
-        const corporateItem = subscription.items.data.find(
-          item => item.metadata?.corporate_membership === 'true'
-        );
-        
-        if (corporateItem) {
-          const oldPricePerSeat = corporateItem.price?.unit_amount ?? 0;
-          if (!oldPricePerSeat) {
-            logger.error(`[GroupBilling] Corporate seat price is missing from Stripe subscription item ${corporateItem.id} — cannot adjust`);
-            throw new Error('Corporate seat price not found on Stripe subscription item');
-          }
-          
-          if (oldPricePerSeat !== newPricePerSeat) {
-            logger.info(`[GroupBilling] Price tier change on removal: ${oldPricePerSeat} -> ${newPricePerSeat} cents/seat for ${newMemberCount} members`);
-            
-            await stripe.subscriptionItems.create({
-              subscription: group[0].primary_stripe_subscription_id,
-              price_data: {
-                currency: 'usd',
-                product: corporateItem.price?.product as string,
-                unit_amount: newPricePerSeat,
-                recurring: { interval: 'month' },
-              },
-              quantity: newMemberCount,
-              metadata: {
-                corporate_membership: 'true',
-              },
-              proration_behavior: 'create_prorations',
-            });
-            
-            await stripe.subscriptionItems.del(corporateItem.id, {
-              proration_behavior: 'none',
-            });
-          } else {
-            await stripe.subscriptionItems.update(corporateItem.id, {
-              quantity: newMemberCount,
-            });
-          }
-        }
-      } catch (stripeErr: unknown) {
-        await client.query('ROLLBACK');
-        logger.error('[GroupBilling] Failed to update Stripe on member removal:', { error: stripeErr });
-        return { success: false, error: 'Failed to update billing. Please try again.' };
+      if (memberResult.rows.length === 0) {
+        throw Object.assign(new Error('Member not found in this billing group'), { __earlyReturn: true, result: { success: false, error: 'Member not found in this billing group' } });
       }
-    }
     
-    await client.query('COMMIT');
+      const memberRecord = memberResult.rows[0] as Record<string, unknown>;
+    
+      if (!memberRecord.is_active) {
+        throw Object.assign(new Error('Member is already inactive'), { __earlyReturn: true, result: { success: false, error: 'Member is already inactive' } });
+      }
+    
+      await tx.execute(
+        sql`UPDATE group_members SET is_active = false, removed_at = NOW() WHERE id = ${memberRecord.id}`
+      );
+    
+      await tx.execute(
+        sql`UPDATE users SET billing_group_id = NULL WHERE LOWER(email) = ${params.memberEmail.toLowerCase()}`
+      );
+    
+      const groupResult = await tx.execute(
+        sql`SELECT id, primary_stripe_subscription_id FROM billing_groups WHERE id = ${params.billingGroupId} FOR UPDATE`
+      );
+      const group = groupResult.rows as Array<Record<string, unknown>>;
+    
+      if (group.length > 0 && group[0].primary_stripe_subscription_id) {
+        try {
+          const remainingResult = await tx.execute(
+            sql`SELECT COUNT(*) as cnt FROM group_members WHERE billing_group_id = ${params.billingGroupId} AND is_active = true`
+          );
+        
+          const newMemberCount = Math.max(parseInt((remainingResult.rows[0] as Record<string, unknown>).cnt as string, 10), 5);
+          const newPricePerSeat = getCorporateVolumePrice(newMemberCount);
+        
+          const stripe = await getStripeClient();
+          const subscription = await stripe.subscriptions.retrieve(group[0].primary_stripe_subscription_id as string, {
+            expand: ['items.data'],
+          });
+        
+          const corporateItem = subscription.items.data.find(
+            item => item.metadata?.corporate_membership === 'true'
+          );
+        
+          if (corporateItem) {
+            const oldPricePerSeat = corporateItem.price?.unit_amount ?? 0;
+            if (!oldPricePerSeat) {
+              logger.error(`[GroupBilling] Corporate seat price is missing from Stripe subscription item ${corporateItem.id} — cannot adjust`);
+              throw new Error('Corporate seat price not found on Stripe subscription item');
+            }
+          
+            if (oldPricePerSeat !== newPricePerSeat) {
+              logger.info(`[GroupBilling] Price tier change on removal: ${oldPricePerSeat} -> ${newPricePerSeat} cents/seat for ${newMemberCount} members`);
+            
+              await stripe.subscriptionItems.create({
+                subscription: group[0].primary_stripe_subscription_id as string,
+                price_data: {
+                  currency: 'usd',
+                  product: corporateItem.price?.product as string,
+                  unit_amount: newPricePerSeat,
+                  recurring: { interval: 'month' },
+                },
+                quantity: newMemberCount,
+                metadata: {
+                  corporate_membership: 'true',
+                },
+                proration_behavior: 'create_prorations',
+              }, { idempotencyKey: `subitem_corp_remove_${group[0].primary_stripe_subscription_id}_${newPricePerSeat}_${newMemberCount}` });
+            
+              await stripe.subscriptionItems.del(corporateItem.id, {
+                proration_behavior: 'none',
+              });
+            } else {
+              await stripe.subscriptionItems.update(corporateItem.id, {
+                quantity: newMemberCount,
+              });
+            }
+          }
+        } catch (stripeErr: unknown) {
+          if ((stripeErr as Record<string, unknown>)?.__earlyReturn) throw stripeErr;
+          logger.error('[GroupBilling] Failed to update Stripe on member removal:', { error: stripeErr });
+          throw Object.assign(new Error('Failed to update billing. Please try again.'), { __earlyReturn: true, result: { success: false, error: 'Failed to update billing. Please try again.' } });
+        }
+      }
+    });
+    
     logger.info(`[GroupBilling] Successfully removed corporate member ${params.memberEmail}`);
     return { success: true };
   } catch (err: unknown) {
-    await client.query('ROLLBACK');
+    if ((err as Record<string, unknown>)?.__earlyReturn) {
+      return (err as Record<string, unknown>).result as { success: false; error: string };
+    }
     logger.error('[GroupBilling] Error removing corporate member:', { error: err });
     return { success: false, error: 'Failed to remove member. Please try again.' };
-  } finally {
-    client.release();
   }
 }
 
@@ -1202,65 +1079,53 @@ export async function removeGroupMember(params: {
   memberId: number;
   removedBy: string;
 }): Promise<{ success: boolean; error?: string }> {
-  const client = await pool.connect();
-  
   try {
-    await client.query('BEGIN');
+    await db.transaction(async (tx) => {
+      const memberResult = await tx.execute(
+        sql`SELECT gm.id, gm.member_email, gm.stripe_subscription_item_id, gm.is_active
+         FROM group_members gm
+         WHERE gm.id = ${params.memberId}
+         FOR UPDATE`
+      );
     
-    const memberResult = await client.query(
-      `SELECT gm.id, gm.member_email, gm.stripe_subscription_item_id, gm.is_active
-       FROM group_members gm
-       WHERE gm.id = $1
-       FOR UPDATE`,
-      [params.memberId]
-    );
-    
-    if (memberResult.rows.length === 0) {
-      await client.query('ROLLBACK');
-      return { success: false, error: 'Group member not found' };
-    }
-    
-    const memberRecord = memberResult.rows[0];
-    
-    if (!memberRecord.is_active) {
-      await client.query('ROLLBACK');
-      return { success: false, error: 'Member is already inactive' };
-    }
-    
-    await client.query(
-      `UPDATE group_members SET is_active = false, removed_at = NOW() WHERE id = $1`,
-      [params.memberId]
-    );
-    
-    await client.query(
-      'UPDATE users SET billing_group_id = NULL WHERE LOWER(email) = $1',
-      [memberRecord.member_email.toLowerCase()]
-    );
-    
-    if (memberRecord.stripe_subscription_item_id) {
-      try {
-        const stripe = await getStripeClient();
-        await stripe.subscriptionItems.del(memberRecord.stripe_subscription_item_id);
-        logger.info(`[GroupBilling] Deleted Stripe subscription item ${memberRecord.stripe_subscription_item_id}`);
-      } catch (stripeErr: unknown) {
-        await client.query('ROLLBACK');
-        logger.error('[GroupBilling] Failed to remove Stripe subscription item:', { error: stripeErr });
-        return { 
-          success: false, 
-          error: 'Cannot remove billing. Member is still being charged. Please try again or contact support.' 
-        };
+      if (memberResult.rows.length === 0) {
+        throw Object.assign(new Error('Group member not found'), { __earlyReturn: true, result: { success: false, error: 'Group member not found' } });
       }
-    }
     
-    await client.query('COMMIT');
+      const memberRecord = memberResult.rows[0] as Record<string, unknown>;
+    
+      if (!memberRecord.is_active) {
+        throw Object.assign(new Error('Member is already inactive'), { __earlyReturn: true, result: { success: false, error: 'Member is already inactive' } });
+      }
+    
+      await tx.execute(
+        sql`UPDATE group_members SET is_active = false, removed_at = NOW() WHERE id = ${params.memberId}`
+      );
+    
+      await tx.execute(
+        sql`UPDATE users SET billing_group_id = NULL WHERE LOWER(email) = ${(memberRecord.member_email as string).toLowerCase()}`
+      );
+    
+      if (memberRecord.stripe_subscription_item_id) {
+        try {
+          const stripe = await getStripeClient();
+          await stripe.subscriptionItems.del(memberRecord.stripe_subscription_item_id as string);
+          logger.info(`[GroupBilling] Deleted Stripe subscription item ${memberRecord.stripe_subscription_item_id}`);
+        } catch (stripeErr: unknown) {
+          logger.error('[GroupBilling] Failed to remove Stripe subscription item:', { error: stripeErr });
+          throw Object.assign(new Error('Cannot remove billing. Member is still being charged. Please try again or contact support.'), { __earlyReturn: true, result: { success: false, error: 'Cannot remove billing. Member is still being charged. Please try again or contact support.' } });
+        }
+      }
+    });
+    
     logger.info(`[GroupBilling] Successfully removed group member ${params.memberId}`);
     return { success: true };
   } catch (err: unknown) {
-    await client.query('ROLLBACK');
+    if ((err as Record<string, unknown>)?.__earlyReturn) {
+      return (err as Record<string, unknown>).result as { success: false; error: string };
+    }
     logger.error('[GroupBilling] Error removing group member:', { error: err });
     return { success: false, error: 'Failed to remove member. Please try again.' };
-  } finally {
-    client.release();
   }
 }
 
@@ -1326,7 +1191,7 @@ export async function updateGroupAddOnPricing(params: {
               group_addon: 'true',
               tier_name: params.tierName,
             },
-          });
+          }, { idempotencyKey: `price_${product.stripeProductId}_${params.priceCents}_month` });
           
           await db.update(familyAddOnProducts)
             .set({
@@ -1492,9 +1357,8 @@ export async function reconcileGroupBillingWithStripe(): Promise<ReconciliationR
                   } as Partial<typeof groupMembers.$inferInsert>)
                   .where(eq(groupMembers.id, member.id));
                 
-                await pool.query(
-                  'UPDATE users SET billing_group_id = NULL WHERE LOWER(email) = $1',
-                  [member.memberEmail.toLowerCase()]
+                await db.execute(
+                  sql`UPDATE users SET billing_group_id = NULL WHERE LOWER(email) = ${member.memberEmail.toLowerCase()}`
                 );
                 
                 result.membersDeactivated++;
@@ -1552,9 +1416,8 @@ export async function reconcileGroupBillingWithStripe(): Promise<ReconciliationR
                 } as Partial<typeof groupMembers.$inferInsert>)
                 .where(eq(groupMembers.id, inactiveMember[0].id));
               
-              await pool.query(
-                'UPDATE users SET billing_group_id = $1 WHERE LOWER(email) = $2',
-                [group.id, email]
+              await db.execute(
+                sql`UPDATE users SET billing_group_id = ${group.id} WHERE LOWER(email) = ${email}`
               );
               
               result.membersReactivated++;
@@ -1581,9 +1444,8 @@ export async function reconcileGroupBillingWithStripe(): Promise<ReconciliationR
                 addedByName: 'Stripe Reconciliation',
               });
               
-              await pool.query(
-                'UPDATE users SET billing_group_id = $1 WHERE LOWER(email) = $2',
-                [group.id, email]
+              await db.execute(
+                sql`UPDATE users SET billing_group_id = ${group.id} WHERE LOWER(email) = ${email}`
               );
               
               result.membersCreated++;
@@ -1705,9 +1567,8 @@ export async function handleSubscriptionItemsChanged(
             })
             .where(eq(groupMembers.id, member[0].id));
           
-          await pool.query(
-            'UPDATE users SET billing_group_id = NULL WHERE LOWER(email) = $1',
-            [memberEmail]
+          await db.execute(
+            sql`UPDATE users SET billing_group_id = NULL WHERE LOWER(email) = ${memberEmail}`
           );
           
           logger.info(`[GroupBilling] Auto-deactivated member ${memberEmail} - subscription item ${item.id} fully removed`);
@@ -1767,16 +1628,15 @@ export async function handlePrimarySubscriptionCancelled(subscriptionId: string)
     const emailsToDeactivate = activeMembers.map(m => m.memberEmail.toLowerCase());
 
     if (emailsToDeactivate.length > 0) {
-      await pool.query(
-        `UPDATE users SET 
+      await db.execute(
+        sql`UPDATE users SET 
            billing_group_id = NULL,
            membership_status = 'cancelled',
            billing_provider = 'stripe',
            last_tier = tier,
            tier = NULL,
            updated_at = NOW()
-         WHERE LOWER(email) = ANY($1::text[])`,
-        [emailsToDeactivate]
+         WHERE LOWER(email) = ANY(${emailsToDeactivate}::text[])`
       );
       
       // Sync cancelled sub-members to HubSpot
@@ -1791,9 +1651,8 @@ export async function handlePrimarySubscriptionCancelled(subscriptionId: string)
       }
     }
 
-    await pool.query(
-      `UPDATE billing_groups SET is_active = false, updated_at = NOW() WHERE id = $1 AND is_active = true`,
-      [groupId]
+    await db.execute(
+      sql`UPDATE billing_groups SET is_active = false, updated_at = NOW() WHERE id = ${groupId} AND is_active = true`
     );
 
     logger.info(`[GroupBilling] Successfully deactivated group ${groupId} and ${emailsToDeactivate.length} members`);

@@ -1,5 +1,5 @@
-import { pool } from '../db';
 import { db } from '../../db';
+import { sql } from 'drizzle-orm';
 import { stripeProducts, membershipTiers } from '../../../shared/schema';
 import { eq } from 'drizzle-orm';
 import { getStripeClient } from './client';
@@ -1636,7 +1636,8 @@ export async function syncCafeItemsToStripe(): Promise<{
 
   try {
     const stripe = await getStripeClient();
-    const { rows: cafeItemRows } = await pool.query('SELECT * FROM cafe_items WHERE is_active = true ORDER BY category, sort_order');
+    const cafeItemResult = await db.execute(sql`SELECT * FROM cafe_items WHERE is_active = true ORDER BY category, sort_order`);
+    const cafeItemRows = cafeItemResult.rows as Array<Record<string, unknown>>;
 
     logger.info(`[Cafe Sync] Starting sync for ${cafeItemRows.length} active cafe items`);
 
@@ -1727,10 +1728,7 @@ export async function syncCafeItemsToStripe(): Promise<{
           logger.info(`[Cafe Sync] Created price for ${item.name}: ${stripePriceId}`);
         }
 
-        await pool.query(
-          'UPDATE cafe_items SET stripe_product_id = $1, stripe_price_id = $2 WHERE id = $3',
-          [stripeProductId, stripePriceId, item.id]
-        );
+        await db.execute(sql`UPDATE cafe_items SET stripe_product_id = ${stripeProductId}, stripe_price_id = ${stripePriceId} WHERE id = ${item.id}`);
 
         synced++;
       } catch (error: unknown) {
@@ -1966,8 +1964,8 @@ export async function pullCafeItemsFromStripe(): Promise<{
 
     logger.info(`[Reverse Sync] Found ${activeStripeProducts.length} active and ${inactiveStripeProductIds.length} inactive cafe products in Stripe`);
 
-    const existingCafeCount = await pool.query('SELECT COUNT(*) FROM cafe_items WHERE is_active = true');
-    const localCafeItems = parseInt(existingCafeCount.rows[0].count, 10);
+    const existingCafeCount = await db.execute(sql`SELECT COUNT(*) FROM cafe_items WHERE is_active = true`);
+    const localCafeItems = parseInt((existingCafeCount.rows[0] as Record<string, unknown>).count as string, 10);
 
     if (activeStripeProducts.length === 0 && localCafeItems > 0) {
       logger.warn(`[Reverse Sync] Stripe has 0 cafe products but local DB has ${localCafeItems} active items. Skipping pull to preserve local data. Run "Sync to Stripe" first to push cafe items.`);
@@ -2002,28 +2000,20 @@ export async function pullCafeItemsFromStripe(): Promise<{
         const category = product.metadata?.category || 'other';
         const cafeItemId = parseInt(product.metadata?.cafe_item_id, 10) || -1;
 
-        const existing = await pool.query(
-          'SELECT id FROM cafe_items WHERE stripe_product_id = $1 OR id = $2 LIMIT 1',
-          [product.id, cafeItemId]
-        );
+        const existing = await db.execute(sql`SELECT id FROM cafe_items WHERE stripe_product_id = ${product.id} OR id = ${cafeItemId} LIMIT 1`);
 
         if (existing.rows.length > 0) {
-          await pool.query(
-            `UPDATE cafe_items SET
-              name = $1, description = $2, price = $3, category = $4,
-              image_url = COALESCE($5, image_url), stripe_product_id = $6, stripe_price_id = $7,
+          const existingId = (existing.rows[0] as Record<string, unknown>).id;
+          await db.execute(sql`UPDATE cafe_items SET
+              name = ${product.name}, description = ${product.description || null}, price = ${priceDecimal}, category = ${category},
+              image_url = COALESCE(${imageUrl}, image_url), stripe_product_id = ${product.id}, stripe_price_id = ${stripePriceId},
               is_active = true
-            WHERE id = $8`,
-            [product.name, product.description || null, priceDecimal, category, imageUrl, product.id, stripePriceId, existing.rows[0].id]
-          );
+            WHERE id = ${existingId}`);
           synced++;
-          logger.info(`[Reverse Sync] Updated cafe item "${product.name}" (id: ${existing.rows[0].id})`);
+          logger.info(`[Reverse Sync] Updated cafe item "${product.name}" (id: ${existingId})`);
         } else {
-          await pool.query(
-            `INSERT INTO cafe_items (name, description, price, category, image_url, icon, sort_order, is_active, stripe_product_id, stripe_price_id, created_at)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())`,
-            [product.name, product.description || null, priceDecimal, category, imageUrl, 'restaurant', 0, true, product.id, stripePriceId]
-          );
+          await db.execute(sql`INSERT INTO cafe_items (name, description, price, category, image_url, icon, sort_order, is_active, stripe_product_id, stripe_price_id, created_at)
+             VALUES (${product.name}, ${product.description || null}, ${priceDecimal}, ${category}, ${imageUrl}, ${'restaurant'}, ${0}, ${true}, ${product.id}, ${stripePriceId}, NOW())`);
           created++;
           logger.info(`[Reverse Sync] Created cafe item "${product.name}" from Stripe`);
         }
@@ -2036,13 +2026,10 @@ export async function pullCafeItemsFromStripe(): Promise<{
 
     for (const stripeProductId of inactiveStripeProductIds) {
       try {
-        const result = await pool.query(
-          'UPDATE cafe_items SET is_active = false WHERE stripe_product_id = $1 AND is_active = true RETURNING id, name',
-          [stripeProductId]
-        );
+        const result = await db.execute(sql`UPDATE cafe_items SET is_active = false WHERE stripe_product_id = ${stripeProductId} AND is_active = true RETURNING id, name`);
         if (result.rowCount && result.rowCount > 0) {
           deactivated += result.rowCount;
-          for (const row of result.rows) {
+          for (const row of (result.rows as Array<Record<string, unknown>>)) {
             logger.info(`[Reverse Sync] Deactivated cafe item "${row.name}" (Stripe product inactive)`);
           }
         }

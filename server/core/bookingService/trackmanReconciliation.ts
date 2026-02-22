@@ -1,4 +1,5 @@
-import { pool } from '../db';
+import { db } from '../../db';
+import { sql } from 'drizzle-orm';
 import { logger } from '../logger';
 import { getTierLimits, getMemberTierByEmail } from '../tierService';
 import { PRICING } from '../billing/pricingConfig';
@@ -48,13 +49,10 @@ async function getTierOverageRate(tier: string | null): Promise<number> {
   if (!tier) return DEFAULT_OVERAGE_RATE_PER_30_MIN;
   
   try {
-    const result = await pool.query(
-      `SELECT guest_fee_cents FROM membership_tiers WHERE LOWER(slug) = LOWER($1) OR LOWER(name) = LOWER($1) LIMIT 1`,
-      [tier]
-    );
+    const result = await db.execute(sql`SELECT guest_fee_cents FROM membership_tiers WHERE LOWER(slug) = LOWER(${tier}) OR LOWER(name) = LOWER(${tier}) LIMIT 1`);
     
-    if (result.rows.length > 0 && result.rows[0].guest_fee_cents) {
-      return Math.round(result.rows[0].guest_fee_cents / 100);
+    if (result.rows.length > 0 && (result.rows[0] as Record<string, unknown>).guest_fee_cents) {
+      return Math.round((result.rows[0] as Record<string, unknown>).guest_fee_cents as number / 100);
     }
   } catch (error: unknown) {
     logger.warn('[getTierOverageRate] Failed to fetch tier overage rate, using default', { extra: { tier, error } });
@@ -81,60 +79,38 @@ export async function findAttendanceDiscrepancies(
   const { startDate, endDate, status = 'all', limit = 100, offset = 0 } = options;
   
   try {
-    let whereConditions = `
-      br.status = 'attended'
+    const baseConditions = sql`br.status = 'attended'
       AND br.trackman_booking_id IS NOT NULL
       AND br.trackman_player_count IS NOT NULL
       AND br.declared_player_count IS NOT NULL
-      AND br.trackman_player_count != br.declared_player_count
-    `;
-    const params: (string | number | null)[] = [];
-    let paramIndex = 1;
+      AND br.trackman_player_count != br.declared_player_count`;
     
-    if (startDate) {
-      whereConditions += ` AND br.request_date >= $${paramIndex}`;
-      params.push(startDate);
-      paramIndex++;
-    }
+    const dateStartFilter = startDate ? sql`AND br.request_date >= ${startDate}` : sql``;
+    const dateEndFilter = endDate ? sql`AND br.request_date <= ${endDate}` : sql``;
     
-    if (endDate) {
-      whereConditions += ` AND br.request_date <= $${paramIndex}`;
-      params.push(endDate);
-      paramIndex++;
-    }
-    
+    let statusFilter = sql``;
     if (status !== 'all') {
       if (status === 'pending') {
-        whereConditions += ` AND (br.reconciliation_status IS NULL OR br.reconciliation_status = 'pending')`;
+        statusFilter = sql`AND (br.reconciliation_status IS NULL OR br.reconciliation_status = 'pending')`;
       } else {
-        whereConditions += ` AND br.reconciliation_status = $${paramIndex}`;
-        params.push(status);
-        paramIndex++;
+        statusFilter = sql`AND br.reconciliation_status = ${status}`;
       }
     }
     
-    const countResult = await pool.query(
-      `SELECT COUNT(*) as total FROM booking_requests br WHERE ${whereConditions}`,
-      params
-    );
-    const totalCount = parseInt(countResult.rows[0].total, 10);
+    const whereClause = sql`${baseConditions} ${dateStartFilter} ${dateEndFilter} ${statusFilter}`;
     
-    const statsResult = await pool.query(
-      `SELECT 
+    const countResult = await db.execute(sql`SELECT COUNT(*) as total FROM booking_requests br WHERE ${whereClause}`);
+    const totalCount = parseInt((countResult.rows[0] as Record<string, unknown>).total as string, 10);
+    
+    const statsResult = await db.execute(sql`SELECT 
         COUNT(*) as total_discrepancies,
         COUNT(*) FILTER (WHERE reconciliation_status IS NULL OR reconciliation_status = 'pending') as pending_review,
         COUNT(*) FILTER (WHERE reconciliation_status = 'reviewed') as reviewed,
         COUNT(*) FILTER (WHERE reconciliation_status = 'adjusted') as adjusted
        FROM booking_requests br
-       WHERE ${whereConditions}`,
-      params
-    );
+       WHERE ${whereClause}`);
     
-    const limitParam = paramIndex;
-    const offsetParam = paramIndex + 1;
-    
-    const result = await pool.query(
-      `SELECT 
+    const result = await db.execute(sql`SELECT 
         br.id,
         br.user_email,
         br.user_name,
@@ -151,18 +127,16 @@ export async function findAttendanceDiscrepancies(
         br.resource_id,
         br.trackman_booking_id
        FROM booking_requests br
-       WHERE ${whereConditions}
+       WHERE ${whereClause}
        ORDER BY br.request_date DESC, br.start_time DESC
-       LIMIT $${limitParam} OFFSET $${offsetParam}`,
-      [...params, limit, offset]
-    );
+       LIMIT ${limit} OFFSET ${offset}`);
     
     let totalPotentialFeeAdjustment = 0;
     
-    const discrepancies: ReconciliationResult[] = result.rows.map(row => {
-      const declaredCount = parseInt(row.declared_player_count) || 0;
-      const actualCount = parseInt(row.trackman_player_count) || 0;
-      const durationMinutes = parseInt(row.duration_minutes) || 0;
+    const discrepancies: ReconciliationResult[] = (result.rows as Array<Record<string, unknown>>).map(row => {
+      const declaredCount = parseInt(row.declared_player_count as string) || 0;
+      const actualCount = parseInt(row.trackman_player_count as string) || 0;
+      const durationMinutes = parseInt(row.duration_minutes as string) || 0;
       
       let discrepancy: 'over_declared' | 'under_declared' | 'matched';
       if (actualCount > declaredCount) {
@@ -184,12 +158,12 @@ export async function findAttendanceDiscrepancies(
       }
       
       return {
-        bookingId: row.id,
-        userEmail: row.user_email,
-        userName: row.user_name,
-        requestDate: row.request_date,
-        startTime: row.start_time,
-        endTime: row.end_time,
+        bookingId: row.id as number,
+        userEmail: row.user_email as string,
+        userName: row.user_name as string | null,
+        requestDate: row.request_date as string,
+        startTime: row.start_time as string,
+        endTime: row.end_time as string,
         durationMinutes,
         declaredCount,
         actualCount,
@@ -197,19 +171,20 @@ export async function findAttendanceDiscrepancies(
         discrepancyAmount: Math.abs(actualCount - declaredCount),
         requiresReview: discrepancy === 'under_declared' && !row.reconciliation_status,
         potentialFeeAdjustment,
-        reconciliationStatus: row.reconciliation_status,
-        reconciledBy: row.reconciled_by,
-        reconciledAt: row.reconciled_at,
-        resourceId: row.resource_id,
-        trackmanBookingId: row.trackman_booking_id
+        reconciliationStatus: row.reconciliation_status as string | null,
+        reconciledBy: row.reconciled_by as string | null,
+        reconciledAt: row.reconciled_at as Date | null,
+        resourceId: row.resource_id as number | null,
+        trackmanBookingId: row.trackman_booking_id as string | null
       };
     });
     
+    const statsRow = statsResult.rows[0] as Record<string, unknown>;
     const stats: ReconciliationStats = {
-      totalDiscrepancies: parseInt(statsResult.rows[0].total_discrepancies) || 0,
-      pendingReview: parseInt(statsResult.rows[0].pending_review) || 0,
-      reviewed: parseInt(statsResult.rows[0].reviewed) || 0,
-      adjusted: parseInt(statsResult.rows[0].adjusted) || 0,
+      totalDiscrepancies: parseInt(statsRow.total_discrepancies as string) || 0,
+      pendingReview: parseInt(statsRow.pending_review as string) || 0,
+      reviewed: parseInt(statsRow.reviewed as string) || 0,
+      adjusted: parseInt(statsRow.adjusted as string) || 0,
       totalPotentialFeeAdjustment
     };
     
@@ -227,42 +202,36 @@ export async function markAsReconciled(
   notes?: string
 ): Promise<{ success: boolean; booking?: Record<string, unknown> }> {
   try {
-    const bookingResult = await pool.query(
-      `SELECT id, declared_player_count, trackman_player_count, duration_minutes, 
+    const bookingResult = await db.execute(sql`SELECT id, declared_player_count, trackman_player_count, duration_minutes, 
               user_email, reconciliation_status, session_id
        FROM booking_requests 
-       WHERE id = $1`,
-      [bookingId]
-    );
+       WHERE id = ${bookingId}`);
     
     if (bookingResult.rowCount === 0) {
       return { success: false };
     }
     
-    const booking = bookingResult.rows[0];
-    const previousStatus = booking.reconciliation_status;
+    const booking = bookingResult.rows[0] as Record<string, unknown>;
+    const previousStatus = booking.reconciliation_status as string;
     
-    const updateResult = await pool.query(
-      `UPDATE booking_requests 
-       SET reconciliation_status = $1,
-           reconciled_by = $2,
+    const updateResult = await db.execute(sql`UPDATE booking_requests 
+       SET reconciliation_status = ${status},
+           reconciled_by = ${staffEmail},
            reconciled_at = NOW(),
-           reconciliation_notes = $3,
+           reconciliation_notes = ${notes || null},
            updated_at = NOW()
-       WHERE id = $4
-       RETURNING *`,
-      [status, staffEmail, notes || null, bookingId]
-    );
+       WHERE id = ${bookingId}
+       RETURNING *`);
     
     if (status === 'adjusted') {
-      const declaredCount = parseInt(booking.declared_player_count) || 0;
-      const actualCount = parseInt(booking.trackman_player_count) || 0;
-      const durationMinutes = parseInt(booking.duration_minutes) || 0;
+      const declaredCount = parseInt(booking.declared_player_count as string) || 0;
+      const actualCount = parseInt(booking.trackman_player_count as string) || 0;
+      const durationMinutes = parseInt(booking.duration_minutes as string) || 0;
       const feeAdjustment = calculatePotentialFeeAdjustment(durationMinutes, declaredCount, actualCount);
       
       await logPaymentAudit({
         bookingId,
-        sessionId: booking.session_id,
+        sessionId: booking.session_id as number,
         action: 'reconciliation_adjusted',
         staffEmail,
         reason: notes || `Attendance reconciliation: declared ${declaredCount}, actual ${actualCount}`,
@@ -300,7 +269,7 @@ export async function markAsReconciled(
       });
     }
     
-    return { success: true, booking: updateResult.rows[0] };
+    return { success: true, booking: updateResult.rows[0] as Record<string, unknown> };
   } catch (error: unknown) {
     logger.error('[markAsReconciled] Error:', { error });
     throw error;
@@ -333,40 +302,37 @@ export async function adjustLedgerForReconciliation(
   notes?: string
 ): Promise<{ success: boolean; adjustmentAmount: number }> {
   try {
-    const bookingResult = await pool.query(
-      `SELECT br.id, br.declared_player_count, br.trackman_player_count, br.duration_minutes,
+    const bookingResult = await db.execute(sql`SELECT br.id, br.declared_player_count, br.trackman_player_count, br.duration_minutes,
               br.user_email, br.session_id, u.tier
        FROM booking_requests br
        LEFT JOIN users u ON LOWER(br.user_email) = LOWER(u.email)
-       WHERE br.id = $1`,
-      [bookingId]
-    );
+       WHERE br.id = ${bookingId}`);
     
     if (bookingResult.rowCount === 0) {
       return { success: false, adjustmentAmount: 0 };
     }
     
-    const booking = bookingResult.rows[0];
-    const declaredCount = parseInt(booking.declared_player_count) || 0;
-    const actualCount = parseInt(booking.trackman_player_count) || 0;
-    const durationMinutes = parseInt(booking.duration_minutes) || 0;
+    const booking = bookingResult.rows[0] as Record<string, unknown>;
+    const declaredCount = parseInt(booking.declared_player_count as string) || 0;
+    const actualCount = parseInt(booking.trackman_player_count as string) || 0;
+    const durationMinutes = parseInt(booking.duration_minutes as string) || 0;
     
     if (actualCount <= declaredCount) {
       return { success: true, adjustmentAmount: 0 };
     }
     
-    const overageRate = await getTierOverageRate(booking.tier);
+    const overageRate = await getTierOverageRate(booking.tier as string | null);
     const feeAdjustment = calculatePotentialFeeAdjustment(durationMinutes, declaredCount, actualCount, overageRate);
     
     if (booking.session_id && feeAdjustment > 0) {
       await recordUsage(
-        booking.session_id,
+        booking.session_id as number,
         {
-          memberId: booking.user_email,
+          memberId: booking.user_email as string,
           minutesCharged: 0,
           overageFee: feeAdjustment,
           guestFee: 0,
-          tierAtBooking: booking.tier || 'unknown',
+          tierAtBooking: (booking.tier as string) || 'unknown',
           paymentMethod: 'unpaid',
         },
         'staff_manual'

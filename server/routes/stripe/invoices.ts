@@ -1,7 +1,8 @@
 import { logger } from '../../core/logger';
 import { Router, Request, Response } from 'express';
 import { isStaffOrAdmin } from '../../core/middleware';
-import { pool } from '../../core/db';
+import { db } from '../../db';
+import { sql } from 'drizzle-orm';
 import { getSessionUser } from '../../types/session';
 import {
   createInvoice,
@@ -79,12 +80,11 @@ router.post('/api/stripe/invoices', isStaffOrAdmin, async (req: Request, res: Re
     }
     
     try {
-      const memberLookup = await pool.query(
-        'SELECT email FROM users WHERE stripe_customer_id = $1',
-        [customerId]
+      const memberLookup = await db.execute(
+        sql`SELECT email FROM users WHERE stripe_customer_id = ${customerId}`
       );
       if (memberLookup.rows.length > 0) {
-        const memberEmail = memberLookup.rows[0].email;
+        const memberEmail = (memberLookup.rows[0] as any).email;
         sendNotificationToUser(memberEmail, {
           type: 'billing_update',
           title: 'New Invoice',
@@ -122,12 +122,11 @@ router.post('/api/stripe/invoices/:invoiceId/finalize', isStaffOrAdmin, async (r
         const customerId = typeof (result.invoice as any).customer === 'string' 
           ? (result.invoice as any).customer 
           : (result.invoice as any).customer.id;
-        const memberLookup = await pool.query(
-          'SELECT email FROM users WHERE stripe_customer_id = $1',
-          [customerId]
+        const memberLookup = await db.execute(
+          sql`SELECT email FROM users WHERE stripe_customer_id = ${customerId}`
         );
         if (memberLookup.rows.length > 0) {
-          const memberEmail = memberLookup.rows[0].email;
+          const memberEmail = (memberLookup.rows[0] as any).email;
           sendNotificationToUser(memberEmail, {
             type: 'billing_update',
             title: 'Invoice Ready',
@@ -187,12 +186,11 @@ router.post('/api/stripe/invoices/:invoiceId/void', isStaffOrAdmin, async (req: 
     
     try {
       if (customerId) {
-        const memberLookup = await pool.query(
-          'SELECT email FROM users WHERE stripe_customer_id = $1',
-          [customerId]
+        const memberLookup = await db.execute(
+          sql`SELECT email FROM users WHERE stripe_customer_id = ${customerId}`
         );
         if (memberLookup.rows.length > 0) {
-          const memberEmail = memberLookup.rows[0].email;
+          const memberEmail = (memberLookup.rows[0] as any).email;
           sendNotificationToUser(memberEmail, {
             type: 'billing_update',
             title: 'Invoice Voided',
@@ -238,12 +236,11 @@ router.get('/api/my-invoices', async (req: Request, res: Response) => {
       }
     }
     
-    const userResult = await pool.query(
-      'SELECT stripe_customer_id FROM users WHERE LOWER(email) = $1',
-      [targetEmail.toLowerCase()]
+    const userResult = await db.execute(
+      sql`SELECT stripe_customer_id FROM users WHERE LOWER(email) = ${targetEmail.toLowerCase()}`
     );
     
-    const stripeCustomerId = userResult.rows[0]?.stripe_customer_id;
+    const stripeCustomerId = (userResult.rows[0] as any)?.stripe_customer_id;
     
     if (!stripeCustomerId) {
       return res.json({ invoices: [], count: 0 });

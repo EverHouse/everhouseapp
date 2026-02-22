@@ -1,7 +1,7 @@
 import { logger } from '../core/logger';
 import { Router, Request, Response } from 'express';
 import { isStaffOrAdmin } from '../core/middleware';
-import { pool, isProduction } from '../core/db';
+import { isProduction } from '../core/db';
 import {
   getMemberDealWithLineItems,
   getAllProductMappings,
@@ -469,7 +469,7 @@ router.post('/api/admin/hubspot/deals/batch-delete', isStaffOrAdmin, async (req:
     const { getHubSpotClient } = await import('../core/integrations');
     const hubspot = await getHubSpotClient();
     
-    const allDeals = await pool.query('SELECT id, hubspot_deal_id, member_email, deal_name FROM hubspot_deals ORDER BY id');
+    const allDeals = await db.execute(sql`SELECT id, hubspot_deal_id, member_email, deal_name FROM hubspot_deals ORDER BY id`);
     const deals = allDeals.rows;
     
     let deleted = 0;
@@ -494,8 +494,8 @@ router.post('/api/admin/hubspot/deals/batch-delete', isStaffOrAdmin, async (req:
       }
     }
     
-    await pool.query('DELETE FROM hubspot_line_items');
-    await pool.query('DELETE FROM hubspot_deals');
+    await db.execute(sql`DELETE FROM hubspot_line_items`);
+    await db.execute(sql`DELETE FROM hubspot_deals`);
     
     const { logFromRequest } = await import('../core/auditLog');
     logFromRequest(req, 'bulk_action', 'system', 'all',

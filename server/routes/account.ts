@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
-import { pool } from '../core/db';
+import { db } from '../db';
+import { sql } from 'drizzle-orm';
 import { notifyAllStaff } from '../core/notificationService';
 import { getResendClient } from '../utils/resend';
 import {logAndRespond, logger } from '../core/logger';
@@ -11,9 +12,7 @@ router.post('/api/account/delete-request', isAuthenticated, async (req: Request,
   const userEmail = req.session?.user?.email;
 
   try {
-    const userResult = await pool.query(
-      'SELECT id, email, first_name, last_name FROM users WHERE LOWER(email) = LOWER($1)',
-      [userEmail]
+    const userResult = await db.execute(sql`SELECT id, email, first_name, last_name FROM users WHERE LOWER(email) = LOWER(${userEmail})`
     );
     
     if (userResult.rows.length === 0) {
@@ -23,10 +22,8 @@ router.post('/api/account/delete-request', isAuthenticated, async (req: Request,
     const user = userResult.rows[0];
     const userName = `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.email;
 
-    const existingRequest = await pool.query(
-      `SELECT id FROM account_deletion_requests 
-       WHERE user_id = $1 AND status = 'pending'`,
-      [user.id]
+    const existingRequest = await db.execute(sql`SELECT id FROM account_deletion_requests 
+       WHERE user_id = ${user.id} AND status = 'pending'`
     );
     
     if (existingRequest.rows.length > 0) {
@@ -35,14 +32,12 @@ router.post('/api/account/delete-request', isAuthenticated, async (req: Request,
       });
     }
 
-    await pool.query(
-      `INSERT INTO account_deletion_requests (user_id, email, requested_at, status)
-       SELECT $1, $2, NOW(), 'pending'
+    await db.execute(sql`INSERT INTO account_deletion_requests (user_id, email, requested_at, status)
+       SELECT ${user.id}, ${user.email}, NOW(), 'pending'
        WHERE NOT EXISTS (
          SELECT 1 FROM account_deletion_requests 
-         WHERE user_id = $1 AND status = 'pending'
-       )`,
-      [user.id, user.email]
+         WHERE user_id = ${user.id} AND status = 'pending'
+       )`
     );
 
     await notifyAllStaff(

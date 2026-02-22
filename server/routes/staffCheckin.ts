@@ -1,6 +1,5 @@
 import { Router, Request, Response } from 'express';
 import { db } from '../db';
-import { pool } from '../core/db';
 import { bookingRequests, bookingParticipants, bookingSessions, usageLedger, users } from '../../shared/schema';
 import { eq, and, sql } from 'drizzle-orm';
 import { isStaffOrAdmin } from '../core/middleware';
@@ -54,18 +53,16 @@ async function settleBookingInvoiceAfterCheckin(bookingId: number, sessionId: nu
   settlementInFlight.add(bookingId);
 
   try {
-    const resourceResult = await pool.query(
-      `SELECT r.type FROM resources r JOIN booking_requests br ON br.resource_id = r.id WHERE br.id = $1`,
-      [bookingId]
+    const resourceResult = await db.execute(
+      sql`SELECT r.type FROM resources r JOIN booking_requests br ON br.resource_id = r.id WHERE br.id = ${bookingId}`
     );
     if (resourceResult.rows[0]?.type === 'conference_room') return;
     
     const invoiceId = await getBookingInvoiceId(bookingId);
     if (!invoiceId) return;
     
-    const participantResult = await pool.query(
-      `SELECT payment_status, cached_fee_cents FROM booking_participants WHERE session_id = $1`,
-      [sessionId]
+    const participantResult = await db.execute(
+      sql`SELECT payment_status, cached_fee_cents FROM booking_participants WHERE session_id = ${sessionId}`
     );
     
     const participants = participantResult.rows;
@@ -88,11 +85,10 @@ async function settleBookingInvoiceAfterCheckin(bookingId: number, sessionId: nu
     
     if (anyPaid) {
       try {
-        const userResult = await pool.query(
-          `SELECT u.stripe_customer_id FROM users u 
+        const userResult = await db.execute(
+          sql`SELECT u.stripe_customer_id FROM users u 
            JOIN booking_requests br ON LOWER(u.email) = LOWER(br.user_email) 
-           WHERE br.id = $1 LIMIT 1`,
-          [bookingId]
+           WHERE br.id = ${bookingId} LIMIT 1`
         );
         const customerId = userResult.rows[0]?.stripe_customer_id;
         if (customerId) {
@@ -806,80 +802,75 @@ router.patch('/api/bookings/:id/payments', isStaffOrAdmin, async (req: Request, 
       }
 
       if (action === 'confirm_all') {
-        const snapshotClient = await pool.connect();
         try {
-          await snapshotClient.query('BEGIN');
-          const existingSnapshot = await snapshotClient.query(
-            `SELECT id FROM booking_fee_snapshots WHERE session_id = $1 AND status IN ('completed', 'paid') LIMIT 1`,
-            [sessionId]
-          );
-          if (existingSnapshot.rows.length === 0) {
-            const breakdown = await computeFeeBreakdown({ sessionId, source: 'checkin' as const });
-            const participantFees: Array<{id: number | null; amountCents: number; type: string; description: string}> = [];
-            for (const p of breakdown.participants) {
-              if (!p.participantId) continue;
-              if (p.totalCents <= 0) continue;
-              let feeType = 'booking_fee';
-              let feeDesc = p.displayName || 'Fee';
-              if (p.overageCents > 0 && p.guestCents === 0) {
-                feeType = 'overage';
-                feeDesc = `${p.displayName || 'Owner'} overage`;
-              } else if (p.guestCents > 0 && p.overageCents === 0) {
-                feeType = 'guest_fee';
-                feeDesc = `Guest: ${p.displayName || 'Guest'}`;
-              } else if (p.overageCents > 0 && p.guestCents > 0) {
-                feeType = 'overage_and_guest';
-                feeDesc = `${p.displayName || 'Member'} overage + guest fee`;
+          await db.transaction(async (tx) => {
+            const existingSnapshot = await tx.execute(
+              sql`SELECT id FROM booking_fee_snapshots WHERE session_id = ${sessionId} AND status IN ('completed', 'paid') LIMIT 1`
+            );
+            if (existingSnapshot.rows.length === 0) {
+              const breakdown = await computeFeeBreakdown({ sessionId, source: 'checkin' as const });
+              const participantFees: Array<{id: number | null; amountCents: number; type: string; description: string}> = [];
+              for (const p of breakdown.participants) {
+                if (!p.participantId) continue;
+                if (p.totalCents <= 0) continue;
+                let feeType = 'booking_fee';
+                let feeDesc = p.displayName || 'Fee';
+                if (p.overageCents > 0 && p.guestCents === 0) {
+                  feeType = 'overage';
+                  feeDesc = `${p.displayName || 'Owner'} overage`;
+                } else if (p.guestCents > 0 && p.overageCents === 0) {
+                  feeType = 'guest_fee';
+                  feeDesc = `Guest: ${p.displayName || 'Guest'}`;
+                } else if (p.overageCents > 0 && p.guestCents > 0) {
+                  feeType = 'overage_and_guest';
+                  feeDesc = `${p.displayName || 'Member'} overage + guest fee`;
+                }
+                participantFees.push({ id: p.participantId, amountCents: p.totalCents, type: feeType, description: feeDesc });
               }
-              participantFees.push({ id: p.participantId, amountCents: p.totalCents, type: feeType, description: feeDesc });
-            }
-            if (breakdown.totals && breakdown.totals.guestCents > 0) {
-              const emptySlotTotal = breakdown.participants
-                .filter(p => !p.participantId && p.guestCents > 0)
-                .reduce((sum, p) => sum + p.guestCents, 0);
-              if (emptySlotTotal > 0) {
-                const slotCount = breakdown.participants.filter(p => !p.participantId && p.guestCents > 0).length;
-                const perSlot = slotCount > 0 ? (emptySlotTotal / slotCount / 100).toFixed(0) : '';
-                participantFees.push({
-                  id: null,
-                  amountCents: emptySlotTotal,
-                  type: 'guest_fee',
-                  description: `${slotCount} empty slot${slotCount > 1 ? 's' : ''}${perSlot ? ` × $${perSlot}` : ''}`
-                });
+              if (breakdown.totals && breakdown.totals.guestCents > 0) {
+                const emptySlotTotal = breakdown.participants
+                  .filter(p => !p.participantId && p.guestCents > 0)
+                  .reduce((sum, p) => sum + p.guestCents, 0);
+                if (emptySlotTotal > 0) {
+                  const slotCount = breakdown.participants.filter(p => !p.participantId && p.guestCents > 0).length;
+                  const perSlot = slotCount > 0 ? (emptySlotTotal / slotCount / 100).toFixed(0) : '';
+                  participantFees.push({
+                    id: null,
+                    amountCents: emptySlotTotal,
+                    type: 'guest_fee',
+                    description: `${slotCount} empty slot${slotCount > 1 ? 's' : ''}${perSlot ? ` × $${perSlot}` : ''}`
+                  });
+                }
               }
-            }
-            const totalCents = breakdown.totals.totalCents;
+              const totalCents = breakdown.totals.totalCents;
 
-            const insertResult = await snapshotClient.query(`
-              INSERT INTO booking_fee_snapshots (booking_id, session_id, participant_fees, total_cents, status, created_at)
-              VALUES ($1, $2, $3, $4, 'completed', NOW())
-              ON CONFLICT (session_id) WHERE status = 'completed' DO NOTHING
-              RETURNING id
-            `, [bookingId, sessionId, JSON.stringify(participantFees), totalCents]);
-            if (insertResult.rowCount === 0) {
-              await snapshotClient.query('ROLLBACK');
-              logger.info('[StaffCheckin] Fee snapshot race: another check-in already created snapshot for session', { extra: { sessionId } });
+              const insertResult = await tx.execute(sql`
+                INSERT INTO booking_fee_snapshots (booking_id, session_id, participant_fees, total_cents, status, created_at)
+                VALUES (${bookingId}, ${sessionId}, ${JSON.stringify(participantFees)}, ${totalCents}, 'completed', NOW())
+                ON CONFLICT (session_id) WHERE status = 'completed' DO NOTHING
+                RETURNING id
+              `);
+              if (insertResult.rowCount === 0) {
+                logger.info('[StaffCheckin] Fee snapshot race: another check-in already created snapshot for session', { extra: { sessionId } });
+                throw new Error('SNAPSHOT_RACE');
+              } else {
+                logger.info('[StaffCheckin] Created fee snapshot for booking , session , total cents', { extra: { bookingId, sessionId, totalCents } });
+              }
             } else {
-              await snapshotClient.query('COMMIT');
-              logger.info('[StaffCheckin] Created fee snapshot for booking , session , total cents', { extra: { bookingId, sessionId, totalCents } });
+              logger.info('[StaffCheckin] Fee snapshot already exists for session , skipping', { extra: { sessionId } });
             }
-          } else {
-            await snapshotClient.query('ROLLBACK');
-            logger.info('[StaffCheckin] Fee snapshot already exists for session , skipping', { extra: { sessionId } });
-          }
+          });
         } catch (snapshotErr: unknown) {
-          await snapshotClient.query('ROLLBACK').catch((rollbackErr) => { logger.warn('[Booking] Snapshot ROLLBACK failed:', rollbackErr); });
-          logger.error('[StaffCheckin] Failed to create fee snapshot', { extra: { snapshotErr } });
-        } finally {
-          snapshotClient.release();
+          if ((snapshotErr as Error).message !== 'SNAPSHOT_RACE') {
+            logger.error('[StaffCheckin] Failed to create fee snapshot', { extra: { snapshotErr } });
+          }
         }
 
-        const recentCheckinNotif = await pool.query(
-          `SELECT id FROM notifications 
-           WHERE user_email = $1 AND title = 'Checked In' AND related_id = $2 AND related_type = 'booking'
+        const recentCheckinNotif = await db.execute(
+          sql`SELECT id FROM notifications 
+           WHERE user_email = ${booking.owner_email} AND title = 'Checked In' AND related_id = ${bookingId} AND related_type = 'booking'
            AND created_at > NOW() - INTERVAL '60 seconds'
-           LIMIT 1`,
-          [booking.owner_email, bookingId]
+           LIMIT 1`
         );
         if (recentCheckinNotif.rows.length === 0) {
           await notifyMember({
@@ -1052,7 +1043,6 @@ router.get('/api/bookings/overdue-payments', isStaffOrAdmin, async (req: Request
 });
 
 router.post('/api/booking-participants/:id/mark-waiver-reviewed', isStaffOrAdmin, async (req: Request, res: Response) => {
-  const client = await pool.connect();
   try {
     const participantId = parseInt(req.params.id as string);
     if (isNaN(participantId)) {
@@ -1064,58 +1054,57 @@ router.post('/api/booking-participants/:id/mark-waiver-reviewed', isStaffOrAdmin
       return res.status(401).json({ error: 'Authentication required' });
     }
 
-    await client.query('BEGIN');
+    const txResult = await db.transaction(async (tx) => {
+      const participantCheck = await tx.execute(sql`
+        SELECT bp.id, bp.session_id, bp.display_name, br.id as booking_id
+        FROM booking_participants bp
+        JOIN booking_requests br ON br.session_id = bp.session_id
+        WHERE bp.id = ${participantId} AND bp.payment_status = 'waived'
+      `);
 
-    const participantCheck = await client.query(`
-      SELECT bp.id, bp.session_id, bp.display_name, br.id as booking_id
-      FROM booking_participants bp
-      JOIN booking_requests br ON br.session_id = bp.session_id
-      WHERE bp.id = $1 AND bp.payment_status = 'waived'
-    `, [participantId]);
+      if (participantCheck.rows.length === 0) {
+        return { notFound: true } as const;
+      }
 
-    if (participantCheck.rows.length === 0) {
-      await client.query('ROLLBACK');
+      const { session_id: sessionId, booking_id: bookingId, display_name } = participantCheck.rows[0];
+
+      await tx.execute(sql`
+        UPDATE booking_participants 
+        SET waiver_reviewed_at = NOW()
+        WHERE id = ${participantId}
+      `);
+
+      await logPaymentAudit({
+        bookingId,
+        sessionId,
+        participantId,
+        action: 'payment_waived',
+        staffEmail: sessionUser.email,
+        staffName: sessionUser.name || null,
+        reason: 'Staff marked manual waiver as reviewed',
+        amountAffected: 0,
+      });
+
+      logFromRequest(req, 'review_waiver', 'waiver', participantId.toString(), display_name, {
+        bookingId,
+        sessionId,
+        action: 'waiver_marked_reviewed'
+      });
+
+      return { notFound: false, participant: { id: participantId, displayName: display_name, waiverReviewedAt: new Date() } } as const;
+    });
+
+    if (txResult.notFound) {
       return res.status(404).json({ error: 'Waived participant not found or no associated booking' });
     }
 
-    const { session_id: sessionId, booking_id: bookingId, display_name } = participantCheck.rows[0];
-
-    await client.query(`
-      UPDATE booking_participants 
-      SET waiver_reviewed_at = NOW()
-      WHERE id = $1
-    `, [participantId]);
-
-    await logPaymentAudit({
-      bookingId,
-      sessionId,
-      participantId,
-      action: 'payment_waived',
-      staffEmail: sessionUser.email,
-      staffName: sessionUser.name || null,
-      reason: 'Staff marked manual waiver as reviewed',
-      amountAffected: 0,
-    });
-
-    logFromRequest(req, 'review_waiver', 'waiver', participantId.toString(), display_name, {
-      bookingId,
-      sessionId,
-      action: 'waiver_marked_reviewed'
-    });
-
-    await client.query('COMMIT');
-
-    res.json({ success: true, participant: { id: participantId, displayName: display_name, waiverReviewedAt: new Date() } });
+    res.json({ success: true, participant: txResult.participant });
   } catch (error: unknown) {
-    try { await client.query('ROLLBACK'); } catch (rollbackErr) { logger.warn('[DB] Rollback failed:', rollbackErr); }
     logAndRespond(req, res, 500, 'Failed to mark waiver as reviewed', error);
-  } finally {
-    client.release();
   }
 });
 
 router.post('/api/bookings/:bookingId/mark-all-waivers-reviewed', isStaffOrAdmin, async (req: Request, res: Response) => {
-  const client = await pool.connect();
   try {
     const bookingId = parseInt(req.params.bookingId as string);
     if (isNaN(bookingId)) {
@@ -1127,124 +1116,117 @@ router.post('/api/bookings/:bookingId/mark-all-waivers-reviewed', isStaffOrAdmin
       return res.status(401).json({ error: 'Authentication required' });
     }
 
-    await client.query('BEGIN');
+    const txResult = await db.transaction(async (tx) => {
+      const bookingResult = await tx.execute(sql`
+        SELECT br.session_id, br.user_email as owner_email
+        FROM booking_requests br
+        WHERE br.id = ${bookingId}
+      `);
 
-    const bookingResult = await client.query(`
-      SELECT br.session_id, br.user_email as owner_email
-      FROM booking_requests br
-      WHERE br.id = $1
-    `, [bookingId]);
+      if (bookingResult.rows.length === 0) {
+        return { notFound: true, updatedCount: 0 } as const;
+      }
 
-    if (bookingResult.rows.length === 0) {
-      await client.query('ROLLBACK');
+      const { session_id } = bookingResult.rows[0];
+
+      const result = await tx.execute(sql`
+        UPDATE booking_participants 
+        SET waiver_reviewed_at = NOW()
+        WHERE session_id = ${session_id} 
+          AND payment_status = 'waived' 
+          AND waiver_reviewed_at IS NULL
+        RETURNING id
+      `);
+
+      for (const row of result.rows) {
+        await logPaymentAudit({
+          bookingId,
+          sessionId: session_id,
+          participantId: row.id,
+          action: 'payment_waived',
+          staffEmail: sessionUser.email,
+          staffName: sessionUser.name || null,
+          reason: 'Staff marked manual waiver as reviewed',
+          amountAffected: 0,
+        });
+      }
+
+      logFromRequest(req, 'review_waiver', 'booking', bookingId.toString(), `Booking #${bookingId}`, {
+        action: 'all_waivers_marked_reviewed',
+        sessionId: session_id,
+        waiverCount: result.rows.length,
+        participantIds: result.rows.map(r => r.id)
+      });
+
+      return { notFound: false, updatedCount: result.rows.length } as const;
+    });
+
+    if (txResult.notFound) {
       return res.status(404).json({ error: 'Booking not found' });
     }
 
-    const { session_id } = bookingResult.rows[0];
-
-    const result = await client.query(`
-      UPDATE booking_participants 
-      SET waiver_reviewed_at = NOW()
-      WHERE session_id = $1 
-        AND payment_status = 'waived' 
-        AND waiver_reviewed_at IS NULL
-      RETURNING id
-    `, [session_id]);
-
-    for (const row of result.rows) {
-      await logPaymentAudit({
-        bookingId,
-        sessionId: session_id,
-        participantId: row.id,
-        action: 'payment_waived',
-        staffEmail: sessionUser.email,
-        staffName: sessionUser.name || null,
-        reason: 'Staff marked manual waiver as reviewed',
-        amountAffected: 0,
-      });
-    }
-
-    logFromRequest(req, 'review_waiver', 'booking', bookingId.toString(), `Booking #${bookingId}`, {
-      action: 'all_waivers_marked_reviewed',
-      sessionId: session_id,
-      waiverCount: result.rows.length,
-      participantIds: result.rows.map(r => r.id)
-    });
-
-    await client.query('COMMIT');
-
-    res.json({ success: true, updatedCount: result.rows.length });
+    res.json({ success: true, updatedCount: txResult.updatedCount });
   } catch (error: unknown) {
-    try { await client.query('ROLLBACK'); } catch (rollbackErr) { logger.warn('[DB] Rollback failed:', rollbackErr); }
     logAndRespond(req, res, 500, 'Failed to mark waivers as reviewed', error);
-  } finally {
-    client.release();
   }
 });
 
 router.post('/api/bookings/bulk-review-all-waivers', isStaffOrAdmin, async (req: Request, res: Response) => {
-  const client = await pool.connect();
   try {
     const sessionUser = getSessionUser(req);
     if (!sessionUser?.email) {
       return res.status(401).json({ error: 'Authentication required' });
     }
 
-    await client.query('BEGIN');
+    const updatedCount = await db.transaction(async (tx) => {
+      const result = await tx.execute(sql`
+        UPDATE booking_participants
+        SET waiver_reviewed_at = NOW()
+        WHERE payment_status = 'waived'
+          AND waiver_reviewed_at IS NULL
+          AND (used_guest_pass IS NULL OR used_guest_pass = FALSE)
+          AND created_at < NOW() - INTERVAL '12 hours'
+        RETURNING id, session_id
+      `);
 
-    const result = await client.query(`
-      UPDATE booking_participants
-      SET waiver_reviewed_at = NOW()
-      WHERE payment_status = 'waived'
-        AND waiver_reviewed_at IS NULL
-        AND (used_guest_pass IS NULL OR used_guest_pass = FALSE)
-        AND created_at < NOW() - INTERVAL '12 hours'
-      RETURNING id, session_id
-    `);
+      const sessionIds = result.rows.map(r => r.session_id);
+      const participantIds = result.rows.map(r => r.id);
 
-    const sessionIds = result.rows.map(r => r.session_id);
-    const participantIds = result.rows.map(r => r.id);
+      if (sessionIds.length > 0) {
+        const bookingLookup = await tx.execute(
+          sql`SELECT br.session_id, br.id as booking_id 
+           FROM booking_requests br 
+           WHERE br.session_id = ANY(${sessionIds}::int[])`
+        );
+        const sessionToBooking = new Map(bookingLookup.rows.map(r => [r.session_id, r.booking_id]));
 
-    if (sessionIds.length > 0) {
-      const bookingLookup = await client.query(
-        `SELECT br.session_id, br.id as booking_id 
-         FROM booking_requests br 
-         WHERE br.session_id = ANY($1::int[])`,
-        [sessionIds]
-      );
-      const sessionToBooking = new Map(bookingLookup.rows.map(r => [r.session_id, r.booking_id]));
+        const bookingIds = result.rows.map(r => sessionToBooking.get(r.session_id) || null);
 
-      const bookingIds = result.rows.map(r => sessionToBooking.get(r.session_id) || null);
-
-      for (let i = 0; i < participantIds.length; i++) {
-        await logPaymentAudit({
-          bookingId: bookingIds[i],
-          sessionId: sessionIds[i],
-          participantId: participantIds[i],
-          action: 'payment_waived',
-          staffEmail: sessionUser.email,
-          staffName: sessionUser.name || null,
-          reason: 'Bulk reviewed by staff',
-          amountAffected: 0,
-        });
+        for (let i = 0; i < participantIds.length; i++) {
+          await logPaymentAudit({
+            bookingId: bookingIds[i],
+            sessionId: sessionIds[i],
+            participantId: participantIds[i],
+            action: 'payment_waived',
+            staffEmail: sessionUser.email,
+            staffName: sessionUser.name || null,
+            reason: 'Bulk reviewed by staff',
+            amountAffected: 0,
+          });
+        }
       }
-    }
 
-    const updatedCount = result.rows.length;
+      logFromRequest(req, 'review_waiver', 'bulk_waiver', 'all', 'Bulk waiver review', {
+        action: 'bulk_review_all_stale_waivers',
+        count: result.rows.length
+      });
 
-    logFromRequest(req, 'review_waiver', 'bulk_waiver', 'all', 'Bulk waiver review', {
-      action: 'bulk_review_all_stale_waivers',
-      count: updatedCount
+      return result.rows.length;
     });
-
-    await client.query('COMMIT');
 
     res.json({ success: true, updatedCount });
   } catch (error: unknown) {
-    try { await client.query('ROLLBACK'); } catch (rollbackErr) { logger.warn('[DB] Rollback failed:', rollbackErr); }
     logAndRespond(req, res, 500, 'Failed to bulk review waivers', error);
-  } finally {
-    client.release();
   }
 });
 

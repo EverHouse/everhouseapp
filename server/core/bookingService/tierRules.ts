@@ -6,7 +6,8 @@
  * - Weekly limits are NOT implemented - no weekly_sim_minutes column exists in schema
  * - If weekly caps are needed, a future phase should add the column and aggregation logic
  */
-import { pool } from '../db';
+import { db } from '../../db';
+import { sql } from 'drizzle-orm';
 import { 
   getTierLimits, 
   getMemberTierByEmail, 
@@ -166,25 +167,24 @@ export async function getGuestPassesRemaining(memberEmail: string): Promise<numb
     const lastDay = new Date(year, month, 0).getDate();
     const monthEnd = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
     
-    const result = await pool.query(
-      `SELECT COUNT(*) as guest_count
+    const result = await db.execute(
+      sql`SELECT COUNT(*) as guest_count
        FROM booking_participants bp
        JOIN booking_sessions bs ON bp.session_id = bs.id
        JOIN booking_requests br ON bs.id = br.session_id
        WHERE bp.participant_type = 'guest'
          AND bp.used_guest_pass = true
-         AND bs.session_date >= $1
-         AND bs.session_date <= $2
+         AND bs.session_date >= ${monthStart}
+         AND bs.session_date <= ${monthEnd}
          AND br.status NOT IN ('cancelled', 'declined', 'cancellation_pending')
          AND EXISTS (
            SELECT 1 FROM booking_participants owner_bp
            WHERE owner_bp.session_id = bs.id
              AND owner_bp.participant_type = 'owner'
              AND owner_bp.user_id = (
-               SELECT id FROM users WHERE LOWER(email) = LOWER($3) LIMIT 1
+               SELECT id FROM users WHERE LOWER(email) = LOWER(${memberEmail}) LIMIT 1
              )
-         )`,
-      [monthStart, monthEnd, memberEmail]
+         )`
     );
     
     const usedPasses = parseInt(result.rows[0]?.guest_count || '0');

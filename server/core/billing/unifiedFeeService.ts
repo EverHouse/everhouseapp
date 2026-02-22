@@ -1,4 +1,5 @@
-import { pool } from '../db';
+import { db } from '../../db';
+import { sql } from 'drizzle-orm';
 import { getMemberTierByEmail, getTierLimits } from '../tierService';
 import { getDailyUsageFromLedger, getGuestPassInfo, calculateOverageFee } from '../bookingService/usageCalculator';
 import { MemberService, isEmail, normalizeEmail, isUUID } from '../memberService';
@@ -53,14 +54,10 @@ async function loadSessionData(sessionId?: number, bookingId?: number): Promise<
   if (!sessionId && !bookingId) return null;
   
   try {
-    let query: string;
-    let params: SqlQueryParam[];
+    let sessionResult;
     
     if (sessionId) {
-      // Use the GREATER of session duration and booking duration
-      // Session times come from Trackman imports and may not reflect booking extensions
-      // Booking duration reflects staff-updated times and is authoritative
-      query = `
+      sessionResult = await db.execute(sql`
         SELECT 
           bs.id as session_id,
           br.id as booking_id,
@@ -76,14 +73,12 @@ async function loadSessionData(sessionId?: number, bookingId?: number): Promise<
         FROM booking_sessions bs
         JOIN booking_requests br ON br.session_id = bs.id
         LEFT JOIN resources r ON br.resource_id = r.id
-        WHERE bs.id = $1
+        WHERE bs.id = ${sessionId}
         ORDER BY br.duration_minutes DESC
         LIMIT 1
-      `;
-      params = [sessionId];
+      `);
     } else {
-      // First try with session join - use GREATEST to handle session/booking time mismatches
-      query = `
+      sessionResult = await db.execute(sql`
         SELECT 
           bs.id as session_id,
           br.id as booking_id,
@@ -99,13 +94,10 @@ async function loadSessionData(sessionId?: number, bookingId?: number): Promise<
         FROM booking_requests br
         LEFT JOIN booking_sessions bs ON br.session_id = bs.id
         LEFT JOIN resources r ON br.resource_id = r.id
-        WHERE br.id = $1
+        WHERE br.id = ${bookingId}
         LIMIT 1
-      `;
-      params = [bookingId];
+      `);
     }
-    
-    const sessionResult = await pool.query(query, params);
     if (sessionResult.rows.length === 0) return null;
     
     const session = sessionResult.rows[0];
@@ -122,8 +114,8 @@ async function loadSessionData(sessionId?: number, bookingId?: number): Promise<
     
     // Try to load participants from session first
     if (session.session_id) {
-      const participantsResult = await pool.query(
-        `SELECT 
+      const participantsResult = await db.execute(
+        sql`SELECT 
           bp.id as participant_id,
           bp.user_id,
           bp.guest_id,
@@ -133,9 +125,8 @@ async function loadSessionData(sessionId?: number, bookingId?: number): Promise<
           bp.used_guest_pass
          FROM booking_participants bp
          LEFT JOIN users u ON bp.user_id = u.id
-         WHERE bp.session_id = $1
-         ORDER BY bp.participant_type = 'owner' DESC, bp.created_at ASC`,
-        [session.session_id]
+         WHERE bp.session_id = ${session.session_id}
+         ORDER BY bp.participant_type = 'owner' DESC, bp.created_at ASC`
       );
       participants = participantsResult.rows.map(row => ({
         participantId: row.participant_id,
@@ -150,8 +141,8 @@ async function loadSessionData(sessionId?: number, bookingId?: number): Promise<
     
     // If no participants from session, try booking_participants via booking_requests.session_id
     if (participants.length === 0 && session.booking_id) {
-      const bpFallbackResult = await pool.query(
-        `SELECT 
+      const bpFallbackResult = await db.execute(
+        sql`SELECT 
           bp.id as participant_id,
           bp.user_id,
           bp.guest_id,
@@ -162,9 +153,8 @@ async function loadSessionData(sessionId?: number, bookingId?: number): Promise<
          FROM booking_participants bp
          JOIN booking_requests br ON br.session_id = bp.session_id
          LEFT JOIN users u ON bp.user_id = u.id
-         WHERE br.id = $1
-         ORDER BY bp.participant_type = 'owner' DESC, bp.created_at ASC`,
-        [session.booking_id]
+         WHERE br.id = ${session.booking_id}
+         ORDER BY bp.participant_type = 'owner' DESC, bp.created_at ASC`
       );
       participants = bpFallbackResult.rows.map(row => ({
         participantId: row.participant_id,
@@ -230,9 +220,8 @@ export async function computeFeeBreakdown(params: FeeComputeParams): Promise<Fee
       throw new Error(`Session or booking not found: sessionId=${params.sessionId}, bookingId=${params.bookingId}`);
     }
     // Rule 15a Step 1: Cancelled/declined bookings always have $0 fees
-    const statusCheck = await pool.query(
-      `SELECT status FROM booking_requests WHERE id = $1`,
-      [sessionData.bookingId]
+    const statusCheck = await db.execute(
+      sql`SELECT status FROM booking_requests WHERE id = ${sessionData.bookingId}`
     );
     const bookingStatus = statusCheck.rows[0]?.status;
     if (['cancelled', 'declined', 'cancellation_pending'].includes(bookingStatus)) {
@@ -325,9 +314,8 @@ export async function computeFeeBreakdown(params: FeeComputeParams): Promise<Fee
   const tierMap = new Map<string, string>();
   const roleMap = new Map<string, string>();
   if (emailList.length > 0) {
-    const tiersResult = await pool.query(
-      `SELECT LOWER(email) as email, tier, role, membership_status FROM users WHERE LOWER(email) = ANY($1::text[])`,
-      [emailList.map(e => e.toLowerCase())]
+    const tiersResult = await db.execute(
+      sql`SELECT LOWER(email) as email, tier, role, membership_status FROM users WHERE LOWER(email) = ANY(${emailList.map(e => e.toLowerCase())}::text[])`
     );
     tiersResult.rows.forEach(r => {
       if (r.tier && ['active', 'trialing', 'past_due'].includes(r.membership_status)) {
@@ -360,9 +348,8 @@ export async function computeFeeBreakdown(params: FeeComputeParams): Promise<Fee
       // If we have a bookingId but no startTime, fetch it from the database
       let effectiveStartTime = startTime;
       if (!startTime && currentBookingId) {
-        const startTimeResult = await pool.query(
-          `SELECT start_time FROM booking_requests WHERE id = $1`,
-          [currentBookingId]
+        const startTimeResult = await db.execute(
+          sql`SELECT start_time FROM booking_requests WHERE id = ${currentBookingId}`
         );
         if (startTimeResult.rows.length > 0 && startTimeResult.rows[0].start_time) {
           effectiveStartTime = startTimeResult.rows[0].start_time;
@@ -376,53 +363,32 @@ export async function computeFeeBreakdown(params: FeeComputeParams): Promise<Fee
       // Filter by resource type to separate simulator vs conference room usage
       const resourceTypeFilter = isConferenceRoom ? 'conference_room' : 'simulator';
       
-      // Dynamically build query params and clauses to avoid passing unused null params
-      // which causes PostgreSQL to fail with "could not determine data type of parameter"
-      let queryParams: SqlQueryParam[];
-      let timeFilterClause: string;
-      let resourceTypeClause: string;
+      const emailsLower = emailList.map(e => e.toLowerCase());
       
-      if (hasTimeFilter) {
-        // Params: $1=emails, $2=date, $3=startTime, $4=bookingId, $5=resourceType
-        queryParams = [emailList.map(e => e.toLowerCase()), sessionDate, effectiveStartTime, currentBookingId || 0, resourceTypeFilter];
-        timeFilterClause = `AND (
-             COALESCE(br.start_time, '00:00:00') < $3 
-             OR (COALESCE(br.start_time, '00:00:00') = $3 AND br.id < COALESCE($4, 0))
-           )`;
-        resourceTypeClause = `AND EXISTS (SELECT 1 FROM resources r WHERE r.id = br.resource_id AND r.type = $5)`;
-      } else if (hasBookingIdFilter) {
-        // Params: $1=emails, $2=date, $3=bookingId, $4=resourceType
-        queryParams = [emailList.map(e => e.toLowerCase()), sessionDate, currentBookingId, resourceTypeFilter];
-        timeFilterClause = `AND br.id != $3`;
-        resourceTypeClause = `AND EXISTS (SELECT 1 FROM resources r WHERE r.id = br.resource_id AND r.type = $4)`;
-      } else {
-        // Params: $1=emails, $2=date, $3=resourceType
-        queryParams = [emailList.map(e => e.toLowerCase()), sessionDate, resourceTypeFilter];
-        timeFilterClause = '';
-        resourceTypeClause = `AND EXISTS (SELECT 1 FROM resources r WHERE r.id = br.resource_id AND r.type = $3)`;
-      }
+      const timeFilterFrag = hasTimeFilter
+        ? sql`AND (
+             COALESCE(br.start_time, '00:00:00') < ${effectiveStartTime} 
+             OR (COALESCE(br.start_time, '00:00:00') = ${effectiveStartTime} AND br.id < COALESCE(${currentBookingId || 0}, 0))
+           )`
+        : hasBookingIdFilter
+          ? sql`AND br.id != ${currentBookingId}`
+          : sql``;
       
-      const previewUsageQuery = `
+      const resourceTypeFrag = sql`AND EXISTS (SELECT 1 FROM resources r WHERE r.id = br.resource_id AND r.type = ${resourceTypeFilter})`;
+      
+      const usageResult = await db.execute(sql`
         WITH owned_bookings AS (
-          -- Bookings where the member is the owner
-          -- Per-participant minutes = duration / player_count
-          -- Only count bookings that start EARLIER than current booking
-          -- Filter by resource type (simulator vs conference_room) for separate allowances
           SELECT LOWER(user_email) as identifier, 
                  br.id as booking_id,
                  FLOOR(duration_minutes::float / GREATEST(1, COALESCE(declared_player_count, 1))) as minutes_share
           FROM booking_requests br
-          WHERE LOWER(user_email) = ANY($1::text[])
-            AND request_date = $2
+          WHERE LOWER(user_email) = ANY(${emailsLower}::text[])
+            AND request_date = ${sessionDate}
             AND status IN ('pending', 'approved', 'attended')
-            ${timeFilterClause}
-            ${resourceTypeClause}
+            ${timeFilterFrag}
+            ${resourceTypeFrag}
         ),
         member_bookings AS (
-          -- Bookings where the member is a participant (via booking_participants -> booking_sessions)
-          -- Exclude bookings where they are already the owner to prevent double-counting
-          -- Only count bookings that start EARLIER than current booking
-          -- Filter by resource type (simulator vs conference_room) for separate allowances
           SELECT LOWER(u.email) as identifier,
                  br.id as booking_id,
                  FLOOR(br.duration_minutes::float / GREATEST(1, COALESCE(br.declared_player_count, 1))) as minutes_share
@@ -430,18 +396,14 @@ export async function computeFeeBreakdown(params: FeeComputeParams): Promise<Fee
           JOIN booking_sessions bs ON bp.session_id = bs.id
           JOIN booking_requests br ON br.session_id = bs.id
           JOIN users u ON bp.user_id = u.id
-          WHERE LOWER(u.email) = ANY($1::text[])
-            AND br.request_date = $2
+          WHERE LOWER(u.email) = ANY(${emailsLower}::text[])
+            AND br.request_date = ${sessionDate}
             AND br.status IN ('pending', 'approved', 'attended')
             AND LOWER(u.email) != LOWER(br.user_email)
-            ${timeFilterClause}
-            ${resourceTypeClause}
+            ${timeFilterFrag}
+            ${resourceTypeFrag}
         ),
         session_participant_bookings AS (
-          -- Bookings where the member is a participant (via booking_participants -> booking_sessions)
-          -- This handles cases where sessions were created but booking not in booking_members
-          -- Only count bookings that start EARLIER than current booking
-          -- Filter by resource type (simulator vs conference_room) for separate allowances
           SELECT LOWER(u.email) as identifier,
                  br.id as booking_id,
                  FLOOR(br.duration_minutes::float / GREATEST(1, COALESCE(br.declared_player_count, 1))) as minutes_share
@@ -449,15 +411,14 @@ export async function computeFeeBreakdown(params: FeeComputeParams): Promise<Fee
           JOIN booking_sessions bs ON bp.session_id = bs.id
           JOIN booking_requests br ON br.session_id = bs.id
           JOIN users u ON bp.user_id = u.id
-          WHERE LOWER(u.email) = ANY($1::text[])
-            AND br.request_date = $2
+          WHERE LOWER(u.email) = ANY(${emailsLower}::text[])
+            AND br.request_date = ${sessionDate}
             AND br.status IN ('pending', 'approved', 'attended')
             AND LOWER(u.email) != LOWER(br.user_email)
-            ${timeFilterClause}
-            ${resourceTypeClause}
+            ${timeFilterFrag}
+            ${resourceTypeFrag}
         ),
         all_usage AS (
-          -- Combine all sources and deduplicate by booking_id + identifier
           SELECT DISTINCT ON (identifier, booking_id) identifier, booking_id, minutes_share 
           FROM (
             SELECT identifier, booking_id, minutes_share FROM owned_bookings
@@ -469,9 +430,9 @@ export async function computeFeeBreakdown(params: FeeComputeParams): Promise<Fee
         )
         SELECT identifier, COALESCE(SUM(minutes_share), 0) as used
         FROM all_usage
-        GROUP BY identifier`;
-      const usageResult = await pool.query(previewUsageQuery, queryParams);
-      usageResult.rows.forEach(r => usageMap.set(r.identifier, parseInt(r.used) || 0));
+        GROUP BY identifier
+      `);
+      (usageResult.rows as Array<Record<string, unknown>>).forEach(r => usageMap.set(r.identifier as string, parseInt(String(r.used)) || 0));
     } else {
       // Filter by resource type to separate simulator vs conference room usage
       const resourceTypeFilter = isConferenceRoom ? 'conference_room' : 'simulator';
@@ -482,93 +443,58 @@ export async function computeFeeBreakdown(params: FeeComputeParams): Promise<Fee
       // entry can make an earlier booking appear to have overage.
       const hasTimeFilter = startTime !== undefined;
       
-      // Build query with consistent parameter positions:
-      // $1=identifiers, $2=date, $3=resourceType
-      // When excludeId: +$4=excludeId
-      // When hasTimeFilter: +startTime param, +bookingId param
-      let usageParams: SqlQueryParam[];
-      let pStartTime: string;
-      let pBookingId: string;
-      let pExcludeId: string;
-      
-      if (excludeId && hasTimeFilter) {
-        // $1=identifiers, $2=date, $3=resourceType, $4=excludeId, $5=startTime, $6=bookingId
-        usageParams = [allIdentifiers, sessionDate, resourceTypeFilter, excludeId, startTime, currentBookingId || 0];
-        pExcludeId = '$4';
-        pStartTime = '$5';
-        pBookingId = '$6';
-      } else if (excludeId) {
-        // $1=identifiers, $2=date, $3=resourceType, $4=excludeId
-        usageParams = [allIdentifiers, sessionDate, resourceTypeFilter, excludeId];
-        pExcludeId = '$4';
-        pStartTime = '';
-        pBookingId = '';
-      } else if (hasTimeFilter) {
-        // $1=identifiers, $2=date, $3=resourceType, $4=startTime, $5=bookingId
-        usageParams = [allIdentifiers, sessionDate, resourceTypeFilter, startTime, currentBookingId || 0];
-        pExcludeId = '';
-        pStartTime = '$4';
-        pBookingId = '$5';
-      } else {
-        // $1=identifiers, $2=date, $3=resourceType
-        usageParams = [allIdentifiers, sessionDate, resourceTypeFilter];
-        pExcludeId = '';
-        pStartTime = '';
-        pBookingId = '';
-      }
-      
-      const excludeClauseLedger = pExcludeId ? `AND ul.session_id != ${pExcludeId}` : '';
-      const excludeClauseGhost = pExcludeId 
-        ? `AND (
+      const excludeClauseLedgerFrag = excludeId 
+        ? sql`AND ul.session_id != ${excludeId}` 
+        : sql``;
+      const excludeClauseGhostFrag = excludeId 
+        ? sql`AND (
                  br.session_id IS NULL
-                 OR (br.session_id != ${pExcludeId} AND NOT EXISTS (SELECT 1 FROM usage_ledger ul WHERE ul.session_id = br.session_id))
+                 OR (br.session_id != ${excludeId} AND NOT EXISTS (SELECT 1 FROM usage_ledger ul WHERE ul.session_id = br.session_id))
                )`
-        : `AND (
+        : sql`AND (
                  br.session_id IS NULL
                  OR NOT EXISTS (SELECT 1 FROM usage_ledger ul WHERE ul.session_id = br.session_id)
                )`;
       
-      // For ledger_usage: use a correlated subquery to get the booking's start_time
-      // without JOINing booking_requests (which could multiply rows if multiple BRs per session)
-      const timeFilterLedger = hasTimeFilter 
-        ? `AND (
-                 COALESCE((SELECT MIN(br2.start_time) FROM booking_requests br2 WHERE br2.session_id = bs.id), '00:00:00') < ${pStartTime}
+      const timeFilterLedgerFrag = hasTimeFilter 
+        ? sql`AND (
+                 COALESCE((SELECT MIN(br2.start_time) FROM booking_requests br2 WHERE br2.session_id = bs.id), '00:00:00') < ${startTime}
                  OR (
-                   COALESCE((SELECT MIN(br2.start_time) FROM booking_requests br2 WHERE br2.session_id = bs.id), '00:00:00') = ${pStartTime}
-                   AND COALESCE((SELECT MIN(br2.id) FROM booking_requests br2 WHERE br2.session_id = bs.id), 0) < ${pBookingId}
+                   COALESCE((SELECT MIN(br2.start_time) FROM booking_requests br2 WHERE br2.session_id = bs.id), '00:00:00') = ${startTime}
+                   AND COALESCE((SELECT MIN(br2.id) FROM booking_requests br2 WHERE br2.session_id = bs.id), 0) < ${currentBookingId || 0}
                  )
                )`
-        : '';
+        : sql``;
       
-      const timeFilterGhost = hasTimeFilter
-        ? `AND (
-                 COALESCE(br.start_time, '00:00:00') < ${pStartTime}
-                 OR (COALESCE(br.start_time, '00:00:00') = ${pStartTime} AND br.id < ${pBookingId})
+      const timeFilterGhostFrag = hasTimeFilter
+        ? sql`AND (
+                 COALESCE(br.start_time, '00:00:00') < ${startTime}
+                 OR (COALESCE(br.start_time, '00:00:00') = ${startTime} AND br.id < ${currentBookingId || 0})
                )`
-        : '';
+        : sql``;
       
-      const usageQuery = `WITH ledger_usage AS (
+      const usageResult = await db.execute(sql`WITH ledger_usage AS (
              SELECT LOWER(ul.member_id) as identifier, COALESCE(SUM(ul.minutes_charged), 0) as mins
              FROM usage_ledger ul
              JOIN booking_sessions bs ON ul.session_id = bs.id
              JOIN resources r ON bs.resource_id = r.id
-             WHERE LOWER(ul.member_id) = ANY($1::text[])
-               AND bs.session_date = $2
-               AND r.type = $3
-               ${excludeClauseLedger}
-               ${timeFilterLedger}
+             WHERE LOWER(ul.member_id) = ANY(${allIdentifiers}::text[])
+               AND bs.session_date = ${sessionDate}
+               AND r.type = ${resourceTypeFilter}
+               ${excludeClauseLedgerFrag}
+               ${timeFilterLedgerFrag}
              GROUP BY LOWER(ul.member_id)
            ),
            ghost_usage AS (
              SELECT LOWER(br.user_email) as identifier, 
                     COALESCE(SUM(FLOOR(br.duration_minutes::float / GREATEST(1, COALESCE(br.declared_player_count, 1)))), 0) as mins
              FROM booking_requests br
-             WHERE LOWER(br.user_email) = ANY($1::text[])
-               AND br.request_date = $2
+             WHERE LOWER(br.user_email) = ANY(${allIdentifiers}::text[])
+               AND br.request_date = ${sessionDate}
                AND br.status IN ('approved', 'confirmed', 'attended')
-               ${excludeClauseGhost}
-               AND EXISTS (SELECT 1 FROM resources r WHERE r.id = br.resource_id AND r.type = $3)
-               ${timeFilterGhost}
+               ${excludeClauseGhostFrag}
+               AND EXISTS (SELECT 1 FROM resources r WHERE r.id = br.resource_id AND r.type = ${resourceTypeFilter})
+               ${timeFilterGhostFrag}
              GROUP BY LOWER(br.user_email)
            )
            SELECT identifier, COALESCE(SUM(mins), 0) as used
@@ -577,9 +503,8 @@ export async function computeFeeBreakdown(params: FeeComputeParams): Promise<Fee
              UNION ALL
              SELECT * FROM ghost_usage
            ) combined
-           GROUP BY identifier`;
-      const usageResult = await pool.query(usageQuery, usageParams);
-      usageResult.rows.forEach(r => usageMap.set(r.identifier, parseInt(r.used) || 0));
+           GROUP BY identifier`);
+      (usageResult.rows as Array<Record<string, unknown>>).forEach(r => usageMap.set(r.identifier as string, parseInt(String(r.used)) || 0));
     }
   }
 
@@ -903,40 +828,32 @@ export async function applyFeeBreakdownToParticipants(
   sessionId: number,
   breakdown: FeeBreakdown
 ): Promise<void> {
-  const client = await pool.connect();
-  
   try {
-    await client.query('BEGIN');
-    
-    const idsToUpdate = breakdown.participants
-      .filter(p => p.participantId)
-      .map(p => p.participantId!);
-    const feesToUpdate = breakdown.participants
-      .filter(p => p.participantId)
-      .map(p => p.totalCents);
+    await db.transaction(async (tx) => {
+      const idsToUpdate = breakdown.participants
+        .filter(p => p.participantId)
+        .map(p => p.participantId!);
+      const feesToUpdate = breakdown.participants
+        .filter(p => p.participantId)
+        .map(p => p.totalCents);
 
-    if (idsToUpdate.length > 0) {
-      await client.query(
-        `UPDATE booking_participants bp
-         SET cached_fee_cents = t.fee
-         FROM unnest($1::int[], $2::int[]) AS t(id, fee)
-         WHERE bp.id = t.id`,
-        [idsToUpdate, feesToUpdate]
-      );
-    }
-    
-    await client.query('COMMIT');
+      if (idsToUpdate.length > 0) {
+        await tx.execute(
+          sql`UPDATE booking_participants bp
+           SET cached_fee_cents = t.fee
+           FROM unnest(${idsToUpdate}::int[], ${feesToUpdate}::int[]) AS t(id, fee)
+           WHERE bp.id = t.id`
+        );
+      }
+    });
     logger.info('[UnifiedFeeService] Applied fee breakdown to participants', {
       sessionId,
       participantCount: breakdown.participants.length,
       totalCents: breakdown.totals.totalCents
     });
   } catch (error: unknown) {
-    await client.query('ROLLBACK');
     logger.error('[UnifiedFeeService] Error applying fee breakdown:', { error });
     throw error;
-  } finally {
-    client.release();
   }
 }
 
@@ -947,11 +864,10 @@ export async function invalidateCachedFees(
   if (participantIds.length === 0) return;
   
   try {
-    await pool.query(
-      `UPDATE booking_participants 
+    await db.execute(
+      sql`UPDATE booking_participants 
        SET cached_fee_cents = 0 
-       WHERE id = ANY($1::int[])`,
-      [participantIds]
+       WHERE id = ANY(${participantIds}::int[])`
     );
     
     logger.info('[UnifiedFeeService] Invalidated cached fees', {

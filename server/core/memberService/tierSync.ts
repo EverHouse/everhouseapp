@@ -1,4 +1,5 @@
-import { pool } from '../db';
+import { db } from '../../db';
+import { sql } from 'drizzle-orm';
 import { getErrorMessage } from '../../utils/errorUtils';
 
 import { logger } from '../logger';
@@ -14,25 +15,20 @@ export async function syncMemberTierFromStripe(
   stripePriceId: string
 ): Promise<TierSyncResult> {
   try {
-    const tierResult = await pool.query(
-      `SELECT id, slug, name FROM membership_tiers 
-       WHERE stripe_price_id = $1 OR founding_price_id = $1`,
-      [stripePriceId]
-    );
+    const tierResult = await db.execute(sql`SELECT id, slug, name FROM membership_tiers 
+       WHERE stripe_price_id = ${stripePriceId} OR founding_price_id = ${stripePriceId}`);
     
     if (tierResult.rows.length === 0) {
       logger.warn(`[TierSync] No tier found for price ${stripePriceId}`);
       return { success: false, error: `No tier found for price ID: ${stripePriceId}` };
     }
     
-    const { id: tierId, slug: tierSlug, name: tierName } = tierResult.rows[0];
+    const row = tierResult.rows[0] as Record<string, unknown>;
+    const { id: tierId, slug: tierSlug, name: tierName } = row as { id: number; slug: string; name: string };
     
-    const updateResult = await pool.query(
-      `UPDATE users SET tier = $1, tier_id = $2, updated_at = NOW() 
-       WHERE LOWER(email) = LOWER($3)
-       RETURNING id`,
-      [tierSlug, tierId, email]
-    );
+    const updateResult = await db.execute(sql`UPDATE users SET tier = ${tierSlug}, tier_id = ${tierId}, updated_at = NOW() 
+       WHERE LOWER(email) = LOWER(${email})
+       RETURNING id`);
     
     if (updateResult.rowCount === 0) {
       logger.warn(`[TierSync] No user found for email ${email}`);
@@ -41,7 +37,6 @@ export async function syncMemberTierFromStripe(
     
     logger.info(`[TierSync] Synced ${email} to tier ${tierSlug} (${tierName})`);
     
-    // Sync tier change to HubSpot
     try {
       const { syncMemberToHubSpot } = await import('../hubspot/stages');
       await syncMemberToHubSpot({ email, tier: tierName, billingProvider: 'stripe' });
@@ -85,12 +80,9 @@ export async function syncMemberStatusFromStripe(
         membershipStatus = 'inactive';
     }
     
-    const updateResult = await pool.query(
-      `UPDATE users SET membership_status = $1, updated_at = NOW() 
-       WHERE LOWER(email) = LOWER($2)
-       RETURNING id`,
-      [membershipStatus, email]
-    );
+    const updateResult = await db.execute(sql`UPDATE users SET membership_status = ${membershipStatus}, updated_at = NOW() 
+       WHERE LOWER(email) = LOWER(${email})
+       RETURNING id`);
     
     if (updateResult.rowCount === 0) {
       logger.warn(`[TierSync] No user found for email ${email}`);
@@ -99,7 +91,6 @@ export async function syncMemberStatusFromStripe(
     
     logger.info(`[TierSync] Updated ${email} membership_status to ${membershipStatus}`);
     
-    // Sync status change to HubSpot
     try {
       const { syncMemberToHubSpot } = await import('../hubspot/stages');
       await syncMemberToHubSpot({ email, status: membershipStatus, billingProvider: 'stripe' });
@@ -121,17 +112,14 @@ export async function getTierFromPriceId(stripePriceId: string): Promise<{
   name: string;
 } | null> {
   try {
-    const tierResult = await pool.query(
-      `SELECT id, slug, name FROM membership_tiers 
-       WHERE stripe_price_id = $1 OR founding_price_id = $1`,
-      [stripePriceId]
-    );
+    const tierResult = await db.execute(sql`SELECT id, slug, name FROM membership_tiers 
+       WHERE stripe_price_id = ${stripePriceId} OR founding_price_id = ${stripePriceId}`);
     
     if (tierResult.rows.length === 0) {
       return null;
     }
     
-    return tierResult.rows[0];
+    return tierResult.rows[0] as { id: number; slug: string; name: string };
   } catch (error: unknown) {
     logger.error('[TierSync] Error getting tier from price ID:', { error: error });
     return null;
@@ -144,20 +132,17 @@ export async function validateTierConsistency(email: string): Promise<{
   recommendation?: string;
 }> {
   try {
-    const userResult = await pool.query(
-      `SELECT u.id, u.email, u.tier, u.tier_id, u.stripe_subscription_id,
+    const userResult = await db.execute(sql`SELECT u.id, u.email, u.tier, u.tier_id, u.stripe_subscription_id,
               mt.slug as tier_slug, mt.name as tier_name
        FROM users u
        LEFT JOIN membership_tiers mt ON u.tier_id = mt.id
-       WHERE LOWER(u.email) = LOWER($1)`,
-      [email]
-    );
+       WHERE LOWER(u.email) = LOWER(${email})`);
     
     if (userResult.rows.length === 0) {
       return { isConsistent: false, issues: ['User not found'] };
     }
     
-    const user = userResult.rows[0];
+    const user = userResult.rows[0] as Record<string, unknown>;
     const issues: string[] = [];
     
     if (user.tier_id && user.tier !== user.tier_slug) {

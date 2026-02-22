@@ -697,7 +697,6 @@ router.post('/api/stripe/sync-member-subscriptions', isStaffOrAdmin, sensitiveAc
     }
 
     const stripe = await getStripeClient();
-    const { pool } = await import('../../core/db');
 
     const statusMap: Record<string, string> = {
       'active': 'active',
@@ -710,12 +709,10 @@ router.post('/api/stripe/sync-member-subscriptions', isStaffOrAdmin, sensitiveAc
       'paused': 'frozen'
     };
 
-    const membersResult = await pool.query(
-      `SELECT id, email, first_name, last_name, stripe_subscription_id, stripe_customer_id,
+    const membersResult = await db.execute(sql`SELECT id, email, first_name, last_name, stripe_subscription_id, stripe_customer_id,
               membership_status, billing_provider, stripe_current_period_end, join_date, tier
        FROM users
-       WHERE stripe_subscription_id IS NOT NULL OR stripe_customer_id IS NOT NULL`
-    );
+       WHERE stripe_subscription_id IS NOT NULL OR stripe_customer_id IS NOT NULL`);
 
     const members = membersResult.rows;
     let synced = 0;
@@ -728,21 +725,15 @@ router.post('/api/stripe/sync-member-subscriptions', isStaffOrAdmin, sensitiveAc
       const metadataTierName = subscription.metadata?.tier_name || subscription.metadata?.tier;
 
       if (metadataTierSlug) {
-        const tierResult = await pool.query(
-          'SELECT name FROM membership_tiers WHERE slug = $1',
-          [metadataTierSlug]
-        );
-        if (tierResult.rows.length > 0) return tierResult.rows[0].name;
+        const tierResult = await db.execute(sql`SELECT name FROM membership_tiers WHERE slug = ${metadataTierSlug}`);
+        if (tierResult.rows.length > 0) return (tierResult.rows[0] as Record<string, unknown>).name as string;
         if (metadataTierName) return metadataTierName;
       }
 
       const priceId = subscription.items?.data?.[0]?.price?.id;
       if (priceId) {
-        const tierResult = await pool.query(
-          'SELECT name FROM membership_tiers WHERE stripe_price_id = $1 OR founding_price_id = $1',
-          [priceId]
-        );
-        if (tierResult.rows.length > 0) return tierResult.rows[0].name;
+        const tierResult = await db.execute(sql`SELECT name FROM membership_tiers WHERE stripe_price_id = ${priceId} OR founding_price_id = ${priceId}`);
+        if (tierResult.rows.length > 0) return (tierResult.rows[0] as Record<string, unknown>).name as string;
       }
 
       return null;
@@ -794,42 +785,29 @@ router.post('/api/stripe/sync-member-subscriptions', isStaffOrAdmin, sensitiveAc
             }
 
             if (changes.length > 0) {
-              const updateFields: string[] = [
-                `membership_status = $1`,
-                `billing_provider = 'stripe'`,
-                `stripe_current_period_end = $2`,
-                `updated_at = NOW()`
+              const updateParts = [
+                sql`membership_status = ${mappedStatus}`,
+                sql`billing_provider = 'stripe'`,
+                sql`stripe_current_period_end = ${periodEnd}`,
+                sql`updated_at = NOW()`
               ];
-              const updateParams: Array<string | Date | null> = [mappedStatus, periodEnd];
-              let paramIndex = 3;
 
               if (resolvedTier && member.tier !== resolvedTier) {
-                updateFields.push(`tier = $${paramIndex}`);
-                updateParams.push(resolvedTier);
-                paramIndex++;
+                updateParts.push(sql`tier = ${resolvedTier}`);
               }
 
               if (setJoinDate) {
-                updateFields.push(`join_date = $${paramIndex}`);
-                updateParams.push(new Date());
-                paramIndex++;
+                updateParts.push(sql`join_date = ${new Date()}`);
               }
 
-              updateParams.push(member.id);
-              await pool.query(
-                `UPDATE users SET ${updateFields.join(', ')} WHERE id = $${paramIndex}`,
-                updateParams
-              );
+              await db.execute(sql`UPDATE users SET ${sql.join(updateParts, sql`, `)} WHERE id = ${member.id}`);
               updated++;
               details.push({ email: member.email, action: 'updated', changes } as any);
             }
             synced++;
           } catch (err: unknown) {
             if (getErrorCode(err) === 'resource_missing') {
-              await pool.query(
-                `UPDATE users SET stripe_subscription_id = NULL, updated_at = NOW() WHERE id = $1`,
-                [member.id]
-              );
+              await db.execute(sql`UPDATE users SET stripe_subscription_id = NULL, updated_at = NOW() WHERE id = ${member.id}`);
               updated++;
               details.push({ email: member.email, action: 'cleared', changes: ['subscription not found in Stripe — cleared'] } as any);
               synced++;
@@ -854,33 +832,23 @@ router.post('/api/stripe/sync-member-subscriptions', isStaffOrAdmin, sensitiveAc
                 : null;
               const resolvedTier = await resolveTierFromSubscription(sub);
 
-              const updateFields: string[] = [
-                `stripe_subscription_id = $1`,
-                `membership_status = $2`,
-                `billing_provider = 'stripe'`,
-                `stripe_current_period_end = $3`,
-                `updated_at = NOW()`
+              const updateParts = [
+                sql`stripe_subscription_id = ${sub.id}`,
+                sql`membership_status = ${mappedStatus}`,
+                sql`billing_provider = 'stripe'`,
+                sql`stripe_current_period_end = ${periodEnd}`,
+                sql`updated_at = NOW()`
               ];
-              const updateParams: Array<string | Date | null> = [sub.id, mappedStatus, periodEnd];
-              let paramIndex = 4;
 
               if (resolvedTier) {
-                updateFields.push(`tier = COALESCE($${paramIndex}, tier)`);
-                updateParams.push(resolvedTier);
-                paramIndex++;
+                updateParts.push(sql`tier = COALESCE(${resolvedTier}, tier)`);
               }
 
               if (!member.join_date && (mappedStatus === 'active' || mappedStatus === 'trialing')) {
-                updateFields.push(`join_date = $${paramIndex}`);
-                updateParams.push(new Date());
-                paramIndex++;
+                updateParts.push(sql`join_date = ${new Date()}`);
               }
 
-              updateParams.push(member.id);
-              await pool.query(
-                `UPDATE users SET ${updateFields.join(', ')} WHERE id = $${paramIndex}`,
-                updateParams
-              );
+              await db.execute(sql`UPDATE users SET ${sql.join(updateParts, sql`, `)} WHERE id = ${member.id}`);
               updated++;
               const changeDetails = [`linked subscription ${sub.id}`, `status: ${mappedStatus}`];
               if (resolvedTier) changeDetails.push(`tier: ${resolvedTier}`);

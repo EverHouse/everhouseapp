@@ -1,4 +1,3 @@
-import { pool } from '../../core/db';
 import { logger } from '../../core/logger';
 import { sendNotificationToUser, broadcastToStaff, broadcastAvailabilityUpdate } from '../../core/websocket';
 import { notifyAllStaff, notifyMember } from '../../core/notificationService';
@@ -8,7 +7,7 @@ import { checkUnifiedAvailability } from '../../core/bookingService/availability
 import { cancelPaymentIntent, getStripeClient } from '../../core/stripe';
 import { BookingStateService } from '../../core/bookingService';
 import { bookingRequests } from '../../../shared/schema';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, sql } from 'drizzle-orm';
 import { db } from '../../db';
 import {
   TrackmanWebhookPayload,
@@ -44,51 +43,45 @@ export async function tryAutoApproveBooking(
   trackmanBookingId: string
 ): Promise<{ matched: boolean; bookingId?: number; resourceId?: number; sessionId?: number; sessionFailed?: boolean }> {
   try {
-    const result = await pool.query(
-      `SELECT br.id, br.user_email, br.user_name, br.staff_notes, br.resource_id, 
+    const result = await db.execute(sql`SELECT br.id, br.user_email, br.user_name, br.staff_notes, br.resource_id, 
               br.start_time, br.end_time, br.duration_minutes, br.session_id,
               u.id as user_id
        FROM booking_requests br
        LEFT JOIN users u ON LOWER(u.email) = LOWER(br.user_email)
-       WHERE LOWER(br.user_email) = LOWER($1)
-         AND br.request_date = $2
-         AND ABS(EXTRACT(EPOCH FROM (br.start_time::time - $3::time))) <= 600
+       WHERE LOWER(br.user_email) = LOWER(${customerEmail})
+         AND br.request_date = ${slotDate}
+         AND ABS(EXTRACT(EPOCH FROM (br.start_time::time - ${startTime}::time))) <= 600
          AND (
-           (br.start_time < br.end_time AND $3::time < br.end_time)
+           (br.start_time < br.end_time AND ${startTime}::time < br.end_time)
            OR
-           (br.start_time >= br.end_time AND ($3::time < br.end_time OR $3::time >= br.start_time))
+           (br.start_time >= br.end_time AND (${startTime}::time < br.end_time OR ${startTime}::time >= br.start_time))
          )
          AND br.status = 'pending'
          AND br.trackman_booking_id IS NULL
-       ORDER BY ABS(EXTRACT(EPOCH FROM (br.start_time::time - $3::time))), br.created_at DESC
-       LIMIT 1`,
-      [customerEmail, slotDate, startTime]
-    );
+       ORDER BY ABS(EXTRACT(EPOCH FROM (br.start_time::time - ${startTime}::time))), br.created_at DESC
+       LIMIT 1`);
     
-    if (result.rows.length === 0) {
+    if ((result.rows as Array<Record<string, unknown>>).length === 0) {
       return { matched: false };
     }
     
-    const pendingBooking = result.rows[0];
+    const pendingBooking = (result.rows as Array<Record<string, unknown>>)[0];
     const bookingId = pendingBooking.id;
     const resourceId = pendingBooking.resource_id;
     
     const updatedNotes = (pendingBooking.staff_notes || '') + ' [Auto-approved via Trackman webhook]';
     
-    const updateResult = await pool.query(
-      `UPDATE booking_requests 
+    const updateResult = await db.execute(sql`UPDATE booking_requests 
        SET status = 'approved', 
-           trackman_booking_id = $1, 
-           staff_notes = $2,
+           trackman_booking_id = ${trackmanBookingId}, 
+           staff_notes = ${updatedNotes},
            reviewed_by = 'trackman_webhook',
            reviewed_at = NOW(),
            updated_at = NOW()
-       WHERE id = $3 AND trackman_booking_id IS NULL
-       RETURNING id`,
-      [trackmanBookingId, updatedNotes, bookingId]
-    );
+       WHERE id = ${bookingId} AND trackman_booking_id IS NULL
+       RETURNING id`);
     
-    if (updateResult.rowCount === 0) {
+    if ((updateResult as any).rowCount === 0) {
       logger.warn('[Trackman Webhook] Pending booking was already linked by another process', {
         extra: { bookingId, trackmanBookingId, email: customerEmail, date: slotDate, time: startTime }
       });
@@ -118,10 +111,7 @@ export async function tryAutoApproveBooking(
         logger.warn('[Trackman Webhook] Session creation failed for matched pending booking, reverting to pending', {
           extra: { bookingId, trackmanBookingId, error: sessionResult.error }
         });
-        await pool.query(
-          `UPDATE booking_requests SET status = 'pending', updated_at = NOW() WHERE id = $1`,
-          [bookingId]
-        );
+        await db.execute(sql`UPDATE booking_requests SET status = 'pending', updated_at = NOW() WHERE id = ${bookingId}`);
         return { matched: true, bookingId, sessionFailed: true };
       }
     }
@@ -133,26 +123,17 @@ export async function tryAutoApproveBooking(
     // Create draft invoice for one-invoice-per-booking model (non-blocking)
     if (createdSessionId) {
       try {
-        const resourceResult = await pool.query(
-          `SELECT r.type FROM resources r JOIN booking_requests br ON br.resource_id = r.id WHERE br.id = $1`,
-          [bookingId]
-        );
-        const resourceType = resourceResult.rows[0]?.type;
+        const resourceResult = await db.execute(sql`SELECT r.type FROM resources r JOIN booking_requests br ON br.resource_id = r.id WHERE br.id = ${bookingId}`);
+        const resourceType = (resourceResult.rows as Array<Record<string, unknown>>)[0]?.type;
         if (resourceType !== 'conference_room') {
-          const participantResult = await pool.query(
-            `SELECT id, display_name, participant_type, cached_fee_cents
+          const participantResult = await db.execute(sql`SELECT id, display_name, participant_type, cached_fee_cents
              FROM booking_participants
-             WHERE session_id = $1 AND cached_fee_cents > 0`,
-            [createdSessionId]
-          );
-          if (participantResult.rows.length > 0) {
-            const userResult = await pool.query(
-              `SELECT stripe_customer_id FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1`,
-              [customerEmail]
-            );
-            const stripeCustomerId = userResult.rows[0]?.stripe_customer_id;
+             WHERE session_id = ${createdSessionId} AND cached_fee_cents > 0`);
+          if ((participantResult.rows as Array<Record<string, unknown>>).length > 0) {
+            const userResult = await db.execute(sql`SELECT stripe_customer_id FROM users WHERE LOWER(email) = LOWER(${customerEmail}) LIMIT 1`);
+            const stripeCustomerId = (userResult.rows as Array<Record<string, unknown>>)[0]?.stripe_customer_id;
             if (stripeCustomerId) {
-              const feeLineItems = participantResult.rows.map((row: any) => ({
+              const feeLineItems = (participantResult.rows as Array<Record<string, unknown>>).map((row: any) => ({
                 participantId: row.id,
                 displayName: row.display_name || 'Unknown',
                 participantType: row.participant_type as 'owner' | 'member' | 'guest',
@@ -260,40 +241,29 @@ export async function saveToUnmatchedBookings(
   reason?: string
 ): Promise<{ success: boolean; id?: number }> {
   try {
-    const existingResult = await pool.query(
-      `SELECT id FROM trackman_unmatched_bookings WHERE trackman_booking_id = $1`,
-      [trackmanBookingId]
-    );
+    const existingResult = await db.execute(sql`SELECT id FROM trackman_unmatched_bookings WHERE trackman_booking_id = ${trackmanBookingId}`);
     
-    if (existingResult.rows.length > 0) {
-      await pool.query(
-        `UPDATE trackman_unmatched_bookings 
-         SET booking_date = $2, start_time = $3, end_time = $4, bay_number = $5,
-             original_email = $6, user_name = $7, player_count = $8, 
-             match_attempt_reason = COALESCE($9, match_attempt_reason),
+    if ((existingResult.rows as Array<Record<string, unknown>>).length > 0) {
+      await db.execute(sql`UPDATE trackman_unmatched_bookings 
+         SET booking_date = ${slotDate}, start_time = ${startTime}, end_time = ${endTime}, bay_number = ${resourceId},
+             original_email = ${customerEmail}, user_name = ${customerName}, player_count = ${playerCount}, 
+             match_attempt_reason = COALESCE(${reason}, match_attempt_reason),
              updated_at = NOW()
-         WHERE trackman_booking_id = $1`,
-        [trackmanBookingId, slotDate, startTime, endTime, resourceId, 
-         customerEmail, customerName, playerCount, reason]
-      );
-      return { success: true, id: existingResult.rows[0].id };
+         WHERE trackman_booking_id = ${trackmanBookingId}`);
+      return { success: true, id: (existingResult.rows as Array<Record<string, unknown>>)[0].id as number };
     }
     
-    const result = await pool.query(
-      `INSERT INTO trackman_unmatched_bookings 
+    const result = await db.execute(sql`INSERT INTO trackman_unmatched_bookings 
        (trackman_booking_id, booking_date, start_time, end_time, bay_number, 
         original_email, user_name, player_count, status, match_attempt_reason, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending', $9, NOW())
-       RETURNING id`,
-      [trackmanBookingId, slotDate, startTime, endTime, resourceId, 
-       customerEmail, customerName, playerCount, reason || 'no_member_match']
-    );
+       VALUES (${trackmanBookingId}, ${slotDate}, ${startTime}, ${endTime}, ${resourceId}, ${customerEmail}, ${customerName}, ${playerCount}, 'pending', ${reason || 'no_member_match'}, NOW())
+       RETURNING id`);
     
     logger.info('[Trackman Webhook] Saved to unmatched bookings', {
       extra: { trackmanBookingId, email: customerEmail, name: customerName, date: slotDate }
     });
     
-    return { success: true, id: result.rows[0]?.id };
+    return { success: true, id: (result.rows as Array<Record<string, unknown>>)[0]?.id as number };
   } catch (e: unknown) {
     logger.error('[Trackman Webhook] Failed to save unmatched booking', { error: e as Error });
     return { success: false };
@@ -344,41 +314,22 @@ export async function createUnmatchedBookingRequest(
       }
     }
     
-    // Use INSERT ... ON CONFLICT to atomically prevent duplicate trackman_booking_id
-    // This prevents race conditions when multiple webhooks arrive simultaneously
-    const result = await pool.query(
-      `INSERT INTO booking_requests 
+    const result = await db.execute(sql`INSERT INTO booking_requests 
        (request_date, start_time, end_time, duration_minutes, resource_id,
         user_email, user_name, status, trackman_booking_id, trackman_external_id,
         trackman_player_count, is_unmatched, staff_notes,
         origin, last_sync_source, last_trackman_sync_at, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $11, $8, $9, $10, true, $12,
+       VALUES (${slotDate}, ${startTime}, ${endTime}, ${durationMinutes}, ${resourceId}, ${customerEmail || ''}, ${customerName || 'Unknown (Trackman)'}, ${bookingStatus}, ${trackmanBookingId}, ${externalBookingId || null}, ${playerCount}, true, ${conflictNote || null},
                'trackman_webhook', 'trackman_webhook', NOW(), NOW(), NOW())
        ON CONFLICT (trackman_booking_id) WHERE trackman_booking_id IS NOT NULL DO UPDATE SET
          last_trackman_sync_at = NOW(),
          updated_at = NOW()
-       RETURNING id, (xmax = 0) AS was_inserted`,
-      [
-        slotDate,
-        startTime,
-        endTime,
-        durationMinutes,
-        resourceId,
-        customerEmail || '',
-        customerName || 'Unknown (Trackman)',
-        trackmanBookingId,
-        externalBookingId || null,
-        playerCount,
-        bookingStatus,
-        conflictNote || null
-      ]
-    );
+       RETURNING id, (xmax = 0) AS was_inserted`);
     
-    if (result.rows.length > 0) {
-      const bookingId = result.rows[0].id;
-      const wasInserted = result.rows[0].was_inserted;
+    if ((result.rows as Array<Record<string, unknown>>).length > 0) {
+      const bookingId = (result.rows as Array<Record<string, unknown>>)[0].id as number;
+      const wasInserted = (result.rows as Array<Record<string, unknown>>)[0].was_inserted;
       
-      // If this was a duplicate (ON CONFLICT triggered), just return the existing booking
       if (!wasInserted) {
         logger.info('[Trackman Webhook] Booking already exists for this Trackman ID (atomic dedup)', {
           extra: { trackmanBookingId, existingBookingId: bookingId }
@@ -432,49 +383,40 @@ async function tryLinkCancelledBooking(
   trackmanBookingId: string
 ): Promise<{ matched: boolean; bookingId?: number; refundedPasses?: number }> {
   try {
-    // Match cancelled booking within 10-min tolerance (600 seconds)
-    // Also require end_time > webhook start_time to prevent matching previous slot
-    // Handle cross-midnight bookings: if start_time >= end_time, booking spans midnight
-    const result = await pool.query(
-      `SELECT id, user_email, staff_notes, session_id FROM booking_requests 
-       WHERE LOWER(user_email) = LOWER($1)
-         AND request_date = $2
-         AND ABS(EXTRACT(EPOCH FROM (start_time::time - $3::time))) <= 600
+    const result = await db.execute(sql`SELECT id, user_email, staff_notes, session_id FROM booking_requests 
+       WHERE LOWER(user_email) = LOWER(${customerEmail})
+         AND request_date = ${slotDate}
+         AND ABS(EXTRACT(EPOCH FROM (start_time::time - ${startTime}::time))) <= 600
          AND (
-           (start_time < end_time AND $3::time < end_time)
+           (start_time < end_time AND ${startTime}::time < end_time)
            OR
-           (start_time >= end_time AND ($3::time < end_time OR $3::time >= start_time))
+           (start_time >= end_time AND (${startTime}::time < end_time OR ${startTime}::time >= start_time))
          )
          AND status = 'cancelled'
          AND updated_at >= NOW() - INTERVAL '24 hours'
          AND trackman_booking_id IS NULL
-       ORDER BY ABS(EXTRACT(EPOCH FROM (start_time::time - $3::time))), updated_at DESC
-       LIMIT 1`,
-      [customerEmail, slotDate, startTime]
-    );
+       ORDER BY ABS(EXTRACT(EPOCH FROM (start_time::time - ${startTime}::time))), updated_at DESC
+       LIMIT 1`);
     
-    if (result.rows.length === 0) {
+    if ((result.rows as Array<Record<string, unknown>>).length === 0) {
       return { matched: false };
     }
     
-    const cancelledBooking = result.rows[0];
+    const cancelledBooking = (result.rows as Array<Record<string, unknown>>)[0];
     const bookingId = cancelledBooking.id;
     const memberEmail = cancelledBooking.user_email;
     
     const updatedNotes = (cancelledBooking.staff_notes || '') + 
       ' [Trackman booking linked - request was cancelled, manual Trackman cancellation may be needed]';
     
-    const updateResult = await pool.query(
-      `UPDATE booking_requests 
-       SET trackman_booking_id = $1, 
-           staff_notes = $2,
+    const updateResult = await db.execute(sql`UPDATE booking_requests 
+       SET trackman_booking_id = ${trackmanBookingId}, 
+           staff_notes = ${updatedNotes},
            updated_at = NOW()
-       WHERE id = $3 AND trackman_booking_id IS NULL
-       RETURNING id`,
-      [trackmanBookingId, updatedNotes, bookingId]
-    );
+       WHERE id = ${bookingId} AND trackman_booking_id IS NULL
+       RETURNING id`);
     
-    if (updateResult.rowCount === 0) {
+    if ((updateResult as any).rowCount === 0) {
       logger.warn('[Trackman Webhook] Cancelled booking was already linked by another process', {
         extra: { bookingId, trackmanBookingId, email: customerEmail, date: slotDate, time: startTime }
       });
@@ -550,13 +492,10 @@ async function notifyMemberBookingConfirmed(
   bayName?: string
 ): Promise<void> {
   try {
-    const userResult = await pool.query(
-      `SELECT id, first_name, last_name, email FROM users WHERE LOWER(email) = LOWER($1)`,
-      [customerEmail]
-    );
+    const userResult = await db.execute(sql`SELECT id, first_name, last_name, email FROM users WHERE LOWER(email) = LOWER(${customerEmail})`);
     
-    if (userResult.rows.length > 0) {
-      const user = userResult.rows[0];
+    if ((userResult.rows as Array<Record<string, unknown>>).length > 0) {
+      const user = (userResult.rows as Array<Record<string, unknown>>)[0];
       const memberName = `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Member';
       const message = `Your simulator booking for ${slotDate} at ${startTime}${bayName ? ` (${bayName})` : ''} has been confirmed.`;
       

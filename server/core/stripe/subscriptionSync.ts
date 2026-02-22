@@ -1,5 +1,6 @@
 import { getStripeClient } from './client';
-import { pool } from '../db';
+import { db } from '../../db';
+import { sql } from 'drizzle-orm';
 import { normalizeTierName } from '../../utils/tierUtils';
 import { findOrCreateHubSpotContact } from '../hubspot/members';
 import Stripe from 'stripe';
@@ -46,7 +47,6 @@ export async function syncActiveSubscriptionsFromStripe(): Promise<SubscriptionS
   try {
     const stripe = await getStripeClient();
     
-    // Debug: Check which Stripe mode we're using by looking at the account
     try {
       const account = await stripe.accounts.retrieve();
       logger.info(`[Stripe Sync] Connected to Stripe account: ${account.id}, mode: ${account.settings?.dashboard?.display_name || 'unknown'}`);
@@ -58,8 +58,6 @@ export async function syncActiveSubscriptionsFromStripe(): Promise<SubscriptionS
     
     const subscriptions: Stripe.Subscription[] = [];
     
-    // Fetch all subscription statuses that represent active membership
-    // Include trialing and past_due - members still have access during these states
     for (const status of ['active', 'trialing', 'past_due'] as const) {
       let hasMore = true;
       let startingAfter: string | undefined;
@@ -85,7 +83,6 @@ export async function syncActiveSubscriptionsFromStripe(): Promise<SubscriptionS
 
     logger.info(`[Stripe Sync] Found ${subscriptions.length} subscriptions (active/trialing/past_due) from global list`);
     
-    // If no subscriptions found globally, try per-customer fetch (for test clock subscriptions)
     if (subscriptions.length === 0) {
       logger.info('[Stripe Sync] No subscriptions from global list - checking per-customer for test clock support...');
       
@@ -104,7 +101,6 @@ export async function syncActiveSubscriptionsFromStripe(): Promise<SubscriptionS
         
         for (const cust of customersPage.data) {
           try {
-            // Include trialing and past_due - members still have access during these states
             for (const status of ['active', 'trialing', 'past_due'] as const) {
               const custSubs = await stripe.subscriptions.list({ 
                 customer: cust.id, 
@@ -127,7 +123,6 @@ export async function syncActiveSubscriptionsFromStripe(): Promise<SubscriptionS
           customerStartingAfter = customersPage.data[customersPage.data.length - 1].id;
         }
         
-        // Safety limit
         if (customerCount >= 1000) {
           logger.info('[Stripe Sync] Reached customer limit (1000)');
           break;
@@ -137,7 +132,6 @@ export async function syncActiveSubscriptionsFromStripe(): Promise<SubscriptionS
       logger.info(`[Stripe Sync] Scanned ${customerCount} customers, found ${subscriptions.length} subscriptions via per-customer fetch`);
     }
 
-    // Collect all product IDs that need fetching (products not expanded)
     const productIdsToFetch = new Set<string>();
     for (const sub of subscriptions) {
       const item = sub.items.data[0];
@@ -147,7 +141,6 @@ export async function syncActiveSubscriptionsFromStripe(): Promise<SubscriptionS
       }
     }
     
-    // Fetch product details in batches to avoid Stripe's expand depth limit
     const productMap = new Map<string, Stripe.Product>();
     if (productIdsToFetch.size > 0) {
       const productIds = Array.from(productIdsToFetch);
@@ -193,7 +186,6 @@ export async function syncActiveSubscriptionsFromStripe(): Promise<SubscriptionS
           const price = item?.price;
           const productRef = price?.product;
           
-          // Get product from expanded data or from our productMap
           let product: Stripe.Product | undefined;
           if (productRef && typeof productRef === 'string') {
             product = productMap.get(productRef);
@@ -219,13 +211,10 @@ export async function syncActiveSubscriptionsFromStripe(): Promise<SubscriptionS
           const stripeCustomerId = customer.id;
           const stripeSubscriptionId = subscription.id;
 
-          const existingUser = await pool.query(
-            'SELECT id, tier, stripe_customer_id, stripe_subscription_id, hubspot_id, first_name, last_name, updated_at FROM users WHERE LOWER(email) = $1',
-            [email]
-          );
+          const existingUser = await db.execute(sql`SELECT id, tier, stripe_customer_id, stripe_subscription_id, hubspot_id, first_name, last_name, updated_at FROM users WHERE LOWER(email) = ${email}`);
 
           if (existingUser.rows.length > 0) {
-            const user = existingUser.rows[0];
+            const user = existingUser.rows[0] as Record<string, unknown>;
             const needsUpdate = 
               user.stripe_customer_id !== stripeCustomerId ||
               user.stripe_subscription_id !== stripeSubscriptionId ||
@@ -233,19 +222,19 @@ export async function syncActiveSubscriptionsFromStripe(): Promise<SubscriptionS
               !user.hubspot_id;
 
             if (needsUpdate) {
-              if (user.updated_at && (Date.now() - new Date(user.updated_at).getTime()) < 5 * 60 * 1000) {
+              if (user.updated_at && (Date.now() - new Date(user.updated_at as string).getTime()) < 5 * 60 * 1000) {
                 result.skipped++;
                 result.details.push({ email, action: 'skipped', reason: 'Recently updated (within 5 min), skipping to avoid webhook race' });
                 continue;
               }
 
-              let hubspotId = user.hubspot_id;
+              let hubspotId = user.hubspot_id as string | null;
               if (!hubspotId) {
                 try {
                   const hubspotResult = await findOrCreateHubSpotContact(
                     email,
-                    firstName || user.first_name || '',
-                    lastName || user.last_name || '',
+                    firstName || (user.first_name as string) || '',
+                    lastName || (user.last_name as string) || '',
                     undefined,
                     tier
                   );
@@ -256,24 +245,20 @@ export async function syncActiveSubscriptionsFromStripe(): Promise<SubscriptionS
                 }
               }
 
-              await pool.query(
-                `UPDATE users 
-                 SET stripe_customer_id = $1, 
-                     stripe_subscription_id = $2, 
-                     tier = $3,
+              await db.execute(sql`UPDATE users 
+                 SET stripe_customer_id = ${stripeCustomerId}, 
+                     stripe_subscription_id = ${stripeSubscriptionId}, 
+                     tier = ${tier},
                      membership_status = 'active',
                      billing_provider = CASE WHEN billing_provider IN ('mindbody', 'manual', 'comped') THEN billing_provider ELSE 'stripe' END,
-                     hubspot_id = COALESCE($5, hubspot_id),
+                     hubspot_id = COALESCE(${hubspotId}, hubspot_id),
                      grace_period_start = NULL,
                      grace_period_email_count = 0,
                      updated_at = NOW()
-                 WHERE id = $4
-                 AND (updated_at IS NULL OR updated_at < NOW() - INTERVAL '5 minutes')`,
-                [stripeCustomerId, stripeSubscriptionId, tier, user.id, hubspotId]
-              );
+                 WHERE id = ${user.id}
+                 AND (updated_at IS NULL OR updated_at < NOW() - INTERVAL '5 minutes')`);
               logger.info(`[Stripe Sync] Cleared grace period for migrated member ${email}`);
               
-              // Sync to HubSpot
               try {
                 const { syncMemberToHubSpot } = await import('../hubspot/stages');
                 await syncMemberToHubSpot({ email, status: 'active', tier, billingProvider: 'stripe' });
@@ -312,42 +297,33 @@ export async function syncActiveSubscriptionsFromStripe(): Promise<SubscriptionS
               logger.warn(`[Stripe Sync] Failed to create HubSpot contact for ${email}:`, { extra: { detail: getErrorMessage(hubspotErr) } });
             }
 
-            // Check if this email resolves to an existing user via linked email
             const { resolveUserByEmail } = await import('./customers');
             const resolved = await resolveUserByEmail(email);
             if (resolved) {
-              // Update existing user found via linked email
-              await pool.query(
-                `UPDATE users SET stripe_customer_id = $1, stripe_subscription_id = $2, 
+              await db.execute(sql`UPDATE users SET stripe_customer_id = ${stripeCustomerId}, stripe_subscription_id = ${stripeSubscriptionId}, 
                  membership_status = 'active',
                  billing_provider = CASE WHEN billing_provider IN ('mindbody', 'manual', 'comped') THEN billing_provider ELSE 'stripe' END,
                  data_source = 'stripe_sync',
-                 tier = COALESCE($3, tier), hubspot_id = COALESCE($4, hubspot_id),
+                 tier = COALESCE(${tier}, tier), hubspot_id = COALESCE(${hubspotId}, hubspot_id),
                  grace_period_start = NULL, grace_period_email_count = 0, updated_at = NOW()
-                 WHERE id = $5`,
-                [stripeCustomerId, stripeSubscriptionId, tier, hubspotId, resolved.userId]
-              );
+                 WHERE id = ${resolved.userId}`);
               logger.info(`[Stripe Sync] Cleared grace period for migrated member ${email}`);
               result.updated++;
               result.details.push({ email, action: 'updated', tier, reason: `Matched via ${resolved.matchType}` });
               logger.info(`[Stripe Sync] Updated existing user ${resolved.primaryEmail} (matched ${email} via ${resolved.matchType}) with tier ${tier}`);
             } else {
-            const exclusionCheck = await pool.query('SELECT 1 FROM sync_exclusions WHERE email = $1', [email.toLowerCase()]);
+            const exclusionCheck = await db.execute(sql`SELECT 1 FROM sync_exclusions WHERE email = ${email.toLowerCase()}`);
             if (exclusionCheck.rows.length > 0) {
               logger.info(`[Stripe Sync] Skipping user creation for ${email} — permanently deleted (sync_exclusions)`);
               result.details.push({ email, action: 'skipped', tier, reason: 'sync_exclusions' });
             } else {
-            await pool.query(
-              `INSERT INTO users (
+            await db.execute(sql`INSERT INTO users (
                  email, first_name, last_name, role, tier, 
                  stripe_customer_id, stripe_subscription_id, 
                  membership_status, billing_provider, data_source,
                  hubspot_id, created_at, updated_at
-               ) VALUES ($1, $2, $3, 'member', $4, $5, $6, 'active', 'stripe', 'stripe_sync', $7, NOW(), NOW())`,
-              [email, firstName, lastName, tier, stripeCustomerId, stripeSubscriptionId, hubspotId]
-            );
+               ) VALUES (${email}, ${firstName}, ${lastName}, ${'member'}, ${tier}, ${stripeCustomerId}, ${stripeSubscriptionId}, ${'active'}, ${'stripe'}, ${'stripe_sync'}, ${hubspotId}, NOW(), NOW())`);
             
-            // Sync new user to HubSpot
             try {
               await findOrCreateHubSpotContact(email, firstName, lastName);
               const { syncMemberToHubSpot } = await import('../hubspot/stages');

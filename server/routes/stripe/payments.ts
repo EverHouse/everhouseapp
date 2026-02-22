@@ -2,7 +2,6 @@ import { logger } from '../../core/logger';
 import { Router, Request, Response } from 'express';
 import Stripe from 'stripe';
 import { isStaffOrAdmin } from '../../core/middleware';
-import { pool } from '../../core/db';
 import { db } from '../../db';
 import { passRedemptionLogs, dayPassPurchases, users } from '../../../shared/schema';
 import { eq, gte, desc, inArray, sql } from 'drizzle-orm';
@@ -316,25 +315,10 @@ router.post('/api/stripe/create-payment-intent', isStaffOrAdmin, async (req: Req
         logger.warn('[Stripe] Client total mismatch: client=, server= - using server total', { extra: { amountCents, serverTotal } });
       }
 
-      const client = await pool.connect();
-      try {
-        await client.query('BEGIN');
-        
-        const snapshotResult = await client.query(
-          `INSERT INTO booking_fee_snapshots (booking_id, session_id, participant_fees, total_cents, status)
-           VALUES ($1, $2, $3, $4, 'pending') RETURNING id`,
-          [bookingId, sessionId, JSON.stringify(serverFees), serverTotal]
-        );
-        snapshotId = snapshotResult.rows[0].id;
-        
-        await client.query('COMMIT');
-        logger.info('[Stripe] Created fee snapshot for booking : $ with participants', { extra: { snapshotId, bookingId, serverTotal_100_ToFixed_2: (serverTotal/100).toFixed(2), serverFeesLength: serverFees.length } });
-      } catch (err: unknown) {
-        await client.query('ROLLBACK');
-        throw err;
-      } finally {
-        client.release();
-      }
+      const snapshotResult = await db.execute(sql`INSERT INTO booking_fee_snapshots (booking_id, session_id, participant_fees, total_cents, status)
+           VALUES (${bookingId}, ${sessionId}, ${JSON.stringify(serverFees)}, ${serverTotal}, 'pending') RETURNING id`);
+      snapshotId = (snapshotResult.rows[0] as Record<string, unknown>).id;
+      logger.info('[Stripe] Created fee snapshot for booking : $ with participants', { extra: { snapshotId, bookingId, serverTotal_100_ToFixed_2: (serverTotal/100).toFixed(2), serverFeesLength: serverFees.length } });
     } else {
       if (serverTotal < 50) {
         return res.status(400).json({ error: 'Amount must be at least $0.50' });
@@ -358,10 +342,7 @@ router.post('/api/stripe/create-payment-intent', isStaffOrAdmin, async (req: Req
     if (isBookingPayment) {
       const { customerId: stripeCustomerId } = await getOrCreateStripeCustomer(resolvedUserId, email, memberName || email.split('@')[0]);
 
-      const participantDetails = await pool.query(
-        `SELECT id, display_name, participant_type FROM booking_participants WHERE id = ANY($1::int[])`,
-        [serverFees.map(f => f.id)]
-      );
+      const participantDetails = await db.execute(sql`SELECT id, display_name, participant_type FROM booking_participants WHERE id = ANY(${serverFees.map(f => f.id)}::int[])`);
 
       const feeLineItems: BookingFeeLineItem[] = [];
       for (const detail of participantDetails.rows) {
@@ -407,13 +388,10 @@ router.post('/api/stripe/create-payment-intent', isStaffOrAdmin, async (req: Req
           await db.execute(sql`UPDATE booking_fee_snapshots SET stripe_payment_intent_id = ${invoiceResult.paymentIntentId}, status = 'paid' WHERE id = ${snapshotId}`);
         }
 
-        await pool.query(
-          `INSERT INTO stripe_payment_intents 
+        await db.execute(sql`INSERT INTO stripe_payment_intents 
            (user_id, stripe_payment_intent_id, stripe_customer_id, amount_cents, purpose, booking_id, session_id, description, status)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-           ON CONFLICT (stripe_payment_intent_id) DO NOTHING`,
-          [resolvedUserId || email, invoiceResult.paymentIntentId, stripeCustomerId, serverTotal, purpose, bookingId, sessionId, finalDescription, 'succeeded']
-        );
+           VALUES (${resolvedUserId || email}, ${invoiceResult.paymentIntentId}, ${stripeCustomerId}, ${serverTotal}, ${purpose}, ${bookingId}, ${sessionId}, ${finalDescription}, 'succeeded')
+           ON CONFLICT (stripe_payment_intent_id) DO NOTHING`);
 
         logFromRequest(req, 'record_charge', 'payment', invoiceResult.paymentIntentId, email, {
           amount: serverTotal,
@@ -434,13 +412,10 @@ router.post('/api/stripe/create-payment-intent', isStaffOrAdmin, async (req: Req
         await db.execute(sql`UPDATE booking_fee_snapshots SET stripe_payment_intent_id = ${invoiceResult.paymentIntentId} WHERE id = ${snapshotId}`);
       }
 
-      await pool.query(
-        `INSERT INTO stripe_payment_intents 
+      await db.execute(sql`INSERT INTO stripe_payment_intents 
          (user_id, stripe_payment_intent_id, stripe_customer_id, amount_cents, purpose, booking_id, session_id, description, status)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-         ON CONFLICT (stripe_payment_intent_id) DO NOTHING`,
-        [resolvedUserId || email, invoiceResult.paymentIntentId, stripeCustomerId, serverTotal, purpose, bookingId, sessionId, finalDescription, 'pending']
-      );
+         VALUES (${resolvedUserId || email}, ${invoiceResult.paymentIntentId}, ${stripeCustomerId}, ${serverTotal}, ${purpose}, ${bookingId}, ${sessionId}, ${finalDescription}, 'pending')
+         ON CONFLICT (stripe_payment_intent_id) DO NOTHING`);
 
       logFromRequest(req, 'record_charge', 'payment', invoiceResult.paymentIntentId, email, {
         amount: serverTotal,
@@ -901,13 +876,10 @@ router.post('/api/stripe/staff/quick-charge', isStaffOrAdmin, async (req: Reques
 
         const dbUserId = member?.id?.toString() || `guest-${stripeCustomerId}`;
         try {
-          await pool.query(
-            `INSERT INTO stripe_payment_intents 
+          await db.execute(sql`INSERT INTO stripe_payment_intents 
              (user_id, stripe_payment_intent_id, stripe_customer_id, amount_cents, purpose, description, status, product_id, product_name)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-             ON CONFLICT (stripe_payment_intent_id) DO NOTHING`,
-            [dbUserId, invoiceResult.paymentIntentId, stripeCustomerId, Math.round(numericAmount), 'one_time_purchase', finalDescription, 'pending', productId || null, finalProductName || null]
-          );
+             VALUES (${dbUserId}, ${invoiceResult.paymentIntentId}, ${stripeCustomerId}, ${Math.round(numericAmount)}, 'one_time_purchase', ${finalDescription}, 'pending', ${productId || null}, ${finalProductName || null})
+             ON CONFLICT (stripe_payment_intent_id) DO NOTHING`);
         } catch (dbErr: unknown) {
           logger.warn('[QuickCharge] Non-blocking: Could not save local payment record', { extra: { dbErr: getErrorMessage(dbErr) } });
         }
@@ -1211,12 +1183,9 @@ router.post('/api/stripe/staff/charge-saved-card', isStaffOrAdmin, async (req: R
     }
 
     if (resolvedBookingId) {
-      const existingIntent = await pool.query(
-        `SELECT stripe_payment_intent_id, status FROM stripe_payment_intents 
-         WHERE booking_id = $1 AND status NOT IN ('succeeded', 'canceled', 'refunded')
-         LIMIT 1`,
-        [resolvedBookingId]
-      );
+      const existingIntent = await db.execute(sql`SELECT stripe_payment_intent_id, status FROM stripe_payment_intents 
+         WHERE booking_id = ${resolvedBookingId} AND status NOT IN ('succeeded', 'canceled', 'refunded')
+         LIMIT 1`);
 
       if (existingIntent.rows.length > 0) {
         return res.status(409).json({ 
@@ -1275,31 +1244,21 @@ router.post('/api/stripe/staff/charge-saved-card', isStaffOrAdmin, async (req: R
     let successMessage: string;
 
     if (invoiceResult.status === 'succeeded') {
-      const txClient = await pool.connect();
-      try {
-        await txClient.query('BEGIN');
-
+      await db.transaction(async (tx) => {
         const safeParticipantIds = (participantIds || []).filter((id: unknown) => typeof id === 'number' && Number.isFinite(id) && id > 0).map((id: number) => Math.floor(id));
         if (safeParticipantIds.length > 0) {
-          const idPlaceholders = safeParticipantIds.map((_: number, i: number) => `$${i + 1}`).join(', ');
-          await txClient.query(
-            `UPDATE booking_participants 
+          await tx.execute(sql`UPDATE booking_participants 
              SET payment_status = 'paid', 
-                 stripe_payment_intent_id = $${safeParticipantIds.length + 1},
+                 stripe_payment_intent_id = ${invoiceResult.paymentIntentId},
                  paid_at = NOW()
-             WHERE id IN (${idPlaceholders})`,
-            [...safeParticipantIds, invoiceResult.paymentIntentId]
-          );
+             WHERE id IN (${sql.join(safeParticipantIds.map((id: number) => sql`${id}`), sql`, `)})`);
           logger.info('[Stripe] Staff charged via invoice: $ for', { extra: { totalDollars: (authoritativeAmountCents / 100).toFixed(2), memberEmail: member.email, participantIdsLength: participantIds.length, invoiceId: invoiceResult.invoiceId } });
         }
 
-        await txClient.query(
-          `INSERT INTO stripe_payment_intents 
+        await tx.execute(sql`INSERT INTO stripe_payment_intents 
             (user_id, stripe_payment_intent_id, stripe_customer_id, amount_cents, status, purpose, description, booking_id, session_id)
-           VALUES ($1, $2, $3, $4, 'succeeded', 'booking_fee', 'Staff charged via invoice', $5, $6)
-           ON CONFLICT (stripe_payment_intent_id) DO UPDATE SET status = 'succeeded', updated_at = NOW()`,
-          [member.id, invoiceResult.paymentIntentId, member.stripe_customer_id, authoritativeAmountCents, resolvedBookingId, resolvedSessionId]
-        );
+           VALUES (${member.id}, ${invoiceResult.paymentIntentId}, ${member.stripe_customer_id}, ${authoritativeAmountCents}, 'succeeded', 'booking_fee', 'Staff charged via invoice', ${resolvedBookingId}, ${resolvedSessionId})
+           ON CONFLICT (stripe_payment_intent_id) DO UPDATE SET status = 'succeeded', updated_at = NOW()`);
 
         const staffActionDetails = JSON.stringify({
             amountCents: authoritativeAmountCents,
@@ -1312,20 +1271,9 @@ router.post('/api/stripe/staff/charge-saved-card', isStaffOrAdmin, async (req: R
             bookingId: resolvedBookingId,
             sessionId: resolvedSessionId
           });
-        await txClient.query(
-          `INSERT INTO staff_actions (action_type, staff_email, staff_name, target_email, details, created_at)
-           VALUES ('charge_saved_card', $1, $2, $3, $4, NOW())`,
-          [staffEmail, staffName || '', member.email, staffActionDetails]
-        );
-
-        await txClient.query('COMMIT');
-      } catch (txErr: unknown) {
-        await txClient.query('ROLLBACK');
-        logger.error('[Stripe] Transaction failed for staff charge post-payment DB updates', { extra: { txErr } });
-        throw txErr;
-      } finally {
-        txClient.release();
-      }
+        await tx.execute(sql`INSERT INTO staff_actions (action_type, staff_email, staff_name, target_email, details, created_at)
+           VALUES ('charge_saved_card', ${staffEmail}, ${staffName || ''}, ${member.email}, ${staffActionDetails}, NOW())`);
+      });
 
       broadcastBillingUpdate({
         action: 'payment_succeeded',
@@ -1407,16 +1355,12 @@ router.post('/api/stripe/staff/mark-booking-paid', isStaffOrAdmin, async (req: R
 
     const safeParticipantIds = (participantIds || []).filter((id: unknown) => typeof id === 'number' && Number.isFinite(id) && id > 0).map((id: number) => Math.floor(id));
     if (safeParticipantIds.length > 0) {
-      const idPlaceholders = safeParticipantIds.map((_: number, i: number) => `$${i + 1}`).join(', ');
-      await pool.query(
-        `UPDATE booking_participants 
+      await db.execute(sql`UPDATE booking_participants 
          SET payment_status = 'paid', 
              paid_at = NOW(),
              updated_at = NOW(),
              cached_fee_cents = 0
-         WHERE id IN (${idPlaceholders})`,
-        safeParticipantIds
-      );
+         WHERE id IN (${sql.join(safeParticipantIds.map((id: number) => sql`${id}`), sql`, `)})`);
     }
 
     logFromRequest(req, 'mark_booking_paid', 'payment', oobResult.invoiceId || null, null, {
@@ -1608,17 +1552,11 @@ router.post('/api/stripe/staff/charge-saved-card-pos', isStaffOrAdmin, async (re
     });
 
     if (paymentIntent.status === 'succeeded') {
-      const txClient = await pool.connect();
-      try {
-        await txClient.query('BEGIN');
-
-        await txClient.query(
-          `INSERT INTO stripe_payment_intents 
+      await db.transaction(async (tx) => {
+        await tx.execute(sql`INSERT INTO stripe_payment_intents 
             (payment_intent_id, member_email, member_id, amount_cents, status, purpose, description, created_by)
-           VALUES ($1, $2, $3, $4, 'succeeded', 'pos_charge', $5, $6)
-           ON CONFLICT (payment_intent_id) DO UPDATE SET status = 'succeeded', updated_at = NOW()`,
-          [paymentIntent.id, member.email, member.id, numericAmount, description || 'POS saved card charge', staffEmail]
-        );
+           VALUES (${paymentIntent.id}, ${member.email}, ${member.id}, ${numericAmount}, 'succeeded', 'pos_charge', ${description || 'POS saved card charge'}, ${staffEmail})
+           ON CONFLICT (payment_intent_id) DO UPDATE SET status = 'succeeded', updated_at = NOW()`);
 
         await logBillingAudit({
           memberEmail: member.email,
@@ -1631,15 +1569,7 @@ router.post('/api/stripe/staff/charge-saved-card-pos', isStaffOrAdmin, async (re
           },
           performedBy: staffEmail,
         });
-
-        await txClient.query('COMMIT');
-      } catch (txErr: unknown) {
-        await txClient.query('ROLLBACK');
-        logger.error('[Stripe] Transaction failed for POS charge post-payment DB updates', { extra: { txErr } });
-        throw txErr;
-      } finally {
-        txClient.release();
-      }
+      });
 
       logFromRequest(req, 'charge_saved_card', 'payment', paymentIntent.id, member.email, {
         amountCents: numericAmount,
@@ -2411,43 +2341,28 @@ router.post('/api/payments/refund', isStaffOrAdmin, async (req: Request, res: Re
     const isPartialRefund = refundedAmount < payment.amountCents;
     const newStatus = isPartialRefund ? 'partially_refunded' : 'refunded';
 
-    const txClient = await pool.connect();
-    try {
-      await txClient.query('BEGIN');
-
-      await txClient.query(
-        `UPDATE stripe_payment_intents SET status = $1, updated_at = NOW() WHERE stripe_payment_intent_id = $2`,
-        [newStatus, paymentIntentId]
-      );
+    await db.transaction(async (tx) => {
+      await tx.execute(sql`UPDATE stripe_payment_intents SET status = ${newStatus}, updated_at = NOW() WHERE stripe_payment_intent_id = ${paymentIntentId}`);
 
       if (payment.sessionId) {
-        await txClient.query(
-          `UPDATE booking_participants 
+        await tx.execute(sql`UPDATE booking_participants 
            SET payment_status = 'refunded', updated_at = NOW() 
-           WHERE session_id = $1 AND stripe_payment_intent_id = $2`,
-          [payment.sessionId, paymentIntentId]
-        );
+           WHERE session_id = ${payment.sessionId} AND stripe_payment_intent_id = ${paymentIntentId}`);
 
-        let ledgerResult = await txClient.query(
-          `SELECT id, member_id, overage_fee, guest_fee, minutes_charged, stripe_payment_intent_id
+        let ledgerResult = await tx.execute(sql`SELECT id, member_id, overage_fee, guest_fee, minutes_charged, stripe_payment_intent_id
            FROM usage_ledger 
-           WHERE session_id = $1 
-             AND stripe_payment_intent_id = $2
+           WHERE session_id = ${payment.sessionId} 
+             AND stripe_payment_intent_id = ${paymentIntentId}
              AND (COALESCE(overage_fee, 0) > 0 OR COALESCE(guest_fee, 0) > 0)
-           ORDER BY created_at ASC`,
-          [payment.sessionId, paymentIntentId]
-        );
+           ORDER BY created_at ASC`);
 
         if (ledgerResult.rows.length === 0) {
           logger.warn('[Payments] [OPS_REVIEW_REQUIRED] No ledger entries found with payment_intent_id , falling back to session-wide entries for session .', { extra: { paymentIntentId, paymentSessionId: payment.sessionId } });
-          ledgerResult = await txClient.query(
-            `SELECT id, member_id, overage_fee, guest_fee, minutes_charged, stripe_payment_intent_id
+          ledgerResult = await tx.execute(sql`SELECT id, member_id, overage_fee, guest_fee, minutes_charged, stripe_payment_intent_id
              FROM usage_ledger 
-             WHERE session_id = $1 
+             WHERE session_id = ${payment.sessionId} 
                AND (COALESCE(overage_fee, 0) > 0 OR COALESCE(guest_fee, 0) > 0)
-             ORDER BY created_at ASC`,
-            [payment.sessionId]
-          );
+             ORDER BY created_at ASC`);
         }
 
         if (ledgerResult.rows.length > 0) {
@@ -2510,12 +2425,9 @@ router.post('/api/payments/refund', isStaffOrAdmin, async (req: Request, res: Re
             const amounts = reversalAmounts[i];
 
             if (amounts.reversedOverageCents !== 0 || amounts.reversedGuestCents !== 0) {
-              await txClient.query(
-                `INSERT INTO usage_ledger 
+              await tx.execute(sql`INSERT INTO usage_ledger 
                  (session_id, member_id, minutes_charged, overage_fee, guest_fee, payment_method, source, stripe_payment_intent_id)
-                 VALUES ($1, $2, 0, $3, $4, 'waived', 'staff_manual', $5)`,
-                [payment.sessionId, amounts.memberId, (-amounts.reversedOverageCents / 100).toFixed(2), (-amounts.reversedGuestCents / 100).toFixed(2), paymentIntentId]
-              );
+                 VALUES (${payment.sessionId}, ${amounts.memberId}, 0, ${(-amounts.reversedOverageCents / 100).toFixed(2)}, ${(-amounts.reversedGuestCents / 100).toFixed(2)}, 'waived', 'staff_manual', ${paymentIntentId})`);
               reversalCount++;
             }
           }
@@ -2545,14 +2457,7 @@ router.post('/api/payments/refund', isStaffOrAdmin, async (req: Request, res: Re
         performedBy: staffEmail,
         performedByName: staffName
       });
-
-      await txClient.query('COMMIT');
-    } catch (txError: unknown) {
-      await txClient.query('ROLLBACK');
-      throw txError;
-    } finally {
-      txClient.release();
-    }
+    });
 
     logger.info('[Payments] Refund created for : $', { extra: { refundId: refund.id, paymentIntentId, refundedAmount_100_ToFixed_2: (refundedAmount / 100).toFixed(2) } });
 

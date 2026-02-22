@@ -1,4 +1,5 @@
-import { pool } from '../db';
+import { db } from '../../db';
+import { sql } from 'drizzle-orm';
 import { getStripeClient } from './client';
 import { confirmPaymentSuccess } from './payments';
 import { findOrCreateHubSpotContact } from '../hubspot/members';
@@ -36,32 +37,18 @@ export async function reconcileDailyPayments() {
         totalChecked++;
         
         if (pi.status === 'succeeded') {
-          const result = await pool.query(
-            `SELECT status FROM stripe_payment_intents WHERE stripe_payment_intent_id = $1`,
-            [pi.id]
-          );
+          const result = await db.execute(sql`SELECT status FROM stripe_payment_intents WHERE stripe_payment_intent_id = ${pi.id}`);
 
-          // If missing in DB OR status mismatch (DB says pending, Stripe says succeeded)
-          if (result.rows.length === 0 || result.rows[0].status !== 'succeeded') {
+          if (result.rows.length === 0 || (result.rows[0] as Record<string, unknown>).status !== 'succeeded') {
             logger.warn(`[Reconcile] Healing payment: ${pi.id} (${(pi.amount / 100).toFixed(2)} ${pi.currency})`);
             
-            // A. Update the Audit Log / Intent Table
-            await pool.query(
-              `INSERT INTO stripe_payment_intents (
+            const userId = pi.metadata?.userId || pi.metadata?.email || 'unknown';
+            const purpose = pi.metadata?.purpose || 'reconciled';
+            await db.execute(sql`INSERT INTO stripe_payment_intents (
                 stripe_payment_intent_id, user_id, amount_cents, status, purpose, created_at, updated_at
-              ) VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
-              ON CONFLICT (stripe_payment_intent_id) DO UPDATE SET status = $4, updated_at = NOW()`,
-              [
-                pi.id,
-                pi.metadata?.userId || pi.metadata?.email || 'unknown',
-                pi.amount,
-                'succeeded',
-                pi.metadata?.purpose || 'reconciled'
-              ]
-            );
+              ) VALUES (${pi.id}, ${userId}, ${pi.amount}, ${'succeeded'}, ${purpose}, NOW(), NOW())
+              ON CONFLICT (stripe_payment_intent_id) DO UPDATE SET status = ${'succeeded'}, updated_at = NOW()`);
 
-            // B. CRITICAL: Execute Business Logic (Mark booking paid, send email, etc.)
-            // We use 'system' as the performedBy to attribute reconciled actions to the system
             await confirmPaymentSuccess(pi.id, 'system', 'System Reconciler');
             
             if (result.rows.length === 0) missingPayments++;
@@ -95,24 +82,19 @@ export async function reconcileSubscriptions() {
   try {
     const stripe = await getStripeClient();
     
-    // Phase 1: Check if DB active/trialing/past_due members have corresponding Stripe subscriptions
-    // Include trialing and past_due as active - they still have membership access
-    const activeMembers = await pool.query(
-      `SELECT stripe_customer_id, email, tier, membership_status 
+    const activeMembers = await db.execute(sql`SELECT stripe_customer_id, email, tier, membership_status 
        FROM users 
        WHERE stripe_customer_id IS NOT NULL 
-       AND (membership_status IN ('active', 'trialing', 'past_due') OR stripe_subscription_id IS NOT NULL)`
-    );
+       AND (membership_status IN ('active', 'trialing', 'past_due') OR stripe_subscription_id IS NOT NULL)`);
 
     let mismatches = 0;
     
-    for (const member of activeMembers.rows) {
+    for (const member of (activeMembers.rows as Array<Record<string, unknown>>)) {
       if (!member.stripe_customer_id) continue;
       
       try {
-        // Check for any active-ish subscription status
         const subscriptions = await stripe.subscriptions.list({
-          customer: member.stripe_customer_id,
+          customer: member.stripe_customer_id as string,
           limit: 10
         });
         
@@ -133,7 +115,6 @@ export async function reconcileSubscriptions() {
 
     logger.info(`[Reconcile] Phase 1 complete - ${activeMembers.rows.length} members checked, ${mismatches} mismatches found`);
     
-    // Phase 2: Check for Stripe subscriptions missing DB users
     logger.info('[Reconcile] Phase 2: Checking for Stripe subscriptions missing DB users...');
     
     let subscriptionsChecked = 0;
@@ -141,7 +122,6 @@ export async function reconcileSubscriptions() {
     let hasMore = true;
     let startingAfter: string | undefined;
     
-    // Include trialing and past_due - members still have access during these states
     for (const status of ['active', 'trialing', 'past_due'] as const) {
     hasMore = true;
     startingAfter = undefined;
@@ -164,7 +144,6 @@ export async function reconcileSubscriptions() {
         try {
           let customer: Stripe.Customer;
           
-          // Handle case where customer is not expanded (returns as string ID)
           if (typeof subscription.customer === 'string') {
             try {
               const fetchedCustomer = await stripe.customers.retrieve(subscription.customer);
@@ -180,7 +159,6 @@ export async function reconcileSubscriptions() {
           } else {
             customer = subscription.customer as Stripe.Customer;
             
-            // Handle deleted customer
             if (!customer || customer.deleted) {
               logger.warn(`[Reconcile] Subscription ${subscription.id} has deleted/missing customer - skipping`);
               continue;
@@ -193,25 +171,16 @@ export async function reconcileSubscriptions() {
             continue;
           }
           
-          // Check if user exists in DB
-          const existingUser = await pool.query(
-            'SELECT id, email, stripe_customer_id FROM users WHERE LOWER(email) = LOWER($1)',
-            [customerEmail]
-          );
+          const existingUser = await db.execute(sql`SELECT id, email, stripe_customer_id FROM users WHERE LOWER(email) = LOWER(${customerEmail})`);
           
           if (existingUser.rows.length > 0) {
-            // User exists, ensure stripe_customer_id is set
-            if (!existingUser.rows[0].stripe_customer_id) {
-              await pool.query(
-                `UPDATE users SET stripe_customer_id = $1, updated_at = NOW() WHERE id = $2`,
-                [customer.id, existingUser.rows[0].id]
-              );
+            if (!(existingUser.rows[0] as Record<string, unknown>).stripe_customer_id) {
+              await db.execute(sql`UPDATE users SET stripe_customer_id = ${customer.id}, updated_at = NOW() WHERE id = ${(existingUser.rows[0] as Record<string, unknown>).id}`);
               logger.info(`[Reconcile] Updated missing stripe_customer_id for ${customerEmail}`);
             }
             continue;
           }
           
-          // User doesn't exist - check linked emails before creating
           logger.warn(`[Reconcile] MISSING USER: Stripe subscription ${subscription.id} for ${customerEmail} has no DB user - checking linked emails...`);
           
           const customerName = customer.name || '';
@@ -219,7 +188,6 @@ export async function reconcileSubscriptions() {
           const firstName = nameParts[0] || '';
           const lastName = nameParts.slice(1).join(' ') || '';
           
-          // Get tier from subscription price ID
           let tierSlug: string | null = null;
           let tierName: string | null = null;
           
@@ -227,55 +195,43 @@ export async function reconcileSubscriptions() {
           const priceId = subscriptionItem?.price?.id;
           
           if (priceId) {
-            const tierResult = await pool.query(
-              'SELECT slug, name FROM membership_tiers WHERE stripe_price_id = $1 OR founding_price_id = $1',
-              [priceId]
-            );
+            const tierResult = await db.execute(sql`SELECT slug, name FROM membership_tiers WHERE stripe_price_id = ${priceId} OR founding_price_id = ${priceId}`);
             if (tierResult.rows.length > 0) {
-              tierSlug = tierResult.rows[0].slug;
-              tierName = tierResult.rows[0].name;
+              tierSlug = (tierResult.rows[0] as Record<string, unknown>).slug as string;
+              tierName = (tierResult.rows[0] as Record<string, unknown>).name as string;
             }
           }
           
-          // Check if this email resolves to an existing user via linked email
           const { resolveUserByEmail } = await import('./customers');
           const resolved = await resolveUserByEmail(customerEmail);
           if (resolved && resolved.matchType !== 'direct') {
-            await pool.query(
-              `UPDATE users SET stripe_customer_id = $1, stripe_subscription_id = $2,
+            await db.execute(sql`UPDATE users SET stripe_customer_id = ${customer.id}, stripe_subscription_id = ${subscription.id},
                membership_status = 'active',
                billing_provider = CASE WHEN billing_provider IN ('mindbody', 'manual', 'comped') THEN billing_provider ELSE 'stripe' END,
-               tier = COALESCE($3, tier), updated_at = NOW()
-               WHERE id = $4`,
-              [customer.id, subscription.id, tierSlug, resolved.userId]
-            );
+               tier = COALESCE(${tierSlug}, tier), updated_at = NOW()
+               WHERE id = ${resolved.userId}`);
             logger.info(`[Reconcile] Updated existing user ${resolved.primaryEmail} (matched ${customerEmail} via ${resolved.matchType})`);
             usersCreated++;
           } else {
-          const exclusionCheck = await pool.query('SELECT 1 FROM sync_exclusions WHERE email = $1', [customerEmail.toLowerCase()]);
+          const exclusionCheck = await db.execute(sql`SELECT 1 FROM sync_exclusions WHERE email = ${customerEmail.toLowerCase()}`);
           if (exclusionCheck.rows.length > 0) {
             logger.info(`[Reconcile] Skipping user creation for ${customerEmail} — permanently deleted (sync_exclusions)`);
           } else {
-          // Create user in DB
-          await pool.query(
-            `INSERT INTO users (email, first_name, last_name, tier, membership_status, billing_provider, stripe_customer_id, stripe_subscription_id, join_date, created_at, updated_at)
-             VALUES ($1, $2, $3, $4, 'active', 'stripe', $5, $6, NOW(), NOW(), NOW())
+          await db.execute(sql`INSERT INTO users (email, first_name, last_name, tier, membership_status, billing_provider, stripe_customer_id, stripe_subscription_id, join_date, created_at, updated_at)
+             VALUES (${customerEmail}, ${firstName}, ${lastName}, ${tierSlug}, 'active', 'stripe', ${customer.id}, ${subscription.id}, NOW(), NOW(), NOW())
              ON CONFLICT (email) DO UPDATE SET 
                stripe_customer_id = EXCLUDED.stripe_customer_id,
                stripe_subscription_id = EXCLUDED.stripe_subscription_id,
                membership_status = 'active',
                billing_provider = CASE WHEN users.billing_provider IN ('mindbody', 'manual', 'comped') THEN users.billing_provider ELSE 'stripe' END,
                tier = COALESCE(EXCLUDED.tier, users.tier),
-               updated_at = NOW()`,
-            [customerEmail, firstName, lastName, tierSlug, customer.id, subscription.id]
-          );
+               updated_at = NOW()`);
           
           logger.info(`[Reconcile] Created user ${customerEmail} with tier ${tierSlug || 'none'}, subscription ${subscription.id}`);
           usersCreated++;
           }
           }
           
-          // Sync to HubSpot with name and status
           try {
             const { findOrCreateHubSpotContact } = await import('../hubspot/members');
             await findOrCreateHubSpotContact(customerEmail, firstName, lastName);

@@ -1,8 +1,7 @@
 import { Router } from 'express';
 import { db } from '../../db';
-import { pool } from '../../core/db';
 import { bookingRequests, resources } from '../../../shared/schema';
-import { eq, and, or, gte, lte, asc, SQL } from 'drizzle-orm';
+import { eq, and, or, gte, lte, asc, SQL, sql } from 'drizzle-orm';
 import { getConferenceRoomBookingsFromCalendar } from '../../core/calendar/index';
 import { isStaffOrAdmin } from '../../core/middleware';
 import { getConferenceRoomId } from '../../core/affectedAreas';
@@ -157,7 +156,7 @@ router.get('/api/approved-bookings', isStaffOrAdmin, async (req, res) => {
     let feeSnapshotPaidSet = new Set<number>();
     
     if (bookingIds.length > 0) {
-      const paymentStatusResult = await pool.query(`
+      const paymentStatusResult = await db.execute(sql`
         SELECT 
           br.id as booking_id,
           COALESCE(pending_fees.total_owed, 0)::numeric as total_owed,
@@ -175,15 +174,15 @@ router.get('/api/approved-bookings', isStaffOrAdmin, async (req, res) => {
           WHERE bp.session_id = br.session_id
             AND bp.payment_status = 'pending'
         ) pending_fees ON true
-        WHERE br.id = ANY($1)
-      `, [bookingIds]);
+        WHERE br.id = ANY(${bookingIds})
+      `);
       
-      const feeSnapshotResult = await pool.query(`
+      const feeSnapshotResult = await db.execute(sql`
         SELECT br.id as booking_id, bfs.created_at as snapshot_created_at
         FROM booking_requests br
         INNER JOIN booking_fee_snapshots bfs ON bfs.session_id = br.session_id AND bfs.status IN ('completed', 'paid')
-        WHERE br.id = ANY($1)
-      `, [bookingIds]);
+        WHERE br.id = ANY(${bookingIds})
+      `);
       feeSnapshotPaidSet = new Set<number>(feeSnapshotResult.rows.map((r: { booking_id: number }) => r.booking_id));
 
       for (const row of paymentStatusResult.rows) {
@@ -198,7 +197,7 @@ router.get('/api/approved-bookings', isStaffOrAdmin, async (req, res) => {
         }
       }
       
-      const filledSlotsResult = await pool.query(`
+      const filledSlotsResult = await db.execute(sql`
         SELECT 
           br.id as booking_id,
           CASE 
@@ -208,8 +207,8 @@ router.get('/api/approved-bookings', isStaffOrAdmin, async (req, res) => {
                  + (SELECT COUNT(*) FROM booking_participants bp2 WHERE bp2.session_id = br.session_id AND bp2.participant_type = 'guest')
           END as filled_count
         FROM booking_requests br
-        WHERE br.id = ANY($1)
-      `, [bookingIds]);
+        WHERE br.id = ANY(${bookingIds})
+      `);
       
       for (const row of filledSlotsResult.rows) {
         filledSlotsMap.set(row.booking_id, parseInt(row.filled_count) || 0);

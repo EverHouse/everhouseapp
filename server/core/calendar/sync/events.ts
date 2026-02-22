@@ -1,6 +1,6 @@
-import { pool } from '../../db';
-import { getGoogleCalendarClient } from '../../integrations';
 import { db } from '../../../db';
+import { sql } from 'drizzle-orm';
+import { getGoogleCalendarClient } from '../../integrations';
 import { events } from '../../../../shared/models/auth';
 import { and, isNotNull, eq } from 'drizzle-orm';
 import { CALENDAR_CONFIG } from '../config';
@@ -18,7 +18,6 @@ export async function syncGoogleCalendarEvents(options?: { suppressAlert?: boole
       return { synced: 0, created: 0, updated: 0, deleted: 0, pushedToCalendar: 0, error: `Calendar "${CALENDAR_CONFIG.events.name}" not found` };
     }
     
-    // Use Pacific midnight for consistent timezone handling
     const oneYearAgo = getPacificMidnightUTC();
     oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
     
@@ -53,7 +52,6 @@ export async function syncGoogleCalendarEvents(options?: { suppressAlert?: boole
       const rawTitle = event.summary;
       const description = event.description || null;
       
-      // Extract category from bracket prefix and strip it from title
       const bracketMatch = rawTitle.match(/^\[([^\]]+)\]\s*/);
       const extractedCategory = bracketMatch ? bracketMatch[1] : null;
       const title = bracketMatch ? rawTitle.replace(/^\[([^\]]+)\]\s*/, '') : rawTitle;
@@ -103,40 +101,31 @@ export async function syncGoogleCalendarEvents(options?: { suppressAlert?: boole
         ? `[${extractedCategory}]`
         : description;
       
-      const existing = await pool.query(
-        `SELECT id, locally_edited, app_last_modified_at, google_event_updated_at,
+      const existing = await db.execute(sql`SELECT id, locally_edited, app_last_modified_at, google_event_updated_at,
                 title, description, event_date, start_time, end_time, location, category,
                 image_url, external_url, max_attendees, visibility, requires_rsvp,
                 reviewed_at, last_synced_at, review_dismissed, needs_review
-         FROM events WHERE google_calendar_id = $1`,
-        [googleEventId]
-      );
+         FROM events WHERE google_calendar_id = ${googleEventId}`);
       
       if (existing.rows.length > 0) {
-        const dbRow = existing.rows[0];
-        const appModifiedAt = dbRow.app_last_modified_at ? new Date(dbRow.app_last_modified_at) : null;
+        const dbRow = existing.rows[0] as Record<string, unknown>;
+        const appModifiedAt = dbRow.app_last_modified_at ? new Date(dbRow.app_last_modified_at as string) : null;
         
         if (dbRow.locally_edited === true && appModifiedAt) {
           const calendarIsNewer = googleUpdatedAt && googleUpdatedAt > appModifiedAt;
           
           if (calendarIsNewer) {
-            await pool.query(
-              `UPDATE events SET title = $1, description = $2, event_date = $3, start_time = $4, 
-               end_time = $5, location = $6, source = 'google_calendar',
-               category = COALESCE($15, category),
-               image_url = COALESCE($7, image_url),
-               external_url = COALESCE($8, external_url),
-               max_attendees = COALESCE($9, max_attendees),
-               visibility = COALESCE($10, visibility),
-               requires_rsvp = COALESCE($11, requires_rsvp),
-               google_event_etag = $12, google_event_updated_at = $13, last_synced_at = NOW(),
+            await db.execute(sql`UPDATE events SET title = ${title}, description = ${enrichedDescription}, event_date = ${eventDate}, start_time = ${startTime}, 
+               end_time = ${endTime}, location = ${location}, source = 'google_calendar',
+               category = COALESCE(${extractedCategory}, category),
+               image_url = COALESCE(${appMetadata.imageUrl}, image_url),
+               external_url = COALESCE(${appMetadata.externalUrl}, external_url),
+               max_attendees = COALESCE(${appMetadata.maxAttendees}, max_attendees),
+               visibility = COALESCE(${appMetadata.visibility}, visibility),
+               requires_rsvp = COALESCE(${appMetadata.requiresRsvp}, requires_rsvp),
+               google_event_etag = ${googleEtag}, google_event_updated_at = ${googleUpdatedAt}, last_synced_at = NOW(),
                locally_edited = false, app_last_modified_at = NULL
-               WHERE google_calendar_id = $14`,
-              [title, enrichedDescription, eventDate, startTime, endTime, location,
-               appMetadata.imageUrl, appMetadata.externalUrl, appMetadata.maxAttendees,
-               appMetadata.visibility, appMetadata.requiresRsvp,
-               googleEtag, googleUpdatedAt, googleEventId, extractedCategory]
-            );
+               WHERE google_calendar_id = ${googleEventId}`);
             updated++;
           } else {
             try {
@@ -144,19 +133,17 @@ export async function syncGoogleCalendarEvents(options?: { suppressAlert?: boole
                 'ehApp_type': 'event',
                 'ehApp_id': String(dbRow.id),
               };
-              if (dbRow.image_url) extendedProps['ehApp_imageUrl'] = dbRow.image_url;
-              if (dbRow.external_url) extendedProps['ehApp_externalUrl'] = dbRow.external_url;
+              if (dbRow.image_url) extendedProps['ehApp_imageUrl'] = dbRow.image_url as string;
+              if (dbRow.external_url) extendedProps['ehApp_externalUrl'] = dbRow.external_url as string;
               if (dbRow.max_attendees) extendedProps['ehApp_maxAttendees'] = String(dbRow.max_attendees);
-              if (dbRow.visibility) extendedProps['ehApp_visibility'] = dbRow.visibility;
+              if (dbRow.visibility) extendedProps['ehApp_visibility'] = dbRow.visibility as string;
               if (dbRow.requires_rsvp !== null) extendedProps['ehApp_requiresRsvp'] = String(dbRow.requires_rsvp);
-              if (dbRow.location) extendedProps['ehApp_location'] = dbRow.location;
+              if (dbRow.location) extendedProps['ehApp_location'] = dbRow.location as string;
               
-              // Format title with category bracket prefix for Google Calendar
-              const calendarTitle = dbRow.category ? `[${dbRow.category}] ${dbRow.title}` : dbRow.title;
+              const calendarTitle = dbRow.category ? `[${dbRow.category}] ${dbRow.title}` : dbRow.title as string;
               
-              const formattedDate = new Date(dbRow.event_date).toISOString().split('T')[0];
+              const formattedDate = new Date(dbRow.event_date as string).toISOString().split('T')[0];
               
-              // Handle events that span midnight (end time is earlier than start time)
               let endDate = formattedDate;
               if (dbRow.end_time && dbRow.start_time) {
                 const startParts = String(dbRow.start_time).split(':').map(Number);
@@ -164,8 +151,7 @@ export async function syncGoogleCalendarEvents(options?: { suppressAlert?: boole
                 const startMinutes = startParts[0] * 60 + (startParts[1] || 0);
                 const endMinutes = endParts[0] * 60 + (endParts[1] || 0);
                 if (endMinutes < startMinutes) {
-                  // Event spans midnight, end date should be next day
-                  const nextDay = new Date(dbRow.event_date);
+                  const nextDay = new Date(dbRow.event_date as string);
                   nextDay.setDate(nextDay.getDate() + 1);
                   endDate = nextDay.toISOString().split('T')[0];
                 }
@@ -176,8 +162,8 @@ export async function syncGoogleCalendarEvents(options?: { suppressAlert?: boole
                 eventId: googleEventId,
                 requestBody: {
                   summary: calendarTitle,
-                  description: dbRow.description,
-                  location: dbRow.location,
+                  description: dbRow.description as string,
+                  location: dbRow.location as string,
                   start: {
                     dateTime: `${formattedDate}T${dbRow.start_time}`,
                     timeZone: 'America/Los_Angeles',
@@ -195,12 +181,9 @@ export async function syncGoogleCalendarEvents(options?: { suppressAlert?: boole
               const newEtag = patchResult.data.etag || null;
               const newUpdatedAt = patchResult.data.updated ? new Date(patchResult.data.updated) : null;
               
-              await pool.query(
-                `UPDATE events SET last_synced_at = NOW(), locally_edited = false, 
-                 google_event_etag = $2, google_event_updated_at = $3, app_last_modified_at = NULL 
-                 WHERE id = $1`,
-                [dbRow.id, newEtag, newUpdatedAt]
-              );
+              await db.execute(sql`UPDATE events SET last_synced_at = NOW(), locally_edited = false, 
+                 google_event_etag = ${newEtag}, google_event_updated_at = ${newUpdatedAt}, app_last_modified_at = NULL 
+                 WHERE id = ${dbRow.id}`);
               pushedToCalendar++;
             } catch (pushError: unknown) {
               logger.error(`[Events Sync] Failed to push local edits to calendar for event #${dbRow.id}:`, { error: pushError });
@@ -210,7 +193,6 @@ export async function syncGoogleCalendarEvents(options?: { suppressAlert?: boole
           const reviewDismissed = dbRow.review_dismissed === true;
           const shouldSetNeedsReview = reviewDismissed ? false : needsReview;
           
-          // Normalize dates/times for comparison to avoid false positives from format differences
           const dbEventDate = dbRow.event_date instanceof Date 
             ? dbRow.event_date.toISOString().split('T')[0] 
             : String(dbRow.event_date || '').split('T')[0];
@@ -225,43 +207,33 @@ export async function syncGoogleCalendarEvents(options?: { suppressAlert?: boole
             dbEventDate !== eventDate ||
             dbStartTime !== normalizedStartTime ||
             dbEndTime !== normalizedEndTime ||
-            (dbRow.description || null) !== (description || null) ||
-            (dbRow.location || null) !== (location || null)
+            ((dbRow.description as string) || null) !== (description || null) ||
+            ((dbRow.location as string) || null) !== (location || null)
           );
-          // Only flag conflict if reviewed AND has real changes AND not already dismissed
           const isConflict = wasReviewed && hasChanges && !reviewDismissed;
           
-          await pool.query(
-            `UPDATE events SET title = $1, description = $2, event_date = $3, start_time = $4, 
-             end_time = $5, location = $6, source = 'google_calendar',
-             category = COALESCE($18, category),
-             image_url = COALESCE($7, image_url),
-             external_url = COALESCE($8, external_url),
-             max_attendees = COALESCE($9, max_attendees),
-             visibility = COALESCE($10, visibility),
-             requires_rsvp = COALESCE($11, requires_rsvp),
-             google_event_etag = $12, google_event_updated_at = $13, last_synced_at = NOW(),
-             needs_review = CASE WHEN $15 THEN needs_review ELSE CASE WHEN $17 THEN true ELSE $16 END END,
-             conflict_detected = CASE WHEN $17 THEN true ELSE conflict_detected END
-             WHERE google_calendar_id = $14`,
-            [title, enrichedDescription, eventDate, startTime, endTime, location,
-             appMetadata.imageUrl, appMetadata.externalUrl, appMetadata.maxAttendees,
-             appMetadata.visibility, appMetadata.requiresRsvp,
-             googleEtag, googleUpdatedAt, googleEventId, reviewDismissed, shouldSetNeedsReview, isConflict, extractedCategory]
-          );
+          await db.execute(sql`UPDATE events SET title = ${title}, description = ${enrichedDescription}, event_date = ${eventDate}, start_time = ${startTime}, 
+             end_time = ${endTime}, location = ${location}, source = 'google_calendar',
+             category = COALESCE(${extractedCategory}, category),
+             image_url = COALESCE(${appMetadata.imageUrl}, image_url),
+             external_url = COALESCE(${appMetadata.externalUrl}, external_url),
+             max_attendees = COALESCE(${appMetadata.maxAttendees}, max_attendees),
+             visibility = COALESCE(${appMetadata.visibility}, visibility),
+             requires_rsvp = COALESCE(${appMetadata.requiresRsvp}, requires_rsvp),
+             google_event_etag = ${googleEtag}, google_event_updated_at = ${googleUpdatedAt}, last_synced_at = NOW(),
+             needs_review = CASE WHEN ${reviewDismissed} THEN needs_review ELSE CASE WHEN ${isConflict} THEN true ELSE ${shouldSetNeedsReview} END END,
+             conflict_detected = CASE WHEN ${isConflict} THEN true ELSE conflict_detected END
+             WHERE google_calendar_id = ${googleEventId}`);
           updated++;
         }
       } else {
-        await pool.query(
-          `INSERT INTO events (title, description, event_date, start_time, end_time, location, category, 
+        await db.execute(sql`INSERT INTO events (title, description, event_date, start_time, end_time, location, category, 
            source, visibility, requires_rsvp, google_calendar_id, image_url, external_url, max_attendees,
            google_event_etag, google_event_updated_at, last_synced_at, needs_review)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, NOW(), $17)`,
-          [title, enrichedDescription, eventDate, startTime, endTime, location, extractedCategory || 'Social', 'google_calendar', 
-           appMetadata.visibility || 'public', appMetadata.requiresRsvp || false, googleEventId,
-           appMetadata.imageUrl, appMetadata.externalUrl, appMetadata.maxAttendees,
-           googleEtag, googleUpdatedAt, needsReview]
-        );
+           VALUES (${title}, ${enrichedDescription}, ${eventDate}, ${startTime}, ${endTime}, ${location}, ${extractedCategory || 'Social'}, ${'google_calendar'}, 
+            ${appMetadata.visibility || 'public'}, ${appMetadata.requiresRsvp || false}, ${googleEventId},
+            ${appMetadata.imageUrl}, ${appMetadata.externalUrl}, ${appMetadata.maxAttendees},
+            ${googleEtag}, ${googleUpdatedAt}, NOW(), ${needsReview})`);
         created++;
       }
     }
@@ -281,7 +253,7 @@ export async function syncGoogleCalendarEvents(options?: { suppressAlert?: boole
       .map(dbEvent => dbEvent.id);
     let deleted = 0;
     if (idsToDelete.length > 0) {
-      await pool.query('DELETE FROM events WHERE id = ANY($1)', [idsToDelete]);
+      await db.execute(sql`DELETE FROM events WHERE id = ANY(${idsToDelete})`);
       deleted = idsToDelete.length;
     }
     

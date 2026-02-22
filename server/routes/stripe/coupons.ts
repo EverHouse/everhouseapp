@@ -3,6 +3,7 @@ import { Router, Request, Response } from 'express';
 import { isStaffOrAdmin, isAdmin } from '../../core/middleware';
 import { getErrorMessage, getErrorCode } from '../../utils/errorUtils';
 import { logFromRequest } from '../../core/auditLog';
+import { createHash } from 'crypto';
 
 const router = Router();
 
@@ -103,7 +104,15 @@ router.post('/api/stripe/coupons', isAdmin, async (req: Request, res: Response) 
       couponParams.duration_in_months = durationInMonths;
     }
     
-    const coupon = await stripe.coupons.create(couponParams);
+    const discountValue = percentOff ? `${percentOff}p` : `${amountOffCents}c`;
+    const nameForKey = (name || 'unnamed').replace(/\s+/g, '_').toLowerCase();
+    const keyString = `${nameForKey}_${discountValue}_${duration}`;
+    const keyHash = createHash('md5').update(keyString).digest('hex').slice(0, 12);
+    const idempotencyKey = `coupon_admin_${nameForKey}_${keyHash}`;
+    
+    const coupon = await stripe.coupons.create(couponParams, {
+      idempotencyKey,
+    });
     
     logger.info('[Stripe] Created coupon', { extra: { couponId: coupon.id } });
     logFromRequest(req, 'create_coupon', 'coupon', coupon.id, coupon.name || '', {});

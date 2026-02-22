@@ -1,7 +1,6 @@
 import { Router } from 'express';
 import { eq, sql, desc, and, or } from 'drizzle-orm';
 import { db } from '../../db';
-import { pool } from '../../core/db';
 import { 
   users, 
   bookingRequests, 
@@ -180,9 +179,8 @@ router.get('/api/members/:email/details', isAuthenticated, memberLookupRateLimit
             AND wc.date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
         ) combined
       `),
-      pool.query(
-        `SELECT COUNT(*)::int as count FROM walk_in_visits WHERE LOWER(member_email) = $1`,
-        [normalizedEmail]
+      db.execute(
+        sql`SELECT COUNT(*)::int as count FROM walk_in_visits WHERE LOWER(member_email) = ${normalizedEmail}`
       )
     ]);
     
@@ -522,12 +520,12 @@ router.get('/api/members/:email/history', isStaffOrAdmin, async (req, res) => {
       ))
       .orderBy(desc(bookingRequests.requestDate));
     
-    const walkInResult = await pool.query(`
+    const walkInResult = await db.execute(sql`
       SELECT id, member_email, checked_in_by_name, created_at
       FROM walk_in_visits
-      WHERE LOWER(member_email) = $1
+      WHERE LOWER(member_email) = ${normalizedEmail}
       ORDER BY created_at DESC
-    `, [normalizedEmail]);
+    `);
 
     const walkInItems = walkInResult.rows.map((v: Record<string, unknown>) => ({
       id: `walkin-${v.id}`,

@@ -1,6 +1,5 @@
 import { eq, and, or, sql, desc, asc, ne } from 'drizzle-orm';
 import { db } from '../db';
-import { pool } from './db';
 import { resources, users, facilityClosures, notifications, bookingRequests, bookingParticipants, staffUsers, availabilityBlocks, trackmanUnmatchedBookings, userLinkedEmails } from '../../shared/schema';
 import { isAuthorizedForMemberBooking } from './bookingAuth';
 import { createCalendarEventOnCalendar, getCalendarIdByName, deleteCalendarEvent, CALENDAR_CONFIG } from './calendar/index';
@@ -48,59 +47,49 @@ export async function handleCancellationCascade(
     errors: []
   };
 
-  const client = await pool.connect();
-  
-  try {
-    await client.query('BEGIN');
-    
-    const bookingStartTime = createPacificDate(requestDate, startTime);
-    const now = new Date();
-    const hoursUntilStart = (bookingStartTime.getTime() - now.getTime()) / (1000 * 60 * 60);
-    const shouldRefundGuestPasses = hoursUntilStart > 24;
+  const bookingStartTime = createPacificDate(requestDate, startTime);
+  const now = new Date();
+  const hoursUntilStart = (bookingStartTime.getTime() - now.getTime()) / (1000 * 60 * 60);
+  const shouldRefundGuestPasses = hoursUntilStart > 24;
 
-    logger.info('[cancellation-cascade] Starting cascade', {
-      extra: {
-        bookingId,
-        sessionId,
-        hoursUntilStart: hoursUntilStart.toFixed(1),
-        shouldRefundGuestPasses
-      }
-    });
+  logger.info('[cancellation-cascade] Starting cascade', {
+    extra: {
+      bookingId,
+      sessionId,
+      hoursUntilStart: hoursUntilStart.toFixed(1),
+      shouldRefundGuestPasses
+    }
+  });
 
-    const formattedDate = formatDateDisplayWithDay(requestDate);
-    const formattedTime = formatTime12Hour(startTime);
-    const displayOwner = ownerName || ownerEmail;
-    const displayResource = resourceName || 'simulator';
+  const formattedDate = formatDateDisplayWithDay(requestDate);
+  const formattedTime = formatTime12Hour(startTime);
+  const displayOwner = ownerName || ownerEmail;
+  const displayResource = resourceName || 'simulator';
 
-    const membersToNotify: { email: string; participantId: number }[] = [];
-    const guestsToRefund: { displayName: string; participantId: number }[] = [];
+  const membersToNotify: { email: string; participantId: number }[] = [];
+  const guestsToRefund: { displayName: string; participantId: number }[] = [];
 
+  const txResult = await db.transaction(async (tx) => {
     if (sessionId) {
-      const participantsResult = await client.query(
-        `SELECT id, user_id, guest_id, participant_type, display_name 
-         FROM booking_participants WHERE session_id = $1`,
-        [sessionId]
-      );
-      const participants = participantsResult.rows;
+      const participantsResult = await tx.execute(sql`SELECT id, user_id, guest_id, participant_type, display_name 
+         FROM booking_participants WHERE session_id = ${sessionId}`);
+      const participants = participantsResult.rows as Array<Record<string, unknown>>;
 
       for (const participant of participants) {
         if (participant.participant_type === 'member' && participant.user_id) {
-          const userResult = await client.query(
-            `SELECT email FROM users WHERE id = $1 OR LOWER(email) = LOWER($1) LIMIT 1`,
-            [participant.user_id]
-          );
-          if (userResult.rows.length > 0) {
+          const userResult = await tx.execute(sql`SELECT email FROM users WHERE id = ${participant.user_id} OR LOWER(email) = LOWER(${participant.user_id}) LIMIT 1`);
+          if ((userResult.rows as Array<Record<string, unknown>>).length > 0) {
             membersToNotify.push({
-              email: userResult.rows[0].email,
-              participantId: participant.id
+              email: (userResult.rows as Array<Record<string, unknown>>)[0].email as string,
+              participantId: participant.id as number
             });
           }
         }
 
         if (participant.participant_type === 'guest' && shouldRefundGuestPasses) {
           guestsToRefund.push({
-            displayName: participant.display_name || 'Guest',
-            participantId: participant.id
+            displayName: (participant.display_name as string) || 'Guest',
+            participantId: participant.id as number
           });
         }
       }
@@ -110,46 +99,38 @@ export async function handleCancellationCascade(
       });
     }
 
-    const pendingIntents = await client.query(
-      `SELECT stripe_payment_intent_id 
+    const pendingIntentsResult = await tx.execute(sql`SELECT stripe_payment_intent_id 
        FROM stripe_payment_intents 
-       WHERE booking_id = $1 AND status IN ('pending', 'requires_payment_method', 'requires_action', 'requires_confirmation')`,
-      [bookingId]
-    );
+       WHERE booking_id = ${bookingId} AND status IN ('pending', 'requires_payment_method', 'requires_action', 'requires_confirmation')`);
 
-    await client.query('COMMIT');
+    return { pendingIntents: pendingIntentsResult.rows as Array<Record<string, unknown>> };
+  });
     
-    for (const row of pendingIntents.rows) {
-      try {
-        await cancelPaymentIntent(row.stripe_payment_intent_id);
-        logger.info('[cancellation-cascade] Cancelled payment intent', {
-          extra: { bookingId, paymentIntentId: row.stripe_payment_intent_id }
-        });
-      } catch (cancelErr: unknown) {
-        const errorMsg = `Failed to cancel payment intent ${row.stripe_payment_intent_id}: ${getErrorMessage(cancelErr)}`;
-        result.errors.push(errorMsg);
-        logger.warn('[cancellation-cascade] ' + errorMsg);
-      }
+  for (const row of txResult.pendingIntents) {
+    try {
+      await cancelPaymentIntent(row.stripe_payment_intent_id as string);
+      logger.info('[cancellation-cascade] Cancelled payment intent', {
+        extra: { bookingId, paymentIntentId: row.stripe_payment_intent_id }
+      });
+    } catch (cancelErr: unknown) {
+      const errorMsg = `Failed to cancel payment intent ${row.stripe_payment_intent_id}: ${getErrorMessage(cancelErr)}`;
+      result.errors.push(errorMsg);
+      logger.warn('[cancellation-cascade] ' + errorMsg);
     }
+  }
 
-    const succeededIntents = await pool.query(
-      `SELECT spi.stripe_payment_intent_id, spi.amount_cents, spi.stripe_customer_id, spi.user_id
+  const succeededIntents = await db.execute(sql`SELECT spi.stripe_payment_intent_id, spi.amount_cents, spi.stripe_customer_id, spi.user_id
        FROM stripe_payment_intents spi
-       WHERE spi.booking_id = $1 AND spi.purpose = 'prepayment' AND spi.status = 'succeeded'`,
-      [bookingId]
-    );
+       WHERE spi.booking_id = ${bookingId} AND spi.purpose = 'prepayment' AND spi.status = 'succeeded'`);
 
-    for (const row of succeededIntents.rows) {
-      try {
-        const claimResult = await pool.query(
-          `UPDATE stripe_payment_intents 
+  for (const row of (succeededIntents.rows as Array<Record<string, unknown>>)) {
+    try {
+      const claimResult = await db.execute(sql`UPDATE stripe_payment_intents 
            SET status = 'refunding', updated_at = NOW() 
-           WHERE stripe_payment_intent_id = $1 AND status = 'succeeded'
-           RETURNING stripe_payment_intent_id`,
-          [row.stripe_payment_intent_id]
-        );
+           WHERE stripe_payment_intent_id = ${row.stripe_payment_intent_id} AND status = 'succeeded'
+           RETURNING stripe_payment_intent_id`);
         
-        if (claimResult.rowCount === 0) {
+      if ((claimResult as any).rowCount === 0) {
           logger.info('[cancellation-cascade] Prepayment already claimed or refunded, skipping', {
             extra: { bookingId, paymentIntentId: row.stripe_payment_intent_id }
           });
@@ -169,12 +150,9 @@ export async function handleCancellationCascade(
               }
             );
             
-            await pool.query(
-              `UPDATE stripe_payment_intents 
+            await db.execute(sql`UPDATE stripe_payment_intents 
                SET status = 'refunded', updated_at = NOW() 
-               WHERE stripe_payment_intent_id = $1`,
-              [row.stripe_payment_intent_id]
-            );
+               WHERE stripe_payment_intent_id = ${row.stripe_payment_intent_id}`);
             
             result.prepaymentRefunds++;
             logger.info('[cancellation-cascade] Credited balance for cancelled prepayment', {
@@ -191,7 +169,7 @@ export async function handleCancellationCascade(
             });
           }
         } else {
-          const paymentIntent = await stripe.paymentIntents.retrieve(row.stripe_payment_intent_id);
+          const paymentIntent = await stripe.paymentIntents.retrieve(row.stripe_payment_intent_id as string);
           
           if (paymentIntent.status === 'succeeded' && paymentIntent.latest_charge) {
             const idempotencyKey = `refund-booking-${bookingId}-${row.stripe_payment_intent_id}`;
@@ -209,12 +187,9 @@ export async function handleCancellationCascade(
               idempotencyKey
             });
             
-            await pool.query(
-              `UPDATE stripe_payment_intents 
+            await db.execute(sql`UPDATE stripe_payment_intents 
                SET status = 'refunded', updated_at = NOW() 
-               WHERE stripe_payment_intent_id = $1`,
-              [row.stripe_payment_intent_id]
-            );
+               WHERE stripe_payment_intent_id = ${row.stripe_payment_intent_id}`);
             
             result.prepaymentRefunds++;
             logger.info('[cancellation-cascade] Refunded prepayment', {
@@ -226,21 +201,15 @@ export async function handleCancellationCascade(
               }
             });
           } else {
-            await pool.query(
-              `UPDATE stripe_payment_intents 
+            await db.execute(sql`UPDATE stripe_payment_intents 
                SET status = 'succeeded', updated_at = NOW() 
-               WHERE stripe_payment_intent_id = $1`,
-              [row.stripe_payment_intent_id]
-            );
+               WHERE stripe_payment_intent_id = ${row.stripe_payment_intent_id}`);
           }
         }
       } catch (refundErr: unknown) {
-        await pool.query(
-          `UPDATE stripe_payment_intents 
+        await db.execute(sql`UPDATE stripe_payment_intents 
            SET status = 'succeeded', updated_at = NOW() 
-           WHERE stripe_payment_intent_id = $1 AND status = 'refunding'`,
-          [row.stripe_payment_intent_id]
-        ).catch((rollbackErr) => {
+           WHERE stripe_payment_intent_id = ${row.stripe_payment_intent_id} AND status = 'refunding'`).catch((rollbackErr) => {
           logger.error('[cancellation-cascade] CRITICAL: Failed to rollback payment_intent status after refund failure', {
             error: rollbackErr instanceof Error ? rollbackErr : new Error(String(rollbackErr)),
             extra: { paymentIntentId: row.stripe_payment_intent_id }
@@ -329,15 +298,6 @@ export async function handleCancellationCascade(
         errorCount: result.errors.length
       }
     });
-
-  } catch (error: unknown) {
-    await client.query('ROLLBACK');
-    const errorMsg = `Cascade error: ${(error as Error).message}`;
-    result.errors.push(errorMsg);
-    logger.error('[cancellation-cascade] Fatal error during cascade', { error: error as Error });
-  } finally {
-    client.release();
-  }
 
   return result;
 }
@@ -643,11 +603,8 @@ export async function declineBooking(bookingId: number, reason?: string) {
   
   if (result.resourceId && result.requestDate && result.startTime) {
     try {
-      await pool.query(
-        `DELETE FROM trackman_bay_slots 
-         WHERE resource_id = $1 AND slot_date = $2 AND start_time = $3`,
-        [result.resourceId, result.requestDate, result.startTime]
-      );
+      await db.execute(sql`DELETE FROM trackman_bay_slots 
+         WHERE resource_id = ${result.resourceId} AND slot_date = ${result.requestDate} AND start_time = ${result.startTime}`);
     } catch (err: unknown) {
       logger.warn('[Staff Decline] Failed to clean up trackman_bay_slots', { 
         bookingId, 
@@ -708,17 +665,8 @@ export async function assignMemberToBooking(bookingId: number, memberEmail: stri
   const formattedTime = result.startTime || '';
   
   if (memberEmail) {
-    await pool.query(
-      `INSERT INTO notifications (user_email, title, message, type, related_type, created_at)
-       VALUES ($1, $2, $3, $4, $5, NOW())`,
-      [
-        memberEmail.toLowerCase(),
-        'Booking Confirmed',
-        `Your simulator booking for ${formattedDate} at ${formattedTime} has been confirmed.`,
-        'booking',
-        'booking'
-      ]
-    );
+    await db.execute(sql`INSERT INTO notifications (user_email, title, message, type, related_type, created_at)
+       VALUES (${memberEmail.toLowerCase()}, ${'Booking Confirmed'}, ${`Your simulator booking for ${formattedDate} at ${formattedTime} has been confirmed.`}, ${'booking'}, ${'booking'}, NOW())`);
   }
   
   sendNotificationToUser(memberEmail, {
@@ -838,15 +786,12 @@ export async function getBookingDataForTrackman(trackmanBookingId: string) {
     return { bookingData, existingBooking: null };
   }
   
-  const webhookResult = await pool.query(
-    `SELECT payload FROM trackman_webhook_events WHERE trackman_booking_id = $1 ORDER BY created_at DESC LIMIT 1`,
-    [trackmanBookingId]
-  );
+  const webhookResult = await db.execute(sql`SELECT payload FROM trackman_webhook_events WHERE trackman_booking_id = ${trackmanBookingId} ORDER BY created_at DESC LIMIT 1`);
   
-  if (webhookResult.rows.length > 0) {
-    const payload = typeof webhookResult.rows[0].payload === 'string' 
-      ? JSON.parse(webhookResult.rows[0].payload) 
-      : webhookResult.rows[0].payload;
+  if ((webhookResult.rows as Array<Record<string, unknown>>).length > 0) {
+    const payload = typeof (webhookResult.rows as Array<Record<string, unknown>>)[0].payload === 'string' 
+      ? JSON.parse((webhookResult.rows as Array<Record<string, unknown>>)[0].payload as string) 
+      : (webhookResult.rows as Array<Record<string, unknown>>)[0].payload;
     const data = payload?.data || payload?.booking || {};
     
     const startStr = data?.start;
@@ -920,10 +865,7 @@ export async function convertToInstructorBlock(
   await db.delete(trackmanUnmatchedBookings)
     .where(eq(trackmanUnmatchedBookings.trackmanBookingId, trackmanBookingId));
   
-  await pool.query(
-    `UPDATE trackman_webhook_events SET matched_booking_id = NULL, processed_at = NOW() WHERE trackman_booking_id = $1`,
-    [trackmanBookingId]
-  );
+  await db.execute(sql`UPDATE trackman_webhook_events SET matched_booking_id = NULL, processed_at = NOW() WHERE trackman_booking_id = ${trackmanBookingId}`);
   
   const { broadcastToStaff } = await import('./websocket');
   broadcastToStaff({
@@ -1093,23 +1035,14 @@ export async function linkTrackmanToMember(
 
       for (const player of additionalPlayers) {
         if (player.type === 'guest_placeholder') {
-          await pool.query(
-            `INSERT INTO booking_participants (session_id, participant_type, display_name, slot_duration, payment_status, used_guest_pass, created_at)
-             VALUES ($1, 'guest', $2, $3, 'pending', false, NOW())`,
-            [finalSessionId, player.guest_name || 'Guest (info pending)', slotDuration]
-          );
+          await db.execute(sql`INSERT INTO booking_participants (session_id, participant_type, display_name, slot_duration, payment_status, used_guest_pass, created_at)
+             VALUES (${finalSessionId}, 'guest', ${player.guest_name || 'Guest (info pending)'}, ${slotDuration}, 'pending', false, NOW())`);
         } else if (player.type === 'member' && player.email) {
-          const memberLookup = await pool.query(
-            `SELECT id, first_name, last_name FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1`,
-            [player.email]
-          );
-          const memberRow = memberLookup.rows[0];
+          const memberLookup = await db.execute(sql`SELECT id, first_name, last_name FROM users WHERE LOWER(email) = LOWER(${player.email}) LIMIT 1`);
+          const memberRow = (memberLookup.rows as Array<Record<string, unknown>>)[0];
           const displayName = memberRow ? [memberRow.first_name, memberRow.last_name].filter(Boolean).join(' ') || player.email : player.email;
-          await pool.query(
-            `INSERT INTO booking_participants (session_id, user_id, participant_type, display_name, slot_duration, payment_status, created_at)
-             VALUES ($1, $2, 'member', $3, $4, 'pending', NOW())`,
-            [finalSessionId, memberRow?.id || null, displayName, slotDuration]
-          );
+          await db.execute(sql`INSERT INTO booking_participants (session_id, user_id, participant_type, display_name, slot_duration, payment_status, created_at)
+             VALUES (${finalSessionId}, ${memberRow?.id || null}, 'member', ${displayName}, ${slotDuration}, 'pending', NOW())`);
         }
       }
 
@@ -1151,20 +1084,14 @@ export async function linkTrackmanToMember(
 
 export async function linkEmailToMember(ownerEmail: string, originalEmail: string) {
   try {
-    const existingLink = await pool.query(
-      `SELECT id FROM user_linked_emails WHERE LOWER(linked_email) = LOWER($1)`,
-      [originalEmail]
-    );
+    const existingLink = await db.execute(sql`SELECT id FROM user_linked_emails WHERE LOWER(linked_email) = LOWER(${originalEmail})`);
     
-    if (existingLink.rows.length === 0) {
+    if ((existingLink.rows as Array<Record<string, unknown>>).length === 0) {
       const [member] = await db.select().from(users).where(eq(users.email, ownerEmail.toLowerCase())).limit(1);
       if (member) {
-        await pool.query(
-          `INSERT INTO user_linked_emails (primary_email, linked_email, source, created_at) 
-           VALUES ($1, $2, $3, NOW())
-           ON CONFLICT (linked_email) DO NOTHING`,
-          [member.email, originalEmail.toLowerCase(), 'staff_assignment']
-        );
+        await db.execute(sql`INSERT INTO user_linked_emails (primary_email, linked_email, source, created_at) 
+           VALUES (${member.email}, ${originalEmail.toLowerCase()}, ${'staff_assignment'}, NOW())
+           ON CONFLICT (linked_email) DO NOTHING`);
         logger.info('[resourceService] Linked email to member', {
           extra: { memberEmail: ownerEmail, linkedEmail: originalEmail, memberId: member.id }
         });
@@ -1190,17 +1117,13 @@ export async function fetchOverlappingNotices(params: {
   const queryEndTime = params.endTime;
   
   const timeOverlapCondition = params.sameDayOnly
-    ? ''
-    : `AND (
+    ? sql``
+    : sql`AND (
         (fc.start_time IS NULL AND fc.end_time IS NULL)
-        OR (fc.start_time < $4 AND fc.end_time > $3)
+        OR (fc.start_time < ${queryEndTime} AND fc.end_time > ${queryStartTime})
       )`;
   
-  const sqlParams = params.sameDayOnly
-    ? [queryDate, queryEndDate]
-    : [queryDate, queryEndDate, queryStartTime, queryEndTime];
-  
-  const result = await pool.query(`
+  const result = await db.execute(sql`
     SELECT 
       fc.id,
       fc.title,
@@ -1221,12 +1144,12 @@ export async function fetchOverlappingNotices(params: {
       END as source
     FROM facility_closures fc
     WHERE fc.is_active = true
-      AND fc.start_date <= $2
-      AND fc.end_date >= $1
+      AND fc.start_date <= ${queryEndDate}
+      AND fc.end_date >= ${queryDate}
       ${timeOverlapCondition}
     ORDER BY fc.start_date, fc.start_time
     LIMIT 20
-  `, sqlParams);
+  `);
   
   return result.rows;
 }
@@ -1552,25 +1475,16 @@ export async function assignWithPlayers(
       const slotDuration = Math.floor(durationMinutes / Math.max(totalPlayerCount, 1));
       for (const player of additionalPlayers) {
         if (player.type === 'guest_placeholder') {
-          await pool.query(
-            `INSERT INTO booking_participants (session_id, participant_type, display_name, slot_duration, payment_status, used_guest_pass, created_at)
-             VALUES ($1, 'guest', $2, $3, 'pending', false, NOW())`,
-            [result.sessionId, player.guest_name || 'Guest (info pending)', slotDuration]
-          );
+          await db.execute(sql`INSERT INTO booking_participants (session_id, participant_type, display_name, slot_duration, payment_status, used_guest_pass, created_at)
+             VALUES (${result.sessionId}, 'guest', ${player.guest_name || 'Guest (info pending)'}, ${slotDuration}, 'pending', false, NOW())`);
         } else if (player.type === 'member' && player.email) {
-          const memberLookup = await pool.query(
-            `SELECT id, first_name, last_name FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1`,
-            [player.email]
-          );
-          const memberRow = memberLookup.rows[0];
+          const memberLookup = await db.execute(sql`SELECT id, first_name, last_name FROM users WHERE LOWER(email) = LOWER(${player.email}) LIMIT 1`);
+          const memberRow = (memberLookup.rows as Array<Record<string, unknown>>)[0];
           const displayName = memberRow
             ? `${memberRow.first_name || ''} ${memberRow.last_name || ''}`.trim() || player.name || player.email
             : player.name || player.email;
-          await pool.query(
-            `INSERT INTO booking_participants (session_id, user_id, participant_type, display_name, slot_duration, payment_status, created_at)
-             VALUES ($1, $2, 'member', $3, $4, 'pending', NOW())`,
-            [result.sessionId, memberRow?.id || null, displayName, slotDuration]
-          );
+          await db.execute(sql`INSERT INTO booking_participants (session_id, user_id, participant_type, display_name, slot_duration, payment_status, created_at)
+             VALUES (${result.sessionId}, ${memberRow?.id || null}, 'member', ${displayName}, ${slotDuration}, 'pending', NOW())`);
         }
       }
     } catch (partErr: unknown) {
@@ -1595,17 +1509,17 @@ export async function assignWithPlayers(
   
   if (result.sessionId) {
     try {
-      const feeResult = await pool.query(`
+      const feeResult = await db.execute(sql`
         SELECT SUM(COALESCE(cached_fee_cents, 0)) as total_cents,
                SUM(CASE WHEN participant_type = 'owner' THEN COALESCE(cached_fee_cents, 0) ELSE 0 END) as overage_cents,
                SUM(CASE WHEN participant_type = 'guest' THEN COALESCE(cached_fee_cents, 0) ELSE 0 END) as guest_cents
         FROM booking_participants
-        WHERE session_id = $1
-      `, [result.sessionId]);
+        WHERE session_id = ${result.sessionId}
+      `);
       
-      const totalCents = parseInt(feeResult.rows[0]?.total_cents || '0');
-      const overageCents = parseInt(feeResult.rows[0]?.overage_cents || '0');
-      const guestCents = parseInt(feeResult.rows[0]?.guest_cents || '0');
+      const totalCents = parseInt((feeResult.rows as Array<Record<string, unknown>>)[0]?.total_cents as string || '0');
+      const overageCents = parseInt((feeResult.rows as Array<Record<string, unknown>>)[0]?.overage_cents as string || '0');
+      const guestCents = parseInt((feeResult.rows as Array<Record<string, unknown>>)[0]?.guest_cents as string || '0');
       
       if (totalCents > 0) {
         const prepayResult = await createPrepaymentIntent({
@@ -1619,10 +1533,7 @@ export async function assignWithPlayers(
         });
         
         if (prepayResult?.paidInFull) {
-          await pool.query(
-            `UPDATE booking_participants SET payment_status = 'paid' WHERE session_id = $1 AND payment_status = 'pending'`,
-            [result.sessionId]
-          );
+          await db.execute(sql`UPDATE booking_participants SET payment_status = 'paid' WHERE session_id = ${result.sessionId} AND payment_status = 'pending'`);
           logger.info('[assign-with-players] Prepayment fully covered by credit', {
             extra: { bookingId, sessionId: result.sessionId, totalCents }
           });
@@ -1651,13 +1562,13 @@ export async function assignWithPlayers(
   
   if (owner.member_id) {
     try {
-      const feeResult = await pool.query(`
+      const feeResult = await db.execute(sql`
         SELECT SUM(COALESCE(cached_fee_cents, 0)) as total_cents
         FROM booking_participants
-        WHERE session_id = $1
-      `, [result.sessionId]);
+        WHERE session_id = ${result.sessionId}
+      `);
       
-      const totalCents = parseInt(feeResult.rows[0]?.total_cents || '0');
+      const totalCents = parseInt((feeResult.rows as Array<Record<string, unknown>>)[0]?.total_cents as string || '0');
       const feeMessage = totalCents > 0 
         ? ` Estimated fees: $${(totalCents / 100).toFixed(2)}. You can pay now from your dashboard.`
         : '';
@@ -1667,17 +1578,8 @@ export async function assignWithPlayers(
         : '';
       const timeStr = result.booking.startTime || '';
       
-      await pool.query(
-        `INSERT INTO notifications (user_email, title, message, type, related_type, created_at)
-         VALUES ($1, $2, $3, $4, $5, NOW())`,
-        [
-          owner.email.toLowerCase(),
-          'Booking Confirmed',
-          `Your simulator booking for ${dateStr} at ${timeStr} has been confirmed.${feeMessage}`,
-          'booking',
-          'booking'
-        ]
-      );
+      await db.execute(sql`INSERT INTO notifications (user_email, title, message, type, related_type, created_at)
+         VALUES (${owner.email.toLowerCase()}, ${'Booking Confirmed'}, ${`Your simulator booking for ${dateStr} at ${timeStr} has been confirmed.${feeMessage}`}, ${'booking'}, ${'booking'}, NOW())`);
       
       sendNotificationToUser(owner.email, {
         type: 'booking_confirmed',
@@ -1770,11 +1672,8 @@ export async function createBookingRequest(params: {
   
   let resourceType = 'simulator';
   if (params.resourceId) {
-    const resourceResult = await pool.query(
-      `SELECT type FROM resources WHERE id = $1`,
-      [params.resourceId]
-    );
-    resourceType = resourceResult.rows[0]?.type || 'simulator';
+    const resourceResult = await db.execute(sql`SELECT type FROM resources WHERE id = ${params.resourceId}`);
+    resourceType = (resourceResult.rows as Array<Record<string, unknown>>)[0]?.type as string || 'simulator';
   }
   
   const limitCheck = await checkDailyBookingLimit(params.userEmail, params.bookingDate, durationMinutes, userTier, resourceType);
@@ -1926,58 +1825,31 @@ export async function deleteBooking(bookingId: number, archivedBy: string, hardD
   let cascadeResult: CancellationCascadeResult | undefined;
   
   if (hardDelete) {
-    const client = await pool.connect();
-    try {
-      await client.query('BEGIN');
-      
+    await db.transaction(async (tx) => {
       if (booking.sessionId) {
-        await client.query(`DELETE FROM booking_participants WHERE session_id = $1`, [booking.sessionId]);
-        await client.query(`DELETE FROM booking_sessions WHERE id = $1`, [booking.sessionId]);
+        await tx.execute(sql`DELETE FROM booking_participants WHERE session_id = ${booking.sessionId}`);
+        await tx.execute(sql`DELETE FROM booking_sessions WHERE id = ${booking.sessionId}`);
       }
       
       if (booking.trackmanBookingId) {
-        await client.query(
-          `DELETE FROM trackman_bay_slots WHERE trackman_booking_id = $1`,
-          [booking.trackmanBookingId]
-        );
-        await client.query(
-          `UPDATE trackman_webhook_events SET matched_booking_id = NULL WHERE trackman_booking_id = $1`,
-          [booking.trackmanBookingId]
-        );
-        await client.query(
-          `DELETE FROM trackman_unmatched_bookings WHERE trackman_booking_id = $1`,
-          [booking.trackmanBookingId]
-        );
+        await tx.execute(sql`DELETE FROM trackman_bay_slots WHERE trackman_booking_id = ${booking.trackmanBookingId}`);
+        await tx.execute(sql`UPDATE trackman_webhook_events SET matched_booking_id = NULL WHERE trackman_booking_id = ${booking.trackmanBookingId}`);
+        await tx.execute(sql`DELETE FROM trackman_unmatched_bookings WHERE trackman_booking_id = ${booking.trackmanBookingId}`);
       }
       
-      await client.query(
-        `DELETE FROM stripe_payment_intents WHERE booking_id = $1`,
-        [bookingId]
-      );
-      
-      await client.query(
-        `DELETE FROM booking_fee_snapshots WHERE booking_id = $1`,
-        [bookingId]
-      );
-      
-      await client.query(`DELETE FROM booking_requests WHERE id = $1`, [bookingId]);
-      
-      await client.query('COMMIT');
-      
-      logger.info('[DELETE /api/bookings] Hard delete complete', {
-        extra: {
-          bookingId,
-          deletedBy: archivedBy,
-          trackmanBookingId: booking.trackmanBookingId,
-          sessionId: booking.sessionId
-        }
-      });
-    } catch (txErr: unknown) {
-      await client.query('ROLLBACK');
-      throw txErr;
-    } finally {
-      client.release();
-    }
+      await tx.execute(sql`DELETE FROM stripe_payment_intents WHERE booking_id = ${bookingId}`);
+      await tx.execute(sql`DELETE FROM booking_fee_snapshots WHERE booking_id = ${bookingId}`);
+      await tx.execute(sql`DELETE FROM booking_requests WHERE id = ${bookingId}`);
+    });
+    
+    logger.info('[DELETE /api/bookings] Hard delete complete', {
+      extra: {
+        bookingId,
+        deletedBy: archivedBy,
+        trackmanBookingId: booking.trackmanBookingId,
+        sessionId: booking.sessionId
+      }
+    });
   } else {
     await db.update(bookingRequests)
       .set({ 
@@ -2156,11 +2028,8 @@ export async function memberCancelBooking(bookingId: number, userEmail: string, 
   
   if (existing.resourceId && existing.requestDate && existing.startTime) {
     try {
-      await pool.query(
-        `DELETE FROM trackman_bay_slots 
-         WHERE resource_id = $1 AND slot_date = $2 AND start_time = $3`,
-        [existing.resourceId, existing.requestDate, existing.startTime]
-      );
+      await db.execute(sql`DELETE FROM trackman_bay_slots 
+         WHERE resource_id = ${existing.resourceId} AND slot_date = ${existing.requestDate} AND start_time = ${existing.startTime}`);
     } catch (err: unknown) {
       logger.warn('[Member Cancel] Failed to clean up trackman_bay_slots', { 
         bookingId, 
@@ -2271,24 +2140,24 @@ export async function memberCancelBooking(bookingId: number, userEmail: string, 
 }
 
 export async function checkinBooking(bookingId: number, staffEmail: string | undefined) {
-  const unpaidCheck = await pool.query(`
+  const unpaidCheck = await db.execute(sql`
     SELECT bp.id, bp.display_name, bp.payment_status,
            COALESCE(bp.overage_fee_cents, 0) + COALESCE(bp.guest_fee_cents, 0) as total_fee_cents
     FROM booking_participants bp
     JOIN booking_sessions bs ON bp.session_id = bs.id
     JOIN booking_requests br ON br.session_id = bs.id
-    WHERE br.id = $1 
+    WHERE br.id = ${bookingId} 
       AND bp.payment_status NOT IN ('paid', 'waived')
       AND (COALESCE(bp.overage_fee_cents, 0) + COALESCE(bp.guest_fee_cents, 0)) > 0
-  `, [bookingId]);
+  `);
   
-  if (unpaidCheck.rows.length > 0) {
-    const unpaidNames = unpaidCheck.rows.map((r: Record<string, unknown>) => r.display_name).join(', ');
+  if ((unpaidCheck.rows as Array<Record<string, unknown>>).length > 0) {
+    const unpaidNames = (unpaidCheck.rows as Array<Record<string, unknown>>).map((r: Record<string, unknown>) => r.display_name).join(', ');
     throw {
       statusCode: 402,
       error: 'OUTSTANDING_BALANCE',
       message: `Cannot check in - outstanding fees for: ${unpaidNames}. Please collect payment first.`,
-      unpaidParticipants: unpaidCheck.rows.map((r: Record<string, unknown>) => ({
+      unpaidParticipants: (unpaidCheck.rows as Array<Record<string, unknown>>).map((r: Record<string, unknown>) => ({
         id: r.id,
         name: r.display_name,
         status: r.payment_status,
@@ -2511,15 +2380,12 @@ export async function createManualBooking(params: {
       .where(eq(bookingRequests.id, params.rescheduleFromId as number));
     
     try {
-      const pendingIntents = await pool.query(
-        `SELECT stripe_payment_intent_id 
+      const pendingIntents = await db.execute(sql`SELECT stripe_payment_intent_id 
          FROM stripe_payment_intents 
-         WHERE booking_id = $1 AND status IN ('pending', 'requires_payment_method', 'requires_action', 'requires_confirmation')`,
-        [params.rescheduleFromId]
-      );
-      for (const row of pendingIntents.rows) {
+         WHERE booking_id = ${params.rescheduleFromId} AND status IN ('pending', 'requires_payment_method', 'requires_action', 'requires_confirmation')`);
+      for (const row of (pendingIntents.rows as Array<Record<string, unknown>>)) {
         try {
-          await cancelPaymentIntent(row.stripe_payment_intent_id);
+          await cancelPaymentIntent(row.stripe_payment_intent_id as string);
           logger.info('[Reschedule] Cancelled payment intent for old booking', {
             extra: { oldBookingId: params.rescheduleFromId, paymentIntentId: row.stripe_payment_intent_id }
           });

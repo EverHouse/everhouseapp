@@ -490,9 +490,8 @@ export async function linkBookingRequestToSession(
   sessionId: number
 ): Promise<void> {
   try {
-    await pool.query(
-      `UPDATE booking_requests SET session_id = $1, updated_at = NOW() WHERE id = $2`,
-      [sessionId, bookingRequestId]
+    await db.execute(
+      sql`UPDATE booking_requests SET session_id = ${sessionId}, updated_at = NOW() WHERE id = ${bookingRequestId}`
     );
   } catch (error: unknown) {
     logger.error('[linkBookingRequestToSession] Error:', { error });
@@ -682,12 +681,12 @@ export async function findOverlappingSession(
 ): Promise<BookingSession | null> {
   const dbCtx = tx || db;
   try {
-    const result = await pool.query(`
+    const result = await db.execute(sql`
       SELECT id, resource_id, session_date, start_time, end_time, 
              trackman_booking_id, source, created_by, created_at
       FROM booking_sessions 
-      WHERE resource_id = $1 
-        AND session_date = $2 
+      WHERE resource_id = ${resourceId} 
+        AND session_date = ${sessionDate} 
         AND tsrange(
           (session_date + start_time)::timestamp,
           CASE WHEN end_time < start_time
@@ -696,16 +695,16 @@ export async function findOverlappingSession(
           END,
           '[)'
         ) && tsrange(
-          ($2::date + $3::time)::timestamp,
-          CASE WHEN $4::time < $3::time
-            THEN ($2::date + $4::time + INTERVAL '1 day')::timestamp
-            ELSE ($2::date + $4::time)::timestamp
+          (${sessionDate}::date + ${startTime}::time)::timestamp,
+          CASE WHEN ${endTime}::time < ${startTime}::time
+            THEN (${sessionDate}::date + ${endTime}::time + INTERVAL '1 day')::timestamp
+            ELSE (${sessionDate}::date + ${endTime}::time)::timestamp
           END,
           '[)'
         )
       ORDER BY start_time
       LIMIT 1
-    `, [resourceId, sessionDate, startTime, endTime]);
+    `);
     
     if (result.rows.length > 0) {
       const row = result.rows[0];
@@ -817,7 +816,7 @@ export async function createSessionWithUsageTracking(
       displayName: p.displayName
     }));
     
-    const resourceResult = await pool.query(`SELECT type FROM resources WHERE id = $1`, [request.resourceId]);
+    const resourceResult = await db.execute(sql`SELECT type FROM resources WHERE id = ${request.resourceId}`);
     const resourceType = resourceResult.rows[0]?.type || 'simulator';
 
     // Step 4: Calculate billing using the centralized billing calculator (pre-transaction)

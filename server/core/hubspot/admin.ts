@@ -1,7 +1,6 @@
 import { db } from '../../db';
-import { pool } from '../db';
 import { discountRules } from '../../../shared/schema';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 
 import { logger } from '../logger';
 export async function getAllDiscountRules(): Promise<any[]> {
@@ -37,14 +36,11 @@ export async function updateDiscountRule(
 
 export async function getBillingAuditLog(memberEmail: string, limit: number = 50): Promise<any[]> {
   try {
-    const result = await pool.query(
-      `SELECT * FROM admin_audit_log 
+    const result = await db.execute(sql`SELECT * FROM admin_audit_log 
        WHERE resource_type = 'billing'
-       AND resource_id = $1 
+       AND resource_id = ${memberEmail.toLowerCase()} 
        ORDER BY created_at DESC 
-       LIMIT $2`,
-      [memberEmail.toLowerCase(), limit]
-    );
+       LIMIT ${limit}`);
     return result.rows;
   } catch (error: unknown) {
     logger.error('[HubSpotDeals] Error fetching billing audit log:', { error: error });

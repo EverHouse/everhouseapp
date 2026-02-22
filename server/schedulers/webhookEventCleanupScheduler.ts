@@ -1,11 +1,12 @@
 import { schedulerTracker } from '../core/schedulerTracker';
-import { pool } from '../core/db';
+import { db } from '../db';
+import { sql } from 'drizzle-orm';
 import { logger } from '../core/logger';
 
 async function cleanupOldWebhookEvents(): Promise<void> {
   try {
-    const result = await pool.query(
-      `DELETE FROM webhook_processed_events WHERE processed_at < NOW() - INTERVAL '7 days'`
+    const result = await db.execute(
+      sql`DELETE FROM webhook_processed_events WHERE processed_at < NOW() - INTERVAL '7 days'`
     );
 
     logger.info(`[Webhook Event Cleanup] Deleted ${result.rowCount} old webhook deduplication record(s)`);

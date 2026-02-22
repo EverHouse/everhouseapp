@@ -1,4 +1,5 @@
-import { pool } from '../db';
+import { db } from '../../db';
+import { sql } from 'drizzle-orm';
 
 import { logger } from '../logger';
 export type VisitorType = 'classpass' | 'sim_walkin' | 'private_lesson' | 'guest' | 'day_pass' | 'lead' | 'golfnow' | 'private_event';
@@ -22,60 +23,53 @@ export async function updateVisitorType({
   const normalizedEmail = email.toLowerCase().trim();
   
   try {
-    let updateQuery: string;
-    let params: (string | number | Date)[];
+    let result;
     
     if (type === 'day_pass') {
-      updateQuery = `
+      result = await db.execute(sql`
         UPDATE users
         SET 
           visitor_type = 'day_pass',
-          last_activity_at = $2,
-          last_activity_source = $3,
+          last_activity_at = ${activityDate},
+          last_activity_source = ${activitySource},
           updated_at = NOW()
-        WHERE LOWER(email) = $1
+        WHERE LOWER(email) = ${normalizedEmail}
           AND (role = 'visitor' OR membership_status IN ('visitor', 'non-member'))
           AND role NOT IN ('admin', 'staff', 'member')
           AND tier IS NULL
         RETURNING id
-      `;
-      params = [normalizedEmail, activityDate, activitySource];
+      `);
     } else if (type === 'guest') {
-      updateQuery = `
+      result = await db.execute(sql`
         UPDATE users
         SET 
           visitor_type = 'guest',
-          last_activity_at = $2,
-          last_activity_source = $3,
+          last_activity_at = ${activityDate},
+          last_activity_source = ${activitySource},
           updated_at = NOW()
-        WHERE LOWER(email) = $1
+        WHERE LOWER(email) = ${normalizedEmail}
           AND (role = 'visitor' OR membership_status IN ('visitor', 'non-member'))
           AND role NOT IN ('admin', 'staff', 'member')
           AND tier IS NULL
           AND (visitor_type IS NULL OR visitor_type = 'lead')
         RETURNING id
-      `;
-      params = [normalizedEmail, activityDate, activitySource];
+      `);
     } else {
-      // For classpass, golfnow, private_lesson, sim_walkin - allow updating from NULL or lead
-      updateQuery = `
+      result = await db.execute(sql`
         UPDATE users
         SET 
-          visitor_type = $2,
-          last_activity_at = $3,
-          last_activity_source = $4,
+          visitor_type = ${type},
+          last_activity_at = ${activityDate},
+          last_activity_source = ${activitySource},
           updated_at = NOW()
-        WHERE LOWER(email) = $1
+        WHERE LOWER(email) = ${normalizedEmail}
           AND (role = 'visitor' OR membership_status IN ('visitor', 'non-member'))
           AND role NOT IN ('admin', 'staff', 'member')
           AND tier IS NULL
           AND (visitor_type IS NULL OR visitor_type = 'lead' OR visitor_type = 'guest')
         RETURNING id
-      `;
-      params = [normalizedEmail, type, activityDate, activitySource];
+      `);
     }
-    
-    const result = await pool.query(updateQuery, params);
     
     if (result.rowCount && result.rowCount > 0) {
       process.stderr.write(`[VisitorType] Updated ${normalizedEmail} to type '${type}' (source: ${activitySource})\n`);
@@ -96,60 +90,53 @@ export async function updateVisitorTypeByUserId(
   activityDate: Date = new Date()
 ): Promise<boolean> {
   try {
-    let updateQuery: string;
-    let params: (string | number | Date)[];
+    let result;
     
     if (type === 'day_pass') {
-      updateQuery = `
+      result = await db.execute(sql`
         UPDATE users
         SET 
           visitor_type = 'day_pass',
-          last_activity_at = $2,
-          last_activity_source = $3,
+          last_activity_at = ${activityDate},
+          last_activity_source = ${activitySource},
           updated_at = NOW()
-        WHERE id = $1
+        WHERE id = ${userId}
           AND (role = 'visitor' OR membership_status IN ('visitor', 'non-member'))
           AND role NOT IN ('admin', 'staff', 'member')
           AND tier IS NULL
         RETURNING id
-      `;
-      params = [userId, activityDate, activitySource];
+      `);
     } else if (type === 'guest') {
-      updateQuery = `
+      result = await db.execute(sql`
         UPDATE users
         SET 
           visitor_type = 'guest',
-          last_activity_at = $2,
-          last_activity_source = $3,
+          last_activity_at = ${activityDate},
+          last_activity_source = ${activitySource},
           updated_at = NOW()
-        WHERE id = $1
+        WHERE id = ${userId}
           AND (role = 'visitor' OR membership_status IN ('visitor', 'non-member'))
           AND role NOT IN ('admin', 'staff', 'member')
           AND tier IS NULL
           AND (visitor_type IS NULL OR visitor_type = 'lead')
         RETURNING id
-      `;
-      params = [userId, activityDate, activitySource];
+      `);
     } else {
-      // For classpass, golfnow, private_lesson, sim_walkin - allow updating from NULL or lead
-      updateQuery = `
+      result = await db.execute(sql`
         UPDATE users
         SET 
-          visitor_type = $2,
-          last_activity_at = $3,
-          last_activity_source = $4,
+          visitor_type = ${type},
+          last_activity_at = ${activityDate},
+          last_activity_source = ${activitySource},
           updated_at = NOW()
-        WHERE id = $1
+        WHERE id = ${userId}
           AND (role = 'visitor' OR membership_status IN ('visitor', 'non-member'))
           AND role NOT IN ('admin', 'staff', 'member')
           AND tier IS NULL
           AND (visitor_type IS NULL OR visitor_type = 'lead' OR visitor_type = 'guest')
         RETURNING id
-      `;
-      params = [userId, type, activityDate, activitySource];
+      `);
     }
-    
-    const result = await pool.query(updateQuery, params);
     
     if (result.rowCount && result.rowCount > 0) {
       process.stderr.write(`[VisitorType] Updated user ${userId} to type '${type}' (source: ${activitySource})\n`);
@@ -192,8 +179,26 @@ export async function calculateVisitorTypeFromHistory(email: string): Promise<Vi
     `;
     
     const [purchaseResult, guestResult] = await Promise.all([
-      pool.query(purchaseQuery, [normalizedEmail]),
-      pool.query(guestQuery, [normalizedEmail])
+      db.execute(sql`
+        SELECT 
+          item_name,
+          sale_date as activity_date
+        FROM legacy_purchases
+        WHERE LOWER(member_email) = ${normalizedEmail}
+        ORDER BY sale_date DESC
+        LIMIT 1
+      `),
+      db.execute(sql`
+        SELECT 
+          bs.session_date::timestamp as activity_date
+        FROM booking_participants bp
+        JOIN guests g ON bp.guest_id = g.id
+        JOIN booking_sessions bs ON bp.session_id = bs.id
+        WHERE LOWER(g.email) = ${normalizedEmail}
+          AND bp.participant_type = 'guest'
+        ORDER BY bs.session_date DESC
+        LIMIT 1
+      `)
     ]);
     
     const lastPurchase = purchaseResult.rows[0];

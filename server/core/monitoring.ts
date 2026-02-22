@@ -1,4 +1,5 @@
-import { pool } from './db';
+import { db } from '../db';
+import { sql } from 'drizzle-orm';
 import { logger } from './logger';
 
 export type AlertSeverity = 'critical' | 'warning' | 'info';
@@ -44,11 +45,11 @@ export async function logAlert(event: Omit<AlertEvent, 'timestamp'>): Promise<vo
   }
   
   try {
-    await pool.query(`
+    await db.execute(sql`
       INSERT INTO system_alerts (severity, category, message, details, user_email, created_at)
-      VALUES ($1, $2, $3, $4, $5, NOW())
+      VALUES (${event.severity}, ${event.category}, ${event.message}, ${JSON.stringify(event.details || {})}, ${event.userEmail || null}, NOW())
       ON CONFLICT DO NOTHING
-    `, [event.severity, event.category, event.message, JSON.stringify(event.details || {}), event.userEmail || null])
+    `)
     .catch(() => {
       // Table might not exist yet - that's ok
     });

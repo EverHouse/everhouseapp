@@ -1,6 +1,5 @@
 import { db } from '../../db';
 import { getErrorCode } from '../../utils/errorUtils';
-import { pool } from '../db';
 import { PoolClient } from 'pg';
 import { 
   bookingSessions, 
@@ -88,19 +87,16 @@ async function checkSessionConflict(
   excludeSessionId?: number
 ): Promise<SessionConflictResult> {
   try {
-    const result = await pool.query(
-      `SELECT id, start_time, end_time
+    const result = await db.execute(sql`
+      SELECT id, start_time, end_time
        FROM booking_sessions
-       WHERE resource_id = $1
-         AND session_date = $2
-         AND start_time < $3
-         AND end_time > $4
-         ${excludeSessionId ? 'AND id != $5' : ''}
-       LIMIT 1`,
-      excludeSessionId 
-        ? [resourceId, date, endTime, startTime, excludeSessionId]
-        : [resourceId, date, endTime, startTime]
-    );
+       WHERE resource_id = ${resourceId}
+         AND session_date = ${date}
+         AND start_time < ${endTime}
+         AND end_time > ${startTime}
+         ${excludeSessionId ? sql`AND id != ${excludeSessionId}` : sql``}
+       LIMIT 1
+    `);
     
     if (result.rows.length > 0) {
       const conflict = result.rows[0];
@@ -225,19 +221,17 @@ export async function getAvailableSlots(
   operatingEnd: string = '22:00'
 ): Promise<{ startTime: string; endTime: string }[]> {
   try {
-    const sessions = await pool.query(
-      `SELECT start_time, end_time FROM booking_sessions
-       WHERE resource_id = $1 AND session_date = $2
-       ORDER BY start_time`,
-      [resourceId, date]
-    );
+    const sessions = await db.execute(sql`
+      SELECT start_time, end_time FROM booking_sessions
+       WHERE resource_id = ${resourceId} AND session_date = ${date}
+       ORDER BY start_time
+    `);
     
-    const blocks = await pool.query(
-      `SELECT start_time, end_time FROM availability_blocks
-       WHERE resource_id = $1 AND block_date = $2
-       ORDER BY start_time`,
-      [resourceId, date]
-    );
+    const blocks = await db.execute(sql`
+      SELECT start_time, end_time FROM availability_blocks
+       WHERE resource_id = ${resourceId} AND block_date = ${date}
+       ORDER BY start_time
+    `);
     
     const bookedSlots: { start: number; end: number }[] = [];
     
@@ -300,15 +294,14 @@ export async function isResourceAvailableForDate(
   date: string
 ): Promise<boolean> {
   try {
-    const closures = await pool.query(
-      `SELECT id, affected_areas FROM facility_closures
+    const closures = await db.execute(sql`
+      SELECT id, affected_areas FROM facility_closures
        WHERE is_active = true
-         AND start_date <= $1
-         AND end_date >= $1
+         AND start_date <= ${date}
+         AND end_date >= ${date}
          AND start_time IS NULL
-         AND end_time IS NULL`,
-      [date]
-    );
+         AND end_time IS NULL
+    `);
     
     for (const closure of closures.rows) {
       if (closure.affected_areas) {

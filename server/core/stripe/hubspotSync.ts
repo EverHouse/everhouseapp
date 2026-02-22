@@ -1,8 +1,7 @@
 import { db } from '../../db';
-import { pool } from '../db';
 import { hubspotDeals, hubspotLineItems } from '../../../shared/schema';
 import { logBillingAudit } from '../auditLog';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { getHubSpotClient } from '../integrations';
 
 import { logger } from '../logger';
@@ -41,11 +40,10 @@ export async function syncPaymentToHubSpot(params: SyncPaymentParams): Promise<v
   const memberDeal = deal[0];
   const hubspotDealId = memberDeal.hubspotDealId;
 
-  const productResult = await pool.query(
-    `SELECT hubspot_product_id, product_name FROM hubspot_product_mappings 
-     WHERE product_type = $1 AND is_active = true 
-     LIMIT 1`,
-    [purpose === 'guest_fee' ? 'pass' : 'fee']
+  const productResult = await db.execute(
+    sql`SELECT hubspot_product_id, product_name FROM hubspot_product_mappings 
+     WHERE product_type = ${purpose === 'guest_fee' ? 'pass' : 'fee'} AND is_active = true 
+     LIMIT 1`
   );
 
   let productId: string | null = null;
@@ -145,11 +143,10 @@ export async function syncDayPassToHubSpot(params: SyncDayPassParams): Promise<v
       return;
     }
 
-    const productResult = await pool.query(
-      `SELECT hubspot_product_id, product_name FROM hubspot_product_mappings 
-       WHERE product_type = $1 AND is_active = true 
-       LIMIT 1`,
-      ['day_pass']
+    const productResult = await db.execute(
+      sql`SELECT hubspot_product_id, product_name FROM hubspot_product_mappings 
+       WHERE product_type = ${'day_pass'} AND is_active = true 
+       LIMIT 1`
     );
 
     let productId: string | null = null;

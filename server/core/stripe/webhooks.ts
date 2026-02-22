@@ -560,16 +560,9 @@ async function handleCreditNoteCreated(client: PoolClient, creditNote: Stripe.Cr
       
       deferredActions.push(async () => {
         try {
-          await pool.query(
-            `INSERT INTO notifications (user_email, title, message, type, related_type, created_at)
-             VALUES ($1, $2, $3, $4, $5, NOW())`,
-            [
-              member.email.toLowerCase(),
-              'Credit Applied',
-              `A credit of ${amountStr} has been applied to your account${reason ? ` (${reason.replace(/_/g, ' ')})` : ''}.`,
-              'billing',
-              'payment'
-            ]
+          await db.execute(
+            sql`INSERT INTO notifications (user_email, title, message, type, related_type, created_at)
+             VALUES (${member.email.toLowerCase()}, ${'Credit Applied'}, ${`A credit of ${amountStr} has been applied to your account${reason ? ` (${reason.replace(/_/g, ' ')})` : ''}.`}, ${'billing'}, ${'payment'}, NOW())`
           );
         } catch (err: unknown) {
           logger.error('[Stripe Webhook] Failed to create credit note notification:', { error: err });
@@ -1565,7 +1558,7 @@ async function handlePaymentIntentFailed(client: PoolClient, paymentIntent: Stri
 
   deferredActions.push(async () => {
     try {
-      const userResult = await pool.query('SELECT first_name, last_name FROM users WHERE LOWER(email) = LOWER($1)', [email]);
+      const userResult = await db.execute(sql`SELECT first_name, last_name FROM users WHERE LOWER(email) = LOWER(${email})`);
       const memberName = userResult.rows[0] 
         ? `${userResult.rows[0].first_name || ''} ${userResult.rows[0].last_name || ''}`.trim() || email
         : email;

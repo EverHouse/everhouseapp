@@ -62,7 +62,7 @@ export async function syncDiscountRulesToStripeCoupons(): Promise<{
                 discount_tag: rule.discountTag,
                 source: 'app_discount_rules',
               },
-            });
+            }, { idempotencyKey: `coupon_sync_${couponId}_${rule.discountPercent}_updated` });
             logger.info(`[Discount Sync] Updated coupon ${couponId} (changed percent)`);
             results.push({
               discountTag: rule.discountTag,
@@ -94,7 +94,7 @@ export async function syncDiscountRulesToStripeCoupons(): Promise<{
                 discount_tag: rule.discountTag,
                 source: 'app_discount_rules',
               },
-            });
+            }, { idempotencyKey: `coupon_sync_${couponId}_${rule.discountPercent}_created` });
             logger.info(`[Discount Sync] Created coupon ${couponId}`);
             results.push({
               discountTag: rule.discountTag,
@@ -190,7 +190,7 @@ export async function findOrCreateCoupon(discountTag: string, discountPercent: n
             discount_tag: discountTag,
             source: 'app_discount_rules',
           },
-        });
+        }, { idempotencyKey: `coupon_findorcreate_${couponId}_${discountPercent}` });
         return couponId;
       }
       throw error;

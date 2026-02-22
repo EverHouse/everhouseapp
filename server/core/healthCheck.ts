@@ -1,4 +1,5 @@
-import { pool } from './db';
+import { db } from '../db';
+import { sql } from 'drizzle-orm';
 import { getErrorMessage } from '../utils/errorUtils';
 import { logger } from './logger';
 import { getStripeClient } from './stripe/client';
@@ -47,7 +48,7 @@ async function checkWithTimeout<T>(
 
 async function checkDatabase(): Promise<ServiceHealth> {
   const { result, latencyMs, error } = await checkWithTimeout(
-    () => pool.query('SELECT 1'),
+    () => db.execute(sql`SELECT 1`),
     3000
   );
 

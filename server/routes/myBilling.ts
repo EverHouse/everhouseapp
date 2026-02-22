@@ -1,7 +1,8 @@
 import { logger } from '../core/logger';
 import { Router, Request, Response, NextFunction } from 'express';
 import Stripe from 'stripe';
-import { pool } from '../core/db';
+import { db } from '../db';
+import { sql } from 'drizzle-orm';
 import { getStripeClient } from '../core/stripe/client';
 import { isPlaceholderEmail, getOrCreateStripeCustomer } from '../core/stripe/customers';
 import { listCustomerSubscriptions } from '../core/stripe/subscriptions';
@@ -37,14 +38,11 @@ router.get('/api/my/billing', requireAuth, async (req, res) => {
     const targetEmail = (req.query.email && isStaff) ? String(req.query.email) : sessionUser.email;
     const email = targetEmail;
     
-    const result = await pool.query(
-      `SELECT id, email, first_name, last_name, billing_provider, stripe_customer_id, hubspot_id, mindbody_client_id, tier, billing_migration_requested_at,
+    const result = await db.execute(sql`SELECT id, email, first_name, last_name, billing_provider, stripe_customer_id, hubspot_id, mindbody_client_id, tier, billing_migration_requested_at,
               cancellation_requested_at, cancellation_effective_date, cancellation_reason, contract_start_date
-       FROM users WHERE LOWER(email) = $1`,
-      [email.toLowerCase()]
-    );
+       FROM users WHERE LOWER(email) = ${email.toLowerCase()}`);
     
-    const member = result.rows[0];
+    const member = (result.rows as Array<Record<string, unknown>>)[0];
     if (!member) {
       return res.status(404).json({ error: 'Member not found' });
     }
@@ -71,7 +69,7 @@ router.get('/api/my/billing', requireAuth, async (req, res) => {
         
         // Only fetch subscription data if billing_provider is stripe
         if (member.billing_provider === 'stripe') {
-          const subsResult = await listCustomerSubscriptions(member.stripe_customer_id);
+          const subsResult = await listCustomerSubscriptions(member.stripe_customer_id as string);
           if (subsResult.success && subsResult.subscriptions) {
             const activeSub = subsResult.subscriptions.find(
               s => s.status === 'active' || s.status === 'trialing' || s.status === 'past_due'
@@ -112,7 +110,7 @@ router.get('/api/my/billing', requireAuth, async (req, res) => {
         
         // Always fetch payment methods and balance for any member with Stripe customer
         const paymentMethods = await stripe.paymentMethods.list({
-          customer: member.stripe_customer_id,
+          customer: member.stripe_customer_id as string,
           type: 'card',
         });
         billingInfo.paymentMethods = paymentMethods.data.map(pm => ({
@@ -123,7 +121,7 @@ router.get('/api/my/billing', requireAuth, async (req, res) => {
           expYear: pm.card?.exp_year,
         }));
         
-        const customer = await stripe.customers.retrieve(member.stripe_customer_id);
+        const customer = await stripe.customers.retrieve(member.stripe_customer_id as string);
         if (customer && !customer.deleted) {
           // Return balance in cents (UI divides by 100 for display)
           billingInfo.customerBalance = (customer as Stripe.Customer).balance || 0;
@@ -161,12 +159,9 @@ router.get('/api/my/billing/invoices', requireAuth, async (req, res) => {
     const isStaff = sessionUser.role === 'admin' || sessionUser.role === 'staff';
     const email = (req.query.email && isStaff) ? String(req.query.email) : sessionUser.email;
     
-    const result = await pool.query(
-      `SELECT stripe_customer_id, billing_provider FROM users WHERE LOWER(email) = $1`,
-      [email.toLowerCase()]
-    );
+    const result = await db.execute(sql`SELECT stripe_customer_id, billing_provider FROM users WHERE LOWER(email) = ${email.toLowerCase()}`);
     
-    const member = result.rows[0];
+    const member = (result.rows as Array<Record<string, unknown>>)[0];
     if (!member) {
       return res.status(404).json({ error: 'Member not found' });
     }
@@ -177,7 +172,7 @@ router.get('/api/my/billing/invoices', requireAuth, async (req, res) => {
       return res.json({ invoices: [] });
     }
     
-    const invoicesResult = await listCustomerInvoices(member.stripe_customer_id);
+    const invoicesResult = await listCustomerInvoices(member.stripe_customer_id as string);
     
     if (!invoicesResult.success) {
       return res.status(500).json({ error: 'Failed to load invoices' });
@@ -205,12 +200,9 @@ router.post('/api/my/billing/update-payment-method', requireAuth, async (req, re
   try {
     const email = req.session.user.email;
     
-    const result = await pool.query(
-      `SELECT stripe_customer_id, billing_provider FROM users WHERE LOWER(email) = $1`,
-      [email.toLowerCase()]
-    );
+    const result = await db.execute(sql`SELECT stripe_customer_id, billing_provider FROM users WHERE LOWER(email) = ${email.toLowerCase()}`);
     
-    const member = result.rows[0];
+    const member = (result.rows as Array<Record<string, unknown>>)[0];
     if (!member || member.billing_provider !== 'stripe' || !member.stripe_customer_id) {
       return res.status(400).json({ error: 'Stripe billing not available' });
     }
@@ -224,7 +216,7 @@ router.post('/api/my/billing/update-payment-method', requireAuth, async (req, re
         : 'https://everclub.com/profile';
     
     const session = await stripe.billingPortal.sessions.create({
-      customer: member.stripe_customer_id,
+      customer: member.stripe_customer_id as string,
       return_url: returnUrl,
       flow_data: {
         type: 'payment_method_update',
@@ -244,12 +236,9 @@ router.post('/api/my/billing/portal', requireAuth, async (req, res) => {
     const isStaff = sessionUser.role === 'admin' || sessionUser.role === 'staff';
     const targetEmail = (req.body.email && isStaff) ? String(req.body.email) : sessionUser.email;
     
-    const result = await pool.query(
-      `SELECT id, stripe_customer_id, billing_provider, email, role, first_name, last_name, tier FROM users WHERE LOWER(email) = $1`,
-      [targetEmail.toLowerCase()]
-    );
+    const result = await db.execute(sql`SELECT id, stripe_customer_id, billing_provider, email, role, first_name, last_name, tier FROM users WHERE LOWER(email) = ${targetEmail.toLowerCase()}`);
     
-    const member = result.rows[0];
+    const member = (result.rows as Array<Record<string, unknown>>)[0];
     if (!member) {
       return res.status(404).json({ error: 'Member not found' });
     }
@@ -262,26 +251,23 @@ router.post('/api/my/billing/portal', requireAuth, async (req, res) => {
     }
     
     const stripe = await getStripeClient();
-    let customerId = member.stripe_customer_id;
+    let customerId = member.stripe_customer_id as string;
     
     if (!customerId) {
       const fullName = [member.first_name, member.last_name].filter(Boolean).join(' ') || undefined;
-      const result = await getOrCreateStripeCustomer(member.id, member.email, fullName, member.tier);
+      const result = await getOrCreateStripeCustomer(String(member.id), member.email as string, fullName as string, member.tier as string);
       customerId = result.customerId;
-      await pool.query(
-        `UPDATE users SET stripe_customer_id = $1,
+      await db.execute(sql`UPDATE users SET stripe_customer_id = ${customerId},
          billing_provider = CASE WHEN billing_provider IN ('mindbody', 'manual', 'comped') THEN billing_provider ELSE 'stripe' END
-         WHERE LOWER(email) = LOWER($2)`,
-        [customerId, targetEmail.toLowerCase()]
-      );
-      const preservedProvider = member.billing_provider && ['mindbody', 'manual', 'comped'].includes(member.billing_provider)
-        ? member.billing_provider
+         WHERE LOWER(email) = LOWER(${targetEmail.toLowerCase()})`);
+      const preservedProvider = member.billing_provider && ['mindbody', 'manual', 'comped'].includes(member.billing_provider as string)
+        ? member.billing_provider as string
         : 'stripe';
       try {
         const { syncMemberToHubSpot } = await import('../core/hubspot/stages');
-        await syncMemberToHubSpot({ email: member.email, billingProvider: preservedProvider });
+        await syncMemberToHubSpot({ email: member.email as string, billingProvider: preservedProvider });
       } catch (e: unknown) {
-        logger.warn('[MyBilling] Failed to sync billing provider to HubSpot for', { extra: { email: member.email, e_as_any_e: (e as Error)?.message || e } });
+        logger.warn('[MyBilling] Failed to sync billing provider to HubSpot for', { extra: { email: member.email as string, e_as_any_e: (e as Error)?.message || e } });
       }
     }
     
@@ -292,7 +278,7 @@ router.post('/api/my/billing/portal', requireAuth, async (req, res) => {
         : 'https://everclub.com/profile';
     
     const session = await stripe.billingPortal.sessions.create({
-      customer: customerId,
+      customer: customerId as string,
       return_url: returnUrl,
     });
     
@@ -314,24 +300,21 @@ router.post('/api/my/billing/add-payment-method-for-extras', requireAuth, async 
       return res.status(400).json({ error: 'Staff accounts do not use billing' });
     }
     
-    const result = await pool.query(
-      `SELECT id, email, first_name, last_name, billing_provider, stripe_customer_id, tier
-       FROM users WHERE LOWER(email) = $1`,
-      [email.toLowerCase()]
-    );
+    const result = await db.execute(sql`SELECT id, email, first_name, last_name, billing_provider, stripe_customer_id, tier
+       FROM users WHERE LOWER(email) = ${email.toLowerCase()}`);
     
-    const member = result.rows[0];
+    const member = (result.rows as Array<Record<string, unknown>>)[0];
     if (!member) {
       return res.status(404).json({ error: 'Member not found' });
     }
     
     const stripe = await getStripeClient();
-    let customerId = member.stripe_customer_id;
+    let customerId = member.stripe_customer_id as string;
     
     // Create or find Stripe customer (but don't mark for migration)
     if (!customerId) {
       const fullName = [member.first_name, member.last_name].filter(Boolean).join(' ') || undefined;
-      const custResult = await getOrCreateStripeCustomer(member.id, member.email, fullName, member.tier);
+      const custResult = await getOrCreateStripeCustomer(String(member.id), member.email as string, fullName as string, member.tier as string);
       customerId = custResult.customerId;
     }
     
@@ -342,14 +325,14 @@ router.post('/api/my/billing/add-payment-method-for-extras', requireAuth, async 
         : 'https://everclub.com/profile';
     
     const session = await stripe.billingPortal.sessions.create({
-      customer: customerId,
+      customer: customerId as string,
       return_url: returnUrl,
       flow_data: {
         type: 'payment_method_update',
       },
     });
     
-    logger.info('[MyBilling] Payment method setup (for extras) initiated for', { extra: { memberEmail: member.email } });
+    logger.info('[MyBilling] Payment method setup (for extras) initiated for', { extra: { memberEmail: member.email as string } });
     res.json({ url: session.url });
   } catch (error: unknown) {
     logger.error('[MyBilling] Add payment method for extras error', { error: error instanceof Error ? error : new Error(String(error)) });
@@ -367,13 +350,10 @@ router.post('/api/my/billing/migrate-to-stripe', requireAuth, async (req, res) =
       return res.status(400).json({ error: 'Staff accounts do not use billing' });
     }
     
-    const result = await pool.query(
-      `SELECT id, email, first_name, last_name, billing_provider, stripe_customer_id, tier
-       FROM users WHERE LOWER(email) = $1`,
-      [email.toLowerCase()]
-    );
+    const result = await db.execute(sql`SELECT id, email, first_name, last_name, billing_provider, stripe_customer_id, tier
+       FROM users WHERE LOWER(email) = ${email.toLowerCase()}`);
     
-    const member = result.rows[0];
+    const member = (result.rows as Array<Record<string, unknown>>)[0];
     if (!member) {
       return res.status(404).json({ error: 'Member not found' });
     }
@@ -383,18 +363,15 @@ router.post('/api/my/billing/migrate-to-stripe', requireAuth, async (req, res) =
     }
     
     const stripe = await getStripeClient();
-    let customerId = member.stripe_customer_id;
+    let customerId = member.stripe_customer_id as string;
     
     if (!customerId) {
       const fullName = [member.first_name, member.last_name].filter(Boolean).join(' ') || undefined;
-      const custResult = await getOrCreateStripeCustomer(member.id, member.email, fullName, member.tier);
+      const custResult = await getOrCreateStripeCustomer(String(member.id), member.email as string, fullName as string, member.tier as string);
       customerId = custResult.customerId;
     }
     
-    await pool.query(
-      `UPDATE users SET billing_migration_requested_at = NOW() WHERE id = $1`,
-      [member.id]
-    );
+    await db.execute(sql`UPDATE users SET billing_migration_requested_at = NOW() WHERE id = ${member.id}`);
     
     const returnUrl = process.env.REPLIT_DEV_DOMAIN
       ? `https://${process.env.REPLIT_DEV_DOMAIN}/profile`
@@ -403,7 +380,7 @@ router.post('/api/my/billing/migrate-to-stripe', requireAuth, async (req, res) =
         : 'https://everclub.com/profile';
     
     const session = await stripe.billingPortal.sessions.create({
-      customer: customerId,
+      customer: customerId as string,
       return_url: returnUrl,
       flow_data: {
         type: 'payment_method_update',
@@ -436,22 +413,19 @@ router.get('/api/my/balance', requireAuth, async (req, res) => {
   try {
     const email = req.session.user.email;
     
-    const result = await pool.query(
-      `SELECT stripe_customer_id, role FROM users WHERE LOWER(email) = $1`,
-      [email.toLowerCase()]
-    );
+    const result = await db.execute(sql`SELECT stripe_customer_id, role FROM users WHERE LOWER(email) = ${email.toLowerCase()}`);
     
     // Staff/admin don't have account balances
-    if (result.rows[0]?.role === 'staff' || result.rows[0]?.role === 'admin') {
+    if ((result.rows as Array<Record<string, unknown>>)[0]?.role === 'staff' || (result.rows as Array<Record<string, unknown>>)[0]?.role === 'admin') {
       return res.json({ balanceCents: 0, balanceDollars: 0, isStaff: true });
     }
     
-    if (!result.rows[0]?.stripe_customer_id) {
+    if (!(result.rows as Array<Record<string, unknown>>)[0]?.stripe_customer_id) {
       return res.json({ balanceCents: 0, balanceDollars: 0 });
     }
     
     const stripe = await getStripeClient();
-    const customer = await stripe.customers.retrieve(result.rows[0].stripe_customer_id);
+    const customer = await stripe.customers.retrieve((result.rows as Array<Record<string, unknown>>)[0].stripe_customer_id as string);
     
     if (customer.deleted) {
       return res.json({ balanceCents: 0, balanceDollars: 0 });
@@ -478,12 +452,9 @@ router.post('/api/my/add-funds', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Amount must be between $5 and $500' });
     }
     
-    const result = await pool.query(
-      `SELECT id, stripe_customer_id, first_name, last_name, role, tier FROM users WHERE LOWER(email) = $1`,
-      [email.toLowerCase()]
-    );
+    const result = await db.execute(sql`SELECT id, stripe_customer_id, first_name, last_name, role, tier FROM users WHERE LOWER(email) = ${email.toLowerCase()}`);
     
-    const member = result.rows[0];
+    const member = (result.rows as Array<Record<string, unknown>>)[0];
     if (!member) {
       return res.status(404).json({ error: 'Member not found' });
     }
@@ -495,10 +466,10 @@ router.post('/api/my/add-funds', requireAuth, async (req, res) => {
     
     const stripe = await getStripeClient();
     
-    let customerId = member.stripe_customer_id;
+    let customerId = member.stripe_customer_id as string;
     if (!customerId) {
-      const fullName = `${member.first_name || ''} ${member.last_name || ''}`.trim() || undefined;
-      const custResult = await getOrCreateStripeCustomer(member.id, email, fullName, member.tier);
+      const fullName = `${(member.first_name as string) || ''} ${(member.last_name as string) || ''}`.trim() || undefined;
+      const custResult = await getOrCreateStripeCustomer(String(member.id), email, fullName, member.tier as string);
       customerId = custResult.customerId;
     }
     
@@ -506,7 +477,7 @@ router.post('/api/my/add-funds', requireAuth, async (req, res) => {
     const baseUrl = replitDomains ? `https://${replitDomains}` : 'http://localhost:5000';
     
     const session = await stripe.checkout.sessions.create({
-      customer: customerId,
+      customer: customerId as string,
       mode: 'payment',
       line_items: [{
         price_data: {
@@ -552,22 +523,19 @@ router.get('/api/my-billing/account-balance', requireAuth, async (req, res) => {
       }
     }
     
-    const result = await pool.query(
-      `SELECT stripe_customer_id, role FROM users WHERE LOWER(email) = $1`,
-      [targetEmail.toLowerCase()]
-    );
+    const result = await db.execute(sql`SELECT stripe_customer_id, role FROM users WHERE LOWER(email) = ${targetEmail.toLowerCase()}`);
     
     // Staff/admin don't have account balances
-    if (result.rows[0]?.role === 'staff' || result.rows[0]?.role === 'admin') {
+    if ((result.rows as Array<Record<string, unknown>>)[0]?.role === 'staff' || (result.rows as Array<Record<string, unknown>>)[0]?.role === 'admin') {
       return res.json({ balanceCents: 0, balanceDollars: 0, isStaff: true });
     }
     
-    if (!result.rows[0]?.stripe_customer_id) {
+    if (!(result.rows as Array<Record<string, unknown>>)[0]?.stripe_customer_id) {
       return res.json({ balanceCents: 0, balanceDollars: 0 });
     }
     
     const stripe = await getStripeClient();
-    const customer = await stripe.customers.retrieve(result.rows[0].stripe_customer_id);
+    const customer = await stripe.customers.retrieve((result.rows as Array<Record<string, unknown>>)[0].stripe_customer_id as string);
     
     if (customer.deleted) {
       return res.json({ balanceCents: 0, balanceDollars: 0 });
@@ -590,12 +558,9 @@ router.post('/api/member-billing/:email/sync-stripe', requireStaffAuth, async (r
   try {
     const targetEmail = decodeURIComponent(req.params.email as any);
     
-    const result = await pool.query(
-      `SELECT id, email, first_name, last_name, stripe_customer_id, tier FROM users WHERE LOWER(email) = $1`,
-      [targetEmail.toLowerCase()]
-    );
+    const result = await db.execute(sql`SELECT id, email, first_name, last_name, stripe_customer_id, tier FROM users WHERE LOWER(email) = ${targetEmail.toLowerCase()}`);
     
-    const member = result.rows[0];
+    const member = (result.rows as Array<Record<string, unknown>>)[0];
     if (!member) {
       return res.status(404).json({ error: 'Member not found' });
     }
@@ -605,7 +570,7 @@ router.post('/api/member-billing/:email/sync-stripe', requireStaffAuth, async (r
     }
     
     const fullName = [member.first_name, member.last_name].filter(Boolean).join(' ') || undefined;
-    const custResult = await getOrCreateStripeCustomer(member.id, targetEmail, fullName, member.tier);
+    const custResult = await getOrCreateStripeCustomer(String(member.id), targetEmail, fullName as string, member.tier as string);
     const customerId = custResult.customerId;
     const created = custResult.isNew;
     logger.info('[SyncStripe] Stripe customer for', { extra: { created_Created_Found_existing: created ? 'Created' : 'Found existing', customerId, targetEmail } });
@@ -622,12 +587,9 @@ router.post('/api/member-billing/:email/sync-metadata', requireStaffAuth, async 
   try {
     const targetEmail = decodeURIComponent(req.params.email as any);
     
-    const result = await pool.query(
-      `SELECT id, email, first_name, last_name, stripe_customer_id, tier FROM users WHERE LOWER(email) = $1`,
-      [targetEmail.toLowerCase()]
-    );
+    const result = await db.execute(sql`SELECT id, email, first_name, last_name, stripe_customer_id, tier FROM users WHERE LOWER(email) = ${targetEmail.toLowerCase()}`);
     
-    const member = result.rows[0];
+    const member = (result.rows as Array<Record<string, unknown>>)[0];
     if (!member) {
       return res.status(404).json({ error: 'Member not found' });
     }
@@ -638,11 +600,11 @@ router.post('/api/member-billing/:email/sync-metadata', requireStaffAuth, async 
     
     const stripe = await getStripeClient();
     
-    await stripe.customers.update(member.stripe_customer_id, {
+    await stripe.customers.update(member.stripe_customer_id as string, {
       name: [member.first_name, member.last_name].filter(Boolean).join(' ') || undefined,
       metadata: {
-        userId: member.id.toString(),
-        tier: member.tier || '',
+        userId: (member.id as number).toString(),
+        tier: (member.tier as string) || '',
         lastSyncAt: new Date().toISOString(),
       },
     });
@@ -660,12 +622,9 @@ router.post('/api/member-billing/:email/sync-tier-from-stripe', requireStaffAuth
   try {
     const targetEmail = decodeURIComponent(req.params.email as any);
     
-    const result = await pool.query(
-      `SELECT id, email, first_name, last_name, stripe_customer_id, tier FROM users WHERE LOWER(email) = $1`,
-      [targetEmail.toLowerCase()]
-    );
+    const result = await db.execute(sql`SELECT id, email, first_name, last_name, stripe_customer_id, tier FROM users WHERE LOWER(email) = ${targetEmail.toLowerCase()}`);
     
-    const member = result.rows[0];
+    const member = (result.rows as Array<Record<string, unknown>>)[0];
     if (!member) {
       return res.status(404).json({ error: 'Member not found' });
     }
@@ -678,7 +637,7 @@ router.post('/api/member-billing/:email/sync-tier-from-stripe', requireStaffAuth
     
     // Fetch active subscriptions
     const subscriptions = await stripe.subscriptions.list({
-      customer: member.stripe_customer_id,
+      customer: member.stripe_customer_id as string,
       status: 'active',
       limit: 10,
     });
@@ -686,7 +645,7 @@ router.post('/api/member-billing/:email/sync-tier-from-stripe', requireStaffAuth
     if (subscriptions.data.length === 0) {
       // Also check for trialing/past_due
       const allSubs = await stripe.subscriptions.list({
-        customer: member.stripe_customer_id,
+        customer: member.stripe_customer_id as string,
         limit: 10,
       });
       const activeSub = allSubs.data.find(s => 
@@ -703,16 +662,14 @@ router.post('/api/member-billing/:email/sync-tier-from-stripe', requireStaffAuth
     const productId = activeSub.items?.data?.[0]?.price?.product;
     
     // First try to match by price ID
-    let tierResult = await pool.query(
-      'SELECT slug, name FROM membership_tiers WHERE stripe_price_id = $1 OR founding_price_id = $1',
-      [priceId]
-    );
+    let tierResult = await db.execute(sql`SELECT slug, name FROM membership_tiers WHERE stripe_price_id = ${priceId} OR founding_price_id = ${priceId}`);
     
     let newTier: string | null = null;
     let matchMethod = '';
     
-    if (tierResult.rows.length > 0) {
-      newTier = tierResult.rows[0].name;
+    let tierRows = tierResult.rows as Array<Record<string, unknown>>;
+    if (tierRows.length > 0) {
+      newTier = tierRows[0].name as string;
       matchMethod = 'price_id';
     } else if (productId) {
       // Fallback: fetch product and match by name
@@ -723,12 +680,10 @@ router.post('/api/member-billing/:email/sync-tier-from-stripe', requireStaffAuth
       const tierKeywords = ['vip', 'premium', 'corporate', 'core', 'social'];
       for (const keyword of tierKeywords) {
         if (productName.includes(keyword)) {
-          tierResult = await pool.query(
-            'SELECT slug, name FROM membership_tiers WHERE LOWER(slug) = $1 OR LOWER(name) = $1',
-            [keyword]
-          );
-          if (tierResult.rows.length > 0) {
-            newTier = tierResult.rows[0].name;
+          tierResult = await db.execute(sql`SELECT slug, name FROM membership_tiers WHERE LOWER(slug) = ${keyword} OR LOWER(name) = ${keyword}`);
+          tierRows = tierResult.rows as Array<Record<string, unknown>>;
+          if (tierRows.length > 0) {
+            newTier = tierRows[0].name as string;
             matchMethod = 'product_name';
             break;
           }
@@ -758,10 +713,7 @@ router.post('/api/member-billing/:email/sync-tier-from-stripe', requireStaffAuth
     }
     
     // Update the user's tier
-    await pool.query(
-      `UPDATE users SET tier = $1, billing_provider = 'stripe', membership_status = 'active', updated_at = NOW() WHERE id = $2`,
-      [newTier, member.id]
-    );
+    await db.execute(sql`UPDATE users SET tier = ${newTier}, billing_provider = 'stripe', membership_status = 'active', updated_at = NOW() WHERE id = ${member.id}`);
     
     logger.info('[SyncTierFromStripe] Updated tier for : -> (matched by )', { extra: { targetEmail, previousTier, newTier, matchMethod } });
     
@@ -792,12 +744,9 @@ router.post('/api/member-billing/:email/backfill-cache', requireStaffAuth, async
   try {
     const targetEmail = decodeURIComponent(req.params.email as any);
     
-    const result = await pool.query(
-      `SELECT id, email, stripe_customer_id FROM users WHERE LOWER(email) = $1`,
-      [targetEmail.toLowerCase()]
-    );
+    const result = await db.execute(sql`SELECT id, email, stripe_customer_id FROM users WHERE LOWER(email) = ${targetEmail.toLowerCase()}`);
     
-    const member = result.rows[0];
+    const member = (result.rows as Array<Record<string, unknown>>)[0];
     if (!member) {
       return res.status(404).json({ error: 'Member not found' });
     }
@@ -812,7 +761,7 @@ router.post('/api/member-billing/:email/backfill-cache', requireStaffAuth, async
     const ninetyDaysAgo = Math.floor((Date.now() - 90 * 24 * 60 * 60 * 1000) / 1000);
     
     const charges = await stripe.charges.list({
-      customer: member.stripe_customer_id,
+      customer: member.stripe_customer_id as string,
       created: { gte: ninetyDaysAgo },
       limit: 100,
     });
@@ -823,32 +772,16 @@ router.post('/api/member-billing/:email/backfill-cache', requireStaffAuth, async
       if (charge.status !== 'succeeded') continue;
       
       // Insert or update in stripe_transaction_cache
-      await pool.query(
-        `INSERT INTO stripe_transaction_cache (
+      await db.execute(sql`INSERT INTO stripe_transaction_cache (
           stripe_id, object_type, customer_id, customer_email,
           amount_cents, currency, status, description, 
           payment_intent_id, charge_id, created_at, updated_at, source
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, to_timestamp($11), NOW(), $12)
+        ) VALUES (${charge.id}, ${'charge'}, ${member.stripe_customer_id as string}, ${targetEmail}, ${charge.amount}, ${charge.currency}, ${charge.status}, ${charge.description || null}, ${charge.payment_intent || null}, ${charge.id}, to_timestamp(${charge.created}), NOW(), ${'backfill'})
         ON CONFLICT (stripe_id) DO UPDATE SET
           amount_cents = EXCLUDED.amount_cents,
           status = EXCLUDED.status,
           description = EXCLUDED.description,
-          updated_at = NOW()`,
-        [
-          charge.id,
-          'charge',
-          member.stripe_customer_id,
-          targetEmail,
-          charge.amount,
-          charge.currency,
-          charge.status,
-          charge.description || null,
-          charge.payment_intent || null,
-          charge.id,
-          charge.created,
-          'backfill',
-        ]
-      );
+          updated_at = NOW()`);
       transactionCount++;
     }
     
@@ -865,13 +798,10 @@ router.post('/api/my/billing/request-cancellation', requireAuth, async (req, res
     const email = req.session.user.email;
     const { reason } = req.body;
     
-    const result = await pool.query(
-      `SELECT id, email, billing_provider, stripe_customer_id, cancellation_requested_at 
-       FROM users WHERE LOWER(email) = $1`,
-      [email.toLowerCase()]
-    );
+    const result = await db.execute(sql`SELECT id, email, billing_provider, stripe_customer_id, cancellation_requested_at 
+       FROM users WHERE LOWER(email) = ${email.toLowerCase()}`);
     
-    const member = result.rows[0];
+    const member = (result.rows as Array<Record<string, unknown>>)[0];
     if (!member) {
       return res.status(404).json({ error: 'Member not found' });
     }
@@ -889,7 +819,7 @@ router.post('/api/my/billing/request-cancellation', requireAuth, async (req, res
     
     const stripe = await getStripeClient();
     const subscriptions = await stripe.subscriptions.list({
-      customer: member.stripe_customer_id,
+      customer: member.stripe_customer_id as string,
       status: 'active',
       limit: 1,
     });
@@ -909,15 +839,12 @@ router.post('/api/my/billing/request-cancellation', requireAuth, async (req, res
       cancel_at: cancelAtTimestamp,
     });
     
-    await pool.query(
-      `UPDATE users SET 
+    await db.execute(sql`UPDATE users SET 
         cancellation_requested_at = NOW(),
-        cancellation_effective_date = $1,
-        cancellation_reason = $2,
+        cancellation_effective_date = ${formatDatePacific(effectiveDate)},
+        cancellation_reason = ${reason || null},
         updated_at = NOW()
-       WHERE LOWER(email) = $3`,
-      [formatDatePacific(effectiveDate), reason || null, email.toLowerCase()]
-    );
+       WHERE LOWER(email) = ${email.toLowerCase()}`);
     
     try {
       await notifyAllStaff(
@@ -948,13 +875,10 @@ router.get('/api/my/billing/cancellation-status', requireAuth, async (req, res) 
   try {
     const email = req.session.user.email;
     
-    const result = await pool.query(
-      `SELECT cancellation_requested_at, cancellation_effective_date, cancellation_reason
-       FROM users WHERE LOWER(email) = $1`,
-      [email.toLowerCase()]
-    );
+    const result = await db.execute(sql`SELECT cancellation_requested_at, cancellation_effective_date, cancellation_reason
+       FROM users WHERE LOWER(email) = ${email.toLowerCase()}`);
     
-    const member = result.rows[0];
+    const member = (result.rows as Array<Record<string, unknown>>)[0];
     if (!member) {
       return res.status(404).json({ error: 'Member not found' });
     }
@@ -976,26 +900,20 @@ router.get('/api/my-billing/receipt/:paymentIntentId', requireAuth, async (req, 
     const { paymentIntentId } = req.params;
     const sessionEmail = req.session.user.email;
     
-    if (!paymentIntentId || !paymentIntentId.startsWith('pi_')) {
+    if (!paymentIntentId || !(paymentIntentId as string).startsWith('pi_')) {
       return res.status(400).json({ error: 'Invalid payment intent ID' });
     }
     
-    const userResult = await pool.query(
-      `SELECT stripe_customer_id FROM users WHERE LOWER(email) = $1`,
-      [sessionEmail.toLowerCase()]
-    );
+    const userResult = await db.execute(sql`SELECT stripe_customer_id FROM users WHERE LOWER(email) = ${sessionEmail.toLowerCase()}`);
     
-    const user = userResult.rows[0];
+    const user = (userResult.rows as Array<Record<string, unknown>>)[0];
     if (!user || !user.stripe_customer_id) {
       return res.status(403).json({ error: 'Access denied' });
     }
     
-    const piResult = await pool.query(
-      `SELECT stripe_customer_id, user_id FROM stripe_payment_intents WHERE stripe_payment_intent_id = $1`,
-      [paymentIntentId]
-    );
+    const piResult = await db.execute(sql`SELECT stripe_customer_id, user_id FROM stripe_payment_intents WHERE stripe_payment_intent_id = ${paymentIntentId}`);
     
-    const paymentIntent = piResult.rows[0];
+    const paymentIntent = (piResult.rows as Array<Record<string, unknown>>)[0];
     if (!paymentIntent) {
       return res.status(404).json({ error: 'Payment intent not found' });
     }
@@ -1008,7 +926,7 @@ router.get('/api/my-billing/receipt/:paymentIntentId', requireAuth, async (req, 
     }
     
     const stripe = await getStripeClient();
-    const charges = await stripe.charges.list({ payment_intent: paymentIntentId, limit: 1 });
+    const charges = await stripe.charges.list({ payment_intent: paymentIntentId as string, limit: 1 });
     
     if (charges.data.length > 0 && charges.data[0].receipt_url) {
       return res.json({ receiptUrl: charges.data[0].receipt_url });

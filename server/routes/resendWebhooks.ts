@@ -1,6 +1,5 @@
 import { Router, Request, Response } from 'express';
 import { db } from '../db';
-import { pool } from '../core/db';
 import { sql } from 'drizzle-orm';
 import { logger } from '../core/logger';
 import { Webhook } from 'svix';
@@ -93,14 +92,14 @@ async function handleEmailBounced(event: ResendEmailEvent) {
 
   if (recipientEmail) {
     try {
-      await pool.query(`
+      await db.execute(sql`
         UPDATE users 
         SET 
           email_delivery_status = 'bounced',
           email_bounced_at = NOW(),
           notes = COALESCE(notes, '') || E'\n[' || TO_CHAR(NOW(), 'YYYY-MM-DD') || '] Email bounced - may need to update contact info'
-        WHERE LOWER(email) = $1
-      `, [recipientEmail]);
+        WHERE LOWER(email) = ${recipientEmail}
+      `);
       
       logger.info('Marked user email as bounced', {
         extra: { email: recipientEmail }
@@ -126,14 +125,14 @@ async function handleEmailComplained(event: ResendEmailEvent) {
 
   if (recipientEmail) {
     try {
-      await pool.query(`
+      await db.execute(sql`
         UPDATE users 
         SET 
           email_delivery_status = 'complained',
           email_marketing_opt_in = false,
           notes = COALESCE(notes, '') || E'\n[' || TO_CHAR(NOW(), 'YYYY-MM-DD') || '] Marked email as spam - unsubscribed from marketing'
-        WHERE LOWER(email) = $1
-      `, [recipientEmail]);
+        WHERE LOWER(email) = ${recipientEmail}
+      `);
       
       logger.info('Unsubscribed user after complaint', {
         extra: { email: recipientEmail }
@@ -195,19 +194,12 @@ router.post('/api/webhooks/resend', async (req: Request, res: Response) => {
     const eventId = svixHeaders['svix-id'] || `${event.type}-${event.data?.email_id}-${Date.now()}`;
     const recipientEmail = event.data?.to?.[0] || null;
 
-    const insertResult = await pool.query(`
+    const insertResult = await db.execute(sql`
       INSERT INTO email_events (event_id, event_type, email_id, recipient_email, subject, event_data)
-      VALUES ($1, $2, $3, $4, $5, $6)
+      VALUES (${eventId}, ${event.type}, ${event.data?.email_id || null}, ${recipientEmail}, ${event.data?.subject || null}, ${JSON.stringify(event.data)})
       ON CONFLICT (event_id) DO NOTHING
       RETURNING id
-    `, [
-      eventId,
-      event.type,
-      event.data?.email_id || null,
-      recipientEmail,
-      event.data?.subject || null,
-      JSON.stringify(event.data)
-    ]);
+    `);
 
     if (insertResult.rowCount === 0) {
       logger.info('Duplicate Resend webhook event ignored', {

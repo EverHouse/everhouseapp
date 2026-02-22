@@ -2,7 +2,6 @@ import { logger } from '../core/logger';
 import { Router, Request, Response } from 'express';
 import { db } from '../db';
 import { isProduction } from '../core/db';
-import { pool } from '../core/db';
 import { users, bookingRequests, legacyPurchases, adminAuditLog } from '@shared/schema';
 import { eq, sql, and, gte, lte, desc, isNull, inArray } from 'drizzle-orm';
 import { isAdmin, isStaffOrAdmin } from '../core/middleware';
@@ -2023,7 +2022,7 @@ router.post('/api/data-tools/fix-trackman-ghost-bookings', isAdmin, async (req: 
         
         const ownerTier = booking.tier || await getMemberTierByEmail(booking.userEmail, { allowInactive: true });
         
-        const resourceResult = await pool.query(`SELECT type FROM resources WHERE id = $1`, [booking.resourceId]);
+        const resourceResult = await db.execute(sql`SELECT type FROM resources WHERE id = ${booking.resourceId}`);
         const resourceType = (resourceResult.rows[0] as Record<string, unknown>)?.type as string || 'simulator';
         
         const participants = [
@@ -2602,7 +2601,7 @@ router.post('/api/data-tools/cleanup-ghost-fees', isAdmin, async (req: Request, 
     const staffEmail = getSessionUser(req)?.email || 'unknown';
     const { dryRun = true } = req.body;
 
-    const ghostResult = await pool.query(`
+    const ghostResult = await db.execute(sql`
       SELECT bp.id, bp.display_name, bp.cached_fee_cents, bs.trackman_booking_id, bs.session_date
       FROM booking_participants bp
       JOIN booking_sessions bs ON bs.id = bp.session_id
@@ -2612,7 +2611,7 @@ router.post('/api/data-tools/cleanup-ghost-fees', isAdmin, async (req: Request, 
         AND bp.display_name LIKE '%Unknown%'
     `);
 
-    const pastPendingResult = await pool.query(`
+    const pastPendingResult = await db.execute(sql`
       SELECT bp.id, bp.display_name, bp.cached_fee_cents, bs.trackman_booking_id, bs.session_date
       FROM booking_participants bp
       JOIN booking_sessions bs ON bs.id = bp.session_id
@@ -2623,7 +2622,7 @@ router.post('/api/data-tools/cleanup-ghost-fees', isAdmin, async (req: Request, 
     `);
 
     if (!dryRun) {
-      await pool.query(`
+      await db.execute(sql`
         UPDATE booking_participants bp
         SET payment_status = 'waived'
         FROM booking_sessions bs
@@ -2634,7 +2633,7 @@ router.post('/api/data-tools/cleanup-ghost-fees', isAdmin, async (req: Request, 
           AND bp.display_name LIKE '%Unknown%'
       `);
 
-      await pool.query(`
+      await db.execute(sql`
         UPDATE booking_participants bp
         SET payment_status = 'paid', paid_at = NOW()
         FROM booking_sessions bs

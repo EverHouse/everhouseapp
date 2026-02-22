@@ -1,6 +1,5 @@
 import { db } from '../db';
 import { getErrorMessage, getErrorCode } from '../utils/errorUtils';
-import { pool } from './db';
 import { users, bookingRequests, trackmanUnmatchedBookings, trackmanImportRuns, notifications, bookingSessions, bookingParticipants, usageLedger, guests as guestsTable, availabilityBlocks, facilityClosures } from '../../shared/schema';
 import { eq, or, ilike, sql, and } from 'drizzle-orm';
 import * as fs from 'fs';
@@ -585,11 +584,8 @@ function resolveEmail(email: string, membersByEmail: Map<string, string>, trackm
 }
 
 async function getUserIdByEmail(email: string): Promise<string | null> {
-  const result = await pool.query(
-    `SELECT id FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1`,
-    [email]
-  );
-  return result.rows[0]?.id || null;
+  const result = await db.execute(sql`SELECT id FROM users WHERE LOWER(email) = LOWER(${email}) LIMIT 1`);
+  return (result.rows[0] as Record<string, unknown>)?.id as string || null;
 }
 
 // Check if an email belongs to a user (via primary email, trackman_email, or manually_linked_emails)
@@ -601,17 +597,14 @@ async function isEmailLinkedToUser(email: string, userEmail: string): Promise<bo
   if (emailLower === userEmailLower) return true;
   
   // Check if email matches user's trackman_email or is in manually_linked_emails
-  const result = await pool.query(
-    `SELECT 1 FROM users 
-     WHERE LOWER(email) = LOWER($1) 
+  const result = await db.execute(sql`SELECT 1 FROM users 
+     WHERE LOWER(email) = LOWER(${userEmail}) 
      AND (
-       LOWER(trackman_email) = LOWER($2)
-       OR COALESCE(manually_linked_emails, '[]'::jsonb) ? $2
+       LOWER(trackman_email) = LOWER(${emailLower})
+       OR COALESCE(manually_linked_emails, '[]'::jsonb) ? ${emailLower}
      )
-     LIMIT 1`,
-    [userEmail, emailLower]
-  );
-  return result.rowCount > 0;
+     LIMIT 1`);
+  return (result.rowCount ?? 0) > 0;
 }
 
 // Normalize a name for comparison (lowercase, remove extra spaces, handle common variations)
@@ -677,16 +670,14 @@ async function findMembersByName(name: string): Promise<{
   const lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1] : null;
   
   // Search for members with matching name
-  let query: string;
-  let params: string[];
-  
-  if (lastName) {
-    // Full name search - more specific
-    query = `
+  try {
+    let result;
+    if (lastName) {
+      result = await db.execute(sql`
       SELECT id, email, 
         COALESCE(
           (SELECT contact->>'firstname' || ' ' || contact->>'lastname' 
-           FROM (SELECT $3::text) AS dummy(contact) WHERE false),
+           FROM (SELECT ${''}::text) AS dummy(contact) WHERE false),
           email
         ) as name,
         LOWER(COALESCE(
@@ -701,26 +692,24 @@ async function findMembersByName(name: string): Promise<{
       WHERE u.tier IS NOT NULL 
         AND u.tier != ''
         AND (
-          LOWER(u.email) LIKE $1 || '%'
+          LOWER(u.email) LIKE ${firstName} || '%'
           OR EXISTS (
             SELECT 1 FROM hubspot_contacts hs 
             WHERE LOWER(hs.properties->>'email') = LOWER(u.email)
             AND (
-              LOWER(hs.properties->>'firstname') LIKE $1 || '%'
-              OR LOWER(hs.properties->>'firstname') = $1
+              LOWER(hs.properties->>'firstname') LIKE ${firstName} || '%'
+              OR LOWER(hs.properties->>'firstname') = ${firstName}
             )
             AND (
-              LOWER(hs.properties->>'lastname') LIKE $2 || '%'
-              OR LOWER(hs.properties->>'lastname') = $2
+              LOWER(hs.properties->>'lastname') LIKE ${lastName} || '%'
+              OR LOWER(hs.properties->>'lastname') = ${lastName}
             )
           )
         )
       LIMIT 10
-    `;
-    params = [firstName, lastName, ''];
-  } else {
-    // First name only - will likely have multiple matches
-    query = `
+    `);
+    } else {
+      result = await db.execute(sql`
       SELECT u.id, u.email,
         COALESCE(hs.properties->>'firstname', '') || ' ' || COALESCE(hs.properties->>'lastname', '') as name
       FROM users u
@@ -728,17 +717,13 @@ async function findMembersByName(name: string): Promise<{
       WHERE u.tier IS NOT NULL 
         AND u.tier != ''
         AND (
-          LOWER(SPLIT_PART(u.email, '@', 1)) LIKE $1 || '%'
-          OR LOWER(COALESCE(hs.properties->>'firstname', '')) = $1
-          OR LOWER(COALESCE(hs.properties->>'firstname', '')) LIKE $1 || '%'
+          LOWER(SPLIT_PART(u.email, '@', 1)) LIKE ${firstName} || '%'
+          OR LOWER(COALESCE(hs.properties->>'firstname', '')) = ${firstName}
+          OR LOWER(COALESCE(hs.properties->>'firstname', '')) LIKE ${firstName} || '%'
         )
       LIMIT 10
-    `;
-    params = [firstName];
-  }
-  
-  try {
-    const result = await pool.query(query, params);
+    `);
+    }
     
     if (result.rows.length === 0) {
       return { match: 'none', members: [] };
@@ -797,18 +782,15 @@ async function autoLinkEmailToOwner(aliasEmail: string, ownerEmail: string, reas
     const aliasLower = aliasEmail.toLowerCase().trim();
     
     // Add to manually_linked_emails if not already present
-    const result = await pool.query(
-      `UPDATE users 
+    const result = await db.execute(sql`UPDATE users 
        SET manually_linked_emails = 
          CASE 
-           WHEN COALESCE(manually_linked_emails, '[]'::jsonb) ? $2
+           WHEN COALESCE(manually_linked_emails, '[]'::jsonb) ? ${aliasLower}
            THEN manually_linked_emails
-           ELSE COALESCE(manually_linked_emails, '[]'::jsonb) || to_jsonb($2::text)
+           ELSE COALESCE(manually_linked_emails, '[]'::jsonb) || to_jsonb(${aliasLower}::text)
          END
-       WHERE LOWER(email) = LOWER($1)
-       RETURNING email`,
-      [ownerEmail, aliasLower]
-    );
+       WHERE LOWER(email) = LOWER(${ownerEmail})
+       RETURNING email`);
     
     if (result.rowCount && result.rowCount > 0) {
       process.stderr.write(`[Trackman Import] Auto-linked ${aliasLower} to ${ownerEmail}: ${reason}\n`);
@@ -1736,15 +1718,12 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
           let hasPaidFees = false;
           if (existing.sessionId) {
             try {
-              const paidCheck = await pool.query(
-                `SELECT EXISTS(
-                  SELECT 1 FROM booking_fee_snapshots WHERE session_id = $1 AND status IN ('completed', 'paid')
+              const paidCheck = await db.execute(sql`SELECT EXISTS(
+                  SELECT 1 FROM booking_fee_snapshots WHERE session_id = ${existing.sessionId} AND status IN ('completed', 'paid')
                 ) AS has_paid,
                 EXISTS(
-                  SELECT 1 FROM booking_participants WHERE session_id = $1 AND payment_status = 'paid'
-                ) AS has_paid_participants`,
-                [existing.sessionId]
-              );
+                  SELECT 1 FROM booking_participants WHERE session_id = ${existing.sessionId} AND payment_status = 'paid'
+                ) AS has_paid_participants`);
               hasPaidFees = paidCheck.rows[0]?.has_paid || paidCheck.rows[0]?.has_paid_participants;
             } catch { hasPaidFees = true; }
           }
@@ -1755,10 +1734,7 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
               .set({ trackmanBookingId: null })
               .where(eq(bookingRequests.id, existing.id));
             if (existing.sessionId) {
-              await pool.query(
-                `UPDATE booking_sessions SET trackman_booking_id = NULL WHERE id = $1`,
-                [existing.sessionId]
-              );
+              await db.execute(sql`UPDATE booking_sessions SET trackman_booking_id = NULL WHERE id = ${existing.sessionId}`);
             }
             process.stderr.write(`[Trackman Import] FREED: Cleared trackman_booking_id from cancelled booking #${existing.id} (Trackman ID: ${row.bookingId}) — will create fresh booking with correct owner\n`);
             freedCancelledBooking = true;
@@ -1771,17 +1747,14 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
         let hasCompletedPayments = false;
         if (existing.sessionId) {
           try {
-            const paymentCheck = await pool.query(
-              `SELECT EXISTS(
+            const paymentCheck = await db.execute(sql`SELECT EXISTS(
                 SELECT 1 FROM booking_fee_snapshots 
-                WHERE session_id = $1 AND status IN ('completed', 'paid')
+                WHERE session_id = ${existing.sessionId} AND status IN ('completed', 'paid')
               ) AS has_snapshot,
               EXISTS(
                 SELECT 1 FROM booking_participants 
-                WHERE session_id = $1 AND payment_status = 'paid'
-              ) AS has_paid_participants`,
-              [existing.sessionId]
-            );
+                WHERE session_id = ${existing.sessionId} AND payment_status = 'paid'
+              ) AS has_paid_participants`);
             hasCompletedPayments = paymentCheck.rows[0]?.has_snapshot || paymentCheck.rows[0]?.has_paid_participants;
           } catch (checkErr: unknown) {
             hasCompletedPayments = true;
@@ -1879,17 +1852,11 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
               originalEmail !== matchedEmail.toLowerCase() &&
               !isPlaceholderEmail(originalEmail)) {
             try {
-              const existingLink = await pool.query(
-                `SELECT id FROM user_linked_emails WHERE LOWER(linked_email) = $1`,
-                [originalEmail]
-              );
+              const existingLink = await db.execute(sql`SELECT id FROM user_linked_emails WHERE LOWER(linked_email) = ${originalEmail}`);
               
               if (existingLink.rows.length === 0) {
-                await pool.query(
-                  `INSERT INTO user_linked_emails (primary_email, linked_email, source, created_by)
-                   VALUES ($1, $2, 'trackman_import_auto', 'system')`,
-                  [matchedEmail.toLowerCase(), originalEmail]
-                );
+                await db.execute(sql`INSERT INTO user_linked_emails (primary_email, linked_email, source, created_by)
+                   VALUES (${matchedEmail.toLowerCase()}, ${originalEmail}, 'trackman_import_auto', 'system')`);
                 process.stderr.write(`[Email Learning] Auto-linked ${originalEmail} -> ${matchedEmail} from import\n`);
               }
             } catch (linkErr: unknown) {
@@ -2042,22 +2009,19 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
       // PRIORITY 1: Merge with webhook-created placeholder/ghost bookings
       // Look for existing bookings at same simulator/time that are unmatched or unknown
       if ((!existingBooking.length || freedCancelledBooking) && parsedBayId && bookingDate && startTime) {
-        const placeholderBooking = await pool.query(
-          `SELECT id, user_email, user_name, status, session_id, trackman_booking_id, origin,
-                  ABS(EXTRACT(EPOCH FROM (start_time::time - $3::time))) as time_diff_seconds
+        const placeholderBooking = await db.execute(sql`SELECT id, user_email, user_name, status, session_id, trackman_booking_id, origin,
+                  ABS(EXTRACT(EPOCH FROM (start_time::time - ${startTime}::time))) as time_diff_seconds
            FROM booking_requests
-           WHERE resource_id = $1
-           AND request_date = $2
-           AND ABS(EXTRACT(EPOCH FROM (start_time::time - $3::time))) <= 120
+           WHERE resource_id = ${parsedBayId}
+           AND request_date = ${bookingDate}
+           AND ABS(EXTRACT(EPOCH FROM (start_time::time - ${startTime}::time))) <= 120
            AND trackman_booking_id IS NULL
            AND (is_unmatched = true 
                 OR LOWER(user_name) LIKE '%unknown%' 
                 OR LOWER(user_name) LIKE '%unassigned%'
                 OR (user_email = '' AND user_name IS NOT NULL))
            AND status NOT IN ('cancelled', 'declined', 'cancellation_pending')
-           ORDER BY ABS(EXTRACT(EPOCH FROM (start_time::time - $3::time))), created_at DESC`,
-          [parsedBayId, bookingDate, startTime]
-        );
+           ORDER BY ABS(EXTRACT(EPOCH FROM (start_time::time - ${startTime}::time))), created_at DESC`);
         
         if (placeholderBooking.rows.length > 1) {
           process.stderr.write(`[Trackman Import] Multiple placeholder candidates (${placeholderBooking.rows.length}) for Trackman ${row.bookingId} on bay ${parsedBayId} at ${startTime} - skipping auto-merge, requires manual resolution\n`);
@@ -2089,20 +2053,11 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
           }
           
           // Build SET clause dynamically
-          const setClauses: string[] = [];
-          const setValues: unknown[] = [];
-          let paramIdx = 1;
-          for (const [key, value] of Object.entries(updateFields)) {
-            setClauses.push(`${key} = $${paramIdx}`);
-            setValues.push(value);
-            paramIdx++;
-          }
-          setValues.push(placeholder.id);
-          
-          await pool.query(
-            `UPDATE booking_requests SET ${setClauses.join(', ')} WHERE id = $${paramIdx}`,
-            setValues
+          const setFragments = Object.entries(updateFields).map(([key, value]) => 
+            sql`${sql.raw(key)} = ${value}`
           );
+          
+          await db.execute(sql`UPDATE booking_requests SET ${sql.join(setFragments, sql`, `)} WHERE id = ${placeholder.id}`);
           
           process.stderr.write(`[Trackman Import] MERGED: CSV row ${row.bookingId} into placeholder booking #${placeholder.id} (was: "${placeholder.user_name}", now: "${row.userName}"${matchedEmail ? `, linked to ${matchedEmail}` : ''})\n`);
           
@@ -3020,8 +2975,7 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
 
   // POST-IMPORT CLEANUP: Auto-approve any pending bookings from this import that are linked to a member
   try {
-    const autoApproved = await pool.query(
-      `UPDATE booking_requests 
+    const autoApproved = await db.execute(sql`UPDATE booking_requests 
        SET status = 'approved', updated_at = NOW(), staff_notes = COALESCE(staff_notes, '') || ' [Auto-approved by import: member linked]'
        WHERE origin = 'trackman_import'
        AND status = 'pending'
@@ -3029,8 +2983,7 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
        AND user_email != ''
        AND is_unmatched IS NOT TRUE
        AND last_trackman_sync_at >= NOW() - INTERVAL '1 hour'
-       RETURNING id, user_email, user_name`
-    );
+       RETURNING id, user_email, user_name`);
     
     if (autoApproved.rows.length > 0) {
       process.stderr.write(`[Trackman Import] Post-import cleanup: Auto-approved ${autoApproved.rows.length} pending member-linked bookings\n`);
@@ -3045,7 +2998,7 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
   // POST-IMPORT: Mark past session participants as paid (settled externally via Trackman)
   // and waive ghost participants (Unknown Trackman with no real owner)
   try {
-    const pastPaidResult = await pool.query(`
+    const pastPaidResult = await db.execute(sql`
       UPDATE booking_participants bp
       SET payment_status = 'paid', paid_at = NOW()
       FROM booking_sessions bs
@@ -3065,7 +3018,7 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
           WHERE bs2.id = bp.session_id AND spi.status = 'succeeded'
         )
     `);
-    const ghostWaivedResult = await pool.query(`
+    const ghostWaivedResult = await db.execute(sql`
       UPDATE booking_participants bp
       SET payment_status = 'waived'
       FROM booking_sessions bs
@@ -3708,50 +3661,34 @@ export async function rescanUnmatchedBookings(performedBy: string = 'system'): P
         
         if (resourceId && resourceId > 0 && bookingDate && startTime) {
           // Check if block already exists for this time slot
-          const existingBlock = await pool.query(`
+          const existingBlock = await db.execute(sql`
             SELECT ab.id FROM availability_blocks ab
             JOIN facility_closures fc ON ab.closure_id = fc.id
-            WHERE ab.resource_id = $1
-              AND ab.block_date = $2
-              AND ab.start_time < $4::time
-              AND ab.end_time > $3::time
+            WHERE ab.resource_id = ${resourceId}
+              AND ab.block_date = ${bookingDate}
+              AND ab.start_time < ${endTime}::time
+              AND ab.end_time > ${startTime}::time
               AND fc.notice_type = 'private_event'
               AND fc.is_active = true
             LIMIT 1
-          `, [resourceId, bookingDate, startTime, endTime]);
+          `);
           
           if (existingBlock.rows.length === 0) {
-            // Create facility closure and availability block
             const closureTitle = `Lesson: ${userName || 'Unknown'}`;
             const closureReason = `Lesson (Converted from Rescan): ${userName || 'Unknown'} [TM:${booking.trackmanBookingId || booking.id}]`;
             
-            const closureResult = await pool.query(`
+            const closureResult = await db.execute(sql`
               INSERT INTO facility_closures 
                 (title, start_date, end_date, start_time, end_time, reason, notice_type, is_active, created_by)
-              VALUES ($1, $2, $2, $3, $4, $5, 'private_event', true, $6)
+              VALUES (${closureTitle}, ${bookingDate}, ${bookingDate}, ${startTime}, ${endTime}, ${closureReason}, 'private_event', true, ${performedBy})
               RETURNING id
-            `, [
-              closureTitle,
-              bookingDate,
-              startTime,
-              endTime,
-              closureReason,
-              performedBy
-            ]);
+            `);
             
-            await pool.query(`
+            await db.execute(sql`
               INSERT INTO availability_blocks 
                 (closure_id, resource_id, block_date, start_time, end_time, block_type, notes, created_by)
-              VALUES ($1, $2, $3, $4, $5, 'blocked', $6, $7)
-            `, [
-              closureResult.rows[0].id,
-              resourceId,
-              bookingDate,
-              startTime,
-              endTime,
-              `Lesson - ${userName || 'Unknown'}`,
-              performedBy
-            ]);
+              VALUES (${(closureResult.rows[0] as Record<string, unknown>).id}, ${resourceId}, ${bookingDate}, ${startTime}, ${endTime}, 'blocked', ${`Lesson - ${userName || 'Unknown'}`}, ${performedBy})
+            `);
             
             process.stderr.write(`[Trackman Rescan] Created availability block for lesson: ${userName} on ${bookingDate} ${startTime}-${endTime}\n`);
           } else {
@@ -3881,27 +3818,12 @@ export async function rescanUnmatchedBookings(performedBy: string = 'system'): P
             if (existingBooking.length === 0) {
               // Create the booking with ON CONFLICT to handle race conditions
               try {
-                await pool.query(
-                  `INSERT INTO booking_requests (
+                await db.execute(sql`INSERT INTO booking_requests (
                     user_email, user_name, request_date, start_time, end_time,
                     duration_minutes, resource_id, status, trackman_booking_id,
                     notes, trackman_player_count, created_at, updated_at
-                  ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), NOW())
-                  ON CONFLICT (trackman_booking_id) WHERE trackman_booking_id IS NOT NULL DO NOTHING`,
-                  [
-                    matchedEmail,
-                    booking.userName || '',
-                    bookingDate,
-                    startTime,
-                    endTime,
-                    booking.durationMinutes || 60,
-                    bayId,
-                    'approved',
-                    booking.trackmanBookingId,
-                    `[Trackman Import ID:${booking.trackmanBookingId}] ${booking.notes || ''}`.trim(),
-                    booking.playerCount || 1
-                  ]
-                );
+                  ) VALUES (${matchedEmail}, ${booking.userName || ''}, ${bookingDate}, ${startTime}, ${endTime}, ${booking.durationMinutes || 60}, ${bayId}, 'approved', ${booking.trackmanBookingId}, ${`[Trackman Import ID:${booking.trackmanBookingId}] ${booking.notes || ''}`.trim()}, ${booking.playerCount || 1}, NOW(), NOW())
+                  ON CONFLICT (trackman_booking_id) WHERE trackman_booking_id IS NOT NULL DO NOTHING`);
                 process.stderr.write(`[Trackman Rescan] Created booking for ${matchedEmail} (Trackman ID: ${booking.trackmanBookingId})\n`);
               } catch (insertErr: unknown) {
                 // Handle any remaining duplicate key errors
@@ -3968,7 +3890,7 @@ export async function cleanupHistoricalLessons(dryRun = false): Promise<{
   let skipped = 0;
 
   // 1. Find bookings linked to Tim/Rebecca or containing "Lesson" keyword
-  const lessonBookingsResult = await pool.query(`
+  const lessonBookingsResult = await db.execute(sql`
     SELECT 
       br.id,
       br.user_name,
@@ -3985,13 +3907,13 @@ export async function cleanupHistoricalLessons(dryRun = false): Promise<{
     WHERE br.status NOT IN ('cancelled', 'cancellation_pending')
       AND br.archived_at IS NULL
       AND (
-        LOWER(br.user_email) = ANY($1)
+        LOWER(br.user_email) = ANY(${INSTRUCTOR_EMAILS})
         OR LOWER(br.user_name) LIKE '%lesson%'
         OR LOWER(br.notes) LIKE '%lesson%'
       )
     ORDER BY br.request_date DESC
     LIMIT 1000
-  `, [INSTRUCTOR_EMAILS]);
+  `);
 
   const lessonBookings = lessonBookingsResult.rows;
   log(`[Lesson Cleanup] Found ${lessonBookings.length} lesson bookings to process.`);
@@ -4008,93 +3930,72 @@ export async function cleanupHistoricalLessons(dryRun = false): Promise<{
     const endTime = booking.end_time || booking.start_time;
 
     // Check if block already exists for this time slot
-    const existingBlock = await pool.query(`
+    const existingBlock = await db.execute(sql`
       SELECT ab.id FROM availability_blocks ab
       JOIN facility_closures fc ON ab.closure_id = fc.id
-      WHERE ab.resource_id = $1
-        AND ab.block_date = $2
-        AND ab.start_time < $4::time
-        AND ab.end_time > $3::time
+      WHERE ab.resource_id = ${booking.resource_id}
+        AND ab.block_date = ${bookingDate}
+        AND ab.start_time < ${endTime}::time
+        AND ab.end_time > ${booking.start_time}::time
         AND fc.notice_type = 'private_event'
         AND fc.is_active = true
       LIMIT 1
-    `, [booking.resource_id, bookingDate, booking.start_time, endTime]);
+    `);
 
     const blockAlreadyExists = existingBlock.rows.length > 0;
 
     if (!dryRun) {
-      // Create block if it doesn't exist
       if (!blockAlreadyExists) {
         const closureTitle = `Lesson: ${booking.user_name || 'Unknown'}`;
         const closureReason = `Lesson (Converted): ${booking.user_name || 'Unknown'} [TM:${booking.trackman_booking_id || booking.id}]`;
         
-        // Create Facility Closure (matching pattern from trackman/admin cleanup)
-        const closureResult = await pool.query(`
+        const closureResult = await db.execute(sql`
           INSERT INTO facility_closures 
             (title, start_date, end_date, start_time, end_time, reason, notice_type, is_active, created_by)
-          VALUES ($1, $2, $2, $3, $4, $5, 'private_event', true, $6)
+          VALUES (${closureTitle}, ${bookingDate}, ${bookingDate}, ${booking.start_time}, ${endTime}, ${closureReason}, 'private_event', true, 'system_cleanup')
           RETURNING id
-        `, [
-          closureTitle,
-          bookingDate, 
-          booking.start_time, 
-          endTime,
-          closureReason,
-          'system_cleanup'
-        ]);
+        `);
 
-        // Create Availability Block
-        await pool.query(`
+        await db.execute(sql`
           INSERT INTO availability_blocks 
             (closure_id, resource_id, block_date, start_time, end_time, block_type, notes, created_by)
-          VALUES ($1, $2, $3, $4, $5, 'blocked', $6, 'system_cleanup')
-        `, [
-          closureResult.rows[0].id,
-          booking.resource_id,
-          bookingDate,
-          booking.start_time,
-          endTime,
-          `Lesson - ${booking.user_name || 'Unknown'}`
-        ]);
+          VALUES (${(closureResult.rows[0] as Record<string, unknown>).id}, ${booking.resource_id}, ${bookingDate}, ${booking.start_time}, ${endTime}, 'blocked', ${`Lesson - ${booking.user_name || 'Unknown'}`}, 'system_cleanup')
+        `);
       }
 
-      // Soft-delete the booking: mark as cancelled with cleanup note
-      await pool.query(`
+      await db.execute(sql`
         UPDATE booking_requests 
         SET status = 'cancelled',
             archived_at = NOW(),
             archived_by = 'system_cleanup',
             staff_notes = COALESCE(staff_notes, '') || ' [Converted to Availability Block by cleanupHistoricalLessons]',
             updated_at = NOW()
-        WHERE id = $1
-      `, [booking.id]);
+        WHERE id = ${booking.id}
+      `);
 
-      await pool.query(`DELETE FROM booking_participants WHERE session_id IN (
-        SELECT id FROM booking_sessions WHERE trackman_booking_id = $1
-      )`, [booking.trackman_booking_id]);
+      await db.execute(sql`DELETE FROM booking_participants WHERE session_id IN (
+        SELECT id FROM booking_sessions WHERE trackman_booking_id = ${booking.trackman_booking_id}
+      )`);
 
-      // Clean up financial artifacts: usage_ledger entries
-      await pool.query(`DELETE FROM usage_ledger WHERE booking_id = $1`, [booking.id]);
+      await db.execute(sql`DELETE FROM usage_ledger WHERE booking_id = ${booking.id}`);
 
-      // Cancel any pending payment intents
-      const pendingIntents = await pool.query(`
+      const pendingIntents = await db.execute(sql`
         SELECT stripe_payment_intent_id FROM stripe_payment_intents 
-        WHERE booking_id = $1 AND status IN ('pending', 'requires_payment_method', 'requires_action', 'requires_confirmation')
-      `, [booking.id]);
+        WHERE booking_id = ${booking.id} AND status IN ('pending', 'requires_payment_method', 'requires_action', 'requires_confirmation')
+      `);
       
       for (const intent of pendingIntents.rows) {
         try {
           const stripe = await import('./stripe').then(m => m.getStripeClient());
-          await stripe.paymentIntents.cancel(intent.stripe_payment_intent_id);
-          log(`[Lesson Cleanup] Cancelled payment intent ${intent.stripe_payment_intent_id}`);
+          await stripe.paymentIntents.cancel((intent as Record<string, unknown>).stripe_payment_intent_id as string);
+          log(`[Lesson Cleanup] Cancelled payment intent ${(intent as Record<string, unknown>).stripe_payment_intent_id}`);
         } catch (err: unknown) {
-          log(`[Lesson Cleanup] Could not cancel payment intent ${intent.stripe_payment_intent_id}: ${getErrorMessage(err)}`);
+          log(`[Lesson Cleanup] Could not cancel payment intent ${(intent as Record<string, unknown>).stripe_payment_intent_id}: ${getErrorMessage(err)}`);
         }
       }
 
-      // Clean up booking sessions linked to this booking
       if (booking.session_id) {
-        await pool.query(`DELETE FROM booking_sessions WHERE id = $1`, [booking.session_id]);
+        await db.execute(sql`DELETE FROM booking_sessions WHERE id = ${booking.session_id}`);
       }
     }
 
@@ -4146,60 +4047,43 @@ export async function cleanupHistoricalLessons(dryRun = false): Promise<{
 
     if (!dryRun) {
       // Check if block already exists
-      const existingBlock = await pool.query(`
+      const existingBlock = await db.execute(sql`
         SELECT ab.id FROM availability_blocks ab
         JOIN facility_closures fc ON ab.closure_id = fc.id
-        WHERE ab.resource_id = $1
-          AND ab.block_date = $2
-          AND ab.start_time < $4::time
-          AND ab.end_time > $3::time
+        WHERE ab.resource_id = ${resourceId}
+          AND ab.block_date = ${bookingDate}
+          AND ab.start_time < ${item.endTime || item.startTime}::time
+          AND ab.end_time > ${item.startTime}::time
           AND fc.notice_type = 'private_event'
           AND fc.is_active = true
         LIMIT 1
-      `, [resourceId, bookingDate, item.startTime, item.endTime || item.startTime]);
+      `);
 
       if (existingBlock.rows.length === 0) {
         const closureTitle = `Lesson: ${item.userName || 'Unknown'}`;
         const closureReason = `Lesson: ${item.userName || 'Unknown'} [TM:${item.trackmanBookingId || item.id}]`;
         
-        // Create Facility Closure
-        const closureResult = await pool.query(`
+        const closureResult = await db.execute(sql`
           INSERT INTO facility_closures 
             (title, start_date, end_date, start_time, end_time, reason, notice_type, is_active, created_by)
-          VALUES ($1, $2, $2, $3, $4, $5, 'private_event', true, $6)
+          VALUES (${closureTitle}, ${bookingDate}, ${bookingDate}, ${item.startTime}, ${item.endTime || item.startTime}, ${closureReason}, 'private_event', true, 'system_cleanup')
           RETURNING id
-        `, [
-          closureTitle,
-          bookingDate,
-          item.startTime,
-          item.endTime || item.startTime,
-          closureReason,
-          'system_cleanup'
-        ]);
+        `);
 
-        // Create Availability Block
-        await pool.query(`
+        await db.execute(sql`
           INSERT INTO availability_blocks 
             (closure_id, resource_id, block_date, start_time, end_time, block_type, notes, created_by)
-          VALUES ($1, $2, $3, $4, $5, 'blocked', $6, 'system_cleanup')
-        `, [
-          closureResult.rows[0].id,
-          resourceId,
-          bookingDate,
-          item.startTime,
-          item.endTime || item.startTime,
-          `Lesson - ${item.userName || 'Unknown'}`
-        ]);
+          VALUES (${(closureResult.rows[0] as Record<string, unknown>).id}, ${resourceId}, ${bookingDate}, ${item.startTime}, ${item.endTime || item.startTime}, 'blocked', ${`Lesson - ${item.userName || 'Unknown'}`}, 'system_cleanup')
+        `);
       }
 
-      // Mark as Resolved
-      await pool.query(`
+      await db.execute(sql`
         UPDATE trackman_unmatched_bookings
         SET resolved_at = NOW(),
             resolved_by = 'system_cleanup',
             match_attempt_reason = 'Converted to Availability Block (Lesson Cleanup)'
-        WHERE id = $1
-      `, [item.id]);
+        WHERE id = ${item.id}
+      `);
     }
 
     log(`[Lesson Cleanup] Resolved unmatched lesson #${item.id} (${item.userName || 'Unknown'}).`);

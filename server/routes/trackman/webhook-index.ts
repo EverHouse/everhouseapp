@@ -1,6 +1,5 @@
 import { Router, Request, Response } from 'express';
 import { db } from '../../db';
-import { pool } from '../../core/db';
 import { sql } from 'drizzle-orm';
 import { logger } from '../../core/logger';
 import { sendNotificationToUser, broadcastToStaff } from '../../core/websocket';
@@ -219,9 +218,8 @@ router.post('/api/webhooks/trackman', async (req: Request, res: Response) => {
       
       // Step 1: Try direct match via trackman_booking_id (staff paste the Trackman booking ID number to confirm bookings)
       if (v2Result.normalized.trackmanBookingId) {
-        const directMatch = await pool.query(
-          `SELECT id, user_email, user_name FROM booking_requests WHERE trackman_booking_id = $1 LIMIT 1`,
-          [v2Result.normalized.trackmanBookingId]
+        const directMatch = await db.execute(
+          sql`SELECT id, user_email, user_name FROM booking_requests WHERE trackman_booking_id = ${v2Result.normalized.trackmanBookingId} LIMIT 1`
         );
         if (directMatch.rows.length > 0) {
           matchedBookingId = directMatch.rows[0].id;

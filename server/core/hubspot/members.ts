@@ -1,10 +1,10 @@
 import { db } from '../../db';
 import { getErrorMessage, getErrorCode, getErrorStatusCode } from '../../utils/errorUtils';
-import { pool, isProduction } from '../db';
+import { isProduction } from '../db';
 import { getHubSpotClient } from '../integrations';
 import { hubspotDeals, hubspotLineItems } from '../../../shared/schema';
 import { logBillingAudit } from '../auditLog';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, sql } from 'drizzle-orm';
 import { retryableHubSpotRequest } from './request';
 import { HUBSPOT_STAGE_IDS, MEMBERSHIP_PIPELINE_ID, MINDBODY_TO_STAGE_MAP } from './constants';
 import { getProductMapping } from './products';
@@ -228,21 +228,19 @@ export async function createDealForLegacyMember(
   const normalizedEmail = memberEmail.toLowerCase().trim();
   
   try {
-    const memberResult = await pool.query(
-      'SELECT id, first_name, last_name, email, phone, tier, tags FROM users WHERE LOWER(email) = $1',
-      [normalizedEmail]
-    );
+    const memberResult = await db.execute(sql`SELECT id, first_name, last_name, email, phone, tier, tags FROM users WHERE LOWER(email) = ${normalizedEmail}`);
     
     if (memberResult.rows.length === 0) {
       if (!isProduction) logger.info(`[HubSpotDeals] Member not found in users table: ${memberEmail}`);
       return { success: false, error: 'Member not found in users table' };
     }
     
-    const member = memberResult.rows[0];
-    const tier = member.tier || 'Resident';
-    const firstName = member.first_name || '';
-    const lastName = member.last_name || '';
-    const phone = member.phone || '';
+    const memberRows = memberResult.rows as Array<Record<string, unknown>>;
+    const member = memberRows[0];
+    const tier = (member.tier as string) || 'Resident';
+    const firstName = (member.first_name as string) || '';
+    const lastName = (member.last_name as string) || '';
+    const phone = (member.phone as string) || '';
     
     const product = await getProductMapping(tier);
     if (!product) {
@@ -255,10 +253,10 @@ export async function createDealForLegacyMember(
     
     const { contactId, isNew: isNewContact } = await findOrCreateHubSpotContact(
       normalizedEmail,
-      firstName,
-      lastName,
-      phone,
-      tier
+      firstName as string,
+      lastName as string,
+      phone as string,
+      tier as string
     );
     
     const existingDeals = await getContactDeals(contactId);
@@ -299,12 +297,12 @@ export async function createDealForLegacyMember(
     const fullName = (firstName || lastName) 
       ? `${firstName} ${lastName}`.trim() 
       : normalizedEmail.split('@')[0];
-    const dealName = `${fullName} - ${tier} Membership (Legacy)`;
+    const dealName = `${fullName} - ${tier as string} Membership (Legacy)`;
     const dealId = await createMembershipDeal(
       contactId,
       normalizedEmail,
       dealName,
-      tier,
+      tier as string,
       undefined,
       targetStage
     );
@@ -335,10 +333,7 @@ export async function createDealForLegacyMember(
       billingProvider: 'mindbody'
     } as typeof hubspotDeals.$inferInsert);
     
-    await pool.query(
-      'UPDATE users SET hubspot_id = $1, updated_at = NOW() WHERE LOWER(email) = $2 AND (hubspot_id IS NULL OR hubspot_id = \'\')',
-      [contactId, normalizedEmail]
-    );
+    await db.execute(sql`UPDATE users SET hubspot_id = ${contactId}, updated_at = NOW() WHERE LOWER(email) = ${normalizedEmail} AND (hubspot_id IS NULL OR hubspot_id = '')`);
     
     await logBillingAudit({
       memberEmail: normalizedEmail,
@@ -385,7 +380,7 @@ export async function createMemberLocally(input: AddMemberInput): Promise<Create
   const { firstName, lastName, email, phone, tier, startDate, discountReason } = input;
   const normalizedEmail = email.toLowerCase().trim();
   
-  const exclusionCheck = await pool.query('SELECT 1 FROM sync_exclusions WHERE email = $1', [normalizedEmail]);
+  const exclusionCheck = await db.execute(sql`SELECT 1 FROM sync_exclusions WHERE email = ${normalizedEmail}`);
   if (exclusionCheck.rows.length > 0) {
     return { success: false, error: 'This email belongs to a permanently deleted member and cannot be re-added. Remove them from the sync exclusions list first if this is intentional.' };
   }
@@ -399,74 +394,54 @@ export async function createMemberLocally(input: AddMemberInput): Promise<Create
     const resolved = await resolveUserByEmail(normalizedEmail);
 
     const existingUser = resolved
-      ? await pool.query(
-          `SELECT id, email, role, membership_status FROM users WHERE id = $1`,
-          [resolved.userId]
-        )
-      : await pool.query(
-          `SELECT id, email, role, membership_status FROM users WHERE LOWER(email) = $1`,
-          [normalizedEmail]
-        );
+      ? await db.execute(sql`SELECT id, email, role, membership_status FROM users WHERE id = ${resolved.userId}`)
+      : await db.execute(sql`SELECT id, email, role, membership_status FROM users WHERE LOWER(email) = ${normalizedEmail}`);
 
     if (resolved && resolved.matchType !== 'direct') {
       logger.info(`[AddMember] Email ${normalizedEmail} resolved to existing user ${resolved.primaryEmail} via ${resolved.matchType}`);
     }
     
-    if (existingUser.rows.length > 0) {
-      const existing = existingUser.rows[0];
+    const existingRows = existingUser.rows as Array<Record<string, unknown>>;
+    if (existingRows.length > 0) {
+      const existing = existingRows[0];
       if (existing.role === 'member' && existing.membership_status === 'active') {
         return { success: false, error: 'A member with this email already exists' };
       }
       
-      const updateResult = await pool.query(
-        `UPDATE users SET 
-          first_name = COALESCE(NULLIF($2, ''), first_name),
-          last_name = COALESCE(NULLIF($3, ''), last_name),
-          phone = COALESCE(NULLIF($4, ''), phone),
+      const updateResult = await db.execute(sql`UPDATE users SET 
+          first_name = COALESCE(NULLIF(${firstName}, ''), first_name),
+          last_name = COALESCE(NULLIF(${lastName}, ''), last_name),
+          phone = COALESCE(NULLIF(${phone || null}, ''), phone),
           role = 'member',
-          tier = $5,
+          tier = ${tier},
           membership_status = 'active',
           billing_provider = COALESCE(billing_provider, 'hubspot'),
-          join_date = COALESCE(join_date, $6),
-          discount_code = $7,
+          join_date = COALESCE(join_date, ${startDate || getTodayPacific()}),
+          discount_code = ${discountReason || null},
           updated_at = NOW()
-        WHERE id = $1
-        RETURNING id`,
-        [existing.id, firstName, lastName, phone || null, tier, startDate || getTodayPacific(), discountReason || null]
-      );
+        WHERE id = ${existing.id}
+        RETURNING id`);
       
       logger.info(`[AddMember] Converted existing visitor ${normalizedEmail} to member with tier ${tier}`);
 
       findOrCreateHubSpotContact(normalizedEmail, firstName, lastName, phone || undefined, tier)
         .catch((err: unknown) => logger.error(`[AddMember] HubSpot contact sync failed for converted visitor ${normalizedEmail}:`, { extra: { detail: getErrorMessage(err) } }));
 
-      return { success: true, userId: updateResult.rows[0].id };
+      return { success: true, userId: (updateResult.rows as Array<Record<string, unknown>>)[0].id as number };
     }
     
     const tags: string[] = [];
-    const result = await pool.query(
-      `INSERT INTO users (
+    const result = await db.execute(sql`INSERT INTO users (
         email, first_name, last_name, phone, role, tier, 
         membership_status, billing_provider,
         tags, discount_code, data_source, join_date, created_at, updated_at
-      ) VALUES ($1, $2, $3, $4, 'member', $5, 'active', 'hubspot', $6, $8, 'staff_manual', $7, NOW(), NOW())
-      RETURNING id`,
-      [
-        normalizedEmail,
-        firstName,
-        lastName,
-        phone || null,
-        tier,
-        JSON.stringify(tags),
-        startDate || getTodayPacific(),
-        discountReason || null
-      ]
-    );
+      ) VALUES (${normalizedEmail}, ${firstName}, ${lastName}, ${phone || null}, 'member', ${tier}, 'active', 'hubspot', ${JSON.stringify(tags)}, ${discountReason || null}, 'staff_manual', ${startDate || getTodayPacific()}, NOW(), NOW())
+      RETURNING id`);
 
     findOrCreateHubSpotContact(normalizedEmail, firstName, lastName, phone || undefined, tier)
       .catch((err: unknown) => logger.error(`[AddMember] HubSpot contact sync failed for ${normalizedEmail}:`, { extra: { detail: getErrorMessage(err) } }));
     
-    return { success: true, userId: result.rows[0].id };
+    return { success: true, userId: (result.rows as Array<Record<string, unknown>>)[0].id as number };
   } catch (error: unknown) {
     logger.error('[AddMember] Failed to create user locally:', { error: error });
     return { success: false, error: getErrorMessage(error) || 'Failed to create member' };
@@ -479,10 +454,7 @@ export async function syncNewMemberToHubSpot(input: AddMemberInput): Promise<voi
   const { firstName, lastName, email, phone, tier, startDate, discountReason, createdBy, createdByName } = input;
   const normalizedEmail = email.toLowerCase().trim();
   
-  const existingUser = await pool.query(
-    'SELECT id FROM users WHERE LOWER(email) = $1',
-    [normalizedEmail]
-  );
+  const existingUser = await db.execute(sql`SELECT id FROM users WHERE LOWER(email) = ${normalizedEmail}`);
   
   if (existingUser.rows.length === 0) {
     logger.warn(`[SyncMember] User ${normalizedEmail} not found in database - skipping HubSpot sync`);
@@ -496,12 +468,10 @@ export async function syncNewMemberToHubSpot(input: AddMemberInput): Promise<voi
   
   let discountPercent = 0;
   if (discountReason) {
-    const discountResult = await pool.query(
-      'SELECT discount_percent FROM discount_rules WHERE discount_tag = $1 AND is_active = true',
-      [discountReason]
-    );
-    if (discountResult.rows.length > 0) {
-      discountPercent = discountResult.rows[0].discount_percent;
+    const discountResult = await db.execute(sql`SELECT discount_percent FROM discount_rules WHERE discount_tag = ${discountReason} AND is_active = true`);
+    const discountRows = discountResult.rows as Array<Record<string, unknown>>;
+    if (discountRows.length > 0) {
+      discountPercent = discountRows[0].discount_percent as number;
     }
   }
   
@@ -542,10 +512,7 @@ export async function syncNewMemberToHubSpot(input: AddMemberInput): Promise<voi
     throw new Error('Failed to add line item to deal');
   }
   
-  await pool.query(
-    'UPDATE users SET hubspot_id = $1, updated_at = NOW() WHERE LOWER(email) = $2',
-    [contactId, normalizedEmail]
-  );
+  await db.execute(sql`UPDATE users SET hubspot_id = ${contactId}, updated_at = NOW() WHERE LOWER(email) = ${normalizedEmail}`);
   
   try {
     await db.insert(hubspotDeals).values({
@@ -608,14 +575,8 @@ export async function createMemberWithDeal(input: AddMemberInput): Promise<AddMe
     const resolved = await resolveUserByEmail(normalizedEmail);
 
     const existingUser = resolved
-      ? await pool.query(
-          'SELECT id, email FROM users WHERE id = $1',
-          [resolved.userId]
-        )
-      : await pool.query(
-          'SELECT id, email FROM users WHERE LOWER(email) = $1',
-          [normalizedEmail]
-        );
+      ? await db.execute(sql`SELECT id, email FROM users WHERE id = ${resolved.userId}`)
+      : await db.execute(sql`SELECT id, email FROM users WHERE LOWER(email) = ${normalizedEmail}`);
 
     if (resolved && resolved.matchType !== 'direct') {
       logger.info(`[AddMemberWithDeal] Email ${normalizedEmail} resolved to existing user ${resolved.primaryEmail} via ${resolved.matchType}`);
@@ -632,12 +593,10 @@ export async function createMemberWithDeal(input: AddMemberInput): Promise<AddMe
     
     let discountPercent = 0;
     if (discountReason) {
-      const discountResult = await pool.query(
-        'SELECT discount_percent FROM discount_rules WHERE discount_tag = $1 AND is_active = true',
-        [discountReason]
-      );
-      if (discountResult.rows.length > 0) {
-        discountPercent = discountResult.rows[0].discount_percent;
+      const discountResult = await db.execute(sql`SELECT discount_percent FROM discount_rules WHERE discount_tag = ${discountReason} AND is_active = true`);
+      const discountRows2 = discountResult.rows as Array<Record<string, unknown>>;
+      if (discountRows2.length > 0) {
+        discountPercent = discountRows2[0].discount_percent as number;
       }
     }
     
@@ -682,25 +641,12 @@ export async function createMemberWithDeal(input: AddMemberInput): Promise<AddMe
     
     try {
       const tags: string[] = [];
-      userId = await pool.query(
-        `INSERT INTO users (
+      userId = await db.execute(sql`INSERT INTO users (
           email, first_name, last_name, phone, role, tier, 
           membership_status, billing_provider, hubspot_id, 
           tags, discount_code, data_source, join_date, created_at, updated_at
-        ) VALUES ($1, $2, $3, $4, 'member', $5, 'active', 'hubspot', $6, $7, $9, 'staff_manual', $8, NOW(), NOW())
-        RETURNING id`,
-        [
-          normalizedEmail,
-          firstName,
-          lastName,
-          phone || null,
-          tier,
-          contactId,
-          JSON.stringify(tags),
-          startDate || getTodayPacific(),
-          discountReason || null
-        ]
-      );
+        ) VALUES (${normalizedEmail}, ${firstName}, ${lastName}, ${phone || null}, 'member', ${tier}, 'active', 'hubspot', ${contactId}, ${JSON.stringify(tags)}, ${discountReason || null}, 'staff_manual', ${startDate || getTodayPacific()}, NOW(), NOW())
+        RETURNING id`) as any;
     } catch (userError: unknown) {
       logger.error('[AddMember] Failed to create user in database:', { error: userError });
       return { success: false, error: 'Failed to create user record in database' };
@@ -1009,19 +955,17 @@ export async function syncTierToHubSpot(params: {
     return;
   }
   
-  const userResult = await pool.query(
-    'SELECT hubspot_id, billing_provider, membership_status FROM users WHERE LOWER(email) = $1',
-    [normalizedEmail]
-  );
+  const userResult = await db.execute(sql`SELECT hubspot_id, billing_provider, membership_status FROM users WHERE LOWER(email) = ${normalizedEmail}`);
   
-  if (userResult.rows.length === 0 || !userResult.rows[0].hubspot_id) {
+  const userRows = userResult.rows as Array<Record<string, unknown>>;
+  if (userRows.length === 0 || !userRows[0].hubspot_id) {
     logger.info(`[HubSpot TierSync] No HubSpot ID for ${normalizedEmail}, skipping sync`);
     return;
   }
   
-  const hubspotContactId = userResult.rows[0].hubspot_id;
-  const billingProvider = userResult.rows[0].billing_provider;
-  const membershipStatus = userResult.rows[0].membership_status;
+  const hubspotContactId = userRows[0].hubspot_id as string;
+  const billingProvider = userRows[0].billing_provider as string;
+  const membershipStatus = userRows[0].membership_status as string;
   
   // Map billing provider to HubSpot value
   const DB_BILLING_PROVIDER_TO_HUBSPOT: Record<string, string> = {
@@ -1031,10 +975,10 @@ export async function syncTierToHubSpot(params: {
     'manual': 'Manual',
     'comped': 'Comped'
   };
-  const hubspotBillingProvider = billingProvider ? (DB_BILLING_PROVIDER_TO_HUBSPOT[billingProvider.toLowerCase()] || 'Manual') : undefined;
+  const hubspotBillingProvider = billingProvider ? (DB_BILLING_PROVIDER_TO_HUBSPOT[(billingProvider as string).toLowerCase()] || 'Manual') : undefined;
   
   // Determine lifecycle stage based on membership status
-  const isActive = membershipStatus && ['active', 'trialing', 'past_due'].includes(membershipStatus.toLowerCase());
+  const isActive = membershipStatus && ['active', 'trialing', 'past_due'].includes((membershipStatus as string).toLowerCase());
   const lifecyclestage = isActive ? 'customer' : 'other';
   
   try {

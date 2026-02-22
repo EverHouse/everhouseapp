@@ -1,7 +1,6 @@
 import { logger } from '../core/logger';
 import { Router, Request, Response } from "express";
 import { db } from "../db";
-import { pool } from "../core/db";
 import { legacyPurchases, users, legacyImportJobs, hubspotDeals, hubspotProductMappings, hubspotLineItems } from "../../shared/schema";
 import { eq, desc, and, sql, gte, lte } from "drizzle-orm";
 import { isStaffOrAdmin, isAdmin } from "../core/middleware";
@@ -287,12 +286,11 @@ async function getUnifiedPurchasesForEmail(email: string): Promise<UnifiedPurcha
   let unifiedPaymentIntents: UnifiedPurchase[] = [];
   
   if (userInfo?.id) {
-    const paymentIntentsResult = await pool.query(
-      `SELECT * FROM stripe_payment_intents 
-       WHERE (user_id = $1 OR user_id = $2)
+    const paymentIntentsResult = await db.execute(
+      sql`SELECT * FROM stripe_payment_intents 
+       WHERE (user_id = ${userInfo.id} OR user_id = ${normalizedEmail})
        AND status = 'succeeded'
-       ORDER BY created_at DESC`,
-      [userInfo.id, normalizedEmail]
+       ORDER BY created_at DESC`
     );
     
     unifiedPaymentIntents = paymentIntentsResult.rows.map((record: Record<string, unknown>) => ({
@@ -310,13 +308,12 @@ async function getUnifiedPurchasesForEmail(email: string): Promise<UnifiedPurcha
   
   let unifiedCashCheckPayments: UnifiedPurchase[] = [];
   
-  const cashCheckResult = await pool.query(
-    `SELECT * FROM admin_audit_log 
+  const cashCheckResult = await db.execute(
+    sql`SELECT * FROM admin_audit_log 
      WHERE resource_type = 'billing'
-     AND resource_id = $1 
+     AND resource_id = ${normalizedEmail} 
      AND action IN ('cash_payment_recorded', 'check_payment_recorded', 'cash_check_recorded')
-     ORDER BY created_at DESC`,
-    [normalizedEmail]
+     ORDER BY created_at DESC`
   );
   
   unifiedCashCheckPayments = cashCheckResult.rows.map((record: Record<string, unknown>) => {

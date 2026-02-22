@@ -2,7 +2,8 @@ import { logger } from '../core/logger';
 import { Router } from 'express';
 import Stripe from 'stripe';
 import { isStaffOrAdmin } from '../core/middleware';
-import { pool } from '../core/db';
+import { db } from '../db';
+import { sql } from 'drizzle-orm';
 import { getStripeClient } from '../core/stripe/client';
 import { isPlaceholderEmail } from '../core/stripe/customers';
 import { getBillingGroupByMemberEmail } from '../core/stripe/groupBilling';
@@ -83,11 +84,8 @@ async function findEligibleSubscription(
 }
 
 async function getMemberByEmail(email: string) {
-  const result = await pool.query(
-    `SELECT id, email, first_name, last_name, billing_provider, stripe_customer_id, mindbody_client_id, tier, billing_migration_requested_at
-     FROM users WHERE LOWER(email) = $1`,
-    [email.toLowerCase()]
-  );
+  const result = await db.execute(sql`SELECT id, email, first_name, last_name, billing_provider, stripe_customer_id, mindbody_client_id, tier, billing_migration_requested_at
+     FROM users WHERE LOWER(email) = ${email.toLowerCase()}`);
   return result.rows[0] || null;
 }
 
@@ -203,18 +201,18 @@ router.get('/api/member-billing/:email', isStaffOrAdmin, async (req, res) => {
     }
 
     try {
-      const outstandingResult = await pool.query(`
+      const outstandingResult = await db.execute(sql`
         SELECT 
           COALESCE(SUM(bp.cached_fee_cents), 0) as total_cents
         FROM booking_participants bp
         JOIN booking_sessions bs ON bs.id = bp.session_id
         JOIN booking_requests br ON br.session_id = bs.id
         LEFT JOIN users u ON bp.user_id = u.id
-        WHERE (LOWER(u.email) = LOWER($1) 
-               OR (bp.participant_type = 'owner' AND LOWER(br.user_email) = LOWER($1)))
+        WHERE (LOWER(u.email) = LOWER(${email}) 
+               OR (bp.participant_type = 'owner' AND LOWER(br.user_email) = LOWER(${email})))
           AND bp.payment_status = 'pending'
           AND COALESCE(bp.cached_fee_cents, 0) > 0
-      `, [email]);
+      `);
       const totalCents = parseInt(outstandingResult.rows[0]?.total_cents || '0');
       billingInfo.outstandingBalanceCents = totalCents;
       billingInfo.outstandingBalanceDollars = totalCents / 100;
@@ -235,7 +233,7 @@ router.get('/api/member-billing/:email/outstanding', isStaffOrAdmin, async (req,
   try {
     const email = req.params.email as string;
 
-    const result = await pool.query(`
+    const result = await db.execute(sql`
       SELECT 
         br.id as booking_id,
         br.trackman_booking_id,
@@ -253,12 +251,12 @@ router.get('/api/member-billing/:email/outstanding', isStaffOrAdmin, async (req,
       JOIN booking_requests br ON br.session_id = bs.id
       LEFT JOIN resources r ON br.resource_id = r.id
       LEFT JOIN users u ON bp.user_id = u.id
-      WHERE (LOWER(u.email) = LOWER($1) 
-             OR (bp.participant_type = 'owner' AND LOWER(br.user_email) = LOWER($1)))
+      WHERE (LOWER(u.email) = LOWER(${email}) 
+             OR (bp.participant_type = 'owner' AND LOWER(br.user_email) = LOWER(${email})))
         AND bp.payment_status IN ('pending')
         AND COALESCE(bp.cached_fee_cents, 0) > 0
       ORDER BY br.request_date DESC, br.start_time ASC
-    `, [email]);
+    `);
 
     const items = result.rows.map(row => {
       const feeCents = row.cached_fee_cents || 0;
@@ -310,10 +308,7 @@ router.put('/api/member-billing/:email/source', isStaffOrAdmin, async (req, res)
       return res.status(404).json({ error: 'Member not found' });
     }
 
-    await pool.query(
-      'UPDATE users SET billing_provider = $1, updated_at = NOW() WHERE LOWER(email) = $2',
-      [billingProvider, (email as string).toLowerCase()]
-    );
+    await db.execute(sql`UPDATE users SET billing_provider = ${billingProvider}, updated_at = NOW() WHERE LOWER(email) = ${(email as string).toLowerCase()}`);
 
     logger.info('[MemberBilling] Updated billing provider for to', { extra: { email, billingProvider } });
     
@@ -474,15 +469,12 @@ router.post('/api/member-billing/:email/cancel', isStaffOrAdmin, async (req, res
       cancel_at: cancelAtTimestamp,
     });
 
-    await pool.query(
-      `UPDATE users SET 
+    await db.execute(sql`UPDATE users SET 
         cancellation_requested_at = NOW(),
-        cancellation_effective_date = $1,
-        cancellation_reason = $2,
+        cancellation_effective_date = ${formatDatePacific(effectiveDate)},
+        cancellation_reason = ${reason || null},
         updated_at = NOW()
-       WHERE LOWER(email) = $3`,
-      [formatDatePacific(effectiveDate), reason || null, (email as string).toLowerCase()]
-    );
+       WHERE LOWER(email) = ${(email as string).toLowerCase()}`);
 
     logger.info('[MemberBilling] Set cancel_at for subscription , email , effective', { extra: { subscriptionId: subscription.id, email, effectiveDateToISOString: effectiveDate.toISOString() } });
     
@@ -542,15 +534,12 @@ router.post('/api/member-billing/:email/undo-cancellation', isStaffOrAdmin, asyn
       cancel_at_period_end: false,
     });
 
-    await pool.query(
-      `UPDATE users SET 
+    await db.execute(sql`UPDATE users SET 
         cancellation_requested_at = NULL,
         cancellation_effective_date = NULL,
         cancellation_reason = NULL,
         updated_at = NOW()
-       WHERE LOWER(email) = $1`,
-      [(email as string).toLowerCase()]
-    );
+       WHERE LOWER(email) = ${(email as string).toLowerCase()}`);
 
     logger.info('[MemberBilling] Undid cancellation for subscription , email', { extra: { pendingCancelSubId: pendingCancelSub.id, email } });
     
@@ -683,10 +672,13 @@ router.post('/api/member-billing/:email/discount', isStaffOrAdmin, async (req, r
     let appliedCouponId = couponId;
 
     if (!couponId && percentOff) {
+      const idempotencyKey = `coupon_member_${email}_${percentOff}_${duration}`;
       const coupon = await stripe.coupons.create({
         percent_off: percentOff,
         duration: duration as 'once' | 'forever',
         name: `Staff discount for ${email}`,
+      }, {
+        idempotencyKey,
       });
       appliedCouponId = coupon.id;
     }

@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { isAuthenticated } from '../../core/middleware';
 import { db } from '../../db';
-import { pool, isProduction } from '../../core/db';
+import { isProduction } from '../../core/db';
 import { 
   bookingRequests, 
   resources, 
@@ -264,7 +264,7 @@ router.get('/api/member/dashboard-data', isAuthenticated, async (req, res) => {
     
     const fetchWellnessClasses = async () => {
       try {
-        const query = `
+        const result = await db.execute(sql`
           SELECT wc.*, 
             COALESCE(e.enrolled_count, 0)::integer as enrolled_count,
             COALESCE(w.waitlist_count, 0)::integer as waitlist_count,
@@ -287,10 +287,9 @@ router.get('/api/member/dashboard-data', isAuthenticated, async (req, res) => {
             WHERE status = 'confirmed' AND is_waitlisted = true
             GROUP BY class_id
           ) w ON wc.id = w.class_id
-          WHERE wc.archived_at IS NULL AND wc.date >= $1
+          WHERE wc.archived_at IS NULL AND wc.date >= ${todayPacific}
           ORDER BY wc.date, wc.time
-        `;
-        const result = await pool.query(query, [todayPacific]);
+        `);
         return result.rows;
       } catch (error: unknown) {
         logger.warn('[dashboard-data] Failed to fetch wellness classes', { error: error instanceof Error ? error : new Error(String(error)) });

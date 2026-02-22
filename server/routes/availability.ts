@@ -1,5 +1,6 @@
 import { Router } from 'express';
-import { pool, isProduction } from '../core/db';
+import { db } from '../db';
+import { sql } from 'drizzle-orm';
 import { isStaffOrAdmin } from '../core/middleware';
 import { getCalendarBusyTimes, getCalendarIdByName, CALENDAR_CONFIG } from '../core/calendar/index';
 import { getTodayPacific, getPacificDateParts } from '../utils/dateUtils';
@@ -131,46 +132,22 @@ router.post('/api/availability/batch', async (req, res) => {
     
     // Fetch all data in parallel with optimized queries
     const [resourcesResult, bookedResult, blockedResult, unmatchedResult, webhookCacheResult] = await Promise.all([
-      // Get resource types for all requested resources
-      pool.query(
-        `SELECT id, type FROM resources WHERE id = ANY($1)`,
-        [resource_ids]
-      ),
-      // Fetch all booked slots for all resources in one query
-      // Include both 'approved' and 'confirmed' statuses as active bookings that block availability
+      db.execute(sql`SELECT id, type FROM resources WHERE id = ANY(${resource_ids})`),
       ignoreId
-        ? pool.query(
-            `SELECT resource_id, start_time, end_time FROM booking_requests 
-             WHERE resource_id = ANY($1) AND request_date = $2 AND status IN ('approved', 'confirmed') AND id != $3`,
-            [resource_ids, date, ignoreId]
-          )
-        : pool.query(
-            `SELECT resource_id, start_time, end_time FROM booking_requests 
-             WHERE resource_id = ANY($1) AND request_date = $2 AND status IN ('approved', 'confirmed')`,
-            [resource_ids, date]
-          ),
-      // Fetch all blocked slots for all resources in one query
-      pool.query(
-        `SELECT resource_id, start_time, end_time FROM availability_blocks 
-         WHERE resource_id = ANY($1) AND block_date = $2`,
-        [resource_ids, date]
-      ),
-      // Fetch all unmatched Trackman bookings (excluding those already in booking_requests)
-      pool.query(
-        `SELECT tub.bay_number, tub.start_time, tub.end_time FROM trackman_unmatched_bookings tub
-         WHERE tub.bay_number = ANY($1::text[]) AND tub.booking_date = $2 AND tub.resolved_at IS NULL
+        ? db.execute(sql`SELECT resource_id, start_time, end_time FROM booking_requests 
+             WHERE resource_id = ANY(${resource_ids}) AND request_date = ${date} AND status IN ('approved', 'confirmed') AND id != ${ignoreId}`)
+        : db.execute(sql`SELECT resource_id, start_time, end_time FROM booking_requests 
+             WHERE resource_id = ANY(${resource_ids}) AND request_date = ${date} AND status IN ('approved', 'confirmed')`),
+      db.execute(sql`SELECT resource_id, start_time, end_time FROM availability_blocks 
+         WHERE resource_id = ANY(${resource_ids}) AND block_date = ${date}`),
+      db.execute(sql`SELECT tub.bay_number, tub.start_time, tub.end_time FROM trackman_unmatched_bookings tub
+         WHERE tub.bay_number = ANY(${resource_ids.map(String)}::text[]) AND tub.booking_date = ${date} AND tub.resolved_at IS NULL
            AND NOT EXISTS (
              SELECT 1 FROM booking_requests br 
              WHERE br.trackman_booking_id = tub.trackman_booking_id::text
-           )`,
-        [resource_ids.map(String), date]
-      ).catch(() => ({ rows: [] })), // Non-blocking if table doesn't exist
-      // Fetch Trackman webhook cache slots (real-time availability from webhooks)
-      pool.query(
-        `SELECT resource_id, start_time, end_time FROM trackman_bay_slots 
-         WHERE resource_id = ANY($1) AND slot_date = $2 AND status = 'booked'`,
-        [resource_ids, date]
-      ).catch(() => ({ rows: [] })) // Non-blocking if table doesn't exist
+           )`).catch(() => ({ rows: [] })),
+      db.execute(sql`SELECT resource_id, start_time, end_time FROM trackman_bay_slots 
+         WHERE resource_id = ANY(${resource_ids}) AND slot_date = ${date} AND status = 'booked'`).catch(() => ({ rows: [] }))
     ]);
     
     // Build resource type map
@@ -279,10 +256,7 @@ router.get('/api/availability', async (req, res) => {
     const slotIncrement = 15;
     
     // Get resource type to determine business hours
-    const resourceResult = await pool.query(
-      `SELECT type FROM resources WHERE id = $1`,
-      [resource_id]
-    );
+    const resourceResult = await db.execute(sql`SELECT type FROM resources WHERE id = ${resource_id}`);
     const resourceType = resourceResult.rows[0]?.type || 'simulator';
     
     // When rescheduling, ignore the original booking so its slot shows as available
@@ -290,36 +264,24 @@ router.get('/api/availability', async (req, res) => {
     
     // Include both 'approved' and 'confirmed' statuses as active bookings that block availability
     const bookedSlots = ignoreId
-      ? await pool.query(
-          `SELECT start_time, end_time FROM booking_requests 
-           WHERE resource_id = $1 AND request_date = $2 AND status IN ('approved', 'confirmed') AND id != $3`,
-          [resource_id, date, ignoreId]
-        )
-      : await pool.query(
-          `SELECT start_time, end_time FROM booking_requests 
-           WHERE resource_id = $1 AND request_date = $2 AND status IN ('approved', 'confirmed')`,
-          [resource_id, date]
-        );
+      ? await db.execute(sql`SELECT start_time, end_time FROM booking_requests 
+           WHERE resource_id = ${resource_id} AND request_date = ${date} AND status IN ('approved', 'confirmed') AND id != ${ignoreId}`)
+      : await db.execute(sql`SELECT start_time, end_time FROM booking_requests 
+           WHERE resource_id = ${resource_id} AND request_date = ${date} AND status IN ('approved', 'confirmed')`);
     
-    const blockedSlots = await pool.query(
-      `SELECT start_time, end_time FROM availability_blocks 
-       WHERE resource_id = $1 AND block_date = $2`,
-      [resource_id, date]
-    );
+    const blockedSlots = await db.execute(sql`SELECT start_time, end_time FROM availability_blocks 
+       WHERE resource_id = ${resource_id} AND block_date = ${date}`);
     
     // Also check unmatched Trackman bookings (unresolved imports occupy time slots)
     // Exclude entries that already exist in booking_requests to prevent double-counting
     let unmatchedTrackmanSlots: { rows: { start_time: string; end_time: string }[] } = { rows: [] };
     try {
-      unmatchedTrackmanSlots = await pool.query(
-        `SELECT tub.start_time, tub.end_time FROM trackman_unmatched_bookings tub
-         WHERE tub.bay_number = $1::text AND tub.booking_date = $2 AND tub.resolved_at IS NULL
+      unmatchedTrackmanSlots = await db.execute(sql`SELECT tub.start_time, tub.end_time FROM trackman_unmatched_bookings tub
+         WHERE tub.bay_number = ${resource_id}::text AND tub.booking_date = ${date} AND tub.resolved_at IS NULL
            AND NOT EXISTS (
              SELECT 1 FROM booking_requests br 
              WHERE br.trackman_booking_id = tub.trackman_booking_id::text
-           )`,
-        [resource_id, date]
-      );
+           )`);
     } catch (e: unknown) {
       // Non-blocking: continue without unmatched booking checks if table doesn't exist
       logger.error('Failed to fetch unmatched Trackman bookings (non-blocking)', { extra: { error: e } });
@@ -464,11 +426,8 @@ router.post('/api/availability-blocks', isStaffOrAdmin, async (req, res) => {
       return res.status(400).json({ error: 'Missing required fields' });
     }
     
-    const result = await pool.query(
-      `INSERT INTO availability_blocks (resource_id, block_date, start_time, end_time, block_type, notes, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
-      [resource_id, block_date, start_time, end_time, block_type, notes, created_by]
-    );
+    const result = await db.execute(sql`INSERT INTO availability_blocks (resource_id, block_date, start_time, end_time, block_type, notes, created_by)
+       VALUES (${resource_id}, ${block_date}, ${start_time}, ${end_time}, ${block_type}, ${notes}, ${created_by}) RETURNING *`);
     
     if (result.rows[0]) {
       logFromRequest(req, 'create_availability_block', 'availability', String(result.rows[0].id), undefined, { resource_id, block_date, start_time, end_time });
@@ -486,29 +445,27 @@ router.get('/api/availability-blocks', async (req, res) => {
   try {
     const { start_date, end_date, resource_id } = req.query;
     
-    let query = `SELECT ab.*, r.name as resource_name, fc.title as closure_title 
+    const conditions: ReturnType<typeof sql>[] = [];
+    
+    if (start_date) {
+      conditions.push(sql`AND ab.block_date >= ${start_date}`);
+    }
+    if (end_date) {
+      conditions.push(sql`AND ab.block_date <= ${end_date}`);
+    }
+    if (resource_id) {
+      conditions.push(sql`AND ab.resource_id = ${resource_id}`);
+    }
+    
+    const result = await db.execute(sql.join([
+      sql`SELECT ab.*, r.name as resource_name, fc.title as closure_title 
                  FROM availability_blocks ab
                  JOIN resources r ON ab.resource_id = r.id
                  LEFT JOIN facility_closures fc ON ab.closure_id = fc.id
-                 WHERE 1=1`;
-    const params: (string | number)[] = [];
-    
-    if (start_date) {
-      params.push(start_date as any);
-      query += ` AND ab.block_date >= $${params.length}`;
-    }
-    if (end_date) {
-      params.push(end_date as any);
-      query += ` AND ab.block_date <= $${params.length}`;
-    }
-    if (resource_id) {
-      params.push(resource_id as any);
-      query += ` AND ab.resource_id = $${params.length}`;
-    }
-    
-    query += ' ORDER BY ab.block_date, ab.start_time';
-    
-    const result = await pool.query(query, params);
+                 WHERE 1=1`,
+      ...conditions,
+      sql`ORDER BY ab.block_date, ab.start_time`
+    ], sql` `));
     res.json(result.rows);
   } catch (error: unknown) {
     logger.error('Availability blocks error', { error: error instanceof Error ? error : new Error(String(error)) });
@@ -521,17 +478,14 @@ router.put('/api/availability-blocks/:id', isStaffOrAdmin, async (req, res) => {
     const { id } = req.params;
     const { resource_id, block_date, start_time, end_time, block_type, notes } = req.body;
     
-    const result = await pool.query(
-      `UPDATE availability_blocks 
-       SET resource_id = COALESCE($1, resource_id),
-           block_date = COALESCE($2, block_date),
-           start_time = COALESCE($3, start_time),
-           end_time = COALESCE($4, end_time),
-           block_type = COALESCE($5, block_type),
-           notes = $6
-       WHERE id = $7 RETURNING *`,
-      [resource_id, block_date, start_time, end_time, block_type, notes, id]
-    );
+    const result = await db.execute(sql`UPDATE availability_blocks 
+       SET resource_id = COALESCE(${resource_id}, resource_id),
+           block_date = COALESCE(${block_date}, block_date),
+           start_time = COALESCE(${start_time}, start_time),
+           end_time = COALESCE(${end_time}, end_time),
+           block_type = COALESCE(${block_type}, block_type),
+           notes = ${notes}
+       WHERE id = ${id} RETURNING *`);
     
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Block not found' });
@@ -548,7 +502,7 @@ router.put('/api/availability-blocks/:id', isStaffOrAdmin, async (req, res) => {
 router.delete('/api/availability-blocks/:id', isStaffOrAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    await pool.query('DELETE FROM availability_blocks WHERE id = $1', [id]);
+    await db.execute(sql`DELETE FROM availability_blocks WHERE id = ${id}`);
     logFromRequest(req, 'delete_availability_block', 'availability', id as string);
     res.json({ success: true });
   } catch (error: unknown) {

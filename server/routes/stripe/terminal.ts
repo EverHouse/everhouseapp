@@ -6,7 +6,8 @@ import { createInvoiceWithLineItems, confirmPaymentSuccess, type CartLineItem } 
 import { createDraftBookingFeeInvoice, type BookingFeeLineItem } from '../../core/stripe/invoices';
 import { getBookingInvoiceId } from '../../core/billing/bookingInvoiceService';
 import { logFromRequest } from '../../core/auditLog';
-import { pool } from '../../core/db';
+import { db } from '../../db';
+import { sql } from 'drizzle-orm';
 import { getErrorMessage, getErrorCode } from '../../utils/errorUtils';
 import { findOrCreateHubSpotContact } from '../../core/hubspot/members';
 import { getSessionUser } from '../../types/session';
@@ -146,35 +147,29 @@ router.post('/api/stripe/terminal/process-payment', isStaffOrAdmin, async (req: 
             const resolvedTerminal = await resolveTerminalUser(metadata.ownerEmail);
             if (resolvedTerminal) {
               if (!resolvedTerminal.stripeCustomerId) {
-                const terminalUserCheck = await pool.query('SELECT archived_at FROM users WHERE id = $1', [resolvedTerminal.userId]);
-                await pool.query(
-                  'UPDATE users SET stripe_customer_id = $1, archived_at = NULL, archived_by = NULL, updated_at = NOW() WHERE id = $2',
-                  [customerId, resolvedTerminal.userId]
-                );
-                if (terminalUserCheck.rows[0]?.archived_at) {
+                const terminalUserCheck = await db.execute(sql`SELECT archived_at FROM users WHERE id = ${resolvedTerminal.userId}`);
+                await db.execute(sql`UPDATE users SET stripe_customer_id = ${customerId}, archived_at = NULL, archived_by = NULL, updated_at = NOW() WHERE id = ${resolvedTerminal.userId}`);
+                if ((terminalUserCheck.rows as Array<Record<string, unknown>>)[0]?.archived_at) {
                   logger.info('[Auto-Unarchive] User unarchived after receiving Stripe customer ID', { extra: { resolvedTerminalPrimaryEmail: resolvedTerminal.primaryEmail } });
                 }
               }
               logger.info('[Terminal] Linked Stripe customer to existing user via', { extra: { resolvedTerminalPrimaryEmail: resolvedTerminal.primaryEmail, resolvedTerminalMatchType: resolvedTerminal.matchType } });
             } else {
-              const termExclusionCheck = await pool.query('SELECT 1 FROM sync_exclusions WHERE email = $1', [metadata.ownerEmail.toLowerCase()]);
+              const termExclusionCheck = await db.execute(sql`SELECT 1 FROM sync_exclusions WHERE email = ${metadata.ownerEmail.toLowerCase()}`);
               if (termExclusionCheck.rows.length > 0) {
                 logger.info('[Terminal] Skipping visitor creation for permanently deleted member', { extra: { email: metadata.ownerEmail } });
               } else {
                 const crypto = await import('crypto');
                 const visitorId = crypto.randomUUID();
-                await pool.query(
-                  `INSERT INTO users (id, email, first_name, last_name, membership_status, stripe_customer_id, data_source, visitor_type, role, created_at, updated_at)
-                   VALUES ($1, $2, $3, $4, 'visitor', $5, 'APP', 'day_pass', 'visitor', NOW(), NOW())
+                await db.execute(sql`INSERT INTO users (id, email, first_name, last_name, membership_status, stripe_customer_id, data_source, visitor_type, role, created_at, updated_at)
+                   VALUES (${visitorId}, ${metadata.ownerEmail}, ${firstName}, ${lastName}, 'visitor', ${customerId}, 'APP', 'day_pass', 'visitor', NOW(), NOW())
                    ON CONFLICT (email) DO UPDATE SET
                      stripe_customer_id = COALESCE(users.stripe_customer_id, EXCLUDED.stripe_customer_id),
                      first_name = COALESCE(NULLIF(users.first_name, ''), EXCLUDED.first_name),
                      last_name = COALESCE(NULLIF(users.last_name, ''), EXCLUDED.last_name),
                      archived_at = NULL,
                      archived_by = NULL,
-                     updated_at = NOW()`,
-                  [visitorId, metadata.ownerEmail, firstName, lastName, customerId]
-                );
+                     updated_at = NOW()`);
                 logger.info('[Terminal] Created/updated visitor record for POS customer', { extra: { metadataOwnerEmail: metadata.ownerEmail } });
                 
                 // Background sync visitor to HubSpot for CRM tracking
@@ -209,15 +204,12 @@ router.post('/api/stripe/terminal/process-payment', isStaffOrAdmin, async (req: 
 
     if (isBookingFee && metadata?.sessionId) {
       try {
-        const pendingParticipants = await pool.query(
-          `SELECT id, cached_fee_cents FROM booking_participants
-           WHERE session_id = $1 AND payment_status = 'pending' AND cached_fee_cents > 0`,
-          [parseInt(metadata.sessionId)]
-        );
+        const pendingParticipants = await db.execute(sql`SELECT id, cached_fee_cents FROM booking_participants
+           WHERE session_id = ${parseInt(metadata.sessionId)} AND payment_status = 'pending' AND cached_fee_cents > 0`);
         if (pendingParticipants.rows.length > 0) {
-          const fees = pendingParticipants.rows.map((r: { id: number; cached_fee_cents: number }) => ({
-            id: r.id,
-            amountCents: r.cached_fee_cents
+          const fees = (pendingParticipants.rows as Array<Record<string, unknown>>).map((r: Record<string, unknown>) => ({
+            id: r.id as number,
+            amountCents: r.cached_fee_cents as number
           }));
           const serialized = JSON.stringify(fees);
           if (serialized.length <= 490) {
@@ -236,10 +228,7 @@ router.post('/api/stripe/terminal/process-payment', isStaffOrAdmin, async (req: 
     let finalDescription = description || 'Terminal payment';
     if (metadata?.bookingId) {
       try {
-        const bookingLookup = await pool.query(
-          'SELECT trackman_booking_id FROM booking_requests WHERE id = $1',
-          [metadata.bookingId]
-        );
+        const bookingLookup = await db.execute(sql`SELECT trackman_booking_id FROM booking_requests WHERE id = ${metadata.bookingId}`);
         const trackmanId = bookingLookup.rows[0]?.trackman_booking_id;
         const displayId = trackmanId || metadata.bookingId;
         if (finalDescription && !finalDescription.startsWith('#')) {
@@ -300,30 +289,24 @@ router.post('/api/stripe/terminal/process-payment', isStaffOrAdmin, async (req: 
           if (!invoiceId) {
             const sessionIdVal = parseInt(metadata.sessionId);
 
-            const participantRows = await pool.query(
-              `SELECT id, display_name, participant_type, cached_fee_cents
+            const participantRows = await db.execute(sql`SELECT id, display_name, participant_type, cached_fee_cents
                FROM booking_participants
-               WHERE session_id = $1 AND payment_status = 'pending' AND cached_fee_cents > 0`,
-              [sessionIdVal]
-            );
+               WHERE session_id = ${sessionIdVal} AND payment_status = 'pending' AND cached_fee_cents > 0`);
 
             if (participantRows.rows.length > 0) {
-              const feeLineItems: BookingFeeLineItem[] = participantRows.rows.map((r: { id: number; display_name: string; participant_type: string; cached_fee_cents: number }) => {
+              const feeLineItems: BookingFeeLineItem[] = (participantRows.rows as Array<Record<string, unknown>>).map((r: Record<string, unknown>) => {
                 const isGuest = r.participant_type === 'guest';
                 return {
-                  participantId: r.id,
-                  displayName: r.display_name || (isGuest ? 'Guest' : 'Member'),
+                  participantId: r.id as number,
+                  displayName: (r.display_name as string) || (isGuest ? 'Guest' : 'Member'),
                   participantType: r.participant_type as 'owner' | 'member' | 'guest',
-                  overageCents: isGuest ? 0 : r.cached_fee_cents,
-                  guestCents: isGuest ? r.cached_fee_cents : 0,
-                  totalCents: r.cached_fee_cents,
+                  overageCents: isGuest ? 0 : (r.cached_fee_cents as number),
+                  guestCents: isGuest ? (r.cached_fee_cents as number) : 0,
+                  totalCents: r.cached_fee_cents as number,
                 };
               });
 
-              const trackmanLookup = await pool.query(
-                'SELECT trackman_booking_id FROM booking_requests WHERE id = $1',
-                [bookingIdVal]
-              );
+              const trackmanLookup = await db.execute(sql`SELECT trackman_booking_id FROM booking_requests WHERE id = ${bookingIdVal}`);
               const trackmanBookingId = trackmanLookup.rows[0]?.trackman_booking_id || null;
 
               const draftResult = await createDraftBookingFeeInvoice({
@@ -364,25 +347,10 @@ router.post('/api/stripe/terminal/process-payment', isStaffOrAdmin, async (req: 
       try {
         const bookingIdVal = isBookingFee && metadata?.bookingId ? parseInt(metadata.bookingId) || null : null;
         const sessionIdVal = isBookingFee && metadata?.sessionId ? parseInt(metadata.sessionId) || null : null;
-        await pool.query(
-          `INSERT INTO stripe_payment_intents 
+        await db.execute(sql`INSERT INTO stripe_payment_intents 
            (user_id, stripe_payment_intent_id, stripe_customer_id, amount_cents, purpose, description, status, product_id, product_name, booking_id, session_id)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-           ON CONFLICT (stripe_payment_intent_id) DO NOTHING`,
-          [
-            metadata?.userId || `guest-${customerId || 'terminal'}`,
-            paymentIntent.id,
-            customerId || null,
-            Math.round(amount),
-            isBookingFee ? 'booking_fee' : 'one_time_purchase',
-            finalDescription,
-            'pending',
-            null,
-            metadata?.items || null,
-            bookingIdVal,
-            sessionIdVal
-          ]
-        );
+           VALUES (${metadata?.userId || `guest-${customerId || 'terminal'}`}, ${paymentIntent.id}, ${customerId || null}, ${Math.round(amount)}, ${isBookingFee ? 'booking_fee' : 'one_time_purchase'}, ${finalDescription}, 'pending', ${null}, ${metadata?.items || null}, ${bookingIdVal}, ${sessionIdVal})
+           ON CONFLICT (stripe_payment_intent_id) DO NOTHING`);
       } catch (dbErr: unknown) {
         logger.warn('[Terminal] Non-blocking: Could not save local payment record', { extra: { dbErr: getErrorMessage(dbErr) } });
       }
@@ -491,10 +459,7 @@ router.get('/api/stripe/terminal/payment-status/:paymentIntentId', isStaffOrAdmi
 
     if (paymentIntent.status === 'succeeded') {
       try {
-        const localRecord = await pool.query(
-          `SELECT id, status FROM stripe_payment_intents WHERE stripe_payment_intent_id = $1`,
-          [paymentIntentId]
-        );
+        const localRecord = await db.execute(sql`SELECT id, status FROM stripe_payment_intents WHERE stripe_payment_intent_id = ${paymentIntentId}`);
         if (localRecord.rows.length > 0 && localRecord.rows[0].status !== 'succeeded') {
           const result = await confirmPaymentSuccess(paymentIntentId as string, 'system', 'Terminal auto-sync');
           logger.info('[Terminal] Auto-synced payment via confirmPaymentSuccess', { extra: { paymentIntentId, result } });
@@ -620,10 +585,7 @@ router.post('/api/stripe/terminal/process-subscription-payment', isStaffOrAdmin,
       return res.status(400).json({ error: 'User ID is required' });
     }
     
-    const userCheck = await pool.query(
-      'SELECT id, email, membership_status FROM users WHERE id = $1',
-      [userId]
-    );
+    const userCheck = await db.execute(sql`SELECT id, email, membership_status FROM users WHERE id = ${userId}`);
     if (userCheck.rows.length === 0) {
       return res.status(400).json({ error: 'User not found. Cannot process payment without a linked member account.' });
     }
@@ -727,10 +689,7 @@ router.post('/api/stripe/terminal/process-subscription-payment', isStaffOrAdmin,
 
       let subDescription = 'Membership activation';
       try {
-        const userTier = await pool.query(
-          'SELECT t.name AS tier_name FROM users u JOIN membership_tiers t ON u.membership_tier = t.id WHERE u.id = $1',
-          [userId]
-        );
+        const userTier = await db.execute(sql`SELECT t.name AS tier_name FROM users u JOIN membership_tiers t ON u.membership_tier = t.id WHERE u.id = ${userId}`);
         if (userTier.rows[0]?.tier_name) {
           subDescription = `Membership activation - ${userTier.rows[0].tier_name}`;
         }

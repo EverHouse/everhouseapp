@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import Stripe from 'stripe';
-import { pool } from '../db';
+import { db } from '../../db';
+import { sql } from 'drizzle-orm';
 import { logBillingAudit } from '../auditLog';
 import { getStripeClient } from './client';
 import { getOrCreateStripeCustomer } from './customers';
@@ -79,16 +80,13 @@ export async function createPaymentIntent(
   }
 
   if (bookingId) {
-    const existingIntentResult = await pool.query(
-      `SELECT stripe_payment_intent_id, status, amount_cents 
+    const existingIntentResult = await db.execute(sql`SELECT stripe_payment_intent_id, status, amount_cents 
        FROM stripe_payment_intents 
-       WHERE booking_id = $1 
-       AND amount_cents = $2
+       WHERE booking_id = ${bookingId} 
+       AND amount_cents = ${amountCents}
        AND purpose IN ('prepayment', 'booking_fee')
        AND status NOT IN ('canceled', 'cancelled', 'refunded', 'failed', 'succeeded')
-       LIMIT 1`,
-      [bookingId, amountCents]
-    );
+       LIMIT 1`);
 
     if (existingIntentResult.rows.length > 0) {
       const existingIntent = existingIntentResult.rows[0];
@@ -148,12 +146,9 @@ export async function createPaymentIntent(
 
   const dbUserId = userId === 'guest' ? `guest-${customerId}` : userId;
   
-  await pool.query(
-    `INSERT INTO stripe_payment_intents 
+  await db.execute(sql`INSERT INTO stripe_payment_intents 
      (user_id, stripe_payment_intent_id, stripe_customer_id, amount_cents, purpose, booking_id, session_id, description, status, product_id, product_name)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
-    [dbUserId, paymentIntent.id, customerId, amountCents, purpose, bookingId || null, sessionId || null, description, 'pending', productId || null, productName || null]
-  );
+     VALUES (${dbUserId}, ${paymentIntent.id}, ${customerId}, ${amountCents}, ${purpose}, ${bookingId || null}, ${sessionId || null}, ${description}, 'pending', ${productId || null}, ${productName || null})`);
 
   logger.info(`[Stripe] Created PaymentIntent ${paymentIntent.id} for ${purpose}: $${(amountCents / 100).toFixed(2)}${productName ? ` (${productName})` : ''}`);
 
@@ -335,21 +330,21 @@ export async function confirmPaymentSuccess(
 
     if (!result.success) {
       logger.error(`[Stripe] PaymentStatusService failed:`, { error: result.error });
-      // Fall back to updating just stripe_payment_intents
-      const queryClient = txClient || pool;
-      await queryClient.query(
-        `UPDATE stripe_payment_intents 
-         SET status = 'succeeded', updated_at = NOW() 
-         WHERE stripe_payment_intent_id = $1`,
-        [paymentIntentId]
-      );
+      if (txClient) {
+        await txClient.query(
+          `UPDATE stripe_payment_intents 
+           SET status = 'succeeded', updated_at = NOW() 
+           WHERE stripe_payment_intent_id = $1`,
+          [paymentIntentId]
+        );
+      } else {
+        await db.execute(sql`UPDATE stripe_payment_intents 
+           SET status = 'succeeded', updated_at = NOW() 
+           WHERE stripe_payment_intent_id = ${paymentIntentId}`);
+      }
     }
 
-    // Log to billing audit log
-    const localRecord = await pool.query(
-      'SELECT * FROM stripe_payment_intents WHERE stripe_payment_intent_id = $1',
-      [paymentIntentId]
-    );
+    const localRecord = await db.execute(sql`SELECT * FROM stripe_payment_intents WHERE stripe_payment_intent_id = ${paymentIntentId}`);
 
     if (localRecord.rows[0]) {
       const record = localRecord.rows[0];
@@ -385,10 +380,7 @@ export async function confirmPaymentSuccess(
 export async function getPaymentIntentStatus(
   paymentIntentId: string
 ): Promise<{ status: string; amountCents: number; purpose: string } | null> {
-  const result = await pool.query(
-    'SELECT status, amount_cents, purpose FROM stripe_payment_intents WHERE stripe_payment_intent_id = $1',
-    [paymentIntentId]
-  );
+  const result = await db.execute(sql`SELECT status, amount_cents, purpose FROM stripe_payment_intents WHERE stripe_payment_intent_id = ${paymentIntentId}`);
 
   if (result.rows.length === 0) {
     return null;
@@ -408,12 +400,9 @@ export async function cancelPaymentIntent(
     const stripe = await getStripeClient();
     await stripe.paymentIntents.cancel(paymentIntentId);
 
-    await pool.query(
-      `UPDATE stripe_payment_intents 
+    await db.execute(sql`UPDATE stripe_payment_intents 
        SET status = 'canceled', updated_at = NOW() 
-       WHERE stripe_payment_intent_id = $1`,
-      [paymentIntentId]
-    );
+       WHERE stripe_payment_intent_id = ${paymentIntentId}`);
 
     logger.info(`[Stripe] Payment ${paymentIntentId} canceled`);
     return { success: true };
@@ -484,13 +473,9 @@ export async function createBalanceAwarePayment(params: {
         }
       );
 
-      // Log to database
-      await pool.query(
-        `INSERT INTO stripe_payment_intents 
+      await db.execute(sql`INSERT INTO stripe_payment_intents 
          (user_id, stripe_payment_intent_id, stripe_customer_id, amount_cents, purpose, booking_id, session_id, description, status)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-        [email, `balance-${balanceTransaction.id}`, stripeCustomerId, amountCents, purpose, bookingId || null, sessionId || null, description, 'succeeded']
-      );
+         VALUES (${email}, ${`balance-${balanceTransaction.id}`}, ${stripeCustomerId}, ${amountCents}, ${purpose}, ${bookingId || null}, ${sessionId || null}, ${description}, 'succeeded')`);
 
       logger.info(`[Stripe] Member payment fully covered by balance: $${(amountCents / 100).toFixed(2)} for ${email}`);
 
@@ -543,13 +528,9 @@ export async function createBalanceAwarePayment(params: {
       idempotencyKey
     });
 
-    // Log to database
-    await pool.query(
-      `INSERT INTO stripe_payment_intents 
+    await db.execute(sql`INSERT INTO stripe_payment_intents 
        (user_id, stripe_payment_intent_id, stripe_customer_id, amount_cents, purpose, booking_id, session_id, description, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-      [email, paymentIntent.id, stripeCustomerId, amountCents, purpose, bookingId || null, sessionId || null, description, 'pending']
-    );
+       VALUES (${email}, ${paymentIntent.id}, ${stripeCustomerId}, ${amountCents}, ${purpose}, ${bookingId || null}, ${sessionId || null}, ${description}, 'pending')`);
 
     logger.info(`[Stripe] Member payment: total $${(amountCents / 100).toFixed(2)}, card charge: $${(remainingCents / 100).toFixed(2)}, credit to consume: $${(balanceToApply / 100).toFixed(2)}`);
 
@@ -651,13 +632,9 @@ export async function chargeWithBalance(params: {
     const amountFromBalance = Math.max(0, Math.abs(startingBalance) - Math.abs(endingBalance));
     const amountCharged = Math.max(0, (paidInvoice.amount_paid || 0) - amountFromBalance);
 
-    // Log to database
-    await pool.query(
-      `INSERT INTO stripe_payment_intents 
+    await db.execute(sql`INSERT INTO stripe_payment_intents 
        (user_id, stripe_payment_intent_id, stripe_customer_id, amount_cents, purpose, booking_id, session_id, description, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-      [email, `invoice-${invoice.id}`, stripeCustomerId, amountCents, purpose, bookingId || null, sessionId || null, description, paidInvoice.status === 'paid' ? 'succeeded' : paidInvoice.status]
-    );
+       VALUES (${email}, ${`invoice-${invoice.id}`}, ${stripeCustomerId}, ${amountCents}, ${purpose}, ${bookingId || null}, ${sessionId || null}, ${description}, ${paidInvoice.status === 'paid' ? 'succeeded' : paidInvoice.status})`);
 
     logger.info(`[Stripe] Charged ${purpose} via invoice ${invoice.id}: $${(amountCents / 100).toFixed(2)} (balance: $${(amountFromBalance / 100).toFixed(2)}, card: $${(amountCharged / 100).toFixed(2)})`);
 

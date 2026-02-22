@@ -1,7 +1,8 @@
 import { getOrCreateStripeCustomer } from '../stripe/customers';
 import { type BookingFeeLineItem } from '../stripe/invoices';
 import { createDraftInvoiceForBooking } from './bookingInvoiceService';
-import { pool } from '../db';
+import { db } from '../../db';
+import { sql } from 'drizzle-orm';
 import { logger } from '../logger';
 
 export interface CreatePrepaymentIntentParams {
@@ -46,9 +47,8 @@ export async function createPrepaymentIntent(
     return null;
   }
 
-  const unmatchedCheck = await pool.query(
-    `SELECT is_unmatched, user_email, user_name FROM booking_requests WHERE id = $1 LIMIT 1`,
-    [bookingId]
+  const unmatchedCheck = await db.execute(
+    sql`SELECT is_unmatched, user_email, user_name FROM booking_requests WHERE id = ${bookingId} LIMIT 1`
   );
   if (unmatchedCheck.rows.length > 0) {
     const booking = unmatchedCheck.rows[0];
@@ -61,12 +61,11 @@ export async function createPrepaymentIntent(
   }
 
   if (userEmail) {
-    const exemptCheck = await pool.query(
-      `SELECT u.role, u.tier, COALESCE(tf.unlimited_access, false) as unlimited_access
+    const exemptCheck = await db.execute(
+      sql`SELECT u.role, u.tier, COALESCE(tf.unlimited_access, false) as unlimited_access
        FROM users u 
        LEFT JOIN tier_features tf ON LOWER(u.tier) = LOWER(tf.tier_name)
-       WHERE LOWER(u.email) = LOWER($1) LIMIT 1`,
-      [userEmail]
+       WHERE LOWER(u.email) = LOWER(${userEmail}) LIMIT 1`
     );
     if (exemptCheck.rows.length > 0) {
       const { role, tier, unlimited_access } = exemptCheck.rows[0];
@@ -81,9 +80,8 @@ export async function createPrepaymentIntent(
   }
 
   try {
-    const existingInvoice = await pool.query(
-      `SELECT stripe_invoice_id FROM booking_requests WHERE id = $1 LIMIT 1`,
-      [bookingId]
+    const existingInvoice = await db.execute(
+      sql`SELECT stripe_invoice_id FROM booking_requests WHERE id = ${bookingId} LIMIT 1`
     );
 
     if (existingInvoice.rows[0]?.stripe_invoice_id) {
@@ -91,12 +89,11 @@ export async function createPrepaymentIntent(
       return null;
     }
 
-    const resourceTypeResult = await pool.query(
-      `SELECT COALESCE(r.type, 'simulator') as resource_type
+    const resourceTypeResult = await db.execute(
+      sql`SELECT COALESCE(r.type, 'simulator') as resource_type
        FROM booking_requests br
        LEFT JOIN resources r ON br.resource_id = r.id
-       WHERE br.id = $1 LIMIT 1`,
-      [bookingId]
+       WHERE br.id = ${bookingId} LIMIT 1`
     );
     const resourceType = resourceTypeResult.rows[0]?.resource_type || 'simulator';
 
@@ -107,9 +104,8 @@ export async function createPrepaymentIntent(
       return null;
     }
 
-    const trackmanResult = await pool.query(
-      `SELECT trackman_booking_id FROM booking_requests WHERE id = $1 LIMIT 1`,
-      [bookingId]
+    const trackmanResult = await db.execute(
+      sql`SELECT trackman_booking_id FROM booking_requests WHERE id = ${bookingId} LIMIT 1`
     );
     const trackmanBookingId = trackmanResult.rows[0]?.trackman_booking_id || null;
 
@@ -156,12 +152,11 @@ async function buildParticipantLineItems(
   aggregateFees: { overageCents: number; guestCents: number }
 ): Promise<BookingFeeLineItem[]> {
   try {
-    const participantsResult = await pool.query(
-      `SELECT id, participant_type, display_name, cached_fee_cents
+    const participantsResult = await db.execute(
+      sql`SELECT id, participant_type, display_name, cached_fee_cents
        FROM booking_participants
-       WHERE session_id = $1 AND cached_fee_cents > 0
-       ORDER BY participant_type, id`,
-      [sessionId]
+       WHERE session_id = ${sessionId} AND cached_fee_cents > 0
+       ORDER BY participant_type, id`
     );
 
     if (participantsResult.rows.length === 0) {

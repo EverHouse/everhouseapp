@@ -1,6 +1,7 @@
 import { logger } from '../logger';
 import { getTierLimits, getMemberTierByEmail } from '../tierService';
-import { pool } from '../db';
+import { db } from '../../db';
+import { sql } from 'drizzle-orm';
 import { MemberService, isUUID, isEmail, normalizeEmail } from '../memberService';
 import { PRICING } from '../billing/pricingConfig';
 
@@ -147,72 +148,46 @@ export async function getDailyUsageFromLedger(
   resourceType?: string
 ): Promise<number> {
   try {
-    const params: (string | number | null)[] = [memberEmail, date];
-    let paramIdx = 3;
-
-    let excludeClause = '';
-    if (excludeSessionId) {
-      excludeClause = `AND ul.session_id != $${paramIdx}`;
-      params.push(excludeSessionId);
-      paramIdx++;
-    }
-
-    let resourceTypeClause = '';
-    if (resourceType) {
-      resourceTypeClause = `AND EXISTS (
+    const excludeClause = excludeSessionId ? sql`AND ul.session_id != ${excludeSessionId}` : sql``;
+    const resourceTypeClause = resourceType ? sql`AND EXISTS (
         SELECT 1 FROM resources r 
-        WHERE r.id = bs.resource_id AND r.type = $${paramIdx}
-      )`;
-      params.push(resourceType);
-    }
+        WHERE r.id = bs.resource_id AND r.type = ${resourceType}
+      )` : sql``;
 
-    const result = await pool.query(
-      `SELECT COALESCE(SUM(minutes_charged), 0) as total_minutes
+    const result = await db.execute(sql`SELECT COALESCE(SUM(minutes_charged), 0) as total_minutes
        FROM usage_ledger ul
        JOIN booking_sessions bs ON ul.session_id = bs.id
-       WHERE LOWER(ul.member_id) = LOWER($1)
-         AND bs.session_date = $2
+       WHERE LOWER(ul.member_id) = LOWER(${memberEmail})
+         AND bs.session_date = ${date}
          ${excludeClause}
-         ${resourceTypeClause}`,
-      params
-    );
+         ${resourceTypeClause}`);
     
-    // Safety check: warn if there are sessions with participants but no ledger entries
     try {
-      const warningParams: (string | number | null)[] = [memberEmail, date];
-      let warningExclude = '';
-      if (excludeSessionId) {
-        warningExclude = `AND bs.id != $3`;
-        warningParams.push(excludeSessionId);
-      }
+      const warningExclude = excludeSessionId ? sql`AND bs.id != ${excludeSessionId}` : sql``;
       
-      const missingCheck = await pool.query(
-        `SELECT COUNT(DISTINCT bs.id) as missing_count
+      const missingCheck = await db.execute(sql`SELECT COUNT(DISTINCT bs.id) as missing_count
          FROM booking_sessions bs
          JOIN booking_participants bp ON bp.session_id = bs.id
          JOIN users u ON bp.user_id = u.id
-         WHERE LOWER(u.email) = LOWER($1)
-           AND bs.session_date = $2
+         WHERE LOWER(u.email) = LOWER(${memberEmail})
+           AND bs.session_date = ${date}
            AND NOT EXISTS (
              SELECT 1 FROM usage_ledger ul 
              WHERE ul.session_id = bs.id 
-             AND LOWER(ul.member_id) = LOWER($1)
+             AND LOWER(ul.member_id) = LOWER(${memberEmail})
            )
-           ${warningExclude}`,
-        warningParams
-      );
+           ${warningExclude}`);
       
-      const missingCount = parseInt(missingCheck.rows[0]?.missing_count) || 0;
+      const missingCount = parseInt((missingCheck.rows[0] as Record<string, unknown>)?.missing_count as string) || 0;
       if (missingCount > 0) {
         logger.warn('[getDailyUsageFromLedger] Sessions with participants but no ledger entries detected', {
           extra: { memberEmail, date, missingSessionCount: missingCount }
         });
       }
     } catch (checkError: unknown) {
-      // Non-critical check, don't fail the main query
     }
 
-    return parseInt(result.rows[0].total_minutes) || 0;
+    return parseInt((result.rows[0] as Record<string, unknown>).total_minutes as string) || 0;
   } catch (error: unknown) {
     logger.error('[getDailyUsageFromLedger] Error:', { error });
     return 0;
@@ -232,17 +207,15 @@ export async function getGuestPassInfo(
       return { remaining: 0, hasGuestPassBenefit: false };
     }
     
-    const result = await pool.query(
-      `SELECT passes_used, passes_total FROM guest_passes WHERE LOWER(member_email) = LOWER($1)`,
-      [memberEmail]
-    );
+    const result = await db.execute(sql`SELECT passes_used, passes_total FROM guest_passes WHERE LOWER(member_email) = LOWER(${memberEmail})`);
     
     if (result.rows.length === 0) {
       const monthlyAllocation = tierLimits?.guest_passes_per_month ?? 0;
       return { remaining: monthlyAllocation, hasGuestPassBenefit: true };
     }
     
-    const remaining = Math.max(0, result.rows[0].passes_total - result.rows[0].passes_used);
+    const row = result.rows[0] as Record<string, unknown>;
+    const remaining = Math.max(0, (row.passes_total as number) - (row.passes_used as number));
     return { remaining, hasGuestPassBenefit: true };
   } catch (error: unknown) {
     logger.error('[getGuestPassInfo] Error:', { error });
@@ -271,7 +244,6 @@ export async function calculateSessionBilling(
   const guestPassInfo = await getGuestPassInfo(hostEmail, hostTier || undefined);
   let guestPassesRemaining = guestPassInfo.remaining;
   
-  // Use proper allocation helper to distribute remainder minutes correctly
   const allocations = computeUsageAllocation(sessionDuration, participants);
   const allocationMap = new Map(allocations.map((a, idx) => [idx, a]));
   
@@ -402,8 +374,6 @@ export async function calculateFullSessionBilling(
   const guestCount = participants.filter(p => p.participantType === 'guest').length;
   const memberCount = participants.filter(p => p.participantType !== 'guest').length;
   
-  // Calculate effective player count using Math.max to match unifiedFeeService logic
-  // This fixes the "bait-and-switch" fee bug where declared player count differs from actual participants
   const effectivePlayerCount = Math.max(declaredPlayerCount, participants.length);
   const perPersonMinutes = Math.floor(sessionDuration / effectivePlayerCount);
   const ownerRemainder = sessionDuration % effectivePlayerCount;
@@ -438,7 +408,6 @@ export async function calculateFullSessionBilling(
     hostOverageFee = Math.max(0, hostOverageResult.overageFee - hostPriorOverage.overageFee);
   }
   
-  // Use proper allocation helper to distribute remainder minutes correctly for non-owner participants
   const allocations = computeUsageAllocation(sessionDuration, participants, {
     declaredSlots: effectivePlayerCount,
     assignRemainderToOwner: true
@@ -675,65 +644,55 @@ export async function recalculateSessionFees(
   sessionId: number
 ): Promise<RecalculationResult> {
   try {
-    // Query raw start_time and end_time as TIME strings to handle cross-midnight sessions properly
-    const sessionResult = await pool.query(
-      `SELECT bs.id, bs.session_date, bs.start_time::text, bs.end_time::text,
+    const sessionResult = await db.execute(sql`SELECT bs.id, bs.session_date, bs.start_time::text, bs.end_time::text,
               br.user_email as host_email, br.declared_player_count,
               r.type as resource_type
        FROM booking_sessions bs
        LEFT JOIN booking_requests br ON br.session_id = bs.id
        LEFT JOIN resources r ON bs.resource_id = r.id
-       WHERE bs.id = $1`,
-      [sessionId]
-    );
+       WHERE bs.id = ${sessionId}`);
     
     if (sessionResult.rows.length === 0) {
       throw new Error(`Session ${sessionId} not found`);
     }
     
-    const session = sessionResult.rows[0];
-    const sessionDate = session.session_date;
+    const session = sessionResult.rows[0] as Record<string, unknown>;
+    const sessionDate = session.session_date as string;
     
-    // Calculate duration manually to handle cross-midnight sessions
-    // start_time and end_time are TIME types stored as 'HH:MM:SS'
-    const startTimeParts = session.start_time.split(':').map(Number);
-    const endTimeParts = session.end_time.split(':').map(Number);
+    const startTimeParts = (session.start_time as string).split(':').map(Number);
+    const endTimeParts = (session.end_time as string).split(':').map(Number);
     const startMinutes = startTimeParts[0] * 60 + startTimeParts[1];
     let endMinutes = endTimeParts[0] * 60 + endTimeParts[1];
     
-    // Handle cross-midnight: if end_time < start_time, add 24 hours to end
     if (endMinutes < startMinutes) {
-      endMinutes += 24 * 60; // Add 24 hours worth of minutes
+      endMinutes += 24 * 60;
     }
     
     const sessionDuration = Math.round(endMinutes - startMinutes) || 60;
-    const hostEmail = session.host_email;
+    const hostEmail = session.host_email as string;
     
-    const participantsResult = await pool.query(
-      `SELECT bp.id, bp.user_id, bp.guest_id, bp.display_name, bp.participant_type,
+    const participantsResult = await db.execute(sql`SELECT bp.id, bp.user_id, bp.guest_id, bp.display_name, bp.participant_type,
               u.email as member_email
        FROM booking_participants bp
        LEFT JOIN users u ON bp.user_id = u.id
-       WHERE bp.session_id = $1
+       WHERE bp.session_id = ${sessionId}
        ORDER BY 
          CASE bp.participant_type 
            WHEN 'owner' THEN 1 
            WHEN 'member' THEN 2 
            WHEN 'guest' THEN 3 
-         END`,
-      [sessionId]
-    );
+         END`);
     
-    const participants: Participant[] = participantsResult.rows.map(p => ({
-      userId: p.user_id,
-      email: p.member_email || p.user_id,
-      guestId: p.guest_id,
+    const participants: Participant[] = (participantsResult.rows as Array<Record<string, unknown>>).map(p => ({
+      userId: p.user_id as string,
+      email: (p.member_email as string) || (p.user_id as string),
+      guestId: p.guest_id as number,
       participantType: p.participant_type as 'owner' | 'member' | 'guest',
-      displayName: p.display_name
+      displayName: p.display_name as string
     }));
     
-    const declaredPlayerCount = session.declared_player_count || participants.length || 1;
-    const resourceType = session.resource_type;
+    const declaredPlayerCount = (session.declared_player_count as number) || participants.length || 1;
+    const resourceType = session.resource_type as string;
     const billingResult = await calculateFullSessionBilling(
       sessionDate,
       sessionDuration,
@@ -743,13 +702,10 @@ export async function recalculateSessionFees(
       { excludeSessionId: sessionId, resourceType }
     );
     
-    const client = await pool.connect();
     let participantsUpdated = 0;
     
-    try {
-      await client.query('BEGIN');
-      
-      await client.query(`DELETE FROM usage_ledger WHERE session_id = $1`, [sessionId]);
+    await db.transaction(async (tx) => {
+      await tx.execute(sql`DELETE FROM usage_ledger WHERE session_id = ${sessionId}`);
       
       const resolvedBillings = await Promise.all(
         billingResult.billingBreakdown.map(async (billing) => {
@@ -782,22 +738,15 @@ export async function recalculateSessionFees(
         const guestFees = validBillings.map(b => b.guestFee);
         const tiersAtBooking = validBillings.map(b => b.tierAtBooking);
 
-        await client.query(`
+        await tx.execute(sql`
           INSERT INTO usage_ledger (session_id, member_id, minutes_charged, overage_fee, guest_fee, tier_at_booking, payment_method, source)
-          SELECT $1, member_id, minutes_charged, overage_fee, guest_fee, tier_at_booking, 'unpaid', 'recalculation'
-          FROM unnest($2::text[], $3::int[], $4::numeric[], $5::numeric[], $6::text[])
+          SELECT ${sessionId}, member_id, minutes_charged, overage_fee, guest_fee, tier_at_booking, 'unpaid', 'recalculation'
+          FROM unnest(${memberIds}::text[], ${minutesCharged}::int[], ${overageFees}::numeric[], ${guestFees}::numeric[], ${tiersAtBooking}::text[])
           AS t(member_id, minutes_charged, overage_fee, guest_fee, tier_at_booking)
-        `, [sessionId, memberIds, minutesCharged, overageFees, guestFees, tiersAtBooking]);
+        `);
       }
       participantsUpdated = validBillings.length;
-      
-      await client.query('COMMIT');
-    } catch (error: unknown) {
-      await client.query('ROLLBACK');
-      throw error;
-    } finally {
-      client.release();
-    }
+    });
     
     logger.info('[recalculateSessionFees] Session fees recalculated', {
       extra: {

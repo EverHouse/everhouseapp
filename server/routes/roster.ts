@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { logAndRespond, logger } from '../core/logger';
-import { pool } from '../core/db';
+import { db } from '../db';
+import { sql } from 'drizzle-orm';
 import { getSessionUser } from '../types/session';
 import { isStaffOrAdmin } from '../core/middleware';
 import { checkMemberAvailability } from '../core/bookingService/conflictDetection';
@@ -328,25 +329,24 @@ router.post('/api/admin/booking/:bookingId/recalculate-fees', isStaffOrAdmin, as
     const totalCents = recalcResult.totals?.totalCents || 0;
     if (totalCents > 0) {
       try {
-        const ownerResult = await pool.query(
-          `SELECT u.id, u.email, u.first_name, u.last_name 
+        const ownerResult = await db.execute(
+          sql`SELECT u.id, u.email, u.first_name, u.last_name 
            FROM users u 
-           WHERE LOWER(u.email) = LOWER($1)
-           LIMIT 1`,
-          [booking.owner_email]
+           WHERE LOWER(u.email) = LOWER(${booking.owner_email})
+           LIMIT 1`
         );
 
         const owner = ownerResult.rows[0];
         const ownerUserId = owner?.id || null;
         const ownerName = owner ? `${owner.first_name || ''} ${owner.last_name || ''}`.trim() || booking.owner_email : booking.owner_email;
 
-        const feeResult = await pool.query(`
+        const feeResult = await db.execute(sql`
           SELECT SUM(COALESCE(cached_fee_cents, 0)) as total_cents,
                  SUM(CASE WHEN participant_type = 'owner' THEN COALESCE(cached_fee_cents, 0) ELSE 0 END) as overage_cents,
                  SUM(CASE WHEN participant_type = 'guest' THEN COALESCE(cached_fee_cents, 0) ELSE 0 END) as guest_cents
           FROM booking_participants
-          WHERE session_id = $1
-        `, [booking.session_id]);
+          WHERE session_id = ${booking.session_id}
+        `);
 
         const feeTotalCents = parseInt(feeResult.rows[0]?.total_cents || '0');
         const overageCents = parseInt(feeResult.rows[0]?.overage_cents || '0');
@@ -365,9 +365,8 @@ router.post('/api/admin/booking/:bookingId/recalculate-fees', isStaffOrAdmin, as
           });
 
           if (prepayResult?.paidInFull) {
-            await pool.query(
-              `UPDATE booking_participants SET payment_status = 'paid' WHERE session_id = $1 AND payment_status = 'pending'`,
-              [booking.session_id]
+            await db.execute(
+              sql`UPDATE booking_participants SET payment_status = 'paid' WHERE session_id = ${booking.session_id} AND payment_status = 'pending'`
             );
           }
           prepaymentCreated = true;

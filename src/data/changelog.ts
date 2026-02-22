@@ -13,6 +13,18 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.8.0",
+    date: "2026-02-22",
+    title: "Complete Drizzle ORM Migration & Stripe Idempotency Hardening",
+    isMajor: true,
+    changes: [
+      "Improved: Migrated ~390 pool.query calls across 50+ server files to Drizzle ORM db.execute(sql`...`) — all production database queries now use parameterized template literals for SQL injection safety",
+      "Improved: Converted 15+ pool.connect() manual transaction blocks to db.transaction() with automatic BEGIN/COMMIT/ROLLBACK — eliminates leaked connections on error paths",
+      "Fixed: Added Stripe idempotency keys to all remaining .create() calls in invoices.ts, groupBilling.ts, discounts.ts, coupons.ts, and memberBilling.ts — complete coverage across all Stripe resource creation",
+      "Improved: Only 13 pool.query calls remain in excluded files (seed.ts, one-off scripts, managed integrations, session store, pool definition) — 97% migration complete",
+    ]
+  },
+  {
     version: "8.7.0",
     date: "2026-02-22",
     title: "Code Quality & Financial Safety Hardening",

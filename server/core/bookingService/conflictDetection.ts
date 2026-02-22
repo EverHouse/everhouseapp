@@ -1,4 +1,5 @@
-import { pool } from '../db';
+import { db } from '../../db';
+import { sql } from 'drizzle-orm';
 import { logger } from '../logger';
 import { ACTIVE_BOOKING_STATUSES } from '../../../shared/constants/statuses';
 
@@ -71,15 +72,12 @@ export async function findConflictingBookings(
   const normalizedEmail = memberEmail.toLowerCase();
 
   try {
-    const memberResult = await pool.query(
-      `SELECT id FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1`,
-      [normalizedEmail]
+    const memberResult = await db.execute(
+      sql`SELECT id FROM users WHERE LOWER(email) = LOWER(${normalizedEmail}) LIMIT 1`
     );
     const memberId = memberResult.rows[0]?.id;
 
-    const statusPlaceholders = OCCUPIED_STATUSES.map((_, i) => `$${i + 3}`).join(', ');
-    const excludeIdPlaceholder = 3 + OCCUPIED_STATUSES.length;
-    const ownerQuery = `
+    const ownerResult = await db.execute(sql`
       SELECT 
         br.id as booking_id,
         COALESCE(r.name, 'Unknown Resource') as resource_name,
@@ -90,16 +88,11 @@ export async function findConflictingBookings(
         br.user_email as owner_email
       FROM booking_requests br
       LEFT JOIN resources r ON br.resource_id = r.id
-      WHERE LOWER(br.user_email) = LOWER($1)
-        AND br.request_date = $2
-        AND br.status IN (${statusPlaceholders})
-        ${excludeBookingId ? `AND br.id != $${excludeIdPlaceholder}` : ''}
-    `;
-    const ownerParams = excludeBookingId 
-      ? [normalizedEmail, date, ...OCCUPIED_STATUSES, excludeBookingId]
-      : [normalizedEmail, date, ...OCCUPIED_STATUSES];
-    
-    const ownerResult = await pool.query(ownerQuery, ownerParams);
+      WHERE LOWER(br.user_email) = LOWER(${normalizedEmail})
+        AND br.request_date = ${date}
+        AND br.status = ANY(${OCCUPIED_STATUSES})
+        ${excludeBookingId ? sql`AND br.id != ${excludeBookingId}` : sql``}
+    `);
     
     for (const row of ownerResult.rows) {
       if (timePeriodsOverlap(startTime, endTime, row.start_time, row.end_time)) {
@@ -117,7 +110,7 @@ export async function findConflictingBookings(
     }
 
     if (memberId) {
-      const participantQuery = `
+      const participantResult = await db.execute(sql`
         SELECT 
           br.id as booking_id,
           COALESCE(r.name, 'Unknown Resource') as resource_name,
@@ -131,17 +124,12 @@ export async function findConflictingBookings(
         JOIN booking_sessions bs ON bp.session_id = bs.id
         JOIN booking_requests br ON br.session_id = bs.id
         LEFT JOIN resources r ON bs.resource_id = r.id
-        WHERE bp.user_id = $1
-          AND bs.session_date = $2
+        WHERE bp.user_id = ${memberId}
+          AND bs.session_date = ${date}
           AND bp.invite_status = 'accepted'
-          AND br.status IN (${statusPlaceholders})
-          ${excludeBookingId ? `AND br.id != $${excludeIdPlaceholder}` : ''}
-      `;
-      const participantParams = excludeBookingId
-        ? [memberId, date, ...OCCUPIED_STATUSES, excludeBookingId]
-        : [memberId, date, ...OCCUPIED_STATUSES];
-      
-      const participantResult = await pool.query(participantQuery, participantParams);
+          AND br.status = ANY(${OCCUPIED_STATUSES})
+          ${excludeBookingId ? sql`AND br.id != ${excludeBookingId}` : sql``}
+      `);
       
       for (const row of participantResult.rows) {
         if (timePeriodsOverlap(startTime, endTime, row.start_time, row.end_time)) {
@@ -162,7 +150,7 @@ export async function findConflictingBookings(
       }
     }
 
-    const linkedMemberQuery = `
+    const linkedMemberResult = await db.execute(sql`
       SELECT 
         br.id as booking_id,
         COALESCE(r.name, 'Unknown Resource') as resource_name,
@@ -176,17 +164,12 @@ export async function findConflictingBookings(
       JOIN booking_requests br ON br.session_id = bs.id
       JOIN users u ON bp.user_id = u.id
       LEFT JOIN resources r ON br.resource_id = r.id
-      WHERE LOWER(u.email) = LOWER($1)
+      WHERE LOWER(u.email) = LOWER(${normalizedEmail})
         AND bp.invite_status = 'accepted'
-        AND br.request_date = $2
-        AND br.status IN (${statusPlaceholders})
-        ${excludeBookingId ? `AND br.id != $${excludeIdPlaceholder}` : ''}
-    `;
-    const linkedMemberParams = excludeBookingId
-      ? [normalizedEmail, date, ...OCCUPIED_STATUSES, excludeBookingId]
-      : [normalizedEmail, date, ...OCCUPIED_STATUSES];
-    
-    const linkedMemberResult = await pool.query(linkedMemberQuery, linkedMemberParams);
+        AND br.request_date = ${date}
+        AND br.status = ANY(${OCCUPIED_STATUSES})
+        ${excludeBookingId ? sql`AND br.id != ${excludeBookingId}` : sql``}
+    `);
     
     for (const row of linkedMemberResult.rows) {
       if (timePeriodsOverlap(startTime, endTime, row.start_time, row.end_time)) {

@@ -1,5 +1,6 @@
 import { Router } from 'express';
-import { pool, queryWithRetry } from '../core/db';
+import { db } from '../db';
+import { sql } from 'drizzle-orm';
 import { logAndRespond, createErrorResponse } from '../core/logger';
 import { isAuthenticated, isAdminEmail } from '../core/middleware';
 import { getSessionUser } from '../types/session';
@@ -15,9 +16,8 @@ async function isStaffUser(email: string): Promise<boolean> {
     const isAdmin = await isAdminEmail(email);
     if (isAdmin) return true;
     
-    const result = await queryWithRetry(
-      'SELECT id FROM staff_users WHERE LOWER(email) = LOWER($1) AND is_active = true',
-      [email]
+    const result = await db.execute(
+      sql`SELECT id FROM staff_users WHERE LOWER(email) = LOWER(${email}) AND is_active = true`
     );
     return result.rows.length > 0;
   } catch (error: unknown) {
@@ -49,16 +49,9 @@ router.get('/api/notifications', isAuthenticated, async (req, res) => {
       return res.status(401).json(createErrorResponse(req, 'Authentication required', 'UNAUTHORIZED'));
     }
     
-    let query = 'SELECT * FROM notifications WHERE LOWER(user_email) = LOWER($1)';
-    const params: (string | boolean)[] = [effective.email];
-    
-    if (unread_only === 'true') {
-      query += ' AND is_read = false';
-    }
-    
-    query += ' ORDER BY created_at DESC LIMIT 50';
-    
-    const result = await queryWithRetry(query, params);
+    const result = unread_only === 'true'
+      ? await db.execute(sql`SELECT * FROM notifications WHERE LOWER(user_email) = LOWER(${effective.email}) AND is_read = false ORDER BY created_at DESC LIMIT 50`)
+      : await db.execute(sql`SELECT * FROM notifications WHERE LOWER(user_email) = LOWER(${effective.email}) ORDER BY created_at DESC LIMIT 50`);
     
     // Convert timestamps to proper ISO format for UTC interpretation
     // Database stores 'timestamp without time zone' in UTC, but pg driver returns it without 'Z' suffix
@@ -91,9 +84,8 @@ router.get('/api/notifications/count', isAuthenticated, async (req, res) => {
       return res.status(401).json(createErrorResponse(req, 'Authentication required', 'UNAUTHORIZED'));
     }
     
-    const result = await queryWithRetry(
-      'SELECT COUNT(*) as count FROM notifications WHERE LOWER(user_email) = LOWER($1) AND is_read = false',
-      [effective.email]
+    const result = await db.execute(
+      sql`SELECT COUNT(*) as count FROM notifications WHERE LOWER(user_email) = LOWER(${effective.email}) AND is_read = false`
     );
     
     res.json({ count: parseInt(result.rows[0].count as string) });
@@ -113,9 +105,8 @@ router.put('/api/notifications/:id/read', isAuthenticated, async (req, res) => {
       return res.status(401).json(createErrorResponse(req, 'Authentication required', 'UNAUTHORIZED'));
     }
     
-    const result = await pool.query(
-      'UPDATE notifications SET is_read = true WHERE id = $1 AND LOWER(user_email) = LOWER($2) RETURNING *',
-      [id, effective.email]
+    const result = await db.execute(
+      sql`UPDATE notifications SET is_read = true WHERE id = ${id} AND LOWER(user_email) = LOWER(${effective.email}) RETURNING *`
     );
     
     if (result.rows.length === 0) {
@@ -138,9 +129,8 @@ router.put('/api/notifications/mark-all-read', isAuthenticated, async (req, res)
       return res.status(401).json(createErrorResponse(req, 'Authentication required', 'UNAUTHORIZED'));
     }
     
-    await pool.query(
-      'UPDATE notifications SET is_read = true WHERE LOWER(user_email) = LOWER($1) AND is_read = false',
-      [effective.email]
+    await db.execute(
+      sql`UPDATE notifications SET is_read = true WHERE LOWER(user_email) = LOWER(${effective.email}) AND is_read = false`
     );
     
     res.json({ success: true });
@@ -159,9 +149,8 @@ router.delete('/api/notifications/dismiss-all', isAuthenticated, async (req, res
       return res.status(401).json(createErrorResponse(req, 'Authentication required', 'UNAUTHORIZED'));
     }
     
-    const result = await pool.query(
-      'DELETE FROM notifications WHERE LOWER(user_email) = LOWER($1)',
-      [effective.email]
+    const result = await db.execute(
+      sql`DELETE FROM notifications WHERE LOWER(user_email) = LOWER(${effective.email})`
     );
     
     res.json({ success: true, deletedCount: result.rowCount });
@@ -182,9 +171,8 @@ router.delete('/api/notifications/:id', isAuthenticated, async (req, res) => {
       return res.status(401).json(createErrorResponse(req, 'Authentication required', 'UNAUTHORIZED'));
     }
     
-    const result = await pool.query(
-      'DELETE FROM notifications WHERE id = $1 AND LOWER(user_email) = LOWER($2) RETURNING id',
-      [id, effective.email]
+    const result = await db.execute(
+      sql`DELETE FROM notifications WHERE id = ${id} AND LOWER(user_email) = LOWER(${effective.email}) RETURNING id`
     );
     
     if (result.rows.length === 0) {

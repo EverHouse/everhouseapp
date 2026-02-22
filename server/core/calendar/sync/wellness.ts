@@ -1,7 +1,7 @@
-import { pool } from '../../db';
+import { db } from '../../../db';
+import { sql } from 'drizzle-orm';
 import { getErrorMessage } from '../../../utils/errorUtils';
 import { getGoogleCalendarClient } from '../../integrations';
-import { db } from '../../../db';
 import { wellnessClasses } from '../../../../shared/models/auth';
 import { isNull, gte, asc, and } from 'drizzle-orm';
 import { getTodayPacific, getPacificMidnightUTC } from '../../../utils/dateUtils';
@@ -20,7 +20,6 @@ export async function syncWellnessCalendarEvents(options?: { suppressAlert?: boo
       return { synced: 0, created: 0, updated: 0, deleted: 0, pushedToCalendar: 0, error: `Calendar "${CALENDAR_CONFIG.wellness.name}" not found` };
     }
     
-    // Use Pacific midnight for consistent timezone handling
     const oneYearAgo = getPacificMidnightUTC();
     oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
     
@@ -128,41 +127,34 @@ export async function syncWellnessCalendarEvents(options?: { suppressAlert?: boo
         }
       }
       
-      const existing = await pool.query(
-        `SELECT id, locally_edited, app_last_modified_at, google_event_updated_at, 
+      const existing = await db.execute(sql`SELECT id, locally_edited, app_last_modified_at, google_event_updated_at, 
                 image_url, external_url, spots, status, title, time, instructor, duration, category, date,
                 reviewed_at, last_synced_at, review_dismissed, needs_review
-         FROM wellness_classes WHERE google_calendar_id = $1`,
-        [googleEventId]
-      );
+         FROM wellness_classes WHERE google_calendar_id = ${googleEventId}`);
       
       if (existing.rows.length > 0) {
-        const dbRow = existing.rows[0];
-        const appModifiedAt = dbRow.app_last_modified_at ? new Date(dbRow.app_last_modified_at) : null;
+        const dbRow = existing.rows[0] as Record<string, unknown>;
+        const appModifiedAt = dbRow.app_last_modified_at ? new Date(dbRow.app_last_modified_at as string) : null;
         
         if (dbRow.locally_edited === true && appModifiedAt) {
           const calendarIsNewer = googleUpdatedAt && googleUpdatedAt > appModifiedAt;
           
           if (calendarIsNewer) {
-            await pool.query(
-              `UPDATE wellness_classes SET 
-                title = $1, time = $2, instructor = $3, duration = $4, 
-                category = $5, spots = $6, status = $7, description = $8, 
-                date = $9, is_active = true, updated_at = NOW(),
-                image_url = COALESCE($10, image_url),
-                external_url = COALESCE($11, external_url),
-                google_event_etag = $12, google_event_updated_at = $13, last_synced_at = NOW(),
-                locally_edited = false, app_last_modified_at = NULL, needs_review = $15,
-                recurring_event_id = COALESCE($16, recurring_event_id)
-               WHERE google_calendar_id = $14`,
-              [title, startTime, instructor, duration, category, spots, status, description, eventDate,
-               appMetadata.imageUrl, appMetadata.externalUrl, googleEtag, googleUpdatedAt, googleEventId, needsReview, recurringEventId]
-            );
+            await db.execute(sql`UPDATE wellness_classes SET 
+                title = ${title}, time = ${startTime}, instructor = ${instructor}, duration = ${duration}, 
+                category = ${category}, spots = ${spots}, status = ${status}, description = ${description}, 
+                date = ${eventDate}, is_active = true, updated_at = NOW(),
+                image_url = COALESCE(${appMetadata.imageUrl}, image_url),
+                external_url = COALESCE(${appMetadata.externalUrl}, external_url),
+                google_event_etag = ${googleEtag}, google_event_updated_at = ${googleUpdatedAt}, last_synced_at = NOW(),
+                locally_edited = false, app_last_modified_at = NULL, needs_review = ${needsReview},
+                recurring_event_id = COALESCE(${recurringEventId}, recurring_event_id)
+               WHERE google_calendar_id = ${googleEventId}`);
             updated++;
           } else {
             try {
               const calendarTitle = `${dbRow.title} with ${dbRow.instructor}`;
-              const calendarDescription = [`Category: ${dbRow.category}`, dbRow.description || '', `Duration: ${dbRow.duration}`, `Spots: ${dbRow.spots}`].filter(Boolean).join('\n');
+              const calendarDescription = [`Category: ${dbRow.category}`, (dbRow.description as string) || '', `Duration: ${dbRow.duration}`, `Spots: ${dbRow.spots}`].filter(Boolean).join('\n');
               
               const convertTo24Hour = (timeStr: string): string => {
                 const match12h = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
@@ -198,19 +190,19 @@ export async function syncWellnessCalendarEvents(options?: { suppressAlert?: boo
                 const day = String(d.getDate()).padStart(2, '0');
                 return `${year}-${month}-${day}`;
               };
-              const dbDateStr = formatDateToISO(dbRow.date);
+              const dbDateStr = formatDateToISO(dbRow.date as Date | string);
               
-              const startTime24 = convertTo24Hour(dbRow.time);
-              const endTime24 = calculateEndTime(startTime24, dbRow.duration);
+              const startTime24 = convertTo24Hour(dbRow.time as string);
+              const endTime24 = calculateEndTime(startTime24, dbRow.duration as string);
               
               const extendedProps: Record<string, string> = {
                 'ehApp_type': 'wellness',
                 'ehApp_id': String(dbRow.id),
               };
-              if (dbRow.image_url) extendedProps['ehApp_imageUrl'] = dbRow.image_url;
-              if (dbRow.external_url) extendedProps['ehApp_externalUrl'] = dbRow.external_url;
-              if (dbRow.spots) extendedProps['ehApp_spots'] = dbRow.spots;
-              if (dbRow.status) extendedProps['ehApp_status'] = dbRow.status;
+              if (dbRow.image_url) extendedProps['ehApp_imageUrl'] = dbRow.image_url as string;
+              if (dbRow.external_url) extendedProps['ehApp_externalUrl'] = dbRow.external_url as string;
+              if (dbRow.spots) extendedProps['ehApp_spots'] = dbRow.spots as string;
+              if (dbRow.status) extendedProps['ehApp_status'] = dbRow.status as string;
               
               const patchResult = await calendar.events.patch({
                 calendarId,
@@ -235,12 +227,9 @@ export async function syncWellnessCalendarEvents(options?: { suppressAlert?: boo
               const newEtag = patchResult.data.etag || null;
               const newUpdatedAt = patchResult.data.updated ? new Date(patchResult.data.updated) : null;
               
-              await pool.query(
-                `UPDATE wellness_classes SET last_synced_at = NOW(), locally_edited = false,
-                 google_event_etag = $2, google_event_updated_at = $3, app_last_modified_at = NULL
-                 WHERE id = $1`,
-                [dbRow.id, newEtag, newUpdatedAt]
-              );
+              await db.execute(sql`UPDATE wellness_classes SET last_synced_at = NOW(), locally_edited = false,
+                 google_event_etag = ${newEtag}, google_event_updated_at = ${newUpdatedAt}, app_last_modified_at = NULL
+                 WHERE id = ${dbRow.id}`);
               pushedToCalendar++;
             } catch (pushError: unknown) {
               logger.error(`[Wellness Sync] Failed to push local edits to calendar for class #${dbRow.id}:`, { error: pushError });
@@ -250,7 +239,6 @@ export async function syncWellnessCalendarEvents(options?: { suppressAlert?: boo
           const reviewDismissed = dbRow.review_dismissed === true;
           const shouldSetNeedsReview = reviewDismissed ? false : needsReview;
           
-          // Normalize date for comparison to avoid false positives from format differences
           const dbDate = dbRow.date instanceof Date 
             ? dbRow.date.toISOString().split('T')[0] 
             : String(dbRow.date || '').split('T')[0];
@@ -260,53 +248,43 @@ export async function syncWellnessCalendarEvents(options?: { suppressAlert?: boo
             dbRow.title !== title ||
             dbDate !== eventDate ||
             dbRow.time !== startTime ||
-            (dbRow.instructor || null) !== (instructor || null) ||
+            ((dbRow.instructor as string) || null) !== (instructor || null) ||
             dbRow.duration !== duration ||
-            (dbRow.category || null) !== (category || null)
+            ((dbRow.category as string) || null) !== (category || null)
           );
-          // Only mark as conflict if reviewed AND has changes AND not dismissed
           const isConflict = wasReviewed && hasChanges && !reviewDismissed;
           
-          await pool.query(
-            `UPDATE wellness_classes SET 
-              title = $1, time = $2, instructor = $3, duration = $4, 
-              category = $5, spots = $6, status = $7, description = $8, 
-              date = $9, is_active = true, updated_at = NOW(),
-              image_url = COALESCE($10, image_url),
-              external_url = COALESCE($11, external_url),
-              google_event_etag = $12, google_event_updated_at = $13, last_synced_at = NOW(),
-              needs_review = CASE WHEN $15 THEN needs_review ELSE CASE WHEN $17 THEN true ELSE $16 END END,
-              conflict_detected = CASE WHEN $17 THEN true ELSE conflict_detected END,
-              recurring_event_id = COALESCE($18, recurring_event_id)
-             WHERE google_calendar_id = $14`,
-            [title, startTime, instructor, duration, category, spots, status, description, eventDate,
-             appMetadata.imageUrl, appMetadata.externalUrl, googleEtag, googleUpdatedAt, googleEventId, reviewDismissed, shouldSetNeedsReview, isConflict, recurringEventId]
-          );
+          await db.execute(sql`UPDATE wellness_classes SET 
+              title = ${title}, time = ${startTime}, instructor = ${instructor}, duration = ${duration}, 
+              category = ${category}, spots = ${spots}, status = ${status}, description = ${description}, 
+              date = ${eventDate}, is_active = true, updated_at = NOW(),
+              image_url = COALESCE(${appMetadata.imageUrl}, image_url),
+              external_url = COALESCE(${appMetadata.externalUrl}, external_url),
+              google_event_etag = ${googleEtag}, google_event_updated_at = ${googleUpdatedAt}, last_synced_at = NOW(),
+              needs_review = CASE WHEN ${reviewDismissed} THEN needs_review ELSE CASE WHEN ${isConflict} THEN true ELSE ${shouldSetNeedsReview} END END,
+              conflict_detected = CASE WHEN ${isConflict} THEN true ELSE conflict_detected END,
+              recurring_event_id = COALESCE(${recurringEventId}, recurring_event_id)
+             WHERE google_calendar_id = ${googleEventId}`);
           updated++;
         }
       } else {
-        await pool.query(
-          `INSERT INTO wellness_classes 
+        await db.execute(sql`INSERT INTO wellness_classes 
             (title, time, instructor, duration, category, spots, status, description, date, is_active, 
              google_calendar_id, image_url, external_url, google_event_etag, google_event_updated_at, last_synced_at, created_at, needs_review, recurring_event_id)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, true, $10, $11, $12, $13, $14, NOW(), NOW(), $15, $16)`,
-          [title, startTime, instructor, duration, category, spots, status, description, eventDate, googleEventId,
-           appMetadata.imageUrl, appMetadata.externalUrl, googleEtag, googleUpdatedAt, needsReview, recurringEventId]
-        );
+           VALUES (${title}, ${startTime}, ${instructor}, ${duration}, ${category}, ${spots}, ${status}, ${description}, ${eventDate}, true, ${googleEventId},
+            ${appMetadata.imageUrl}, ${appMetadata.externalUrl}, ${googleEtag}, ${googleUpdatedAt}, NOW(), NOW(), ${needsReview}, ${recurringEventId})`);
         created++;
       }
     }
     
-    const existingClasses = await pool.query(
-      'SELECT id, google_calendar_id FROM wellness_classes WHERE google_calendar_id IS NOT NULL AND is_active = true'
-    );
+    const existingClasses = await db.execute(sql`SELECT id, google_calendar_id FROM wellness_classes WHERE google_calendar_id IS NOT NULL AND is_active = true`);
     
-    const idsToDeactivate = existingClasses.rows
+    const idsToDeactivate = (existingClasses.rows as Array<Record<string, unknown>>)
       .filter((dbClass: Record<string, unknown>) => cancelledEventIds.has(dbClass.google_calendar_id as string) || !fetchedEventIds.has(dbClass.google_calendar_id as string))
       .map((dbClass: Record<string, unknown>) => dbClass.id as number);
     let deleted = 0;
     if (idsToDeactivate.length > 0) {
-      await pool.query('UPDATE wellness_classes SET is_active = false WHERE id = ANY($1)', [idsToDeactivate]);
+      await db.execute(sql`UPDATE wellness_classes SET is_active = false WHERE id = ANY(${idsToDeactivate})`);
       deleted = idsToDeactivate.length;
     }
     
@@ -396,7 +374,7 @@ export async function backfillWellnessToCalendar(): Promise<{ created: number; t
         );
         
         if (googleCalendarId) {
-          await pool.query('UPDATE wellness_classes SET google_calendar_id = $1 WHERE id = $2', [googleCalendarId, wc.id]);
+          await db.execute(sql`UPDATE wellness_classes SET google_calendar_id = ${googleCalendarId} WHERE id = ${wc.id}`);
           created++;
         }
       } catch (err: unknown) {

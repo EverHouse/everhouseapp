@@ -2,9 +2,8 @@ import Stripe from 'stripe';
 import { getStripeClient } from './client';
 import { db } from '../../db';
 import { membershipTiers, users, memberNotes } from '../../../shared/schema';
-import { eq, ilike } from 'drizzle-orm';
+import { eq, ilike, sql } from 'drizzle-orm';
 import { changeSubscriptionTier } from './subscriptions';
-import { pool } from '../db';
 import { syncCustomerMetadataToStripe } from './customers';
 import { getErrorMessage } from '../../utils/errorUtils';
 
@@ -118,9 +117,8 @@ export async function commitTierChange(
     // Look up current tier from DB using price ID (consistent naming)
     let currentTierName = 'Unknown';
     if (currentPriceId) {
-      const currentTierResult = await pool.query(
-        'SELECT name FROM membership_tiers WHERE stripe_price_id = $1 OR founding_price_id = $1',
-        [currentPriceId]
+      const currentTierResult = await db.execute(
+        sql`SELECT name FROM membership_tiers WHERE stripe_price_id = ${currentPriceId} OR founding_price_id = ${currentPriceId}`
       );
       if (currentTierResult.rows.length > 0) {
         currentTierName = currentTierResult.rows[0].name;
@@ -145,9 +143,8 @@ export async function commitTierChange(
     // Only update DB tier immediately if this is an immediate change
     // Scheduled changes are handled by the subscription.updated webhook when Stripe applies them
     if (immediate) {
-      await pool.query(
-        'UPDATE users SET tier = $1, updated_at = NOW() WHERE LOWER(email) = LOWER($2)',
-        [tier.name, memberEmail]
+      await db.execute(
+        sql`UPDATE users SET tier = ${tier.name}, updated_at = NOW() WHERE LOWER(email) = LOWER(${memberEmail})`
       );
       
       // Sync the updated tier to Stripe customer metadata
@@ -180,9 +177,8 @@ export async function commitTierChange(
     // Verification: Check if DB tier was properly updated
     let warning: string | undefined;
     if (immediate) {
-      const userResult = await pool.query(
-        'SELECT tier FROM users WHERE LOWER(email) = LOWER($1)',
-        [memberEmail]
+      const userResult = await db.execute(
+        sql`SELECT tier FROM users WHERE LOWER(email) = LOWER(${memberEmail})`
       );
       if (userResult.rows.length > 0) {
         const actualTier = userResult.rows[0].tier;

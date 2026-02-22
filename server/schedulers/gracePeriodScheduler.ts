@@ -1,5 +1,6 @@
 import { schedulerTracker } from '../core/schedulerTracker';
-import { pool } from '../core/db';
+import { db } from '../db';
+import { sql } from 'drizzle-orm';
 import { getPacificHour, getTodayPacific, CLUB_TIMEZONE } from '../utils/dateUtils';
 import { sendGracePeriodReminderEmail } from '../emails/membershipEmails';
 import { notifyAllStaff } from '../core/notificationService';
@@ -57,13 +58,12 @@ async function processGracePeriodMembers(): Promise<void> {
     
     logger.info('[Grace Period] Starting daily grace period check...');
     
-    const membersResult = await pool.query(
-      `SELECT id, email, first_name, last_name, tier, grace_period_start, grace_period_email_count, stripe_customer_id
+    const membersResult = await db.execute(
+      sql`SELECT id, email, first_name, last_name, tier, grace_period_start, grace_period_email_count, stripe_customer_id
        FROM users
        WHERE grace_period_start IS NOT NULL 
-         AND grace_period_email_count < $1
-       ORDER BY grace_period_start ASC`,
-      [GRACE_PERIOD_DAYS]
+         AND grace_period_email_count < ${GRACE_PERIOD_DAYS}
+       ORDER BY grace_period_start ASC`
     );
     
     if (membersResult.rows.length === 0) {
@@ -88,9 +88,8 @@ async function processGracePeriodMembers(): Promise<void> {
           reactivationLink
         });
         
-        await pool.query(
-          `UPDATE users SET grace_period_email_count = $1, updated_at = NOW() WHERE id = $2`,
-          [newEmailCount, id]
+        await db.execute(
+          sql`UPDATE users SET grace_period_email_count = ${newEmailCount}, updated_at = NOW() WHERE id = ${id}`
         );
         
         logger.info(`[Grace Period] Sent day ${newEmailCount} email to ${email}`);
@@ -99,16 +98,15 @@ async function processGracePeriodMembers(): Promise<void> {
           const daysSinceStart = getDaysSinceStartPacific(new Date(grace_period_start));
           
           if (daysSinceStart >= GRACE_PERIOD_DAYS) {
-            await pool.query(
-              `UPDATE users SET 
+            await db.execute(
+              sql`UPDATE users SET 
                 last_tier = tier,
                 tier = NULL,
                 membership_status = 'terminated',
                 grace_period_start = NULL,
                 grace_period_email_count = 0,
                 updated_at = NOW()
-              WHERE id = $1`,
-              [id]
+              WHERE id = ${id}`
             );
             
             logger.info(`[Grace Period] TERMINATED membership for ${email} (was tier: ${tier})`);

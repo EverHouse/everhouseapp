@@ -1,4 +1,5 @@
-import { pool } from '../db';
+import { db } from '../../db';
+import { sql } from 'drizzle-orm';
 import { memberCache } from './memberCache';
 import {
   MemberRecord,
@@ -50,7 +51,8 @@ class MemberServiceClass {
       if (cached) return cached;
     }
     
-    const result = await pool.query(`
+    const archiveFilter = options.includeArchived ? sql`` : sql`AND u.archived_at IS NULL`;
+    const result = await db.execute(sql`
       SELECT 
         u.id,
         u.email,
@@ -82,16 +84,16 @@ class MemberServiceClass {
       FROM users u
       LEFT JOIN membership_tiers mt ON u.tier_id = mt.id
       WHERE (
-        LOWER(u.email) = $1
-        OR LOWER(u.trackman_email) = $1
+        LOWER(u.email) = ${normalized}
+        OR LOWER(u.trackman_email) = ${normalized}
         OR EXISTS (
           SELECT 1 FROM jsonb_array_elements_text(u.linked_emails) AS linked(email) 
-          WHERE LOWER(linked.email) = $1
+          WHERE LOWER(linked.email) = ${normalized}
         )
       )
-      ${options.includeArchived ? '' : 'AND u.archived_at IS NULL'}
+      ${archiveFilter}
       LIMIT 1
-    `, [normalized]);
+    `);
     
     if (result.rows.length === 0) return null;
     
@@ -111,7 +113,8 @@ class MemberServiceClass {
       if (cached) return cached;
     }
     
-    const result = await pool.query(`
+    const archiveFilter = options.includeArchived ? sql`` : sql`AND u.archived_at IS NULL`;
+    const result = await db.execute(sql`
       SELECT 
         u.id,
         u.email,
@@ -142,10 +145,10 @@ class MemberServiceClass {
         mt.unlimited_access
       FROM users u
       LEFT JOIN membership_tiers mt ON u.tier_id = mt.id
-      WHERE u.id = $1
-        ${options.includeArchived ? '' : 'AND u.archived_at IS NULL'}
+      WHERE u.id = ${id}
+        ${archiveFilter}
       LIMIT 1
-    `, [id]);
+    `);
     
     if (result.rows.length === 0) return null;
     
@@ -160,7 +163,8 @@ class MemberServiceClass {
   ): Promise<MemberRecord | null> {
     if (!hubspotId) return null;
     
-    const result = await pool.query(`
+    const archiveFilter = options.includeArchived ? sql`` : sql`AND u.archived_at IS NULL`;
+    const result = await db.execute(sql`
       SELECT 
         u.id,
         u.email,
@@ -191,10 +195,10 @@ class MemberServiceClass {
         mt.unlimited_access
       FROM users u
       LEFT JOIN membership_tiers mt ON u.tier_id = mt.id
-      WHERE u.hubspot_id = $1
-        ${options.includeArchived ? '' : 'AND u.archived_at IS NULL'}
+      WHERE u.hubspot_id = ${hubspotId}
+        ${archiveFilter}
       LIMIT 1
-    `, [hubspotId]);
+    `);
     
     if (result.rows.length === 0) return null;
     
@@ -209,7 +213,8 @@ class MemberServiceClass {
   ): Promise<MemberRecord | null> {
     if (!mindbodyClientId) return null;
     
-    const result = await pool.query(`
+    const archiveFilter = options.includeArchived ? sql`` : sql`AND u.archived_at IS NULL`;
+    const result = await db.execute(sql`
       SELECT 
         u.id,
         u.email,
@@ -240,10 +245,10 @@ class MemberServiceClass {
         mt.unlimited_access
       FROM users u
       LEFT JOIN membership_tiers mt ON u.tier_id = mt.id
-      WHERE u.mindbody_client_id = $1
-        ${options.includeArchived ? '' : 'AND u.archived_at IS NULL'}
+      WHERE u.mindbody_client_id = ${mindbodyClientId}
+        ${archiveFilter}
       LIMIT 1
-    `, [mindbodyClientId]);
+    `);
     
     if (result.rows.length === 0) return null;
     
@@ -333,12 +338,12 @@ class MemberServiceClass {
     }
     
     if (sessionId) {
-      const bookingResult = await pool.query(`
-        SELECT user_email FROM booking_requests WHERE session_id = $1 LIMIT 1
-      `, [sessionId]);
+      const bookingResult = await db.execute(sql`
+        SELECT user_email FROM booking_requests WHERE session_id = ${sessionId} LIMIT 1
+      `);
       
-      if (bookingResult.rows.length > 0 && bookingResult.rows[0].user_email) {
-        const bookingEmail = bookingResult.rows[0].user_email;
+      if (bookingResult.rows.length > 0 && (bookingResult.rows[0] as Record<string, unknown>).user_email) {
+        const bookingEmail = (bookingResult.rows[0] as Record<string, unknown>).user_email as string;
         const member = await this.findByEmail(bookingEmail, { includeTierConfig: true });
         if (member) {
           return {
@@ -365,7 +370,7 @@ class MemberServiceClass {
     const cached = memberCache.getStaffByEmail(normalized);
     if (cached) return cached;
     
-    const result = await pool.query(`
+    const result = await db.execute(sql`
       SELECT 
         id,
         email,
@@ -377,25 +382,25 @@ class MemberServiceClass {
         role,
         is_active
       FROM staff_users
-      WHERE LOWER(email) = $1 AND is_active = true
+      WHERE LOWER(email) = ${normalized} AND is_active = true
       LIMIT 1
-    `, [normalized]);
+    `);
     
     if (result.rows.length === 0) return null;
     
-    const row = result.rows[0];
+    const row = result.rows[0] as Record<string, unknown>;
     const staff: StaffRecord = {
-      id: row.id,
-      email: row.email,
+      id: row.id as string,
+      email: row.email as string,
       normalizedEmail: normalized,
-      name: row.name,
-      firstName: row.first_name,
-      lastName: row.last_name,
-      displayName: row.name || `${row.first_name || ''} ${row.last_name || ''}`.trim() || row.email,
+      name: row.name as string,
+      firstName: row.first_name as string,
+      lastName: row.last_name as string,
+      displayName: (row.name as string) || `${row.first_name || ''} ${row.last_name || ''}`.trim() || (row.email as string),
       role: row.role === 'admin' ? 'admin' : 'staff',
-      jobTitle: row.job_title,
-      phone: row.phone,
-      isActive: row.is_active
+      jobTitle: row.job_title as string,
+      phone: row.phone as string,
+      isActive: row.is_active as boolean
     };
     
     memberCache.setStaff(staff);
@@ -433,11 +438,11 @@ class MemberServiceClass {
     }
     
     if (sessionId) {
-      const result = await pool.query(`
-        SELECT user_email FROM booking_requests WHERE session_id = $1 LIMIT 1
-      `, [sessionId]);
-      if (result.rows.length > 0 && result.rows[0].user_email) {
-        return normalizeEmail(result.rows[0].user_email);
+      const result = await db.execute(sql`
+        SELECT user_email FROM booking_requests WHERE session_id = ${sessionId} LIMIT 1
+      `);
+      if (result.rows.length > 0 && (result.rows[0] as Record<string, unknown>).user_email) {
+        return normalizeEmail((result.rows[0] as Record<string, unknown>).user_email as string);
       }
     }
     

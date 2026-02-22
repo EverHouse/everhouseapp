@@ -1132,17 +1132,14 @@ router.put('/api/booking-requests/:id/member-cancel', async (req, res) => {
     
     let isLinkedEmail = false;
     if (!isOwnBooking && !isValidViewAs && bookingEmail && userEmail) {
-      const linkedCheck = await pool.query(
-        `SELECT 1 FROM users 
-         WHERE LOWER(email) = $1 
+      const linkedCheck = await db.execute(sql`SELECT 1 FROM users 
+         WHERE LOWER(email) = ${userEmail} 
          AND (
-           LOWER(trackman_email) = $2
-           OR COALESCE(linked_emails, '[]'::jsonb) @> to_jsonb($2::text)
-           OR COALESCE(manually_linked_emails, '[]'::jsonb) @> to_jsonb($2::text)
+           LOWER(trackman_email) = ${bookingEmail}
+           OR COALESCE(linked_emails, '[]'::jsonb) @> to_jsonb(${bookingEmail}::text)
+           OR COALESCE(manually_linked_emails, '[]'::jsonb) @> to_jsonb(${bookingEmail}::text)
          )
-         LIMIT 1`,
-        [userEmail, bookingEmail]
-      );
+         LIMIT 1`);
       isLinkedEmail = (linkedCheck.rowCount ?? 0) > 0;
     }
     
@@ -1262,11 +1259,8 @@ router.put('/api/booking-requests/:id/member-cancel', async (req, res) => {
     
     if (existing.sessionId) {
       try {
-        const guestParticipants = await pool.query(
-          `SELECT display_name FROM booking_participants
-           WHERE session_id = $1 AND participant_type = 'guest' AND used_guest_pass = true`,
-          [existing.sessionId]
-        );
+        const guestParticipants = await db.execute(sql`SELECT display_name FROM booking_participants
+           WHERE session_id = ${existing.sessionId} AND participant_type = 'guest' AND used_guest_pass = true`);
         for (const guest of guestParticipants.rows) {
           try {
             await refundGuestPass(existing.userEmail, guest.display_name || undefined, false);
@@ -1296,12 +1290,9 @@ router.put('/api/booking-requests/:id/member-cancel', async (req, res) => {
     
     // Cancel pending payment intents from stripe_payment_intents table
     try {
-      const pendingIntents = await pool.query(
-        `SELECT stripe_payment_intent_id 
+      const pendingIntents = await db.execute(sql`SELECT stripe_payment_intent_id 
          FROM stripe_payment_intents 
-         WHERE booking_id = $1 AND status IN ('pending', 'requires_payment_method', 'requires_action', 'requires_confirmation')`,
-        [bookingId]
-      );
+         WHERE booking_id = ${bookingId} AND status IN ('pending', 'requires_payment_method', 'requires_action', 'requires_confirmation')`);
       if (pendingIntents.rows.length > 0) {
         for (const row of pendingIntents.rows) {
           try {
@@ -1321,16 +1312,13 @@ router.put('/api/booking-requests/:id/member-cancel', async (req, res) => {
     if (!shouldSkipRefund) {
       try {
         if (existing.sessionId) {
-          const paidParticipants = await pool.query(
-            `SELECT id, stripe_payment_intent_id, cached_fee_cents, display_name
+          const paidParticipants = await db.execute(sql`SELECT id, stripe_payment_intent_id, cached_fee_cents, display_name
              FROM booking_participants 
-             WHERE session_id = $1 
+             WHERE session_id = ${existing.sessionId} 
              AND payment_status = 'paid' 
              AND stripe_payment_intent_id IS NOT NULL 
              AND stripe_payment_intent_id != ''
-             AND stripe_payment_intent_id NOT LIKE 'balance-%'`,
-            [existing.sessionId]
-          );
+             AND stripe_payment_intent_id NOT LIKE 'balance-%'`);
           
           if (paidParticipants.rows.length > 0) {
             const stripe = await getStripeClient();
@@ -1369,13 +1357,10 @@ router.put('/api/booking-requests/:id/member-cancel', async (req, res) => {
     // Clear pending fees for cancelled booking
     try {
       if (existing.sessionId) {
-        await pool.query(
-          `UPDATE booking_participants 
+        await db.execute(sql`UPDATE booking_participants 
            SET cached_fee_cents = 0, payment_status = 'waived'
-           WHERE session_id = $1 
-           AND payment_status = 'pending'`,
-          [existing.sessionId]
-        );
+           WHERE session_id = ${existing.sessionId} 
+           AND payment_status = 'pending'`);
         logger.info('[Member Cancel] Cleared pending fees for session', { extra: { sessionId: existing.sessionId } });
       }
     } catch (feeCleanupErr: unknown) {
@@ -1702,11 +1687,8 @@ router.get('/api/fee-estimate', async (req, res) => {
       // Get resource type to determine if this is a conference room booking
       let resourceType = 'simulator';
       if (request.resourceId) {
-        const resourceResult = await pool.query(
-          `SELECT type FROM resources WHERE id = $1`,
-          [request.resourceId]
-        );
-        resourceType = resourceResult.rows[0]?.type || 'simulator';
+        const resourceResult = await db.execute(sql`SELECT type FROM resources WHERE id = ${request.resourceId}`);
+        resourceType = (resourceResult.rows[0] as Record<string, unknown>)?.type as string || 'simulator';
       }
       
       // If booking has a session, use actual participant count for accuracy
@@ -1714,16 +1696,13 @@ router.get('/api/fee-estimate', async (req, res) => {
       let guestCount = Math.max(0, declaredPlayerCount - 1);
       
       if (request.sessionId) {
-        const participantResult = await pool.query(
-          `SELECT 
+        const participantResult = await db.execute(sql`SELECT 
             COUNT(*) FILTER (WHERE participant_type = 'guest') as guest_count,
             COUNT(*) as total_count
            FROM booking_participants 
-           WHERE session_id = $1`,
-          [request.sessionId]
-        );
-        const actualTotal = parseInt(participantResult.rows[0]?.total_count || '0');
-        const actualGuests = parseInt(participantResult.rows[0]?.guest_count || '0');
+           WHERE session_id = ${request.sessionId}`);
+        const actualTotal = parseInt((participantResult.rows[0] as Record<string, unknown>)?.total_count as string || '0');
+        const actualGuests = parseInt((participantResult.rows[0] as Record<string, unknown>)?.guest_count as string || '0');
         
         // Use the greater of declared vs actual (staff may have added more players)
         effectivePlayerCount = Math.max(declaredPlayerCount, actualTotal);
@@ -1743,12 +1722,9 @@ router.get('/api/fee-estimate', async (req, res) => {
       
       if (request.sessionId && estimate.totalFee === 0) {
         try {
-          await pool.query(
-            `UPDATE booking_participants 
+          await db.execute(sql`UPDATE booking_participants 
              SET cached_fee_cents = 0 
-             WHERE session_id = $1 AND payment_status = 'pending' AND cached_fee_cents > 0`,
-            [request.sessionId]
-          );
+             WHERE session_id = ${request.sessionId} AND payment_status = 'pending' AND cached_fee_cents > 0`);
         } catch (syncErr: unknown) {
           logger.error('[Fee Estimate] Failed to sync cached fee cents', { extra: { syncErr, bookingId } });
         }

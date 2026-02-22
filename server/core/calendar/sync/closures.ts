@@ -1,4 +1,5 @@
-import { pool } from '../../db';
+import { db } from '../../../db';
+import { sql, type SQL } from 'drizzle-orm';
 import { getGoogleCalendarClient } from '../../integrations';
 import { CALENDAR_CONFIG } from '../config';
 import { getCalendarIdByName } from '../cache';
@@ -85,8 +86,8 @@ export function getBaseDescription(description: string): string {
 
 async function getAllResourceIds(): Promise<number[]> {
   const idSet = new Set<number>();
-  const resourcesResult = await pool.query('SELECT id FROM resources');
-  resourcesResult.rows.forEach((r: Record<string, unknown>) => idSet.add(r.id as number));
+  const resourcesResult = await db.execute(sql`SELECT id FROM resources`);
+  (resourcesResult.rows as Array<Record<string, unknown>>).forEach((r: Record<string, unknown>) => idSet.add(r.id as number));
   return Array.from(idSet);
 }
 
@@ -104,13 +105,13 @@ async function getResourceIdsForAffectedAreas(affectedAreas: string): Promise<nu
   }
   
   if (normalized === 'all_bays') {
-    const simulatorsResult = await pool.query("SELECT id FROM resources WHERE type = 'simulator'");
-    simulatorsResult.rows.forEach((r: Record<string, unknown>) => idSet.add(r.id as number));
+    const simulatorsResult = await db.execute(sql`SELECT id FROM resources WHERE type = 'simulator'`);
+    (simulatorsResult.rows as Array<Record<string, unknown>>).forEach((r: Record<string, unknown>) => idSet.add(r.id as number));
     return Array.from(idSet);
   }
   
   if (normalized === 'conference_room' || normalized === 'conference room') {
-    const confResult = await pool.query("SELECT id FROM resources WHERE LOWER(name) LIKE '%conference%' LIMIT 1");
+    const confResult = await db.execute(sql`SELECT id FROM resources WHERE LOWER(name) LIKE '%conference%' LIMIT 1`);
     if (confResult.rows.length > 0) {
       idSet.add((confResult.rows[0] as Record<string, unknown>).id as number);
     }
@@ -123,11 +124,11 @@ async function getResourceIdsForAffectedAreas(affectedAreas: string): Promise<nu
       const all = await getAllResourceIds();
       all.forEach(id => idSet.add(id));
     } else if (t === 'all_bays') {
-      const simulatorsResult = await pool.query("SELECT id FROM resources WHERE type = 'simulator'");
-      simulatorsResult.rows.forEach((r: Record<string, unknown>) => idSet.add(r.id as number));
+      const simulatorsResult = await db.execute(sql`SELECT id FROM resources WHERE type = 'simulator'`);
+      (simulatorsResult.rows as Array<Record<string, unknown>>).forEach((r: Record<string, unknown>) => idSet.add(r.id as number));
     } else if (t === 'conference_room' || t === 'conference room') {
-      const confResult = await pool.query("SELECT id FROM resources WHERE LOWER(name) LIKE '%conference%' LIMIT 1");
-      if (confResult.rows.length > 0) idSet.add((confResult.rows[0] as Record<string, unknown>).id as number);
+      const confResult = await db.execute(sql`SELECT id FROM resources WHERE LOWER(name) LIKE '%conference%' LIMIT 1`);
+      if ((confResult.rows as Array<Record<string, unknown>>).length > 0) idSet.add(((confResult.rows as Array<Record<string, unknown>>)[0]).id as number);
     } else if (t.startsWith('bay_')) {
       const bayId = parseInt(t.replace('bay_', ''));
       if (!isNaN(bayId)) idSet.add(bayId);
@@ -189,11 +190,10 @@ async function createAvailabilityBlocks(
 ): Promise<number> {
   let blocksCreated = 0;
   
-  const validResourcesResult = await pool.query(
-    'SELECT id FROM resources WHERE id = ANY($1)',
-    [resourceIds]
+  const validResourcesResult = await db.execute(
+    sql`SELECT id FROM resources WHERE id = ANY(${resourceIds})`
   );
-  const validResourceIds = new Set(validResourcesResult.rows.map((r: Record<string, unknown>) => r.id as number));
+  const validResourceIds = new Set((validResourcesResult.rows as Array<Record<string, unknown>>).map((r: Record<string, unknown>) => r.id as number));
   const filteredIds = resourceIds.filter(id => validResourceIds.has(id));
   
   if (filteredIds.length < resourceIds.length) {
@@ -201,29 +201,25 @@ async function createAvailabilityBlocks(
     logger.info(`[Calendar Sync] Skipping non-existent resource IDs: ${skippedIds.join(', ')}`);
   }
   
-  const valueRows: string[] = [];
-  const params: (string | number)[] = [];
-  let paramIdx = 1;
+  const valueParts: SQL[] = [];
   for (const resId of filteredIds) {
     for (const date of dates) {
-      valueRows.push(`($${paramIdx++}, $${paramIdx++}, $${paramIdx++}, $${paramIdx++}, $${paramIdx++}, $${paramIdx++}, $${paramIdx++}, $${paramIdx++})`);
-      params.push(resId, date, blockStartTime, blockEndTime, 'blocked', notes, 'system', closureId);
+      valueParts.push(sql`(${resId}, ${date}, ${blockStartTime}, ${blockEndTime}, 'blocked', ${notes}, 'system', ${closureId})`);
       blocksCreated++;
     }
   }
-  if (valueRows.length > 0) {
-    await pool.query(
-      `INSERT INTO availability_blocks (resource_id, block_date, start_time, end_time, block_type, notes, created_by, closure_id)
-       VALUES ${valueRows.join(', ')}
-       ON CONFLICT DO NOTHING`,
-      params
+  if (valueParts.length > 0) {
+    await db.execute(
+      sql`INSERT INTO availability_blocks (resource_id, block_date, start_time, end_time, block_type, notes, created_by, closure_id)
+       VALUES ${sql.join(valueParts, sql`, `)}
+       ON CONFLICT DO NOTHING`
     );
   }
   return blocksCreated;
 }
 
 async function deleteAvailabilityBlocks(closureId: number): Promise<void> {
-  await pool.query('DELETE FROM availability_blocks WHERE closure_id = $1', [closureId]);
+  await db.execute(sql`DELETE FROM availability_blocks WHERE closure_id = ${closureId}`);
 }
 
 function extractNoticeTypeFromTitle(title: string): { noticeType: string | null; cleanTitle: string } {
@@ -242,9 +238,8 @@ function extractNoticeTypeFromTitle(title: string): { noticeType: string | null;
 async function ensureNoticeTypeExists(typeName: string): Promise<void> {
   if (!typeName) return;
   const normalized = typeName.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
-  await pool.query(
-    `INSERT INTO notice_types (name, is_preset, sort_order) VALUES ($1, false, 100) ON CONFLICT (name) DO NOTHING`,
-    [normalized]
+  await db.execute(
+    sql`INSERT INTO notice_types (name, is_preset, sort_order) VALUES (${normalized}, false, 100) ON CONFLICT (name) DO NOTHING`
   );
 }
 
@@ -330,9 +325,8 @@ export async function syncInternalCalendarToClosures(): Promise<{ synced: number
         continue;
       }
       
-      const existing = await pool.query(
-        'SELECT id, start_date, end_date, start_time, end_time, affected_areas FROM facility_closures WHERE internal_calendar_id = $1',
-        [internalCalendarId]
+      const existing = await db.execute(
+        sql`SELECT id, start_date, end_date, start_time, end_time, affected_areas FROM facility_closures WHERE internal_calendar_id = ${internalCalendarId}`
       );
       
       if (existing.rows.length > 0) {
@@ -347,12 +341,11 @@ export async function syncInternalCalendarToClosures(): Promise<{ synced: number
           existingClosure.start_time !== startTime ||
           existingClosure.end_time !== endTime;
         
-        await pool.query(
-          `UPDATE facility_closures SET 
-           title = $1, start_date = $2, start_time = $3,
-           end_date = $4, end_time = $5, notice_type = $6, notes = COALESCE($7, notes), is_active = true
-           WHERE internal_calendar_id = $8`,
-          [title, startDate, startTime, endDate, endTime, noticeType, calendarNotes || metadata.notes || null, internalCalendarId]
+        await db.execute(
+          sql`UPDATE facility_closures SET 
+           title = ${title}, start_date = ${startDate}, start_time = ${startTime},
+           end_date = ${endDate}, end_time = ${endTime}, notice_type = ${noticeType}, notes = COALESCE(${calendarNotes || metadata.notes || null}, notes), is_active = true
+           WHERE internal_calendar_id = ${internalCalendarId}`
         );
         
         if (datesChanged) {
@@ -375,12 +368,11 @@ export async function syncInternalCalendarToClosures(): Promise<{ synced: number
         const visibility = metadata.visibility || null;
         const needsReview = !noticeType || affectedAreas === 'none' || !visibility;
         
-        const result = await pool.query(
-          `INSERT INTO facility_closures 
+        const result = await db.execute(
+          sql`INSERT INTO facility_closures 
            (title, notes, notice_type, start_date, start_time, end_date, end_time, affected_areas, is_active, created_by, internal_calendar_id, needs_review)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, true, 'system', $9, $10)
-           RETURNING id`,
-          [title, calendarNotes || metadata.notes || null, noticeType, startDate, startTime, endDate, endTime, affectedAreas, internalCalendarId, needsReview]
+           VALUES (${title}, ${calendarNotes || metadata.notes || null}, ${noticeType}, ${startDate}, ${startTime}, ${endDate}, ${endTime}, ${affectedAreas}, true, 'system', ${internalCalendarId}, ${needsReview})
+           RETURNING id`
         );
         
         const closureId = result.rows[0].id;
@@ -400,15 +392,15 @@ export async function syncInternalCalendarToClosures(): Promise<{ synced: number
       }
     }
     
-    const existingClosures = await pool.query(
-      'SELECT id, internal_calendar_id FROM facility_closures WHERE internal_calendar_id IS NOT NULL AND is_active = true'
+    const existingClosures = await db.execute(
+      sql`SELECT id, internal_calendar_id FROM facility_closures WHERE internal_calendar_id IS NOT NULL AND is_active = true`
     );
     
     let deleted = 0;
     for (const closure of existingClosures.rows) {
       if (cancelledEventIds.has(closure.internal_calendar_id) || !fetchedEventIds.has(closure.internal_calendar_id)) {
         await deleteAvailabilityBlocks(closure.id);
-        await pool.query('UPDATE facility_closures SET is_active = false WHERE id = $1', [closure.id]);
+        await db.execute(sql`UPDATE facility_closures SET is_active = false WHERE id = ${closure.id}`);
         logger.info(`[Calendar Sync] Deactivated closure #${closure.id} and removed availability blocks`);
         deleted++;
       }

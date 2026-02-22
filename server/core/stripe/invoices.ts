@@ -1,6 +1,8 @@
 import { getStripeClient } from './client';
-import { pool } from '../db';
+import { db } from '../../db';
+import { sql } from 'drizzle-orm';
 import Stripe from 'stripe';
+import { createHash } from 'crypto';
 import { getErrorMessage } from '../../utils/errorUtils';
 
 import { logger } from '../logger';
@@ -51,6 +53,7 @@ export async function createInvoice(params: CreateInvoiceParams): Promise<{
       return { success: false, error: 'At least one invoice item is required' };
     }
 
+    const descHash = createHash('md5').update(description || 'general').digest('hex').slice(0, 8);
     const invoice = await stripe.invoices.create({
       customer: customerId,
       description: description || undefined,
@@ -59,24 +62,26 @@ export async function createInvoice(params: CreateInvoiceParams): Promise<{
         ...metadata,
         source: 'ever_house_app',
       },
-    });
+    }, { idempotencyKey: `invoice_general_${customerId}_${descHash}` });
 
-    for (const item of items) {
+    for (let idx = 0; idx < items.length; idx++) {
+      const item = items[idx];
       if (item.priceId) {
         await stripe.invoiceItems.create({
           customer: customerId,
           invoice: invoice.id,
           price: item.priceId as string,
           quantity: item.quantity ?? 1,
-        } as any);
+        } as any, { idempotencyKey: `invitem_${invoice.id}_${idx}_${item.priceId}` });
       } else if (item.amountCents && item.description) {
+        const itemDescHash = createHash('md5').update(item.description).digest('hex').slice(0, 8);
         await stripe.invoiceItems.create({
           customer: customerId,
           invoice: invoice.id,
           amount: item.amountCents,
           currency: 'usd',
           description: item.description,
-        });
+        }, { idempotencyKey: `invitem_${invoice.id}_${idx}_${itemDescHash}` });
       }
     }
 
@@ -275,7 +280,7 @@ export async function chargeOneTimeFee(params: {
     const stripe = await getStripeClient();
     const { customerId, amountCents, description, metadata = {} } = params;
 
-    // Create invoice first (in draft state)
+    const feeDescHash = createHash('md5').update(description).digest('hex').slice(0, 8);
     const invoice = await stripe.invoices.create({
       customer: customerId,
       collection_method: 'charge_automatically',
@@ -286,16 +291,15 @@ export async function chargeOneTimeFee(params: {
         source: 'ever_house_app',
         fee_type: 'one_time',
       },
-    });
+    }, { idempotencyKey: `invoice_onetime_${customerId}_${amountCents}_${feeDescHash}` });
 
-    // Create invoice item attached to this specific invoice
     await stripe.invoiceItems.create({
       customer: customerId,
       invoice: invoice.id,
       amount: amountCents,
       currency: 'usd',
       description,
-    });
+    }, { idempotencyKey: `invitem_${invoice.id}_onetime_${feeDescHash}` });
 
     // Finalize the invoice - this applies customer balance automatically
     const finalizedInvoice = await stripe.invoices.finalizeInvoice(invoice.id);
@@ -438,7 +442,7 @@ export async function createBookingFeeInvoice(
     description,
     metadata: invoiceMetadata,
     pending_invoice_items_behavior: 'exclude',
-  });
+  }, { idempotencyKey: `invoice_bookingfee_${customerId}_${bookingId}_${sessionId}` });
 
   try {
     for (const li of feeLineItems) {
@@ -459,7 +463,7 @@ export async function createBookingFeeInvoice(
             feeType: 'overage',
             participantType: li.participantType,
           },
-        });
+        }, { idempotencyKey: `invitem_${invoice.id}_overage_${li.participantId || 'owner'}` });
       }
 
       if (li.guestCents > 0) {
@@ -474,7 +478,7 @@ export async function createBookingFeeInvoice(
             feeType: 'guest',
             participantType: li.participantType,
           },
-        });
+        }, { idempotencyKey: `invitem_${invoice.id}_guest_${li.participantId || 'owner'}` });
       }
     }
 
@@ -616,7 +620,7 @@ export async function createDraftBookingFeeInvoice(
     description,
     metadata: invoiceMetadata,
     pending_invoice_items_behavior: 'exclude',
-  });
+  }, { idempotencyKey: `invoice_draftbookingfee_${customerId}_${bookingId}_${sessionId}` });
 
   for (const li of feeLineItems) {
     if (li.totalCents <= 0) continue;
@@ -636,7 +640,7 @@ export async function createDraftBookingFeeInvoice(
           feeType: 'overage',
           participantType: li.participantType,
         },
-      });
+      }, { idempotencyKey: `invitem_${invoice.id}_overage_${li.participantId || 'owner'}` });
     }
 
     if (li.guestCents > 0) {
@@ -651,7 +655,7 @@ export async function createDraftBookingFeeInvoice(
           feeType: 'guest',
           participantType: li.participantType,
         },
-      });
+      }, { idempotencyKey: `invitem_${invoice.id}_guest_${li.participantId || 'owner'}` });
     }
   }
 
@@ -750,8 +754,8 @@ export async function getCustomerPaymentHistory(customerId: string, limit = 50):
   error?: string;
 }> {
   try {
-    const result = await pool.query(
-      `SELECT 
+    const result = await db.execute(
+      sql`SELECT 
         stripe_id as id,
         object_type as type,
         amount_cents,
@@ -760,10 +764,9 @@ export async function getCustomerPaymentHistory(customerId: string, limit = 50):
         COALESCE(description, 'Payment') as description,
         created_at
       FROM stripe_transaction_cache
-      WHERE customer_id = $1
+      WHERE customer_id = ${customerId}
       ORDER BY created_at DESC
-      LIMIT $2`,
-      [customerId, limit]
+      LIMIT ${limit}`
     );
     
     return {

@@ -1,5 +1,4 @@
 import { db } from '../db';
-import { pool } from './db';
 import { users } from '../../shared/schema';
 import { eq, sql } from 'drizzle-orm';
 import { logger } from './logger';
@@ -100,139 +99,82 @@ export async function previewMerge(primaryUserId: string, secondaryUserId: strin
   const secondaryEmail = normalizeEmail(secondaryUser.email);
   
   // Count bookings (all booking requests for this user)
-  const bookingsResult = await pool.query(
-    `SELECT COUNT(*) as count FROM booking_requests WHERE LOWER(user_email) = $1 OR user_id = $2`,
-    [secondaryEmail, secondaryUserId]
-  );
-  const bookingsCount = parseInt(bookingsResult.rows[0]?.count || '0');
+  const bookingsResult = await db.execute(sql`SELECT COUNT(*) as count FROM booking_requests WHERE LOWER(user_email) = ${secondaryEmail} OR user_id = ${secondaryUserId}`);
+  const bookingsCount = parseInt((bookingsResult.rows as Array<Record<string, unknown>>)[0]?.count as string || '0');
   
   // Count attended visits (booking requests with attended status)
-  const visitsResult = await pool.query(
-    `SELECT COUNT(*) as count FROM booking_requests 
-     WHERE (LOWER(user_email) = $1 OR user_id = $2) 
-     AND status = 'attended'`,
-    [secondaryEmail, secondaryUserId]
-  );
-  const visitsCount = parseInt(visitsResult.rows[0]?.count || '0');
+  const visitsResult = await db.execute(sql`SELECT COUNT(*) as count FROM booking_requests 
+     WHERE (LOWER(user_email) = ${secondaryEmail} OR user_id = ${secondaryUserId}) 
+     AND status = 'attended'`);
+  const visitsCount = parseInt((visitsResult.rows as Array<Record<string, unknown>>)[0]?.count as string || '0');
   
   // Count wellness enrollments
-  const wellnessResult = await pool.query(
-    `SELECT COUNT(*) as count FROM wellness_enrollments WHERE LOWER(user_email) = $1`,
-    [secondaryEmail]
-  );
-  const wellnessCount = parseInt(wellnessResult.rows[0]?.count || '0');
+  const wellnessResult = await db.execute(sql`SELECT COUNT(*) as count FROM wellness_enrollments WHERE LOWER(user_email) = ${secondaryEmail}`);
+  const wellnessCount = parseInt((wellnessResult.rows as Array<Record<string, unknown>>)[0]?.count as string || '0');
   
   // Count event RSVPs (uses user_email column)
-  const eventRsvpsResult = await pool.query(
-    `SELECT COUNT(*) as count FROM event_rsvps WHERE LOWER(user_email) = $1`,
-    [secondaryEmail]
-  );
-  const eventRsvpsCount = parseInt(eventRsvpsResult.rows[0]?.count || '0');
+  const eventRsvpsResult = await db.execute(sql`SELECT COUNT(*) as count FROM event_rsvps WHERE LOWER(user_email) = ${secondaryEmail}`);
+  const eventRsvpsCount = parseInt((eventRsvpsResult.rows as Array<Record<string, unknown>>)[0]?.count as string || '0');
   
   // Count notifications (uses user_email column)
-  const notificationsResult = await pool.query(
-    `SELECT COUNT(*) as count FROM notifications WHERE LOWER(user_email) = $1`,
-    [secondaryEmail]
-  );
-  const notificationsCount = parseInt(notificationsResult.rows[0]?.count || '0');
+  const notificationsResult = await db.execute(sql`SELECT COUNT(*) as count FROM notifications WHERE LOWER(user_email) = ${secondaryEmail}`);
+  const notificationsCount = parseInt((notificationsResult.rows as Array<Record<string, unknown>>)[0]?.count as string || '0');
   
   // Count member notes
-  const memberNotesResult = await pool.query(
-    `SELECT COUNT(*) as count FROM member_notes WHERE LOWER(member_email) = $1`,
-    [secondaryEmail]
-  );
-  const memberNotesCount = parseInt(memberNotesResult.rows[0]?.count || '0');
+  const memberNotesResult = await db.execute(sql`SELECT COUNT(*) as count FROM member_notes WHERE LOWER(member_email) = ${secondaryEmail}`);
+  const memberNotesCount = parseInt((memberNotesResult.rows as Array<Record<string, unknown>>)[0]?.count as string || '0');
   
   // Count guest check-ins (uses member_email column)
-  const guestCheckInsResult = await pool.query(
-    `SELECT COUNT(*) as count FROM guest_check_ins WHERE LOWER(member_email) = $1`,
-    [secondaryEmail]
-  );
-  const guestCheckInsCount = parseInt(guestCheckInsResult.rows[0]?.count || '0');
+  const guestCheckInsResult = await db.execute(sql`SELECT COUNT(*) as count FROM guest_check_ins WHERE LOWER(member_email) = ${secondaryEmail}`);
+  const guestCheckInsCount = parseInt((guestCheckInsResult.rows as Array<Record<string, unknown>>)[0]?.count as string || '0');
   
   // Count usage ledger entries (uses member_id column)
-  const usageLedgerResult = await pool.query(
-    `SELECT COUNT(*) as count FROM usage_ledger WHERE member_id = $1`,
-    [secondaryUserId]
-  );
-  const usageLedgerCount = parseInt(usageLedgerResult.rows[0]?.count || '0');
+  const usageLedgerResult = await db.execute(sql`SELECT COUNT(*) as count FROM usage_ledger WHERE member_id = ${secondaryUserId}`);
+  const usageLedgerCount = parseInt((usageLedgerResult.rows as Array<Record<string, unknown>>)[0]?.count as string || '0');
   
   // Count booking participants (uses user_id column)
-  const bookingParticipantsResult = await pool.query(
-    `SELECT COUNT(*) as count FROM booking_participants WHERE user_id = $1`,
-    [secondaryUserId]
-  );
-  const bookingParticipantsCount = parseInt(bookingParticipantsResult.rows[0]?.count || '0');
+  const bookingParticipantsResult = await db.execute(sql`SELECT COUNT(*) as count FROM booking_participants WHERE user_id = ${secondaryUserId}`);
+  const bookingParticipantsCount = parseInt((bookingParticipantsResult.rows as Array<Record<string, unknown>>)[0]?.count as string || '0');
   
   // Count day pass purchases (uses user_id and purchaser_email columns)
-  const dayPassResult = await pool.query(
-    `SELECT COUNT(*) as count FROM day_pass_purchases WHERE user_id = $1 OR LOWER(purchaser_email) = $2`,
-    [secondaryUserId, secondaryEmail]
-  );
-  const dayPassCount = parseInt(dayPassResult.rows[0]?.count || '0');
+  const dayPassResult = await db.execute(sql`SELECT COUNT(*) as count FROM day_pass_purchases WHERE user_id = ${secondaryUserId} OR LOWER(purchaser_email) = ${secondaryEmail}`);
+  const dayPassCount = parseInt((dayPassResult.rows as Array<Record<string, unknown>>)[0]?.count as string || '0');
   
   // Count legacy purchases (uses user_id and member_email columns)
-  const legacyPurchasesResult = await pool.query(
-    `SELECT COUNT(*) as count FROM legacy_purchases WHERE user_id = $1 OR LOWER(member_email) = $2`,
-    [secondaryUserId, secondaryEmail]
-  );
-  const legacyPurchasesCount = parseInt(legacyPurchasesResult.rows[0]?.count || '0');
+  const legacyPurchasesResult = await db.execute(sql`SELECT COUNT(*) as count FROM legacy_purchases WHERE user_id = ${secondaryUserId} OR LOWER(member_email) = ${secondaryEmail}`);
+  const legacyPurchasesCount = parseInt((legacyPurchasesResult.rows as Array<Record<string, unknown>>)[0]?.count as string || '0');
   
   // Count group members (uses member_email column)
-  const groupMembersResult = await pool.query(
-    `SELECT COUNT(*) as count FROM group_members WHERE LOWER(member_email) = $1`,
-    [secondaryEmail]
-  );
-  const groupMembersCount = parseInt(groupMembersResult.rows[0]?.count || '0');
+  const groupMembersResult = await db.execute(sql`SELECT COUNT(*) as count FROM group_members WHERE LOWER(member_email) = ${secondaryEmail}`);
+  const groupMembersCount = parseInt((groupMembersResult.rows as Array<Record<string, unknown>>)[0]?.count as string || '0');
   
   // Count push subscriptions (uses user_email column)
-  const pushSubscriptionsResult = await pool.query(
-    `SELECT COUNT(*) as count FROM push_subscriptions WHERE LOWER(user_email) = $1`,
-    [secondaryEmail]
-  );
-  const pushSubscriptionsCount = parseInt(pushSubscriptionsResult.rows[0]?.count || '0');
+  const pushSubscriptionsResult = await db.execute(sql`SELECT COUNT(*) as count FROM push_subscriptions WHERE LOWER(user_email) = ${secondaryEmail}`);
+  const pushSubscriptionsCount = parseInt((pushSubscriptionsResult.rows as Array<Record<string, unknown>>)[0]?.count as string || '0');
   
   // Count dismissed notices (uses user_email column)
-  const dismissedNoticesResult = await pool.query(
-    `SELECT COUNT(*) as count FROM user_dismissed_notices WHERE LOWER(user_email) = $1`,
-    [secondaryEmail]
-  );
-  const dismissedNoticesCount = parseInt(dismissedNoticesResult.rows[0]?.count || '0');
+  const dismissedNoticesResult = await db.execute(sql`SELECT COUNT(*) as count FROM user_dismissed_notices WHERE LOWER(user_email) = ${secondaryEmail}`);
+  const dismissedNoticesCount = parseInt((dismissedNoticesResult.rows as Array<Record<string, unknown>>)[0]?.count as string || '0');
   
   // Count billing groups where user is primary payer (uses primary_email column)
-  const billingGroupsResult = await pool.query(
-    `SELECT COUNT(*) as count FROM billing_groups WHERE LOWER(primary_email) = $1`,
-    [secondaryEmail]
-  );
-  const billingGroupsCount = parseInt(billingGroupsResult.rows[0]?.count || '0');
+  const billingGroupsResult = await db.execute(sql`SELECT COUNT(*) as count FROM billing_groups WHERE LOWER(primary_email) = ${secondaryEmail}`);
+  const billingGroupsCount = parseInt((billingGroupsResult.rows as Array<Record<string, unknown>>)[0]?.count as string || '0');
   
   // Count bug reports (uses user_email column)
-  const bugReportsResult = await pool.query(
-    `SELECT COUNT(*) as count FROM bug_reports WHERE LOWER(user_email) = $1`,
-    [secondaryEmail]
-  );
-  const bugReportsCount = parseInt(bugReportsResult.rows[0]?.count || '0');
+  const bugReportsResult = await db.execute(sql`SELECT COUNT(*) as count FROM bug_reports WHERE LOWER(user_email) = ${secondaryEmail}`);
+  const bugReportsCount = parseInt((bugReportsResult.rows as Array<Record<string, unknown>>)[0]?.count as string || '0');
   
   // Count data export requests (uses user_email column)
-  const dataExportResult = await pool.query(
-    `SELECT COUNT(*) as count FROM data_export_requests WHERE LOWER(user_email) = $1`,
-    [secondaryEmail]
-  );
-  const dataExportCount = parseInt(dataExportResult.rows[0]?.count || '0');
+  const dataExportResult = await db.execute(sql`SELECT COUNT(*) as count FROM data_export_requests WHERE LOWER(user_email) = ${secondaryEmail}`);
+  const dataExportCount = parseInt((dataExportResult.rows as Array<Record<string, unknown>>)[0]?.count as string || '0');
   
   // Count HubSpot deals (uses member_email column)
-  const hubspotDealsResult = await pool.query(
-    `SELECT COUNT(*) as count FROM hubspot_deals WHERE LOWER(member_email) = $1`,
-    [secondaryEmail]
-  );
-  const hubspotDealsCount = parseInt(hubspotDealsResult.rows[0]?.count || '0');
+  const hubspotDealsResult = await db.execute(sql`SELECT COUNT(*) as count FROM hubspot_deals WHERE LOWER(member_email) = ${secondaryEmail}`);
+  const hubspotDealsCount = parseInt((hubspotDealsResult.rows as Array<Record<string, unknown>>)[0]?.count as string || '0');
   
   // Count Stripe payment intents (uses user_id column)
-  const stripePaymentIntentsResult = await pool.query(
-    `SELECT COUNT(*) as count FROM stripe_payment_intents WHERE user_id = $1`,
-    [secondaryUserId]
-  );
-  const stripePaymentIntentsCount = parseInt(stripePaymentIntentsResult.rows[0]?.count || '0');
+  const stripePaymentIntentsResult = await db.execute(sql`SELECT COUNT(*) as count FROM stripe_payment_intents WHERE user_id = ${secondaryUserId}`);
+  const stripePaymentIntentsCount = parseInt((stripePaymentIntentsResult.rows as Array<Record<string, unknown>>)[0]?.count as string || '0');
   
   const conflicts: string[] = [];
   const recommendations: string[] = [];
@@ -346,225 +288,137 @@ export async function executeMerge(
     guests: 0,
   };
   
-  const client = await pool.connect();
-  
-  try {
-    // Check for active sessions (cannot merge user who is currently playing)
-    const activeSession = await pool.query(`
+  // Check for active sessions (cannot merge user who is currently playing)
+  const activeSession = await db.execute(sql`
       SELECT bp.session_id, bs.session_date, bs.start_time
       FROM booking_participants bp
       JOIN booking_sessions bs ON bp.session_id = bs.id
-      WHERE bp.user_id = $1
+      WHERE bp.user_id = ${secondaryUserId}
         AND bs.session_date = (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
         AND bs.start_time <= (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::time
         AND bs.end_time > (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::time
-    `, [secondaryUserId]);
+    `);
 
-    if (activeSession.rows.length > 0) {
-      throw new Error(`Cannot merge: Secondary user has ${activeSession.rows.length} active session(s). Wait until session ends.`);
-    }
-    
-    await client.query('BEGIN');
-    
-    const bookingsResult = await client.query(
-      `UPDATE booking_requests 
-       SET user_email = $1, user_id = $2, updated_at = NOW(),
-           staff_notes = COALESCE(staff_notes, '') || ' [Merged from ' || $3 || ']'
-       WHERE (LOWER(user_email) = $3 OR user_id = $4)`,
-      [primaryEmail, primaryUserId, secondaryEmail, secondaryUserId]
-    );
-    recordsMerged.bookings = bookingsResult.rowCount || 0;
+  if ((activeSession.rows as Array<Record<string, unknown>>).length > 0) {
+    throw new Error(`Cannot merge: Secondary user has ${(activeSession.rows as Array<Record<string, unknown>>).length} active session(s). Wait until session ends.`);
+  }
+  
+  await db.transaction(async (tx) => {
+    const bookingsResult = await tx.execute(sql`UPDATE booking_requests 
+       SET user_email = ${primaryEmail}, user_id = ${primaryUserId}, updated_at = NOW(),
+           staff_notes = COALESCE(staff_notes, '') || ' [Merged from ' || ${secondaryEmail} || ']'
+       WHERE (LOWER(user_email) = ${secondaryEmail} OR user_id = ${secondaryUserId})`);
+    recordsMerged.bookings = (bookingsResult as any).rowCount || 0;
     
     // Visits are tracked via booking_requests status - no separate table to update
     // Just count how many attended bookings were transferred
-    const attendedResult = await client.query(
-      `SELECT COUNT(*) as count FROM booking_requests 
-       WHERE (LOWER(user_email) = $1 OR user_id = $2) AND status = 'attended'`,
-      [primaryEmail, primaryUserId]
-    );
-    recordsMerged.visits = parseInt(attendedResult.rows[0]?.count || '0');
+    const attendedResult = await tx.execute(sql`SELECT COUNT(*) as count FROM booking_requests 
+       WHERE (LOWER(user_email) = ${primaryEmail} OR user_id = ${primaryUserId}) AND status = 'attended'`);
+    recordsMerged.visits = parseInt((attendedResult.rows as Array<Record<string, unknown>>)[0]?.count as string || '0');
     
     // Update wellness enrollments
-    const wellnessResult = await client.query(
-      `UPDATE wellness_enrollments SET user_email = $1 WHERE LOWER(user_email) = $2`,
-      [primaryEmail, secondaryEmail]
-    );
-    recordsMerged.wellnessBookings = wellnessResult.rowCount || 0;
+    const wellnessResult = await tx.execute(sql`UPDATE wellness_enrollments SET user_email = ${primaryEmail} WHERE LOWER(user_email) = ${secondaryEmail}`);
+    recordsMerged.wellnessBookings = (wellnessResult as any).rowCount || 0;
     
     // Update event RSVPs (uses user_email column)
-    const eventRsvpsResult = await client.query(
-      `UPDATE event_rsvps SET user_email = $1 WHERE LOWER(user_email) = $2`,
-      [primaryEmail, secondaryEmail]
-    );
-    recordsMerged.eventRsvps = eventRsvpsResult.rowCount || 0;
+    const eventRsvpsResult = await tx.execute(sql`UPDATE event_rsvps SET user_email = ${primaryEmail} WHERE LOWER(user_email) = ${secondaryEmail}`);
+    recordsMerged.eventRsvps = (eventRsvpsResult as any).rowCount || 0;
     
     // Update notifications (uses user_email column)
-    const notificationsResult = await client.query(
-      `UPDATE notifications SET user_email = $1 WHERE LOWER(user_email) = $2`,
-      [primaryEmail, secondaryEmail]
-    );
-    recordsMerged.notifications = notificationsResult.rowCount || 0;
+    const notificationsResult = await tx.execute(sql`UPDATE notifications SET user_email = ${primaryEmail} WHERE LOWER(user_email) = ${secondaryEmail}`);
+    recordsMerged.notifications = (notificationsResult as any).rowCount || 0;
     
-    const memberNotesResult = await client.query(
-      `UPDATE member_notes SET member_email = $1, updated_at = NOW() WHERE LOWER(member_email) = $2`,
-      [primaryEmail, secondaryEmail]
-    );
-    recordsMerged.memberNotes = memberNotesResult.rowCount || 0;
+    const memberNotesResult = await tx.execute(sql`UPDATE member_notes SET member_email = ${primaryEmail}, updated_at = NOW() WHERE LOWER(member_email) = ${secondaryEmail}`);
+    recordsMerged.memberNotes = (memberNotesResult as any).rowCount || 0;
     
     // Update guest check-ins (uses member_email column)
-    const guestCheckInsResult = await client.query(
-      `UPDATE guest_check_ins SET member_email = $1 WHERE LOWER(member_email) = $2`,
-      [primaryEmail, secondaryEmail]
-    );
-    recordsMerged.guestCheckIns = guestCheckInsResult.rowCount || 0;
+    const guestCheckInsResult = await tx.execute(sql`UPDATE guest_check_ins SET member_email = ${primaryEmail} WHERE LOWER(member_email) = ${secondaryEmail}`);
+    recordsMerged.guestCheckIns = (guestCheckInsResult as any).rowCount || 0;
     
     // Update usage ledger (uses member_id column)
-    const usageLedgerResult = await client.query(
-      `UPDATE usage_ledger SET member_id = $1 WHERE member_id = $2`,
-      [primaryUserId, secondaryUserId]
-    );
-    recordsMerged.usageLedger = usageLedgerResult.rowCount || 0;
+    const usageLedgerResult = await tx.execute(sql`UPDATE usage_ledger SET member_id = ${primaryUserId} WHERE member_id = ${secondaryUserId}`);
+    recordsMerged.usageLedger = (usageLedgerResult as any).rowCount || 0;
     
-    await client.query(
-      `UPDATE communication_logs SET member_email = $1, updated_at = NOW() WHERE LOWER(member_email) = $2`,
-      [primaryEmail, secondaryEmail]
-    );
+    await tx.execute(sql`UPDATE communication_logs SET member_email = ${primaryEmail}, updated_at = NOW() WHERE LOWER(member_email) = ${secondaryEmail}`);
     
-    await client.query(
-      `UPDATE guest_passes SET member_email = $1 WHERE LOWER(member_email) = $2`,
-      [primaryEmail, secondaryEmail]
-    );
+    await tx.execute(sql`UPDATE guest_passes SET member_email = ${primaryEmail} WHERE LOWER(member_email) = ${secondaryEmail}`);
     
     // Update guests created by secondary user
-    const guestsResult = await client.query(
-      `UPDATE guests SET created_by_member_id = $1 WHERE created_by_member_id = $2`,
-      [primaryUserId, secondaryUserId]
-    );
-    recordsMerged.guests = guestsResult.rowCount || 0;
+    const guestsResult = await tx.execute(sql`UPDATE guests SET created_by_member_id = ${primaryUserId} WHERE created_by_member_id = ${secondaryUserId}`);
+    recordsMerged.guests = (guestsResult as any).rowCount || 0;
     
     // Update booking participants (uses user_id column)
     // DEDUPLICATE: If primary user is already in a session, remove secondary user's duplicate record
-    await client.query(
-      `DELETE FROM booking_participants 
-       WHERE user_id = $1 
-       AND session_id IN (SELECT session_id FROM booking_participants WHERE user_id = $2)`,
-      [secondaryUserId, primaryUserId]
-    );
+    await tx.execute(sql`DELETE FROM booking_participants 
+       WHERE user_id = ${secondaryUserId} 
+       AND session_id IN (SELECT session_id FROM booking_participants WHERE user_id = ${primaryUserId})`);
     
-    const bookingParticipantsResult = await client.query(
-      `UPDATE booking_participants SET user_id = $1 WHERE user_id = $2`,
-      [primaryUserId, secondaryUserId]
-    );
-    recordsMerged.bookingParticipants = bookingParticipantsResult.rowCount || 0;
+    const bookingParticipantsResult = await tx.execute(sql`UPDATE booking_participants SET user_id = ${primaryUserId} WHERE user_id = ${secondaryUserId}`);
+    recordsMerged.bookingParticipants = (bookingParticipantsResult as any).rowCount || 0;
     
     // Update day pass purchases (uses user_id and purchaser_email columns)
-    const dayPassResult = await client.query(
-      `UPDATE day_pass_purchases SET user_id = $1, purchaser_email = $2 
-       WHERE user_id = $3 OR LOWER(purchaser_email) = $4`,
-      [primaryUserId, primaryEmail, secondaryUserId, secondaryEmail]
-    );
-    recordsMerged.dayPassPurchases = dayPassResult.rowCount || 0;
+    const dayPassResult = await tx.execute(sql`UPDATE day_pass_purchases SET user_id = ${primaryUserId}, purchaser_email = ${primaryEmail} 
+       WHERE user_id = ${secondaryUserId} OR LOWER(purchaser_email) = ${secondaryEmail}`);
+    recordsMerged.dayPassPurchases = (dayPassResult as any).rowCount || 0;
     
     // Update legacy purchases (uses user_id and member_email columns)
-    const legacyPurchasesResult = await client.query(
-      `UPDATE legacy_purchases SET user_id = $1, member_email = $2 
-       WHERE user_id = $3 OR LOWER(member_email) = $4`,
-      [primaryUserId, primaryEmail, secondaryUserId, secondaryEmail]
-    );
-    recordsMerged.legacyPurchases = legacyPurchasesResult.rowCount || 0;
+    const legacyPurchasesResult = await tx.execute(sql`UPDATE legacy_purchases SET user_id = ${primaryUserId}, member_email = ${primaryEmail} 
+       WHERE user_id = ${secondaryUserId} OR LOWER(member_email) = ${secondaryEmail}`);
+    recordsMerged.legacyPurchases = (legacyPurchasesResult as any).rowCount || 0;
     
     // Update group members (uses member_email column)
     // DEDUPLICATE: If primary email is already in a group, remove secondary email's duplicate record
-    await client.query(
-      `DELETE FROM group_members 
-       WHERE LOWER(member_email) = $1 
-       AND billing_group_id IN (SELECT billing_group_id FROM group_members WHERE LOWER(member_email) = $2)`,
-      [secondaryEmail, primaryEmail]
-    );
+    await tx.execute(sql`DELETE FROM group_members 
+       WHERE LOWER(member_email) = ${secondaryEmail} 
+       AND billing_group_id IN (SELECT billing_group_id FROM group_members WHERE LOWER(member_email) = ${primaryEmail})`);
     
-    const groupMembersResult = await client.query(
-      `UPDATE group_members SET member_email = $1 WHERE LOWER(member_email) = $2`,
-      [primaryEmail, secondaryEmail]
-    );
-    recordsMerged.groupMembers = groupMembersResult.rowCount || 0;
+    const groupMembersResult = await tx.execute(sql`UPDATE group_members SET member_email = ${primaryEmail} WHERE LOWER(member_email) = ${secondaryEmail}`);
+    recordsMerged.groupMembers = (groupMembersResult as any).rowCount || 0;
     
     // Update push subscriptions (uses user_email column)
     // DEDUPLICATE: If same endpoint exists for primary, remove secondary's duplicate subscription
-    await client.query(
-      `DELETE FROM push_subscriptions
-       WHERE LOWER(user_email) = $1
-       AND endpoint IN (SELECT endpoint FROM push_subscriptions WHERE LOWER(user_email) = $2)`,
-      [secondaryEmail, primaryEmail]
-    );
+    await tx.execute(sql`DELETE FROM push_subscriptions
+       WHERE LOWER(user_email) = ${secondaryEmail}
+       AND endpoint IN (SELECT endpoint FROM push_subscriptions WHERE LOWER(user_email) = ${primaryEmail})`);
     
-    const pushSubscriptionsResult = await client.query(
-      `UPDATE push_subscriptions SET user_email = $1 WHERE LOWER(user_email) = $2`,
-      [primaryEmail, secondaryEmail]
-    );
-    recordsMerged.pushSubscriptions = pushSubscriptionsResult.rowCount || 0;
+    const pushSubscriptionsResult = await tx.execute(sql`UPDATE push_subscriptions SET user_email = ${primaryEmail} WHERE LOWER(user_email) = ${secondaryEmail}`);
+    recordsMerged.pushSubscriptions = (pushSubscriptionsResult as any).rowCount || 0;
     
     // Update dismissed notices (uses user_email column)
-    const dismissedNoticesResult = await client.query(
-      `UPDATE user_dismissed_notices SET user_email = $1 WHERE LOWER(user_email) = $2`,
-      [primaryEmail, secondaryEmail]
-    );
-    recordsMerged.dismissedNotices = dismissedNoticesResult.rowCount || 0;
+    const dismissedNoticesResult = await tx.execute(sql`UPDATE user_dismissed_notices SET user_email = ${primaryEmail} WHERE LOWER(user_email) = ${secondaryEmail}`);
+    recordsMerged.dismissedNotices = (dismissedNoticesResult as any).rowCount || 0;
     
     // Update billing groups where user is primary payer (uses primary_email column)
-    const billingGroupsResult = await client.query(
-      `UPDATE billing_groups SET primary_email = $1 WHERE LOWER(primary_email) = $2`,
-      [primaryEmail, secondaryEmail]
-    );
-    recordsMerged.billingGroups = billingGroupsResult.rowCount || 0;
+    const billingGroupsResult = await tx.execute(sql`UPDATE billing_groups SET primary_email = ${primaryEmail} WHERE LOWER(primary_email) = ${secondaryEmail}`);
+    recordsMerged.billingGroups = (billingGroupsResult as any).rowCount || 0;
     
     // Update bug reports (uses user_email column)
-    const bugReportsResult = await client.query(
-      `UPDATE bug_reports SET user_email = $1 WHERE LOWER(user_email) = $2`,
-      [primaryEmail, secondaryEmail]
-    );
-    recordsMerged.bugReports = bugReportsResult.rowCount || 0;
+    const bugReportsResult = await tx.execute(sql`UPDATE bug_reports SET user_email = ${primaryEmail} WHERE LOWER(user_email) = ${secondaryEmail}`);
+    recordsMerged.bugReports = (bugReportsResult as any).rowCount || 0;
     
     // Update data export requests (uses user_email column)
-    const dataExportResult = await client.query(
-      `UPDATE data_export_requests SET user_email = $1 WHERE LOWER(user_email) = $2`,
-      [primaryEmail, secondaryEmail]
-    );
-    recordsMerged.dataExportRequests = dataExportResult.rowCount || 0;
+    const dataExportResult = await tx.execute(sql`UPDATE data_export_requests SET user_email = ${primaryEmail} WHERE LOWER(user_email) = ${secondaryEmail}`);
+    recordsMerged.dataExportRequests = (dataExportResult as any).rowCount || 0;
     
     // Update HubSpot deals (uses member_email column)
-    const hubspotDealsResult = await client.query(
-      `UPDATE hubspot_deals SET member_email = $1 WHERE LOWER(member_email) = $2`,
-      [primaryEmail, secondaryEmail]
-    );
-    recordsMerged.hubspotDeals = hubspotDealsResult.rowCount || 0;
+    const hubspotDealsResult = await tx.execute(sql`UPDATE hubspot_deals SET member_email = ${primaryEmail} WHERE LOWER(member_email) = ${secondaryEmail}`);
+    recordsMerged.hubspotDeals = (hubspotDealsResult as any).rowCount || 0;
     
     // Update Stripe payment intents (uses user_id column)
-    const stripePaymentIntentsResult = await client.query(
-      `UPDATE stripe_payment_intents SET user_id = $1 WHERE user_id = $2`,
-      [primaryUserId, secondaryUserId]
-    );
-    recordsMerged.stripePaymentIntents = stripePaymentIntentsResult.rowCount || 0;
+    const stripePaymentIntentsResult = await tx.execute(sql`UPDATE stripe_payment_intents SET user_id = ${primaryUserId} WHERE user_id = ${secondaryUserId}`);
+    recordsMerged.stripePaymentIntents = (stripePaymentIntentsResult as any).rowCount || 0;
     
     // Update user_linked_emails (uses primary_email column, not user_id)
-    await client.query(
-      `UPDATE user_linked_emails SET primary_email = $1 WHERE LOWER(primary_email) = $2`,
-      [primaryEmail, secondaryEmail]
-    );
+    await tx.execute(sql`UPDATE user_linked_emails SET primary_email = ${primaryEmail} WHERE LOWER(primary_email) = ${secondaryEmail}`);
     
     // Add secondary email as a linked email for the primary user
     if (secondaryEmail && secondaryEmail !== primaryEmail) {
-      const existingLink = await client.query(
-        `SELECT id FROM user_linked_emails WHERE LOWER(linked_email) = $1`,
-        [secondaryEmail]
-      );
+      const existingLink = await tx.execute(sql`SELECT id FROM user_linked_emails WHERE LOWER(linked_email) = ${secondaryEmail}`);
       
-      if (existingLink.rows.length === 0) {
-        await client.query(
-          `INSERT INTO user_linked_emails (primary_email, linked_email, source, created_at)
-           VALUES ($1, $2, 'user_merge', NOW())
-           ON CONFLICT (linked_email) DO NOTHING`,
-          [primaryEmail, secondaryEmail]
-        );
+      if ((existingLink.rows as Array<Record<string, unknown>>).length === 0) {
+        await tx.execute(sql`INSERT INTO user_linked_emails (primary_email, linked_email, source, created_at)
+           VALUES (${primaryEmail}, ${secondaryEmail}, 'user_merge', NOW())
+           ON CONFLICT (linked_email) DO NOTHING`);
         recordsMerged.linkedEmails++;
       }
     }
@@ -657,28 +511,19 @@ export async function executeMerge(
     
     const finalTags = [...currentTags, { type: 'merge_record', ...mergeInfo }];
     
-    await client.query(
-      `UPDATE users SET
-         lifetime_visits = $1,
-         join_date = $2,
-         waiver_version = $3,
-         waiver_signed_at = $4,
-         tags = $5,
-         stripe_customer_id = COALESCE($6, stripe_customer_id),
-         hubspot_id = COALESCE($7, hubspot_id),
+    const finalStripeId = resolvedStripeCustomerId || (transferStripeId ? secondaryUser.stripeCustomerId : null);
+    const finalHubspotId = transferHubspotId ? secondaryUser.hubspotId : null;
+    
+    await tx.execute(sql`UPDATE users SET
+         lifetime_visits = ${combinedVisits},
+         join_date = ${earlierJoinDate},
+         waiver_version = ${newerWaiver.version},
+         waiver_signed_at = ${newerWaiver.signedAt},
+         tags = ${JSON.stringify(finalTags)},
+         stripe_customer_id = COALESCE(${finalStripeId}, stripe_customer_id),
+         hubspot_id = COALESCE(${finalHubspotId}, hubspot_id),
          updated_at = NOW()
-       WHERE id = $8`,
-      [
-        combinedVisits, 
-        earlierJoinDate, 
-        newerWaiver.version, 
-        newerWaiver.signedAt, 
-        JSON.stringify(finalTags),
-        resolvedStripeCustomerId || (transferStripeId ? secondaryUser.stripeCustomerId : null),
-        transferHubspotId ? secondaryUser.hubspotId : null,
-        primaryUserId
-      ]
-    );
+       WHERE id = ${primaryUserId}`);
     
     const secondaryTags = (secondaryUser.tags as unknown[]) || [];
     const archiveTags = [...secondaryTags, { 
@@ -698,65 +543,54 @@ export async function executeMerge(
       extra: { originalEmail: secondaryEmail, archivedEmail, secondaryUserId }
     });
     
-    await client.query(
-      `UPDATE users SET
+    await tx.execute(sql`UPDATE users SET
          archived_at = NOW(),
-         archived_by = $1,
+         archived_by = ${performedBy},
          membership_status = 'merged',
-         email = $4,
-         tags = $2,
+         email = ${archivedEmail},
+         tags = ${JSON.stringify(archiveTags)},
          updated_at = NOW()
-       WHERE id = $3`,
-      [performedBy, JSON.stringify(archiveTags), secondaryUserId, archivedEmail]
-    );
+       WHERE id = ${secondaryUserId}`);
+  });
     
-    await client.query('COMMIT');
-    
-    logger.info('[UserMerge] Successfully merged users', {
-      extra: { primaryUserId, secondaryUserId, performedBy, recordsMerged }
-    });
-    
-    const primaryHubspotId = primaryUser.hubspotId || (transferHubspotId ? secondaryUser.hubspotId : null);
-    const secondaryHubspotId = transferHubspotId ? null : secondaryUser.hubspotId;
-    
-    if (primaryHubspotId && secondaryHubspotId && primaryHubspotId !== secondaryHubspotId) {
-      try {
-        const hubspot = await getHubSpotClient();
-        if (hubspot) {
-          await hubspot.apiRequest({
-            method: 'POST',
-            path: '/crm/v3/objects/contacts/merge',
-            body: {
-              primaryObjectId: primaryHubspotId,
-              objectIdToMerge: secondaryHubspotId
-            }
-          });
-          logger.info('[UserMerge] HubSpot contacts merged automatically', {
-            extra: { primaryHubspotId, secondaryHubspotId }
-          });
-        }
-      } catch (hubspotErr: unknown) {
-        logger.warn('[UserMerge] Failed to merge HubSpot contacts (merge them manually in HubSpot)', {
-          extra: { error: hubspotErr, primaryHubspotId, secondaryHubspotId }
+  logger.info('[UserMerge] Successfully merged users', {
+    extra: { primaryUserId, secondaryUserId, performedBy, recordsMerged }
+  });
+  
+  const primaryHubspotId = primaryUser.hubspotId || (transferHubspotId ? secondaryUser.hubspotId : null);
+  const secondaryHubspotId = transferHubspotId ? null : secondaryUser.hubspotId;
+  
+  if (primaryHubspotId && secondaryHubspotId && primaryHubspotId !== secondaryHubspotId) {
+    try {
+      const hubspot = await getHubSpotClient();
+      if (hubspot) {
+        await hubspot.apiRequest({
+          method: 'POST',
+          path: '/crm/v3/objects/contacts/merge',
+          body: {
+            primaryObjectId: primaryHubspotId,
+            objectIdToMerge: secondaryHubspotId
+          }
+        });
+        logger.info('[UserMerge] HubSpot contacts merged automatically', {
+          extra: { primaryHubspotId, secondaryHubspotId }
         });
       }
+    } catch (hubspotErr: unknown) {
+      logger.warn('[UserMerge] Failed to merge HubSpot contacts (merge them manually in HubSpot)', {
+        extra: { error: hubspotErr, primaryHubspotId, secondaryHubspotId }
+      });
     }
-    
-    return {
-      success: true,
-      primaryUserId,
-      secondaryUserId,
-      recordsMerged,
-      mergedLifetimeVisits: combinedVisits,
-      secondaryArchived: true,
-    };
-  } catch (error: unknown) {
-    await client.query('ROLLBACK');
-    logger.error('[UserMerge] Failed to merge users', { extra: { primaryUserId, secondaryUserId, error } });
-    throw error;
-  } finally {
-    client.release();
   }
+  
+  return {
+    success: true,
+    primaryUserId,
+    secondaryUserId,
+    recordsMerged,
+    mergedLifetimeVisits: combinedVisits,
+    secondaryArchived: true,
+  };
 }
 
 export async function findPotentialDuplicates(userId: string): Promise<Array<{
@@ -781,95 +615,83 @@ export async function findPotentialDuplicates(userId: string): Promise<Array<{
   }> = [];
   
   if (fullName) {
-    const nameMatches = await pool.query(
-      `SELECT id, email, first_name, last_name, tier, membership_status
+    const nameMatches = await db.execute(sql`SELECT id, email, first_name, last_name, tier, membership_status
        FROM users 
-       WHERE id != $1 
+       WHERE id != ${userId} 
          AND archived_at IS NULL
-         AND LOWER(CONCAT(first_name, ' ', last_name)) = $2
-       LIMIT 10`,
-      [userId, fullName]
-    );
+         AND LOWER(CONCAT(first_name, ' ', last_name)) = ${fullName}
+       LIMIT 10`);
     
-    for (const row of nameMatches.rows) {
+    for (const row of (nameMatches.rows as Array<Record<string, unknown>>)) {
       duplicates.push({
-        id: row.id,
-        email: row.email || '',
+        id: row.id as string,
+        email: (row.email as string) || '',
         name: `${row.first_name || ''} ${row.last_name || ''}`.trim(),
-        tier: row.tier,
-        membershipStatus: row.membership_status,
+        tier: row.tier as string | null,
+        membershipStatus: row.membership_status as string | null,
         matchReason: 'Same name',
       });
     }
   }
   
   if (user.phone) {
-    const phoneMatches = await pool.query(
-      `SELECT id, email, first_name, last_name, tier, membership_status
+    const phoneMatches = await db.execute(sql`SELECT id, email, first_name, last_name, tier, membership_status
        FROM users 
-       WHERE id != $1 
+       WHERE id != ${userId} 
          AND archived_at IS NULL
-         AND phone = $2
-         AND id NOT IN (SELECT unnest($3::text[]))
-       LIMIT 5`,
-      [userId, user.phone, duplicates.map(d => d.id)]
-    );
+         AND phone = ${user.phone}
+         AND id NOT IN (SELECT unnest(${duplicates.map(d => d.id)}::text[]))
+       LIMIT 5`);
     
-    for (const row of phoneMatches.rows) {
+    for (const row of (phoneMatches.rows as Array<Record<string, unknown>>)) {
       duplicates.push({
-        id: row.id,
-        email: row.email || '',
+        id: row.id as string,
+        email: (row.email as string) || '',
         name: `${row.first_name || ''} ${row.last_name || ''}`.trim(),
-        tier: row.tier,
-        membershipStatus: row.membership_status,
+        tier: row.tier as string | null,
+        membershipStatus: row.membership_status as string | null,
         matchReason: 'Same phone number',
       });
     }
   }
   
   if (user.mindbodyClientId) {
-    const mbMatches = await pool.query(
-      `SELECT id, email, first_name, last_name, tier, membership_status
+    const mbMatches = await db.execute(sql`SELECT id, email, first_name, last_name, tier, membership_status
        FROM users 
-       WHERE id != $1 
+       WHERE id != ${userId} 
          AND archived_at IS NULL
-         AND mindbody_client_id = $2
-         AND id NOT IN (SELECT unnest($3::text[]))
-       LIMIT 5`,
-      [userId, user.mindbodyClientId, duplicates.map(d => d.id)]
-    );
+         AND mindbody_client_id = ${user.mindbodyClientId}
+         AND id NOT IN (SELECT unnest(${duplicates.map(d => d.id)}::text[]))
+       LIMIT 5`);
     
-    for (const row of mbMatches.rows) {
+    for (const row of (mbMatches.rows as Array<Record<string, unknown>>)) {
       duplicates.push({
-        id: row.id,
-        email: row.email || '',
+        id: row.id as string,
+        email: (row.email as string) || '',
         name: `${row.first_name || ''} ${row.last_name || ''}`.trim(),
-        tier: row.tier,
-        membershipStatus: row.membership_status,
+        tier: row.tier as string | null,
+        membershipStatus: row.membership_status as string | null,
         matchReason: 'Same MindBody ID',
       });
     }
   }
   
   if (user.hubspotId) {
-    const hsMatches = await pool.query(
-      `SELECT id, email, first_name, last_name, tier, membership_status
+    const hsMatches = await db.execute(sql`SELECT id, email, first_name, last_name, tier, membership_status
        FROM users 
-       WHERE id != $1 
+       WHERE id != ${userId} 
          AND archived_at IS NULL
-         AND hubspot_id = $2
-         AND id NOT IN (SELECT unnest($3::text[]))
-       LIMIT 5`,
-      [userId, user.hubspotId, duplicates.map(d => d.id)]
-    );
+         AND hubspot_id = ${user.hubspotId}
+         AND id NOT IN (SELECT unnest(${duplicates.map(d => d.id)}::text[]))
+       LIMIT 5`);
     
-    for (const row of hsMatches.rows) {
+    for (const row of (hsMatches.rows as Array<Record<string, unknown>>)) {
       duplicates.push({
-        id: row.id,
-        email: row.email || '',
+        id: row.id as string,
+        email: (row.email as string) || '',
         name: `${row.first_name || ''} ${row.last_name || ''}`.trim(),
-        tier: row.tier,
-        membershipStatus: row.membership_status,
+        tier: row.tier as string | null,
+        membershipStatus: row.membership_status as string | null,
         matchReason: 'Same HubSpot ID',
       });
     }
@@ -882,17 +704,11 @@ export async function consolidateStripeCustomers(
   primaryUserId: string,
   secondaryUserId: string
 ): Promise<{ keptCustomerId: string; orphanedCustomerId: string; reason: string }> {
-  const primaryResult = await pool.query(
-    `SELECT stripe_customer_id, stripe_subscription_id, email FROM users WHERE id = $1`,
-    [primaryUserId]
-  );
-  const secondaryResult = await pool.query(
-    `SELECT stripe_customer_id, stripe_subscription_id, email FROM users WHERE id = $1`,
-    [secondaryUserId]
-  );
+  const primaryResult = await db.execute(sql`SELECT stripe_customer_id, stripe_subscription_id, email FROM users WHERE id = ${primaryUserId}`);
+  const secondaryResult = await db.execute(sql`SELECT stripe_customer_id, stripe_subscription_id, email FROM users WHERE id = ${secondaryUserId}`);
   
-  const primary = primaryResult.rows[0];
-  const secondary = secondaryResult.rows[0];
+  const primary = (primaryResult.rows as Array<Record<string, unknown>>)[0];
+  const secondary = (secondaryResult.rows as Array<Record<string, unknown>>)[0];
   
   if (!primary?.stripe_customer_id || !secondary?.stripe_customer_id) {
     throw new Error('Both users must have Stripe customer IDs to consolidate');
@@ -919,10 +735,7 @@ export async function consolidateStripeCustomers(
     reason = primaryHasSub && secondaryHasSub ? 'both_have_subscriptions_kept_primary' : 'neither_has_subscription_kept_primary';
   }
   
-  await pool.query(
-    `UPDATE users SET stripe_customer_id = $1, updated_at = NOW() WHERE id = $2`,
-    [keptCustomerId, primaryUserId]
-  );
+  await db.execute(sql`UPDATE users SET stripe_customer_id = ${keptCustomerId}, updated_at = NOW() WHERE id = ${primaryUserId}`);
   
   try {
     const stripe = await getStripeClient();

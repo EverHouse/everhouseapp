@@ -1,7 +1,8 @@
 import crypto from 'crypto';
 import { Request } from 'express';
 import { logger } from '../../core/logger';
-import { pool } from '../../core/db';
+import { db } from '../../db';
+import { sql } from 'drizzle-orm';
 import { isProduction, redactPII } from './webhook-helpers';
 
 export function validateTrackmanWebhookSignature(req: Request): boolean {
@@ -74,15 +75,12 @@ export async function logWebhookEvent(
       const endTime = (bookingData as any)?.end || (bookingData as any)?.end_time || (payload as any)?.end_time || '';
       const status = (bookingData as any)?.status || (payload as any)?.status || eventType;
       
-      const recentDupe = await pool.query(
-        `SELECT id, payload FROM trackman_webhook_events 
-         WHERE trackman_booking_id = $1 
-           AND event_type = $2
+      const recentDupe = await db.execute(sql`SELECT id, payload FROM trackman_webhook_events 
+         WHERE trackman_booking_id = ${trackmanBookingId} 
+           AND event_type = ${eventType}
            AND created_at >= NOW() - INTERVAL '2 minutes'
          ORDER BY created_at DESC
-         LIMIT 1`,
-        [trackmanBookingId, eventType]
-      );
+         LIMIT 1`);
       
       if (recentDupe.rows.length > 0) {
         const existingPayload = typeof recentDupe.rows[0].payload === 'string' 
@@ -107,13 +105,10 @@ export async function logWebhookEvent(
     
     const dedupKey = trackmanBookingId ? `${trackmanBookingId}_${eventType.toLowerCase()}` : null;
     
-    const result = await pool.query(
-      `INSERT INTO trackman_webhook_events 
+    const result = await db.execute(sql`INSERT INTO trackman_webhook_events 
        (event_type, payload, trackman_booking_id, trackman_user_id, matched_booking_id, matched_user_id, processed_at, processing_error, dedup_key)
-       VALUES ($1, $2, $3, $4, $5, $6, NOW(), $7, $8)
-       RETURNING id`,
-      [eventType, JSON.stringify(redactedPayload), trackmanBookingId, trackmanUserId, matchedBookingId, matchedUserId, error, dedupKey]
-    );
+       VALUES (${eventType}, ${JSON.stringify(redactedPayload)}, ${trackmanBookingId}, ${trackmanUserId}, ${matchedBookingId}, ${matchedUserId}, NOW(), ${error}, ${dedupKey})
+       RETURNING id`);
     return result.rows[0]?.id;
   } catch (e: unknown) {
     logger.error('[Trackman Webhook] Failed to log webhook event', { error: e as Error });
@@ -123,33 +118,24 @@ export async function logWebhookEvent(
 
 export async function resolveLinkedEmail(email: string): Promise<string> {
   try {
-    const linkResult = await pool.query(
-      `SELECT primary_email FROM user_linked_emails WHERE LOWER(linked_email) = LOWER($1) LIMIT 1`,
-      [email]
-    );
+    const linkResult = await db.execute(sql`SELECT primary_email FROM user_linked_emails WHERE LOWER(linked_email) = LOWER(${email}) LIMIT 1`);
     
     if (linkResult.rows.length > 0) {
-      return linkResult.rows[0].primary_email;
+      return (linkResult.rows[0] as Record<string, unknown>).primary_email as string;
     }
     
-    const manualLinkResult = await pool.query(
-      `SELECT email FROM users 
-       WHERE manually_linked_emails @> to_jsonb($1::text)
-       LIMIT 1`,
-      [email.toLowerCase()]
-    );
+    const manualLinkResult = await db.execute(sql`SELECT email FROM users 
+       WHERE manually_linked_emails @> to_jsonb(${email.toLowerCase()}::text)
+       LIMIT 1`);
     
     if (manualLinkResult.rows.length > 0) {
-      return manualLinkResult.rows[0].email;
+      return (manualLinkResult.rows[0] as Record<string, unknown>).email as string;
     }
     
-    const trackmanEmailResult = await pool.query(
-      `SELECT email FROM users WHERE LOWER(trackman_email) = LOWER($1) LIMIT 1`,
-      [email]
-    );
+    const trackmanEmailResult = await db.execute(sql`SELECT email FROM users WHERE LOWER(trackman_email) = LOWER(${email}) LIMIT 1`);
     
     if (trackmanEmailResult.rows.length > 0) {
-      return trackmanEmailResult.rows[0].email;
+      return (trackmanEmailResult.rows[0] as Record<string, unknown>).email as string;
     }
     
     return email;
@@ -166,20 +152,18 @@ export async function findMemberByEmail(email: string): Promise<{
   lastName?: string;
 } | null> {
   try {
-    const result = await pool.query(
-      `SELECT id, email, first_name, last_name FROM users 
-       WHERE LOWER(email) = LOWER($1) 
+    const result = await db.execute(sql`SELECT id, email, first_name, last_name FROM users 
+       WHERE LOWER(email) = LOWER(${email}) 
          AND (membership_status IS NOT NULL OR role = 'visitor')
-       LIMIT 1`,
-      [email]
-    );
+       LIMIT 1`);
     
     if (result.rows.length > 0) {
+      const row = result.rows[0] as Record<string, unknown>;
       return {
-        id: result.rows[0].id,
-        email: result.rows[0].email,
-        firstName: result.rows[0].first_name,
-        lastName: result.rows[0].last_name,
+        id: row.id as number,
+        email: row.email as string,
+        firstName: row.first_name as string,
+        lastName: row.last_name as string,
       };
     }
     
