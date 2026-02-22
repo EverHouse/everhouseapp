@@ -4,6 +4,7 @@ import { startStripeReconciliationScheduler } from './stripeReconciliationSchedu
 import { startFeeSnapshotReconciliationScheduler } from './feeSnapshotReconciliationScheduler';
 import { startGracePeriodScheduler } from './gracePeriodScheduler';
 import { startBookingExpiryScheduler } from './bookingExpiryScheduler';
+import { startBookingAutoCompleteScheduler } from './bookingAutoCompleteScheduler';
 import { startBackgroundSyncScheduler } from './backgroundSyncScheduler';
 import { startDailyReminderScheduler } from './dailyReminderScheduler';
 import { startMorningClosureScheduler } from './morningClosureScheduler';
@@ -38,6 +39,7 @@ export function initSchedulers(): void {
   schedulerTracker.registerScheduler('Fee Snapshot Reconciliation', 15 * 60 * 1000);
   schedulerTracker.registerScheduler('Grace Period', 60 * 60 * 1000);
   schedulerTracker.registerScheduler('Booking Expiry', 60 * 60 * 1000);
+  schedulerTracker.registerScheduler('Booking Auto-Complete', 2 * 60 * 60 * 1000);
   schedulerTracker.registerScheduler('Communication Logs Sync', 30 * 60 * 1000);
   schedulerTracker.registerScheduler('Webhook Log Cleanup', 60 * 60 * 1000);
   schedulerTracker.registerScheduler('Session Cleanup', 60 * 60 * 1000);
@@ -64,6 +66,7 @@ export function initSchedulers(): void {
   startFeeSnapshotReconciliationScheduler();
   startGracePeriodScheduler();
   startBookingExpiryScheduler();
+  startBookingAutoCompleteScheduler();
   startCommunicationLogsScheduler();
   startWebhookLogCleanupScheduler();
   startSessionCleanupScheduler();
