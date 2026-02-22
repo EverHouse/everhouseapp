@@ -86,6 +86,14 @@ The following conventions were comprehensively audited and enforced across the e
 - **`checkinBooking()` payment confirmation moved after atomic status update** — prevents payment confirmations from persisting when the booking status has been changed by another concurrent request.
 
 ## Recent Changes
+- **Feb 22, 2026 (Batch 5)**: Fixed 7 payment/billing/UX bugs:
+  - Terminal payment cancellation: Added `requires_capture` to 3 cancellation status check arrays so POS card reader payments get properly voided on booking cancellation.
+  - Check-in split-brain: Wrapped participant payment status updates in `db.transaction()` to prevent partial updates during check-in confirmation.
+  - Email whitespace: Added `.trim()` to memberEmail in quick-charge route and email param routes to prevent whitespace-induced duplicate billing profiles.
+  - Feature wipe protection: `handleProductUpdated` webhook now skips `highlighted_features` update when `marketing_features` is empty/absent instead of overwriting with `[]`.
+  - Daily summary pagination: Raised cap from 500 to 5000 items to prevent revenue undercount on busy days.
+  - Past_due notification spam: Added `previousAttributes?.status` guard so notifications only fire on actual status transitions to `past_due`.
+  - Booking overlap error: Response now includes conflicting time range (e.g., "conflicts with booking from 2:00 PM to 3:30 PM") instead of generic message.
 - **Feb 22, 2026 (Transaction Safety Audit)**: Moved all third-party API calls out of database transactions across 2 files (6 violation groups):
   - `approveBooking()`: Google Calendar API calls and Stripe prepayment (createPrepaymentIntent) now execute after transaction commits. Calendar event ID and participant payment status updated via follow-up DB writes.
   - `cancelBooking()`: All Stripe refund/cancel calls (paymentIntents.retrieve, refunds.create, paymentIntents.cancel) and PaymentStatusService updates moved after transaction. Fixed ordering bug: participants now marked as 'refunded' only after successful Stripe refund (was previously marked before).
