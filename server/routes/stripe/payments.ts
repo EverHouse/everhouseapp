@@ -729,7 +729,8 @@ router.get('/api/billing/members/search', isStaffOrAdmin, async (req: Request, r
 
 router.post('/api/stripe/staff/quick-charge', isStaffOrAdmin, async (req: Request, res: Response) => {
   try {
-    const { memberEmail, memberName, amountCents, description, productId, isNewCustomer, firstName, lastName, phone, dob, tierSlug, tierName, createUser, streetAddress, city, state, zipCode, cartItems } = req.body;
+    const { memberEmail: rawEmail, memberName, amountCents, description, productId, isNewCustomer, firstName, lastName, phone, dob, tierSlug, tierName, createUser, streetAddress, city, state, zipCode, cartItems } = req.body;
+    const memberEmail = rawEmail?.trim()?.toLowerCase();
     const { sessionUser, staffEmail } = getStaffInfo(req);
 
     if (!memberEmail || amountCents === undefined || amountCents === null) {
@@ -1629,7 +1630,7 @@ router.post('/api/stripe/staff/charge-saved-card-pos', isStaffOrAdmin, async (re
 // Check if member has a saved card on file
 router.get('/api/stripe/staff/check-saved-card/:email', isStaffOrAdmin, async (req: Request, res: Response) => {
   try {
-    const memberEmail = decodeURIComponent(req.params.email as string).toLowerCase();
+    const memberEmail = decodeURIComponent(req.params.email as string).trim().toLowerCase();
 
     const { staffEmail } = getStaffInfo(req);
     logFromRequest(req, {
@@ -1677,7 +1678,7 @@ router.get('/api/stripe/staff/check-saved-card/:email', isStaffOrAdmin, async (r
 
 router.get('/api/staff/member-balance/:email', isStaffOrAdmin, async (req: Request, res: Response) => {
   try {
-    const memberEmail = decodeURIComponent(req.params.email as string).toLowerCase();
+    const memberEmail = decodeURIComponent(req.params.email as string).trim().toLowerCase();
 
     const { staffEmail } = getStaffInfo(req);
     logFromRequest(req, {
@@ -2711,7 +2712,7 @@ router.get('/api/payments/daily-summary', isStaffOrAdmin, async (req: Request, r
     let piHasMore = true;
     let piStartingAfter: string | undefined;
     
-    while (piHasMore && allPaymentIntents.length < 500) {
+    while (piHasMore && allPaymentIntents.length < 5000) {
       const page = await stripe.paymentIntents.list({
         created: { gte: startOfDay, lt: endOfDay },
         limit: 100,
@@ -2728,7 +2729,7 @@ router.get('/api/payments/daily-summary', isStaffOrAdmin, async (req: Request, r
     let chHasMore = true;
     let chStartingAfter: string | undefined;
     
-    while (chHasMore && allCharges.length < 500) {
+    while (chHasMore && allCharges.length < 5000) {
       const page = await stripe.charges.list({
         created: { gte: startOfDay, lt: endOfDay },
         limit: 100,

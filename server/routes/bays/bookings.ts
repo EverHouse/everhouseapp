@@ -561,7 +561,7 @@ router.post('/api/booking-requests', async (req, res) => {
       // Check for time slot overlap
       if (resource_id) {
         const overlapCheck = await client.query(
-          `SELECT id FROM booking_requests 
+          `SELECT id, start_time, end_time FROM booking_requests 
            WHERE resource_id = $1 
            AND request_date = $2 
            AND status IN ('pending', 'approved', 'confirmed', 'attended')
@@ -571,8 +571,16 @@ router.post('/api/booking-requests', async (req, res) => {
         );
         
         if (overlapCheck.rows.length > 0) {
+          const conflict = overlapCheck.rows[0];
+          const conflictStart = conflict.start_time?.substring(0, 5);
+          const conflictEnd = conflict.end_time?.substring(0, 5);
           await client.query('ROLLBACK');
-          return res.status(409).json({ error: 'This time slot is already booked' });
+          
+          const errorMsg = conflictStart && conflictEnd
+            ? `This time slot conflicts with an existing booking from ${formatTime12Hour(conflictStart)} to ${formatTime12Hour(conflictEnd)}. Please adjust your time or duration.`
+            : 'This time slot is already booked';
+          
+          return res.status(409).json({ error: errorMsg });
         }
       }
       

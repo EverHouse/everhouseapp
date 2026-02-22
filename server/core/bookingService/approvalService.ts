@@ -1080,7 +1080,7 @@ export async function cancelBooking(params: CancelBookingParams) {
                 refundId: refund.id,
                 amountCents: pi.amount
               });
-            } else if (['requires_payment_method', 'requires_confirmation', 'requires_action', 'processing'].includes(pi.status)) {
+            } else if (['requires_payment_method', 'requires_confirmation', 'requires_action', 'requires_capture', 'processing'].includes(pi.status)) {
               await stripe.paymentIntents.cancel(snapshot.stripePaymentIntentId);
               logger.info('[Staff Cancel] Cancelled payment intent for booking', { extra: { snapshotStripe_payment_intent_id: snapshot.stripePaymentIntentId, bookingId } });
 
@@ -1575,11 +1575,15 @@ export async function checkinBooking(params: CheckinBookingParams) {
   }
 
   if (confirmPayment && totalOutstanding > 0) {
-    for (const p of unpaidParticipants) {
-      await db.update(bookingParticipants)
-        .set({ paymentStatus: 'paid' })
-        .where(eq(bookingParticipants.id, p.id));
+    await db.transaction(async (tx) => {
+      for (const p of unpaidParticipants) {
+        await tx.update(bookingParticipants)
+          .set({ paymentStatus: 'paid' })
+          .where(eq(bookingParticipants.id, p.id));
+      }
+    });
 
+    for (const p of unpaidParticipants) {
       await logPaymentAudit({
         bookingId,
         sessionId: existing.session_id,
@@ -1909,7 +1913,7 @@ export async function completeCancellation(params: CompleteCancellationParams) {
       .from(stripePaymentIntents)
       .where(and(
         eq(stripePaymentIntents.bookingId, bookingId),
-        sql`${stripePaymentIntents.status} IN ('pending', 'requires_payment_method', 'requires_action', 'requires_confirmation')`
+        sql`${stripePaymentIntents.status} IN ('pending', 'requires_payment_method', 'requires_action', 'requires_confirmation', 'requires_capture')`
       ));
     for (const row of pendingIntents) {
       try {
@@ -1952,7 +1956,7 @@ export async function completeCancellation(params: CompleteCancellationParams) {
               refundId: refund.id 
             } 
           });
-        } else if (['requires_payment_method', 'requires_confirmation', 'requires_action', 'processing'].includes(pi.status)) {
+        } else if (['requires_payment_method', 'requires_confirmation', 'requires_action', 'requires_capture', 'processing'].includes(pi.status)) {
           await stripe.paymentIntents.cancel(snapshot.stripe_payment_intent_id);
           logger.info('[Complete Cancellation] Cancelled pending fee snapshot payment', {
             extra: { paymentIntentId: snapshot.stripe_payment_intent_id, bookingId }

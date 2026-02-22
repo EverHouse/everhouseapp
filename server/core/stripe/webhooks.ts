@@ -3420,29 +3420,36 @@ async function handleSubscriptionUpdated(client: PoolClient, subscription: Strip
         `UPDATE users SET membership_status = 'past_due', billing_provider = 'stripe', stripe_current_period_end = COALESCE($2, stripe_current_period_end), updated_at = NOW() WHERE id = $1`,
         [userId, subscriptionPeriodEnd]
       );
-      try {
-        await notifyMember({
-          userEmail: email,
-          title: 'Membership Past Due',
-          message: 'Your membership payment is past due. Please update your payment method to avoid service interruption.',
-          type: 'membership_past_due',
-        }, { sendPush: true });
-      } catch (notifyErr: unknown) {
-        logger.error('[Stripe Webhook] Notification failed (non-fatal):', { error: getErrorMessage(notifyErr) });
-      }
 
-      try {
-        await notifyAllStaff(
-          'Membership Past Due',
-          `${memberName} (${email}) subscription payment is past due.`,
-          'membership_past_due',
-          { sendPush: true, sendWebSocket: true }
-        );
-      } catch (notifyErr: unknown) {
-        logger.error('[Stripe Webhook] Notification failed (non-fatal):', { error: getErrorMessage(notifyErr) });
-      }
+      const statusActuallyChanged = previousAttributes?.status && previousAttributes.status !== 'past_due';
 
-      logger.info(`[Stripe Webhook] Past due notification sent to ${email}`);
+      if (statusActuallyChanged) {
+        try {
+          await notifyMember({
+            userEmail: email,
+            title: 'Membership Past Due',
+            message: 'Your membership payment is past due. Please update your payment method to avoid service interruption.',
+            type: 'membership_past_due',
+          }, { sendPush: true });
+        } catch (notifyErr: unknown) {
+          logger.error('[Stripe Webhook] Notification failed (non-fatal):', { error: getErrorMessage(notifyErr) });
+        }
+
+        try {
+          await notifyAllStaff(
+            'Membership Past Due',
+            `${memberName} (${email}) subscription payment is past due.`,
+            'membership_past_due',
+            { sendPush: true, sendWebSocket: true }
+          );
+        } catch (notifyErr: unknown) {
+          logger.error('[Stripe Webhook] Notification failed (non-fatal):', { error: getErrorMessage(notifyErr) });
+        }
+
+        logger.info(`[Stripe Webhook] Past due notification sent to ${email}`);
+      } else {
+        logger.info(`[Stripe Webhook] Skipping past_due notification for ${email} — status was already past_due`);
+      }
       
       // Propagate past_due status to sub-members (family/corporate employees)
       try {
@@ -4106,18 +4113,10 @@ async function handleProductUpdated(client: PoolClient, product: StripeProductWi
           );
           logger.info(`[Stripe Webhook] Updated highlighted features for "${tierName}" from ${featureNames.length} marketing features`);
         } else {
-          await client.query(
-            'UPDATE membership_tiers SET highlighted_features = $1, updated_at = NOW() WHERE id = $2',
-            [JSON.stringify([]), tierId]
-          );
-          logger.info(`[Stripe Webhook] Cleared highlighted features for "${tierName}" (marketing features empty)`);
+          logger.info(`[Stripe Webhook] Skipping highlighted_features update for "${tierName}" — marketing_features present but all empty names`);
         }
       } else {
-        await client.query(
-          'UPDATE membership_tiers SET highlighted_features = $1, updated_at = NOW() WHERE id = $2',
-          [JSON.stringify([]), tierId]
-        );
-        logger.info(`[Stripe Webhook] Cleared highlighted features for "${tierName}" (no marketing features)`);
+        logger.info(`[Stripe Webhook] Skipping highlighted_features update for "${tierName}" — no marketing_features in webhook payload`);
       }
 
       deferredActions.push(async () => {
