@@ -80,8 +80,13 @@ The following conventions were comprehensively audited and enforced across the e
 ### Database
 - 3 missing FK indexes added on `event_rsvps` and `wellness_enrollments` to prevent slow JOINs.
 
+### Booking Race Condition Guards
+- **`approveBooking()` has status guard + optimistic lock** — only allows approval from `pending`/`pending_approval` status. UPDATE WHERE clause includes status condition to prevent double-approve race creating duplicate sessions/participants/calendar events. Returns 409 on conflict.
+- **`declineBooking()` has status guard** — only allows declining from `pending`/`pending_approval` status. Approved bookings must use cancel flow instead (which handles cleanup of sessions, participants, calendar events).
+- **`checkinBooking()` payment confirmation moved after atomic status update** — prevents payment confirmations from persisting when the booking status has been changed by another concurrent request.
+
 ## Recent Changes
-- **Feb 2026**: Deep architectural audit — fixed 60 empty catch blocks, 75+ timezone violations (server + frontend), 16 unprotected async routes, 6 webhook guard gaps, 3 missing DB indexes, enhanced placeholder account detection across 60+ files.
+- **Feb 2026**: Deep architectural audit — fixed 60 empty catch blocks, 75+ timezone violations (server + frontend), 16 unprotected async routes, 6 webhook guard gaps, 3 missing DB indexes, 3 critical booking race conditions (double-approve, decline-after-approve, checkin payment ordering), enhanced placeholder account detection across 60+ files.
 
 ## External Dependencies
 - **Stripe**: Terminal, subscriptions, webhooks for billing authority.

@@ -176,6 +176,11 @@ export async function approveBooking(params: ApproveBookingParams) {
       throw { statusCode: 404, error: 'Request not found' };
     }
 
+    const allowedForApproval = ['pending', 'pending_approval'];
+    if (!allowedForApproval.includes(req_data.status || '')) {
+      throw { statusCode: 409, error: `Booking is already ${req_data.status}. Please refresh the page.` };
+    }
+
     const assignedBayId = resource_id || req_data.resourceId;
 
     if (!assignedBayId) {
@@ -263,8 +268,12 @@ export async function approveBooking(params: ApproveBookingParams) {
         ...(trackman_external_id !== undefined ? { trackmanExternalId: trackman_external_id || null } : {}),
         updatedAt: new Date()
       })
-      .where(eq(bookingRequests.id, bookingId))
+      .where(and(eq(bookingRequests.id, bookingId), or(eq(bookingRequests.status, 'pending'), eq(bookingRequests.status, 'pending_approval'))))
       .returning();
+
+    if (!updatedRow) {
+      throw { statusCode: 409, error: 'Booking was modified by another staff member. Please refresh and try again.' };
+    }
 
     let createdSessionId: number | null = null;
     let createdParticipantIds: number[] = [];
@@ -656,6 +665,11 @@ export async function declineBooking(params: DeclineBookingParams) {
 
     if (!existing) {
       throw { statusCode: 404, error: 'Booking request not found' };
+    }
+
+    const declinableStatuses = ['pending', 'pending_approval'];
+    if (!declinableStatuses.includes(existing.status || '')) {
+      throw { statusCode: 409, error: `Cannot decline a booking that is already ${existing.status}. Use cancel instead.` };
     }
 
     let resourceTypeName = 'simulator';
@@ -1348,6 +1362,9 @@ export async function checkinBooking(params: CheckinBookingParams) {
     };
   }
 
+  let totalOutstanding = 0;
+  let unpaidParticipants: Array<{ id: number; name: string; amount: number }> = [];
+
   if (newStatus === 'attended' && existing.session_id) {
     const nullFeesCheck = await db.execute(sql`
       SELECT COUNT(*) as null_count
@@ -1374,9 +1391,6 @@ export async function checkinBooking(params: CheckinBookingParams) {
       FROM booking_participants bp
       WHERE bp.session_id = ${existing.session_id} AND bp.payment_status = 'pending'
     `);
-
-    let totalOutstanding = 0;
-    const unpaidParticipants: Array<{ id: number; name: string; amount: number }> = [];
 
     for (const p of balanceResult.rows as any[]) {
       const amount = parseFloat(p.fee_amount);
@@ -1441,33 +1455,6 @@ export async function checkinBooking(params: CheckinBookingParams) {
       }
     }
 
-    if (confirmPayment && totalOutstanding > 0) {
-      for (const p of unpaidParticipants) {
-        await db.update(bookingParticipants)
-          .set({ paymentStatus: 'paid' })
-          .where(eq(bookingParticipants.id, p.id));
-
-        await logPaymentAudit({
-          bookingId,
-          sessionId: existing.session_id,
-          participantId: p.id,
-          action: 'payment_confirmed',
-          staffEmail,
-          staffName,
-          amountAffected: p.amount,
-          previousStatus: 'pending',
-          newStatus: 'paid',
-        });
-      }
-
-      broadcastBillingUpdate({
-        action: 'booking_payment_updated',
-        bookingId,
-        sessionId: existing.session_id,
-        memberEmail: existing.user_email,
-        amount: totalOutstanding * 100
-      });
-    }
   }
 
   const statusConditions = allowedStatuses.map(s => eq(bookingRequests.status, s));
@@ -1486,6 +1473,34 @@ export async function checkinBooking(params: CheckinBookingParams) {
 
   if (result.length === 0) {
     return { error: 'Booking status changed before update', statusCode: 400 };
+  }
+
+  if (confirmPayment && totalOutstanding > 0) {
+    for (const p of unpaidParticipants) {
+      await db.update(bookingParticipants)
+        .set({ paymentStatus: 'paid' })
+        .where(eq(bookingParticipants.id, p.id));
+
+      await logPaymentAudit({
+        bookingId,
+        sessionId: existing.session_id,
+        participantId: p.id,
+        action: 'payment_confirmed',
+        staffEmail,
+        staffName,
+        amountAffected: p.amount,
+        previousStatus: 'pending',
+        newStatus: 'paid',
+      });
+    }
+
+    broadcastBillingUpdate({
+      action: 'booking_payment_updated',
+      bookingId,
+      sessionId: existing.session_id,
+      memberEmail: existing.user_email,
+      amount: totalOutstanding * 100
+    });
   }
 
   const booking = result[0];
