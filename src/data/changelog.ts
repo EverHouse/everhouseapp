@@ -13,6 +13,20 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.11.0",
+    date: "2026-02-22",
+    title: "Deep Architectural Audit — Error Handling, Timezone, Auth & Webhook Safety",
+    isMajor: true,
+    changes: [
+      "Fixed: 60 empty catch blocks replaced with proper error logging across 33 server files — silent failures in billing, booking, Stripe, HubSpot sync, and Trackman import are now visible for debugging",
+      "Fixed: 32 date formatting calls were missing Pacific timezone — member-facing dates in emails, notifications, tour confirmations, billing displays, and reschedule messages could show wrong dates depending on server location",
+      "Fixed: 3 tour notification dates were using UTC instead of Pacific timezone — staff notifications now show correct local dates for scheduled tours",
+      "Security: 8 mutating API routes (wellness enrollment, booking cancel, RSVP delete) were missing authentication — now protected with auth middleware to prevent unauthorized access",
+      "Security: 6 Stripe webhook handlers that modify member status now include billing provider guards — prevents Stripe events from overwriting status for members billed through other systems",
+      "Improved: 3 missing database indexes added on event RSVPs and wellness enrollments — faster page loads for events and wellness class listings",
+    ]
+  },
+  {
     version: "8.10.0",
     date: "2026-02-22",
     title: "Complete Inline Resolution UI for All 29 Integrity Checks",
