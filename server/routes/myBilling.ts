@@ -234,7 +234,7 @@ router.post('/api/my/billing/portal', requireAuth, async (req, res) => {
   try {
     const sessionUser = req.session.user;
     const isStaff = sessionUser.role === 'admin' || sessionUser.role === 'staff';
-    const targetEmail = (req.body.email && isStaff) ? String(req.body.email) : sessionUser.email;
+    const targetEmail = (req.body.email && isStaff) ? String(req.body.email).trim().toLowerCase() : sessionUser.email;
     
     const result = await db.execute(sql`SELECT id, stripe_customer_id, billing_provider, email, role, first_name, last_name, tier FROM users WHERE LOWER(email) = ${targetEmail.toLowerCase()}`);
     
