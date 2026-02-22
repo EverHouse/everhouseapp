@@ -53,7 +53,7 @@ const severityMap: Record<string, 'critical' | 'high' | 'medium' | 'low'> = {
   'Deal Stage Drift': 'critical',
   'Stripe Subscription Sync': 'critical',
   'Stuck Transitional Members': 'critical',
-  'Active Bookings Without Sessions': 'medium',
+  'Active Bookings Without Sessions': 'critical',
   'Participant User Relationships': 'high',
   'Booking Resource Relationships': 'high',
   'Booking Time Validity': 'high',
@@ -75,7 +75,11 @@ const severityMap: Record<string, 'critical' | 'high' | 'medium' | 'low'> = {
   'Sessions Without Participants': 'low',
   'Orphaned Payment Intents': 'critical',
   'Guest Passes Without Members': 'medium',
-  'Billing Provider Hybrid State': 'critical'
+  'Billing Provider Hybrid State': 'critical',
+  'Invoice-Booking Reconciliation': 'critical',
+  'Overlapping Bookings': 'critical',
+  'Guest Pass Accounting Drift': 'high',
+  'Stale Pending Bookings': 'high'
 };
 
 function getCheckSeverity(checkName: string): 'critical' | 'high' | 'medium' | 'low' {
@@ -134,7 +138,7 @@ export interface IssueContext {
 }
 
 export interface IntegrityIssue {
-  category: 'orphan_record' | 'missing_relationship' | 'sync_mismatch' | 'data_quality' | 'system_error';
+  category: 'orphan_record' | 'missing_relationship' | 'sync_mismatch' | 'data_quality' | 'system_error' | 'billing_issue' | 'booking_issue';
   severity: 'error' | 'warning' | 'info';
   table: string;
   recordId: number | string;
@@ -2109,6 +2113,292 @@ async function checkBillingProviderHybridState(): Promise<IntegrityCheckResult> 
   };
 }
 
+async function checkInvoiceBookingReconciliation(): Promise<IntegrityCheckResult> {
+  const issues: IntegrityIssue[] = [];
+
+  try {
+    const duplicateInvoicesResult = await db.execute(sql`
+      SELECT stripe_invoice_id, COUNT(*) as booking_count, array_agg(id) as booking_ids
+      FROM booking_requests
+      WHERE stripe_invoice_id IS NOT NULL
+        AND status NOT IN ('cancelled', 'declined')
+      GROUP BY stripe_invoice_id
+      HAVING COUNT(*) > 1
+    `);
+
+    for (const row of duplicateInvoicesResult.rows as Record<string, unknown>[]) {
+      const bookingIds = row.booking_ids as number[];
+      issues.push({
+        category: 'billing_issue',
+        severity: 'error',
+        table: 'booking_requests',
+        recordId: row.stripe_invoice_id as string,
+        description: `Stripe invoice ${row.stripe_invoice_id} is shared by ${row.booking_count} bookings (IDs: ${bookingIds.join(', ')}). Potential double-billing.`,
+        suggestion: 'Multiple bookings share the same Stripe invoice. Review for double-billing risk.',
+        context: {
+          stripeCustomerId: row.stripe_invoice_id as string
+        }
+      });
+    }
+
+    const missingInvoicesResult = await db.execute(sql`
+      SELECT id, user_email, request_date, status
+      FROM booking_requests
+      WHERE status = 'attended'
+        AND stripe_invoice_id IS NULL
+        AND request_date > CURRENT_DATE - INTERVAL '90 days'
+    `);
+
+    for (const row of missingInvoicesResult.rows as Record<string, unknown>[]) {
+      issues.push({
+        category: 'billing_issue',
+        severity: 'warning',
+        table: 'booking_requests',
+        recordId: row.id as string | number,
+        description: `Attended booking #${row.id} for ${row.user_email} on ${row.request_date} has no Stripe invoice. Member used service but wasn't billed.`,
+        suggestion: 'Member attended but no invoice was created. Review billing.',
+        context: {
+          memberEmail: (row.user_email as string) || undefined,
+          bookingDate: (row.request_date as string) || undefined,
+          status: (row.status as string) || undefined
+        }
+      });
+    }
+  } catch (error: unknown) {
+    logger.error('[DataIntegrity] Error checking invoice-booking reconciliation:', { extra: { detail: getErrorMessage(error) } });
+    return {
+      checkName: 'Invoice-Booking Reconciliation',
+      status: 'warning',
+      issueCount: 1,
+      issues: [{
+        category: 'system_error',
+        severity: 'error',
+        table: 'booking_requests',
+        recordId: 'check_error',
+        description: `Failed to check invoice-booking reconciliation: ${getErrorMessage(error)}`,
+        suggestion: 'Review server logs for details and retry'
+      }],
+      lastRun: new Date()
+    };
+  }
+
+  return {
+    checkName: 'Invoice-Booking Reconciliation',
+    status: issues.length === 0 ? 'pass' : issues.some(i => i.severity === 'error') ? 'fail' : 'warning',
+    issueCount: issues.length,
+    issues,
+    lastRun: new Date()
+  };
+}
+
+async function checkOverlappingBookings(): Promise<IntegrityCheckResult> {
+  const issues: IntegrityIssue[] = [];
+
+  try {
+    const overlapsResult = await db.execute(sql`
+      SELECT bs1.id as session1_id, bs2.id as session2_id, bs1.resource_id, bs1.session_date,
+             bs1.start_time, bs1.end_time, bs2.start_time as overlap_start, bs2.end_time as overlap_end
+      FROM booking_sessions bs1
+      JOIN booking_sessions bs2 ON bs1.resource_id = bs2.resource_id
+        AND bs1.session_date = bs2.session_date
+        AND bs1.id < bs2.id
+        AND bs1.start_time < bs2.end_time
+        AND bs2.start_time < bs1.end_time
+      WHERE EXISTS (SELECT 1 FROM booking_requests br WHERE br.session_id = bs1.id AND br.status IN ('approved', 'confirmed', 'attended'))
+        AND EXISTS (SELECT 1 FROM booking_requests br WHERE br.session_id = bs2.id AND br.status IN ('approved', 'confirmed', 'attended'))
+        AND bs1.session_date >= CURRENT_DATE - INTERVAL '30 days'
+    `);
+
+    for (const row of overlapsResult.rows as Record<string, unknown>[]) {
+      issues.push({
+        category: 'booking_issue',
+        severity: 'error',
+        table: 'booking_sessions',
+        recordId: `${row.session1_id}-${row.session2_id}`,
+        description: `Sessions #${row.session1_id} and #${row.session2_id} overlap on resource ${row.resource_id} on ${row.session_date} (${row.start_time}-${row.end_time} vs ${row.overlap_start}-${row.overlap_end})`,
+        suggestion: 'Two active bookings overlap on the same bay. One should be rescheduled or cancelled to prevent conflicts.',
+        context: {
+          resourceId: Number(row.resource_id),
+          startTime: (row.start_time as string) || undefined,
+          endTime: (row.end_time as string) || undefined,
+          bookingDate: (row.session_date as string) || undefined
+        }
+      });
+    }
+  } catch (error: unknown) {
+    logger.error('[DataIntegrity] Error checking overlapping bookings:', { extra: { detail: getErrorMessage(error) } });
+    return {
+      checkName: 'Overlapping Bookings',
+      status: 'warning',
+      issueCount: 1,
+      issues: [{
+        category: 'system_error',
+        severity: 'error',
+        table: 'booking_sessions',
+        recordId: 'check_error',
+        description: `Failed to check overlapping bookings: ${getErrorMessage(error)}`,
+        suggestion: 'Review server logs for details and retry'
+      }],
+      lastRun: new Date()
+    };
+  }
+
+  return {
+    checkName: 'Overlapping Bookings',
+    status: issues.length === 0 ? 'pass' : 'fail',
+    issueCount: issues.length,
+    issues,
+    lastRun: new Date()
+  };
+}
+
+async function checkGuestPassAccountingDrift(): Promise<IntegrityCheckResult> {
+  const issues: IntegrityIssue[] = [];
+
+  try {
+    const overUsedResult = await db.execute(sql`
+      SELECT id, member_email, passes_used, passes_total
+      FROM guest_passes
+      WHERE passes_used > passes_total
+    `);
+
+    for (const row of overUsedResult.rows as Record<string, unknown>[]) {
+      issues.push({
+        category: 'billing_issue',
+        severity: 'error',
+        table: 'guest_passes',
+        recordId: row.id as string | number,
+        description: `Guest pass #${row.id} for ${row.member_email} has passes_used (${row.passes_used}) > passes_total (${row.passes_total})`,
+        suggestion: 'Guest pass usage exceeds total allocation. Review and correct the pass balance.',
+        context: {
+          memberEmail: (row.member_email as string) || undefined
+        }
+      });
+    }
+
+    const orphanHoldsResult = await db.execute(sql`
+      SELECT gph.id, gph.member_email, gph.booking_id, gph.passes_held
+      FROM guest_pass_holds gph
+      WHERE NOT EXISTS (SELECT 1 FROM booking_requests br WHERE br.id = gph.booking_id)
+    `);
+
+    for (const row of orphanHoldsResult.rows as Record<string, unknown>[]) {
+      issues.push({
+        category: 'orphan_record',
+        severity: 'warning',
+        table: 'guest_pass_holds',
+        recordId: row.id as string | number,
+        description: `Guest pass hold #${row.id} for ${row.member_email} references non-existent booking #${row.booking_id} (${row.passes_held} passes held)`,
+        suggestion: 'Release the held passes and delete the orphan hold record.',
+        context: {
+          memberEmail: (row.member_email as string) || undefined
+        }
+      });
+    }
+
+    const expiredHoldsResult = await db.execute(sql`
+      SELECT id, member_email, booking_id, passes_held, expires_at
+      FROM guest_pass_holds
+      WHERE expires_at < NOW()
+    `);
+
+    for (const row of expiredHoldsResult.rows as Record<string, unknown>[]) {
+      issues.push({
+        category: 'orphan_record',
+        severity: 'warning',
+        table: 'guest_pass_holds',
+        recordId: row.id as string | number,
+        description: `Guest pass hold #${row.id} for ${row.member_email} expired at ${row.expires_at} but was not cleaned up (${row.passes_held} passes still held)`,
+        suggestion: 'Release expired hold and return passes to the member balance.',
+        context: {
+          memberEmail: (row.member_email as string) || undefined
+        }
+      });
+    }
+  } catch (error: unknown) {
+    logger.error('[DataIntegrity] Error checking guest pass accounting drift:', { extra: { detail: getErrorMessage(error) } });
+    return {
+      checkName: 'Guest Pass Accounting Drift',
+      status: 'warning',
+      issueCount: 1,
+      issues: [{
+        category: 'system_error',
+        severity: 'error',
+        table: 'guest_passes',
+        recordId: 'check_error',
+        description: `Failed to check guest pass accounting drift: ${getErrorMessage(error)}`,
+        suggestion: 'Review server logs for details and retry'
+      }],
+      lastRun: new Date()
+    };
+  }
+
+  return {
+    checkName: 'Guest Pass Accounting Drift',
+    status: issues.length === 0 ? 'pass' : issues.some(i => i.severity === 'error') ? 'fail' : 'warning',
+    issueCount: issues.length,
+    issues,
+    lastRun: new Date()
+  };
+}
+
+async function checkStalePendingBookings(): Promise<IntegrityCheckResult> {
+  const issues: IntegrityIssue[] = [];
+
+  try {
+    const staleResult = await db.execute(sql`
+      SELECT br.id, br.user_email, br.request_date, br.start_time, br.status, br.resource_id
+      FROM booking_requests br
+      WHERE br.status IN ('pending', 'approved')
+        AND (br.request_date + br.start_time::time) < (NOW() AT TIME ZONE 'America/Los_Angeles')
+        AND br.request_date >= CURRENT_DATE - INTERVAL '30 days'
+      ORDER BY br.request_date DESC
+    `);
+
+    for (const row of staleResult.rows as Record<string, unknown>[]) {
+      issues.push({
+        category: 'booking_issue',
+        severity: 'warning',
+        table: 'booking_requests',
+        recordId: row.id as string | number,
+        description: `Booking #${row.id} for ${row.user_email} on ${row.request_date} at ${row.start_time} is still "${row.status}" but past its start time`,
+        suggestion: 'This booking is past its start time but still in pending/approved status. It should be confirmed, cancelled, or marked as no-show.',
+        context: {
+          memberEmail: (row.user_email as string) || undefined,
+          bookingDate: (row.request_date as string) || undefined,
+          startTime: (row.start_time as string) || undefined,
+          status: (row.status as string) || undefined,
+          resourceId: row.resource_id ? Number(row.resource_id) : undefined
+        }
+      });
+    }
+  } catch (error: unknown) {
+    logger.error('[DataIntegrity] Error checking stale pending bookings:', { extra: { detail: getErrorMessage(error) } });
+    return {
+      checkName: 'Stale Pending Bookings',
+      status: 'warning',
+      issueCount: 1,
+      issues: [{
+        category: 'system_error',
+        severity: 'error',
+        table: 'booking_requests',
+        recordId: 'check_error',
+        description: `Failed to check stale pending bookings: ${getErrorMessage(error)}`,
+        suggestion: 'Review server logs for details and retry'
+      }],
+      lastRun: new Date()
+    };
+  }
+
+  return {
+    checkName: 'Stale Pending Bookings',
+    status: issues.length === 0 ? 'pass' : 'warning',
+    issueCount: issues.length,
+    issues,
+    lastRun: new Date()
+  };
+}
+
 export async function runAllIntegrityChecks(triggeredBy: 'manual' | 'scheduled' = 'manual'): Promise<IntegrityCheckResult[]> {
   const checks = await Promise.all([
     safeCheck(checkOrphanBookingParticipants, 'Orphan Booking Participants'),
@@ -2136,6 +2426,10 @@ export async function runAllIntegrityChecks(triggeredBy: 'manual' | 'scheduled' 
     safeCheck(checkOrphanedPaymentIntents, 'Orphaned Payment Intents'),
     safeCheck(checkGuestPassesForNonExistentMembers, 'Guest Passes Without Members'),
     safeCheck(checkBillingProviderHybridState, 'Billing Provider Hybrid State'),
+    safeCheck(checkInvoiceBookingReconciliation, 'Invoice-Booking Reconciliation'),
+    safeCheck(checkOverlappingBookings, 'Overlapping Bookings'),
+    safeCheck(checkGuestPassAccountingDrift, 'Guest Pass Accounting Drift'),
+    safeCheck(checkStalePendingBookings, 'Stale Pending Bookings'),
   ]);
   
   const now = new Date();
@@ -2862,11 +3156,17 @@ export async function runDataCleanup(): Promise<{
   orphanedBookings: number;
   normalizedEmails: number;
   orphanedFeeSnapshots: number;
+  orphanedEnrollments: number;
+  orphanedParticipants: number;
+  expiredHolds: number;
 }> {
   let orphanedNotifications = 0;
   let orphanedBookings = 0;
   let normalizedEmails = 0;
   let orphanedFeeSnapshots = 0;
+  let orphanedEnrollments = 0;
+  let orphanedParticipants = 0;
+  let expiredHolds = 0;
 
   try {
     const notifResult = await db.execute(sql`
@@ -2944,13 +3244,35 @@ export async function runDataCleanup(): Promise<{
       logger.info(`[DataCleanup] Removed ${orphanedFeeSnapshots} orphaned fee snapshots`);
     }
 
-    logger.info(`[DataCleanup] Removed ${orphanedNotifications} orphaned notifications, marked ${orphanedBookings} orphaned bookings, normalized ${normalizedEmails} emails, removed ${orphanedFeeSnapshots} orphaned fee snapshots`);
+    const enrollmentResult = await db.execute(sql`
+      DELETE FROM wellness_enrollments we
+      WHERE NOT EXISTS (SELECT 1 FROM wellness_classes wc WHERE wc.id = we.class_id)
+      RETURNING id
+    `);
+    orphanedEnrollments = enrollmentResult.rows.length;
+
+    const participantResult = await db.execute(sql`
+      DELETE FROM booking_participants bp
+      WHERE NOT EXISTS (SELECT 1 FROM booking_sessions bs WHERE bs.id = bp.session_id)
+      RETURNING id
+    `);
+    orphanedParticipants = participantResult.rows.length;
+
+    const holdResult = await db.execute(sql`
+      DELETE FROM guest_pass_holds gph
+      WHERE (NOT EXISTS (SELECT 1 FROM booking_requests br WHERE br.id = gph.booking_id))
+        OR (gph.expires_at < NOW())
+      RETURNING id
+    `);
+    expiredHolds = holdResult.rows.length;
+
+    logger.info(`[DataCleanup] Removed ${orphanedNotifications} orphaned notifications, marked ${orphanedBookings} orphaned bookings, normalized ${normalizedEmails} emails, removed ${orphanedFeeSnapshots} orphaned fee snapshots, removed ${orphanedEnrollments} orphaned wellness enrollments, removed ${orphanedParticipants} orphaned booking participants, removed ${expiredHolds} expired guest pass holds`);
   } catch (error: unknown) {
     logger.error('[DataCleanup] Error during cleanup:', { extra: { detail: getErrorMessage(error) } });
     throw error;
   }
 
-  return { orphanedNotifications, orphanedBookings, normalizedEmails, orphanedFeeSnapshots };
+  return { orphanedNotifications, orphanedBookings, normalizedEmails, orphanedFeeSnapshots, orphanedEnrollments, orphanedParticipants, expiredHolds };
 }
 
 export async function autoFixMissingTiers(): Promise<{

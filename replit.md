@@ -66,6 +66,14 @@ We use a **Liquid Glass UI** system.
 - **Member Lifecycle & Check-In**: Tiers, QR/NFC check-in, onboarding.
 
 ## Recent Changes
+- **Feb 22, 2026**: v8.9.0 — Data Integrity Hardening — 4 New Checks & Auto-Cleanup:
+  1. Added Invoice-Booking Reconciliation check (critical) — detects duplicate Stripe invoices and attended bookings with no invoice.
+  2. Added Overlapping Bookings check (critical) — detects confirmed bookings overlapping on the same bay.
+  3. Added Guest Pass Accounting Drift check (high) — detects passes_used > passes_total, orphan/expired holds.
+  4. Added Stale Pending Bookings check (high) — detects pending/approved bookings past start time.
+  5. Auto-cleanup now removes orphaned wellness enrollments, orphaned booking participants, and expired guest pass holds.
+  6. Upgraded 'Active Bookings Without Sessions' severity from medium to critical.
+  7. Total integrity checks increased from 25 to 29.
 - **Feb 22, 2026**: v8.8.0 — Complete Drizzle ORM Migration & Stripe Idempotency Hardening:
   1. Migrated ~390 pool.query calls across 50+ server files to Drizzle ORM db.execute(sql`...`) — all production database queries now use parameterized template literals.
   2. Converted 15+ pool.connect() manual transaction blocks to db.transaction() with automatic BEGIN/COMMIT/ROLLBACK.

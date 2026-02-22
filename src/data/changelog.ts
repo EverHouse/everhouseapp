@@ -13,6 +13,21 @@ export function getLatestVersion(): { version: string; date: string } {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.9.0",
+    date: "2026-02-22",
+    title: "Data Integrity Hardening — 4 New Checks & Auto-Cleanup",
+    isMajor: true,
+    changes: [
+      "Added: Invoice-Booking Reconciliation check (critical) — detects duplicate Stripe invoices shared across bookings and attended bookings with no invoice created",
+      "Added: Overlapping Bookings check (critical) — detects confirmed/approved bookings that overlap on the same bay at the same time (race condition evidence)",
+      "Added: Guest Pass Accounting Drift check (high) — detects passes_used exceeding passes_total, orphan holds for deleted bookings, and expired holds not cleaned up",
+      "Added: Stale Pending Bookings check (high) — detects pending/approved bookings past their start time that were never confirmed or cancelled",
+      "Improved: Auto-cleanup now removes orphaned wellness enrollments (referencing deleted classes), orphaned booking participants (referencing deleted sessions), and expired guest pass holds",
+      "Fixed: Upgraded 'Active Bookings Without Sessions' severity from medium to critical — bookings without sessions mean billing isn't being tracked",
+      "Improved: Total integrity checks increased from 25 to 29, covering all major financial, booking, and guest pass integrity gaps",
+    ]
+  },
+  {
     version: "8.8.0",
     date: "2026-02-22",
     title: "Complete Drizzle ORM Migration & Stripe Idempotency Hardening",

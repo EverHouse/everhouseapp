@@ -112,6 +112,22 @@ Issues are categorized as: `orphan_record`, `sync_mismatch`, `data_quality`, `bo
 - **Detects**: Guest pass records where the associated member email does not match any user.
 - **Action**: Link to correct member or delete orphaned passes.
 
+### Invoice-Booking Reconciliation
+- **Detects**: (1) Duplicate Stripe invoices shared across multiple active bookings (double-billing risk). (2) Attended bookings within the last 90 days with no Stripe invoice created (unbilled service).
+- **Action**: For duplicates, verify in Stripe dashboard and void/refund the duplicate invoice. For missing invoices, create invoice retroactively or investigate why billing was skipped.
+
+### Overlapping Bookings
+- **Detects**: Booking sessions where two or more active bookings (approved/confirmed/attended) overlap on the same resource (bay) on the same date within the last 30 days.
+- **Action**: Reschedule or cancel one of the overlapping bookings to resolve the conflict. Investigate if this resulted from a race condition in the booking flow.
+
+### Guest Pass Accounting Drift
+- **Detects**: Three sub-conditions: (1) Guest pass records where passes_used exceeds passes_total (error). (2) Guest pass holds referencing non-existent bookings (orphan). (3) Expired guest pass holds not cleaned up.
+- **Action**: For over-used passes, reconcile the count. For orphan/expired holds, clean up and adjust pass totals if needed.
+
+### Stale Pending Bookings
+- **Detects**: Booking requests in pending or approved status whose start time has already passed (within last 30 days, using Pacific timezone).
+- **Action**: Mark as no-show, cancel, or confirm retroactively. Investigate why the booking was not processed before its start time.
+
 ---
 
 ## Low Severity Checks

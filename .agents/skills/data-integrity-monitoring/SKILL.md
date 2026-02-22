@@ -32,7 +32,7 @@ The monitoring system operates as a layered defense against data corruption, syn
 
 | Component | File | Purpose |
 |---|---|---|
-| Integrity Engine | `server/core/dataIntegrity.ts` | Run 25 integrity checks, store history, track issues, support ignore rules and audit log |
+| Integrity Engine | `server/core/dataIntegrity.ts` | Run 29 integrity checks, store history, track issues, support ignore rules and audit log |
 | Data Alerts | `server/core/dataAlerts.ts` | Send in-app staff notifications for integrity failures, sync errors, import issues |
 | Error Alerts | `server/core/errorAlerts.ts` | Send email alerts for server errors, payment failures, external service issues |
 | Monitoring Core | `server/core/monitoring.ts` | Log alerts to `system_alerts` table, provide in-memory recent alert buffer |
@@ -48,10 +48,10 @@ The monitoring system operates as a layered defense against data corruption, syn
 
 ### Integrity Check Severities
 
-Each of the 25 integrity checks has an assigned severity in `severityMap`:
+Each of the 29 integrity checks has an assigned severity in `severityMap`:
 
-- **Critical** — Require immediate attention. Trigger staff notifications on every run if status is `fail`. Examples: Stripe Subscription Sync, Billing Provider Hybrid State, Orphaned Payment Intents, Deal Stage Drift, Stuck Transitional Members.
-- **High** — Trigger notifications when issue count exceeds a threshold (default 10). Examples: Tier Reconciliation, Duplicate Stripe Customers, Members Without Email, HubSpot ID Duplicates.
+- **Critical** — Require immediate attention. Trigger staff notifications on every run if status is `fail`. Examples: Stripe Subscription Sync, Billing Provider Hybrid State, Orphaned Payment Intents, Deal Stage Drift, Stuck Transitional Members, Invoice-Booking Reconciliation, Overlapping Bookings, Active Bookings Without Sessions.
+- **High** — Trigger notifications when issue count exceeds a threshold (default 10). Examples: Tier Reconciliation, Duplicate Stripe Customers, Members Without Email, HubSpot ID Duplicates, Guest Pass Accounting Drift, Stale Pending Bookings.
 - **Medium** — Logged and visible in dashboard but do not trigger proactive alerts. Examples: Orphan Booking Participants, MindBody Stale Sync, Unmatched Trackman Bookings.
 - **Low** — Informational. Examples: Sessions Without Participants, Items Needing Review.
 
@@ -175,7 +175,7 @@ The admin data integrity dashboard is accessible at `/admin/data-integrity` (sta
 
 ## Reference Files
 
-- **[references/integrity-checks.md](references/integrity-checks.md)** — Complete list of all 25 integrity checks with detection logic, severity, and recommended actions. Also covers webhook, job queue, and HubSpot queue monitors.
+- **[references/integrity-checks.md](references/integrity-checks.md)** — Complete list of all 29 integrity checks with detection logic, severity, and recommended actions. Also covers webhook, job queue, and HubSpot queue monitors.
 - **[references/scheduler-map.md](references/scheduler-map.md)** — All 27+ scheduled tasks with frequencies, execution windows, and multi-instance safety details.
 
 ## Database Tables Used by Monitoring
@@ -199,7 +199,7 @@ The admin data integrity dashboard is accessible at `/admin/data-integrity` (sta
 
 | File | Role |
 |---|---|
-| `server/core/dataIntegrity.ts` | 25 integrity checks, issue tracking, ignore rules, audit log, sync push/pull, bulk operations |
+| `server/core/dataIntegrity.ts` | 29 integrity checks, issue tracking, ignore rules, audit log, sync push/pull, bulk operations |
 | `server/core/dataAlerts.ts` | In-app staff notifications for imports, sync failures, integrity issues, scheduled task failures |
 | `server/core/errorAlerts.ts` | Email alerts with plain-language translation, rate limiting, transient error filtering |
 | `server/core/monitoring.ts` | Alert logging to `system_alerts` table and in-memory buffer |
