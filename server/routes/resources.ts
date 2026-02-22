@@ -199,7 +199,8 @@ router.post('/api/bookings/:id/assign-member', isStaffOrAdmin, async (req, res) 
   try {
     const { id } = req.params;
     const bookingId = parseInt(id as string);
-    const { member_email, member_name, member_id } = req.body;
+    const { member_email: raw_member_email, member_name, member_id } = req.body;
+    const member_email = raw_member_email?.trim()?.toLowerCase();
     
     if (!member_email || !member_name) {
       return res.status(400).json({ error: 'Missing required fields: member_email, member_name' });
@@ -224,7 +225,8 @@ router.post('/api/bookings/:id/assign-member', isStaffOrAdmin, async (req, res) 
 
 router.post('/api/bookings/link-trackman-to-member', isStaffOrAdmin, async (req, res) => {
   try {
-    const { trackman_booking_id, owner, additional_players, member_email, member_name, member_id, rememberEmail, originalEmail } = req.body;
+    const { trackman_booking_id, owner, additional_players, member_email: raw_member_email, member_name, member_id, rememberEmail, originalEmail } = req.body;
+    const member_email = raw_member_email?.trim()?.toLowerCase();
     
     if (!trackman_booking_id) {
       return res.status(400).json({ error: 'Missing required field: trackman_booking_id' });
@@ -446,7 +448,8 @@ router.put('/api/bookings/:id/assign-with-players', isStaffOrAdmin, async (req, 
 router.put('/api/bookings/:id/change-owner', isStaffOrAdmin, async (req, res) => {
   try {
     const bookingId = parseInt(req.params.id as string);
-    const { new_email, new_name, member_id } = req.body;
+    const { new_email: raw_new_email, new_name, member_id } = req.body;
+    const new_email = raw_new_email?.trim()?.toLowerCase();
     
     if (!bookingId || isNaN(bookingId)) {
       return res.status(400).json({ error: 'Invalid booking ID' });
@@ -484,7 +487,8 @@ router.post('/api/bookings', bookingRateLimiter, async (req, res) => {
       return res.status(401).json({ error: 'Authentication required' });
     }
     
-    const { resource_id, user_email, booking_date, start_time, end_time, notes } = req.body;
+    const { resource_id, user_email: raw_user_email, booking_date, start_time, end_time, notes } = req.body;
+    const user_email = raw_user_email?.trim()?.toLowerCase();
     
     if (!resource_id || !user_email || !booking_date || !start_time || !end_time) {
       return res.status(400).json({ error: 'Missing required fields: resource_id, user_email, booking_date, start_time, end_time' });

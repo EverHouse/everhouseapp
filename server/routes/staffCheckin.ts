@@ -1280,7 +1280,9 @@ router.post('/api/bookings/:id/staff-direct-add', isStaffOrAdmin, async (req: Re
     const staffEmail = sessionUser.email;
     const staffName = sessionUser.name || null;
 
-    const { memberEmail, guestName, guestEmail, overrideReason, participantType } = req.body;
+    const { memberEmail: rawMemberEmail, guestName, guestEmail: rawGuestEmail, overrideReason, participantType } = req.body;
+    const memberEmail = rawMemberEmail?.trim()?.toLowerCase();
+    const guestEmail = rawGuestEmail?.trim()?.toLowerCase();
 
     if (!participantType || !['member', 'guest'].includes(participantType)) {
       return res.status(400).json({ error: 'participantType must be member or guest' });

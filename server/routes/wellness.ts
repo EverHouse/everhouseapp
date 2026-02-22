@@ -890,7 +890,8 @@ router.get('/api/wellness-enrollments', async (req, res) => {
 
 router.post('/api/wellness-enrollments', isAuthenticated, async (req, res) => {
   try {
-    const { class_id, user_email } = req.body;
+    const { class_id, user_email: raw_user_email } = req.body;
+    const user_email = raw_user_email?.trim()?.toLowerCase();
     
     if (!class_id || !user_email) {
       return res.status(400).json({ error: 'Missing class_id or user_email' });
@@ -1276,7 +1277,8 @@ router.get('/api/wellness-classes/:id/enrollments', isStaffOrAdmin, async (req, 
 router.post('/api/wellness-classes/:id/enrollments/manual', isStaffOrAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const { email } = req.body;
+    const { email: rawEmail } = req.body;
+    const email = rawEmail?.trim()?.toLowerCase();
     
     if (!email || typeof email !== 'string' || !email.includes('@')) {
       return res.status(400).json({ error: 'Valid email is required' });

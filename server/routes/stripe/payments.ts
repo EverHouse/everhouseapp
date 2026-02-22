@@ -575,7 +575,8 @@ router.post('/api/stripe/cancel-payment', isStaffOrAdmin, async (req: Request, r
 
 router.post('/api/stripe/create-customer', isStaffOrAdmin, async (req: Request, res: Response) => {
   try {
-    const { userId, email, name } = req.body;
+    const { userId, email: rawEmail, name } = req.body;
+    const email = rawEmail?.trim()?.toLowerCase();
 
     if (!userId || !email) {
       return res.status(400).json({ error: 'Missing required fields: userId, email' });
@@ -1770,7 +1771,8 @@ router.get('/api/staff/member-balance/:email', isStaffOrAdmin, async (req: Reque
 
 router.post('/api/purchases/send-receipt', isStaffOrAdmin, async (req: Request, res: Response) => {
   try {
-    const { email, memberName, items, totalAmount, paymentMethod, paymentIntentId } = req.body;
+    const { email: rawEmail, memberName, items, totalAmount, paymentMethod, paymentIntentId } = req.body;
+    const email = rawEmail?.trim()?.toLowerCase();
 
     if (!email || !memberName || !items || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ error: 'Missing required fields: email, memberName, items' });

@@ -226,7 +226,8 @@ router.get('/api/stripe/billing/needs-migration', isAdmin, async (req: Request, 
 
 router.post('/api/stripe/staff/send-membership-link', isStaffOrAdmin, async (req: Request, res: Response) => {
   try {
-    const { email, firstName, lastName, tierId } = req.body;
+    const { email: rawEmail, firstName, lastName, tierId } = req.body;
+    const email = rawEmail?.trim()?.toLowerCase();
 
     if (!email || !firstName || !lastName || !tierId) {
       return res.status(400).json({ error: 'Missing required fields: email, firstName, lastName, tierId' });
@@ -356,7 +357,8 @@ router.post('/api/stripe/staff/send-membership-link', isStaffOrAdmin, async (req
 
 router.post('/api/stripe/staff/send-reactivation-link', isStaffOrAdmin, async (req: Request, res: Response) => {
   try {
-    const { memberEmail } = req.body;
+    const { memberEmail: rawMemberEmail } = req.body;
+    const memberEmail = rawMemberEmail?.trim()?.toLowerCase();
 
     if (!memberEmail) {
       return res.status(400).json({ error: 'Missing required field: memberEmail' });
@@ -539,7 +541,8 @@ router.post('/api/stripe/staff/send-reactivation-link', isStaffOrAdmin, async (r
 
 router.post('/api/public/day-pass/checkout', checkoutRateLimiter, async (req: Request, res: Response) => {
   try {
-    const { email, passType, firstName, lastName } = req.body;
+    const { email: rawEmail, passType, firstName, lastName } = req.body;
+    const email = rawEmail?.trim()?.toLowerCase();
 
     if (!email || !passType) {
       return res.status(400).json({ error: 'Missing required fields: email, passType' });

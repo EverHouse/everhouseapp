@@ -215,7 +215,8 @@ router.delete('/api/group-billing/group/:groupId', isStaffOrAdmin, async (req, r
 
 router.post('/api/group-billing/groups', isStaffOrAdmin, async (req, res) => {
   try {
-    const { primaryEmail, groupName } = req.body;
+    const { primaryEmail: rawPrimaryEmail, groupName } = req.body;
+    const primaryEmail = rawPrimaryEmail?.trim()?.toLowerCase();
     const user = getSessionUser(req);
     
     if (!primaryEmail) {
@@ -242,7 +243,8 @@ router.post('/api/group-billing/groups', isStaffOrAdmin, async (req, res) => {
 
 router.post('/api/family-billing/groups', isStaffOrAdmin, async (req, res) => {
   try {
-    const { primaryEmail, groupName } = req.body;
+    const { primaryEmail: rawPrimaryEmail, groupName } = req.body;
+    const primaryEmail = rawPrimaryEmail?.trim()?.toLowerCase();
     const user = getSessionUser(req);
     
     if (!primaryEmail) {
@@ -270,7 +272,8 @@ router.post('/api/family-billing/groups', isStaffOrAdmin, async (req, res) => {
 router.post('/api/group-billing/groups/:groupId/members', isStaffOrAdmin, async (req, res) => {
   try {
     const groupId = req.params.groupId as string;
-    const { memberEmail, memberTier, relationship, firstName, lastName, phone, dob, streetAddress, city, state, zipCode } = req.body;
+    const { memberEmail: rawMemberEmail, memberTier, relationship, firstName, lastName, phone, dob, streetAddress, city, state, zipCode } = req.body;
+    const memberEmail = rawMemberEmail?.trim()?.toLowerCase();
     const user = getSessionUser(req);
     
     if (!memberEmail || !memberTier) {
@@ -308,7 +311,8 @@ router.post('/api/group-billing/groups/:groupId/members', isStaffOrAdmin, async 
 router.post('/api/group-billing/groups/:groupId/corporate-members', isStaffOrAdmin, async (req, res) => {
   try {
     const groupId = req.params.groupId as string;
-    const { email, firstName, lastName, phone, dob } = req.body;
+    const { email: rawEmail, firstName, lastName, phone, dob } = req.body;
+    const email = rawEmail?.trim()?.toLowerCase();
     const user = getSessionUser(req);
     
     if (!email) {
@@ -374,7 +378,8 @@ router.post('/api/group-billing/groups/:groupId/corporate-members', isStaffOrAdm
 router.post('/api/family-billing/groups/:groupId/members', isStaffOrAdmin, async (req, res) => {
   try {
     const groupId = req.params.groupId as string;
-    const { memberEmail, memberTier, relationship, firstName, lastName, phone, dob, streetAddress, city, state, zipCode } = req.body;
+    const { memberEmail: rawMemberEmail, memberTier, relationship, firstName, lastName, phone, dob, streetAddress, city, state, zipCode } = req.body;
+    const memberEmail = rawMemberEmail?.trim()?.toLowerCase();
     const user = getSessionUser(req);
     
     if (!memberEmail || !memberTier) {

@@ -43,7 +43,8 @@ router.post('/api/member/conference/prepay/estimate', isAuthenticated, async (re
       return res.status(401).json({ error: 'Not authenticated' });
     }
 
-    const { memberEmail, date, startTime, durationMinutes } = req.body as PrepayEstimateRequest;
+    const { memberEmail: rawMemberEmail, date, startTime, durationMinutes } = req.body as PrepayEstimateRequest;
+    const memberEmail = rawMemberEmail?.trim()?.toLowerCase();
 
     if (!memberEmail || !date || !startTime || !durationMinutes) {
       return res.status(400).json({ error: 'Missing required fields: memberEmail, date, startTime, durationMinutes' });
@@ -102,7 +103,8 @@ router.post('/api/member/conference/prepay/create-intent', isAuthenticated, asyn
       return res.status(401).json({ error: 'Not authenticated' });
     }
 
-    const { memberEmail, date, startTime, durationMinutes, useCredit = false } = req.body as CreateIntentRequest;
+    const { memberEmail: rawMemberEmail, date, startTime, durationMinutes, useCredit = false } = req.body as CreateIntentRequest;
+    const memberEmail = rawMemberEmail?.trim()?.toLowerCase();
 
     if (!memberEmail || !date || !startTime || !durationMinutes) {
       return res.status(400).json({ error: 'Missing required fields: memberEmail, date, startTime, durationMinutes' });

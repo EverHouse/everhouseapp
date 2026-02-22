@@ -75,7 +75,8 @@ router.get('/api/staff-users', isStaffOrAdmin, async (req, res) => {
 
 router.post('/api/staff-users', isAdmin, async (req, res) => {
   try {
-    const { email, name, first_name, last_name, phone, job_title, role, created_by } = req.body;
+    const { email: rawEmail, name, first_name, last_name, phone, job_title, role, created_by } = req.body;
+    const email = rawEmail?.trim()?.toLowerCase();
     
     if (!email) {
       return res.status(400).json({ error: 'Email is required' });
@@ -121,7 +122,8 @@ router.post('/api/staff-users', isAdmin, async (req, res) => {
 router.put('/api/staff-users/:id', isAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const { email, name, first_name, last_name, phone, job_title, role, is_active } = req.body;
+    const { email: rawEmail, name, first_name, last_name, phone, job_title, role, is_active } = req.body;
+    const email = rawEmail?.trim()?.toLowerCase();
     
     const updateData: Record<string, any> = {};
     if (email !== undefined) updateData.email = normalizeEmail(email);
@@ -238,7 +240,8 @@ router.get('/api/admin-users', isAdmin, async (req, res) => {
 
 router.post('/api/admin-users', isAdmin, async (req, res) => {
   try {
-    const { email, name, created_by } = req.body;
+    const { email: rawEmail, name, created_by } = req.body;
+    const email = rawEmail?.trim()?.toLowerCase();
     
     if (!email) {
       return res.status(400).json({ error: 'Email is required' });
@@ -279,7 +282,8 @@ router.post('/api/admin-users', isAdmin, async (req, res) => {
 router.put('/api/admin-users/:id', isAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const { email, name, first_name, last_name, phone, job_title, is_active } = req.body;
+    const { email: rawEmail, name, first_name, last_name, phone, job_title, is_active } = req.body;
+    const email = rawEmail?.trim()?.toLowerCase();
     
     const updateData: Record<string, any> = {};
     if (email !== undefined) updateData.email = normalizeEmail(email);

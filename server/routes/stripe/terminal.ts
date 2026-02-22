@@ -573,7 +573,8 @@ router.post('/api/stripe/terminal/cancel-payment', isStaffOrAdmin, async (req: R
 
 router.post('/api/stripe/terminal/process-subscription-payment', isStaffOrAdmin, async (req: Request, res: Response) => {
   try {
-    const { readerId, subscriptionId, userId, email } = req.body;
+    const { readerId, subscriptionId, userId, email: rawEmail } = req.body;
+    const email = rawEmail?.trim()?.toLowerCase();
     
     if (!readerId) {
       return res.status(400).json({ error: 'Reader ID is required' });
@@ -1161,7 +1162,8 @@ router.post('/api/stripe/terminal/process-existing-payment', isStaffOrAdmin, asy
 
 router.post('/api/stripe/terminal/save-card', isStaffOrAdmin, async (req: Request, res: Response) => {
   try {
-    const { readerId, customerId, email, userId } = req.body;
+    const { readerId, customerId, email: rawEmail, userId } = req.body;
+    const email = rawEmail?.trim()?.toLowerCase();
 
     if (!readerId) {
       return res.status(400).json({ error: 'Reader ID is required' });

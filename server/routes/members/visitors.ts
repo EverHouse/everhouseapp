@@ -422,7 +422,8 @@ router.get('/api/guests/needs-email', isStaffOrAdmin, async (req, res) => {
 router.patch('/api/guests/:guestId/email', isStaffOrAdmin, async (req, res) => {
   try {
     const { guestId } = req.params;
-    const { email } = req.body;
+    const { email: rawEmail } = req.body;
+    const email = rawEmail?.trim()?.toLowerCase();
     
     if (!email || typeof email !== 'string' || !email.includes('@')) {
       return res.status(400).json({ error: 'Valid email is required' });
@@ -449,13 +450,14 @@ router.patch('/api/guests/:guestId/email', isStaffOrAdmin, async (req, res) => {
 
 router.post('/api/visitors', isStaffOrAdmin, async (req, res) => {
   try {
-    const { email, firstName, lastName, phone, createStripeCustomer = true, visitorType, dataSource } = req.body;
+    const { email: rawEmail, firstName, lastName, phone, createStripeCustomer = true, visitorType, dataSource } = req.body;
+    const email = rawEmail?.trim()?.toLowerCase();
     
     if (!email) {
       return res.status(400).json({ error: 'Email is required' });
     }
     
-    const normalizedEmail = email.toLowerCase().trim();
+    const normalizedEmail = email.trim().toLowerCase();
     
     const { resolveUserByEmail } = await import('../../core/stripe/customers');
     const resolved = await resolveUserByEmail(normalizedEmail);

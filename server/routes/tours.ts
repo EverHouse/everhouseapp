@@ -233,7 +233,8 @@ router.post('/api/tours/sync', isStaffOrAdmin, async (req, res) => {
 
 router.post('/api/tours/book', async (req, res) => {
   try {
-    const { firstName, lastName, email, phone } = req.body;
+    const { firstName, lastName, email: rawEmail, phone } = req.body;
+    const email = rawEmail?.trim()?.toLowerCase();
     
     if (!firstName || !lastName || !email) {
       return res.status(400).json({ error: 'First name, last name, and email are required' });
@@ -1225,7 +1226,8 @@ router.get('/api/tours/availability', async (req, res) => {
 
 router.post('/api/tours/schedule', async (req, res) => {
   try {
-    const { firstName, lastName, email, phone, date, startTime } = req.body;
+    const { firstName, lastName, email: rawEmail, phone, date, startTime } = req.body;
+    const email = rawEmail?.trim()?.toLowerCase();
 
     if (!firstName || !lastName || !email || !date || !startTime) {
       return res.status(400).json({ error: 'firstName, lastName, email, date, and startTime are required' });

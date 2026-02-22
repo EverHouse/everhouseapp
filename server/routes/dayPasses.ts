@@ -50,7 +50,8 @@ router.get('/api/day-passes/products', async (req: Request, res: Response) => {
  */
 router.post('/api/day-passes/checkout', checkoutRateLimiter, async (req: Request, res: Response) => {
   try {
-    const { productSlug, email, firstName, lastName, phone } = req.body;
+    const { productSlug, email: rawEmail, firstName, lastName, phone } = req.body;
+    const email = rawEmail?.trim()?.toLowerCase();
 
     if (!productSlug || !email) {
       return res.status(400).json({ error: 'Missing required fields: productSlug, email' });
@@ -278,7 +279,8 @@ router.post('/api/day-passes/confirm', async (req: Request, res: Response) => {
  */
 router.post('/api/day-passes/staff-checkout', isStaffOrAdmin, async (req: Request, res: Response) => {
   try {
-    const { productSlug, email, firstName, lastName, phone, dob, notes, streetAddress, city, state, zipCode } = req.body;
+    const { productSlug, email: rawEmail, firstName, lastName, phone, dob, notes, streetAddress, city, state, zipCode } = req.body;
+    const email = rawEmail?.trim()?.toLowerCase();
     const sessionUser = getSessionUser(req);
     const staffEmail = sessionUser?.email || 'staff';
 

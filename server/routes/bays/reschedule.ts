@@ -118,7 +118,13 @@ router.post('/api/admin/booking/:id/reschedule/confirm', isStaffOrAdmin, async (
 
     const bookingConflictCheck = await checkBookingConflict(resource_id, request_date, start_time, end_time, bookingId);
     if (bookingConflictCheck.hasConflict) {
-      return res.status(409).json({ error: 'Time slot conflicts with existing booking' });
+      const conflict = bookingConflictCheck.conflictingBooking;
+      const conflictStart = conflict?.startTime || conflict?.start_time;
+      const conflictEnd = conflict?.endTime || conflict?.end_time;
+      const errorMsg = conflictStart && conflictEnd
+        ? `This time slot conflicts with an existing booking from ${formatTime12Hour(String(conflictStart).substring(0, 5))} to ${formatTime12Hour(String(conflictEnd).substring(0, 5))}. Please adjust your time or duration.`
+        : 'Time slot conflicts with existing booking';
+      return res.status(409).json({ error: errorMsg });
     }
 
     const closureCheck = await checkClosureConflict(resource_id, request_date, start_time, end_time);

@@ -897,7 +897,8 @@ router.post('/api/members', isStaffOrAdmin, async (req, res) => {
       return res.status(401).json({ error: 'Authentication required' });
     }
     
-    const { firstName, lastName, email, phone, tier, startDate, discountReason } = req.body;
+    const { firstName, lastName, email: rawEmail, phone, tier, startDate, discountReason } = req.body;
+    const email = rawEmail?.trim()?.toLowerCase();
     
     if (!firstName || typeof firstName !== 'string' || firstName.trim().length === 0) {
       return res.status(400).json({ error: 'First name is required' });
@@ -1197,7 +1198,9 @@ router.post('/api/members/admin/bulk-tier-update', isStaffOrAdmin, async (req, r
 
 router.post('/api/admin/member/change-email', isStaffOrAdmin, async (req, res) => {
   try {
-    const { oldEmail, newEmail } = req.body;
+    const { oldEmail: rawOldEmail, newEmail: rawNewEmail } = req.body;
+    const oldEmail = rawOldEmail?.trim()?.toLowerCase();
+    const newEmail = rawNewEmail?.trim()?.toLowerCase();
     const sessionUser = getSessionUser(req);
     
     if (!oldEmail || !newEmail) {
@@ -1275,7 +1278,8 @@ router.post('/api/admin/tier-change/preview', isStaffOrAdmin, async (req, res) =
 
 router.post('/api/admin/tier-change/commit', isStaffOrAdmin, async (req, res) => {
   try {
-    const { memberEmail, subscriptionId, newPriceId, immediate = true } = req.body;
+    const { memberEmail: rawMemberEmail, subscriptionId, newPriceId, immediate = true } = req.body;
+    const memberEmail = rawMemberEmail?.trim()?.toLowerCase();
     const staffEmail = getSessionUser(req)?.email || 'unknown';
     
     if (!memberEmail || !subscriptionId || !newPriceId) {

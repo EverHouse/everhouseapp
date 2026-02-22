@@ -466,7 +466,9 @@ router.get('/api/admin/trackman-webhook/stats', isStaffOrAdmin, async (req: Requ
 
 router.post('/api/admin/linked-emails', isStaffOrAdmin, async (req: Request, res: Response) => {
   try {
-    const { primaryEmail, linkedEmail } = req.body;
+    const { primaryEmail: rawPrimaryEmail, linkedEmail: rawLinkedEmail } = req.body;
+    const primaryEmail = rawPrimaryEmail?.trim()?.toLowerCase();
+    const linkedEmail = rawLinkedEmail?.trim()?.toLowerCase();
     
     if (!primaryEmail || !linkedEmail) {
       return res.status(400).json({ error: 'primaryEmail and linkedEmail are required' });

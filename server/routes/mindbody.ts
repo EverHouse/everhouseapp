@@ -71,7 +71,8 @@ router.get("/api/admin/mindbody/unmatched", isStaffOrAdmin, async (req: Request,
 
 router.post("/api/admin/mindbody/link", isStaffOrAdmin, async (req: Request, res: Response) => {
   try {
-    const { mindbodyClientId, memberEmail } = req.body;
+    const { mindbodyClientId, memberEmail: rawMemberEmail } = req.body;
+    const memberEmail = rawMemberEmail?.trim()?.toLowerCase();
     
     if (!mindbodyClientId || !memberEmail) {
       return res.status(400).json({ error: "Missing mindbodyClientId or memberEmail" });

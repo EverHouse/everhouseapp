@@ -97,7 +97,7 @@ router.get('/api/notifications/count', isAuthenticated, async (req, res) => {
 router.put('/api/notifications/:id/read', isAuthenticated, async (req, res) => {
   try {
     const { id } = req.params;
-    const user_email = req.body?.user_email;
+    const user_email = (req.body?.user_email as string | undefined)?.trim()?.toLowerCase();
     
     const effective = await getEffectiveEmail(req as any, user_email);
     
@@ -121,7 +121,8 @@ router.put('/api/notifications/:id/read', isAuthenticated, async (req, res) => {
 
 router.put('/api/notifications/mark-all-read', isAuthenticated, async (req, res) => {
   try {
-    const { user_email } = req.body;
+    const { user_email: raw_user_email } = req.body;
+    const user_email = (raw_user_email as string | undefined)?.trim()?.toLowerCase();
     
     const effective = await getEffectiveEmail(req as any, user_email);
     
@@ -141,7 +142,8 @@ router.put('/api/notifications/mark-all-read', isAuthenticated, async (req, res)
 
 router.delete('/api/notifications/dismiss-all', isAuthenticated, async (req, res) => {
   try {
-    const { user_email } = req.body;
+    const { user_email: raw_user_email } = req.body;
+    const user_email = (raw_user_email as string | undefined)?.trim()?.toLowerCase();
     
     const effective = await getEffectiveEmail(req as any, user_email);
     
@@ -162,9 +164,9 @@ router.delete('/api/notifications/dismiss-all', isAuthenticated, async (req, res
 router.delete('/api/notifications/:id', isAuthenticated, async (req, res) => {
   try {
     const { id } = req.params;
-    const { user_email } = req.body;
+    const { user_email: raw_user_email } = req.body;
+    const user_email = (raw_user_email as string | undefined)?.trim()?.toLowerCase();
     
-    // Allow staff to delete notifications for any user (consistent with dismiss-all)
     const effective = await getEffectiveEmail(req as any, user_email);
     
     if (!effective) {

@@ -123,7 +123,8 @@ const router = Router();
 
 router.post('/api/data-tools/resync-member', isAdmin, async (req: Request, res: Response) => {
   try {
-    const { email } = req.body;
+    const { email: rawEmail } = req.body;
+    const email = rawEmail?.trim()?.toLowerCase();
     const staffEmail = getSessionUser(req)?.email || 'unknown';
     
     if (!email || typeof email !== 'string') {
@@ -820,7 +821,8 @@ router.post('/api/data-tools/bulk-push-to-hubspot', isAdmin, async (req: Request
 router.post('/api/data-tools/sync-members-to-hubspot', isAdmin, async (req: Request, res: Response) => {
   try {
     const staffEmail = getSessionUser(req)?.email || 'unknown';
-    const { emails, dryRun = true } = req.body;
+    const { emails: rawEmails, dryRun = true } = req.body;
+    const emails = Array.isArray(rawEmails) ? rawEmails.map((e: string) => e?.trim()?.toLowerCase()).filter(Boolean) : rawEmails;
     
     logger.info('[DataTools] Starting HubSpot sync for members without contacts (dryRun: ) by', { extra: { dryRun, staffEmail } });
     

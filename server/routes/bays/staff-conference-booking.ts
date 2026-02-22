@@ -180,7 +180,8 @@ router.get('/api/staff/conference-room/fee-estimate', isStaffOrAdmin, async (req
 
 router.post('/api/staff/conference-room/booking', isStaffOrAdmin, async (req: Request, res: Response) => {
   try {
-    const { hostEmail, hostName, date, startTime, durationMinutes } = req.body;
+    const { hostEmail: rawHostEmail, hostName, date, startTime, durationMinutes } = req.body;
+    const hostEmail = rawHostEmail?.trim()?.toLowerCase();
     const sessionUser = getSessionUser(req);
     const staffEmail = sessionUser?.email || 'staff';
 

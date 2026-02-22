@@ -190,7 +190,8 @@ router.get('/api/hubspot/member-discount/:email', isStaffOrAdmin, async (req, re
 
 router.post('/api/hubspot/sync-deal-stage', isStaffOrAdmin, async (req, res) => {
   try {
-    const { memberEmail, mindbodyStatus } = req.body;
+    const { memberEmail: rawMemberEmail, mindbodyStatus } = req.body;
+    const memberEmail = rawMemberEmail?.trim()?.toLowerCase();
     const sessionUser = getSessionUser(req);
     const staffEmail = sessionUser?.email || 'system';
     const staffName = sessionUser?.name || 'System';

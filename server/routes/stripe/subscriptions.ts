@@ -51,7 +51,8 @@ router.get('/api/stripe/subscriptions/:customerId', isStaffOrAdmin, async (req: 
 
 router.post('/api/stripe/subscriptions', isStaffOrAdmin, async (req: Request, res: Response) => {
   try {
-    const { customerId, priceId, memberEmail } = req.body;
+    const { customerId, priceId, memberEmail: rawMemberEmail } = req.body;
+    const memberEmail = rawMemberEmail?.trim()?.toLowerCase();
     
     if (!customerId || !priceId) {
       return res.status(400).json({ error: 'Missing required fields: customerId, priceId' });
@@ -192,7 +193,8 @@ router.get('/api/stripe/coupons', isStaffOrAdmin, async (req: Request, res: Resp
 
 router.post('/api/stripe/subscriptions/create-for-member', isStaffOrAdmin, async (req: Request, res: Response) => {
   try {
-    const { memberEmail, tierName, couponId } = req.body;
+    const { memberEmail: rawMemberEmail, tierName, couponId } = req.body;
+    const memberEmail = rawMemberEmail?.trim()?.toLowerCase();
     const sessionUser = getSessionUser(req);
     
     if (!memberEmail || !tierName) {
@@ -342,7 +344,8 @@ router.post('/api/stripe/subscriptions/create-for-member', isStaffOrAdmin, async
 
 router.post('/api/stripe/subscriptions/create-new-member', isStaffOrAdmin, async (req: Request, res: Response) => {
   try {
-    const { email, firstName, lastName, phone, dob, tierSlug, couponId, streetAddress, city, state, zipCode } = req.body;
+    const { email: rawEmail, firstName, lastName, phone, dob, tierSlug, couponId, streetAddress, city, state, zipCode } = req.body;
+    const email = rawEmail?.trim()?.toLowerCase();
     const sessionUser = getSessionUser(req);
     
     if (!email || !tierSlug) {
@@ -712,7 +715,8 @@ router.post('/api/stripe/subscriptions/confirm-inline-payment', isStaffOrAdmin, 
 
 router.post('/api/stripe/subscriptions/send-activation-link', isStaffOrAdmin, async (req: Request, res: Response) => {
   try {
-    const { email, firstName, lastName, phone, dob, tierSlug, couponId, streetAddress, city, state, zipCode } = req.body;
+    const { email: rawEmail, firstName, lastName, phone, dob, tierSlug, couponId, streetAddress, city, state, zipCode } = req.body;
+    const email = rawEmail?.trim()?.toLowerCase();
     const sessionUser = getSessionUser(req);
     
     if (!email || !tierSlug) {

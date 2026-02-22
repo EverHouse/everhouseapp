@@ -924,7 +924,8 @@ router.get('/api/rsvps', async (req, res) => {
 
 router.post('/api/rsvps', isAuthenticated, async (req, res) => {
   try {
-    const { event_id, user_email } = req.body;
+    const { event_id, user_email: raw_user_email } = req.body;
+    const user_email = raw_user_email?.trim()?.toLowerCase();
     
     if (!event_id || !user_email) {
       return res.status(400).json({ error: 'Missing event_id or user_email' });
@@ -1190,7 +1191,8 @@ router.delete('/api/events/:eventId/rsvps/:rsvpId', isStaffOrAdmin, async (req, 
 router.post('/api/events/:id/rsvps/manual', isStaffOrAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const { email } = req.body;
+    const { email: rawEmail } = req.body;
+    const email = rawEmail?.trim()?.toLowerCase();
     
     if (!email || typeof email !== 'string' || !email.includes('@')) {
       return res.status(400).json({ error: 'Valid email is required' });

@@ -1039,7 +1039,8 @@ router.post('/api/data-integrity/fix/delete-empty-session', isAdmin, async (req:
 
 router.post('/api/data-integrity/fix/merge-stripe-customers', isAdmin, async (req: Request, res) => {
   try {
-    const { email, keepCustomerId, removeCustomerId } = req.body;
+    const { email: rawEmail, keepCustomerId, removeCustomerId } = req.body;
+    const email = rawEmail?.trim()?.toLowerCase();
     if (!email || !keepCustomerId || !removeCustomerId) {
       return res.status(400).json({ success: false, message: 'email, keepCustomerId, and removeCustomerId are required' });
     }

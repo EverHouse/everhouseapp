@@ -1067,7 +1067,7 @@ router.post('/api/member/balance/pay', isAuthenticated, async (req: Request, res
     }
 
     let memberEmail = sessionUser.email.toLowerCase();
-    const requestEmail = req.body?.memberEmail as string | undefined;
+    const requestEmail = (req.body?.memberEmail as string | undefined)?.trim()?.toLowerCase();
     // Allow staff and admins to pay on behalf of another member (for View As mode)
     const canActForOthers = sessionUser.isStaff || sessionUser.role === 'admin';
     if (requestEmail && canActForOthers) {

@@ -386,7 +386,9 @@ router.post('/api/admin/trackman/unmatched/bulk-dismiss', isStaffOrAdmin, async 
 router.put('/api/admin/trackman/unmatched/:id/resolve', isStaffOrAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const { email, memberEmail, rememberEmail } = req.body;
+    const { email: rawEmail, memberEmail: rawMemberEmail, rememberEmail } = req.body;
+    const email = rawEmail?.trim()?.toLowerCase();
+    const memberEmail = rawMemberEmail?.trim()?.toLowerCase();
     const resolveEmail = memberEmail || email;
     
     if (!resolveEmail) {
@@ -857,7 +859,8 @@ router.put('/api/admin/trackman/unmatched/:id/resolve', isStaffOrAdmin, async (r
 
 router.post('/api/admin/trackman/auto-resolve-same-email', isStaffOrAdmin, async (req, res) => {
   try {
-    const { originalEmail, memberEmail, excludeTrackmanId } = req.body;
+    const { originalEmail, memberEmail: rawMemberEmail, excludeTrackmanId } = req.body;
+    const memberEmail = rawMemberEmail?.trim()?.toLowerCase();
     
     if (!originalEmail) {
       return res.status(400).json({ error: 'originalEmail is required' });
@@ -1023,7 +1026,9 @@ router.post('/api/admin/trackman/auto-resolve-same-email', isStaffOrAdmin, async
 
 router.delete('/api/admin/trackman/linked-email', isStaffOrAdmin, async (req, res) => {
   try {
-    const { memberEmail, linkedEmail } = req.body;
+    const { memberEmail: rawMemberEmail, linkedEmail: rawLinkedEmail } = req.body;
+    const memberEmail = rawMemberEmail?.trim()?.toLowerCase();
+    const linkedEmail = rawLinkedEmail?.trim()?.toLowerCase();
     
     if (!memberEmail || !linkedEmail) {
       return res.status(400).json({ error: 'memberEmail and linkedEmail are required' });
@@ -1171,7 +1176,8 @@ router.put('/api/admin/trackman/matched/:id/reassign', isStaffOrAdmin, async (re
   const client = await pool.connect();
   try {
     const { id } = req.params;
-    const { newMemberEmail } = req.body;
+    const { newMemberEmail: rawNewMemberEmail } = req.body;
+    const newMemberEmail = rawNewMemberEmail?.trim()?.toLowerCase();
     
     if (!newMemberEmail) {
       return res.status(400).json({ error: 'newMemberEmail is required' });
@@ -1321,7 +1327,8 @@ router.put('/api/admin/trackman/matched/:id/reassign', isStaffOrAdmin, async (re
 
 router.post('/api/admin/trackman/unmatch-member', isStaffOrAdmin, async (req, res) => {
   try {
-    const { email } = req.body;
+    const { email: rawEmail } = req.body;
+    const email = rawEmail?.trim()?.toLowerCase();
     const unmatchedBy = req.session?.user?.email || 'admin';
     
     if (!email) {
@@ -2377,7 +2384,8 @@ router.get('/api/admin/booking/:id/members', isStaffOrAdmin, async (req, res) =>
 router.post('/api/admin/booking/:id/guests', isStaffOrAdmin, async (req, res) => {
   try {
     const bookingId = parseInt(req.params.id as string);
-    const { guestEmail, guestPhone, slotId, forceAddAsGuest, quickAdd } = req.body;
+    const { guestEmail: rawGuestEmail, guestPhone, slotId, forceAddAsGuest, quickAdd } = req.body;
+    const guestEmail = rawGuestEmail?.trim()?.toLowerCase();
     let { guestName } = req.body;
     
     if (quickAdd && !guestName?.trim()) {
@@ -2550,7 +2558,8 @@ router.delete('/api/admin/booking/:id/guests/:guestId', isStaffOrAdmin, async (r
 router.put('/api/admin/booking/:bookingId/members/:slotId/link', isStaffOrAdmin, async (req, res) => {
   try {
     const { bookingId, slotId } = req.params;
-    const { memberEmail } = req.body;
+    const { memberEmail: rawMemberEmail } = req.body;
+    const memberEmail = rawMemberEmail?.trim()?.toLowerCase();
     const linkedBy = req.session?.user?.email || 'admin';
     
     if (!memberEmail) {
