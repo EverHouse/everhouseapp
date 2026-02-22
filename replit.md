@@ -81,7 +81,7 @@ The following conventions were comprehensively audited and enforced across the e
 - 3 missing FK indexes added on `event_rsvps` and `wellness_enrollments` to prevent slow JOINs.
 
 ## Recent Changes
-- **Feb 2026**: Deep architectural audit — fixed 60 empty catch blocks, 32 timezone violations, 8 unprotected routes, 6 webhook guard gaps, 3 missing DB indexes across 40+ files.
+- **Feb 2026**: Deep architectural audit — fixed 60 empty catch blocks, 75+ timezone violations (server + frontend), 16 unprotected async routes, 6 webhook guard gaps, 3 missing DB indexes, enhanced placeholder account detection across 60+ files.
 
 ## External Dependencies
 - **Stripe**: Terminal, subscriptions, webhooks for billing authority.
