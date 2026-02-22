@@ -1636,7 +1636,7 @@ async function checkMindBodyStaleSyncMembers(): Promise<IntegrityCheckResult> {
   for (const member of staleMembers) {
     const memberName = [member.first_name, member.last_name].filter(Boolean).join(' ') || 'Unknown';
     const lastUpdate = member.updated_at 
-      ? new Date(member.updated_at as string).toLocaleDateString()
+      ? new Date(member.updated_at as string).toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' })
       : 'unknown';
     
     issues.push({

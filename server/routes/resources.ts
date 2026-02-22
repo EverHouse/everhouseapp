@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { bookingRateLimiter } from '../middleware/rateLimiting';
-import { isStaffOrAdmin } from '../core/middleware';
+import { isAuthenticated, isStaffOrAdmin } from '../core/middleware';
 import { logAndRespond, logger } from '../core/logger';
 import { getSessionUser } from '../types/session';
 import { logFromRequest } from '../core/auditLog';
@@ -564,7 +564,7 @@ router.delete('/api/bookings/:id', isStaffOrAdmin, async (req, res) => {
   }
 });
 
-router.put('/api/bookings/:id/member-cancel', async (req, res) => {
+router.put('/api/bookings/:id/member-cancel', isAuthenticated, async (req, res) => {
   try {
     const { id } = req.params;
     const rawSessionEmail = getSessionUser(req)?.email;

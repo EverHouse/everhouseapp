@@ -54,7 +54,11 @@ export const eventRsvps = pgTable("event_rsvps", {
   guestCount: integer("guest_count").default(0), // additional tickets for same email (for +X guests)
   orderDate: timestamp("order_date"), // when the RSVP was actually made (from Eventbrite)
   createdAt: timestamp("created_at").defaultNow(),
-});
+},
+(table) => [
+  index("idx_event_rsvps_event_id").on(table.eventId),
+  index("idx_event_rsvps_matched_user_id").on(table.matchedUserId),
+]);
 
 // Wellness classes table - for scheduling wellness/fitness classes
 export const wellnessClasses = pgTable("wellness_classes", {
@@ -102,7 +106,10 @@ export const wellnessEnrollments = pgTable("wellness_enrollments", {
   status: varchar("status").default("confirmed"),
   isWaitlisted: boolean("is_waitlisted").default(false),
   createdAt: timestamp("created_at").defaultNow(),
-});
+},
+(table) => [
+  index("idx_wellness_enrollments_class_id").on(table.classId),
+]);
 
 // Announcements table - club announcements
 export const announcements = pgTable("announcements", {

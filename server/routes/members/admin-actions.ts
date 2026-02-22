@@ -293,7 +293,7 @@ router.post('/api/members/:id/suspend', isStaffOrAdmin, async (req, res) => {
       await notifyMember({
         userEmail: member.email || '',
         title: 'Membership Paused',
-        message: `Your membership has been paused for ${durationDays} days starting ${start.toLocaleDateString()}.`,
+        message: `Your membership has been paused for ${durationDays} days starting ${start.toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' })}.`,
         type: 'system',
         url: '/member/profile'
       });

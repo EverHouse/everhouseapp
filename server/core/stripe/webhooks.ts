@@ -718,47 +718,57 @@ async function handleChargeRefunded(client: PoolClient, charge: Stripe.Charge): 
       logger.info(`[Stripe Webhook] Terminal payment refunded for user ${terminalPayment.user_email}`);
       
       if (refunded) {
-        await client.query(
-          `UPDATE users SET membership_status = 'suspended', billing_provider = 'stripe', updated_at = NOW() WHERE id = $1`,
+        const refundUserCheck = await client.query(
+          `SELECT billing_provider FROM users WHERE id = $1`,
           [terminalPayment.user_id]
         );
-        logger.info(`[Stripe Webhook] Suspended membership for user ${terminalPayment.user_id} due to Terminal payment refund`);
-        
-        await client.query(
-          `INSERT INTO notifications (user_email, title, message, type, related_type, created_at)
-           VALUES ($1, $2, $3, $4, $5, NOW())`,
-          [
-            terminalPayment.user_email.toLowerCase(), 
-            'Membership Suspended', 
-            'Your membership has been suspended due to a payment refund. Please contact staff for assistance.',
-            'billing',
-            'membership'
-          ]
-        );
-        
-        deferredActions.push(async () => {
-          await notifyAllStaff(
-            'Terminal Payment Refunded',
-            `A Terminal payment for ${terminalPayment.user_email} has been fully refunded. Membership has been suspended.`,
-            'terminal_refund',
-            { sendPush: true }
+        const refundBillingProvider = refundUserCheck.rows[0]?.billing_provider;
+
+        if (refundBillingProvider && refundBillingProvider !== '' && refundBillingProvider !== 'stripe') {
+          logger.info(`[Stripe Webhook] Skipping charge.refunded for ${terminalPayment.user_email} — billing_provider is '${refundBillingProvider}', not 'stripe'`);
+        } else {
+          await client.query(
+            `UPDATE users SET membership_status = 'suspended', billing_provider = 'stripe', updated_at = NOW() WHERE id = $1`,
+            [terminalPayment.user_id]
           );
+          logger.info(`[Stripe Webhook] Suspended membership for user ${terminalPayment.user_id} due to Terminal payment refund`);
+        
+          await client.query(
+            `INSERT INTO notifications (user_email, title, message, type, related_type, created_at)
+             VALUES ($1, $2, $3, $4, $5, NOW())`,
+            [
+              terminalPayment.user_email.toLowerCase(), 
+              'Membership Suspended', 
+              'Your membership has been suspended due to a payment refund. Please contact staff for assistance.',
+              'billing',
+              'membership'
+            ]
+          );
+        
+          deferredActions.push(async () => {
+            await notifyAllStaff(
+              'Terminal Payment Refunded',
+              `A Terminal payment for ${terminalPayment.user_email} has been fully refunded. Membership has been suspended.`,
+              'terminal_refund',
+              { sendPush: true }
+            );
           
-          await logSystemAction({
-            action: 'terminal_payment_refunded',
-            resourceType: 'user',
-            resourceId: terminalPayment.user_id,
-            resourceName: terminalPayment.user_email,
-            details: {
-              source: 'stripe_webhook',
-              stripe_payment_intent_id: paymentIntentId,
-              stripe_subscription_id: terminalPayment.stripe_subscription_id,
-              amount_cents: terminalPayment.amount_cents,
-              refund_amount_cents: amount_refunded,
-              membership_action: 'suspended'
-            }
+            await logSystemAction({
+              action: 'terminal_payment_refunded',
+              resourceType: 'user',
+              resourceId: terminalPayment.user_id,
+              resourceName: terminalPayment.user_email,
+              details: {
+                source: 'stripe_webhook',
+                stripe_payment_intent_id: paymentIntentId,
+                stripe_subscription_id: terminalPayment.stripe_subscription_id,
+                amount_cents: terminalPayment.amount_cents,
+                refund_amount_cents: amount_refunded,
+                membership_action: 'suspended'
+              }
+            });
           });
-        });
+        }
       }
     }
   }
@@ -812,23 +822,33 @@ async function handleChargeDisputeCreated(client: PoolClient, dispute: Stripe.Di
       const terminalPayment = terminalPaymentResult.rows[0];
       logger.info(`[Stripe Webhook] Terminal payment disputed for user ${terminalPayment.user_email}`);
       
-      await client.query(
-        `UPDATE users SET membership_status = 'suspended', billing_provider = 'stripe', updated_at = NOW() WHERE id = $1`,
+      const disputeUserCheck = await client.query(
+        `SELECT billing_provider FROM users WHERE id = $1`,
         [terminalPayment.user_id]
       );
-      logger.info(`[Stripe Webhook] Suspended membership for user ${terminalPayment.user_id} due to payment dispute`);
+      const disputeBillingProvider = disputeUserCheck.rows[0]?.billing_provider;
+
+      if (disputeBillingProvider && disputeBillingProvider !== '' && disputeBillingProvider !== 'stripe') {
+        logger.info(`[Stripe Webhook] Skipping charge.dispute.created for ${terminalPayment.user_email} — billing_provider is '${disputeBillingProvider}', not 'stripe'`);
+      } else {
+        await client.query(
+          `UPDATE users SET membership_status = 'suspended', billing_provider = 'stripe', updated_at = NOW() WHERE id = $1`,
+          [terminalPayment.user_id]
+        );
+        logger.info(`[Stripe Webhook] Suspended membership for user ${terminalPayment.user_id} due to payment dispute`);
       
-      await client.query(
-        `INSERT INTO notifications (user_email, title, message, type, related_type, created_at)
-         VALUES ($1, $2, $3, $4, $5, NOW())`,
-        [
-          terminalPayment.user_email.toLowerCase(), 
-          'Membership Suspended', 
-          'Your membership has been suspended due to a payment dispute. Please contact staff immediately to resolve this issue.',
-          'billing',
-          'membership'
-        ]
-      );
+        await client.query(
+          `INSERT INTO notifications (user_email, title, message, type, related_type, created_at)
+           VALUES ($1, $2, $3, $4, $5, NOW())`,
+          [
+            terminalPayment.user_email.toLowerCase(), 
+            'Membership Suspended', 
+            'Your membership has been suspended due to a payment dispute. Please contact staff immediately to resolve this issue.',
+            'billing',
+            'membership'
+          ]
+        );
+      }
       
       deferredActions.push(async () => {
         await notifyAllStaff(
@@ -890,23 +910,33 @@ async function handleChargeDisputeClosed(client: PoolClient, dispute: Stripe.Dis
       logger.info(`[Stripe Webhook] Terminal payment dispute closed for user ${terminalPayment.user_email}: ${status}`);
       
       if (disputeWon) {
-        await client.query(
-          `UPDATE users SET membership_status = 'active', billing_provider = 'stripe', updated_at = NOW() WHERE id = $1`,
+        const disputeClosedUserCheck = await client.query(
+          `SELECT billing_provider FROM users WHERE id = $1`,
           [terminalPayment.user_id]
         );
-        logger.info(`[Stripe Webhook] Reactivated membership for user ${terminalPayment.user_id} - dispute won`);
+        const disputeClosedBillingProvider = disputeClosedUserCheck.rows[0]?.billing_provider;
+
+        if (disputeClosedBillingProvider && disputeClosedBillingProvider !== '' && disputeClosedBillingProvider !== 'stripe') {
+          logger.info(`[Stripe Webhook] Skipping charge.dispute.closed for ${terminalPayment.user_email} — billing_provider is '${disputeClosedBillingProvider}', not 'stripe'`);
+        } else {
+          await client.query(
+            `UPDATE users SET membership_status = 'active', billing_provider = 'stripe', updated_at = NOW() WHERE id = $1`,
+            [terminalPayment.user_id]
+          );
+          logger.info(`[Stripe Webhook] Reactivated membership for user ${terminalPayment.user_id} - dispute won`);
         
-        await client.query(
-          `INSERT INTO notifications (user_email, title, message, type, related_type, created_at)
-           VALUES ($1, $2, $3, $4, $5, NOW())`,
-          [
-            terminalPayment.user_email.toLowerCase(), 
-            'Membership Reactivated', 
-            'Your membership has been reactivated. The payment dispute has been resolved in your favor.',
-            'billing',
-            'membership'
-          ]
-        );
+          await client.query(
+            `INSERT INTO notifications (user_email, title, message, type, related_type, created_at)
+             VALUES ($1, $2, $3, $4, $5, NOW())`,
+            [
+              terminalPayment.user_email.toLowerCase(), 
+              'Membership Reactivated', 
+              'Your membership has been reactivated. The payment dispute has been resolved in your favor.',
+              'billing',
+              'membership'
+            ]
+          );
+        }
       }
       
       deferredActions.push(async () => {
@@ -1745,6 +1775,7 @@ async function handleInvoicePaymentSucceeded(client: PoolClient, invoice: Invoic
   const invoiceUserBillingProvider = userResult.rows[0]?.billing_provider;
   if (invoiceUserBillingProvider && invoiceUserBillingProvider !== 'stripe') {
     logger.info(`[Stripe Webhook] Skipping billing_provider/grace-period update for ${email} — billing_provider is '${invoiceUserBillingProvider}', not 'stripe' (invoice.payment_succeeded)`);
+    return deferredActions;
   }
 
   await client.query(

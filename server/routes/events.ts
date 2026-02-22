@@ -1034,7 +1034,7 @@ router.post('/api/rsvps', isAuthenticated, async (req, res) => {
   }
 });
 
-router.delete('/api/rsvps/:event_id/:user_email', async (req, res) => {
+router.delete('/api/rsvps/:event_id/:user_email', isAuthenticated, async (req, res) => {
   try {
     const { event_id, user_email } = req.params;
     

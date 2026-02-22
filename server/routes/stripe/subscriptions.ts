@@ -749,7 +749,7 @@ router.post('/api/stripe/subscriptions/send-activation-link', isStaffOrAdmin, as
       } else if (existing.membershipStatus === 'pending') {
         const name = [existing.firstName, existing.lastName].filter(Boolean).join(' ') || email;
         return res.status(400).json({ 
-          error: `This email has an incomplete signup from ${new Date(existing.createdAt).toLocaleDateString()}. Clean it up to proceed.`,
+          error: `This email has an incomplete signup from ${new Date(existing.createdAt).toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' })}. Clean it up to proceed.`,
           isPendingUser: true,
           existingUserId: existing.id,
           existingUserName: name,

@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { isProduction } from '../core/db';
-import { isStaffOrAdmin } from '../core/middleware';
+import { isAuthenticated, isStaffOrAdmin } from '../core/middleware';
 import { syncWellnessCalendarEvents, discoverCalendarIds, getCalendarIdByName, createCalendarEventOnCalendar, deleteCalendarEvent, updateCalendarEvent, CALENDAR_CONFIG } from '../core/calendar/index';
 import { db } from '../db';
 import { wellnessEnrollments, wellnessClasses, users, notifications } from '../../shared/schema';
@@ -888,7 +888,7 @@ router.get('/api/wellness-enrollments', async (req, res) => {
   }
 });
 
-router.post('/api/wellness-enrollments', async (req, res) => {
+router.post('/api/wellness-enrollments', isAuthenticated, async (req, res) => {
   try {
     const { class_id, user_email } = req.body;
     
@@ -1015,7 +1015,7 @@ router.post('/api/wellness-enrollments', async (req, res) => {
   }
 });
 
-router.delete('/api/wellness-enrollments/:class_id/:user_email', async (req, res) => {
+router.delete('/api/wellness-enrollments/:class_id/:user_email', isAuthenticated, async (req, res) => {
   try {
     const { class_id, user_email } = req.params;
     const enrollmentEmail = user_email.toLowerCase();

@@ -226,7 +226,7 @@ export async function syncDayPassPurchaseToHubSpot(
     if (contactId) {
       try {
         const amountDollars = (amountCents / 100).toFixed(2);
-        const purchaseDateStr = purchaseDate.toLocaleDateString('en-US');
+        const purchaseDateStr = purchaseDate.toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' });
         const noteContent = `Day Pass Purchase: ${productName}\nAmount: $${amountDollars}\nPurchase Date: ${purchaseDateStr}`;
 
         await retryableHubSpotRequest(() =>

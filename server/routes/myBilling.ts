@@ -849,7 +849,7 @@ router.post('/api/my/billing/request-cancellation', requireAuth, async (req, res
     try {
       await notifyAllStaff(
         'Member Cancellation Request',
-        `${email} has requested to cancel their membership. Effective date: ${effectiveDate.toLocaleDateString()}. Reason: ${reason || 'Not specified'}`,
+        `${email} has requested to cancel their membership. Effective date: ${effectiveDate.toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' })}. Reason: ${reason || 'Not specified'}`,
         'membership_cancellation'
       );
     } catch (notifyErr) {

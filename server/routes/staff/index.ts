@@ -132,7 +132,7 @@ router.get('/api/admin/command-center', isStaffOrAdmin, async (req, res) => {
         AND created_at >= to_timestamp(${startOfDayUnix}) AND created_at < to_timestamp(${endOfDayUnix})
       `);
       financials.todayRevenueCents = parseInt(String(todayRevenue.rows[0]?.total_cents || '0'));
-    } catch { /* table may not have expected structure */ }
+    } catch (err) { logger.debug('[Command Center] Failed to query today revenue — table may not have expected structure', { error: err instanceof Error ? err.message : err }); }
     
     res.json({
       counts: {
@@ -235,7 +235,7 @@ router.get('/api/admin/financials/summary', isStaffOrAdmin, async (req, res) => 
         AND created_at < to_timestamp(${endOfDay})
       `);
       results.todayRevenueCents = parseInt(String(todayRevenue.rows[0]?.total_cents || '0'));
-    } catch { /* table may not exist */ }
+    } catch (err) { logger.debug('[Financials] Failed to query today revenue — table may not exist', { error: err instanceof Error ? err.message : err }); }
     
     // Overdue payments from booking sessions
     try {
@@ -258,7 +258,7 @@ router.get('/api/admin/financials/summary', isStaffOrAdmin, async (req, res) => 
           )
       `);
       results.overduePaymentsCount = parseInt(String(overdueCount.rows[0]?.count || '0'));
-    } catch { /* table may not exist */ }
+    } catch (err) { logger.debug('[Financials] Failed to query overdue payments — table may not exist', { error: err instanceof Error ? err.message : err }); }
     
     // Failed payments - only query if table exists
     try {
@@ -268,7 +268,7 @@ router.get('/api/admin/financials/summary', isStaffOrAdmin, async (req, res) => 
         WHERE status = 'requires_payment_method' OR status = 'requires_confirmation'
       `);
       results.failedPaymentsCount = parseInt(String(failedPayments.rows[0]?.count || '0'));
-    } catch { /* table may not exist */ }
+    } catch (err) { logger.debug('[Financials] Failed to query failed payments — table may not exist', { error: err instanceof Error ? err.message : err }); }
     
     // Pending authorizations - count uncaptured payment intents
     try {
@@ -278,7 +278,7 @@ router.get('/api/admin/financials/summary', isStaffOrAdmin, async (req, res) => 
         WHERE status = 'requires_capture'
       `);
       results.pendingAuthorizationsCount = parseInt(String(pendingAuths.rows[0]?.count || '0'));
-    } catch { /* table may not exist */ }
+    } catch (err) { logger.debug('[Financials] Failed to query pending authorizations — table may not exist', { error: err instanceof Error ? err.message : err }); }
     
     res.json({
       ...results,

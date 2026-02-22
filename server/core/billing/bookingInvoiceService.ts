@@ -252,7 +252,8 @@ export async function getBookingInvoiceStatus(bookingId: number): Promise<{
       status: invoice.status,
       amountDue: invoice.amount_due,
     };
-  } catch {
+  } catch (err) {
+    logger.warn('[BookingInvoice] Failed to retrieve invoice status', { error: err instanceof Error ? err.message : err });
     return null;
   }
 }
@@ -833,7 +834,8 @@ export async function isBookingInvoicePaid(bookingId: number): Promise<{ locked:
       return { locked: true, invoiceId, reason: 'Invoice has been paid' };
     }
     return { locked: false };
-  } catch {
+  } catch (err) {
+    logger.warn('[BookingInvoice] Failed to check if booking invoice is paid', { error: err instanceof Error ? err.message : err });
     return { locked: false };
   }
 }
