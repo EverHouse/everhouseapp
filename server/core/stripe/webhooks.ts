@@ -2958,6 +2958,30 @@ async function handleSubscriptionCreated(client: PoolClient, subscription: Strip
       logger.info(`[Stripe Webhook] Updated existing user ${email}: subscription=${subscription.id}, customerId=${customerId}, status=${mappedStatus} (stripe: ${subscription.status}), shouldActivate=${shouldActivate}`);
     }
 
+    try {
+      const subDiscounts = subscription.discounts?.filter((d): d is Stripe.Discount => typeof d !== 'string');
+      let subCoupon = subDiscounts?.[0]?.coupon;
+      if (!subCoupon) {
+        for (const item of (subscription.items?.data || [])) {
+          const itemDiscounts = (item as any).discounts?.filter((d: any): d is Stripe.Discount => typeof d === 'object' && d !== null && 'coupon' in d);
+          if (itemDiscounts?.[0]?.coupon) {
+            subCoupon = itemDiscounts[0].coupon;
+            break;
+          }
+        }
+      }
+      if (subCoupon) {
+        const couponName = typeof subCoupon === 'string' ? subCoupon : (subCoupon.name || subCoupon.id);
+        await client.query(
+          'UPDATE users SET discount_code = $1, updated_at = NOW() WHERE LOWER(email) = LOWER($2)',
+          [couponName, email]
+        );
+        logger.info(`[Stripe Webhook] Set discount_code="${couponName}" for new subscription user ${email}`);
+      }
+    } catch (discountErr: unknown) {
+      logger.warn('[Stripe Webhook] Failed to set discount_code from subscription coupon', { extra: { error: getErrorMessage(discountErr) } });
+    }
+
     const memberName = `${first_name || ''} ${last_name || ''}`.trim() || email;
 
     const deferredNotifyEmail = email;
@@ -3764,6 +3788,32 @@ async function handleSubscriptionUpdated(client: PoolClient, subscription: Strip
           logger.error('[Stripe Webhook] HubSpot sync failed for status suspended:', { error: hubspotError });
         }
       });
+    }
+
+    try {
+      const updatedDiscounts = subscription.discounts?.filter((d): d is Stripe.Discount => typeof d !== 'string');
+      let currentCoupon = updatedDiscounts?.[0]?.coupon;
+      if (!currentCoupon) {
+        for (const item of (subscription.items?.data || [])) {
+          const itemDiscounts = (item as any).discounts?.filter((d: any): d is Stripe.Discount => typeof d === 'object' && d !== null && 'coupon' in d);
+          if (itemDiscounts?.[0]?.coupon) {
+            currentCoupon = itemDiscounts[0].coupon;
+            break;
+          }
+        }
+      }
+      const newDiscountCode = currentCoupon
+        ? (typeof currentCoupon === 'string' ? currentCoupon : (currentCoupon.name || currentCoupon.id))
+        : null;
+      await client.query(
+        'UPDATE users SET discount_code = $1, updated_at = NOW() WHERE id = $2',
+        [newDiscountCode, userId]
+      );
+      if (newDiscountCode) {
+        logger.info(`[Stripe Webhook] Synced discount_code="${newDiscountCode}" for ${email}`);
+      }
+    } catch (discountErr: unknown) {
+      logger.warn('[Stripe Webhook] Failed to sync discount_code from subscription', { extra: { error: getErrorMessage(discountErr) } });
     }
 
     broadcastBillingUpdate({

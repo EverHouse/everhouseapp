@@ -687,6 +687,16 @@ router.post('/api/member-billing/:email/discount', isStaffOrAdmin, async (req, r
       coupon: appliedCouponId,
     } as any);
 
+    try {
+      const coupon = await stripe.coupons.retrieve(appliedCouponId);
+      const couponName = coupon.name || appliedCouponId;
+      await db.execute(
+        sql`UPDATE users SET discount_code = ${couponName}, updated_at = NOW() WHERE LOWER(email) = ${email}`
+      );
+    } catch (couponErr: unknown) {
+      logger.warn('[MemberBilling] Failed to set discount_code from coupon', { extra: { couponId: appliedCouponId, error: getErrorMessage(couponErr) } });
+    }
+
     logger.info('[MemberBilling] Applied discount to subscription for', { extra: { appliedCouponId, subscriptionId: subscription.id, email } });
     res.json({
       success: true,

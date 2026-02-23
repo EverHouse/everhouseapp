@@ -619,6 +619,17 @@ export async function addGroupMember(params: {
           await db.execute(
             sql`UPDATE group_members SET stripe_subscription_item_id = ${subscriptionItem.id} WHERE id = ${insertedMemberId}`
           );
+
+          if (isFamilyGroup) {
+            try {
+              await db.execute(
+                sql`UPDATE users SET discount_code = 'FAMILY20', updated_at = NOW() WHERE LOWER(email) = ${params.memberEmail.toLowerCase()}`
+              );
+              logger.info(`[GroupBilling] Set discount_code=FAMILY20 for family member ${params.memberEmail}`);
+            } catch (dcErr: unknown) {
+              logger.warn(`[GroupBilling] Failed to set discount_code for family member: ${getErrorMessage(dcErr)}`);
+            }
+          }
         } catch (stripeErr: unknown) {
           logger.error('[GroupBilling] Stripe API failed, rolling back DB reservation:', { error: stripeErr });
           try {
