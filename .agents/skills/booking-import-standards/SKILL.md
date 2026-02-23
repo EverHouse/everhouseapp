@@ -296,7 +296,7 @@ Each simulator booking has at most one Stripe invoice, tracked by `booking_reque
 
 ### Rule 15c — Roster lock after paid invoice
 
-Once a booking's Stripe invoice is paid, roster edits are blocked by `enforceRosterLock()` in `rosterService.ts`. This prevents changes that would invalidate a paid invoice. Staff can override with `forceOverride: true` and a required `overrideReason` (logged via audit). The lock is fail-open: if the Stripe API check fails, edits proceed to avoid blocking staff.
+Once a booking's Stripe invoice is paid, roster edits are blocked by `enforceRosterLock()` in `rosterService.ts`. This prevents changes that would invalidate a paid invoice. Staff can override with `forceOverride: true` and a required `overrideReason` (logged via `logger.warn`, not the formal audit trail). The lock is fail-open: if the Stripe API check fails, edits proceed to avoid blocking staff.
 
 ---
 

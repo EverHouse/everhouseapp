@@ -137,11 +137,13 @@ The `isConferenceRoom` flag on `FeeComputeParams` (or derived from `resources.ty
 Calculated fees are cached at two levels to avoid redundant computation:
 
 1. **`booking_participants.cached_fee_cents`** — per-participant cached total fee. Set by `applyFeeBreakdownToParticipants()` or `calculateAndCacheParticipantFees()`. Cleared by `invalidateCachedFees()` or `clearCachedFees()` when roster changes occur.
-2. **`booking_requests.overage_fee_cents` and `overage_minutes`** — session-level totals synced by `recalculateSessionFees()` for legacy dashboard compatibility (Pay Now button). (Legacy — scheduled for removal when overage payment UI migrates to invoice flow)
+2. **`booking_requests.overage_fee_cents` and `overage_minutes`** — session-level totals for legacy dashboard compatibility (Pay Now button). These columns are NOT synced by `recalculateSessionFees()`; callers handle invoice sync separately via `syncBookingInvoice()`. (Legacy — scheduled for removal when overage payment UI migrates to invoice flow)
 
-When `feeCalculator.ts` resolves fees, it checks in order: cached → ledger → calculated. This means a participant whose fee was already cached will not trigger a recalculation unless the cache is explicitly cleared.
+When `feeCalculator.ts` resolves fees, it checks in order: cached → ledger → calculated. This means a participant whose fee was already cached will not trigger a recalculation unless the cache is explicitly cleared. In ledger-mode fallback, if no `usage_ledger` rows exist for a participant (ghost usage), the calculator falls back to computing a guest fee from tier data or `PRICING.GUEST_FEE_CENTS`.
 
-`recalculateSessionFees()` orchestrates the full recalculation pipeline: compute → apply to participants → sync to booking_requests.
+`recalculateSessionFees()` orchestrates a two-step recalculation pipeline: compute (via `computeFeeBreakdown`) → apply to participants (via `applyFeeBreakdownToParticipants`). It does NOT sync to `booking_requests` columns or update the Stripe invoice directly. Invoice sync is the caller's responsibility via `syncBookingInvoice()`.
+
+The `usedGuestPass` field on a booking participant record is an input to guest pass logic: when `used_guest_pass = TRUE`, `computeFeeBreakdown` treats that participant's guest fee as already waived and does not attempt to consume another guest pass.
 
 ## Key Invariants
 

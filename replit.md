@@ -33,7 +33,7 @@ The Ever Club Members App is a private members club application designed for gol
 
 ### Core Domain
 - **Booking & Scheduling**: "Request & Hold" model, unified participants, calendar sync, auto no-show scheduler.
-- **Fees & Billing**: Unified fee service, dynamic pricing, prepayment, guest fees, "one invoice per booking" architecture.
+- **Fees & Billing**: Unified fee service, dynamic pricing, prepayment, guest fees, "one invoice per booking" architecture. Dual payment path: staff approval creates a prepayment PaymentIntent for online payment, while Trackman auto-approve creates a draft Stripe invoice; `finalizeAndPayInvoice()` detects existing terminal payments to avoid double-charging. Conference rooms use a separate prepayment flow (`conference_prepayments`) and are excluded from the booking invoice system. Roster lock: after invoice is paid, roster edits are blocked unless staff provides force-override with reason (fail-open — Stripe API outage won't block edits). Invoice lifecycle: Draft → finalize → pay/void; drafts updated on roster changes, deleted when fees drop to $0.
 - **Database & Data Integrity**: PostgreSQL, Supabase Realtime, Drizzle ORM with CASCADE constraints on `wellness_enrollments.class_id` and `booking_participants.session_id`.
 - **Member Lifecycle & Check-In**: Membership tiers, QR/NFC check-in, onboarding.
 

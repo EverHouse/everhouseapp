@@ -130,7 +130,7 @@ Two cancellation paths:
 3. Update `booking_requests.status = 'cancelled'`.
 4. Release guest pass holds via `releaseGuestPassHold(bookingId)`.
 5. Cancel all pending Stripe payment intents linked to the booking (`status IN ('pending', 'requires_payment_method', 'requires_action', 'requires_confirmation')`).
-5a. Void any draft/open Stripe invoice via `voidBookingInvoice(bookingId)` (non-blocking).
+5a. Handle Stripe invoice cleanup via `voidBookingInvoice(bookingId)` (non-blocking). This handles all invoice states: draft (deletes), open (voids), paid (auto-refunds via `stripe.refunds.create`, notifies staff on failure), void/uncollectible (skips).
 6. Delete Google Calendar event via `deleteCalendarEvent(calendarEventId)`.
 7. Publish `booking_cancelled` event with `cleanupNotifications: true` (deletes related notifications).
 8. Broadcast availability update.
@@ -142,7 +142,7 @@ Two cancellation paths:
 3. Update status to `'cancelled'`, append `'[Cancelled via Trackman webhook]'` to staff notes.
 4. Clear pending fees: set `booking_participants.cached_fee_cents = 0`, `payment_status = 'waived'` for the session's pending participants.
 5. Cancel pending Stripe payment intents (same as member flow).
-5a. Void any draft/open Stripe invoice via `voidBookingInvoice(bookingId)` (non-blocking).
+5a. Handle Stripe invoice cleanup via `voidBookingInvoice(bookingId)` (non-blocking). This handles all invoice states: draft (deletes), open (voids), paid (auto-refunds via `stripe.refunds.create`, notifies staff on failure), void/uncollectible (skips).
 6. Refund already-paid participant fees: for each participant with `payment_status='paid'`, call `stripe.refunds.create()`, update participant and payment records to `'refunded'`.
 7. Refund guest passes via `refundGuestPassesForCancelledBooking()`.
 8. Notify staff and member. If `wasPendingCancellation`, send member a confirmation push notification.
@@ -277,7 +277,7 @@ See `references/trackman-sync.md` for reconciliation details.
 - `server/core/bookingService/conflictDetection.ts` — Booking conflict detection (owner and participant conflicts).
 - `server/core/bookingValidation.ts` — Centralized booking conflict detection (`checkBookingConflict`). Used by reschedule confirm and booking creation for consistent conflict validation with advisory locks.
 - `server/core/bookingService/availabilityGuard.ts` — Availability validation (closures, blocks, session overlaps).
-- `server/core/billing/bookingInvoiceService.ts` — Draft invoice creation, line item sync, finalization, voiding, paid-status check. Key exports: `createDraftInvoiceForBooking`, `syncBookingInvoice`, `finalizeAndPayInvoice`, `finalizeInvoicePaidOutOfBand`, `voidBookingInvoice`, `isBookingInvoicePaid`.
+- `server/core/billing/bookingInvoiceService.ts` — Draft invoice creation, line item sync, finalization, voiding, paid-status check. Key exports: `createDraftInvoiceForBooking`, `syncBookingInvoice`, `finalizeAndPayInvoice`, `finalizeInvoicePaidOutOfBand`, `voidBookingInvoice`, `isBookingInvoicePaid`. `finalizeAndPayInvoice()` includes terminal payment detection: before charging, it checks for existing terminal payments on the booking to avoid double-charging. It is also balance-aware: if the customer's Stripe balance fully covers the invoice amount, the invoice is finalized and auto-paid without requiring a card charge.
 - `server/core/bookingService/rosterService.ts` — Roster changes with `enforceRosterLock()` guard. Exports: `addParticipant`, `removeParticipant`, `updateDeclaredPlayerCount`, `applyRosterBatch`.
 
 **Related Skills:**
