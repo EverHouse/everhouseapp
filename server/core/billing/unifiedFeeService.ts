@@ -844,7 +844,7 @@ export async function applyFeeBreakdownToParticipants(
         await tx.execute(
           sql`UPDATE booking_participants bp
            SET cached_fee_cents = t.fee
-           FROM unnest(${idsToUpdate}::int[], ${feesToUpdate}::int[]) AS t(id, fee)
+           FROM unnest(${toIntArrayLiteral(idsToUpdate)}::int[], ${toIntArrayLiteral(feesToUpdate)}::int[]) AS t(id, fee)
            WHERE bp.id = t.id`
         );
       }
