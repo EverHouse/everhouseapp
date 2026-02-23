@@ -263,6 +263,7 @@ async function initializeApp() {
       "worker-src 'self'",
       "object-src 'none'",
       "base-uri 'self'",
+      "form-action 'self'",
       isProduction ? "upgrade-insecure-requests" : "",
     ].filter(Boolean).join('; '));
     if (isProduction) {
