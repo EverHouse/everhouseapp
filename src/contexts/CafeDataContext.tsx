@@ -84,6 +84,12 @@ export const CafeDataProvider: React.FC<{children: ReactNode}> = ({ children }) 
     return () => { window.removeEventListener('cafe-menu-update', handleCafeMenuUpdate); };
   }, [refreshCafeMenu]);
 
+  useEffect(() => {
+    const handleAppRefresh = () => { refreshCafeMenu(); };
+    window.addEventListener('app-refresh', handleAppRefresh);
+    return () => window.removeEventListener('app-refresh', handleAppRefresh);
+  }, [refreshCafeMenu]);
+
   const addCafeItem = useCallback(async (item: CafeItem) => {
     const tempId = `temp-${Date.now()}`;
     const optimisticItem = { ...item, id: tempId };

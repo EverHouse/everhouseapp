@@ -61,6 +61,12 @@ export const AnnouncementDataProvider: React.FC<{children: ReactNode}> = ({ chil
   }, [sessionChecked]);
 
   useEffect(() => {
+    const handleAppRefresh = () => { refreshAnnouncements(); };
+    window.addEventListener('app-refresh', handleAppRefresh);
+    return () => window.removeEventListener('app-refresh', handleAppRefresh);
+  }, [refreshAnnouncements]);
+
+  useEffect(() => {
     const handleAnnouncementUpdate = () => { refreshAnnouncements(); };
     window.addEventListener('announcement-update', handleAnnouncementUpdate);
     return () => { window.removeEventListener('announcement-update', handleAnnouncementUpdate); };

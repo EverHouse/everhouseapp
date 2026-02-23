@@ -498,6 +498,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { processNotifications } = useNotificationSounds(false, user?.email);
   const layoutQueryClient = useQueryClient();
   const handleLayoutRefresh = useCallback(async () => {
+    window.dispatchEvent(new Event('app-refresh'));
     await layoutQueryClient.invalidateQueries();
   }, [layoutQueryClient]);
   

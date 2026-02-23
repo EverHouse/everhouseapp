@@ -41,6 +41,7 @@ const AdminDashboard: React.FC = () => {
   const { unreadNotifCount } = useUnreadNotifications(actualUser?.email);
   const adminQueryClient = useQueryClient();
   const handleAdminRefresh = useCallback(async () => {
+    window.dispatchEvent(new Event('app-refresh'));
     await adminQueryClient.invalidateQueries();
   }, [adminQueryClient]);
 

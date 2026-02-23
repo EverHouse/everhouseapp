@@ -90,6 +90,26 @@ export const EventDataProvider: React.FC<{children: ReactNode}> = ({ children })
     fetchEvents();
   }, [sessionChecked]);
 
+  const refreshEvents = useCallback(async () => {
+    try {
+      const res = await fetch('/api/events');
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          setEvents(data.length ? formatEventData(data) : []);
+        }
+      }
+    } catch (err: unknown) {
+      console.error('Failed to refresh events:', err);
+    }
+  }, []);
+
+  useEffect(() => {
+    const handleAppRefresh = () => { refreshEvents(); };
+    window.addEventListener('app-refresh', handleAppRefresh);
+    return () => window.removeEventListener('app-refresh', handleAppRefresh);
+  }, [refreshEvents]);
+
   const addEvent = useCallback(async (item: Partial<EventData>) => {
     try {
       const res = await fetch('/api/events', {

@@ -180,6 +180,15 @@ const MemberUpdates: React.FC = () => {
   }, [fetchClosures]);
 
   useEffect(() => {
+    const handleAppRefresh = () => {
+      fetchNotifications();
+      fetchClosures();
+    };
+    window.addEventListener('app-refresh', handleAppRefresh);
+    return () => window.removeEventListener('app-refresh', handleAppRefresh);
+  }, [fetchNotifications, fetchClosures]);
+
+  useEffect(() => {
     if (tabParam === 'announcements') {
       setActiveTab('announcements');
     } else if (tabParam === 'notices' || tabParam === 'closures') {
