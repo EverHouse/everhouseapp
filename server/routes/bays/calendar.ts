@@ -8,6 +8,7 @@ import { getConferenceRoomId } from '../../core/affectedAreas';
 import { logAndRespond, logger } from '../../core/logger';
 import { getSessionUser } from '../../types/session';
 import { getTodayPacific } from '../../utils/dateUtils';
+import { toIntArrayLiteral } from '../../utils/sqlArrayLiteral';
 
 const router = Router();
 
@@ -155,6 +156,7 @@ router.get('/api/approved-bookings', isStaffOrAdmin, async (req, res) => {
     let filledSlotsMap = new Map<number, number>();
     let feeSnapshotPaidSet = new Set<number>();
     
+    const bookingIdsLiteral = toIntArrayLiteral(bookingIds);
     if (bookingIds.length > 0) {
       const paymentStatusResult = await db.execute(sql`
         SELECT 
@@ -174,14 +176,14 @@ router.get('/api/approved-bookings', isStaffOrAdmin, async (req, res) => {
           WHERE bp.session_id = br.session_id
             AND bp.payment_status = 'pending'
         ) pending_fees ON true
-        WHERE br.id = ANY(${bookingIds})
+        WHERE br.id = ANY(${bookingIdsLiteral}::int[])
       `);
       
       const feeSnapshotResult = await db.execute(sql`
         SELECT br.id as booking_id, bfs.created_at as snapshot_created_at
         FROM booking_requests br
         INNER JOIN booking_fee_snapshots bfs ON bfs.session_id = br.session_id AND bfs.status IN ('completed', 'paid')
-        WHERE br.id = ANY(${bookingIds})
+        WHERE br.id = ANY(${bookingIdsLiteral}::int[])
       `);
       feeSnapshotPaidSet = new Set<number>(feeSnapshotResult.rows.map((r: { booking_id: number }) => r.booking_id));
 
@@ -207,7 +209,7 @@ router.get('/api/approved-bookings', isStaffOrAdmin, async (req, res) => {
                  + (SELECT COUNT(*) FROM booking_participants bp2 WHERE bp2.session_id = br.session_id AND bp2.participant_type = 'guest')
           END as filled_count
         FROM booking_requests br
-        WHERE br.id = ANY(${bookingIds})
+        WHERE br.id = ANY(${bookingIdsLiteral}::int[])
       `);
       
       for (const row of filledSlotsResult.rows) {

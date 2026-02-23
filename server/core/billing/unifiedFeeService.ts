@@ -6,6 +6,7 @@ import { MemberService, isEmail, normalizeEmail, isUUID } from '../memberService
 import { FeeBreakdown, FeeComputeParams, FeeLineItem } from '../../../shared/models/billing';
 import { logger } from '../logger';
 import { PRICING } from './pricingConfig';
+import { toTextArrayLiteral } from '../../utils/sqlArrayLiteral';
 
 type SqlQueryParam = string | number | boolean | null | Date | string[];
 
@@ -314,8 +315,9 @@ export async function computeFeeBreakdown(params: FeeComputeParams): Promise<Fee
   const tierMap = new Map<string, string>();
   const roleMap = new Map<string, string>();
   if (emailList.length > 0) {
+    const emailArrayLiteral = toTextArrayLiteral(emailList.map(e => e.toLowerCase()));
     const tiersResult = await db.execute(
-      sql`SELECT LOWER(email) as email, tier, role, membership_status FROM users WHERE LOWER(email) = ANY(${emailList.map(e => e.toLowerCase())}::text[])`
+      sql`SELECT LOWER(email) as email, tier, role, membership_status FROM users WHERE LOWER(email) = ANY(${emailArrayLiteral}::text[])`
     );
     tiersResult.rows.forEach(r => {
       if (r.tier && ['active', 'trialing', 'past_due'].includes(r.membership_status)) {
@@ -364,6 +366,7 @@ export async function computeFeeBreakdown(params: FeeComputeParams): Promise<Fee
       const resourceTypeFilter = isConferenceRoom ? 'conference_room' : 'simulator';
       
       const emailsLower = emailList.map(e => e.toLowerCase());
+      const emailsLowerLiteral = toTextArrayLiteral(emailsLower);
       
       const timeFilterFrag = hasTimeFilter
         ? sql`AND (
@@ -382,7 +385,7 @@ export async function computeFeeBreakdown(params: FeeComputeParams): Promise<Fee
                  br.id as booking_id,
                  FLOOR(duration_minutes::float / GREATEST(1, COALESCE(declared_player_count, 1))) as minutes_share
           FROM booking_requests br
-          WHERE LOWER(user_email) = ANY(${emailsLower}::text[])
+          WHERE LOWER(user_email) = ANY(${emailsLowerLiteral}::text[])
             AND request_date = ${sessionDate}
             AND status IN ('pending', 'approved', 'attended')
             ${timeFilterFrag}
@@ -396,7 +399,7 @@ export async function computeFeeBreakdown(params: FeeComputeParams): Promise<Fee
           JOIN booking_sessions bs ON bp.session_id = bs.id
           JOIN booking_requests br ON br.session_id = bs.id
           JOIN users u ON bp.user_id = u.id
-          WHERE LOWER(u.email) = ANY(${emailsLower}::text[])
+          WHERE LOWER(u.email) = ANY(${emailsLowerLiteral}::text[])
             AND br.request_date = ${sessionDate}
             AND br.status IN ('pending', 'approved', 'attended')
             AND LOWER(u.email) != LOWER(br.user_email)
@@ -411,7 +414,7 @@ export async function computeFeeBreakdown(params: FeeComputeParams): Promise<Fee
           JOIN booking_sessions bs ON bp.session_id = bs.id
           JOIN booking_requests br ON br.session_id = bs.id
           JOIN users u ON bp.user_id = u.id
-          WHERE LOWER(u.email) = ANY(${emailsLower}::text[])
+          WHERE LOWER(u.email) = ANY(${emailsLowerLiteral}::text[])
             AND br.request_date = ${sessionDate}
             AND br.status IN ('pending', 'approved', 'attended')
             AND LOWER(u.email) != LOWER(br.user_email)
@@ -473,12 +476,13 @@ export async function computeFeeBreakdown(params: FeeComputeParams): Promise<Fee
                )`
         : sql``;
       
+      const identifiersLiteral = toTextArrayLiteral(allIdentifiers);
       const usageResult = await db.execute(sql`WITH ledger_usage AS (
              SELECT LOWER(ul.member_id) as identifier, COALESCE(SUM(ul.minutes_charged), 0) as mins
              FROM usage_ledger ul
              JOIN booking_sessions bs ON ul.session_id = bs.id
              JOIN resources r ON bs.resource_id = r.id
-             WHERE LOWER(ul.member_id) = ANY(${allIdentifiers}::text[])
+             WHERE LOWER(ul.member_id) = ANY(${identifiersLiteral}::text[])
                AND bs.session_date = ${sessionDate}
                AND r.type = ${resourceTypeFilter}
                ${excludeClauseLedgerFrag}
@@ -489,7 +493,7 @@ export async function computeFeeBreakdown(params: FeeComputeParams): Promise<Fee
              SELECT LOWER(br.user_email) as identifier, 
                     COALESCE(SUM(FLOOR(br.duration_minutes::float / GREATEST(1, COALESCE(br.declared_player_count, 1)))), 0) as mins
              FROM booking_requests br
-             WHERE LOWER(br.user_email) = ANY(${allIdentifiers}::text[])
+             WHERE LOWER(br.user_email) = ANY(${identifiersLiteral}::text[])
                AND br.request_date = ${sessionDate}
                AND br.status IN ('approved', 'confirmed', 'attended')
                ${excludeClauseGhostFrag}
