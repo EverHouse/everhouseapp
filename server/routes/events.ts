@@ -962,7 +962,6 @@ router.post('/api/rsvps', isAuthenticated, async (req, res) => {
     const staffMessage = `${memberName} RSVP'd for ${evt.title} on ${formattedDate}`;
     
     const result = await db.transaction(async (tx) => {
-      // Check capacity before inserting - prevents overbooking and handles race conditions
       if (evt.maxAttendees && evt.maxAttendees > 0) {
         const rsvpCountResult = await tx.select({ count: sql<number>`count(*)::int` })
           .from(eventRsvps)
@@ -993,15 +992,15 @@ router.post('/api/rsvps', isAuthenticated, async (req, res) => {
         relatedType: 'event'
       });
       
-      await notifyAllStaff(
-        'New Event RSVP',
-        staffMessage,
-        'event_rsvp',
-        { relatedId: event_id, relatedType: 'event', url: '/admin/calendar' }
-      );
-      
       return rsvpResult[0];
     });
+    
+    notifyAllStaff(
+      'New Event RSVP',
+      staffMessage,
+      'event_rsvp',
+      { relatedId: event_id, relatedType: 'event', url: '/admin/calendar' }
+    ).catch((err: unknown) => logger.warn('Failed to notify staff of event RSVP', { error: err instanceof Error ? err : new Error(getErrorMessage(err)) }));
     
     sendPushNotification(user_email, {
       title: 'RSVP Confirmed!',
@@ -1072,24 +1071,24 @@ router.delete('/api/rsvps/:event_id/:user_email', isAuthenticated, async (req, r
           eq(eventRsvps.eventId, parseInt(event_id)),
           eq(eventRsvps.userEmail, user_email)
         ));
-      
-      await notifyAllStaff(
-        'Event RSVP Cancelled',
-        staffMessage,
-        'event_rsvp_cancelled',
-        { relatedId: parseInt(event_id), relatedType: 'event', url: '/admin/calendar' }
-      );
-      
-      await notifyMember({
-        userEmail: user_email,
-        title: 'RSVP Cancelled',
-        message: `Your RSVP for "${evt.title}" on ${formattedDate} has been cancelled`,
-        type: 'event',
-        relatedId: parseInt(event_id),
-        relatedType: 'event',
-        url: '/member-events'
-      });
     });
+    
+    notifyAllStaff(
+      'Event RSVP Cancelled',
+      staffMessage,
+      'event_rsvp_cancelled',
+      { relatedId: parseInt(event_id), relatedType: 'event', url: '/admin/calendar' }
+    ).catch((err: unknown) => logger.warn('Failed to notify staff of RSVP cancellation', { error: err instanceof Error ? err : new Error(getErrorMessage(err)) }));
+    
+    notifyMember({
+      userEmail: user_email,
+      title: 'RSVP Cancelled',
+      message: `Your RSVP for "${evt.title}" on ${formattedDate} has been cancelled`,
+      type: 'event',
+      relatedId: parseInt(event_id),
+      relatedType: 'event',
+      url: '/member-events'
+    }).catch((err: unknown) => logger.warn('Failed to notify member of RSVP cancellation', { error: err instanceof Error ? err : new Error(getErrorMessage(err)) }));
     
     // Broadcast to staff for real-time updates
     broadcastToStaff({

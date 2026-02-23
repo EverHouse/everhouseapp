@@ -288,6 +288,9 @@ export async function executeMerge(
     guests: 0,
   };
   
+  let stripeCustomerToUpdateId: string | null = null;
+  let stripeOrphanedIdForMetadata: string | null = null;
+
   // Check for active sessions (cannot merge user who is currently playing)
   const activeSession = await db.execute(sql`
       SELECT bp.session_id, bs.session_date, bs.start_time
@@ -479,24 +482,8 @@ export async function executeMerge(
         });
       }
       
-      try {
-        const stripe = await getStripeClient();
-        const keptId = resolvedStripeCustomerId || primaryUser.stripeCustomerId;
-        if (keptId) {
-          await stripe.customers.update(keptId, {
-            metadata: {
-              mergedFromEmail: secondaryEmail,
-              mergedFromUserId: secondaryUserId,
-              mergedAt: new Date().toISOString(),
-              orphanedStripeCustomerId: orphanedStripeCustomerId || ''
-            }
-          });
-        }
-      } catch (stripeErr: unknown) {
-        logger.error('[UserMerge] Failed to update Stripe customer metadata after merge', {
-          extra: { error: stripeErr, primaryUserId, secondaryUserId }
-        });
-      }
+      stripeCustomerToUpdateId = resolvedStripeCustomerId || primaryUser.stripeCustomerId || null;
+      stripeOrphanedIdForMetadata = orphanedStripeCustomerId;
     }
     
     if (orphanedStripeCustomerId) {
@@ -552,6 +539,24 @@ export async function executeMerge(
          updated_at = NOW()
        WHERE id = ${secondaryUserId}`);
   });
+
+  if (stripeCustomerToUpdateId) {
+    try {
+      const stripe = await getStripeClient();
+      await stripe.customers.update(stripeCustomerToUpdateId, {
+        metadata: {
+          mergedFromEmail: secondaryEmail,
+          mergedFromUserId: secondaryUserId,
+          mergedAt: new Date().toISOString(),
+          orphanedStripeCustomerId: stripeOrphanedIdForMetadata || ''
+        }
+      });
+    } catch (stripeErr: unknown) {
+      logger.error('[UserMerge] Failed to update Stripe customer metadata after merge', {
+        extra: { error: stripeErr, primaryUserId, secondaryUserId }
+      });
+    }
+  }
     
   logger.info('[UserMerge] Successfully merged users', {
     extra: { primaryUserId, secondaryUserId, performedBy, recordsMerged }

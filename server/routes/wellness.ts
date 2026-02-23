@@ -974,15 +974,15 @@ router.post('/api/wellness-enrollments', isAuthenticated, async (req, res) => {
         relatedType: 'wellness_class'
       });
       
-      await notifyAllStaff(
-        isWaitlisted ? 'New Waitlist Entry' : 'New Wellness Enrollment',
-        staffMessage,
-        'wellness_enrollment',
-        { relatedId: class_id, relatedType: 'wellness_class', url: '/admin/calendar' }
-      );
-      
       return enrollmentResult[0];
     });
+    
+    notifyAllStaff(
+      isWaitlisted ? 'New Waitlist Entry' : 'New Wellness Enrollment',
+      staffMessage,
+      'wellness_enrollment',
+      { relatedId: class_id, relatedType: 'wellness_class', url: '/admin/calendar' }
+    ).catch(err => logger.warn('Failed to notify staff of wellness enrollment', { extra: { error: err } }));
     
     sendPushNotification(user_email, {
       title: isWaitlisted ? 'Added to Waitlist' : 'Class Booked!',
@@ -1076,14 +1076,14 @@ router.delete('/api/wellness-enrollments/:class_id/:user_email', isAuthenticated
           eq(wellnessEnrollments.classId, parseInt(class_id)),
           eq(wellnessEnrollments.userEmail, user_email)
         ));
-      
-      await notifyAllStaff(
-        'Wellness Enrollment Cancelled',
-        staffMessage,
-        'wellness_cancellation',
-        { relatedId: parseInt(class_id), relatedType: 'wellness_class', url: '/admin/calendar' }
-      );
     });
+    
+    notifyAllStaff(
+      'Wellness Enrollment Cancelled',
+      staffMessage,
+      'wellness_cancellation',
+      { relatedId: parseInt(class_id), relatedType: 'wellness_class', url: '/admin/calendar' }
+    ).catch(err => logger.warn('Failed to notify staff of wellness cancellation', { extra: { error: err } }));
     
     // Delete the original "Wellness Class Confirmed" notification to avoid confusion
     try {
