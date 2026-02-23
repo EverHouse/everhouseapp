@@ -132,6 +132,7 @@ export const facilityClosures = pgTable("facility_closures", {
   endDate: date("end_date").notNull(),
   endTime: time("end_time"),
   affectedAreas: varchar("affected_areas"),
+  visibility: varchar("visibility"),
   notifyMembers: boolean("notify_members").default(false),
   isActive: boolean("is_active").default(true),
   needsReview: boolean("needs_review").default(false),

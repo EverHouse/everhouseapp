@@ -563,7 +563,7 @@ router.get('/api/closures/needs-review', isStaffOrAdmin, async (req, res) => {
       if (!closure.affectedAreas || closure.affectedAreas === 'none') {
         missingFields.push('Affected areas');
       }
-      if (!(closure as Record<string, unknown>).visibility || ((closure as Record<string, unknown>).visibility as string).trim() === '') {
+      if (!closure.visibility || closure.visibility.trim() === '') {
         missingFields.push('Visibility');
       }
       return {
@@ -591,7 +591,8 @@ router.post('/api/closures', isStaffOrAdmin, async (req, res) => {
       start_time,
       end_date, 
       end_time,
-      affected_areas, 
+      affected_areas,
+      visibility,
       notify_members,
       created_by 
     } = req.body;
@@ -613,6 +614,7 @@ router.post('/api/closures', isStaffOrAdmin, async (req, res) => {
       endDate: end_date || start_date,
       endTime: end_time || null,
       affectedAreas: affected_areas,
+      visibility: visibility || null,
       notifyMembers: shouldNotifyMembers,
       isActive: true,
       createdBy: created_by
@@ -840,6 +842,7 @@ router.put('/api/closures/:id', isStaffOrAdmin, async (req, res) => {
       end_date, 
       end_time,
       affected_areas,
+      visibility,
       notify_members
     } = req.body;
     
@@ -876,6 +879,7 @@ router.put('/api/closures/:id', isStaffOrAdmin, async (req, res) => {
         endDate: end_date || existing.endDate,
         endTime: normalizedEndTime,
         affectedAreas: affected_areas || existing.affectedAreas,
+        visibility: visibility !== undefined ? visibility : existing.visibility,
         notifyMembers: shouldNotifyMembers,
         needsReview: false
       })

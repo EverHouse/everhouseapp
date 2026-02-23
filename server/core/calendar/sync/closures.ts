@@ -372,8 +372,8 @@ export async function syncInternalCalendarToClosures(): Promise<{ synced: number
         
         const result = await db.execute(
           sql`INSERT INTO facility_closures 
-           (title, notes, notice_type, start_date, start_time, end_date, end_time, affected_areas, is_active, created_by, internal_calendar_id, needs_review)
-           VALUES (${title}, ${calendarNotes || metadata.notes || null}, ${noticeType}, ${startDate}, ${startTime}, ${endDate}, ${endTime}, ${affectedAreas}, true, 'system', ${internalCalendarId}, ${needsReview})
+           (title, notes, notice_type, start_date, start_time, end_date, end_time, affected_areas, visibility, is_active, created_by, internal_calendar_id, needs_review)
+           VALUES (${title}, ${calendarNotes || metadata.notes || null}, ${noticeType}, ${startDate}, ${startTime}, ${endDate}, ${endTime}, ${affectedAreas}, ${visibility}, true, 'system', ${internalCalendarId}, ${needsReview})
            RETURNING id`
         );
         
