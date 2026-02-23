@@ -1,6 +1,6 @@
 [project]
 domains = []
-name = "everclub"
+name = "ever-club"
 
 [crawler]
 max_pages = 100
