@@ -239,7 +239,7 @@ router.get('/api/bookings/:id/staff-checkin-context', isStaffOrAdmin, async (req
             await db.execute(sql`
               INSERT INTO booking_participants (session_id, user_id, participant_type, display_name, payment_status, slot_duration)
               SELECT ${sessionId}, NULL, 'guest', name, 'pending', ${bookingDuration}
-              FROM unnest(${guestNames}::text[]) AS t(name)
+              FROM unnest(${toTextArrayLiteral(guestNames)}::text[]) AS t(name)
             `);
           }
           
@@ -761,7 +761,7 @@ router.patch('/api/bookings/:id/payments', isStaffOrAdmin, async (req: Request, 
               await db.execute(sql`
                 INSERT INTO booking_participants (session_id, user_id, participant_type, display_name, payment_status, slot_duration)
                 SELECT ${sessionId}, NULL, 'guest', name, 'pending', ${bookingDuration}
-                FROM unnest(${guestNames}::text[]) AS t(name)
+                FROM unnest(${toTextArrayLiteral(guestNames)}::text[]) AS t(name)
               `);
             }
 

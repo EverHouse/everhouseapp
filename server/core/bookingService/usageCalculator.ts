@@ -4,6 +4,7 @@ import { db } from '../../db';
 import { sql } from 'drizzle-orm';
 import { MemberService, isUUID, isEmail, normalizeEmail } from '../memberService';
 import { PRICING } from '../billing/pricingConfig';
+import { toTextArrayLiteral, toIntArrayLiteral, toNumericArrayLiteral } from '../../utils/sqlArrayLiteral';
 
 async function resolveToEmail(identifier: string | undefined): Promise<string> {
   if (!identifier) return '';
@@ -742,7 +743,7 @@ export async function recalculateSessionFees(
         await tx.execute(sql`
           INSERT INTO usage_ledger (session_id, member_id, minutes_charged, overage_fee, guest_fee, tier_at_booking, payment_method, source)
           SELECT ${sessionId}, member_id, minutes_charged, overage_fee, guest_fee, tier_at_booking, 'unpaid', 'recalculation'
-          FROM unnest(${memberIds}::text[], ${minutesCharged}::int[], ${overageFees}::numeric[], ${guestFees}::numeric[], ${tiersAtBooking}::text[])
+          FROM unnest(${toTextArrayLiteral(memberIds)}::text[], ${toIntArrayLiteral(minutesCharged)}::int[], ${toNumericArrayLiteral(overageFees)}::numeric[], ${toNumericArrayLiteral(guestFees)}::numeric[], ${toTextArrayLiteral(tiersAtBooking)}::text[])
           AS t(member_id, minutes_charged, overage_fee, guest_fee, tier_at_booking)
         `);
       }

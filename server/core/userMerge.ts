@@ -5,6 +5,7 @@ import { logger } from './logger';
 import { normalizeEmail } from './utils/emailNormalization';
 import { getStripeClient } from './stripe/client';
 import { getHubSpotClient } from './integrations';
+import { toTextArrayLiteral } from '../utils/sqlArrayLiteral';
 
 export interface MergePreview {
   primaryUser: {
@@ -645,7 +646,7 @@ export async function findPotentialDuplicates(userId: string): Promise<Array<{
        WHERE id != ${userId} 
          AND archived_at IS NULL
          AND phone = ${user.phone}
-         AND id NOT IN (SELECT unnest(${duplicates.map(d => d.id)}::text[]))
+         AND id NOT IN (SELECT unnest(${toTextArrayLiteral(duplicates.map(d => d.id))}::text[]))
        LIMIT 5`);
     
     for (const row of (phoneMatches.rows as Array<Record<string, unknown>>)) {
@@ -666,7 +667,7 @@ export async function findPotentialDuplicates(userId: string): Promise<Array<{
        WHERE id != ${userId} 
          AND archived_at IS NULL
          AND mindbody_client_id = ${user.mindbodyClientId}
-         AND id NOT IN (SELECT unnest(${duplicates.map(d => d.id)}::text[]))
+         AND id NOT IN (SELECT unnest(${toTextArrayLiteral(duplicates.map(d => d.id))}::text[]))
        LIMIT 5`);
     
     for (const row of (mbMatches.rows as Array<Record<string, unknown>>)) {
@@ -687,7 +688,7 @@ export async function findPotentialDuplicates(userId: string): Promise<Array<{
        WHERE id != ${userId} 
          AND archived_at IS NULL
          AND hubspot_id = ${user.hubspotId}
-         AND id NOT IN (SELECT unnest(${duplicates.map(d => d.id)}::text[]))
+         AND id NOT IN (SELECT unnest(${toTextArrayLiteral(duplicates.map(d => d.id))}::text[]))
        LIMIT 5`);
     
     for (const row of (hsMatches.rows as Array<Record<string, unknown>>)) {

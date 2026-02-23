@@ -5,3 +5,7 @@ export function toIntArrayLiteral(ids: number[]): string {
 export function toTextArrayLiteral(values: string[]): string {
   return '{' + values.map(v => '"' + String(v).replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"').join(',') + '}';
 }
+
+export function toNumericArrayLiteral(values: number[]): string {
+  return '{' + values.filter(v => Number.isFinite(v)).map(v => String(v)).join(',') + '}';
+}
