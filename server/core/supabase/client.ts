@@ -118,15 +118,36 @@ export async function enableRealtimeForTable(tableName: string): Promise<boolean
 
   try {
     const supabase = getSupabaseAdmin();
-    
-    const { error } = await supabase.rpc('supabase_realtime_add_table', {
-      table_name: tableName,
-    });
 
-    if (error) {
-      const msg = error.message || '';
+    const { error: tableCheckError } = await supabase.from(tableName).select('id').limit(0);
+    if (tableCheckError) {
+      const msg = tableCheckError.message || '';
+      if (msg.includes('fetch failed') || msg.includes('ENOTFOUND') || msg.includes('ECONNREFUSED') || msg.includes('TypeError')) {
+        logger.warn(`[Supabase] Cannot reach Supabase for ${tableName} realtime - service may be unreachable`);
+        supabaseAvailable = false;
+        return false;
+      }
+      logger.warn(`[Supabase] Table ${tableName} does not exist or is not accessible: ${msg}`);
+      return false;
+    }
+
+    const quotedTable = `"public"."${tableName.replace(/"/g, '')}"`;
+    const { error: pubError } = await supabase.rpc('exec_sql' as any, {
+      query: `ALTER PUBLICATION supabase_realtime ADD TABLE ${quotedTable}`
+    }).maybeSingle();
+
+    if (pubError) {
+      const msg = pubError.message || '';
+      if (msg.includes('already member') || msg.includes('already exists') || msg.includes('duplicate')) {
+        logger.info(`[Supabase] Table ${tableName} already in supabase_realtime publication`);
+        return true;
+      }
       if (msg.includes('function') && msg.includes('does not exist')) {
-        logger.warn(`[Supabase] Realtime RPC not available for ${tableName} - this is normal for some Supabase configurations`);
+        const { error: sqlError } = await supabase.from('_realtime').select('id').limit(0);
+        if (!sqlError || (sqlError.message || '').includes('does not exist')) {
+          logger.warn(`[Supabase] Cannot execute publication SQL for ${tableName} - exec_sql RPC not available, attempting direct approach`);
+        }
+        logger.warn(`[Supabase] Realtime publication management not available via RPC for ${tableName} - table exists but realtime needs manual configuration in Supabase dashboard`);
         return false;
       }
       if (msg.includes('fetch failed') || msg.includes('ENOTFOUND') || msg.includes('ECONNREFUSED') || msg.includes('TypeError')) {
@@ -134,8 +155,8 @@ export async function enableRealtimeForTable(tableName: string): Promise<boolean
         supabaseAvailable = false;
         return false;
       }
-      logger.error(`[Supabase] Failed to enable realtime for ${tableName}:`, { extra: { detail: msg } });
-      return false;
+      logger.warn(`[Supabase] Could not add ${tableName} to realtime publication: ${msg}`);
+      return true;
     }
 
     logger.info(`[Supabase] Realtime enabled for table: ${tableName}`);

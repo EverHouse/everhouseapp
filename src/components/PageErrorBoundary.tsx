@@ -10,7 +10,12 @@ interface State {
   hasError: boolean;
   error: Error | null;
   retryCount: number;
+  autoRetryCount: number;
+  countdown: number | null;
 }
+
+const MAX_AUTO_RETRIES = 2;
+const AUTO_RETRY_DELAYS = [3, 5];
 
 const RELOAD_COUNT_KEY = 'error_reload_count';
 const RELOAD_TIMESTAMP_KEY = 'error_reload_timestamp';
@@ -60,7 +65,10 @@ function isChunkLoadError(error: Error | null): boolean {
 }
 
 class PageErrorBoundary extends Component<Props, State> {
-  state: State = { hasError: false, error: null, retryCount: 0 };
+  state: State = { hasError: false, error: null, retryCount: 0, autoRetryCount: 0, countdown: null };
+
+  private retryTimerRef: ReturnType<typeof setTimeout> | null = null;
+  private countdownTimerRef: ReturnType<typeof setInterval> | null = null;
 
   static getDerivedStateFromError(error: Error): Partial<State> {
     return { hasError: true, error };
@@ -90,17 +98,70 @@ class PageErrorBoundary extends Component<Props, State> {
         console.log(`[PageErrorBoundary] Detected stale chunk error, auto-reload ${reloadCount + 1}/${MAX_AUTO_RELOADS}...`);
         incrementReloadCount();
         window.location.reload();
+        return;
       } else {
         console.log('[PageErrorBoundary] Max auto-reloads reached, showing error UI');
       }
     }
+
+    if (this.state.autoRetryCount < MAX_AUTO_RETRIES && !isChunkLoadError(error)) {
+      this.startAutoRetryCountdown();
+    }
+  }
+
+  componentWillUnmount() {
+    this.clearTimers();
+  }
+
+  private clearTimers() {
+    if (this.retryTimerRef) {
+      clearTimeout(this.retryTimerRef);
+      this.retryTimerRef = null;
+    }
+    if (this.countdownTimerRef) {
+      clearInterval(this.countdownTimerRef);
+      this.countdownTimerRef = null;
+    }
+  }
+
+  private startAutoRetryCountdown() {
+    this.clearTimers();
+
+    const delaySeconds = AUTO_RETRY_DELAYS[this.state.autoRetryCount] ?? 5;
+    console.log(`[PageErrorBoundary${this.props.pageName ? ` - ${this.props.pageName}` : ''}] Auto-retry ${this.state.autoRetryCount + 1}/${MAX_AUTO_RETRIES} in ${delaySeconds}s...`);
+
+    this.setState({ countdown: delaySeconds });
+
+    this.countdownTimerRef = setInterval(() => {
+      this.setState(prev => {
+        const next = (prev.countdown ?? 1) - 1;
+        if (next <= 0) {
+          return { countdown: null };
+        }
+        return { countdown: next };
+      });
+    }, 1000);
+
+    this.retryTimerRef = setTimeout(() => {
+      this.clearTimers();
+      this.setState(prev => ({
+        hasError: false,
+        error: null,
+        countdown: null,
+        autoRetryCount: prev.autoRetryCount + 1,
+        retryCount: prev.retryCount + 1
+      }));
+    }, delaySeconds * 1000);
   }
 
   handleRetry = () => {
+    this.clearTimers();
     this.setState(prev => ({
       hasError: false,
       error: null,
-      retryCount: prev.retryCount + 1
+      retryCount: prev.retryCount + 1,
+      autoRetryCount: 0,
+      countdown: null
     }));
   };
 
@@ -140,6 +201,34 @@ class PageErrorBoundary extends Component<Props, State> {
                               this.state.error?.message?.toLowerCase().includes('load failed');
       const reloadCount = getReloadCount();
       const hitReloadLimit = reloadCount >= MAX_AUTO_RELOADS;
+      const isAutoRetrying = this.state.countdown !== null && this.state.autoRetryCount < MAX_AUTO_RETRIES;
+
+      if (isAutoRetrying && !isChunkError) {
+        return (
+          <div className="flex items-center justify-center min-h-[50vh] p-6">
+            <div className="text-center max-w-sm">
+              <div className="w-14 h-14 mx-auto mb-4 rounded-full bg-amber-500/10 flex items-center justify-center">
+                <svg className="w-6 h-6 text-amber-400 animate-spin" viewBox="0 0 24 24" fill="none">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v3a5 5 0 00-5 5H4z" />
+                </svg>
+              </div>
+              <h2 className="text-lg font-semibold mb-2 text-primary dark:text-white">
+                {isNetworkError ? 'Reconnecting...' : 'Retrying...'}
+              </h2>
+              <p className="text-gray-600 dark:text-white/60 text-sm mb-4">
+                Retrying in {this.state.countdown}s... (attempt {this.state.autoRetryCount + 1}/{MAX_AUTO_RETRIES})
+              </p>
+              <button
+                onClick={this.handleRetry}
+                className="px-5 py-2.5 bg-gray-100 dark:bg-white/10 text-gray-700 dark:text-white/80 rounded-xl font-medium text-sm hover:bg-gray-200 dark:hover:bg-white/20 transition-colors"
+              >
+                Retry Now
+              </button>
+            </div>
+          </div>
+        );
+      }
 
       if (isChunkError && hitReloadLimit) {
         return (

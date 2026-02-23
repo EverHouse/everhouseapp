@@ -24,6 +24,8 @@ export function useSupabaseRealtime(options: UseSupabaseRealtimeOptions = {}) {
 
   const channelsRef = useRef<RealtimeChannel[]>([]);
   const isSubscribedRef = useRef(false);
+  const retryCountRef = useRef<Record<string, number>>({});
+  const retryTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   const handleNotification = useCallback((payload: Record<string, unknown>) => {
     window.dispatchEvent(new CustomEvent('member-notification', { detail: payload }));
@@ -140,6 +142,39 @@ export function useSupabaseRealtime(options: UseSupabaseRealtimeOptions = {}) {
         channel.subscribe((status) => {
           if (status === 'SUBSCRIBED') {
             console.log(`[Supabase Realtime] Subscribed to ${table}`);
+            retryCountRef.current[table] = 0;
+          } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+            const currentRetries = retryCountRef.current[table] || 0;
+            console.warn(`[Supabase Realtime] ${status} for ${table} (attempt ${currentRetries + 1}/3)`);
+            if (currentRetries < 3) {
+              retryCountRef.current[table] = currentRetries + 1;
+              if (retryTimersRef.current[table]) {
+                clearTimeout(retryTimersRef.current[table]);
+              }
+              retryTimersRef.current[table] = setTimeout(() => {
+                delete retryTimersRef.current[table];
+                try {
+                  supabase.removeChannel(channel);
+                } catch {}
+                const idx = channelsRef.current.indexOf(channel);
+                if (idx !== -1) {
+                  channelsRef.current.splice(idx, 1);
+                }
+                isSubscribedRef.current = false;
+                subscribeToTables();
+              }, 5000);
+            } else {
+              console.warn(`[Supabase Realtime] Max retries reached for ${table}, giving up`);
+            }
+          } else if (status === 'CLOSED') {
+            console.log(`[Supabase Realtime] Channel closed for ${table}`);
+            try {
+              supabase.removeChannel(channel);
+            } catch {}
+            const idx = channelsRef.current.indexOf(channel);
+            if (idx !== -1) {
+              channelsRef.current.splice(idx, 1);
+            }
           }
         });
 
@@ -153,6 +188,8 @@ export function useSupabaseRealtime(options: UseSupabaseRealtimeOptions = {}) {
     subscribeToTables();
 
     return () => {
+      Object.values(retryTimersRef.current).forEach(clearTimeout);
+      retryTimersRef.current = {};
       channelsRef.current.forEach((channel) => {
         supabase.removeChannel(channel);
       });

@@ -7,7 +7,7 @@ import { db } from '../db';
 import { formSubmissions, users } from '../../shared/schema';
 import { and, eq, isNotNull, sql } from 'drizzle-orm';
 import { notifyAllStaff } from '../core/notificationService';
-import { isStaffOrAdmin } from '../core/middleware';
+import { isStaffOrAdmin, isAdmin } from '../core/middleware';
 import { getSessionUser } from '../types/session';
 import { normalizeTierName, TIER_NAMES } from '../../shared/constants/tiers';
 import * as fs from 'fs';
@@ -1719,6 +1719,27 @@ router.post('/api/admin/hubspot/sync-form-submissions', isStaffOrAdmin, async (r
   } catch (error: unknown) {
     logger.error('[HubSpot FormSync] Manual sync error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to sync form submissions' });
+  }
+});
+
+router.get('/api/admin/hubspot/form-sync-status', isAdmin, async (_req: Request, res: Response) => {
+  try {
+    const { getFormSyncStatus } = await import('../core/hubspot/formSync');
+    res.json(getFormSyncStatus());
+  } catch (error: unknown) {
+    logger.error('[HubSpot FormSync] Status check error', { error: error instanceof Error ? error : new Error(String(error)) });
+    res.status(500).json({ error: 'Failed to get form sync status' });
+  }
+});
+
+router.post('/api/admin/hubspot/form-sync-reset', isAdmin, async (_req: Request, res: Response) => {
+  try {
+    const { resetFormSyncAccessDeniedFlag } = await import('../core/hubspot/formSync');
+    resetFormSyncAccessDeniedFlag();
+    res.json({ success: true });
+  } catch (error: unknown) {
+    logger.error('[HubSpot FormSync] Reset error', { error: error instanceof Error ? error : new Error(String(error)) });
+    res.status(500).json({ error: 'Failed to reset form sync flags' });
   }
 });
 

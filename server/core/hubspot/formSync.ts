@@ -27,6 +27,15 @@ export function resetFormSyncAccessDeniedFlag(): void {
   formSyncAuthFailureUntil = 0;
 }
 
+export function getFormSyncStatus(): { accessDenied: boolean; accessDeniedUntil: number | null; authFailure: boolean; authFailureUntil: number | null } {
+  return {
+    accessDenied: Date.now() < formSyncAccessDeniedUntil,
+    accessDeniedUntil: formSyncAccessDeniedUntil > 0 ? formSyncAccessDeniedUntil : null,
+    authFailure: Date.now() < formSyncAuthFailureUntil,
+    authFailureUntil: formSyncAuthFailureUntil > 0 ? formSyncAuthFailureUntil : null,
+  };
+}
+
 async function getFormSyncTokens(): Promise<Array<{ token: string; name: string }>> {
   const sources: Array<{ token: string; name: string }> = [];
   const privateAppToken = process.env.HUBSPOT_PRIVATE_APP_TOKEN;
@@ -187,9 +196,9 @@ export async function syncHubSpotFormSubmissions(): Promise<{
     }
 
     if (!accessToken) {
-      formSyncAccessDeniedUntil = Date.now() + 24 * 60 * 60 * 1000;
+      formSyncAccessDeniedUntil = Date.now() + 4 * 60 * 60 * 1000;
       if (!formSyncAccessDeniedLogged) {
-        logger.warn('[HubSpot FormSync] All token sources denied (401/403) for forms scope. Add "forms" scope to your HubSpot private app OR re-authorize the HubSpot connector with forms permission. Suppressing retries for 24 hours.');
+        logger.warn('[HubSpot FormSync] All token sources denied (401/403) for forms scope. Add "forms" scope to your HubSpot private app OR re-authorize the HubSpot connector with forms permission. Suppressing retries for 4 hours.');
         formSyncAccessDeniedLogged = true;
       }
       return result;
@@ -217,9 +226,9 @@ export async function syncHubSpotFormSubmissions(): Promise<{
       } catch (err: unknown) {
         const errMsg = getErrorMessage(err);
         if (errMsg.includes('HUBSPOT_FORMS_ACCESS_DENIED')) {
-          formSyncAccessDeniedUntil = Date.now() + 24 * 60 * 60 * 1000;
+          formSyncAccessDeniedUntil = Date.now() + 4 * 60 * 60 * 1000;
           if (!formSyncAccessDeniedLogged) {
-            logger.warn('[HubSpot FormSync] Access denied during sync. Token may have been revoked. Suppressing retries for 24 hours.');
+            logger.warn('[HubSpot FormSync] Access denied during sync. Token may have been revoked. Suppressing retries for 4 hours.');
             formSyncAccessDeniedLogged = true;
           }
           break;
