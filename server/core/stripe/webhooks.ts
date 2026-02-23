@@ -4474,6 +4474,11 @@ async function handleCustomerUpdated(client: PoolClient, customer: Stripe.Custom
     const currentEmail = user.email?.toLowerCase();
     const updates: string[] = [];
 
+    if (currentEmail && currentEmail.includes('.merged.')) {
+      logger.info(`[Stripe Webhook] customer.updated: skipping merged/archived user for Stripe customer ${stripeCustomerId} (email: ${currentEmail})`);
+      return deferredActions;
+    }
+
     if (currentEmail && stripeEmail !== currentEmail) {
       logger.warn(`[Stripe Webhook] customer.updated: email changed in Stripe for customer ${stripeCustomerId}: ${currentEmail} → ${stripeEmail}. NOT auto-syncing email (requires manual verification).`);
       

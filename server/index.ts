@@ -872,6 +872,21 @@ async function initializeApp() {
       }
     })();
 
+    (async () => {
+      try {
+        const cleanupResult = await db.execute(sql`
+          UPDATE users SET stripe_customer_id = NULL, stripe_subscription_id = NULL, updated_at = NOW()
+          WHERE email LIKE '%.merged.%' AND (stripe_customer_id IS NOT NULL OR stripe_subscription_id IS NOT NULL)
+          RETURNING email, stripe_customer_id
+        `);
+        if (cleanupResult.rows.length > 0) {
+          logger.info('[Startup] Cleared Stripe IDs from merged/archived users', { extra: { count: cleanupResult.rows.length, users: cleanupResult.rows.map((r: any) => r.email) } });
+        }
+      } catch (err) {
+        logger.warn('[Startup] Failed to cleanup merged user Stripe IDs:', { error: err as Error });
+      }
+    })();
+
     runStartupTasks()
       .then(() => {
         const startupHealth = getStartupHealth();

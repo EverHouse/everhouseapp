@@ -536,6 +536,9 @@ export async function executeMerge(
          archived_by = ${performedBy},
          membership_status = 'merged',
          email = ${archivedEmail},
+         stripe_customer_id = NULL,
+         stripe_subscription_id = NULL,
+         hubspot_id = NULL,
          tags = ${JSON.stringify(archiveTags)},
          updated_at = NOW()
        WHERE id = ${secondaryUserId}`);
