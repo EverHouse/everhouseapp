@@ -1583,14 +1583,19 @@ router.get('/api/admin/booking/:id/members', isStaffOrAdmin, async (req, res) =>
         expectedPlayerCount = Math.min(expectedPlayerCount, resourceCapacity as number);
       }
 
-      feeBreakdownResult = await computeFeeBreakdown({
-        sessionId: sessionId as number,
-        bookingId,
-        declaredPlayerCount: expectedPlayerCount,
-        source: 'preview',
-        isConferenceRoom: bookingData.resource_type === 'conference_room',
-        excludeSessionFromUsage: true
-      });
+      try {
+        feeBreakdownResult = await computeFeeBreakdown({
+          sessionId: sessionId as number,
+          bookingId,
+          declaredPlayerCount: expectedPlayerCount,
+          source: 'preview',
+          isConferenceRoom: bookingData.resource_type === 'conference_room',
+          excludeSessionFromUsage: true
+        });
+      } catch (feeErr) {
+        logger.warn('computeFeeBreakdown failed for booking members, using fallback', { extra: { bookingId, sessionId, error: feeErr instanceof Error ? feeErr.message : String(feeErr) } });
+        feeBreakdownResult = { totals: { totalCents: 0, overageCents: 0, guestCents: 0, guestPassesUsed: 0, guestPassesAvailable: 0 }, participants: [], metadata: { effectivePlayerCount: expectedPlayerCount, declaredPlayerCount: expectedPlayerCount, actualPlayerCount: 0, sessionDuration: durationMinutes as number, sessionDate: String(requestDate || ''), source: 'preview' } };
+      }
 
       const feeByParticipantId = new Map<number, typeof feeBreakdownResult.participants[0]>();
       for (const li of feeBreakdownResult.participants) {
@@ -2123,8 +2128,13 @@ router.get('/api/admin/booking/:id/members', isStaffOrAdmin, async (req, res) =>
       
       if (participantsResult.rows.length > 0) {
         const allParticipantIds = participantsResult.rows.map((p: DbRow) => p.participant_id);
-        // Use recalculateSessionFees to compute and persist participant fees
-        const breakdown = await recalculateSessionFees(sessionId as number, 'checkin');
+        let breakdown: Awaited<ReturnType<typeof recalculateSessionFees>>;
+        try {
+          breakdown = await recalculateSessionFees(sessionId as number, 'checkin');
+        } catch (feeErr) {
+          logger.warn('recalculateSessionFees failed, using cached fees', { extra: { sessionId, error: feeErr instanceof Error ? feeErr.message : String(feeErr) } });
+          breakdown = { totals: { totalCents: 0, overageCents: 0, guestCents: 0, guestPassesUsed: 0, guestPassesAvailable: 0 }, participants: [], metadata: { effectivePlayerCount: 1, declaredPlayerCount: 1, actualPlayerCount: 0, sessionDuration: 60, sessionDate: '', source: 'checkin' } };
+        }
         
         const feeMap = new Map<number, number>();
         const staffFlagMap = new Map<number, boolean>();

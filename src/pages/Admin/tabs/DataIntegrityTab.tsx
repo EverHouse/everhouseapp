@@ -2145,6 +2145,7 @@ const DataIntegrityTab: React.FC = () => {
         bayName={bookingSheet.bayName}
         bookingDate={bookingSheet.bookingDate}
         timeSlot={bookingSheet.timeSlot}
+        bookingId={bookingSheet.bookingId || undefined}
         matchedBookingId={bookingSheet.isUnmatched ? undefined : (bookingSheet.bookingId || undefined)}
         currentMemberName={bookingSheet.memberName}
         currentMemberEmail={bookingSheet.memberEmail}
