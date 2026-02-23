@@ -228,7 +228,13 @@ export async function refundGuestPassForParticipant(
         if ((priceResult.rows[0] as Record<string, unknown>)?.stripe_price_id) {
           const { getStripeClient } = await import('../stripe/client');
           const stripe = await getStripeClient();
-          const price = await stripe.prices.retrieve((priceResult.rows[0] as Record<string, unknown>).stripe_price_id as string);
+          // NOTE: Must stay in transaction - result needed for DB writes (guest fee amount for cached_fee_cents)
+          const price = await Promise.race([
+            stripe.prices.retrieve((priceResult.rows[0] as Record<string, unknown>).stripe_price_id as string),
+            new Promise<never>((_, reject) => 
+              setTimeout(() => reject(new Error('Stripe prices.retrieve timed out after 5s')), 5000)
+            )
+          ]) as Stripe.Price;
           if (price.unit_amount) {
             guestFeeCents = price.unit_amount;
           }

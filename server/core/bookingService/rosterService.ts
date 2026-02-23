@@ -842,7 +842,7 @@ export async function addParticipant(params: AddParticipantParams): Promise<AddP
 
   let newRosterVersion: number;
 
-  return await db.transaction(async (tx) => {
+  const txResult = await db.transaction(async (tx) => {
     const lockedBooking = await tx.execute(sql`
       SELECT roster_version FROM booking_requests WHERE id = ${bookingId} FOR UPDATE
     `);
@@ -1107,29 +1107,19 @@ export async function addParticipant(params: AddParticipantParams): Promise<AddP
       }
     }
 
+    let notificationData: { memberEmail: string; formattedDate: string; timeDisplay: string; ownerName: string; bookingId: number } | null = null;
+
     if (type === 'member' && memberInfo) {
-      try {
-        const formattedDate = booking.request_date || 'upcoming date';
-        const formattedTime = booking.start_time ? booking.start_time.substring(0, 5) : '';
-        const timeDisplay = formattedTime ? ` at ${formattedTime}` : '';
-
-        await notifyMember({
-          userEmail: memberInfo.email.toLowerCase(),
-          type: 'booking_update',
-          title: 'Added to a booking',
-          message: `${booking.owner_name || 'A member'} has added you to their simulator booking on ${formattedDate}${timeDisplay}`,
-          relatedId: bookingId
-        });
-
-        logger.info('[rosterService] Notification sent', {
-          extra: { bookingId, addedMember: memberInfo.email }
-        });
-      } catch (notifError: unknown) {
-        logger.warn('[rosterService] Failed to send notification (non-blocking)', {
-          error: notifError as Error,
-          extra: { bookingId, memberEmail: memberInfo.email }
-        });
-      }
+      const formattedDate = booking.request_date || 'upcoming date';
+      const formattedTime = booking.start_time ? booking.start_time.substring(0, 5) : '';
+      const timeDisplay = formattedTime ? ` at ${formattedTime}` : '';
+      notificationData = {
+        memberEmail: memberInfo.email.toLowerCase(),
+        formattedDate,
+        timeDisplay,
+        ownerName: booking.owner_name || 'A member',
+        bookingId
+      };
 
       if (matchingGuestId !== null) {
         const guestCheckResult = await tx.execute(sql`
@@ -1188,97 +1178,6 @@ export async function addParticipant(params: AddParticipantParams): Promise<AddP
       }
     });
 
-    if (!params.deferFeeRecalc) {
-      try {
-        const allParticipants = await getSessionParticipants(sessionId);
-        const participantIds = allParticipants.map(p => p.id);
-
-        await invalidateCachedFees(participantIds, 'participant_added');
-
-        const recalcResult = await recalculateSessionFees(sessionId, 'roster_update');
-        logger.info('[rosterService] Session fees recalculated after adding participant', {
-          extra: {
-            sessionId,
-            bookingId,
-            participantsUpdated: recalcResult.participantsUpdated,
-            totalFees: recalcResult.billingResult.totalFees,
-            ledgerUpdated: recalcResult.ledgerUpdated
-          }
-        });
-
-        syncBookingInvoice(bookingId, sessionId).catch(err => {
-          logger.warn('[rosterService] Non-blocking: draft invoice sync failed after roster change', { extra: { error: getErrorMessage(err), bookingId, sessionId } });
-        });
-
-        if (Number(recalcResult.billingResult.totalFees) > 0) {
-          try {
-            const ownerResult = await db.select({
-              id: users.id,
-              email: users.email,
-              firstName: users.firstName,
-              lastName: users.lastName
-            }).from(users)
-              .where(sql`LOWER(${users.email}) = LOWER(${booking.owner_email})`)
-              .limit(1);
-
-            const owner = ownerResult[0];
-            const ownerUserId = owner?.id || null;
-            const ownerName = owner ? `${owner.firstName || ''} ${owner.lastName || ''}`.trim() || booking.owner_email : booking.owner_email;
-
-            const feeResult = await db.execute(sql`
-              SELECT SUM(COALESCE(cached_fee_cents, 0)) as total_cents,
-                     SUM(CASE WHEN participant_type = 'owner' THEN COALESCE(cached_fee_cents, 0) ELSE 0 END) as overage_cents,
-                     SUM(CASE WHEN participant_type = 'guest' THEN COALESCE(cached_fee_cents, 0) ELSE 0 END) as guest_cents
-              FROM booking_participants
-              WHERE session_id = ${sessionId}
-            `);
-
-            const totalCents = parseInt((feeResult.rows[0] as Record<string, string>)?.total_cents || '0');
-            const overageCents = parseInt((feeResult.rows[0] as Record<string, string>)?.overage_cents || '0');
-            const guestCents = parseInt((feeResult.rows[0] as Record<string, string>)?.guest_cents || '0');
-
-            if (totalCents > 0) {
-              const prepayResult = await createPrepaymentIntent({
-                sessionId,
-                bookingId,
-                userId: ownerUserId,
-                userEmail: booking.owner_email,
-                userName: ownerName,
-                totalFeeCents: totalCents,
-                feeBreakdown: { overageCents, guestCents }
-              });
-
-              if (prepayResult?.paidInFull) {
-                await db.update(bookingParticipants)
-                  .set({ paymentStatus: 'paid' })
-                  .where(and(
-                    eq(bookingParticipants.sessionId, sessionId),
-                    eq(bookingParticipants.paymentStatus, 'pending')
-                  ));
-                logger.info('[rosterService] Prepayment fully covered by credit', {
-                  extra: { sessionId, bookingId, totalCents }
-                });
-              } else {
-                logger.info('[rosterService] Created prepayment intent after adding participant', {
-                  extra: { sessionId, bookingId, totalCents }
-                });
-              }
-            }
-          } catch (prepayError: unknown) {
-            logger.warn('[rosterService] Failed to create prepayment intent (non-blocking)', {
-              error: prepayError as Error,
-              extra: { sessionId, bookingId }
-            });
-          }
-        }
-      } catch (recalcError: unknown) {
-        logger.warn('[rosterService] Failed to recalculate session fees (non-blocking)', {
-          error: recalcError as Error,
-          extra: { sessionId, bookingId }
-        });
-      }
-    }
-
     await tx.update(bookingRequests)
       .set({ rosterVersion: sql`COALESCE(roster_version, 0) + 1` })
       .where(eq(bookingRequests.id, bookingId));
@@ -1289,9 +1188,130 @@ export async function addParticipant(params: AddParticipantParams): Promise<AddP
       participant: newParticipant,
       message: `${type === 'member' ? 'Member' : 'Guest'} added successfully`,
       ...(type === 'guest' && { guestPassesRemaining }),
-      newRosterVersion
+      newRosterVersion,
+      sessionId: sessionId!,
+      notificationData,
     };
   });
+
+  if (txResult.notificationData) {
+    const nd = txResult.notificationData;
+    notifyMember({
+      userEmail: nd.memberEmail,
+      type: 'booking_update',
+      title: 'Added to a booking',
+      message: `${nd.ownerName} has added you to their simulator booking on ${nd.formattedDate}${nd.timeDisplay}`,
+      relatedId: nd.bookingId
+    }).then(() => {
+      logger.info('[rosterService] Notification sent', {
+        extra: { bookingId, addedMember: nd.memberEmail }
+      });
+    }).catch((notifError: unknown) => {
+      logger.warn('[rosterService] Failed to send notification (non-blocking)', {
+        error: notifError as Error,
+        extra: { bookingId, memberEmail: nd.memberEmail }
+      });
+    });
+  }
+
+  if (!params.deferFeeRecalc) {
+    try {
+      const sessionId = txResult.sessionId;
+      const allParticipants = await getSessionParticipants(sessionId);
+      const participantIds = allParticipants.map(p => p.id);
+
+      await invalidateCachedFees(participantIds, 'participant_added');
+
+      const recalcResult = await recalculateSessionFees(sessionId, 'roster_update');
+      logger.info('[rosterService] Session fees recalculated after adding participant', {
+        extra: {
+          sessionId,
+          bookingId,
+          participantsUpdated: recalcResult.participantsUpdated,
+          totalFees: recalcResult.billingResult.totalFees,
+          ledgerUpdated: recalcResult.ledgerUpdated
+        }
+      });
+
+      syncBookingInvoice(bookingId, sessionId).catch(err => {
+        logger.warn('[rosterService] Non-blocking: draft invoice sync failed after roster change', { extra: { error: getErrorMessage(err), bookingId, sessionId } });
+      });
+
+      if (Number(recalcResult.billingResult.totalFees) > 0) {
+        try {
+          const ownerResult = await db.select({
+            id: users.id,
+            email: users.email,
+            firstName: users.firstName,
+            lastName: users.lastName
+          }).from(users)
+            .where(sql`LOWER(${users.email}) = LOWER(${booking.owner_email})`)
+            .limit(1);
+
+          const owner = ownerResult[0];
+          const ownerUserId = owner?.id || null;
+          const ownerName = owner ? `${owner.firstName || ''} ${owner.lastName || ''}`.trim() || booking.owner_email : booking.owner_email;
+
+          const feeResult = await db.execute(sql`
+            SELECT SUM(COALESCE(cached_fee_cents, 0)) as total_cents,
+                   SUM(CASE WHEN participant_type = 'owner' THEN COALESCE(cached_fee_cents, 0) ELSE 0 END) as overage_cents,
+                   SUM(CASE WHEN participant_type = 'guest' THEN COALESCE(cached_fee_cents, 0) ELSE 0 END) as guest_cents
+            FROM booking_participants
+            WHERE session_id = ${sessionId}
+          `);
+
+          const totalCents = parseInt((feeResult.rows[0] as Record<string, string>)?.total_cents || '0');
+          const overageCents = parseInt((feeResult.rows[0] as Record<string, string>)?.overage_cents || '0');
+          const guestCents = parseInt((feeResult.rows[0] as Record<string, string>)?.guest_cents || '0');
+
+          if (totalCents > 0) {
+            const prepayResult = await createPrepaymentIntent({
+              sessionId,
+              bookingId,
+              userId: ownerUserId,
+              userEmail: booking.owner_email,
+              userName: ownerName,
+              totalFeeCents: totalCents,
+              feeBreakdown: { overageCents, guestCents }
+            });
+
+            if (prepayResult?.paidInFull) {
+              await db.update(bookingParticipants)
+                .set({ paymentStatus: 'paid' })
+                .where(and(
+                  eq(bookingParticipants.sessionId, sessionId),
+                  eq(bookingParticipants.paymentStatus, 'pending')
+                ));
+              logger.info('[rosterService] Prepayment fully covered by credit', {
+                extra: { sessionId, bookingId, totalCents }
+              });
+            } else {
+              logger.info('[rosterService] Created prepayment intent after adding participant', {
+                extra: { sessionId, bookingId, totalCents }
+              });
+            }
+          }
+        } catch (prepayError: unknown) {
+          logger.warn('[rosterService] Failed to create prepayment intent (non-blocking)', {
+            error: prepayError as Error,
+            extra: { sessionId, bookingId }
+          });
+        }
+      }
+    } catch (recalcError: unknown) {
+      logger.warn('[rosterService] Failed to recalculate session fees (non-blocking)', {
+        error: recalcError as Error,
+        extra: { sessionId: txResult.sessionId, bookingId }
+      });
+    }
+  }
+
+  return {
+    participant: txResult.participant,
+    message: txResult.message,
+    ...(txResult.guestPassesRemaining !== undefined && { guestPassesRemaining: txResult.guestPassesRemaining }),
+    newRosterVersion: txResult.newRosterVersion
+  };
 }
 
 // ─── removeParticipant ─────────────────────────────────────────
@@ -1349,7 +1369,7 @@ export async function removeParticipant(params: RemoveParticipantParams): Promis
 
   let newRosterVersion: number;
 
-  return await db.transaction(async (tx) => {
+  const txResult = await db.transaction(async (tx) => {
     const lockedBooking = await tx.execute(sql`
       SELECT roster_version FROM booking_requests WHERE id = ${bookingId} FOR UPDATE
     `);
@@ -1409,35 +1429,6 @@ export async function removeParticipant(params: RemoveParticipantParams): Promis
       }
     });
 
-    if (!params.deferFeeRecalc) {
-      try {
-        const remainingParticipants = await getSessionParticipants(booking.session_id!);
-        const participantIds = remainingParticipants.map(p => p.id);
-
-        await invalidateCachedFees(participantIds, 'participant_removed');
-
-        const recalcResult = await recalculateSessionFees(booking.session_id!, 'roster_update');
-        logger.info('[rosterService] Session fees recalculated after removing participant', {
-          extra: {
-            sessionId: booking.session_id,
-            bookingId,
-            participantsUpdated: recalcResult.participantsUpdated,
-            totalFees: recalcResult.billingResult.totalFees,
-            ledgerUpdated: recalcResult.ledgerUpdated
-          }
-        });
-
-        syncBookingInvoice(bookingId, booking.session_id!).catch(err => {
-          logger.warn('[rosterService] Non-blocking: draft invoice sync failed after roster change', { extra: { error: getErrorMessage(err), bookingId, sessionId: booking.session_id } });
-        });
-      } catch (recalcError: unknown) {
-        logger.warn('[rosterService] Failed to recalculate session fees (non-blocking)', {
-          error: recalcError as Error,
-          extra: { sessionId: booking.session_id, bookingId }
-        });
-      }
-    }
-
     await tx.update(bookingRequests)
       .set({ rosterVersion: sql`COALESCE(roster_version, 0) + 1` })
       .where(eq(bookingRequests.id, bookingId));
@@ -1445,11 +1436,47 @@ export async function removeParticipant(params: RemoveParticipantParams): Promis
     newRosterVersion = currentVersion + 1;
 
     return {
-      message: 'Participant removed successfully',
-      ...(participant.participantType === 'guest' && guestPassesRemaining !== undefined && { guestPassesRemaining }),
+      sessionId: booking.session_id,
+      deferFeeRecalc: !!params.deferFeeRecalc,
+      guestPassesRemaining,
       newRosterVersion
     };
   });
+
+  if (!txResult.deferFeeRecalc && txResult.sessionId) {
+    try {
+      const remainingParticipants = await getSessionParticipants(txResult.sessionId);
+      const participantIds = remainingParticipants.map(p => p.id);
+
+      await invalidateCachedFees(participantIds, 'participant_removed');
+
+      const recalcResult = await recalculateSessionFees(txResult.sessionId, 'roster_update');
+      logger.info('[rosterService] Session fees recalculated after removing participant', {
+        extra: {
+          sessionId: txResult.sessionId,
+          bookingId,
+          participantsUpdated: recalcResult.participantsUpdated,
+          totalFees: recalcResult.billingResult.totalFees,
+          ledgerUpdated: recalcResult.ledgerUpdated
+        }
+      });
+
+      syncBookingInvoice(bookingId, txResult.sessionId).catch(err => {
+        logger.warn('[rosterService] Non-blocking: draft invoice sync failed after roster change', { extra: { error: getErrorMessage(err), bookingId, sessionId: txResult.sessionId } });
+      });
+    } catch (recalcError: unknown) {
+      logger.warn('[rosterService] Failed to recalculate session fees (non-blocking)', {
+        error: recalcError as Error,
+        extra: { sessionId: txResult.sessionId, bookingId }
+      });
+    }
+  }
+
+  return {
+    message: 'Participant removed successfully',
+    ...(participant.participantType === 'guest' && txResult.guestPassesRemaining !== undefined && { guestPassesRemaining: txResult.guestPassesRemaining }),
+    newRosterVersion: txResult.newRosterVersion
+  };
 }
 
 // ─── updateDeclaredPlayerCount ─────────────────────────────────
@@ -1464,8 +1491,7 @@ export async function updateDeclaredPlayerCount(params: UpdatePlayerCountParams)
     logger.warn('[rosterService] Roster lock check failed (non-blocking)', { extra: { bookingId, error: getErrorMessage(lockErr) } });
   }
 
-  return await db.transaction(async (tx) => {
-    // Step 1: SELECT booking info (inside transaction for consistency)
+  const txResult = await db.transaction(async (tx) => {
     const bookingResult = await tx.execute(sql`
       SELECT br.id, br.declared_player_count, br.session_id, br.user_email, br.status
       FROM booking_requests br
@@ -1479,7 +1505,6 @@ export async function updateDeclaredPlayerCount(params: UpdatePlayerCountParams)
     const booking = bookingResult.rows[0] as Record<string, unknown>;
     const previousCount = (booking.declared_player_count as number) || 1;
 
-    // Step 2: UPDATE declared_player_count
     await tx.update(bookingRequests)
       .set({ declaredPlayerCount: playerCount })
       .where(eq(bookingRequests.id, bookingId));
@@ -1490,35 +1515,36 @@ export async function updateDeclaredPlayerCount(params: UpdatePlayerCountParams)
       });
     }
 
-    // Step 5 (OUTSIDE transaction): Recalculate fees - non-critical, fire-and-forget
-    if (!params.deferFeeRecalc) {
-      if (booking.session_id) {
-        try {
-          await recalculateSessionFees(booking.session_id as number, 'roster_update');
-
-          syncBookingInvoice(bookingId, booking.session_id as number).catch(err => {
-            logger.warn('[rosterService] Non-blocking: draft invoice sync failed after roster change', { extra: { error: getErrorMessage(err), bookingId, sessionId: booking.session_id } });
-          });
-        } catch (feeError: unknown) {
-          logger.error('[rosterService] Failed to recalculate session fees after player count update', {
-            error: feeError as Error,
-            extra: { bookingId, sessionId: booking.session_id }
-          });
-          // Don't throw - this is non-critical
-        }
-      }
-    }
-
     logger.info('[rosterService] Player count updated', {
       extra: { bookingId, previousCount, newCount: playerCount, staffEmail }
     });
 
     return {
       previousCount,
-      newCount: playerCount,
-      feesRecalculated: !!booking.session_id
+      sessionId: booking.session_id as number | null,
     };
   });
+
+  if (!params.deferFeeRecalc && txResult.sessionId) {
+    try {
+      await recalculateSessionFees(txResult.sessionId, 'roster_update');
+
+      syncBookingInvoice(bookingId, txResult.sessionId).catch(err => {
+        logger.warn('[rosterService] Non-blocking: draft invoice sync failed after roster change', { extra: { error: getErrorMessage(err), bookingId, sessionId: txResult.sessionId } });
+      });
+    } catch (feeError: unknown) {
+      logger.error('[rosterService] Failed to recalculate session fees after player count update', {
+        error: feeError as Error,
+        extra: { bookingId, sessionId: txResult.sessionId }
+      });
+    }
+  }
+
+  return {
+    previousCount: txResult.previousCount,
+    newCount: playerCount,
+    feesRecalculated: !!txResult.sessionId
+  };
 }
 
 // ─── Batch Roster Update ──────────────────────────────────────
