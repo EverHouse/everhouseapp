@@ -67,6 +67,18 @@ function sanitize(obj: Record<string, any> | undefined): Record<string, any> | u
 }
 
 export const logger = {
+  debug(message: string, context?: LogContext) {
+    const log = {
+      level: 'DEBUG',
+      timestamp: formatTimestamp(),
+      message,
+      ...context,
+      params: sanitize(context?.params),
+      query: sanitize(context?.query),
+    };
+    console.log(JSON.stringify(log));
+  },
+
   info(message: string, context?: LogContext) {
     const log = {
       level: 'INFO',
