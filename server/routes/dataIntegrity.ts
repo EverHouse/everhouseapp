@@ -1156,17 +1156,17 @@ router.post('/api/data-integrity/fix/complete-booking', isAdmin, async (req: Req
 
     const result = await db.execute(sql`
       UPDATE booking_requests 
-      SET status = 'completed', updated_at = NOW() 
-      WHERE id = ${recordId} AND status IN ('approved', 'attended', 'confirmed')
+      SET status = 'attended', updated_at = NOW() 
+      WHERE id = ${recordId} AND status IN ('pending', 'approved', 'confirmed')
     `);
 
     if (result.rowCount === 0) {
-      return res.status(404).json({ success: false, message: 'Booking not found or not in an active status' });
+      return res.status(404).json({ success: false, message: 'Booking not found or not in pending/approved/confirmed status' });
     }
 
-    logFromRequest(req, 'complete_booking', 'booking_request', String(recordId), `Marked booking #${recordId} as completed via data integrity`, { bookingId: recordId });
+    logFromRequest(req, 'complete_booking', 'booking_request', String(recordId), `Marked booking #${recordId} as attended via data integrity`, { bookingId: recordId });
 
-    res.json({ success: true, message: `Booking #${recordId} marked as completed` });
+    res.json({ success: true, message: `Booking #${recordId} marked as attended` });
   } catch (error: unknown) {
     logger.error('[DataIntegrity] Complete booking error', { extra: { error: getErrorMessage(error) } });
     res.status(500).json({ success: false, message: getErrorMessage(error) });

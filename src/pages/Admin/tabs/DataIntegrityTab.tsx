@@ -2152,6 +2152,37 @@ const DataIntegrityTab: React.FC = () => {
         importedName={bookingSheet.importedName}
         notes={bookingSheet.notes}
         originalEmail={bookingSheet.originalEmail}
+        onCancelBooking={(bookingId) => {
+          cancelBookingMutation.mutate(bookingId, {
+            onSuccess: () => {
+              setBookingSheet({ isOpen: false, bookingId: null });
+              runIntegrityMutation.mutate();
+            }
+          });
+        }}
+        onCheckIn={async (bookingId, targetStatus) => {
+          const statusToSet = targetStatus || 'attended';
+          try {
+            const res = await fetch(`/api/bookings/${bookingId}/checkin`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify({
+                status: statusToSet === 'no_show' ? 'no_show' : 'attended',
+                skipPaymentCheck: true,
+                skipRosterCheck: true
+              })
+            });
+            if (!res.ok) {
+              const data = await res.json().catch(() => ({}));
+              throw new Error(data.error || 'Failed to update booking status');
+            }
+            setBookingSheet({ isOpen: false, bookingId: null });
+            runIntegrityMutation.mutate();
+          } catch (error) {
+            console.error('Check-in failed:', error);
+          }
+        }}
         onSuccess={() => {
           setBookingSheet({ isOpen: false, bookingId: null });
           runIntegrityMutation.mutate();

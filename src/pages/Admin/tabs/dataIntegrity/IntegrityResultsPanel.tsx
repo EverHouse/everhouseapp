@@ -947,8 +947,8 @@ const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
                               key={idx}
                               className={`p-3 rounded-lg border ${getSeverityColor(issue.severity)} ${issue.ignored ? 'opacity-50' : ''}`}
                             >
-                              <div className="flex items-start justify-between gap-2">
-                                <div className="flex-1 min-w-0">
+                              <div className="space-y-2">
+                                <div>
                                   <div className="flex items-center gap-2 mb-1 flex-wrap">
                                     <span aria-hidden="true" className="material-symbols-outlined text-[16px]">
                                       {getSeverityIcon(issue.severity)}
@@ -988,7 +988,7 @@ const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
                                   )}
                                 </div>
                                 
-                                <div className="flex items-center gap-1 shrink-0">
+                                <div className="flex items-center gap-1 flex-wrap pt-1 border-t border-black/5 dark:border-white/5">
                                   {issue.context?.syncType && !issue.ignored && (
                                     <>
                                       <button
@@ -1054,6 +1054,23 @@ const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
                                           <span className="material-symbols-outlined text-[16px]">calendar_month</span>
                                         </button>
                                       )}
+                                      {!issue.context?.trackmanBookingId && (
+                                        <button
+                                          onClick={() => setBookingSheet({
+                                            isOpen: true,
+                                            bookingId: issue.recordId as number,
+                                            bayName: issue.context?.resourceName,
+                                            bookingDate: issue.context?.bookingDate,
+                                            timeSlot: issue.context?.startTime,
+                                            memberName: issue.context?.memberName,
+                                            memberEmail: issue.context?.memberEmail,
+                                          })}
+                                          className="p-1.5 text-blue-600 hover:bg-blue-100 dark:text-blue-400 dark:hover:bg-blue-900/30 rounded transition-colors"
+                                          title="Open booking details"
+                                        >
+                                          <span className="material-symbols-outlined text-[16px]">open_in_new</span>
+                                        </button>
+                                      )}
                                       <button
                                         onClick={() => handleCancelBooking(issue.recordId as number)}
                                         disabled={cancellingBookings.has(issue.recordId as number)}
@@ -1068,13 +1085,13 @@ const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
                                       </button>
                                       <button
                                         onClick={() => {
-                                          if (confirm(`Mark booking #${issue.recordId} as completed? This will resolve the "no session" alert.`)) {
+                                          if (confirm(`Mark booking #${issue.recordId} as attended? This will resolve the stale booking alert.`)) {
                                             fixIssueMutation.mutate({ endpoint: '/api/data-integrity/fix/complete-booking', body: { recordId: issue.recordId } });
                                           }
                                         }}
                                         disabled={fixIssueMutation.isPending}
                                         className="p-1.5 text-green-600 hover:bg-green-100 dark:text-green-400 dark:hover:bg-green-900/30 rounded transition-colors disabled:opacity-50"
-                                        title="Mark as completed"
+                                        title="Mark as attended"
                                       >
                                         {fixIssueMutation.isPending ? (
                                           <span className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>
