@@ -23,11 +23,11 @@ async function autoCompletePastBookings(): Promise<void> {
 
     const markedBookings = await queryWithRetry<AutoCompletedBookingResult>(
       `UPDATE booking_requests 
-       SET status = 'no_show',
-           staff_notes = COALESCE(staff_notes || E'\n', '') || '[Auto no-show: booking time passed without check-in]',
+       SET status = 'attended',
+           staff_notes = COALESCE(staff_notes || E'\n', '') || '[Auto checked-in: booking time passed]',
            updated_at = NOW(),
            reviewed_at = NOW(),
-           reviewed_by = 'system-auto-complete'
+           reviewed_by = 'system-auto-checkin'
        WHERE status IN ('approved', 'confirmed')
          AND status NOT IN ('attended', 'checked_in')
          AND is_relocating IS NOT TRUE
@@ -56,12 +56,12 @@ async function autoCompletePastBookings(): Promise<void> {
 
     for (const booking of markedBookings.rows) {
       logger.info(
-        `[Booking Auto-Complete] Marked no-show request #${booking.id}: ` +
+        `[Booking Auto-Complete] Auto checked-in request #${booking.id}: ` +
         `${booking.userName || booking.userEmail} for ${booking.requestDate} ${booking.startTime}`
       );
     }
 
-    logger.info(`[Booking Auto-Complete] Marked ${markedCount} past booking(s) as no-show`);
+    logger.info(`[Booking Auto-Complete] Auto checked-in ${markedCount} past booking(s)`);
     schedulerTracker.recordRun('Booking Auto-Complete', true);
 
     if (markedCount >= 2) {
@@ -73,8 +73,8 @@ async function autoCompletePastBookings(): Promise<void> {
       const moreText = markedCount > 5 ? `\n...and ${markedCount - 5} more` : '';
 
       await notifyAllStaff(
-        'Bookings Marked No-Show',
-        `${markedCount} approved/confirmed booking(s) were marked as no-show because their scheduled time passed without check-in:\n\n${summary}${moreText}`,
+        'Bookings Auto Checked-In',
+        `${markedCount} approved/confirmed booking(s) were auto checked-in because their scheduled time passed:\n\n${summary}${moreText}`,
         'system',
         { sendPush: false }
       );
@@ -125,11 +125,11 @@ export async function runManualBookingAutoComplete(): Promise<{ markedCount: num
 
   const result = await queryWithRetry(
     `UPDATE booking_requests 
-     SET status = 'no_show',
-         staff_notes = COALESCE(staff_notes || E'\n', '') || '[Auto no-show: booking time passed without check-in]',
+     SET status = 'attended',
+         staff_notes = COALESCE(staff_notes || E'\n', '') || '[Auto checked-in: booking time passed]',
          updated_at = NOW(),
          reviewed_at = NOW(),
-         reviewed_by = 'system-auto-complete'
+         reviewed_by = 'system-auto-checkin'
      WHERE status IN ('approved', 'confirmed')
        AND status NOT IN ('attended', 'checked_in')
        AND is_relocating IS NOT TRUE
@@ -149,7 +149,7 @@ export async function runManualBookingAutoComplete(): Promise<{ markedCount: num
   );
 
   const markedCount = result.rows.length;
-  logger.info(`[Booking Auto-Complete] Manual run marked ${markedCount} booking(s) as no-show`);
+  logger.info(`[Booking Auto-Complete] Manual run auto checked-in ${markedCount} booking(s)`);
 
   return { markedCount };
 }

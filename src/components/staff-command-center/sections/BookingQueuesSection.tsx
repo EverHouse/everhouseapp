@@ -300,7 +300,7 @@ interface BookingQueuesSectionProps {
   onOpenTrackman: (booking?: BookingRequest) => void;
   onApprove: (request: BookingRequest) => void;
   onDeny: (request: BookingRequest) => void;
-  onCheckIn: (booking: BookingRequest) => void;
+  onCheckIn: (booking: BookingRequest, targetStatus?: 'attended' | 'no_show') => void;
   onPaymentClick?: (bookingId: number) => void;
   onRosterClick?: (bookingId: number) => void;
   onAssignMember?: (booking: BookingRequest) => void;
@@ -331,6 +331,7 @@ export const BookingQueuesSection: React.FC<BookingQueuesSectionProps> = ({
     if (tabToPath[tab]) navigate(tabToPath[tab]);
   }, [navigate]);
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
+  const [statusMenuBookingId, setStatusMenuBookingId] = useState<number | null>(null);
 
   const { execute: executeApprove } = useAsyncAction(
     async (request: BookingRequest) => {
@@ -355,10 +356,10 @@ export const BookingQueuesSection: React.FC<BookingQueuesSectionProps> = ({
   );
 
   const { execute: executeCheckIn } = useAsyncAction(
-    async (booking: BookingRequest) => {
+    async (booking: BookingRequest, targetStatus?: 'attended' | 'no_show') => {
       setLoadingAction(`checkin-${booking.id}`);
       try {
-        await onCheckIn(booking);
+        await onCheckIn(booking, targetStatus);
       } finally {
         setLoadingAction(null);
       }
@@ -474,12 +475,121 @@ export const BookingQueuesSection: React.FC<BookingQueuesSectionProps> = ({
       );
     }
 
-    if (booking.status === 'attended') {
+    if (booking.status === 'attended' && !(booking.has_unpaid_fees && (booking.total_owed ?? 0) > 0)) {
+      const bookingIdNum = typeof booking.id === 'string' ? parseInt(String(booking.id).replace('cal_', '')) : booking.id;
+      const isMenuOpen = statusMenuBookingId === bookingIdNum;
+      
       return (
-        <span className="text-xs px-2 py-1 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 rounded-lg font-medium flex items-center gap-1">
-          <span className="material-symbols-outlined text-sm">check_circle</span>
-          Checked In
-        </span>
+        <div className="relative">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setStatusMenuBookingId(isMenuOpen ? null : bookingIdNum);
+            }}
+            className="text-xs px-2 py-1 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 rounded-lg font-medium flex items-center gap-1 hover:ring-2 hover:ring-emerald-300 dark:hover:ring-emerald-600 transition-all cursor-pointer"
+          >
+            <span className="material-symbols-outlined text-sm">check_circle</span>
+            Checked In
+            <span className="material-symbols-outlined text-xs ml-0.5">expand_more</span>
+          </button>
+          {isMenuOpen && (
+            <>
+              <div
+                className="fixed inset-0 z-40"
+                onClick={(e) => { e.stopPropagation(); setStatusMenuBookingId(null); }}
+              />
+              <div className="absolute right-0 top-full mt-1 z-50 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-primary/10 dark:border-white/20 py-1 min-w-[140px] animate-pop-in">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setStatusMenuBookingId(null);
+                    executeCheckIn(booking, 'attended');
+                  }}
+                  className="w-full px-3 py-2 text-left text-xs flex items-center gap-2 hover:bg-primary/5 dark:hover:bg-white/5 transition-colors font-bold"
+                >
+                  <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-green-500/20 text-green-700 dark:text-green-400">
+                    <span className="material-symbols-outlined text-xs">check_circle</span>
+                  </span>
+                  Checked In
+                  <span className="material-symbols-outlined text-sm ml-auto text-green-600">check</span>
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setStatusMenuBookingId(null);
+                    executeCheckIn(booking, 'no_show');
+                  }}
+                  className="w-full px-3 py-2 text-left text-xs flex items-center gap-2 hover:bg-primary/5 dark:hover:bg-white/5 transition-colors"
+                >
+                  <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-red-500/20 text-red-700 dark:text-red-400">
+                    <span className="material-symbols-outlined text-xs">person_off</span>
+                  </span>
+                  No Show
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      );
+    }
+
+    if (booking.status === 'no_show') {
+      const bookingIdNum = typeof booking.id === 'string' ? parseInt(String(booking.id).replace('cal_', '')) : booking.id;
+      const isMenuOpen = statusMenuBookingId === bookingIdNum;
+      
+      return (
+        <div className="relative">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setStatusMenuBookingId(isMenuOpen ? null : bookingIdNum);
+            }}
+            className="text-xs px-2 py-1 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded-lg font-medium flex items-center gap-1 hover:ring-2 hover:ring-red-300 dark:hover:ring-red-600 transition-all cursor-pointer"
+          >
+            <span className="material-symbols-outlined text-sm">person_off</span>
+            No Show
+            <span className="material-symbols-outlined text-xs ml-0.5">expand_more</span>
+          </button>
+          {isMenuOpen && (
+            <>
+              <div
+                className="fixed inset-0 z-40"
+                onClick={(e) => { e.stopPropagation(); setStatusMenuBookingId(null); }}
+              />
+              <div className="absolute right-0 top-full mt-1 z-50 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-primary/10 dark:border-white/20 py-1 min-w-[140px] animate-pop-in">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setStatusMenuBookingId(null);
+                    executeCheckIn(booking, 'attended');
+                  }}
+                  className="w-full px-3 py-2 text-left text-xs flex items-center gap-2 hover:bg-primary/5 dark:hover:bg-white/5 transition-colors"
+                >
+                  <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-green-500/20 text-green-700 dark:text-green-400">
+                    <span className="material-symbols-outlined text-xs">check_circle</span>
+                  </span>
+                  Checked In
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setStatusMenuBookingId(null);
+                    executeCheckIn(booking, 'no_show');
+                  }}
+                  className="w-full px-3 py-2 text-left text-xs flex items-center gap-2 hover:bg-primary/5 dark:hover:bg-white/5 transition-colors font-bold"
+                >
+                  <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-red-500/20 text-red-700 dark:text-red-400">
+                    <span className="material-symbols-outlined text-xs">person_off</span>
+                  </span>
+                  No Show
+                  <span className="material-symbols-outlined text-sm ml-auto text-red-600">check</span>
+                </button>
+              </div>
+            </>
+          )}
+        </div>
       );
     }
     
@@ -528,30 +638,72 @@ export const BookingQueuesSection: React.FC<BookingQueuesSectionProps> = ({
       );
     }
     
+    const bookingIdNum = typeof booking.id === 'string' ? parseInt(String(booking.id).replace('cal_', '')) : booking.id;
+    const isMenuOpen = statusMenuBookingId === bookingIdNum;
+
     return (
-      <button
-        type="button"
-        onClick={(e) => { 
-          e.stopPropagation(); 
-          e.preventDefault();
-          executeCheckIn(booking); 
-        }}
-        onTouchEnd={(e) => e.stopPropagation()}
-        disabled={isCheckingIn}
-        className="tactile-btn text-xs px-2 py-1 bg-glass-surface-primary dark:bg-glass-surface-primary-dark text-glass-surface-primary-text dark:text-accent rounded-lg hover:bg-glass-surface-primary/80 dark:hover:bg-glass-surface-primary-dark/80 transition-colors disabled:opacity-50 flex items-center gap-1"
-      >
-        {isCheckingIn ? (
+      <div className="relative">
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            setStatusMenuBookingId(isMenuOpen ? null : bookingIdNum);
+          }}
+          onTouchEnd={(e) => e.stopPropagation()}
+          disabled={isCheckingIn}
+          className="tactile-btn text-xs px-2 py-1 bg-glass-surface-primary dark:bg-glass-surface-primary-dark text-glass-surface-primary-text dark:text-accent rounded-lg hover:bg-glass-surface-primary/80 dark:hover:bg-glass-surface-primary-dark/80 transition-colors disabled:opacity-50 flex items-center gap-1"
+        >
+          {isCheckingIn ? (
+            <>
+              <span className="material-symbols-outlined text-sm animate-spin">progress_activity</span>
+              Updating...
+            </>
+          ) : (
+            <>
+              <span className="material-symbols-outlined text-sm">login</span>
+              Check In
+              <span className="material-symbols-outlined text-xs ml-0.5">expand_more</span>
+            </>
+          )}
+        </button>
+        {isMenuOpen && (
           <>
-            <span className="material-symbols-outlined text-sm animate-spin">progress_activity</span>
-            Checking...
-          </>
-        ) : (
-          <>
-            <span className="material-symbols-outlined text-sm">login</span>
-            Check In
+            <div
+              className="fixed inset-0 z-40"
+              onClick={(e) => { e.stopPropagation(); setStatusMenuBookingId(null); }}
+            />
+            <div className="absolute right-0 top-full mt-1 z-50 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-primary/10 dark:border-white/20 py-1 min-w-[140px] animate-pop-in">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setStatusMenuBookingId(null);
+                  executeCheckIn(booking, 'attended');
+                }}
+                className="w-full px-3 py-2 text-left text-xs flex items-center gap-2 hover:bg-primary/5 dark:hover:bg-white/5 transition-colors"
+              >
+                <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-green-500/20 text-green-700 dark:text-green-400">
+                  <span className="material-symbols-outlined text-xs">check_circle</span>
+                </span>
+                Checked In
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setStatusMenuBookingId(null);
+                  executeCheckIn(booking, 'no_show');
+                }}
+                className="w-full px-3 py-2 text-left text-xs flex items-center gap-2 hover:bg-primary/5 dark:hover:bg-white/5 transition-colors"
+              >
+                <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-red-500/20 text-red-700 dark:text-red-400">
+                  <span className="material-symbols-outlined text-xs">person_off</span>
+                </span>
+                No Show
+              </button>
+            </div>
           </>
         )}
-      </button>
+      </div>
     );
   };
 

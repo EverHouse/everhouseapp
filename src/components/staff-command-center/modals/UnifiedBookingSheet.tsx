@@ -43,7 +43,7 @@ export interface UnifiedBookingSheetProps {
   onCollectPayment?: (bookingId: number) => void;
   onReschedule?: (booking: { id: number; requestDate: string; startTime: string; endTime: string; resourceId: number; resourceName?: string; userName?: string; userEmail?: string }) => void;
   onCancelBooking?: (bookingId: number) => void;
-  onCheckIn?: (bookingId: number) => void;
+  onCheckIn?: (bookingId: number, targetStatus?: 'attended' | 'no_show') => void;
   bookingStatus?: string;
   ownerMembershipStatus?: string | null;
 }

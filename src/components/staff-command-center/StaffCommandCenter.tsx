@@ -427,12 +427,12 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
     }
   };
 
-  const handleCheckIn = async (booking: BookingRequest) => {
+  const handleCheckIn = async (booking: BookingRequest, targetStatus?: 'attended' | 'no_show') => {
     const id = typeof booking.id === 'string' ? parseInt(String(booking.id).replace('cal_', '')) : booking.id;
     setActionInProgress(`checkin-${id}`);
     
     const originalStatus = booking.status;
-    const optimisticStatus = 'attended';
+    const optimisticStatus = targetStatus || 'attended';
     
     optimisticUpdateRef.current = {
       bookingId: booking.id,
@@ -456,15 +456,15 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
     
     const newActivity: RecentActivity = {
       id: `checkin-${id}-${Date.now()}`,
-      type: 'booking_checked_in' as any,
+      type: (targetStatus === 'no_show' ? 'booking_no_show' : 'booking_checked_in') as any,
       timestamp: new Date().toISOString(),
       primary_text: booking.user_name || 'Member',
       secondary_text: booking.bay_name || 'Bay',
-      icon: 'how_to_reg'
+      icon: targetStatus === 'no_show' ? 'person_off' : 'how_to_reg'
     };
     updateRecentActivity(prev => [newActivity, ...prev]);
     
-    const result = await checkInWithToast(id);
+    const result = await checkInWithToast(id, { status: targetStatus || 'attended' });
     
     if (result.success) {
       optimisticUpdateRef.current = null;
