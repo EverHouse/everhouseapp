@@ -17,6 +17,7 @@ import { useConfirmDialog } from '../../components/ConfirmDialog';
 import { TabTransition } from '../../components/motion';
 import WalkingGolferSpinner from '../../components/WalkingGolferSpinner';
 import PullToRefresh from '../../components/PullToRefresh';
+import CheckInConfirmationModal from '../../components/staff-command-center/modals/CheckInConfirmationModal';
 
 import { TabType, StaffBottomNav, StaffSidebar, usePendingCounts, useUnreadNotifications, getTabFromPathname, tabToPath } from './layout';
 
@@ -44,6 +45,34 @@ const AdminDashboard: React.FC = () => {
     window.dispatchEvent(new Event('app-refresh'));
     await adminQueryClient.invalidateQueries();
   }, [adminQueryClient]);
+
+  const [checkinConfirmation, setCheckinConfirmation] = useState<{
+    isOpen: boolean;
+    memberName: string;
+    pinnedNotes: Array<{ content: string; createdBy: string }>;
+    tier?: string | null;
+    membershipStatus?: string | null;
+  }>({ isOpen: false, memberName: '', pinnedNotes: [] });
+
+  useEffect(() => {
+    const handleWalkinCheckin = (event: CustomEvent) => {
+      const detail = event.detail?.data;
+      if (detail) {
+        setCheckinConfirmation({
+          isOpen: true,
+          memberName: detail.memberName || 'Member',
+          pinnedNotes: detail.pinnedNotes || [],
+          tier: detail.tier,
+          membershipStatus: detail.membershipStatus
+        });
+      }
+    };
+
+    window.addEventListener('walkin-checkin', handleWalkinCheckin as EventListener);
+    return () => {
+      window.removeEventListener('walkin-checkin', handleWalkinCheckin as EventListener);
+    };
+  }, []);
 
   const handleGlobalBookingEvent = useCallback(() => {
     console.log('[AdminDashboard] Received global booking event, refreshing counts');
@@ -198,6 +227,15 @@ const AdminDashboard: React.FC = () => {
       <BackToTop threshold={200} />
 
       <MenuOverlay isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} />
+
+      <CheckInConfirmationModal
+        isOpen={checkinConfirmation.isOpen}
+        onClose={() => setCheckinConfirmation(prev => ({ ...prev, isOpen: false }))}
+        memberName={checkinConfirmation.memberName}
+        pinnedNotes={checkinConfirmation.pinnedNotes}
+        tier={checkinConfirmation.tier}
+        membershipStatus={checkinConfirmation.membershipStatus}
+      />
     </div>
   );
 };

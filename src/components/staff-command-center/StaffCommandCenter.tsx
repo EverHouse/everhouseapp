@@ -27,7 +27,6 @@ import { AlertsCard } from './sections/AlertsCard';
 import { QuickActionsGrid } from './sections/QuickActionsGrid';
 import { CheckinBillingModal } from './modals/CheckinBillingModal';
 import QrScannerModal from './modals/QrScannerModal';
-import CheckInConfirmationModal from './modals/CheckInConfirmationModal';
 import { TrackmanBookingModal } from './modals/TrackmanBookingModal';
 import { UnifiedBookingSheet } from './modals/UnifiedBookingSheet';
 import { StaffManualBookingModal } from './modals/StaffManualBookingModal';
@@ -73,13 +72,6 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
   const [eventDrawerOpen, setEventDrawerOpen] = useState(false);
   const [wellnessDrawerOpen, setWellnessDrawerOpen] = useState(false);
   const [trackmanModal, setTrackmanModal] = useState<{ isOpen: boolean; booking: BookingRequest | null }>({ isOpen: false, booking: null });
-  const [checkinConfirmation, setCheckinConfirmation] = useState<{
-    isOpen: boolean;
-    memberName: string;
-    pinnedNotes: Array<{ content: string; createdBy: string }>;
-    tier?: string | null;
-    membershipStatus?: string | null;
-  }>({ isOpen: false, memberName: '', pinnedNotes: [] });
   const [bookingSheet, setBookingSheet] = useState<{
     isOpen: boolean;
     trackmanBookingId: string | null;
@@ -115,25 +107,9 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
       refresh();
     };
 
-    const handleWalkinCheckin = (event: CustomEvent) => {
-      const detail = event.detail?.data;
-      if (detail) {
-        setCheckinConfirmation({
-          isOpen: true,
-          memberName: detail.memberName || 'Member',
-          pinnedNotes: detail.pinnedNotes || [],
-          tier: detail.tier,
-          membershipStatus: detail.membershipStatus
-        });
-        refresh();
-      }
-    };
-
     window.addEventListener('booking-auto-confirmed', handleBookingAutoConfirmed as EventListener);
-    window.addEventListener('walkin-checkin', handleWalkinCheckin as EventListener);
     return () => {
       window.removeEventListener('booking-auto-confirmed', handleBookingAutoConfirmed as EventListener);
-      window.removeEventListener('walkin-checkin', handleWalkinCheckin as EventListener);
     };
   }, [showToast, refresh]);
 
@@ -782,15 +758,6 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
         isOpen={qrScannerOpen}
         onClose={() => setQrScannerOpen(false)}
         onScanSuccess={handleScanSuccess}
-      />
-
-      <CheckInConfirmationModal
-        isOpen={checkinConfirmation.isOpen}
-        onClose={() => setCheckinConfirmation(prev => ({ ...prev, isOpen: false }))}
-        memberName={checkinConfirmation.memberName}
-        pinnedNotes={checkinConfirmation.pinnedNotes}
-        tier={checkinConfirmation.tier}
-        membershipStatus={checkinConfirmation.membershipStatus}
       />
 
       <TrackmanBookingModal
