@@ -47,7 +47,7 @@ interface SideEffectsManifest {
     memberWebSocket?: { email: string; title: string; message: string; bookingId: number };
   };
   availabilityBroadcast: { resourceId?: number; resourceType: string; date: string } | null;
-  bookingEvent: { bookingId: number; memberEmail: string; status: string; actionBy: string } | null;
+  bookingEvent: { bookingId: number; memberEmail: string; status: string; actionBy: string; bookingDate: string; startTime: string } | null;
 }
 
 interface BookingRecord {
@@ -158,7 +158,7 @@ export class BookingStateService {
         calendarDeletion: booking.calendarEventId ? { eventId: booking.calendarEventId, resourceId: booking.resourceId } : null,
         notifications: {},
         availabilityBroadcast: { resourceId: booking.resourceId || undefined, resourceType, date: booking.requestDate },
-        bookingEvent: { bookingId, memberEmail: booking.userEmail, status: 'cancelled', actionBy: memberCancelled ? 'member' : 'staff' },
+        bookingEvent: { bookingId, memberEmail: booking.userEmail, status: 'cancelled', actionBy: memberCancelled ? 'member' : 'staff', bookingDate: booking.requestDate, startTime: booking.startTime || '' },
       };
 
       const allSnapshots = await tx.execute(sql`
@@ -402,7 +402,7 @@ export class BookingStateService {
         calendarDeletion: existing.calendarEventId ? { eventId: existing.calendarEventId, resourceId: existing.resourceId } : null,
         notifications: {},
         availabilityBroadcast: { resourceId: existing.resourceId || undefined, resourceType, date: existing.requestDate },
-        bookingEvent: { bookingId, memberEmail: existing.userEmail, status: 'cancelled', actionBy: 'staff' },
+        bookingEvent: { bookingId, memberEmail: existing.userEmail, status: 'cancelled', actionBy: 'staff', bookingDate: existing.requestDate, startTime: existing.startTime || '' },
       };
 
       const pendingIntents = await tx.select({ stripePaymentIntentId: stripePaymentIntents.stripePaymentIntentId })
@@ -744,8 +744,8 @@ export class BookingStateService {
       bookingEvents.publish('booking_cancelled', {
         bookingId: manifest.bookingEvent.bookingId,
         memberEmail: manifest.bookingEvent.memberEmail,
-        bookingDate: '',
-        startTime: '',
+        bookingDate: manifest.bookingEvent.bookingDate,
+        startTime: manifest.bookingEvent.startTime,
         status: manifest.bookingEvent.status,
         actionBy: manifest.bookingEvent.actionBy as 'member' | 'staff',
       }, { notifyMember: false, notifyStaff: true, cleanupNotifications: false }).catch(err => logger.error('[BookingStateService] Booking event publish failed', { extra: { error: getErrorMessage(err) } }));

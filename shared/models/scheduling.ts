@@ -110,6 +110,8 @@ export const bookingRequests = pgTable("booking_requests", {
   // Link to facility closure when booking is marked as private event
   closureId: integer("closure_id"),
   cancellationPendingAt: timestamp("cancellation_pending_at"),
+  isRelocating: boolean("is_relocating").default(false),
+  relocatingStartedAt: timestamp("relocating_started_at"),
 }, (table) => [
   uniqueIndex("idx_booking_requests_trackman_booking_id").on(table.trackmanBookingId),
   uniqueIndex("booking_requests_trackman_external_id_idx").on(table.trackmanExternalId),

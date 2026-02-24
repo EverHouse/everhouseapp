@@ -229,10 +229,11 @@ export function getTomorrowPacific(): string {
  * Format a time string (HH:MM or HH:MM:SS) to 12-hour format (e.g., "1:00 PM")
  */
 export function formatTime12Hour(timeStr: string): string {
+  if (!timeStr || !timeStr.includes(':')) return timeStr || '';
   const [hours, minutes] = timeStr.split(':').map(Number);
   const ampm = hours >= 12 ? 'PM' : 'AM';
   const hour12 = hours % 12 || 12;
-  return `${hour12}:${minutes.toString().padStart(2, '0')} ${ampm}`;
+  return `${hour12}:${(minutes ?? 0).toString().padStart(2, '0')} ${ampm}`;
 }
 
 /**
