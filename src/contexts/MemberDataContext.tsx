@@ -270,9 +270,11 @@ export const MemberDataProvider: React.FC<{children: ReactNode}> = ({ children }
     };
     window.addEventListener('directory-update', handleDirectoryUpdate);
     window.addEventListener('member-data-updated', handleDirectoryUpdate);
+    window.addEventListener('app-refresh', handleDirectoryUpdate);
     return () => {
       window.removeEventListener('directory-update', handleDirectoryUpdate);
       window.removeEventListener('member-data-updated', handleDirectoryUpdate);
+      window.removeEventListener('app-refresh', handleDirectoryUpdate);
       if (directoryRefreshTimeoutRef.current) clearTimeout(directoryRefreshTimeoutRef.current);
     };
   }, [refreshMembers]);
