@@ -332,50 +332,6 @@ export function useBayAvailability(resourceId: number | null, date: string | nul
   });
 }
 
-export function useUpdateBookingStatus() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async ({ bookingId, status, source, skipPaymentCheck }: { 
-      bookingId: number | string; 
-      status: 'attended' | 'no_show' | 'cancelled'; 
-      source?: string;
-      skipPaymentCheck?: boolean;
-    }) => {
-      const response = await fetch(`/api/bookings/${bookingId}/checkin`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ status, source, skipPaymentCheck })
-      });
-      
-      if (response.status === 402) {
-        const errorData = await response.json();
-        throw { status: 402, ...errorData };
-      }
-      
-      if (response.status === 400) {
-        const errorData = await response.json();
-        throw { status: 400, ...errorData };
-      }
-      
-      if (!response.ok) {
-        const err = await response.json();
-        throw new Error(err.error || 'Failed to update status');
-      }
-      
-      return response.json();
-    },
-    onMutate: async () => {
-      await queryClient.cancelQueries({ queryKey: bookingsKeys.all });
-      await queryClient.cancelQueries({ queryKey: simulatorKeys.all });
-    },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: bookingsKeys.all });
-      queryClient.invalidateQueries({ queryKey: simulatorKeys.all });
-    },
-  });
-}
-
 export function useCancelBookingWithOptimistic() {
   const queryClient = useQueryClient();
   return useMutation({

@@ -171,7 +171,6 @@ const SimulatorTab: React.FC = () => {
     const [prefillStartTime, setPrefillStartTime] = useState<string | null>(null);
     
     const [scheduledFilter, setScheduledFilter] = useState<'all' | 'today' | 'tomorrow' | 'week'>('all');
-    const [markStatusModal, setMarkStatusModal] = useState<{ booking: BookingRequest | null; confirmNoShow: boolean }>({ booking: null, confirmNoShow: false });
     
     const [showDatePicker, setShowDatePicker] = useState(false);
     const [isSyncing, setIsSyncing] = useState(false);
@@ -317,7 +316,7 @@ const SimulatorTab: React.FC = () => {
     }, []);
 
     useEffect(() => {
-        if (actionModal || showTrackmanConfirm || markStatusModal.booking) {
+        if (actionModal || showTrackmanConfirm) {
             document.body.style.overflow = 'hidden';
         } else {
             document.body.style.overflow = '';
@@ -325,7 +324,7 @@ const SimulatorTab: React.FC = () => {
         return () => {
             document.body.style.overflow = '';
         };
-    }, [actionModal, showTrackmanConfirm, markStatusModal.booking]);
+    }, [actionModal, showTrackmanConfirm]);
 
     const handleRefresh = useCallback(() => {
         queryClient.invalidateQueries({ queryKey: bookingsKeys.all });
@@ -1318,87 +1317,6 @@ const SimulatorTab: React.FC = () => {
                 />
             )}
 
-            <ModalShell isOpen={!!markStatusModal.booking} onClose={() => setMarkStatusModal({ booking: null, confirmNoShow: false })} showCloseButton={false}>
-                <div className="p-6 space-y-4">
-                    <div className="text-center">
-                        <div className="w-12 h-12 rounded-full bg-accent/20 flex items-center justify-center mx-auto mb-3">
-                            <span aria-hidden="true" className="material-symbols-outlined text-primary dark:text-accent text-2xl">task_alt</span>
-                        </div>
-                        <h3 className="text-lg font-bold text-primary dark:text-white mb-2">
-                            {markStatusModal.confirmNoShow ? 'Confirm No Show' : 'Mark Booking Status'}
-                        </h3>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">
-                            {markStatusModal.confirmNoShow 
-                                ? 'Are you sure you want to mark this booking as a no show?' 
-                                : 'Did the member attend their booking?'}
-                        </p>
-                    </div>
-                    
-                    <div className="p-3 bg-gray-50 dark:bg-white/5 rounded-lg text-sm">
-                        <p className="font-medium text-primary dark:text-white">{markStatusModal.booking?.user_name || markStatusModal.booking?.user_email}</p>
-                        <p className="text-gray-500 dark:text-gray-400">
-                            {markStatusModal.booking && formatDateShortAdmin(markStatusModal.booking.request_date)} • {markStatusModal.booking && formatTime12Hour(markStatusModal.booking.start_time)} - {markStatusModal.booking && formatTime12Hour(markStatusModal.booking.end_time)}
-                        </p>
-                        {markStatusModal.booking?.bay_name && (
-                            <p className="text-gray-500 dark:text-gray-400">
-                                {markStatusModal.booking.bay_name}
-                            </p>
-                        )}
-                    </div>
-                    
-                    {markStatusModal.confirmNoShow ? (
-                        <div className="flex gap-3">
-                            <button
-                                onClick={() => setMarkStatusModal({ ...markStatusModal, confirmNoShow: false })}
-                                className="flex-1 py-3 px-4 rounded-lg border border-gray-200 dark:border-white/25 text-gray-600 dark:text-gray-300 font-medium"
-                            >
-                                Go Back
-                            </button>
-                            <button
-                                onClick={async () => {
-                                    if (!markStatusModal.booking) return;
-                                    const booking = markStatusModal.booking;
-                                    setMarkStatusModal({ booking: null, confirmNoShow: false });
-                                    await updateBookingStatusOptimistic(booking, 'no_show');
-                                }}
-                                className="flex-1 py-3 px-4 rounded-lg bg-red-500 hover:bg-red-600 text-white font-medium flex items-center justify-center gap-2"
-                            >
-                                <span aria-hidden="true" className="material-symbols-outlined text-sm">person_off</span>
-                                Confirm No Show
-                            </button>
-                        </div>
-                    ) : (
-                        <div className="flex gap-3">
-                            <button
-                                onClick={async () => {
-                                    if (!markStatusModal.booking) return;
-                                    const booking = markStatusModal.booking;
-                                    setMarkStatusModal({ booking: null, confirmNoShow: false });
-                                    await updateBookingStatusOptimistic(booking, 'attended');
-                                }}
-                                className="flex-1 py-3 px-4 rounded-lg bg-green-500 hover:bg-green-600 text-white font-medium flex items-center justify-center gap-2"
-                            >
-                                <span aria-hidden="true" className="material-symbols-outlined text-sm">check_circle</span>
-                                Attended
-                            </button>
-                            <button
-                                onClick={() => setMarkStatusModal({ ...markStatusModal, confirmNoShow: true })}
-                                className="flex-1 py-3 px-4 rounded-lg bg-red-500 hover:bg-red-600 text-white font-medium flex items-center justify-center gap-2"
-                            >
-                                <span aria-hidden="true" className="material-symbols-outlined text-sm">person_off</span>
-                                No Show
-                            </button>
-                        </div>
-                    )}
-                    
-                    <button
-                        onClick={() => setMarkStatusModal({ booking: null, confirmNoShow: false })}
-                        className="w-full py-2 px-4 rounded-lg text-gray-500 dark:text-gray-400 text-sm font-medium hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"
-                    >
-                        Cancel
-                    </button>
-                </div>
-            </ModalShell>
 
 
             <TrackmanBookingModal
