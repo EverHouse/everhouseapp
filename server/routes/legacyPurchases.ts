@@ -287,7 +287,7 @@ async function getUnifiedPurchasesForEmail(email: string): Promise<UnifiedPurcha
   
   if (userInfo?.id) {
     const paymentIntentsResult = await db.execute(
-      sql`SELECT * FROM stripe_payment_intents 
+      sql`SELECT id, stripe_payment_intent_id, amount_cents, purpose, description, status, created_at FROM stripe_payment_intents 
        WHERE (user_id = ${userInfo.id} OR user_id = ${normalizedEmail})
        AND status = 'succeeded'
        ORDER BY created_at DESC`
@@ -309,7 +309,7 @@ async function getUnifiedPurchasesForEmail(email: string): Promise<UnifiedPurcha
   let unifiedCashCheckPayments: UnifiedPurchase[] = [];
   
   const cashCheckResult = await db.execute(
-    sql`SELECT * FROM admin_audit_log 
+    sql`SELECT id, action, actor_email, resource_type, resource_id, details, created_at FROM admin_audit_log 
      WHERE resource_type = 'billing'
      AND resource_id = ${normalizedEmail} 
      AND action IN ('cash_payment_recorded', 'check_payment_recorded', 'cash_check_recorded')

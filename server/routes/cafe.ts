@@ -7,12 +7,22 @@ import { logger } from '../core/logger';
 import { db } from '../db';
 import { cafeItems } from '../../shared/schema';
 import { sql, eq, and, asc } from 'drizzle-orm';
+import { getCached, setCache, invalidateCache } from '../core/queryCache';
+
+const CAFE_CACHE_KEY = 'cafe_menu';
+const CAFE_CACHE_TTL = 60_000;
 
 const router = Router();
 
 router.get('/api/cafe-menu', async (req, res) => {
   try {
     const { category, include_inactive } = req.query;
+
+    if (!category && include_inactive !== 'true') {
+      const cached = getCached<any[]>(CAFE_CACHE_KEY);
+      if (cached) return res.json(cached);
+    }
+
     const conditions = [];
     
     if (include_inactive !== 'true') {
@@ -26,7 +36,11 @@ router.get('/api/cafe-menu', async (req, res) => {
     const result = await db.select().from(cafeItems)
       .where(conditions.length > 0 ? and(...conditions) : undefined)
       .orderBy(asc(cafeItems.sortOrder), asc(cafeItems.category), asc(cafeItems.name));
-    
+
+    if (!category && include_inactive !== 'true') {
+      setCache(CAFE_CACHE_KEY, result, CAFE_CACHE_TTL);
+    }
+
     res.json(result);
   } catch (error: unknown) {
     if (!isProduction) logger.error('Cafe menu error', { error: error instanceof Error ? error : new Error(String(error)) });
@@ -53,6 +67,7 @@ router.post('/api/cafe-menu', isStaffOrAdmin, async (req, res) => {
       sortOrder: sort_order || 0,
     }).returning();
     
+    invalidateCache(CAFE_CACHE_KEY);
     broadcastCafeMenuUpdate('created');
     logFromRequest(req, 'create_cafe_item', 'cafe', String(result[0].id), result[0].name || name, {});
     res.status(201).json(result[0]);
@@ -95,6 +110,7 @@ router.put('/api/cafe-menu/:id', isStaffOrAdmin, async (req, res) => {
       }).where(eq(cafeItems.id, Number(id))).returning();
     }
     
+    invalidateCache(CAFE_CACHE_KEY);
     broadcastCafeMenuUpdate('updated');
     logFromRequest(req, 'update_cafe_item', 'cafe', String(id), name, {});
     res.json(result[0]);
@@ -116,6 +132,7 @@ router.delete('/api/cafe-menu/:id', isStaffOrAdmin, async (req, res) => {
     }
     
     await db.delete(cafeItems).where(eq(cafeItems.id, Number(id)));
+    invalidateCache(CAFE_CACHE_KEY);
     broadcastCafeMenuUpdate('deleted');
     logFromRequest(req, 'delete_cafe_item', 'cafe', String(id), undefined, {});
     res.json({ success: true });

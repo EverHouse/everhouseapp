@@ -177,3 +177,9 @@ This file tracks every instance where the agent failed to follow explicit instru
 ---
 
 *New entries must be added above the Summary section. Format: Incident number, date, rule violated, what happened, estimated wasted usage, corrective action taken.*
+
+## Incident #26 — 2026-02-24
+**Rule Violated:** MANDATORY skill loading before ALL work — planning, auditing, AND coding
+**What Happened:** Agent proceeded with performance audit and implementation across 3 subagents without loading ANY skills first. Should have loaded: `performance`, `sql-optimization-patterns`, `project-architecture`, `postgres-drizzle`, `stripe-integration`, `clean-code`, and `remembering-conversations`. Read the SKILL.md files for `performance` and `sql-optimization-patterns` briefly but did not follow the mandatory protocol of loading all relevant skills before work, did not search conversation memory, and jumped straight to implementation.
+**Estimated Wasted Usage:** ~3 messages (audit and implementation started without proper skill context — though work was largely correct, it risked missing patterns documented in skills)
+**Corrective Action:** Must load ALL relevant skills before any work begins, even for audits and reviews. The replit.md rules are clear: "This applies to ALL task types, not just code changes."

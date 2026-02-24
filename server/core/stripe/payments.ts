@@ -348,7 +348,7 @@ export async function confirmPaymentSuccess(
       }
     }
 
-    const localRecord = await db.execute(sql`SELECT * FROM stripe_payment_intents WHERE stripe_payment_intent_id = ${paymentIntentId}`);
+    const localRecord = await db.execute(sql`SELECT id, user_id, stripe_payment_intent_id, amount_cents, purpose, booking_id, session_id, product_name, status FROM stripe_payment_intents WHERE stripe_payment_intent_id = ${paymentIntentId}`);
 
     if (localRecord.rows[0]) {
       const record = localRecord.rows[0];

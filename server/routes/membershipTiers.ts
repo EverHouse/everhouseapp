@@ -8,16 +8,26 @@ import { invalidateTierCache, clearTierCache } from '../core/tierService';
 import { syncMembershipTiersToStripe, getTierSyncStatus, cleanupOrphanStripeProducts, syncTierFeaturesToStripe, syncCafeItemsToStripe, pullTierFeaturesFromStripe, pullCafeItemsFromStripe } from '../core/stripe/products';
 import { logFromRequest } from '../core/auditLog';
 import { getErrorMessage, getErrorCode } from '../utils/errorUtils';
+import { getCached, setCache, invalidateCache as invalidateQueryCache } from '../core/queryCache';
+
+const TIERS_CACHE_KEY = 'membership_tiers';
+const TIERS_CACHE_TTL = 120_000;
 
 const router = Router();
 
 router.get('/api/membership-tiers', async (req, res) => {
   try {
     const { active } = req.query;
-    
+    const cacheKey = active === 'true' ? `${TIERS_CACHE_KEY}_active` : `${TIERS_CACHE_KEY}_all`;
+
+    const cached = getCached<any[]>(cacheKey);
+    if (cached) return res.json(cached);
+
     const result = active === 'true'
       ? await db.execute(sql`SELECT * FROM membership_tiers WHERE is_active = true ORDER BY sort_order ASC, id ASC`)
       : await db.execute(sql`SELECT * FROM membership_tiers ORDER BY sort_order ASC, id ASC`);
+
+    setCache(cacheKey, result.rows, TIERS_CACHE_TTL);
     res.json(result.rows);
   } catch (error: unknown) {
     if (!isProduction) logger.error('Membership tiers fetch error', { error: error instanceof Error ? error : new Error(String(error)) });
@@ -134,10 +144,10 @@ router.put('/api/membership-tiers/:id', isAdmin, async (req, res) => {
       return res.status(404).json({ error: 'Tier not found' });
     }
     
-    // Invalidate cache for this tier
     const updatedTier = result.rows[0];
     if (updatedTier.name) invalidateTierCache(updatedTier.name);
     if (updatedTier.slug) invalidateTierCache(updatedTier.slug);
+    invalidateQueryCache(TIERS_CACHE_KEY);
     
     res.json(updatedTier);
   } catch (error: unknown) {
@@ -183,10 +193,10 @@ router.post('/api/membership-tiers', isAdmin, async (req, res) => {
       RETURNING *
     `);
     
-    // Invalidate tier cache for the new tier
     const newTier = result.rows[0];
     if (newTier.name) invalidateTierCache(newTier.name);
     if (newTier.slug) invalidateTierCache(newTier.slug);
+    invalidateQueryCache(TIERS_CACHE_KEY);
     
     res.status(201).json(result.rows[0]);
   } catch (error: unknown) {
@@ -220,6 +230,8 @@ router.post('/api/admin/stripe/sync-products', isStaffOrAdmin, async (req, res) 
     const cafeResult = await syncCafeItemsToStripe();
     logger.info('[Admin] Cafe sync complete: synced, failed, skipped', { extra: { cafeResultSynced: cafeResult.synced, cafeResultFailed: cafeResult.failed, cafeResultSkipped: cafeResult.skipped } });
     
+    invalidateQueryCache(TIERS_CACHE_KEY);
+
     res.json({ 
       success: syncResult.success && cleanupResult.success && featureResult.success && cafeResult.success, 
       synced: syncResult.synced,
@@ -274,6 +286,8 @@ router.post('/api/admin/stripe/pull-from-stripe', isStaffOrAdmin, async (req, re
         cafeErrors: cafeResult.errors,
       },
     });
+
+    invalidateQueryCache(TIERS_CACHE_KEY);
 
     res.json({
       success: tierResult.success && cafeResult.success,

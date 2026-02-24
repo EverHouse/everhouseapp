@@ -392,7 +392,7 @@ router.post('/api/member/conference/prepay/:id/confirm', isAuthenticated, async 
     }
 
     const prepaymentResult = await db.execute(
-      sql`SELECT * FROM conference_prepayments WHERE id = ${prepaymentId}`
+      sql`SELECT id, member_email, stripe_payment_intent_id, amount_cents, booking_request_id, status FROM conference_prepayments WHERE id = ${prepaymentId}`
     );
 
     if (prepaymentResult.rows.length === 0) {
@@ -461,7 +461,7 @@ router.get('/api/member/conference/prepay/:id', isAuthenticated, async (req: Req
     }
 
     const prepaymentResult = await db.execute(
-      sql`SELECT * FROM conference_prepayments WHERE id = ${prepaymentId}`
+      sql`SELECT id, member_email, stripe_payment_intent_id, amount_cents, booking_request_id, status FROM conference_prepayments WHERE id = ${prepaymentId}`
     );
 
     if (prepaymentResult.rows.length === 0) {

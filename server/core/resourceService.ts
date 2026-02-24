@@ -21,6 +21,10 @@ import { createPrepaymentIntent } from './billing/prepaymentService';
 import { ensureSessionForBooking } from './bookingService/sessionManager';
 import { getErrorMessage, getErrorCode, getErrorStatusCode } from '../utils/errorUtils';
 import { normalizeToISODate } from '../utils/dateNormalize';
+import { getCached, setCache } from './queryCache';
+
+const RESOURCE_CACHE_KEY = 'all_resources';
+const RESOURCE_CACHE_TTL = 60_000;
 
 export interface CancellationCascadeResult {
   participantsNotified: number;
@@ -123,7 +127,7 @@ export async function handleCancellationCascade(
        FROM stripe_payment_intents spi
        WHERE spi.booking_id = ${bookingId} AND spi.purpose = 'prepayment' AND spi.status = 'succeeded'`);
 
-  for (const row of (succeededIntents.rows as Array<Record<string, unknown>>)) {
+  await Promise.allSettled((succeededIntents.rows as Array<Record<string, unknown>>).map(async (row) => {
     try {
       const claimResult = await db.execute(sql`UPDATE stripe_payment_intents 
            SET status = 'refunding', updated_at = NOW() 
@@ -134,17 +138,17 @@ export async function handleCancellationCascade(
           logger.info('[cancellation-cascade] Prepayment already claimed or refunded, skipping', {
             extra: { bookingId, paymentIntentId: row.stripe_payment_intent_id }
           });
-          continue;
+          return;
         }
         
         const stripe = await getStripeClient();
         
-        if (row.stripe_payment_intent_id.startsWith('balance-')) {
+        if ((row.stripe_payment_intent_id as string).startsWith('balance-')) {
           if (row.stripe_customer_id) {
             const balanceTransaction = await stripe.customers.createBalanceTransaction(
-              row.stripe_customer_id,
+              row.stripe_customer_id as string,
               {
-                amount: -row.amount_cents,
+                amount: -(row.amount_cents as number),
                 currency: 'usd',
                 description: `Refund for cancelled booking #${bookingId}`,
               }
@@ -220,7 +224,7 @@ export async function handleCancellationCascade(
         result.errors.push(errorMsg);
         logger.warn('[cancellation-cascade] ' + errorMsg);
       }
-    }
+    }));
 
     for (const member of membersToNotify) {
       try {
@@ -303,11 +307,17 @@ export async function handleCancellationCascade(
 }
 
 export async function fetchAllResources() {
-  return withRetry(() =>
+  const cached = getCached<any[]>(RESOURCE_CACHE_KEY);
+  if (cached) return cached;
+
+  const result = await withRetry(() =>
     db.select()
       .from(resources)
       .orderBy(asc(resources.type), asc(resources.name))
   );
+
+  setCache(RESOURCE_CACHE_KEY, result, RESOURCE_CACHE_TTL);
+  return result;
 }
 
 export async function checkExistingBookings(userEmail: string, date: string, resourceType: string) {

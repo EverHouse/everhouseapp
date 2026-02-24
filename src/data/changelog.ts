@@ -8,6 +8,16 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.22.0",
+    date: "2026-02-24",
+    title: "Performance Optimization — Caching, Query Efficiency & Parallel Processing",
+    changes: [
+      "Improved: Added server-side caching for frequently-accessed data (resources, cafe menu, membership tiers) — reduces database load on high-traffic pages",
+      "Improved: Optimized database queries across multiple endpoints to fetch only the columns needed instead of entire rows — faster response times",
+      "Improved: Booking cancellation refunds now process in parallel instead of one-at-a-time — faster cancellations when multiple refunds are needed",
+    ]
+  },
+  {
     version: "8.21.0",
     date: "2026-02-24",
     title: "Security Hardening — Input Validation & Rate Limiting",

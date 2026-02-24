@@ -1636,7 +1636,7 @@ export async function syncCafeItemsToStripe(): Promise<{
 
   try {
     const stripe = await getStripeClient();
-    const cafeItemResult = await db.execute(sql`SELECT * FROM cafe_items WHERE is_active = true ORDER BY category, sort_order`);
+    const cafeItemResult = await db.execute(sql`SELECT id, name, description, price, category, stripe_product_id, stripe_price_id FROM cafe_items WHERE is_active = true ORDER BY category, sort_order`);
     const cafeItemRows = cafeItemResult.rows as Array<Record<string, unknown>>;
 
     logger.info(`[Cafe Sync] Starting sync for ${cafeItemRows.length} active cafe items`);

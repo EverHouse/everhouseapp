@@ -36,7 +36,7 @@ export async function updateDiscountRule(
 
 export async function getBillingAuditLog(memberEmail: string, limit: number = 50): Promise<any[]> {
   try {
-    const result = await db.execute(sql`SELECT * FROM admin_audit_log 
+    const result = await db.execute(sql`SELECT id, action, actor_email, actor_type, resource_type, resource_id, resource_name, details, created_at FROM admin_audit_log 
        WHERE resource_type = 'billing'
        AND resource_id = ${memberEmail.toLowerCase()} 
        ORDER BY created_at DESC 
