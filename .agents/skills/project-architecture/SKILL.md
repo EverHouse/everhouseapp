@@ -85,6 +85,33 @@ NEVER write migration files manually — use `npm run db:push`. Schema changes g
 ### 8. No External API Calls in DB Transactions (v8.12.0)
 HTTP calls to Stripe, HubSpot, or any external service must NOT be made inside `BEGIN`/`COMMIT` blocks. They hold connections while waiting for network responses. Use the deferred action pattern (`deferredActions.push(async () => { ... })`) or DB-side checks instead. Exceptions: 5 Stripe/HubSpot calls that must stay in-transaction (customer retrieve, product retrieve, payment methods list, company sync, prices retrieve in guestPassConsumer) are wrapped with 5-second `Promise.race()` timeouts and marked with `// NOTE: Must stay in transaction` comments. See `stripe-webhook-flow` skill for the full pattern.
 
+### 9. Route Authentication Patterns (Audit Finding, Feb 2026)
+Two authentication patterns coexist in the codebase:
+
+**Pattern A — Middleware guard (preferred):**
+```typescript
+router.post('/api/admin/resource', isStaffOrAdmin, async (req, res) => { ... })
+```
+
+**Pattern B — Inline check (legacy, acceptable):**
+```typescript
+router.post('/api/resource', async (req, res) => {
+  const sessionUser = getSessionUser(req);
+  if (!sessionUser) return res.status(401).json({ error: 'Authentication required' });
+  ...
+})
+```
+
+Both patterns provide equivalent security. Pattern A is preferred for new routes. Pattern B is used in roster.ts, bays/bookings.ts, and some other files. Do NOT treat Pattern B routes as "missing auth" — they have inline auth checks.
+
+**Intentionally public routes** (no auth required):
+- `POST /api/auth/*` — login/registration flows
+- `POST /api/tours/book` — prospect tour booking
+- `POST /api/day-passes/confirm` — day pass purchase confirmation (verifies via Stripe session)
+- `POST /api/webhooks/*` — Stripe, Trackman, Resend, HubSpot webhooks (verified by signature/secret)
+- `POST /api/availability/batch` — public availability check
+- `POST /api/hubspot/forms/*` — HubSpot form submissions
+
 ---
 
 ## Unified Booking Sheet Architecture

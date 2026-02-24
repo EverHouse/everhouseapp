@@ -2,6 +2,21 @@
 
 **CRITICAL RULE: Routes are THIN.** They handle HTTP request/response only. All business logic lives in `server/core/`. Never write business logic inline in route files.
 
+## Authentication Patterns
+
+All mutating routes (POST/PUT/PATCH/DELETE) must be protected. Two equivalent patterns exist:
+
+1. **Middleware** (`isAuthenticated`, `isStaffOrAdmin`, `isAdmin`) — preferred for new routes
+2. **Inline check** (`getSessionUser(req)` + 401 return) — used in roster.ts, bays/bookings.ts
+
+**Intentionally public mutating routes:**
+- Auth endpoints (`/api/auth/*`)
+- Webhook endpoints (`/api/webhooks/*`) — verified by payload signature
+- Tour booking (`/api/tours/book`) — prospect-facing
+- Day pass confirmation (`/api/day-passes/confirm`) — verified by Stripe session
+- Availability batch check (`/api/availability/batch`)
+- HubSpot form submissions (`/api/hubspot/forms/*`)
+
 ---
 
 ## Booking Routes (`server/routes/bays/`)

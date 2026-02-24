@@ -359,6 +359,29 @@ Every payment, invoice, refund, and charge event upserts into `stripe_transactio
 
 `reconcileSubscriptions()` cross-references active DB members against their Stripe subscription status to detect drift.
 
+## Audit Findings (Feb 2026)
+
+### Error Handling Audit Results
+A comprehensive code-reviewer audit confirmed:
+- **Zero empty catch blocks** across all webhook handlers — every catch re-throws, logs via `logger.error`/`logger.warn`, or uses `safeDbOperation()`
+- **Financial operation errors always propagate** — async day pass, payment intents, invoice finalization all throw on failure to enable Stripe retry
+- **Savepoint usage in batch operations** (trackman/admin.ts) uses internally-generated names (`sp_${counter}`), NOT user input — verified safe from SQL injection
+
+### Deferred Action Error Isolation
+Deferred actions (HubSpot sync, email, notifications) execute AFTER the database transaction commits. Errors in deferred actions are logged but never propagate back to the webhook response — this is by design, to prevent non-critical side-effect failures from triggering unnecessary Stripe retries.
+
+### Billing Provider Guard Coverage
+The following handlers include `billing_provider` guards:
+- `handleCustomerSubscriptionUpdated` — skips if billing_provider ≠ stripe
+- `handleCustomerSubscriptionDeleted` — skips if billing_provider ≠ stripe  
+- `handleInvoicePaymentFailed` — skips if billing_provider ≠ stripe, AND skips if invoice's subscription doesn't match user's current subscription
+- `handleInvoicePaymentSucceeded` — skips if billing_provider ≠ stripe
+
+Handlers that do NOT need billing_provider guards (they operate on Stripe-specific resources):
+- `handlePaymentIntentSucceeded` — operates on payment intents, always from Stripe
+- `handleChargeRefunded` — operates on charges, always from Stripe
+- `handleCheckoutSessionCompleted` — operates on checkout sessions, always from Stripe
+
 ## Key References
 
 - `references/event-handling.md` — Complete event type → handler → downstream effects mapping

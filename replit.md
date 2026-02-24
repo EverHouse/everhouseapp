@@ -57,6 +57,7 @@ The Ever Club Members App is a private members club application for golf and wel
 - **Async Webhook Payload Parity**: All async payment handlers (`checkout.session.async_payment_succeeded`) must construct identical payloads to their synchronous counterparts and throw errors on failure (not swallow them) to ensure Stripe retries.
 - **Booking Race Condition Guards**: `approveBooking()`, `declineBooking()`, and `checkinBooking()` implement status guards and optimistic locking to prevent race conditions and ensure data integrity.
 - **Real-time Updates**: Implements WebSocket broadcasting for booking and invoice changes, ensuring staff and members receive real-time updates.
+- **Route Authentication Audit (Feb 2026)**: Two authentication patterns coexist: middleware guards (`isAuthenticated`, `isStaffOrAdmin`) and inline `getSessionUser(req)` checks. Both are equivalent in security. Middleware is preferred for new routes. Intentionally public routes include auth endpoints, webhook endpoints (signature-verified), tour booking, day pass confirm, and availability checks.
 
 ## External Dependencies
 - **Stripe**: For payment processing, subscriptions, and webhooks.

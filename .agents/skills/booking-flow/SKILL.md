@@ -174,6 +174,8 @@ Three-step flow (all staff-only):
 
 `hasTimeOverlap(start1, end1, start2, end2)` in `bookingValidation.ts` handles overnight wrap-around closures (where `start2 > end2`, e.g., 22:00–06:00). When detected, it splits the range into two sub-ranges: `[start2, 1440)` (night portion) and `[0, end2)` (morning portion), checking overlap against each. This ensures facility closures spanning midnight correctly block bookings in both the late-night and early-morning windows.
 
+**Audit note (Feb 2026):** The SQL-level overlap checks in `checkBookingConflict`, `checkAvailabilityBlockConflict`, and `checkSessionConflict`/`checkSessionConflictWithLock` use the standard `start < endTime AND end > startTime` pattern without overnight handling. This was audited and confirmed correct — bookings, availability blocks, and sessions are all single-day constructs that cannot cross midnight. Only closure overlap checks need the midnight-spanning logic.
+
 `checkUnifiedAvailability(resourceId, date, startTime, endTime, excludeSessionId?)` runs three layered checks:
 
 1. `checkClosureConflict()` — facility-wide closures from `facility_closures` table.
@@ -236,6 +238,8 @@ Resource type?
 12. **One invoice per booking**: Each booking (simulator or conference room) has at most one Stripe invoice (`booking_requests.stripe_invoice_id`). Draft created at approval (if fees > $0), updated on roster changes, finalized at payment. If a booking is approved with $0 fees (no invoice created) and later gains fees through roster edits, `syncBookingInvoice()` creates the draft invoice on-the-fly. Conference rooms were migrated to the same invoice flow as simulators in v8.16.0 (2026-02-24). The invoice lifecycle is managed by `bookingInvoiceService.ts`.
 
 13. **Roster lock after paid invoice**: Once a booking's Stripe invoice is paid, roster edits (add/remove participant, change player count) are blocked via `enforceRosterLock()`. Staff can override with a reason (logged via audit). The lock is fail-open: if the Stripe API check fails, edits proceed.
+
+14. **Conflict check scope**: `checkBookingConflict()`, `checkAvailabilityBlockConflict()`, and `checkSessionConflict()` use simple time overlap logic (`start < end AND end > start`). This is correct because bookings and availability blocks are constrained to single-day, same-day time windows — cross-midnight bookings cannot be created (club closes at 10 PM). Only `hasTimeOverlap()` in closure checks needs overnight wrap-around handling, because facility closures CAN span midnight (e.g., 22:00–06:00).
 
 ## Booking Event System
 
