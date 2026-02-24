@@ -175,9 +175,10 @@ The `BookingStatusDropdown` component (`src/components/BookingStatusDropdown.tsx
 
 **Key implementation details:**
 - The dropdown menu and backdrop overlay are portaled to `document.body`.
-- `getBoundingClientRect()` positions the menu relative to the trigger button.
+- `getBoundingClientRect()` positions the menu relative to the trigger button at open time.
 - The backdrop uses `style={{ zIndex: 9998 }}` and the menu uses `style` with `zIndex: 9999`.
 - `menuDirection` prop controls whether the menu opens upward or downward.
+- **Scroll dismiss:** On open, the component walks up the DOM tree to find all scrollable ancestors. It attaches passive `scroll` listeners to each ancestor and `window`. Any scroll event immediately closes the dropdown. This prevents the menu from detaching from the button when the booking queue is scrolled.
 
 **Rule:** Any dropdown or popover rendered inside a container with `backdrop-filter`, `transform`, `filter`, `perspective`, or `will-change` MUST use a React portal to `document.body`. These CSS properties create new stacking contexts that prevent fixed-position children from layering above sibling elements.
 

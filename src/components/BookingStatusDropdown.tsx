@@ -117,24 +117,44 @@ export function BookingStatusDropdown({
   const buttonRef = useRef<HTMLDivElement>(null);
   const [menuStyle, setMenuStyle] = useState<React.CSSProperties>({});
 
+  const computeMenuStyle = () => {
+    if (!buttonRef.current) return;
+    const rect = buttonRef.current.getBoundingClientRect();
+    if (menuDirection === 'up') {
+      setMenuStyle({
+        position: 'fixed',
+        left: rect.left,
+        bottom: window.innerHeight - rect.top + 4,
+        zIndex: 9999,
+      });
+    } else {
+      setMenuStyle({
+        position: 'fixed',
+        left: Math.min(rect.left, window.innerWidth - 180),
+        top: rect.bottom + 4,
+        zIndex: 9999,
+      });
+    }
+  };
+
   useEffect(() => {
-    if (isOpen && buttonRef.current) {
-      const rect = buttonRef.current.getBoundingClientRect();
-      if (menuDirection === 'up') {
-        setMenuStyle({
-          position: 'fixed',
-          left: rect.left,
-          bottom: window.innerHeight - rect.top + 4,
-          zIndex: 9999,
-        });
-      } else {
-        setMenuStyle({
-          position: 'fixed',
-          left: Math.min(rect.left, window.innerWidth - 180),
-          top: rect.bottom + 4,
-          zIndex: 9999,
-        });
+    if (isOpen) {
+      computeMenuStyle();
+      const scrollParents: Element[] = [];
+      let el: Element | null = buttonRef.current;
+      while (el) {
+        if (el.scrollHeight > el.clientHeight || el.scrollWidth > el.clientWidth) {
+          scrollParents.push(el);
+        }
+        el = el.parentElement;
       }
+      const handleScroll = () => setIsOpen(false);
+      scrollParents.forEach(sp => sp.addEventListener('scroll', handleScroll, { passive: true }));
+      window.addEventListener('scroll', handleScroll, { passive: true });
+      return () => {
+        scrollParents.forEach(sp => sp.removeEventListener('scroll', handleScroll));
+        window.removeEventListener('scroll', handleScroll);
+      };
     }
   }, [isOpen, menuDirection]);
 
