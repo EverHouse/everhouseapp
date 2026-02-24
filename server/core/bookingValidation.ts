@@ -109,8 +109,8 @@ export async function checkBookingConflict(
         eq(bookingRequests.status, 'attended')
       ),
       and(
-        sql`${bookingRequests.startTime} < ${endTime}`,
-        sql`${bookingRequests.endTime} > ${startTime}`
+        sql`${bookingRequests.startTime}::time < ${endTime}::time`,
+        sql`${bookingRequests.endTime}::time > ${startTime}::time`
       )
     ];
 
@@ -148,8 +148,8 @@ export async function checkAvailabilityBlockConflict(
         eq(availabilityBlocks.resourceId, resourceId),
         sql`${availabilityBlocks.blockDate} = ${bookingDate}`,
         and(
-          sql`${availabilityBlocks.startTime} < ${endTime}`,
-          sql`${availabilityBlocks.endTime} > ${startTime}`
+          sql`${availabilityBlocks.startTime}::time < ${endTime}::time`,
+          sql`${availabilityBlocks.endTime}::time > ${startTime}::time`
         )
       ));
 

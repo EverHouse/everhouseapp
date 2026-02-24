@@ -8,6 +8,8 @@ import { logger } from './core/logger';
 let isShuttingDown = false;
 let isReady = false;
 let httpServer: Server | null = null;
+let schedulersInitialized = false;
+let websocketInitialized = false;
 let expressApp: any = null;
 let cachedIndexHtml: string | null = null;
 
@@ -20,10 +22,8 @@ declare global {
 }
 
 process.on('uncaughtException', (error) => {
-  logger.error('[Process] Uncaught Exception:', { error: error as Error });
-  if (error.message?.includes('EADDRINUSE')) {
-    process.exit(1);
-  }
+  logger.error('[Process] Uncaught Exception - shutting down:', { error: error as Error });
+  setTimeout(() => process.exit(1), 3000);
 });
 
 process.on('unhandledRejection', (reason, promise) => {
@@ -53,14 +53,18 @@ async function gracefulShutdown(signal: string) {
   }, 30000);
 
   try {
-    try {
-      const { stopSchedulers } = await import('./schedulers');
-      stopSchedulers();
-    } catch (err) { logger.warn('[Shutdown] Failed to stop schedulers:', err); }
-    try {
-      const { closeWebSocketServer } = await import('./core/websocket');
-      closeWebSocketServer();
-    } catch (err) { logger.warn('[Shutdown] Failed to close WebSocket server:', err); }
+    if (schedulersInitialized) {
+      try {
+        const { stopSchedulers } = await import('./schedulers');
+        stopSchedulers();
+      } catch (err) { logger.warn('[Shutdown] Failed to stop schedulers:', err); }
+    }
+    if (websocketInitialized) {
+      try {
+        const { closeWebSocketServer } = await import('./core/websocket');
+        closeWebSocketServer();
+      } catch (err) { logger.warn('[Shutdown] Failed to close WebSocket server:', err); }
+    }
 
     if (httpServer) {
       await new Promise<void>((resolve) => {
@@ -219,10 +223,6 @@ async function initializeApp() {
         const url = new URL(origin);
         const hostname = url.hostname;
         if (hostname.endsWith('.replit.app') || hostname.endsWith('.replit.dev') || hostname.endsWith('.repl.co')) {
-          callback(null, true);
-          return;
-        }
-        if (hostname === 'localhost' || hostname === '127.0.0.1') {
           callback(null, true);
           return;
         }
@@ -918,6 +918,7 @@ async function initializeApp() {
 
     try {
       initWebSocketServer(httpServer!);
+      websocketInitialized = true;
     } catch (err: unknown) {
       logger.error('[Startup] WebSocket initialization failed:', { error: err as Error });
     }
@@ -1000,6 +1001,7 @@ async function initializeApp() {
 
     try {
       initSchedulers();
+      schedulersInitialized = true;
     } catch (err: unknown) {
       logger.error('[Startup] Scheduler initialization failed:', { error: err as Error });
     }

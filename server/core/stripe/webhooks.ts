@@ -1008,7 +1008,7 @@ async function handlePaymentIntentSucceeded(client: PoolClient, paymentIntent: S
       `SELECT bfs.*
        FROM booking_fee_snapshots bfs
        WHERE bfs.id = $1 AND bfs.stripe_payment_intent_id = $2 AND bfs.status = 'pending'
-       FOR UPDATE OF bfs SKIP LOCKED`,
+       FOR UPDATE OF bfs`,
       [feeSnapshotId, id]
     );
     
@@ -2174,46 +2174,42 @@ async function handleCheckoutSessionCompleted(client: PoolClient, session: Strip
         ? `${userResult.rows[0].first_name || ''} ${userResult.rows[0].last_name || ''}`.trim() || memberEmail
         : memberEmail;
 
-      const deferredCustomerId = customerId;
-      const deferredAmountCents = amountCents;
+      // NOTE: Must stay in transaction - user balance is financial state
+      const stripe = await getStripeClient();
+      const transaction = await Promise.race([
+        stripe.customers.createBalanceTransaction(
+          customerId,
+          { amount: -amountCents, currency: 'usd', description: `Account balance top-up via checkout (${session.id})` },
+          { idempotencyKey: `add_funds_${session.id}` }
+        ),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Balance transaction timed out after 5s')), 5000))
+      ]);
+      const newBalanceDollars = Math.abs(transaction.ending_balance) / 100;
+      logger.info(`[Stripe Webhook] Successfully added $${amountDollars.toFixed(2)} to balance for ${memberEmail}. New balance: $${newBalanceDollars.toFixed(2)}`);
+
       const deferredAmountDollars = amountDollars;
       const deferredMemberEmail = memberEmail;
       const deferredMemberName = memberName;
       const deferredSessionId = session.id;
+      const deferredAmountCents = amountCents;
+      const deferredNewBalance = transaction.ending_balance;
 
       deferredActions.push(async () => {
         try {
-          const stripe = await getStripeClient();
-          
-          const transaction = await stripe.customers.createBalanceTransaction(
-            deferredCustomerId,
-            {
-              amount: -deferredAmountCents,
-              currency: 'usd',
-              description: `Account balance top-up via checkout (${deferredSessionId})`
-            },
-            {
-              idempotencyKey: `add_funds_${deferredSessionId}`
-            }
-          );
-          
-          const newBalanceDollars = Math.abs(transaction.ending_balance) / 100;
-          logger.info(`[Stripe Webhook] Successfully added $${deferredAmountDollars.toFixed(2)} to balance for ${deferredMemberEmail}. New balance: $${newBalanceDollars.toFixed(2)}`);
-          
           await notifyMember({
             userEmail: deferredMemberEmail,
             title: 'Funds Added Successfully',
             message: `$${deferredAmountDollars.toFixed(2)} has been added to your account balance. New balance: $${newBalanceDollars.toFixed(2)}`,
             type: 'funds_added',
           }, { sendPush: true });
-          
+
           await notifyAllStaff(
             'Member Added Funds',
             `${deferredMemberName} (${deferredMemberEmail}) added $${deferredAmountDollars.toFixed(2)} to their account balance.`,
             'funds_added',
             { sendPush: true }
           );
-          
+
           await sendPaymentReceiptEmail(deferredMemberEmail, {
             memberName: deferredMemberName,
             amount: deferredAmountDollars,
@@ -2221,32 +2217,20 @@ async function handleCheckoutSessionCompleted(client: PoolClient, session: Strip
             date: new Date(),
             transactionId: deferredSessionId
           });
-          
+
           logger.info(`[Stripe Webhook] All notifications sent for add_funds: ${deferredMemberEmail}`);
-          
+
           broadcastBillingUpdate({
             action: 'balance_updated',
             memberEmail: deferredMemberEmail,
             amountCents: deferredAmountCents,
-            newBalance: transaction.ending_balance
+            newBalance: deferredNewBalance
           });
-          
-        } catch (balanceError: unknown) {
-          logger.error(`[Stripe Webhook] Failed to credit balance for ${deferredMemberEmail}:`, { extra: { detail: getErrorMessage(balanceError) } });
-          
-          try {
-            await notifyAllStaff(
-              'Payment Processing Error',
-              `Failed to add $${deferredAmountDollars.toFixed(2)} to balance for ${deferredMemberEmail}. Error: ${getErrorMessage(balanceError)}. Manual intervention required.`,
-              'payment_error',
-              { sendPush: true }
-            );
-          } catch (notifyErr: unknown) {
-            logger.error('[Stripe Webhook] Failed to notify staff of balance error:', { error: notifyErr });
-          }
+        } catch (notifyError: unknown) {
+          logger.error(`[Stripe Webhook] Deferred notification failed for add_funds ${deferredMemberEmail}:`, { extra: { detail: getErrorMessage(notifyError) } });
         }
       });
-      
+
       return deferredActions;
     }
     

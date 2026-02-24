@@ -196,9 +196,9 @@ export async function syncHubSpotFormSubmissions(): Promise<{
     }
 
     if (!accessToken) {
-      formSyncAccessDeniedUntil = Date.now() + 4 * 60 * 60 * 1000;
+      formSyncAccessDeniedUntil = Date.now() + 12 * 60 * 60 * 1000;
       if (!formSyncAccessDeniedLogged) {
-        logger.warn('[HubSpot FormSync] All token sources denied (401/403) for forms scope. Add "forms" scope to your HubSpot private app OR re-authorize the HubSpot connector with forms permission. Suppressing retries for 4 hours.');
+        logger.warn('[HubSpot FormSync] All token sources denied (401/403) for forms scope. Add "forms" scope to your HubSpot private app OR re-authorize the HubSpot connector with forms permission. Suppressing retries for 12 hours.');
         formSyncAccessDeniedLogged = true;
       }
       return result;
@@ -226,9 +226,9 @@ export async function syncHubSpotFormSubmissions(): Promise<{
       } catch (err: unknown) {
         const errMsg = getErrorMessage(err);
         if (errMsg.includes('HUBSPOT_FORMS_ACCESS_DENIED')) {
-          formSyncAccessDeniedUntil = Date.now() + 4 * 60 * 60 * 1000;
+          formSyncAccessDeniedUntil = Date.now() + 12 * 60 * 60 * 1000;
           if (!formSyncAccessDeniedLogged) {
-            logger.warn('[HubSpot FormSync] Access denied during sync. Token may have been revoked. Suppressing retries for 4 hours.');
+            logger.warn('[HubSpot FormSync] Access denied during sync. Token may have been revoked. Suppressing retries for 12 hours.');
             formSyncAccessDeniedLogged = true;
           }
           break;

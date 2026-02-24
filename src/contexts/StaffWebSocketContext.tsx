@@ -13,8 +13,6 @@ interface StaffWebSocketContextType {
 
 const StaffWebSocketContext = createContext<StaffWebSocketContextType | null>(null);
 
-let providerMountCount = 0;
-
 export const StaffWebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { actualUser, sessionChecked } = useData();
   const callbacksRef = useRef<Map<string, EventCallback>>(new Map());
@@ -22,9 +20,10 @@ export const StaffWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
   const mountIdRef = useRef<number>(0);
 
   if (mountIdRef.current === 0) {
-    providerMountCount++;
-    mountIdRef.current = providerMountCount;
-    console.log(`[StaffWebSocketContext] Provider mounted (id=${mountIdRef.current})`);
+    mountIdRef.current = 1;
+    if (import.meta.env.DEV) {
+      console.log(`[StaffWebSocketContext] Provider mounted`);
+    }
   }
 
   const isStaff = actualUser?.role === 'staff' || actualUser?.role === 'admin';

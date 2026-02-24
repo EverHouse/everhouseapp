@@ -1,7 +1,7 @@
 import React, { createContext, useState, useContext, ReactNode, useEffect, useCallback, useRef } from 'react';
 import { flushSync } from 'react-dom';
 import { useUserStore } from '../stores/userStore';
-import { startBackgroundSync } from '../lib/backgroundSync';
+
 import type { MemberProfile } from '../types/data';
 
 interface AuthDataContextType {
@@ -356,13 +356,8 @@ export const AuthDataProvider: React.FC<{children: ReactNode}> = ({ children }) 
     }
   }, [actualUser?.email]);
 
-  const backgroundSyncStartedRef = useRef(false);
-  useEffect(() => {
-    if (sessionChecked && actualUserRef.current && !backgroundSyncStartedRef.current) {
-      backgroundSyncStartedRef.current = true;
-      startBackgroundSync();
-    }
-  }, [sessionChecked]);
+
+
 
   const refreshUserRef = useRef<() => Promise<void>>(undefined);
   useEffect(() => {

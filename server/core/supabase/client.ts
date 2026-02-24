@@ -106,13 +106,13 @@ export function isSupabaseConfigured(): boolean {
 
 export async function enableRealtimeForTable(tableName: string): Promise<boolean> {
   if (!isSupabaseConfigured()) {
-    logger.warn(`[Supabase] Skipping realtime for ${tableName} - Supabase not configured`);
+    logger.debug(`[Supabase] Skipping realtime for ${tableName} - Supabase not configured`);
     return false;
   }
 
   const available = await isSupabaseAvailable();
   if (!available) {
-    logger.warn(`[Supabase] Skipping realtime for ${tableName} - Supabase not reachable`);
+    logger.debug(`[Supabase] Skipping realtime for ${tableName} - Supabase not reachable`);
     return false;
   }
 

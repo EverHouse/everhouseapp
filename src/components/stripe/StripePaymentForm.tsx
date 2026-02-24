@@ -217,7 +217,7 @@ export function StripePaymentWithSecret({
   };
 
   return (
-    <Elements stripe={stripeInstance} options={options} key={isDark ? 'dark' : 'light'}>
+    <Elements stripe={stripeInstance} options={options}>
       <div className="space-y-4">
         <div className="bg-primary/5 dark:bg-white/5 rounded-xl p-4 flex items-center justify-between">
           <span className="text-primary/70 dark:text-white/70">{description}</span>
@@ -361,7 +361,7 @@ export function StripePaymentForm({
   };
 
   return (
-    <Elements stripe={stripeInstance} options={options} key={isDark ? 'dark' : 'light'}>
+    <Elements stripe={stripeInstance} options={options}>
       <div className="space-y-4">
         <div className="bg-primary/5 dark:bg-white/5 rounded-xl p-4 flex items-center justify-between">
           <span className="text-primary/70 dark:text-white/70">{description}</span>

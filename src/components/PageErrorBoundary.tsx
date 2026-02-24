@@ -60,6 +60,7 @@ function isChunkLoadError(error: Error | null): boolean {
     message.includes('loading css chunk') ||
     message.includes('dynamically imported module') ||
     message.includes('is not a valid javascript mime type') ||
+    message.includes('unable to preload') ||
     (message.includes('failed to fetch') && message.includes('.js'))
   );
 }
