@@ -1742,7 +1742,7 @@ async function handleInvoicePaymentSucceeded(client: PoolClient, invoice: Invoic
   }
 
   const userResult = await client.query(
-    'SELECT id, first_name, last_name, billing_provider FROM users WHERE email = $1',
+    'SELECT id, first_name, last_name, billing_provider FROM users WHERE LOWER(email) = LOWER($1)',
     [email]
   );
 
@@ -2286,7 +2286,7 @@ async function handleCheckoutSessionCompleted(client: PoolClient, session: Strip
 
       if (userId && memberEmail) {
         try {
-          const updateResult = await client.query(
+          let updateResult = await client.query(
             `UPDATE users SET 
               membership_status = 'active',
               stripe_customer_id = COALESCE(stripe_customer_id, $1),
@@ -2295,10 +2295,27 @@ async function handleCheckoutSessionCompleted(client: PoolClient, session: Strip
               tier = COALESCE($3, tier),
               join_date = COALESCE(join_date, NOW()),
               updated_at = NOW()
-            WHERE id = $4 OR LOWER(email) = LOWER($5)
+            WHERE id = $4
             RETURNING id, email`,
-            [customerId, subscriptionId, normalizeTierName(tierNameMeta || tierSlugMeta), userId, memberEmail]
+            [customerId, subscriptionId, normalizeTierName(tierNameMeta || tierSlugMeta), userId]
           );
+
+          if (updateResult.rowCount === 0 && memberEmail) {
+            logger.warn(`[Stripe Webhook] Activation link: user not found by id=${userId}, falling back to email=${memberEmail}`);
+            updateResult = await client.query(
+              `UPDATE users SET 
+                membership_status = 'active',
+                stripe_customer_id = COALESCE(stripe_customer_id, $1),
+                stripe_subscription_id = $2,
+                billing_provider = 'stripe',
+                tier = COALESCE($3, tier),
+                join_date = COALESCE(join_date, NOW()),
+                updated_at = NOW()
+              WHERE LOWER(email) = LOWER($4) AND stripe_customer_id IS NULL
+              RETURNING id, email`,
+              [customerId, subscriptionId, normalizeTierName(tierNameMeta || tierSlugMeta), memberEmail]
+            );
+          }
 
           if (updateResult.rowCount && updateResult.rowCount > 0) {
             const updatedEmail = updateResult.rows[0].email;
@@ -2794,26 +2811,47 @@ async function handleSubscriptionCreated(client: PoolClient, subscription: Strip
         if (exclusionCheck.rows.length > 0) {
           logger.info(`[Stripe Webhook] Skipping user creation for ${customerEmail} — permanently deleted (sync_exclusions)`);
         } else {
-        await client.query(
-          `INSERT INTO users (email, first_name, last_name, phone, tier, membership_status, stripe_customer_id, stripe_subscription_id, billing_provider, stripe_current_period_end, join_date, created_at, updated_at)
-           VALUES ($1, $2, $3, $8, $4, $7, $5, $6, 'stripe', $9, NOW(), NOW(), NOW())
-           ON CONFLICT (email) DO UPDATE SET 
-             stripe_customer_id = EXCLUDED.stripe_customer_id,
-             stripe_subscription_id = EXCLUDED.stripe_subscription_id,
-             membership_status = CASE WHEN users.billing_provider IS NULL OR users.billing_provider = '' OR users.billing_provider = 'stripe' THEN $7 ELSE users.membership_status END,
-             billing_provider = CASE WHEN users.billing_provider IS NULL OR users.billing_provider = '' OR users.billing_provider = 'stripe' THEN 'stripe' ELSE users.billing_provider END,
-             stripe_current_period_end = COALESCE($9, users.stripe_current_period_end),
-             tier = COALESCE(EXCLUDED.tier, users.tier),
-             role = 'member',
-             join_date = COALESCE(users.join_date, NOW()),
-             first_name = COALESCE(NULLIF(EXCLUDED.first_name, ''), users.first_name),
-             last_name = COALESCE(NULLIF(EXCLUDED.last_name, ''), users.last_name),
-             phone = COALESCE(NULLIF(EXCLUDED.phone, ''), users.phone),
-             updated_at = NOW()`,
-          [customerEmail, firstName, lastName, tierName, customerId, subscription.id, actualStatus, metadataPhone || '', subscriptionPeriodEnd]
-        );
-        
-        logger.info(`[Stripe Webhook] Created user ${customerEmail} with tier ${tierName || 'none'}, phone ${metadataPhone || 'none'}, subscription ${subscription.id}`);
+          const existingUser = await client.query(
+            'SELECT id, stripe_customer_id, billing_provider, membership_status FROM users WHERE LOWER(email) = LOWER($1)',
+            [customerEmail]
+          );
+          
+          if (existingUser.rows.length > 0 && existingUser.rows[0].stripe_customer_id && existingUser.rows[0].stripe_customer_id !== String(customerId)) {
+            logger.warn(`[Stripe Webhook] subscription.created: user ${customerEmail} already has stripe_customer_id=${existingUser.rows[0].stripe_customer_id}, incoming=${customerId}. Skipping overwrite — flagging for review.`);
+            deferredActions.push(async () => {
+              try {
+                await notifyAllStaff(
+                  'Stripe Customer Conflict',
+                  `Subscription ${subscription.id} created for ${customerEmail}, but this user already has a different Stripe customer ID (${existingUser.rows[0].stripe_customer_id} vs ${customerId}). Please verify manually.`,
+                  'billing_alert',
+                  { sendPush: true }
+                );
+              } catch (err: unknown) {
+                logger.error('[Stripe Webhook] Failed to send customer conflict alert:', { error: err });
+              }
+            });
+          } else {
+            await client.query(
+              `INSERT INTO users (email, first_name, last_name, phone, tier, membership_status, stripe_customer_id, stripe_subscription_id, billing_provider, stripe_current_period_end, join_date, created_at, updated_at)
+               VALUES ($1, $2, $3, $8, $4, $7, $5, $6, 'stripe', $9, NOW(), NOW(), NOW())
+               ON CONFLICT (email) DO UPDATE SET 
+                 stripe_customer_id = EXCLUDED.stripe_customer_id,
+                 stripe_subscription_id = EXCLUDED.stripe_subscription_id,
+                 membership_status = CASE WHEN users.billing_provider IS NULL OR users.billing_provider = '' OR users.billing_provider = 'stripe' THEN $7 ELSE users.membership_status END,
+                 billing_provider = CASE WHEN users.billing_provider IS NULL OR users.billing_provider = '' OR users.billing_provider = 'stripe' THEN 'stripe' ELSE users.billing_provider END,
+                 stripe_current_period_end = COALESCE($9, users.stripe_current_period_end),
+                 tier = COALESCE(EXCLUDED.tier, users.tier),
+                 role = 'member',
+                 join_date = COALESCE(users.join_date, NOW()),
+                 first_name = COALESCE(NULLIF(EXCLUDED.first_name, ''), users.first_name),
+                 last_name = COALESCE(NULLIF(EXCLUDED.last_name, ''), users.last_name),
+                 phone = COALESCE(NULLIF(EXCLUDED.phone, ''), users.phone),
+                 updated_at = NOW()`,
+              [customerEmail, firstName, lastName, tierName, customerId, subscription.id, actualStatus, metadataPhone || '', subscriptionPeriodEnd]
+            );
+            
+            logger.info(`[Stripe Webhook] Created user ${customerEmail} with tier ${tierName || 'none'}, phone ${metadataPhone || 'none'}, subscription ${subscription.id}`);
+          }
         }
       }
       
@@ -4536,15 +4574,21 @@ async function handleCustomerUpdated(client: PoolClient, customer: Stripe.Custom
         [stripeEmail]
       );
       if (activeMatch.rows.length === 1) {
-        const correctUser = activeMatch.rows[0];
-        await client.query('UPDATE users SET stripe_customer_id = NULL, stripe_subscription_id = NULL WHERE id = $1', [user.id]);
-        await client.query(
-          `UPDATE users SET stripe_customer_id = $1, updated_at = NOW() WHERE id = $2 AND stripe_customer_id IS NULL`,
-          [stripeCustomerId, correctUser.id]
-        );
-        logger.info(`[Stripe Webhook] customer.updated: auto-reassigned stripe_customer_id ${stripeCustomerId} from ${currentEmail} to ${correctUser.email} (active user matches Stripe email)`);
-        updates.push(`auto_reassigned_to_${correctUser.email}`);
-        return deferredActions;
+        logger.warn(`[Stripe Webhook] customer.updated: Stripe email change for ${stripeCustomerId} matches existing user ${activeMatch.rows[0].email}. Auto-reassignment BLOCKED — flagging for manual review.`);
+        
+        deferredActions.push(async () => {
+          try {
+            await notifyAllStaff(
+              'Stripe Customer Email Change — Action Required',
+              `Stripe customer ${stripeCustomerId} (currently ${currentEmail}) changed their email to ${stripeEmail}, which matches existing member ${activeMatch.rows[0].email}. Auto-reassignment was blocked for security. Please verify and update manually if this is legitimate.`,
+              'billing_alert',
+              { sendPush: true }
+            );
+          } catch (err: unknown) {
+            logger.error('[Stripe Webhook] Failed to send reassignment alert:', { error: err });
+          }
+        });
+        updates.push(`auto_reassignment_blocked (stripe_email=${stripeEmail} matches ${activeMatch.rows[0].email})`);
       } else if (activeMatch.rows.length > 1) {
         logger.warn(`[Stripe Webhook] customer.updated: multiple active users match Stripe email ${stripeEmail} — skipping auto-reassignment, sending mismatch alert`);
       }
