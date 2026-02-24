@@ -42,6 +42,20 @@ Common skill mappings (quick reference — NOT exhaustive):
 
 **INCIDENT LOG:** If you fail to follow ANY of the above rules, you MUST immediately log it in `.agents/incident-log.md` with: what rule was violated, what happened, estimated wasted agent usage, and corrective action. This is how the founder tracks accountability.
 
+## ⛔ ANTI-PATTERNS — NEVER DO THESE ⛔
+
+These are the most expensive mistakes from the incident log (`.agents/incident-log.md`). Read the incident log at the start of every session to learn from past failures.
+
+1. **NO THRASHING.** If a fix doesn't work after 2 attempts, STOP. Do not make a 3rd attempt at the same approach. Instead: research the problem (web search, read docs, load relevant skills), understand the root cause, then try a fundamentally different approach. The incident log documents cases of 7-22 consecutive failed attempts on the same problem — this is the single most expensive pattern.
+
+2. **RESEARCH BEFORE CODING on unfamiliar topics.** If you don't know how something works (Safari viewport behavior, a library API, a CSS feature, a Stripe flow), search for documentation FIRST. Do not trial-and-error your way through it. One informed attempt beats 10 blind ones.
+
+3. **AUDIT THE FULL SCOPE, FIX ONCE.** When you find a bug, investigate whether there are related issues before writing any fix. Don't fix one symptom, deploy, find the next symptom, fix that, deploy — that's piecemeal and wastes messages. Audit everything, fix everything in one commit.
+
+4. **CHECK DATABASE CONSTRAINTS before using values.** Before using any enum/status value in code, verify it exists in the database CHECK constraint. The booking_requests.status CHECK allows ONLY: pending, approved, confirmed, declined, cancelled, cancellation_pending, attended, no_show, expired. Load `project-architecture` skill to confirm valid values for any table.
+
+5. **DON'T REPEAT A FAILED APPROACH.** If something was tried before and didn't work (check incident log + conversation memory), a different approach is needed — not the same approach again.
+
 ## Overview
 The Ever Club Members App is a private members club application designed for golf and wellness centers. Its core purpose is to streamline the management of golf simulator bookings, wellness service appointments, and club events. The project aims to create a central digital hub for private members clubs, providing comprehensive tools for membership management, facility booking, and community building, ultimately enhancing member satisfaction and operational efficiency.
 
