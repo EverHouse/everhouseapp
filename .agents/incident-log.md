@@ -179,6 +179,12 @@ This file tracks every instance where the agent failed to follow explicit instru
 *New entries must be added above the Summary section. Format: Incident number, date, rule violated, what happened, estimated wasted usage, corrective action taken.*
 
 ## Incident #26 — 2026-02-24
+**Rule Violated:** MANDATORY skill loading + conversation memory search + plan-before-coding
+**What Happened:** Agent worked on pull-to-refresh fix across multiple messages without: (1) loading any relevant skills (`react-dev`, `project-architecture`, `remembering-conversations`, `systematic-debugging`), (2) searching conversation memory for past PTR context or decisions, (3) creating a task list plan for user approval before coding. Jumped straight into reading code and making changes. The subagent delegated for public pages also only fixed 1 of 6 files (Cafe.tsx), requiring a second subagent to fix the remaining 5 — wasting messages.
+**Estimated Wasted Usage:** ~4 messages (skipped skill loading, skipped memory search, skipped plan approval, first subagent incomplete requiring second pass)
+**Corrective Action:** Always follow the 3-step protocol before ANY code work: (1) load all relevant skills, (2) search conversation memory, (3) create task list and wait for user approval. No exceptions.
+
+## Incident #27 — 2026-02-24
 **Rule Violated:** MANDATORY skill loading before ALL work — planning, auditing, AND coding
 **What Happened:** Agent proceeded with performance audit and implementation across 3 subagents without loading ANY skills first. Should have loaded: `performance`, `sql-optimization-patterns`, `project-architecture`, `postgres-drizzle`, `stripe-integration`, `clean-code`, and `remembering-conversations`. Read the SKILL.md files for `performance` and `sql-optimization-patterns` briefly but did not follow the mandatory protocol of loading all relevant skills before work, did not search conversation memory, and jumped straight to implementation.
 **Estimated Wasted Usage:** ~3 messages (audit and implementation started without proper skill context — though work was largely correct, it risked missing patterns documented in skills)
