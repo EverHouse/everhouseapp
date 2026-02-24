@@ -48,7 +48,7 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
   const isMobile = useIsMobile();
   const { actualUser, refreshMembers } = useData();
   const { isConnected: wsConnected } = useStaffWebSocketContext();
-  const { checkInWithToast } = useBookingActions();
+  const { checkInWithToast, staffCancelWithToast } = useBookingActions();
   
   const navigateToTab = useCallback((tab: TabType) => {
     if (tabToPath[tab as keyof typeof tabToPath]) {
@@ -798,6 +798,25 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
         onRosterUpdated={() => refresh()}
         onOpenBillingModal={(bookingId) => setBillingModal({ isOpen: true, bookingId })}
         onCollectPayment={(bookingId) => setBillingModal({ isOpen: true, bookingId })}
+        onCheckIn={async (bookingId: number, targetStatus?: 'attended' | 'no_show') => {
+          const booking = data.todaysBookings.find(b => b.id === bookingId);
+          if (booking) {
+            handleCheckIn(booking, targetStatus);
+          } else {
+            const result = await checkInWithToast(bookingId, { status: targetStatus || 'attended' });
+            if (result?.success) {
+              window.dispatchEvent(new CustomEvent('booking-action-completed'));
+              refresh();
+            }
+          }
+        }}
+        onCancelBooking={async (bookingId: number) => {
+          const result = await staffCancelWithToast(bookingId);
+          if (result?.success) {
+            window.dispatchEvent(new CustomEvent('booking-action-completed'));
+            refresh();
+          }
+        }}
       />
 
       {createPortal(
