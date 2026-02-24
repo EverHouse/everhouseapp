@@ -8,6 +8,15 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.26.2",
+    date: "2026-02-24",
+    title: "Terminal Card Reader — New Member Signup Fix",
+    changes: [
+      "Fixed: Card reader payments during new member signup were failing with a Stripe error — the system was trying to modify a subscription payment in a way Stripe doesn't allow, now it correctly creates a separate terminal-compatible payment and reconciles it automatically",
+      "Fixed: Both the 'process existing payment' and 'process subscription payment' terminal flows now gracefully fall back when the subscription's payment can't be directly routed to the card reader",
+    ]
+  },
+  {
     version: "8.26.1",
     date: "2026-02-24",
     title: "Future Bookings Fee Display Fix",

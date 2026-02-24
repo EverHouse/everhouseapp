@@ -674,11 +674,43 @@ router.post('/api/stripe/terminal/process-subscription-payment', isStaffOrAdmin,
         });
         logger.info('[Terminal] Using invoice PI for subscription', { extra: { invoicePIId: invoicePI.id, subscriptionId } });
       } catch (updateErr: unknown) {
-        logger.error('[Terminal] Failed to update invoice PI', { extra: { id: invoicePI.id, error: getErrorMessage(updateErr) } });
-        return res.status(500).json({ 
-          error: `Failed to configure invoice payment for terminal: ${getErrorMessage(updateErr)}`,
-          paymentIntentId: invoicePI.id
+        logger.info('[Terminal] Cannot update invoice PI for terminal (likely automatic_payment_methods), creating new card_present PI', { extra: { id: invoicePI.id, error: getErrorMessage(updateErr) } });
+
+        let subDescription = 'Membership activation';
+        try {
+          const userTier = await db.execute(sql`SELECT t.name AS tier_name FROM users u JOIN membership_tiers t ON u.membership_tier = t.id WHERE u.id = ${userId}`);
+          if (userTier.rows[0]?.tier_name) {
+            subDescription = `Membership activation - ${userTier.rows[0].tier_name}`;
+          }
+        } catch (_) { /* use default description */ }
+
+        paymentIntent = await stripe.paymentIntents.create({
+          amount,
+          currency: invoice.currency || 'usd',
+          customer: customerId,
+          payment_method_types: ['card_present'],
+          capture_method: 'automatic',
+          setup_future_usage: 'off_session',
+          description: subDescription,
+          ...(email ? { receipt_email: email } : {}),
+          metadata: {
+            subscriptionId,
+            invoiceId: invoice.id,
+            invoiceAmountDue: String(amount),
+            userId: userId || '',
+            email: email || '',
+            paymentType: 'subscription_terminal',
+            source: 'terminal',
+            readerId,
+            readerLabel,
+            fallback: 'true',
+            requiresInvoiceReconciliation: 'true',
+            originalPaymentIntentId: invoicePI.id,
+          }
+        }, {
+          idempotencyKey: `terminal_sub_fallback_${subscriptionId}_${invoice.id}`
         });
+        logger.info('[Terminal] Created fallback PI for subscription terminal payment', { extra: { newPiId: paymentIntent.id, originalPiId: invoicePI.id, subscriptionId } });
       }
     } else {
       logger.warn('[Terminal] No invoice PI found for subscription, creating terminal PI linked to invoice', { extra: { subscriptionId } });
@@ -1105,27 +1137,50 @@ router.post('/api/stripe/terminal/process-existing-payment', isStaffOrAdmin, asy
       updateParams.setup_future_usage = '';
     }
 
+    let terminalPiId = paymentIntentId;
     try {
       await stripe.paymentIntents.update(paymentIntentId, updateParams);
     } catch (updateErr: unknown) {
-      logger.info('[Terminal] First update attempt failed, trying stepwise:', { extra: { error: getErrorMessage(updateErr) } });
-      await stripe.paymentIntents.update(paymentIntentId, {
-        automatic_payment_methods: { enabled: false },
-        ...(paymentIntent.setup_future_usage ? { setup_future_usage: '' } : {}),
+      const errMsg = getErrorMessage(updateErr);
+      logger.info('[Terminal] Cannot update existing PI for terminal, creating new card_present PI:', { extra: { error: errMsg } });
+
+      const customerId = typeof paymentIntent.customer === 'string'
+        ? paymentIntent.customer
+        : paymentIntent.customer?.id || null;
+
+      if (!customerId) {
+        return res.status(400).json({ error: 'Payment Intent has no customer — cannot create terminal payment' });
+      }
+
+      try {
+        await stripe.paymentIntents.cancel(paymentIntentId);
+        logger.info('[Terminal] Cancelled original PI to create terminal-compatible PI', { extra: { originalPiId: paymentIntentId } });
+      } catch (cancelErr: unknown) {
+        logger.warn('[Terminal] Could not cancel original PI (may already be cancelled)', { extra: { error: getErrorMessage(cancelErr) } });
+      }
+
+      const newPi = await stripe.paymentIntents.create({
+        amount: paymentIntent.amount,
+        currency: paymentIntent.currency,
+        customer: customerId,
+        payment_method_types: ['card_present'],
+        capture_method: 'automatic',
+        setup_future_usage: 'off_session',
+        description: paymentIntent.description || 'Terminal payment',
         metadata: {
           ...paymentIntent.metadata,
           readerId,
           readerLabel,
           terminalPayment: 'true',
+          originalPaymentIntentId: paymentIntentId,
         },
-      } as Stripe.PaymentIntentUpdateParams);
-      await stripe.paymentIntents.update(paymentIntentId, {
-        payment_method_types: ['card_present']
       });
+      terminalPiId = newPi.id;
+      logger.info('[Terminal] Created new card_present PI for terminal', { extra: { newPiId: newPi.id, originalPiId: paymentIntentId } });
     }
 
     const reader = await stripe.terminal.readers.processPaymentIntent(readerId, {
-      payment_intent: paymentIntentId
+      payment_intent: terminalPiId
     });
 
     if (reader.device_type?.startsWith('simulated')) {
@@ -1139,9 +1194,10 @@ router.post('/api/stripe/terminal/process-existing-payment', isStaffOrAdmin, asy
     await logFromRequest(req, {
       action: 'terminal_existing_payment_routed',
       resourceType: 'payment',
-      resourceId: paymentIntentId,
+      resourceId: terminalPiId,
       details: {
-        paymentIntentId,
+        paymentIntentId: terminalPiId,
+        originalPaymentIntentId: terminalPiId !== paymentIntentId ? paymentIntentId : undefined,
         readerId,
         originalStatus: paymentIntent.status,
         amount: paymentIntent.amount
@@ -1150,7 +1206,7 @@ router.post('/api/stripe/terminal/process-existing-payment', isStaffOrAdmin, asy
 
     res.json({
       success: true,
-      paymentIntentId,
+      paymentIntentId: terminalPiId,
       readerId: reader.id,
       readerAction: reader.action
     });
