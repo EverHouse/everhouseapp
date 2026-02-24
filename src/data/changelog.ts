@@ -13,7 +13,7 @@ export const changelog: ChangelogEntry[] = [
     title: "Staff Portal — Bottom Nav Glass Fix",
     changes: [
       "Fixed: Staff portal bottom navigation now shows proper liquid glass transparency matching the member portal",
-      "Fixed: Reduced transparency accessibility setting now correctly makes the staff bottom nav solid instead of transparent",
+      "Fixed: Both staff and member bottom nav menus now correctly show a solid background when reduced transparency is enabled, and liquid glass when it is not",
     ]
   },
   {

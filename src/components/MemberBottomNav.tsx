@@ -52,7 +52,7 @@ const MemberBottomNav: React.FC<MemberBottomNavProps> = ({ currentPath, isDarkTh
   
   const navContent = (
       <nav 
-        className="relative mb-8 mx-auto w-[calc(100%-3rem)] max-w-md rounded-full p-2 bg-black/60 backdrop-blur-xl border border-[#293515]/80 shadow-[0_4px_16px_rgba(0,0,0,0.15)] pointer-events-auto"
+        className="member-bottom-nav relative mb-8 mx-auto w-[calc(100%-3rem)] max-w-md rounded-full p-2 bg-black/60 backdrop-blur-xl border border-[#293515]/80 shadow-[0_4px_16px_rgba(0,0,0,0.15)] pointer-events-auto"
         role="navigation"
         aria-label="Member navigation"
       >
