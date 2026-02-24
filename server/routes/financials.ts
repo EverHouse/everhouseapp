@@ -101,14 +101,14 @@ router.get('/api/financials/recent-transactions', isStaffOrAdmin, async (req: Re
         SELECT 
           id::text,
           'day_pass' as type,
-          price_cents as amount_cents,
+          amount_cents,
           'Day Pass' as description,
-          email as member_email,
-          COALESCE(purchaser_first_name || ' ' || purchaser_last_name, email) as member_name,
+          purchaser_email as member_email,
+          COALESCE(purchaser_first_name || ' ' || purchaser_last_name, purchaser_email) as member_name,
           purchased_at as created_at,
           'completed' as status
-        FROM day_passes
-        WHERE status = 'active'${purchasedDateFilter}${purchasedCursorFilter}
+        FROM day_pass_purchases
+        WHERE status IN ('active', 'exhausted')${purchasedDateFilter}${purchasedCursorFilter}
       )
       SELECT * FROM all_transactions
       ORDER BY created_at DESC
