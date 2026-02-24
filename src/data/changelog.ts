@@ -8,6 +8,16 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.26.6",
+    date: "2026-02-24",
+    title: "Check-In Race Condition, HubSpot Sync & Fee Calculation Fixes",
+    changes: [
+      "Fixed: If two staff members clicked check-in on the same booking at the exact same time, both could succeed — the system now locks against the exact booking status to prevent duplicate check-ins",
+      "Fixed: During corporate member signup, if HubSpot was slow or timed out, the company link was permanently lost — the system now queues a reliable retry so the company always gets synced to HubSpot",
+      "Fixed: On legacy or malformed bookings missing an explicit owner in the roster, overage fees for empty slots were silently skipped — the system now correctly assigns the overage to the first member participant as a fallback",
+    ]
+  },
+  {
     version: "8.26.5",
     date: "2026-02-24",
     title: "Roster Editing Deadlock Prevention",

@@ -755,7 +755,8 @@ export async function computeFeeBreakdown(params: FeeComputeParams): Promise<Fee
   const nonMemberMinutes = emptySlotMinutes + guestSlotMinutes;
 
   if (nonMemberMinutes > 0 && !isConferenceRoom) {
-    const ownerLineItem = lineItems.find(li => li.participantType === 'owner');
+    const ownerLineItem = lineItems.find(li => li.participantType === 'owner') ||
+                          lineItems.find(li => li.participantType === 'member');
     if (ownerLineItem && !ownerLineItem.isStaff) {
       ownerLineItem.minutesAllocated += nonMemberMinutes;
 

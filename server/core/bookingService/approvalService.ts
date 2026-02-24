@@ -1679,8 +1679,6 @@ export async function checkinBooking(params: CheckinBookingParams) {
 
   }
 
-  const statusConditions = allowedStatuses.map(s => eq(bookingRequests.status, s));
-
   const result = await db.update(bookingRequests)
     .set({
       status: newStatus,
@@ -1689,12 +1687,12 @@ export async function checkinBooking(params: CheckinBookingParams) {
     })
     .where(and(
       eq(bookingRequests.id, bookingId),
-      or(...statusConditions)
+      eq(bookingRequests.status, currentStatus)
     ))
     .returning();
 
   if (result.length === 0) {
-    logger.warn('[Checkin] Booking status changed during check-in, possible race condition', { extra: { bookingId, expectedStatuses: allowedStatuses, newStatus } });
+    logger.warn('[Checkin] Booking status changed during check-in, possible race condition', { extra: { bookingId, expectedStatus: currentStatus, newStatus } });
     return { error: 'Booking status changed during check-in. Please refresh and try again.', statusCode: 409 };
   }
 

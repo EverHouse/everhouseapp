@@ -2302,7 +2302,23 @@ async function handleCheckoutSessionCompleted(client: PoolClient, session: Strip
           logger.error(`[Stripe Webhook] Company sync failed: ${companyResult.error}`);
         }
       } catch (companyError: unknown) {
-        logger.error('[Stripe Webhook] Error syncing company to HubSpot:', { error: companyError });
+        logger.error('[Stripe Webhook] Error syncing company to HubSpot (will queue retry):', { error: companyError });
+        deferredActions.push(async () => {
+          try {
+            const { enqueueHubSpotSync } = await import('../hubspot/queue');
+            await enqueueHubSpotSync('sync_company', {
+              companyName,
+              userEmail,
+              retryReason: 'checkout_timeout'
+            }, {
+              idempotencyKey: `company_sync_checkout_${userEmail}_${session.id}`,
+              priority: 3
+            });
+            logger.info(`[Stripe Webhook] Queued HubSpot company sync retry for ${companyName} (${userEmail})`);
+          } catch (queueErr: unknown) {
+            logger.error('[Stripe Webhook] Failed to queue HubSpot company sync retry:', { error: queueErr });
+          }
+        });
       }
     }
 
