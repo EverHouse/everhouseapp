@@ -2,6 +2,7 @@ import { getResendClient } from '../utils/resend';
 import { IntegrityCheckResult, IntegrityIssue } from '../core/dataIntegrity';
 import { getErrorMessage } from '../utils/errorUtils';
 import { logger } from '../core/logger';
+import { isEmailCategoryEnabled } from '../core/settingsHelper';
 
 const CLUB_COLORS = {
   deepGreen: '#293515',
@@ -225,6 +226,10 @@ export async function sendIntegrityAlertEmail(
   results: IntegrityCheckResult[],
   adminEmail: string
 ): Promise<{ success: boolean; error?: string }> {
+  if (!await isEmailCategoryEnabled('system')) {
+    logger.info('[Integrity Alert Email] SKIPPED - system emails disabled via settings');
+    return { success: true };
+  }
   try {
     const criticalIssues = results
       .flatMap(r => r.issues)

@@ -1,5 +1,6 @@
 import { getResendClient } from '../utils/resend';
 import { logger } from '../core/logger';
+import { isEmailCategoryEnabled } from '../core/settingsHelper';
 
 const CLUB_COLORS = {
   deepGreen: '#293515',
@@ -273,6 +274,10 @@ export async function sendBookingRescheduleEmail(
   email: string,
   data: BookingRescheduleData
 ): Promise<boolean> {
+  if (!await isEmailCategoryEnabled('booking')) {
+    logger.info('[Booking Reschedule Email] SKIPPED - booking emails disabled via settings', { extra: { email } });
+    return true;
+  }
   try {
     const resendResult = await getResendClient();
     if (!resendResult) {
@@ -301,6 +306,10 @@ export async function sendBookingConfirmationEmail(
   email: string,
   data: BookingConfirmationData
 ): Promise<boolean> {
+  if (!await isEmailCategoryEnabled('booking')) {
+    logger.info('[Booking Confirmation Email] SKIPPED - booking emails disabled via settings', { extra: { email } });
+    return true;
+  }
   try {
     const resendResult = await getResendClient();
     if (!resendResult) {

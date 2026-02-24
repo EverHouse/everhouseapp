@@ -1,8 +1,7 @@
 import { getResendClient } from '../utils/resend';
 import { logger } from '../core/logger';
 import { getErrorMessage } from '../utils/errorUtils';
-
-const BILLING_EMAILS_DISABLED = true;
+import { isEmailCategoryEnabled } from '../core/settingsHelper';
 
 const CLUB_COLORS = {
   deepGreen: '#293515',
@@ -314,8 +313,8 @@ export async function sendMembershipRenewalEmail(
   email: string, 
   params: MembershipRenewalParams
 ): Promise<{ success: boolean; error?: string }> {
-  if (BILLING_EMAILS_DISABLED) {
-    logger.info('[Membership Renewal Email] SKIPPED - billing emails disabled, use Stripe instead', { extra: { email } });
+  if (!await isEmailCategoryEnabled('membership')) {
+    logger.info('[Membership Renewal Email] SKIPPED - membership emails disabled via settings', { extra: { email } });
     return { success: true };
   }
   try {
@@ -340,8 +339,8 @@ export async function sendMembershipFailedEmail(
   email: string, 
   params: MembershipFailedParams
 ): Promise<{ success: boolean; error?: string }> {
-  if (BILLING_EMAILS_DISABLED) {
-    logger.info('[Membership Failed Email] SKIPPED - billing emails disabled, use Stripe instead', { extra: { email } });
+  if (!await isEmailCategoryEnabled('membership')) {
+    logger.info('[Membership Failed Email] SKIPPED - membership emails disabled via settings', { extra: { email } });
     return { success: true };
   }
   try {
@@ -366,8 +365,8 @@ export async function sendCardExpiringEmail(
   email: string, 
   params: CardExpiringParams
 ): Promise<{ success: boolean; error?: string }> {
-  if (BILLING_EMAILS_DISABLED) {
-    logger.info('[Card Expiring Email] SKIPPED - billing emails disabled, use Stripe instead', { extra: { email } });
+  if (!await isEmailCategoryEnabled('membership')) {
+    logger.info('[Card Expiring Email] SKIPPED - membership emails disabled via settings', { extra: { email } });
     return { success: true };
   }
   try {
@@ -491,8 +490,8 @@ export async function sendGracePeriodReminderEmail(
   email: string, 
   params: GracePeriodReminderParams
 ): Promise<{ success: boolean; error?: string }> {
-  if (BILLING_EMAILS_DISABLED) {
-    logger.info('[Grace Period Email] SKIPPED - billing emails disabled, use Stripe instead', { extra: { email, day: params.currentDay } });
+  if (!await isEmailCategoryEnabled('membership')) {
+    logger.info('[Grace Period Email] SKIPPED - membership emails disabled via settings', { extra: { email } });
     return { success: true };
   }
   try {
@@ -593,6 +592,10 @@ export async function sendMembershipActivationEmail(
   email: string,
   params: MembershipActivationParams
 ): Promise<{ success: boolean; error?: string }> {
+  if (!await isEmailCategoryEnabled('membership')) {
+    logger.info('[Membership Activation Email] SKIPPED - membership emails disabled via settings', { extra: { email } });
+    return { success: true };
+  }
   try {
     const { client, fromEmail } = await getResendClient();
     

@@ -1,12 +1,15 @@
+import { isSchedulerEnabled } from './settingsHelper';
+
 interface SchedulerStatus {
   taskName: string;
   lastRunAt: Date | null;
-  lastResult: 'success' | 'error' | 'pending';
+  lastResult: 'success' | 'error' | 'pending' | 'disabled';
   lastError?: string;
   intervalMs: number;
   nextRunAt: Date | null;
   runCount: number;
   lastDurationMs: number | null;
+  isEnabled: boolean;
 }
 
 class SchedulerTracker {
@@ -21,6 +24,7 @@ class SchedulerTracker {
       nextRunAt: new Date(Date.now() + intervalMs),
       runCount: 0,
       lastDurationMs: null,
+      isEnabled: true,
     });
   }
 
@@ -36,6 +40,7 @@ class SchedulerTracker {
         nextRunAt: null,
         runCount: 1,
         lastDurationMs: durationMs ?? null,
+        isEnabled: true,
       });
       return;
     }
@@ -47,6 +52,34 @@ class SchedulerTracker {
     existing.lastDurationMs = durationMs ?? null;
     if (existing.intervalMs > 0) {
       existing.nextRunAt = new Date(Date.now() + existing.intervalMs);
+    }
+  }
+
+  recordSkipped(name: string): void {
+    const existing = this.schedulers.get(name);
+    if (existing) {
+      existing.lastResult = 'disabled';
+      existing.isEnabled = false;
+    }
+  }
+
+  setEnabled(name: string, enabled: boolean): void {
+    const existing = this.schedulers.get(name);
+    if (existing) {
+      existing.isEnabled = enabled;
+      if (!enabled) {
+        existing.lastResult = 'disabled';
+      }
+    }
+  }
+
+  async refreshEnabledStates(): Promise<void> {
+    for (const [name, status] of this.schedulers) {
+      const enabled = await isSchedulerEnabled(name);
+      status.isEnabled = enabled;
+      if (!enabled && status.lastResult !== 'error') {
+        status.lastResult = 'disabled';
+      }
     }
   }
 

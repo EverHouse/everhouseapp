@@ -1,6 +1,7 @@
 import { getResendClient } from '../utils/resend';
 import { getErrorMessage } from '../utils/errorUtils';
 import { logger } from '../core/logger';
+import { isEmailCategoryEnabled } from '../core/settingsHelper';
 
 const CLUB_COLORS = {
   deepGreen: '#293515',
@@ -172,6 +173,10 @@ export function getWelcomeEmailHtml(firstName?: string): string {
 
 export async function sendWelcomeEmail(email: string, firstName?: string): Promise<{ success: boolean; error?: string }> {
   try {
+    if (!await isEmailCategoryEnabled('welcome')) {
+      logger.info('[Welcome Email] SKIPPED - welcome emails disabled via settings', { extra: { email } });
+      return { success: true };
+    }
     const { client, fromEmail } = await getResendClient();
     
     await client.emails.send({

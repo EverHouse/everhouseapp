@@ -6,6 +6,7 @@ import { eq } from 'drizzle-orm';
 import { logAndRespond } from '../core/logger';
 import { getSessionUser } from '../types/session';
 import { logFromRequest } from '../core/auditLog';
+import { invalidateSettingsCache } from '../core/settingsHelper';
 
 const router = Router();
 
@@ -22,6 +23,44 @@ const DEFAULT_SETTINGS: Record<string, { value: string; category: string }> = {
   'category.other': { value: 'Other', category: 'categories' },
   'notifications.data_integrity_alerts': { value: 'true', category: 'notifications' },
   'notifications.sync_failure_alerts': { value: 'true', category: 'notifications' },
+
+  'email.welcome.enabled': { value: 'true', category: 'email' },
+  'email.booking.enabled': { value: 'true', category: 'email' },
+  'email.passes.enabled': { value: 'true', category: 'email' },
+  'email.payments.enabled': { value: 'false', category: 'email' },
+  'email.membership.enabled': { value: 'false', category: 'email' },
+  'email.onboarding.enabled': { value: 'true', category: 'email' },
+  'email.system.enabled': { value: 'true', category: 'email' },
+
+  'scheduler.Background_Sync.enabled': { value: 'true', category: 'scheduler' },
+  'scheduler.Daily_Reminder.enabled': { value: 'true', category: 'scheduler' },
+  'scheduler.Morning_Closure.enabled': { value: 'true', category: 'scheduler' },
+  'scheduler.Weekly_Cleanup.enabled': { value: 'true', category: 'scheduler' },
+  'scheduler.Integrity_Check.enabled': { value: 'true', category: 'scheduler' },
+  'scheduler.Auto-Fix_Tiers.enabled': { value: 'true', category: 'scheduler' },
+  'scheduler.Abandoned_Pending_Cleanup.enabled': { value: 'true', category: 'scheduler' },
+  'scheduler.Waiver_Review.enabled': { value: 'true', category: 'scheduler' },
+  'scheduler.Stripe_Reconciliation.enabled': { value: 'true', category: 'scheduler' },
+  'scheduler.Fee_Snapshot_Reconciliation.enabled': { value: 'true', category: 'scheduler' },
+  'scheduler.Grace_Period.enabled': { value: 'true', category: 'scheduler' },
+  'scheduler.Booking_Expiry.enabled': { value: 'true', category: 'scheduler' },
+  'scheduler.Booking_Auto-Complete.enabled': { value: 'true', category: 'scheduler' },
+  'scheduler.Communication_Logs_Sync.enabled': { value: 'true', category: 'scheduler' },
+  'scheduler.Webhook_Log_Cleanup.enabled': { value: 'true', category: 'scheduler' },
+  'scheduler.Session_Cleanup.enabled': { value: 'true', category: 'scheduler' },
+  'scheduler.Unresolved_Trackman.enabled': { value: 'true', category: 'scheduler' },
+  'scheduler.HubSpot_Queue.enabled': { value: 'true', category: 'scheduler' },
+  'scheduler.HubSpot_Form_Sync.enabled': { value: 'true', category: 'scheduler' },
+  'scheduler.Member_Sync.enabled': { value: 'true', category: 'scheduler' },
+  'scheduler.Duplicate_Cleanup.enabled': { value: 'true', category: 'scheduler' },
+  'scheduler.Guest_Pass_Reset.enabled': { value: 'true', category: 'scheduler' },
+  'scheduler.Relocation_Cleanup.enabled': { value: 'true', category: 'scheduler' },
+  'scheduler.Stuck_Cancellation.enabled': { value: 'true', category: 'scheduler' },
+  'scheduler.Pending_User_Cleanup.enabled': { value: 'true', category: 'scheduler' },
+  'scheduler.Webhook_Event_Cleanup.enabled': { value: 'true', category: 'scheduler' },
+  'scheduler.Onboarding_Nudge.enabled': { value: 'true', category: 'scheduler' },
+  'scheduler.Job_Queue_Processor.enabled': { value: 'true', category: 'scheduler' },
+  'scheduler.Invite_Expiry.enabled': { value: 'true', category: 'scheduler' },
 };
 
 router.get('/api/settings', isAuthenticated, async (req, res) => {
@@ -108,6 +147,7 @@ router.put('/api/admin/settings/:key', isAdmin, async (req, res) => {
       })
       .returning();
     
+    invalidateSettingsCache(key);
     logFromRequest(req, 'update_setting', 'setting', req.params.key as string, req.params.key as string, { value: req.body.value });
     res.json(result);
   } catch (error: unknown) {
@@ -151,6 +191,7 @@ router.put('/api/admin/settings', isAdmin, async (req, res) => {
       results.push(result);
     }
     
+    invalidateSettingsCache();
     logFromRequest(req, 'update_settings_bulk', 'settings', '', 'bulk_update', { keys: Object.keys(settings) });
     res.json({ success: true, updated: results.length });
   } catch (error: unknown) {

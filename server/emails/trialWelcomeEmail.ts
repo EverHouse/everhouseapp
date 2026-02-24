@@ -1,6 +1,7 @@
 import { getResendClient } from '../utils/resend';
 import { getErrorMessage } from '../utils/errorUtils';
 import { logger } from '../core/logger';
+import { isEmailCategoryEnabled } from '../core/settingsHelper';
 import QRCode from 'qrcode';
 
 async function generateQrDataUri(data: string): Promise<string> {
@@ -231,6 +232,10 @@ export async function sendTrialWelcomeWithQrEmail(
   email: string,
   params: { firstName?: string; userId: number; trialEndDate: Date; couponCode?: string }
 ): Promise<{ success: boolean; error?: string }> {
+  if (!await isEmailCategoryEnabled('welcome')) {
+    logger.info('[Trial Welcome Email] SKIPPED - welcome emails disabled via settings', { extra: { email } });
+    return { success: true };
+  }
   try {
     const { client, fromEmail } = await getResendClient();
     

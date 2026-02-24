@@ -11,6 +11,7 @@ const router = Router();
 
 router.get('/api/admin/monitoring/schedulers', isStaffOrAdmin, async (_req, res) => {
   try {
+    await schedulerTracker.refreshEnabledStates();
     const statuses = schedulerTracker.getSchedulerStatuses();
     res.json({ schedulers: statuses });
   } catch (error: unknown) {

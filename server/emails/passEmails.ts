@@ -1,5 +1,6 @@
 import { getResendClient } from '../utils/resend';
 import { logger } from '../core/logger';
+import { isEmailCategoryEnabled } from '../core/settingsHelper';
 import QRCode from 'qrcode';
 
 async function generateQrDataUri(data: string): Promise<string> {
@@ -193,6 +194,10 @@ export async function sendPassWithQrEmail(
   email: string,
   passDetails: PassDetails
 ): Promise<void> {
+  if (!await isEmailCategoryEnabled('passes')) {
+    logger.info('[Pass QR Email] SKIPPED - passes emails disabled via settings', { extra: { email } });
+    return;
+  }
   try {
     const { client, fromEmail } = await getResendClient();
     
@@ -407,6 +412,10 @@ export async function sendRedemptionConfirmationEmail(
   email: string,
   details: RedemptionDetails
 ): Promise<void> {
+  if (!await isEmailCategoryEnabled('passes')) {
+    logger.info('[Redemption Confirmation Email] SKIPPED - passes emails disabled via settings', { extra: { email } });
+    return;
+  }
   try {
     const { client, fromEmail } = await getResendClient();
     

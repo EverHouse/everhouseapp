@@ -8,6 +8,17 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.24.0",
+    date: "2026-02-24",
+    title: "Admin Controls — Email & Scheduler Management",
+    changes: [
+      "Added: Email Controls panel in Email Templates — toggle each email category on/off (Welcome, Booking, Passes, Payments, Membership, Onboarding, System) without code changes",
+      "Added: Scheduler Controls — enable/disable individual background tasks (booking expiry, HubSpot sync, onboarding nudges, etc.) from the Data Integrity panel",
+      "Improved: Payment and Membership emails now controlled via admin settings instead of hardcoded flags — can be re-enabled when ready to move off Stripe-native emails",
+      "Improved: Scheduler monitoring now shows enabled/disabled state for each background task with real-time toggle controls",
+    ]
+  },
+  {
     version: "8.23.0",
     date: "2026-02-24",
     title: "Directory UX — Loading States & Performance",

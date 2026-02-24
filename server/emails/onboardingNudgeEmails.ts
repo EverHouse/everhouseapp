@@ -1,6 +1,7 @@
 import { getResendClient } from '../utils/resend';
 import { getErrorMessage } from '../utils/errorUtils';
 import { logger } from '../core/logger';
+import { isEmailCategoryEnabled } from '../core/settingsHelper';
 
 const CLUB_COLORS = {
   deepGreen: '#293515',
@@ -257,6 +258,10 @@ function getNudge7dHtml(firstName?: string): string {
 }
 
 export async function sendOnboardingNudge24h(email: string, firstName?: string): Promise<{ success: boolean; error?: string }> {
+  if (!await isEmailCategoryEnabled('onboarding')) {
+    logger.info('[Onboarding Nudge Email] SKIPPED - onboarding emails disabled via settings', { extra: { email } });
+    return { success: true };
+  }
   try {
     const { client, fromEmail } = await getResendClient();
 
@@ -276,6 +281,10 @@ export async function sendOnboardingNudge24h(email: string, firstName?: string):
 }
 
 export async function sendOnboardingNudge72h(email: string, firstName?: string): Promise<{ success: boolean; error?: string }> {
+  if (!await isEmailCategoryEnabled('onboarding')) {
+    logger.info('[Onboarding Nudge Email] SKIPPED - onboarding emails disabled via settings', { extra: { email } });
+    return { success: true };
+  }
   try {
     const { client, fromEmail } = await getResendClient();
 
@@ -295,6 +304,10 @@ export async function sendOnboardingNudge72h(email: string, firstName?: string):
 }
 
 export async function sendOnboardingNudge7d(email: string, firstName?: string): Promise<{ success: boolean; error?: string }> {
+  if (!await isEmailCategoryEnabled('onboarding')) {
+    logger.info('[Onboarding Nudge Email] SKIPPED - onboarding emails disabled via settings', { extra: { email } });
+    return { success: true };
+  }
   try {
     const { client, fromEmail } = await getResendClient();
 

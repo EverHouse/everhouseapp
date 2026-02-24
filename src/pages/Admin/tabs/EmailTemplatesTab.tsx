@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { fetchWithCredentials } from '../../../hooks/queries/useFetch';
+import Toggle from '../../../components/Toggle';
 import WalkingGolferSpinner from '../../../components/WalkingGolferSpinner';
 
 interface EmailTemplate {
@@ -24,6 +26,25 @@ const CATEGORY_ICONS: Record<string, string> = {
   System: 'settings',
 };
 
+interface EmailCategory {
+  key: string;
+  label: string;
+  icon: string;
+  description: string;
+  defaultOff?: boolean;
+  stripeNote?: boolean;
+}
+
+const EMAIL_CATEGORIES: EmailCategory[] = [
+  { key: 'email.welcome.enabled', label: 'Welcome', icon: 'waving_hand', description: 'Welcome, trial welcome, and first visit emails' },
+  { key: 'email.booking.enabled', label: 'Booking', icon: 'event_note', description: 'Booking confirmation and reschedule notifications' },
+  { key: 'email.passes.enabled', label: 'Passes', icon: 'confirmation_number', description: 'Day pass and guest pass emails with QR codes' },
+  { key: 'email.payments.enabled', label: 'Payments', icon: 'payments', description: 'Payment receipts, failed payments, outstanding balances', defaultOff: true, stripeNote: true },
+  { key: 'email.membership.enabled', label: 'Membership', icon: 'card_membership', description: 'Renewal, failed payment, card expiring, grace period emails', defaultOff: true, stripeNote: true },
+  { key: 'email.onboarding.enabled', label: 'Onboarding', icon: 'school', description: 'Automated onboarding nudge emails for stalled members' },
+  { key: 'email.system.enabled', label: 'System', icon: 'settings', description: 'Data integrity alerts sent to staff' },
+];
+
 const EmailTemplatesTab: React.FC = () => {
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<EmailTemplate | null>(null);
@@ -32,6 +53,65 @@ const EmailTemplatesTab: React.FC = () => {
   const [previewLoading, setPreviewLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const [controlsOpen, setControlsOpen] = useState(true);
+  const [savedToast, setSavedToast] = useState(false);
+  const [savingKey, setSavingKey] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+
+  const { data: settingsData } = useQuery({
+    queryKey: ['settings'],
+    queryFn: () => fetchWithCredentials<Record<string, { value: string | null; category: string | null }>>('/api/settings'),
+  });
+
+  const toggleMutation = useMutation({
+    mutationFn: async ({ key, value }: { key: string; value: string }) => {
+      return fetchWithCredentials(`/api/admin/settings/${encodeURIComponent(key)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ value }),
+      });
+    },
+    onMutate: async ({ key, value }) => {
+      setSavingKey(key);
+      await queryClient.cancelQueries({ queryKey: ['settings'] });
+      const previous = queryClient.getQueryData(['settings']);
+      queryClient.setQueryData(['settings'], (old: any) => {
+        if (!old) return old;
+        return { ...old, [key]: { ...old[key], value } };
+      });
+      return { previous };
+    },
+    onSuccess: () => {
+      setSavedToast(true);
+      setTimeout(() => setSavedToast(false), 3000);
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(['settings'], context.previous);
+      }
+    },
+    onSettled: () => {
+      setSavingKey(null);
+      queryClient.invalidateQueries({ queryKey: ['settings'] });
+    },
+  });
+
+  const getEmailEnabled = (key: string): boolean => {
+    if (!settingsData) {
+      const cat = EMAIL_CATEGORIES.find(c => c.key === key);
+      return !cat?.defaultOff;
+    }
+    const setting = settingsData[key];
+    if (!setting) {
+      const cat = EMAIL_CATEGORIES.find(c => c.key === key);
+      return !cat?.defaultOff;
+    }
+    return setting.value !== 'false';
+  };
+
+  const handleToggle = (key: string, currentValue: boolean) => {
+    toggleMutation.mutate({ key, value: String(!currentValue) });
+  };
 
   useEffect(() => {
     fetchTemplates();
@@ -108,6 +188,84 @@ const EmailTemplatesTab: React.FC = () => {
 
   return (
     <div className="space-y-6 animate-pop-in pb-32">
+      {savedToast && (
+        <div className="fixed top-4 right-4 z-50 animate-pop-in">
+          <div className="px-4 py-3 bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-700 rounded-xl text-green-700 dark:text-green-400 text-sm font-medium flex items-center gap-2 shadow-lg backdrop-blur-lg">
+            <span className="material-symbols-outlined text-lg">check_circle</span>
+            Saved
+          </div>
+        </div>
+      )}
+
+      <div className="bg-white/60 dark:bg-white/5 backdrop-blur-lg rounded-2xl border border-primary/10 dark:border-white/20 overflow-hidden">
+        <button
+          onClick={() => setControlsOpen(!controlsOpen)}
+          className="tactile-btn w-full px-6 py-4 flex items-center justify-between"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-primary/10 dark:bg-white/10 flex items-center justify-center">
+              <span className="material-symbols-outlined text-primary dark:text-white">mail</span>
+            </div>
+            <div className="text-left">
+              <h3 className="text-lg font-bold text-primary dark:text-white">Email Controls</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400">Enable or disable email categories</p>
+            </div>
+          </div>
+          <span className={`material-symbols-outlined text-primary/50 dark:text-white/50 transition-transform duration-200 ${controlsOpen ? 'rotate-180' : ''}`}>
+            expand_more
+          </span>
+        </button>
+
+        {controlsOpen && (
+          <div className="px-6 pb-6 space-y-3 border-t border-primary/5 dark:border-white/5 pt-4">
+            {EMAIL_CATEGORIES.map((cat) => {
+              const enabled = getEmailEnabled(cat.key);
+              const isSaving = savingKey === cat.key;
+              return (
+                <div
+                  key={cat.key}
+                  className="flex items-center justify-between p-4 bg-gray-50 dark:bg-black/20 rounded-xl"
+                >
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    <div className="w-9 h-9 rounded-lg bg-primary/10 dark:bg-white/10 flex items-center justify-center flex-shrink-0">
+                      <span className="material-symbols-outlined text-lg text-primary dark:text-white">{cat.icon}</span>
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="font-medium text-primary dark:text-white">{cat.label}</p>
+                        {!enabled && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-700/50">
+                            Disabled
+                          </span>
+                        )}
+                        {isSaving && (
+                          <span className="material-symbols-outlined animate-spin text-sm text-primary/40 dark:text-white/40">progress_activity</span>
+                        )}
+                      </div>
+                      <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{cat.description}</p>
+                      {cat.stripeNote && (
+                        <p className="text-xs text-primary/40 dark:text-white/30 mt-1 flex items-center gap-1">
+                          <span className="material-symbols-outlined text-xs">info</span>
+                          Using Stripe emails instead
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex-shrink-0 ml-4">
+                    <Toggle
+                      checked={enabled}
+                      onChange={() => handleToggle(cat.key, enabled)}
+                      disabled={isSaving}
+                      size="sm"
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
       <div className="mb-2">
         <p className="text-sm text-primary/70 dark:text-white/70">
           Preview all email templates sent to members. Select a template to see its rendered HTML.

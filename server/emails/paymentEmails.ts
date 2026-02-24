@@ -1,8 +1,7 @@
 import { getResendClient } from '../utils/resend';
 import { logger } from '../core/logger';
 import { getErrorMessage } from '../utils/errorUtils';
-
-const BILLING_EMAILS_DISABLED = true;
+import { isEmailCategoryEnabled } from '../core/settingsHelper';
 
 const CLUB_COLORS = {
   deepGreen: '#293515',
@@ -399,8 +398,8 @@ export async function sendPaymentReceiptEmail(
   email: string, 
   params: PaymentReceiptParams
 ): Promise<{ success: boolean; error?: string }> {
-  if (BILLING_EMAILS_DISABLED) {
-    logger.info('[Payment Receipt Email] SKIPPED - billing emails disabled, use Stripe instead', { extra: { email } });
+  if (!await isEmailCategoryEnabled('payments')) {
+    logger.info('[Payment Receipt Email] SKIPPED - payments emails disabled via settings', { extra: { email } });
     return { success: true };
   }
   try {
@@ -425,8 +424,8 @@ export async function sendPaymentFailedEmail(
   email: string, 
   params: PaymentFailedParams
 ): Promise<{ success: boolean; error?: string }> {
-  if (BILLING_EMAILS_DISABLED) {
-    logger.info('[Payment Failed Email] SKIPPED - billing emails disabled, use Stripe instead', { extra: { email } });
+  if (!await isEmailCategoryEnabled('payments')) {
+    logger.info('[Payment Failed Email] SKIPPED - payments emails disabled via settings', { extra: { email } });
     return { success: true };
   }
   try {
@@ -451,8 +450,8 @@ export async function sendOutstandingBalanceEmail(
   email: string, 
   params: OutstandingBalanceParams
 ): Promise<{ success: boolean; error?: string }> {
-  if (BILLING_EMAILS_DISABLED) {
-    logger.info('[Outstanding Balance Email] SKIPPED - billing emails disabled, use Stripe instead', { extra: { email } });
+  if (!await isEmailCategoryEnabled('payments')) {
+    logger.info('[Outstanding Balance Email] SKIPPED - payments emails disabled via settings', { extra: { email } });
     return { success: true };
   }
   try {
@@ -477,8 +476,8 @@ export async function sendFeeWaivedEmail(
   email: string, 
   params: FeeWaivedParams
 ): Promise<{ success: boolean; error?: string }> {
-  if (BILLING_EMAILS_DISABLED) {
-    logger.info('[Fee Waived Email] SKIPPED - billing emails disabled, use Stripe instead', { extra: { email } });
+  if (!await isEmailCategoryEnabled('payments')) {
+    logger.info('[Fee Waived Email] SKIPPED - payments emails disabled via settings', { extra: { email } });
     return { success: true };
   }
   try {
@@ -614,8 +613,8 @@ export async function sendPurchaseReceipt(
   email: string,
   params: PurchaseReceiptParams
 ): Promise<{ success: boolean; error?: string }> {
-  if (BILLING_EMAILS_DISABLED) {
-    logger.info('[Purchase Receipt Email] SKIPPED - billing emails disabled', { extra: { email } });
+  if (!await isEmailCategoryEnabled('payments')) {
+    logger.info('[Purchase Receipt Email] SKIPPED - payments emails disabled via settings', { extra: { email } });
     return { success: true };
   }
   try {
