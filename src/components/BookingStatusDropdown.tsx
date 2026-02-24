@@ -162,7 +162,7 @@ export function BookingStatusDropdown({
   }, [isOpen, menuDirection]);
 
   return (
-    <div ref={buttonRef} className={`relative ${className}`}>
+    <div ref={buttonRef} className={`relative w-full ${className}`}>
       {renderButton()}
       {isOpen && !disabled && !loading && createPortal(
         <>
