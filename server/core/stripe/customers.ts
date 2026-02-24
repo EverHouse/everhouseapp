@@ -31,7 +31,7 @@ const PLACEHOLDER_EMAIL_PATTERNS = [
   'testguest@',
   'notif-test-',
   'notification-test-',
-  '+test',
+  '+test@',
 ];
 
 export function isPlaceholderEmail(email: string): boolean {
