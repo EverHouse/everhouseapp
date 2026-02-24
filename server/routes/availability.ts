@@ -157,9 +157,9 @@ router.post('/api/availability/batch', async (req, res) => {
       db.execute(sql`SELECT id, type FROM resources WHERE id = ANY(${resourceIdsLiteral}::int[])`),
       ignoreId
         ? db.execute(sql`SELECT resource_id, start_time, end_time FROM booking_requests 
-             WHERE resource_id = ANY(${resourceIdsLiteral}::int[]) AND request_date = ${date} AND status IN ('approved', 'confirmed') AND id != ${ignoreId}`)
+             WHERE resource_id = ANY(${resourceIdsLiteral}::int[]) AND request_date = ${date} AND status IN ('approved', 'confirmed', 'cancellation_pending') AND id != ${ignoreId}`)
         : db.execute(sql`SELECT resource_id, start_time, end_time FROM booking_requests 
-             WHERE resource_id = ANY(${resourceIdsLiteral}::int[]) AND request_date = ${date} AND status IN ('approved', 'confirmed')`),
+             WHERE resource_id = ANY(${resourceIdsLiteral}::int[]) AND request_date = ${date} AND status IN ('approved', 'confirmed', 'cancellation_pending')`),
       db.execute(sql`SELECT resource_id, start_time, end_time FROM availability_blocks 
          WHERE resource_id = ANY(${resourceIdsLiteral}::int[]) AND block_date = ${date}`),
       db.execute(sql`SELECT tub.bay_number, tub.start_time, tub.end_time FROM trackman_unmatched_bookings tub
@@ -173,12 +173,12 @@ router.post('/api/availability/batch', async (req, res) => {
       requestingEmail
         ? db.execute(sql`SELECT resource_id, start_time, end_time FROM booking_requests 
              WHERE resource_id = ANY(${resourceIdsLiteral}::int[]) AND request_date = ${date} 
-             AND status IN ('pending', 'pending_approval', 'cancellation_pending')
+             AND status IN ('pending', 'pending_approval')
              AND LOWER(user_email) != ${requestingEmail}
              AND resource_id IS NOT NULL`)
         : db.execute(sql`SELECT resource_id, start_time, end_time FROM booking_requests 
              WHERE resource_id = ANY(${resourceIdsLiteral}::int[]) AND request_date = ${date} 
-             AND status IN ('pending', 'pending_approval', 'cancellation_pending')
+             AND status IN ('pending', 'pending_approval')
              AND resource_id IS NOT NULL`)
     ]);
     
@@ -308,9 +308,9 @@ router.get('/api/availability', async (req, res) => {
     // Include both 'approved' and 'confirmed' statuses as active bookings that block availability
     const bookedSlots = ignoreId
       ? await db.execute(sql`SELECT start_time, end_time FROM booking_requests 
-           WHERE resource_id = ${resource_id} AND request_date = ${date} AND status IN ('approved', 'confirmed') AND id != ${ignoreId}`)
+           WHERE resource_id = ${resource_id} AND request_date = ${date} AND status IN ('approved', 'confirmed', 'cancellation_pending') AND id != ${ignoreId}`)
       : await db.execute(sql`SELECT start_time, end_time FROM booking_requests 
-           WHERE resource_id = ${resource_id} AND request_date = ${date} AND status IN ('approved', 'confirmed')`);
+           WHERE resource_id = ${resource_id} AND request_date = ${date} AND status IN ('approved', 'confirmed', 'cancellation_pending')`);
     
     const blockedSlots = await db.execute(sql`SELECT start_time, end_time FROM availability_blocks 
        WHERE resource_id = ${resource_id} AND block_date = ${date}`);
@@ -319,12 +319,12 @@ router.get('/api/availability', async (req, res) => {
     const pendingSlots = requestingEmail
       ? await db.execute(sql`SELECT start_time, end_time FROM booking_requests 
            WHERE resource_id = ${resource_id} AND request_date = ${date} 
-           AND status IN ('pending', 'pending_approval', 'cancellation_pending')
+           AND status IN ('pending', 'pending_approval')
            AND LOWER(user_email) != ${requestingEmail}
            AND resource_id IS NOT NULL`)
       : await db.execute(sql`SELECT start_time, end_time FROM booking_requests 
            WHERE resource_id = ${resource_id} AND request_date = ${date} 
-           AND status IN ('pending', 'pending_approval', 'cancellation_pending')
+           AND status IN ('pending', 'pending_approval')
            AND resource_id IS NOT NULL`);
     
     // Also check unmatched Trackman bookings (unresolved imports occupy time slots)
