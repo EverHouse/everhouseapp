@@ -17,7 +17,7 @@ import {
 import { resolveUserByEmail } from '../../core/stripe/customers';
 import { computeFeeBreakdown, applyFeeBreakdownToParticipants } from '../../core/billing/unifiedFeeService';
 import { GUEST_FEE_CENTS } from './helpers';
-import { sendNotificationToUser, broadcastBillingUpdate } from '../../core/websocket';
+import { sendNotificationToUser, broadcastBillingUpdate, broadcastBookingInvoiceUpdate } from '../../core/websocket';
 import { alertOnExternalServiceError } from '../../core/errorAlerts';
 import { getErrorCode, getErrorMessage } from '../../utils/errorUtils';
 import { toIntArrayLiteral } from '../../utils/sqlArrayLiteral';
@@ -397,6 +397,11 @@ router.post('/api/member/bookings/:id/confirm-payment', isAuthenticated, async (
         bookingId,
         status: 'paid'
       });
+
+      broadcastBookingInvoiceUpdate({
+        bookingId,
+        action: 'payment_confirmed',
+      });
     } catch (txError: unknown) {
       logger.error('[Stripe] Transaction rolled back for member payment confirmation', { extra: { txError } });
       throw txError;
@@ -589,6 +594,17 @@ router.post('/api/member/invoices/:invoiceId/confirm', isAuthenticated, async (r
         action: 'invoice_paid',
         status: 'paid'
       });
+
+      try {
+        const invoiceBookingId = invoice.metadata?.bookingId ? parseInt(invoice.metadata.bookingId) : null;
+        if (invoiceBookingId) {
+          broadcastBookingInvoiceUpdate({
+            bookingId: invoiceBookingId,
+            action: 'invoice_paid',
+            invoiceId,
+          });
+        }
+      } catch (_broadcastErr: unknown) { /* non-blocking */ }
     } catch (payErr: unknown) {
       if (getErrorCode(payErr) === 'invoice_already_paid') {
         logger.info('[Stripe] Invoice was already marked as paid', { extra: { invoiceId } });

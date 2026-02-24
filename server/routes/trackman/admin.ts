@@ -17,6 +17,7 @@ import { PRICING } from '../../core/billing/pricingConfig';
 import { refundGuestPassForParticipant } from '../../core/billing/guestPassConsumer';
 import { getErrorMessage } from '../../utils/errorUtils';
 import { getTodayPacific } from '../../utils/dateUtils';
+import { broadcastBookingRosterUpdate } from '../../core/websocket';
 
 type DbRow = Record<string, unknown>;
 
@@ -2483,6 +2484,13 @@ router.post('/api/admin/booking/:id/guests', isStaffOrAdmin, async (req, res) =>
       resourceName: `Guest added: ${guestName.trim()}`,
       details: { guestName: guestName.trim(), guestEmail: guestEmail?.trim() || null, sessionId }
     });
+
+    broadcastBookingRosterUpdate({
+      bookingId,
+      sessionId: sessionId as number,
+      action: 'participant_added',
+      memberEmail: ownerEmail as string,
+    });
     
     res.json({
       success: true,
@@ -2553,6 +2561,13 @@ router.delete('/api/admin/booking/:id/guests/:guestId', isStaffOrAdmin, async (r
       resourceId: String(bookingId),
       resourceName: `Remove guest ${guestDisplayName}`,
       details: { guestId, guestDisplayName, staffEmail }
+    });
+
+    broadcastBookingRosterUpdate({
+      bookingId,
+      sessionId: sessionId as number,
+      action: 'participant_removed',
+      memberEmail: (booking.owner_email as string) || '',
     });
 
     res.json({
@@ -2657,6 +2672,13 @@ router.put('/api/admin/booking/:bookingId/members/:slotId/link', isStaffOrAdmin,
       memberEmail: memberEmail.toLowerCase(),
       linkedBy
     });
+
+    broadcastBookingRosterUpdate({
+      bookingId: parseInt(bookingId),
+      sessionId: sessionId as number,
+      action: 'participant_added',
+      memberEmail: memberEmail.toLowerCase(),
+    });
     
     res.json({ 
       success: true, 
@@ -2706,6 +2728,13 @@ router.put('/api/admin/booking/:bookingId/members/:slotId/unlink', isStaffOrAdmi
     
     logFromRequest(req, 'unlink_member_from_booking', 'booking', String(bookingId), String(memberEmail).toLowerCase(), {
       slotId
+    });
+
+    broadcastBookingRosterUpdate({
+      bookingId: parseInt(bookingId),
+      sessionId: sessionId as number,
+      action: 'participant_removed',
+      memberEmail: String(memberEmail).toLowerCase(),
     });
     
     res.json({ 
