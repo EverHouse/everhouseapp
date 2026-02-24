@@ -2,11 +2,19 @@
 
 ## ⛔ MANDATORY — READ BEFORE EVERY TASK ⛔
 
-**SKILL-LOADING IS NON-NEGOTIABLE.** Before touching ANY code, you MUST:
-1. Identify which skills are relevant to the task (check the skill list in your system prompt)
-2. Read the full SKILL.md file for each relevant skill (e.g., `.agents/skills/booking-flow/SKILL.md`)
-3. Follow the architectural rules in those skills as the single source of truth
-4. If you skip this step, you WILL introduce bugs that violate established patterns
+**SKILL-LOADING IS NON-NEGOTIABLE.** Before ANY work — planning, auditing, discussing, OR coding — you MUST:
+1. Match the user's request against skill trigger words (every skill has "use when..." triggers in the skill list)
+2. Identify ALL relevant skills — not just implementation skills, but planning/audit skills too
+3. Read the full SKILL.md file for each relevant skill (e.g., `.agents/skills/booking-flow/SKILL.md`)
+4. Follow the architectural rules in those skills as the single source of truth
+5. If you skip this step, you WILL introduce bugs that violate established patterns
+
+**This applies to ALL task types, not just code changes:**
+- Planning a new feature → load `brainstorming` + domain skills BEFORE discussing
+- Auditing/reviewing code → load `code-reviewer`, `clean-code`, `project-architecture` + domain skills
+- Designing UI → load `frontend-design`, `ui-ux-pro-max`, `react-dev` BEFORE proposing anything
+- Debugging → load `systematic-debugging` + domain skills BEFORE investigating
+- Researching an approach → load relevant domain skills BEFORE making recommendations
 
 Common skill mappings:
 - Booking changes → `booking-flow`, `booking-import-standards`, `checkin-flow`
@@ -19,6 +27,12 @@ Common skill mappings:
 - Guest passes → `guest-pass-system`
 - Member status → `member-lifecycle`
 - Scheduled jobs → `scheduler-jobs`
+- New feature planning → `brainstorming`, `project-architecture` + domain skills
+- Code audit/review → `code-reviewer`, `clean-code`, `project-architecture`
+- Strategy/business → `strategy-advisor`, `pricing-strategy`
+- Email features → `email-best-practices`, `resend` (+ sub-skills)
+- Performance → `performance`, `sql-optimization-patterns`
+- Testing → `test-driven-development`, `e2e-testing-patterns`, `webapp-testing`
 
 **CHANGELOG IS NON-NEGOTIABLE.** Every session that produces user-facing changes MUST end with an update to `src/data/changelog.ts` and `src/data/changelog-version.ts`. Group related changes into versioned entries (bump minor version per logical feature/fix group). Never leave a session without updating the changelog — members see this in-app.
 
