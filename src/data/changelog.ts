@@ -8,6 +8,16 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.21.0",
+    date: "2026-02-24",
+    title: "Security Hardening — Input Validation & Rate Limiting",
+    changes: [
+      "Added: Rate limiting on booking request submissions to prevent spam (30 requests per minute per user)",
+      "Fixed: Multiple API routes now properly validate numeric URL parameters before database queries, preventing errors from malformed requests",
+      "Fixed: Added safety limit to legacy purchase audit log query to prevent unbounded database reads",
+    ]
+  },
+  {
     version: "8.20.0",
     date: "2026-02-24",
     title: "Data Integrity UX — Instant Fix Feedback & Mobile Layout",
