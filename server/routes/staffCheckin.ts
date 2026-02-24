@@ -14,7 +14,7 @@ import { cancelPaymentIntent } from '../core/stripe';
 import { logFromRequest, logPaymentAudit } from '../core/auditLog';
 import { PRICING } from '../core/billing/pricingConfig';
 import { enforceSocialTierRules, type ParticipantForValidation } from '../core/bookingService/tierRules';
-import { broadcastMemberStatsUpdated } from '../core/websocket';
+import { broadcastMemberStatsUpdated, broadcastBookingInvoiceUpdate } from '../core/websocket';
 import { updateHubSpotContactVisitCount } from '../core/memberSync';
 import { ensureSessionForBooking } from '../core/bookingService/sessionManager';
 import { sendFirstVisitConfirmationEmail } from '../emails/firstVisitEmail';
@@ -44,7 +44,7 @@ async function getMemberDisplayName(email: string): Promise<string> {
   return email.split('@')[0];
 }
 
-async function settleBookingInvoiceAfterCheckin(bookingId: number, sessionId: number | null): Promise<void> {
+async function settleBookingInvoiceAfterCheckin(bookingId: number, sessionId: number | null, ownerEmail?: string): Promise<void> {
   if (!sessionId) return;
   
   if (settlementInFlight.has(bookingId)) {
@@ -95,6 +95,7 @@ async function settleBookingInvoiceAfterCheckin(bookingId: number, sessionId: nu
           logger.info('[StaffCheckin] Finalized invoice as paid OOB after check-in confirm', {
             extra: { bookingId, invoiceId }
           });
+          broadcastBookingInvoiceUpdate({ bookingId, sessionId, action: 'invoice_finalized', memberEmail: ownerEmail });
         }
       } catch (finalizeErr: unknown) {
         logger.warn('[StaffCheckin] Non-blocking: Failed to finalize invoice OOB', {
@@ -107,6 +108,7 @@ async function settleBookingInvoiceAfterCheckin(bookingId: number, sessionId: nu
           extra: { bookingId, error: (err as Error).message }
         });
       });
+      broadcastBookingInvoiceUpdate({ bookingId, sessionId, action: 'invoice_voided', memberEmail: ownerEmail });
     }
   } catch (err: unknown) {
     logger.warn('[StaffCheckin] Non-blocking: settleBookingInvoiceAfterCheckin failed', {
@@ -546,9 +548,11 @@ router.patch('/api/bookings/:id/payments', isStaffOrAdmin, async (req: Request, 
           try { broadcastMemberStatsUpdated(booking.owner_email, { guestPasses: consumeResult.passesRemaining }); } catch (err: unknown) {logger.error('[Broadcast] Stats update error:', err); }
         }
         
-        settleBookingInvoiceAfterCheckin(bookingId, sessionId).catch((err: unknown) => {
+        settleBookingInvoiceAfterCheckin(bookingId, sessionId, booking.owner_email).catch((err: unknown) => {
           logger.error('[StaffCheckin] Failed to settle booking invoice after check-in', { extra: { bookingId, sessionId, error: getErrorMessage(err) } });
         });
+
+        broadcastBookingInvoiceUpdate({ bookingId, sessionId, action: 'fees_waived', memberEmail: booking.owner_email });
 
         return res.json({ 
           success: true, 
@@ -611,10 +615,17 @@ router.patch('/api/bookings/:id/payments', isStaffOrAdmin, async (req: Request, 
         }
       }
 
-      settleBookingInvoiceAfterCheckin(bookingId, sessionId).catch((err: unknown) => {
+      settleBookingInvoiceAfterCheckin(bookingId, sessionId, booking.owner_email).catch((err: unknown) => {
         logger.error('[StaffCheckin] Invoice settlement failed after check-in — requires manual review', {
           extra: { bookingId, sessionId, error: (err as Error).message }
         });
+      });
+
+      broadcastBookingInvoiceUpdate({ 
+        bookingId, 
+        sessionId, 
+        action: action === 'confirm' ? 'payment_confirmed' : 'fees_waived', 
+        memberEmail: booking.owner_email 
       });
 
       return res.json({ 
@@ -918,10 +929,17 @@ router.patch('/api/bookings/:id/payments', isStaffOrAdmin, async (req: Request, 
         reason: reason || null
       });
 
-      settleBookingInvoiceAfterCheckin(bookingId, sessionId).catch((err: unknown) => {
+      settleBookingInvoiceAfterCheckin(bookingId, sessionId, booking.owner_email).catch((err: unknown) => {
         logger.error('[StaffCheckin] Invoice settlement failed after check-in — requires manual review', {
           extra: { bookingId, sessionId, error: (err as Error).message }
         });
+      });
+
+      broadcastBookingInvoiceUpdate({ 
+        bookingId, 
+        sessionId, 
+        action: action === 'confirm_all' ? 'payment_confirmed' : 'fees_waived', 
+        memberEmail: booking.owner_email 
       });
 
       return res.json({ 

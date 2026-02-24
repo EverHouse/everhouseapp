@@ -39,6 +39,7 @@ import { getErrorMessage } from '../../utils/errorUtils';
 import type { FeeBreakdown } from '../../../shared/models/billing';
 import type { BookingParticipant } from '../../../shared/models/scheduling';
 import { syncBookingInvoice, isBookingInvoicePaid } from '../billing/bookingInvoiceService';
+import { broadcastBookingRosterUpdate } from '../websocket';
 
 export interface BookingWithSession {
   booking_id: number;
@@ -1237,6 +1238,13 @@ export async function addParticipant(params: AddParticipantParams): Promise<AddP
         logger.warn('[rosterService] Non-blocking: draft invoice sync failed after roster change', { extra: { error: getErrorMessage(err), bookingId, sessionId } });
       });
 
+      broadcastBookingRosterUpdate({
+        bookingId,
+        sessionId,
+        action: 'participant_added',
+        memberEmail: booking.owner_email,
+      });
+
       if (Number(recalcResult.billingResult.totalFees) > 0) {
         try {
           const ownerResult = await db.select({
@@ -1464,6 +1472,13 @@ export async function removeParticipant(params: RemoveParticipantParams): Promis
       syncBookingInvoice(bookingId, txResult.sessionId).catch(err => {
         logger.warn('[rosterService] Non-blocking: draft invoice sync failed after roster change', { extra: { error: getErrorMessage(err), bookingId, sessionId: txResult.sessionId } });
       });
+
+      broadcastBookingRosterUpdate({
+        bookingId,
+        sessionId: txResult.sessionId,
+        action: 'participant_removed',
+        memberEmail: booking.owner_email,
+      });
     } catch (recalcError: unknown) {
       logger.warn('[rosterService] Failed to recalculate session fees (non-blocking)', {
         error: recalcError as Error,
@@ -1531,6 +1546,13 @@ export async function updateDeclaredPlayerCount(params: UpdatePlayerCountParams)
 
       syncBookingInvoice(bookingId, txResult.sessionId).catch(err => {
         logger.warn('[rosterService] Non-blocking: draft invoice sync failed after roster change', { extra: { error: getErrorMessage(err), bookingId, sessionId: txResult.sessionId } });
+      });
+
+      broadcastBookingRosterUpdate({
+        bookingId,
+        sessionId: txResult.sessionId,
+        action: 'roster_updated',
+        memberEmail: booking.owner_email,
       });
     } catch (feeError: unknown) {
       logger.error('[rosterService] Failed to recalculate session fees after player count update', {
@@ -1912,6 +1934,13 @@ export async function applyRosterBatch(params: BatchRosterUpdateParams): Promise
 
       syncBookingInvoice(bookingId, sessionId).catch(err => {
         logger.warn('[rosterService] Non-blocking: draft invoice sync failed after roster change', { extra: { error: getErrorMessage(err), bookingId, sessionId } });
+      });
+
+      broadcastBookingRosterUpdate({
+        bookingId,
+        sessionId,
+        action: 'roster_updated',
+        memberEmail: booking.owner_email,
       });
 
       logger.info('[rosterService:batch] Session fees recalculated after batch update', {

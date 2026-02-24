@@ -383,6 +383,36 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
   }, [isOpen, bookingId, onPaymentConfirmed]);
 
   useEffect(() => {
+    if (!isOpen || !bookingId) return;
+
+    const handleRosterUpdate = (event: Event) => {
+      const detail = (event as CustomEvent).detail;
+      if (!detail || Number(detail.bookingId) !== bookingId) return;
+      console.log('[BookingSheet] Roster update received via WebSocket, refreshing', detail.action);
+      fetchRosterData();
+    };
+
+    const handleInvoiceUpdate = (event: Event) => {
+      const detail = (event as CustomEvent).detail;
+      if (!detail || Number(detail.bookingId) !== bookingId) return;
+      console.log('[BookingSheet] Invoice update received via WebSocket, refreshing', detail.action);
+      fetchRosterData();
+      if (detail.action === 'invoice_paid' || detail.action === 'payment_confirmed') {
+        setPaymentSuccess(true);
+        setShowInlinePayment(false);
+        setInlinePaymentAction(null);
+      }
+    };
+
+    window.addEventListener('booking-roster-update', handleRosterUpdate);
+    window.addEventListener('booking-invoice-update', handleInvoiceUpdate);
+    return () => {
+      window.removeEventListener('booking-roster-update', handleRosterUpdate);
+      window.removeEventListener('booking-invoice-update', handleInvoiceUpdate);
+    };
+  }, [isOpen, bookingId, fetchRosterData]);
+
+  useEffect(() => {
     return () => {
       if (pollingTimerRef.current) {
         clearInterval(pollingTimerRef.current);

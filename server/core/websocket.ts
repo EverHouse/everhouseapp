@@ -1066,6 +1066,104 @@ export function broadcastDayPassUpdate(data: {
   return sent;
 }
 
+// Debounce map for booking-scoped broadcasts (prevent event storms during batch roster edits)
+const bookingBroadcastTimers = new Map<string, NodeJS.Timeout>();
+
+export function broadcastBookingRosterUpdate(data: {
+  bookingId: number;
+  sessionId?: number;
+  action: 'roster_updated' | 'player_count_changed' | 'participant_added' | 'participant_removed';
+  memberEmail?: string;
+  resourceType?: string;
+  totalFeeCents?: number;
+  participantCount?: number;
+}) {
+  const key = `roster_${data.bookingId}`;
+  const existing = bookingBroadcastTimers.get(key);
+  if (existing) clearTimeout(existing);
+
+  bookingBroadcastTimers.set(key, setTimeout(() => {
+    bookingBroadcastTimers.delete(key);
+    const payload = JSON.stringify({
+      type: 'booking_roster_update',
+      ...data,
+      timestamp: new Date().toISOString()
+    });
+
+    let sent = 0;
+
+    if (data.memberEmail) {
+      const memberConnections = clients.get(data.memberEmail.toLowerCase()) || [];
+      memberConnections.forEach(conn => {
+        if (conn.ws.readyState === WebSocket.OPEN) {
+          try { conn.ws.send(payload); sent++; } catch (err: unknown) {
+            logger.warn('[WebSocket] Error in broadcastBookingRosterUpdate send', { error: getErrorMessage(err) });
+          }
+        }
+      });
+    }
+
+    clients.forEach((connections) => {
+      connections.forEach(conn => {
+        if (conn.isStaff && conn.ws.readyState === WebSocket.OPEN) {
+          try { conn.ws.send(payload); sent++; } catch (err: unknown) {
+            logger.warn('[WebSocket] Error in broadcastBookingRosterUpdate send', { error: getErrorMessage(err) });
+          }
+        }
+      });
+    });
+
+    if (sent > 0) {
+      logger.info(`[WebSocket] Broadcast booking roster ${data.action} for booking #${data.bookingId} to ${sent} connections`);
+    }
+  }, 300));
+}
+
+export function broadcastBookingInvoiceUpdate(data: {
+  bookingId: number;
+  sessionId?: number;
+  action: 'invoice_created' | 'invoice_updated' | 'invoice_finalized' | 'invoice_paid' | 'invoice_voided' | 'invoice_deleted' | 'payment_confirmed' | 'fees_waived' | 'payment_voided';
+  memberEmail?: string;
+  invoiceId?: string;
+  totalCents?: number;
+  paidInFull?: boolean;
+  status?: string;
+}) {
+  const payload = JSON.stringify({
+    type: 'booking_invoice_update',
+    ...data,
+    timestamp: new Date().toISOString()
+  });
+
+  let sent = 0;
+
+  if (data.memberEmail) {
+    const memberConnections = clients.get(data.memberEmail.toLowerCase()) || [];
+    memberConnections.forEach(conn => {
+      if (conn.ws.readyState === WebSocket.OPEN) {
+        try { conn.ws.send(payload); sent++; } catch (err: unknown) {
+          logger.warn('[WebSocket] Error in broadcastBookingInvoiceUpdate send', { error: getErrorMessage(err) });
+        }
+      }
+    });
+  }
+
+  clients.forEach((connections) => {
+    connections.forEach(conn => {
+      if (conn.isStaff && conn.ws.readyState === WebSocket.OPEN) {
+        try { conn.ws.send(payload); sent++; } catch (err: unknown) {
+          logger.warn('[WebSocket] Error in broadcastBookingInvoiceUpdate send', { error: getErrorMessage(err) });
+        }
+      }
+    });
+  });
+
+  if (sent > 0) {
+    logger.info(`[WebSocket] Broadcast booking invoice ${data.action} for booking #${data.bookingId} to ${sent} connections`);
+  }
+  return sent;
+}
+
 export function getConnectedUsers(): string[] {
   return Array.from(clients.keys());
 }

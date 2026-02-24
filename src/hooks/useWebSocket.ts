@@ -151,6 +151,16 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
             bookingEvents.emit(); // Trigger data refresh
           }
 
+          // Handle booking roster updates (real-time roster/fee changes)
+          if (message.type === 'booking_roster_update') {
+            window.dispatchEvent(new CustomEvent('booking-roster-update', { detail: message }));
+          }
+
+          // Handle booking invoice updates (invoice/payment status changes)
+          if (message.type === 'booking_invoice_update') {
+            window.dispatchEvent(new CustomEvent('booking-invoice-update', { detail: message }));
+          }
+
           // Handle tier updates (membership tier changes by staff)
           if (message.type === 'tier_update') {
             window.dispatchEvent(new CustomEvent('tier-update', { detail: message }));
