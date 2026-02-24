@@ -878,13 +878,13 @@ const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
                   className="w-full p-4 flex items-center justify-between text-left"
                 >
                   <div className="flex items-center gap-3 flex-1 min-w-0">
-                    <span className={`px-2 py-1 text-[10px] font-bold uppercase tracking-wider rounded ${getStatusColor(result.status)}`}>
+                    <span className={`px-2 py-1 text-[10px] font-bold uppercase tracking-wider rounded shrink-0 ${getStatusColor(result.status)}`}>
                       {result.status}
                     </span>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-primary dark:text-white truncate">{displayTitle}</span>
-                        <span className={`px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded ${getCheckSeverityColor(checkSeverity)}`}>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-bold text-primary dark:text-white text-sm leading-tight">{displayTitle}</span>
+                        <span className={`px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded shrink-0 ${getCheckSeverityColor(checkSeverity)}`}>
                           {checkSeverity}
                         </span>
                       </div>
@@ -977,10 +977,12 @@ const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
                                       <p className="text-[10px] font-bold uppercase text-gray-500 dark:text-gray-400 mb-1">Field Differences</p>
                                       <div className="space-y-1">
                                         {issue.context.syncComparison.map((comp, compIdx) => (
-                                          <div key={compIdx} className="grid grid-cols-3 gap-2 text-[11px]">
+                                          <div key={compIdx} className="text-[11px] py-1 border-b border-gray-100 dark:border-white/5 last:border-0">
                                             <span className="font-medium text-gray-700 dark:text-gray-300">{comp.field}</span>
-                                            <span className="text-blue-600 dark:text-blue-400 truncate" title={String(comp.appValue)}>App: {String(comp.appValue)}</span>
-                                            <span className="text-orange-600 dark:text-orange-400 truncate" title={String(comp.externalValue)}>External: {String(comp.externalValue)}</span>
+                                            <div className="flex flex-col sm:flex-row sm:gap-3 gap-0.5 mt-0.5">
+                                              <span className="text-blue-600 dark:text-blue-400 truncate" title={String(comp.appValue)}>App: {String(comp.appValue)}</span>
+                                              <span className="text-orange-600 dark:text-orange-400 truncate" title={String(comp.externalValue)}>External: {String(comp.externalValue)}</span>
+                                            </div>
                                           </div>
                                         ))}
                                       </div>
