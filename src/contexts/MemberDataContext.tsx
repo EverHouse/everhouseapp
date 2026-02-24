@@ -1,7 +1,6 @@
 import React, { createContext, useState, useContext, ReactNode, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useAuthData } from './AuthDataContext';
 import type { MemberProfile } from '../types/data';
-import { INITIAL_MEMBERS } from '../data/defaults';
 export interface PaginatedMembersResponse {
   members: MemberProfile[];
   total: number;
@@ -89,7 +88,7 @@ export const MemberDataProvider: React.FC<{children: ReactNode}> = ({ children }
   const { sessionChecked, actualUser } = useAuthData();
   const actualUserRef = useRef<MemberProfile | null>(null);
 
-  const [members, setMembers] = useState<MemberProfile[]>(INITIAL_MEMBERS);
+  const [members, setMembers] = useState<MemberProfile[]>([]);
   const [formerMembers, setFormerMembers] = useState<MemberProfile[]>([]);
   const [membersPagination, setMembersPagination] = useState<{ total: number; page: number; totalPages: number; hasMore: boolean } | null>(null);
   const [isFetchingMembers, setIsFetchingMembers] = useState(false);
@@ -113,6 +112,7 @@ export const MemberDataProvider: React.FC<{children: ReactNode}> = ({ children }
       const currentRole = currentUser.role;
       if (initialMembersFetchedRef.current && membersFetchUserRoleRef.current === currentRole) return;
 
+      setIsFetchingMembers(true);
       try {
         const res = await fetch('/api/members/directory?status=active', { credentials: 'include' });
         if (res.ok) {
@@ -133,6 +133,8 @@ export const MemberDataProvider: React.FC<{children: ReactNode}> = ({ children }
         }
       } catch (err: unknown) {
         console.error('Failed to fetch initial members:', err);
+      } finally {
+        setIsFetchingMembers(false);
       }
     };
     fetchInitialMembers();

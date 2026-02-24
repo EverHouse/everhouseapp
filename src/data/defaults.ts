@@ -1,4 +1,4 @@
-import type { CafeItem, EventData, Announcement, MemberProfile, Booking } from '../types/data';
+import type { CafeItem, EventData, Announcement, Booking } from '../types/data';
 
 export const INITIAL_CAFE: CafeItem[] = [
   // COFFEE
@@ -111,70 +111,6 @@ export const INITIAL_EVENTS: EventData[] = [
 
 export const INITIAL_ANNOUNCEMENTS: Announcement[] = [];
 
-export const INITIAL_MEMBERS: MemberProfile[] = [
-  { 
-    id: '8821', 
-    name: "Alexander James", 
-    tier: "Core", 
-    status: "Active", 
-    email: "alex@example.com", 
-    phone: "+1 (949) 555-0101",
-    joinDate: "Jan 2021", 
-    avatar: "https://lh3.googleusercontent.com/aida-public/AB6AXuCfn5ddkAImjBeYIVGDC9eu6eVBy4VdxiMZcgL75jHdPGbriX1aGdJ5m2yagDgcPzq3dACO0xbgNxwfcG_j7f5rROEXbwGGTeqNRmAWD2vHkgY3JlItOfHUfgl3AcPUTZEqjxIFGt-zeP1Sf2r4YV9pchyafGGtpEaTBzfRHKZqzSudHdTUCdv2cK3fDpxYwcLaBeOvl6JhLuXfwLhz3sbhnDq188os16jhbKV6lfdMELIZ-W0XYNC9sWvU-NllhtC7X7JzcBQYv39_" 
-  },
-  { 
-    id: '8822', 
-    name: "Sarah Connor", 
-    tier: "Core", 
-    status: "Active", 
-    email: "sarah@example.com", 
-    phone: "+1 (949) 555-0102",
-    joinDate: "Mar 2022", 
-    avatar: "https://i.pravatar.cc/300?img=5" 
-  },
-  { 
-    id: '8823', 
-    name: "James Bond", 
-    tier: "Premium", 
-    status: "Active", 
-    email: "jb@example.com", 
-    phone: "+1 (949) 555-0007",
-    joinDate: "Dec 2023", 
-    avatar: "https://i.pravatar.cc/300?img=8" 
-  },
-  { 
-    id: '8824', 
-    name: "Ellen Ripley", 
-    tier: "Social", 
-    status: "Pending", 
-    email: "ellen@example.com", 
-    phone: "+1 (949) 555-0104",
-    joinDate: "Pending", 
-    avatar: "https://i.pravatar.cc/300?img=9" 
-  },
-  { 
-    id: 'stf-1', 
-    name: "Adam Admin", 
-    tier: "Management", 
-    status: "Active", 
-    email: "adam@evenhouse.club", 
-    phone: "+1 (949) 555-9999",
-    role: 'admin', 
-    joinDate: "Jan 2020",
-    avatar: "https://i.pravatar.cc/300?img=11"
-  },
-  { 
-    id: 'stf-2', 
-    name: "Nick Staff", 
-    tier: "Concierge", 
-    status: "Active", 
-    email: "nick@evenhouse.club", 
-    phone: "+1 (949) 555-8888",
-    role: 'admin',
-    joinDate: "Mar 2021",
-    avatar: "https://i.pravatar.cc/300?img=12"
-  },
-];
 
 export const INITIAL_BOOKINGS: Booking[] = [
   { id: 'b1', type: 'dining', title: 'Lunch at The Patio', date: 'Tue, Oct 24', time: '12:30 PM', details: '4 Guests', color: 'accent' },

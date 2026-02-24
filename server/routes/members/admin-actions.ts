@@ -18,6 +18,7 @@ import { getAvailableTiersForChange, previewTierChange, commitTierChange } from 
 import { logFromRequest } from '../../core/auditLog';
 import { previewMerge, executeMerge, findPotentialDuplicates } from '../../core/userMerge';
 import { getErrorMessage } from '../../utils/errorUtils';
+import { invalidateCache } from '../../core/queryCache';
 
 const router = Router();
 
@@ -159,6 +160,8 @@ router.patch('/api/members/:email/tier', isStaffOrAdmin, async (req, res) => {
       url: '/member/profile'
     });
 
+    invalidateCache('members_directory');
+
     broadcastTierUpdate({
       action: normalizedTier ? 'updated' : 'removed',
       memberEmail: normalizedEmail,
@@ -298,6 +301,7 @@ router.post('/api/members/:id/suspend', isStaffOrAdmin, async (req, res) => {
         url: '/member/profile'
       });
       
+      invalidateCache('members_directory');
       return res.json({ 
         success: true, 
         message: `Billing suspended for ${durationDays} days starting ${startDate}`,
@@ -414,6 +418,7 @@ router.delete('/api/members/:email', isStaffOrAdmin, async (req, res) => {
       client.release();
     }
 
+    invalidateCache('members_directory');
     res.json({ 
       success: true, 
       archived: true,
@@ -955,6 +960,7 @@ router.post('/api/members', isStaffOrAdmin, async (req, res) => {
       logger.error('[CreateMember] Failed to queue HubSpot sync (member created locally)', { extra: { queueError } });
     }
     
+    invalidateCache('members_directory');
     res.status(201).json({
       success: true,
       message: `Successfully created member ${firstName} ${lastName}`,

@@ -21,6 +21,7 @@ import { logSystemAction, logFromRequest } from '../../core/auditLog';
 import { logger } from '../../core/logger';
 import { memberLookupRateLimiter } from '../../middleware/rateLimiting';
 import { z } from 'zod';
+import { invalidateCache } from '../../core/queryCache';
 
 const router = Router();
 
@@ -644,6 +645,7 @@ router.put('/api/members/:id/role', isAdmin, async (req, res) => {
       return res.json(insertResult[0]);
     }
     
+    invalidateCache('members_directory');
     logFromRequest(req, 'change_member_role', 'user', req.params.id as any, '', { newRole: req.body.role, tags: req.body.tags });
     res.json(result[0]);
   } catch (error: unknown) {

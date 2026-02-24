@@ -7,6 +7,10 @@ import { isStaffOrAdmin, isAuthenticated } from '../../core/middleware';
 import { logger } from '../../core/logger';
 import { getSessionUser } from '../../types/session';
 import { redactEmail } from './helpers';
+import { getCached, setCache } from '../../core/queryCache';
+
+const DIRECTORY_CACHE_KEY = 'members_directory';
+const DIRECTORY_CACHE_TTL = 30_000;
 
 const router = Router();
 
@@ -162,6 +166,12 @@ router.get('/api/members/directory', isStaffOrAdmin, async (req, res) => {
     const page = isNaN(pageParam) || pageParam < 1 ? 1 : pageParam;
     const limit = isNaN(limitParam) ? 500 : Math.min(Math.max(limitParam, 1), 500);
     
+    if (!searchQuery && !isPaginated) {
+      const cacheKey = `${DIRECTORY_CACHE_KEY}_${statusFilter}`;
+      const cached = getCached<any>(cacheKey);
+      if (cached) return res.json(cached);
+    }
+
     let statusCondition = sql`1=1`;
     if (statusFilter === 'active') {
       // Include trialing and past_due as active - they still have membership access
@@ -398,7 +408,7 @@ router.get('/api/members/directory', isStaffOrAdmin, async (req, res) => {
     
     if (isPaginated) {
       const totalPages = Math.ceil(total / limit);
-      return res.json({
+      const paginatedResponse = {
         contacts,
         total,
         page,
@@ -408,15 +418,23 @@ router.get('/api/members/directory', isStaffOrAdmin, async (req, res) => {
         count: contacts.length,
         stale: false,
         refreshing: false,
-      });
+      };
+      if (!searchQuery && !isPaginated) {
+        setCache(`${DIRECTORY_CACHE_KEY}_${statusFilter}`, paginatedResponse, DIRECTORY_CACHE_TTL);
+      }
+      return res.json(paginatedResponse);
     }
     
-    return res.json({
+    const response = {
       contacts,
       count: contacts.length,
       stale: false,
       refreshing: false,
-    });
+    };
+    if (!searchQuery && !isPaginated) {
+      setCache(`${DIRECTORY_CACHE_KEY}_${statusFilter}`, response, DIRECTORY_CACHE_TTL);
+    }
+    return res.json(response);
   } catch (error: unknown) {
     logger.error('[Members Directory] Error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to fetch members directory' });

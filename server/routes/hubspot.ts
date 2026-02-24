@@ -13,6 +13,7 @@ import { normalizeTierName, TIER_NAMES } from '../../shared/constants/tiers';
 import * as fs from 'fs';
 import * as path from 'path';
 import pRetry, { AbortError } from 'p-retry';
+import { invalidateCache } from '../core/queryCache';
 import { broadcastDirectoryUpdate } from '../core/websocket';
 import { FilterOperatorEnum } from '@hubspot/api-client/lib/codegen/crm/contacts';
 import { getErrorMessage } from '../utils/errorUtils';
@@ -1204,6 +1205,7 @@ router.post('/api/hubspot/sync-tiers', isStaffOrAdmin, async (req, res) => {
     logger.info('[Tier Sync] Complete - Matched: , Updates: , Errors', { extra: { resultsMatched: results.matched, resultsUpdatesLength: results.updates.length, resultsErrorsLength: results.errors.length } });
     
     if (!dryRun && results.updated > 0) {
+      invalidateCache('members_directory');
       broadcastDirectoryUpdate('synced');
     }
     
@@ -1311,6 +1313,8 @@ router.put('/api/hubspot/contacts/:id/tier', isStaffOrAdmin, async (req, res) =>
     // Invalidate cache to reflect the change
     allContactsCache.timestamp = 0;
     
+    invalidateCache('members_directory');
+
     // Broadcast update to all connected clients
     broadcastDirectoryUpdate('synced');
     
@@ -1358,6 +1362,8 @@ router.post('/api/hubspot/webhooks', async (req, res) => {
           // Invalidate cache to pick up the change on next fetch
           allContactsCache.timestamp = 0;
           
+          invalidateCache('members_directory');
+
           // Broadcast to all connected clients
           broadcastDirectoryUpdate('synced');
           
@@ -1545,6 +1551,7 @@ router.post('/api/hubspot/push-db-tiers', isStaffOrAdmin, async (req, res) => {
     }
     
     if (!dryRun && results.updated > 0) {
+      invalidateCache('members_directory');
       broadcastDirectoryUpdate('synced');
     }
     

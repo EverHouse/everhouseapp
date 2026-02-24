@@ -213,7 +213,7 @@ const SortableHeader: React.FC<SortableHeaderProps> = ({ field, label, className
 
 const DirectoryTab: React.FC = () => {
     const { setPageReady } = usePageReady();
-    const { members, formerMembers, fetchFormerMembers, refreshMembers, setViewAsUser, actualUser } = useData();
+    const { members, formerMembers, fetchFormerMembers, refreshMembers, setViewAsUser, actualUser, isFetchingMembers } = useData();
     const navigate = useNavigate();
     const queryClient = useQueryClient();
     
@@ -1303,6 +1303,10 @@ const DirectoryTab: React.FC = () => {
             </div>
 
             <div key={memberTab} className="flex flex-col animate-content-enter">
+                {members.length === 0 && isFetchingMembers && memberTab === 'active' && (
+                    <DirectoryTabSkeleton />
+                )}
+
                 {formerLoading && memberTab === 'former' && (
                     <DirectoryTabSkeleton />
                 )}

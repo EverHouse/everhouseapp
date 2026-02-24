@@ -8,6 +8,16 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.23.0",
+    date: "2026-02-24",
+    title: "Directory UX — Loading States & Performance",
+    changes: [
+      "Fixed: Removed placeholder data (fake member names) that briefly appeared when the member directory was loading",
+      "Improved: Directory now shows a proper loading skeleton while member data is being fetched",
+      "Improved: Added server-side caching to the member directory for faster load times on repeat visits",
+    ]
+  },
+  {
     version: "8.22.0",
     date: "2026-02-24",
     title: "Performance Optimization — Caching, Query Efficiency & Parallel Processing",
