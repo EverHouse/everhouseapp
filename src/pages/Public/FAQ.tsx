@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { Footer } from '../../components/Footer';
 import WalkingGolferSpinner from '../../components/WalkingGolferSpinner';
@@ -42,7 +42,7 @@ const FAQ: React.FC = () => {
     }
   }, [loading, setPageReady]);
 
-  useEffect(() => {
+  const fetchFaqs = useCallback(() => {
     fetch('/api/faqs')
       .then(res => res.ok ? res.json() : Promise.reject())
       .then((data: FaqItem[]) => {
@@ -51,6 +51,16 @@ const FAQ: React.FC = () => {
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    fetchFaqs();
+  }, [fetchFaqs]);
+
+  useEffect(() => {
+    const handler = () => { fetchFaqs(); };
+    window.addEventListener('app-refresh', handler);
+    return () => window.removeEventListener('app-refresh', handler);
+  }, [fetchFaqs]);
 
   const categories = useMemo(() => {
     const uniqueCategories = [...new Set(faqs.map(f => f.category).filter(Boolean))] as string[];

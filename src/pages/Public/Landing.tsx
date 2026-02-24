@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Footer } from '../../components/Footer';
 import BackToTop from '../../components/BackToTop';
@@ -42,23 +42,30 @@ const Landing: React.FC = () => {
     }
   }, [isLoading, setPageReady]);
 
-  useEffect(() => {
+  const fetchTiers = useCallback(async () => {
     if (user) return;
-    const fetchTiers = async () => {
-      try {
-        const response = await fetch('/api/membership-tiers?active=true');
-        if (response.ok) {
-          const data = await response.json();
-          setTiers(data.filter((t: MembershipTier) => ['social', 'core', 'corporate'].includes(t.slug)));
-        }
-      } catch (error: unknown) {
-        console.error('Failed to fetch tiers:', error);
-      } finally {
-        setIsLoading(false);
+    try {
+      const response = await fetch('/api/membership-tiers?active=true');
+      if (response.ok) {
+        const data = await response.json();
+        setTiers(data.filter((t: MembershipTier) => ['social', 'core', 'corporate'].includes(t.slug)));
       }
-    };
-    fetchTiers();
+    } catch (error: unknown) {
+      console.error('Failed to fetch tiers:', error);
+    } finally {
+      setIsLoading(false);
+    }
   }, [user]);
+
+  useEffect(() => {
+    fetchTiers();
+  }, [fetchTiers]);
+
+  useEffect(() => {
+    const handler = () => { fetchTiers(); };
+    window.addEventListener('app-refresh', handler);
+    return () => window.removeEventListener('app-refresh', handler);
+  }, [fetchTiers]);
 
   const socialTier = tiers.find(t => t.slug === 'social');
   const coreTier = tiers.find(t => t.slug === 'core');

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useTheme } from '../../contexts/ThemeContext';
 import { Footer } from '../../components/Footer';
@@ -36,31 +36,38 @@ const PublicCafe: React.FC = () => {
     }
   }, [isLoading, setPageReady]);
 
-  useEffect(() => {
-    const fetchMenu = async () => {
-      try {
-        const response = await fetch('/api/cafe-menu');
-        if (response.ok) {
-          const data = await response.json();
-          const normalized = data.map((item: Record<string, unknown>) => ({
-            id: item.id?.toString() || '',
-            name: item.name || '',
-            category: item.category || '',
-            price: parseFloat(String(item.price)) || 0,
-            desc: item.description || item.desc || '',
-            image: item.image_url || item.image || '',
-            icon: item.icon || ''
-          }));
-          setCafeMenu(normalized);
-        }
-      } catch (error: unknown) {
-        console.error('Failed to fetch cafe menu:', error);
-      } finally {
-        setIsLoading(false);
+  const fetchMenu = useCallback(async () => {
+    try {
+      const response = await fetch('/api/cafe-menu');
+      if (response.ok) {
+        const data = await response.json();
+        const normalized = data.map((item: Record<string, unknown>) => ({
+          id: item.id?.toString() || '',
+          name: item.name || '',
+          category: item.category || '',
+          price: parseFloat(String(item.price)) || 0,
+          desc: item.description || item.desc || '',
+          image: item.image_url || item.image || '',
+          icon: item.icon || ''
+        }));
+        setCafeMenu(normalized);
       }
-    };
-    fetchMenu();
+    } catch (error: unknown) {
+      console.error('Failed to fetch cafe menu:', error);
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchMenu();
+  }, [fetchMenu]);
+
+  useEffect(() => {
+    const handleAppRefresh = () => { fetchMenu(); };
+    window.addEventListener('app-refresh', handleAppRefresh);
+    return () => window.removeEventListener('app-refresh', handleAppRefresh);
+  }, [fetchMenu]);
 
   useEffect(() => {
     if (categories.length > 0 && !categories.includes(activeCategory)) {

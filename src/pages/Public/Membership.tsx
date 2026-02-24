@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Routes, Route, useNavigate, Link } from 'react-router-dom';
 import { Footer } from '../../components/Footer';
 import BackToTop from '../../components/BackToTop';
@@ -72,23 +72,30 @@ const MembershipOverview: React.FC = () => {
     }
   }, [loading, setPageReady]);
 
-  useEffect(() => {
-    const fetchTiers = async () => {
-      try {
-        const response = await fetch('/api/membership-tiers?active=true');
-        if (response.ok) {
-          const data = await response.json();
-          const filteredTiers = data.filter((t: MembershipTier) => t.show_on_membership_page !== false && t.product_type === 'subscription');
-          setTiers(filteredTiers);
-        }
-      } catch (error: unknown) {
-        console.error('Failed to fetch membership tiers:', error);
-      } finally {
-        setLoading(false);
+  const fetchTiers = useCallback(async () => {
+    try {
+      const response = await fetch('/api/membership-tiers?active=true');
+      if (response.ok) {
+        const data = await response.json();
+        const filteredTiers = data.filter((t: MembershipTier) => t.show_on_membership_page !== false && t.product_type === 'subscription');
+        setTiers(filteredTiers);
       }
-    };
-    fetchTiers();
+    } catch (error: unknown) {
+      console.error('Failed to fetch membership tiers:', error);
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchTiers();
+  }, [fetchTiers]);
+
+  useEffect(() => {
+    const handler = () => { fetchTiers(); };
+    window.addEventListener('app-refresh', handler);
+    return () => window.removeEventListener('app-refresh', handler);
+  }, [fetchTiers]);
 
   const extractPrice = (priceString: string) => {
     const match = priceString.match(/\$[\d,]+/);

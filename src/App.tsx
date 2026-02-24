@@ -499,7 +499,8 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const layoutQueryClient = useQueryClient();
   const handleLayoutRefresh = useCallback(async () => {
     window.dispatchEvent(new Event('app-refresh'));
-    await layoutQueryClient.invalidateQueries();
+    await layoutQueryClient.refetchQueries({ type: 'active' });
+    window.scrollTo({ top: 0 });
   }, [layoutQueryClient]);
   
   // End navigation loading when route changes
@@ -781,13 +782,9 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                 id="main-content"
                 className={`relative h-auto overflow-visible dark:bg-[#141414] ${showHeader && !isFullBleedHeroPage ? 'pt-[max(88px,calc(env(safe-area-inset-top)+72px))]' : ''}`}
             >
-                {isMemberRoute && user ? (
-                  <PullToRefresh onRefresh={handleLayoutRefresh}>
-                    {children}
-                  </PullToRefresh>
-                ) : (
-                  children
-                )}
+                <PullToRefresh onRefresh={handleLayoutRefresh}>
+                  {children}
+                </PullToRefresh>
                 {isMemberRoute && !isAdminRoute && !isProfilePage && <BottomSentinel />}
             </main>
 

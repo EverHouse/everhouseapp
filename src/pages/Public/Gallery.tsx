@@ -25,22 +25,29 @@ const Gallery: React.FC = () => {
     setPageReady(true);
   }, [setPageReady]);
 
-  useEffect(() => {
-    const fetchGallery = async () => {
-      try {
-        const res = await fetch('/api/gallery');
-        if (res.ok) {
-          const data = await res.json();
-          setImages(data);
-        }
-      } catch (err: unknown) {
-        console.error('Failed to fetch gallery:', err);
-      } finally {
-        setIsLoadingData(false);
+  const fetchGallery = useCallback(async () => {
+    try {
+      const res = await fetch('/api/gallery');
+      if (res.ok) {
+        const data = await res.json();
+        setImages(data);
       }
-    };
-    fetchGallery();
+    } catch (err: unknown) {
+      console.error('Failed to fetch gallery:', err);
+    } finally {
+      setIsLoadingData(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchGallery();
+  }, [fetchGallery]);
+
+  useEffect(() => {
+    const handler = () => { fetchGallery(); };
+    window.addEventListener('app-refresh', handler);
+    return () => window.removeEventListener('app-refresh', handler);
+  }, [fetchGallery]);
 
   const categories = useMemo(() => {
     const cats = new Set(images.map(img => img.category));

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Footer } from '../../components/Footer';
 import { BookingCardSkeleton, SkeletonList } from '../../components/skeletons';
@@ -60,30 +60,37 @@ const WhatsOn: React.FC = () => {
     }
   }, [loading, setPageReady]);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [eventsRes, wellnessRes] = await Promise.all([
-          fetch('/api/events?visibility=public'),
-          fetch('/api/wellness-classes?active_only=true')
-        ]);
-        
-        if (eventsRes.ok) {
-          const data = await eventsRes.json();
-          setEvents(data.map((e: Record<string, unknown>) => ({ ...e, type: 'event' })));
-        }
-        if (wellnessRes.ok) {
-          const data = await wellnessRes.json();
-          setWellnessClasses(data.map((w: Record<string, unknown>) => ({ ...w, type: 'wellness' })));
-        }
-      } catch (error: unknown) {
-        console.error('Failed to fetch data:', error);
-      } finally {
-        setLoading(false);
+  const fetchData = useCallback(async () => {
+    try {
+      const [eventsRes, wellnessRes] = await Promise.all([
+        fetch('/api/events?visibility=public'),
+        fetch('/api/wellness-classes?active_only=true')
+      ]);
+      
+      if (eventsRes.ok) {
+        const data = await eventsRes.json();
+        setEvents(data.map((e: Record<string, unknown>) => ({ ...e, type: 'event' })));
       }
-    };
-    fetchData();
+      if (wellnessRes.ok) {
+        const data = await wellnessRes.json();
+        setWellnessClasses(data.map((w: Record<string, unknown>) => ({ ...w, type: 'wellness' })));
+      }
+    } catch (error: unknown) {
+      console.error('Failed to fetch data:', error);
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  useEffect(() => {
+    const handler = () => { fetchData(); };
+    window.addEventListener('app-refresh', handler);
+    return () => window.removeEventListener('app-refresh', handler);
+  }, [fetchData]);
 
   const combinedItems = useMemo(() => {
     let items: ListItem[] = [];
