@@ -104,6 +104,36 @@ export function TrackmanBookingModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [enrichedParticipants, setEnrichedParticipants] = useState<EnrichedParticipant[]>([]);
+  const [autoApproved, setAutoApproved] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen || !booking) {
+      setAutoApproved(false);
+      return;
+    }
+
+    const handleAutoConfirmed = (event: CustomEvent) => {
+      const detail = event.detail;
+      const eventBookingId = detail?.data?.bookingId;
+      const eventEmail = detail?.data?.memberEmail;
+      const eventDate = detail?.data?.date;
+
+      const isMatch = (eventBookingId && eventBookingId === booking.id) ||
+        (eventEmail && eventDate && eventEmail.toLowerCase() === booking.user_email?.toLowerCase() && eventDate === booking.request_date);
+
+      if (isMatch) {
+        setAutoApproved(true);
+        setTimeout(() => {
+          onClose();
+        }, 2000);
+      }
+    };
+
+    window.addEventListener('booking-auto-confirmed', handleAutoConfirmed as EventListener);
+    return () => {
+      window.removeEventListener('booking-auto-confirmed', handleAutoConfirmed as EventListener);
+    };
+  }, [isOpen, booking, onClose]);
 
   // Fetch participant emails when modal opens
   useEffect(() => {
@@ -311,7 +341,14 @@ export function TrackmanBookingModal({
           </p>
         </div>
 
-        {error && (
+        {autoApproved && (
+          <div className="flex items-center gap-2 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+            <span className="material-symbols-outlined text-green-600 dark:text-green-400">check_circle</span>
+            <span className="text-sm text-green-700 dark:text-green-300">This booking was just auto-approved via Trackman — no further action needed.</span>
+          </div>
+        )}
+
+        {!autoApproved && error && (
           <div className="flex items-center gap-2 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
             <span className="material-symbols-outlined text-red-600 dark:text-red-400">error</span>
             <span className="text-sm text-red-700 dark:text-red-300">{error}</span>
@@ -320,7 +357,7 @@ export function TrackmanBookingModal({
 
         <button
           onClick={handleConfirm}
-          disabled={isSubmitting || !externalId.trim()}
+          disabled={isSubmitting || !externalId.trim() || autoApproved}
           className="tactile-btn w-full py-3 px-4 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 dark:disabled:bg-gray-700 text-white font-semibold rounded-xl transition-colors flex items-center justify-center gap-2 disabled:cursor-not-allowed"
         >
           {isSubmitting ? (

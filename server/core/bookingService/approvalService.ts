@@ -178,6 +178,16 @@ export async function approveBooking(params: ApproveBookingParams) {
 
     const allowedForApproval = ['pending', 'pending_approval'];
     if (!allowedForApproval.includes(req_data.status || '')) {
+      const alreadyApprovedStatuses = ['approved', 'confirmed', 'attended'];
+      if (alreadyApprovedStatuses.includes(req_data.status || '') && trackman_booking_id) {
+        if (!req_data.trackmanBookingId) {
+          await tx.update(bookingRequests)
+            .set({ trackmanBookingId: trackman_booking_id, updatedAt: new Date() })
+            .where(eq(bookingRequests.id, bookingId));
+        }
+        const [refreshed] = await tx.select().from(bookingRequests).where(eq(bookingRequests.id, bookingId));
+        return { updated: refreshed, bayName: null, approvalMessage: null, isConferenceRoom: false, calendarData: null, prepaymentData: null };
+      }
       throw { statusCode: 409, error: `Booking is already ${req_data.status}. Please refresh the page.` };
     }
 
@@ -481,102 +491,104 @@ export async function approveBooking(params: ApproveBookingParams) {
     return { updated: updatedRow, bayName, approvalMessage, isConferenceRoom, calendarData, prepaymentData };
   });
 
-  if (calendarData && !calendarData.existingCalendarEventId) {
-    try {
-      const calendarId = await getCalendarIdByName(calendarData.calendarName);
-      if (calendarId) {
-        const summary = `Booking: ${calendarData.userName || calendarData.userEmail}`;
-        const description = `Area: ${calendarData.bayName}\nMember: ${calendarData.userEmail}\nDuration: ${calendarData.durationMinutes} minutes${calendarData.notes ? '\nNotes: ' + calendarData.notes : ''}`;
-        const newCalendarEventId = await createCalendarEventOnCalendar(calendarId, summary, description, calendarData.requestDate, calendarData.startTime, calendarData.endTime);
-        if (newCalendarEventId) {
-          await db.update(bookingRequests)
-            .set({ calendarEventId: newCalendarEventId })
-            .where(eq(bookingRequests.id, bookingId));
+  if (bayName !== null) {
+    if (calendarData && !calendarData.existingCalendarEventId) {
+      try {
+        const calendarId = await getCalendarIdByName(calendarData.calendarName);
+        if (calendarId) {
+          const summary = `Booking: ${calendarData.userName || calendarData.userEmail}`;
+          const description = `Area: ${calendarData.bayName}\nMember: ${calendarData.userEmail}\nDuration: ${calendarData.durationMinutes} minutes${calendarData.notes ? '\nNotes: ' + calendarData.notes : ''}`;
+          const newCalendarEventId = await createCalendarEventOnCalendar(calendarId, summary, description, calendarData.requestDate, calendarData.startTime, calendarData.endTime);
+          if (newCalendarEventId) {
+            await db.update(bookingRequests)
+              .set({ calendarEventId: newCalendarEventId })
+              .where(eq(bookingRequests.id, bookingId));
+          }
         }
+      } catch (calError: unknown) {
+        logger.error('Calendar sync failed (non-blocking)', { extra: { calError } });
       }
-    } catch (calError: unknown) {
-      logger.error('Calendar sync failed (non-blocking)', { extra: { calError } });
     }
-  }
 
-  if (prepaymentData) {
-    try {
-      const prepayResult = await createPrepaymentIntent({
-        sessionId: prepaymentData.sessionId,
-        bookingId: prepaymentData.bookingId,
-        userId: prepaymentData.userId,
-        userEmail: prepaymentData.userEmail,
-        userName: prepaymentData.userName,
-        totalFeeCents: prepaymentData.totalFeeCents,
-        feeBreakdown: prepaymentData.feeBreakdown
-      });
-      if (prepayResult?.paidInFull) {
-        await db.update(bookingParticipants)
-          .set({ paymentStatus: 'paid' })
-          .where(and(
-            eq(bookingParticipants.sessionId, prepaymentData.createdSessionId),
-            eq(bookingParticipants.paymentStatus, 'pending')
-          ));
-        logger.info('[Booking Approval] Prepayment fully covered by credit for session', { extra: { createdSessionId: prepaymentData.createdSessionId } });
+    if (prepaymentData) {
+      try {
+        const prepayResult = await createPrepaymentIntent({
+          sessionId: prepaymentData.sessionId,
+          bookingId: prepaymentData.bookingId,
+          userId: prepaymentData.userId,
+          userEmail: prepaymentData.userEmail,
+          userName: prepaymentData.userName,
+          totalFeeCents: prepaymentData.totalFeeCents,
+          feeBreakdown: prepaymentData.feeBreakdown
+        });
+        if (prepayResult?.paidInFull) {
+          await db.update(bookingParticipants)
+            .set({ paymentStatus: 'paid' })
+            .where(and(
+              eq(bookingParticipants.sessionId, prepaymentData.createdSessionId),
+              eq(bookingParticipants.paymentStatus, 'pending')
+            ));
+          logger.info('[Booking Approval] Prepayment fully covered by credit for session', { extra: { createdSessionId: prepaymentData.createdSessionId } });
+        }
+      } catch (prepayError: unknown) {
+        logger.error('[Booking Approval] Failed to create prepayment intent', { extra: { prepayError } });
       }
-    } catch (prepayError: unknown) {
-      logger.error('[Booking Approval] Failed to create prepayment intent', { extra: { prepayError } });
     }
-  }
 
-  if (isConferenceRoom && prepaymentData && prepaymentData.bookingId) {
-    try {
-      const invoiceResult = await finalizeAndPayInvoice({ bookingId: prepaymentData.bookingId });
-      if (invoiceResult?.paidInFull) {
-        await db.update(bookingParticipants)
-          .set({ paymentStatus: 'paid' })
-          .where(and(
-            eq(bookingParticipants.sessionId, prepaymentData.createdSessionId),
-            eq(bookingParticipants.paymentStatus, 'pending')
-          ));
-        logger.info('[Booking Approval] Conference room invoice finalized and paid for booking', { extra: { bookingId: prepaymentData.bookingId, invoiceId: invoiceResult.invoiceId } });
+    if (isConferenceRoom && prepaymentData && prepaymentData.bookingId) {
+      try {
+        const invoiceResult = await finalizeAndPayInvoice({ bookingId: prepaymentData.bookingId });
+        if (invoiceResult?.paidInFull) {
+          await db.update(bookingParticipants)
+            .set({ paymentStatus: 'paid' })
+            .where(and(
+              eq(bookingParticipants.sessionId, prepaymentData.createdSessionId),
+              eq(bookingParticipants.paymentStatus, 'pending')
+            ));
+          logger.info('[Booking Approval] Conference room invoice finalized and paid for booking', { extra: { bookingId: prepaymentData.bookingId, invoiceId: invoiceResult.invoiceId } });
+        }
+      } catch (invoiceError: unknown) {
+        logger.error('[Booking Approval] Failed to finalize conference room invoice (non-blocking)', { extra: { bookingId: prepaymentData.bookingId, invoiceError: getErrorMessage(invoiceError) } });
       }
-    } catch (invoiceError: unknown) {
-      logger.error('[Booking Approval] Failed to finalize conference room invoice (non-blocking)', { extra: { bookingId: prepaymentData.bookingId, invoiceError: getErrorMessage(invoiceError) } });
     }
+
+    sendPushNotification(updated.userEmail, {
+      title: 'Booking Approved!',
+      body: approvalMessage,
+      url: '/sims'
+    }).catch(err => logger.error('Push notification failed:', { extra: { err } }));
+
+    notifyLinkedMembers(bookingId, updated as any);
+
+    bookingEvents.publish('booking_approved', {
+      bookingId,
+      memberEmail: updated.userEmail,
+      memberName: updated.userName || undefined,
+      resourceId: updated.resourceId || undefined,
+      resourceName: bayName,
+      bookingDate: updated.requestDate,
+      startTime: updated.startTime,
+      endTime: updated.endTime,
+      status: 'approved',
+      actionBy: 'staff'
+    }, { notifyMember: true, notifyStaff: true, cleanupNotifications: true }).catch(err => logger.error('Booking event publish failed:', { extra: { err } }));
+
+    broadcastAvailabilityUpdate({
+      resourceId: updated.resourceId || undefined,
+      resourceType: isConferenceRoom ? 'conference_room' : 'simulator',
+      date: updated.requestDate,
+      action: 'booked'
+    });
+
+    sendNotificationToUser(updated.userEmail, {
+      type: 'notification',
+      title: 'Booking Approved',
+      message: approvalMessage,
+      data: { bookingId, eventType: 'booking_approved' }
+    }, { action: 'booking_approved', bookingId, triggerSource: 'approval.ts' });
+
+    notifyApprovalParticipants(bookingId, updated as any);
   }
-
-  sendPushNotification(updated.userEmail, {
-    title: 'Booking Approved!',
-    body: approvalMessage,
-    url: '/sims'
-  }).catch(err => logger.error('Push notification failed:', { extra: { err } }));
-
-  notifyLinkedMembers(bookingId, updated as any);
-
-  bookingEvents.publish('booking_approved', {
-    bookingId,
-    memberEmail: updated.userEmail,
-    memberName: updated.userName || undefined,
-    resourceId: updated.resourceId || undefined,
-    resourceName: bayName,
-    bookingDate: updated.requestDate,
-    startTime: updated.startTime,
-    endTime: updated.endTime,
-    status: 'approved',
-    actionBy: 'staff'
-  }, { notifyMember: true, notifyStaff: true, cleanupNotifications: true }).catch(err => logger.error('Booking event publish failed:', { extra: { err } }));
-
-  broadcastAvailabilityUpdate({
-    resourceId: updated.resourceId || undefined,
-    resourceType: isConferenceRoom ? 'conference_room' : 'simulator',
-    date: updated.requestDate,
-    action: 'booked'
-  });
-
-  sendNotificationToUser(updated.userEmail, {
-    type: 'notification',
-    title: 'Booking Approved',
-    message: approvalMessage,
-    data: { bookingId, eventType: 'booking_approved' }
-  }, { action: 'booking_approved', bookingId, triggerSource: 'approval.ts' });
-
-  notifyApprovalParticipants(bookingId, updated as any);
 
   return { updated, isConferenceRoom };
 }
