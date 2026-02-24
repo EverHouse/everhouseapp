@@ -24,7 +24,7 @@ async function runSync(): Promise<void> {
   }
 }
 
-export function startHubSpotFormSyncScheduler(): void {
+export function startHubSpotFormSyncScheduler(): NodeJS.Timeout {
   logger.info('[Startup] HubSpot form sync scheduler enabled (runs every 30 minutes)');
 
   setTimeout(() => {
@@ -34,5 +34,5 @@ export function startHubSpotFormSyncScheduler(): void {
     });
   }, 60000);
 
-  setInterval(runSync, SYNC_INTERVAL_MS);
+  return setInterval(runSync, SYNC_INTERVAL_MS);
 }

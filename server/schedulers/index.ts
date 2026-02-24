@@ -1,30 +1,32 @@
 import { startIntegrityScheduler } from './integrityScheduler';
 import { startWaiverReviewScheduler } from './waiverReviewScheduler';
-import { startStripeReconciliationScheduler } from './stripeReconciliationScheduler';
-import { startFeeSnapshotReconciliationScheduler } from './feeSnapshotReconciliationScheduler';
-import { startGracePeriodScheduler } from './gracePeriodScheduler';
-import { startBookingExpiryScheduler } from './bookingExpiryScheduler';
-import { startBookingAutoCompleteScheduler } from './bookingAutoCompleteScheduler';
+import { startStripeReconciliationScheduler, stopStripeReconciliationScheduler } from './stripeReconciliationScheduler';
+import { startFeeSnapshotReconciliationScheduler, stopFeeSnapshotReconciliationScheduler } from './feeSnapshotReconciliationScheduler';
+import { startGracePeriodScheduler, stopGracePeriodScheduler } from './gracePeriodScheduler';
+import { startBookingExpiryScheduler, stopBookingExpiryScheduler } from './bookingExpiryScheduler';
+import { startBookingAutoCompleteScheduler, stopBookingAutoCompleteScheduler } from './bookingAutoCompleteScheduler';
 import { startBackgroundSyncScheduler } from './backgroundSyncScheduler';
 import { startDailyReminderScheduler } from './dailyReminderScheduler';
 import { startMorningClosureScheduler } from './morningClosureScheduler';
 import { startWeeklyCleanupScheduler } from './weeklyCleanupScheduler';
-import { startCommunicationLogsScheduler } from './communicationLogsScheduler';
+import { startCommunicationLogsScheduler, stopCommunicationLogsScheduler } from './communicationLogsScheduler';
 import { startWebhookLogCleanupScheduler } from './webhookLogCleanupScheduler';
 import { startHubSpotQueueScheduler } from './hubspotQueueScheduler';
 import { startHubSpotFormSyncScheduler } from './hubspotFormSyncScheduler';
 import { startSessionCleanupScheduler } from './sessionCleanupScheduler';
 import { startUnresolvedTrackmanScheduler } from './unresolvedTrackmanScheduler';
-import { startGuestPassResetScheduler } from './guestPassResetScheduler';
+import { startGuestPassResetScheduler, stopGuestPassResetScheduler } from './guestPassResetScheduler';
 import { startMemberSyncScheduler } from './memberSyncScheduler';
 import { startDuplicateCleanupScheduler } from './duplicateCleanupScheduler';
 import { startRelocationCleanupScheduler } from './relocationCleanupScheduler';
-import { startStuckCancellationScheduler } from './stuckCancellationScheduler';
-import { startPendingUserCleanupScheduler } from './pendingUserCleanupScheduler';
-import { startWebhookEventCleanupScheduler } from './webhookEventCleanupScheduler';
+import { startStuckCancellationScheduler, stopStuckCancellationScheduler } from './stuckCancellationScheduler';
+import { startPendingUserCleanupScheduler, stopPendingUserCleanupScheduler } from './pendingUserCleanupScheduler';
+import { startWebhookEventCleanupScheduler, stopWebhookEventCleanupScheduler } from './webhookEventCleanupScheduler';
 import { startOnboardingNudgeScheduler } from './onboardingNudgeScheduler';
 import { startJobProcessor, stopJobProcessor } from '../core/jobQueue';
 import { schedulerTracker } from '../core/schedulerTracker';
+
+const intervalIds: NodeJS.Timeout[] = [];
 
 export function initSchedulers(): void {
   schedulerTracker.registerScheduler('Background Sync', 5 * 60 * 1000);
@@ -57,33 +59,48 @@ export function initSchedulers(): void {
   schedulerTracker.registerScheduler('Job Queue Processor', 5000);
 
   startBackgroundSyncScheduler();
-  startDailyReminderScheduler();
-  startMorningClosureScheduler();
-  startWeeklyCleanupScheduler();
-  startIntegrityScheduler();
-  startWaiverReviewScheduler();
+  intervalIds.push(startDailyReminderScheduler());
+  intervalIds.push(startMorningClosureScheduler());
+  intervalIds.push(startWeeklyCleanupScheduler());
+  intervalIds.push(...startIntegrityScheduler());
+  intervalIds.push(startWaiverReviewScheduler());
   startStripeReconciliationScheduler();
   startFeeSnapshotReconciliationScheduler();
   startGracePeriodScheduler();
   startBookingExpiryScheduler();
   startBookingAutoCompleteScheduler();
   startCommunicationLogsScheduler();
-  startWebhookLogCleanupScheduler();
-  startSessionCleanupScheduler();
-  startUnresolvedTrackmanScheduler();
-  startHubSpotQueueScheduler();
-  startHubSpotFormSyncScheduler();
+  intervalIds.push(startWebhookLogCleanupScheduler());
+  intervalIds.push(startSessionCleanupScheduler());
+  intervalIds.push(startUnresolvedTrackmanScheduler());
+  intervalIds.push(startHubSpotQueueScheduler());
+  intervalIds.push(startHubSpotFormSyncScheduler());
   startMemberSyncScheduler();
-  startDuplicateCleanupScheduler();
+  intervalIds.push(startDuplicateCleanupScheduler());
   startGuestPassResetScheduler();
-  startRelocationCleanupScheduler();
+  intervalIds.push(startRelocationCleanupScheduler());
   startStuckCancellationScheduler();
   startPendingUserCleanupScheduler();
   startWebhookEventCleanupScheduler();
-  startOnboardingNudgeScheduler();
+  intervalIds.push(startOnboardingNudgeScheduler());
   startJobProcessor(5000);
 }
 
 export function stopSchedulers(): void {
+  for (const id of intervalIds) {
+    clearInterval(id);
+  }
+  intervalIds.length = 0;
+
+  stopStripeReconciliationScheduler();
+  stopFeeSnapshotReconciliationScheduler();
+  stopGracePeriodScheduler();
+  stopBookingExpiryScheduler();
+  stopBookingAutoCompleteScheduler();
+  stopGuestPassResetScheduler();
+  stopStuckCancellationScheduler();
+  stopPendingUserCleanupScheduler();
+  stopWebhookEventCleanupScheduler();
+  stopCommunicationLogsScheduler();
   stopJobProcessor();
 }

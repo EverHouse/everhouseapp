@@ -3,6 +3,7 @@ import multer from "multer";
 import { randomUUID } from "crypto";
 import { ObjectStorageService, ObjectNotFoundError, objectStorageClient } from "./objectStorage";
 import { getSessionUser } from "../../types/session";
+import { isAuthenticated } from "../auth";
 import { logger } from "../../core/logger";
 
 const upload = multer({ 
@@ -102,7 +103,7 @@ export function registerObjectStorageRoutes(app: Express): void {
    * IMPORTANT: The client should NOT send the file to this endpoint.
    * Send JSON metadata only, then upload the file directly to uploadURL.
    */
-  app.post("/api/uploads/request-url", async (req, res) => {
+  app.post("/api/uploads/request-url", isAuthenticated, async (req, res) => {
     try {
       const { name, size, contentType } = req.body;
 

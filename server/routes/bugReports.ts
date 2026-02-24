@@ -53,7 +53,8 @@ router.post('/api/bug-reports', isAuthenticated, async (req, res) => {
 
 router.get('/api/admin/bug-reports', isStaffOrAdmin, async (req, res) => {
   try {
-    const { status } = req.query;
+    const { status, limit: limitParam } = req.query;
+    const queryLimit = Math.min(Math.max(parseInt(limitParam as string) || 200, 1), 2000);
     
     const conditions: SQL[] = [];
     
@@ -66,7 +67,7 @@ router.get('/api/admin/bug-reports', isStaffOrAdmin, async (req, res) => {
       query = query.where(conditions[0]) as typeof query;
     }
     
-    const result = await query.orderBy(desc(bugReports.createdAt));
+    const result = await query.orderBy(desc(bugReports.createdAt)).limit(queryLimit);
     
     res.json(result);
   } catch (error: unknown) {

@@ -2,8 +2,9 @@ import { schedulerTracker } from '../core/schedulerTracker';
 import { getPacificHour } from '../utils/dateUtils';
 import { logger } from '../core/logger';
 
-export function startSessionCleanupScheduler(): void {
-  setInterval(async () => {
+export function startSessionCleanupScheduler(): NodeJS.Timeout {
+  logger.info('[Startup] Session cleanup scheduler enabled (runs daily at 2am Pacific)');
+  return setInterval(async () => {
     try {
       if (getPacificHour() === 2) {
         const { runSessionCleanup } = await import('../core/sessionCleanup');
@@ -15,6 +16,4 @@ export function startSessionCleanupScheduler(): void {
       schedulerTracker.recordRun('Session Cleanup', false, String(err));
     }
   }, 60 * 60 * 1000);
-  
-  logger.info('[Startup] Session cleanup scheduler enabled (runs daily at 2am Pacific)');
 }

@@ -13,8 +13,9 @@ async function scheduleWebhookLogCleanup(): Promise<void> {
   }
 }
 
-export function startWebhookLogCleanupScheduler(): void {
-  setInterval(async () => {
+export function startWebhookLogCleanupScheduler(): NodeJS.Timeout {
+  logger.info('[Startup] Webhook log cleanup scheduler enabled (runs daily at 4am Pacific, deletes logs older than 30 days)');
+  return setInterval(async () => {
     try {
       if (getPacificHour() === 4) {
         await scheduleWebhookLogCleanup();
@@ -23,6 +24,4 @@ export function startWebhookLogCleanupScheduler(): void {
       logger.error('[Webhook Cleanup] Check error:', { error: err as Error });
     }
   }, 60 * 60 * 1000);
-  
-  logger.info('[Startup] Webhook log cleanup scheduler enabled (runs daily at 4am Pacific, deletes logs older than 30 days)');
 }

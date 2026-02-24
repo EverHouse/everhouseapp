@@ -15,10 +15,14 @@ async function reconcilePendingSnapshots(): Promise<{ synced: number; errors: nu
   
   let client: PoolClient | null = null;
   try {
+    const connectPromise = pool.connect();
     const connectTimeout = new Promise<never>((_, reject) => 
-      setTimeout(() => reject(new Error('DB connection timeout after 10s')), 10000)
+      setTimeout(() => {
+        connectPromise.then(c => c.release()).catch(() => {});
+        reject(new Error('DB connection timeout after 10s'));
+      }, 10000)
     );
-    client = await Promise.race([pool.connect(), connectTimeout]) as PoolClient;
+    client = await Promise.race([connectPromise, connectTimeout]) as PoolClient;
     await client.query('SET statement_timeout = 30000');
     
     const staleSnapshots = await client.query(
@@ -110,10 +114,14 @@ async function cancelAbandonedPaymentIntents(): Promise<{ cancelled: number; err
 
   let client: PoolClient | null = null;
   try {
+    const connectPromise = pool.connect();
     const connectTimeout = new Promise<never>((_, reject) => 
-      setTimeout(() => reject(new Error('DB connection timeout after 10s')), 10000)
+      setTimeout(() => {
+        connectPromise.then(c => c.release()).catch(() => {});
+        reject(new Error('DB connection timeout after 10s'));
+      }, 10000)
     );
-    client = await Promise.race([pool.connect(), connectTimeout]) as PoolClient;
+    client = await Promise.race([connectPromise, connectTimeout]) as PoolClient;
     await client.query('SET statement_timeout = 30000');
     
     const abandonedIntents = await client.query(
@@ -242,10 +250,14 @@ async function reconcileStalePaymentIntents(): Promise<{ reconciled: number; err
 
   let client: PoolClient | null = null;
   try {
+    const connectPromise = pool.connect();
     const connectTimeout = new Promise<never>((_, reject) => 
-      setTimeout(() => reject(new Error('DB connection timeout after 10s')), 10000)
+      setTimeout(() => {
+        connectPromise.then(c => c.release()).catch(() => {});
+        reject(new Error('DB connection timeout after 10s'));
+      }, 10000)
     );
-    client = await Promise.race([pool.connect(), connectTimeout]) as PoolClient;
+    client = await Promise.race([connectPromise, connectTimeout]) as PoolClient;
     await client.query('SET statement_timeout = 30000');
     
     const staleIntents = await client.query(

@@ -114,6 +114,24 @@ Pattern A is preferred for new routes. Pattern B is used in roster.ts, bays/book
 - `POST /api/availability/batch` — public availability check
 - `POST /api/hubspot/forms/*` — HubSpot form submissions
 
+### 10. Rate Limiting
+All public endpoints that create database records or trigger notifications MUST have rate limiting middleware. Currently protected: `/api/tours/book`, `/api/tours/schedule`, `/api/day-passes/confirm`, `/api/client-error`. Use `checkoutRateLimiter` from `../middleware/rateLimiting` for public form submissions.
+
+### 11. Input Validation
+All API endpoints SHOULD validate request body with Zod schemas. Currently only 3 route files use Zod (checkout.ts, members/onboarding.ts, members/profile.ts). All `parseInt(req.params.id)` calls MUST be followed by an `isNaN()` check with 400 response. Many routes are missing this guard.
+
+### 12. Unbounded Queries
+All SELECT queries MUST have a LIMIT clause or be naturally bounded (e.g., by FK or date range). Admin list endpoints should support `?limit=N` query parameter with a sensible default (200-500). Never load all rows from a growing table into memory.
+
+### 13. Scheduler Lifecycle
+All `setInterval()` calls in schedulers MUST return their `NodeJS.Timeout` ID. The `initSchedulers()` function collects all IDs and `stopSchedulers()` clears them on shutdown. Never create timers that can't be stopped.
+
+### 14. Stripe Idempotency
+All `stripe.*.create()` calls MUST include an `idempotencyKey` parameter with a deterministic value (NOT `randomUUID()`). Pattern: `operation_type_${uniqueBusinessKey}`. Idempotency keys on `update()` calls are nice-to-have but not required.
+
+### 15. Connection Pool Safety
+Never use `pool.connect()` inside `Promise.race()` without ensuring the connection is released regardless of which promise wins. Always use try/finally for connection release. The `safeDbTransaction()` helper handles this correctly.
+
 ---
 
 ## Unified Booking Sheet Architecture

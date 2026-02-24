@@ -14,6 +14,7 @@ import { getSessionUser } from '../types/session';
 import { logFromRequest, AuditAction } from '../core/auditLog';
 import { broadcastToStaff } from '../core/websocket';
 import { getErrorMessage } from '../utils/errorUtils';
+import { checkoutRateLimiter } from '../middleware/rateLimiting';
 
 function parseTimeToMinutes(timeStr: string): number {
   const [hours, minutes] = timeStr.split(':').map(Number);
@@ -231,7 +232,7 @@ router.post('/api/tours/sync', isStaffOrAdmin, async (req, res) => {
   }
 });
 
-router.post('/api/tours/book', async (req, res) => {
+router.post('/api/tours/book', checkoutRateLimiter, async (req, res) => {
   try {
     const { firstName, lastName, email: rawEmail, phone } = req.body;
     const email = rawEmail?.trim()?.toLowerCase();
@@ -1247,7 +1248,7 @@ router.get('/api/tours/availability', async (req, res) => {
   }
 });
 
-router.post('/api/tours/schedule', async (req, res) => {
+router.post('/api/tours/schedule', checkoutRateLimiter, async (req, res) => {
   try {
     const { firstName, lastName, email: rawEmail, phone, date, startTime } = req.body;
     const email = rawEmail?.trim()?.toLowerCase();

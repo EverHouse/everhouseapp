@@ -371,7 +371,7 @@ export async function getOrCreateStripeCustomer(
         name: resolvedName || undefined,
         metadata: metadata,
         ...(userPhone ? { phone: userPhone } : {}),
-      });
+      }, { idempotencyKey: `cust_create_${email.toLowerCase()}` });
       customerId = customer.id;
       isNew = true;
     }
@@ -463,7 +463,7 @@ export async function syncCustomerMetadataToStripe(
 }
 
 export async function syncAllCustomerMetadata(): Promise<{ synced: number; failed: number }> {
-  const result = await db.execute(sql`SELECT id, email, tier, stripe_customer_id, first_name, last_name, phone FROM users WHERE stripe_customer_id IS NOT NULL`);
+  const result = await db.execute(sql`SELECT id, email, tier, stripe_customer_id, first_name, last_name, phone FROM users WHERE stripe_customer_id IS NOT NULL LIMIT 10000`);
   
   let synced = 0;
   let failed = 0;

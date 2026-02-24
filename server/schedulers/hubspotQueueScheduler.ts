@@ -52,7 +52,7 @@ async function processQueue(): Promise<void> {
   }
 }
 
-export function startHubSpotQueueScheduler(): void {
+export function startHubSpotQueueScheduler(): NodeJS.Timeout {
   logger.info('[Startup] HubSpot queue scheduler enabled (runs every 2 minutes)');
   
   // Ensure HubSpot properties have all required options on startup
@@ -79,5 +79,5 @@ export function startHubSpotQueueScheduler(): void {
   }, 30000); // Wait 30 seconds after startup
   
   // Then run every 2 minutes
-  setInterval(processQueue, PROCESS_INTERVAL_MS);
+  return setInterval(processQueue, PROCESS_INTERVAL_MS);
 }

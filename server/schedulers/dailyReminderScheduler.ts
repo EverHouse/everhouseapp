@@ -63,7 +63,8 @@ async function checkAndSendReminders(): Promise<void> {
   }
 }
 
-export function startDailyReminderScheduler(): void {
-  setInterval(checkAndSendReminders, 30 * 60 * 1000);
+export function startDailyReminderScheduler(): NodeJS.Timeout {
+  const id = setInterval(checkAndSendReminders, 30 * 60 * 1000);
   logger.info('[Startup] Daily reminder scheduler enabled (runs at 6pm)');
+  return id;
 }

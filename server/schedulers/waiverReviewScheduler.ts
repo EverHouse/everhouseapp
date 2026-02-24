@@ -99,9 +99,10 @@ async function scheduledCheck(): Promise<void> {
   }
 }
 
-export function startWaiverReviewScheduler(): void {
+export function startWaiverReviewScheduler(): NodeJS.Timeout {
   const CHECK_INTERVAL_MS = 4 * 60 * 60 * 1000;
   
-  setInterval(scheduledCheck, CHECK_INTERVAL_MS);
+  const id = setInterval(scheduledCheck, CHECK_INTERVAL_MS);
   logger.info('[Startup] Waiver review scheduler enabled (checks every 4 hours for stale waivers)');
+  return id;
 }

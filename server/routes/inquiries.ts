@@ -10,7 +10,8 @@ const router = Router();
 
 router.get('/api/admin/inquiries', isStaffOrAdmin, async (req, res) => {
   try {
-    const { status, formType } = req.query;
+    const { status, formType, limit: limitParam } = req.query;
+    const queryLimit = Math.min(Math.max(parseInt(limitParam as string) || 500, 1), 5000);
     
     const conditions: SQL[] = [
       ne(formSubmissions.formType, 'membership'),
@@ -29,7 +30,7 @@ router.get('/api/admin/inquiries', isStaffOrAdmin, async (req, res) => {
       query = query.where(conditions.length === 1 ? conditions[0] : and(...conditions)) as typeof query;
     }
     
-    const result = await query.orderBy(desc(formSubmissions.createdAt));
+    const result = await query.orderBy(desc(formSubmissions.createdAt)).limit(queryLimit);
     
     res.json(result);
   } catch (error: unknown) {

@@ -14,6 +14,17 @@ const alertCooldowns: Map<string, number> = new Map();
 const ALERT_COOLDOWN_MS = 30 * 60 * 1000; // 30 minutes between same-type alerts
 const INTEGRITY_COOLDOWN_MS = 4 * 60 * 60 * 1000; // 4 hours for integrity checks (issues persist until manually fixed)
 const lastIntegrityFingerprint: Map<string, string> = new Map();
+const COOLDOWN_CLEANUP_THRESHOLD = 2 * INTEGRITY_COOLDOWN_MS;
+
+function pruneExpiredCooldowns(): void {
+  const now = Date.now();
+  for (const [key, timestamp] of alertCooldowns) {
+    if (now - timestamp > COOLDOWN_CLEANUP_THRESHOLD) {
+      alertCooldowns.delete(key);
+      lastIntegrityFingerprint.delete(key);
+    }
+  }
+}
 
 function canSendAlert(alertKey: string): boolean {
   const now = Date.now();
@@ -30,6 +41,7 @@ function canSendAlert(alertKey: string): boolean {
 }
 
 function recordAlertSent(alertKey: string): void {
+  pruneExpiredCooldowns();
   alertCooldowns.set(alertKey, Date.now());
 }
 

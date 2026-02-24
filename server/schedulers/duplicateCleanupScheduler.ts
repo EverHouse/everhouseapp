@@ -80,7 +80,7 @@ async function checkAndRunCleanup(): Promise<void> {
   }
 }
 
-export function startDuplicateCleanupScheduler(): void {
+export function startDuplicateCleanupScheduler(): NodeJS.Timeout {
   logger.info('[Startup] Duplicate cleanup scheduler enabled (runs at 4am Pacific and on startup with 30s delay)');
   
   setTimeout(async () => {
@@ -99,7 +99,7 @@ export function startDuplicateCleanupScheduler(): void {
     }
   }, 30000);
   
-  setInterval(checkAndRunCleanup, 60 * 60 * 1000);
+  return setInterval(checkAndRunCleanup, 60 * 60 * 1000);
 }
 
 export { cleanupDuplicateTrackmanBookings };

@@ -137,7 +137,7 @@ router.post('/api/day-passes/checkout', checkoutRateLimiter, async (req: Request
  * POST /api/day-passes/confirm
  * Called after successful payment to record purchase (supports both session_id and payment_intent_id)
  */
-router.post('/api/day-passes/confirm', async (req: Request, res: Response) => {
+router.post('/api/day-passes/confirm', checkoutRateLimiter, async (req: Request, res: Response) => {
   try {
     const { sessionId, paymentIntentId } = req.body;
 

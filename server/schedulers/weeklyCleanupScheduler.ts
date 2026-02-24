@@ -33,7 +33,8 @@ async function checkAndRunCleanup(): Promise<void> {
   }
 }
 
-export function startWeeklyCleanupScheduler(): void {
-  setInterval(checkAndRunCleanup, 60 * 60 * 1000);
+export function startWeeklyCleanupScheduler(): NodeJS.Timeout {
+  const id = setInterval(checkAndRunCleanup, 60 * 60 * 1000);
   logger.info('[Startup] Weekly cleanup scheduler enabled (runs Sundays at 3am)');
+  return id;
 }

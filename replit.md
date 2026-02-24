@@ -20,6 +20,17 @@ The Ever Club Members App is a private members club application for golf and wel
 7. **Stale asset interceptor** — Fixed middleware in `server/index.ts` that sent HTML with `Content-Type: text/html` for missing JS assets; now sends valid JavaScript with `Content-Type: application/javascript` to prevent white screen of death.
 8. **Late-arriving failed invoice guard** — `handleInvoicePaymentFailed` now checks if the invoice's subscription ID matches the user's current subscription before applying `past_due` status, preventing old subscription invoices from downgrading active members.
 
+### Production-Readiness Audit Fixes (2026-02-24)
+1. **Unauthenticated upload endpoint** — Added `isAuthenticated` middleware to `POST /api/uploads/request-url` to prevent anonymous file upload URL generation.
+2. **Rate limiting on public endpoints** — Added `checkoutRateLimiter` to `POST /api/tours/book`, `POST /api/tours/schedule`, `POST /api/day-passes/confirm`, and strict rate limiting (10 req/15min) to `POST /api/client-error`.
+3. **Connection pool leak** — Fixed `Promise.race` timeout pattern in `feeSnapshotReconciliationScheduler.ts` to release connections if timeout wins the race.
+4. **Stripe customer idempotency** — Added deterministic idempotency key to `stripe.customers.create()` in `customers.ts`.
+5. **Scheduler shutdown** — Modified 15 scheduler files to return interval IDs; `stopSchedulers()` now clears all timers on shutdown.
+6. **Database indexes** — Added `booking_requests_status_idx` and `booking_requests_status_date_idx` indexes for query performance.
+7. **Console.log cleanup** — Wrapped ~50 unguarded `console.log` calls in `useStaffWebSocket.ts` and `useWebSocketQuerySync.ts` with `import.meta.env.DEV` guards.
+8. **Unbounded query safety** — Added LIMIT guards to `syncAllCustomerMetadata`, `GET /api/admin/inquiries`, and `GET /api/admin/bug-reports`.
+9. **Alert cooldown pruning** — Added `pruneExpiredCooldowns()` to `dataAlerts.ts` to prevent unbounded Map growth.
+
 ### Previously Fixed (prior sessions)
 - **SQL OR cross-linking** in activation_link checkout — replaced with id-first lookup + IS NULL guard.
 - **Multi-day facility closures** — intermediate days now correctly treated as fully closed.
@@ -56,6 +67,9 @@ The Ever Club Members App is a private members club application for golf and wel
 - **Stripe Subscription ID Matching**: Invoice payment failure handlers must verify the invoice's `subscription_id` matches the user's current `stripe_subscription_id` before applying status downgrades, preventing stale invoices from affecting members on new subscriptions.
 - **Async Webhook Payload Parity**: All async payment handlers (`checkout.session.async_payment_succeeded`) must construct identical payloads to their synchronous counterparts and throw errors on failure (not swallow them) to ensure Stripe retries.
 - **Booking Race Condition Guards**: `approveBooking()`, `declineBooking()`, and `checkinBooking()` implement status guards and optimistic locking to prevent race conditions and ensure data integrity.
+- **Rate Limiting**: All public endpoints creating database records must have rate limiting middleware.
+- **Unbounded Queries**: All SELECT queries must have a LIMIT clause or be naturally bounded.
+- **Scheduler Lifecycle**: All `setInterval()` in schedulers must return their timer ID for shutdown cleanup.
 - **Real-time Updates**: Implements WebSocket broadcasting for booking and invoice changes, ensuring staff and members receive real-time updates.
 - **Route Authentication Audit (Feb 2026)**: Two authentication patterns coexist: middleware guards (`isAuthenticated`, `isStaffOrAdmin`) and inline `getSessionUser(req)` checks. Both provide equivalent authentication (identity check). Inline checks are acceptable only for member-facing routes; staff/admin routes must use middleware guards (`isStaffOrAdmin`, `isAdmin`) for role-based authorization. Middleware is preferred for new routes. Intentionally public routes include auth endpoints, webhook endpoints (signature-verified), tour booking, day pass confirm, and availability checks.
 

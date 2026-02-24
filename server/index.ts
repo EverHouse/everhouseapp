@@ -506,7 +506,16 @@ async function initializeApp() {
   });
   app.use('/api/', apiLimiter);
 
-  app.post('/api/client-error', (req, res) => {
+  const clientErrorLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 10,
+    standardHeaders: true,
+    legacyHeaders: false,
+    validate: false,
+    message: { error: 'Too many error reports, please try again later' }
+  });
+
+  app.post('/api/client-error', clientErrorLimiter, (req, res) => {
     const { page, error, stack, componentStack } = req.body || {};
     logger.error(`[CLIENT ERROR] Page: ${page}, Error: ${error}`);
     if (stack) logger.error(`[CLIENT ERROR] Stack: ${stack}`);

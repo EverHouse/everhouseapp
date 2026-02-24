@@ -109,6 +109,8 @@ After deferred actions execute, `cleanupOldProcessedEvents()` is called probabil
 
 Critical operations (DB writes, status changes, booking payment updates) happen INSIDE the transaction. Non-critical operations (notifications, emails, syncs) are deferred.
 
+**Webhook Response Timing:** Currently, the webhook handler awaits full processing before returning 200. The `tryClaimEvent()` dedup mechanism prevents double-processing on Stripe retries. However, if processing takes >30s, Stripe may timeout and retry. The deferred actions pattern keeps heavy work (notifications, CRM sync) after COMMIT but still before the HTTP response. This is a known trade-off — moving to fully async processing would require a job queue.
+
 Some operations use `queueJobInTransaction(client, jobType, payload, options)` to enqueue jobs that run asynchronously via the job queue system. These jobs are inserted within the transaction but executed later by a worker.
 
 ### Transaction Safety: No External API Calls Inside Transactions (v8.12.0)

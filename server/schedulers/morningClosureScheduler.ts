@@ -63,7 +63,8 @@ async function checkAndSendMorningNotifications(): Promise<void> {
   }
 }
 
-export function startMorningClosureScheduler(): void {
-  setInterval(checkAndSendMorningNotifications, 30 * 60 * 1000);
+export function startMorningClosureScheduler(): NodeJS.Timeout {
+  const id = setInterval(checkAndSendMorningNotifications, 30 * 60 * 1000);
   logger.info('[Startup] Morning closure notification scheduler enabled (runs at 8am)');
+  return id;
 }

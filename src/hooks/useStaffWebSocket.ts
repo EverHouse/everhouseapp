@@ -91,28 +91,28 @@ export function useStaffWebSocket(options: UseStaffWebSocketOptions = {}) {
     const currentMountId = mountIdRef.current;
     
     if (!email) {
-      console.log('[StaffWebSocket] Skipping connect: no email');
+      if (import.meta.env.DEV) console.log('[StaffWebSocket] Skipping connect: no email');
       return;
     }
     
     if (isConnectingRef.current) {
-      console.log('[StaffWebSocket] Skipping connect: already connecting');
+      if (import.meta.env.DEV) console.log('[StaffWebSocket] Skipping connect: already connecting');
       return;
     }
     
     if (wsRef.current?.readyState === WebSocket.OPEN) {
-      console.log('[StaffWebSocket] Skipping connect: socket already open');
+      if (import.meta.env.DEV) console.log('[StaffWebSocket] Skipping connect: socket already open');
       return;
     }
     
     if (wsRef.current?.readyState === WebSocket.CONNECTING) {
-      console.log('[StaffWebSocket] Skipping connect: socket already connecting');
+      if (import.meta.env.DEV) console.log('[StaffWebSocket] Skipping connect: socket already connecting');
       return;
     }
 
     const isStaff = role === 'staff' || role === 'admin';
     if (!isStaff) {
-      console.log('[StaffWebSocket] Skipping connect: not staff');
+      if (import.meta.env.DEV) console.log('[StaffWebSocket] Skipping connect: not staff');
       return;
     }
 
@@ -120,7 +120,7 @@ export function useStaffWebSocket(options: UseStaffWebSocketOptions = {}) {
     const thisConnectionId = globalConnectionId;
     connectionIdRef.current = thisConnectionId;
     
-    console.log(`[StaffWebSocket] Connecting (id=${thisConnectionId}, mount=${currentMountId}, reason=${reason}):`, email);
+    if (import.meta.env.DEV) console.log(`[StaffWebSocket] Connecting (id=${thisConnectionId}, mount=${currentMountId}, reason=${reason}):`, email);
     isConnectingRef.current = true;
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -132,13 +132,13 @@ export function useStaffWebSocket(options: UseStaffWebSocketOptions = {}) {
 
       ws.onopen = () => {
         if (connectionIdRef.current !== thisConnectionId) {
-          console.log(`[StaffWebSocket] Stale connection opened (id=${thisConnectionId}, current=${connectionIdRef.current}), closing`);
+          if (import.meta.env.DEV) console.log(`[StaffWebSocket] Stale connection opened (id=${thisConnectionId}, current=${connectionIdRef.current}), closing`);
           ws.close();
           return;
         }
         
         const currentEmail = userEmailRef.current;
-        console.log(`[StaffWebSocket] Connected (id=${thisConnectionId}):`, currentEmail);
+        if (import.meta.env.DEV) console.log(`[StaffWebSocket] Connected (id=${thisConnectionId}):`, currentEmail);
         isConnectingRef.current = false;
         setIsConnected(true);
         activeConnectionUserRef.current = currentEmail || null;
@@ -156,12 +156,12 @@ export function useStaffWebSocket(options: UseStaffWebSocketOptions = {}) {
           const message = JSON.parse(event.data);
           
           if (message.type === 'booking_event') {
-            console.log('[StaffWebSocket] Received booking_event:', message.eventType);
+            if (import.meta.env.DEV) console.log('[StaffWebSocket] Received booking_event:', message.eventType);
             handleBookingEvent(message as BookingEvent);
           }
           
           if (message.type === 'notification') {
-            console.log('[StaffWebSocket] Received notification');
+            if (import.meta.env.DEV) console.log('[StaffWebSocket] Received notification');
             handleBookingEvent({
               eventType: 'notification',
               bookingId: message.data?.bookingId || 0,
@@ -174,7 +174,7 @@ export function useStaffWebSocket(options: UseStaffWebSocketOptions = {}) {
           }
           
           if (message.type === 'rsvp_event') {
-            console.log('[StaffWebSocket] Received rsvp_event:', message.action);
+            if (import.meta.env.DEV) console.log('[StaffWebSocket] Received rsvp_event:', message.action);
             handleBookingEvent({
               eventType: `rsvp_${message.action}`,
               bookingId: message.eventId || 0,
@@ -187,7 +187,7 @@ export function useStaffWebSocket(options: UseStaffWebSocketOptions = {}) {
           }
           
           if (message.type === 'wellness_event') {
-            console.log('[StaffWebSocket] Received wellness_event:', message.action);
+            if (import.meta.env.DEV) console.log('[StaffWebSocket] Received wellness_event:', message.action);
             handleBookingEvent({
               eventType: `wellness_${message.action}`,
               bookingId: message.classId || 0,
@@ -200,17 +200,17 @@ export function useStaffWebSocket(options: UseStaffWebSocketOptions = {}) {
           }
           
           if (message.type === 'walkin_checkin') {
-            console.log('[StaffWebSocket] Received walkin_checkin:', message.data?.memberName);
+            if (import.meta.env.DEV) console.log('[StaffWebSocket] Received walkin_checkin:', message.data?.memberName);
             window.dispatchEvent(new CustomEvent('walkin-checkin', { detail: message }));
           }
 
           if (message.type === 'directory_update') {
-            console.log('[StaffWebSocket] Received directory_update:', message.action);
+            if (import.meta.env.DEV) console.log('[StaffWebSocket] Received directory_update:', message.action);
             window.dispatchEvent(new CustomEvent('directory-update', { detail: message }));
           }
 
           if (message.type === 'availability_update') {
-            console.log('[StaffWebSocket] Received availability_update');
+            if (import.meta.env.DEV) console.log('[StaffWebSocket] Received availability_update');
             handleBookingEvent({
               eventType: 'availability_update',
               bookingId: 0,
@@ -231,7 +231,7 @@ export function useStaffWebSocket(options: UseStaffWebSocketOptions = {}) {
           }
 
           if (message.type === 'billing_update') {
-            console.log('[StaffWebSocket] Received billing_update:', message.action);
+            if (import.meta.env.DEV) console.log('[StaffWebSocket] Received billing_update:', message.action);
             window.dispatchEvent(new CustomEvent('billing-update', { detail: message }));
             
             if (message.action === 'booking_payment_updated' && message.bookingId) {
@@ -248,17 +248,17 @@ export function useStaffWebSocket(options: UseStaffWebSocketOptions = {}) {
           }
 
           if (message.type === 'tier_update') {
-            console.log('[StaffWebSocket] Received tier_update:', message.action);
+            if (import.meta.env.DEV) console.log('[StaffWebSocket] Received tier_update:', message.action);
             window.dispatchEvent(new CustomEvent('tier-update', { detail: message }));
           }
 
           if (message.type === 'member_stats_updated') {
-            console.log('[StaffWebSocket] Received member_stats_updated for:', message.memberEmail);
+            if (import.meta.env.DEV) console.log('[StaffWebSocket] Received member_stats_updated for:', message.memberEmail);
             window.dispatchEvent(new CustomEvent('member-stats-updated', { detail: message }));
           }
 
           if (message.type === 'booking_auto_confirmed') {
-            console.log('[StaffWebSocket] Received booking_auto_confirmed:', message.data?.memberName);
+            if (import.meta.env.DEV) console.log('[StaffWebSocket] Received booking_auto_confirmed:', message.data?.memberName);
             window.dispatchEvent(new CustomEvent('booking-auto-confirmed', { detail: message }));
             handleBookingEvent({
               eventType: 'booking_auto_confirmed',
@@ -273,7 +273,7 @@ export function useStaffWebSocket(options: UseStaffWebSocketOptions = {}) {
           }
 
           if (message.type === 'booking_confirmed') {
-            console.log('[StaffWebSocket] Received booking_confirmed:', message.data?.bookingId);
+            if (import.meta.env.DEV) console.log('[StaffWebSocket] Received booking_confirmed:', message.data?.bookingId);
             window.dispatchEvent(new CustomEvent('booking-confirmed', { detail: message }));
             handleBookingEvent({
               eventType: 'booking_confirmed',
@@ -287,12 +287,12 @@ export function useStaffWebSocket(options: UseStaffWebSocketOptions = {}) {
           }
 
           if (message.type === 'day_pass_update') {
-            console.log('[StaffWebSocket] Received day_pass_update:', message.action);
+            if (import.meta.env.DEV) console.log('[StaffWebSocket] Received day_pass_update:', message.action);
             window.dispatchEvent(new CustomEvent('day-pass-update', { detail: message }));
           }
 
           if (message.type === 'tour_update') {
-            console.log('[StaffWebSocket] Received tour_update:', message.action);
+            if (import.meta.env.DEV) console.log('[StaffWebSocket] Received tour_update:', message.action);
             window.dispatchEvent(new CustomEvent('tour-update', { detail: message }));
           }
         } catch (e: unknown) {
@@ -302,7 +302,7 @@ export function useStaffWebSocket(options: UseStaffWebSocketOptions = {}) {
 
       ws.onclose = () => {
         const wasThisConnection = connectionIdRef.current === thisConnectionId;
-        console.log(`[StaffWebSocket] Connection closed (id=${thisConnectionId}, current=${connectionIdRef.current}, wasActive=${wasThisConnection})`);
+        if (import.meta.env.DEV) console.log(`[StaffWebSocket] Connection closed (id=${thisConnectionId}, current=${connectionIdRef.current}, wasActive=${wasThisConnection})`);
         
         if (!wasThisConnection) {
           return;
@@ -321,10 +321,10 @@ export function useStaffWebSocket(options: UseStaffWebSocketOptions = {}) {
             const maxDelay = 30000;
             const delay = Math.min(baseDelay * Math.pow(2, reconnectAttemptRef.current), maxDelay);
             reconnectAttemptRef.current++;
-            console.log(`[StaffWebSocket] Scheduling reconnect in ${delay / 1000}s (attempt ${reconnectAttemptRef.current})`);
+            if (import.meta.env.DEV) console.log(`[StaffWebSocket] Scheduling reconnect in ${delay / 1000}s (attempt ${reconnectAttemptRef.current})`);
             reconnectTimeoutRef.current = setTimeout(() => {
               if (!sessionCheckedRef.current) {
-                console.log('[StaffWebSocket] Session not ready, delaying reconnect');
+                if (import.meta.env.DEV) console.log('[StaffWebSocket] Session not ready, delaying reconnect');
                 reconnectTimeoutRef.current = setTimeout(() => {
                   connect('session_ready_retry');
                 }, 1000);
@@ -349,7 +349,7 @@ export function useStaffWebSocket(options: UseStaffWebSocketOptions = {}) {
   }, [handleBookingEvent]);
 
   const cleanup = useCallback(() => {
-    console.log(`[StaffWebSocket] Cleanup called (mount=${mountIdRef.current})`);
+    if (import.meta.env.DEV) console.log(`[StaffWebSocket] Cleanup called (mount=${mountIdRef.current})`);
     intentionalDisconnectRef.current = true;
     
     if (initTimerRef.current) {
@@ -375,10 +375,10 @@ export function useStaffWebSocket(options: UseStaffWebSocketOptions = {}) {
   useEffect(() => {
     mountIdRef.current++;
     const thisMountId = mountIdRef.current;
-    console.log(`[StaffWebSocket] Effect running (mount=${thisMountId}, sessionChecked=${sessionChecked}, email=${actualUser?.email})`);
+    if (import.meta.env.DEV) console.log(`[StaffWebSocket] Effect running (mount=${thisMountId}, sessionChecked=${sessionChecked}, email=${actualUser?.email})`);
     
     if (!sessionChecked) {
-      console.log(`[StaffWebSocket] Waiting for session check (mount=${thisMountId})`);
+      if (import.meta.env.DEV) console.log(`[StaffWebSocket] Waiting for session check (mount=${thisMountId})`);
       return;
     }
     
@@ -387,7 +387,7 @@ export function useStaffWebSocket(options: UseStaffWebSocketOptions = {}) {
     
     if (!userEmail || !isStaff) {
       if (activeConnectionUserRef.current || wsRef.current) {
-        console.log(`[StaffWebSocket] User logged out or no longer staff, cleaning up (mount=${thisMountId})`);
+        if (import.meta.env.DEV) console.log(`[StaffWebSocket] User logged out or no longer staff, cleaning up (mount=${thisMountId})`);
         cleanup();
       }
       intentionalDisconnectRef.current = false;
@@ -396,38 +396,38 @@ export function useStaffWebSocket(options: UseStaffWebSocketOptions = {}) {
     }
     
     if (activeConnectionUserRef.current === userEmail && wsRef.current?.readyState === WebSocket.OPEN) {
-      console.log(`[StaffWebSocket] Already connected to ${userEmail}, skipping (mount=${thisMountId})`);
+      if (import.meta.env.DEV) console.log(`[StaffWebSocket] Already connected to ${userEmail}, skipping (mount=${thisMountId})`);
       return;
     }
     
     if (activeConnectionUserRef.current && activeConnectionUserRef.current !== userEmail) {
-      console.log(`[StaffWebSocket] User changed from ${activeConnectionUserRef.current} to ${userEmail} (mount=${thisMountId})`);
+      if (import.meta.env.DEV) console.log(`[StaffWebSocket] User changed from ${activeConnectionUserRef.current} to ${userEmail} (mount=${thisMountId})`);
       cleanup();
     }
     
     if (wsRef.current?.readyState === WebSocket.OPEN || wsRef.current?.readyState === WebSocket.CONNECTING) {
-      console.log(`[StaffWebSocket] Socket already open/connecting, skipping (mount=${thisMountId})`);
+      if (import.meta.env.DEV) console.log(`[StaffWebSocket] Socket already open/connecting, skipping (mount=${thisMountId})`);
       return;
     }
     
     if (isConnectingRef.current) {
-      console.log(`[StaffWebSocket] Already connecting, skipping (mount=${thisMountId})`);
+      if (import.meta.env.DEV) console.log(`[StaffWebSocket] Already connecting, skipping (mount=${thisMountId})`);
       return;
     }
     
     if (initTimerRef.current) {
-      console.log(`[StaffWebSocket] Init timer already pending, skipping (mount=${thisMountId})`);
+      if (import.meta.env.DEV) console.log(`[StaffWebSocket] Init timer already pending, skipping (mount=${thisMountId})`);
       return;
     }
 
-    console.log(`[StaffWebSocket] Scheduling connection for ${userEmail} (mount=${thisMountId})`);
+    if (import.meta.env.DEV) console.log(`[StaffWebSocket] Scheduling connection for ${userEmail} (mount=${thisMountId})`);
     intentionalDisconnectRef.current = false;
     hasInitializedRef.current = true;
     
     initTimerRef.current = setTimeout(() => {
       initTimerRef.current = null;
       if (mountIdRef.current !== thisMountId) {
-        console.log(`[StaffWebSocket] Stale init timer (mount=${thisMountId}, current=${mountIdRef.current}), skipping`);
+        if (import.meta.env.DEV) console.log(`[StaffWebSocket] Stale init timer (mount=${thisMountId}, current=${mountIdRef.current}), skipping`);
         return;
       }
       connect('initial');
