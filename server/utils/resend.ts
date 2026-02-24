@@ -47,11 +47,13 @@ async function getCredentials() {
   return { apiKey: (connectionSettings.settings as any).api_key, fromEmail: (connectionSettings.settings as any).from_email };
 }
 
-export async function getResendClient(): Promise<{ client: Resend; fromEmail: string | null }> {
+export async function getResendClient(): Promise<{ client: Resend; fromEmail: string }> {
   const { apiKey, fromEmail } = await getCredentials();
+  const rawEmail = fromEmail || 'noreply@everclub.app';
+  const formattedFrom = rawEmail.includes('<') ? rawEmail : `Ever Club <${rawEmail}>`;
   return {
     client: new Resend(apiKey),
-    fromEmail: fromEmail || null
+    fromEmail: formattedFrom
   };
 }
 

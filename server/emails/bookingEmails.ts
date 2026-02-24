@@ -283,7 +283,7 @@ export async function sendBookingRescheduleEmail(
     const html = getBookingRescheduleHtml(data);
 
     await resendResult.client.emails.send({
-      from: 'Ever Club <noreply@everclub.app>',
+      from: resendResult.fromEmail,
       to: email,
       subject: `Booking Rescheduled: ${data.bayName} on ${data.date}`,
       html,
@@ -311,7 +311,7 @@ export async function sendBookingConfirmationEmail(
     const html = getBookingConfirmationHtml(data);
     
     await resendResult.client.emails.send({
-      from: 'Ever Club <noreply@everclub.app>',
+      from: resendResult.fromEmail,
       to: email,
       subject: `Booking Confirmed: ${data.bayName} on ${data.date}`,
       html,

@@ -39,13 +39,13 @@ export function getAllTemplates(): EmailTemplateInfo[] {
   return TEMPLATE_REGISTRY;
 }
 
-export function renderTemplatePreview(templateId: string): string | null {
+export async function renderTemplatePreview(templateId: string): Promise<string | null> {
   switch (templateId) {
     case 'welcome':
       return getWelcomeEmailHtml('Alex');
 
     case 'trial-welcome':
-      return getTrialWelcomeHtml({
+      return await getTrialWelcomeHtml({
         firstName: 'Alex',
         userId: 1,
         trialEndDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
@@ -74,7 +74,7 @@ export function renderTemplatePreview(templateId: string): string | null {
       });
 
     case 'pass-with-qr':
-      return getPassWithQrHtml({
+      return await getPassWithQrHtml({
         passId: 42,
         type: 'day_pass',
         quantity: 2,

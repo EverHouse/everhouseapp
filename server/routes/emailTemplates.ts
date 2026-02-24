@@ -17,7 +17,7 @@ router.get('/api/admin/email-templates', isStaffOrAdmin, async (_req, res) => {
 router.get('/api/admin/email-templates/:templateId/preview', isStaffOrAdmin, async (req, res) => {
   try {
     const { templateId } = req.params;
-    const html = renderTemplatePreview(templateId as string);
+    const html = await renderTemplatePreview(templateId as string);
 
     if (!html) {
       return res.status(404).json({ error: 'Template not found' });

@@ -1,5 +1,14 @@
 import { getResendClient } from '../utils/resend';
 import { logger } from '../core/logger';
+import QRCode from 'qrcode';
+
+async function generateQrDataUri(data: string): Promise<string> {
+  return await QRCode.toDataURL(data, {
+    width: 200,
+    margin: 1,
+    color: { dark: '#000000', light: '#ffffff' }
+  });
+}
 
 const CLUB_COLORS = {
   deepGreen: '#293515',
@@ -21,10 +30,10 @@ function formatDate(date: Date): string {
 
 function formatPassType(type: string): string {
   return type
-    .split('_')
+    .split(/[-_]/)
     .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
     .join(' ')
-    .replace(/day pass/i, 'Day Pass');
+    .replace(/day pass/i, 'Day Pass -');
 }
 
 function getEmailWrapper(content: string): string {
@@ -79,8 +88,8 @@ interface PassDetails {
   purchaseDate: Date;
 }
 
-export function getPassWithQrHtml(passDetails: PassDetails): string {
-  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(`PASS:${passDetails.passId}`)}`;
+export async function getPassWithQrHtml(passDetails: PassDetails): Promise<string> {
+  const qrCodeUrl = await generateQrDataUri(`PASS:${passDetails.passId}`);
   const formattedType = formatPassType(passDetails.type);
   
   const content = `
@@ -193,7 +202,7 @@ export async function sendPassWithQrEmail(
       from: fromEmail || 'Ever Club <noreply@everclub.app>',
       to: email,
       subject: `Your ${formattedType} is Ready - Ever Club`,
-      html: getPassWithQrHtml(passDetails)
+      html: await getPassWithQrHtml(passDetails)
     });
     
     logger.info(`[PassEmails] Sent QR pass email to ${email} for pass #${passDetails.passId}`);

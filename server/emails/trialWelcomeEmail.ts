@@ -1,6 +1,15 @@
 import { getResendClient } from '../utils/resend';
 import { getErrorMessage } from '../utils/errorUtils';
 import { logger } from '../core/logger';
+import QRCode from 'qrcode';
+
+async function generateQrDataUri(data: string): Promise<string> {
+  return await QRCode.toDataURL(data, {
+    width: 200,
+    margin: 1,
+    color: { dark: '#000000', light: '#ffffff' }
+  });
+}
 
 const CLUB_COLORS = {
   deepGreen: '#293515',
@@ -63,9 +72,9 @@ function getEmailWrapper(content: string): string {
 `;
 }
 
-export function getTrialWelcomeHtml(params: { firstName?: string; userId: number; trialEndDate: Date; couponCode?: string }): string {
+export async function getTrialWelcomeHtml(params: { firstName?: string; userId: number; trialEndDate: Date; couponCode?: string }): Promise<string> {
   const greeting = params.firstName ? `Welcome, ${params.firstName}!` : 'Welcome to Ever Club!';
-  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(`MEMBER:${params.userId}`)}`;
+  const qrCodeUrl = await generateQrDataUri(`MEMBER:${params.userId}`);
   const coupon = params.couponCode || 'ASTORIA7';
 
   const content = `
@@ -229,7 +238,7 @@ export async function sendTrialWelcomeWithQrEmail(
       from: fromEmail || 'Ever Club <noreply@everclub.app>',
       to: email,
       subject: 'Welcome to Ever Club - Your Trial Pass',
-      html: getTrialWelcomeHtml(params)
+      html: await getTrialWelcomeHtml(params)
     });
     
     logger.info(`[TrialWelcomeEmail] Sent trial welcome email to ${email} for user #${params.userId}`);
