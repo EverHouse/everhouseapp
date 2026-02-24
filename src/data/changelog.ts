@@ -8,6 +8,14 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.26.5",
+    date: "2026-02-24",
+    title: "Roster Editing Deadlock Prevention",
+    changes: [
+      "Fixed: Adding a member that replaces a guest, removing a guest participant, and batch roster edits (remove/replace) could all cause a database deadlock under heavy load — guest pass refunds in all four roster operations now run safely after the database transaction completes",
+    ]
+  },
+  {
     version: "8.26.4",
     date: "2026-02-24",
     title: "Booking Cancellation & Webhook Stability Fixes",

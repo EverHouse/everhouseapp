@@ -842,6 +842,7 @@ export async function addParticipant(params: AddParticipantParams): Promise<AddP
   }
 
   let newRosterVersion: number;
+  let deferredGuestPassRefund: { ownerEmail: string; guestName: string | undefined } | null = null;
 
   const txResult = await db.transaction(async (tx) => {
     const lockedBooking = await tx.execute(sql`
@@ -1144,22 +1145,7 @@ export async function addParticipant(params: AddParticipantParams): Promise<AddP
             .where(eq(bookingParticipants.id, guestToRemove.id as number));
 
           if (guestToRemove.used_guest_pass === true) {
-            const refundResult = await refundGuestPass(
-              booking.owner_email,
-              guestToRemove.display_name as string || undefined,
-              true
-            );
-
-            if (refundResult.success) {
-              logger.info('[rosterService] Guest pass refunded when replacing guest with member', {
-                extra: {
-                  bookingId,
-                  ownerEmail: booking.owner_email,
-                  guestName: guestToRemove.display_name,
-                  remainingPasses: refundResult.remaining
-                }
-              });
-            }
+            deferredGuestPassRefund = { ownerEmail: booking.owner_email, guestName: guestToRemove.display_name as string || undefined };
           }
         } else {
           logger.info('[rosterService] Matching guest already removed or changed, skipping delete', {
@@ -1213,6 +1199,31 @@ export async function addParticipant(params: AddParticipantParams): Promise<AddP
         extra: { bookingId, memberEmail: nd.memberEmail }
       });
     });
+  }
+
+  if (deferredGuestPassRefund) {
+    try {
+      const refundResult = await refundGuestPass(
+        deferredGuestPassRefund.ownerEmail,
+        deferredGuestPassRefund.guestName,
+        true
+      );
+      if (refundResult.success) {
+        logger.info('[rosterService] Guest pass refunded when replacing guest with member (deferred)', {
+          extra: {
+            bookingId,
+            ownerEmail: deferredGuestPassRefund.ownerEmail,
+            guestName: deferredGuestPassRefund.guestName,
+            remainingPasses: refundResult.remaining
+          }
+        });
+      }
+    } catch (refundErr: unknown) {
+      logger.warn('[rosterService] Failed to refund guest pass after tx (non-blocking)', {
+        error: refundErr as Error,
+        extra: { bookingId, ownerEmail: deferredGuestPassRefund.ownerEmail }
+      });
+    }
   }
 
   if (!params.deferFeeRecalc) {
@@ -1376,6 +1387,7 @@ export async function removeParticipant(params: RemoveParticipantParams): Promis
   }
 
   let newRosterVersion: number;
+  let deferredRemoveRefund: { ownerEmail: string; guestName: string | undefined } | null = null;
 
   const txResult = await db.transaction(async (tx) => {
     const lockedBooking = await tx.execute(sql`
@@ -1397,31 +1409,7 @@ export async function removeParticipant(params: RemoveParticipantParams): Promis
 
     let guestPassesRemaining: number | undefined;
     if (participant.participantType === 'guest') {
-      const refundResult = await refundGuestPass(
-        booking.owner_email,
-        participant.displayName || undefined,
-        true
-      );
-
-      if (refundResult.success) {
-        guestPassesRemaining = refundResult.remaining;
-        logger.info('[rosterService] Guest pass refunded on participant removal', {
-          extra: {
-            bookingId,
-            ownerEmail: booking.owner_email,
-            guestName: participant.displayName,
-            remainingPasses: refundResult.remaining
-          }
-        });
-      } else {
-        logger.warn('[rosterService] Failed to refund guest pass (non-blocking)', {
-          extra: {
-            bookingId,
-            ownerEmail: booking.owner_email,
-            error: refundResult.error
-          }
-        });
-      }
+      deferredRemoveRefund = { ownerEmail: booking.owner_email, guestName: participant.displayName || undefined };
     }
 
     await tx.delete(bookingParticipants)
@@ -1450,6 +1438,40 @@ export async function removeParticipant(params: RemoveParticipantParams): Promis
       newRosterVersion
     };
   });
+
+  if (deferredRemoveRefund) {
+    try {
+      const refundResult = await refundGuestPass(
+        deferredRemoveRefund.ownerEmail,
+        deferredRemoveRefund.guestName,
+        true
+      );
+      if (refundResult.success) {
+        txResult.guestPassesRemaining = refundResult.remaining;
+        logger.info('[rosterService] Guest pass refunded on participant removal (deferred)', {
+          extra: {
+            bookingId,
+            ownerEmail: deferredRemoveRefund.ownerEmail,
+            guestName: deferredRemoveRefund.guestName,
+            remainingPasses: refundResult.remaining
+          }
+        });
+      } else {
+        logger.warn('[rosterService] Failed to refund guest pass (non-blocking)', {
+          extra: {
+            bookingId,
+            ownerEmail: deferredRemoveRefund.ownerEmail,
+            error: refundResult.error
+          }
+        });
+      }
+    } catch (refundErr: unknown) {
+      logger.warn('[rosterService] Failed to refund guest pass after tx (non-blocking)', {
+        error: refundErr as Error,
+        extra: { bookingId, ownerEmail: deferredRemoveRefund.ownerEmail }
+      });
+    }
+  }
 
   if (!txResult.deferFeeRecalc && txResult.sessionId) {
     try {
@@ -1616,6 +1638,7 @@ export async function applyRosterBatch(params: BatchRosterUpdateParams): Promise
   const operationResults: Array<{ type: string; success: boolean; error?: string }> = [];
   let sessionId = booking.session_id;
   let newRosterVersion: number;
+  const deferredBatchRefunds: Array<{ ownerEmail: string; guestName: string | undefined }> = [];
 
   await db.transaction(async (tx) => {
     const lockedBooking = await tx.execute(sql`
@@ -1713,15 +1736,8 @@ export async function applyRosterBatch(params: BatchRosterUpdateParams): Promise
               break;
             }
 
-            if (participant.participant_type === 'guest') {
-              try {
-                await refundGuestPass(booking.owner_email, participant.display_name as string || undefined, true);
-              } catch (refundErr: unknown) {
-                logger.warn('[rosterService:batch] Failed to refund guest pass (non-blocking)', {
-                  error: refundErr as Error,
-                  extra: { bookingId, participantId: op.participantId }
-                });
-              }
+            if (participant.participant_type === 'guest' && participant.used_guest_pass === true) {
+              deferredBatchRefunds.push({ ownerEmail: booking.owner_email, guestName: participant.display_name as string || undefined });
             }
 
             await tx.delete(bookingParticipants)
@@ -1821,14 +1837,7 @@ export async function applyRosterBatch(params: BatchRosterUpdateParams): Promise
                   .where(eq(bookingParticipants.id, guestToRemove.id as number));
 
                 if (guestToRemove.used_guest_pass === true) {
-                  try {
-                    await refundGuestPass(booking.owner_email, guestToRemove.display_name as string || undefined, true);
-                  } catch (refundErr: unknown) {
-                    logger.warn('[rosterService:batch] Failed to refund guest pass on replacement (non-blocking)', {
-                      error: refundErr as Error,
-                      extra: { bookingId, guestName: guestToRemove.display_name }
-                    });
-                  }
+                  deferredBatchRefunds.push({ ownerEmail: booking.owner_email, guestName: guestToRemove.display_name as string || undefined });
                 }
               }
             }
@@ -1920,6 +1929,20 @@ export async function applyRosterBatch(params: BatchRosterUpdateParams): Promise
 
     newRosterVersion = currentVersion + 1;
   });
+
+  for (const refund of deferredBatchRefunds) {
+    try {
+      await refundGuestPass(refund.ownerEmail, refund.guestName, true);
+      logger.info('[rosterService:batch] Guest pass refunded (deferred)', {
+        extra: { bookingId, ownerEmail: refund.ownerEmail, guestName: refund.guestName }
+      });
+    } catch (refundErr: unknown) {
+      logger.warn('[rosterService:batch] Failed to refund guest pass after tx (non-blocking)', {
+        error: refundErr as Error,
+        extra: { bookingId, ownerEmail: refund.ownerEmail, guestName: refund.guestName }
+      });
+    }
+  }
 
   let feesRecalculated = false;
   if (sessionId) {
