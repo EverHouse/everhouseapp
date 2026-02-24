@@ -48,7 +48,7 @@ export const StaffBottomNav: React.FC<StaffBottomNavProps> = ({
   const navContent = (
     <nav 
       ref={navRef}
-      className="relative mb-8 mx-auto w-[calc(100%-3rem)] max-w-md bg-[#1a1a1a]/90 backdrop-blur-xl border border-white/15 p-1.5 shadow-[0_8px_32px_rgba(0,0,0,0.4),0_2px_8px_rgba(0,0,0,0.2)] rounded-full pointer-events-auto"
+      className="staff-bottom-nav relative mb-8 mx-auto w-[calc(100%-3rem)] max-w-md bg-black/60 backdrop-blur-xl border border-white/15 p-1.5 shadow-[0_8px_32px_rgba(0,0,0,0.4),0_2px_8px_rgba(0,0,0,0.2)] rounded-full pointer-events-auto"
     >
       <div className="relative flex items-center w-full">
         {activeIndex >= 0 && (

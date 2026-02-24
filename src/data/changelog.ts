@@ -8,6 +8,15 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.25.1",
+    date: "2026-02-24",
+    title: "Staff Portal — Bottom Nav Glass Fix",
+    changes: [
+      "Fixed: Staff portal bottom navigation now shows proper liquid glass transparency matching the member portal",
+      "Fixed: Reduced transparency accessibility setting now correctly makes the staff bottom nav solid instead of transparent",
+    ]
+  },
+  {
     version: "8.25.0",
     date: "2026-02-24",
     title: "Admin Controls — Complete Operations Dashboard",
