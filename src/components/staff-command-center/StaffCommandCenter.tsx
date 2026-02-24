@@ -129,13 +129,17 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
         });
         const result = await response.json();
         if (response.ok && result.success) {
-          setCheckinConfirmation({
-            isOpen: true,
-            memberName: result.memberName,
-            pinnedNotes: result.pinnedNotes || [],
-            tier: result.tier,
-            membershipStatus: result.membershipStatus
-          });
+          window.dispatchEvent(new CustomEvent('walkin-checkin', {
+            detail: {
+              data: {
+                memberName: result.memberName,
+                pinnedNotes: result.pinnedNotes || [],
+                tier: result.tier,
+                membershipStatus: result.membershipStatus
+              }
+            }
+          }));
+          refresh();
         } else if (result.alreadyCheckedIn) {
           playSound('tap');
           showToast('This member was already checked in just now', 'info');

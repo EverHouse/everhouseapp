@@ -65,6 +65,7 @@ const AdminDashboard: React.FC = () => {
           tier: detail.tier,
           membershipStatus: detail.membershipStatus
         });
+        adminQueryClient.invalidateQueries();
       }
     };
 
@@ -72,7 +73,7 @@ const AdminDashboard: React.FC = () => {
     return () => {
       window.removeEventListener('walkin-checkin', handleWalkinCheckin as EventListener);
     };
-  }, []);
+  }, [adminQueryClient]);
 
   const handleGlobalBookingEvent = useCallback(() => {
     console.log('[AdminDashboard] Received global booking event, refreshing counts');
