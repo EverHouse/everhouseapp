@@ -34,9 +34,9 @@ Former-member statuses (used for filtering/archival):
 
 When `billing_provider = 'stripe'`, Stripe is the source of truth for `membership_status` and `tier`. HubSpot sync skips status/tier updates for Stripe-protected members (`STRIPE WINS` rule in `memberSync.ts`). The database is corrected from Stripe on login (auto-fix) and via webhooks. All Stripe webhook handlers check `billing_provider` before processing and bail out if it is not `'stripe'` (e.g., `'mindbody'`, `'manual'`, `'comped'`).
 
-### HubSpot Is Authoritative for Mindbody Legacy Members
+### HubSpot Is Authoritative for Membership Status (Not Tier)
 
-When `billing_provider = 'mindbody'`, HubSpot drives membership status during sync. The `syncAllMembersFromHubSpot` function in `server/core/memberSync.ts` pulls `membership_status` and `membership_tier` from HubSpot contact properties and writes them to the database. Unrecognized tier strings from HubSpot are logged but not overwritten (preserves existing DB tier via `COALESCE`).
+When `billing_provider` is not `'stripe'`, HubSpot drives `membership_status` during sync. The `syncAllMembersFromHubSpot` function in `server/core/memberSync.ts` pulls `membership_status` from HubSpot contact properties and writes it to the database. However, **the app is the source of truth for membership tier** — the HubSpot sync uses `COALESCE(existing_tier, hubspot_tier)`, meaning HubSpot tier only fills in the value for brand-new users who don't have a tier set yet. Once a tier exists in the app, HubSpot cannot overwrite it. Tier changes are managed exclusively through the app (staff UI, Stripe subscription changes, or admin actions).
 
 ### Staff = VIP Rule
 

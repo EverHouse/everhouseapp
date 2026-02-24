@@ -9,7 +9,7 @@ description: HubSpot CRM synchronization system — queue-based sync of contacts
 
 The app integrates with HubSpot CRM as the central member directory. The integration is **asymmetric by design**:
 
-- **HubSpot → App (read direction):** The daily member sync (`syncAllMembersFromHubSpot`) pulls all contacts from HubSpot and upserts them into the local `users` table. HubSpot is the source of truth for member profiles, tiers, statuses, communication preferences, address/DOB, and notes sourced from Mindbody.
+- **HubSpot → App (read direction):** The daily member sync (`syncAllMembersFromHubSpot`) pulls all contacts from HubSpot and upserts them into the local `users` table. HubSpot is the source of truth for member profiles, statuses, communication preferences, address/DOB, and notes sourced from Mindbody. **The app is the source of truth for membership tier** — the HubSpot sync only writes tier for brand-new users who have no tier in the app yet (via `COALESCE(existing_tier, hubspot_tier)`). Once a tier is set in the app, HubSpot cannot overwrite it.
 - **App → HubSpot (write direction):** The app pushes discrete changes (new contacts, tier changes, payments, day pass purchases, company associations) to HubSpot via a **persistent queue** (`hubspot_sync_queue` table). Deal creation is currently disabled but the infrastructure remains.
 - **Form submissions (HubSpot → App):** A separate scheduler pulls form submissions from HubSpot Forms API every 30 minutes and inserts them into the local `form_submissions` table.
 
