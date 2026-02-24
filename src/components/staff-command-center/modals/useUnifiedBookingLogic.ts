@@ -135,6 +135,7 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
   const [isQuickAddingGuest, setIsQuickAddingGuest] = useState(false);
   const pollingTimerRef = useRef<NodeJS.Timeout | null>(null);
   const pollingCountRef = useRef(0);
+  const wsRefreshTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const isManageMode = mode === 'manage';
 
@@ -385,18 +386,26 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
   useEffect(() => {
     if (!isOpen || !bookingId) return;
 
+    const debouncedRefresh = () => {
+      if (wsRefreshTimerRef.current) clearTimeout(wsRefreshTimerRef.current);
+      wsRefreshTimerRef.current = setTimeout(() => {
+        wsRefreshTimerRef.current = null;
+        fetchRosterData();
+      }, 300);
+    };
+
     const handleRosterUpdate = (event: Event) => {
       const detail = (event as CustomEvent).detail;
       if (!detail || Number(detail.bookingId) !== bookingId) return;
       console.log('[BookingSheet] Roster update received via WebSocket, refreshing', detail.action);
-      fetchRosterData();
+      debouncedRefresh();
     };
 
     const handleInvoiceUpdate = (event: Event) => {
       const detail = (event as CustomEvent).detail;
       if (!detail || Number(detail.bookingId) !== bookingId) return;
       console.log('[BookingSheet] Invoice update received via WebSocket, refreshing', detail.action);
-      fetchRosterData();
+      debouncedRefresh();
       if (detail.action === 'invoice_paid' || detail.action === 'payment_confirmed') {
         setPaymentSuccess(true);
         setShowInlinePayment(false);
@@ -409,6 +418,10 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
     return () => {
       window.removeEventListener('booking-roster-update', handleRosterUpdate);
       window.removeEventListener('booking-invoice-update', handleInvoiceUpdate);
+      if (wsRefreshTimerRef.current) {
+        clearTimeout(wsRefreshTimerRef.current);
+        wsRefreshTimerRef.current = null;
+      }
     };
   }, [isOpen, bookingId, fetchRosterData]);
 

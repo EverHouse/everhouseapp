@@ -1103,9 +1103,10 @@ export function broadcastBookingRosterUpdate(data: {
       });
     }
 
+    const memberEmailLower = data.memberEmail?.toLowerCase();
     clients.forEach((connections) => {
       connections.forEach(conn => {
-        if (conn.isStaff && conn.ws.readyState === WebSocket.OPEN) {
+        if (conn.isStaff && conn.ws.readyState === WebSocket.OPEN && conn.userEmail !== memberEmailLower) {
           try { conn.ws.send(payload); sent++; } catch (err: unknown) {
             logger.warn('[WebSocket] Error in broadcastBookingRosterUpdate send', { error: getErrorMessage(err) });
           }
@@ -1148,9 +1149,10 @@ export function broadcastBookingInvoiceUpdate(data: {
     });
   }
 
+  const memberEmailLower = data.memberEmail?.toLowerCase();
   clients.forEach((connections) => {
     connections.forEach(conn => {
-      if (conn.isStaff && conn.ws.readyState === WebSocket.OPEN) {
+      if (conn.isStaff && conn.ws.readyState === WebSocket.OPEN && conn.userEmail !== memberEmailLower) {
         try { conn.ws.send(payload); sent++; } catch (err: unknown) {
           logger.warn('[WebSocket] Error in broadcastBookingInvoiceUpdate send', { error: getErrorMessage(err) });
         }

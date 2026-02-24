@@ -86,9 +86,15 @@ const History: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['my-purchases', user?.email] });
     };
 
+    const handleInvoiceUpdate = () => {
+      queryClient.invalidateQueries({ queryKey: ['my-purchases', user?.email] });
+    };
+
     window.addEventListener('billing-update', handleBillingUpdate);
+    window.addEventListener('booking-invoice-update', handleInvoiceUpdate);
     return () => {
       window.removeEventListener('billing-update', handleBillingUpdate);
+      window.removeEventListener('booking-invoice-update', handleInvoiceUpdate);
     };
   }, [queryClient, user?.email]);
 
