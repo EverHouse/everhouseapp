@@ -40,6 +40,8 @@ interface IntegrityResultsPanelProps {
     isUnmatched?: boolean;
   }) => void;
   fixIssueMutation: UseMutationResult<{ success: boolean; message: string }, Error, { endpoint: string; body: Record<string, unknown> }, unknown>;
+  fixingIssues: Set<string>;
+  isRefreshing: boolean;
   openIgnoreModal: (issue: IntegrityIssue, checkName: string) => void;
   openBulkIgnoreModal: (checkName: string, issues: IntegrityIssue[]) => void;
   getIssueTracking: (issue: IntegrityIssue) => ActiveIssue | undefined;
@@ -111,6 +113,11 @@ interface IntegrityResultsPanelProps {
   handleApproveAllReviewItems: (dryRun: boolean) => void;
 }
 
+const AnimatedCategoryDiv: React.FC<{ category: string; className?: string; children: React.ReactNode }> = ({ className, children }) => {
+  const [ref] = useAutoAnimate();
+  return <div ref={ref} className={className}>{children}</div>;
+};
+
 const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
   results,
   expandedChecks,
@@ -124,6 +131,8 @@ const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
   handleViewProfile,
   setBookingSheet,
   fixIssueMutation,
+  fixingIssues,
+  isRefreshing,
   openIgnoreModal,
   openBulkIgnoreModal,
   getIssueTracking,
@@ -861,6 +870,12 @@ const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
   return (
     <>
       <div ref={resultsRef} className="space-y-3">
+        {isRefreshing && (
+          <div className="flex items-center gap-2 text-xs text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 rounded-lg px-3 py-2 animate-pulse">
+            <span className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>
+            Refreshing data integrity results...
+          </div>
+        )}
         {results.length > 0 && results.map((result) => {
             const metadata = getCheckMetadata(result.checkName);
             const displayTitle = metadata?.title || result.checkName;
@@ -932,7 +947,7 @@ const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
                     )}
                     
                     {result.issues.length > 0 && Object.entries(groupByCategory(result.issues)).map(([category, categoryIssues]) => (
-                      <div key={category} className="space-y-2">
+                      <AnimatedCategoryDiv key={category} category={category} className="space-y-2">
                         <p className="text-xs font-medium text-primary/60 dark:text-white/60 uppercase tracking-wide">
                           {getCategoryLabel(category)} ({categoryIssues.length})
                         </p>
@@ -1091,11 +1106,11 @@ const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
                                             fixIssueMutation.mutate({ endpoint: '/api/data-integrity/fix/complete-booking', body: { recordId: issue.recordId } });
                                           }
                                         }}
-                                        disabled={fixIssueMutation.isPending}
+                                        disabled={fixingIssues.has(String(issue.recordId))}
                                         className="p-1.5 text-green-600 hover:bg-green-100 dark:text-green-400 dark:hover:bg-green-900/30 rounded transition-colors disabled:opacity-50"
                                         title="Mark as attended"
                                       >
-                                        {fixIssueMutation.isPending ? (
+                                        {fixingIssues.has(String(issue.recordId)) ? (
                                           <span className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>
                                         ) : (
                                           <span className="material-symbols-outlined text-[16px]">check_circle</span>
@@ -1131,11 +1146,11 @@ const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
                                             fixIssueMutation.mutate({ endpoint: '/api/data-integrity/fix/dismiss-trackman-unmatched', body: { recordId: issue.recordId } });
                                           }
                                         }}
-                                        disabled={fixIssueMutation.isPending}
+                                        disabled={fixingIssues.has(String(issue.recordId))}
                                         className="p-1.5 text-red-600 hover:bg-red-100 dark:text-red-400 dark:hover:bg-red-900/30 rounded transition-colors disabled:opacity-50"
                                         title="Dismiss this unmatched booking"
                                       >
-                                        {fixIssueMutation.isPending ? (
+                                        {fixingIssues.has(String(issue.recordId)) ? (
                                           <span className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>
                                         ) : (
                                           <span className="material-symbols-outlined text-[16px]">visibility_off</span>
@@ -1149,11 +1164,11 @@ const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
                                         onClick={() => {
                                           fixIssueMutation.mutate({ endpoint: '/api/data-integrity/fix/approve-review-item', body: { recordId: issue.recordId, table: issue.table } });
                                         }}
-                                        disabled={fixIssueMutation.isPending}
+                                        disabled={fixingIssues.has(String(issue.recordId))}
                                         className="p-1.5 text-green-600 hover:bg-green-100 dark:text-green-400 dark:hover:bg-green-900/30 rounded transition-colors disabled:opacity-50"
                                         title="Approve this item"
                                       >
-                                        {fixIssueMutation.isPending ? (
+                                        {fixingIssues.has(String(issue.recordId)) ? (
                                           <span className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>
                                         ) : (
                                           <span className="material-symbols-outlined text-[16px]">check_circle</span>
@@ -1165,11 +1180,11 @@ const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
                                             fixIssueMutation.mutate({ endpoint: '/api/data-integrity/fix/delete-review-item', body: { recordId: issue.recordId, table: issue.table } });
                                           }
                                         }}
-                                        disabled={fixIssueMutation.isPending}
+                                        disabled={fixingIssues.has(String(issue.recordId))}
                                         className="p-1.5 text-red-600 hover:bg-red-100 dark:text-red-400 dark:hover:bg-red-900/30 rounded transition-colors disabled:opacity-50"
                                         title="Remove this item"
                                       >
-                                        {fixIssueMutation.isPending ? (
+                                        {fixingIssues.has(String(issue.recordId)) ? (
                                           <span className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>
                                         ) : (
                                           <span className="material-symbols-outlined text-[16px]">delete</span>
@@ -1184,11 +1199,11 @@ const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
                                           fixIssueMutation.mutate({ endpoint: '/api/data-integrity/fix/convert-participant-to-guest', body: { recordId: issue.recordId } });
                                         }
                                       }}
-                                      disabled={fixIssueMutation.isPending}
+                                      disabled={fixingIssues.has(String(issue.recordId))}
                                       className="p-1.5 text-orange-600 hover:bg-orange-100 dark:text-orange-400 dark:hover:bg-orange-900/30 rounded transition-colors disabled:opacity-50"
                                       title="Convert to guest (keeps booking record)"
                                     >
-                                      {fixIssueMutation.isPending ? (
+                                      {fixingIssues.has(String(issue.recordId)) ? (
                                         <span className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>
                                       ) : (
                                         <span className="material-symbols-outlined text-[16px]">person_off</span>
@@ -1207,11 +1222,11 @@ const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
                                           fixIssueMutation.mutate({ endpoint, body: { recordId: issue.recordId } });
                                         }
                                       }}
-                                      disabled={fixIssueMutation.isPending}
+                                      disabled={fixingIssues.has(String(issue.recordId))}
                                       className="p-1.5 text-red-600 hover:bg-red-100 dark:text-red-400 dark:hover:bg-red-900/30 rounded transition-colors disabled:opacity-50"
                                       title="Delete this orphaned record"
                                     >
-                                      {fixIssueMutation.isPending ? (
+                                      {fixingIssues.has(String(issue.recordId)) ? (
                                         <span className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>
                                       ) : (
                                         <span className="material-symbols-outlined text-[16px]">delete</span>
@@ -1230,11 +1245,11 @@ const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
                                             });
                                           }
                                         }}
-                                        disabled={fixIssueMutation.isPending}
+                                        disabled={fixingIssues.has(String(user.userId))}
                                         className="p-1.5 text-orange-600 hover:bg-orange-100 dark:text-orange-400 dark:hover:bg-orange-900/30 rounded transition-colors disabled:opacity-50"
                                         title={`Unlink HubSpot from ${user.email}`}
                                       >
-                                        {fixIssueMutation.isPending ? (
+                                        {fixingIssues.has(String(user.userId)) ? (
                                           <span className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>
                                         ) : (
                                           <span className="material-symbols-outlined text-[16px]">link_off</span>
@@ -1259,11 +1274,11 @@ const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
                                           });
                                         }
                                       }}
-                                      disabled={fixIssueMutation.isPending}
+                                      disabled={fixingIssues.has(String(issue.context.duplicateUsers[0]?.userId))}
                                       className="p-1.5 text-purple-600 hover:bg-purple-100 dark:text-purple-400 dark:hover:bg-purple-900/30 rounded transition-colors disabled:opacity-50"
                                       title={`Merge ${issue.context.duplicateUsers[1]?.email} into ${issue.context.duplicateUsers[0]?.email}`}
                                     >
-                                      {fixIssueMutation.isPending ? (
+                                      {fixingIssues.has(String(issue.context.duplicateUsers[0]?.userId)) ? (
                                         <span className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>
                                       ) : (
                                         <span className="material-symbols-outlined text-[16px]">merge</span>
@@ -1277,7 +1292,7 @@ const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
                                           fixIssueMutation.mutate({ endpoint: '/api/data-integrity/fix/delete-empty-session', body: { recordId: issue.recordId } });
                                         }
                                       }}
-                                      disabled={fixIssueMutation.isPending}
+                                      disabled={fixingIssues.has(String(issue.recordId))}
                                       className="p-1.5 text-red-600 hover:bg-red-100 dark:text-red-400 dark:hover:bg-red-900/30 rounded transition-colors disabled:opacity-50"
                                       title="Delete empty session"
                                     >
@@ -1291,11 +1306,11 @@ const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
                                           fixIssueMutation.mutate({ endpoint: '/api/data-integrity/fix/delete-member-no-email', body: { recordId: issue.recordId } });
                                         }
                                       }}
-                                      disabled={fixIssueMutation.isPending}
+                                      disabled={fixingIssues.has(String(issue.recordId))}
                                       className="p-1.5 text-red-600 hover:bg-red-100 dark:text-red-400 dark:hover:bg-red-900/30 rounded transition-colors disabled:opacity-50"
                                       title="Delete this member (no email)"
                                     >
-                                      {fixIssueMutation.isPending ? (
+                                      {fixingIssues.has(String(issue.recordId)) ? (
                                         <span className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>
                                       ) : (
                                         <span className="material-symbols-outlined text-[16px]">delete</span>
@@ -1328,7 +1343,7 @@ const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
                                             fixIssueMutation.mutate({ endpoint: '/api/data-integrity/fix/deactivate-stale-member', body: { userId: issue.context?.userId } });
                                           }
                                         }}
-                                        disabled={fixIssueMutation.isPending}
+                                        disabled={fixingIssues.has(String(issue.context?.userId))}
                                         className="p-1.5 text-orange-600 hover:bg-orange-100 dark:text-orange-400 dark:hover:bg-orange-900/30 rounded transition-colors disabled:opacity-50"
                                         title="Deactivate member"
                                       >
@@ -1352,7 +1367,7 @@ const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
                                             fixIssueMutation.mutate({ endpoint: '/api/data-integrity/fix/change-billing-provider', body: { userId: issue.context?.userId, newProvider: 'manual' } });
                                           }
                                         }}
-                                        disabled={fixIssueMutation.isPending}
+                                        disabled={fixingIssues.has(String(issue.context?.userId))}
                                         className="p-1.5 text-purple-600 hover:bg-purple-100 dark:text-purple-400 dark:hover:bg-purple-900/30 rounded transition-colors disabled:opacity-50"
                                         title="Switch to manual billing"
                                       >
@@ -1493,11 +1508,11 @@ const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
                                             fixIssueMutation.mutate({ endpoint: '/api/data-integrity/fix/activate-stuck-member', body: { userId: issue.context?.userId } });
                                           }
                                         }}
-                                        disabled={fixIssueMutation.isPending}
+                                        disabled={fixingIssues.has(String(issue.context?.userId))}
                                         className="p-1.5 text-green-600 hover:bg-green-100 dark:text-green-400 dark:hover:bg-green-900/30 rounded transition-colors disabled:opacity-50"
                                         title="Activate this member"
                                       >
-                                        {fixIssueMutation.isPending ? (
+                                        {fixingIssues.has(String(issue.context?.userId)) ? (
                                           <span className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>
                                         ) : (
                                           <span className="material-symbols-outlined text-[16px]">check_circle</span>
@@ -1513,11 +1528,11 @@ const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
                                           fixIssueMutation.mutate({ endpoint: '/api/data-integrity/fix/recalculate-guest-passes', body: { userId: issue.context?.userId } });
                                         }
                                       }}
-                                      disabled={fixIssueMutation.isPending}
+                                      disabled={fixingIssues.has(String(issue.context?.userId))}
                                       className="p-1.5 text-orange-600 hover:bg-orange-100 dark:text-orange-400 dark:hover:bg-orange-900/30 rounded transition-colors disabled:opacity-50"
                                       title="Recalculate guest pass usage"
                                     >
-                                      {fixIssueMutation.isPending ? (
+                                      {fixingIssues.has(String(issue.context?.userId)) ? (
                                         <span className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>
                                       ) : (
                                         <span className="material-symbols-outlined text-[16px]">calculate</span>
@@ -1532,11 +1547,11 @@ const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
                                           fixIssueMutation.mutate({ endpoint: '/api/data-integrity/fix/release-guest-pass-hold', body: { recordId: issue.recordId } });
                                         }
                                       }}
-                                      disabled={fixIssueMutation.isPending}
+                                      disabled={fixingIssues.has(String(issue.recordId))}
                                       className="p-1.5 text-red-600 hover:bg-red-100 dark:text-red-400 dark:hover:bg-red-900/30 rounded transition-colors disabled:opacity-50"
                                       title="Release expired hold"
                                     >
-                                      {fixIssueMutation.isPending ? (
+                                      {fixingIssues.has(String(issue.recordId)) ? (
                                         <span className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>
                                       ) : (
                                         <span className="material-symbols-outlined text-[16px]">lock_open</span>
@@ -1551,11 +1566,11 @@ const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
                                           fixIssueMutation.mutate({ endpoint: '/api/data-integrity/fix/cancel-orphaned-pi', body: { paymentIntentId: String(issue.recordId) } });
                                         }
                                       }}
-                                      disabled={fixIssueMutation.isPending}
+                                      disabled={fixingIssues.has(String(issue.recordId))}
                                       className="p-1.5 text-red-600 hover:bg-red-100 dark:text-red-400 dark:hover:bg-red-900/30 rounded transition-colors disabled:opacity-50"
                                       title="Cancel orphaned payment intent"
                                     >
-                                      {fixIssueMutation.isPending ? (
+                                      {fixingIssues.has(String(issue.recordId)) ? (
                                         <span className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>
                                       ) : (
                                         <span className="material-symbols-outlined text-[16px]">money_off</span>
@@ -1570,11 +1585,11 @@ const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
                                           fixIssueMutation.mutate({ endpoint: '/api/data-integrity/fix/delete-orphan-enrollment', body: { recordId: issue.recordId } });
                                         }
                                       }}
-                                      disabled={fixIssueMutation.isPending}
+                                      disabled={fixingIssues.has(String(issue.recordId))}
                                       className="p-1.5 text-red-600 hover:bg-red-100 dark:text-red-400 dark:hover:bg-red-900/30 rounded transition-colors disabled:opacity-50"
                                       title="Delete orphaned enrollment"
                                     >
-                                      {fixIssueMutation.isPending ? (
+                                      {fixingIssues.has(String(issue.recordId)) ? (
                                         <span className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>
                                       ) : (
                                         <span className="material-symbols-outlined text-[16px]">delete</span>
@@ -1589,11 +1604,11 @@ const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
                                           fixIssueMutation.mutate({ endpoint: '/api/data-integrity/fix/delete-orphan-rsvp', body: { recordId: issue.recordId } });
                                         }
                                       }}
-                                      disabled={fixIssueMutation.isPending}
+                                      disabled={fixingIssues.has(String(issue.recordId))}
                                       className="p-1.5 text-red-600 hover:bg-red-100 dark:text-red-400 dark:hover:bg-red-900/30 rounded transition-colors disabled:opacity-50"
                                       title="Delete orphaned RSVP"
                                     >
-                                      {fixIssueMutation.isPending ? (
+                                      {fixingIssues.has(String(issue.recordId)) ? (
                                         <span className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>
                                       ) : (
                                         <span className="material-symbols-outlined text-[16px]">delete</span>
@@ -1640,7 +1655,7 @@ const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
                             </div>
                           );
                         })}
-                      </div>
+                      </AnimatedCategoryDiv>
                     ))}
                   </div>
                 )}

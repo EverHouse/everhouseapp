@@ -176,6 +176,7 @@ const DataIntegrityTab: React.FC = () => {
 
   const [syncingIssues, setSyncingIssues] = useState<Set<string>>(new Set());
   const [cancellingBookings, setCancellingBookings] = useState<Set<number>>(new Set());
+  const [fixingIssues, setFixingIssues] = useState<Set<string>>(new Set());
 
   const [ignoreModal, setIgnoreModal] = useState<IgnoreModalState>({ isOpen: false, issue: null, checkName: '' });
   const [bulkIgnoreModal, setBulkIgnoreModal] = useState<BulkIgnoreModalState>({ isOpen: false, checkName: '', issues: [] });
@@ -806,12 +807,56 @@ const DataIntegrityTab: React.FC = () => {
   const fixIssueMutation = useMutation({
     mutationFn: (params: { endpoint: string; body: Record<string, any> }) =>
       postWithCredentials<{ success: boolean; message: string }>(params.endpoint, params.body),
-    onSuccess: (data) => {
-      showToast(data.message || 'Issue fixed successfully', 'success');
-      queryClient.invalidateQueries({ queryKey: ['data-integrity'] });
-      runIntegrityMutation.mutate();
+    onMutate: (params) => {
+      const recordId = params.body.recordId || params.body.userId || params.body.primaryUserId;
+      if (recordId) {
+        const key = String(recordId);
+        setFixingIssues(prev => new Set(prev).add(key));
+      }
     },
-    onError: (err: unknown) => {
+    onSuccess: (data, params) => {
+      const recordId = params.body.recordId || params.body.userId || params.body.primaryUserId;
+      if (recordId) {
+        const key = String(recordId);
+        setFixingIssues(prev => {
+          const next = new Set(prev);
+          next.delete(key);
+          return next;
+        });
+      }
+      showToast(data.message || 'Issue fixed successfully', 'success');
+      queryClient.setQueryData(['data-integrity', 'cached'], (old: CachedResultsResponse | undefined) => {
+        if (!old?.hasCached || !recordId) return old;
+        const rid = String(recordId);
+        const matchesIssue = (issue: any) => {
+          const id = issue.recordId ?? issue.id;
+          if (id != null && String(id) === rid) return true;
+          if (issue.context?.userId && String(issue.context.userId) === rid) return true;
+          return false;
+        };
+        return {
+          ...old,
+          results: old.results.map((check) => {
+            if (!Array.isArray(check.issues)) return check;
+            const filtered = check.issues.filter((issue) => !matchesIssue(issue));
+            return { ...check, issues: filtered, issueCount: filtered.length };
+          }).filter((check) => check.issueCount > 0),
+        };
+      });
+      setTimeout(() => {
+        runIntegrityMutation.mutate();
+      }, 1500);
+    },
+    onError: (err: unknown, params) => {
+      const recordId = params.body.recordId || params.body.userId || params.body.primaryUserId;
+      if (recordId) {
+        const key = String(recordId);
+        setFixingIssues(prev => {
+          const next = new Set(prev);
+          next.delete(key);
+          return next;
+        });
+      }
       showToast((err instanceof Error ? err.message : String(err)) || 'Failed to fix issue', 'error');
     }
   });
@@ -1993,6 +2038,8 @@ const DataIntegrityTab: React.FC = () => {
         handleViewProfile={handleViewProfile}
         setBookingSheet={setBookingSheet}
         fixIssueMutation={fixIssueMutation as any}
+        fixingIssues={fixingIssues}
+        isRefreshing={runIntegrityMutation.isPending}
         openIgnoreModal={openIgnoreModal}
         openBulkIgnoreModal={openBulkIgnoreModal}
         getIssueTracking={getIssueTrackingForIssue}
