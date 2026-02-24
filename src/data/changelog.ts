@@ -8,6 +8,123 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.20.0",
+    date: "2026-02-24",
+    title: "Data Integrity UX — Instant Fix Feedback & Mobile Layout",
+    changes: [
+      "Improved: Fix buttons now show per-issue loading spinners instead of disabling all buttons globally — you can fix multiple issues simultaneously",
+      "Improved: Resolved issues now disappear instantly from the list instead of waiting for a full re-scan — background refresh confirms the fix automatically",
+      "Improved: Empty check categories are automatically removed after all their issues are resolved",
+      "Improved: All data integrity issue cards now use a stacked layout with action buttons below the description — no more cramped horizontal rows on mobile",
+      "Improved: HubSpot sync comparison grid and check header accordions are now fully responsive on mobile screens",
+      "Fixed: 'Complete Booking' action on data integrity page used invalid 'completed' status causing database constraint errors — now correctly uses 'attended' status",
+      "Added: Cancel Booking and Check In actions directly from the booking detail sheet opened via data integrity",
+    ]
+  },
+  {
+    version: "8.19.0",
+    date: "2026-02-24",
+    title: "Stripe Webhook Safety — 8 Critical Fixes",
+    isMajor: true,
+    changes: [
+      "Fixed: Overnight facility closures (e.g., 22:00–06:00) were not detected correctly — time overlap validation now handles wrap-around closures spanning midnight",
+      "Fixed: Membership cancellation webhook was cancelling bookings that already started today — now only cancels future/unstarted bookings",
+      "Fixed: Webhook deduplication table could grow unbounded — cleanup now runs probabilistically (5%) after each webhook",
+      "Fixed: Partial refund webhooks arriving out of order could overwrite higher refund amounts with lower ones — now uses GREATEST to keep the highest cumulative amount",
+      "Fixed: Concurrent webhook retries could race on booking fee lookups — added row locking (FOR UPDATE) to prevent conflicts",
+      "Fixed: Async day pass payment handler was passing wrong arguments, causing day passes to be lost — now passes correct payload and throws on failure for Stripe retries",
+      "Fixed: Missing JavaScript assets returned HTML content type causing white screen of death — now returns valid JavaScript with correct content type",
+      "Fixed: Old subscription invoices failing payment could downgrade members who already switched to a new subscription — now verifies subscription ID matches before applying past_due status",
+    ]
+  },
+  {
+    version: "8.18.0",
+    date: "2026-02-24",
+    title: "Day Pass Financial Reporting Fixes",
+    changes: [
+      "Fixed: Financial reports referenced wrong database table for day passes — corrected to use proper table and column names",
+      "Fixed: Day pass payments appeared twice in transaction reports — added exclusion filter so each day pass purchase is counted exactly once",
+      "Fixed: Day pass transaction cache wasn't populated if the initial webhook failed — added cache population in checkout completion handler",
+      "Fixed: Duplicate day pass records could be created from webhook retries — added unique constraint on payment intent ID",
+    ]
+  },
+  {
+    version: "8.17.0",
+    date: "2026-02-24",
+    title: "Production-Readiness Security & Performance Audit",
+    isMajor: true,
+    changes: [
+      "Security: Upload endpoint was accessible without login — added authentication to prevent anonymous file upload URL generation",
+      "Security: Public tour booking, day pass, and error reporting endpoints now have rate limiting to prevent abuse",
+      "Fixed: Database connection pool could leak connections when timeout beats long-running fee reconciliation — fixed promise cleanup",
+      "Fixed: Stripe customer creation could produce duplicates on retry — added deterministic idempotency key",
+      "Fixed: 15 scheduler timers were not cleaned up on server shutdown — all schedulers now return interval IDs for proper cleanup",
+      "Improved: Added database indexes on booking request status fields for faster query performance",
+      "Improved: Wrapped ~50 debug console.log calls behind development-only guards to reduce production log noise",
+      "Improved: Added LIMIT guards to unbounded admin queries (inquiries, bug reports, customer metadata sync)",
+      "Improved: Alert cooldown tracking now prunes expired entries to prevent memory growth",
+    ]
+  },
+  {
+    version: "8.16.0",
+    date: "2026-02-24",
+    title: "Trackman & Booking Owner Assignment Fixes",
+    changes: [
+      "Fixed: Trackman auto-linked bookings showed empty roster slots because owner participant had no user ID — system now resolves user ID from email automatically",
+      "Fixed: Linking a member to an owner slot failed instead of updating the existing slot — now detects owner-type slots and updates them in-place",
+      "Fixed: Auto-fix backfill now repairs historical bookings with missing owner user IDs (90-day window, runs every 4 hours)",
+      "Fixed: Assigning bookings to staff members without a user account caused database errors — frontend now sends null instead of invalid staff table ID",
+      "Fixed: Backend booking assignment now resolves user ID from email when no valid member ID is provided",
+      "Fixed: Trackman webhook SQL queries produced syntax errors from undefined values — applied null coalescing to all optional parameters",
+      "Fixed: Booking event notifications crashed when receiving Date objects instead of strings — now handles both types",
+    ]
+  },
+  {
+    version: "8.15.0",
+    date: "2026-02-24",
+    title: "Email Deliverability & Sender Identity",
+    changes: [
+      "Improved: All emails now consistently show 'Ever Club' as the sender name for better brand recognition and deliverability",
+      "Improved: QR codes in emails are now generated on our server instead of relying on external API — faster loading and no third-party dependency",
+      "Fixed: Day pass type names in emails showed raw slugs with hyphens (e.g., 'day-pass-golf-sim') instead of formatted names ('Day Pass - Golf Sim')",
+    ]
+  },
+  {
+    version: "8.14.0",
+    date: "2026-02-23",
+    title: "Conference Room Invoice Billing & Real-Time Updates",
+    isMajor: true,
+    changes: [
+      "Added: Conference room bookings now use the same invoice-based billing flow as simulator bookings — consistent payment experience across all facility types",
+      "Added: Conference room invoices are automatically created, finalized, and charged after booking approval",
+      "Added: Real-time WebSocket updates for all booking and invoice changes — staff see instant updates when bookings are modified, approved, or paid",
+      "Added: WebSocket broadcasts for roster changes, payment confirmations, and admin booking operations",
+      "Improved: Booking check-in now supports manual status selection (attended/no-show) instead of auto-marking attended",
+      "Improved: Removed legacy check-in functionality and consolidated status management into the unified booking sheet",
+      "Improved: Booking conflict detection updated to work with new status flow",
+    ]
+  },
+  {
+    version: "8.13.0",
+    date: "2026-02-23",
+    title: "Security Hardening, Discount Tracking & Bug Fixes",
+    changes: [
+      "Security: Content Security Policy (CSP) headers hardened — added Google Fonts, Google Sign-In, HubSpot tracking, Google Maps, virtual tours, camera access for ID scanner, and form submission protection",
+      "Added: XML sitemap and robots.txt for search engine visibility",
+      "Added: Discount codes now persist on user accounts when coupons are applied — visible across all Stripe coupon application flows",
+      "Fixed: Merged user accounts caused notification spam from Stripe data mismatches — now handles merged users gracefully",
+      "Fixed: Booking cancellation cleaned up financial records after status change, risking partial cleanup on error — financial cleanup now runs first",
+      "Fixed: Booking display now shows player counts for better visibility",
+      "Fixed: Overdue payment display improved in member dashboards",
+      "Fixed: Facility closure drafts stayed marked as drafts even after required fields were filled",
+      "Fixed: Facility closures now default to proper visibility and notice type settings",
+      "Fixed: HubSpot form sync now automatically tries backup token when primary token fails",
+      "Fixed: Data integrity check now auto-cleans expired Stripe subscriptions",
+      "Improved: Application bundle size reduced and database query performance optimized",
+      "Improved: Booking approval flow now prevents duplicate approvals via optimistic locking",
+    ]
+  },
+  {
     version: "8.12.0",
     date: "2026-02-22",
     title: "Payment Safety & Performance Hardening",
