@@ -33,21 +33,14 @@ POST /api/booking-requests
   │   ├── conference_room → 'confirmed'
   │   └── simulator → 'pending'
   │
-  ├── Conference room overage check:
-  │   ├── getMemberTierByEmail(userEmail) → tierName
-  │   ├── getTierLimits(tierName) → dailyAllowance
-  │   ├── getDailyBookedMinutes(userEmail, date, 'conference_room') → usedToday
-  │   ├── calculateOverageCents(overageMinutes) → totalCents
-  │   └── If totalCents > 0: require conference_prepayment_id, validate prepayment
-  │
   ├── BEGIN transaction (raw pg client)
   │   ├── INSERT INTO booking_requests (...) RETURNING *
-  │   ├── If guests > 0: createGuestPassHold(email, bookingId, guestCount, client)
-  │   └── If conference room + prepayment: UPDATE conference_prepayments SET booking_id
+  │   └── If guests > 0: createGuestPassHold(email, bookingId, guestCount, client)
   ├── COMMIT
   │
   ├── If conference_room + resourceId:
-  │   └── ensureSessionForBooking({ bookingId, resourceId, sessionDate, ... })
+  │   ├── ensureSessionForBooking({ bookingId, resourceId, sessionDate, ... })
+  │   └── Create draft invoice via bookingInvoiceService (same flow as simulators since v8.16.0)
   │
   ├── res.status(201).json(booking) — response sent BEFORE post-commit ops
   │
@@ -409,9 +402,7 @@ remainingToday = tier.daily_conf_room_minutes - bookedMinutes
 if (newBookingDuration > remainingToday) {
   overageMinutes = newBookingDuration - remainingToday
   overageCents = calculateOverageCents(overageMinutes)
-  if (overageCents > 0) {
-    // Require conference_prepayment_id to proceed
-  }
+  // Overage fees are captured via draft invoice (same flow as simulators since v8.16.0)
 }
 ```
 

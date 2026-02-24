@@ -28,15 +28,10 @@ Member submits via `POST /api/booking-requests`. The route:
 5. Determine initial status:
    - **Conference rooms** → `confirmed` (auto-approve, skip staff review).
    - **Golf simulators** → `pending` (require staff approval).
-6. For conference rooms with overage fees:
-   - Compute overage: `getMemberTierByEmail()` → `getTierLimits()` → `getDailyBookedMinutes()`.
-   - If `calculateOverageCents(overageMinutes) > 0`, require `conference_prepayment_id` in the request body.
-   - Validate prepayment status (`'succeeded'` or `'completed'`) and amount ≥ required.
-7. Insert into `booking_requests` table within a raw pg transaction.
-8. If guests present, call `createGuestPassHold()` to reserve guest passes (non-blocking — hold failure does not block booking).
-9. If conference room with prepayment: link prepayment to booking via `conference_prepayments.booking_id` and update `stripe_payment_intents.booking_id`.
-10. COMMIT transaction, then for conference rooms call `ensureSessionForBooking()`.
-11. Send HTTP response, then asynchronously:
+6. Insert into `booking_requests` table within a raw pg transaction.
+7. If guests present, call `createGuestPassHold()` to reserve guest passes (non-blocking — hold failure does not block booking).
+8. COMMIT transaction, then for conference rooms call `ensureSessionForBooking()` and create a draft invoice via the booking invoice service (same flow as simulators since v8.16.0).
+9. Send HTTP response, then asynchronously:
     - Publish `booking_created` event via `bookingEvents.publish()`.
     - Notify staff via `notifyAllStaff()` with push notification.
     - Broadcast availability update via WebSocket.
@@ -191,10 +186,8 @@ For pessimistic locking during concurrent session creation, `checkSessionConflic
 
 ```
 Is resource a conference room?
-├── Yes → Auto-confirm (status='confirmed'), create session immediately
-│   └── Has overage fees?
-│       ├── Yes → Require prepayment (conference_prepayment_id), validate amount
-│       └── No → Confirm directly
+├── Yes → Auto-confirm (status='confirmed'), create session + draft invoice (same invoice flow as simulators since v8.16.0)
+│   └── Invoice auto-finalized and charged to member's Stripe credit balance
 └── No (golf simulator) → Pending staff approval (status='pending')
     └── Trackman webhook arrives?
         ├── Yes, matching pending booking → Auto-approve, create session
