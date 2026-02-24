@@ -2395,6 +2395,9 @@ router.get('/api/admin/booking/:id/members', isStaffOrAdmin, async (req, res) =>
 router.post('/api/admin/booking/:id/guests', isStaffOrAdmin, async (req, res) => {
   try {
     const bookingId = parseInt(req.params.id as string);
+    if (isNaN(bookingId)) {
+      return res.status(400).json({ error: 'Invalid booking ID' });
+    }
     const { guestEmail: rawGuestEmail, guestPhone, slotId, forceAddAsGuest, quickAdd } = req.body;
     const guestEmail = rawGuestEmail?.trim()?.toLowerCase();
     let { guestName } = req.body;
@@ -2505,7 +2508,13 @@ router.post('/api/admin/booking/:id/guests', isStaffOrAdmin, async (req, res) =>
 router.delete('/api/admin/booking/:id/guests/:guestId', isStaffOrAdmin, async (req, res) => {
   try {
     const bookingId = parseInt(req.params.id as string);
+    if (isNaN(bookingId)) {
+      return res.status(400).json({ error: 'Invalid booking ID' });
+    }
     const guestId = parseInt(req.params.guestId as string);
+    if (isNaN(guestId)) {
+      return res.status(400).json({ error: 'Invalid guest ID' });
+    }
     const staffEmail = req.session?.user?.email || 'admin';
 
     const bookingResult = await db.execute(sql`SELECT br.id, br.session_id, br.guest_count, br.user_email as owner_email

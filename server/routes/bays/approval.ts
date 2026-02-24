@@ -22,6 +22,9 @@ router.put('/api/booking-requests/:id', isStaffOrAdmin, async (req, res) => {
     const { id } = req.params;
     const { status, staff_notes, suggested_time, reviewed_by, resource_id, trackman_booking_id, trackman_external_id, pending_trackman_sync } = req.body;
     const bookingId = parseInt(id as string, 10);
+    if (isNaN(bookingId)) {
+      return res.status(400).json({ error: 'Invalid booking ID' });
+    }
 
     if (trackman_booking_id !== undefined && trackman_booking_id !== null && trackman_booking_id !== '') {
       const validation = await validateTrackmanId(trackman_booking_id, bookingId);
@@ -116,6 +119,9 @@ router.put('/api/bookings/:id/checkin', isStaffOrAdmin, async (req, res) => {
     const { id } = req.params;
     const { status: targetStatus, confirmPayment, skipPaymentCheck, skipRosterCheck } = req.body;
     const bookingId = parseInt(id as string, 10);
+    if (isNaN(bookingId)) {
+      return res.status(400).json({ error: 'Invalid booking ID' });
+    }
     const sessionUser = getSessionUser(req);
     const staffEmail = sessionUser?.email || 'unknown';
     const staffName = sessionUser?.name || null;
@@ -183,6 +189,9 @@ router.put('/api/booking-requests/:id/complete-cancellation', isStaffOrAdmin, as
     if (!staffEmail) return res.status(401).json({ error: 'Authentication required' });
 
     const bookingId = parseInt(req.params.id as string, 10);
+    if (isNaN(bookingId)) {
+      return res.status(400).json({ error: 'Invalid booking ID' });
+    }
 
     const result = await BookingStateService.completePendingCancellation({ bookingId, staffEmail, source: 'staff_manual' });
 

@@ -25,6 +25,7 @@ import { ensureSessionForBooking, createSessionWithUsageTracking } from '../../c
 import { getErrorMessage } from '../../utils/errorUtils';
 import { cancelPendingPaymentIntentsForBooking } from '../../core/billing/paymentIntentCleanup';
 import { normalizeToISODate } from '../../utils/dateNormalize';
+import { bookingRateLimiter } from '../../middleware/rateLimiting';
 
 interface SanitizedParticipant {
   email: string;
@@ -417,7 +418,7 @@ router.get('/api/booking-requests', async (req, res) => {
   }
 });
 
-router.post('/api/booking-requests', async (req, res) => {
+router.post('/api/booking-requests', bookingRateLimiter, async (req, res) => {
   try {
     const sessionUser = getSessionUser(req);
     

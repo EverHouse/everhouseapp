@@ -313,7 +313,8 @@ async function getUnifiedPurchasesForEmail(email: string): Promise<UnifiedPurcha
      WHERE resource_type = 'billing'
      AND resource_id = ${normalizedEmail} 
      AND action IN ('cash_payment_recorded', 'check_payment_recorded', 'cash_check_recorded')
-     ORDER BY created_at DESC`
+     ORDER BY created_at DESC
+     LIMIT 1000`
   );
   
   unifiedCashCheckPayments = cashCheckResult.rows.map((record: Record<string, unknown>) => {

@@ -1413,6 +1413,9 @@ router.post('/api/member/bookings/:bookingId/cancel-payment', isAuthenticated, a
     }
 
     const bookingId = parseInt(req.params.bookingId as any);
+    if (isNaN(bookingId)) {
+      return res.status(400).json({ error: 'Invalid booking ID' });
+    }
     const { paymentIntentId } = req.body;
 
     if (!paymentIntentId || typeof paymentIntentId !== 'string') {
