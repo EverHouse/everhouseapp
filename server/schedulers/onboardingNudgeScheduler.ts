@@ -64,11 +64,26 @@ async function processOnboardingNudges(): Promise<void> {
   }
 }
 
-export function startOnboardingNudgeScheduler(): NodeJS.Timeout {
+let intervalId: NodeJS.Timeout | null = null;
+
+export function startOnboardingNudgeScheduler(): void {
+  if (intervalId) {
+    logger.info('[Onboarding Nudge] Scheduler already running');
+    return;
+  }
+
   const interval = 60 * 60 * 1000;
   logger.info('[Scheduler] Onboarding Nudge scheduler started (runs at 10 AM Pacific)');
-  return setInterval(async () => {
+  intervalId = setInterval(async () => {
     schedulerTracker.recordRun('Onboarding Nudge', true);
     await processOnboardingNudges();
   }, interval);
+}
+
+export function stopOnboardingNudgeScheduler(): void {
+  if (intervalId) {
+    clearInterval(intervalId);
+    intervalId = null;
+    logger.info('[Onboarding Nudge] Scheduler stopped');
+  }
 }

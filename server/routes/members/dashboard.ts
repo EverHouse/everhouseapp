@@ -343,6 +343,7 @@ router.get('/api/member/dashboard-data', isAuthenticated, async (req, res) => {
           db.select()
             .from(guestPasses)
             .where(sql`LOWER(${guestPasses.memberEmail}) = ${userEmail}`)
+            .limit(1)
         );
         
         if (result.length === 0) {
@@ -358,6 +359,7 @@ router.get('/api/member/dashboard-data', isAuthenticated, async (req, res) => {
             db.select()
               .from(guestPasses)
               .where(sql`LOWER(${guestPasses.memberEmail}) = ${userEmail}`)
+              .limit(1)
           );
         } else if (result[0].passesTotal !== passesTotal) {
           const newPassesUsed = Math.min(result[0].passesUsed, passesTotal);

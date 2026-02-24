@@ -99,10 +99,23 @@ async function scheduledCheck(): Promise<void> {
   }
 }
 
-export function startWaiverReviewScheduler(): NodeJS.Timeout {
+let intervalId: NodeJS.Timeout | null = null;
+
+export function startWaiverReviewScheduler(): void {
+  if (intervalId) {
+    logger.info('[Waiver Review] Scheduler already running');
+    return;
+  }
+
   const CHECK_INTERVAL_MS = 4 * 60 * 60 * 1000;
-  
-  const id = setInterval(scheduledCheck, CHECK_INTERVAL_MS);
+  intervalId = setInterval(scheduledCheck, CHECK_INTERVAL_MS);
   logger.info('[Startup] Waiver review scheduler enabled (checks every 4 hours for stale waivers)');
-  return id;
+}
+
+export function stopWaiverReviewScheduler(): void {
+  if (intervalId) {
+    clearInterval(intervalId);
+    intervalId = null;
+    logger.info('[Waiver Review] Scheduler stopped');
+  }
 }

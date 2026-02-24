@@ -24,7 +24,14 @@ async function runSync(): Promise<void> {
   }
 }
 
-export function startHubSpotFormSyncScheduler(): NodeJS.Timeout {
+let intervalId: NodeJS.Timeout | null = null;
+
+export function startHubSpotFormSyncScheduler(): void {
+  if (intervalId) {
+    logger.info('[HubSpot FormSync] Scheduler already running');
+    return;
+  }
+
   logger.info('[Startup] HubSpot form sync scheduler enabled (runs every 30 minutes)');
 
   setTimeout(() => {
@@ -34,5 +41,13 @@ export function startHubSpotFormSyncScheduler(): NodeJS.Timeout {
     });
   }, 60000);
 
-  return setInterval(runSync, SYNC_INTERVAL_MS);
+  intervalId = setInterval(runSync, SYNC_INTERVAL_MS);
+}
+
+export function stopHubSpotFormSyncScheduler(): void {
+  if (intervalId) {
+    clearInterval(intervalId);
+    intervalId = null;
+    logger.info('[HubSpot FormSync] Scheduler stopped');
+  }
 }

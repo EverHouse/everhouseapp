@@ -63,8 +63,22 @@ async function checkAndSendMorningNotifications(): Promise<void> {
   }
 }
 
-export function startMorningClosureScheduler(): NodeJS.Timeout {
-  const id = setInterval(checkAndSendMorningNotifications, 30 * 60 * 1000);
+let intervalId: NodeJS.Timeout | null = null;
+
+export function startMorningClosureScheduler(): void {
+  if (intervalId) {
+    logger.info('[Morning Closures] Scheduler already running');
+    return;
+  }
+
+  intervalId = setInterval(checkAndSendMorningNotifications, 30 * 60 * 1000);
   logger.info('[Startup] Morning closure notification scheduler enabled (runs at 8am)');
-  return id;
+}
+
+export function stopMorningClosureScheduler(): void {
+  if (intervalId) {
+    clearInterval(intervalId);
+    intervalId = null;
+    logger.info('[Morning Closures] Scheduler stopped');
+  }
 }

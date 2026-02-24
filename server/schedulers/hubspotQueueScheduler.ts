@@ -52,10 +52,16 @@ async function processQueue(): Promise<void> {
   }
 }
 
-export function startHubSpotQueueScheduler(): NodeJS.Timeout {
+let intervalId: NodeJS.Timeout | null = null;
+
+export function startHubSpotQueueScheduler(): void {
+  if (intervalId) {
+    logger.info('[HubSpot Queue] Scheduler already running');
+    return;
+  }
+
   logger.info('[Startup] HubSpot queue scheduler enabled (runs every 2 minutes)');
   
-  // Ensure HubSpot properties have all required options on startup
   setTimeout(async () => {
     try {
       const { ensureHubSpotPropertiesExist } = await import('../core/hubspot/stages');
@@ -71,13 +77,19 @@ export function startHubSpotQueueScheduler(): NodeJS.Timeout {
     }
   }, 15000);
   
-  // Run immediately on startup to process any pending jobs
   setTimeout(() => {
     processQueue().catch((err: unknown) => {
       logger.error('[HubSpot Queue] Initial run failed:', { error: err as Error });
     });
-  }, 30000); // Wait 30 seconds after startup
+  }, 30000);
   
-  // Then run every 2 minutes
-  return setInterval(processQueue, PROCESS_INTERVAL_MS);
+  intervalId = setInterval(processQueue, PROCESS_INTERVAL_MS);
+}
+
+export function stopHubSpotQueueScheduler(): void {
+  if (intervalId) {
+    clearInterval(intervalId);
+    intervalId = null;
+    logger.info('[HubSpot Queue] Scheduler stopped');
+  }
 }

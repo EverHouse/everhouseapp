@@ -1462,6 +1462,9 @@ router.get('/api/admin/booking/:id/members', isStaffOrAdmin, async (req, res) =>
     const isUnmatchedOwner = !ownerEmail || String(ownerEmail).includes('unmatched@') || String(ownerEmail).includes('@trackman.import');
     const bookingData = bookingResult.rows[0] as DbRow;
     const bookingId = parseInt(id as string);
+    if (isNaN(bookingId)) {
+      return res.status(400).json({ error: 'Invalid booking ID' });
+    }
 
     const staffEmailsResult = await db.execute(sql`SELECT LOWER(email) as email FROM staff_users WHERE is_active = true`);
     const staffEmailSet = new Set(staffEmailsResult.rows.map((r: DbRow) => r.email));

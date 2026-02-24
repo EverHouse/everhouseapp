@@ -59,11 +59,16 @@ router.put('/api/admin/trackman/reconciliation/:id', isStaffOrAdmin, async (req,
       });
     }
     
+    const reconciliationId = parseInt(id as string);
+    if (isNaN(reconciliationId)) {
+      return res.status(400).json({ error: 'Invalid ID' });
+    }
+    
     let result;
     
     if (status === 'adjusted' && adjustLedger) {
       const adjustResult = await adjustLedgerForReconciliation(
-        parseInt(id as string),
+        reconciliationId,
         staffEmail,
         notes
       );
@@ -79,7 +84,7 @@ router.put('/api/admin/trackman/reconciliation/:id', isStaffOrAdmin, async (req,
       };
     } else {
       const reconcileResult = await markAsReconciled(
-        parseInt(id as string),
+        reconciliationId,
         staffEmail,
         status,
         notes

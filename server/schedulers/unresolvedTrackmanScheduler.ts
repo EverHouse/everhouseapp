@@ -91,8 +91,22 @@ async function checkUnresolvedTrackmanBookings(): Promise<void> {
   }
 }
 
-export function startUnresolvedTrackmanScheduler(): NodeJS.Timeout {
-  const id = setInterval(checkUnresolvedTrackmanBookings, 15 * 60 * 1000);
+let intervalId: NodeJS.Timeout | null = null;
+
+export function startUnresolvedTrackmanScheduler(): void {
+  if (intervalId) {
+    logger.info('[Unresolved Trackman] Scheduler already running');
+    return;
+  }
+
+  intervalId = setInterval(checkUnresolvedTrackmanBookings, 15 * 60 * 1000);
   logger.info('[Startup] Unresolved Trackman check scheduler enabled (runs at 9am Pacific)');
-  return id;
+}
+
+export function stopUnresolvedTrackmanScheduler(): void {
+  if (intervalId) {
+    clearInterval(intervalId);
+    intervalId = null;
+    logger.info('[Unresolved Trackman] Scheduler stopped');
+  }
 }

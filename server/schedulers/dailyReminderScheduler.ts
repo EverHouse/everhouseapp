@@ -63,8 +63,22 @@ async function checkAndSendReminders(): Promise<void> {
   }
 }
 
-export function startDailyReminderScheduler(): NodeJS.Timeout {
-  const id = setInterval(checkAndSendReminders, 30 * 60 * 1000);
+let intervalId: NodeJS.Timeout | null = null;
+
+export function startDailyReminderScheduler(): void {
+  if (intervalId) {
+    logger.info('[Daily Reminders] Scheduler already running');
+    return;
+  }
+
+  intervalId = setInterval(checkAndSendReminders, 30 * 60 * 1000);
   logger.info('[Startup] Daily reminder scheduler enabled (runs at 6pm)');
-  return id;
+}
+
+export function stopDailyReminderScheduler(): void {
+  if (intervalId) {
+    clearInterval(intervalId);
+    intervalId = null;
+    logger.info('[Daily Reminders] Scheduler stopped');
+  }
 }

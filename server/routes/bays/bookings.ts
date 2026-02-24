@@ -1063,6 +1063,9 @@ router.put('/api/booking-requests/:id/member-cancel', async (req, res) => {
     }
     
     const bookingId = parseInt(id, 10);
+    if (isNaN(bookingId)) {
+      return res.status(400).json({ error: 'Invalid booking ID' });
+    }
     
     const [existing] = await db.select({
       id: bookingRequests.id,

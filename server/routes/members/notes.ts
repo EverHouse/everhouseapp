@@ -18,7 +18,8 @@ router.get('/api/members/:email/notes', isStaffOrAdmin, async (req, res) => {
     const notes = await db.select()
       .from(memberNotes)
       .where(sql`LOWER(${memberNotes.memberEmail}) = ${normalizedEmail}`)
-      .orderBy(desc(memberNotes.isPinned), desc(memberNotes.createdAt));
+      .orderBy(desc(memberNotes.isPinned), desc(memberNotes.createdAt))
+      .limit(200);
     
     res.json(notes);
   } catch (error: unknown) {

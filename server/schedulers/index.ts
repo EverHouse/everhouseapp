@@ -1,20 +1,20 @@
 import { startIntegrityScheduler } from './integrityScheduler';
-import { startWaiverReviewScheduler } from './waiverReviewScheduler';
+import { startWaiverReviewScheduler, stopWaiverReviewScheduler } from './waiverReviewScheduler';
 import { startStripeReconciliationScheduler, stopStripeReconciliationScheduler } from './stripeReconciliationScheduler';
 import { startFeeSnapshotReconciliationScheduler, stopFeeSnapshotReconciliationScheduler } from './feeSnapshotReconciliationScheduler';
 import { startGracePeriodScheduler, stopGracePeriodScheduler } from './gracePeriodScheduler';
 import { startBookingExpiryScheduler, stopBookingExpiryScheduler } from './bookingExpiryScheduler';
 import { startBookingAutoCompleteScheduler, stopBookingAutoCompleteScheduler } from './bookingAutoCompleteScheduler';
 import { startBackgroundSyncScheduler } from './backgroundSyncScheduler';
-import { startDailyReminderScheduler } from './dailyReminderScheduler';
-import { startMorningClosureScheduler } from './morningClosureScheduler';
+import { startDailyReminderScheduler, stopDailyReminderScheduler } from './dailyReminderScheduler';
+import { startMorningClosureScheduler, stopMorningClosureScheduler } from './morningClosureScheduler';
 import { startWeeklyCleanupScheduler } from './weeklyCleanupScheduler';
 import { startCommunicationLogsScheduler, stopCommunicationLogsScheduler } from './communicationLogsScheduler';
 import { startWebhookLogCleanupScheduler } from './webhookLogCleanupScheduler';
-import { startHubSpotQueueScheduler } from './hubspotQueueScheduler';
-import { startHubSpotFormSyncScheduler } from './hubspotFormSyncScheduler';
+import { startHubSpotQueueScheduler, stopHubSpotQueueScheduler } from './hubspotQueueScheduler';
+import { startHubSpotFormSyncScheduler, stopHubSpotFormSyncScheduler } from './hubspotFormSyncScheduler';
 import { startSessionCleanupScheduler } from './sessionCleanupScheduler';
-import { startUnresolvedTrackmanScheduler } from './unresolvedTrackmanScheduler';
+import { startUnresolvedTrackmanScheduler, stopUnresolvedTrackmanScheduler } from './unresolvedTrackmanScheduler';
 import { startGuestPassResetScheduler, stopGuestPassResetScheduler } from './guestPassResetScheduler';
 import { startMemberSyncScheduler } from './memberSyncScheduler';
 import { startDuplicateCleanupScheduler } from './duplicateCleanupScheduler';
@@ -22,7 +22,7 @@ import { startRelocationCleanupScheduler } from './relocationCleanupScheduler';
 import { startStuckCancellationScheduler, stopStuckCancellationScheduler } from './stuckCancellationScheduler';
 import { startPendingUserCleanupScheduler, stopPendingUserCleanupScheduler } from './pendingUserCleanupScheduler';
 import { startWebhookEventCleanupScheduler, stopWebhookEventCleanupScheduler } from './webhookEventCleanupScheduler';
-import { startOnboardingNudgeScheduler } from './onboardingNudgeScheduler';
+import { startOnboardingNudgeScheduler, stopOnboardingNudgeScheduler } from './onboardingNudgeScheduler';
 import { startJobProcessor, stopJobProcessor } from '../core/jobQueue';
 import { schedulerTracker } from '../core/schedulerTracker';
 
@@ -59,11 +59,11 @@ export function initSchedulers(): void {
   schedulerTracker.registerScheduler('Job Queue Processor', 5000);
 
   startBackgroundSyncScheduler();
-  intervalIds.push(startDailyReminderScheduler());
-  intervalIds.push(startMorningClosureScheduler());
+  startDailyReminderScheduler();
+  startMorningClosureScheduler();
   intervalIds.push(startWeeklyCleanupScheduler());
   intervalIds.push(...startIntegrityScheduler());
-  intervalIds.push(startWaiverReviewScheduler());
+  startWaiverReviewScheduler();
   startStripeReconciliationScheduler();
   startFeeSnapshotReconciliationScheduler();
   startGracePeriodScheduler();
@@ -72,9 +72,9 @@ export function initSchedulers(): void {
   startCommunicationLogsScheduler();
   intervalIds.push(startWebhookLogCleanupScheduler());
   intervalIds.push(startSessionCleanupScheduler());
-  intervalIds.push(startUnresolvedTrackmanScheduler());
-  intervalIds.push(startHubSpotQueueScheduler());
-  intervalIds.push(startHubSpotFormSyncScheduler());
+  startUnresolvedTrackmanScheduler();
+  startHubSpotQueueScheduler();
+  startHubSpotFormSyncScheduler();
   startMemberSyncScheduler();
   intervalIds.push(startDuplicateCleanupScheduler());
   startGuestPassResetScheduler();
@@ -82,7 +82,7 @@ export function initSchedulers(): void {
   startStuckCancellationScheduler();
   startPendingUserCleanupScheduler();
   startWebhookEventCleanupScheduler();
-  intervalIds.push(startOnboardingNudgeScheduler());
+  startOnboardingNudgeScheduler();
   startJobProcessor(5000);
 }
 
@@ -102,5 +102,12 @@ export function stopSchedulers(): void {
   stopPendingUserCleanupScheduler();
   stopWebhookEventCleanupScheduler();
   stopCommunicationLogsScheduler();
+  stopDailyReminderScheduler();
+  stopMorningClosureScheduler();
+  stopWaiverReviewScheduler();
+  stopUnresolvedTrackmanScheduler();
+  stopHubSpotQueueScheduler();
+  stopHubSpotFormSyncScheduler();
+  stopOnboardingNudgeScheduler();
   stopJobProcessor();
 }

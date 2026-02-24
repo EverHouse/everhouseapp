@@ -21,7 +21,8 @@ router.get('/api/members/:email/communications', isStaffOrAdmin, async (req, res
     const logs = await db.select()
       .from(communicationLogs)
       .where(sql`LOWER(${communicationLogs.memberEmail}) = ${normalizedEmail}`)
-      .orderBy(desc(communicationLogs.occurredAt));
+      .orderBy(desc(communicationLogs.occurredAt))
+      .limit(500);
     
     res.json(logs);
   } catch (error: unknown) {
