@@ -1,7 +1,7 @@
 # Ever Club Members App
 
 ## Overview
-The Ever Club Members App is a private members club application designed for golf and wellness centers. Its core function is to streamline golf simulator bookings, wellness service appointments, and club event management. The application aims to enhance member engagement, optimize operational workflows, and deliver a unified digital experience. The long-term objective is to establish this application as a central digital hub for private members clubs, providing extensive tools for membership management, facility booking, and community building to improve member satisfaction and operational efficiency.
+The Ever Club Members App is a private members club application for golf and wellness centers. Its primary purpose is to manage golf simulator bookings, wellness service appointments, and club events, aiming to enhance member engagement and optimize operations. The project's vision is to become a central digital hub for private members clubs, offering comprehensive tools for membership, facility booking, and community building to improve member satisfaction and operational efficiency.
 
 ## User Preferences
 - **Skill-Driven Development**: We have an extensive library of custom skills installed. Before answering questions, debugging, or modifying any system, you MUST identify and load the relevant skill (e.g., booking-flow, stripe-webhook-flow, fee-calculation, react-dev). Rely on your skills as the single source of truth for architectural rules.
@@ -11,59 +11,36 @@ The Ever Club Members App is a private members club application designed for gol
 ## System Architecture
 
 ### Core Architecture & Data Flow
-- **Camel-to-Snake Boundary Map**: `snake_case` for PostgreSQL tables/columns, `camelCase` for Drizzle schemas, API JSON payloads, and React/TypeScript frontend. Raw DB rows must not be leaked in API responses.
-- **TypeScript Mismatches**: Fix underlying schema or DTOs; avoid `as any`.
-- **SQL Security**: Use Drizzle ORM query builders or parameterized `sql` template literals; raw string-interpolated SQL is forbidden.
-
-### UI/UX & Interaction Standards
-- **Design System**: Liquid Glass UI system.
-- **Sheet/Modal Design**: Consists of a Header (title and close "X"), a scrollable Body for data entry, and a Sticky Footer for primary/secondary actions.
-- **Button Hierarchy**: Primary actions (e.g., "Collect", "Check In"), secondary actions (Reschedule, Cancel as ghost links), and destructive actions (e.g., "Void All Payments"). Buttons in scrollable bodies must have `type="button"`.
-- **Fee Recalculation**: Roster changes trigger server-side fee recalculation with subtle visual feedback (loading states) on the Financial Summary.
-
-### System Non-Negotiables
-- **Timezone**: All date/time operations must use Pacific Time (`America/Los_Angeles`).
+- **Naming Conventions**: `snake_case` for PostgreSQL tables/columns; `camelCase` for Drizzle schemas, API JSON payloads, and React/TypeScript frontend. Raw database rows must not be exposed in API responses.
+- **Type Safety**: Fix underlying schemas or DTOs to resolve TypeScript mismatches; avoid using `as any`.
+- **Database Interaction**: Use Drizzle ORM query builders or parameterized `sql` template literals for all SQL queries; raw string-interpolated SQL is forbidden.
+- **Timezone**: All date/time operations must explicitly use Pacific Time (`America/Los_Angeles`).
 - **Audit Logging**: All staff actions must be logged using `logFromRequest()`.
-- **API/Frontend Consistency**: API response field names must exactly match frontend TypeScript interfaces.
+- **API/Frontend Consistency**: API response field names must align exactly with frontend TypeScript interfaces.
 
 ### UI/UX & Frontend
-- **Design & Styling**: Liquid Glass UI, Tailwind CSS v4, dark mode.
-- **Interactions & Motion**: Spring-physics, drag-to-dismiss.
-- **React & Framework**: React 19, Vite, state management (Zustand/TanStack).
+- **Design System**: Liquid Glass UI system, utilizing Tailwind CSS v4 and supporting dark mode.
+- **Interactions**: Features spring-physics for motion and drag-to-dismiss functionality.
+- **Technology Stack**: React 19, Vite, and state management using Zustand/TanStack libraries.
+- **Component Design**: Sheets and modals follow a structure of a Header (title and close "X"), a scrollable Body for content, and a Sticky Footer for actions.
+- **Button Hierarchy**: Differentiates between primary actions, secondary actions (as ghost links), and destructive actions. Buttons within scrollable bodies must have `type="button"`.
+- **Fee Recalculation**: Roster changes trigger server-side fee recalculation, with visual feedback for loading states on the Financial Summary.
 
-### Core Domain
-- **Booking & Scheduling**: "Request & Hold" model, unified participants, calendar sync, auto-complete scheduler (marks past bookings as `attended`).
-- **Fees & Billing**: Unified fee service, dynamic pricing, prepayment, guest fees, "one invoice per booking" architecture. Dual payment path: staff approval creates a prepayment PaymentIntent for online payment, while Trackman auto-approve creates a draft Stripe invoice; `finalizeAndPayInvoice()` detects existing terminal payments to avoid double-charging. Both simulator and conference room bookings use the same invoice-based flow (unified since v8.16.0; auto-applies Stripe customer credit balance). Old `conference_prepayments` records are grandfathered at check-in. Roster lock: after invoice is paid, roster edits are blocked unless staff provides force-override with reason (fail-open — Stripe API outage won't block edits). Invoice lifecycle: Draft → finalize → pay/void; drafts updated on roster changes, deleted when fees drop to $0.
-- **Database & Data Integrity**: PostgreSQL, Supabase Realtime, Drizzle ORM with CASCADE constraints on `wellness_enrollments.class_id` and `booking_participants.session_id`.
-- **Member Lifecycle & Check-In**: Membership tiers, QR/NFC check-in, onboarding.
+### Core Domain Features
+- **Booking & Scheduling**: Implements a "Request & Hold" model, unified participant management, calendar synchronization, and an auto-complete scheduler that marks past bookings as `attended`.
+- **Fees & Billing**: Features a unified fee service, dynamic pricing, prepayment capabilities, and guest fees, based on a "one invoice per booking" architecture. It supports dual payment paths: staff-approved bookings use a PaymentIntent for online payment, while Trackman auto-approvals create a draft Stripe invoice. The system `finalizeAndPayInvoice()` method intelligently handles existing payments to prevent double-charging. Both simulator and conference room bookings utilize a unified invoice-based flow, auto-applying Stripe customer credit balances. Roster edits are blocked post-payment unless a force-override with a reason is provided by staff. Invoice lifecycle transitions through Draft, Finalize, and Pay/Void states.
+- **Database & Data Integrity**: Uses PostgreSQL, Supabase Realtime, and Drizzle ORM with CASCADE constraints on `wellness_enrollments.class_id` and `booking_participants.session_id`.
+- **Member Lifecycle**: Includes membership tiers, QR/NFC check-in, and onboarding processes.
 
 ### Enforced Code Conventions
-- **Error Handling**: Empty catch blocks are banned; every `catch` must re-throw, log via `logger.debug`/`logger.warn`, or use `safeDbOperation()`.
-- **Timezone**: All `toLocaleDateString()` calls must include `timeZone: 'America/Los_Angeles'`.
-- **Authentication**: All mutating API routes (POST/PUT/PATCH/DELETE) must have authentication protection.
-- **Stripe Webhook Safety**: Webhook handlers modifying member status must include a `billing_provider` guard to prevent overwrites from other systems.
+- **Error Handling**: Empty catch blocks are prohibited; all `catch` blocks must re-throw, log via `logger.debug`/`logger.warn`, or use `safeDbOperation()`.
+- **Authentication**: All mutating API routes (POST/PUT/PATCH/DELETE) must be protected by authentication.
+- **Stripe Webhook Safety**: Webhook handlers modifying member status must include a `billing_provider` guard to prevent data overwrites from other systems.
 - **Booking Race Condition Guards**: `approveBooking()`, `declineBooking()`, and `checkinBooking()` implement status guards and optimistic locking to prevent race conditions and ensure data integrity.
-
-## Recent Changes
-- **2026-02-23**: Fixed `logger.debug` missing method in `server/core/logger.ts` (was causing 230+ runtime errors across 28 files)
-- **2026-02-23**: Fixed day pass purchase insert failures — `stripe_customer_id` column made nullable to support guest checkouts without a Stripe customer. Unsafe `as string` casts replaced with safe extraction in `webhooks.ts` and `dayPasses.ts`.
-- **2026-02-23**: Fixed audit log insert failures for system actions — all `logSystemAction()` calls in `webhooks.ts` were using wrong field names (`entityType`/`entityId` instead of `resourceType`/`resourceId`), causing NOT NULL constraint violations on `resource_type`.
-- **2026-02-23**: Full app audit — fixed ~20 unsafe Stripe type casts across webhooks/routes, created reusable `getCustomerId()`/`getPaymentIntentId()` helpers in `server/types/stripe-helpers.ts`. Fixed unauthenticated tour confirm endpoint. Fixed job queue Date serialization (ISO strings + `::timestamptz`). Fixed HubSpot FormSync 401 error spam. Fixed `broadcastBillingUpdate` wrong call signature. Fixed `InvoiceResult` missing `customerId` (invoice notifications weren't sending). Production booking expiry will self-fix on next deploy (constraint already correct in code).
-- **2026-02-23**: Second-pass verification fixes — Fixed booking auto-complete scheduler crash (`bp.updated_at` → `bs.updated_at`, column only exists on booking_sessions). Added `'billing'` to notification type CHECK constraint and NotificationType union (was blocking all billing notifications in production). Fixed audit log `checkout_session_expired` using invalid `resourceType: 'checkout_session'` → `'checkout'`.
-- **2026-02-23**: Added `'refunded'` to `participant_payment_status` PostgreSQL enum — cancellation was failing because `bookingStateService.cancelBooking()` sets `paymentStatus: 'refunded'` on paid participants, but the enum only had `pending/paid/waived`. This blocked cancellation of all bookings with paid participants.
-- **2026-02-23**: Fixed Stripe Email Mismatch notification spam — merged users retained `stripe_customer_id` causing webhook handlers to match archived users and fire false alerts. Fixed `userMerge.ts` to clear all external IDs (Stripe, HubSpot) when archiving secondary users, added merged-user guard in `handleCustomerUpdated`, and added startup cleanup for existing affected users.
-- **2026-02-23**: Fixed discount_code tracking across all 9 coupon flows — removed duplicate GET /api/stripe/coupons route (was causing empty coupon dropdown), added discount_code persistence to: staff discount endpoint (memberBilling.ts), subscription.created webhook, subscription.updated webhook, and family group billing (groupBilling.ts). Both webhook handlers now check item-level discounts (e.g., FAMILY20 coupon) when subscription-level discounts are empty, preventing incorrect NULL overwrites.
-- **2026-02-23**: Performance optimization — reduced initial JS bundle from 545KB to 327KB (40% reduction). Lazy-loaded html5-qrcode (327KB) via dynamic import in QrScannerModal and RedeemPassCard. Split changelog.ts (7,437 lines) into lazy-loaded module. Added 16 database indexes across 8 high-traffic tables. Removed duplicate LOWER(email) index.
-- **2026-02-23**: Fixed facility closure drafts not unmarking when required fields filled — `visibility` column was missing from database/Drizzle schema but both frontend and backend checked it as a required field. Added `visibility` column to `facility_closures` table, Drizzle schema, create/update endpoints, and calendar sync INSERT.
-- **2026-02-23**: Bug fix sweep — (1) Supabase Realtime: improved `enableRealtimeForTable` to use schema-qualified `ALTER PUBLICATION` SQL with proper quoting, returns `false` when RPC not available instead of masking failure. Client-side `useSupabaseRealtime` hook now handles `CHANNEL_ERROR`/`TIMED_OUT` with auto-reconnect (3 attempts, 5s delay) and properly cleans up retry timers on unmount. (2) HubSpot FormSync: reduced access-denied suppression from 24h to 4h, added admin endpoints `GET/POST /api/admin/hubspot/form-sync-status` and `/form-sync-reset` for manual control. (3) PageErrorBoundary: added auto-retry with visible countdown during transient API failures (3s then 5s delays, max 2 auto-retries before showing manual retry UI).
-- **2026-02-24**: Conference room billing migration — moved conference room bookings from PaymentIntent-based prepayment flow (`conference_prepayments` table) to invoice-based flow (matching simulator bookings). Removed conference room exclusions from `bookingInvoiceService.ts`, `prepaymentService.ts`, and `staffCheckin.ts` settlement. Both member (`bookings.ts`) and staff (`staff-conference-booking.ts`) flows now create sessions + invoices after booking. Frontend (`BookGolf.tsx`) updated with "Book & Pay" button, auto-credit-charge messaging, and conference-specific confirmation toast. Old `conference_prepayments` records still honored at check-in (grandfather). Prepayment endpoints (`/create-intent`, `/confirm`) deprecated but kept; `/estimate` still active.
-- **2026-02-24**: Conference room billing gap fixes — (1) `approvalService.ts`: staff-approved conference room bookings now auto-finalize+pay invoice via credit balance (was only creating draft). (2) `payments.ts`: removed `r.type != 'conference_room'` exclusion from upcoming-bookings-requiring-payment query so staff can see conference room fees. (3) Verified `staffCheckin.ts` settlement is generic and handles conference rooms correctly. (4) Audited all `isConferenceRoom` UI guards — remaining ones are intentional (player slots, Trackman, roster layout).
-- **2026-02-24**: Real-time WebSocket broadcasting for booking/invoice changes — Added `broadcastBookingRosterUpdate()` (debounced 300ms) and `broadcastBookingInvoiceUpdate()` to `websocket.ts`. Roster broadcasts fire after add/remove participant, player count change, and batch edits in `rosterService.ts`. Invoice broadcasts fire after create/update/finalize/pay/void/delete in `bookingInvoiceService.ts` and after settlement/waiver/void in `staffCheckin.ts`. Frontend `useUnifiedBookingLogic.ts` listens for booking-scoped events and auto-refetches with debounce. Member History page also listens for invoice updates. Staff members who are also booking owners receive messages once (deduped).
-- **2026-02-24**: Extended WebSocket broadcast coverage — Added `broadcastBookingRosterUpdate` to 4 Trackman admin endpoints (add guest, remove guest, link member, unlink member) in `trackman/admin.ts`. Added `broadcastBookingInvoiceUpdate` to member payment confirmation and invoice reconciliation flows in `member-payments.ts` (alongside existing `broadcastBillingUpdate`). Complete broadcast coverage now includes: rosterService (4 ops), bookingInvoiceService (7 ops), staffCheckin (4 ops), trackman/admin (4 ops), member-payments (2 ops), payments/mark-paid (1 op).
-- **2026-02-24**: Booking check-in UX overhaul — (1) Auto-complete scheduler now marks past bookings as 'attended' instead of 'no_show' (stops noisy no-show notifications). (2) Created shared `BookingStatusDropdown` component (`src/components/BookingStatusDropdown.tsx`) used across all check-in surfaces: Staff Command Center cards, booking detail sheet footer, and Bookings page list items. Dropdown lets staff choose "Checked In" or "No Show" and toggle between them. (3) Refactored `BookingQueuesSection`, `BookingActions`, and `BookingRequestsPanel` to use the shared component, eliminating ~200 lines of duplicate dropdown code. (4) Removed legacy `POST /api/bookings/:id/checkin` route and old `checkinBooking()` from `resourceService.ts` — was dead code that set status to 'checked_in' instead of 'attended'/'no_show'. All check-in now flows through `PUT /api/bookings/:id/checkin` → `approvalService.checkinBooking()`. (5) Removed dead `markStatusModal` from SimulatorTab and unused `useUpdateBookingStatus` hook.
+- **Real-time Updates**: Implements WebSocket broadcasting for booking and invoice changes, ensuring staff and members receive real-time updates.
 
 ## External Dependencies
-- **Stripe**: For terminal payments, subscriptions, and webhooks (billing authority).
-- **HubSpot**: For two-way data synchronization and form submissions.
-- **Communications**: In-app notifications, push notifications, and email via Resend.
-- **Other**: Trackman (Booking CSV/webhooks), Eventbrite, Google Sheets, OpenAI Vision (ID scanning).
+- **Stripe**: For payment processing, subscriptions, and webhooks.
+- **HubSpot**: Used for two-way data synchronization and form submissions.
+- **Communications**: Handles in-app notifications, push notifications, and email via Resend.
+- **Other**: Integrations include Trackman (for booking CSV/webhooks), Eventbrite, Google Sheets, and OpenAI Vision (for ID scanning).
