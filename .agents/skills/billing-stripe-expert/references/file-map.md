@@ -90,7 +90,7 @@
 | `server/routes/cafe.ts` | Cafe menu items (Stripe-managed prices) |
 | `server/routes/membershipTiers.ts` | Tier management (Stripe price IDs) |
 | `server/routes/settings.ts` | Fee configuration settings |
-| `server/routes/conference/prepayment.ts` | Conference room prepayment endpoints |
+| `server/routes/conference/prepayment.ts` | Conference room prepayment endpoints (deprecated since v8.16.0 — conference rooms now use invoice flow) |
 | `server/routes/guestPasses.ts` | Guest pass management (allocation, reset, staff actions) |
 | `server/routes/trackman/webhook-billing.ts` | Trackman webhook billing logic (fee calculation on Trackman events) |
 
@@ -272,7 +272,7 @@ These files reference billing concepts incidentally. Documented here for zero-or
 | `server/routes/bays/bookings.ts` | Booking CRUD (fee display, billing session creation) |
 | `server/routes/bays/reschedule.ts` | Reschedule (fee recalculation) |
 | `server/routes/bays/calendar.ts` | Calendar (payment status in booking display) |
-| `server/routes/bays/staff-conference-booking.ts` | Conference booking (prepayment handling) |
+| `server/routes/bays/staff-conference-booking.ts` | Conference booking (uses invoice flow since v8.16.0) |
 | `server/routes/members/admin-actions.ts` | Member admin actions (billing status changes) |
 | `server/routes/members/visitors.ts` | Visitor routes (day pass payment references) |
 | `server/routes/members/search.ts` | Member search (subscription status filters) |

@@ -66,7 +66,7 @@
 
 ## Conference Routes (`server/routes/conference/`)
 
-- `prepayment.ts` — Conference room prepayment
+- `prepayment.ts` — Conference room prepayment (deprecated since v8.16.0 — conference rooms now use invoice flow; endpoints kept for backward compat)
 
 ---
 
