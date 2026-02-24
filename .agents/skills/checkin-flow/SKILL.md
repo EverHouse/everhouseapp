@@ -48,7 +48,7 @@ Invoice Settlement (automatic, non-blocking)
   ├─ If all settled AND all waived (no paid fees) → void the invoice
        │
        ▼
-POST /api/bookings/:id/checkin
+PUT /api/bookings/:id/checkin (server/routes/bays/approval.ts)
   ├─ Verify no unpaid participants with outstanding fees
   ├─ Set booking status to targetStatus ('attended' or 'no_show', defaults to 'attended')
   ├─ Publish booking_checked_in event
@@ -174,7 +174,7 @@ Booking authorization for members is handled separately by `isAuthorizedForMembe
 | Area | File |
 |------|------|
 | Check-in API routes | `server/routes/staffCheckin.ts` |
-| Booking check-in endpoint | `server/routes/resources.ts` (POST /api/bookings/:id/checkin) |
+| Booking check-in endpoint | `server/routes/bays/approval.ts` (PUT /api/bookings/:id/checkin) |
 | Fee computation | `server/core/billing/unifiedFeeService.ts` |
 | Prepayment service | `server/core/billing/prepaymentService.ts` |
 | Guest pass consumer | `server/core/billing/guestPassConsumer.ts` |

@@ -112,7 +112,7 @@ Trackman webhooks and CSV imports link external bookings to app bookings:
 
 See `references/trackman-sync.md` for full details.
 
-### 6. Check-in (status: `attended` / `checked_in`)
+### 6. Check-in (status: `attended` or `no_show`)
 
 Staff marks booking as attended or no-show via the BookingStatusDropdown. The dropdown allows toggling between statuses after initial selection. Session must exist before check-in. If no session exists yet, the check-in flow calls `ensureSessionForBooking()` to create one.
 

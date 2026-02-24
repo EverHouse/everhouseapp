@@ -4,7 +4,7 @@ import { logger } from '../logger';
 import { ACTIVE_BOOKING_STATUSES } from '../../../shared/constants/statuses';
 import { toTextArrayLiteral } from '../../utils/sqlArrayLiteral';
 
-const OCCUPIED_STATUSES = [...ACTIVE_BOOKING_STATUSES, 'checked_in'];
+const OCCUPIED_STATUSES = [...ACTIVE_BOOKING_STATUSES, 'checked_in', 'attended'];
 
 export interface ConflictingBooking {
   bookingId: number;
