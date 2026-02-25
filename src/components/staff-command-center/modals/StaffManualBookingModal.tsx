@@ -36,7 +36,8 @@ export function StaffManualBookingModal({
 }: StaffManualBookingModalProps) {
   const { showToast } = useToast();
 
-  const [confDate, setConfDate] = useState(getTodayPacific());
+  const initialDate = defaultDate ?? getTodayPacific();
+  const [confDate, setConfDate] = useState(initialDate);
   const [confDuration, setConfDuration] = useState(60);
   const [confAvailableSlots, setConfAvailableSlots] = useState<string[]>([]);
   const [confSelectedSlot, setConfSelectedSlot] = useState<string>('');
@@ -49,7 +50,8 @@ export function StaffManualBookingModal({
 
   useEffect(() => {
     if (isOpen) {
-      setConfDate(defaultDate ?? getTodayPacific());
+      const dateToUse = defaultDate ?? getTodayPacific();
+      setConfDate(dateToUse);
       setConfDuration(60);
       setConfAvailableSlots([]);
       setConfSelectedSlot('');
@@ -61,11 +63,12 @@ export function StaffManualBookingModal({
 
   useEffect(() => {
     if (!isOpen) return;
-    if (!confDate) return;
+    const dateToFetch = confDate || defaultDate || getTodayPacific();
+    if (!dateToFetch) return;
 
     setConfLoadingSlots(true);
     setConfSelectedSlot('');
-    fetch(`/api/staff/conference-room/available-slots?date=${confDate}&duration=${confDuration}`, { credentials: 'include' })
+    fetch(`/api/staff/conference-room/available-slots?date=${dateToFetch}&duration=${confDuration}`, { credentials: 'include' })
       .then(res => res.json())
       .then(slots => {
         setConfAvailableSlots(slots);
