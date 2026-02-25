@@ -4719,49 +4719,33 @@ async function handleCustomerUpdated(client: PoolClient, customer: Stripe.Custom
         logger.warn(`[Stripe Webhook] customer.updated: multiple active users match Stripe email ${stripeEmail} — skipping auto-reassignment, sending mismatch alert`);
       }
 
-      if (activeMatch.rows.length === 0) {
-        logger.info(`[Stripe Webhook] customer.updated: email changed in Stripe for customer ${stripeCustomerId}: ${currentEmail} → ${stripeEmail}. Auto-syncing app email to match Stripe.`);
-        
-        deferredActions.push(async () => {
+      logger.warn(`[Stripe Webhook] customer.updated: email mismatch for customer ${stripeCustomerId}: Stripe has ${stripeEmail}, app has ${currentEmail}. Auto-correcting Stripe to match app.`);
+      
+      deferredActions.push(async () => {
+        try {
+          await stripe.customers.update(stripeCustomerId, { email: currentEmail });
+          logger.info(`[Stripe Webhook] Auto-corrected Stripe customer ${stripeCustomerId} email from ${stripeEmail} to ${currentEmail}`);
+          await notifyAllStaff(
+            'Stripe Email Auto-Corrected',
+            `Member ${user.display_name || currentEmail} had a different email in Stripe (${stripeEmail}). It has been automatically corrected to match the app email (${currentEmail}).`,
+            'billing_alert',
+            { sendPush: false }
+          );
+        } catch (err: unknown) {
+          logger.error('[Stripe Webhook] Failed to auto-correct Stripe email:', { error: err });
           try {
-            const { cascadeEmailChange } = await import('../memberService/emailChangeService');
-            const result = await cascadeEmailChange(currentEmail, stripeEmail, 'stripe-webhook', 'Stripe Webhook (Auto-Sync)');
-            if (result.success) {
-              logger.info(`[Stripe Webhook] Auto-synced app email from ${currentEmail} to ${stripeEmail} for Stripe customer ${stripeCustomerId}. Tables updated: ${result.tablesUpdated.map(t => t.tableName).join(', ')}`);
-              await notifyAllStaff(
-                'Member Email Auto-Updated from Stripe',
-                `Member ${user.display_name || currentEmail}'s email was updated from ${currentEmail} to ${stripeEmail} to match their Stripe account.`,
-                'billing_alert',
-                { sendPush: false }
-              );
-            } else {
-              logger.error(`[Stripe Webhook] cascadeEmailChange failed: ${result.error}`);
-              await notifyAllStaff(
-                'Stripe Email Sync Failed',
-                `Member ${user.display_name || currentEmail} updated their email in Stripe to ${stripeEmail}, but auto-sync failed: ${result.error}. Please update manually.`,
-                'billing_alert',
-                { sendPush: true }
-              );
-            }
-          } catch (err: unknown) {
-            logger.error('[Stripe Webhook] Failed to auto-sync email from Stripe:', { error: err });
-            try {
-              await notifyAllStaff(
-                'Stripe Email Sync Failed',
-                `Member ${user.display_name || currentEmail} updated their email in Stripe to ${stripeEmail}, but auto-sync failed. Please update manually.`,
-                'billing_alert',
-                { sendPush: true }
-              );
-            } catch {
-              logger.error('[Stripe Webhook] Failed to send email sync failure notification');
-            }
+            await notifyAllStaff(
+              'Stripe Email Mismatch — Auto-Correct Failed',
+              `Member ${user.display_name || currentEmail} has a different email in Stripe (${stripeEmail}) than in the app (${currentEmail}). Auto-correction failed — please update manually.`,
+              'billing_alert',
+              { sendPush: true }
+            );
+          } catch {
+            logger.error('[Stripe Webhook] Failed to send email mismatch fallback notification');
           }
-        });
-        updates.push(`email_auto_synced_from_stripe (app=${currentEmail} → stripe=${stripeEmail})`);
-      } else {
-        logger.warn(`[Stripe Webhook] customer.updated: email mismatch for ${stripeCustomerId} but Stripe email conflicts with existing user(s) — skipping auto-sync.`);
-        updates.push(`email_mismatch_skipped_conflict (stripe=${stripeEmail}, app=${currentEmail})`);
-      }
+        }
+      });
+      updates.push(`email_auto_corrected (stripe=${stripeEmail} → app=${currentEmail})`);
     }
 
     if (stripeName) {

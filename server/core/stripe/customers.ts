@@ -301,6 +301,35 @@ export async function getOrCreateStripeCustomer(
         const primaryEmailMatch = sortedCustomers.find(c => 
           c.email?.toLowerCase() === email.toLowerCase()
         );
+        
+        const isLinkedEmailSearch = searchEmail.toLowerCase() !== email.toLowerCase();
+        
+        if (isLinkedEmailSearch && !primaryEmailMatch) {
+          const ownershipVerified = sortedCustomers.find(c => {
+            const meta = (c as Stripe.Customer).metadata || {};
+            if (meta.userId === userId) return true;
+            if (meta.primaryEmail?.toLowerCase() === email.toLowerCase()) return true;
+            const linkedMeta = meta.linkedEmails?.split(',').map((e: string) => e.trim().toLowerCase()) || [];
+            if (linkedMeta.includes(email.toLowerCase())) return true;
+            return false;
+          });
+          
+          if (!ownershipVerified) {
+            const alreadyLinkedResult = await db.execute(sql`SELECT id, email FROM users WHERE stripe_customer_id = ANY(${toTextArrayLiteral(sortedCustomers.map(c => c.id))}::text[]) AND id != ${userId} AND archived_at IS NULL LIMIT 1`);
+            if (alreadyLinkedResult.rows.length > 0) {
+              logger.warn(`[Stripe] Customer(s) found via linked email ${searchEmail} but already linked to different user ${alreadyLinkedResult.rows[0].email} — skipping to prevent cross-linking`);
+              continue;
+            }
+            
+            const customerName = (sortedCustomers[0] as Stripe.Customer).name?.toLowerCase() || '';
+            const userName = resolvedName?.toLowerCase() || '';
+            if (customerName && userName && !customerName.includes(userName.split(' ')[0]) && !userName.includes(customerName.split(' ')[0])) {
+              logger.warn(`[Stripe] Customer ${sortedCustomers[0].id} found via linked email ${searchEmail} but name mismatch (Stripe: "${(sortedCustomers[0] as Stripe.Customer).name}", App: "${resolvedName}") — skipping to prevent cross-linking`);
+              continue;
+            }
+          }
+        }
+        
         const selectedCustomer = primaryEmailMatch || sortedCustomers[0];
         
         foundCustomerId = selectedCustomer.id;
