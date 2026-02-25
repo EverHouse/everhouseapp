@@ -178,6 +178,23 @@ Cancellation is triggered by the `customer.subscription.deleted` Stripe webhook.
 - **Trial members** (`membership_status = 'trialing'`): set to `paused` (account preserved, booking blocked). Stripe subscription ID cleared. Staff notified "Trial Expired."
 - **Regular members**: set to `cancelled`, tier saved to `last_tier`, tier cleared to NULL, subscription ID cleared. HubSpot deal moved to lost, deal line items removed. If member was primary on a billing group, all sub-members are deactivated and the group is deactivated.
 
+### Group Billing Member Removal
+
+When removing a member from a billing group (family or corporate) via `removeCorporateMember` or `removeGroupMember` in `server/core/stripe/groupBilling.ts`:
+
+1. The Stripe subscription item is deleted (or quantity decremented for corporate groups).
+2. The `group_members` row is removed.
+3. The user record is updated: `membership_status = 'cancelled'`, `last_tier = tier`, `tier = NULL`. This prevents the removed member from retaining active access without billing.
+4. If the Stripe deletion fails after the DB update, the compensating rollback restores `membership_status`, `tier`, and `last_tier` to their original values.
+
+### Group Billing Member Addition — Stripe Failure Rollback
+
+When adding a member to a billing group via `addGroupMember` or `addCorporateMember`:
+
+1. The user record is updated with `membership_status = 'active'`, `tier = <group tier>`, etc.
+2. A Stripe subscription item is created.
+3. If the Stripe create fails, the compensating catch block resets `membership_status = 'pending'` and `tier = NULL` on the user record. This prevents ghost active users who appear as active members but have no billing.
+
 Guard: the webhook only processes if the user's `stripe_subscription_id` matches the deleted subscription. This prevents processing old/duplicate subscription deletions.
 
 See [references/transitions.md](references/transitions.md) for all status transitions.

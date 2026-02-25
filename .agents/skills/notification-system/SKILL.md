@@ -112,12 +112,14 @@ All format the dollar amount as `$X.XX` and set appropriate `relatedType`/`relat
 **File:** `server/core/websocket.ts`
 
 - Initialize with `initWebSocketServer(server)` on path `/ws`.
-- Session-based authentication: parse `connect.sid` cookie → look up session in DB → extract user email and role.
-- Fallback: unauthenticated clients can send an `auth` message; max 3 attempts within 10s timeout.
+- Session-based authentication: parse `connect.sid` cookie using `cookie-signature.unsign()` for cryptographic verification → look up session in DB → extract user email and role.
+- Fallback: unauthenticated clients can send an `auth` message with optional `sessionId` field (for mobile/React Native clients that cannot attach cookies); max 3 attempts within 10s timeout. When `sessionId` is provided in the auth message, it is verified directly against the session store instead of re-reading cookies from the upgrade request.
 - Connection map: `Map<email, ClientConnection[]>` — supports multiple connections per user.
-- Staff tracking: `Set<string>` of staff emails for targeted broadcasts.
-- Heartbeat: every 30s, ping all connections. Terminate unresponsive ones.
+- Staff tracking: `Set<string>` of staff emails for targeted broadcasts. On `ws.on('close')`, if remaining connections exist for a user, check `filtered.some(c => c.isStaff)` — if no remaining connection is a staff session, the user is removed from `staffEmails`. This prevents false-positive staff presence after a staff tab closes but a member tab remains open.
+- Session revalidation: every 5 minutes, all connections are re-verified against the database. Expired or revoked sessions are terminated automatically. Uses a dedicated connection pool (`max: 20`) to handle reconnection storms during deploys.
+- Heartbeat: every 30s, ping all connections. Terminate unresponsive ones. The heartbeat handler revalidates sessions when the 5-minute interval has elapsed (tracked via `lastSessionCheck` per connection), using the same `debounceKey` pattern that includes the action type to prevent cross-action debounce collisions.
 - Origin validation: allow Replit domains, localhost, production domains, and `ALLOWED_ORIGINS` env var.
+- Frontend reconnection: member WebSocket hook (`useWebSocket.ts`) uses randomized jitter (2-5s delay) for reconnection to prevent thundering herd. Staff WebSocket hook (`useStaffWebSocket.ts`) uses exponential backoff with `Math.pow(2, attempt)` scaling up to 30s max delay.
 
 ### Broadcast Functions
 
@@ -261,3 +263,7 @@ Return sorted by timestamp, limited to 20 items.
 5. Use `notifyAllStaff()` from `notificationService.ts` (not `staffNotifications.ts`) for full 3-channel delivery. The `staffNotifications.ts` version only does DB inserts.
 6. Handle `relatedId` defensively — it must be a valid number or null. Never pass strings or undefined.
 7. WebSocket broadcasts are fire-and-forget. If no connections exist for the target, the notification still persists in the database.
+8. WebSocket `parseSessionId()` must use `cookie-signature.unsign()` for cryptographic verification — never raw string extraction (e.g., `s:` prefix stripping without signature check). Invalid signatures must be rejected.
+9. WebSocket debounce keys must include the action type (e.g., `ws_revalidate_${email}` vs `ws_notify_${email}`) to prevent cross-action debounce collisions.
+10. On `ws.close`, always check `filtered.some(c => c.isStaff)` on remaining connections — do not assume remaining connections inherit staff status from the closed connection.
+11. The session revalidation pool must use `max: 20` (not 5) to handle reconnection storms during deploys without exhausting connections.

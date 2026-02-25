@@ -139,13 +139,33 @@ All `setInterval()` calls in schedulers MUST return their `NodeJS.Timeout` ID. T
 All `stripe.*.create()` calls MUST include an `idempotencyKey` parameter with a deterministic value (NOT `randomUUID()`). Pattern: `operation_type_${uniqueBusinessKey}`. Idempotency keys on `update()` calls are nice-to-have but not required.
 
 ### 15. Connection Pool Safety
-Never use `pool.connect()` inside `Promise.race()` without ensuring the connection is released regardless of which promise wins. Always use try/finally for connection release. The `safeDbTransaction()` helper handles this correctly.
+Never use `pool.connect()` inside `Promise.race()` without ensuring the connection is released regardless of which promise wins. Always use try/finally for connection release. The `safeDbTransaction()` helper handles this correctly. The WebSocket session verification pool uses `max: 20` to handle reconnection storms during deploys.
 
 ### 16. Drizzle SQL Null Coalescing
 All optional/nullable values interpolated in Drizzle `sql` template literals MUST use `?? null` coalescing. When `undefined` is passed to a `sql` template literal, Drizzle produces an empty SQL placeholder (e.g., `$7, , $8`) causing syntax errors. Pattern: `sql\`... VALUES (${optionalValue ?? null})\``. This was discovered via production Trackman webhook failures (Feb 2026).
 
 ### 17. Date/String Type Guards
 Database query results may return `Date` objects for date columns. Any function that calls `.split()`, `.substring()`, or other string methods on a date value from a DB result MUST handle both `Date` and `string` types. Pattern: `const dateStr = value instanceof Date ? value.toISOString().split('T')[0] : String(value)`. This was discovered via production `bookingEvents.publish()` crash (Feb 2026).
+
+### 18. WebSocket Architectural Rules (v8.26.7)
+- **Cookie Signature Verification**: `parseSessionId()` uses `cookie-signature.unsign()` — never raw string parsing.
+- **Session Revalidation**: Heartbeat handler revalidates sessions every 5 minutes via `lastSessionCheck` timestamp per connection.
+- **Debounce Key Includes Action Type**: The debounce mechanism for WebSocket actions uses a key that includes the action type (e.g., `ws_revalidate_${email}`) to prevent cross-action debounce collisions (e.g., a notification debounce accidentally blocking a session revalidation).
+- **Staff Presence Accuracy**: On `ws.close`, check `filtered.some(c => c.isStaff)` — don't assume remaining connections have staff privilege.
+- **Mobile Auth Fallback**: Auth messages accept optional `sessionId` field for mobile clients that can't attach cookies to the WebSocket upgrade request.
+- **Reconnection Jitter**: Member hook uses 2-5s random delay. Staff hook uses exponential backoff. Prevents thundering herd on restart.
+
+### 19. Group Billing Rollback Completeness (v8.26.7)
+- **Add Member Failure**: When Stripe fails during `addGroupMember`/`addCorporateMember`, the catch block MUST reset both `membership_status = 'pending'` AND `tier = NULL` on the user record. Without this, ghost users appear as active members with no billing.
+- **Remove Member**: When removing from a billing group, MUST set `membership_status = 'cancelled'`, `last_tier = tier`, `tier = NULL`. Without this, removed members retain active access indefinitely.
+- **Stripe Item Tracking**: Both add and remove operations track `newStripeItemId` to enable compensating Stripe rollbacks on subsequent failures.
+- **Lock Ordering**: Always lock `billing_groups` FOR UPDATE before `group_members` FOR UPDATE to prevent deadlocks.
+
+### 20. Frontend Async Race Protection (v8.26.7)
+All async fetches in React hooks MUST use one of these patterns to prevent stale responses from overwriting current state:
+- **AbortController + isCurrent flag**: `useEffect` cleanup sets `isCurrent = false` and calls `controller.abort()`. The async callback checks `isCurrent` after `await`.
+- **fetchIdRef counter**: Increment a `useRef` counter at the start of each fetch. After `await`, check that the counter hasn't changed. Used in `fetchRosterData()` in `useUnifiedBookingLogic.ts`.
+- **Booking-specific**: `calculateFees` in `useUnifiedBookingLogic.ts` uses both AbortController and isCurrent flag. Payment polling uses bookingId comparison to stop on navigation.
 
 ---
 

@@ -34,7 +34,7 @@ All schedulers registered in `initSchedulers()`:
 | Stripe Reconciliation | stripeReconciliationScheduler.ts | 1 hr | 5 AM Pacific | Reconcile Stripe subscriptions and payments with DB |
 | Fee Snapshot Reconciliation | feeSnapshotReconciliationScheduler.ts | 15 min | None | Reconcile pending fee snapshots, cancel abandoned payment intents |
 | Grace Period | gracePeriodScheduler.ts | 1 hr | 10 AM Pacific | Process membership grace periods, send reminder emails, terminate |
-| Booking Expiry | bookingExpiryScheduler.ts | 1 hr | None | Expire past-due pending bookings |
+| Booking Expiry | bookingExpiryScheduler.ts | 1 hr | None | Expire past-due pending/pending_approval bookings (20-min grace period past start_time) |
 | Booking Auto-Complete | bookingAutoCompleteScheduler.ts | 2 hr | None | Mark approved/confirmed bookings as attended (auto checked-in) 24h after end time |
 | Communication Logs Sync | communicationLogsScheduler.ts | 30 min | None | Sync communication log records |
 | Webhook Log Cleanup | webhookLogCleanupScheduler.ts | 1 hr | 4 AM Pacific | Delete webhook logs older than 30 days |
@@ -109,6 +109,8 @@ Check `getDay() === 0` (Sunday) + hour check + week-number tracking to prevent r
 8. Use the `tryClaimSlot` pattern (INSERT ON CONFLICT) for idempotency if the task must run only once per day/month
 9. Wrap the main logic in try/catch — never let errors crash the interval
 10. Add a `[Startup]` console.log in the start function for boot visibility
+11. **All `setTimeout()` and `setInterval()` timer IDs must be stored in a variable or collection** so they can be cleared on shutdown. The `stopSchedulers()` function must clear all interval AND timeout IDs. The booking expiry scheduler stores individual setTimeout IDs in a `Map` and clears them in its stop function. (v8.26.7)
+12. **Booking expiry targets both `pending` and `pending_approval`** statuses. A 20-minute grace period past `start_time` prevents premature expiry for members arriving at the front desk. (v8.26.7)
 
 ## Job Queue
 
