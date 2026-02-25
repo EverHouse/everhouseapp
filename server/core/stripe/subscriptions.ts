@@ -173,6 +173,10 @@ export async function listCustomerSubscriptions(customerId: string): Promise<{
     priceId: string;
     productId: string;
     productName: string;
+    planName: string;
+    planAmount: number;
+    currency: string;
+    interval: string;
     currentPeriodStart: Date;
     currentPeriodEnd: Date;
     cancelAtPeriodEnd: boolean;
@@ -183,6 +187,15 @@ export async function listCustomerSubscriptions(customerId: string): Promise<{
       newPriceId: string;
       newProductName: string;
       effectiveAt: Date;
+    } | null;
+    discount: {
+      id: string;
+      coupon: {
+        id: string;
+        name?: string;
+        percentOff?: number;
+        amountOff?: number;
+      };
     } | null;
   }>;
   error?: string;
@@ -261,12 +274,27 @@ export async function listCustomerSubscriptions(customerId: string): Promise<{
           }
         }
         
+        const discountObj = sub.discount;
+        const mappedDiscount = discountObj && discountObj.coupon ? {
+          id: discountObj.id,
+          coupon: {
+            id: discountObj.coupon.id,
+            name: discountObj.coupon.name || undefined,
+            percentOff: discountObj.coupon.percent_off || undefined,
+            amountOff: discountObj.coupon.amount_off || undefined,
+          },
+        } : null;
+
         return {
           id: sub.id,
           status: sub.status,
           priceId: price?.id || '',
           productId,
           productName,
+          planName: productName,
+          planAmount: price?.unit_amount || 0,
+          currency: price?.currency || 'usd',
+          interval: price?.recurring?.interval || 'month',
           currentPeriodStart: new Date((sub as StripeSubscriptionWithPeriods).current_period_start * 1000),
           currentPeriodEnd: new Date((sub as StripeSubscriptionWithPeriods).current_period_end * 1000),
           cancelAtPeriodEnd: sub.cancel_at_period_end,
@@ -274,6 +302,7 @@ export async function listCustomerSubscriptions(customerId: string): Promise<{
           isPaused: !!(sub.pause_collection && sub.pause_collection.behavior),
           pausedUntil: sub.pause_collection?.resumes_at ? new Date(sub.pause_collection.resumes_at * 1000) : null,
           pendingUpdate,
+          discount: mappedDiscount,
         };
       }),
     };
