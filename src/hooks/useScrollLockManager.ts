@@ -37,6 +37,8 @@ function preventTouchMove(e: TouchEvent) {
 function applyScrollLock() {
   if (lockCount === 1) {
     savedScrollY = window.scrollY;
+    document.documentElement.style.setProperty('background-color', 'black', 'important');
+    document.body.style.setProperty('background-color', 'black', 'important');
     document.body.style.position = 'fixed';
     document.body.style.top = `-${savedScrollY}px`;
     document.body.style.left = '0';
@@ -53,6 +55,8 @@ function applyScrollLock() {
 function removeScrollLock() {
   if (lockCount === 0 && lockOwners.size === 0) {
     const scrollY = savedScrollY;
+    document.documentElement.style.removeProperty('background-color');
+    document.body.style.removeProperty('background-color');
     document.body.style.position = '';
     document.body.style.top = '';
     document.body.style.left = '';
@@ -92,6 +96,8 @@ export function forceReleaseAllLocks(): void {
   lockOwners.clear();
   lockCount = 0;
   const scrollY = savedScrollY;
+  document.documentElement.style.removeProperty('background-color');
+  document.body.style.removeProperty('background-color');
   document.body.style.position = '';
   document.body.style.top = '';
   document.body.style.left = '';
@@ -181,6 +187,8 @@ export function useScrollLockControl() {
 if (typeof window !== 'undefined') {
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible' && lockCount === 0 && lockOwners.size === 0) {
+      document.documentElement.style.removeProperty('background-color');
+      document.body.style.removeProperty('background-color');
       document.body.style.position = '';
       document.body.style.top = '';
       document.body.style.left = '';
