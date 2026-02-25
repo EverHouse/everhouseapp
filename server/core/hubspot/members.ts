@@ -83,7 +83,8 @@ export async function findOrCreateHubSpotContact(
   firstName: string,
   lastName: string,
   phone?: string,
-  tier?: string
+  tier?: string,
+  options?: { role?: string }
 ): Promise<{ contactId: string; isNew: boolean }> {
   if (isPlaceholderEmail(email)) {
     logger.info(`[HubSpot] Skipping contact creation for placeholder email: ${email}`);
@@ -139,13 +140,14 @@ export async function findOrCreateHubSpotContact(
     const { denormalizeTierForHubSpot } = await import('../../utils/tierUtils');
     const hubspotTier = tier ? denormalizeTierForHubSpot(tier) : null;
     
+    const isVisitor = options?.role === 'visitor' || options?.role === 'day-pass';
     const properties: Record<string, string> = {
       email: email.toLowerCase(),
       firstname: firstName,
       lastname: lastName,
       phone: phone || '',
-      membership_status: 'Active',
-      lifecyclestage: 'customer'
+      membership_status: isVisitor ? 'Non-Member' : 'Active',
+      lifecyclestage: isVisitor ? 'lead' : 'customer'
     };
     
     if (hubspotTier) {

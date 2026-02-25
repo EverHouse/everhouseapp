@@ -218,7 +218,9 @@ async function executeHubSpotOperation(operation: string, payload: Record<string
         payload.email as string,
         payload.firstName as string,
         payload.lastName as string,
-        payload.phone as string
+        payload.phone as string,
+        payload.tier as string | undefined,
+        payload.role ? { role: payload.role as string } : undefined
       );
       break;
       

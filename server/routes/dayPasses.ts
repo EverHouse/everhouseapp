@@ -257,7 +257,7 @@ router.post('/api/day-passes/confirm', checkoutRateLimiter, async (req: Request,
       await linkPurchaseToUser(purchase.id, user.id);
     }
 
-    findOrCreateHubSpotContact(email, firstName || '', lastName || '', phone || undefined).catch((err) => {
+    findOrCreateHubSpotContact(email, firstName || '', lastName || '', phone || undefined, undefined, { role: 'day-pass' }).catch((err) => {
       logger.error('[DayPasses] Background HubSpot sync for day-pass buyer failed', { error: err instanceof Error ? err : new Error(String(err)) });
     });
 
@@ -532,7 +532,7 @@ export async function recordDayPassPurchaseFromWebhook(data: {
       await linkPurchaseToUser(purchase.id, user.id);
     }
 
-    findOrCreateHubSpotContact(data.email, data.firstName || '', data.lastName || '', data.phone || undefined).catch((err) => {
+    findOrCreateHubSpotContact(data.email, data.firstName || '', data.lastName || '', data.phone || undefined, undefined, { role: 'day-pass' }).catch((err) => {
       logger.error('[DayPasses] Background HubSpot sync for day-pass buyer failed', { error: err instanceof Error ? err : new Error(String(err)) });
     });
 

@@ -802,7 +802,7 @@ router.post('/api/stripe/staff/quick-charge', isStaffOrAdmin, async (req: Reques
                    archived_by = NULL,
                    updated_at = NOW()`);
               logger.info('[QuickCharge] Created visitor record for new customer', { extra: { memberEmail } });
-              findOrCreateHubSpotContact(memberEmail, firstName, lastName).catch((err) => {
+              findOrCreateHubSpotContact(memberEmail, firstName, lastName, undefined, undefined, { role: 'visitor' }).catch((err) => {
                 logger.error('[QuickCharge] Background HubSpot sync for visitor failed', { error: err instanceof Error ? err : new Error(String(err)) });
               });
             }

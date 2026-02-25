@@ -189,7 +189,9 @@ export async function upsertVisitor(data: VisitorData, createStripeCustomer: boo
           updated[0].email,
           updated[0].firstName || '',
           updated[0].lastName || '',
-          updated[0].phone || undefined
+          updated[0].phone || undefined,
+          undefined,
+          { role: 'visitor' }
         ).catch((err) => {
           logger.error('[upsertVisitor] Background HubSpot sync failed:', { extra: { detail: err instanceof Error ? err.message : String(err) } });
         });
@@ -224,7 +226,9 @@ export async function upsertVisitor(data: VisitorData, createStripeCustomer: boo
         updated[0].email,
         updated[0].firstName || '',
         updated[0].lastName || '',
-        updated[0].phone || undefined
+        updated[0].phone || undefined,
+        undefined,
+        { role: 'visitor' }
       ).catch((err) => {
         logger.error('[upsertVisitor] Background HubSpot sync failed:', { extra: { detail: err instanceof Error ? err.message : String(err) } });
       });

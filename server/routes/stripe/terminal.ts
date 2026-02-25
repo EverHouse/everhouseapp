@@ -177,7 +177,9 @@ router.post('/api/stripe/terminal/process-payment', isStaffOrAdmin, async (req: 
                   metadata.ownerEmail,
                   firstName || '',
                   lastName || '',
-                  undefined
+                  undefined,
+                  undefined,
+                  { role: 'visitor' }
                 ).catch((err) => {
                   logger.error('[Terminal] Background HubSpot sync for day-pass visitor failed', { extra: { err: err instanceof Error ? err.message : String(err) } });
                 });
