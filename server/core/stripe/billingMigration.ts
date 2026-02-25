@@ -52,6 +52,20 @@ export async function executePendingMigration(userId: string, email: string): Pr
       return { success: false, error: `Migration status is '${user.migration_status}', expected 'pending'` };
     }
 
+    if (user.membership_status !== 'active') {
+      logger.warn(`${prefix} Member ${email} is no longer active (status: ${user.membership_status}), failing migration`);
+      await db.execute(sql`
+        UPDATE users SET migration_status = 'failed', updated_at = NOW()
+        WHERE id = ${userId}
+      `);
+      await notifyAllStaff(
+        'Migration Failed — Member No Longer Active',
+        `Billing migration failed for ${email}: membership status is '${user.membership_status}'. The member may have been cancelled by staff.`,
+        'billing_migration'
+      );
+      return { success: false, error: `Member is no longer active (status: ${user.membership_status})` };
+    }
+
     const stripe = await getStripeClient();
 
     let customerId = user.stripe_customer_id;
@@ -86,6 +100,30 @@ export async function executePendingMigration(userId: string, email: string): Pr
     }
 
     const defaultPaymentMethod = paymentMethods.data[0].id;
+
+    const existingSubscriptions = await stripe.subscriptions.list({
+      customer: customerId,
+      limit: 10,
+    });
+    const activeSubscription = existingSubscriptions.data.find(s =>
+      ['active', 'trialing', 'past_due'].includes(s.status)
+    );
+    if (activeSubscription) {
+      logger.warn(`${prefix} Member ${email} already has active subscription ${activeSubscription.id}, aborting migration to prevent double billing`);
+      await db.execute(sql`
+        UPDATE users SET migration_status = 'completed',
+          stripe_subscription_id = ${activeSubscription.id},
+          billing_provider = 'stripe',
+          updated_at = NOW()
+        WHERE id = ${userId}
+      `);
+      await notifyAllStaff(
+        'Migration Skipped — Existing Subscription',
+        `${email} already has active Stripe subscription ${activeSubscription.id}. Migration marked as completed without creating a new subscription.`,
+        'billing_migration'
+      );
+      return { success: true };
+    }
 
     const tierSlug = user.tier || user.migration_tier_snapshot;
     if (!tierSlug) {
@@ -161,7 +199,9 @@ export async function executePendingMigration(userId: string, email: string): Pr
       logger.info(`${prefix} Subscription created: ${subscription.id} for ${email} (status: ${subscription.status})`);
 
       await db.execute(sql`
-        UPDATE users SET migration_status = 'completed', updated_at = NOW()
+        UPDATE users SET migration_status = 'completed',
+          stripe_subscription_id = ${subscription.id},
+          updated_at = NOW()
         WHERE id = ${userId}
       `);
 

@@ -200,11 +200,15 @@ router.post('/api/my/billing/update-payment-method', requireAuth, async (req, re
   try {
     const email = req.session.user.email;
     
-    const result = await db.execute(sql`SELECT stripe_customer_id, billing_provider FROM users WHERE LOWER(email) = ${email.toLowerCase()}`);
+    const result = await db.execute(sql`SELECT stripe_customer_id, billing_provider, migration_status FROM users WHERE LOWER(email) = ${email.toLowerCase()}`);
     
     const member = (result.rows as Array<Record<string, unknown>>)[0];
     if (!member || member.billing_provider !== 'stripe' || !member.stripe_customer_id) {
       return res.status(400).json({ error: 'Stripe billing not available' });
+    }
+
+    if (member.migration_status === 'pending') {
+      return res.status(400).json({ error: 'Your billing is being migrated. A subscription will be created automatically — no action needed.' });
     }
     
     const stripe = await getStripeClient();
@@ -236,7 +240,7 @@ router.post('/api/my/billing/portal', requireAuth, async (req, res) => {
     const isStaff = sessionUser.role === 'admin' || sessionUser.role === 'staff';
     const targetEmail = (req.body.email && isStaff) ? String(req.body.email).trim().toLowerCase() : sessionUser.email;
     
-    const result = await db.execute(sql`SELECT id, stripe_customer_id, billing_provider, email, role, first_name, last_name, tier FROM users WHERE LOWER(email) = ${targetEmail.toLowerCase()}`);
+    const result = await db.execute(sql`SELECT id, stripe_customer_id, billing_provider, email, role, first_name, last_name, tier, migration_status FROM users WHERE LOWER(email) = ${targetEmail.toLowerCase()}`);
     
     const member = (result.rows as Array<Record<string, unknown>>)[0];
     if (!member) {
@@ -248,6 +252,10 @@ router.post('/api/my/billing/portal', requireAuth, async (req, res) => {
     const targetIsStaff = member.role === 'staff' || member.role === 'admin';
     if (targetIsStaff) {
       return res.status(400).json({ error: 'Staff accounts do not have billing portals' });
+    }
+
+    if (member.migration_status === 'pending' && !isStaff) {
+      return res.status(400).json({ error: 'Your billing is being migrated. A subscription will be created automatically — no action needed.' });
     }
     
     const stripe = await getStripeClient();

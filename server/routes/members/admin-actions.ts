@@ -64,6 +64,15 @@ router.patch('/api/members/:email/tier', isStaffOrAdmin, async (req, res) => {
         member: { id: member.id, email: member.email, tier: normalizedTier }
       });
     }
+
+    if (!normalizedTier) {
+      const migrationCheck = await db.execute(sql`
+        SELECT migration_status FROM users WHERE LOWER(email) = ${normalizedEmail}
+      `);
+      if ((migrationCheck.rows[0] as Record<string, unknown>)?.migration_status === 'pending') {
+        return res.status(400).json({ error: 'Cannot clear tier while billing migration is pending. Cancel the migration first.' });
+      }
+    }
     
     const client = await pool.connect();
     try {
@@ -340,6 +349,13 @@ router.delete('/api/members/:email', isStaffOrAdmin, async (req, res) => {
     
     if (userResult[0].archivedAt) {
       return res.status(400).json({ error: 'Member is already archived' });
+    }
+
+    const migrationCheck = await db.execute(sql`
+      SELECT migration_status FROM users WHERE id = ${userResult[0].id}
+    `);
+    if ((migrationCheck.rows[0] as Record<string, unknown>)?.migration_status === 'pending') {
+      return res.status(400).json({ error: 'Cannot archive member while billing migration is pending. Cancel the migration first.' });
     }
     
     let subscriptionCancelled = false;
