@@ -99,6 +99,8 @@ export function TrackmanBookingModal({
   const [autoConfirmedId, setAutoConfirmedId] = useState<string | null>(null);
   const [showSuccessOverlay, setShowSuccessOverlay] = useState(false);
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   useEffect(() => {
     if (!isOpen) {
@@ -118,6 +120,10 @@ export function TrackmanBookingModal({
       return;
     }
 
+    const bookingId = booking.id;
+    const bookingEmail = booking.user_email;
+    const bookingDate = booking.request_date;
+
     const handleAutoConfirmed = (event: CustomEvent) => {
       const detail = event.detail;
       const eventBookingId = detail?.data?.bookingId;
@@ -125,8 +131,8 @@ export function TrackmanBookingModal({
       const eventDate = detail?.data?.date;
       const trackmanId = detail?.data?.trackmanBookingId;
 
-      const isMatch = (eventBookingId && String(eventBookingId) === String(booking.id)) ||
-        (eventEmail && eventDate && eventEmail.toLowerCase() === booking.user_email?.toLowerCase() && eventDate === booking.request_date);
+      const isMatch = (eventBookingId && String(eventBookingId) === String(bookingId)) ||
+        (eventEmail && eventDate && eventEmail.toLowerCase() === bookingEmail?.toLowerCase() && eventDate === bookingDate);
 
       if (isMatch) {
         if (trackmanId) {
@@ -136,7 +142,7 @@ export function TrackmanBookingModal({
         setAutoApproved(true);
         setTimeout(() => setShowSuccessOverlay(true), 50);
         closeTimerRef.current = setTimeout(() => {
-          onClose();
+          onCloseRef.current();
         }, 3500);
       }
     };
@@ -144,12 +150,8 @@ export function TrackmanBookingModal({
     window.addEventListener('booking-auto-confirmed', handleAutoConfirmed as EventListener);
     return () => {
       window.removeEventListener('booking-auto-confirmed', handleAutoConfirmed as EventListener);
-      if (closeTimerRef.current) {
-        clearTimeout(closeTimerRef.current);
-        closeTimerRef.current = null;
-      }
     };
-  }, [isOpen, booking, onClose]);
+  }, [isOpen, booking]);
 
   useEffect(() => {
     if (!isOpen || !booking) {
