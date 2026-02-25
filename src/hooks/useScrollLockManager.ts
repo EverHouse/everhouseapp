@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef } from 'react';
 
 let lockCount = 0;
 let savedScrollY = 0;
-let savedHtmlBg = '';
 const lockOwners = new Set<string>();
 
 function generateLockId(): string {
@@ -35,15 +34,9 @@ function preventTouchMove(e: TouchEvent) {
   e.preventDefault();
 }
 
-let savedBodyBg = '';
-
 function applyScrollLock() {
   if (lockCount === 1) {
     savedScrollY = window.scrollY;
-    savedHtmlBg = document.documentElement.style.backgroundColor;
-    savedBodyBg = document.body.style.backgroundColor;
-    document.documentElement.style.backgroundColor = '#000';
-    document.body.style.backgroundColor = '#000';
     document.body.style.position = 'fixed';
     document.body.style.top = `-${savedScrollY}px`;
     document.body.style.left = '0';
@@ -51,7 +44,6 @@ function applyScrollLock() {
     document.body.style.bottom = '0';
     document.body.style.width = '100%';
     document.documentElement.classList.add('overflow-hidden');
-    document.body.classList.add('overflow-hidden');
     document.documentElement.style.overscrollBehavior = 'none';
     document.body.style.overscrollBehavior = 'none';
     document.addEventListener('touchmove', preventTouchMove, { passive: false });
@@ -61,8 +53,6 @@ function applyScrollLock() {
 function removeScrollLock() {
   if (lockCount === 0 && lockOwners.size === 0) {
     const scrollY = savedScrollY;
-    document.documentElement.style.backgroundColor = savedHtmlBg;
-    document.body.style.backgroundColor = savedBodyBg;
     document.body.style.position = '';
     document.body.style.top = '';
     document.body.style.left = '';
@@ -70,7 +60,6 @@ function removeScrollLock() {
     document.body.style.bottom = '';
     document.body.style.width = '';
     document.documentElement.classList.remove('overflow-hidden');
-    document.body.classList.remove('overflow-hidden');
     document.documentElement.style.overscrollBehavior = '';
     document.body.style.overscrollBehavior = '';
     document.removeEventListener('touchmove', preventTouchMove);
@@ -103,8 +92,6 @@ export function forceReleaseAllLocks(): void {
   lockOwners.clear();
   lockCount = 0;
   const scrollY = savedScrollY;
-  document.documentElement.style.backgroundColor = savedHtmlBg;
-  document.body.style.backgroundColor = savedBodyBg;
   document.body.style.position = '';
   document.body.style.top = '';
   document.body.style.left = '';
@@ -112,7 +99,6 @@ export function forceReleaseAllLocks(): void {
   document.body.style.bottom = '';
   document.body.style.width = '';
   document.documentElement.classList.remove('overflow-hidden');
-  document.body.classList.remove('overflow-hidden');
   document.documentElement.style.overscrollBehavior = '';
   document.body.style.overscrollBehavior = '';
   document.removeEventListener('touchmove', preventTouchMove);
@@ -202,7 +188,6 @@ if (typeof window !== 'undefined') {
       document.body.style.bottom = '';
       document.body.style.width = '';
       document.documentElement.classList.remove('overflow-hidden');
-      document.body.classList.remove('overflow-hidden');
       document.documentElement.style.overscrollBehavior = '';
       document.body.style.overscrollBehavior = '';
       document.removeEventListener('touchmove', preventTouchMove);

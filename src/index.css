@@ -280,12 +280,14 @@ body {
   background-color: inherit;
 }
 
-/* Modal scroll lock - override when modal is open */
-html.overflow-hidden,
-html.overflow-hidden body {
+/* Modal scroll lock - override when modal is open.
+   Only html gets overflow:hidden (applied to viewport).
+   Body must NOT get overflow:hidden — on iOS Safari it clips
+   position:fixed overlay children at the viewport boundary,
+   causing a gap at the bottom of the screen. */
+html.overflow-hidden {
   overflow: hidden !important;
   overscroll-behavior: none;
-  background-color: #000 !important;
 }
 
 html, body {
