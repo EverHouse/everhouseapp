@@ -35,6 +35,7 @@ function preventTouchMove(e: TouchEvent) {
 }
 
 function applyScrollLock() {
+  console.log('[ScrollLock] applyScrollLock called, lockCount:', lockCount, 'owners:', lockOwners.size);
   if (lockCount === 1) {
     savedScrollY = window.scrollY;
     document.documentElement.style.setProperty('background-color', '#262626', 'important');
@@ -49,6 +50,9 @@ function applyScrollLock() {
     document.documentElement.style.overscrollBehavior = 'none';
     document.body.style.overscrollBehavior = 'none';
     document.addEventListener('touchmove', preventTouchMove, { passive: false });
+    console.log('[ScrollLock] APPLIED — body.position:', document.body.style.position, 'html.bg:', document.documentElement.style.backgroundColor);
+  } else {
+    console.log('[ScrollLock] SKIPPED — lockCount is not 1');
   }
 }
 
@@ -73,6 +77,7 @@ function removeScrollLock() {
 
 export function acquireScrollLock(ownerId?: string): string {
   const id = ownerId || generateLockId();
+  console.log('[ScrollLock] acquireScrollLock called, id:', id, 'already owned:', lockOwners.has(id), 'lockCount:', lockCount);
 
   if (!lockOwners.has(id)) {
     lockOwners.add(id);
@@ -123,12 +128,15 @@ export function useScrollLockManager(isLocked: boolean, onEscape?: () => void) {
   const lockIdRef = useRef<string | null>(null);
 
   useEffect(() => {
+    console.log('[ScrollLock] useScrollLockManager effect, isLocked:', isLocked, 'currentLockId:', lockIdRef.current);
     if (isLocked) {
       if (!lockIdRef.current) {
         lockIdRef.current = acquireScrollLock();
+        console.log('[ScrollLock] Lock acquired:', lockIdRef.current);
       }
     } else {
       if (lockIdRef.current) {
+        console.log('[ScrollLock] Releasing lock:', lockIdRef.current);
         releaseScrollLock(lockIdRef.current);
         lockIdRef.current = null;
       }
@@ -136,6 +144,7 @@ export function useScrollLockManager(isLocked: boolean, onEscape?: () => void) {
 
     return () => {
       if (lockIdRef.current) {
+        console.log('[ScrollLock] Cleanup releasing lock:', lockIdRef.current);
         releaseScrollLock(lockIdRef.current);
         lockIdRef.current = null;
       }
