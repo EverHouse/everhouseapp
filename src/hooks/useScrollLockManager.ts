@@ -35,11 +35,15 @@ function preventTouchMove(e: TouchEvent) {
   e.preventDefault();
 }
 
+let savedBodyBg = '';
+
 function applyScrollLock() {
   if (lockCount === 1) {
     savedScrollY = window.scrollY;
     savedHtmlBg = document.documentElement.style.backgroundColor;
+    savedBodyBg = document.body.style.backgroundColor;
     document.documentElement.style.backgroundColor = '#000';
+    document.body.style.backgroundColor = '#000';
     document.body.style.position = 'fixed';
     document.body.style.top = `-${savedScrollY}px`;
     document.body.style.left = '0';
@@ -58,6 +62,7 @@ function removeScrollLock() {
   if (lockCount === 0 && lockOwners.size === 0) {
     const scrollY = savedScrollY;
     document.documentElement.style.backgroundColor = savedHtmlBg;
+    document.body.style.backgroundColor = savedBodyBg;
     document.body.style.position = '';
     document.body.style.top = '';
     document.body.style.left = '';
@@ -99,6 +104,7 @@ export function forceReleaseAllLocks(): void {
   lockCount = 0;
   const scrollY = savedScrollY;
   document.documentElement.style.backgroundColor = savedHtmlBg;
+  document.body.style.backgroundColor = savedBodyBg;
   document.body.style.position = '';
   document.body.style.top = '';
   document.body.style.left = '';

@@ -285,21 +285,7 @@ html.overflow-hidden,
 html.overflow-hidden body {
   overflow: hidden !important;
   overscroll-behavior: none;
-}
-
-/* Full-screen black backdrop behind everything when scroll lock is active.
-   Covers the entire screen including iOS safe areas and any edge gaps.
-   Uses a pseudo-element on html so it's independent of body positioning. */
-html.overflow-hidden::before {
-  content: '';
-  position: fixed;
-  top: -200px;
-  left: -200px;
-  right: -200px;
-  bottom: -200px;
-  background: #000;
-  z-index: -1;
-  pointer-events: none;
+  background-color: #000 !important;
 }
 
 html, body {
