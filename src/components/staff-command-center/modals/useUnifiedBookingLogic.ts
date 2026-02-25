@@ -47,6 +47,7 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
     isLegacyReview,
     originalEmail,
     bookingId,
+    sessionId,
     ownerName,
     ownerEmail,
     declaredPlayerCount,
@@ -1160,6 +1161,21 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
         feesRecalculated = data.feesRecalculated === true;
         if (data.bookingId) {
           resultBookingId = data.bookingId;
+        }
+      } else if (sessionId) {
+        const res = await fetch('/api/data-integrity/fix/assign-session-owner', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            sessionId: sessionId,
+            ownerEmail: owner.email
+          })
+        });
+
+        if (!res.ok) {
+          const data = await res.json();
+          throw new Error(data.error || data.message || 'Failed to assign member to session');
         }
       }
       

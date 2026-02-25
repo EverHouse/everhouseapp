@@ -31,6 +31,7 @@ export interface UnifiedBookingSheetProps {
   isLegacyReview?: boolean;
   originalEmail?: string;
   bookingId?: number;
+  sessionId?: number | string | null;
   ownerName?: string;
   ownerEmail?: string;
   declaredPlayerCount?: number;

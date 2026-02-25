@@ -28,6 +28,7 @@ interface IntegrityResultsPanelProps {
   setBookingSheet: (sheet: {
     isOpen: boolean;
     bookingId: number | null;
+    sessionId?: number | string | null;
     bayName?: string;
     bookingDate?: string;
     timeSlot?: string;
@@ -1287,37 +1288,22 @@ const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
                                   )}
                                   {!issue.ignored && issue.table === 'booking_sessions' && issue.category === 'orphan_record' && (
                                     <>
-                                      {(issue.context?.trackmanBookingId || issue.context?.linkedBookingId) ? (
-                                        <button
-                                          onClick={() => setBookingSheet({
-                                            isOpen: true,
-                                            bookingId: (issue.context?.linkedBookingId as number) || null,
-                                            bayName: issue.context?.resourceName as string,
-                                            bookingDate: issue.context?.bookingDate as string,
-                                            timeSlot: `${issue.context?.startTime || ''} - ${issue.context?.endTime || ''}`,
-                                            trackmanBookingId: issue.context?.trackmanBookingId as string,
-                                            isUnmatched: true,
-                                          })}
-                                          className="p-1.5 text-blue-600 hover:bg-blue-100 dark:text-blue-400 dark:hover:bg-blue-900/30 rounded transition-colors"
-                                          title="Assign member to this session"
-                                        >
-                                          <span className="material-symbols-outlined text-[16px]">person_add</span>
-                                        </button>
-                                      ) : (
-                                        <button
-                                          onClick={() => {
-                                            const email = prompt(`Assign owner to session #${issue.recordId} on ${issue.context?.bookingDate} (${issue.context?.resourceName}).\n\nEnter member email:`);
-                                            if (email?.trim()) {
-                                              fixIssueMutation.mutate({ endpoint: '/api/data-integrity/fix/assign-session-owner', body: { sessionId: issue.recordId, ownerEmail: email.trim() } });
-                                            }
-                                          }}
-                                          disabled={fixingIssues.has(String(issue.recordId))}
-                                          className="p-1.5 text-blue-600 hover:bg-blue-100 dark:text-blue-400 dark:hover:bg-blue-900/30 rounded transition-colors disabled:opacity-50"
-                                          title="Assign member to this session"
-                                        >
-                                          <span className="material-symbols-outlined text-[16px]">person_add</span>
-                                        </button>
-                                      )}
+                                      <button
+                                        onClick={() => setBookingSheet({
+                                          isOpen: true,
+                                          bookingId: (issue.context?.linkedBookingId as number) || null,
+                                          sessionId: issue.recordId,
+                                          bayName: issue.context?.resourceName as string,
+                                          bookingDate: issue.context?.bookingDate as string,
+                                          timeSlot: `${issue.context?.startTime || ''} - ${issue.context?.endTime || ''}`,
+                                          trackmanBookingId: issue.context?.trackmanBookingId as string,
+                                          isUnmatched: true,
+                                        })}
+                                        className="p-1.5 text-blue-600 hover:bg-blue-100 dark:text-blue-400 dark:hover:bg-blue-900/30 rounded transition-colors"
+                                        title="Assign member to this session"
+                                      >
+                                        <span className="material-symbols-outlined text-[16px]">person_add</span>
+                                      </button>
                                       <button
                                         onClick={() => {
                                           if (confirm(`Delete empty session #${issue.recordId}? This cannot be undone.`)) {

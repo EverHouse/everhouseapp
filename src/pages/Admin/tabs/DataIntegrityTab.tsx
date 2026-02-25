@@ -275,6 +275,7 @@ const DataIntegrityTab: React.FC = () => {
   const [bookingSheet, setBookingSheet] = useState<{
     isOpen: boolean;
     bookingId: number | null;
+    sessionId?: number | string | null;
     bayName?: string;
     bookingDate?: string;
     timeSlot?: string;
@@ -2224,6 +2225,7 @@ const DataIntegrityTab: React.FC = () => {
         onClose={() => setBookingSheet({ isOpen: false, bookingId: null })}
         mode={bookingSheet.isUnmatched ? "assign" : "manage"}
         trackmanBookingId={bookingSheet.trackmanBookingId || null}
+        sessionId={bookingSheet.sessionId}
         bayName={bookingSheet.bayName}
         bookingDate={bookingSheet.bookingDate}
         timeSlot={bookingSheet.timeSlot}
