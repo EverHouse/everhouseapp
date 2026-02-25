@@ -331,7 +331,7 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
                 <div className="w-full px-1 sm:px-2 pb-4">
                     <div className="w-full">
                     <div className="grid gap-0.5 w-full" style={{ gridTemplateColumns: `minmax(32px, 0.6fr) repeat(${resources.length}, minmax(0, 1fr))` }}>
-                        <div className="h-8 sm:h-10 sticky top-0 z-20 bg-white dark:bg-[#1a1f1a] flex items-center justify-center text-[10px] sm:text-xs font-bold text-primary dark:text-white rounded-t-lg border border-gray-200 dark:border-white/25 shadow-[0_2px_4px_rgba(0,0,0,0.05)] dark:shadow-[0_2px_4px_rgba(0,0,0,0.2)]">
+                        <div className="h-8 sm:h-10 bg-white dark:bg-[#1a1f1a] flex items-center justify-center text-[10px] sm:text-xs font-bold text-primary dark:text-white rounded-t-lg border border-gray-200 dark:border-white/25 shadow-[0_2px_4px_rgba(0,0,0,0.05)] dark:shadow-[0_2px_4px_rgba(0,0,0,0.2)]">
                             <span className="hidden sm:inline">Time</span>
                             <span className="sm:hidden">T</span>
                         </div>
@@ -340,7 +340,7 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
                             if (a.type !== 'conference_room' && b.type === 'conference_room') return -1;
                             return 0;
                         }).map(resource => (
-                            <div key={resource.id} className={`h-8 sm:h-10 flex items-center justify-center font-bold text-[10px] sm:text-xs text-primary dark:text-white text-center rounded-t-lg border border-gray-200 dark:border-white/25 px-0.5 sticky top-0 z-20 shadow-[0_2px_4px_rgba(0,0,0,0.05)] dark:shadow-[0_2px_4px_rgba(0,0,0,0.2)] transition-all duration-fast ${resource.type === 'conference_room' ? 'bg-purple-100 dark:bg-purple-900/50 hover:bg-purple-150 dark:hover:bg-purple-900/60' : 'bg-white dark:bg-[#1a1f1a]'}`}>
+                            <div key={resource.id} className={`h-8 sm:h-10 flex items-center justify-center font-bold text-[10px] sm:text-xs text-primary dark:text-white text-center rounded-t-lg border border-gray-200 dark:border-white/25 px-0.5 shadow-[0_2px_4px_rgba(0,0,0,0.05)] dark:shadow-[0_2px_4px_rgba(0,0,0,0.2)] transition-all duration-fast ${resource.type === 'conference_room' ? 'bg-purple-100 dark:bg-purple-900/50 hover:bg-purple-150 dark:hover:bg-purple-900/60' : 'bg-white dark:bg-[#1a1f1a]'}`}>
                                 <span className="hidden sm:inline">{resource.type === 'conference_room' ? 'Conf' : resource.name.replace('Simulator Bay ', 'Bay ')}</span>
                                 <span className="sm:hidden">{resource.type === 'conference_room' ? 'CR' : resource.name.replace('Simulator Bay ', 'B')}</span>
                             </div>
@@ -442,19 +442,19 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
                                                         ? 'bg-orange-100 dark:bg-orange-500/20 border border-orange-300 dark:border-orange-500/30'
                                                     : booking 
                                                         ? isConference
-                                                            ? 'group relative hover:scale-105 hover:z-10 bg-purple-100 dark:bg-purple-500/20 border border-purple-300 dark:border-purple-500/30 cursor-pointer hover:bg-purple-200 dark:hover:bg-purple-500/30'
+                                                            ? 'group relative hover:scale-105 hover:z-40 bg-purple-100 dark:bg-purple-500/20 border border-purple-300 dark:border-purple-500/30 cursor-pointer hover:bg-purple-200 dark:hover:bg-purple-500/30'
                                                             : isUnmatched
-                                                                ? 'group relative hover:scale-105 hover:z-10 bg-amber-100 dark:bg-amber-500/20 border-2 border-dashed border-amber-400 dark:border-amber-400/50 cursor-pointer hover:bg-amber-200 dark:hover:bg-amber-500/30'
+                                                                ? 'group relative hover:scale-105 hover:z-40 bg-amber-100 dark:bg-amber-500/20 border-2 border-dashed border-amber-400 dark:border-amber-400/50 cursor-pointer hover:bg-amber-200 dark:hover:bg-amber-500/30'
                                                             : isInactiveMember
-                                                                ? 'group relative hover:scale-105 hover:z-10 bg-green-100/50 dark:bg-green-500/10 border border-dashed border-orange-300 dark:border-orange-500/40 cursor-pointer hover:bg-green-200/50 dark:hover:bg-green-500/20'
+                                                                ? 'group relative hover:scale-105 hover:z-40 bg-green-100/50 dark:bg-green-500/10 border border-dashed border-orange-300 dark:border-orange-500/40 cursor-pointer hover:bg-green-200/50 dark:hover:bg-green-500/20'
                                                             : booking.status === 'cancellation_pending'
-                                                                ? 'group relative hover:scale-105 hover:z-10 bg-red-100 dark:bg-red-500/15 border-2 border-red-400 dark:border-red-500/50 cursor-pointer hover:bg-red-200 dark:hover:bg-red-500/25'
+                                                                ? 'group relative hover:scale-105 hover:z-40 bg-red-100 dark:bg-red-500/15 border-2 border-red-400 dark:border-red-500/50 cursor-pointer hover:bg-red-200 dark:hover:bg-red-500/25'
                                                                 : hasPartialRoster
-                                                                    ? 'group relative hover:scale-105 hover:z-10 bg-blue-100 dark:bg-blue-600/20 border-2 border-dashed border-blue-400 dark:border-blue-400/50 cursor-pointer hover:bg-blue-200 dark:hover:bg-blue-600/30'
-                                                                    : 'group relative hover:scale-105 hover:z-10 bg-green-100 dark:bg-green-500/20 border border-green-300 dark:border-green-500/30 cursor-pointer hover:bg-green-200 dark:hover:bg-green-500/30' 
+                                                                    ? 'group relative hover:scale-105 hover:z-40 bg-blue-100 dark:bg-blue-600/20 border-2 border-dashed border-blue-400 dark:border-blue-400/50 cursor-pointer hover:bg-blue-200 dark:hover:bg-blue-600/30'
+                                                                    : 'group relative hover:scale-105 hover:z-40 bg-green-100 dark:bg-green-500/20 border border-green-300 dark:border-green-500/30 cursor-pointer hover:bg-green-200 dark:hover:bg-green-500/30' 
                                                         : pendingRequest
                                                                 ? 'bg-blue-50 dark:bg-blue-500/10 border-2 border-dashed border-blue-400 dark:border-blue-400/50 cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-500/20'
-                                                                : isConference ? 'group relative bg-white dark:bg-white/5 border border-gray-200 dark:border-white/15 cursor-pointer hover:bg-purple-50 dark:hover:bg-purple-500/10' : 'bg-white dark:bg-white/5 border border-gray-200 dark:border-white/15'
+                                                                : isConference ? 'group relative hover:z-40 bg-white dark:bg-white/5 border border-gray-200 dark:border-white/15 cursor-pointer hover:bg-purple-50 dark:hover:bg-purple-500/10' : 'bg-white dark:bg-white/5 border border-gray-200 dark:border-white/15'
                                             } transition-all duration-fast`}
                                             style={isEmptyCell ? {
                                                 backgroundImage: isDark 
