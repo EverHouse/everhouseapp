@@ -306,6 +306,56 @@ async function deleteClosureCalendarEvents(calendarId: string, eventIds: string)
   }
 }
 
+async function patchClosureCalendarEvents(
+  calendarId: string,
+  eventIds: string,
+  title: string,
+  description: string,
+  startDate: string,
+  endDate: string,
+  startTime: string | null,
+  endTime: string | null
+): Promise<boolean> {
+  const calendar = await getGoogleCalendarClient();
+  const ids = eventIds.split(',').filter(id => id.trim());
+  const hasSpecificTimes = startTime && endTime;
+  const dates = getDatesBetween(startDate, endDate || startDate);
+  
+  for (let i = 0; i < ids.length; i++) {
+    const eventId = ids[i].trim();
+    const eventDate = dates[i] || dates[dates.length - 1];
+    
+    const requestBody: Record<string, unknown> = {
+      summary: title,
+      description: ids.length > 1
+        ? `${description}\n\n(Day ${i + 1} of ${ids.length})`
+        : description,
+    };
+    
+    if (hasSpecificTimes) {
+      requestBody.start = {
+        dateTime: getPacificISOString(eventDate, startTime),
+        timeZone: 'America/Los_Angeles',
+      };
+      requestBody.end = {
+        dateTime: getPacificISOString(eventDate, endTime),
+        timeZone: 'America/Los_Angeles',
+      };
+    } else {
+      requestBody.start = { date: eventDate };
+      requestBody.end = { date: addDaysToPacificDate(eventDate, 1) };
+    }
+    
+    try {
+      await calendar.events.patch({ calendarId, eventId, requestBody });
+    } catch (error: unknown) {
+      logger.warn(`[Closures] Failed to patch calendar event ${eventId}, will fall back to create`, { error: error instanceof Error ? error.message : error });
+      return false;
+    }
+  }
+  return true;
+}
+
 // Notice Types endpoints
 router.get('/api/notice-types', async (req, res) => {
   try {
@@ -935,29 +985,15 @@ router.put('/api/closures/:id', isStaffOrAdmin, async (req, res) => {
     // Update Internal Calendar event if dates/times/title/notes changed
     // Only update Internal Calendar - availability blocking is handled by the availability_blocks table
     const notesChanged = notes !== undefined && notes !== existing.notes;
-    const shouldUpdateCalendar = datesChanged || timesChanged || title !== existing.title || reason !== existing.reason || areasChanged || notesChanged;
+    const noticeTypeChanged = notice_type !== undefined && notice_type !== existing.noticeType;
+    const visibilityChanged = visibility !== undefined && visibility !== existing.visibility;
+    const shouldUpdateCalendar = datesChanged || timesChanged || title !== existing.title || reason !== existing.reason || areasChanged || notesChanged || noticeTypeChanged || visibilityChanged;
     if (shouldUpdateCalendar) {
       try {
         const internalCalendarId = await getCalendarIdByName(CALENDAR_CONFIG.internal.name);
         
         if (internalCalendarId) {
-          // Delete old Internal Calendar event
-          if (existing.internalCalendarId) {
-            await deleteClosureCalendarEvents(internalCalendarId, existing.internalCalendarId);
-          }
-          
-          // Also clean up any legacy conference events (backward compatibility)
-          // Note: Golf calendar cleanup removed as golf calendar sync is deprecated
-          if (existing.conferenceCalendarId) {
-            const conferenceCalendarId = await getCalendarIdByName(CALENDAR_CONFIG.conference.name);
-            if (conferenceCalendarId) {
-              await deleteClosureCalendarEvents(conferenceCalendarId, existing.conferenceCalendarId);
-            }
-          }
-          
-          // Create new Internal Calendar event only (uses newAffectedAreas and shouldNotifyMembers from above)
           const effectiveNoticeType = notice_type !== undefined ? notice_type : existing.noticeType;
-          // Default to NOTICE for non-blocking (affected_areas='none'), CLOSURE otherwise
           const defaultType = newAffectedAreas === 'none' ? 'NOTICE' : 'CLOSURE';
           const typePrefix = effectiveNoticeType ? `[${effectiveNoticeType.toUpperCase()}]` : `[${defaultType}]`;
           const eventTitle = `${typePrefix}: ${title || existing.title}`;
@@ -969,27 +1005,58 @@ router.put('/api/closures/:id', isStaffOrAdmin, async (req, res) => {
           const newStartTime = start_time !== undefined ? start_time : existing.startTime;
           const newEndTime = end_time !== undefined ? end_time : existing.endTime;
           
-          const newInternalEventIds = await createClosureCalendarEvents(
-            internalCalendarId,
-            eventTitle,
-            eventDescription,
-            newStartDate,
-            newEndDate || newStartDate,
-            newStartTime,
-            newEndTime
-          );
+          let calendarUpdated = false;
           
-          // Update stored calendar ID (clear legacy columns)
-          await db
-            .update(facilityClosures)
-            .set({ 
-              googleCalendarId: null,
-              conferenceCalendarId: null,
-              internalCalendarId: newInternalEventIds
-            })
-            .where(eq(facilityClosures.id, closureId));
+          if (existing.internalCalendarId) {
+            calendarUpdated = await patchClosureCalendarEvents(
+              internalCalendarId,
+              existing.internalCalendarId,
+              eventTitle,
+              eventDescription,
+              newStartDate,
+              newEndDate || newStartDate,
+              newStartTime,
+              newEndTime
+            );
+            
+            if (calendarUpdated) {
+              logger.info('[Closures] Patched Internal Calendar event(s) for closure #', { extra: { closureId } });
+            }
+          }
           
-          logger.info('[Closures] Updated Internal Calendar event for closure #', { extra: { closureId } });
+          if (!calendarUpdated) {
+            if (existing.internalCalendarId) {
+              await deleteClosureCalendarEvents(internalCalendarId, existing.internalCalendarId);
+            }
+            
+            const newInternalEventIds = await createClosureCalendarEvents(
+              internalCalendarId,
+              eventTitle,
+              eventDescription,
+              newStartDate,
+              newEndDate || newStartDate,
+              newStartTime,
+              newEndTime
+            );
+            
+            await db
+              .update(facilityClosures)
+              .set({ 
+                googleCalendarId: null,
+                conferenceCalendarId: null,
+                internalCalendarId: newInternalEventIds
+              })
+              .where(eq(facilityClosures.id, closureId));
+            
+            logger.info('[Closures] Recreated Internal Calendar event for closure #', { extra: { closureId } });
+          }
+          
+          if (existing.conferenceCalendarId) {
+            const conferenceCalendarId = await getCalendarIdByName(CALENDAR_CONFIG.conference.name);
+            if (conferenceCalendarId) {
+              await deleteClosureCalendarEvents(conferenceCalendarId, existing.conferenceCalendarId);
+            }
+          }
         }
       } catch (calError: unknown) {
         logger.error('[Closures] Failed to update calendar events', { extra: { calError } });

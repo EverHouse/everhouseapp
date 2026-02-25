@@ -327,15 +327,32 @@ export async function syncInternalCalendarToClosures(): Promise<{ synced: number
         continue;
       }
       
-      const existing = await db.execute(
-        sql`SELECT id, start_date, end_date, start_time, end_time, affected_areas FROM facility_closures WHERE internal_calendar_id = ${internalCalendarId}`
+      let existing = await db.execute(
+        sql`SELECT id, start_date, end_date, start_time, end_time, affected_areas, needs_review FROM facility_closures
+         WHERE internal_calendar_id = ${internalCalendarId}
+            OR POSITION(${internalCalendarId} IN internal_calendar_id) > 0`
       );
       
+      if (existing.rows.length === 0) {
+        const adoptable = await db.execute(
+          sql`SELECT id, start_date, end_date, start_time, end_time, affected_areas, needs_review FROM facility_closures
+           WHERE title = ${title} AND start_date = ${startDate} AND is_active = true AND needs_review = false
+           LIMIT 1`
+        );
+        if (adoptable.rows.length > 0) {
+          await db.execute(
+            sql`UPDATE facility_closures SET internal_calendar_id = ${internalCalendarId} WHERE id = ${(adoptable.rows[0] as Record<string, unknown>).id}`
+          );
+          existing = adoptable;
+          logger.info(`[Calendar Sync] Adopted closure #${(adoptable.rows[0] as Record<string, unknown>).id} for event ${internalCalendarId}: ${title}`);
+        }
+      }
+      
       if (existing.rows.length > 0) {
-        const existingClosure = existing.rows[0];
-        const closureId = existingClosure.id;
+        const existingClosure = existing.rows[0] as Record<string, unknown>;
+        const closureId = existingClosure.id as number;
         
-        const preservedAffectedAreas = existingClosure.affected_areas || 'entire_facility';
+        const preservedAffectedAreas = (existingClosure.affected_areas as string) || 'entire_facility';
         
         const datesChanged = 
           existingClosure.start_date !== startDate || 
@@ -346,8 +363,10 @@ export async function syncInternalCalendarToClosures(): Promise<{ synced: number
         await db.execute(
           sql`UPDATE facility_closures SET 
            title = ${title}, start_date = ${startDate}, start_time = ${startTime},
-           end_date = ${endDate}, end_time = ${endTime}, notice_type = ${noticeType}, notes = COALESCE(${calendarNotes || metadata.notes || null}, notes), is_active = true
-           WHERE internal_calendar_id = ${internalCalendarId}`
+           end_date = ${endDate}, end_time = ${endTime},
+           notice_type = COALESCE(notice_type, ${noticeType}),
+           notes = COALESCE(${calendarNotes || metadata.notes || null}, notes), is_active = true
+           WHERE id = ${closureId}`
         );
         
         if (datesChanged) {
@@ -377,7 +396,7 @@ export async function syncInternalCalendarToClosures(): Promise<{ synced: number
            RETURNING id`
         );
         
-        const closureId = result.rows[0].id;
+        const closureId = (result.rows[0] as Record<string, unknown>).id as number;
         
         if (affectedAreas !== 'none') {
           const resourceIds = await getResourceIdsForAffectedAreas(affectedAreas);
@@ -399,9 +418,13 @@ export async function syncInternalCalendarToClosures(): Promise<{ synced: number
     );
     
     let deleted = 0;
-    for (const closure of existingClosures.rows) {
-      if (cancelledEventIds.has(closure.internal_calendar_id) || !fetchedEventIds.has(closure.internal_calendar_id)) {
-        await deleteAvailabilityBlocks(closure.id);
+    for (const closure of existingClosures.rows as Array<Record<string, unknown>>) {
+      const closureCalIds = (closure.internal_calendar_id as string).split(',').map((id: string) => id.trim()).filter(Boolean);
+      const anyCancelled = closureCalIds.some((id: string) => cancelledEventIds.has(id));
+      const anyFetched = closureCalIds.some((id: string) => fetchedEventIds.has(id));
+      
+      if (anyCancelled || !anyFetched) {
+        await deleteAvailabilityBlocks(closure.id as number);
         await db.execute(sql`UPDATE facility_closures SET is_active = false WHERE id = ${closure.id}`);
         logger.info(`[Calendar Sync] Deactivated closure #${closure.id} and removed availability blocks`);
         deleted++;

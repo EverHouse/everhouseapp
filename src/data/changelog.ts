@@ -8,6 +8,19 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.30.0",
+    date: "2026-02-25",
+    title: "Fix: Notices Reverting to Draft After Editing",
+    changes: [
+      "Fixed: Edited notices no longer revert to 'Needs Review' after calendar sync — sync now patches events in place instead of deleting and recreating them, preserving the original event ID",
+      "Fixed: Sync now preserves user-set notice_type instead of overwriting it with null when the calendar event title has no bracket prefix",
+      "Fixed: Multi-day closures with comma-separated calendar event IDs now correctly match during sync instead of creating duplicate draft closures",
+      "Fixed: Deactivation logic now correctly handles comma-separated calendar event IDs so configured closures don't get wrongly deactivated",
+      "Improved: Editing notice_type or visibility now pushes the change to Google Calendar (previously only dates/times/title triggered calendar updates)",
+      "Improved: When a calendar event can't be found by ID, sync will match by title and date to adopt existing configured closures instead of creating duplicates",
+    ]
+  },
+  {
     version: "8.29.0",
     date: "2026-02-25",
     title: "WCAG Accessibility & Keyboard Navigation",
