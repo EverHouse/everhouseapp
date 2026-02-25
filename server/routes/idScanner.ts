@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, json } from 'express';
 import { isStaffOrAdmin } from '../core/middleware';
 import { openai } from '../replit_integrations/image/client';
 import { ObjectStorageService } from '../replit_integrations/object_storage';
@@ -7,11 +7,13 @@ import { users } from '../../shared/schema';
 import { eq } from 'drizzle-orm';
 import { logFromRequest } from '../core/auditLog';
 import { logger } from '../core/logger';
+import sharp from 'sharp';
 
 const router = Router();
 const objectStorageService = new ObjectStorageService();
+const largeJsonParser = json({ limit: '20mb' });
 
-router.post('/api/admin/scan-id', isStaffOrAdmin, async (req, res) => {
+router.post('/api/admin/scan-id', largeJsonParser, isStaffOrAdmin, async (req, res) => {
   try {
     const { image, mimeType } = req.body;
 
@@ -28,7 +30,15 @@ router.post('/api/admin/scan-id', isStaffOrAdmin, async (req, res) => {
       return res.status(400).json({ error: 'Image too large. Maximum size is 10MB.' });
     }
 
-    const dataUrl = `data:${mimeType};base64,${image}`;
+    const rawBuffer = Buffer.from(image, 'base64');
+    const resizedBuffer = await sharp(rawBuffer, { limitInputPixels: 268402689 })
+      .resize(1500, 1500, { fit: 'inside', withoutEnlargement: true })
+      .jpeg({ quality: 85 })
+      .toBuffer();
+    const resizedBase64 = resizedBuffer.toString('base64');
+    const dataUrl = `data:image/jpeg;base64,${resizedBase64}`;
+
+    logger.info('[ID Scanner] Image resized for OCR', { extra: { originalBytes: rawBuffer.length, resizedBytes: resizedBuffer.length } });
 
     const response = await openai.chat.completions.create({
       model: 'gpt-4o',
@@ -112,7 +122,7 @@ Even if quality is poor, still attempt to extract whatever information is visibl
   }
 });
 
-router.post('/api/admin/save-id-image', isStaffOrAdmin, async (req, res) => {
+router.post('/api/admin/save-id-image', largeJsonParser, isStaffOrAdmin, async (req, res) => {
   try {
     const { userId, image, mimeType } = req.body;
 
