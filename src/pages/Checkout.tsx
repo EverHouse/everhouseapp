@@ -160,8 +160,12 @@ function CorporateCheckoutForm({ tier, email, initialQuantity }: CorporateChecko
   };
   const priceTier = getPriceTier(quantity);
 
-  const handleQuantityChange = (delta: number) => {
-    setQuantity(prev => Math.max(5, Math.min(100, prev + delta)));
+  const handleQuantityChange = (value: number | null, delta?: number) => {
+    if (value !== null) {
+      setQuantity(Math.max(5, Math.min(100, value)));
+    } else if (delta !== undefined) {
+      setQuantity(prev => Math.max(5, Math.min(100, prev + delta)));
+    }
   };
 
   const handleContinue = () => {
@@ -324,18 +328,31 @@ function CorporateCheckoutForm({ tier, email, initialQuantity }: CorporateChecko
           </label>
           <div className="flex items-center gap-4">
             <button
-              onClick={() => handleQuantityChange(-5)}
+              onClick={() => handleQuantityChange(null, -5)}
               disabled={quantity <= 5}
               className="w-12 h-12 rounded-xl flex items-center justify-center bg-primary/10 dark:bg-white/10 text-primary dark:text-white hover:bg-primary/20 dark:hover:bg-white/20 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
             >
               <span className="material-symbols-outlined">remove</span>
             </button>
             <div className="flex-1 text-center">
-              <div className="text-4xl font-bold text-primary dark:text-white">{quantity}</div>
-              <div className="text-sm text-primary/60 dark:text-white/60">{priceTier}</div>
+              <input
+                type="number"
+                value={quantity}
+                onChange={(e) => {
+                  const val = parseInt(e.target.value, 10);
+                  if (!isNaN(val)) handleQuantityChange(val);
+                }}
+                onBlur={() => {
+                  if (quantity < 5) handleQuantityChange(5);
+                }}
+                min={5}
+                max={100}
+                className="w-20 mx-auto text-4xl font-bold text-primary dark:text-white text-center bg-transparent border-b-2 border-primary/20 dark:border-white/20 focus:border-accent focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+              />
+              <div className="text-sm text-primary/60 dark:text-white/60 mt-1">{priceTier}</div>
             </div>
             <button
-              onClick={() => handleQuantityChange(5)}
+              onClick={() => handleQuantityChange(null, 5)}
               disabled={quantity >= 100}
               className="w-12 h-12 rounded-xl flex items-center justify-center bg-primary/10 dark:bg-white/10 text-primary dark:text-white hover:bg-primary/20 dark:hover:bg-white/20 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
             >
@@ -448,11 +465,23 @@ function DayPassesSection() {
     fetchProducts();
   }, [filterType]);
 
+  useEffect(() => {
+    const handlePageShow = (e: PageTransitionEvent) => {
+      if (e.persisted) {
+        setSubmitting(false);
+      }
+    };
+    window.addEventListener('pageshow', handlePageShow);
+    return () => window.removeEventListener('pageshow', handlePageShow);
+  }, []);
+
   const handleCheckout = async (product: DayPassProduct) => {
     if (!email) {
       setSelectedProduct(product);
       return;
     }
+
+    if (submitting) return;
 
     setSubmitting(true);
     try {
@@ -475,6 +504,9 @@ function DayPassesSection() {
       const { sessionUrl } = await res.json();
       if (sessionUrl) {
         window.location.href = sessionUrl;
+        setTimeout(() => setSubmitting(false), 2000);
+      } else {
+        setSubmitting(false);
       }
     } catch (err: unknown) {
       setError((err instanceof Error ? err.message : String(err)));

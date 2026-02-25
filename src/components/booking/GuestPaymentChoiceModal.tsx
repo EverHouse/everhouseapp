@@ -66,37 +66,41 @@ export function GuestPaymentChoiceModal({
 
     const fullName = `${guestFirstName.trim()} ${guestLastName.trim()}`;
 
-    onSuccess(fullName);
+    setLoading(true);
+    setError(null);
 
-    apiRequest(
-      `/api/bookings/${bookingId}/participants`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: 'guest',
-          guest: {
-            name: fullName,
-            email: guestEmail.trim()
-          },
-          useGuestPass: true
-        })
-      }
-    ).then(({ ok, error: apiError }) => {
-      if (!ok) {
-        const msg = (apiError || '').toLowerCase();
-        const isTimeout = msg.includes('abort') || msg.includes('timeout');
-        if (!isTimeout) {
-          onError?.(apiError || 'Failed to add guest with pass');
+    try {
+      const { ok, error: apiError } = await apiRequest(
+        `/api/bookings/${bookingId}/participants`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'guest',
+            guest: {
+              name: fullName,
+              email: guestEmail.trim()
+            },
+            useGuestPass: true
+          })
         }
+      );
+
+      if (ok) {
+        onSuccess(fullName);
+      } else {
+        setError(apiError || 'Failed to add guest with pass');
       }
-    }).catch((err: unknown) => {
+    } catch (err: unknown) {
       const msg = ((err instanceof Error ? err.message : String(err)) || '').toLowerCase();
       const isTimeout = msg.includes('abort') || msg.includes('timeout');
       if (!isTimeout) {
+        setError(msg || 'Failed to add guest');
         onError?.(msg || 'Failed to add guest');
       }
-    });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleAddPaidGuest = async () => {

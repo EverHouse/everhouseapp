@@ -8,6 +8,19 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.30.2",
+    date: "2026-02-25",
+    title: "Fix: Double-Click & Payment Confirmation Guards",
+    changes: [
+      "Fixed: 'Use Guest Pass' button no longer fires before the server confirms — previously the UI showed success immediately, even if the backend failed, causing guest pass counts to desync",
+      "Fixed: 'Use Guest Pass' button now shows a loading spinner and is disabled during the request, preventing duplicate guest additions from rapid clicks",
+      "Fixed: Member payment confirmation now waits for backend confirmation before closing the modal — if confirmation fails, an error message is shown instead of silently proceeding",
+      "Fixed: Member payment modal shows a 'Confirming payment...' spinner during backend confirmation to prevent user interaction",
+      "Fixed: Day pass 'Buy Now' button no longer gets permanently stuck in a disabled state when navigating back from Stripe Checkout via browser back button",
+      "Improved: Corporate membership seat count can now be typed directly instead of requiring repeated button clicks to reach the desired number",
+    ]
+  },
+  {
     version: "8.30.1",
     date: "2026-02-25",
     title: "Fix: Payment Double-Tap Protection",

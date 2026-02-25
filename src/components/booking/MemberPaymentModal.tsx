@@ -47,6 +47,7 @@ export function MemberPaymentModal({
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState(false);
   const [paymentData, setPaymentData] = useState<PayFeesResponse | null>(null);
   const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null);
   const paymentSucceededRef = useRef(false);
@@ -126,6 +127,8 @@ export function MemberPaymentModal({
       return;
     }
 
+    setConfirming(true);
+
     try {
       const { ok, error: confirmError } = await apiRequest(
         `/api/member/bookings/${bookingId}/confirm-payment`,
@@ -138,12 +141,17 @@ export function MemberPaymentModal({
 
       if (!ok) {
         console.error('[MemberPaymentModal] Failed to confirm payment:', confirmError);
+        setError('Payment processed by Stripe, but backend confirmation failed. Please refresh.');
+        setConfirming(false);
+        return;
       }
+
+      onSuccess();
     } catch (err: unknown) {
       console.error('[MemberPaymentModal] Error confirming payment:', err);
+      setError('Network error during confirmation. Please refresh the page.');
+      setConfirming(false);
     }
-
-    onSuccess();
   };
 
   return (
@@ -173,7 +181,16 @@ export function MemberPaymentModal({
           </div>
         )}
 
-        {!loading && !error && paymentData && (
+        {confirming && (
+          <div className="flex flex-col items-center justify-center py-12 gap-4">
+            <WalkingGolferSpinner size="sm" variant="light" />
+            <p className={`text-sm font-medium ${isDark ? 'text-white/70' : 'text-primary/70'}`}>
+              Confirming payment...
+            </p>
+          </div>
+        )}
+
+        {!loading && !confirming && !error && paymentData && (
           <div className="space-y-4">
             <div className={`rounded-xl p-4 ${isDark ? 'bg-white/5' : 'bg-primary/5'}`}>
               <h4 className={`text-sm font-bold mb-3 ${isDark ? 'text-white/80' : 'text-primary/80'}`}>
