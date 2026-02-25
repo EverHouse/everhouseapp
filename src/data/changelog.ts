@@ -17,6 +17,7 @@ export const changelog: ChangelogEntry[] = [
       "Fixed: Switching from 'Enter Card' to 'Card Reader' on a $0 subscription no longer shows 'No such payment_intent' error — the server now detects $0 invoices and marks the subscription as a free activation, skipping the payment step entirely",
       "Fixed: Migrated Stripe subscription coupon application from deprecated root-level 'coupon' property to the modern 'discounts' array format",
       "Fixed: Billing tab 'Discounts' section now correctly shows active coupons (e.g. 'Comped Membership 100% off') — the subscription data mapper was missing the discount, planName, planAmount, currency, and interval fields from Stripe",
+      "Fixed: Trackman auto-confirm animation in 'Book on Trackman' modal was not triggering — booking ID comparison used strict equality between number and string types, causing the match to always fail; also fixed a race condition where a data refresh could reset the animation state mid-flight",
       "Fixed: ID scanner 'string did not match the expected pattern' error — images from phone cameras were too large for the API. Now resized to max 1920px on capture/upload and 1500px on the server before OCR processing",
       "Fixed: Android Chrome scrolling was blocked across the app — React 19 delegates synthetic touch handlers to #root as non-passive listeners, which Android's scroll optimization rejects. Converted PullToRefresh to native addEventListener with passive: true for touchstart",
     ]

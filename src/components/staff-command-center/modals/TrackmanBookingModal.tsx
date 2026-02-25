@@ -101,7 +101,7 @@ export function TrackmanBookingModal({
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    if (!isOpen || !booking) {
+    if (!isOpen) {
       setAutoApproved(false);
       setAutoConfirmedId(null);
       setShowSuccessOverlay(false);
@@ -114,6 +114,10 @@ export function TrackmanBookingModal({
       return;
     }
 
+    if (!booking) {
+      return;
+    }
+
     const handleAutoConfirmed = (event: CustomEvent) => {
       const detail = event.detail;
       const eventBookingId = detail?.data?.bookingId;
@@ -121,7 +125,7 @@ export function TrackmanBookingModal({
       const eventDate = detail?.data?.date;
       const trackmanId = detail?.data?.trackmanBookingId;
 
-      const isMatch = (eventBookingId && eventBookingId === booking.id) ||
+      const isMatch = (eventBookingId && String(eventBookingId) === String(booking.id)) ||
         (eventEmail && eventDate && eventEmail.toLowerCase() === booking.user_email?.toLowerCase() && eventDate === booking.request_date);
 
       if (isMatch) {
