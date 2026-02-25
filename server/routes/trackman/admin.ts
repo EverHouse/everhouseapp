@@ -557,8 +557,46 @@ router.put('/api/admin/trackman/unmatched/:id/resolve', isStaffOrAdmin, async (r
                        updated_at = NOW()
                    WHERE id = ${otherBooking.id}`);
                 
-                const otherSession = await db.execute(sql`SELECT session_id FROM booking_requests WHERE id = ${otherBooking.id}`);
-                const otherSessionId = (otherSession.rows[0] as DbRow)?.session_id;
+                const otherBookingDetails = await db.execute(sql`SELECT session_id, request_date, start_time, end_time, duration_minutes, resource_id, trackman_booking_id FROM booking_requests WHERE id = ${otherBooking.id}`);
+                const otherBD = otherBookingDetails.rows[0] as DbRow;
+                let otherSessionId = otherBD?.session_id;
+                
+                if (!otherSessionId && otherBD) {
+                  const otherDateStr = typeof otherBD.request_date === 'string' ? otherBD.request_date :
+                    new Date(otherBD.request_date as string | number | Date).toISOString().split('T')[0];
+                  const otherSessionResult = await ensureSessionForBooking({
+                    bookingId: otherBooking.id as number,
+                    resourceId: otherBD.resource_id as number,
+                    sessionDate: otherDateStr,
+                    startTime: otherBD.start_time as string,
+                    endTime: otherBD.end_time as string,
+                    ownerEmail: (member.email as string) || '',
+                    ownerName: memberFullName,
+                    ownerUserId: member.id?.toString(),
+                    trackmanBookingId: otherBD.trackman_booking_id as string,
+                    source: 'trackman_import',
+                    createdBy: 'staff_auto_resolve'
+                  });
+                  otherSessionId = otherSessionResult.sessionId || null;
+                  if (otherSessionId) {
+                    const todayPacific = getTodayPacific();
+                    const isPastBooking = otherDateStr < todayPacific;
+                    if (isPastBooking) {
+                      await db.execute(sql`UPDATE booking_participants SET payment_status = 'paid', paid_at = NOW() WHERE session_id = ${otherSessionId} AND payment_status = 'pending'`);
+                    }
+                    await recordUsage(otherSessionId as number, {
+                      memberId: (member.email as string).toLowerCase(),
+                      minutesCharged: Number(otherBD.duration_minutes) || 60,
+                    });
+                    try {
+                      await recalculateSessionFees(otherSessionId as number, 'checkin');
+                    } catch (feeErr: unknown) {
+                      logger.warn('[Email Learning] Failed to recalculate fees for auto-resolved session', { extra: { sessionId: otherSessionId, feeErr } });
+                    }
+                    logger.info('[Email Learning] Created session for auto-resolved booking', { extra: { bookingId: otherBooking.id, sessionId: otherSessionId } });
+                  }
+                }
+                
                 if (otherSessionId) {
                   await db.execute(sql`UPDATE booking_participants 
                      SET user_id = ${member.id}, display_name = ${memberFullName}
@@ -915,8 +953,46 @@ router.post('/api/admin/trackman/auto-resolve-same-email', isStaffOrAdmin, async
                      updated_at = NOW()
                  WHERE id = ${booking.id}`);
               
-              const sameEmailSession = await db.execute(sql`SELECT session_id FROM booking_requests WHERE id = ${booking.id}`);
-              const sameEmailSessionId = (sameEmailSession.rows[0] as DbRow)?.session_id;
+              const sameEmailDetails = await db.execute(sql`SELECT session_id, request_date, start_time, end_time, duration_minutes, resource_id, trackman_booking_id FROM booking_requests WHERE id = ${booking.id}`);
+              const sameEmailBD = sameEmailDetails.rows[0] as DbRow;
+              let sameEmailSessionId = sameEmailBD?.session_id;
+              
+              if (!sameEmailSessionId && sameEmailBD) {
+                const sameEmailDateStr = typeof sameEmailBD.request_date === 'string' ? sameEmailBD.request_date :
+                  new Date(sameEmailBD.request_date as string | number | Date).toISOString().split('T')[0];
+                const sameEmailSessionResult = await ensureSessionForBooking({
+                  bookingId: booking.id as number,
+                  resourceId: sameEmailBD.resource_id as number,
+                  sessionDate: sameEmailDateStr,
+                  startTime: sameEmailBD.start_time as string,
+                  endTime: sameEmailBD.end_time as string,
+                  ownerEmail: (member.email as string) || '',
+                  ownerName: sameEmailName,
+                  ownerUserId: member.id?.toString(),
+                  trackmanBookingId: sameEmailBD.trackman_booking_id as string,
+                  source: 'trackman_import',
+                  createdBy: 'staff_auto_resolve'
+                });
+                sameEmailSessionId = sameEmailSessionResult.sessionId || null;
+                if (sameEmailSessionId) {
+                  const todayPacific = getTodayPacific();
+                  const isPastBooking = sameEmailDateStr < todayPacific;
+                  if (isPastBooking) {
+                    await db.execute(sql`UPDATE booking_participants SET payment_status = 'paid', paid_at = NOW() WHERE session_id = ${sameEmailSessionId} AND payment_status = 'pending'`);
+                  }
+                  await recordUsage(sameEmailSessionId as number, {
+                    memberId: (member.email as string).toLowerCase(),
+                    minutesCharged: Number(sameEmailBD.duration_minutes) || 60,
+                  });
+                  try {
+                    await recalculateSessionFees(sameEmailSessionId as number, 'checkin');
+                  } catch (feeErr: unknown) {
+                    logger.warn('[Auto-resolve] Failed to recalculate fees for auto-resolved session', { extra: { sessionId: sameEmailSessionId, feeErr } });
+                  }
+                  logger.info('[Auto-resolve] Created session for auto-resolved booking', { extra: { bookingId: booking.id, sessionId: sameEmailSessionId } });
+                }
+              }
+              
               if (sameEmailSessionId) {
                 await db.execute(sql`UPDATE booking_participants 
                    SET user_id = ${member.id}, display_name = ${sameEmailName}
