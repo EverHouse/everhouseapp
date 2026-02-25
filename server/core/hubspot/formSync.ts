@@ -56,14 +56,20 @@ let firstSyncCompleted = false;
 
 async function getPrivateAppToken(): Promise<string | null> {
   try {
+    logger.info('[HubSpot FormSync] Checking database for Private App token...');
     const rows = await db.select({ value: systemSettings.value })
       .from(systemSettings)
       .where(eq(systemSettings.key, DB_TOKEN_KEY))
       .limit(1);
+    logger.info(`[HubSpot FormSync] Database query returned ${rows.length} rows`);
     if (rows.length > 0 && rows[0].value) {
+      const suffix = rows[0].value.substring(rows[0].value.length - 4);
+      logger.info(`[HubSpot FormSync] Found token in database ending ...${suffix}`);
       return rows[0].value;
     }
-  } catch {
+    logger.info('[HubSpot FormSync] No token found in database, falling back to env var');
+  } catch (err: unknown) {
+    logger.error(`[HubSpot FormSync] Database token lookup failed: ${getErrorMessage(err)}`);
   }
   return process.env.HUBSPOT_PRIVATE_APP_TOKEN || null;
 }
