@@ -88,6 +88,9 @@ export function UnifiedBookingSheet(props: UnifiedBookingSheetProps) {
     const manageModeTitle = ownerName || logic.fetchedContext?.ownerName || 'Booking Details';
 
     const handleManagedClose = () => {
+      if (logic.paymentSuccess) {
+        props.onRosterUpdated?.();
+      }
       onClose();
     };
 

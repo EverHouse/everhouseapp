@@ -25,6 +25,7 @@ export const changelog: ChangelogEntry[] = [
       "Fixed: Database connection leak in certain error paths that could cause server crashes under load",
       "Fixed: Orphaned booking sessions (sessions without a matching booking) are now properly cleaned up during cancellation",
       "New: Staff can now assign members to unmatched or empty booking sessions directly from the booking details sheet",
+      "Fixed: After charging a member for a booking and closing the details sheet, the calendar card didn't update to reflect the payment — now automatically refreshes booking data when closing after a successful payment",
     ]
   },
   {
