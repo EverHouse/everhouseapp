@@ -26,10 +26,17 @@ import { startOnboardingNudgeScheduler, stopOnboardingNudgeScheduler } from './o
 import { startSupabaseHeartbeatScheduler, stopSupabaseHeartbeatScheduler } from './supabaseHeartbeatScheduler';
 import { startJobProcessor, stopJobProcessor } from '../core/jobQueue';
 import { schedulerTracker } from '../core/schedulerTracker';
+import { isProduction } from '../core/db';
+import { logger } from '../core/logger';
 
 const intervalIds: NodeJS.Timeout[] = [];
 
 export function initSchedulers(): void {
+  if (!isProduction) {
+    logger.info('[Schedulers] Skipping all schedulers in dev — production handles background tasks on the shared database');
+    return;
+  }
+
   schedulerTracker.registerScheduler('Background Sync', 5 * 60 * 1000);
   schedulerTracker.registerScheduler('Daily Reminder', 30 * 60 * 1000);
   schedulerTracker.registerScheduler('Morning Closure', 30 * 60 * 1000);

@@ -8,6 +8,14 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.31.6",
+    date: "2026-02-25",
+    title: "Fix: Dev/Production Scheduler Race Condition",
+    changes: [
+      "Fixed: Background schedulers (form sync, notifications, reminders, etc.) now only run in production — previously both dev and production ran the same schedulers against the shared database, causing a race condition where dev could steal notification triggers from production",
+    ]
+  },
+  {
     version: "8.31.5",
     date: "2026-02-25",
     title: "Fix: Member Directory Search in Bookings",
