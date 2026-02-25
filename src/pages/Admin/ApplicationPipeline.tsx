@@ -82,6 +82,33 @@ const ApplicationPipeline: React.FC = () => {
   const [isSendingInvite, setIsSendingInvite] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [applicationsRef] = useAutoAnimate();
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  const handleSyncFromHubSpot = async () => {
+    setIsSyncing(true);
+    setToast(null);
+    try {
+      const res = await fetch('/api/admin/hubspot/sync-form-submissions', {
+        method: 'POST',
+        credentials: 'include',
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const inserted = data.newInserted ?? 0;
+        setToast({
+          message: inserted > 0 ? `Synced ${inserted} new submission${inserted !== 1 ? 's' : ''}` : 'All applications are up to date',
+          type: 'success',
+        });
+        fetchApplications();
+      } else {
+        setToast({ message: 'Sync failed — please try again', type: 'error' });
+      }
+    } catch {
+      setToast({ message: 'Sync failed — please try again', type: 'error' });
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   useEffect(() => {
     if (!isLoading) {
@@ -233,19 +260,35 @@ const ApplicationPipeline: React.FC = () => {
   return (
     <div className="animate-slide-up-stagger" style={{ '--stagger-index': 0 } as React.CSSProperties}>
       {toast && (
-        <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-xl shadow-lg text-sm font-semibold flex items-center gap-2 animate-slide-up-stagger ${
-          toast.type === 'success' 
-            ? 'bg-green-600 text-white' 
-            : 'bg-red-600 text-white'
+        <div className={`mb-3 px-4 py-3 rounded-xl text-sm font-semibold flex items-center gap-2 animate-content-enter ${
+          toast.type === 'success'
+            ? 'bg-green-500/10 text-green-700 dark:text-green-400'
+            : 'bg-amber-500/10 text-amber-700 dark:text-amber-400'
         }`}>
           <span className="material-symbols-outlined text-lg" aria-hidden="true">
-            {toast.type === 'success' ? 'check_circle' : 'error'}
+            {toast.type === 'success' ? 'check_circle' : 'info'}
           </span>
           {toast.message}
         </div>
       )}
 
-      <div className="flex gap-2 overflow-x-auto pb-4 mb-4 scrollbar-hide -mx-4 px-4 animate-slide-up-stagger scroll-fade-right" style={{ '--stagger-index': 1 } as React.CSSProperties}>
+      <div className="flex items-center justify-end mb-3 animate-slide-up-stagger" style={{ '--stagger-index': 1 } as React.CSSProperties}>
+        <button
+          onClick={handleSyncFromHubSpot}
+          disabled={isSyncing}
+          className="relative flex items-center gap-1.5 px-3 py-2 min-h-[36px] rounded-lg text-xs font-semibold text-gray-600 dark:text-gray-300 bg-white dark:bg-white/10 border border-gray-200 dark:border-white/20 hover:bg-gray-50 dark:hover:bg-white/15 transition-all duration-fast active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed"
+        >
+          <span className={`material-symbols-outlined text-[16px] ${isSyncing ? 'animate-spin' : ''}`} aria-hidden="true">
+            {isSyncing ? 'progress_activity' : 'sync'}
+          </span>
+          <span className={isSyncing ? 'opacity-0' : 'opacity-100'}>{isSyncing ? 'Syncing…' : 'Sync from HubSpot'}</span>
+          {isSyncing && (
+            <span className="absolute inset-0 flex items-center justify-center text-xs font-semibold">Syncing…</span>
+          )}
+        </button>
+      </div>
+
+      <div className="flex gap-2 overflow-x-auto pb-4 mb-4 scrollbar-hide -mx-4 px-4 animate-slide-up-stagger scroll-fade-right" style={{ '--stagger-index': 2 } as React.CSSProperties}>
         {STATUS_TABS.map(tab => (
           <button
             key={tab.id}

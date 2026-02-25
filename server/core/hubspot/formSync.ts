@@ -1,9 +1,10 @@
-import { getHubSpotAccessToken } from '../integrations';
+import { getHubSpotClientWithFallback } from '../integrations';
 import { getErrorMessage } from '../../utils/errorUtils';
 import { db } from '../../db';
 import { formSubmissions } from '../../../shared/schema';
 import { eq, and, gte, lte } from 'drizzle-orm';
 import { notifyAllStaff } from '../notificationService';
+import type { Client } from '@hubspot/api-client';
 
 import { logger } from '../logger';
 
@@ -14,14 +15,6 @@ const FORM_TYPE_LABELS: Record<string, string> = {
   'private-hire': 'Private Hire Inquiry',
   'guest-checkin': 'Guest Check-in',
   'contact': 'Contact Form',
-};
-const HUBSPOT_FORMS: Record<string, string> = {
-  'tour-request': process.env.HUBSPOT_FORM_TOUR_REQUEST || '',
-  'membership': process.env.HUBSPOT_FORM_MEMBERSHIP || '',
-  'private-hire': process.env.HUBSPOT_FORM_PRIVATE_HIRE || 'b69f9fe4-9b3b-4d1e-a689-ba3127e5f8f2',
-  'event-inquiry': process.env.HUBSPOT_FORM_EVENT_INQUIRY || 'b69f9fe4-9b3b-4d1e-a689-ba3127e5f8f2',
-  'guest-checkin': process.env.HUBSPOT_FORM_GUEST_CHECKIN || '',
-  'contact': process.env.HUBSPOT_FORM_CONTACT || '',
 };
 
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
@@ -46,23 +39,6 @@ export function getFormSyncStatus(): { accessDenied: boolean; accessDeniedUntil:
   };
 }
 
-async function getFormSyncTokens(): Promise<Array<{ token: string; name: string }>> {
-  const sources: Array<{ token: string; name: string }> = [];
-  const privateAppToken = process.env.HUBSPOT_PRIVATE_APP_TOKEN;
-  if (privateAppToken) {
-    sources.push({ token: privateAppToken, name: 'private_app' });
-  }
-  try {
-    const connectorToken = await getHubSpotAccessToken() as string;
-    if (connectorToken && connectorToken !== privateAppToken) {
-      sources.push({ token: connectorToken, name: 'connector' });
-    }
-  } catch {
-    logger.debug('[HubSpot FormSync] Connector token not available, skipping');
-  }
-  return sources;
-}
-
 interface HubSpotSubmissionValue {
   name: string;
   value: string;
@@ -85,9 +61,28 @@ interface HubSpotSubmissionsResponse {
   };
 }
 
+interface HubSpotForm {
+  id: string;
+  name: string;
+  formType?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 function getFieldValue(values: HubSpotSubmissionValue[], fieldName: string): string | null {
   const field = values.find(v => v.name === fieldName);
   return field?.value || null;
+}
+
+function inferFormTypeFromName(formName: string): string {
+  const name = formName.toLowerCase();
+  if (name.includes('check-in') || name.includes('checkin') || name.includes('waiver')) return 'guest-checkin';
+  if (name.includes('membership') || name.includes('application')) return 'membership';
+  if (name.includes('private') && (name.includes('event') || name.includes('hire'))) return 'private-hire';
+  if (name.includes('event') || name.includes('inquiry')) return 'event-inquiry';
+  if (name.includes('tour')) return 'tour-request';
+  if (name.includes('contact')) return 'contact';
+  return 'contact';
 }
 
 function inferFormTypeFromPageUrl(pageUrl: string | undefined, defaultType: string): string {
@@ -102,39 +97,52 @@ function inferFormTypeFromPageUrl(pageUrl: string | undefined, defaultType: stri
   return defaultType;
 }
 
-async function fetchFormSubmissions(
+async function discoverForms(client: Client): Promise<HubSpotForm[]> {
+  try {
+    const response = await client.apiRequest({
+      method: 'GET',
+      path: '/marketing/v3/forms/',
+    });
+    const data = await response.json() as { results?: HubSpotForm[]; total?: number };
+    const forms = data.results || [];
+    logger.info(`[HubSpot FormSync] Discovered ${forms.length} forms from HubSpot`);
+    return forms;
+  } catch (err: unknown) {
+    const errMsg = getErrorMessage(err);
+    if (errMsg.includes('401') || errMsg.includes('403')) {
+      throw new Error(`HUBSPOT_FORMS_ACCESS_DENIED: ${errMsg}`);
+    }
+    logger.warn(`[HubSpot FormSync] Could not discover forms via v3 API: ${errMsg}`);
+    return [];
+  }
+}
+
+async function fetchFormSubmissionsViaClient(
+  client: Client,
   formId: string,
-  accessToken: string,
   sinceTimestamp: number
 ): Promise<HubSpotSubmission[]> {
   const allSubmissions: HubSpotSubmission[] = [];
   let after: string | undefined;
 
   do {
-    const url = new URL(`https://api.hubapi.com/form-integrations/v1/submissions/forms/${formId}`);
-    url.searchParams.set('limit', '50');
+    const queryParams: Record<string, string> = { limit: '50' };
     if (after) {
-      url.searchParams.set('after', after);
+      queryParams.after = after;
     }
 
-    const response = await fetch(url.toString(), {
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Accept': 'application/json',
-      },
+    const response = await client.apiRequest({
+      method: 'GET',
+      path: `/form-integrations/v1/submissions/forms/${formId}`,
+      qs: queryParams,
     });
 
-    if (response.status === 403 || response.status === 401) {
+    if ((response as any).status === 403 || (response as any).status === 401) {
       const body = await response.text().catch(() => '');
-      throw new Error(`HUBSPOT_FORMS_ACCESS_DENIED: ${response.status} ${body}`);
+      throw new Error(`HUBSPOT_FORMS_ACCESS_DENIED: ${(response as any).status} ${body}`);
     }
 
-    if (!response.ok) {
-      const errorText = await response.text().catch(() => 'unknown');
-      throw new Error(`HubSpot API error ${response.status}: ${errorText}`);
-    }
-
-    const data: HubSpotSubmissionsResponse = await response.json();
+    const data: HubSpotSubmissionsResponse = await response.json() as HubSpotSubmissionsResponse;
 
     const recentResults = data.results.filter(s => s.submittedAt >= sinceTimestamp);
     allSubmissions.push(...recentResults);
@@ -171,11 +179,16 @@ export async function syncHubSpotFormSubmissions(): Promise<{
   }
 
   try {
-    const tokenSources = await getFormSyncTokens();
-    if (tokenSources.length === 0) {
+    let client: Client;
+    let authSource: string;
+    try {
+      const fallback = await getHubSpotClientWithFallback();
+      client = fallback.client;
+      authSource = fallback.source;
+    } catch (err: unknown) {
       formSyncAuthFailureUntil = Date.now() + 60 * 60 * 1000;
       if (!formSyncAuthFailureLogged) {
-        const msg = 'No HubSpot access token available. Set HUBSPOT_PRIVATE_APP_TOKEN or configure HubSpot connector.';
+        const msg = `No HubSpot client available: ${getErrorMessage(err)}`;
         logger.warn(`[HubSpot FormSync] ${msg}`);
         result.errors.push(msg);
         formSyncAuthFailureLogged = true;
@@ -183,69 +196,54 @@ export async function syncHubSpotFormSubmissions(): Promise<{
       return result;
     }
 
-    let accessToken = '';
-    let authSource = '';
-    for (const source of tokenSources) {
-      try {
-        const testFormId = Object.values(HUBSPOT_FORMS).find(id => id);
-        if (testFormId) {
-          await fetchFormSubmissions(testFormId, source.token, Date.now() - 60000);
-        }
-        accessToken = source.token;
-        authSource = source.name;
-        break;
-      } catch (err: unknown) {
-        const errMsg = getErrorMessage(err);
-        if (errMsg.includes('HUBSPOT_FORMS_ACCESS_DENIED')) {
-          logger.info(`[HubSpot FormSync] ${source.name} token denied (${errMsg}), trying next source...`);
-          continue;
-        }
-        accessToken = source.token;
-        authSource = source.name;
-        break;
-      }
-    }
-
-    if (!accessToken) {
-      formSyncAccessDeniedUntil = Date.now() + 30 * 60 * 1000;
-      logger.warn('[HubSpot FormSync] All token sources denied (401/403) for forms scope. Add "forms" scope to your HubSpot private app OR re-authorize the HubSpot connector with forms permission. Suppressing retries for 30 minutes.');
-      return result;
-    }
-
     logger.info(`[HubSpot FormSync] Using auth source: ${authSource}`);
+
+    let forms: HubSpotForm[];
+    try {
+      forms = await discoverForms(client);
+    } catch (err: unknown) {
+      const errMsg = getErrorMessage(err);
+      if (errMsg.includes('HUBSPOT_FORMS_ACCESS_DENIED')) {
+        formSyncAccessDeniedUntil = Date.now() + 30 * 60 * 1000;
+        logger.warn(`[HubSpot FormSync] Access denied discovering forms (${authSource}): ${errMsg}. Suppressing retries for 30 minutes.`);
+        result.errors.push(`Access denied: ${errMsg}`);
+        return result;
+      }
+      throw err;
+    }
+
+    if (forms.length === 0) {
+      const hardcodedId = 'b69f9fe4-9b3b-4d1e-a689-ba3127e5f8f2';
+      forms = [{ id: hardcodedId, name: 'Events Inquiry Form' }];
+      logger.info('[HubSpot FormSync] No forms discovered, falling back to hardcoded Events Inquiry form');
+    }
 
     const sinceTimestamp = Date.now() - THIRTY_DAYS_MS;
 
-    const formIdToTypes = new Map<string, string[]>();
-    for (const [formType, formId] of Object.entries(HUBSPOT_FORMS)) {
-      if (!formId) continue;
-      const existing = formIdToTypes.get(formId) || [];
-      existing.push(formType);
-      formIdToTypes.set(formId, existing);
-    }
-
-    for (const [formId, formTypes] of formIdToTypes.entries()) {
-      const defaultFormType = formTypes[0];
-      logger.info(`[HubSpot FormSync] Fetching submissions for form ${formId} (types: ${formTypes.join(', ')})`);
+    for (const form of forms) {
+      const formType = inferFormTypeFromName(form.name);
+      logger.info(`[HubSpot FormSync] Fetching submissions for "${form.name}" (${form.id}) → type: ${formType}`);
 
       let submissions: HubSpotSubmission[];
       try {
-        submissions = await fetchFormSubmissions(formId, accessToken, sinceTimestamp);
+        submissions = await fetchFormSubmissionsViaClient(client, form.id, sinceTimestamp);
       } catch (err: unknown) {
         const errMsg = getErrorMessage(err);
         if (errMsg.includes('HUBSPOT_FORMS_ACCESS_DENIED')) {
           formSyncAccessDeniedUntil = Date.now() + 30 * 60 * 1000;
-          logger.warn(`[HubSpot FormSync] Access denied during sync (${errMsg}). Token may have been revoked. Suppressing retries for 30 minutes.`);
+          logger.warn(`[HubSpot FormSync] Access denied during sync (${errMsg}). Suppressing retries for 30 minutes.`);
           break;
         }
-        const msg = `Failed to fetch form ${formId}: ${errMsg}`;
+        const msg = `Failed to fetch form "${form.name}" (${form.id}): ${errMsg}`;
         logger.error(`[HubSpot FormSync] ${msg}`);
         result.errors.push(msg);
         continue;
       }
 
+      if (submissions.length === 0) continue;
+
       result.totalFetched += submissions.length;
-      logger.info(`[HubSpot FormSync] Found ${submissions.length} submissions for form ${formId}`);
+      logger.info(`[HubSpot FormSync] Found ${submissions.length} submissions for "${form.name}"`);
 
       for (const submission of submissions) {
         try {
@@ -259,23 +257,22 @@ export async function syncHubSpotFormSubmissions(): Promise<{
             continue;
           }
 
-          const formType = formTypes.length > 1
-            ? inferFormTypeFromPageUrl(submission.pageUrl, defaultFormType)
-            : defaultFormType;
+          const resolvedFormType = submission.pageUrl
+            ? inferFormTypeFromPageUrl(submission.pageUrl, formType)
+            : formType;
 
           const email = getFieldValue(submission.values, 'email') || '';
           if (!email) {
             continue;
           }
 
-          const submittedAt = new Date(submission.submittedAt);
           const windowStart = new Date(submission.submittedAt - 5 * 60 * 1000);
           const windowEnd = new Date(submission.submittedAt + 5 * 60 * 1000);
           const localMatch = await db.select({ id: formSubmissions.id })
             .from(formSubmissions)
             .where(and(
               eq(formSubmissions.email, email),
-              eq(formSubmissions.formType, formType),
+              eq(formSubmissions.formType, resolvedFormType),
               gte(formSubmissions.createdAt, windowStart),
               lte(formSubmissions.createdAt, windowEnd),
             ))
@@ -305,9 +302,10 @@ export async function syncHubSpotFormSubmissions(): Promise<{
           if (submission.pageUrl) {
             metadataFields['pageUrl'] = submission.pageUrl;
           }
+          metadataFields['hubspotFormName'] = form.name;
 
           const insertResult = await db.insert(formSubmissions).values({
-            formType,
+            formType: resolvedFormType,
             firstName,
             lastName,
             email,
@@ -322,11 +320,11 @@ export async function syncHubSpotFormSubmissions(): Promise<{
 
           result.newInserted++;
 
-          const formLabel = FORM_TYPE_LABELS[formType] || 'Form Submission';
+          const formLabel = FORM_TYPE_LABELS[resolvedFormType] || 'Form Submission';
           const submitterName = [firstName, lastName].filter(Boolean).join(' ') || email || 'Someone';
           const staffMessage = `${submitterName} submitted a ${formLabel}`;
-          const notificationUrl = formType === 'membership' ? '/admin/applications' : '/admin/inquiries';
-          const notificationRelatedType = formType === 'membership' ? 'application' : 'inquiry';
+          const notificationUrl = resolvedFormType === 'membership' ? '/admin/applications' : '/admin/inquiries';
+          const notificationRelatedType = resolvedFormType === 'membership' ? 'application' : 'inquiry';
 
           notifyAllStaff(
             `New ${formLabel}`,
