@@ -48,12 +48,12 @@ export async function createSubscription(params: CreateSubscriptionParams): Prom
     };
     
     if (couponId) {
-      (subscriptionParams as Stripe.SubscriptionCreateParams & { coupon?: string }).coupon = couponId;
+      subscriptionParams.discounts = [{ coupon: couponId }];
       logger.info(`[Stripe Subscriptions] Applying coupon ${couponId} to subscription`);
     }
     
     const subscription = await stripe.subscriptions.create(subscriptionParams, {
-      idempotencyKey: `sub_create_${customerId}_${priceId}_${couponId || 'none'}`
+      idempotencyKey: `sub_create_${customerId}_${priceId}_${couponId || 'none'}_${Date.now()}`
     });
     
     const invoice = subscription.latest_invoice as Stripe.Invoice;

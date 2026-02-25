@@ -160,6 +160,28 @@ export function MemberFlow({
 
         const data = await res.json();
         
+        if (data.freeActivation) {
+          setSubscriptionId(data.subscriptionId);
+          setCreatedUserId(data.userId);
+          showToast('Membership activated — no payment required (100% discount).', 'success');
+          
+          if (scannedIdImage && data.userId) {
+            fetch('/api/admin/save-id-image', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify({
+                userId: data.userId,
+                image: scannedIdImage.base64,
+                mimeType: scannedIdImage.mimeType,
+              }),
+            }).catch(err => console.error('Failed to save ID image:', err));
+          }
+          
+          onSuccess();
+          return;
+        }
+        
         if (data.clientSecret) {
           setClientSecret(data.clientSecret);
           const piId = data.clientSecret.split('_secret_')[0];

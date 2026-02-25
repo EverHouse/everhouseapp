@@ -8,6 +8,17 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.31.3",
+    date: "2026-02-25",
+    title: "Fix: Stripe Idempotency Bug & Android Scroll",
+    changes: [
+      "Fixed: Creating a VIP membership with a 100% coupon no longer crashes with a Stripe idempotency key conflict — the deterministic key collided on retries when parameters differed slightly between attempts",
+      "Fixed: 100% coupon memberships now activate instantly without requiring a card entry step — the subscription is already active at $0, so the payment step is skipped entirely with a success confirmation",
+      "Fixed: Migrated Stripe subscription coupon application from deprecated root-level 'coupon' property to the modern 'discounts' array format",
+      "Fixed: Android Chrome scrolling was blocked across the app — React 19 delegates synthetic touch handlers to #root as non-passive listeners, which Android's scroll optimization rejects. Converted PullToRefresh to native addEventListener with passive: true for touchstart",
+    ]
+  },
+  {
     version: "8.31.2",
     date: "2026-02-25",
     title: "HubSpot Form Sync: Definitive Production Fix",

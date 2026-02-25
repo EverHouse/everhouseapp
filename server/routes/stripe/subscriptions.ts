@@ -540,8 +540,17 @@ router.post('/api/stripe/subscriptions/create-new-member', isStaffOrAdmin, async
     
     logger.info('[Stripe] Created subscription for new member', { extra: { subscriptionResultSubscription: subscriptionResult.subscription?.subscriptionId, email } });
     
-    // If no clientSecret, the subscription may be fully paid (e.g., 100% discount) or there's an issue
-    if (!subscriptionResult.subscription?.clientSecret) {
+    const subStatus = subscriptionResult.subscription?.status;
+    const isFreeActivation = !subscriptionResult.subscription?.clientSecret && (subStatus === 'active' || subStatus === 'trialing');
+    
+    if (isFreeActivation) {
+      logger.info('[Stripe] Free activation (100% coupon) — subscription already active, no payment needed', { extra: { subscriptionResultSubscription: subscriptionResult.subscription?.subscriptionId } });
+      
+      await db.update(users).set({
+        membershipStatus: 'active',
+        updatedAt: new Date(),
+      }).where(eq(users.id, userId));
+    } else if (!subscriptionResult.subscription?.clientSecret) {
       logger.warn('[Stripe] No clientSecret returned for subscription', { extra: { subscriptionResultSubscription: subscriptionResult.subscription?.subscriptionId } });
     }
     
@@ -549,6 +558,8 @@ router.post('/api/stripe/subscriptions/create-new-member', isStaffOrAdmin, async
       success: true,
       clientSecret: subscriptionResult.subscription?.clientSecret || null,
       subscriptionId: subscriptionResult.subscription?.subscriptionId,
+      subscriptionStatus: subStatus,
+      freeActivation: isFreeActivation || false,
       customerId,
       userId,
       tierName: tier.name
