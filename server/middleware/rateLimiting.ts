@@ -12,7 +12,12 @@ const getClientKey = (req: Request): string => {
 
 export const globalRateLimiter = rateLimit({
   windowMs: 60 * 1000,
-  max: 600, // Increased from 300 - staff portal makes many parallel API calls
+  max: (req: Request) => {
+    if (req.session?.user?.id) {
+      return 600;
+    }
+    return 2000;
+  },
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: getClientKey,
@@ -22,16 +27,12 @@ export const globalRateLimiter = rateLimit({
     res.status(429).json({ error: 'Too many requests. Please slow down.' });
   },
   skip: (req) => {
-    // Skip rate limiting for health checks and non-API routes
-    // Non-API routes should not be rate limited (they are proxied or static assets)
     if (req.path === '/healthz' || req.path === '/api/health') {
       return true;
     }
-    // Skip rate limiting for session checks - needed for navigation
     if (req.path === '/api/auth/session') {
       return true;
     }
-    // Only rate limit /api/ routes - skip everything else
     if (!req.path.startsWith('/api/') && !req.path.startsWith('/api')) {
       return true;
     }
@@ -65,21 +66,33 @@ export const bookingRateLimiter = rateLimit({
   }
 });
 
-export const authRateLimiter = rateLimit({
+export const authRateLimiterByIp = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => `auth-ip:${req.ip || 'unknown'}`,
+  validate: false,
+  handler: (req: Request, res: Response) => {
+    logger.warn(`[RateLimit] Auth IP limit exceeded for ${req.ip}`);
+    res.status(429).json({ error: 'Too many login attempts from this location. Please try again in 15 minutes.' });
+  }
+});
+
+export const authRateLimiterByEmail = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => {
-    const email = req.body?.email || 'unknown';
-    return `auth:${email}:${req.ip || 'unknown'}`;
-  },
+  keyGenerator: (req) => `auth-email:${(req.body?.email || 'unknown').toLowerCase()}`,
   validate: false,
   handler: (req: Request, res: Response) => {
-    logger.warn(`[RateLimit] Auth limit exceeded for ${req.body?.email || 'unknown'}`);
-    res.status(429).json({ error: 'Too many login attempts. Please try again in 15 minutes.' });
+    logger.warn(`[RateLimit] Auth email limit exceeded for ${req.body?.email || 'unknown'}`);
+    res.status(429).json({ error: 'Too many login attempts for this account. Please try again in 15 minutes.' });
   }
 });
+
+export const authRateLimiter = [authRateLimiterByIp, authRateLimiterByEmail];
 
 export const sensitiveActionRateLimiter = rateLimit({
   windowMs: 60 * 1000,

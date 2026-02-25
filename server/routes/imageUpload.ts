@@ -23,9 +23,9 @@ router.post('/api/admin/upload-image', isStaffOrAdmin, upload.single('image'), a
     const timestamp = Date.now();
     const filename = `${originalName}-${timestamp}.webp`;
 
-    const webpBuffer = await sharp(req.file.buffer)
-      .webp({ quality: 80 })
+    const webpBuffer = await sharp(req.file.buffer, { limitInputPixels: 268402689 })
       .resize({ width: 1920, height: 1920, fit: 'inside', withoutEnlargement: true })
+      .webp({ quality: 80 })
       .toBuffer();
 
     const uploadURL = await objectStorageService.getObjectEntityUploadURL();

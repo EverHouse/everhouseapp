@@ -29,6 +29,10 @@ export const changelog: ChangelogEntry[] = [
       "Fixed: If the billing migration cron job took longer than its interval, the next run could process the same pending members again, creating duplicate Stripe subscriptions — members are now marked as 'processing' before migration begins so concurrent runs skip them (Bug 40)",
       "Fixed: Setting a migration billing start date less than 48 hours in the future caused Stripe to reject the subscription with a validation error — dates within 48 hours now bill immediately instead of using trial_end (Bug 41)",
       "Fixed: Cancellation effective dates were saved using a localized date format that could be misinterpreted by Postgres depending on server settings — now uses ISO format to prevent date parsing crashes (Bug 42)",
+      "Fixed: Image uploads could crash the server if a malicious or oversized image was uploaded — now limits pixel dimensions before processing to prevent out-of-memory crashes (Bug 43)",
+      "Fixed: Authentication rate limiter could be bypassed by rotating IP addresses or email addresses — now uses separate limiters for IP and email so both vectors are independently protected (Bug 44)",
+      "Fixed: Rapid WebSocket events could fire multiple overlapping command center data requests, causing stale data overwrites — now cancels pending requests before starting new ones (Bug 45)",
+      "Improved: Global rate limiter now allows higher request limits for unauthenticated traffic to prevent false blocks on shared networks like public Wi-Fi (Bug 46)",
     ]
   },
   {

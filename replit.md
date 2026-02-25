@@ -146,6 +146,10 @@ The Ever Club Members App is a private members club application designed for gol
 - **Migration Concurrency Guard**: `processPendingMigrations()` must set `migration_status = 'processing'` on each user BEFORE calling `executePendingMigration()`. This prevents concurrent cron runs from double-processing the same member. `executePendingMigration()` accepts both `'pending'` and `'processing'` as valid source statuses (Bug 40).
 - **Stripe trial_end 48-Hour Minimum**: Stripe requires `trial_end` to be at least 48 hours in the future. When creating a subscription with a deferred billing start date, only use `trial_end` if the start date is more than 48 hours away. Otherwise, bill immediately (Bug 41).
 - **ISO Dates for SQL**: Never use `formatDatePacific()` or localized date strings in SQL queries. Always use `.toISOString()` for date values passed to Postgres to avoid ambiguous date parsing (Bug 42).
+- **Sharp limitInputPixels**: All `sharp()` calls must pass `{ limitInputPixels: 268402689 }` (~16k x 16k max) to prevent image-bomb OOM crashes. Resize BEFORE format conversion for efficiency (Bug 43).
+- **Auth Rate Limiting — Dual Limiters**: `authRateLimiter` is an array of two middleware: `authRateLimiterByIp` (20 attempts/15min per IP) and `authRateLimiterByEmail` (10 attempts/15min per email). Both must fire independently to block brute-force attacks that rotate either vector (Bug 44).
+- **AbortController for Polling Fetches**: Any `useCallback` fetch that can be triggered by events or polling must use `AbortController` to cancel in-flight requests before starting new ones. Store the controller in a `useRef` and abort it at the start of each fetch call. Ignore `AbortError` in the catch block (Bug 45).
+- **Global Rate Limiter — Tiered Limits**: Authenticated users get 600 req/min, unauthenticated IP-based traffic gets 2000 req/min to prevent false positives on shared networks (Bug 46).
 
 ## External Dependencies
 - **Stripe**: Payment processing, subscriptions, and webhooks.

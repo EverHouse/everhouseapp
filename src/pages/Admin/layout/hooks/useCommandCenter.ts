@@ -94,11 +94,19 @@ export function useCommandCenter(): UseCommandCenterResult {
   const [data, setData] = useState<CommandCenterData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const fetchRef = useRef<(() => Promise<void>) | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const fetchData = useCallback(async () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    abortControllerRef.current = new AbortController();
+
     try {
-      const res = await fetch('/api/admin/command-center', { credentials: 'include' });
+      const res = await fetch('/api/admin/command-center', {
+        credentials: 'include',
+        signal: abortControllerRef.current.signal
+      });
       if (!res.ok) {
         if (res.status === 401) {
           setData(null);
@@ -110,6 +118,7 @@ export function useCommandCenter(): UseCommandCenterResult {
       setData(json);
       setError(null);
     } catch (err: unknown) {
+      if (err instanceof Error && err.name === 'AbortError') return;
       console.error('Command center fetch error:', err);
       setError((err instanceof Error ? err.message : String(err)));
       setData({
@@ -127,8 +136,6 @@ export function useCommandCenter(): UseCommandCenterResult {
     }
   }, []);
 
-  fetchRef.current = fetchData;
-
   useEffect(() => {
     fetchData();
     const interval = setInterval(fetchData, 30000);
@@ -141,14 +148,17 @@ export function useCommandCenter(): UseCommandCenterResult {
 
     return () => {
       clearInterval(interval);
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
       window.removeEventListener('booking-action-completed', handleBookingAction);
       window.removeEventListener('booking-update', handleBookingUpdate);
     };
   }, [fetchData]);
 
   const refetch = useCallback(() => {
-    fetchRef.current?.();
-  }, []);
+    fetchData();
+  }, [fetchData]);
 
   return { data, isLoading, error, refetch };
 }
