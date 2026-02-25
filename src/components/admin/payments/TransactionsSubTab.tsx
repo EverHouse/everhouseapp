@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import EmptyState from '../../EmptyState';
 import { useIsMobile } from '../../../hooks/useBreakpoint';
 import WalkingGolferSpinner from '../../WalkingGolferSpinner';
@@ -579,6 +580,7 @@ const PendingAuthorizationsSection: React.FC<SectionProps> = ({ onClose, variant
 };
 
 const FutureBookingsSection: React.FC<SectionProps> = ({ onClose, variant = 'modal' }) => {
+  const queryClient = useQueryClient();
   const { data: allFutureBookings = [], isLoading: loading } = useFutureBookingsWithFees();
   const [bookingSheet, setBookingSheet] = useState<{ isOpen: boolean; bookingId: number | null }>({ isOpen: false, bookingId: null });
 
@@ -697,7 +699,7 @@ const FutureBookingsSection: React.FC<SectionProps> = ({ onClose, variant = 'mod
         onSuccess={() => {
           setBookingSheet({ isOpen: false, bookingId: null });
         }}
-        onRosterUpdated={() => {}}
+        onRosterUpdated={() => { queryClient.invalidateQueries({ queryKey: ['financials'] }); }}
       />
     </>
   );

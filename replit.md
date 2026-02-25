@@ -143,6 +143,9 @@ The Ever Club Members App is a private members club application designed for gol
 - **Immediate Cancellation Means Now**: In `server/routes/memberBilling.ts`, when `immediate` is true for subscription cancellation, `cancel_at` must be `Date.now()`, NOT `currentPeriodEnd`. This ensures banned/terminated members lose access immediately (Bug 36).
 - **Stripe Coupon API — Use discounts Array**: When applying coupons to Stripe subscriptions, use `discounts: [{ coupon: couponId }]` — NOT the deprecated root-level `coupon` property. Never use `as any` to bypass Stripe TypeScript types; if the types reject your call, the API likely will too (Bug 37).
 - **PostgreSQL Result Row Count**: The PostgreSQL driver returns `rowCount`, not `count`, on raw query results. Always use `.rowCount` when checking how many rows were affected by an UPDATE/INSERT/DELETE (Bug 38).
+- **Migration Concurrency Guard**: `processPendingMigrations()` must set `migration_status = 'processing'` on each user BEFORE calling `executePendingMigration()`. This prevents concurrent cron runs from double-processing the same member. `executePendingMigration()` accepts both `'pending'` and `'processing'` as valid source statuses (Bug 40).
+- **Stripe trial_end 48-Hour Minimum**: Stripe requires `trial_end` to be at least 48 hours in the future. When creating a subscription with a deferred billing start date, only use `trial_end` if the start date is more than 48 hours away. Otherwise, bill immediately (Bug 41).
+- **ISO Dates for SQL**: Never use `formatDatePacific()` or localized date strings in SQL queries. Always use `.toISOString()` for date values passed to Postgres to avoid ambiguous date parsing (Bug 42).
 
 ## External Dependencies
 - **Stripe**: Payment processing, subscriptions, and webhooks.

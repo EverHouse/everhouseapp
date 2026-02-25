@@ -26,6 +26,9 @@ export const changelog: ChangelogEntry[] = [
       "Fixed: Orphaned booking sessions (sessions without a matching booking) are now properly cleaned up during cancellation",
       "New: Staff can now assign members to unmatched or empty booking sessions directly from the booking details sheet",
       "Fixed: After charging a member for a booking and closing the details sheet, the calendar card didn't update to reflect the payment — now automatically refreshes booking data when closing after a successful payment",
+      "Fixed: If the billing migration cron job took longer than its interval, the next run could process the same pending members again, creating duplicate Stripe subscriptions — members are now marked as 'processing' before migration begins so concurrent runs skip them (Bug 40)",
+      "Fixed: Setting a migration billing start date less than 48 hours in the future caused Stripe to reject the subscription with a validation error — dates within 48 hours now bill immediately instead of using trial_end (Bug 41)",
+      "Fixed: Cancellation effective dates were saved using a localized date format that could be misinterpreted by Postgres depending on server settings — now uses ISO format to prevent date parsing crashes (Bug 42)",
     ]
   },
   {

@@ -467,10 +467,12 @@ router.post('/api/member-billing/:email/cancel', isStaffOrAdmin, async (req, res
     const currentPeriodEnd = new Date((subscription as any).current_period_end * 1000);
     
     let cancelAtTimestamp: number;
+    let effectiveDate: Date;
     if (immediate) {
       cancelAtTimestamp = Math.floor(Date.now() / 1000);
+      effectiveDate = new Date();
     } else {
-      const effectiveDate = thirtyDaysFromNow > currentPeriodEnd ? thirtyDaysFromNow : currentPeriodEnd;
+      effectiveDate = thirtyDaysFromNow > currentPeriodEnd ? thirtyDaysFromNow : currentPeriodEnd;
       cancelAtTimestamp = Math.floor(effectiveDate.getTime() / 1000);
     }
 
@@ -480,7 +482,7 @@ router.post('/api/member-billing/:email/cancel', isStaffOrAdmin, async (req, res
 
     await db.execute(sql`UPDATE users SET 
         cancellation_requested_at = NOW(),
-        cancellation_effective_date = ${formatDatePacific(effectiveDate)},
+        cancellation_effective_date = ${effectiveDate.toISOString()},
         cancellation_reason = ${reason || null},
         updated_at = NOW()
        WHERE LOWER(email) = ${(email as string).toLowerCase()}`);

@@ -47,9 +47,9 @@ export async function executePendingMigration(userId: string, email: string): Pr
 
     const user = userResult.rows[0] as unknown as MigrationUser;
 
-    if (user.migration_status !== 'pending') {
-      logger.warn(`${prefix} Migration not pending for ${email}, status: ${user.migration_status}`);
-      return { success: false, error: `Migration status is '${user.migration_status}', expected 'pending'` };
+    if (user.migration_status !== 'pending' && user.migration_status !== 'processing') {
+      logger.warn(`${prefix} Migration not pending/processing for ${email}, status: ${user.migration_status}`);
+      return { success: false, error: `Migration status is '${user.migration_status}', expected 'pending' or 'processing'` };
     }
 
     if (user.membership_status !== 'active') {
@@ -171,7 +171,7 @@ export async function executePendingMigration(userId: string, email: string): Pr
     try {
       const now = new Date();
       const billingStartDate = user.migration_billing_start_date;
-      const isFuture = billingStartDate && billingStartDate.getTime() > now.getTime();
+      const isFuture = billingStartDate && (billingStartDate.getTime() - now.getTime() > 48 * 60 * 60 * 1000);
 
       const subscriptionParams: Record<string, unknown> = {
         customer: customerId,
@@ -328,6 +328,8 @@ export async function processPendingMigrations(): Promise<{
 
       logger.info(`${prefix} Processing migration for ${user.email} (MindBody cancelled: ${mindbodyCancellationDetected}, billing date arrived: ${billingDateArrived})`);
       result.processed++;
+
+      await db.execute(sql`UPDATE users SET migration_status = 'processing' WHERE id = ${user.id} AND migration_status = 'pending'`);
 
       const migrationResult = await executePendingMigration(user.id, user.email);
 
