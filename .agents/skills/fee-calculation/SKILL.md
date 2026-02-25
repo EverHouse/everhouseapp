@@ -143,6 +143,22 @@ When `feeCalculator.ts` resolves fees, it checks in order: cached → ledger →
 
 `recalculateSessionFees()` orchestrates a two-step recalculation pipeline: compute (via `computeFeeBreakdown`) → apply to participants (via `applyFeeBreakdownToParticipants`). It does NOT sync to `booking_requests` columns or update the Stripe invoice directly. Invoice sync is the caller's responsibility via `syncBookingInvoice()`.
 
+**Cascade behavior (v8.26.7, Bug 13):** After recalculating a session's fees, `recalculateSessionFees` automatically finds and recalculates all later same-day bookings for the same member (matched by `user_email` and `session_date`, ordered by `start_time ASC`, limited to 10). This ensures that changing an earlier booking's duration correctly adjusts overage calculations on subsequent sessions. The cascade uses `skipCascade: true` internally to prevent infinite loops. Cascade failures are logged as warnings and are non-blocking.
+
+**CRITICAL — Transaction isolation (v8.26.7, Bug 22):** `recalculateSessionFees()` uses the global `db` pool for all its queries. It does NOT accept a transaction handle (`tx`). This means it **MUST NEVER** be called inside a `db.transaction()` block. Under Postgres Read Committed isolation, the global pool cannot see uncommitted rows from an active transaction, causing:
+- $0 fee calculations (session/participants invisible)
+- Deadlock (global pool waits for tx to commit, tx waits for fee calculation)
+
+**Pattern:** Always commit the transaction first, then call `recalculateSessionFees()`:
+```typescript
+const { createdSessionId } = await db.transaction(async (tx) => {
+  // ... create session and participants using tx ...
+  return { createdSessionId };
+});
+// Fee calculation AFTER commit — global pool can now see the rows
+const breakdown = await recalculateSessionFees(createdSessionId, 'approval');
+```
+
 **Known callers that MUST also call `syncBookingInvoice()`:**
 - Booking approval (`server/routes/bays/approval.ts`) — creates invoice at approval time
 - Roster changes: add/remove participant, update player count (`server/routes/roster.ts`)
@@ -165,6 +181,9 @@ The `usedGuestPass` field on a booking participant record is an input to guest p
 5. **Effective player count ≥ 1** — prevents division by zero in per-participant minutes.
 6. **Simulator vs conference room** — separate daily allowances and separate usage tracking per resource type.
 7. **One invoice per booking** — each booking (simulator or conference room) has at most one Stripe invoice. Draft created at approval, updated on roster/fee changes, finalized at payment. Managed by `bookingInvoiceService.ts`. Conference rooms were migrated to the same invoice flow in v8.16.0 (2026-02-24).
+8. **Fee calculation is post-commit only** — `recalculateSessionFees()` and `computeFeeBreakdown()` use the global `db` pool. They must NEVER run inside a `db.transaction()` block. See cascade behavior section above for the correct pattern.
+9. **Account credit payments need audit trails** — when `createPrepaymentIntent` returns `paidInFull: true` (account credit covered the full fee), call `logPaymentAudit()` with `paymentMethod: 'account_credit'`. Without this, credit-based payments have no audit record. (v8.26.7, Bug 17)
+10. **Cascade recalculation** — when a session's fees change (e.g., duration edit, roster change), all later same-day bookings for the same member must also be recalculated. `recalculateSessionFees()` handles this automatically unless `skipCascade: true` is passed.
 
 ## Daily Allowance / Included Minutes
 

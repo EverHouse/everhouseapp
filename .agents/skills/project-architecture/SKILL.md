@@ -85,6 +85,15 @@ NEVER write migration files manually — use `npm run db:push`. Schema changes g
 ### 8. No External API Calls in DB Transactions (v8.12.0)
 HTTP calls to Stripe, HubSpot, or any external service must NOT be made inside `BEGIN`/`COMMIT` blocks. They hold connections while waiting for network responses. Use the deferred action pattern (`deferredActions.push(async () => { ... })`) or DB-side checks instead. Exceptions: 5 Stripe/HubSpot calls that must stay in-transaction (customer retrieve, product retrieve, payment methods list, company sync, prices retrieve in guestPassConsumer) are wrapped with 5-second `Promise.race()` timeouts and marked with `// NOTE: Must stay in transaction` comments. See `stripe-webhook-flow` skill for the full pattern.
 
+### 8a. No Fee Calculation Inside Transactions (v8.26.7, Bug 22)
+`recalculateSessionFees()` and `computeFeeBreakdown()` use the global `db` pool — NOT transaction handles. They MUST NEVER be called inside `db.transaction()`. Under Postgres Read Committed isolation, the global pool cannot see uncommitted rows, causing $0 fees or deadlock. Always commit the transaction first, then calculate fees. See `fee-calculation` skill for the correct pattern.
+
+### 8b. Optimistic Locking on Status Transitions (v8.26.7, Bug 11)
+All booking status-changing UPDATEs must include a `WHERE status IN (...)` clause matching only the expected source statuses. After the UPDATE, check `rowCount` — if 0, the status was concurrently changed and the operation should be rejected. This prevents TOCTOU (time-of-check-time-of-use) races where a concurrent cancellation could be overwritten by a delayed approval.
+
+### 8c. Individual Refund Status Updates (v8.26.7, Bug 15)
+When refunding multiple participants, update each participant's `payment_status` to `'refunded'` individually AFTER confirming its Stripe refund succeeded. Never bulk-update all participants before confirming each refund — a failed refund would leave an inconsistent state where the database says "refunded" but the money was never returned.
+
 ### 9. Route Authentication Patterns (Audit Finding, Feb 2026)
 Two authentication patterns coexist in the codebase:
 

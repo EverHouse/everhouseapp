@@ -405,6 +405,24 @@ sql`INSERT INTO table (col) VALUES (${optionalValue ?? null})`
 
 Apply this rule to ALL `sql` template literals where optional/nullable values are interpolated.
 
+### Overpayment Auto-Refund (v8.26.7, Bug 23)
+
+When `handlePaymentIntentSucceeded` processes a fee snapshot payment, it checks each participant's current `payment_status`. If a participant is already `paid` or `waived` (e.g., staff marked them as paid via cash while the Stripe checkout was still loading), that participant is skipped.
+
+**Before v8.26.7:** The webhook logged a warning and flagged the session for manual review, but kept the Stripe payment — silently double-charging the member.
+
+**After v8.26.7:** The webhook automatically issues a Stripe refund:
+- **All participants already paid** (`validatedParticipantIds.length === 0`): Full refund of the Payment Intent, reason `'duplicate'`, metadata `reason: 'all_participants_already_paid'`.
+- **Some participants already paid**: Partial refund for the overpayment amount (payment minus unpaid total), reason `'duplicate'`, metadata `reason: 'partial_participants_already_paid'`.
+
+Both refund paths run as deferred actions (after COMMIT). If the refund fails (e.g., Stripe error), the session is flagged `needs_review = true` with the error details for staff manual resolution.
+
+**Rule:** When a webhook payment handler detects that work is already done (participant already paid, subscription already active, etc.), it must UNDO the financial side effect (refund), not just skip the database update.
+
+### Day Pass Deferred Action Pattern (v8.26.7, Bug 18)
+
+Day pass purchases from `handleCheckoutSessionCompleted` and `handleCheckoutSessionAsyncPaymentSucceeded` record the purchase via `recordDayPassPurchaseFromWebhook()` as a **deferred action** (runs after COMMIT), not inside the webhook transaction. This ensures the day pass recording doesn't hold the transaction open during Stripe API calls, and the existing idempotency protection in `recordDayPassPurchaseFromWebhook` prevents duplicates if Stripe retries.
+
 ### Day Pass Financial Integrity (Feb 2026)
 
 Three gaps were closed in day pass financial reporting:

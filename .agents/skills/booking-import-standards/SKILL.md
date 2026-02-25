@@ -99,8 +99,9 @@ Non-Trackman bookings (conference rooms, etc.) keep instant cancel behavior.
 
 When completing a cancellation (via webhook or manual):
 1. **First**: Refund Stripe charges, clear fee snapshots, refund guest passes
-2. **Then**: Update status to `cancelled`
-3. **Then**: Notify member
+2. **First (continued)**: After each successful Stripe refund, call `PaymentStatusService.markPaymentRefunded()` to update the participant and payment records to `'refunded'`. Each participant's status update must only happen after its individual refund succeeds — never bulk-update all participants before confirming each refund. (v8.26.7, Bugs 12 & 15)
+3. **Then**: Update status to `cancelled`
+4. **Then**: Notify member
 
 This ordering prevents partial cancellation states where the status changed but money was not returned.
 
@@ -268,6 +269,8 @@ This was a production bug discovered Feb 2026 — undefined optional params caus
 ### Rule 15 — Unified fee calculation via computeFeeBreakdown()
 
 Route ALL fee calculations through `computeFeeBreakdown()` in `unifiedFeeService.ts`. Never calculate fees inline or in route handlers.
+
+**CRITICAL — Transaction isolation:** `recalculateSessionFees()` and `computeFeeBreakdown()` use the global `db` pool. They MUST NEVER be called inside a `db.transaction()` block. The global pool cannot see uncommitted rows from an active transaction (Postgres Read Committed), causing $0 fees or deadlock. Always call fee calculation AFTER the transaction commits. (v8.26.7, Bug 22)
 
 ### Rule 15a — Fee Order of Operations (CRITICAL)
 
