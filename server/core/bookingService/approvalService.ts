@@ -1477,7 +1477,7 @@ export async function checkinBooking(params: CheckinBookingParams) {
   if (newStatus === 'attended') {
     const ownerStatusResult = await db.execute(sql`
       SELECT membership_status, tier FROM users 
-      WHERE LOWER(email) = LOWER(${existing.user_email})
+      WHERE LOWER(email) = LOWER(${existing.user_email ?? null})
       LIMIT 1
     `);
     const ownerStatus = (ownerStatusResult.rows[0] as Record<string, any>)?.membership_status;
@@ -1748,7 +1748,7 @@ export async function checkinBooking(params: CheckinBookingParams) {
     }
 
     const dateStr = (booking.requestDate as any) instanceof Date
-      ? booking.requestDate.toString().split('T')[0]
+      ? booking.requestDate.toISOString().split('T')[0]
       : String(booking.requestDate).split('T')[0];
     const formattedDate = formatDateDisplayWithDay(dateStr);
     const formattedTime = formatTime12Hour(booking.startTime);
@@ -1766,7 +1766,7 @@ export async function checkinBooking(params: CheckinBookingParams) {
 
   if (newStatus === 'no_show' && booking.userEmail) {
     const noShowDateStr = (booking.requestDate as any) instanceof Date
-      ? booking.requestDate.toString().split('T')[0]
+      ? booking.requestDate.toISOString().split('T')[0]
       : String(booking.requestDate).split('T')[0];
     const formattedDate = formatDateDisplayWithDay(noShowDateStr);
     const formattedTime = formatTime12Hour(booking.startTime);

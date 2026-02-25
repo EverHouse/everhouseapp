@@ -8,6 +8,18 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.26.7",
+    date: "2026-02-25",
+    title: "Check-In Sheet Actions, Webhook Transaction Safety & Data Integrity Fixes",
+    changes: [
+      "Fixed: Check In and Cancel Booking buttons in the booking details sheet (opened from calendar/bay views) did nothing when tapped — both actions are now properly wired to the staff command center handlers",
+      "Fixed: The check-in status dropdown appeared behind the booking sheet and was misaligned — dropdown now renders above the sheet (z-index fix) and centers over the button",
+      "Fixed: Day pass purchases from Stripe checkout ran outside the webhook transaction boundary, risking inconsistent state if the webhook failed mid-processing — day pass recording now runs as a deferred action after the transaction commits, with existing idempotency protection preventing duplicates",
+      "Fixed: Check-in and no-show push notifications could display raw unparsed date strings (e.g. 'Tue Feb 24 2026...') instead of formatted dates — now correctly uses ISO date parsing",
+      "Fixed: If a booking had no owner email (legacy/ghost bookings), the check-in membership status query could crash with invalid SQL — now safely handles null/undefined emails",
+    ]
+  },
+  {
     version: "8.26.6",
     date: "2026-02-24",
     title: "Check-In Race Condition, HubSpot Sync & Fee Calculation Fixes",

@@ -2619,108 +2619,97 @@ async function handleCheckoutSessionCompleted(client: PoolClient, session: Strip
     }
 
     const customerId = typeof session.customer === 'string' ? session.customer : session.customer?.id || null;
-
-    // Record the day pass purchase
-    const result = await recordDayPassPurchaseFromWebhook({
-      productSlug,
-      email,
-      firstName,
-      lastName,
-      phone,
-      amountCents,
-      paymentIntentId,
-      customerId
-    });
-
-    if (!result.success) {
-      logger.error(`[Stripe Webhook] Failed to record day pass purchase:`, { error: result.error });
-      throw new Error(`Failed to record day pass: ${result.error}`); // Throw so Stripe retries
-    }
-
-    logger.info(`[Stripe Webhook] Day pass purchase recorded: ${result.purchaseId}`);
-
-    broadcastDayPassUpdate({
-      action: 'day_pass_purchased',
-      passId: result.purchaseId!,
-      purchaserEmail: email,
-      purchaserName: [firstName, lastName].filter(Boolean).join(' ') || email,
-      productType: productSlug,
-      remainingUses: result.remainingUses ?? 1,
-      quantity: result.quantity ?? 1,
-      purchasedAt: new Date().toISOString(),
-    });
-
-    const deferredDayPassEmail = email;
-    const deferredProductSlug = productSlug;
-    const deferredPurchaseId = result.purchaseId;
-    const deferredFirstName = firstName;
-    const deferredLastName = lastName;
-    const deferredPhone = phone;
-    const deferredDayPassAmountCents = amountCents;
-    const deferredPaymentIntentId = paymentIntentId;
     const purchaserName = [firstName, lastName].filter(Boolean).join(' ') || email;
-    const deferredPurchaserName = purchaserName;
 
     deferredActions.push(async () => {
       try {
-        await sendPassWithQrEmail(deferredDayPassEmail, {
-          passId: parseInt(deferredPurchaseId!, 10),
-          type: deferredProductSlug,
-          quantity: 1,
-          purchaseDate: new Date()
+        const result = await recordDayPassPurchaseFromWebhook({
+          productSlug,
+          email,
+          firstName,
+          lastName,
+          phone,
+          amountCents,
+          paymentIntentId,
+          customerId
         });
-        logger.info(`[Stripe Webhook] QR pass email sent to ${deferredDayPassEmail}`);
-      } catch (emailError: unknown) {
-        logger.error('[Stripe Webhook] Failed to send QR pass email:', { error: emailError });
-      }
-    });
 
-    deferredActions.push(async () => {
-      try {
-        await notifyAllStaff(
-          'Day Pass Purchased',
-          `${deferredPurchaserName} (${deferredDayPassEmail}) purchased a ${deferredProductSlug} day pass.`,
-          'day_pass',
-          { sendPush: false, sendWebSocket: true }
-        );
-      } catch (notifyErr: unknown) {
-        logger.error('[Stripe Webhook] Failed to notify staff of day pass:', { error: notifyErr });
-      }
-    });
+        if (!result.success) {
+          logger.error(`[Stripe Webhook] Failed to record day pass purchase:`, { error: result.error });
+          return;
+        }
 
-    deferredActions.push(async () => {
-      try {
-        await queueDayPassSyncToHubSpot({
-          email: deferredDayPassEmail,
-          firstName: deferredFirstName,
-          lastName: deferredLastName,
-          phone: deferredPhone,
-          productSlug: deferredProductSlug,
-          amountCents: deferredDayPassAmountCents,
-          paymentIntentId: deferredPaymentIntentId,
-          purchaseId: deferredPurchaseId
+        logger.info(`[Stripe Webhook] Day pass purchase recorded: ${result.purchaseId}`);
+
+        broadcastDayPassUpdate({
+          action: 'day_pass_purchased',
+          passId: result.purchaseId!,
+          purchaserEmail: email,
+          purchaserName: purchaserName,
+          productType: productSlug,
+          remainingUses: result.remainingUses ?? 1,
+          quantity: result.quantity ?? 1,
+          purchasedAt: new Date().toISOString(),
         });
-      } catch (hubspotError: unknown) {
-        logger.error('[Stripe Webhook] Failed to queue HubSpot sync for day pass:', { error: hubspotError });
+
+        try {
+          await sendPassWithQrEmail(email, {
+            passId: parseInt(result.purchaseId!, 10),
+            type: productSlug,
+            quantity: 1,
+            purchaseDate: new Date()
+          });
+          logger.info(`[Stripe Webhook] QR pass email sent to ${email}`);
+        } catch (emailError: unknown) {
+          logger.error('[Stripe Webhook] Failed to send QR pass email:', { error: emailError });
+        }
+
+        try {
+          await notifyAllStaff(
+            'Day Pass Purchased',
+            `${purchaserName} (${email}) purchased a ${productSlug} day pass.`,
+            'day_pass',
+            { sendPush: false, sendWebSocket: true }
+          );
+        } catch (notifyErr: unknown) {
+          logger.error('[Stripe Webhook] Failed to notify staff of day pass:', { error: notifyErr });
+        }
+
+        try {
+          await queueDayPassSyncToHubSpot({
+            email,
+            firstName,
+            lastName,
+            phone,
+            productSlug,
+            amountCents,
+            paymentIntentId,
+            purchaseId: result.purchaseId
+          });
+        } catch (hubspotError: unknown) {
+          logger.error('[Stripe Webhook] Failed to queue HubSpot sync for day pass:', { error: hubspotError });
+        }
+      } catch (recordErr: unknown) {
+        logger.error('[Stripe Webhook] Day pass deferred recording failed:', { error: recordErr });
       }
     });
 
     deferredActions.push(async () => {
       try {
         await upsertTransactionCache({
-          stripeId: deferredPaymentIntentId!,
+          stripeId: paymentIntentId!,
           objectType: 'payment_intent',
-          amountCents: deferredDayPassAmountCents,
+          amountCents,
           currency: 'usd',
           status: 'succeeded',
           createdAt: new Date(),
           customerId,
-          customerEmail: deferredDayPassEmail,
-          customerName: [deferredFirstName, deferredLastName].filter(Boolean).join(' ') || null,
-          description: `Day Pass: ${deferredProductSlug}`,
+          customerEmail: email,
+          customerName: [firstName, lastName].filter(Boolean).join(' ') || null,
+          description: `Day Pass: ${productSlug}`,
           metadata: session.metadata || undefined,
           source: 'webhook',
-          paymentIntentId: deferredPaymentIntentId,
+          paymentIntentId,
         });
       } catch (cacheErr: unknown) {
         logger.error('[Stripe Webhook] Failed to cache day pass transaction:', { error: cacheErr });
