@@ -535,8 +535,8 @@ router.get('/api/closures', async (req, res) => {
       .select()
       .from(facilityClosures)
       .where(eq(facilityClosures.isActive, true))
-      .orderBy(facilityClosures.startDate, facilityClosures.startTime)
-      .limit(200);
+      .orderBy(desc(facilityClosures.startDate), desc(facilityClosures.startTime))
+      .limit(500);
     res.json(results);
   } catch (error: unknown) {
     if (!isProduction) logger.error('Closures fetch error', { error: error instanceof Error ? error : new Error(String(error)) });
