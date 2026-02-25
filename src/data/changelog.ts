@@ -8,17 +8,17 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
-    version: "8.31.1",
+    version: "8.31.2",
     date: "2026-02-25",
-    title: "HubSpot Form Sync: Root Cause Fix & Diagnostic Hardening",
+    title: "HubSpot Form Sync: Definitive Production Fix",
     changes: [
-      "Fixed: HubSpot form sync now uses client.apiRequest() instead of raw fetch — raw fetch with Bearer tokens fails in production even though it works in dev; this was the root cause of all form sync failures",
-      "Fixed: Form sync auto-discovers all HubSpot forms dynamically via /marketing/v3/forms/ instead of relying on hardcoded form IDs (previously only 1 of 16 forms was configured)",
-      "Fixed: All misleading 'missing scopes' error messages replaced with accurate diagnostics — scopes were never the issue, the auth method was",
+      "Fixed: Form sync now uses the Private App token (which has the forms scope) instead of the Replit connector token (which does not) — this was the true root cause of all 403 MISSING_SCOPES errors in production",
+      "Fixed: Form discovery uses the typed SDK method (client.marketing.forms.formsApi.getPage) instead of client.apiRequest() — typed SDK methods use OpenAPI-generated auth middleware that works in production, while apiRequest() silently drops auth headers in deployed environments",
+      "Fixed: Submission fetching uses direct node-fetch with explicit Bearer header instead of client.apiRequest() — bypasses the SDK's broken HTTP pipeline entirely",
+      "Root cause summary: Two tokens exist (connector OAuth + Private App). Connector works for contacts/properties but lacks forms scope. Private App has forms scope but only works through typed SDK methods or direct fetch, not through client.apiRequest(). Previous fixes tried one piece at a time; this fix combines both proven pieces.",
       "Added: Manual 'Sync from HubSpot' button on both Inquiries and Applications admin pages with toast feedback and auto-refresh",
-      "Added: First-sync diagnostic log that confirms auth method, form count, and form names on every process start",
-      "Added: Detailed code documentation in formSync.ts explaining the root cause, fix, and why raw fetch must never be used for HubSpot API calls",
-      "Improved: HubSpot queue job failure notifications now point to token validity instead of incorrectly suggesting scope updates",
+      "Added: First-sync diagnostic log confirming auth method, form count, and form names on every process start",
+      "Added: Detailed code documentation in formSync.ts explaining the full auth history and why specific methods must be used",
     ]
   },
   {

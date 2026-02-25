@@ -1,34 +1,40 @@
 /**
  * HubSpot Form Sync — pulls form submissions from HubSpot into our database.
  *
- * ROOT CAUSE OF PAST FAILURES (Feb 2026):
+ * AUTH HISTORY & ROOT CAUSE (Feb 2026):
  * ----------------------------------------
- * Raw `fetch()` calls with `Authorization: Bearer <token>` to HubSpot APIs
- * fail in production (Replit deployed environment) even though they work in
- * dev. The @hubspot/api-client `Client` uses the same token but handles auth
- * internally via `client.apiRequest()`, which works in BOTH environments.
+ * 1. The Replit HubSpot connector token does NOT have the `forms` scope.
+ *    It works for contacts, properties, deals, etc. — but NOT for
+ *    /marketing/v3/forms/ or /form-integrations/v1/submissions/.
+ *
+ * 2. The Private App token (HUBSPOT_PRIVATE_APP_TOKEN) DOES have the
+ *    `forms` scope. But the SDK's `client.apiRequest()` method fails
+ *    in production (auth header gets lost in the HTTP pipeline).
+ *
+ * 3. The SDK's typed methods (e.g. `client.marketing.forms.formsApi`)
+ *    DO work with the Private App token — they use the OpenAPI-generated
+ *    auth middleware which properly injects credentials.
  *
  * THE FIX:
- * Always use `getHubSpotClientWithFallback()` → `client.apiRequest()` for ALL
- * HubSpot API calls. Never use raw `fetch` with Bearer tokens.
+ * - Use `getHubSpotPrivateAppClient()` for forms — it has the `forms` scope
+ * - Use the typed SDK method `client.marketing.forms.formsApi.getPage()`
+ *   for form discovery (proven to work in production)
+ * - For submissions (no typed SDK method), use `node-fetch` directly
+ *   with the Private App Bearer token
  *
- * SCOPES ARE FINE:
- * The HubSpot Private App token (HUBSPOT_PRIVATE_APP_TOKEN) has all required
- * scopes including forms. If you see 401/403 errors, the issue is almost
- * certainly the auth method (raw fetch vs client), NOT missing scopes.
- *
- * FORM DISCOVERY:
- * Instead of hardcoding form IDs, we call /marketing/v3/forms/ to discover
- * all forms dynamically, then infer form types from form names.
+ * NEVER USE FOR FORMS:
+ * - `getHubSpotClient()` — connector token lacks `forms` scope
+ * - `client.apiRequest()` — auth header breaks in production
  */
 
-import { getHubSpotClientWithFallback } from '../integrations';
+import { getHubSpotPrivateAppClient } from '../integrations';
 import { getErrorMessage } from '../../utils/errorUtils';
 import { db } from '../../db';
 import { formSubmissions } from '../../../shared/schema';
 import { eq, and, gte, lte } from 'drizzle-orm';
 import { notifyAllStaff } from '../notificationService';
 import type { Client } from '@hubspot/api-client';
+import nodeFetch from 'node-fetch';
 
 import { logger } from '../logger';
 
@@ -129,34 +135,34 @@ function inferFormTypeFromPageUrl(pageUrl: string | undefined, defaultType: stri
   return defaultType;
 }
 
-async function discoverForms(client: Client): Promise<HubSpotForm[]> {
+async function discoverFormsViaSDK(client: Client): Promise<HubSpotForm[]> {
   try {
-    const response = await client.apiRequest({
-      method: 'GET',
-      path: '/marketing/v3/forms/',
-    });
-    const data = await response.json() as { results?: HubSpotForm[]; total?: number };
-    const forms = data.results || [];
-    logger.info(`[HubSpot FormSync] Discovered ${forms.length} forms via client.apiRequest (NOT raw fetch — raw fetch fails in production)`);
+    const response = await client.marketing.forms.formsApi.getPage();
+    const forms: HubSpotForm[] = (response.results || []).map((f: any) => ({
+      id: f.id,
+      name: f.name,
+      formType: f.formType,
+      createdAt: f.createdAt,
+      updatedAt: f.updatedAt,
+    }));
+    logger.info(`[HubSpot FormSync] Discovered ${forms.length} forms via typed SDK (Private App token with forms scope)`);
     return forms;
   } catch (err: unknown) {
     const errMsg = getErrorMessage(err);
-
-    if (errMsg.includes('401') || errMsg.includes('403')) {
+    if (errMsg.includes('401') || errMsg.includes('403') || errMsg.includes('MISSING_SCOPES')) {
       logger.error(
-        `[HubSpot FormSync] API error ${errMsg} discovering forms. ` +
-        `This is NOT a scopes issue — scopes are enabled. ` +
-        `If this persists, check that HUBSPOT_PRIVATE_APP_TOKEN is valid and not expired.`
+        `[HubSpot FormSync] API error discovering forms: ${errMsg}. ` +
+        `The Private App token needs the 'forms' scope enabled.`
       );
       throw new Error(`HUBSPOT_API_ERROR: ${errMsg}`);
     }
-    logger.warn(`[HubSpot FormSync] Could not discover forms via v3 API: ${errMsg}`);
+    logger.warn(`[HubSpot FormSync] Could not discover forms via typed SDK: ${errMsg}`);
     return [];
   }
 }
 
-async function fetchFormSubmissionsViaClient(
-  client: Client,
+async function fetchFormSubmissionsDirectly(
+  accessToken: string,
   formId: string,
   sinceTimestamp: number
 ): Promise<HubSpotSubmission[]> {
@@ -164,27 +170,40 @@ async function fetchFormSubmissionsViaClient(
   let after: string | undefined;
 
   do {
-    const queryParams: Record<string, string> = { limit: '50' };
+    let url = `https://api.hubapi.com/form-integrations/v1/submissions/forms/${formId}?limit=50`;
     if (after) {
-      queryParams.after = after;
+      url += `&after=${encodeURIComponent(after)}`;
     }
 
-    const response = await client.apiRequest({
+    const response = await nodeFetch(url, {
       method: 'GET',
-      path: `/form-integrations/v1/submissions/forms/${formId}`,
-      qs: queryParams,
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
     });
 
-    if ((response as any).status === 403 || (response as any).status === 401) {
+    if (response.status === 401 || response.status === 403) {
       const body = await response.text().catch(() => '');
       logger.error(
-        `[HubSpot FormSync] Got ${(response as any).status} fetching form ${formId}. ` +
-        `This is NOT a scopes issue. Check token validity. Body: ${body}`
+        `[HubSpot FormSync] Got ${response.status} fetching submissions for form ${formId}. ` +
+        `Token may be expired or missing forms scope. Body: ${body.substring(0, 500)}`
       );
-      throw new Error(`HUBSPOT_API_ERROR: ${(response as any).status} ${body}`);
+      throw new Error(`HUBSPOT_API_ERROR: ${response.status} ${body.substring(0, 200)}`);
+    }
+
+    if (!response.ok) {
+      const body = await response.text().catch(() => '');
+      throw new Error(`HTTP ${response.status}: ${body.substring(0, 200)}`);
     }
 
     const data: HubSpotSubmissionsResponse = await response.json() as HubSpotSubmissionsResponse;
+
+    if (!data.results || !Array.isArray(data.results)) {
+      logger.warn(`[HubSpot FormSync] Unexpected response for form ${formId}: no results array`);
+      break;
+    }
 
     const recentResults = data.results.filter(s => s.submittedAt >= sinceTimestamp);
     allSubmissions.push(...recentResults);
@@ -221,37 +240,38 @@ export async function syncHubSpotFormSubmissions(): Promise<{
   }
 
   try {
-    let client: Client;
-    let authSource: string;
-    try {
-      const fallback = await getHubSpotClientWithFallback();
-      client = fallback.client;
-      authSource = fallback.source;
-    } catch (err: unknown) {
+    const privateAppToken = process.env.HUBSPOT_PRIVATE_APP_TOKEN;
+    if (!privateAppToken) {
       authFailureBackoffUntil = Date.now() + 60 * 60 * 1000;
       if (!authFailureAlreadyLogged) {
-        const msg = `No HubSpot client available: ${getErrorMessage(err)}. Will retry in 1 hour.`;
-        logger.warn(`[HubSpot FormSync] ${msg}`);
-        result.errors.push(msg);
+        logger.warn('[HubSpot FormSync] HUBSPOT_PRIVATE_APP_TOKEN not set. Form sync requires Private App token with forms scope. Will retry in 1 hour.');
         authFailureAlreadyLogged = true;
       }
       return result;
     }
 
-    logger.info(`[HubSpot FormSync] Starting sync using auth source: ${authSource} (via client.apiRequest, NOT raw fetch)`);
+    const client = getHubSpotPrivateAppClient();
+    if (!client) {
+      authFailureBackoffUntil = Date.now() + 60 * 60 * 1000;
+      if (!authFailureAlreadyLogged) {
+        logger.warn('[HubSpot FormSync] Could not create Private App client. Will retry in 1 hour.');
+        authFailureAlreadyLogged = true;
+      }
+      return result;
+    }
+
+    logger.info('[HubSpot FormSync] Starting sync using Private App token (has forms scope — connector token does NOT)');
 
     let forms: HubSpotForm[];
     try {
-      forms = await discoverForms(client);
+      forms = await discoverFormsViaSDK(client);
     } catch (err: unknown) {
       const errMsg = getErrorMessage(err);
       if (errMsg.includes('HUBSPOT_API_ERROR')) {
         apiErrorBackoffUntil = Date.now() + 30 * 60 * 1000;
         logger.error(
-          `[HubSpot FormSync] API error discovering forms. ` +
-          `Auth source: ${authSource}. Error: ${errMsg}. ` +
-          `Suppressing retries for 30 minutes. ` +
-          `REMINDER: This is NOT a scopes issue — the token has forms scope. Check token validity.`
+          `[HubSpot FormSync] API error discovering forms. Error: ${errMsg}. ` +
+          `Suppressing retries for 30 minutes.`
         );
         result.errors.push(`API error: ${errMsg}`);
         return result;
@@ -268,9 +288,9 @@ export async function syncHubSpotFormSubmissions(): Promise<{
     if (!firstSyncCompleted) {
       logger.info(
         `[HubSpot FormSync] DIAGNOSTIC — First sync this process. ` +
-        `Auth: ${authSource}. Forms discovered: ${forms.length}. ` +
-        `Form names: ${forms.map(f => f.name).join(', ')}. ` +
-        `Using client.apiRequest() (the method that works in both dev and production).`
+        `Auth: Private App token (typed SDK for discovery + node-fetch for submissions). ` +
+        `Forms discovered: ${forms.length}. ` +
+        `Form names: ${forms.map(f => f.name).join(', ')}.`
       );
     }
 
@@ -282,7 +302,7 @@ export async function syncHubSpotFormSubmissions(): Promise<{
 
       let submissions: HubSpotSubmission[];
       try {
-        submissions = await fetchFormSubmissionsViaClient(client, form.id, sinceTimestamp);
+        submissions = await fetchFormSubmissionsDirectly(privateAppToken, form.id, sinceTimestamp);
       } catch (err: unknown) {
         const errMsg = getErrorMessage(err);
         if (errMsg.includes('HUBSPOT_API_ERROR')) {
