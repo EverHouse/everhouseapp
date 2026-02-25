@@ -14,11 +14,12 @@ async function reconcilePendingSnapshots(): Promise<{ synced: number; errors: nu
   let errors = 0;
   
   let client: PoolClient | null = null;
+  let released = false;
   try {
     const connectPromise = pool.connect();
     const connectTimeout = new Promise<never>((_, reject) => 
       setTimeout(() => {
-        connectPromise.then(c => c.release()).catch(() => {});
+        connectPromise.then(c => { released = true; c.release(); }).catch(() => {});
         reject(new Error('DB connection timeout after 10s'));
       }, 10000)
     );
@@ -104,7 +105,7 @@ async function reconcilePendingSnapshots(): Promise<{ synced: number; errors: nu
     schedulerTracker.recordRun('Fee Snapshot Reconciliation', false, String(error));
     return { synced, errors: errors + 1 };
   } finally {
-    client?.release();
+    if (client && !released) { try { client.release(); } catch {} }
   }
 }
 
@@ -113,11 +114,12 @@ async function cancelAbandonedPaymentIntents(): Promise<{ cancelled: number; err
   let errors = 0;
 
   let client: PoolClient | null = null;
+  let released = false;
   try {
     const connectPromise = pool.connect();
     const connectTimeout = new Promise<never>((_, reject) => 
       setTimeout(() => {
-        connectPromise.then(c => c.release()).catch(() => {});
+        connectPromise.then(c => { released = true; c.release(); }).catch(() => {});
         reject(new Error('DB connection timeout after 10s'));
       }, 10000)
     );
@@ -240,7 +242,7 @@ async function cancelAbandonedPaymentIntents(): Promise<{ cancelled: number; err
     schedulerTracker.recordRun('Fee Snapshot Reconciliation', false, String(error));
     return { cancelled, errors: errors + 1 };
   } finally {
-    client?.release();
+    if (client && !released) { try { client.release(); } catch {} }
   }
 }
 
@@ -249,11 +251,12 @@ async function reconcileStalePaymentIntents(): Promise<{ reconciled: number; err
   let errors = 0;
 
   let client: PoolClient | null = null;
+  let released = false;
   try {
     const connectPromise = pool.connect();
     const connectTimeout = new Promise<never>((_, reject) => 
       setTimeout(() => {
-        connectPromise.then(c => c.release()).catch(() => {});
+        connectPromise.then(c => { released = true; c.release(); }).catch(() => {});
         reject(new Error('DB connection timeout after 10s'));
       }, 10000)
     );
@@ -373,7 +376,7 @@ async function reconcileStalePaymentIntents(): Promise<{ reconciled: number; err
     schedulerTracker.recordRun('Fee Snapshot Reconciliation', false, String(error));
     return { reconciled, errors: errors + 1 };
   } finally {
-    client?.release();
+    if (client && !released) { try { client.release(); } catch {} }
   }
 }
 
