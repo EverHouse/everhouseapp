@@ -142,20 +142,20 @@ function ConfirmDialogComponent({
   const dialogContent = (
     <div
       className={`fixed inset-0 ${isDark ? 'dark' : ''}`}
-      style={{ overscrollBehavior: 'contain', touchAction: 'none', zIndex: dialogZIndex, height: '100dvh' }}
+      style={{ overscrollBehavior: 'contain', touchAction: 'none', zIndex: dialogZIndex }}
     >
       <div
         className={`fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity duration-normal ${
           isClosing ? 'opacity-0' : 'animate-backdrop-fade-in'
         }`}
         aria-hidden="true"
-        style={{ touchAction: 'none', height: '100dvh' }}
+        style={{ touchAction: 'none' }}
         onClick={!isLoading ? handleCancel : undefined}
       />
 
       <div
         className="fixed inset-0 flex items-center justify-center p-4"
-        style={{ overscrollBehavior: 'contain', height: '100dvh' }}
+        style={{ overscrollBehavior: 'contain' }}
       >
         <div
           ref={dialogRef}
