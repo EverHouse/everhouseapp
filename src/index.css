@@ -286,7 +286,6 @@ body {
    position:fixed overlay children at the viewport boundary,
    causing a gap at the bottom of the screen. */
 html.overflow-hidden {
-  overflow: hidden !important;
   overscroll-behavior: none;
 }
 

@@ -164,9 +164,9 @@ export function SlideUpDrawer({
       style={{ overscrollBehavior: 'contain', touchAction: 'none', zIndex: drawerZIndex }}
     >
       <div 
-        className={`fixed bg-black/60 backdrop-blur-sm transition-opacity duration-normal ${isClosing ? 'opacity-0' : 'animate-backdrop-fade-in'}`}
+        className={`fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity duration-normal ${isClosing ? 'opacity-0' : 'animate-backdrop-fade-in'}`}
         aria-hidden="true"
-        style={{ touchAction: 'none', top: '-50px', left: '-50px', right: '-50px', bottom: '-50px' }}
+        style={{ touchAction: 'none' }}
         onClick={dismissible ? handleClose : undefined}
       />
       {/* DEBUG: Red line at fixed bottom:0 to test where viewport ends */}
