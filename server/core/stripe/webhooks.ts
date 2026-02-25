@@ -4719,21 +4719,33 @@ async function handleCustomerUpdated(client: PoolClient, customer: Stripe.Custom
         logger.warn(`[Stripe Webhook] customer.updated: multiple active users match Stripe email ${stripeEmail} — skipping auto-reassignment, sending mismatch alert`);
       }
 
-      logger.warn(`[Stripe Webhook] customer.updated: email changed in Stripe for customer ${stripeCustomerId}: ${currentEmail} → ${stripeEmail}. NOT auto-syncing email (requires manual verification).`);
+      logger.warn(`[Stripe Webhook] customer.updated: email changed in Stripe for customer ${stripeCustomerId}: ${currentEmail} → ${stripeEmail}. Auto-correcting Stripe email back to app email.`);
       
       deferredActions.push(async () => {
         try {
+          await stripe.customers.update(stripeCustomerId, { email: currentEmail });
+          logger.info(`[Stripe Webhook] Auto-corrected Stripe customer ${stripeCustomerId} email from ${stripeEmail} back to ${currentEmail}`);
           await notifyAllStaff(
-            'Stripe Email Mismatch',
-            `Member ${user.display_name || currentEmail} has a different email in Stripe (${stripeEmail}) than in the app (${currentEmail}). Please verify and update manually if needed.`,
+            'Stripe Email Auto-Corrected',
+            `Member ${user.display_name || currentEmail} had a different email in Stripe (${stripeEmail}) than in the app (${currentEmail}). The Stripe email has been automatically updated to match the app.`,
             'billing_alert',
             { sendPush: false }
           );
         } catch (err: unknown) {
-          logger.error('[Stripe Webhook] Failed to send email mismatch notification:', { error: err });
+          logger.error('[Stripe Webhook] Failed to auto-correct Stripe email:', { error: err });
+          try {
+            await notifyAllStaff(
+              'Stripe Email Mismatch — Auto-Correct Failed',
+              `Member ${user.display_name || currentEmail} has a different email in Stripe (${stripeEmail}) than in the app (${currentEmail}). Auto-correction failed — please update manually.`,
+              'billing_alert',
+              { sendPush: true }
+            );
+          } catch {
+            logger.error('[Stripe Webhook] Failed to send email mismatch fallback notification');
+          }
         }
       });
-      updates.push(`email_mismatch_notified (stripe=${stripeEmail}, app=${currentEmail})`);
+      updates.push(`email_auto_corrected (stripe=${stripeEmail} → app=${currentEmail})`);
     }
 
     if (stripeName) {
