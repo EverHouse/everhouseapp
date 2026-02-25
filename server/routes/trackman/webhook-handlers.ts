@@ -810,6 +810,22 @@ export async function handleBookingUpdate(payload: TrackmanWebhookPayload): Prom
       action: 'booked',
     });
     
+    broadcastToStaff({
+      type: 'booking_auto_confirmed',
+      title: 'Booking Auto-Confirmed',
+      message: `${normalized.customerName || emailForLookup}'s booking for ${startParsed.date} at ${startParsed.time} (${normalized.bayName || 'Unknown bay'}) was auto-approved via Trackman.`,
+      data: {
+        bookingId: autoApproveResult.bookingId,
+        memberName: normalized.customerName || emailForLookup,
+        memberEmail: emailForLookup,
+        date: startParsed.date,
+        time: startParsed.time,
+        bay: normalized.bayName,
+        wasAutoApproved: true,
+        trackmanBookingId: normalized.trackmanBookingId
+      }
+    });
+    
     await notifyMemberBookingConfirmed(
       emailForLookup,
       autoApproveResult.bookingId,

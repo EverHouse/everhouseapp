@@ -248,6 +248,22 @@ router.post('/api/webhooks/trackman', async (req: Request, res: Response) => {
           matchedUserId = bayTimeResult.memberEmail;
           isNewlyLinked = true;
           
+          broadcastToStaff({
+            type: 'booking_auto_confirmed',
+            title: 'Booking Auto-Confirmed',
+            message: `${bayTimeResult.memberName || bayTimeResult.memberEmail || 'Member'}'s booking for ${v2Result.normalized.parsedDate} at ${v2Result.normalized.parsedStartTime} was auto-linked via Trackman.`,
+            data: {
+              bookingId: bayTimeResult.bookingId,
+              memberName: bayTimeResult.memberName || bayTimeResult.memberEmail,
+              memberEmail: bayTimeResult.memberEmail,
+              date: v2Result.normalized.parsedDate,
+              time: v2Result.normalized.parsedStartTime,
+              bay: `Bay ${resourceId}`,
+              wasAutoApproved: true,
+              trackmanBookingId: v2Result.normalized.trackmanBookingId
+            }
+          });
+          
           logger.info('[Trackman Webhook] V2: Matched via bay/date/time', {
             extra: { bookingId: matchedBookingId, trackmanBookingId, resourceId }
           });
