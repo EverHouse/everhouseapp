@@ -26,6 +26,8 @@ export const changelog: ChangelogEntry[] = [
       "Fixed: The check-in status dropdown appeared behind the booking sheet — dropdown now renders above the sheet and centers over the button",
       "Fixed: Check-in/no-show push notifications could display raw unparsed date strings — now correctly uses ISO date parsing (Bug 20)",
       "Fixed: Check-in membership status query could crash on legacy bookings with no owner email — now safely handles null/undefined emails (Bug 21)",
+      "Fixed: approveBooking called recalculateSessionFees inside a db.transaction, but the fee service used the global connection pool — the uncommitted session data was invisible, causing $0 fees or deadlocks. Fee calculation now runs after the transaction commits (Bug 22)",
+      "Fixed: When a member paid cash at the front desk and their phone also completed a Stripe charge, the webhook skipped the database update but kept the Stripe payment — now auto-refunds full or partial overpayments when participants are already paid (Bug 23)",
     ]
   },
   {

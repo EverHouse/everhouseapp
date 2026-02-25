@@ -1090,18 +1090,60 @@ async function handlePaymentIntentSucceeded(client: PoolClient, paymentIntent: S
     if (amount > unpaidTotal + 1 && participantFees.length < snapshotFees.length) {
       const alreadyPaidCount = snapshotFees.length - participantFees.length;
       const overpaymentCents = amount - unpaidTotal;
-      logger.error(`[Stripe Webhook] CRITICAL: Potential overpayment detected`, { extra: { detail: {
+      logger.error(`[Stripe Webhook] CRITICAL: Overpayment detected — auto-refunding`, { extra: { detail: {
         sessionId: snapshot.session_id,
+        paymentIntentId: id,
         paymentAmount: amount,
         unpaidTotal,
         overpaymentCents,
         alreadyPaidCount,
         message: `Payment of ${amount} cents received but only ${unpaidTotal} cents was owed. ${alreadyPaidCount} participant(s) already paid separately.`
       } } });
-      await client.query(
-        `UPDATE booking_sessions SET needs_review = true, review_reason = $1 WHERE id = $2`,
-        [`Potential overpayment: received ${amount} cents but only ${unpaidTotal} cents was owed. ${alreadyPaidCount} participant(s) had already paid ${overpaymentCents} cents separately.`, snapshot.session_id]
-      );
+
+      if (validatedParticipantIds.length === 0) {
+        deferredActions.push(async () => {
+          try {
+            const refund = await stripe.refunds.create({
+              payment_intent: id,
+              reason: 'duplicate',
+              metadata: {
+                reason: 'all_participants_already_paid',
+                sessionId: String(snapshot.session_id),
+                bookingId: String(bookingId),
+                overpaymentCents: String(overpaymentCents),
+              }
+            });
+            logger.info(`[Stripe Webhook] Full auto-refund issued for duplicate payment`, { extra: { refundId: refund.id, paymentIntentId: id, amountCents: amount } });
+          } catch (refundError: unknown) {
+            logger.error(`[Stripe Webhook] Failed to auto-refund duplicate payment — flagging for manual review`, { extra: { paymentIntentId: id, error: refundError } });
+            await db.execute(sql`
+              UPDATE booking_sessions SET needs_review = true, review_reason = ${`Auto-refund failed for overpayment: PI ${id}, ${overpaymentCents} cents. All participants already paid.`} WHERE id = ${snapshot.session_id}
+            `);
+          }
+        });
+      } else {
+        deferredActions.push(async () => {
+          try {
+            const refund = await stripe.refunds.create({
+              payment_intent: id,
+              amount: overpaymentCents,
+              reason: 'duplicate',
+              metadata: {
+                reason: 'partial_participants_already_paid',
+                sessionId: String(snapshot.session_id),
+                bookingId: String(bookingId),
+                overpaymentCents: String(overpaymentCents),
+              }
+            });
+            logger.info(`[Stripe Webhook] Partial auto-refund issued for overpayment`, { extra: { refundId: refund.id, paymentIntentId: id, refundedCents: overpaymentCents } });
+          } catch (refundError: unknown) {
+            logger.error(`[Stripe Webhook] Failed to auto-refund partial overpayment — flagging for manual review`, { extra: { paymentIntentId: id, error: refundError } });
+            await db.execute(sql`
+              UPDATE booking_sessions SET needs_review = true, review_reason = ${`Partial auto-refund failed: PI ${id}, ${overpaymentCents} cents overpaid.`} WHERE id = ${snapshot.session_id}
+            `);
+          }
+        });
+      }
     }
     
     await client.query(

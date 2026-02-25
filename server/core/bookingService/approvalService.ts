@@ -281,7 +281,7 @@ interface ApproveBookingParams {
 export async function approveBooking(params: ApproveBookingParams) {
   const { bookingId, staff_notes, suggested_time, reviewed_by, resource_id, trackman_booking_id, trackman_external_id, pending_trackman_sync } = params;
 
-  const { updated, bayName, approvalMessage, isConferenceRoom, calendarData, prepaymentData } = await db.transaction(async (tx) => {
+  const { updated, bayName, approvalMessage, isConferenceRoom, calendarData, createdSessionId, createdParticipantIds, ownerUserId } = await db.transaction(async (tx) => {
     const [req_data] = await tx.select().from(bookingRequests).where(eq(bookingRequests.id, bookingId));
 
     if (!req_data) {
@@ -532,42 +532,19 @@ export async function approveBooking(params: ApproveBookingParams) {
       }
     }
 
-    let prepaymentData: { sessionId: number; bookingId: number; userId: string | null; userEmail: string; userName: string; totalFeeCents: number; feeBreakdown: { overageCents: number; guestCents: number }; createdSessionId: number } | null = null;
-    let breakdown: { totals: { totalCents: number; overageCents: number; guestCents: number } } | null = null;
-    if (createdSessionId && createdParticipantIds.length > 0) {
-        breakdown = await recalculateSessionFees(createdSessionId, 'approval');
-        logger.info('[Booking Approval] Applied unified fees for session : $, overage: $', { extra: { createdSessionId, breakdownTotalsTotalCents_100_ToFixed_2: (breakdown.totals.totalCents/100).toFixed(2), breakdownTotalsOverageCents_100_ToFixed_2: (breakdown.totals.overageCents/100).toFixed(2) } });
-
-        if (breakdown.totals.totalCents > 0) {
-          let ownerUserId = updatedRow.userId;
-          if (!ownerUserId && updatedRow.userEmail) {
-            const userResult = await tx.select({ id: users.id })
-              .from(users)
-              .where(eq(users.email, updatedRow.userEmail.toLowerCase()))
-              .limit(1);
-            if (userResult.length > 0) {
-              ownerUserId = userResult[0].id;
-            }
-          }
-
-          prepaymentData = {
-            sessionId: createdSessionId,
-            bookingId: bookingId,
-            userId: ownerUserId || null,
-            userEmail: updatedRow.userEmail,
-            userName: updatedRow.userName || updatedRow.userEmail,
-            totalFeeCents: breakdown.totals.totalCents,
-            feeBreakdown: { overageCents: breakdown.totals.overageCents, guestCents: breakdown.totals.guestCents },
-            createdSessionId: createdSessionId
-          };
-        }
+    let ownerUserId = updatedRow.userId;
+    if (!ownerUserId && updatedRow.userEmail) {
+      const userResult = await tx.select({ id: users.id })
+        .from(users)
+        .where(eq(users.email, updatedRow.userEmail.toLowerCase()))
+        .limit(1);
+      if (userResult.length > 0) {
+        ownerUserId = userResult[0].id;
+      }
     }
 
     const resourceTypeName = isConferenceRoom ? 'conference room' : 'simulator';
-    const feeMessage = breakdown?.totals?.totalCents && breakdown.totals.totalCents > 0
-      ? ` Estimated fees: $${(breakdown.totals.totalCents / 100).toFixed(2)}.`
-      : '';
-    const approvalMessage = `Your ${resourceTypeName} booking for ${formatNotificationDateTime(updatedRow.requestDate, updatedRow.startTime)} has been approved.${feeMessage}`;
+    const approvalMessage = `Your ${resourceTypeName} booking for ${formatNotificationDateTime(updatedRow.requestDate, updatedRow.startTime)} has been approved.`;
 
     await tx.insert(notifications).values({
       userEmail: updatedRow.userEmail,
@@ -600,8 +577,31 @@ export async function approveBooking(params: ApproveBookingParams) {
       durationMinutes: req_data.durationMinutes
     } : null;
 
-    return { updated: updatedRow, bayName, approvalMessage, isConferenceRoom, calendarData, prepaymentData };
+    return { updated: updatedRow, bayName, approvalMessage, isConferenceRoom, calendarData, prepaymentData: null as typeof prepaymentData, createdSessionId, createdParticipantIds, ownerUserId };
   });
+
+  let prepaymentData: { sessionId: number; bookingId: number; userId: string | null; userEmail: string; userName: string; totalFeeCents: number; feeBreakdown: { overageCents: number; guestCents: number }; createdSessionId: number } | null = null;
+  if (createdSessionId && createdParticipantIds.length > 0) {
+    try {
+      const breakdown = await recalculateSessionFees(createdSessionId, 'approval');
+      logger.info('[Booking Approval] Applied unified fees for session : $, overage: $', { extra: { createdSessionId, breakdownTotalsTotalCents_100_ToFixed_2: (breakdown.totals.totalCents/100).toFixed(2), breakdownTotalsOverageCents_100_ToFixed_2: (breakdown.totals.overageCents/100).toFixed(2) } });
+
+      if (breakdown.totals.totalCents > 0) {
+        prepaymentData = {
+          sessionId: createdSessionId,
+          bookingId: bookingId,
+          userId: ownerUserId || null,
+          userEmail: updated.userEmail,
+          userName: updated.userName || updated.userEmail,
+          totalFeeCents: breakdown.totals.totalCents,
+          feeBreakdown: { overageCents: breakdown.totals.overageCents, guestCents: breakdown.totals.guestCents },
+          createdSessionId: createdSessionId
+        };
+      }
+    } catch (feeError: unknown) {
+      logger.error('[Booking Approval] Fee calculation after commit failed (non-blocking)', { extra: { createdSessionId, feeError: getErrorMessage(feeError) } });
+    }
+  }
 
   if (bayName !== null) {
     if (calendarData && !calendarData.existingCalendarEventId) {
