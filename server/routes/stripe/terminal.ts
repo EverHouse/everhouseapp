@@ -1338,7 +1338,7 @@ router.post('/api/stripe/terminal/confirm-save-card', isStaffOrAdmin, async (req
     const stripe = await getStripeClient();
 
     const setupIntent = await stripe.setupIntents.retrieve(setupIntentId, {
-      expand: ['payment_method']
+      expand: ['payment_method', 'latest_attempt']
     });
 
     if (setupIntent.status !== 'succeeded') {
@@ -1362,9 +1362,18 @@ router.post('/api/stripe/terminal/confirm-save-card', isStaffOrAdmin, async (req
 
     let reusablePaymentMethodId = pmId;
 
-    if (pm.type === 'card_present' && (pm.card_present as any)?.generated_card) {
-      reusablePaymentMethodId = (pm.card_present as any).generated_card;
-      logger.info('[Terminal] Found generated_card from SetupIntent card_present', { extra: { reusablePaymentMethodId } });
+    if (pm.type === 'card_present') {
+      const latestAttempt = (setupIntent as any).latest_attempt;
+      const generatedCard = latestAttempt?.payment_method_details?.card_present?.generated_card;
+      if (generatedCard) {
+        reusablePaymentMethodId = generatedCard;
+        logger.info('[Terminal] Found generated_card from SetupAttempt', { extra: { reusablePaymentMethodId } });
+      } else if ((pm.card_present as any)?.generated_card) {
+        reusablePaymentMethodId = (pm.card_present as any).generated_card;
+        logger.info('[Terminal] Found generated_card from PaymentMethod object (fallback)', { extra: { reusablePaymentMethodId } });
+      } else {
+        logger.warn('[Terminal] No generated_card found for card_present PM — card may not be reusable for online payments', { extra: { pmId, setupIntentId } });
+      }
     }
 
     if (!reusablePaymentMethodId) {
@@ -1407,24 +1416,6 @@ router.post('/api/stripe/terminal/confirm-save-card', isStaffOrAdmin, async (req
         paymentMethodId
       }
     });
-
-    try {
-      const memberCheck = await db.execute(sql`SELECT email, billing_provider, COALESCE(NULLIF(TRIM(COALESCE(first_name, '') || ' ' || COALESCE(last_name, '')), ''), email) AS display_name FROM users WHERE stripe_customer_id = ${customerId} LIMIT 1`);
-      if (memberCheck.rows.length > 0) {
-        const member = memberCheck.rows[0] as { email: string; billing_provider: string | null; display_name: string };
-        if (member.billing_provider === 'mindbody') {
-          const { notifyAllStaff } = await import('../../core/notificationService');
-          await notifyAllStaff(
-            'MindBody Member Card Saved',
-            `MindBody member ${member.display_name} now has a card on file — eligible for Stripe migration`,
-            'billing_migration'
-          );
-          logger.info('[Terminal] Notified staff: MindBody member card saved via terminal', { extra: { email: member.email } });
-        }
-      }
-    } catch (migrationNotifyErr: unknown) {
-      logger.warn('[Terminal] Could not check/notify for MindBody migration eligibility (non-blocking)', { extra: { error: getErrorMessage(migrationNotifyErr) } });
-    }
 
     res.json({
       success: true,

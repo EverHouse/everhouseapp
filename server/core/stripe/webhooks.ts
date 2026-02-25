@@ -5891,24 +5891,6 @@ async function handleSetupIntentSucceeded(client: PoolClient, setupIntent: Strip
       }
     });
 
-    const billingCheck = await client.query(
-      `SELECT billing_provider FROM users WHERE stripe_customer_id = $1 AND billing_provider = 'mindbody' LIMIT 1`,
-      [customerId]
-    );
-    if (billingCheck.rows.length > 0) {
-      deferredActions.push(async () => {
-        try {
-          await notifyAllStaff(
-            'MindBody Member Card Saved',
-            `MindBody member ${user.display_name} now has a card on file — eligible for Stripe migration`,
-            'billing_migration'
-          );
-          logger.info('[Stripe Webhook] Notified staff: MindBody member card saved via setup_intent.succeeded', { extra: { email: user.email } });
-        } catch (err: unknown) {
-          logger.error('[Stripe Webhook] Failed to notify staff about MindBody member card save:', { error: err });
-        }
-      });
-    }
   } catch (error: unknown) {
     logger.error('[Stripe Webhook] Error handling setup_intent.succeeded:', { error: getErrorMessage(error) });
   }
