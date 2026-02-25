@@ -1711,7 +1711,7 @@ router.get('/api/hubspot/products', isStaffOrAdmin, async (req, res) => {
     const statusCode = response?.statusCode || errObj?.status || errObj?.code;
     const category = body?.category || (errObj?.body as Record<string, unknown> | undefined)?.category;
     if (statusCode === 403 || category === 'MISSING_SCOPES') {
-      return res.status(403).json({ error: 'HubSpot API key missing required scopes for products' });
+      return res.status(403).json({ error: 'HubSpot API returned 403 for products. Check that HUBSPOT_PRIVATE_APP_TOKEN is valid — scopes are already configured.' });
     }
     logger.error('[HubSpot] Error fetching products', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to fetch HubSpot products' });

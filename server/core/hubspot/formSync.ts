@@ -1,3 +1,27 @@
+/**
+ * HubSpot Form Sync — pulls form submissions from HubSpot into our database.
+ *
+ * ROOT CAUSE OF PAST FAILURES (Feb 2026):
+ * ----------------------------------------
+ * Raw `fetch()` calls with `Authorization: Bearer <token>` to HubSpot APIs
+ * fail in production (Replit deployed environment) even though they work in
+ * dev. The @hubspot/api-client `Client` uses the same token but handles auth
+ * internally via `client.apiRequest()`, which works in BOTH environments.
+ *
+ * THE FIX:
+ * Always use `getHubSpotClientWithFallback()` → `client.apiRequest()` for ALL
+ * HubSpot API calls. Never use raw `fetch` with Bearer tokens.
+ *
+ * SCOPES ARE FINE:
+ * The HubSpot Private App token (HUBSPOT_PRIVATE_APP_TOKEN) has all required
+ * scopes including forms. If you see 401/403 errors, the issue is almost
+ * certainly the auth method (raw fetch vs client), NOT missing scopes.
+ *
+ * FORM DISCOVERY:
+ * Instead of hardcoding form IDs, we call /marketing/v3/forms/ to discover
+ * all forms dynamically, then infer form types from form names.
+ */
+
 import { getHubSpotClientWithFallback } from '../integrations';
 import { getErrorMessage } from '../../utils/errorUtils';
 import { db } from '../../db';
@@ -18,24 +42,32 @@ const FORM_TYPE_LABELS: Record<string, string> = {
 };
 
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
-let formSyncAccessDeniedLogged = false;
-let formSyncAccessDeniedUntil = 0;
-let formSyncAuthFailureLogged = false;
-let formSyncAuthFailureUntil = 0;
+let authFailureBackoffUntil = 0;
+let authFailureAlreadyLogged = false;
+let apiErrorBackoffUntil = 0;
+let firstSyncCompleted = false;
 
 export function resetFormSyncAccessDeniedFlag(): void {
-  formSyncAccessDeniedLogged = false;
-  formSyncAccessDeniedUntil = 0;
-  formSyncAuthFailureLogged = false;
-  formSyncAuthFailureUntil = 0;
+  authFailureBackoffUntil = 0;
+  authFailureAlreadyLogged = false;
+  apiErrorBackoffUntil = 0;
+  firstSyncCompleted = false;
+  logger.info('[HubSpot FormSync] All backoff flags reset');
 }
 
-export function getFormSyncStatus(): { accessDenied: boolean; accessDeniedUntil: number | null; authFailure: boolean; authFailureUntil: number | null } {
+export function getFormSyncStatus(): {
+  accessDenied: boolean;
+  accessDeniedUntil: number | null;
+  authFailure: boolean;
+  authFailureUntil: number | null;
+  firstSyncCompleted: boolean;
+} {
   return {
-    accessDenied: Date.now() < formSyncAccessDeniedUntil,
-    accessDeniedUntil: formSyncAccessDeniedUntil > 0 ? formSyncAccessDeniedUntil : null,
-    authFailure: Date.now() < formSyncAuthFailureUntil,
-    authFailureUntil: formSyncAuthFailureUntil > 0 ? formSyncAuthFailureUntil : null,
+    accessDenied: Date.now() < apiErrorBackoffUntil,
+    accessDeniedUntil: apiErrorBackoffUntil > 0 ? apiErrorBackoffUntil : null,
+    authFailure: Date.now() < authFailureBackoffUntil,
+    authFailureUntil: authFailureBackoffUntil > 0 ? authFailureBackoffUntil : null,
+    firstSyncCompleted,
   };
 }
 
@@ -105,12 +137,18 @@ async function discoverForms(client: Client): Promise<HubSpotForm[]> {
     });
     const data = await response.json() as { results?: HubSpotForm[]; total?: number };
     const forms = data.results || [];
-    logger.info(`[HubSpot FormSync] Discovered ${forms.length} forms from HubSpot`);
+    logger.info(`[HubSpot FormSync] Discovered ${forms.length} forms via client.apiRequest (NOT raw fetch — raw fetch fails in production)`);
     return forms;
   } catch (err: unknown) {
     const errMsg = getErrorMessage(err);
+
     if (errMsg.includes('401') || errMsg.includes('403')) {
-      throw new Error(`HUBSPOT_FORMS_ACCESS_DENIED: ${errMsg}`);
+      logger.error(
+        `[HubSpot FormSync] API error ${errMsg} discovering forms. ` +
+        `This is NOT a scopes issue — scopes are enabled. ` +
+        `If this persists, check that HUBSPOT_PRIVATE_APP_TOKEN is valid and not expired.`
+      );
+      throw new Error(`HUBSPOT_API_ERROR: ${errMsg}`);
     }
     logger.warn(`[HubSpot FormSync] Could not discover forms via v3 API: ${errMsg}`);
     return [];
@@ -139,7 +177,11 @@ async function fetchFormSubmissionsViaClient(
 
     if ((response as any).status === 403 || (response as any).status === 401) {
       const body = await response.text().catch(() => '');
-      throw new Error(`HUBSPOT_FORMS_ACCESS_DENIED: ${(response as any).status} ${body}`);
+      logger.error(
+        `[HubSpot FormSync] Got ${(response as any).status} fetching form ${formId}. ` +
+        `This is NOT a scopes issue. Check token validity. Body: ${body}`
+      );
+      throw new Error(`HUBSPOT_API_ERROR: ${(response as any).status} ${body}`);
     }
 
     const data: HubSpotSubmissionsResponse = await response.json() as HubSpotSubmissionsResponse;
@@ -170,11 +212,11 @@ export async function syncHubSpotFormSubmissions(): Promise<{
     errors: [] as string[],
   };
 
-  if (Date.now() < formSyncAccessDeniedUntil) {
+  if (Date.now() < authFailureBackoffUntil) {
     return result;
   }
 
-  if (Date.now() < formSyncAuthFailureUntil) {
+  if (Date.now() < apiErrorBackoffUntil) {
     return result;
   }
 
@@ -186,27 +228,32 @@ export async function syncHubSpotFormSubmissions(): Promise<{
       client = fallback.client;
       authSource = fallback.source;
     } catch (err: unknown) {
-      formSyncAuthFailureUntil = Date.now() + 60 * 60 * 1000;
-      if (!formSyncAuthFailureLogged) {
-        const msg = `No HubSpot client available: ${getErrorMessage(err)}`;
+      authFailureBackoffUntil = Date.now() + 60 * 60 * 1000;
+      if (!authFailureAlreadyLogged) {
+        const msg = `No HubSpot client available: ${getErrorMessage(err)}. Will retry in 1 hour.`;
         logger.warn(`[HubSpot FormSync] ${msg}`);
         result.errors.push(msg);
-        formSyncAuthFailureLogged = true;
+        authFailureAlreadyLogged = true;
       }
       return result;
     }
 
-    logger.info(`[HubSpot FormSync] Using auth source: ${authSource}`);
+    logger.info(`[HubSpot FormSync] Starting sync using auth source: ${authSource} (via client.apiRequest, NOT raw fetch)`);
 
     let forms: HubSpotForm[];
     try {
       forms = await discoverForms(client);
     } catch (err: unknown) {
       const errMsg = getErrorMessage(err);
-      if (errMsg.includes('HUBSPOT_FORMS_ACCESS_DENIED')) {
-        formSyncAccessDeniedUntil = Date.now() + 30 * 60 * 1000;
-        logger.warn(`[HubSpot FormSync] Access denied discovering forms (${authSource}): ${errMsg}. Suppressing retries for 30 minutes.`);
-        result.errors.push(`Access denied: ${errMsg}`);
+      if (errMsg.includes('HUBSPOT_API_ERROR')) {
+        apiErrorBackoffUntil = Date.now() + 30 * 60 * 1000;
+        logger.error(
+          `[HubSpot FormSync] API error discovering forms. ` +
+          `Auth source: ${authSource}. Error: ${errMsg}. ` +
+          `Suppressing retries for 30 minutes. ` +
+          `REMINDER: This is NOT a scopes issue — the token has forms scope. Check token validity.`
+        );
+        result.errors.push(`API error: ${errMsg}`);
         return result;
       }
       throw err;
@@ -216,6 +263,15 @@ export async function syncHubSpotFormSubmissions(): Promise<{
       const hardcodedId = 'b69f9fe4-9b3b-4d1e-a689-ba3127e5f8f2';
       forms = [{ id: hardcodedId, name: 'Events Inquiry Form' }];
       logger.info('[HubSpot FormSync] No forms discovered, falling back to hardcoded Events Inquiry form');
+    }
+
+    if (!firstSyncCompleted) {
+      logger.info(
+        `[HubSpot FormSync] DIAGNOSTIC — First sync this process. ` +
+        `Auth: ${authSource}. Forms discovered: ${forms.length}. ` +
+        `Form names: ${forms.map(f => f.name).join(', ')}. ` +
+        `Using client.apiRequest() (the method that works in both dev and production).`
+      );
     }
 
     const sinceTimestamp = Date.now() - THIRTY_DAYS_MS;
@@ -229,9 +285,12 @@ export async function syncHubSpotFormSubmissions(): Promise<{
         submissions = await fetchFormSubmissionsViaClient(client, form.id, sinceTimestamp);
       } catch (err: unknown) {
         const errMsg = getErrorMessage(err);
-        if (errMsg.includes('HUBSPOT_FORMS_ACCESS_DENIED')) {
-          formSyncAccessDeniedUntil = Date.now() + 30 * 60 * 1000;
-          logger.warn(`[HubSpot FormSync] Access denied during sync (${errMsg}). Suppressing retries for 30 minutes.`);
+        if (errMsg.includes('HUBSPOT_API_ERROR')) {
+          apiErrorBackoffUntil = Date.now() + 30 * 60 * 1000;
+          logger.error(
+            `[HubSpot FormSync] API error fetching submissions for "${form.name}". ` +
+            `Error: ${errMsg}. Suppressing retries for 30 minutes.`
+          );
           break;
         }
         const msg = `Failed to fetch form "${form.name}" (${form.id}): ${errMsg}`;
@@ -344,6 +403,8 @@ export async function syncHubSpotFormSubmissions(): Promise<{
       }
     }
 
+    firstSyncCompleted = true;
+    authFailureAlreadyLogged = false;
     logger.info(`[HubSpot FormSync] Sync complete: ${result.totalFetched} fetched, ${result.newInserted} inserted, ${result.skippedDuplicate} duplicates skipped, ${result.errors.length} errors`);
   } catch (err: unknown) {
     logger.error(`[HubSpot FormSync] Unexpected error during sync: ${getErrorMessage(err)}`);

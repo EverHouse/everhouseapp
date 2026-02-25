@@ -143,9 +143,10 @@ export async function processHubSpotQueue(batchSize: number = 10): Promise<{
         try {
           const { notifyAllStaff } = await import('../staffNotifications');
           await notifyAllStaff(
-            'HubSpot Sync Failed - Permission Error',
-            `Job ${job.id} (${job.operation}) failed with unrecoverable error: ${errorMsg}. ` +
-            `Update scopes at https://developers.hubspot.com/scopes`,
+            'HubSpot Sync Failed',
+            `Job ${job.id} (${job.operation}) failed: ${errorMsg}. ` +
+            `Check that HUBSPOT_PRIVATE_APP_TOKEN is valid and not expired. ` +
+            `Note: all required scopes are already enabled — this is likely a token or auth issue, not a scopes problem.`,
             'integration_error'
           );
         } catch (notifyErr: unknown) {
