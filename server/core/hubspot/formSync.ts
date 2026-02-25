@@ -467,6 +467,20 @@ export async function syncHubSpotFormSubmissions(options?: { force?: boolean }):
 
     firstSyncCompleted = true;
     authFailureAlreadyLogged = false;
+
+    if (privateAppToken === process.env.HUBSPOT_PRIVATE_APP_TOKEN) {
+      try {
+        await db.insert(systemSettings)
+          .values({ key: DB_TOKEN_KEY, value: privateAppToken, category: 'hubspot', updatedBy: 'auto-seed', updatedAt: new Date() })
+          .onConflictDoUpdate({
+            target: systemSettings.key,
+            set: { value: privateAppToken, updatedBy: 'auto-seed', updatedAt: new Date() },
+          });
+        logger.info('[HubSpot FormSync] Auto-seeded working token into database for future resilience');
+      } catch {
+      }
+    }
+
     logger.info(`[HubSpot FormSync] Sync complete: ${result.totalFetched} fetched, ${result.newInserted} inserted, ${result.skippedDuplicate} duplicates skipped, ${result.errors.length} errors`);
   } catch (err: unknown) {
     logger.error(`[HubSpot FormSync] Unexpected error during sync: ${getErrorMessage(err)}`);
