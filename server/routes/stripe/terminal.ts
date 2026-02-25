@@ -400,6 +400,9 @@ router.post('/api/stripe/terminal/process-payment', isStaffOrAdmin, async (req: 
 router.get('/api/stripe/terminal/payment-status/:paymentIntentId', isStaffOrAdmin, async (req: Request, res: Response) => {
   try {
     const { paymentIntentId } = req.params;
+    if ((paymentIntentId as string).startsWith('seti_') || (paymentIntentId as string).startsWith('free_')) {
+      return res.json({ status: 'succeeded', freeActivation: true });
+    }
     const stripe = await getStripeClient();
     
     const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId as string);
@@ -509,7 +512,7 @@ router.post('/api/stripe/terminal/cancel-payment', isStaffOrAdmin, async (req: R
 
     let paymentAlreadySucceeded = false;
 
-    if (paymentIntentId) {
+    if (paymentIntentId && !paymentIntentId.startsWith('seti_') && !paymentIntentId.startsWith('free_')) {
       try {
         const pi = await stripe.paymentIntents.retrieve(paymentIntentId);
         if (pi.status === 'succeeded') {
@@ -1075,6 +1078,9 @@ router.post('/api/stripe/terminal/refund-payment', isStaffOrAdmin, async (req: R
     const { paymentIntentId } = req.body;
     if (!paymentIntentId) {
       return res.status(400).json({ error: 'Payment Intent ID is required' });
+    }
+    if (paymentIntentId.startsWith('seti_') || paymentIntentId.startsWith('free_')) {
+      return res.json({ success: true, message: 'No refund needed — $0 subscription' });
     }
     
     const stripe = await getStripeClient();
