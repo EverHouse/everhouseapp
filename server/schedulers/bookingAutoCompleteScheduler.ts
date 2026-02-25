@@ -2,6 +2,7 @@ import { schedulerTracker } from '../core/schedulerTracker';
 import { queryWithRetry } from '../core/db';
 import { getTodayPacific, formatTimePacific } from '../utils/dateUtils';
 import { notifyAllStaff } from '../core/notificationService';
+import { ensureSessionForBooking } from '../core/bookingService/sessionManager';
 import { logger } from '../core/logger';
 
 interface AutoCompletedBookingResult {
@@ -10,7 +11,10 @@ interface AutoCompletedBookingResult {
   userName: string | null;
   requestDate: string;
   startTime: string;
+  endTime: string;
   resourceId: number | null;
+  sessionId: number | null;
+  trackmanBookingId: string | null;
 }
 
 async function autoCompletePastBookings(): Promise<void> {
@@ -42,7 +46,9 @@ async function autoCompletePastBookings(): Promise<void> {
            WHERE bs.updated_at > NOW() - INTERVAL '10 minutes'
            AND bp.payment_status IN ('paid', 'waived')
          )
-       RETURNING id, user_email AS "userEmail", user_name AS "userName", request_date AS "requestDate", start_time AS "startTime", resource_id AS "resourceId"`,
+       RETURNING id, user_email AS "userEmail", user_name AS "userName", request_date AS "requestDate", 
+                 start_time AS "startTime", end_time AS "endTime", resource_id AS "resourceId",
+                 session_id AS "sessionId", trackman_booking_id AS "trackmanBookingId"`,
       [todayStr, currentTimePacific]
     );
 
@@ -54,11 +60,46 @@ async function autoCompletePastBookings(): Promise<void> {
       return;
     }
 
+    let sessionsCreated = 0;
+    let sessionErrors = 0;
+
     for (const booking of markedBookings.rows) {
       logger.info(
         `[Booking Auto-Complete] Auto checked-in request #${booking.id}: ` +
         `${booking.userName || booking.userEmail} for ${booking.requestDate} ${booking.startTime}`
       );
+
+      if (!booking.sessionId && booking.resourceId) {
+        try {
+          const result = await ensureSessionForBooking({
+            bookingId: booking.id,
+            resourceId: booking.resourceId,
+            sessionDate: typeof booking.requestDate === 'object' 
+              ? (booking.requestDate as Date).toISOString().split('T')[0] 
+              : String(booking.requestDate),
+            startTime: booking.startTime,
+            endTime: booking.endTime,
+            ownerEmail: booking.userEmail,
+            ownerName: booking.userName || undefined,
+            trackmanBookingId: booking.trackmanBookingId || undefined,
+            source: 'auto-complete',
+            createdBy: 'system-auto-checkin'
+          });
+          if (result.created) {
+            sessionsCreated++;
+            logger.info(`[Booking Auto-Complete] Created session ${result.sessionId} for booking #${booking.id}`);
+          } else {
+            logger.info(`[Booking Auto-Complete] Linked existing session ${result.sessionId} to booking #${booking.id}`);
+          }
+        } catch (err) {
+          sessionErrors++;
+          logger.error(`[Booking Auto-Complete] Failed to create session for booking #${booking.id}:`, { error: err as Error });
+        }
+      }
+    }
+
+    if (sessionsCreated > 0 || sessionErrors > 0) {
+      logger.info(`[Booking Auto-Complete] Session backfill: ${sessionsCreated} created, ${sessionErrors} errors`);
     }
 
     logger.info(`[Booking Auto-Complete] Auto checked-in ${markedCount} past booking(s)`);
@@ -117,13 +158,13 @@ export function stopBookingAutoCompleteScheduler(): void {
   }
 }
 
-export async function runManualBookingAutoComplete(): Promise<{ markedCount: number }> {
+export async function runManualBookingAutoComplete(): Promise<{ markedCount: number; sessionsCreated: number }> {
   logger.info('[Booking Auto-Complete] Running manual auto-complete check...');
 
   const todayStr = getTodayPacific();
   const currentTimePacific = formatTimePacific(new Date());
 
-  const result = await queryWithRetry(
+  const result = await queryWithRetry<AutoCompletedBookingResult>(
     `UPDATE booking_requests 
      SET status = 'attended',
          staff_notes = COALESCE(staff_notes || E'\n', '') || '[Auto checked-in: booking time passed]',
@@ -144,12 +185,40 @@ export async function runManualBookingAutoComplete(): Promise<{ markedCount: num
          WHERE bs.updated_at > NOW() - INTERVAL '10 minutes'
          AND bp.payment_status IN ('paid', 'waived')
        )
-     RETURNING id`,
+     RETURNING id, user_email AS "userEmail", user_name AS "userName", request_date AS "requestDate",
+               start_time AS "startTime", end_time AS "endTime", resource_id AS "resourceId",
+               session_id AS "sessionId", trackman_booking_id AS "trackmanBookingId"`,
     [todayStr, currentTimePacific]
   );
 
   const markedCount = result.rows.length;
-  logger.info(`[Booking Auto-Complete] Manual run auto checked-in ${markedCount} booking(s)`);
+  let sessionsCreated = 0;
 
-  return { markedCount };
+  for (const booking of result.rows) {
+    if (!booking.sessionId && booking.resourceId) {
+      try {
+        const sessionResult = await ensureSessionForBooking({
+          bookingId: booking.id,
+          resourceId: booking.resourceId,
+          sessionDate: typeof booking.requestDate === 'object'
+            ? (booking.requestDate as Date).toISOString().split('T')[0]
+            : String(booking.requestDate),
+          startTime: booking.startTime,
+          endTime: booking.endTime,
+          ownerEmail: booking.userEmail,
+          ownerName: booking.userName || undefined,
+          trackmanBookingId: booking.trackmanBookingId || undefined,
+          source: 'manual-auto-complete',
+          createdBy: 'system-auto-checkin'
+        });
+        if (sessionResult.created) sessionsCreated++;
+      } catch (err) {
+        logger.error(`[Booking Auto-Complete] Manual: failed to create session for booking #${booking.id}:`, { error: err as Error });
+      }
+    }
+  }
+
+  logger.info(`[Booking Auto-Complete] Manual run auto checked-in ${markedCount} booking(s), created ${sessionsCreated} session(s)`);
+
+  return { markedCount, sessionsCreated };
 }

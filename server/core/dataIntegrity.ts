@@ -3391,21 +3391,39 @@ export async function autoFixMissingTiers(): Promise<{
       logger.info(`[AutoFix] Normalized membership_status case for ${normalizedStatusCase} members: ${details}`);
     }
 
-    const billingProviderResult = await db.execute(sql`
-      UPDATE users SET billing_provider = 'mindbody', updated_at = NOW()
+    const stripeProviderResult = await db.execute(sql`
+      UPDATE users SET billing_provider = 'stripe', updated_at = NOW()
       WHERE membership_status = 'active'
-        AND billing_provider IS NULL
-        AND mindbody_client_id IS NOT NULL
-        AND mindbody_client_id != ''
+        AND (billing_provider IS NULL OR billing_provider = '')
+        AND stripe_subscription_id IS NOT NULL
+        AND stripe_subscription_id != ''
         AND role != 'visitor'
         AND email NOT LIKE '%test%'
         AND email NOT LIKE '%example.com'
       RETURNING email
     `);
-    fixedBillingProvider = billingProviderResult.rows.length;
-    if (fixedBillingProvider > 0) {
+    const fixedStripeProvider = stripeProviderResult.rows.length;
+    if (fixedStripeProvider > 0) {
+      const emails = (stripeProviderResult.rows as Record<string, unknown>[]).map(r => r.email).join(', ');
+      logger.info(`[AutoFix] Set billing_provider='stripe' for ${fixedStripeProvider} members with Stripe subscriptions: ${emails}`);
+    }
+
+    const billingProviderResult = await db.execute(sql`
+      UPDATE users SET billing_provider = 'mindbody', updated_at = NOW()
+      WHERE membership_status = 'active'
+        AND (billing_provider IS NULL OR billing_provider = '')
+        AND mindbody_client_id IS NOT NULL
+        AND mindbody_client_id != ''
+        AND stripe_subscription_id IS NULL
+        AND role != 'visitor'
+        AND email NOT LIKE '%test%'
+        AND email NOT LIKE '%example.com'
+      RETURNING email
+    `);
+    fixedBillingProvider = billingProviderResult.rows.length + fixedStripeProvider;
+    if (billingProviderResult.rows.length > 0) {
       const emails = (billingProviderResult.rows as Record<string, unknown>[]).map(r => r.email).join(', ');
-      logger.info(`[AutoFix] Set billing_provider='mindbody' for ${fixedBillingProvider} members with MindBody IDs: ${emails}`);
+      logger.info(`[AutoFix] Set billing_provider='mindbody' for ${billingProviderResult.rows.length} members with MindBody IDs: ${emails}`);
     }
 
     const fixResult = await db.execute(sql`

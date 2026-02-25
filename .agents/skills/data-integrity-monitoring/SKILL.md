@@ -200,11 +200,12 @@ Staff can trigger a manual integrity check from the admin dashboard. This calls 
 
 The system includes automated correction tasks:
 
-- **Auto-Fix Tiers** (every 4h) — Normalize `membership_status` casing, set `billing_provider='mindbody'` for members with MindBody IDs, sync staff roles.
+- **Auto-Fix Tiers** (every 4h) — Normalize `membership_status` casing, auto-classify `billing_provider` for members with Stripe subscriptions (`'stripe'`) or MindBody IDs (`'mindbody'`), sync staff roles. Stripe classification runs first and takes priority over MindBody.
 - **Stripe Reconciliation** (daily at 5am Pacific) — Compare Stripe subscriptions and daily payments against database records. Uses database lock for multi-instance safety.
 - **Fee Snapshot Reconciliation** (every 15min) — Reconcile fee snapshot records against actual billing data.
 - **Abandoned Pending Cleanup** (every 6h) — Delete users stuck in `pending` status >24h with no Stripe subscription, cascade-deleting related records in a transaction.
-- **Booking Auto-Complete** (every 2h) — Mark approved/confirmed bookings as attended (auto checked-in) 24h after end time. Assumes most members attended; staff can manually mark no_show via BookingStatusDropdown if needed.
+- **Booking Auto-Complete** (every 2h) — Mark approved/confirmed bookings as attended (auto checked-in) 24h after end time. Also calls `ensureSessionForBooking()` for each booking without a session to prevent "Active Bookings Without Sessions" data integrity failures. Assumes most members attended; staff can manually mark no_show via BookingStatusDropdown if needed.
+- **DB-Init Billing Provider Migration** (startup) — Migrates any existing `billing_provider='hubspot'` values to `'manual'`. The `'hubspot'` value is not in the CHECK constraint (`stripe`, `mindbody`, `manual`, `comped`, `family_addon`).
 
 ## Dashboard Overview
 

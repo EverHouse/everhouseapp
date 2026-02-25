@@ -35,7 +35,7 @@ All schedulers registered in `initSchedulers()`:
 | Fee Snapshot Reconciliation | feeSnapshotReconciliationScheduler.ts | 15 min | None | Reconcile pending fee snapshots, cancel abandoned payment intents |
 | Grace Period | gracePeriodScheduler.ts | 1 hr | 10 AM Pacific | Process membership grace periods, send reminder emails, terminate |
 | Booking Expiry | bookingExpiryScheduler.ts | 1 hr | None | Expire past-due pending/pending_approval bookings (20-min grace period past start_time) |
-| Booking Auto-Complete | bookingAutoCompleteScheduler.ts | 2 hr | None | Mark approved/confirmed bookings as attended (auto checked-in) 24h after end time |
+| Booking Auto-Complete | bookingAutoCompleteScheduler.ts | 2 hr | None | Mark approved/confirmed bookings as attended (auto checked-in) 24h after end time. Also calls `ensureSessionForBooking()` for each booking without a session to prevent "Active Bookings Without Sessions" data integrity failures. |
 | Communication Logs Sync | communicationLogsScheduler.ts | 30 min | None | Sync communication log records |
 | Webhook Log Cleanup | webhookLogCleanupScheduler.ts | 1 hr | 4 AM Pacific | Delete webhook logs older than 30 days |
 | Session Cleanup | sessionCleanupScheduler.ts | 1 hr | 2 AM Pacific | Clean up expired HTTP sessions |

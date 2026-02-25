@@ -361,6 +361,15 @@ export async function ensureDatabaseConstraints() {
         END $$;
       `);
       logger.info('[DB Init] Billing provider CHECK constraint created/verified');
+      
+      const hubspotFix = await db.execute(sql`
+        UPDATE users SET billing_provider = 'manual', updated_at = NOW()
+        WHERE billing_provider = 'hubspot'
+        RETURNING email
+      `);
+      if ((hubspotFix as any).rows?.length > 0) {
+        logger.info(`[DB Init] Migrated ${(hubspotFix as any).rows.length} users from billing_provider='hubspot' to 'manual'`);
+      }
     } catch (err: unknown) {
       logger.warn(`[DB Init] Skipping billing provider CHECK constraint: ${getErrorMessage(err)}`);
     }
