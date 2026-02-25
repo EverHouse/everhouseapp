@@ -315,14 +315,20 @@ async function initializeApp() {
     }
   );
 
-  app.use(express.json({
-    limit: '1mb',
-    verify: (req: any, _res: any, buf: Buffer) => {
-      if (req.originalUrl?.includes('/webhooks') || req.url?.includes('/webhooks')) {
-        req.rawBody = buf.toString('utf8');
-      }
+  const LARGE_BODY_PATHS = ['/api/admin/scan-id', '/api/admin/save-id-image'];
+  app.use((req, res, next) => {
+    if (LARGE_BODY_PATHS.includes(req.path)) {
+      return next();
     }
-  }));
+    express.json({
+      limit: '1mb',
+      verify: (req: any, _res: any, buf: Buffer) => {
+        if (req.originalUrl?.includes('/webhooks') || req.url?.includes('/webhooks')) {
+          req.rawBody = buf.toString('utf8');
+        }
+      }
+    })(req, res, next);
+  });
   app.use(express.urlencoded({ limit: '1mb' }));
   app.use(getSession());
   app.use(globalRateLimiter);
