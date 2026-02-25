@@ -70,10 +70,10 @@ const CheckInConfirmationModal: React.FC<CheckInConfirmationModalProps> = ({
       <div
         style={{
           position: 'absolute',
-          top: 0,
-          left: 0,
-          width: '100%',
-          height: '100%',
+          top: '-50px',
+          left: '-50px',
+          right: '-50px',
+          bottom: '-50px',
           backgroundColor: 'rgba(0, 0, 0, 0.5)',
           backdropFilter: 'blur(4px)',
         }}

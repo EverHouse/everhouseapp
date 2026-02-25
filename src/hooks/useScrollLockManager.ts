@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef } from 'react';
 
 let lockCount = 0;
 let savedScrollY = 0;
+let savedHtmlBg = '';
 const lockOwners = new Set<string>();
 
 function generateLockId(): string {
@@ -37,6 +38,8 @@ function preventTouchMove(e: TouchEvent) {
 function applyScrollLock() {
   if (lockCount === 1) {
     savedScrollY = window.scrollY;
+    savedHtmlBg = document.documentElement.style.backgroundColor;
+    document.documentElement.style.backgroundColor = '#000';
     document.body.style.position = 'fixed';
     document.body.style.top = `-${savedScrollY}px`;
     document.body.style.left = '0';
@@ -54,6 +57,7 @@ function applyScrollLock() {
 function removeScrollLock() {
   if (lockCount === 0 && lockOwners.size === 0) {
     const scrollY = savedScrollY;
+    document.documentElement.style.backgroundColor = savedHtmlBg;
     document.body.style.position = '';
     document.body.style.top = '';
     document.body.style.left = '';
@@ -94,6 +98,7 @@ export function forceReleaseAllLocks(): void {
   lockOwners.clear();
   lockCount = 0;
   const scrollY = savedScrollY;
+  document.documentElement.style.backgroundColor = savedHtmlBg;
   document.body.style.position = '';
   document.body.style.top = '';
   document.body.style.left = '';

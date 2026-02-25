@@ -631,7 +631,8 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
   const drawerContent = (
     <div className={`fixed inset-0 ${isDark ? 'dark' : ''}`} style={{ zIndex: 'var(--z-modal)' }}>
       <div 
-        className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity duration-normal"
+        className="fixed bg-black/60 backdrop-blur-sm transition-opacity duration-normal"
+        style={{ top: '-50px', left: '-50px', right: '-50px', bottom: '-50px' }}
         onClick={onClose}
       />
       

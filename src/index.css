@@ -287,12 +287,6 @@ html.overflow-hidden body {
   overscroll-behavior: none;
 }
 
-/* When scroll lock is active, the body becomes position:fixed which on iOS Safari
-   can cause it to not fill the full viewport height. The gap reveals the html
-   element's background, so we set it to black to match the dark modal overlay. */
-html.overflow-hidden {
-  background-color: #000 !important;
-}
 
 html, body {
   width: 100%;
