@@ -8,6 +8,23 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.31.0",
+    date: "2026-02-25",
+    title: "Premium UX Polish: Payment Modals & Checkout",
+    changes: [
+      "Improved: Smooth cross-fade step transitions in guest payment modal using auto-animate, replacing instant snaps",
+      "Improved: Refined button press physics app-wide — active press scale changed from 0.95 to 0.98 for a subtler, premium feel",
+      "Improved: Loading buttons now maintain exact dimensions — text goes invisible with a centered spinner overlay, preventing layout jitter",
+      "Improved: Error states toned down from aggressive red to softer amber styling with info icons and slide-in animations",
+      "Improved: Typography hierarchy refined — demoted overused font-bold to font-semibold across modals and checkout, reserving bold for primary totals only",
+      "Improved: Input focus states now use a branded accent ring with smooth shadow transition across all form inputs",
+      "Improved: Required field indicators use amber instead of red for a less alarming visual tone",
+      "Improved: All user-facing error messages rewritten with friendlier, more helpful copy",
+      "Improved: 'Number of Employee Seats' label renamed to 'Team Size' for clarity",
+      "Improved: Guest payment modal title refined from 'Guest Information' to 'Guest Details'",
+    ]
+  },
+  {
     version: "8.30.2",
     date: "2026-02-25",
     title: "Fix: Double-Click & Payment Confirmation Guards",

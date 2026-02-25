@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useAutoAnimate } from '@formkit/auto-animate/react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { apiRequest } from '../../lib/apiRequest';
 import SlideUpDrawer from '../SlideUpDrawer';
@@ -25,6 +26,7 @@ export function GuestPaymentChoiceModal({
   const { effectiveTheme } = useTheme();
   const isDark = effectiveTheme === 'dark';
   const { guestFeeDollars } = usePricing();
+  const [animateRef] = useAutoAnimate({ duration: 250 });
 
   const [step, setStep] = useState<'choice' | 'guest-info'>('choice');
   const [selectedMethod, setSelectedMethod] = useState<'guest_pass' | 'pay_fee' | null>(null);
@@ -89,13 +91,13 @@ export function GuestPaymentChoiceModal({
       if (ok) {
         onSuccess(fullName);
       } else {
-        setError(apiError || 'Failed to add guest with pass');
+        setError(apiError || "We couldn't add your guest at this time. Please try again.");
       }
     } catch (err: unknown) {
       const msg = ((err instanceof Error ? err.message : String(err)) || '').toLowerCase();
       const isTimeout = msg.includes('abort') || msg.includes('timeout');
       if (!isTimeout) {
-        setError(msg || 'Failed to add guest');
+        setError("Something went wrong adding your guest. Please try again.");
         onError?.(msg || 'Failed to add guest');
       }
     } finally {
@@ -128,10 +130,10 @@ export function GuestPaymentChoiceModal({
       if (ok) {
         onSuccess(fullName);
       } else {
-        setError(apiError || 'Failed to add guest');
+        setError(apiError || "Something went wrong adding your guest. Please try again.");
       }
     } catch (err: unknown) {
-      setError((err instanceof Error ? err.message : String(err)) || 'Failed to add guest');
+      setError((err instanceof Error ? err.message : String(err)) || "Something went wrong adding your guest. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -139,7 +141,7 @@ export function GuestPaymentChoiceModal({
 
   const getTitle = () => {
     if (step === 'choice') return 'Add Guest';
-    return 'Guest Information';
+    return 'Guest Details';
   };
 
   return (
@@ -149,42 +151,45 @@ export function GuestPaymentChoiceModal({
       title={getTitle()}
       maxHeight={step === 'guest-info' ? 'medium' : 'small'}
     >
-      <div className="p-4">
+      <div className="p-4" ref={animateRef}>
         {error && (
-          <div className={`mb-4 p-3 rounded-xl ${isDark ? 'bg-red-500/20 text-red-400' : 'bg-red-50 text-red-600'}`}>
-            {error}
+          <div className={`mb-4 p-3 rounded-xl flex items-start gap-2.5 animate-content-enter ${
+            isDark ? 'bg-amber-500/10 border border-amber-500/20' : 'bg-amber-50 border border-amber-200/60'
+          }`}>
+            <span className={`material-symbols-outlined text-base mt-0.5 shrink-0 ${isDark ? 'text-amber-400' : 'text-amber-600'}`}>info</span>
+            <p className={`text-sm ${isDark ? 'text-amber-300' : 'text-amber-700'}`}>{error}</p>
           </div>
         )}
 
         {step === 'choice' && (
-          <div className="space-y-4">
-            <p className={`text-center text-sm font-medium ${isDark ? 'text-white/80' : 'text-primary/80'}`}>
-              How would you like to cover this guest?
+          <div key="choice" className="space-y-4">
+            <p className={`text-center text-sm font-medium ${isDark ? 'text-white/70' : 'text-primary/70'}`}>
+              How would you like to handle your guest's visit?
             </p>
 
             <div className="space-y-3">
               <button
                 onClick={() => { setSelectedMethod('guest_pass'); setStep('guest-info'); }}
                 disabled={loading || guestPassesRemaining <= 0}
-                className={`w-full p-4 rounded-xl border-2 transition-all duration-fast flex items-start gap-4 tactile-btn ${
+                className={`w-full p-4 rounded-xl border transition-all duration-fast flex items-start gap-4 active:scale-[0.98] ${
                   guestPassesRemaining > 0
                     ? isDark
-                      ? 'border-emerald-500/50 bg-emerald-500/10 hover:bg-emerald-500/20'
-                      : 'border-emerald-500/50 bg-emerald-50 hover:bg-emerald-100'
+                      ? 'border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/15'
+                      : 'border-emerald-200 bg-emerald-50/80 hover:bg-emerald-50'
                     : isDark
                       ? 'border-white/10 bg-white/5 opacity-50 cursor-not-allowed'
                       : 'border-gray-200 bg-gray-50 opacity-50 cursor-not-allowed'
                 }`}
               >
-                <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                <div className={`w-11 h-11 rounded-full flex items-center justify-center ${
                   guestPassesRemaining > 0
                     ? isDark ? 'bg-emerald-500/20 text-emerald-400' : 'bg-emerald-100 text-emerald-600'
                     : isDark ? 'bg-white/10 text-white/40' : 'bg-gray-100 text-gray-400'
                 }`}>
-                  <span className="material-symbols-outlined text-2xl">confirmation_number</span>
+                  <span className="material-symbols-outlined text-xl">confirmation_number</span>
                 </div>
                 <div className="flex-1 text-left">
-                  <p className={`font-bold ${
+                  <p className={`font-semibold ${
                     guestPassesRemaining > 0
                       ? isDark ? 'text-emerald-400' : 'text-emerald-700'
                       : isDark ? 'text-white/40' : 'text-gray-400'
@@ -193,7 +198,7 @@ export function GuestPaymentChoiceModal({
                   </p>
                   <p className={`text-sm ${
                     guestPassesRemaining > 0
-                      ? isDark ? 'text-white/60' : 'text-gray-600'
+                      ? isDark ? 'text-white/50' : 'text-gray-500'
                       : isDark ? 'text-white/30' : 'text-gray-400'
                   }`}>
                     {guestPassesRemaining > 0
@@ -201,7 +206,7 @@ export function GuestPaymentChoiceModal({
                       : 'No passes remaining this month'
                     }
                   </p>
-                  <p className={`text-lg font-bold mt-1 ${
+                  <p className={`text-lg font-semibold mt-1 ${
                     guestPassesRemaining > 0
                       ? isDark ? 'text-emerald-400' : 'text-emerald-600'
                       : isDark ? 'text-white/40' : 'text-gray-400'
@@ -214,25 +219,25 @@ export function GuestPaymentChoiceModal({
               <button
                 onClick={() => { setSelectedMethod('pay_fee'); setStep('guest-info'); }}
                 disabled={loading}
-                className={`w-full p-4 rounded-xl border-2 transition-all duration-fast flex items-start gap-4 tactile-btn ${
+                className={`w-full p-4 rounded-xl border transition-all duration-fast flex items-start gap-4 active:scale-[0.98] ${
                   isDark
-                    ? 'border-[#CCB8E4]/50 bg-[#CCB8E4]/10 hover:bg-[#CCB8E4]/20'
-                    : 'border-[#CCB8E4] bg-[#CCB8E4]/10 hover:bg-[#CCB8E4]/20'
+                    ? 'border-[#CCB8E4]/30 bg-[#CCB8E4]/10 hover:bg-[#CCB8E4]/15'
+                    : 'border-[#CCB8E4]/60 bg-[#CCB8E4]/8 hover:bg-[#CCB8E4]/15'
                 }`}
               >
-                <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
-                  isDark ? 'bg-[#CCB8E4]/20 text-[#CCB8E4]' : 'bg-[#CCB8E4]/30 text-[#5a4a6d]'
+                <div className={`w-11 h-11 rounded-full flex items-center justify-center ${
+                  isDark ? 'bg-[#CCB8E4]/20 text-[#CCB8E4]' : 'bg-[#CCB8E4]/25 text-[#5a4a6d]'
                 }`}>
-                  <span className="material-symbols-outlined text-2xl">credit_card</span>
+                  <span className="material-symbols-outlined text-xl">credit_card</span>
                 </div>
                 <div className="flex-1 text-left">
-                  <p className={`font-bold ${isDark ? 'text-[#CCB8E4]' : 'text-[#5a4a6d]'}`}>
+                  <p className={`font-semibold ${isDark ? 'text-[#CCB8E4]' : 'text-[#5a4a6d]'}`}>
                     Pay Guest Fee
                   </p>
-                  <p className={`text-sm ${isDark ? 'text-white/60' : 'text-gray-600'}`}>
+                  <p className={`text-sm ${isDark ? 'text-white/50' : 'text-gray-500'}`}>
                     One-time charge for this visit
                   </p>
-                  <p className={`text-lg font-bold mt-1 ${isDark ? 'text-white' : 'text-primary'}`}>
+                  <p className={`text-lg font-semibold mt-1 ${isDark ? 'text-white' : 'text-primary'}`}>
                     ${guestFeeDollars.toFixed(2)}
                   </p>
                 </div>
@@ -242,7 +247,7 @@ export function GuestPaymentChoiceModal({
         )}
 
         {step === 'guest-info' && (
-          <div className="space-y-4">
+          <div key="guest-info" className="space-y-4">
             <button
               onClick={() => {
                 setStep('choice');
@@ -258,7 +263,7 @@ export function GuestPaymentChoiceModal({
             </button>
 
             {selectedMethod === 'guest_pass' && (
-              <div className={`p-3 rounded-xl ${isDark ? 'bg-emerald-500/10 border border-emerald-500/20' : 'bg-emerald-50 border border-emerald-200'}`}>
+              <div className={`p-3 rounded-xl ${isDark ? 'bg-emerald-500/10 border border-emerald-500/20' : 'bg-emerald-50 border border-emerald-200/60'}`}>
                 <div className="flex items-center gap-2">
                   <span className={`material-symbols-outlined text-lg ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`}>
                     confirmation_number
@@ -318,7 +323,7 @@ export function GuestPaymentChoiceModal({
             <button
               onClick={selectedMethod === 'guest_pass' ? handleUseGuestPass : handleAddPaidGuest}
               disabled={!guestInfoValid || loading}
-              className={`w-full py-3 px-4 rounded-xl font-bold text-sm transition-all duration-fast flex items-center justify-center gap-2 ${
+              className={`relative w-full py-3 px-4 rounded-xl font-semibold text-sm transition-all duration-fast flex items-center justify-center gap-2 ${
                 guestInfoValid && !loading
                   ? selectedMethod === 'guest_pass'
                     ? 'bg-emerald-600 text-white hover:bg-emerald-700 active:scale-[0.98]'
@@ -328,18 +333,23 @@ export function GuestPaymentChoiceModal({
                     : 'bg-black/5 text-black/30 cursor-not-allowed'
               }`}
             >
-              {loading ? (
-                <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
-              ) : selectedMethod === 'guest_pass' ? (
-                <>
-                  <span className="material-symbols-outlined text-lg">confirmation_number</span>
-                  Use Guest Pass
-                </>
-              ) : (
-                <>
-                  <span className="material-symbols-outlined text-lg">credit_card</span>
-                  Add Guest (${guestFeeDollars.toFixed(2)} fee)
-                </>
+              <span className={`flex items-center gap-2 transition-opacity ${loading ? 'opacity-0' : 'opacity-100'}`}>
+                {selectedMethod === 'guest_pass' ? (
+                  <>
+                    <span className="material-symbols-outlined text-lg">confirmation_number</span>
+                    Use Guest Pass
+                  </>
+                ) : (
+                  <>
+                    <span className="material-symbols-outlined text-lg">credit_card</span>
+                    Add Guest (${guestFeeDollars.toFixed(2)} fee)
+                  </>
+                )}
+              </span>
+              {loading && (
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                </div>
               )}
             </button>
           </div>

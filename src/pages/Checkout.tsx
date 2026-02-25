@@ -103,9 +103,9 @@ function CheckoutForm({ tier, email, quantity = 1, companyName, jobTitle, isCorp
 
   if (error) {
     return (
-      <div className="text-center py-16">
-        <span className="material-symbols-outlined text-6xl text-red-500 mb-4 block">error</span>
-        <p className="text-red-600 dark:text-red-400 text-lg mb-4">{error}</p>
+      <div className="text-center py-16 animate-content-enter">
+        <span className="material-symbols-outlined text-5xl text-amber-500 mb-4 block">info</span>
+        <p className="text-amber-700 dark:text-amber-300 text-base mb-4">{error}</p>
         <a
           href="/#/membership"
           className="inline-block py-3 px-6 rounded-xl font-medium bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
@@ -246,66 +246,66 @@ function CorporateCheckoutForm({ tier, email, initialQuantity }: CorporateChecko
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-primary/70 dark:text-white/70 mb-2">
-              First Name <span className="text-red-500">*</span>
+              First Name <span className="text-amber-500">*</span>
             </label>
             <input
               type="text"
               value={firstName}
               onChange={(e) => setFirstName(e.target.value)}
               placeholder="John"
-              className="w-full px-4 py-3 rounded-xl border border-primary/20 dark:border-white/20 bg-white/50 dark:bg-white/5 backdrop-blur-sm text-primary dark:text-white focus:outline-none focus:ring-2 focus:ring-accent transition-all duration-fast"
+              className="w-full px-4 py-3 rounded-xl border border-primary/20 dark:border-white/20 bg-white/50 dark:bg-white/5 backdrop-blur-sm text-primary dark:text-white focus:outline-none focus:ring-1 focus:ring-accent focus:border-accent transition-shadow duration-fast"
             />
           </div>
           <div>
             <label className="block text-sm font-medium text-primary/70 dark:text-white/70 mb-2">
-              Last Name <span className="text-red-500">*</span>
+              Last Name <span className="text-amber-500">*</span>
             </label>
             <input
               type="text"
               value={lastName}
               onChange={(e) => setLastName(e.target.value)}
               placeholder="Doe"
-              className="w-full px-4 py-3 rounded-xl border border-primary/20 dark:border-white/20 bg-white/50 dark:bg-white/5 backdrop-blur-sm text-primary dark:text-white focus:outline-none focus:ring-2 focus:ring-accent transition-all duration-fast"
+              className="w-full px-4 py-3 rounded-xl border border-primary/20 dark:border-white/20 bg-white/50 dark:bg-white/5 backdrop-blur-sm text-primary dark:text-white focus:outline-none focus:ring-1 focus:ring-accent focus:border-accent transition-shadow duration-fast"
             />
           </div>
         </div>
 
         <div>
           <label className="block text-sm font-medium text-primary/70 dark:text-white/70 mb-2">
-            Email <span className="text-red-500">*</span>
+            Email <span className="text-amber-500">*</span>
           </label>
           <input
             type="email"
             value={contactEmail}
             onChange={(e) => setContactEmail(e.target.value)}
             placeholder="you@company.com"
-            className="w-full px-4 py-3 rounded-xl border border-primary/20 dark:border-white/20 bg-white/50 dark:bg-white/5 backdrop-blur-sm text-primary dark:text-white focus:outline-none focus:ring-2 focus:ring-accent transition-all duration-fast"
+            className="w-full px-4 py-3 rounded-xl border border-primary/20 dark:border-white/20 bg-white/50 dark:bg-white/5 backdrop-blur-sm text-primary dark:text-white focus:outline-none focus:ring-1 focus:ring-accent focus:border-accent transition-shadow duration-fast"
           />
         </div>
 
         <div>
           <label className="block text-sm font-medium text-primary/70 dark:text-white/70 mb-2">
-            Phone Number <span className="text-red-500">*</span>
+            Phone Number <span className="text-amber-500">*</span>
           </label>
           <input
             type="tel"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
             placeholder="(555) 123-4567"
-            className="w-full px-4 py-3 rounded-xl border border-primary/20 dark:border-white/20 bg-white/50 dark:bg-white/5 backdrop-blur-sm text-primary dark:text-white focus:outline-none focus:ring-2 focus:ring-accent transition-all duration-fast"
+            className="w-full px-4 py-3 rounded-xl border border-primary/20 dark:border-white/20 bg-white/50 dark:bg-white/5 backdrop-blur-sm text-primary dark:text-white focus:outline-none focus:ring-1 focus:ring-accent focus:border-accent transition-shadow duration-fast"
           />
         </div>
 
         <div>
           <label className="block text-sm font-medium text-primary/70 dark:text-white/70 mb-2">
-            Company Name <span className="text-red-500">*</span>
+            Company Name <span className="text-amber-500">*</span>
           </label>
           <input
             type="text"
             value={companyName}
             onChange={(e) => setCompanyName(e.target.value)}
             placeholder="Acme Corporation"
-            className="w-full px-4 py-3 rounded-xl border border-primary/20 dark:border-white/20 bg-white/50 dark:bg-white/5 backdrop-blur-sm text-primary dark:text-white focus:outline-none focus:ring-2 focus:ring-accent transition-all duration-fast"
+            className="w-full px-4 py-3 rounded-xl border border-primary/20 dark:border-white/20 bg-white/50 dark:bg-white/5 backdrop-blur-sm text-primary dark:text-white focus:outline-none focus:ring-1 focus:ring-accent focus:border-accent transition-shadow duration-fast"
           />
         </div>
 
@@ -318,13 +318,13 @@ function CorporateCheckoutForm({ tier, email, initialQuantity }: CorporateChecko
             value={jobTitle}
             onChange={(e) => setJobTitle(e.target.value)}
             placeholder="HR Manager, CEO, etc."
-            className="w-full px-4 py-3 rounded-xl border border-primary/20 dark:border-white/20 bg-white/50 dark:bg-white/5 backdrop-blur-sm text-primary dark:text-white focus:outline-none focus:ring-2 focus:ring-accent transition-all duration-fast"
+            className="w-full px-4 py-3 rounded-xl border border-primary/20 dark:border-white/20 bg-white/50 dark:bg-white/5 backdrop-blur-sm text-primary dark:text-white focus:outline-none focus:ring-1 focus:ring-accent focus:border-accent transition-shadow duration-fast"
           />
         </div>
 
         <div>
           <label className="block text-sm font-medium text-primary/70 dark:text-white/70 mb-2">
-            Number of Employee Seats
+            Team Size
           </label>
           <div className="flex items-center gap-4">
             <button
@@ -407,7 +407,10 @@ function CorporateCheckoutForm({ tier, email, initialQuantity }: CorporateChecko
       </div>
 
       {error && (
-        <p className="text-red-500 text-sm text-center">{error}</p>
+        <div className="flex items-center justify-center gap-2 text-sm animate-content-enter">
+          <span className="material-symbols-outlined text-amber-500 text-base">info</span>
+          <p className="text-amber-600 dark:text-amber-400">{error}</p>
+        </div>
       )}
 
       <button
@@ -528,8 +531,9 @@ function DayPassesSection() {
 
   if (error && !selectedProduct) {
     return (
-      <div className="text-center py-8">
-        <p className="text-red-600 dark:text-red-400">{error}</p>
+      <div className="text-center py-8 animate-content-enter">
+        <span className="material-symbols-outlined text-4xl text-amber-500 mb-2 block">info</span>
+        <p className="text-amber-700 dark:text-amber-300 text-sm">{error}</p>
       </div>
     );
   }
@@ -543,7 +547,7 @@ function DayPassesSection() {
 
       {selectedProduct ? (
         <div className="glass-card rounded-2xl p-6 md:p-8 max-w-md mx-auto">
-          <h2 className="text-xl font-bold text-primary dark:text-white mb-4">
+          <h2 className="text-xl font-semibold text-primary dark:text-white mb-4">
             Complete Your Purchase
           </h2>
           <p className="text-primary/70 dark:text-white/70 mb-6">
@@ -553,14 +557,14 @@ function DayPassesSection() {
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-primary/70 dark:text-white/70 mb-1">
-                Email <span className="text-red-500">*</span>
+                Email <span className="text-amber-500">*</span>
               </label>
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="your@email.com"
-                className="w-full px-4 py-3 rounded-xl border border-primary/20 dark:border-white/20 bg-white/50 dark:bg-white/5 text-primary dark:text-white focus:outline-none focus:ring-2 focus:ring-accent"
+                className="w-full px-4 py-3 rounded-xl border border-primary/20 dark:border-white/20 bg-white/50 dark:bg-white/5 text-primary dark:text-white focus:outline-none focus:ring-1 focus:ring-accent focus:border-accent transition-shadow duration-fast"
                 required
               />
             </div>
@@ -575,7 +579,7 @@ function DayPassesSection() {
                   value={firstName}
                   onChange={(e) => setFirstName(e.target.value)}
                   placeholder="John"
-                  className="w-full px-4 py-3 rounded-xl border border-primary/20 dark:border-white/20 bg-white/50 dark:bg-white/5 text-primary dark:text-white focus:outline-none focus:ring-2 focus:ring-accent"
+                  className="w-full px-4 py-3 rounded-xl border border-primary/20 dark:border-white/20 bg-white/50 dark:bg-white/5 text-primary dark:text-white focus:outline-none focus:ring-1 focus:ring-accent focus:border-accent transition-shadow duration-fast"
                 />
               </div>
               <div>
@@ -587,13 +591,16 @@ function DayPassesSection() {
                   value={lastName}
                   onChange={(e) => setLastName(e.target.value)}
                   placeholder="Doe"
-                  className="w-full px-4 py-3 rounded-xl border border-primary/20 dark:border-white/20 bg-white/50 dark:bg-white/5 text-primary dark:text-white focus:outline-none focus:ring-2 focus:ring-accent"
+                  className="w-full px-4 py-3 rounded-xl border border-primary/20 dark:border-white/20 bg-white/50 dark:bg-white/5 text-primary dark:text-white focus:outline-none focus:ring-1 focus:ring-accent focus:border-accent transition-shadow duration-fast"
                 />
               </div>
             </div>
 
             {error && (
-              <p className="text-red-500 text-sm">{error}</p>
+              <div className="flex items-center gap-2 text-sm animate-content-enter">
+                <span className="material-symbols-outlined text-amber-500 text-base">info</span>
+                <p className="text-amber-600 dark:text-amber-400">{error}</p>
+              </div>
             )}
 
             <div className="flex gap-3 pt-2">
@@ -634,8 +641,8 @@ function DayPassesSection() {
                   </span>
                 </div>
                 <div>
-                  <h3 className="font-bold text-primary dark:text-white">{product.name}</h3>
-                  <p className="text-2xl font-bold text-accent">{formatPrice(product.priceCents)}</p>
+                  <h3 className="font-semibold text-primary dark:text-white">{product.name}</h3>
+                  <p className="text-2xl font-semibold text-accent">{formatPrice(product.priceCents)}</p>
                 </div>
               </div>
 
@@ -773,8 +780,8 @@ function CheckoutSuccess() {
   if (status === 'error') {
     return (
       <div className="text-center py-16">
-        <span className="material-symbols-outlined text-6xl text-red-500 mb-4 block">error</span>
-        <h2 className="text-2xl font-bold text-primary dark:text-white mb-2">Something went wrong</h2>
+        <span className="material-symbols-outlined text-5xl text-amber-500 mb-4 block">info</span>
+        <h2 className="text-2xl font-semibold text-primary dark:text-white mb-2">Something went wrong</h2>
         <p className="text-primary/70 dark:text-white/70 mb-6">We couldn't verify your payment. Please contact support.</p>
         <a
           href="/#/contact"

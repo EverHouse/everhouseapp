@@ -13,20 +13,20 @@ const Input: React.FC<InputProps> = ({ label, icon, variant = 'glass', error, cl
   const errorId = error ? `${inputId}-error` : undefined;
   
   const inputClasses = variant === 'solid'
-    ? `w-full bg-white border rounded-lg py-3 px-4 text-primary placeholder:text-gray-600 sm:text-sm sm:leading-6 ${
+    ? `w-full bg-white border rounded-lg py-3 px-4 text-primary placeholder:text-gray-600 sm:text-sm sm:leading-6 transition-shadow duration-fast ${
         error 
-          ? 'border-red-500 focus:ring-2 focus:ring-red-500 focus:border-red-500' 
-          : 'border-gray-200 focus:ring-2 focus:ring-primary focus:border-primary'
+          ? 'border-amber-400 focus:ring-1 focus:ring-amber-400 focus:border-amber-400' 
+          : 'border-gray-200 focus:ring-1 focus:ring-accent focus:border-accent'
       }`
-    : `w-full glass-input py-3 px-4 text-primary dark:text-white placeholder:text-gray-600 dark:placeholder:text-white/70 sm:text-sm sm:leading-6 ${
-        error ? 'border-red-500 focus:ring-red-500' : ''
+    : `w-full glass-input py-3 px-4 text-primary dark:text-white placeholder:text-gray-600 dark:placeholder:text-white/70 sm:text-sm sm:leading-6 transition-shadow duration-fast ${
+        error ? 'border-amber-400 focus:ring-1 focus:ring-amber-400' : ''
       }`;
 
   return (
     <div>
       <label 
         htmlFor={inputId}
-        className="block text-sm font-bold text-primary dark:text-white mb-1.5 pl-1"
+        className="block text-sm font-semibold text-primary dark:text-white mb-1.5 pl-1"
       >
         {label}
       </label>
@@ -43,8 +43,8 @@ const Input: React.FC<InputProps> = ({ label, icon, variant = 'glass', error, cl
           )}
       </div>
       {error && (
-        <p id={errorId} className="mt-1 text-sm text-red-600 dark:text-red-400 pl-1 flex items-center gap-1" role="alert">
-          <span className="material-symbols-outlined text-sm" aria-hidden="true">error</span>
+        <p id={errorId} className="mt-1 text-sm text-amber-600 dark:text-amber-400 pl-1 flex items-center gap-1" role="alert">
+          <span className="material-symbols-outlined text-sm" aria-hidden="true">info</span>
           {error}
         </p>
       )}

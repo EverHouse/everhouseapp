@@ -75,10 +75,10 @@ export function MemberPaymentModal({
           setTimeout(() => onSuccess(), 1500);
         }
       } else {
-        setError(apiError || 'Failed to initialize payment');
+        setError(apiError || "We couldn't set up your payment. Please try again.");
       }
     } catch (err: unknown) {
-      setError((err instanceof Error ? err.message : String(err)) || 'Failed to initialize payment');
+      setError((err instanceof Error ? err.message : String(err)) || "We couldn't set up your payment. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -141,7 +141,7 @@ export function MemberPaymentModal({
 
       if (!ok) {
         console.error('[MemberPaymentModal] Failed to confirm payment:', confirmError);
-        setError('Payment processed by Stripe, but backend confirmation failed. Please refresh.');
+        setError('Your payment was processed, but we had trouble confirming it. Please refresh the page.');
         setConfirming(false);
         return;
       }
@@ -149,7 +149,7 @@ export function MemberPaymentModal({
       onSuccess();
     } catch (err: unknown) {
       console.error('[MemberPaymentModal] Error confirming payment:', err);
-      setError('Network error during confirmation. Please refresh the page.');
+      setError('A network issue occurred during confirmation. Please refresh the page.');
       setConfirming(false);
     }
   };
@@ -169,9 +169,9 @@ export function MemberPaymentModal({
         )}
 
         {error && (
-          <div className="text-center py-8">
-            <span className="material-symbols-outlined text-4xl text-red-500 mb-2">error</span>
-            <p className="text-red-600 dark:text-red-400 mb-4">{error}</p>
+          <div className="text-center py-8 animate-content-enter">
+            <span className={`material-symbols-outlined text-4xl mb-2 ${isDark ? 'text-amber-400' : 'text-amber-500'}`}>info</span>
+            <p className={`mb-4 text-sm ${isDark ? 'text-amber-300' : 'text-amber-700'}`}>{error}</p>
             <button
               onClick={onClose}
               className="px-4 py-2 bg-primary/10 dark:bg-white/10 text-primary dark:text-white rounded-xl tactile-btn"
@@ -193,8 +193,8 @@ export function MemberPaymentModal({
         {!loading && !confirming && !error && paymentData && (
           <div className="space-y-4">
             <div className={`rounded-xl p-4 ${isDark ? 'bg-white/5' : 'bg-primary/5'}`}>
-              <h4 className={`text-sm font-bold mb-3 ${isDark ? 'text-white/80' : 'text-primary/80'}`}>
-                Guest Fee Summary
+              <h4 className={`text-sm font-semibold mb-3 ${isDark ? 'text-white/70' : 'text-primary/70'}`}>
+                Fee Summary
               </h4>
               <div className="space-y-2">
                 {paymentData.participantFees.map((fee) => (
@@ -218,7 +218,7 @@ export function MemberPaymentModal({
                 ))}
               </div>
               <div className={`mt-3 pt-3 border-t flex items-center justify-between ${isDark ? 'border-white/10' : 'border-primary/10'}`}>
-                <span className={`text-sm font-bold ${isDark ? 'text-white' : 'text-primary'}`}>
+                <span className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-primary'}`}>
                   Total
                 </span>
                 <span className={`text-lg font-bold ${isDark ? 'text-white' : 'text-primary'}`}>
@@ -259,7 +259,7 @@ export function MemberPaymentModal({
             {paymentData.paidInFull ? (
               <div className={`rounded-xl p-4 text-center ${isDark ? 'bg-emerald-500/20' : 'bg-emerald-100'}`}>
                 <span className="material-symbols-outlined text-4xl text-emerald-500 mb-2">check_circle</span>
-                <p className={`text-lg font-bold ${isDark ? 'text-emerald-400' : 'text-emerald-700'}`}>
+                <p className={`text-lg font-semibold ${isDark ? 'text-emerald-400' : 'text-emerald-700'}`}>
                   Paid with Account Credit
                 </p>
                 <p className={`text-sm mt-1 ${isDark ? 'text-emerald-400/80' : 'text-emerald-600'}`}>
@@ -275,14 +275,14 @@ export function MemberPaymentModal({
                 onCancel={onClose}
               />
             ) : paymentData.error ? (
-              <div className={`rounded-xl p-4 text-center ${isDark ? 'bg-red-500/20' : 'bg-red-100'}`}>
-                <span className="material-symbols-outlined text-4xl text-red-500 mb-2">error</span>
-                <p className={`text-sm ${isDark ? 'text-red-400' : 'text-red-700'}`}>
+              <div className={`rounded-xl p-4 text-center animate-content-enter ${isDark ? 'bg-amber-500/10 border border-amber-500/20' : 'bg-amber-50 border border-amber-200/60'}`}>
+                <span className={`material-symbols-outlined text-4xl mb-2 ${isDark ? 'text-amber-400' : 'text-amber-500'}`}>info</span>
+                <p className={`text-sm ${isDark ? 'text-amber-300' : 'text-amber-700'}`}>
                   {paymentData.error}
                 </p>
                 <button
                   onClick={() => setPaymentData(null)}
-                  className="mt-3 px-4 py-2 rounded-lg text-sm bg-red-500 text-white hover:bg-red-600 tactile-btn"
+                  className={`mt-3 px-4 py-2 rounded-xl text-sm font-medium tactile-btn ${isDark ? 'bg-white/10 text-white hover:bg-white/15' : 'bg-primary/10 text-primary hover:bg-primary/15'}`}
                 >
                   Try Again
                 </button>
