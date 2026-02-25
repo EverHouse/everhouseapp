@@ -60,7 +60,7 @@ const CheckInConfirmationModal: React.FC<CheckInConfirmationModalProps> = ({
         right: 0,
         bottom: 0,
         width: '100vw',
-        height: '100vh',
+        height: '100dvh',
         zIndex: 99999,
         display: 'flex',
         alignItems: 'center',
