@@ -217,6 +217,57 @@ Guard: the webhook only processes if the user's `stripe_subscription_id` matches
 
 See [references/transitions.md](references/transitions.md) for all status transitions.
 
+## MindBody → Stripe Migration
+
+Staff can migrate MindBody-billed members to Stripe billing one at a time. This is a controlled, staff-initiated process — there is no bulk migration or self-service option.
+
+### Migration Flow
+
+1. Staff opens a member's billing tab and initiates migration
+2. The member must already have a saved Stripe payment method (card on file)
+3. The app sets `billing_provider = 'stripe'` and `migration_status = 'pending'` on the user record
+4. A Stripe subscription is created with metadata: `{ tier_slug, tier_name, migration: 'true', source: 'even_house_app' }`
+5. When the `customer.subscription.created` webhook fires, it detects `metadata.migration === 'true'` and sets `migration_status = 'completed'`
+6. Staff and member are notified at each stage
+
+### migration_status State Machine
+
+The `migration_status` column on the `users` table tracks the migration lifecycle:
+
+```
+null → pending → completed
+                → cancelled
+                → failed
+```
+
+| Status | Meaning |
+|--------|---------|
+| `null` | No migration in progress |
+| `pending` | Migration initiated, waiting for Stripe subscription confirmation |
+| `completed` | Stripe subscription created successfully, migration done |
+| `cancelled` | Staff cancelled the migration before completion |
+| `failed` | Subscription creation or webhook processing failed |
+
+### Deactivation Cascade Exception
+
+Members with `migration_status = 'pending'` are **exempt from the MindBody deactivation cascade**. During the daily HubSpot sync, if a MindBody member's status changes from `active` to non-active but they have a pending migration, the cascade is skipped — the member stays active. This prevents the migration from being disrupted by a race condition between MindBody status updates and the Stripe subscription creation.
+
+### Migration Fields on Users Table
+
+| Column | Type | Purpose |
+|--------|------|---------|
+| `migration_status` | text | Current migration state: `null`, `pending`, `completed`, `cancelled`, `failed` |
+| `migration_billing_start_date` | timestamp | When the Stripe subscription billing should start |
+| `migration_requested_by` | text | Email of the staff member who initiated the migration |
+| `migration_tier_snapshot` | text | The tier slug at the time of migration (preserved for audit) |
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `server/core/stripe/billingMigration.ts` | Core migration logic: initiate, cancel, process pending migrations |
+| `server/routes/memberBilling.ts` | API routes for staff to trigger and manage migrations |
+
 ## Tier Changes
 
 Tier changes can be immediate (upgrade, proration invoiced) or end-of-cycle (downgrade, no proration). Staff initiate changes via the admin panel. The system previews the financial impact before committing.

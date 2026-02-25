@@ -8,6 +8,21 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.27.0",
+    date: "2026-02-25",
+    title: "MindBody → Stripe Billing Migration",
+    isMajor: true,
+    changes: [
+      "New: Staff can now migrate MindBody members to Stripe billing one-by-one from the directory profile drawer — pick a billing start date, confirm MindBody cancellation, and the system handles the rest automatically",
+      "New: Migration engine runs after daily member sync — when MindBody status goes inactive and the billing start date arrives, a Stripe subscription is created automatically using the member's card on file",
+      "New: Members with a pending migration stay fully active with no access gap — the deactivation cascade skips them so their tier and status are preserved during the transition",
+      "New: Staff receives notifications when a MindBody member adds a card on file (from terminal or self-service), making them eligible for migration",
+      "New: Migration status badges in the billing tab show real-time progress: eligible, pending, completed, or failed with retry option",
+      "New: Self-service checkout and billing portal are blocked during a pending migration to prevent double subscriptions",
+      "New: Stale migrations (pending for more than 14 days) trigger staff reminder notifications",
+    ]
+  },
+  {
     version: "8.26.7",
     date: "2026-02-25",
     title: "Critical Financial Safety, Webhook Transaction & Check-In Fixes",

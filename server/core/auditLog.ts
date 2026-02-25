@@ -270,7 +270,9 @@ export type AuditAction =
   | 'confirm_day_pass_payment'
   | 'create_conference_prepayment'
   | 'confirm_conference_prepayment'
-  | 'checkout_session_expired';
+  | 'checkout_session_expired'
+  | 'initiate_billing_migration'
+  | 'cancel_billing_migration';
 
 export type ActorType = 'staff' | 'member' | 'system';
 

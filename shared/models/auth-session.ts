@@ -96,6 +96,10 @@ export const users = pgTable("users", {
   appInstalledAt: timestamp("app_installed_at"),
   onboardingNudgeCount: integer("onboarding_nudge_count").default(0),
   onboardingLastNudgeAt: timestamp("onboarding_last_nudge_at"),
+  migrationBillingStartDate: timestamp("migration_billing_start_date"),
+  migrationRequestedBy: text("migration_requested_by"),
+  migrationTierSnapshot: text("migration_tier_snapshot"),
+  migrationStatus: text("migration_status"),
 }, (table) => [
   index("users_stripe_customer_id_idx").on(table.stripeCustomerId),
   index("users_membership_status_idx").on(table.membershipStatus),

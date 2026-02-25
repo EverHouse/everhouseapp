@@ -1382,6 +1382,24 @@ router.post('/api/stripe/terminal/confirm-save-card', isStaffOrAdmin, async (req
       }
     });
 
+    try {
+      const memberCheck = await db.execute(sql`SELECT email, billing_provider, COALESCE(NULLIF(TRIM(COALESCE(first_name, '') || ' ' || COALESCE(last_name, '')), ''), email) AS display_name FROM users WHERE stripe_customer_id = ${customerId} LIMIT 1`);
+      if (memberCheck.rows.length > 0) {
+        const member = memberCheck.rows[0] as { email: string; billing_provider: string | null; display_name: string };
+        if (member.billing_provider === 'mindbody') {
+          const { notifyAllStaff } = await import('../../core/notificationService');
+          await notifyAllStaff(
+            'MindBody Member Card Saved',
+            `MindBody member ${member.display_name} now has a card on file — eligible for Stripe migration`,
+            'billing_migration'
+          );
+          logger.info('[Terminal] Notified staff: MindBody member card saved via terminal', { extra: { email: member.email } });
+        }
+      }
+    } catch (migrationNotifyErr: unknown) {
+      logger.warn('[Terminal] Could not check/notify for MindBody migration eligibility (non-blocking)', { extra: { error: getErrorMessage(migrationNotifyErr) } });
+    }
+
     res.json({
       success: true,
       cardSaved: true,

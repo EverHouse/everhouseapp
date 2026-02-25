@@ -364,6 +364,21 @@ export async function ensureDatabaseConstraints() {
 
       await db.execute(sql`ALTER TABLE users ALTER COLUMN billing_provider SET DEFAULT 'stripe'`);
       logger.info('[DB Init] billing_provider column default set to stripe');
+
+      const migrationCols = [
+        { col: 'migration_billing_start_date', type: 'TIMESTAMP' },
+        { col: 'migration_requested_by', type: 'TEXT' },
+        { col: 'migration_tier_snapshot', type: 'TEXT' },
+        { col: 'migration_status', type: 'TEXT' },
+      ];
+      for (const { col, type } of migrationCols) {
+        try {
+          await db.execute(sql.raw(`ALTER TABLE users ADD COLUMN IF NOT EXISTS ${col} ${type}`));
+        } catch (colErr: unknown) {
+          logger.warn(`[DB Init] Skipping migration column ${col}: ${getErrorMessage(colErr)}`);
+        }
+      }
+      logger.info('[DB Init] Billing migration columns verified');
       
       const hubspotFix = await db.execute(sql`
         UPDATE users SET billing_provider = 'manual', updated_at = NOW()

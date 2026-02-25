@@ -2779,7 +2779,7 @@ async function handleSubscriptionCreated(client: PoolClient, subscription: Strip
 
     // First try to find user by stripe_customer_id
     let userResult = await client.query(
-      'SELECT email, first_name, last_name, tier, membership_status, billing_provider FROM users WHERE stripe_customer_id = $1 LIMIT 1',
+      'SELECT email, first_name, last_name, tier, membership_status, billing_provider, migration_status FROM users WHERE stripe_customer_id = $1 LIMIT 1',
       [customerId]
     );
     
@@ -2958,6 +2958,15 @@ async function handleSubscriptionCreated(client: PoolClient, subscription: Strip
         }
       }
       
+      if (subscription.metadata?.migration === 'true') {
+        await client.query(
+          `UPDATE users SET migration_status = 'completed', updated_at = NOW()
+           WHERE LOWER(email) = LOWER($1) AND (migration_status = 'pending' OR migration_status IS NULL)`,
+          [customerEmail]
+        );
+        logger.info(`[Stripe Webhook] Migration subscription detected for ${customerEmail} — migration_status set to completed`);
+      }
+
       const deferredCustomerEmail = customerEmail;
       const deferredFirstName = firstName;
       const deferredLastName = lastName;
@@ -3081,6 +3090,15 @@ async function handleSubscriptionCreated(client: PoolClient, subscription: Strip
         [subscription.id, subscriptionPeriodEnd, mappedStatus, email, customerId]
       );
       logger.info(`[Stripe Webhook] Updated existing user ${email}: subscription=${subscription.id}, customerId=${customerId}, status=${mappedStatus} (stripe: ${subscription.status}), shouldActivate=${shouldActivate}`);
+
+      if (subscription.metadata?.migration === 'true') {
+        await client.query(
+          `UPDATE users SET migration_status = 'completed', updated_at = NOW()
+           WHERE LOWER(email) = LOWER($1) AND (migration_status = 'pending' OR migration_status IS NULL)`,
+          [email]
+        );
+        logger.info(`[Stripe Webhook] Migration subscription detected for ${email} — migration_status set to completed`);
+      }
     }
 
     try {
@@ -4885,6 +4903,28 @@ async function handlePaymentMethodAttached(client: PoolClient, paymentMethod: St
         }
       });
     }
+
+    if (memberResult.rows.length > 0) {
+      const memberForMigration = memberResult.rows[0];
+      const billingCheck = await client.query(
+        `SELECT billing_provider FROM users WHERE stripe_customer_id = $1 AND billing_provider = 'mindbody' LIMIT 1`,
+        [customerId]
+      );
+      if (billingCheck.rows.length > 0) {
+        deferredActions.push(async () => {
+          try {
+            await notifyAllStaff(
+              'MindBody Member Card Saved',
+              `MindBody member ${memberForMigration.display_name} now has a card on file — eligible for Stripe migration`,
+              'billing_migration'
+            );
+            logger.info('[Stripe Webhook] Notified staff: MindBody member card saved via payment_method.attached', { extra: { email: memberForMigration.email } });
+          } catch (err: unknown) {
+            logger.error('[Stripe Webhook] Failed to notify staff about MindBody member card save:', { error: err });
+          }
+        });
+      }
+    }
   } catch (error: unknown) {
     logger.error('[Stripe Webhook] Error handling payment_method.attached:', { error });
   }
@@ -5834,6 +5874,25 @@ async function handleSetupIntentSucceeded(client: PoolClient, setupIntent: Strip
         logger.error('[Stripe Webhook] Failed to log setup intent success:', { error: getErrorMessage(err) });
       }
     });
+
+    const billingCheck = await client.query(
+      `SELECT billing_provider FROM users WHERE stripe_customer_id = $1 AND billing_provider = 'mindbody' LIMIT 1`,
+      [customerId]
+    );
+    if (billingCheck.rows.length > 0) {
+      deferredActions.push(async () => {
+        try {
+          await notifyAllStaff(
+            'MindBody Member Card Saved',
+            `MindBody member ${user.display_name} now has a card on file — eligible for Stripe migration`,
+            'billing_migration'
+          );
+          logger.info('[Stripe Webhook] Notified staff: MindBody member card saved via setup_intent.succeeded', { extra: { email: user.email } });
+        } catch (err: unknown) {
+          logger.error('[Stripe Webhook] Failed to notify staff about MindBody member card save:', { error: err });
+        }
+      });
+    }
   } catch (error: unknown) {
     logger.error('[Stripe Webhook] Error handling setup_intent.succeeded:', { error: getErrorMessage(error) });
   }

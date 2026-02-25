@@ -363,7 +363,8 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
             billingProvider: users.billingProvider,
             lastHubspotNotesHash: users.lastHubspotNotesHash,
             role: users.role,
-            tier: users.tier
+            tier: users.tier,
+            migrationStatus: users.migrationStatus
           })
             .from(users)
             .where(eq(users.email, email))
@@ -380,10 +381,13 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
           const isMindBodyBilled = existingUser[0]?.billingProvider === 'mindbody';
           const isCurrentlyActive = existingUser[0]?.membershipStatus === 'active';
           const isMindBodyActiveAllowStatus = isMindBodyBilled && isCurrentlyActive;
-          const isStatusProtected = isVisitorProtected || !isMindBodyActiveAllowStatus;
-          const isMindBodyDeactivation = isMindBodyBilled && isCurrentlyActive && status !== 'active';
+          const hasPendingMigration = existingUser[0]?.migrationStatus === 'pending';
+          const isStatusProtected = isVisitorProtected || !isMindBodyActiveAllowStatus || hasPendingMigration;
+          const isMindBodyDeactivation = isMindBodyBilled && isCurrentlyActive && status !== 'active' && !hasPendingMigration;
 
-          if (existingUser[0]?.billingProvider === 'stripe') {
+          if (hasPendingMigration && isMindBodyBilled && isCurrentlyActive && status !== 'active') {
+            logger.info(`[MemberSync] Skipping deactivation cascade for ${email} — pending migration to Stripe`);
+          } else if (existingUser[0]?.billingProvider === 'stripe') {
             stripeProtectedCount++;
             logger.info(`[MemberSync] APP DB PRIMARY: Skipping status/tier update for Stripe-billed member ${email} (HubSpot status: ${status})`);
           } else if (isVisitorProtected) {
@@ -951,7 +955,8 @@ export async function syncRelevantMembersFromHubSpot(): Promise<{ synced: number
             billingProvider: users.billingProvider,
             lastHubspotNotesHash: users.lastHubspotNotesHash,
             role: users.role,
-            tier: users.tier
+            tier: users.tier,
+            migrationStatus: users.migrationStatus
           })
             .from(users)
             .where(eq(users.email, email))
@@ -968,10 +973,13 @@ export async function syncRelevantMembersFromHubSpot(): Promise<{ synced: number
           const isMindBodyBilled = existingUser[0]?.billingProvider === 'mindbody';
           const isCurrentlyActive = existingUser[0]?.membershipStatus === 'active';
           const isMindBodyActiveAllowStatus = isMindBodyBilled && isCurrentlyActive;
-          const isStatusProtected = isVisitorProtected || !isMindBodyActiveAllowStatus;
-          const isMindBodyDeactivation = isMindBodyBilled && isCurrentlyActive && status !== 'active';
+          const hasPendingMigration = existingUser[0]?.migrationStatus === 'pending';
+          const isStatusProtected = isVisitorProtected || !isMindBodyActiveAllowStatus || hasPendingMigration;
+          const isMindBodyDeactivation = isMindBodyBilled && isCurrentlyActive && status !== 'active' && !hasPendingMigration;
 
-          if (existingUser[0]?.billingProvider === 'stripe') {
+          if (hasPendingMigration && isMindBodyBilled && isCurrentlyActive && status !== 'active') {
+            logger.info(`[MemberSync] Skipping deactivation cascade for ${email} — pending migration to Stripe`);
+          } else if (existingUser[0]?.billingProvider === 'stripe') {
             stripeProtectedCount++;
             logger.info(`[MemberSync] APP DB PRIMARY: Skipping status/tier update for Stripe-billed member ${email} (HubSpot status: ${status})`);
           } else if (isVisitorProtected) {
@@ -1291,6 +1299,16 @@ export async function syncRelevantMembersFromHubSpot(): Promise<{ synced: number
     }
     
     await alertOnHubSpotSyncComplete(synced, errors, allContacts.length);
+    
+    try {
+      const { processPendingMigrations } = await import('./stripe/billingMigration');
+      const migrationResult = await processPendingMigrations();
+      if (migrationResult.processed > 0) {
+        logger.info(`[MemberSync] Post-sync migration processing: ${migrationResult.succeeded} succeeded, ${migrationResult.failed} failed, ${migrationResult.skipped} skipped`);
+      }
+    } catch (migrationError: unknown) {
+      logger.error('[MemberSync] Error processing pending migrations after sync:', { error: migrationError });
+    }
     
     return { synced, errors };
   } catch (error: unknown) {

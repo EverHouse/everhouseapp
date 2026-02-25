@@ -254,6 +254,20 @@ Sound maps:
 
 Return sorted by timestamp, limited to 20 items.
 
+## Billing Migration Notifications
+
+The MindBody → Stripe migration flow uses notification type `billing_migration` for all migration-related notifications. These are triggered at key points in the migration lifecycle:
+
+| Trigger | Recipients | Description |
+|---------|-----------|-------------|
+| Card saved for MindBody member | Staff | When a MindBody member saves a card via terminal, `payment_method.attached`, or `setup_intent.succeeded` — staff are notified the member is now eligible for migration |
+| Migration initiated | Staff + Member | Staff member starts the migration; both parties are notified |
+| Migration completed | Staff + Member | Stripe subscription confirmed via webhook; both parties notified of successful migration |
+| Migration failed | Staff | Subscription creation or processing failed; staff notified for manual intervention |
+| Stale migration alert | Staff | Migration has been in `pending` status for >14 days; staff notified to investigate. Triggered by `processPendingMigrations()` which runs after the daily HubSpot member sync |
+
+All migration notifications use `type: 'billing_migration'` (already listed in the NotificationType union above).
+
 ## Rules
 
 1. Always use `notifyMember()` from `notificationService.ts` — never insert directly into the `notifications` table for member notifications.

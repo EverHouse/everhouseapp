@@ -350,12 +350,16 @@ router.post('/api/my/billing/migrate-to-stripe', requireAuth, async (req, res) =
       return res.status(400).json({ error: 'Staff accounts do not use billing' });
     }
     
-    const result = await db.execute(sql`SELECT id, email, first_name, last_name, billing_provider, stripe_customer_id, tier
+    const result = await db.execute(sql`SELECT id, email, first_name, last_name, billing_provider, stripe_customer_id, tier, migration_status
        FROM users WHERE LOWER(email) = ${email.toLowerCase()}`);
     
     const member = (result.rows as Array<Record<string, unknown>>)[0];
     if (!member) {
       return res.status(404).json({ error: 'Member not found' });
+    }
+    
+    if (member.migration_status === 'pending') {
+      return res.json({ success: true, message: 'Your billing migration is already being processed by staff. No action needed.' });
     }
     
     if (member.billing_provider === 'stripe') {

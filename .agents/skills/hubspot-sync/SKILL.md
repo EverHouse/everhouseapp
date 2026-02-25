@@ -115,12 +115,13 @@ Deal creation is currently disabled (functions return early). The pipeline infra
 2. Skip contacts in the `sync_exclusions` table (permanently deleted members).
 3. For each contact, upsert into `users` with `ON CONFLICT (email) DO UPDATE`.
 4. **Tier normalization:** Only recognized tiers (matching `TIER_NAMES`) are written; unrecognized tiers log a warning and preserve the existing DB tier.
-5. **Status/tier protection (app is primary brain):** ALL users are protected from status/tier overwrite EXCEPT MindBody-billed active members. For MindBody active members, HubSpot can update `membership_status` only. If a MindBody member's status changes from active → non-active, the deactivation cascade fires (tier removed, billing_provider → stripe).
+5. **Status/tier protection (app is primary brain):** ALL users are protected from status/tier overwrite EXCEPT MindBody-billed active members. For MindBody active members, HubSpot can update `membership_status` only. If a MindBody member's status changes from active → non-active, the deactivation cascade fires (tier removed, billing_provider → stripe). **Exception:** Members with `migration_status = 'pending'` skip the deactivation cascade — they stay active while their Stripe subscription is being provisioned.
 6. **New users:** Get `billing_provider = 'mindbody'` if active + has `mindbody_client_id`; otherwise `'stripe'`.
 7. **Notes sync:** Membership notes and messages from HubSpot are hashed; new notes create `member_notes` entries attributed to "HubSpot Sync (Mindbody)".
 8. **Linked emails:** Merged contact IDs (`hs_merged_object_ids`) are batch-fetched and stored in `user_linked_emails` for email deduplication.
 9. **Deal stage sync:** After the main sync, contacts with deal-relevant statuses get their deal stages updated in batches of 5 with 2-second delays.
 10. **Status change notifications:** When a member's status changes to a problematic state (past_due, declined, etc.), the app notifies the member and staff, and starts a grace period for Mindbody members.
+11. **Pending migration processing:** After the main member sync completes, `processPendingMigrations()` runs to check for stale migrations (>14 days pending) and send alerts. This hooks into the existing `syncAllMembersFromHubSpot` flow — no separate scheduler is needed.
 
 ### HubSpot Contact Properties Read
 
@@ -170,12 +171,13 @@ Contacts are enriched with: lifetime visits (bookings + events + wellness + walk
 1. **Never write membership_status to HubSpot for Mindbody-billed members** — prevents Mindbody ↔ HubSpot loop.
 2. **Never overwrite Stripe-protected members' status/tier from HubSpot** — Stripe is authoritative.
 3. **Never overwrite visitor role from HubSpot** — visitors must be explicitly converted.
-4. **Placeholder emails are rejected** — `isPlaceholderEmail` check prevents syncing test/internal emails.
-5. **Idempotency keys prevent duplicate queue jobs** — same operation for the same entity is deduplicated.
-6. **Unrecoverable errors (401, 403, MISSING_SCOPES) go straight to dead** — no retry, staff notified immediately.
-7. **Queue uses FOR UPDATE SKIP LOCKED** — safe for concurrent workers, no double-processing.
-8. **Stripe fields only pushed in live Stripe environment** — sandbox Stripe data never reaches HubSpot.
-9. **Sync exclusions list** — permanently deleted members are excluded from the inbound sync.
+4. **Migration-aware deactivation cascade** — MindBody members with `migration_status = 'pending'` skip the deactivation cascade during daily sync. The member stays active while their Stripe subscription is being set up.
+5. **Placeholder emails are rejected** — `isPlaceholderEmail` check prevents syncing test/internal emails.
+6. **Idempotency keys prevent duplicate queue jobs** — same operation for the same entity is deduplicated.
+7. **Unrecoverable errors (401, 403, MISSING_SCOPES) go straight to dead** — no retry, staff notified immediately.
+8. **Queue uses FOR UPDATE SKIP LOCKED** — safe for concurrent workers, no double-processing.
+9. **Stripe fields only pushed in live Stripe environment** — sandbox Stripe data never reaches HubSpot.
+10. **Sync exclusions list** — permanently deleted members are excluded from the inbound sync.
 
 ## Key Files
 

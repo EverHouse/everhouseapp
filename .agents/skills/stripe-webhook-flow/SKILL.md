@@ -227,6 +227,32 @@ WHERE LOWER(email) = LOWER($1) AND (stripe_subscription_id = $2 OR stripe_subscr
 
 This prevents cancellation of a user who has already been assigned a newer subscription.
 
+## MindBody → Stripe Migration Webhook Handling
+
+When `handleSubscriptionCreated` processes a new subscription, it checks `subscription.metadata.migration === 'true'` to detect migration subscriptions.
+
+### Migration Subscription Metadata
+
+Migration subscriptions are created with specific metadata that identifies them:
+
+| Key | Value | Purpose |
+|-----|-------|---------|
+| `tier_slug` | e.g. `premium` | The tier being migrated to |
+| `tier_name` | e.g. `Premium Membership` | Human-readable tier name |
+| `migration` | `'true'` | Flags this as a migration subscription |
+| `source` | `'even_house_app'` | Identifies the app as the origin |
+
+### Webhook Processing for Migrations
+
+When `handleSubscriptionCreated` detects `metadata.migration === 'true'`:
+
+1. Sets `migration_status = 'completed'` on the user record
+2. The user's `billing_provider` is already `'stripe'` at this point — it was flipped from `'mindbody'` to `'stripe'` before the subscription was created in the migration initiation step
+3. Standard subscription processing continues (status sync, tier assignment, HubSpot sync)
+4. Deferred actions send migration-completed notifications to both staff and member
+
+This means the billing_provider guard in `handleSubscriptionCreated` will NOT skip this user, since `billing_provider` is already `'stripe'` when the webhook fires.
+
 ## Subscription Status Mapping
 
 Stripe subscription statuses map to app membership statuses:

@@ -12,6 +12,7 @@ import { listCustomerSubscriptions } from '../core/stripe/subscriptions';
 import { logFromRequest } from '../core/auditLog';
 import { getErrorMessage } from '../utils/errorUtils';
 import { formatDatePacific } from '../utils/dateUtils';
+import { notifyMember, notifyAllStaff } from '../core/notificationService';
 
 const router = Router();
 
@@ -84,7 +85,7 @@ async function findEligibleSubscription(
 }
 
 async function getMemberByEmail(email: string) {
-  const result = await db.execute(sql`SELECT id, email, first_name, last_name, billing_provider, stripe_customer_id, mindbody_client_id, tier, billing_migration_requested_at
+  const result = await db.execute(sql`SELECT id, email, first_name, last_name, billing_provider, stripe_customer_id, stripe_subscription_id, mindbody_client_id, tier, billing_migration_requested_at, migration_status, migration_billing_start_date, migration_requested_by, migration_tier_snapshot, membership_status
      FROM users WHERE LOWER(email) = ${email.toLowerCase()}`);
   return result.rows[0] || null;
 }
@@ -106,6 +107,10 @@ router.get('/api/member-billing/:email', isStaffOrAdmin, async (req, res) => {
       stripeCustomerId: member.stripe_customer_id,
       tier: member.tier,
       billingMigrationRequestedAt: member.billing_migration_requested_at,
+      migrationStatus: member.migration_status || null,
+      migrationBillingStartDate: member.migration_billing_start_date || null,
+      migrationRequestedBy: member.migration_requested_by || null,
+      migrationTierSnapshot: member.migration_tier_snapshot || null,
     };
 
     if (member.billing_provider === 'stripe' && member.stripe_customer_id) {
@@ -804,6 +809,215 @@ router.post('/api/member-billing/:email/payment-link', isStaffOrAdmin, async (re
     });
   } catch (error: unknown) {
     logger.error('[MemberBilling] Error creating payment link', { error: error instanceof Error ? error : new Error(String(error)) });
+    res.status(500).json({ error: getErrorMessage(error) });
+  }
+});
+
+router.post('/api/member-billing/:email/migrate-to-stripe', isStaffOrAdmin, async (req, res) => {
+  try {
+    const email = (req.params.email as string).trim().toLowerCase();
+    const { billingStartDate, confirmedMindBodyCancelled } = req.body;
+
+    if (!billingStartDate || typeof billingStartDate !== 'string') {
+      return res.status(400).json({ error: 'billingStartDate is required (ISO date string)' });
+    }
+
+    if (!confirmedMindBodyCancelled) {
+      return res.status(400).json({ error: 'You must confirm MindBody subscription has been cancelled' });
+    }
+
+    const parsedDate = new Date(billingStartDate);
+    if (isNaN(parsedDate.getTime())) {
+      return res.status(400).json({ error: 'Invalid billingStartDate format' });
+    }
+
+    const member = await getMemberByEmail(email);
+    if (!member) {
+      return res.status(404).json({ error: 'Member not found' });
+    }
+
+    if (member.billing_provider !== 'mindbody') {
+      return res.status(400).json({ error: `Member billing provider is '${member.billing_provider}', not 'mindbody'. Migration is only for MindBody members.` });
+    }
+
+    if (member.migration_status === 'pending') {
+      return res.status(400).json({ error: 'This member already has a pending migration' });
+    }
+
+    if (member.stripe_subscription_id) {
+      try {
+        const stripe = await getStripeClient();
+        const existingSub = await stripe.subscriptions.retrieve(member.stripe_subscription_id);
+        if (existingSub && !['canceled', 'incomplete_expired'].includes(existingSub.status)) {
+          return res.status(400).json({ error: `Member already has an active Stripe subscription (${existingSub.status})` });
+        }
+      } catch (subErr: unknown) {
+        logger.warn('[MemberBilling] Could not verify existing subscription, proceeding', { extra: { error: getErrorMessage(subErr) } });
+      }
+    }
+
+    const stripe = await getStripeClient();
+    let paymentMethods: Stripe.PaymentMethod[] = [];
+    if (member.stripe_customer_id) {
+      const pmResult = await stripe.paymentMethods.list({
+        customer: member.stripe_customer_id,
+        type: 'card',
+      });
+      paymentMethods = pmResult.data;
+    }
+
+    if (paymentMethods.length === 0) {
+      return res.status(400).json({ error: 'Member does not have a card on file. A payment method must be saved before migration.' });
+    }
+
+    const currentTier = member.tier;
+    if (!currentTier) {
+      return res.status(400).json({ error: 'Member does not have a membership tier assigned' });
+    }
+
+    const tierResult = await db.execute(sql`SELECT stripe_price_id, name FROM membership_tiers WHERE slug = ${currentTier} AND stripe_price_id IS NOT NULL`);
+    if (tierResult.rows.length === 0) {
+      return res.status(400).json({ error: `Tier '${currentTier}' does not have a valid Stripe price configured` });
+    }
+
+    const staffEmail = (req.session as any)?.user?.email || (req.session as any)?.passport?.user?.email || 'staff';
+
+    await db.execute(sql`UPDATE users SET 
+      migration_status = 'pending',
+      migration_billing_start_date = ${parsedDate.toISOString()},
+      migration_requested_by = ${staffEmail},
+      migration_tier_snapshot = ${currentTier},
+      billing_migration_requested_at = NOW(),
+      updated_at = NOW()
+    WHERE LOWER(email) = ${email}`);
+
+    const card = paymentMethods[0]?.card;
+    const cardDisplay = card ? `${card.brand?.toUpperCase()} ••••${card.last4}` : 'card on file';
+    const dateDisplay = formatDatePacific(parsedDate);
+    const memberName = [member.first_name, member.last_name].filter(Boolean).join(' ') || email;
+
+    await notifyMember({
+      userEmail: email,
+      title: 'Billing System Upgrade',
+      message: `We're upgrading your billing system. Your ${cardDisplay} will be used for your membership. New billing starts ${dateDisplay}.`,
+      type: 'billing_migration',
+    });
+
+    await notifyAllStaff(
+      'Migration Initiated',
+      `Migration to Stripe initiated for ${memberName} (${email}) — Stripe billing starts ${dateDisplay}`,
+      'billing_migration'
+    );
+
+    await logFromRequest(req, 'initiate_billing_migration', 'billing', member.id?.toString() || null, email, {
+      billingStartDate: billingStartDate,
+      tier: currentTier,
+      cardLast4: card?.last4 || 'unknown',
+    });
+
+    logger.info('[MemberBilling] Migration initiated for member', { extra: { email, billingStartDate, tier: currentTier, requestedBy: staffEmail } });
+
+    res.json({
+      success: true,
+      migrationStatus: 'pending',
+      billingStartDate: billingStartDate,
+    });
+  } catch (error: unknown) {
+    logger.error('[MemberBilling] Error initiating migration', { error: error instanceof Error ? error : new Error(String(error)) });
+    res.status(500).json({ error: getErrorMessage(error) });
+  }
+});
+
+router.post('/api/member-billing/:email/cancel-migration', isStaffOrAdmin, async (req, res) => {
+  try {
+    const email = (req.params.email as string).trim().toLowerCase();
+    const member = await getMemberByEmail(email);
+
+    if (!member) {
+      return res.status(404).json({ error: 'Member not found' });
+    }
+
+    if (member.migration_status !== 'pending') {
+      return res.status(400).json({ error: `Member does not have a pending migration (current status: ${member.migration_status || 'none'})` });
+    }
+
+    await db.execute(sql`UPDATE users SET 
+      migration_status = 'cancelled',
+      updated_at = NOW()
+    WHERE LOWER(email) = ${email}`);
+
+    const memberName = [member.first_name, member.last_name].filter(Boolean).join(' ') || email;
+
+    await notifyAllStaff(
+      'Migration Cancelled',
+      `Migration to Stripe cancelled for ${memberName} (${email})`,
+      'billing_migration'
+    );
+
+    await logFromRequest(req, 'cancel_billing_migration', 'billing', member.id?.toString() || null, email, {});
+
+    logger.info('[MemberBilling] Migration cancelled for member', { extra: { email } });
+
+    res.json({ success: true });
+  } catch (error: unknown) {
+    logger.error('[MemberBilling] Error cancelling migration', { error: error instanceof Error ? error : new Error(String(error)) });
+    res.status(500).json({ error: getErrorMessage(error) });
+  }
+});
+
+router.get('/api/member-billing/:email/migration-status', isStaffOrAdmin, async (req, res) => {
+  try {
+    const email = (req.params.email as string).trim().toLowerCase();
+    const member = await getMemberByEmail(email);
+
+    if (!member) {
+      return res.status(404).json({ error: 'Member not found' });
+    }
+
+    const migrationInfo: Record<string, unknown> = {
+      email: member.email,
+      migrationStatus: member.migration_status || null,
+      migrationBillingStartDate: member.migration_billing_start_date || null,
+      migrationRequestedBy: member.migration_requested_by || null,
+      migrationTierSnapshot: member.migration_tier_snapshot || null,
+      billingProvider: member.billing_provider,
+      currentTier: member.tier,
+    };
+
+    let hasCardOnFile = false;
+    if (member.stripe_customer_id) {
+      try {
+        const stripe = await getStripeClient();
+        const pmResult = await stripe.paymentMethods.list({
+          customer: member.stripe_customer_id,
+          type: 'card',
+        });
+        hasCardOnFile = pmResult.data.length > 0;
+        if (hasCardOnFile) {
+          const card = pmResult.data[0].card;
+          migrationInfo.cardOnFile = {
+            brand: card?.brand,
+            last4: card?.last4,
+            expMonth: card?.exp_month,
+            expYear: card?.exp_year,
+          };
+        }
+      } catch (stripeErr: unknown) {
+        logger.warn('[MemberBilling] Could not check payment methods for migration status', { extra: { error: getErrorMessage(stripeErr) } });
+      }
+    }
+    migrationInfo.hasCardOnFile = hasCardOnFile;
+
+    let tierHasStripePrice = false;
+    if (member.tier) {
+      const tierResult = await db.execute(sql`SELECT stripe_price_id FROM membership_tiers WHERE slug = ${member.tier} AND stripe_price_id IS NOT NULL`);
+      tierHasStripePrice = tierResult.rows.length > 0;
+    }
+    migrationInfo.tierHasStripePrice = tierHasStripePrice;
+
+    res.json(migrationInfo);
+  } catch (error: unknown) {
+    logger.error('[MemberBilling] Error getting migration status', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: getErrorMessage(error) });
   }
 });

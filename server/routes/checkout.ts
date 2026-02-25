@@ -154,10 +154,15 @@ router.post('/api/checkout/sessions', checkoutRateLimiter, async (req, res) => {
     if (email) {
       const [existingUser] = await db.select({
         stripeCustomerId: users.stripeCustomerId,
+        migrationStatus: users.migrationStatus,
       })
         .from(users)
         .where(sql`LOWER(${users.email}) = ${email.toLowerCase()}`)
         .limit(1);
+
+      if (existingUser?.migrationStatus === 'pending') {
+        return res.status(400).json({ error: 'Your billing is being migrated — a subscription will be created automatically. No action needed.' });
+      }
 
       if (existingUser?.stripeCustomerId) {
         sessionParams.customer = existingUser.stripeCustomerId;

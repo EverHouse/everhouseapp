@@ -3,6 +3,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { ModalShell } from '../ModalShell';
 import { StripeBillingSection } from './billing/StripeBillingSection';
 import { MindbodyBillingSection } from './billing/MindbodyBillingSection';
+import { MigrationConfirmDialog } from './billing/MigrationConfirmDialog';
 import { FamilyAddonBillingSection } from './billing/FamilyAddonBillingSection';
 import { CompedBillingSection } from './billing/CompedBillingSection';
 import { TierChangeWizard } from './billing/TierChangeWizard';
@@ -110,6 +111,10 @@ interface BillingInfo {
   stripeError?: string;
   familyError?: string;
   billingMigrationRequestedAt?: string;
+  migrationStatus?: string | null;
+  migrationBillingStartDate?: string | null;
+  migrationRequestedBy?: string | null;
+  migrationTierSnapshot?: string | null;
 }
 
 const BILLING_PROVIDERS = [
@@ -519,6 +524,10 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({
 
   const [isSendingActivation, setIsSendingActivation] = useState(false);
 
+  const [showMigrationDialog, setShowMigrationDialog] = useState(false);
+  const [isMigrationLoading, setIsMigrationLoading] = useState(false);
+  const [migrationEligibility, setMigrationEligibility] = useState<{ hasCardOnFile: boolean; tierHasStripePrice: boolean; cardOnFile?: { brand?: string; last4?: string } | null }>({ hasCardOnFile: false, tierHasStripePrice: true, cardOnFile: null });
+
   const [showUpdateCardTerminal, setShowUpdateCardTerminal] = useState(false);
   const [showCollectPayment, setShowCollectPayment] = useState(false);
   const [collectPaymentAmount, setCollectPaymentAmount] = useState(0);
@@ -610,6 +619,73 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({
       window.removeEventListener('billing-update', handleBillingUpdate as EventListener);
     };
   }, [memberEmail, billingInfo?.stripeCustomerId, fetchBillingInfo]);
+
+  useEffect(() => {
+    if (billingInfo?.billingProvider === 'mindbody') {
+      const fetchMigrationStatus = async () => {
+        try {
+          const res = await fetch(`/api/member-billing/${encodeURIComponent(memberEmail)}/migration-status`, {
+            credentials: 'include',
+          });
+          if (res.ok) {
+            const data = await res.json();
+            setMigrationEligibility({
+              hasCardOnFile: data.hasCardOnFile || false,
+              tierHasStripePrice: data.tierHasStripePrice || false,
+              cardOnFile: data.cardOnFile || null,
+            });
+          }
+        } catch (err: unknown) {
+          console.error('[MemberBilling] Error fetching migration status:', err);
+        }
+      };
+      fetchMigrationStatus();
+    }
+  }, [billingInfo?.billingProvider, memberEmail]);
+
+  const handleInitiateMigration = async (billingStartDate: string) => {
+    setIsMigrationLoading(true);
+    try {
+      const res = await fetch(`/api/member-billing/${encodeURIComponent(memberEmail)}/migrate-to-stripe`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ billingStartDate, confirmedMindBodyCancelled: true }),
+      });
+      if (res.ok) {
+        setShowMigrationDialog(false);
+        fetchBillingInfo();
+        showSuccess('Migration initiated successfully');
+      } else {
+        setError(await extractApiError(res, 'initiate migration'));
+      }
+    } catch (err: unknown) {
+      setError(getNetworkErrorMessage());
+    } finally {
+      setIsMigrationLoading(false);
+    }
+  };
+
+  const handleCancelMigration = async () => {
+    setIsMigrationLoading(true);
+    try {
+      const res = await fetch(`/api/member-billing/${encodeURIComponent(memberEmail)}/cancel-migration`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+      });
+      if (res.ok) {
+        fetchBillingInfo();
+        showSuccess('Migration cancelled');
+      } else {
+        setError(await extractApiError(res, 'cancel migration'));
+      }
+    } catch (err: unknown) {
+      setError(getNetworkErrorMessage());
+    } finally {
+      setIsMigrationLoading(false);
+    }
+  };
 
   const handleManualTierSave = async () => {
     if (!memberEmail) return;
@@ -1287,54 +1363,81 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({
 
       {billingInfo?.billingProvider === 'mindbody' && (
         <>
-          {billingInfo.billingMigrationRequestedAt && (
-            <div className={`p-4 rounded-xl ${isDark ? 'bg-amber-500/10 border border-amber-500/30' : 'bg-amber-50 border border-amber-200'}`}>
-              <div className="flex items-start gap-3">
-                <span className={`material-symbols-outlined ${isDark ? 'text-amber-400' : 'text-amber-600'} text-xl`}>sync</span>
-                <div className="flex-1">
-                  <p className={`text-sm font-medium ${isDark ? 'text-amber-300' : 'text-amber-700'}`}>
-                    Member has updated payment info and is ready to migrate from MindBody
-                  </p>
-                  <p className={`text-xs mt-1 ${isDark ? 'text-amber-400/80' : 'text-amber-600'}`}>
-                    Migration requested on {new Date(billingInfo.billingMigrationRequestedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'America/Los_Angeles' })}
-                  </p>
-                  <button
-                    onClick={() => handleUpdateBillingSource('stripe')}
-                    disabled={isUpdatingSource}
-                    className={`inline-flex items-center gap-1.5 mt-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                      isDark ? 'bg-amber-500/20 text-amber-300 hover:bg-amber-500/30' : 'bg-amber-100 text-amber-700 hover:bg-amber-200'
-                    } disabled:opacity-50`}
-                  >
-                    {isUpdatingSource ? (
-                      <span className="material-symbols-outlined animate-spin text-base">progress_activity</span>
-                    ) : (
-                      <span className="material-symbols-outlined text-base">swap_horiz</span>
-                    )}
-                    Migrate to Stripe Billing
-                  </button>
+          {(() => {
+            const effectiveStatus = billingInfo.migrationStatus === 'cancelled' ? null : billingInfo.migrationStatus;
+            if (effectiveStatus === 'pending') {
+              const startDateStr = billingInfo.migrationBillingStartDate
+                ? (() => { try { const d = billingInfo.migrationBillingStartDate.includes('T') ? billingInfo.migrationBillingStartDate : `${billingInfo.migrationBillingStartDate}T12:00:00`; return new Date(d).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'America/Los_Angeles' }); } catch { return billingInfo.migrationBillingStartDate; } })()
+                : '';
+              return (
+                <div className={`p-3 rounded-xl flex items-center gap-2 ${isDark ? 'bg-blue-500/10 border border-blue-500/30' : 'bg-blue-50 border border-blue-200'}`}>
+                  <span className={`material-symbols-outlined text-base ${isDark ? 'text-blue-400' : 'text-blue-600'}`}>schedule</span>
+                  <span className={`text-sm font-medium ${isDark ? 'text-blue-300' : 'text-blue-700'}`}>
+                    Migration Pending — Stripe billing starts {startDateStr}
+                  </span>
                 </div>
-              </div>
-            </div>
-          )}
+              );
+            }
+            if (effectiveStatus === 'failed') {
+              return (
+                <div className={`p-3 rounded-xl flex items-center gap-2 ${isDark ? 'bg-red-500/10 border border-red-500/30' : 'bg-red-50 border border-red-200'}`}>
+                  <span className={`material-symbols-outlined text-base ${isDark ? 'text-red-400' : 'text-red-600'}`}>error</span>
+                  <span className={`text-sm font-medium ${isDark ? 'text-red-300' : 'text-red-700'}`}>
+                    Migration Failed
+                  </span>
+                </div>
+              );
+            }
+            if (!effectiveStatus) {
+              const hasCard = !!(billingInfo.paymentMethods && billingInfo.paymentMethods.length > 0);
+              if (hasCard) {
+                return (
+                  <div className={`p-3 rounded-xl flex items-center gap-2 ${isDark ? 'bg-green-500/10 border border-green-500/30' : 'bg-green-50 border border-green-200'}`}>
+                    <span className={`material-symbols-outlined text-base ${isDark ? 'text-green-400' : 'text-green-600'}`}>check_circle</span>
+                    <span className={`text-sm font-medium ${isDark ? 'text-green-300' : 'text-green-700'}`}>
+                      Ready for Migration
+                    </span>
+                  </div>
+                );
+              }
+              return (
+                <div className={`p-3 rounded-xl flex items-center gap-2 ${isDark ? 'bg-amber-500/10 border border-amber-500/30' : 'bg-amber-50 border border-amber-200'}`}>
+                  <span className={`material-symbols-outlined text-base ${isDark ? 'text-amber-400' : 'text-amber-600'}`}>credit_card_off</span>
+                  <span className={`text-sm font-medium ${isDark ? 'text-amber-300' : 'text-amber-700'}`}>
+                    Needs Card for Migration
+                  </span>
+                </div>
+              );
+            }
+            return null;
+          })()}
           <MindbodyBillingSection
             mindbodyClientId={billingInfo.mindbodyClientId}
             isDark={isDark}
             hasStripeCustomer={!!billingInfo.stripeCustomerId}
-            onMigrateToStripe={!billingInfo.activeSubscription ? async () => {
-              setShowCreateSubscriptionModal(true);
-              setIsLoadingCoupons(true);
-              try {
-                const res = await fetch('/api/stripe/coupons', { credentials: 'include' });
-                if (res.ok) {
-                  const data = await res.json();
-                  setAvailableCoupons(data.coupons || []);
-                }
-              } catch (err: unknown) {
-                console.error('Failed to load coupons:', err);
-              } finally {
-                setIsLoadingCoupons(false);
-              }
-            } : undefined}
+            stripeCustomerId={billingInfo.stripeCustomerId}
+            paymentMethods={billingInfo.paymentMethods}
+            recentInvoices={billingInfo.recentInvoices}
+            customerBalance={billingInfo.customerBalance}
+            migrationStatus={billingInfo.migrationStatus}
+            migrationBillingStartDate={billingInfo.migrationBillingStartDate}
+            migrationRequestedBy={billingInfo.migrationRequestedBy}
+            hasCardOnFile={migrationEligibility.hasCardOnFile}
+            tierHasStripePrice={migrationEligibility.tierHasStripePrice}
+            onInitiateMigration={() => setShowMigrationDialog(true)}
+            onCancelMigration={handleCancelMigration}
+            isMigrationLoading={isMigrationLoading}
+          />
+          <MigrationConfirmDialog
+            isOpen={showMigrationDialog}
+            onClose={() => setShowMigrationDialog(false)}
+            onConfirm={handleInitiateMigration}
+            memberEmail={memberEmail}
+            memberName={billingInfo.firstName ? `${billingInfo.firstName} ${billingInfo.lastName || ''}`.trim() : undefined}
+            currentTier={currentTier || billingInfo.tier}
+            cardOnFile={migrationEligibility.cardOnFile}
+            isDark={isDark}
+            isLoading={isMigrationLoading}
           />
         </>
       )}
