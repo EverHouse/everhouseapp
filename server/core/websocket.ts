@@ -66,7 +66,7 @@ function getSessionPool(): Pool | null {
     sessionPool = new Pool({ 
       connectionString: process.env.DATABASE_URL,
       connectionTimeoutMillis: 5000,
-      max: 5
+      max: 20
     });
     return sessionPool;
   } catch (err: unknown) {
@@ -324,7 +324,24 @@ export function initWebSocketServer(server: Server) {
               return;
             }
             
-            const verifiedFromMessage = await getVerifiedUserFromRequest(req);
+            let verifiedFromMessage: Awaited<ReturnType<typeof getVerifiedUserFromRequest>> = null;
+            
+            if (message.sessionId && typeof message.sessionId === 'string') {
+              const sessionData = await verifySessionFromDatabase(message.sessionId);
+              if (sessionData?.user?.email) {
+                const user = sessionData.user;
+                verifiedFromMessage = {
+                  email: user.email.toLowerCase(),
+                  role: user.role,
+                  isStaff: user.role === 'staff' || user.role === 'admin',
+                  sessionId: message.sessionId
+                };
+              }
+            }
+            
+            if (!verifiedFromMessage) {
+              verifiedFromMessage = await getVerifiedUserFromRequest(req);
+            }
             
             if (verifiedFromMessage) {
               userEmail = verifiedFromMessage.email;
@@ -430,6 +447,9 @@ export function initWebSocketServer(server: Server) {
         const filtered = connections.filter(c => c.ws !== ws);
         if (filtered.length > 0) {
           clients.set(userEmail, filtered);
+          if (!filtered.some(c => c.isStaff)) {
+            staffEmails.delete(userEmail);
+          }
         } else {
           clients.delete(userEmail);
           staffEmails.delete(userEmail);

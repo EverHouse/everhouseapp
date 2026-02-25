@@ -176,9 +176,10 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
         window.__wsConnected = false;
         
         if (emailToUse) {
+          const jitter = 2000 + Math.floor(Math.random() * 3000);
           reconnectTimeoutRef.current = setTimeout(() => {
             connect();
-          }, 5000);
+          }, jitter);
         }
       };
 

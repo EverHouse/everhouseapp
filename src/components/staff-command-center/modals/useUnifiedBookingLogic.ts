@@ -136,6 +136,7 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
   const pollingTimerRef = useRef<NodeJS.Timeout | null>(null);
   const pollingCountRef = useRef(0);
   const wsRefreshTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const rosterFetchIdRef = useRef(0);
 
   const isManageMode = mode === 'manage';
 
@@ -165,6 +166,7 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
 
   const fetchRosterData = useCallback(async () => {
     if (!bookingId) return;
+    const fetchId = ++rosterFetchIdRef.current;
     setIsLoadingRoster(true);
     setRosterError(null);
     try {
@@ -176,11 +178,13 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
         headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
       });
       clearTimeout(timeoutId);
+      if (fetchId !== rosterFetchIdRef.current) return;
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
         throw new Error(errData.error || 'Failed to load roster');
       }
       const data: ManageModeRosterData = await res.json();
+      if (fetchId !== rosterFetchIdRef.current) return;
       setRosterData(data);
       membersSnapshotRef.current = [...data.members];
 
@@ -587,6 +591,8 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
 
   useEffect(() => {
     if (isManageMode) return;
+    let isCurrent = true;
+    const controller = new AbortController();
     const calculateFees = async () => {
       const ownerSlot = slots[0];
       if (ownerSlot.type !== 'member' && ownerSlot.type !== 'visitor') {
@@ -627,9 +633,10 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
           params.set('date', bookingDate);
         }
         const res = await fetch(`/api/fee-estimate?${params}`, {
-          credentials: 'include'
+          credentials: 'include',
+          signal: controller.signal
         });
-        if (res.ok) {
+        if (res.ok && isCurrent) {
           const data = await res.json();
           setFeeEstimate({
             totalCents: data.totalCents || 0,
@@ -638,13 +645,19 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
           });
         }
       } catch (err: unknown) {
-        console.error('Fee estimation error:', err);
+        if (isCurrent && !(err instanceof DOMException && (err as DOMException).name === 'AbortError')) {
+          console.error('Fee estimation error:', err);
+        }
       } finally {
-        setIsCalculatingFees(false);
+        if (isCurrent) setIsCalculatingFees(false);
       }
     };
     
     calculateFees();
+    return () => {
+      isCurrent = false;
+      controller.abort();
+    };
   }, [slots, timeSlot, bookingDate, isManageMode]);
 
   const updateSlot = (index: number, slotState: SlotState) => {

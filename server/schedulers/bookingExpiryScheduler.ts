@@ -28,7 +28,7 @@ async function expireStaleBookingRequests(): Promise<void> {
            updated_at = NOW(),
            reviewed_at = NOW(),
            reviewed_by = 'system-auto-expiry'
-       WHERE status = 'pending'
+       WHERE status IN ('pending', 'pending_approval')
          AND (
            request_date < $1
            OR (request_date = $1 AND start_time < ($2::time - interval '20 minutes'))
@@ -127,7 +127,7 @@ export async function runManualBookingExpiry(): Promise<{ expiredCount: number }
          updated_at = NOW(),
          reviewed_at = NOW(),
          reviewed_by = 'system-manual-expiry'
-     WHERE status = 'pending'
+     WHERE status IN ('pending', 'pending_approval')
        AND (
          request_date < $1
          OR (request_date = $1 AND start_time < ($2::time - interval '20 minutes'))
