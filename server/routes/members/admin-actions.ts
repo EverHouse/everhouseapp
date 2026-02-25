@@ -566,7 +566,7 @@ router.delete('/api/members/:email/permanent', isAdmin, async (req, res) => {
       try {
         const { getHubSpotClient } = await import('../../core/integrations');
         const hubspot = await getHubSpotClient();
-        await hubspot.crm.contacts.basicApi.update(effectiveHubspotId, { properties: { membership_status: 'terminated' } });
+        await hubspot.crm.contacts.basicApi.update(effectiveHubspotId, { properties: { membership_status: 'Terminated' } });
         deletionLog.push('hubspot_membership_status_set_terminated');
         logger.info('[Admin] Set HubSpot membership_status to terminated before deletion', { extra: { hubspotId: effectiveHubspotId, normalizedEmail } });
 
