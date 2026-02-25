@@ -407,7 +407,7 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
                                     return (
                                         <div
                                             key={`${resource.id}-${slot}`}
-                                            title={closure ? `CLOSED: ${closure.title}` : eventBlock ? `EVENT BLOCK: ${eventBlock.closureTitle || eventBlock.blockType || 'Blocked'}` : booking ? `${bookingDisplayName}${isUnmatched ? ' (UNMATCHED - Click to assign member)' : isInactiveMember ? ' (Inactive Member)' : ''} - Click for details` : pendingRequest ? `PENDING: ${pendingRequest.user_name || 'Request'} - Awaiting Trackman sync` : isConference ? `Book ${formatTime12Hour(slot)}` : `${resource.name} - ${formatTime12Hour(slot)}`}
+                                            title={closure ? `CLOSED: ${closure.title}` : eventBlock ? `EVENT BLOCK: ${eventBlock.closureTitle || eventBlock.blockType || 'Blocked'}` : booking ? `${bookingDisplayName}${isUnmatched ? ' (UNMATCHED - Click to assign member)' : isInactiveMember ? ' (Inactive Member)' : ''} - Click for details` : pendingRequest ? `PENDING: ${pendingRequest.user_name || 'Request'} - Awaiting Trackman sync` : isConference ? undefined : `${resource.name} - ${formatTime12Hour(slot)}`}
                                             onClick={closure || eventBlock ? undefined : isEmptyCell ? (isConference ? () => {
                                                 setStaffManualBookingDefaults({
                                                     startTime: slot,
@@ -454,7 +454,7 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
                                                                     : 'group relative hover:scale-105 hover:z-10 bg-green-100 dark:bg-green-500/20 border border-green-300 dark:border-green-500/30 cursor-pointer hover:bg-green-200 dark:hover:bg-green-500/30' 
                                                         : pendingRequest
                                                                 ? 'bg-blue-50 dark:bg-blue-500/10 border-2 border-dashed border-blue-400 dark:border-blue-400/50 cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-500/20'
-                                                                : isConference ? 'bg-white dark:bg-white/5 border border-gray-200 dark:border-white/15 cursor-pointer hover:bg-purple-50 dark:hover:bg-purple-500/10' : 'bg-white dark:bg-white/5 border border-gray-200 dark:border-white/15'
+                                                                : isConference ? 'group relative bg-white dark:bg-white/5 border border-gray-200 dark:border-white/15 cursor-pointer hover:bg-purple-50 dark:hover:bg-purple-500/10' : 'bg-white dark:bg-white/5 border border-gray-200 dark:border-white/15'
                                             } transition-all duration-fast`}
                                             style={isEmptyCell ? {
                                                 backgroundImage: isDark 
@@ -501,14 +501,22 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
                                                         </span>
                                                     )}
                                                 </div>
-                                            ) : pendingRequest && (
+                                            ) : pendingRequest ? (
                                                 <div className="px-0.5 sm:px-1 h-full flex items-center justify-center sm:justify-start">
                                                     <span className="hidden sm:block text-[9px] sm:text-[10px] font-medium truncate text-blue-600 dark:text-blue-400">
                                                         {pendingRequest.user_name || 'Pending'}
                                                     </span>
                                                     <span className="sm:hidden w-3 h-3 rounded-full border-2 border-dashed border-blue-400 dark:border-blue-400" title={pendingRequest.user_name || 'Pending'}></span>
                                                 </div>
-                                            )}
+                                            ) : isConference && isEmptyCell ? (
+                                                <div className="hidden sm:block opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-fast absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 z-50">
+                                                    <div className="bg-white/95 dark:bg-gray-900/95 backdrop-blur-md rounded-lg shadow-xl border border-gray-200/50 dark:border-white/10 px-3 py-2 text-left min-w-[140px]">
+                                                        <p className="text-xs font-bold text-gray-900 dark:text-white">Conference Room</p>
+                                                        <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5">{formatTime12Hour(slot)}</p>
+                                                        <p className="text-[10px] text-purple-600 dark:text-purple-400 mt-0.5 font-medium">Click to book</p>
+                                                    </div>
+                                                </div>
+                                            ) : null}
                                         </div>
                                     );
                                 })}
