@@ -2,6 +2,7 @@ import { WebSocketServer, WebSocket } from 'ws';
 import { getErrorMessage } from '../utils/errorUtils';
 import { Server, IncomingMessage } from 'http';
 import { parse as parseCookie } from 'cookie';
+import { unsign } from 'cookie-signature';
 import { Pool } from 'pg';
 import { logger } from './logger';
 
@@ -84,8 +85,13 @@ function parseSessionId(cookieHeader: string | undefined, sessionSecret: string)
     if (!signedCookie) return null;
     
     if (signedCookie.startsWith('s:')) {
-      const sessionId = signedCookie.slice(2).split('.')[0];
-      return sessionId;
+      const raw = signedCookie.slice(2);
+      const result = unsign(raw, sessionSecret);
+      if (result === false) {
+        logger.warn('[WebSocket] Cookie signature verification failed — possible tampering');
+        return null;
+      }
+      return result;
     }
     
     return signedCookie;
@@ -462,8 +468,44 @@ export function initWebSocketServer(server: Server) {
     });
   }, 30000);
 
+  const sessionRevalidationInterval = setInterval(async () => {
+    const pool = getSessionPool();
+    if (!pool) return;
+
+    for (const [email, connections] of clients) {
+      const valid: ClientConnection[] = [];
+      for (const conn of connections) {
+        if (!conn.sessionId) {
+          valid.push(conn);
+          continue;
+        }
+        try {
+          const result = await pool.query(
+            'SELECT 1 FROM sessions WHERE sid = $1 AND expire > NOW()',
+            [conn.sessionId]
+          );
+          if (result.rows.length === 0) {
+            logger.info(`[WebSocket] Session expired/revoked for ${email} — terminating connection`);
+            conn.ws.terminate();
+          } else {
+            valid.push(conn);
+          }
+        } catch {
+          valid.push(conn);
+        }
+      }
+      if (valid.length === 0) {
+        clients.delete(email);
+        staffEmails.delete(email);
+      } else {
+        clients.set(email, valid);
+      }
+    }
+  }, 5 * 60 * 1000);
+
   wss.on('close', () => {
     clearInterval(heartbeatInterval);
+    clearInterval(sessionRevalidationInterval);
   });
 
   logger.info('[WebSocket] Server initialized on /ws with session-based authentication');
@@ -1078,7 +1120,7 @@ export function broadcastBookingRosterUpdate(data: {
   totalFeeCents?: number;
   participantCount?: number;
 }) {
-  const key = `roster_${data.bookingId}`;
+  const key = `roster_${data.bookingId}_${data.action}`;
   const existing = bookingBroadcastTimers.get(key);
   if (existing) clearTimeout(existing);
 

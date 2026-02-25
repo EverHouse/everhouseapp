@@ -108,7 +108,12 @@ The Ever Club Members App is a private members club application designed for gol
 - **Booking Race Condition Guards**: `approveBooking()`, `declineBooking()`, and `checkinBooking()` implement status guards and optimistic locking. All status-transition UPDATEs must include `WHERE status IN (...)` matching expected source statuses, and check `rowCount` after UPDATE to detect concurrent changes. `devConfirmBooking` uses `WHERE status IN ('pending', 'pending_approval')` to prevent overwriting concurrent cancellations (Bug 11).
 - **Rate Limiting**: All public endpoints creating database records must have rate limiting.
 - **Unbounded Queries**: All SELECT queries must have a LIMIT clause or be naturally bounded.
-- **Scheduler Lifecycle**: All `setInterval()` in schedulers must return their timer ID for shutdown cleanup.
+- **Scheduler Lifecycle**: All `setInterval()` and `setTimeout()` in schedulers must store their timer IDs for shutdown cleanup. Stop functions must clear both interval and timeout IDs.
+- **WebSocket Session Revalidation**: WebSocket connections are periodically re-verified against the database (every 5 minutes). Expired or revoked sessions are terminated automatically.
+- **Cookie Signature Verification**: WebSocket `parseSessionId()` uses `cookie-signature.unsign()` to cryptographically verify session cookies. Cookies with invalid signatures are rejected.
+- **Lock Ordering (Group Billing)**: In all group billing transactions, always lock `billing_groups` (parent) FOR UPDATE before `group_members` (child) to prevent deadlocks.
+- **Stripe Rollback on Failure**: Both `addCorporateMember` and `removeCorporateMember` track `newStripeItemId` and roll back newly created subscription items if subsequent Stripe operations fail.
+- **Booking Expiry Grace Period**: The booking expiry scheduler waits 20 minutes past `start_time` before auto-expiring pending bookings, giving members time to check in at the front desk.
 - **Route Authentication Audit**: Both middleware guards and inline `getSessionUser(req)` checks are used, with middleware preferred for staff/admin routes.
 
 ## External Dependencies

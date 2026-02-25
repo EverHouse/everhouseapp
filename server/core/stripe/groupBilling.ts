@@ -951,6 +951,11 @@ export async function removeCorporateMember(params: {
     let memberId: number | null = null;
     
     await db.transaction(async (tx) => {
+      const groupResult = await tx.execute(
+        sql`SELECT id, primary_stripe_subscription_id FROM billing_groups WHERE id = ${params.billingGroupId} FOR UPDATE`
+      );
+      const group = groupResult.rows as Array<Record<string, unknown>>;
+
       const memberResult = await tx.execute(
         sql`SELECT gm.id, gm.member_email, gm.is_active
          FROM group_members gm
@@ -977,11 +982,6 @@ export async function removeCorporateMember(params: {
         sql`UPDATE users SET billing_group_id = NULL WHERE LOWER(email) = ${params.memberEmail.toLowerCase()}`
       );
     
-      const groupResult = await tx.execute(
-        sql`SELECT id, primary_stripe_subscription_id FROM billing_groups WHERE id = ${params.billingGroupId} FOR UPDATE`
-      );
-      const group = groupResult.rows as Array<Record<string, unknown>>;
-    
       if (group.length > 0 && group[0].primary_stripe_subscription_id) {
         primaryStripeSubscriptionId = group[0].primary_stripe_subscription_id as string;
         
@@ -994,6 +994,7 @@ export async function removeCorporateMember(params: {
     });
     
     if (primaryStripeSubscriptionId) {
+      let newStripeItemId: string | null = null;
       try {
         const newPricePerSeat = getCorporateVolumePrice(newMemberCount);
         
@@ -1016,7 +1017,7 @@ export async function removeCorporateMember(params: {
           if (oldPricePerSeat !== newPricePerSeat) {
             logger.info(`[GroupBilling] Price tier change on removal: ${oldPricePerSeat} -> ${newPricePerSeat} cents/seat for ${newMemberCount} members`);
           
-            await stripe.subscriptionItems.create({
+            const newItem = await stripe.subscriptionItems.create({
               subscription: primaryStripeSubscriptionId,
               price_data: {
                 currency: 'usd',
@@ -1030,6 +1031,8 @@ export async function removeCorporateMember(params: {
               },
               proration_behavior: 'create_prorations',
             }, { idempotencyKey: `subitem_corp_remove_${primaryStripeSubscriptionId}_${newPricePerSeat}_${newMemberCount}` });
+
+            newStripeItemId = newItem.id;
           
             await stripe.subscriptionItems.del(corporateItem.id, {
               proration_behavior: 'none',
@@ -1042,6 +1045,17 @@ export async function removeCorporateMember(params: {
         }
       } catch (stripeErr: unknown) {
         logger.error('[GroupBilling] Failed to update Stripe on member removal:', { error: stripeErr });
+        if (newStripeItemId) {
+          try {
+            const stripeForRollback = await getStripeClient();
+            await stripeForRollback.subscriptionItems.del(newStripeItemId, {
+              proration_behavior: 'none',
+            });
+            logger.info(`[GroupBilling] Rolled back newly created Stripe subscription item ${newStripeItemId}`);
+          } catch (rollbackErr: unknown) {
+            logger.error(`[GroupBilling] CRITICAL: Failed to delete newly created Stripe subscription item ${newStripeItemId}. Customer may be double-billed. Manual intervention required.`, { error: rollbackErr });
+          }
+        }
         try {
           await db.execute(
             sql`UPDATE group_members SET is_active = true, removed_at = NULL WHERE id = ${memberId}`
@@ -1599,21 +1613,18 @@ export async function handleSubscriptionItemsChanged(
  */
 export async function handlePrimarySubscriptionCancelled(subscriptionId: string): Promise<void> {
   try {
-    // 1. Find the group linked to this subscription
     const group = await db.select()
       .from(billingGroups)
       .where(eq(billingGroups.primaryStripeSubscriptionId, subscriptionId))
       .limit(1);
 
     if (group.length === 0) {
-      // Not a group subscription - nothing to do
       return;
     }
 
     const groupId = group[0].id;
     logger.info(`[GroupBilling] Primary subscription ${subscriptionId} cancelled. Deactivating group ${groupId}...`);
 
-    // 2. Find all active members in this group
     const activeMembers = await db.select()
       .from(groupMembers)
       .where(and(
@@ -1626,32 +1637,35 @@ export async function handlePrimarySubscriptionCancelled(subscriptionId: string)
       return;
     }
 
-    // 3. Deactivate all members in the group
-    await db.update(groupMembers)
-      .set({
-        isActive: false,
-        removedAt: new Date(),
-        // We keep the stripeSubscriptionItemId for audit history,
-        // but since the parent subscription is dead, the item is dead too.
-      })
-      .where(eq(groupMembers.billingGroupId, groupId));
-
-    // 4. Unlink the users so they lose access permissions
     const emailsToDeactivate = activeMembers.map(m => m.memberEmail.toLowerCase());
 
-    if (emailsToDeactivate.length > 0) {
-      await db.execute(
-        sql`UPDATE users SET 
-           billing_group_id = NULL,
-           membership_status = 'cancelled',
-           billing_provider = 'stripe',
-           last_tier = tier,
-           tier = NULL,
-           updated_at = NOW()
-         WHERE LOWER(email) = ANY(${toTextArrayLiteral(emailsToDeactivate)}::text[])`
+    await db.transaction(async (tx) => {
+      await tx.update(groupMembers)
+        .set({
+          isActive: false,
+          removedAt: new Date(),
+        })
+        .where(eq(groupMembers.billingGroupId, groupId));
+
+      if (emailsToDeactivate.length > 0) {
+        await tx.execute(
+          sql`UPDATE users SET 
+             billing_group_id = NULL,
+             membership_status = 'cancelled',
+             billing_provider = 'stripe',
+             last_tier = tier,
+             tier = NULL,
+             updated_at = NOW()
+           WHERE LOWER(email) = ANY(${toTextArrayLiteral(emailsToDeactivate)}::text[])`
+        );
+      }
+
+      await tx.execute(
+        sql`UPDATE billing_groups SET is_active = false, updated_at = NOW() WHERE id = ${groupId} AND is_active = true`
       );
-      
-      // Sync cancelled sub-members to HubSpot
+    });
+
+    if (emailsToDeactivate.length > 0) {
       try {
         const { syncMemberToHubSpot } = await import('../hubspot/stages');
         for (const subEmail of emailsToDeactivate) {
@@ -1663,14 +1677,10 @@ export async function handlePrimarySubscriptionCancelled(subscriptionId: string)
       }
     }
 
-    await db.execute(
-      sql`UPDATE billing_groups SET is_active = false, updated_at = NOW() WHERE id = ${groupId} AND is_active = true`
-    );
-
     logger.info(`[GroupBilling] Successfully deactivated group ${groupId} and ${emailsToDeactivate.length} members`);
 
   } catch (err: unknown) {
     logger.error('[GroupBilling] Error handling primary subscription cancellation:', { error: err });
-    throw err; // Re-throw to ensure webhook retries if this fails
+    throw err;
   }
 }

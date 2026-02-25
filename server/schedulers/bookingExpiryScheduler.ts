@@ -31,7 +31,7 @@ async function expireStaleBookingRequests(): Promise<void> {
        WHERE status = 'pending'
          AND (
            request_date < $1
-           OR (request_date = $1 AND start_time < $2)
+           OR (request_date = $1 AND start_time < ($2::time - interval '20 minutes'))
          )
        RETURNING id, user_email AS "userEmail", user_name AS "userName", request_date AS "requestDate", start_time AS "startTime", resource_id AS "resourceId"`,
       [todayStr, currentTimePacific]
@@ -78,6 +78,7 @@ async function expireStaleBookingRequests(): Promise<void> {
 }
 
 let intervalId: NodeJS.Timeout | null = null;
+let initialTimeoutId: NodeJS.Timeout | null = null;
 
 export function startBookingExpiryScheduler(): void {
   if (intervalId) {
@@ -93,7 +94,8 @@ export function startBookingExpiryScheduler(): void {
     });
   }, 60 * 60 * 1000);
   
-  setTimeout(() => {
+  initialTimeoutId = setTimeout(() => {
+    initialTimeoutId = null;
     expireStaleBookingRequests().catch((err: unknown) => {
       logger.error('[Booking Expiry] Initial run error:', { error: err as Error });
     });
@@ -101,6 +103,10 @@ export function startBookingExpiryScheduler(): void {
 }
 
 export function stopBookingExpiryScheduler(): void {
+  if (initialTimeoutId) {
+    clearTimeout(initialTimeoutId);
+    initialTimeoutId = null;
+  }
   if (intervalId) {
     clearInterval(intervalId);
     intervalId = null;
@@ -124,7 +130,7 @@ export async function runManualBookingExpiry(): Promise<{ expiredCount: number }
      WHERE status = 'pending'
        AND (
          request_date < $1
-         OR (request_date = $1 AND start_time < $2)
+         OR (request_date = $1 AND start_time < ($2::time - interval '20 minutes'))
        )
      RETURNING id`,
     [todayStr, currentTimePacific]

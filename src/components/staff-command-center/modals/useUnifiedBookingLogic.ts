@@ -426,6 +426,10 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
   }, [isOpen, bookingId, fetchRosterData]);
 
   useEffect(() => {
+    stopPaymentPolling();
+  }, [bookingId, stopPaymentPolling]);
+
+  useEffect(() => {
     return () => {
       if (pollingTimerRef.current) {
         clearInterval(pollingTimerRef.current);
