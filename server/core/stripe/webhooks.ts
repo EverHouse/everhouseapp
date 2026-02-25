@@ -659,6 +659,7 @@ async function handleChargeRefunded(client: PoolClient, charge: Stripe.Charge): 
       });
     });
     
+    if (refunded || amount_refunded >= amount) {
     const participantUpdate = await client.query(
       `UPDATE booking_participants 
        SET payment_status = 'refunded', refunded_at = NOW()
@@ -668,7 +669,7 @@ async function handleChargeRefunded(client: PoolClient, charge: Stripe.Charge): 
     );
     
     if (participantUpdate.rowCount && participantUpdate.rowCount > 0) {
-      logger.info(`[Stripe Webhook] Marked ${participantUpdate.rowCount} participant(s) as refunded for PI ${paymentIntentId}`);
+      logger.info(`[Stripe Webhook] Marked ${participantUpdate.rowCount} participant(s) as refunded for PI ${paymentIntentId} (full refund)`);
       
       for (const row of participantUpdate.rows) {
         const bookingLookup = await client.query(
@@ -708,6 +709,9 @@ async function handleChargeRefunded(client: PoolClient, charge: Stripe.Charge): 
           });
         }
       }
+    }
+    } else {
+      logger.info(`[Stripe Webhook] Partial refund of $${(amount_refunded / 100).toFixed(2)} for PI ${paymentIntentId} - skipping auto-participant update to preserve ledger`);
     }
   }
   
@@ -2250,28 +2254,27 @@ async function handleCheckoutSessionCompleted(client: PoolClient, session: Strip
         ? `${userResult.rows[0].first_name || ''} ${userResult.rows[0].last_name || ''}`.trim() || memberEmail
         : memberEmail;
 
-      // NOTE: Must stay in transaction - user balance is financial state
-      const stripe = await getStripeClient();
-      const transaction = await Promise.race([
-        stripe.customers.createBalanceTransaction(
-          customerId,
-          { amount: -amountCents, currency: 'usd', description: `Account balance top-up via checkout (${session.id})` },
-          { idempotencyKey: `add_funds_${session.id}` }
-        ),
-        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Balance transaction timed out after 5s')), 5000))
-      ]);
-      const newBalanceDollars = Math.abs(transaction.ending_balance) / 100;
-      logger.info(`[Stripe Webhook] Successfully added $${amountDollars.toFixed(2)} to balance for ${memberEmail}. New balance: $${newBalanceDollars.toFixed(2)}`);
-
       const deferredAmountDollars = amountDollars;
       const deferredMemberEmail = memberEmail;
       const deferredMemberName = memberName;
       const deferredSessionId = session.id;
       const deferredAmountCents = amountCents;
-      const deferredNewBalance = transaction.ending_balance;
+      const deferredCustomerId = customerId;
 
       deferredActions.push(async () => {
         try {
+          const stripe = await getStripeClient();
+          const transaction = await Promise.race([
+            stripe.customers.createBalanceTransaction(
+              deferredCustomerId,
+              { amount: -deferredAmountCents, currency: 'usd', description: `Account balance top-up via checkout (${deferredSessionId})` },
+              { idempotencyKey: `add_funds_${deferredSessionId}` }
+            ),
+            new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Balance transaction timed out after 5s')), 5000))
+          ]);
+          const newBalanceDollars = Math.abs(transaction.ending_balance) / 100;
+          logger.info(`[Stripe Webhook] Successfully added $${deferredAmountDollars.toFixed(2)} to balance for ${deferredMemberEmail}. New balance: $${newBalanceDollars.toFixed(2)}`);
+
           await notifyMember({
             userEmail: deferredMemberEmail,
             title: 'Funds Added Successfully',
@@ -2300,10 +2303,10 @@ async function handleCheckoutSessionCompleted(client: PoolClient, session: Strip
             action: 'balance_updated',
             memberEmail: deferredMemberEmail,
             amountCents: deferredAmountCents,
-            newBalance: deferredNewBalance
+            newBalance: transaction.ending_balance
           });
         } catch (notifyError: unknown) {
-          logger.error(`[Stripe Webhook] Deferred notification failed for add_funds ${deferredMemberEmail}:`, { extra: { detail: getErrorMessage(notifyError) } });
+          logger.error(`[Stripe Webhook] Deferred add_funds failed for ${deferredMemberEmail}:`, { extra: { detail: getErrorMessage(notifyError) } });
         }
       });
 

@@ -526,11 +526,13 @@ export function initWebSocketServer(server: Server) {
           if (result.rows.length === 0) {
             logger.info(`[WebSocket] Session expired/revoked for ${email} — terminating connection`);
             conn.ws.terminate();
-          } else {
+          } else if (conn.ws.readyState === WebSocket.OPEN) {
             valid.push(conn);
           }
         } catch {
-          valid.push(conn);
+          if (conn.ws.readyState === WebSocket.OPEN) {
+            valid.push(conn);
+          }
         }
       }
       if (valid.length === 0) {

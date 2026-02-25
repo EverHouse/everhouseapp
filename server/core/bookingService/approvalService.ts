@@ -1334,7 +1334,7 @@ export async function cancelBooking(params: CancelBookingParams) {
                     participantId: participant.id.toString()
                   }
                 }, {
-                  idempotencyKey: `refund_staff_cancel_participant_${bookingId}_${participant.stripePaymentIntentId}`
+                  idempotencyKey: `refund_staff_cancel_participant_${bookingId}_${participant.id}_${participant.stripePaymentIntentId}`
                 });
                 await db.update(bookingParticipants)
                   .set({ paymentStatus: 'refunded', refundedAt: new Date() })
