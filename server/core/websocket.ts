@@ -425,12 +425,15 @@ export function initWebSocketServer(server: Server) {
           if (verifiedStaff?.isStaff) {
             isStaffUser = true;
           } else {
-            const staffCheck = await sessionPool.query(
-              `SELECT role FROM users WHERE LOWER(email) = LOWER($1) AND role IN ('staff', 'admin') LIMIT 1`,
-              [userEmail]
-            );
-            if (staffCheck.rows.length > 0) {
-              isStaffUser = true;
+            const pool = getSessionPool();
+            if (pool) {
+              const staffCheck = await pool.query(
+                `SELECT role FROM users WHERE LOWER(email) = LOWER($1) AND role IN ('staff', 'admin') LIMIT 1`,
+                [userEmail]
+              );
+              if (staffCheck.rows.length > 0) {
+                isStaffUser = true;
+              }
             }
           }
           if (isStaffUser) {

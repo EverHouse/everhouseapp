@@ -242,6 +242,8 @@ export async function validateTrackmanId(trackmanBookingId: string, bookingId: n
         }
 
         if (orphanedSession?.id) {
+          await db.execute(sql`UPDATE booking_requests SET session_id = NULL WHERE session_id = ${orphanedSession.id}`);
+          await db.execute(sql`DELETE FROM booking_participants WHERE session_id = ${orphanedSession.id}`);
           await db.execute(sql`DELETE FROM booking_sessions WHERE id = ${orphanedSession.id}`);
           logger.info('[ValidateTrackmanId] Cleaned up orphaned session', {
             extra: { sessionId: orphanedSession.id, declinedBookingId: duplicateId }
@@ -315,7 +317,8 @@ export async function approveBooking(params: ApproveBookingParams) {
       or(
         eq(bookingRequests.status, 'approved'),
         eq(bookingRequests.status, 'confirmed'),
-        eq(bookingRequests.status, 'attended')
+        eq(bookingRequests.status, 'attended'),
+        eq(bookingRequests.status, 'pending')
       ),
       ne(bookingRequests.id, bookingId),
       or(
@@ -1743,31 +1746,40 @@ export async function checkinBooking(params: CheckinBookingParams) {
 
   }
 
-  const result = await db.update(bookingRequests)
-    .set({
-      status: newStatus,
-      isUnmatched: false,
-      updatedAt: new Date()
-    })
-    .where(and(
-      eq(bookingRequests.id, bookingId),
-      eq(bookingRequests.status, currentStatus)
-    ))
-    .returning();
+  const result = await db.transaction(async (tx) => {
+    const updated = await tx.update(bookingRequests)
+      .set({
+        status: newStatus,
+        isUnmatched: false,
+        updatedAt: new Date()
+      })
+      .where(and(
+        eq(bookingRequests.id, bookingId),
+        eq(bookingRequests.status, currentStatus)
+      ))
+      .returning();
 
-  if (result.length === 0) {
-    logger.warn('[Checkin] Booking status changed during check-in, possible race condition', { extra: { bookingId, expectedStatus: currentStatus, newStatus } });
-    return { error: 'Booking status changed during check-in. Please refresh and try again.', statusCode: 409 };
-  }
+    if (updated.length === 0) {
+      return null;
+    }
 
-  if (confirmPayment && totalOutstanding > 0) {
-    await db.transaction(async (tx) => {
+    if (confirmPayment && totalOutstanding > 0) {
       for (const p of unpaidParticipants) {
         await tx.update(bookingParticipants)
           .set({ paymentStatus: 'paid' })
           .where(eq(bookingParticipants.id, p.id));
       }
-    });
+    }
+
+    return updated;
+  });
+
+  if (!result || result.length === 0) {
+    logger.warn('[Checkin] Booking status changed during check-in, possible race condition', { extra: { bookingId, expectedStatus: currentStatus, newStatus } });
+    return { error: 'Booking status changed during check-in. Please refresh and try again.', statusCode: 409 };
+  }
+
+  if (confirmPayment && totalOutstanding > 0) {
 
     for (const p of unpaidParticipants) {
       await logPaymentAudit({

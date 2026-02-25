@@ -41,7 +41,15 @@ export async function enqueueHubSpotSync(
     
     const result = await db.execute(sql`INSERT INTO hubspot_sync_queue (operation, payload, priority, max_retries, idempotency_key)
        VALUES (${operation}, ${JSON.stringify(payload)}, ${priority}, ${maxRetries}, ${idempotencyKey})
+       ON CONFLICT (idempotency_key) WHERE idempotency_key IS NOT NULL AND status != 'completed' DO NOTHING
        RETURNING id`);
+    
+    if (result.rows.length === 0) {
+      logger.info('[HubSpot Queue] Duplicate job skipped (conflict)', { 
+        extra: { idempotencyKey, operation }
+      });
+      return null;
+    }
     
     logger.info('[HubSpot Queue] Job enqueued', { 
       extra: { jobId: (result.rows[0] as Record<string, unknown>).id, operation, idempotencyKey }
