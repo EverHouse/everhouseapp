@@ -11,6 +11,21 @@ interface ClosureCacheEntry {
 
 const closureCache = new Map<string, ClosureCacheEntry>();
 const CLOSURE_CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutes
+const CLOSURE_CACHE_PRUNE_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
+
+setInterval(() => {
+  const now = Date.now();
+  let pruned = 0;
+  for (const [key, entry] of closureCache) {
+    if (entry.expiry <= now) {
+      closureCache.delete(key);
+      pruned++;
+    }
+  }
+  if (pruned > 0) {
+    logger.info(`[Cache] Pruned ${pruned} expired closure cache entries (${closureCache.size} remaining)`);
+  }
+}, CLOSURE_CACHE_PRUNE_INTERVAL_MS);
 
 export function clearClosureCache(): void {
   closureCache.clear();
@@ -130,10 +145,12 @@ export async function checkBookingConflict(
       eq(bookingRequests.resourceId, resourceId),
       sql`${bookingRequests.requestDate} = ${bookingDate}`,
       or(
+        eq(bookingRequests.status, 'pending'),
         eq(bookingRequests.status, 'confirmed'),
         eq(bookingRequests.status, 'approved'),
         eq(bookingRequests.status, 'pending_approval'),
-        eq(bookingRequests.status, 'attended')
+        eq(bookingRequests.status, 'attended'),
+        eq(bookingRequests.status, 'cancellation_pending')
       ),
       and(
         sql`${bookingRequests.startTime}::time < ${endTime}::time`,

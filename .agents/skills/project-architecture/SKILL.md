@@ -144,6 +144,9 @@ Never use `pool.connect()` inside `Promise.race()` without ensuring the connecti
 ### 16. Drizzle SQL Null Coalescing
 All optional/nullable values interpolated in Drizzle `sql` template literals MUST use `?? null` coalescing. When `undefined` is passed to a `sql` template literal, Drizzle produces an empty SQL placeholder (e.g., `$7, , $8`) causing syntax errors. Pattern: `sql\`... VALUES (${optionalValue ?? null})\``. This was discovered via production Trackman webhook failures (Feb 2026).
 
+### 16a. Closure Cache Pruning (v8.26.7)
+The `closureCache` Map in `bookingValidation.ts` has a 10-minute pruning interval (`setInterval`) that removes expired entries. The cache TTL is 2 minutes. Without pruning, expired entries accumulate indefinitely. The pruning logs how many entries were removed and how many remain.
+
 ### 17. Date/String Type Guards
 Database query results may return `Date` objects for date columns. Any function that calls `.split()`, `.substring()`, or other string methods on a date value from a DB result MUST handle both `Date` and `string` types. Pattern: `const dateStr = value instanceof Date ? value.toISOString().split('T')[0] : String(value)`. This was discovered via production `bookingEvents.publish()` crash (Feb 2026).
 
