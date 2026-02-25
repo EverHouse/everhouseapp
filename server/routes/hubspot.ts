@@ -1721,7 +1721,7 @@ router.get('/api/hubspot/products', isStaffOrAdmin, async (req, res) => {
 router.post('/api/admin/hubspot/sync-form-submissions', isStaffOrAdmin, async (req: Request, res: Response) => {
   try {
     const { syncHubSpotFormSubmissions } = await import('../core/hubspot/formSync');
-    const result = await syncHubSpotFormSubmissions();
+    const result = await syncHubSpotFormSubmissions({ force: true });
     res.json(result);
   } catch (error: unknown) {
     logger.error('[HubSpot FormSync] Manual sync error', { error: error instanceof Error ? error : new Error(String(error)) });

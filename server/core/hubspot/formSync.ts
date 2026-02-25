@@ -247,7 +247,7 @@ async function fetchFormSubmissionsDirectly(
   return allSubmissions;
 }
 
-export async function syncHubSpotFormSubmissions(): Promise<{
+export async function syncHubSpotFormSubmissions(options?: { force?: boolean }): Promise<{
   totalFetched: number;
   newInserted: number;
   skippedDuplicate: number;
@@ -260,12 +260,24 @@ export async function syncHubSpotFormSubmissions(): Promise<{
     errors: [] as string[],
   };
 
-  if (Date.now() < authFailureBackoffUntil) {
+  const force = options?.force === true;
+
+  if (!force && Date.now() < authFailureBackoffUntil) {
+    logger.info(`[HubSpot FormSync] Skipping sync — auth failure backoff active until ${new Date(authFailureBackoffUntil).toISOString()}`);
     return result;
   }
 
-  if (Date.now() < apiErrorBackoffUntil) {
+  if (!force && Date.now() < apiErrorBackoffUntil) {
+    logger.info(`[HubSpot FormSync] Skipping sync — API error backoff active until ${new Date(apiErrorBackoffUntil).toISOString()}`);
     return result;
+  }
+
+  if (force) {
+    authFailureBackoffUntil = 0;
+    authFailureAlreadyLogged = false;
+    apiErrorBackoffUntil = 0;
+    firstSyncCompleted = false;
+    logger.info('[HubSpot FormSync] Force sync requested — all backoff flags cleared');
   }
 
   try {
