@@ -8,6 +8,22 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.28.0",
+    date: "2026-02-25",
+    title: "Admin Calendar & Conference Room Booking Improvements",
+    changes: [
+      "Improved: Admin calendar grid now starts at 8:30 AM and extends to 10:00 PM to match actual club operating hours — removed the unused 8:00 and 8:15 AM rows",
+      "Improved: Conference room cells on the calendar now show a styled hover card with booking details instead of a plain browser tooltip",
+      "Improved: Table column headers on admin pages now scroll naturally with the page instead of staying sticky, fixing visual clipping issues with hover popups",
+      "Fixed: Staff conference room booking modal sometimes showed 'No available slots' even when clicking on clearly empty calendar cells — removed the unreliable slot-check and now uses the clicked time directly",
+      "Fixed: Member deletion now properly cleans up related data across all tables to prevent orphaned records",
+      "Fixed: Creating booking sessions with identical start and end times no longer causes an error",
+      "Fixed: Database connection leak in certain error paths that could cause server crashes under load",
+      "Fixed: Orphaned booking sessions (sessions without a matching booking) are now properly cleaned up during cancellation",
+      "New: Staff can now assign members to unmatched or empty booking sessions directly from the booking details sheet",
+    ]
+  },
+  {
     version: "8.27.0",
     date: "2026-02-25",
     title: "MindBody → Stripe Billing Migration",
