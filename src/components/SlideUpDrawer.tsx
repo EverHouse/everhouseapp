@@ -169,6 +169,44 @@ export function SlideUpDrawer({
         style={{ touchAction: 'none', top: '-50px', left: '-50px', right: '-50px', bottom: '-50px' }}
         onClick={dismissible ? handleClose : undefined}
       />
+      {/* DEBUG: Red line at fixed bottom:0 to test where viewport ends */}
+      <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, height: '3px', background: 'red', zIndex: 999999, pointerEvents: 'none' }} />
+      {/* DEBUG: Blue line at -34px from bottom to test safe area */}
+      <div style={{ position: 'fixed', bottom: '-34px', left: 0, right: 0, height: '3px', background: 'blue', zIndex: 999999, pointerEvents: 'none' }} />
+      {/* DEBUG: Green line at bottom of screen via 100dvh */}
+      <div style={{ position: 'fixed', top: 0, left: 0, right: 0, height: '100dvh', borderBottom: '3px solid lime', zIndex: 999999, pointerEvents: 'none' }} />
+      {/* DEBUG: Info overlay */}
+      <div style={{ position: 'fixed', top: '60px', left: '10px', background: 'rgba(0,0,0,0.85)', color: '#0f0', fontSize: '11px', padding: '8px', borderRadius: '8px', zIndex: 999999, fontFamily: 'monospace', lineHeight: '1.5', pointerEvents: 'none', maxWidth: '280px' }}
+        ref={(el) => {
+          if (el) {
+            const update = () => {
+              const vv = window.visualViewport;
+              const body = document.body;
+              const html = document.documentElement;
+              const bodyCS = window.getComputedStyle(body);
+              const htmlCS = window.getComputedStyle(html);
+              const wrapper = el.parentElement;
+              const wrapperRect = wrapper ? wrapper.getBoundingClientRect() : null;
+              el.textContent = [
+                `innerH: ${window.innerHeight}`,
+                `screen.h: ${window.screen.height}`,
+                `vv.h: ${vv?.height} vv.top: ${vv?.offsetTop}`,
+                `body.pos: ${bodyCS.position}`,
+                `body.top: ${bodyCS.top}`,
+                `body.h: ${body.getBoundingClientRect().height}`,
+                `html.h: ${html.getBoundingClientRect().height}`,
+                `html.bg: ${htmlCS.backgroundColor}`,
+                `html.overflow: ${htmlCS.overflow}`,
+                `wrapper.h: ${wrapperRect?.height}`,
+                `wrapper.bottom: ${wrapperRect?.bottom}`,
+                `dvh test: ${CSS.supports('height', '100dvh')}`,
+              ].join('\n');
+            };
+            update();
+            setTimeout(update, 500);
+          }
+        }}
+      />
       
       <div 
         ref={drawerRef}
