@@ -23,6 +23,7 @@ import { startStuckCancellationScheduler, stopStuckCancellationScheduler } from 
 import { startPendingUserCleanupScheduler, stopPendingUserCleanupScheduler } from './pendingUserCleanupScheduler';
 import { startWebhookEventCleanupScheduler, stopWebhookEventCleanupScheduler } from './webhookEventCleanupScheduler';
 import { startOnboardingNudgeScheduler, stopOnboardingNudgeScheduler } from './onboardingNudgeScheduler';
+import { startSupabaseHeartbeatScheduler, stopSupabaseHeartbeatScheduler } from './supabaseHeartbeatScheduler';
 import { startJobProcessor, stopJobProcessor } from '../core/jobQueue';
 import { schedulerTracker } from '../core/schedulerTracker';
 
@@ -56,6 +57,7 @@ export function initSchedulers(): void {
   schedulerTracker.registerScheduler('Pending User Cleanup', 6 * 60 * 60 * 1000);
   schedulerTracker.registerScheduler('Webhook Event Cleanup', 24 * 60 * 60 * 1000);
   schedulerTracker.registerScheduler('Onboarding Nudge', 60 * 60 * 1000);
+  schedulerTracker.registerScheduler('Supabase Heartbeat', 6 * 60 * 60 * 1000);
   schedulerTracker.registerScheduler('Job Queue Processor', 5000);
 
   startBackgroundSyncScheduler();
@@ -83,6 +85,7 @@ export function initSchedulers(): void {
   startPendingUserCleanupScheduler();
   startWebhookEventCleanupScheduler();
   startOnboardingNudgeScheduler();
+  startSupabaseHeartbeatScheduler();
   startJobProcessor(5000);
 }
 
@@ -111,5 +114,6 @@ export function stopSchedulers(): void {
   stopOnboardingNudgeScheduler();
   stopMemberSyncScheduler();
   stopBackgroundSyncScheduler();
+  stopSupabaseHeartbeatScheduler();
   stopJobProcessor();
 }
