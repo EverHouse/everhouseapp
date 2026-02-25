@@ -8,6 +8,18 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.31.4",
+    date: "2026-02-25",
+    title: "Android Compatibility Improvements",
+    changes: [
+      "Fixed: Modals and drawers no longer cause a visual page jump on Android — the iOS-specific position:fixed body hack is now only applied on iOS Safari, while Android uses the standard overflow:hidden approach",
+      "Fixed: Scroll inside modals and drawers no longer leaks to the background page on Android — added overscroll-behavior:contain to scrollable containers",
+      "Improved: Android users now see an 'Install' banner prompting them to add the app to their home screen — previously only iOS users saw the install prompt",
+      "Improved: Form inputs inside modals and drawers now automatically scroll into view when the keyboard opens on Android — prevents inputs from being hidden behind the virtual keyboard",
+      "Improved: PWA manifest now includes display_override for better Android standalone app behavior",
+    ]
+  },
+  {
     version: "8.31.3",
     date: "2026-02-25",
     title: "Fix: Stripe Idempotency Bug & Android Scroll",

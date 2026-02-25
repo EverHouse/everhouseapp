@@ -4,6 +4,7 @@
   "description": "Ever Club — Golf, Wellness & Community",
   "start_url": "/",
   "display": "standalone",
+  "display_override": ["standalone"],
   "background_color": "#293515",
   "theme_color": "#293515",
   "orientation": "portrait",

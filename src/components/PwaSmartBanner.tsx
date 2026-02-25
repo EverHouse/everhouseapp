@@ -1,8 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 interface PwaSmartBannerProps {
   appName?: string;
   appDescription?: string;
+}
+
+interface BeforeInstallPromptEvent extends Event {
+  prompt(): Promise<void>;
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
 }
 
 const PwaSmartBanner: React.FC<PwaSmartBannerProps> = ({
@@ -11,19 +16,39 @@ const PwaSmartBanner: React.FC<PwaSmartBannerProps> = ({
 }) => {
   const [show, setShow] = useState(false);
   const [dismissed, setDismissed] = useState(false);
+  const [platform, setPlatform] = useState<'ios' | 'android' | null>(null);
+  const deferredPromptRef = useRef<BeforeInstallPromptEvent | null>(null);
 
   useEffect(() => {
     const isStandalone =
       window.matchMedia('(display-mode: standalone)').matches ||
       (navigator as any).standalone === true;
 
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    if (isStandalone) return;
 
     const wasDismissed = sessionStorage.getItem('pwa_banner_dismissed');
+    if (wasDismissed) return;
 
-    if (!isStandalone && isIOS && !wasDismissed) {
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+
+    if (isIOS) {
+      setPlatform('ios');
       setShow(true);
+      return;
     }
+
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault();
+      deferredPromptRef.current = e as BeforeInstallPromptEvent;
+      setPlatform('android');
+      setShow(true);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
   }, []);
 
   const handleDismiss = () => {
@@ -32,7 +57,17 @@ const PwaSmartBanner: React.FC<PwaSmartBannerProps> = ({
     setTimeout(() => setShow(false), 300);
   };
 
-  const handleOpen = () => {
+  const handleAction = async () => {
+    if (platform === 'android' && deferredPromptRef.current) {
+      await deferredPromptRef.current.prompt();
+      const { outcome } = await deferredPromptRef.current.userChoice;
+      deferredPromptRef.current = null;
+      if (outcome === 'accepted') {
+        handleDismiss();
+      }
+      return;
+    }
+
     const currentUrl = window.location.origin + '/dashboard';
     window.location.href = currentUrl;
   };
@@ -69,10 +104,10 @@ const PwaSmartBanner: React.FC<PwaSmartBannerProps> = ({
           </div>
 
           <button
-            onClick={handleOpen}
+            onClick={handleAction}
             className="flex-shrink-0 px-4 py-1.5 rounded-full bg-blue-500 text-white text-sm font-semibold hover:bg-blue-600 transition-colors"
           >
-            OPEN
+            {platform === 'android' ? 'INSTALL' : 'OPEN'}
           </button>
         </div>
       </div>

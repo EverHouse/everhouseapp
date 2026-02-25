@@ -89,9 +89,19 @@ export function useKeyboardDetection() {
 
     const handleResize = () => debouncedEvaluate();
 
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
     const handleFocusIn = () => {
       startStabilizationCheck();
       setTimeout(evaluateKeyboardState, 300);
+      if (!isIOS) {
+        setTimeout(() => {
+          const el = document.activeElement;
+          if (el && isEditableElement(el) && 'scrollIntoView' in el) {
+            (el as HTMLElement).scrollIntoView({ block: 'center', behavior: 'smooth' });
+          }
+        }, 400);
+      }
     };
 
     const handleFocusOut = () => {

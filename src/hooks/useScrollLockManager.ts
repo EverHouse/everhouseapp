@@ -4,6 +4,12 @@ let lockCount = 0;
 let savedScrollY = 0;
 const lockOwners = new Set<string>();
 
+const isIOSSafari = (() => {
+  if (typeof navigator === 'undefined') return false;
+  const ua = navigator.userAgent;
+  return /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+})();
+
 function generateLockId(): string {
   return `lock_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 }
@@ -39,11 +45,13 @@ function applyScrollLock() {
     savedScrollY = window.scrollY;
     document.documentElement.style.setProperty('background-color', 'black', 'important');
     document.body.style.setProperty('background-color', 'black', 'important');
-    document.body.style.position = 'fixed';
-    document.body.style.top = `-${savedScrollY}px`;
-    document.body.style.left = '0';
-    document.body.style.right = '0';
-    document.body.style.width = '100%';
+    if (isIOSSafari) {
+      document.body.style.position = 'fixed';
+      document.body.style.top = `-${savedScrollY}px`;
+      document.body.style.left = '0';
+      document.body.style.right = '0';
+      document.body.style.width = '100%';
+    }
     document.documentElement.classList.add('overflow-hidden');
     document.body.classList.add('overflow-hidden');
     document.documentElement.style.overscrollBehavior = 'none';
@@ -57,17 +65,21 @@ function removeScrollLock() {
     const scrollY = savedScrollY;
     document.documentElement.style.removeProperty('background-color');
     document.body.style.removeProperty('background-color');
-    document.body.style.position = '';
-    document.body.style.top = '';
-    document.body.style.left = '';
-    document.body.style.right = '';
-    document.body.style.width = '';
+    if (isIOSSafari) {
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.left = '';
+      document.body.style.right = '';
+      document.body.style.width = '';
+    }
     document.documentElement.classList.remove('overflow-hidden');
     document.body.classList.remove('overflow-hidden');
     document.documentElement.style.overscrollBehavior = '';
     document.body.style.overscrollBehavior = '';
     document.removeEventListener('touchmove', preventTouchMove);
-    window.scrollTo(0, scrollY);
+    if (isIOSSafari) {
+      window.scrollTo(0, scrollY);
+    }
   }
 }
 
@@ -98,17 +110,21 @@ export function forceReleaseAllLocks(): void {
   const scrollY = savedScrollY;
   document.documentElement.style.removeProperty('background-color');
   document.body.style.removeProperty('background-color');
-  document.body.style.position = '';
-  document.body.style.top = '';
-  document.body.style.left = '';
-  document.body.style.right = '';
-  document.body.style.width = '';
+  if (isIOSSafari) {
+    document.body.style.position = '';
+    document.body.style.top = '';
+    document.body.style.left = '';
+    document.body.style.right = '';
+    document.body.style.width = '';
+  }
   document.documentElement.classList.remove('overflow-hidden');
   document.body.classList.remove('overflow-hidden');
   document.documentElement.style.overscrollBehavior = '';
   document.body.style.overscrollBehavior = '';
   document.removeEventListener('touchmove', preventTouchMove);
-  window.scrollTo(0, scrollY);
+  if (isIOSSafari) {
+    window.scrollTo(0, scrollY);
+  }
 }
 
 export function getActiveLockCount(): number {
@@ -189,11 +205,13 @@ if (typeof window !== 'undefined') {
     if (document.visibilityState === 'visible' && lockCount === 0 && lockOwners.size === 0) {
       document.documentElement.style.removeProperty('background-color');
       document.body.style.removeProperty('background-color');
-      document.body.style.position = '';
-      document.body.style.top = '';
-      document.body.style.left = '';
-      document.body.style.right = '';
-      document.body.style.width = '';
+      if (isIOSSafari) {
+        document.body.style.position = '';
+        document.body.style.top = '';
+        document.body.style.left = '';
+        document.body.style.right = '';
+        document.body.style.width = '';
+      }
       document.documentElement.classList.remove('overflow-hidden');
       document.body.classList.remove('overflow-hidden');
       document.documentElement.style.overscrollBehavior = '';
