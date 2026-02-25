@@ -420,8 +420,20 @@ export function initWebSocketServer(server: Server) {
         if (message.type === 'staff_register' && userEmail && isAuthenticated) {
           const connections = clients.get(userEmail) || [];
           
+          let isStaffUser = false;
           const verifiedStaff = await getVerifiedUserFromRequest(req);
           if (verifiedStaff?.isStaff) {
+            isStaffUser = true;
+          } else {
+            const staffCheck = await sessionPool.query(
+              `SELECT role FROM users WHERE LOWER(email) = LOWER($1) AND role IN ('staff', 'admin') LIMIT 1`,
+              [userEmail]
+            );
+            if (staffCheck.rows.length > 0) {
+              isStaffUser = true;
+            }
+          }
+          if (isStaffUser) {
             connections.forEach(conn => {
               if (conn.ws === ws) {
                 conn.isStaff = true;

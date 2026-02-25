@@ -4,6 +4,7 @@ import { getPacificDateParts } from '../utils/dateUtils';
 import { logger } from '../core/logger';
 
 const SYNC_HOUR = 3;
+let currentTimeoutId: NodeJS.Timeout | null = null;
 
 function getMillisecondsUntil3amPacific(): number {
   const parts = getPacificDateParts();
@@ -35,7 +36,7 @@ async function runDailyMemberSync(): Promise<void> {
   }
   
   const nextRun = getMillisecondsUntil3amPacific();
-  setTimeout(runDailyMemberSync, nextRun);
+  currentTimeoutId = setTimeout(runDailyMemberSync, nextRun);
   logger.info(`[MemberSync] Next sync scheduled in ${Math.round(nextRun / 1000 / 60 / 60)} hours`);
 }
 
@@ -43,6 +44,14 @@ export function startMemberSyncScheduler(): void {
   const msUntilSync = getMillisecondsUntil3amPacific();
   const hoursUntilSync = Math.round(msUntilSync / 1000 / 60 / 60);
   
-  setTimeout(runDailyMemberSync, msUntilSync);
+  currentTimeoutId = setTimeout(runDailyMemberSync, msUntilSync);
   logger.info(`[Startup] Member sync scheduler enabled (runs daily at 3am Pacific, next run in ~${hoursUntilSync} hours)`);
+}
+
+export function stopMemberSyncScheduler(): void {
+  if (currentTimeoutId) {
+    clearTimeout(currentTimeoutId);
+    currentTimeoutId = null;
+    logger.info('[MemberSync] Scheduler stopped');
+  }
 }

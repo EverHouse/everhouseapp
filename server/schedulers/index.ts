@@ -5,7 +5,7 @@ import { startFeeSnapshotReconciliationScheduler, stopFeeSnapshotReconciliationS
 import { startGracePeriodScheduler, stopGracePeriodScheduler } from './gracePeriodScheduler';
 import { startBookingExpiryScheduler, stopBookingExpiryScheduler } from './bookingExpiryScheduler';
 import { startBookingAutoCompleteScheduler, stopBookingAutoCompleteScheduler } from './bookingAutoCompleteScheduler';
-import { startBackgroundSyncScheduler } from './backgroundSyncScheduler';
+import { startBackgroundSyncScheduler, stopBackgroundSyncScheduler } from './backgroundSyncScheduler';
 import { startDailyReminderScheduler, stopDailyReminderScheduler } from './dailyReminderScheduler';
 import { startMorningClosureScheduler, stopMorningClosureScheduler } from './morningClosureScheduler';
 import { startWeeklyCleanupScheduler } from './weeklyCleanupScheduler';
@@ -16,7 +16,7 @@ import { startHubSpotFormSyncScheduler, stopHubSpotFormSyncScheduler } from './h
 import { startSessionCleanupScheduler } from './sessionCleanupScheduler';
 import { startUnresolvedTrackmanScheduler, stopUnresolvedTrackmanScheduler } from './unresolvedTrackmanScheduler';
 import { startGuestPassResetScheduler, stopGuestPassResetScheduler } from './guestPassResetScheduler';
-import { startMemberSyncScheduler } from './memberSyncScheduler';
+import { startMemberSyncScheduler, stopMemberSyncScheduler } from './memberSyncScheduler';
 import { startDuplicateCleanupScheduler } from './duplicateCleanupScheduler';
 import { startRelocationCleanupScheduler } from './relocationCleanupScheduler';
 import { startStuckCancellationScheduler, stopStuckCancellationScheduler } from './stuckCancellationScheduler';
@@ -109,5 +109,7 @@ export function stopSchedulers(): void {
   stopHubSpotQueueScheduler();
   stopHubSpotFormSyncScheduler();
   stopOnboardingNudgeScheduler();
+  stopMemberSyncScheduler();
+  stopBackgroundSyncScheduler();
   stopJobProcessor();
 }

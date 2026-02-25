@@ -6,6 +6,7 @@ import { logger } from '../core/logger';
 
 const SYNC_INTERVAL_MS = 5 * 60 * 1000;
 const consecutiveFailures: Record<string, number> = {};
+let currentTimeoutId: NodeJS.Timeout | null = null;
 const ALERT_THRESHOLD = 2;
 
 async function syncWithRetry<T extends { error?: string }>(
@@ -81,11 +82,19 @@ const runBackgroundSync = async () => {
     logger.error('[Auto-sync] Calendar sync failed:', { error: err as Error });
     schedulerTracker.recordRun('Background Sync', false, String(err));
   } finally {
-    setTimeout(runBackgroundSync, SYNC_INTERVAL_MS);
+    currentTimeoutId = setTimeout(runBackgroundSync, SYNC_INTERVAL_MS);
   }
 };
 
 export function startBackgroundSyncScheduler(): void {
-  setTimeout(runBackgroundSync, SYNC_INTERVAL_MS);
+  currentTimeoutId = setTimeout(runBackgroundSync, SYNC_INTERVAL_MS);
   logger.info('[Startup] Background calendar sync enabled (every 5 minutes, first sync in 5 minutes)');
+}
+
+export function stopBackgroundSyncScheduler(): void {
+  if (currentTimeoutId) {
+    clearTimeout(currentTimeoutId);
+    currentTimeoutId = null;
+    logger.info('[Background Sync] Scheduler stopped');
+  }
 }

@@ -155,6 +155,7 @@ Database query results may return `Date` objects for date columns. Any function 
 - **Mobile Auth Fallback**: Auth messages accept optional `sessionId` field for mobile clients that can't attach cookies to the WebSocket upgrade request.
 - **Reconnection Jitter**: Member hook uses 2-5s random delay. Staff hook uses exponential backoff. Prevents thundering herd on restart.
 - **Duplicate Socket Guard**: Before `existing.push(connection)`, always check `!existing.some(c => c.ws === ws)`. Flaky mobile networks may retransmit auth messages, which without this guard pushes the same WebSocket into the array multiple times, causing duplicate broadcasts.
+- **Mobile Staff Registration Fallback**: The `staff_register` handler first tries `getVerifiedUserFromRequest(req)` (cookie-based). If that returns null (mobile clients without cookies), it falls back to a direct DB lookup of the user's role via `userEmail`. Without this, mobile managers never receive staff-only real-time alerts.
 
 ### 19. Group Billing Rollback Completeness (v8.26.7)
 - **Add Member Failure**: When Stripe fails during `addGroupMember`/`addCorporateMember`, the catch block MUST reset both `membership_status = 'pending'` AND `tier = NULL` on the user record. Without this, ghost users appear as active members with no billing.

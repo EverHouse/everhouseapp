@@ -2,6 +2,7 @@ import { schedulerTracker } from '../core/schedulerTracker';
 import { queryWithRetry } from '../core/db';
 import { getTodayPacific, getPacificHour, formatTimePacific, createPacificDate } from '../utils/dateUtils';
 import { notifyAllStaff } from '../core/notificationService';
+import { broadcastAvailabilityUpdate } from '../core/websocket';
 import { logger } from '../core/logger';
 
 interface ExpiredBookingResult {
@@ -44,6 +45,13 @@ async function expireStaleBookingRequests(): Promise<void> {
         `[Booking Expiry] Trackman-linked request #${booking.id} → cancellation_pending: ` +
         `${booking.userName || booking.userEmail} for ${booking.requestDate} ${booking.startTime}`
       );
+      if (booking.resourceId) {
+        broadcastAvailabilityUpdate({
+          resourceId: booking.resourceId,
+          date: booking.requestDate,
+          action: 'updated'
+        });
+      }
     }
 
     const expiredBookings = await queryWithRetry<ExpiredBookingResult>(
@@ -77,6 +85,13 @@ async function expireStaleBookingRequests(): Promise<void> {
         `[Booking Expiry] Expired request #${booking.id}: ` +
         `${booking.userName || booking.userEmail} for ${booking.requestDate} ${booking.startTime}`
       );
+      if (booking.resourceId) {
+        broadcastAvailabilityUpdate({
+          resourceId: booking.resourceId,
+          date: booking.requestDate,
+          action: 'cancelled'
+        });
+      }
     }
 
     logger.info(`[Booking Expiry] Processed ${totalCount} stale booking(s): ${expiredCount} expired, ${trackmanCount} → cancellation_pending`);
