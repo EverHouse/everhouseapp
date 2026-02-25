@@ -6,7 +6,7 @@ import { MemberService, isEmail, normalizeEmail, isUUID } from '../memberService
 import { FeeBreakdown, FeeComputeParams, FeeLineItem } from '../../../shared/models/billing';
 import { logger } from '../logger';
 import { PRICING } from './pricingConfig';
-import { toIntArrayLiteral, toTextArrayLiteral } from '../../utils/sqlArrayLiteral';
+import { toIntArrayLiteral, toTextArrayLiteral, toBoolArrayLiteral } from '../../utils/sqlArrayLiteral';
 
 type SqlQueryParam = string | number | boolean | null | Date | string[];
 
@@ -837,18 +837,17 @@ export async function applyFeeBreakdownToParticipants(
 ): Promise<void> {
   try {
     await db.transaction(async (tx) => {
-      const idsToUpdate = breakdown.participants
-        .filter(p => p.participantId)
-        .map(p => p.participantId!);
-      const feesToUpdate = breakdown.participants
-        .filter(p => p.participantId)
-        .map(p => p.totalCents);
+      const participantsWithIds = breakdown.participants.filter(p => p.participantId);
+      const idsToUpdate = participantsWithIds.map(p => p.participantId!);
+      const feesToUpdate = participantsWithIds.map(p => p.totalCents);
+      const passesToUpdate = participantsWithIds.map(p => p.guestPassUsed || false);
 
       if (idsToUpdate.length > 0) {
         await tx.execute(
           sql`UPDATE booking_participants bp
-           SET cached_fee_cents = t.fee
-           FROM unnest(${toIntArrayLiteral(idsToUpdate)}::int[], ${toIntArrayLiteral(feesToUpdate)}::int[]) AS t(id, fee)
+           SET cached_fee_cents = t.fee,
+               used_guest_pass = t.used_pass
+           FROM unnest(${toIntArrayLiteral(idsToUpdate)}::int[], ${toIntArrayLiteral(feesToUpdate)}::int[], ${toBoolArrayLiteral(passesToUpdate)}::boolean[]) AS t(id, fee, used_pass)
            WHERE bp.id = t.id`
         );
       }

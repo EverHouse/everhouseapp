@@ -58,10 +58,10 @@ function calculatePotentialFeeAdjustment(
   if (actualCount <= declaredCount) return 0;
 
   const additionalPlayers = actualCount - declaredCount;
-  const minutesPerPlayer = Math.floor(durationMinutes / Math.max(actualCount, 1));
-  const stolenMinutes = minutesPerPlayer * additionalPlayers;
-  const blocksOwed = Math.ceil(stolenMinutes / PRICING.OVERAGE_BLOCK_MINUTES);
-  return blocksOwed * overageRatePer30Min;
+  const stolenMinutes = Math.floor(durationMinutes / actualCount) * additionalPlayers;
+  const blocksOwed = Math.ceil(stolenMinutes / 30);
+  const feeDollars = blocksOwed * overageRatePer30Min;
+  return Math.round(feeDollars * 100);
 }
 
 export async function findAttendanceDiscrepancies(

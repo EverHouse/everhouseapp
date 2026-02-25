@@ -4336,7 +4336,7 @@ async function handleSubscriptionDeleted(client: PoolClient, subscription: Strip
         const { getTodayPacific, formatTimePacific } = await import('../../utils/dateUtils');
         const todayStr = getTodayPacific();
         const nowTimePacific = formatTimePacific(new Date());
-        const futureBookingsResult = await pool.query(
+        const futureBookingsResult = await client.query(
           `SELECT id, request_date, start_time, status FROM booking_requests 
            WHERE LOWER(user_email) = LOWER($1) 
            AND status IN ('pending', 'pending_approval', 'approved', 'confirmed', 'cancellation_pending')

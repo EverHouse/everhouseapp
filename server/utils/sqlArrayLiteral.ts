@@ -9,3 +9,7 @@ export function toTextArrayLiteral(values: string[]): string {
 export function toNumericArrayLiteral(values: number[]): string {
   return '{' + values.filter(v => Number.isFinite(v)).map(v => String(v)).join(',') + '}';
 }
+
+export function toBoolArrayLiteral(values: boolean[]): string {
+  return '{' + values.map(v => v ? 't' : 'f').join(',') + '}';
+}
