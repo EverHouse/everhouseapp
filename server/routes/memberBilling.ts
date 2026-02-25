@@ -59,13 +59,16 @@ async function findEligibleSubscription(
     status: 'trialing',
   });
 
-  // Include past_due subscriptions - members still have access during grace period
   const pastDueSubscriptions = await stripe.subscriptions.list({
     customer: customerId,
     status: 'past_due',
   });
 
-  const allActiveOrTrialing = [...activeSubscriptions.data, ...trialingSubscriptions.data, ...pastDueSubscriptions.data];
+  const incompleteSubscriptions = (mode === 'discountable' || mode === 'cancellable')
+    ? await stripe.subscriptions.list({ customer: customerId, status: 'incomplete' })
+    : { data: [] };
+
+  const allActiveOrTrialing = [...activeSubscriptions.data, ...trialingSubscriptions.data, ...pastDueSubscriptions.data, ...incompleteSubscriptions.data];
 
   let subscription: Stripe.Subscription | undefined;
 
@@ -683,7 +686,7 @@ router.post('/api/member-billing/:email/discount', isStaffOrAdmin, async (req, r
     let appliedCouponId = couponId;
 
     if (!couponId && percentOff) {
-      const idempotencyKey = `coupon_member_${email}_${percentOff}_${duration}`;
+      const idempotencyKey = `coupon_member_${email}_${percentOff}_${duration}_${Date.now()}`;
       const coupon = await stripe.coupons.create({
         percent_off: percentOff,
         duration: duration as 'once' | 'forever',
