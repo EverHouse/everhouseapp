@@ -222,7 +222,7 @@ export const StripeBillingSection: React.FC<StripeBillingSectionProps> = ({
                   <p className={isDark ? 'text-white' : 'text-primary'}>{activeSubscription.planName}</p>
                 </div>
               )}
-              {activeSubscription.planAmount && (
+              {activeSubscription.planAmount != null && (
                 <div>
                   <p className={`text-xs ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>Price</p>
                   <p className={isDark ? 'text-white' : 'text-primary'}>
