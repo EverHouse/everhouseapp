@@ -1750,5 +1750,27 @@ router.post('/api/admin/hubspot/form-sync-reset', isAdmin, async (_req: Request,
   }
 });
 
+router.post('/api/admin/hubspot/set-forms-token', isAdmin, async (req: Request, res: Response) => {
+  try {
+    const { token } = req.body;
+    if (!token || typeof token !== 'string' || token.length < 10) {
+      return res.status(400).json({ error: 'A valid token is required' });
+    }
+    const { setPrivateAppToken } = await import('../core/hubspot/formSync');
+    const userEmail = (req as any).user?.email || 'admin';
+    await setPrivateAppToken(token, userEmail);
+    const { syncHubSpotFormSubmissions } = await import('../core/hubspot/formSync');
+    const syncResult = await syncHubSpotFormSubmissions();
+    res.json({
+      success: true,
+      message: `Token saved and sync triggered: ${syncResult.totalFetched} fetched, ${syncResult.newInserted} new, ${syncResult.errors.length} errors`,
+      syncResult,
+    });
+  } catch (error: unknown) {
+    logger.error('[HubSpot FormSync] Set token error', { error: error instanceof Error ? error : new Error(String(error)) });
+    res.status(500).json({ error: 'Failed to save token' });
+  }
+});
+
 export { fetchAllHubSpotContacts };
 export default router;

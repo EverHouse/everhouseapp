@@ -30,10 +30,10 @@
 import { getHubSpotPrivateAppClient } from '../integrations';
 import { getErrorMessage } from '../../utils/errorUtils';
 import { db } from '../../db';
-import { formSubmissions } from '../../../shared/schema';
+import { formSubmissions, systemSettings } from '../../../shared/schema';
 import { eq, and, gte, lte } from 'drizzle-orm';
 import { notifyAllStaff } from '../notificationService';
-import type { Client } from '@hubspot/api-client';
+import { Client } from '@hubspot/api-client';
 import nodeFetch from 'node-fetch';
 
 import { logger } from '../logger';
@@ -48,10 +48,39 @@ const FORM_TYPE_LABELS: Record<string, string> = {
 };
 
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+const DB_TOKEN_KEY = 'hubspot_private_app_token';
 let authFailureBackoffUntil = 0;
 let authFailureAlreadyLogged = false;
 let apiErrorBackoffUntil = 0;
 let firstSyncCompleted = false;
+
+async function getPrivateAppToken(): Promise<string | null> {
+  try {
+    const rows = await db.select({ value: systemSettings.value })
+      .from(systemSettings)
+      .where(eq(systemSettings.key, DB_TOKEN_KEY))
+      .limit(1);
+    if (rows.length > 0 && rows[0].value) {
+      return rows[0].value;
+    }
+  } catch {
+  }
+  return process.env.HUBSPOT_PRIVATE_APP_TOKEN || null;
+}
+
+export async function setPrivateAppToken(token: string, updatedBy: string): Promise<void> {
+  await db.insert(systemSettings)
+    .values({ key: DB_TOKEN_KEY, value: token, category: 'hubspot', updatedBy, updatedAt: new Date() })
+    .onConflictDoUpdate({
+      target: systemSettings.key,
+      set: { value: token, updatedBy, updatedAt: new Date() },
+    });
+  authFailureBackoffUntil = 0;
+  authFailureAlreadyLogged = false;
+  apiErrorBackoffUntil = 0;
+  firstSyncCompleted = false;
+  logger.info(`[HubSpot FormSync] Private App token updated in database by ${updatedBy}. All backoff flags reset.`);
+}
 
 export function resetFormSyncAccessDeniedFlag(): void {
   authFailureBackoffUntil = 0;
@@ -240,43 +269,20 @@ export async function syncHubSpotFormSubmissions(): Promise<{
   }
 
   try {
-    const privateAppToken = process.env.HUBSPOT_PRIVATE_APP_TOKEN;
+    const privateAppToken = await getPrivateAppToken();
     if (!privateAppToken) {
       authFailureBackoffUntil = Date.now() + 60 * 60 * 1000;
       if (!authFailureAlreadyLogged) {
-        logger.warn('[HubSpot FormSync] HUBSPOT_PRIVATE_APP_TOKEN not set. Form sync requires Private App token with forms scope. Will retry in 1 hour.');
+        logger.warn('[HubSpot FormSync] No Private App token found (checked database + env var). Form sync requires Private App token with forms scope. Will retry in 1 hour.');
         authFailureAlreadyLogged = true;
       }
       return result;
     }
 
-    logger.info(`[HubSpot FormSync] DIAGNOSTIC — Token check: length=${privateAppToken.length}, starts=${privateAppToken.substring(0, 8)}..., ends=...${privateAppToken.substring(privateAppToken.length - 4)}, NODE_ENV=${process.env.NODE_ENV}, REPL_SLUG=${process.env.REPL_SLUG || 'unset'}, REPL_OWNER=${process.env.REPL_OWNER || 'unset'}`);
+    const tokenSuffix = privateAppToken.substring(privateAppToken.length - 4);
+    logger.info(`[HubSpot FormSync] Using token ...${tokenSuffix} (source: ${privateAppToken === process.env.HUBSPOT_PRIVATE_APP_TOKEN ? 'env' : 'database'})`);
 
-    logger.info('[HubSpot FormSync] Testing Private App token with direct node-fetch before using SDK...');
-    const testResponse = await nodeFetch('https://api.hubapi.com/marketing/v3/forms/?limit=1', {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${privateAppToken}`,
-        'Accept': 'application/json',
-      },
-    });
-    const testStatus = testResponse.status;
-    const testBody = await testResponse.text();
-    logger.info(`[HubSpot FormSync] Direct fetch test: status=${testStatus}, body=${testBody.substring(0, 300)}`);
-
-    if (testStatus === 401 || testStatus === 403) {
-      logger.error(`[HubSpot FormSync] Direct node-fetch ALSO fails with ${testStatus}. The token itself is rejected by HubSpot from this environment. Falling back to connector token approach.`);
-    }
-
-    const client = getHubSpotPrivateAppClient();
-    if (!client) {
-      authFailureBackoffUntil = Date.now() + 60 * 60 * 1000;
-      if (!authFailureAlreadyLogged) {
-        logger.warn('[HubSpot FormSync] Could not create Private App client. Will retry in 1 hour.');
-        authFailureAlreadyLogged = true;
-      }
-      return result;
-    }
+    const client = new Client({ accessToken: privateAppToken });
 
     logger.info('[HubSpot FormSync] Starting sync using Private App token (has forms scope — connector token does NOT)');
 
