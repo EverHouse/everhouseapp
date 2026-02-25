@@ -7,6 +7,7 @@ import { getPacificHour, getTodayPacific } from '../utils/dateUtils';
 import { alertOnScheduledTaskFailure } from '../core/dataAlerts';
 import { schedulerTracker } from '../core/schedulerTracker';
 import { logger } from '../core/logger';
+import { getSettingBoolean } from '../core/settingsHelper';
 
 const INTEGRITY_CHECK_HOUR = 0;
 const INTEGRITY_SETTING_KEY = 'last_integrity_check_date';
@@ -72,17 +73,22 @@ async function checkAndRunIntegrityCheck(): Promise<void> {
           logger.info(`[Integrity Check] Completed: ${totalIssues} issues found (${errorCount} errors, ${warningCount} warnings)`);
           
           if (errorCount > 0 || warningCount > 0) {
-            const adminEmail = process.env.ADMIN_ALERT_EMAIL;
-            
-            if (adminEmail) {
-              const emailResult = await sendIntegrityAlertEmail(results, adminEmail);
-              if (emailResult.success) {
-                logger.info(`[Integrity Check] Alert email sent to ${adminEmail}`);
-              } else {
-                logger.error(`[Integrity Check] Failed to send alert email: ${emailResult.error}`);
-              }
+            const alertsEnabled = await getSettingBoolean('notifications.data_integrity_alerts', true);
+            if (!alertsEnabled) {
+              logger.info('[Integrity Check] Data integrity alerts disabled via settings, skipping email and in-app alerts');
             } else {
-              logger.info('[Integrity Check] No ADMIN_ALERT_EMAIL configured, skipping email alert');
+              const adminEmail = process.env.ADMIN_ALERT_EMAIL;
+              
+              if (adminEmail) {
+                const emailResult = await sendIntegrityAlertEmail(results, adminEmail);
+                if (emailResult.success) {
+                  logger.info(`[Integrity Check] Alert email sent to ${adminEmail}`);
+                } else {
+                  logger.error(`[Integrity Check] Failed to send alert email: ${emailResult.error}`);
+                }
+              } else {
+                logger.info('[Integrity Check] No ADMIN_ALERT_EMAIL configured, skipping email alert');
+              }
             }
           } else {
             logger.info('[Integrity Check] No critical issues found, no alert needed');

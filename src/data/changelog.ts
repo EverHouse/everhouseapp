@@ -8,6 +8,17 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.31.9",
+    date: "2026-02-25",
+    title: "Fix: Data Integrity & Sync Alert Toggle Now Respected",
+    changes: [
+      "Fixed: Toggling off 'Data Integrity Check Alerts' in Notification Settings now actually stops all data integrity notifications — previously the toggle was saved but the alert system never checked it",
+      "Fixed: Toggling off 'Sync Failure Alerts' now stops HubSpot sync, calendar sync, and other external sync failure notifications",
+      "Fixed: The nightly integrity check email alert also respects the toggle — no more midnight emails when alerts are disabled",
+      "Fixed: Duplicate action icons on Stale Pending Bookings in the Data Integrity tab (open/cancel buttons appeared twice per booking)",
+    ]
+  },
+  {
     version: "8.31.8",
     date: "2026-02-25",
     title: "Fix: Orphaned Session & Null Bay Guards on All Auto-Resolve Paths",

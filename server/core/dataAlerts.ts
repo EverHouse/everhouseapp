@@ -1,6 +1,7 @@
 import { notifyAllStaff } from './notificationService';
 import { isProduction } from './db';
 import { getTodayPacific } from '../utils/dateUtils';
+import { getSettingBoolean } from './settingsHelper';
 
 import { logger } from './logger';
 export type DataAlertType = 
@@ -116,6 +117,12 @@ export async function alertOnCriticalIntegrityIssues(
   checks: IntegrityCheckSummary[],
   severityMap: Record<string, 'critical' | 'high' | 'medium' | 'low'>
 ): Promise<void> {
+  const alertsEnabled = await getSettingBoolean('notifications.data_integrity_alerts', true);
+  if (!alertsEnabled) {
+    logger.info('[DataAlerts] Data integrity alerts disabled via settings, skipping critical alert');
+    return;
+  }
+
   const criticalChecks = checks.filter(check => {
     const severity = severityMap[check.checkName] || 'medium';
     return severity === 'critical' && check.status === 'fail' && check.issueCount > 0;
@@ -160,6 +167,12 @@ export async function alertOnHighIntegrityIssues(
   severityMap: Record<string, 'critical' | 'high' | 'medium' | 'low'>,
   threshold: number = 10
 ): Promise<void> {
+  const alertsEnabled = await getSettingBoolean('notifications.data_integrity_alerts', true);
+  if (!alertsEnabled) {
+    logger.info('[DataAlerts] Data integrity alerts disabled via settings, skipping high priority alert');
+    return;
+  }
+
   const highChecks = checks.filter(check => {
     const severity = severityMap[check.checkName] || 'medium';
     return severity === 'high' && check.status === 'fail' && check.issueCount >= threshold;
@@ -205,6 +218,12 @@ export async function alertOnSyncFailure(
   error: Error | string,
   details?: { synced?: number; errors?: number; total?: number; calendarName?: string }
 ): Promise<void> {
+  const syncAlertsEnabled = await getSettingBoolean('notifications.sync_failure_alerts', true);
+  if (!syncAlertsEnabled) {
+    logger.info(`[DataAlerts] Sync failure alerts disabled via settings, skipping ${service} alert`);
+    return;
+  }
+
   const alertKey = `sync_failure:${service}:${operation}`;
   
   if (!canSendAlert(alertKey)) {
@@ -249,6 +268,12 @@ export async function alertOnHubSpotSyncComplete(
   total: number
 ): Promise<void> {
   if (errors === 0) return;
+
+  const syncAlertsEnabled = await getSettingBoolean('notifications.sync_failure_alerts', true);
+  if (!syncAlertsEnabled) {
+    logger.info('[DataAlerts] Sync failure alerts disabled via settings, skipping HubSpot sync alert');
+    return;
+  }
 
   const errorRate = (errors / total) * 100;
   
