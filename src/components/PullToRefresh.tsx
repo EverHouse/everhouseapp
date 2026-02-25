@@ -233,81 +233,114 @@ const PullToRefresh: React.FC<PullToRefreshProps> = ({ children, onRefresh, disa
     };
   }, [isTouchCapable, disabled, isModalOpen, isRefreshing, isFillingScreen, isSpringBack, triggerRefresh, animateSpringBack]);
 
-  const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    if (disabled || isModalOpen || isRefreshing || isSpringBack) return;
-    
-    const scrollTop = window.scrollY || document.documentElement.scrollTop;
-    if (scrollTop <= 5) {
-      startYRef.current = e.touches[0].clientY;
-      isPullingRef.current = true;
-    }
-  }, [disabled, isModalOpen, isRefreshing, isSpringBack]);
+  const disabledRef = useRef(disabled);
+  const isModalOpenRef = useRef(isModalOpen);
+  const isRefreshingRef = useRef(isRefreshing);
+  const isSpringBackRef = useRef(isSpringBack);
+  const isFillingScreenRef = useRef(isFillingScreen);
+  const pullDistanceRef = useRef(pullDistance);
+  const onRefreshRef = useRef(onRefresh);
+  const animateSpringBackRef = useRef(animateSpringBack);
 
-  const handleTouchMove = useCallback((e: React.TouchEvent) => {
-    if (!isPullingRef.current || startYRef.current === null || disabled || isModalOpen || isRefreshing || isSpringBack) return;
+  useEffect(() => { disabledRef.current = disabled; }, [disabled]);
+  useEffect(() => { isModalOpenRef.current = isModalOpen; }, [isModalOpen]);
+  useEffect(() => { isRefreshingRef.current = isRefreshing; }, [isRefreshing]);
+  useEffect(() => { isSpringBackRef.current = isSpringBack; }, [isSpringBack]);
+  useEffect(() => { isFillingScreenRef.current = isFillingScreen; }, [isFillingScreen]);
+  useEffect(() => { pullDistanceRef.current = pullDistance; }, [pullDistance]);
+  useEffect(() => { onRefreshRef.current = onRefresh; }, [onRefresh]);
+  useEffect(() => { animateSpringBackRef.current = animateSpringBack; }, [animateSpringBack]);
 
-    const scrollTop = window.scrollY || document.documentElement.scrollTop;
-    if (scrollTop > 5) {
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container || !isTouchCapable) return;
+
+    const onTouchStart = (e: TouchEvent) => {
+      if (disabledRef.current || isModalOpenRef.current || isRefreshingRef.current || isSpringBackRef.current) return;
+
+      const scrollTop = window.scrollY || document.documentElement.scrollTop;
+      if (scrollTop <= 5) {
+        startYRef.current = e.touches[0].clientY;
+        isPullingRef.current = true;
+      }
+    };
+
+    const onTouchMove = (e: TouchEvent) => {
+      if (!isPullingRef.current || startYRef.current === null || disabledRef.current || isModalOpenRef.current || isRefreshingRef.current || isSpringBackRef.current) return;
+
+      const scrollTop = window.scrollY || document.documentElement.scrollTop;
+      if (scrollTop > 5) {
+        isPullingRef.current = false;
+        const currentDistance = pullDistanceRef.current;
+        if (currentDistance > 5) {
+          animateSpringBackRef.current(currentDistance);
+        } else {
+          setPullDistance(0);
+        }
+        return;
+      }
+
+      const currentY = e.touches[0].clientY;
+      const diff = currentY - startYRef.current;
+
+      if (diff > 0) {
+        const resistance = 0.5;
+        const distance = Math.min(diff * resistance, MAX_PULL);
+        setPullDistance(distance);
+
+        if (distance > 10) {
+          e.preventDefault();
+        }
+      } else {
+        setPullDistance(0);
+      }
+    };
+
+    const onTouchEnd = async () => {
+      if (!isPullingRef.current || disabledRef.current || isModalOpenRef.current) return;
+
       isPullingRef.current = false;
-      const currentDistance = pullDistance;
-      if (currentDistance > 5) {
-        animateSpringBack(currentDistance);
-      } else {
+      startYRef.current = null;
+      const currentPullDistance = pullDistanceRef.current;
+
+      if (currentPullDistance >= PULL_THRESHOLD && !isRefreshingRef.current && !isFillingScreenRef.current) {
+        setIsFillingScreen(true);
         setPullDistance(0);
-      }
-      return;
-    }
 
-    const currentY = e.touches[0].clientY;
-    const diff = currentY - startYRef.current;
+        await new Promise(resolve => setTimeout(resolve, 350));
 
-    if (diff > 0) {
-      const resistance = 0.5;
-      const distance = Math.min(diff * resistance, MAX_PULL);
-      setPullDistance(distance);
-      
-      if (distance > 10) {
-        e.preventDefault();
-      }
-    } else {
-      setPullDistance(0);
-    }
-  }, [disabled, isModalOpen, isRefreshing, isSpringBack, pullDistance, animateSpringBack]);
+        setIsFillingScreen(false);
+        setIsRefreshing(true);
 
-  const handleTouchEnd = useCallback(async () => {
-    if (!isPullingRef.current || disabled || isModalOpen) return;
-    
-    isPullingRef.current = false;
-    startYRef.current = null;
+        try {
+          await onRefreshRef.current();
+        } catch (err: unknown) {
+          console.error('Refresh failed:', err);
+        }
 
-    if (pullDistance >= PULL_THRESHOLD && !isRefreshing && !isFillingScreen) {
-      setIsFillingScreen(true);
-      setPullDistance(0);
-      
-      await new Promise(resolve => setTimeout(resolve, 350));
-      
-      setIsFillingScreen(false);
-      setIsRefreshing(true);
-      
-      try {
-        await onRefresh();
-      } catch (e: unknown) {
-        console.error('Refresh failed:', e);
-      }
-      
-      setIsExiting(true);
-      await new Promise(resolve => setTimeout(resolve, 550));
-      setIsRefreshing(false);
-      setIsExiting(false);
-    } else {
-      // Spring back animation instead of instant reset
-      if (pullDistance > 5) {
-        animateSpringBack(pullDistance);
+        setIsExiting(true);
+        await new Promise(resolve => setTimeout(resolve, 550));
+        setIsRefreshing(false);
+        setIsExiting(false);
       } else {
-        setPullDistance(0);
+        if (currentPullDistance > 5) {
+          animateSpringBackRef.current(currentPullDistance);
+        } else {
+          setPullDistance(0);
+        }
       }
-    }
-  }, [pullDistance, isRefreshing, isFillingScreen, onRefresh, disabled, isModalOpen, animateSpringBack]);
+    };
+
+    container.addEventListener('touchstart', onTouchStart, { passive: true });
+    container.addEventListener('touchmove', onTouchMove, { passive: false });
+    container.addEventListener('touchend', onTouchEnd);
+
+    return () => {
+      container.removeEventListener('touchstart', onTouchStart);
+      container.removeEventListener('touchmove', onTouchMove);
+      container.removeEventListener('touchend', onTouchEnd);
+    };
+  }, [isTouchCapable]);
 
   useEffect(() => {
     if (isRefreshing || isFillingScreen) {
@@ -352,9 +385,6 @@ const PullToRefresh: React.FC<PullToRefreshProps> = ({ children, onRefresh, disa
   return (
     <div
       ref={containerRef}
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
       className={`min-h-full ${className}`}
       style={isTouchCapable ? { touchAction: pullDistance > 0 ? 'none' : 'pan-y' } : undefined}
     >
