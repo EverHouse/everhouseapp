@@ -274,3 +274,97 @@ export async function reconcileSubscriptions() {
     throw error;
   }
 }
+
+export async function reconcileDailyRefunds() {
+  logger.info('[Reconcile] Starting daily refund reconciliation...');
+  
+  try {
+    const stripe = await getStripeClient();
+    
+    const yesterday = Math.floor((Date.now() - 24 * 60 * 60 * 1000) / 1000);
+    
+    let hasMore = true;
+    let startingAfter: string | undefined;
+    let totalChecked = 0;
+    let missingRefunds = 0;
+    let participantsHealed = 0;
+
+    while (hasMore) {
+      const params: Stripe.RefundListParams = {
+        created: { gte: yesterday },
+        limit: 100,
+        expand: ['data.charge', 'data.payment_intent']
+      };
+      if (startingAfter) {
+        params.starting_after = startingAfter;
+      }
+
+      const refunds = await stripe.refunds.list(params);
+      
+      for (const refund of refunds.data) {
+        totalChecked++;
+        
+        if (refund.status !== 'succeeded') continue;
+        
+        const paymentIntentId = typeof refund.payment_intent === 'string' 
+          ? refund.payment_intent 
+          : refund.payment_intent?.id;
+        
+        if (!paymentIntentId) continue;
+        
+        const dbRecord = await db.execute(
+          sql`SELECT status FROM stripe_payment_intents WHERE stripe_payment_intent_id = ${paymentIntentId}`
+        );
+        
+        const currentStatus = dbRecord.rows.length > 0 
+          ? (dbRecord.rows[0] as Record<string, unknown>).status as string 
+          : null;
+        
+        if (currentStatus === 'refunded' || currentStatus === 'partially_refunded') {
+          continue;
+        }
+        
+        const charge = typeof refund.charge === 'object' ? refund.charge as Stripe.Charge : null;
+        const isFullRefund = charge ? (charge.amount_refunded >= charge.amount) : false;
+        const newStatus = isFullRefund ? 'refunded' : 'partially_refunded';
+        const originalAmountCents = charge ? charge.amount : refund.amount;
+        
+        logger.warn(`[Reconcile] Healing refund: PI ${paymentIntentId} should be ${newStatus} (DB has: ${currentStatus || 'missing'}, original: ${originalAmountCents}c, refunded: ${refund.amount}c)`);
+        missingRefunds++;
+        
+        await db.execute(sql`INSERT INTO stripe_payment_intents (
+            stripe_payment_intent_id, user_id, amount_cents, status, purpose, created_at, updated_at
+          ) VALUES (${paymentIntentId}, ${'unknown'}, ${originalAmountCents}, ${newStatus}, ${'reconciled_refund'}, NOW(), NOW())
+          ON CONFLICT (stripe_payment_intent_id) DO UPDATE SET status = ${newStatus}, updated_at = NOW()`);
+        
+        if (isFullRefund) {
+          const participantResult = await db.execute(sql`UPDATE booking_participants 
+             SET payment_status = 'refunded', refunded_at = NOW()
+             WHERE stripe_payment_intent_id = ${paymentIntentId} AND payment_status = 'paid'
+             RETURNING id, user_email`);
+          
+          if (participantResult.rowCount && participantResult.rowCount > 0) {
+            participantsHealed += participantResult.rowCount;
+            logger.warn(`[Reconcile] Healed ${participantResult.rowCount} participant(s) marked refunded for PI ${paymentIntentId}`);
+          }
+        }
+      }
+
+      hasMore = refunds.has_more;
+      if (hasMore && refunds.data.length > 0) {
+        startingAfter = refunds.data[refunds.data.length - 1].id;
+      }
+    }
+
+    logger.info(`[Reconcile] Refund reconciliation complete - Checked: ${totalChecked}, Missing/mismatched: ${missingRefunds}, Participants healed: ${participantsHealed}`);
+    
+    return {
+      totalChecked,
+      missingRefunds,
+      participantsHealed
+    };
+  } catch (error: unknown) {
+    logger.error('[Reconcile] Error during refund reconciliation:', { error: error });
+    throw error;
+  }
+}

@@ -34,9 +34,11 @@ The Ever Club Members App is a private members club application designed for gol
 - **Error Handling**: Empty catch blocks are prohibited; all `catch` blocks must re-throw, log, or use `safeDbOperation()`.
 - **Authentication**: All mutating API routes require authentication.
 - **Rate Limiting**: All public endpoints creating database records are rate-limited. Authenticated users get 600 req/min, unauthenticated IP-based traffic gets 2000 req/min.
-- **Scheduler Robustness**: Schedulers (auto-complete, expiry, integrity, auto-fix, cleanup, guest pass reset) use `isRunning` flags to prevent concurrent execution, catch-up windows, and claim slots to prevent double runs. They also include alerts for claim failures and handle graceful shutdowns.
-- **Stripe Integration Specifics**: Includes Stripe webhook safety, payment handler logic (auto-refunds, error handling for retries), idempotency keys, coupon application, and specific requirements for `trial_end` and $0 subscriptions.
-- **Data Integrity and Consistency**: Prevents double-charging, ensures orphaned invoice cleanup, uses optimistic locking for booking status transitions, and maintains atomicity for critical operations like billing group creation.
+- **Scheduler Robustness**: Schedulers (auto-complete, expiry, integrity, auto-fix, cleanup, guest pass reset, refund reconciliation) use `isRunning` flags to prevent concurrent execution, catch-up windows, and claim slots to prevent double runs. They also include alerts for claim failures and handle graceful shutdowns.
+- **Stripe Integration Specifics**: Includes Stripe webhook safety, payment handler logic (auto-refunds, error handling for retries), stable idempotency keys (format: `tier-upgrade-{subId}-{priceId}-{itemId}`), coupon application, and specific requirements for `trial_end` and $0 subscriptions. Daily refund reconciliation (`reconcileDailyRefunds()`) heals split-brain scenarios where Stripe refunds succeed but database isn't updated.
+- **Data Integrity and Consistency**: Prevents double-charging, ensures orphaned invoice cleanup, uses optimistic locking for booking status transitions, and maintains atomicity for critical operations like billing group creation. NaN guards on all numeric route params. Cart item validation enforces non-negative finite `priceCents` and positive integer `quantity`.
+- **Tier Hierarchy Validation**: Startup validates DB membership tier slugs against `TIER_NAMES` in `shared/constants/tiers.ts`, logging drift warnings. Actual tier logic is DB-driven via `getTierLimits()`.
+- **Deferred Webhook Actions**: Post-commit webhook side-effects (notifications, HubSpot sync) log event context (`eventId`, `eventType`) for production debuggability.
 - **WebSocket Robustness**: Includes periodic session revalidation, cryptographic verification of session cookies, reconnect jitter, and guards against duplicate socket registrations.
 
 ## Web Performance & Security

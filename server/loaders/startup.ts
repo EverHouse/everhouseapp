@@ -1,4 +1,4 @@
-import { ensureDatabaseConstraints, seedDefaultNoticeTypes, createStripeTransactionCache, createSyncExclusionsTable, setupEmailNormalization, normalizeExistingEmails, cleanupOrphanedRecords, seedTierFeatures, fixFunctionSearchPaths } from '../db-init';
+import { ensureDatabaseConstraints, seedDefaultNoticeTypes, createStripeTransactionCache, createSyncExclusionsTable, setupEmailNormalization, normalizeExistingEmails, cleanupOrphanedRecords, seedTierFeatures, fixFunctionSearchPaths, validateTierHierarchy } from '../db-init';
 import { seedTrainingSections } from '../routes/training';
 import { getStripeSync } from '../core/stripe';
 import { getStripeEnvironmentInfo, getStripeClient } from '../core/stripe/client';
@@ -89,6 +89,13 @@ export async function runStartupTasks(): Promise<void> {
   } catch (err: unknown) {
     logger.error('[Startup] Seeding tier features failed', { error: err instanceof Error ? err : new Error(String(err)) });
     startupHealth.warnings.push(`Tier features: ${getErrorMessage(err)}`);
+  }
+
+  try {
+    await validateTierHierarchy();
+  } catch (err: unknown) {
+    logger.error('[Startup] Tier hierarchy validation failed', { error: err instanceof Error ? err : new Error(String(err)) });
+    startupHealth.warnings.push(`Tier validation: ${getErrorMessage(err)}`);
   }
 
   try {

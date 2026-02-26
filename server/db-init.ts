@@ -523,6 +523,30 @@ export async function ensureDatabaseConstraints() {
   }
 }
 
+export async function validateTierHierarchy(): Promise<void> {
+  try {
+    const { TIER_NAMES } = await import('../shared/constants/tiers');
+    const dbTiers = await db.execute(sql`SELECT DISTINCT slug FROM membership_tiers WHERE is_active = true`);
+    const dbSlugs = new Set(dbTiers.rows.map((r: Record<string, unknown>) => (r.slug as string)?.toLowerCase()));
+    const codeSlugs = new Set(TIER_NAMES.map(t => t.toLowerCase()));
+    
+    const inDbNotCode = [...dbSlugs].filter(s => !codeSlugs.has(s));
+    const inCodeNotDb = [...codeSlugs].filter(s => !dbSlugs.has(s));
+    
+    if (inDbNotCode.length > 0) {
+      logger.warn(`[DB Init] Tier drift detected: DB has tiers not in code constants: ${inDbNotCode.join(', ')}`);
+    }
+    if (inCodeNotDb.length > 0) {
+      logger.warn(`[DB Init] Tier drift detected: Code constants have tiers not in DB: ${inCodeNotDb.join(', ')}`);
+    }
+    if (inDbNotCode.length === 0 && inCodeNotDb.length === 0) {
+      logger.info('[DB Init] Tier hierarchy validated — DB and code constants in sync');
+    }
+  } catch (error: unknown) {
+    logger.error('[DB Init] Tier hierarchy validation failed:', { extra: { errorMessage: getErrorMessage(error) } });
+  }
+}
+
 export async function seedTierFeatures(): Promise<void> {
   try {
     const existing = await db.execute(sql`SELECT COUNT(*) FROM tier_features`);

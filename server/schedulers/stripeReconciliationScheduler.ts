@@ -2,7 +2,7 @@ import { schedulerTracker } from '../core/schedulerTracker';
 import { db } from '../db';
 import { systemSettings } from '../../shared/schema';
 import { sql } from 'drizzle-orm';
-import { reconcileDailyPayments, reconcileSubscriptions } from '../core/stripe/reconciliation';
+import { reconcileDailyPayments, reconcileSubscriptions, reconcileDailyRefunds } from '../core/stripe/reconciliation';
 import { getPacificHour, getTodayPacific } from '../utils/dateUtils';
 import { logger } from '../core/logger';
 
@@ -55,6 +55,10 @@ async function checkAndRunReconciliation(): Promise<void> {
           
           const subscriptionResults = await reconcileSubscriptions();
           logger.info('[Stripe Reconciliation] Subscription reconciliation complete:', { extra: { results: subscriptionResults } });
+          schedulerTracker.recordRun('Stripe Reconciliation', true);
+          
+          const refundResults = await reconcileDailyRefunds();
+          logger.info('[Stripe Reconciliation] Refund reconciliation complete:', { extra: { results: refundResults } });
           schedulerTracker.recordRun('Stripe Reconciliation', true);
         } catch (error: unknown) {
           logger.error('[Stripe Reconciliation] Error running reconciliation:', { error: error as Error });

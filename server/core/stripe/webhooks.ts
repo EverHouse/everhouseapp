@@ -172,13 +172,21 @@ async function checkResourceEventOrder(
   return true;
 }
 
-async function executeDeferredActions(actions: DeferredAction[]): Promise<void> {
-  for (const action of actions) {
+async function executeDeferredActions(actions: DeferredAction[], eventContext?: { eventId: string; eventType: string }): Promise<void> {
+  let failedCount = 0;
+  for (let i = 0; i < actions.length; i++) {
     try {
-      await action();
+      await actions[i]();
     } catch (err: unknown) {
-      logger.error('[Stripe Webhook] Deferred action failed (non-critical):', { error: err });
+      failedCount++;
+      logger.error(`[Stripe Webhook] Deferred action ${i + 1}/${actions.length} failed (non-critical):`, { 
+        error: err,
+        extra: eventContext ? { eventId: eventContext.eventId, eventType: eventContext.eventType } : undefined
+      });
     }
+  }
+  if (failedCount > 0) {
+    logger.warn(`[Stripe Webhook] ${failedCount}/${actions.length} deferred actions failed for event ${eventContext?.eventId || 'unknown'} (${eventContext?.eventType || 'unknown'})`);
   }
 }
 
@@ -371,7 +379,7 @@ export async function processStripeWebhook(
     await client.query('COMMIT');
     logger.info(`[Stripe Webhook] Event ${event.id} committed successfully`);
 
-    await executeDeferredActions(deferredActions);
+    await executeDeferredActions(deferredActions, { eventId: event.id, eventType: event.type });
 
     if (Math.random() < 0.05) {
       cleanupOldProcessedEvents().catch(err => 
