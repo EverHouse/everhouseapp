@@ -104,7 +104,7 @@ export const AlertsCard: React.FC<AlertsCardProps> = ({ notifications, onAlertCl
   const unreadCount = notifications.filter(n => !n.is_read).length;
   
   return (
-    <div className="flex-1 min-h-[200px] bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl p-4 flex flex-col">
+    <div className="flex-1 min-h-[200px] bg-white/40 dark:bg-white/[0.08] backdrop-blur-xl border border-white/60 dark:border-white/[0.12] rounded-2xl p-4 shadow-liquid dark:shadow-liquid-dark flex flex-col">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <h3 className="font-bold text-primary dark:text-white">Alerts</h3>

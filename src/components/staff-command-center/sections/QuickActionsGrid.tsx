@@ -21,7 +21,7 @@ export const QuickActionsGrid: React.FC<QuickActionsGridProps> = ({ isAdmin, var
 
   if (variant === 'desktop') {
     return (
-      <div className="flex-1 h-full bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl p-4 flex flex-col">
+      <div className="flex-1 h-full bg-white/40 dark:bg-white/[0.08] backdrop-blur-xl border border-white/60 dark:border-white/[0.12] rounded-2xl p-4 shadow-liquid dark:shadow-liquid-dark flex flex-col">
         <h3 className="font-bold text-primary dark:text-white mb-4">Employee Resources</h3>
         
         <div className="flex-1 flex flex-col justify-between">
@@ -83,7 +83,7 @@ export const QuickActionsGrid: React.FC<QuickActionsGridProps> = ({ isAdmin, var
   }
 
   return (
-    <div className="bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl p-4">
+    <div className="bg-white/40 dark:bg-white/[0.08] backdrop-blur-xl border border-white/60 dark:border-white/[0.12] rounded-2xl p-4 shadow-liquid dark:shadow-liquid-dark">
       {onScanQr && (
         <div className="mb-4">
           <button

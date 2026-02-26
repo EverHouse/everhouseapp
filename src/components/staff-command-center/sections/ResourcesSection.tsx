@@ -21,7 +21,7 @@ const NoticeBoardCard = memo<NoticeBoardCardProps>(({
   upcomingClosure,
   navigateToTab
 }) => (
-  <div className={`${variant === 'desktop' ? 'h-full' : ''} bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl p-4 ${variant === 'desktop' ? 'flex flex-col' : ''}`}>
+  <div className={`${variant === 'desktop' ? 'h-full' : ''} bg-white/40 dark:bg-white/[0.08] backdrop-blur-xl border border-white/60 dark:border-white/[0.12] rounded-2xl p-4 shadow-liquid dark:shadow-liquid-dark ${variant === 'desktop' ? 'flex flex-col' : ''}`}>
     <div className="flex items-center justify-between mb-3 lg:mb-4">
       <h3 className="font-bold text-primary dark:text-white">Internal Notice Board</h3>
       <button onClick={() => navigateToTab('blocks')} className="text-xs text-primary/80 dark:text-white/80 hover:underline tactile-btn">Manage</button>
@@ -146,7 +146,7 @@ const FacilityStatusCard = memo<FacilityStatusCardProps>(({
   navigate,
   variant
 }) => (
-  <div className="bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl p-4">
+  <div className="bg-white/40 dark:bg-white/[0.08] backdrop-blur-xl border border-white/60 dark:border-white/[0.12] rounded-2xl p-4 shadow-liquid dark:shadow-liquid-dark">
     <div className="flex items-center justify-between mb-3 lg:mb-4">
       <h3 className="font-bold text-primary dark:text-white">Facility Status</h3>
       <div className="flex items-center gap-3 text-xs text-primary/80 dark:text-white/80">
@@ -293,7 +293,7 @@ export const NoticeBoardWidget: React.FC<{
   }, [navigate]);
 
   return (
-    <div className="h-full min-h-[140px] bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl p-4 flex flex-col">
+    <div className="h-full min-h-[140px] bg-white/40 dark:bg-white/[0.08] backdrop-blur-xl border border-white/60 dark:border-white/[0.12] rounded-2xl p-4 shadow-liquid dark:shadow-liquid-dark flex flex-col">
       <div className="flex items-center justify-between mb-4">
         <h3 className="font-bold text-primary dark:text-white">Internal Notice Board</h3>
         <button onClick={() => navigateToTab('blocks')} className="text-xs text-primary/80 dark:text-white/80 hover:underline tactile-btn">Manage</button>

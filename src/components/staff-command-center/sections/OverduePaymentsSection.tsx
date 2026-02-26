@@ -84,7 +84,7 @@ export const OverduePaymentsSection: React.FC<OverduePaymentsSectionProps> = ({ 
 
   if (loading) {
     return (
-      <div className={`${isDesktop ? 'h-full min-h-[280px]' : 'min-h-[200px]'} flex flex-col bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl p-4`}>
+      <div className={`${isDesktop ? 'h-full min-h-[280px]' : 'min-h-[200px]'} flex flex-col bg-white/40 dark:bg-white/[0.08] backdrop-blur-xl border border-white/60 dark:border-white/[0.12] rounded-2xl p-4 shadow-liquid dark:shadow-liquid-dark`}>
         <div className="flex items-center justify-center flex-1">
           <WalkingGolferSpinner size="sm" variant="dark" />
         </div>
@@ -95,7 +95,7 @@ export const OverduePaymentsSection: React.FC<OverduePaymentsSectionProps> = ({ 
   return (
     <>
       <div 
-        className={`${isDesktop ? 'h-full min-h-[280px]' : 'min-h-[200px]'} flex flex-col bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl p-4 ${count > 0 ? 'border-l-4 border-l-red-500' : ''}`}
+        className={`${isDesktop ? 'h-full min-h-[280px]' : 'min-h-[200px]'} flex flex-col bg-white/40 dark:bg-white/[0.08] backdrop-blur-xl border border-white/60 dark:border-white/[0.12] rounded-2xl p-4 shadow-liquid dark:shadow-liquid-dark ${count > 0 ? 'border-l-4 border-l-red-500' : ''}`}
         role="region"
         aria-label={count > 0 ? `Overdue Payments - ${count} outstanding` : 'Overdue Payments'}
       >
