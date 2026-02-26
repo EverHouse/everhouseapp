@@ -2151,6 +2151,91 @@ router.get('/api/admin/booking/:id/members', isStaffOrAdmin, async (req, res) =>
         };
       });
 
+      if (membersWithFees.length === 0 && ownerEmail && !isUnmatchedOwner) {
+        const ownerLineItem = feeBreakdownResult.participants.find(li => li.participantType === 'owner');
+        const isStaffUser = staffEmailSet.has(String(ownerEmail).toLowerCase());
+        let ownerMembershipStatus: string | null = null;
+        const ownerUserLookup = await db.execute(sql`SELECT tier, membership_status, first_name, last_name FROM users WHERE LOWER(email) = LOWER(${ownerEmail}) LIMIT 1`);
+        let resolvedOwnerName = (ownerName as string) || (ownerEmail as string);
+        if (ownerUserLookup.rows.length > 0) {
+          const u = ownerUserLookup.rows[0] as DbRow;
+          ownerMembershipStatus = (u.membership_status as string) || null;
+          if (u.first_name && u.last_name) resolvedOwnerName = `${u.first_name} ${u.last_name}`;
+        }
+
+        let ownerFee = 0;
+        let ownerFeeNote = '';
+        let ownerFeeBreakdown: FeeBreakdownObj = null;
+        if (ownerLineItem) {
+          ownerFee = ownerLineItem.totalCents / 100;
+          ownerFeeNote = generateFeeNote(ownerLineItem, ownerMembershipStatus, true);
+          const da = ownerLineItem.dailyAllowance || 0;
+          const om = ownerLineItem.overageCents > 0
+            ? Math.ceil((ownerLineItem.overageCents / 100) / PRICING.OVERAGE_RATE_DOLLARS) * PRICING.OVERAGE_BLOCK_MINUTES
+            : 0;
+          ownerFeeBreakdown = {
+            perPersonMins: ownerLineItem.minutesAllocated,
+            dailyAllowance: da,
+            usedToday: ownerLineItem.usedMinutesToday || 0,
+            overageMinutes: om,
+            fee: ownerFee,
+            isUnlimited: isStaffUser ? true : da >= 999,
+            isSocialTier: ownerLineItem.tierName?.toLowerCase() === 'social'
+          };
+        }
+
+        membersWithFees.push({
+          id: -100,
+          bookingId,
+          userEmail: ownerEmail as string,
+          slotNumber: 1,
+          isPrimary: true,
+          linkedAt: null,
+          linkedBy: null,
+          memberName: resolvedOwnerName,
+          tier: isStaffUser ? 'Staff' : (ownerTier || null),
+          fee: ownerFee,
+          feeNote: ownerFeeNote,
+          feeBreakdown: ownerFeeBreakdown,
+          membershipStatus: ownerMembershipStatus,
+          isInactiveMember: false,
+          isStaff: isStaffUser,
+          guestInfo: null
+        });
+      }
+
+      let legacySlotNumber = membersWithFees.length > 0
+        ? Math.max(...membersWithFees.map(m => m.slotNumber)) + 1
+        : (membersWithFees.length === 0 ? 2 : 1);
+      let legacyEmptySlotId = -1;
+      while (membersWithFees.length < expectedPlayerCount) {
+        membersWithFees.push({
+          id: legacyEmptySlotId,
+          bookingId,
+          userEmail: null,
+          slotNumber: legacySlotNumber,
+          isPrimary: false,
+          linkedAt: null,
+          linkedBy: null,
+          memberName: 'Empty Slot',
+          tier: null,
+          fee: PRICING.GUEST_FEE_DOLLARS,
+          feeNote: `Pending assignment - $${PRICING.GUEST_FEE_DOLLARS}`,
+          feeBreakdown: null,
+          membershipStatus: null,
+          isInactiveMember: false,
+          isStaff: false,
+          guestInfo: null
+        });
+        legacyEmptySlotId--;
+        legacySlotNumber++;
+      }
+
+      filledMemberSlots = membersWithFees.filter(m => !!m.userEmail).length;
+      totalMemberSlots = membersWithFees.length;
+      actualPlayerCount = filledMemberSlots + Number(effectiveGuestCount);
+      playerCountMismatch = actualPlayerCount !== expectedPlayerCount;
+
       guestPassesUsedThisBooking = feeBreakdownResult.totals.guestPassesUsed;
       guestPassesRemainingAfterBooking = ownerGuestPassesRemaining - guestPassesUsedThisBooking;
 
