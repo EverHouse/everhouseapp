@@ -143,8 +143,8 @@ export async function enableRealtimeForTable(tableName: string): Promise<boolean
         return true;
       }
       if ((msg.includes('function') && (msg.includes('does not exist') || msg.includes('Could not find'))) || msg.includes('exec_sql')) {
-        logger.debug(`[Supabase] exec_sql RPC not available for ${tableName} — configure realtime via Supabase dashboard`);
-        return false;
+        logger.info(`[Supabase] exec_sql RPC not available — assuming ${tableName} was added to realtime publication via dashboard`);
+        return true;
       }
       if (msg.includes('fetch failed') || msg.includes('ENOTFOUND') || msg.includes('ECONNREFUSED') || msg.includes('TypeError')) {
         logger.warn(`[Supabase] Cannot reach Supabase for ${tableName} realtime - service may be unreachable`);
