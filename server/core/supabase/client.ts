@@ -142,12 +142,8 @@ export async function enableRealtimeForTable(tableName: string): Promise<boolean
         logger.info(`[Supabase] Table ${tableName} already in supabase_realtime publication`);
         return true;
       }
-      if (msg.includes('function') && msg.includes('does not exist')) {
-        const { error: sqlError } = await supabase.from('_realtime').select('id').limit(0);
-        if (!sqlError || (sqlError.message || '').includes('does not exist')) {
-          logger.warn(`[Supabase] Cannot execute publication SQL for ${tableName} - exec_sql RPC not available, attempting direct approach`);
-        }
-        logger.warn(`[Supabase] Realtime publication management not available via RPC for ${tableName} - table exists but realtime needs manual configuration in Supabase dashboard`);
+      if ((msg.includes('function') && (msg.includes('does not exist') || msg.includes('Could not find'))) || msg.includes('exec_sql')) {
+        logger.debug(`[Supabase] exec_sql RPC not available for ${tableName} — configure realtime via Supabase dashboard`);
         return false;
       }
       if (msg.includes('fetch failed') || msg.includes('ENOTFOUND') || msg.includes('ECONNREFUSED') || msg.includes('TypeError')) {

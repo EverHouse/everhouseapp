@@ -79,7 +79,8 @@ const severityMap: Record<string, 'critical' | 'high' | 'medium' | 'low'> = {
   'Invoice-Booking Reconciliation': 'critical',
   'Overlapping Bookings': 'critical',
   'Guest Pass Accounting Drift': 'high',
-  'Stale Pending Bookings': 'high'
+  'Stale Pending Bookings': 'high',
+  'Orphaned Usage Ledger Entries': 'critical'
 };
 
 function getCheckSeverity(checkName: string): 'critical' | 'high' | 'medium' | 'low' {
@@ -2498,6 +2499,54 @@ async function checkStalePendingBookings(): Promise<IntegrityCheckResult> {
   }
 }
 
+async function checkOrphanedUsageLedgerEntries(): Promise<IntegrityCheckResult> {
+  const issues: IntegrityIssue[] = [];
+
+  try {
+    const orphanedResult = await db.execute(sql`
+      SELECT ul.id, ul.session_id, ul.member_id, ul.overage_fee, ul.guest_fee, ul.minutes_charged, ul.created_at
+      FROM usage_ledger ul
+      LEFT JOIN booking_sessions bs ON ul.session_id = bs.id
+      WHERE bs.id IS NULL
+        AND ul.session_id IS NOT NULL
+        AND ul.created_at >= CURRENT_DATE - INTERVAL '90 days'
+      LIMIT 100
+    `);
+
+    for (const row of orphanedResult.rows as any[]) {
+      issues.push({
+        severity: 'error',
+        table: 'usage_ledger',
+        recordId: String(row.id),
+        description: `Usage ledger entry #${row.id} references non-existent session #${row.session_id} (member: ${row.member_id || 'unknown'}, overage: ${row.overage_fee || 0}¢, guest: ${row.guest_fee || 0}¢)`,
+        suggestion: 'Review and archive orphaned ledger entry — billing may be inaccurate for this member'
+      });
+    }
+
+    return {
+      checkName: 'Orphaned Usage Ledger Entries',
+      status: issues.length > 0 ? 'fail' : 'pass',
+      issues,
+      issueCount: issues.length,
+      lastRun: new Date()
+    };
+  } catch (error) {
+    return {
+      checkName: 'Orphaned Usage Ledger Entries',
+      status: 'fail',
+      issueCount: 1,
+      issues: [{
+        severity: 'error',
+        table: 'usage_ledger',
+        recordId: 'check_error',
+        description: `Failed to check orphaned usage ledger entries: ${getErrorMessage(error)}`,
+        suggestion: 'Review server logs for details and retry'
+      }],
+      lastRun: new Date()
+    };
+  }
+}
+
 export async function runAllIntegrityChecks(triggeredBy: 'manual' | 'scheduled' = 'manual'): Promise<IntegrityCheckResult[]> {
   const checks = await Promise.all([
     safeCheck(checkOrphanBookingParticipants, 'Orphan Booking Participants'),
@@ -2529,6 +2578,9 @@ export async function runAllIntegrityChecks(triggeredBy: 'manual' | 'scheduled' 
     safeCheck(checkOverlappingBookings, 'Overlapping Bookings'),
     safeCheck(checkGuestPassAccountingDrift, 'Guest Pass Accounting Drift'),
     safeCheck(checkStalePendingBookings, 'Stale Pending Bookings'),
+    safeCheck(checkDuplicateTourSources, 'Duplicate Tour Sources'),
+    safeCheck(checkStalePastTours, 'Stale Past Tours'),
+    safeCheck(checkOrphanedUsageLedgerEntries, 'Orphaned Usage Ledger Entries'),
   ]);
   
   const now = new Date();

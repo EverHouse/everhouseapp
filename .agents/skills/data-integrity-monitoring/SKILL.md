@@ -245,9 +245,17 @@ The following production error patterns were discovered and fixed during the Feb
 2. **Date/string type mismatch** — Database date columns may return `Date` objects where string methods (`.split()`) are called. Fix: type-check with `instanceof Date`.
 3. **Stale asset MIME type** — Missing JS assets served with `Content-Type: text/html` cause white screen of death. Fix: serve valid JavaScript with correct MIME type.
 
+### Integrity Hardening (Feb 26, 2026)
+
+1. **3 checks wired into runAllIntegrityChecks** — `checkDuplicateTourSources`, `checkStalePastTours`, and new `checkOrphanedUsageLedgerEntries` were added. Total checks: 32 (was 29).
+2. **Orphaned Usage Ledger check** — Detects `usage_ledger` entries referencing non-existent `booking_sessions` (billing-critical, severity: critical). Scans 90-day window.
+3. **Unsafe sessionId fallback fixed** — `payment.sessionId || 0` in refund logic replaced with `?? null` to avoid false-matching session_id=0.
+4. **Payment status optimistic locking** — `payment_status = 'pending'` update in prepayment flow widened to `IN ('pending', 'unpaid')` for correct state matching.
+5. **Supabase exec_sql warning suppressed** — `exec_sql` RPC unavailability downgraded from WARN to DEBUG to reduce log noise.
+
 ## Reference Files
 
-- **[references/integrity-checks.md](references/integrity-checks.md)** — Complete list of all 29 integrity checks with detection logic, severity, and recommended actions. Also covers webhook, job queue, and HubSpot queue monitors.
+- **[references/integrity-checks.md](references/integrity-checks.md)** — Complete list of all 32 integrity checks with detection logic, severity, and recommended actions. Also covers webhook, job queue, and HubSpot queue monitors.
 - **[references/scheduler-map.md](references/scheduler-map.md)** — All 27+ scheduled tasks with frequencies, execution windows, and multi-instance safety details.
 
 ## Database Tables Used by Monitoring
