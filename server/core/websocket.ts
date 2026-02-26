@@ -57,14 +57,17 @@ let sessionPool: Pool | null = null;
 function getSessionPool(): Pool | null {
   if (sessionPool) return sessionPool;
   
-  const dbUrl = process.env.DATABASE_URL;
+  const poolerUrl = process.env.DATABASE_POOLER_URL;
+  const directUrl = process.env.DATABASE_URL;
+  const usePooler = process.env.ENABLE_PGBOUNCER === 'true' && !!poolerUrl;
+  const dbUrl = usePooler ? poolerUrl : directUrl;
   if (!dbUrl) {
-    logger.warn('[WebSocket] DATABASE_URL not configured - session verification disabled');
+    logger.warn('[WebSocket] No database URL configured - session verification disabled');
     return null;
   }
   
   try {
-    const needsSsl = process.env.NODE_ENV === 'production';
+    const needsSsl = process.env.NODE_ENV === 'production' || usePooler;
     sessionPool = new Pool({ 
       connectionString: dbUrl,
       connectionTimeoutMillis: 5000,

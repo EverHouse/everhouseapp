@@ -8,16 +8,11 @@ import { getErrorMessage } from "../../utils/errorUtils";
 import { logger } from "../../core/logger";
 
 export function getAuthPool() {
-  if (!process.env.DATABASE_URL) {
-    logger.warn('[Auth] DATABASE_URL not configured - database features disabled');
-    return null;
-  }
   return pool;
 }
 
 export function getSession() {
   const sessionSecret = process.env.SESSION_SECRET;
-  const databaseUrl = process.env.DATABASE_URL;
   const isProduction = process.env.NODE_ENV === 'production' || process.env.REPLIT_DEPLOYMENT === '1';
   
   const cookieConfig = {
@@ -41,21 +36,11 @@ export function getSession() {
     });
   }
   
-  if (!databaseUrl) {
-    logger.info('[Session] Using MemoryStore');
-    return session({
-      secret: sessionSecret,
-      resave: false,
-      saveUninitialized: false,
-      cookie: cookieConfig,
-    });
-  }
-  
   try {
     const sessionTtl = 30 * 24 * 60 * 60 * 1000; // 30 days
     const pgStore = connectPg(session);
     const sessionStore = new pgStore({
-      conString: databaseUrl,
+      pool: pool as any,
       createTableIfMissing: true,
       ttl: sessionTtl,
       tableName: "sessions",
