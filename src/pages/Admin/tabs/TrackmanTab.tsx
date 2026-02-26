@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import EmptyState from '../../../components/EmptyState';
 import { usePageReady } from '../../../contexts/PageReadyContext';
@@ -191,7 +191,9 @@ const TrackmanTab: React.FC = () => {
   const [fuzzySearchQuery, setFuzzySearchQuery] = useState('');
   const [isDragging, setIsDragging] = useState(false);
   const [viewDetailBooking, setViewDetailBooking] = useState<TrackmanBooking | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<{ phase: 'uploading' | 'processing' | 'complete'; percent: number } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const processingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const unmatchedSectionRef = useRef<HTMLDivElement>(null);
   const needsPlayersSectionRef = useRef<HTMLDivElement>(null);
   
@@ -262,17 +264,60 @@ const TrackmanTab: React.FC = () => {
     }
   }, [fuzzyMatchesData, fuzzyMatchModal]);
 
+  useEffect(() => {
+    return () => {
+      if (processingTimerRef.current) clearInterval(processingTimerRef.current);
+    };
+  }, []);
+
   const uploadMutation = useMutation({
     mutationFn: async (file: File) => {
+      setUploadProgress({ phase: 'uploading', percent: 0 });
+      
       const formData = new FormData();
       formData.append('file', file);
       
-      const res = await fetch('/api/admin/trackman/upload', {
-        method: 'POST',
-        credentials: 'include',
-        body: formData,
+      return new Promise<ImportResult>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', '/api/admin/trackman/upload');
+        xhr.withCredentials = true;
+        
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable) {
+            const pct = Math.round((e.loaded / e.total) * 40);
+            setUploadProgress({ phase: 'uploading', percent: pct });
+          }
+        };
+        
+        xhr.upload.onload = () => {
+          setUploadProgress({ phase: 'processing', percent: 40 });
+          let simPct = 40;
+          processingTimerRef.current = setInterval(() => {
+            simPct = Math.min(simPct + Math.random() * 8 + 2, 92);
+            setUploadProgress({ phase: 'processing', percent: Math.round(simPct) });
+          }, 400);
+        };
+        
+        xhr.onload = () => {
+          if (processingTimerRef.current) clearInterval(processingTimerRef.current);
+          setUploadProgress({ phase: 'complete', percent: 100 });
+          try {
+            const data = JSON.parse(xhr.responseText);
+            setTimeout(() => setUploadProgress(null), 800);
+            resolve(data);
+          } catch {
+            reject(new Error('Invalid server response'));
+          }
+        };
+        
+        xhr.onerror = () => {
+          if (processingTimerRef.current) clearInterval(processingTimerRef.current);
+          setUploadProgress(null);
+          reject(new Error('Network error - please check your connection and try again'));
+        };
+        
+        xhr.send(formData);
       });
-      return res.json();
     },
     onSuccess: (data) => {
       setImportResult(data);
@@ -469,13 +514,33 @@ const TrackmanTab: React.FC = () => {
             ${isDragging 
               ? 'border-accent bg-accent/10' 
               : 'border-primary/20 dark:border-white/20 hover:border-accent hover:bg-accent/5'}
-            ${uploadMutation.isPending ? 'pointer-events-none opacity-50' : ''}
+            ${uploadMutation.isPending ? 'pointer-events-none' : ''}
           `}
         >
           {uploadMutation.isPending ? (
-            <div className="flex flex-col items-center gap-3">
+            <div className="flex flex-col items-center gap-3 w-full px-4">
               <WalkingGolferSpinner size="lg" variant="dark" />
-              <p className="text-sm font-medium text-primary dark:text-white">Processing import...</p>
+              {uploadProgress && (
+                <div className="w-full max-w-sm">
+                  <div className="flex items-center gap-2 mb-2 justify-center">
+                    <span className="material-symbols-outlined animate-spin text-[16px] text-accent-dark dark:text-accent">progress_activity</span>
+                    <span className="text-xs font-medium text-primary/80 dark:text-white/80">
+                      {uploadProgress.phase === 'uploading' && `Uploading file... ${uploadProgress.percent}%`}
+                      {uploadProgress.phase === 'processing' && `Matching bookings to members... ${uploadProgress.percent}%`}
+                      {uploadProgress.phase === 'complete' && 'Import complete!'}
+                    </span>
+                  </div>
+                  <div className="w-full bg-primary/10 dark:bg-white/10 rounded-full h-2">
+                    <div 
+                      className={`h-2 rounded-full transition-all duration-normal ${uploadProgress.phase === 'complete' ? 'bg-green-500' : 'bg-accent-dark dark:bg-accent'}`}
+                      style={{ width: `${uploadProgress.percent}%` }}
+                    />
+                  </div>
+                  <p className="text-[10px] text-primary/50 dark:text-white/40 text-center mt-1.5">
+                    {uploadProgress.phase === 'uploading' ? 'Sending CSV to server...' : uploadProgress.phase === 'processing' ? 'Parsing rows, matching emails & names...' : 'Done'}
+                  </p>
+                </div>
+              )}
             </div>
           ) : (
             <div className="flex flex-col items-center gap-2">
