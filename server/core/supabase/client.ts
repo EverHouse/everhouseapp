@@ -94,11 +94,11 @@ export function getSupabaseAnon(): SupabaseClient {
   const supabaseUrl = process.env.SUPABASE_URL;
   const anonKey = process.env.SUPABASE_ANON_KEY;
 
-  if (!supabaseUrl) {
-    throw new Error('Missing SUPABASE_URL environment variable');
+  if (!supabaseUrl || !anonKey) {
+    throw new Error('Missing SUPABASE_URL or SUPABASE_ANON_KEY environment variables');
   }
 
-  supabaseAnon = createClient(supabaseUrl, anonKey || '', {
+  supabaseAnon = createClient(supabaseUrl, anonKey, {
     auth: {
       autoRefreshToken: false,
       persistSession: false,

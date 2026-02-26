@@ -40,6 +40,7 @@ The Ever Club Members App is a private members club application designed for gol
 - **Tier Hierarchy Validation**: Startup validates DB membership tier slugs against `TIER_NAMES` in `shared/constants/tiers.ts`, logging drift warnings. Actual tier logic is DB-driven via `getTierLimits()`.
 - **Deferred Webhook Actions**: Post-commit webhook side-effects (notifications, HubSpot sync) log event context (`eventId`, `eventType`) for production debuggability.
 - **WebSocket Robustness**: Includes periodic session revalidation, cryptographic verification of session cookies, reconnect jitter, and guards against duplicate socket registrations.
+- **Supabase Hardening**: Frontend client sets `eventsPerSecond: 100` to prevent quota disconnects during batch updates. Realtime hook uses refs for optional callbacks to prevent re-subscription churn. Server anon client enforces `SUPABASE_ANON_KEY` presence (no empty-string fallback). Heartbeat scheduler uses `Promise.race` with 10s timeout to prevent hangs on dropped connections. Vite watcher ignores `.local/`, `.agents/`, `replit.nix`, and `.git/` to prevent spurious HMR reloads.
 
 ## Web Performance & Security
 - **Google Fonts**: Plus Jakarta Sans (300,400,500,600,700) and Playfair Display (400,600,700) loaded non-render-blocking via `media="print" onload` pattern with `font-display: swap` fallback. Heritage luxury aesthetic: Playfair Display (Bold) for major headings, Plus Jakarta Sans (Light/Regular) for all body text and UI elements.

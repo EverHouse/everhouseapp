@@ -72,7 +72,11 @@ export default defineConfig({
         '**/node_modules/**',
         '**/.replit',
         '**/*.tsbuildinfo',
-        '**/.replit_integration_files/**'
+        '**/.replit_integration_files/**',
+        '**/.local/**',
+        '**/.agents/**',
+        '**/replit.nix',
+        '**/.git/**'
       ]
     }
   },

@@ -31,6 +31,7 @@ export function getSupabase(): SupabaseClient | null {
           return Math.min(1000 * Math.pow(2, tries), 30000);
         },
         timeout: 30000,
+        eventsPerSecond: 100,
       }
     });
     return supabaseClient;

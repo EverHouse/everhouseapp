@@ -28,43 +28,44 @@ export function useSupabaseRealtime(options: UseSupabaseRealtimeOptions = {}) {
   const mountedRef = useRef(true);
   const instanceId = useMemo(() => Math.random().toString(36).slice(2, 8), []);
 
-  const handleNotification = useCallback((payload: Record<string, unknown>) => {
-    window.dispatchEvent(new CustomEvent('member-notification', { detail: payload }));
-    if (!window.__wsConnected) {
-      bookingEvents.emit();
-    }
-    onNotification?.(payload);
-  }, [onNotification]);
-
-  const handleBookingUpdate = useCallback((payload: Record<string, unknown>) => {
-    window.dispatchEvent(new CustomEvent('booking-update', { detail: payload }));
-    if (!window.__wsConnected) {
-      bookingEvents.emit();
-    }
-    onBookingUpdate?.(payload);
-  }, [onBookingUpdate]);
-
-  const handleAnnouncementUpdate = useCallback((payload: Record<string, unknown>) => {
-    window.dispatchEvent(new CustomEvent('announcement-update', { detail: payload }));
-    onAnnouncementUpdate?.(payload);
-  }, [onAnnouncementUpdate]);
-
-  const handleTrackmanUnmatchedUpdate = useCallback((payload: Record<string, unknown>) => {
-    window.dispatchEvent(new CustomEvent('trackman-unmatched-update', { detail: payload }));
-    onTrackmanUnmatchedUpdate?.(payload);
-  }, [onTrackmanUnmatchedUpdate]);
+  const onNotificationRef = useRef(onNotification);
+  const onBookingUpdateRef = useRef(onBookingUpdate);
+  const onAnnouncementUpdateRef = useRef(onAnnouncementUpdate);
+  const onTrackmanUnmatchedUpdateRef = useRef(onTrackmanUnmatchedUpdate);
+  onNotificationRef.current = onNotification;
+  onBookingUpdateRef.current = onBookingUpdate;
+  onAnnouncementUpdateRef.current = onAnnouncementUpdate;
+  onTrackmanUnmatchedUpdateRef.current = onTrackmanUnmatchedUpdate;
 
   const getHandler = useCallback((table: string) => {
     switch (table) {
-      case 'notifications': return handleNotification;
-      case 'booking_sessions': return handleBookingUpdate;
-      case 'announcements': return handleAnnouncementUpdate;
-      case 'trackman_unmatched_bookings': return handleTrackmanUnmatchedUpdate;
+      case 'notifications': return (payload: Record<string, unknown>) => {
+        window.dispatchEvent(new CustomEvent('member-notification', { detail: payload }));
+        if (!window.__wsConnected) {
+          bookingEvents.emit();
+        }
+        onNotificationRef.current?.(payload);
+      };
+      case 'booking_sessions': return (payload: Record<string, unknown>) => {
+        window.dispatchEvent(new CustomEvent('booking-update', { detail: payload }));
+        if (!window.__wsConnected) {
+          bookingEvents.emit();
+        }
+        onBookingUpdateRef.current?.(payload);
+      };
+      case 'announcements': return (payload: Record<string, unknown>) => {
+        window.dispatchEvent(new CustomEvent('announcement-update', { detail: payload }));
+        onAnnouncementUpdateRef.current?.(payload);
+      };
+      case 'trackman_unmatched_bookings': return (payload: Record<string, unknown>) => {
+        window.dispatchEvent(new CustomEvent('trackman-unmatched-update', { detail: payload }));
+        onTrackmanUnmatchedUpdateRef.current?.(payload);
+      };
       default: return (payload: Record<string, unknown>) => {
         window.dispatchEvent(new CustomEvent(`${table}-update`, { detail: payload }));
       };
     }
-  }, [handleNotification, handleBookingUpdate, handleAnnouncementUpdate, handleTrackmanUnmatchedUpdate]);
+  }, []);
 
   const getChannelName = useCallback((table: string) => {
     const base = (table === 'notifications' && userEmail)

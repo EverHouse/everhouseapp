@@ -6,6 +6,8 @@ let intervalId: NodeJS.Timeout | null = null;
 
 const HEARTBEAT_INTERVAL = 6 * 60 * 60 * 1000; // Every 6 hours
 
+const HEARTBEAT_TIMEOUT = 10000;
+
 async function runHeartbeat(): Promise<void> {
   if (!isSupabaseConfigured()) {
     logger.debug('[Supabase Heartbeat] Skipped - Supabase not configured');
@@ -14,9 +16,15 @@ async function runHeartbeat(): Promise<void> {
 
   const supabase = getSupabaseAdmin();
 
-  const { count, error } = await supabase
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    setTimeout(() => reject(new Error('Supabase heartbeat query timed out after 10s')), HEARTBEAT_TIMEOUT);
+  });
+
+  const queryPromise = supabase
     .from('users')
     .select('id', { count: 'exact', head: true });
+
+  const { count, error } = await Promise.race([queryPromise, timeoutPromise]) as Awaited<typeof queryPromise>;
 
   if (error) {
     throw new Error(`Supabase heartbeat query failed: ${error.message}`);
