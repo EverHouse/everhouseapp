@@ -445,7 +445,7 @@ const PullToRefresh: React.FC<PullToRefreshProps> = ({ children, onRefresh, disa
             }
 
             .ptr-release-text {
-              font-family: 'Inter', sans-serif;
+              font-family: 'Plus Jakarta Sans', sans-serif;
               font-size: 12px;
               font-weight: 500;
               color: rgba(255,255,255,0.9);

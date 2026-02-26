@@ -40,7 +40,7 @@ The Ever Club Members App is a private members club application designed for gol
 - **WebSocket Robustness**: Includes periodic session revalidation, cryptographic verification of session cookies, reconnect jitter, and guards against duplicate socket registrations.
 
 ## Web Performance & Security
-- **Google Fonts**: Inter (400,500,600,700) and Playfair Display (400,600,700) loaded non-render-blocking via `media="print" onload` pattern with `font-display: swap` fallback. Unused weights (300, 800, Playfair 500) removed.
+- **Google Fonts**: Plus Jakarta Sans (300,400,500,600,700) and Playfair Display (400,600,700) loaded non-render-blocking via `media="print" onload` pattern with `font-display: swap` fallback. Heritage luxury aesthetic: Playfair Display (Bold) for major headings, Plus Jakarta Sans (Light/Regular) for all body text and UI elements.
 - **Material Symbols**: Icon font lazy-loaded via JavaScript after first paint using `requestAnimationFrame`. Icons hidden via `visibility: hidden` until font loads, then revealed by adding `icons-loaded` class to `<html>`. Prevents FOUC (flash of unstyled icon text).
 - **Splash Screen**: Walking golfer GIF with random tagline, 2-second minimum display. Brand requirement — do not remove.
 - **Hero Image**: Preloaded in `index.html` with `fetchpriority="high"` and server-side `Link` header for production.

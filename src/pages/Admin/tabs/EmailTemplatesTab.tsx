@@ -302,7 +302,7 @@ const EmailTemplatesTab: React.FC = () => {
                       <span className="material-symbols-outlined text-base text-primary/40 dark:text-white/40">
                         {CATEGORY_ICONS[category] || 'folder'}
                       </span>
-                      <h3 className="text-xs font-semibold text-primary/50 dark:text-white/40 uppercase tracking-widest font-['Playfair_Display']">
+                      <h3 className="text-xs font-semibold text-primary/50 dark:text-white/40 uppercase tracking-widest">
                         {category}
                       </h3>
                     </div>
@@ -341,7 +341,7 @@ const EmailTemplatesTab: React.FC = () => {
             <div className="bg-white/80 dark:bg-white/[0.05] backdrop-blur-xl border border-white/20 dark:border-white/10 rounded-2xl shadow-lg overflow-hidden">
               <div className="px-5 py-4 border-b border-primary/5 dark:border-white/5 flex items-center justify-between">
                 <div>
-                  <h2 className="text-lg font-bold text-primary dark:text-white font-['Playfair_Display']">
+                  <h2 className="text-lg font-bold text-primary dark:text-white">
                     {selectedTemplate.name}
                   </h2>
                   <p className="text-xs text-primary/50 dark:text-white/40 mt-0.5">
