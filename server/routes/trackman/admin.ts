@@ -387,6 +387,8 @@ router.post('/api/admin/trackman/unmatched/bulk-dismiss', isStaffOrAdmin, async 
 router.put('/api/admin/trackman/unmatched/:id/resolve', isStaffOrAdmin, async (req, res) => {
   try {
     const { id } = req.params;
+    const numericId = parseInt(id as string);
+    if (isNaN(numericId)) return res.status(400).json({ error: 'Invalid booking ID' });
     const { email: rawEmail, memberEmail: rawMemberEmail, rememberEmail } = req.body;
     const email = rawEmail?.trim()?.toLowerCase();
     const memberEmail = rawMemberEmail?.trim()?.toLowerCase();
@@ -427,7 +429,7 @@ router.put('/api/admin/trackman/unmatched/:id/resolve', isStaffOrAdmin, async (r
     
     let bookingResult = await db.execute(sql`SELECT id, trackman_booking_id, staff_notes, trackman_customer_notes, request_date, start_time, end_time, 
               duration_minutes, resource_id, session_id
-       FROM booking_requests WHERE id = ${id}`);
+       FROM booking_requests WHERE id = ${numericId}`);
     
     let booking = bookingResult.rows[0] as DbRow;
     let fromLegacyTable = false;
@@ -435,7 +437,7 @@ router.put('/api/admin/trackman/unmatched/:id/resolve', isStaffOrAdmin, async (r
     if (!booking) {
       const legacyResult = await db.execute(sql`SELECT id, trackman_booking_id, user_name, original_email, booking_date, 
                 start_time, end_time, duration_minutes, bay_number, notes
-         FROM trackman_unmatched_bookings WHERE id = ${id} AND resolved_at IS NULL`);
+         FROM trackman_unmatched_bookings WHERE id = ${numericId} AND resolved_at IS NULL`);
       
       if (legacyResult.rows.length === 0) {
         return res.status(404).json({ error: 'Booking not found in either booking requests or unmatched bookings' });
@@ -466,7 +468,7 @@ router.put('/api/admin/trackman/unmatched/:id/resolve', isStaffOrAdmin, async (r
       
       booking = createResult.rows[0] as DbRow;
       
-      await db.execute(sql`UPDATE trackman_unmatched_bookings SET resolved_at = NOW(), resolved_email = ${member.email} WHERE id = ${id}`);
+      await db.execute(sql`UPDATE trackman_unmatched_bookings SET resolved_at = NOW(), resolved_email = ${member.email} WHERE id = ${numericId}`);
     } else {
       await db.execute(sql`UPDATE booking_requests 
          SET user_id = ${member.id}, 
@@ -475,7 +477,7 @@ router.put('/api/admin/trackman/unmatched/:id/resolve', isStaffOrAdmin, async (r
              is_unmatched = false,
              staff_notes = COALESCE(staff_notes, '') || ${` [Resolved by ${staffEmail} on ${new Date().toISOString()}]`},
              updated_at = NOW()
-         WHERE id = ${id}`);
+         WHERE id = ${numericId}`);
     }
     
     const memberFullName = `${member.first_name} ${member.last_name}`.trim();

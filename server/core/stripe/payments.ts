@@ -191,6 +191,14 @@ export async function createInvoiceWithLineItems(params: CreatePOSInvoiceParams)
   const stripe = await getStripeClient();
   const { customerId, description, cartItems, metadata = {}, receiptEmail, forTerminal = false } = params;
 
+  for (const item of cartItems) {
+    if (!Number.isFinite(item.priceCents) || item.priceCents < 0) {
+      throw new Error(`Invalid price for item "${item.name}": priceCents must be a non-negative number`);
+    }
+    if (!Number.isFinite(item.quantity) || item.quantity < 1 || !Number.isInteger(item.quantity)) {
+      throw new Error(`Invalid quantity for item "${item.name}": must be a positive integer`);
+    }
+  }
   const cartTotal = cartItems.reduce((sum, item) => sum + (item.priceCents * item.quantity), 0);
 
   const checkoutNonce = crypto.randomBytes(8).toString('hex');
