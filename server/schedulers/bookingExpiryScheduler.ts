@@ -212,8 +212,20 @@ export async function runManualBookingExpiry(): Promise<{ expiredCount: number }
          reviewed_by = 'system-manual-expiry'
      WHERE status IN ('pending', 'pending_approval')
        AND (
-         request_date < $1
-         OR (request_date = $1 AND start_time < ($2::time - interval '20 minutes'))
+         request_date < $1::date - INTERVAL '1 day'
+         OR (
+           request_date = $1::date - INTERVAL '1 day'
+           AND CASE
+             WHEN end_time IS NOT NULL AND end_time < start_time
+               THEN end_time < ($2::time - interval '20 minutes')
+             ELSE start_time < ($2::time - interval '20 minutes')
+           END
+         )
+         OR (
+           request_date = $1
+           AND (end_time IS NULL OR end_time >= start_time)
+           AND start_time < ($2::time - interval '20 minutes')
+         )
        )
      RETURNING id`,
     [todayStr, currentTimePacific]
