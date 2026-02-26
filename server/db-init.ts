@@ -126,6 +126,13 @@ export async function fixFunctionSearchPaths(): Promise<void> {
   } catch (err: unknown) {
     logger.warn(`[DB Init] Skipping search_path fix: ${getErrorMessage(err)}`);
   }
+
+  try {
+    await db.execute(sql`DROP INDEX IF EXISTS idx_availability_blocks_closure_id`);
+    logger.info('[DB Init] Duplicate index cleanup complete');
+  } catch (err: unknown) {
+    logger.warn(`[DB Init] Skipping duplicate index cleanup: ${getErrorMessage(err)}`);
+  }
 }
 
 export async function cleanupOrphanedRecords(): Promise<{ notifications: number; oldBookings: number }> {
