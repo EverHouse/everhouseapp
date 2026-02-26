@@ -362,7 +362,7 @@ async function initializeApp() {
           resourceCount: Number(resourceCountResult[0]?.count ?? 0),
           resourcesByType: resourceTypes.rows,
           databaseUrl: process.env.DATABASE_URL ? 'configured' : 'missing',
-          databasePooler: process.env.DATABASE_POOLER_URL ? 'pgbouncer' : 'direct',
+          databasePooler: usingPooler ? 'session_pooler' : 'direct',
           startupHealth,
           alerts: {
             counts: alertCounts,
