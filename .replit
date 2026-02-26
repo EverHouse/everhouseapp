@@ -1,7 +1,7 @@
 modules = ["nodejs-20", "python-3.11", "postgresql-16"]
 [nix]
 channel = "stable-25_05"
-packages = ["g-ls", "gifsicle", "gitFull", "imagemagick", "libwebp", "playwright-driver", "unzip", "yakut", "glib", "nss", "nspr", "at-spi2-atk", "cups", "dbus", "expat", "libdrm", "xorg.libxcb", "xorg.libX11", "xorg.libXcomposite", "xorg.libXdamage", "xorg.libXext", "xorg.libXfixes", "xorg.libXrandr", "mesa", "alsa-lib", "pango", "cairo", "libgbm", "libxkbcommon"]
+packages = ["alsa-lib", "at-spi2-atk", "cairo", "cups", "dbus", "expat", "g-ls", "gifsicle", "gitFull", "glib", "imagemagick", "libdrm", "libgbm", "libwebp", "libxkbcommon", "mesa", "nspr", "nss", "pango", "playwright-driver", "unzip", "xorg.libX11", "xorg.libXcomposite", "xorg.libXdamage", "xorg.libXext", "xorg.libXfixes", "xorg.libXrandr", "xorg.libxcb", "yakut"]
 
 [agent]
 expertMode = true
@@ -55,7 +55,7 @@ VAPID_PUBLIC_KEY = "BG-oXwIn5dHb93Y6SuyOpkHm7Qu2La9ge5pwQFAx98WRllqI6-zg-n3A5CUR
 SUPABASE_URL = "https://lenzghtdaoxwhnyzprxc.supabase.co"
 ENABLE_CORPORATE_BILLING = "true"
 SUPABASE_DB_SCHEMA = "public"
-ENABLE_PGBOUNCER = "false"
+ENABLE_PGBOUNCER = "true"
 
 [userenv.development]
 DEV_LOGIN_ENABLED = "true"
