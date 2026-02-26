@@ -152,6 +152,123 @@ router.post('/api/auth/google/verify', async (req, res) => {
   }
 });
 
+router.post('/api/auth/google/callback', async (req, res) => {
+  try {
+    const credential = req.body?.credential;
+    if (!credential) {
+      return res.redirect('/login?error=missing_credential');
+    }
+
+    const googleUser = await verifyGoogleToken(credential);
+
+    const userSelectFields = {
+      id: users.id,
+      firstName: users.firstName,
+      lastName: users.lastName,
+      email: users.email,
+      phone: users.phone,
+      tier: users.tier,
+      tags: users.tags,
+      membershipStatus: users.membershipStatus,
+      stripeSubscriptionId: users.stripeSubscriptionId,
+      stripeCustomerId: users.stripeCustomerId,
+      mindbodyClientId: users.mindbodyClientId,
+      joinDate: users.joinDate,
+      dateOfBirth: users.dateOfBirth,
+      role: users.role,
+      googleId: users.googleId,
+    };
+
+    let dbUser = await db.select(userSelectFields)
+      .from(users)
+      .where(sql`${users.googleId} = ${googleUser.sub} AND ${users.archivedAt} IS NULL`)
+      .limit(1);
+
+    if (dbUser.length === 0) {
+      dbUser = await db.select(userSelectFields)
+        .from(users)
+        .where(sql`LOWER(${users.googleEmail}) = LOWER(${googleUser.email}) AND ${users.archivedAt} IS NULL`)
+        .limit(1);
+    }
+
+    if (dbUser.length === 0) {
+      const { resolveUserByEmail } = await import('../core/stripe/customers');
+      const resolved = await resolveUserByEmail(googleUser.email);
+
+      if (resolved) {
+        const primaryEmail = normalizeEmail(resolved.primaryEmail);
+        dbUser = await db.select(userSelectFields)
+          .from(users)
+          .where(sql`LOWER(${users.email}) = LOWER(${primaryEmail}) AND ${users.archivedAt} IS NULL`)
+          .limit(1);
+      }
+    }
+
+    if (dbUser.length === 0) {
+      return res.redirect('/login?error=no_membership');
+    }
+
+    const user = dbUser[0];
+    const dbMemberStatus = (user.membershipStatus || '').toLowerCase();
+    const role = (user.role || 'member') as 'admin' | 'staff' | 'member';
+    const activeStatuses = ['active', 'trialing', 'past_due'];
+
+    if (role === 'member' && !activeStatuses.includes(dbMemberStatus)) {
+      return res.redirect('/login?error=inactive_membership');
+    }
+
+    const sessionTtl = 7 * 24 * 60 * 60 * 1000;
+    const member = {
+      id: user.id,
+      firstName: user.firstName || '',
+      lastName: user.lastName || '',
+      email: user.email || googleUser.email,
+      phone: user.phone || '',
+      tier: normalizeTierName(user.tier),
+      tags: user.tags || [],
+      mindbodyClientId: user.mindbodyClientId || '',
+      status: 'Active',
+      role,
+      expires_at: Date.now() + sessionTtl,
+      dateOfBirth: user.dateOfBirth || null,
+    };
+
+    req.session.user = member as any;
+
+    if (!user.googleId || user.googleId !== googleUser.sub) {
+      const existingGoogleLink = await db.select({ id: users.id, email: users.email })
+        .from(users)
+        .where(eq(users.googleId, googleUser.sub))
+        .limit(1);
+
+      if (existingGoogleLink.length > 0 && existingGoogleLink[0].id !== user.id) {
+        logger.warn('[Google Auth Callback] Google account already linked to another user, not auto-linking', { extra: { googleSub: googleUser.sub, existingEmail: existingGoogleLink[0].email, targetEmail: user.email } });
+      } else {
+        await db.update(users)
+          .set({
+            googleId: googleUser.sub,
+            googleEmail: googleUser.email,
+            googleLinkedAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .where(eq(users.id, user.id));
+      }
+    }
+
+    req.session.save((err) => {
+      if (err) {
+        logger.error('[Google Auth Callback] Session save error', { extra: { error: err } });
+        return res.redirect('/login?error=session_failed');
+      }
+      const destination = (role === 'admin' || role === 'staff') ? '/admin' : '/dashboard';
+      res.redirect(destination);
+    });
+  } catch (error: unknown) {
+    logger.error('[Google Auth Callback] Error', { error: error instanceof Error ? error : new Error(String(error)) });
+    res.redirect('/login?error=google_failed');
+  }
+});
+
 router.post('/api/auth/google/link', async (req, res) => {
   try {
     const sessionUser = req.session?.user;

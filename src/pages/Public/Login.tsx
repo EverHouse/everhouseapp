@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Footer } from '../../components/Footer';
 import { useData } from '../../contexts/DataContext';
 import { usePageReady } from '../../contexts/PageReadyContext';
@@ -11,8 +11,17 @@ const Spinner = () => (
   <WalkingGolferSpinner size="sm" variant="light" />
 );
 
+const GOOGLE_REDIRECT_ERRORS: Record<string, string> = {
+  missing_credential: 'Google sign-in failed. Please try again.',
+  no_membership: 'No membership found for this email. Please sign up or use the email associated with your membership.',
+  inactive_membership: 'Your membership is not active. Please contact us for assistance.',
+  session_failed: 'Failed to create session. Please try again.',
+  google_failed: 'Google sign-in failed. Please try again.',
+};
+
 const Login: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { startNavigation } = useNavigationLoading();
   const { loginWithMember, user, actualUser, isViewingAs, sessionChecked } = useData();
   const { setPageReady } = usePageReady();
@@ -31,7 +40,14 @@ const Login: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [devLoading, setDevLoading] = useState(false);
   const [devMemberLoading, setDevMemberLoading] = useState(false);
-  const [error, setError] = useState('');
+  const redirectError = searchParams.get('error');
+  const [error, setError] = useState(redirectError ? (GOOGLE_REDIRECT_ERRORS[redirectError] || 'Sign-in failed. Please try again.') : '');
+
+  useEffect(() => {
+    if (redirectError) {
+      setSearchParams({}, { replace: true });
+    }
+  }, [redirectError, setSearchParams]);
   const [isStaffOrAdmin, setIsStaffOrAdmin] = useState(false);
   const [hasPassword, setHasPassword] = useState(false);
   const [showPasswordField, setShowPasswordField] = useState(false);

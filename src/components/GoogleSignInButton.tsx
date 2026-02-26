@@ -47,8 +47,12 @@ const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({
     const google = (window as unknown as { google?: { accounts?: { id?: { initialize: (opts: { client_id: string; callback: (response: { credential: string }) => void }) => void; renderButton: (el: HTMLElement | null, opts: Record<string, unknown>) => void } } } }).google;
     if (!google?.accounts?.id) return;
 
+    const loginUri = `${window.location.origin}/api/auth/google/callback`;
+
     google.accounts.id.initialize({
       client_id: clientId,
+      ux_mode: 'popup',
+      login_uri: loginUri,
       callback: (response: { credential: string }) => {
         if (response.credential) {
           onSuccess(response.credential);
