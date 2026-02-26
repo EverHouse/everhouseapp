@@ -192,7 +192,7 @@ const MembershipOverview: React.FC = () => {
                 </ul>
                 <button 
                   onClick={handleClick}
-                  className="w-full relative z-10 py-4 px-6 rounded-2xl bg-white/95 backdrop-blur text-primary font-bold text-sm tracking-widest uppercase hover:bg-white transition-all duration-normal active:scale-[0.98] shadow-[0_4px_16px_rgba(0,0,0,0.2)]"
+                  className="w-full relative z-10 py-4 px-6 rounded-2xl bg-white/95 backdrop-blur text-primary font-bold text-sm tracking-widest uppercase hover:bg-white/80 transition-all duration-normal active:scale-[0.98] shadow-[0_4px_16px_rgba(0,0,0,0.2)]"
                 >
                   {btnText}
                 </button>
@@ -350,7 +350,7 @@ const MembershipCard: React.FC<{ title: string; price: string; suffix?: string; 
         </li>
       ))}
     </ul>
-    <button onClick={onClick} className="w-full py-4 px-6 rounded-2xl bg-primary text-white font-bold text-sm tracking-widest uppercase hover:bg-primary/90 transition-all duration-normal active:scale-[0.98] shadow-[0_4px_16px_rgba(41,53,21,0.3)]">
+    <button onClick={onClick} className="w-full py-4 px-6 rounded-2xl bg-primary dark:bg-white/15 text-white font-bold text-sm tracking-widest uppercase hover:bg-primary/90 dark:hover:bg-white/25 transition-all duration-normal active:scale-[0.98] shadow-[0_4px_16px_rgba(41,53,21,0.3)] dark:shadow-[0_4px_16px_rgba(0,0,0,0.3)] border border-transparent dark:border-white/20">
       {btnText}
     </button>
   </div>

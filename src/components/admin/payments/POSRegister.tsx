@@ -1051,11 +1051,11 @@ const POSRegister: React.FC = () => {
     return (
       <div className="pb-24">
         <div className="space-y-4">
-          <div className="bg-white/40 dark:bg-white/[0.08] backdrop-blur-xl border border-white/60 dark:border-white/[0.12] rounded-2xl p-4 shadow-liquid dark:shadow-liquid-dark">
+          <div className="bg-white/40 dark:bg-white/[0.08] backdrop-blur-xl border border-white/60 dark:border-white/[0.12] rounded-2xl p-4 shadow-liquid dark:shadow-liquid-dark overflow-visible relative z-20">
             {renderCustomerSection()}
           </div>
 
-          <div className="bg-white/40 dark:bg-white/[0.08] backdrop-blur-xl border border-white/60 dark:border-white/[0.12] rounded-2xl p-4 shadow-liquid dark:shadow-liquid-dark overflow-hidden">
+          <div className="bg-white/40 dark:bg-white/[0.08] backdrop-blur-xl border border-white/60 dark:border-white/[0.12] rounded-2xl p-4 shadow-liquid dark:shadow-liquid-dark">
             <div className="flex items-center gap-2 mb-3">
               <span className="material-symbols-outlined text-primary dark:text-accent">grid_view</span>
               <h3 className="font-bold text-primary dark:text-white">Products</h3>

@@ -1027,7 +1027,7 @@ const Profile: React.FC = () => {
 
       {/* Privacy Modal */}
       <ModalShell isOpen={showPrivacyModal} onClose={() => setShowPrivacyModal(false)} title="Privacy Settings">
-        <div className="space-y-6">
+        <div className="space-y-6 p-5">
           {/* Do Not Sell My Info */}
           <div className={`p-4 rounded-xl ${isDark ? 'bg-white/5' : 'bg-black/5'}`}>
             <div className="flex items-center justify-between mb-2">
