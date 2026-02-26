@@ -189,9 +189,6 @@ export function useSupabaseRealtime(options: UseSupabaseRealtimeOptions = {}) {
             }
           } else if (status === 'CLOSED') {
             console.log(`[Supabase Realtime] Channel closed for ${table}`);
-            try {
-              supabase.removeChannel(channel);
-            } catch {}
             const idx = channelsRef.current.indexOf(channel);
             if (idx !== -1) {
               channelsRef.current.splice(idx, 1);
