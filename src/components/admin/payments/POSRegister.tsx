@@ -1051,11 +1051,11 @@ const POSRegister: React.FC = () => {
     return (
       <div className="pb-24">
         <div className="space-y-4">
-          <div className="bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl p-4">
+          <div className="bg-white/40 dark:bg-white/[0.08] backdrop-blur-xl border border-white/60 dark:border-white/[0.12] rounded-2xl p-4 shadow-liquid dark:shadow-liquid-dark">
             {renderCustomerSection()}
           </div>
 
-          <div className="bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl p-4 overflow-hidden">
+          <div className="bg-white/40 dark:bg-white/[0.08] backdrop-blur-xl border border-white/60 dark:border-white/[0.12] rounded-2xl p-4 shadow-liquid dark:shadow-liquid-dark overflow-hidden">
             <div className="flex items-center gap-2 mb-3">
               <span className="material-symbols-outlined text-primary dark:text-accent">grid_view</span>
               <h3 className="font-bold text-primary dark:text-white">Products</h3>
@@ -1081,7 +1081,7 @@ const POSRegister: React.FC = () => {
             {renderProductGrid()}
           </div>
 
-          <div className="bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl">
+          <div className="bg-white/40 dark:bg-white/[0.08] backdrop-blur-xl border border-white/60 dark:border-white/[0.12] rounded-2xl shadow-liquid dark:shadow-liquid-dark">
             <RedeemDayPassSection variant="card" />
           </div>
         </div>
@@ -1156,7 +1156,7 @@ const POSRegister: React.FC = () => {
   return (
     <div className="flex gap-6 items-start">
       <div className="flex-[2] min-w-0">
-        <div className="bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl p-5">
+        <div className="bg-white/40 dark:bg-white/[0.08] backdrop-blur-xl border border-white/60 dark:border-white/[0.12] rounded-2xl p-5 shadow-liquid dark:shadow-liquid-dark">
           <div className="flex items-center gap-2 mb-4">
             <span className="material-symbols-outlined text-primary dark:text-accent">grid_view</span>
             <h3 className="font-bold text-primary dark:text-white text-lg">Products</h3>
@@ -1184,7 +1184,7 @@ const POSRegister: React.FC = () => {
       </div>
 
       <div className="flex-1 min-w-[320px] max-w-[400px] sticky top-4">
-        <div className="bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl p-5 space-y-4">
+        <div className="bg-white/40 dark:bg-white/[0.08] backdrop-blur-xl border border-white/60 dark:border-white/[0.12] rounded-2xl p-5 shadow-liquid dark:shadow-liquid-dark space-y-4">
           <div className="flex items-center gap-2">
             <span className="material-symbols-outlined text-primary dark:text-accent">point_of_sale</span>
             <h3 className="font-bold text-primary dark:text-white">Checkout</h3>
@@ -1227,7 +1227,7 @@ const POSRegister: React.FC = () => {
           </button>
         </div>
 
-        <div className="mt-4 bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl">
+        <div className="mt-4 bg-white/40 dark:bg-white/[0.08] backdrop-blur-xl border border-white/60 dark:border-white/[0.12] rounded-2xl shadow-liquid dark:shadow-liquid-dark">
           <RedeemDayPassSection variant="card" />
         </div>
       </div>

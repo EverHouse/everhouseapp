@@ -1183,7 +1183,7 @@ const RedeemDayPassSection: React.FC<SectionProps> = ({ onClose, variant = 'moda
 
   if (variant === 'card') {
     return (
-      <div className="bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl p-5 overflow-hidden">
+      <div className="bg-white/40 dark:bg-white/[0.08] backdrop-blur-xl border border-white/60 dark:border-white/[0.12] rounded-2xl p-5 shadow-liquid dark:shadow-liquid-dark overflow-hidden">
         <div className="flex items-center gap-2 mb-4">
           <span className="material-symbols-outlined text-teal-600 dark:text-teal-400">qr_code_scanner</span>
           <h3 className="font-bold text-primary dark:text-white">Redeem Day Pass</h3>
@@ -1194,7 +1194,7 @@ const RedeemDayPassSection: React.FC<SectionProps> = ({ onClose, variant = 'moda
   }
 
   return (
-    <div className="bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl p-4">
+    <div className="bg-white/40 dark:bg-white/[0.08] backdrop-blur-xl border border-white/60 dark:border-white/[0.12] rounded-2xl p-4 shadow-liquid dark:shadow-liquid-dark">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <span className="material-symbols-outlined text-teal-600 dark:text-teal-400">qr_code_scanner</span>
