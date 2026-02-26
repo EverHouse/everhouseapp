@@ -20,41 +20,15 @@ const basePool = new Pool({
   ssl: needsSsl ? sslConfig : undefined,
 });
 
-if (usingPooler) {
-  const origQuery = basePool.query.bind(basePool);
-  (basePool as any).query = function (...args: any[]) {
-    if (args[0] && typeof args[0] === 'object' && 'name' in args[0]) {
-      args[0] = { ...args[0], name: undefined };
-    }
-    return origQuery(...args);
-  };
-
-  const origConnect = basePool.connect.bind(basePool);
-  (basePool as any).connect = async function (...args: any[]) {
-    if (args.length > 0) {
-      return origConnect(...args);
-    }
-    const client = await origConnect() as PoolClient;
-    const origClientQuery = client.query.bind(client);
-    (client as any).query = function (...cArgs: any[]) {
-      if (cArgs[0] && typeof cArgs[0] === 'object' && 'name' in cArgs[0]) {
-        cArgs[0] = { ...cArgs[0], name: undefined };
-      }
-      return origClientQuery(...cArgs);
-    };
-    return client;
-  };
-}
-
 export const pool = basePool;
 
-export const directPool = poolerUrl
+export const directPool = usingPooler
   ? new Pool({
       connectionString: directUrl,
       connectionTimeoutMillis: 10000,
       idleTimeoutMillis: 30000,
       max: 5,
-      ssl: needsSsl ? sslConfig : undefined,
+      ssl: isProduction ? sslConfig : undefined,
     })
   : pool;
 
@@ -63,10 +37,10 @@ pool.on('error', (err) => {
 });
 
 pool.on('connect', () => {
-  logger.info(`[Database] New client connected via ${usingPooler ? 'PgBouncer pooler' : 'direct connection'}`);
+  logger.info(`[Database] New client connected via ${usingPooler ? 'session pooler' : 'direct connection'}`);
 });
 
-if (poolerUrl && directPool !== pool) {
+if (usingPooler && directPool !== pool) {
   directPool.on('error', (err) => {
     logger.error('[Database] Direct pool error:', { extra: { detail: err.message } });
   });

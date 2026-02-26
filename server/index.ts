@@ -4,6 +4,7 @@ import http from 'http';
 import type { Server } from 'http';
 import { getErrorMessage } from './utils/errorUtils';
 import { logger } from './core/logger';
+import { usingPooler } from './core/db';
 
 let isShuttingDown = false;
 let isReady = false;
@@ -159,7 +160,7 @@ async function initializeApp() {
 
   logger.info(`[Startup] Environment: ${isProduction ? 'production' : 'development'}`);
   logger.info(`[Startup] DATABASE_URL: ${process.env.DATABASE_URL ? 'configured' : 'MISSING'}`);
-  logger.info(`[Startup] DATABASE_POOLER_URL: ${process.env.DATABASE_POOLER_URL ? 'configured (PgBouncer active)' : 'not set (using direct connection)'}`);
+  logger.info(`[Startup] DATABASE_POOLER_URL: ${usingPooler ? 'configured (session pooler active)' : process.env.DATABASE_POOLER_URL ? 'set but disabled (ENABLE_PGBOUNCER != true)' : 'not set (using direct connection)'}`);
 
   const app = express();
 

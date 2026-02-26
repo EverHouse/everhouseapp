@@ -64,7 +64,7 @@ function getSessionPool(): Pool | null {
   }
   
   try {
-    const needsSsl = process.env.NODE_ENV === 'production' || !!process.env.DATABASE_POOLER_URL;
+    const needsSsl = process.env.NODE_ENV === 'production';
     sessionPool = new Pool({ 
       connectionString: dbUrl,
       connectionTimeoutMillis: 5000,
