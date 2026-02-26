@@ -1,4 +1,4 @@
-import { ensureDatabaseConstraints, seedDefaultNoticeTypes, createStripeTransactionCache, createSyncExclusionsTable, setupEmailNormalization, normalizeExistingEmails, cleanupOrphanedRecords, seedTierFeatures } from '../db-init';
+import { ensureDatabaseConstraints, seedDefaultNoticeTypes, createStripeTransactionCache, createSyncExclusionsTable, setupEmailNormalization, normalizeExistingEmails, cleanupOrphanedRecords, seedTierFeatures, fixFunctionSearchPaths } from '../db-init';
 import { seedTrainingSections } from '../routes/training';
 import { getStripeSync } from '../core/stripe';
 import { getStripeEnvironmentInfo, getStripeClient } from '../core/stripe/client';
@@ -69,6 +69,12 @@ export async function runStartupTasks(): Promise<void> {
   } catch (err: unknown) {
     logger.error('[Startup] Email normalization failed', { error: err instanceof Error ? err : new Error(String(err)) });
     startupHealth.warnings.push(`Email normalization: ${getErrorMessage(err)}`);
+  }
+
+  try {
+    await fixFunctionSearchPaths();
+  } catch (err: unknown) {
+    logger.warn(`[Startup] Function search_path fix failed (non-critical): ${getErrorMessage(err)}`);
   }
   
   try {

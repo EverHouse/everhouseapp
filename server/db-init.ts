@@ -7,16 +7,17 @@ export async function setupEmailNormalization(): Promise<void> {
   try {
     await db.execute(sql`
       CREATE OR REPLACE FUNCTION normalize_email()
-      RETURNS TRIGGER AS $$
+      RETURNS TRIGGER
+      LANGUAGE plpgsql
+      SET search_path = ''
+      AS $$
       BEGIN
-        -- Normalize user_email column for tables that have it
         IF TG_TABLE_NAME IN ('booking_requests', 'notifications', 'push_subscriptions') THEN
           IF NEW.user_email IS NOT NULL THEN
             NEW.user_email := LOWER(TRIM(NEW.user_email));
           END IF;
         END IF;
         
-        -- Normalize email column only for users table
         IF TG_TABLE_NAME = 'users' THEN
           IF NEW.email IS NOT NULL THEN
             NEW.email := LOWER(TRIM(NEW.email));
@@ -25,7 +26,7 @@ export async function setupEmailNormalization(): Promise<void> {
         
         RETURN NEW;
       END;
-      $$ LANGUAGE plpgsql;
+      $$;
     `);
 
     const tables = [
@@ -93,6 +94,38 @@ export async function normalizeExistingEmails(): Promise<{ updated: number }> {
   }
   
   return { updated: totalUpdated };
+}
+
+export async function fixFunctionSearchPaths(): Promise<void> {
+  try {
+    await db.execute(sql`
+      CREATE OR REPLACE FUNCTION set_updated_at()
+      RETURNS TRIGGER
+      LANGUAGE plpgsql
+      SET search_path = ''
+      AS $$
+      BEGIN
+        new._updated_at = now();
+        RETURN NEW;
+      END;
+      $$;
+    `);
+    await db.execute(sql`
+      CREATE OR REPLACE FUNCTION set_updated_at_metadata()
+      RETURNS TRIGGER
+      LANGUAGE plpgsql
+      SET search_path = ''
+      AS $$
+      BEGIN
+        new.updated_at = now();
+        RETURN NEW;
+      END;
+      $$;
+    `);
+    logger.info('[DB Init] Function search_path security hardened');
+  } catch (err: unknown) {
+    logger.warn(`[DB Init] Skipping search_path fix: ${getErrorMessage(err)}`);
+  }
 }
 
 export async function cleanupOrphanedRecords(): Promise<{ notifications: number; oldBookings: number }> {
@@ -247,12 +280,15 @@ export async function ensureDatabaseConstraints() {
     try {
       await db.execute(sql`
         CREATE OR REPLACE FUNCTION prevent_booking_session_overlap()
-        RETURNS TRIGGER AS $$
+        RETURNS TRIGGER
+        LANGUAGE plpgsql
+        SET search_path = ''
+        AS $$
         DECLARE
           conflict_count INTEGER;
         BEGIN
           SELECT COUNT(*) INTO conflict_count
-          FROM booking_sessions
+          FROM public.booking_sessions
           WHERE resource_id = NEW.resource_id
             AND session_date = NEW.session_date
             AND id != COALESCE(NEW.id, 0)
@@ -272,7 +308,7 @@ export async function ensureDatabaseConstraints() {
           
           RETURN NEW;
         END;
-        $$ LANGUAGE plpgsql;
+        $$;
 
         DROP TRIGGER IF EXISTS check_booking_session_overlap ON booking_sessions;
         CREATE TRIGGER check_booking_session_overlap
@@ -288,7 +324,10 @@ export async function ensureDatabaseConstraints() {
     try {
       await db.execute(sql`
         CREATE OR REPLACE FUNCTION normalize_tier_value()
-        RETURNS TRIGGER AS $$
+        RETURNS TRIGGER
+        LANGUAGE plpgsql
+        SET search_path = ''
+        AS $$
         DECLARE
           raw_tier TEXT;
           lowered TEXT;
@@ -318,7 +357,7 @@ export async function ensureDatabaseConstraints() {
           END IF;
           RETURN NEW;
         END;
-        $$ LANGUAGE plpgsql;
+        $$;
 
         DROP TRIGGER IF EXISTS normalize_tier_before_write ON users;
         CREATE TRIGGER normalize_tier_before_write
