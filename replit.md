@@ -45,7 +45,7 @@ The Ever Club Members App is a private members club application designed for gol
 - **Splash Screen**: Walking golfer GIF with random tagline, 2-second minimum display. Brand requirement — do not remove.
 - **Hero Image**: Preloaded in `index.html` with `fetchpriority="high"` and server-side `Link` header for production.
 - **HubSpot**: Script deferred via `requestIdleCallback` (falls back to 3s `setTimeout`).
-- **Security Headers**: HSTS with preload, CSP with `upgrade-insecure-requests`, COOP `same-origin`, X-Content-Type-Options, X-Frame-Options, Referrer-Policy, Permissions-Policy. All headers sent in all environments.
+- **Security Headers**: HSTS with preload, CSP with `upgrade-insecure-requests`, COOP `same-origin-allow-popups` (required for Google GSI popup sign-in), X-Content-Type-Options, X-Frame-Options, Referrer-Policy, Permissions-Policy. All headers sent in all environments.
 - **robots.txt**: Static file (`public/robots.txt`) and server route (`server/index.ts`) kept in sync. Disallow rules listed before Allow.
 
 ## External Dependencies
