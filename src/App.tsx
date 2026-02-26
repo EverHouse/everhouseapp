@@ -248,17 +248,11 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
               >
                 Try Again
               </button>
-              <button
-                onClick={this.handleReload}
-                className="px-6 py-3 bg-white/10 text-white rounded-xl font-semibold hover:opacity-90 transition-opacity"
-              >
-                Reload Page
-              </button>
               <a
                 href="sms:9495455855"
-                className="px-6 py-3 text-white/70 hover:text-white transition-colors text-sm underline"
+                className="px-6 py-3 bg-white/10 text-white rounded-xl font-semibold hover:opacity-90 transition-opacity text-center"
               >
-                Text Us — (949) 545-5855
+                Contact Support
               </a>
             </div>
           </div>

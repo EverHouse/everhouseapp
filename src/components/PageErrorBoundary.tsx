@@ -257,7 +257,7 @@ class PageErrorBoundary extends Component<Props, State> {
                   href="sms:9495455855"
                   className="px-5 py-2.5 bg-gray-100 dark:bg-white/10 text-gray-700 dark:text-white/80 rounded-xl font-medium text-sm hover:bg-gray-200 dark:hover:bg-white/20 transition-colors text-center"
                 >
-                  Text Us — (949) 545-5855
+                  Contact Support
                 </a>
               </div>
             </div>
@@ -314,17 +314,11 @@ class PageErrorBoundary extends Component<Props, State> {
               >
                 Try Again
               </button>
-              <button
-                onClick={this.handleHardReload}
-                className="px-5 py-2.5 bg-gray-100 dark:bg-white/10 text-gray-700 dark:text-white/80 rounded-xl font-medium text-sm hover:bg-gray-200 dark:hover:bg-white/20 transition-colors"
-              >
-                Reload Page
-              </button>
               <a
                 href="sms:9495455855"
-                className="px-5 py-2.5 text-gray-500 dark:text-white/50 hover:text-gray-700 dark:hover:text-white/70 text-sm transition-colors"
+                className="px-5 py-2.5 bg-gray-100 dark:bg-white/10 text-gray-700 dark:text-white/80 rounded-xl font-medium text-sm hover:bg-gray-200 dark:hover:bg-white/20 transition-colors text-center"
               >
-                Text Us — (949) 545-5855
+                Contact Support
               </a>
             </div>
           </div>

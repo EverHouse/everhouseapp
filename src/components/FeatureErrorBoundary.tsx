@@ -65,12 +65,12 @@ class FeatureErrorBoundary extends Component<Props, State> {
                   Try Again
                 </button>
                 {this.state.retryCount >= 1 && (
-                  <button
-                    onClick={() => window.location.reload()}
+                  <a
+                    href="sms:9495455855"
                     className="px-3 py-1.5 text-xs text-gray-500 dark:text-white/50 hover:text-gray-700 dark:hover:text-white/70 transition-colors"
                   >
-                    Reload Page
-                  </button>
+                    Contact Support
+                  </a>
                 )}
               </div>
             )}
