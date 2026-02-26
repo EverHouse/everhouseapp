@@ -1,7 +1,7 @@
 import { logger } from '../../core/logger';
 import { Router, Request, Response } from 'express';
 import { isStaffOrAdmin, isAdmin } from '../../core/middleware';
-import { getErrorMessage, getErrorCode } from '../../utils/errorUtils';
+import { getErrorMessage, getErrorCode, safeErrorDetail } from '../../utils/errorUtils';
 import { logFromRequest } from '../../core/auditLog';
 import { createHash } from 'crypto';
 
@@ -136,7 +136,7 @@ router.post('/api/stripe/coupons', isAdmin, async (req: Request, res: Response) 
     if (getErrorCode(error) === 'resource_already_exists') {
       return res.status(400).json({ error: 'A coupon with this ID already exists.' });
     }
-    res.status(500).json({ error: getErrorMessage(error) || 'Failed to create coupon' });
+    res.status(500).json({ error: 'Failed to create coupon' });
   }
 });
 
@@ -178,7 +178,7 @@ router.put('/api/stripe/coupons/:id', isAdmin, async (req: Request, res: Respons
     if (getErrorCode(error) === 'resource_missing') {
       return res.status(404).json({ error: 'Coupon not found.' });
     }
-    res.status(500).json({ error: getErrorMessage(error) || 'Failed to update coupon' });
+    res.status(500).json({ error: 'Failed to update coupon' });
   }
 });
 
@@ -204,7 +204,7 @@ router.delete('/api/stripe/coupons/:id', isAdmin, async (req: Request, res: Resp
     if (getErrorCode(error) === 'resource_missing') {
       return res.status(404).json({ error: 'Coupon not found.' });
     }
-    res.status(500).json({ error: getErrorMessage(error) || 'Failed to delete coupon' });
+    res.status(500).json({ error: 'Failed to delete coupon' });
   }
 });
 

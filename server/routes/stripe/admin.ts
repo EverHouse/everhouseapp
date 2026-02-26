@@ -24,7 +24,7 @@ import { getBillingClassificationSummary, getMembersNeedingStripeMigration } fro
 import { escapeHtml, checkSyncCooldown } from './helpers';
 import { sensitiveActionRateLimiter, checkoutRateLimiter } from '../../middleware/rateLimiting';
 import { logFromRequest } from '../../core/auditLog';
-import { getErrorMessage, getErrorCode } from '../../utils/errorUtils';
+import { getErrorMessage, getErrorCode, safeErrorDetail } from '../../utils/errorUtils';
 
 const router = Router();
 
@@ -34,7 +34,7 @@ router.post('/api/admin/check-expiring-cards', isAdmin, async (req: Request, res
     res.json(result);
   } catch (error: unknown) {
     logger.error('[Stripe] Error checking expiring cards', { error: error instanceof Error ? error : new Error(String(error)) });
-    res.status(500).json({ error: 'Failed to check expiring cards', details: getErrorMessage(error) });
+    res.status(500).json({ error: 'Failed to check expiring cards', details: safeErrorDetail(error) });
   }
 });
 
@@ -44,7 +44,7 @@ router.post('/api/admin/check-stale-waivers', isAdmin, async (req: Request, res:
     res.json(result);
   } catch (error: unknown) {
     logger.error('[Admin] Error checking stale waivers', { error: error instanceof Error ? error : new Error(String(error)) });
-    res.status(500).json({ error: 'Failed to check stale waivers', details: getErrorMessage(error) });
+    res.status(500).json({ error: 'Failed to check stale waivers', details: safeErrorDetail(error) });
   }
 });
 
@@ -620,7 +620,7 @@ router.get('/api/stripe/customer-sync-status', isStaffOrAdmin, async (req: Reque
     res.json(status);
   } catch (error: unknown) {
     logger.error('[Stripe Customer Sync] Error getting status', { error: error instanceof Error ? error : new Error(String(error)) });
-    res.status(500).json({ error: getErrorMessage(error) });
+    res.status(500).json({ error: 'Failed to get customer sync status' });
   }
 });
 
@@ -877,7 +877,7 @@ router.post('/api/stripe/sync-member-subscriptions', isStaffOrAdmin, sensitiveAc
     res.json({ success: true, synced, updated, errors: errorCount, details });
   } catch (error: unknown) {
     logger.error('[Stripe] Error syncing member subscriptions', { error: error instanceof Error ? error : new Error(String(error)) });
-    res.status(500).json({ error: 'Failed to sync member subscriptions', details: getErrorMessage(error) });
+    res.status(500).json({ error: 'Failed to sync member subscriptions', details: safeErrorDetail(error) });
   }
 });
 

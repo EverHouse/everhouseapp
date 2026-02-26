@@ -976,7 +976,7 @@ router.post('/api/booking-requests', bookingRateLimiter, async (req, res) => {
   } catch (error: unknown) {
     const errMsg = error instanceof Error ? error.message : String(error);
     if (errMsg.includes('Guest pass hold failed:')) {
-      return res.status(402).json({ error: errMsg });
+      return res.status(402).json({ error: 'Guest pass hold failed. Please check guest pass availability and try again.' });
     }
     const { isConstraintError } = await import('../../core/db');
     const constraint = isConstraintError(error);

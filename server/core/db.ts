@@ -9,6 +9,11 @@ const directUrl = process.env.DATABASE_URL;
 const poolerEnabled = process.env.ENABLE_PGBOUNCER === 'true';
 export const usingPooler = poolerEnabled && !!poolerUrl;
 
+const effectiveConnectionString = usingPooler ? poolerUrl : directUrl;
+if (!effectiveConnectionString) {
+  logger.error('[Database] FATAL: No database connection string configured. Set DATABASE_URL or DATABASE_POOLER_URL + ENABLE_PGBOUNCER=true');
+}
+
 const sslConfig = { rejectUnauthorized: false };
 const needsSsl = isProduction || usingPooler;
 

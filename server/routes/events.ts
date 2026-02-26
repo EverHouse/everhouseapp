@@ -12,7 +12,7 @@ import { getAllActiveBayIds, getConferenceRoomId } from '../core/affectedAreas';
 import { sendNotificationToUser, broadcastToStaff } from '../core/websocket';
 import { getSessionUser } from '../types/session';
 import { logFromRequest, type AuditAction } from '../core/auditLog';
-import { getErrorMessage } from '../utils/errorUtils';
+import { getErrorMessage, safeErrorDetail } from '../utils/errorUtils';
 import { logger } from '../core/logger';
 
 async function getMemberDisplayName(email: string): Promise<string> {
@@ -698,7 +698,7 @@ router.delete('/api/events/:id', isStaffOrAdmin, async (req, res) => {
     res.json({ success: true, archived: true, archivedBy });
   } catch (error: unknown) {
     logger.error('Event archive error', { error: error instanceof Error ? error : new Error(getErrorMessage(error)) });
-    res.status(500).json({ error: 'Failed to archive event', details: getErrorMessage(error) });
+    res.status(500).json({ error: 'Failed to archive event', details: safeErrorDetail(error) });
   }
 });
 

@@ -21,7 +21,7 @@ import { findOrCreateHubSpotContact } from '../../core/hubspot/members';
 import { randomUUID } from 'crypto';
 import { checkSyncCooldown } from './helpers';
 import { sensitiveActionRateLimiter } from '../../middleware/rateLimiting';
-import { getErrorMessage, getErrorCode } from '../../utils/errorUtils';
+import { getErrorMessage, getErrorCode, safeErrorDetail } from '../../utils/errorUtils';
 
 const router = Router();
 
@@ -353,7 +353,7 @@ router.post('/api/stripe/subscriptions/create-for-member', isStaffOrAdmin, async
     });
   } catch (error: unknown) {
     logger.error('[Stripe] Error creating subscription for member', { error: error instanceof Error ? error : new Error(String(error)) });
-    res.status(500).json({ error: getErrorMessage(error) || 'Failed to create subscription' });
+    res.status(500).json({ error: 'Failed to create subscription', details: safeErrorDetail(error) });
   }
 });
 
@@ -623,7 +623,7 @@ router.post('/api/stripe/subscriptions/create-new-member', isStaffOrAdmin, async
     });
   } catch (error: unknown) {
     logger.error('[Stripe] Error creating new member subscription', { error: error instanceof Error ? error : new Error(String(error)) });
-    res.status(500).json({ error: getErrorMessage(error) || 'Failed to create subscription' });
+    res.status(500).json({ error: 'Failed to create subscription', details: safeErrorDetail(error) });
   }
 });
 
@@ -783,7 +783,7 @@ router.post('/api/stripe/subscriptions/confirm-inline-payment', isStaffOrAdmin, 
     });
   } catch (error: unknown) {
     logger.error('[Stripe Subscriptions] Error confirming inline payment', { error: error instanceof Error ? error : new Error(String(error)) });
-    res.status(500).json({ error: getErrorMessage(error) || 'Failed to confirm payment' });
+    res.status(500).json({ error: 'Failed to confirm payment', details: safeErrorDetail(error) });
   }
 });
 
@@ -999,7 +999,7 @@ router.post('/api/stripe/subscriptions/send-activation-link', isStaffOrAdmin, as
     });
   } catch (error: unknown) {
     logger.error('[Stripe] Error sending activation link', { error: error instanceof Error ? error : new Error(String(error)) });
-    res.status(500).json({ error: getErrorMessage(error) || 'Failed to send activation link' });
+    res.status(500).json({ error: 'Failed to send activation link', details: safeErrorDetail(error) });
   }
 });
 

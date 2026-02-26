@@ -21,7 +21,7 @@ import { eq, and, ne, sql } from 'drizzle-orm';
 import { MINDBODY_TO_STAGE_MAP, HUBSPOT_STAGE_IDS } from '../core/hubspot/constants';
 import { getSessionUser } from '../types/session';
 import pLimit from 'p-limit';
-import { getErrorMessage } from '../utils/errorUtils';
+import { getErrorMessage, safeErrorDetail } from '../utils/errorUtils';
 
 const router = Router();
 
@@ -514,7 +514,7 @@ router.post('/api/admin/hubspot/deals/batch-delete', isStaffOrAdmin, async (req:
     res.json({ success: true, deleted, failed, total: deals.length, errors: errors.length > 0 ? errors : undefined });
   } catch (error: unknown) {
     logger.error('[HubSpot] Batch delete failed', { error: error instanceof Error ? error : new Error(String(error)) });
-    res.status(500).json({ error: getErrorMessage(error) || 'Batch delete failed' });
+    res.status(500).json({ error: 'Batch delete failed' });
   }
 });
 

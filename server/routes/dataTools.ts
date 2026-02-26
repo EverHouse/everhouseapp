@@ -10,7 +10,7 @@ import { retryableHubSpotRequest } from '../core/hubspot/request';
 import { logFromRequest, logBillingAudit } from '../core/auditLog';
 import { getSessionUser } from '../types/session';
 import { broadcastToStaff } from '../core/websocket';
-import { getErrorMessage, getErrorCode, getErrorStatusCode } from '../utils/errorUtils';
+import { getErrorMessage, getErrorCode, getErrorStatusCode, safeErrorDetail } from '../utils/errorUtils';
 import { getTodayPacific } from '../utils/dateUtils';
 import { getStripeClient } from '../core/stripe/client';
 import { syncCustomerMetadataToStripe } from '../core/stripe/customers';
@@ -268,7 +268,7 @@ router.post('/api/data-tools/resync-member', isAdmin, async (req: Request, res: 
     });
   } catch (error: unknown) {
     logger.error('[DataTools] Resync member error', { error: error instanceof Error ? error : new Error(String(error)) });
-    res.status(500).json({ error: 'Failed to resync member', details: getErrorMessage(error) });
+    res.status(500).json({ error: 'Failed to resync member', details: safeErrorDetail(error) });
   }
 });
 
@@ -309,7 +309,7 @@ router.get('/api/data-tools/unlinked-guest-fees', isAdmin, async (req: Request, 
     res.json(formatted);
   } catch (error: unknown) {
     logger.error('[DataTools] Get unlinked guest fees error', { error: error instanceof Error ? error : new Error(String(error)) });
-    res.status(500).json({ error: 'Failed to get unlinked guest fees', details: getErrorMessage(error) });
+    res.status(500).json({ error: 'Failed to get unlinked guest fees', details: safeErrorDetail(error) });
   }
 });
 
@@ -360,7 +360,7 @@ router.get('/api/data-tools/available-sessions', isAdmin, async (req: Request, r
     }));
   } catch (error: unknown) {
     logger.error('[DataTools] Get available sessions error', { error: error instanceof Error ? error : new Error(String(error)) });
-    res.status(500).json({ error: 'Failed to get available sessions', details: getErrorMessage(error) });
+    res.status(500).json({ error: 'Failed to get available sessions', details: safeErrorDetail(error) });
   }
 });
 
@@ -420,7 +420,7 @@ router.post('/api/data-tools/link-guest-fee', isAdmin, async (req: Request, res:
     });
   } catch (error: unknown) {
     logger.error('[DataTools] Link guest fee error', { error: error instanceof Error ? error : new Error(String(error)) });
-    res.status(500).json({ error: 'Failed to link guest fee', details: getErrorMessage(error) });
+    res.status(500).json({ error: 'Failed to link guest fee', details: safeErrorDetail(error) });
   }
 });
 
@@ -482,7 +482,7 @@ router.get('/api/data-tools/bookings-search', isStaffOrAdmin, async (req: Reques
     }));
   } catch (error: unknown) {
     logger.error('[DataTools] Bookings search error', { error: error instanceof Error ? error : new Error(String(error)) });
-    res.status(500).json({ error: 'Failed to search bookings', details: getErrorMessage(error) });
+    res.status(500).json({ error: 'Failed to search bookings', details: safeErrorDetail(error) });
   }
 });
 
@@ -542,7 +542,7 @@ router.post('/api/data-tools/update-attendance', isAdmin, async (req: Request, r
     });
   } catch (error: unknown) {
     logger.error('[DataTools] Update attendance error', { error: error instanceof Error ? error : new Error(String(error)) });
-    res.status(500).json({ error: 'Failed to update attendance', details: getErrorMessage(error) });
+    res.status(500).json({ error: 'Failed to update attendance', details: safeErrorDetail(error) });
   }
 });
 
@@ -591,7 +591,7 @@ router.post('/api/data-tools/mindbody-reimport', isAdmin, async (req: Request, r
     });
   } catch (error: unknown) {
     logger.error('[DataTools] Mindbody reimport error', { error: error instanceof Error ? error : new Error(String(error)) });
-    res.status(500).json({ error: 'Failed to queue mindbody reimport', details: getErrorMessage(error) });
+    res.status(500).json({ error: 'Failed to queue mindbody reimport', details: safeErrorDetail(error) });
   }
 });
 
@@ -616,7 +616,7 @@ router.get('/api/data-tools/audit-log', isAdmin, async (req: Request, res: Respo
     ));
   } catch (error: unknown) {
     logger.error('[DataTools] Get audit log error', { error: error instanceof Error ? error : new Error(String(error)) });
-    res.status(500).json({ error: 'Failed to get audit log', details: getErrorMessage(error) });
+    res.status(500).json({ error: 'Failed to get audit log', details: safeErrorDetail(error) });
   }
 });
 
@@ -663,7 +663,7 @@ router.get('/api/data-tools/staff-activity', isAdmin, async (req: Request, res: 
     res.json({ logs: parsedLogs });
   } catch (error: unknown) {
     logger.error('[DataTools] Get staff activity error', { error: error instanceof Error ? error : new Error(String(error)) });
-    res.status(500).json({ error: 'Failed to get staff activity', details: getErrorMessage(error) });
+    res.status(500).json({ error: 'Failed to get staff activity', details: safeErrorDetail(error) });
   }
 });
 
@@ -796,7 +796,7 @@ router.post('/api/data-tools/cleanup-mindbody-ids', isAdmin, async (req: Request
     });
   } catch (error: unknown) {
     logger.error('[DataTools] Cleanup mindbody IDs error', { error: error instanceof Error ? error : new Error(String(error)) });
-    res.status(500).json({ error: 'Failed to cleanup mindbody IDs', details: getErrorMessage(error) });
+    res.status(500).json({ error: 'Failed to cleanup mindbody IDs', details: safeErrorDetail(error) });
   }
 });
 
@@ -814,7 +814,7 @@ router.post('/api/data-tools/bulk-push-to-hubspot', isAdmin, async (req: Request
     res.json(result);
   } catch (error: unknown) {
     logger.error('[DataTools] Bulk push to HubSpot error', { error: error instanceof Error ? error : new Error(String(error)) });
-    res.status(500).json({ error: 'Failed to bulk push to HubSpot', details: getErrorMessage(error) });
+    res.status(500).json({ error: 'Failed to bulk push to HubSpot', details: safeErrorDetail(error) });
   }
 });
 
@@ -913,7 +913,7 @@ router.post('/api/data-tools/sync-members-to-hubspot', isAdmin, async (req: Requ
     });
   } catch (error: unknown) {
     logger.error('[DataTools] Sync members to HubSpot error', { error: error instanceof Error ? error : new Error(String(error)) });
-    res.status(500).json({ error: 'Failed to sync members to HubSpot', details: getErrorMessage(error) });
+    res.status(500).json({ error: 'Failed to sync members to HubSpot', details: safeErrorDetail(error) });
   }
 });
 
@@ -1095,7 +1095,7 @@ router.post('/api/data-tools/sync-subscription-status', isAdmin, async (req: Req
     });
   } catch (error: unknown) {
     logger.error('[DataTools] Sync subscription status error', { error: error instanceof Error ? error : new Error(String(error)) });
-    res.status(500).json({ error: 'Failed to sync subscription status', details: getErrorMessage(error) });
+    res.status(500).json({ error: 'Failed to sync subscription status', details: safeErrorDetail(error) });
   }
 });
 
@@ -1207,7 +1207,7 @@ router.post('/api/data-tools/clear-orphaned-stripe-ids', isAdmin, async (req: Re
     });
   } catch (error: unknown) {
     logger.error('[DataTools] Clear orphaned Stripe IDs error', { error: error instanceof Error ? error : new Error(String(error)) });
-    res.status(500).json({ error: 'Failed to clear orphaned Stripe IDs', details: getErrorMessage(error) });
+    res.status(500).json({ error: 'Failed to clear orphaned Stripe IDs', details: safeErrorDetail(error) });
   }
 });
 
@@ -1360,7 +1360,7 @@ router.post('/api/data-tools/link-stripe-hubspot', isAdmin, async (req: Request,
     });
   } catch (error: unknown) {
     logger.error('[DataTools] Link Stripe-HubSpot error', { error: error instanceof Error ? error : new Error(String(error)) });
-    res.status(500).json({ error: 'Failed to link Stripe-HubSpot', details: getErrorMessage(error) });
+    res.status(500).json({ error: 'Failed to link Stripe-HubSpot', details: safeErrorDetail(error) });
   }
 });
 
@@ -1554,7 +1554,7 @@ router.post('/api/data-tools/sync-visit-counts', isAdmin, async (req: Request, r
     });
   } catch (error: unknown) {
     logger.error('[DataTools] Sync visit counts error', { error: error instanceof Error ? error : new Error(String(error)) });
-    res.status(500).json({ error: 'Failed to sync visit counts', details: getErrorMessage(error) });
+    res.status(500).json({ error: 'Failed to sync visit counts', details: safeErrorDetail(error) });
   }
 });
 
@@ -1684,7 +1684,7 @@ router.post('/api/data-tools/detect-duplicates', isAdmin, async (req: Request, r
     });
   } catch (error: unknown) {
     logger.error('[DataTools] Detect duplicates error', { error: error instanceof Error ? error : new Error(String(error)) });
-    res.status(500).json({ error: 'Failed to detect duplicates', details: getErrorMessage(error) });
+    res.status(500).json({ error: 'Failed to detect duplicates', details: safeErrorDetail(error) });
   }
 });
 
@@ -1883,7 +1883,7 @@ router.post('/api/data-tools/sync-payment-status', isAdmin, async (req: Request,
     });
   } catch (error: unknown) {
     logger.error('[DataTools] Sync payment status error', { error: error instanceof Error ? error : new Error(String(error)) });
-    res.status(500).json({ error: 'Failed to sync payment status', details: getErrorMessage(error) });
+    res.status(500).json({ error: 'Failed to sync payment status', details: safeErrorDetail(error) });
   }
 });
 
@@ -2169,7 +2169,7 @@ router.post('/api/data-tools/fix-trackman-ghost-bookings', isAdmin, async (req: 
     });
   } catch (error: unknown) {
     logger.error('[DataTools] Fix Trackman ghost bookings error', { error: error instanceof Error ? error : new Error(String(error)) });
-    res.status(500).json({ error: 'Failed to fix Trackman ghost bookings', details: getErrorMessage(error) });
+    res.status(500).json({ error: 'Failed to fix Trackman ghost bookings', details: safeErrorDetail(error) });
   }
 });
 
@@ -2396,7 +2396,7 @@ router.post('/api/data-tools/cleanup-stripe-customers', isAdmin, async (req: Req
     res.json({ success: true, jobId, message: 'Cleanup job started' });
   } catch (error: unknown) {
     logger.error('[DataTools] Stripe customer cleanup error', { error: error instanceof Error ? error : new Error(String(error)) });
-    res.status(500).json({ error: 'Failed to start cleanup job', details: getErrorMessage(error) });
+    res.status(500).json({ error: 'Failed to start cleanup job', details: safeErrorDetail(error) });
   }
 });
 
@@ -2440,7 +2440,7 @@ router.post('/api/data-tools/archive-stale-visitors', isAdmin, async (req: Reque
     res.json({ success: true, jobId, message: 'Archive job started' });
   } catch (error: unknown) {
     logger.error('[DataTools] Visitor archive error', { error: error instanceof Error ? error : new Error(String(error)) });
-    res.status(500).json({ error: 'Failed to start archive job', details: getErrorMessage(error) });
+    res.status(500).json({ error: 'Failed to start archive job', details: safeErrorDetail(error) });
   }
 });
 
@@ -2671,7 +2671,7 @@ router.post('/api/data-tools/cleanup-ghost-fees', isAdmin, async (req: Request, 
     });
   } catch (error: unknown) {
     logger.error('[DataTools] Ghost fee cleanup error', { error: error instanceof Error ? error : new Error(String(error)) });
-    res.status(500).json({ error: getErrorMessage(error) });
+    res.status(500).json({ error: 'Failed to clean up ghost fees' });
   }
 });
 

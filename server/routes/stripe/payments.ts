@@ -37,7 +37,7 @@ import { sendPurchaseReceipt, PurchaseReceiptItem } from '../../emails/paymentEm
 import { getStaffInfo, MAX_RETRY_ATTEMPTS, GUEST_FEE_CENTS, SAVED_CARD_APPROVAL_THRESHOLD_CENTS } from './helpers';
 import { broadcastBillingUpdate, sendNotificationToUser, broadcastBookingInvoiceUpdate } from '../../core/websocket';
 import { alertOnExternalServiceError } from '../../core/errorAlerts';
-import { getErrorMessage, getErrorCode } from '../../utils/errorUtils';
+import { getErrorMessage, getErrorCode, safeErrorDetail } from '../../utils/errorUtils';
 import { normalizeTierName } from '../../utils/tierUtils';
 import { toIntArrayLiteral } from '../../utils/sqlArrayLiteral';
 import { getBookingInvoiceId, finalizeAndPayInvoice, createDraftInvoiceForBooking, finalizeInvoicePaidOutOfBand, recreateDraftInvoiceFromBooking } from '../../core/billing/bookingInvoiceService';
@@ -1332,7 +1332,7 @@ router.post('/api/stripe/staff/charge-saved-card', isStaffOrAdmin, async (req: R
     // Handle specific Stripe errors
     if ((error as StripeError).type === 'StripeCardError') {
       return res.status(400).json({ 
-        error: `Card declined: ${getErrorMessage(error)}`,
+        error: `Card declined: ${safeErrorDetail(error)}`,
         cardError: true,
         declineCode: (error as StripeError).decline_code
       });
@@ -1639,7 +1639,7 @@ router.post('/api/stripe/staff/charge-saved-card-pos', isStaffOrAdmin, async (re
 
     if ((error as StripeError).type === 'StripeCardError') {
       return res.status(400).json({
-        error: `Card declined: ${getErrorMessage(error)}`,
+        error: `Card declined: ${safeErrorDetail(error)}`,
         cardError: true
       });
     }
@@ -2340,7 +2340,7 @@ router.post('/api/payments/cancel', isStaffOrAdmin, async (req: Request, res: Re
     res.json({ success: true, message: 'Payment canceled successfully' });
   } catch (error: unknown) {
     logger.error('[Payments] Error canceling payment', { error: error instanceof Error ? error : new Error(String(error)) });
-    res.status(500).json({ error: getErrorMessage(error) || 'Failed to cancel payment' });
+    res.status(500).json({ error: 'Failed to cancel payment' });
   }
 });
 
@@ -2534,7 +2534,7 @@ router.post('/api/payments/refund', isStaffOrAdmin, async (req: Request, res: Re
     });
   } catch (error: unknown) {
     logger.error('[Payments] Error creating refund', { error: error instanceof Error ? error : new Error(String(error)) });
-    res.status(500).json({ error: getErrorMessage(error) || 'Failed to create refund' });
+    res.status(500).json({ error: 'Failed to create refund' });
   }
 });
 
@@ -2664,7 +2664,7 @@ router.post('/api/payments/capture', isStaffOrAdmin, async (req: Request, res: R
     });
   } catch (error: unknown) {
     logger.error('[Payments] Error capturing payment', { error: error instanceof Error ? error : new Error(String(error)) });
-    res.status(500).json({ error: getErrorMessage(error) || 'Failed to capture payment' });
+    res.status(500).json({ error: 'Failed to capture payment' });
   }
 });
 
@@ -2715,7 +2715,7 @@ router.post('/api/payments/void-authorization', isStaffOrAdmin, async (req: Requ
     });
   } catch (error: unknown) {
     logger.error('[Payments] Error voiding authorization', { error: error instanceof Error ? error : new Error(String(error)) });
-    res.status(500).json({ error: getErrorMessage(error) || 'Failed to void authorization' });
+    res.status(500).json({ error: 'Failed to void authorization' });
   }
 });
 
@@ -2978,14 +2978,14 @@ router.post('/api/stripe/staff/charge-subscription-invoice', isStaffOrAdmin, asy
     
     if ((error as StripeError).type === 'StripeCardError') {
       return res.status(400).json({ 
-        error: `Card declined: ${getErrorMessage(error)}`,
+        error: `Card declined: ${safeErrorDetail(error)}`,
         declineCode: (error as StripeError).decline_code
       });
     }
     
     await alertOnExternalServiceError('Stripe', error as Error, 'charge subscription invoice');
     res.status(500).json({ 
-      error: getErrorMessage(error) || 'Failed to charge subscription invoice',
+      error: 'Failed to charge subscription invoice',
       retryable: true
     });
   }

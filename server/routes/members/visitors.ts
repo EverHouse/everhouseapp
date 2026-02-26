@@ -8,7 +8,7 @@ import { isProduction } from '../../core/db';
 import { isStaffOrAdmin, isAdmin } from '../../core/middleware';
 import { getSessionUser } from '../../types/session';
 import { logFromRequest } from '../../core/auditLog';
-import { getErrorMessage } from '../../utils/errorUtils';
+import { getErrorMessage, safeErrorDetail } from '../../utils/errorUtils';
 
 const PLACEHOLDER_EMAIL_PATTERNS = [
   '@visitors.evenhouse.club',
@@ -631,7 +631,7 @@ router.post('/api/visitors', isStaffOrAdmin, async (req, res) => {
     });
   } catch (error: unknown) {
     logger.error('[Visitors] Create visitor error', { error: error instanceof Error ? error : new Error(String(error)) });
-    res.status(500).json({ error: getErrorMessage(error) || 'Failed to create visitor' });
+    res.status(500).json({ error: 'Failed to create visitor' });
   }
 });
 
@@ -811,7 +811,7 @@ router.post('/api/visitors/backfill-types', isAdmin, async (req, res) => {
     });
   } catch (error: unknown) {
     logger.error('[Visitors] Backfill types error', { error: error instanceof Error ? error : new Error(String(error)) });
-    res.status(500).json({ error: getErrorMessage(error) || 'Failed to backfill visitor types' });
+    res.status(500).json({ error: 'Failed to backfill visitor types' });
   }
 });
 

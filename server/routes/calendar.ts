@@ -4,7 +4,7 @@ import { isProduction } from '../core/db';
 import { getGoogleCalendarClient } from '../core/integrations';
 import { CALENDAR_CONFIG, getCalendarAvailability, discoverCalendarIds, getCalendarStatus, syncConferenceRoomCalendarToBookings } from '../core/calendar/index';
 import { isStaffOrAdmin, isAdmin } from '../core/middleware';
-import { getErrorMessage } from '../utils/errorUtils';
+import { getErrorMessage, safeErrorDetail } from '../utils/errorUtils';
 
 const router = Router();
 
@@ -136,7 +136,7 @@ router.get('/api/calendar/availability', async (req, res) => {
     });
   } catch (error: unknown) {
     if (!isProduction) logger.error('Calendar availability error', { error: error instanceof Error ? error : new Error(String(error)) });
-    res.status(500).json({ error: 'Failed to fetch calendar availability', details: getErrorMessage(error) });
+    res.status(500).json({ error: 'Failed to fetch calendar availability', details: safeErrorDetail(error) });
   }
 });
 
@@ -166,7 +166,7 @@ router.post('/api/admin/conference-room/backfill', isAdmin, async (req, res) => 
     });
   } catch (error: unknown) {
     logger.error('Conference room backfill error', { error: error instanceof Error ? error : new Error(String(error)) });
-    res.status(500).json({ error: 'Failed to run backfill', details: getErrorMessage(error) });
+    res.status(500).json({ error: 'Failed to run backfill', details: safeErrorDetail(error) });
   }
 });
 
@@ -200,7 +200,7 @@ router.post('/api/admin/bookings/sync-history', isAdmin, async (req, res) => {
     });
   } catch (error: unknown) {
     logger.error('Booking sync error', { error: error instanceof Error ? error : new Error(String(error)) });
-    res.status(500).json({ error: 'Failed to run sync', details: getErrorMessage(error) });
+    res.status(500).json({ error: 'Failed to run sync', details: safeErrorDetail(error) });
   }
 });
 

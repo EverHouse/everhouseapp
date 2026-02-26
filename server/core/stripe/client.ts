@@ -77,10 +77,14 @@ export async function getStripeSync() {
     const { StripeSync } = await import('stripe-replit-sync');
     const secretKey = await getStripeSecretKey();
 
+    const connectionString = process.env.DATABASE_POOLER_URL || process.env.DATABASE_URL || '';
+    if (!connectionString) {
+      throw new Error('[StripeSync] No DATABASE_URL or DATABASE_POOLER_URL configured');
+    }
     const needsSsl = process.env.NODE_ENV === 'production' || !!process.env.DATABASE_POOLER_URL;
     stripeSync = new StripeSync({
       poolConfig: {
-        connectionString: process.env.DATABASE_POOLER_URL || process.env.DATABASE_URL!,
+        connectionString,
         max: 2,
         ssl: needsSsl ? { rejectUnauthorized: false } : undefined,
       },

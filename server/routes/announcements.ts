@@ -20,7 +20,7 @@ import {
   deleteFromSheet
 } from '../core/googleSheets/announcementSync';
 import { systemSettings } from '../../shared/models/system';
-import { getErrorMessage } from '../utils/errorUtils';
+import { safeErrorDetail } from '../utils/errorUtils';
 
 const router = Router();
 
@@ -400,7 +400,7 @@ router.post('/api/announcements/sheets/connect', isStaffOrAdmin, async (req, res
     res.json({ sheetId, sheetUrl });
   } catch (error: unknown) {
     logger.error('Google Sheets connect error', { error: error instanceof Error ? error : new Error(String(error)) });
-    res.status(500).json({ error: 'Failed to connect Google Sheets: ' + getErrorMessage(error) });
+    res.status(500).json({ error: 'Failed to connect Google Sheets' });
   }
 });
 
@@ -438,7 +438,7 @@ router.post('/api/announcements/sheets/sync-from', isStaffOrAdmin, async (req, r
     res.json(result);
   } catch (error: unknown) {
     logger.error('Google Sheets sync-from error', { error: error instanceof Error ? error : new Error(String(error)) });
-    res.status(500).json({ error: 'Failed to sync from Google Sheets: ' + getErrorMessage(error) });
+    res.status(500).json({ error: 'Failed to sync from Google Sheets' });
   }
 });
 
@@ -458,7 +458,7 @@ router.post('/api/announcements/sheets/sync-to', isStaffOrAdmin, async (req, res
     res.json(result);
   } catch (error: unknown) {
     logger.error('Google Sheets sync-to error', { error: error instanceof Error ? error : new Error(String(error)) });
-    res.status(500).json({ error: 'Failed to sync to Google Sheets: ' + getErrorMessage(error) });
+    res.status(500).json({ error: 'Failed to sync to Google Sheets' });
   }
 });
 

@@ -5,7 +5,7 @@ import { getWebhookEvents, getWebhookEventTypes } from '../core/webhookMonitor';
 import { getJobQueueMonitorData } from '../core/jobQueueMonitor';
 import { getHubSpotQueueMonitorData } from '../core/hubspotQueueMonitor';
 import { getAlertHistory } from '../core/alertHistoryMonitor';
-import { getErrorMessage } from '../utils/errorUtils';
+import { safeErrorDetail } from '../utils/errorUtils';
 import { getAuditLogs } from '../core/auditLog';
 import { isPushNotificationsEnabled } from './push';
 import { getSettingBoolean } from '../core/settingsHelper';
@@ -21,7 +21,7 @@ router.get('/api/admin/monitoring/schedulers', isStaffOrAdmin, async (_req, res)
     const statuses = schedulerTracker.getSchedulerStatuses();
     res.json({ schedulers: statuses });
   } catch (error: unknown) {
-    res.status(500).json({ error: 'Failed to get scheduler statuses', details: getErrorMessage(error) });
+    res.status(500).json({ error: 'Failed to get scheduler statuses', details: safeErrorDetail(error) });
   }
 });
 
@@ -35,7 +35,7 @@ router.get('/api/admin/monitoring/webhooks', isStaffOrAdmin, async (req, res) =>
     const data = await getWebhookEvents({ type, status, limit, offset });
     res.json(data);
   } catch (error: unknown) {
-    res.status(500).json({ error: 'Failed to get webhook events', details: getErrorMessage(error) });
+    res.status(500).json({ error: 'Failed to get webhook events', details: safeErrorDetail(error) });
   }
 });
 
@@ -44,7 +44,7 @@ router.get('/api/admin/monitoring/webhook-types', isStaffOrAdmin, async (_req, r
     const types = await getWebhookEventTypes();
     res.json({ types });
   } catch (error: unknown) {
-    res.status(500).json({ error: 'Failed to get webhook event types', details: getErrorMessage(error) });
+    res.status(500).json({ error: 'Failed to get webhook event types', details: safeErrorDetail(error) });
   }
 });
 
@@ -53,7 +53,7 @@ router.get('/api/admin/monitoring/jobs', isStaffOrAdmin, async (_req, res) => {
     const data = await getJobQueueMonitorData();
     res.json(data);
   } catch (error: unknown) {
-    res.status(500).json({ error: 'Failed to get job queue data', details: getErrorMessage(error) });
+    res.status(500).json({ error: 'Failed to get job queue data', details: safeErrorDetail(error) });
   }
 });
 
@@ -62,7 +62,7 @@ router.get('/api/admin/monitoring/hubspot-queue', isStaffOrAdmin, async (_req, r
     const data = await getHubSpotQueueMonitorData();
     res.json(data);
   } catch (error: unknown) {
-    res.status(500).json({ error: 'Failed to get HubSpot queue data', details: getErrorMessage(error) });
+    res.status(500).json({ error: 'Failed to get HubSpot queue data', details: safeErrorDetail(error) });
   }
 });
 
@@ -75,7 +75,7 @@ router.get('/api/admin/monitoring/alerts', isStaffOrAdmin, async (req, res) => {
     const alerts = await getAlertHistory({ startDate, endDate, limit });
     res.json({ alerts });
   } catch (error: unknown) {
-    res.status(500).json({ error: 'Failed to get alert history', details: getErrorMessage(error) });
+    res.status(500).json({ error: 'Failed to get alert history', details: safeErrorDetail(error) });
   }
 });
 
@@ -93,7 +93,7 @@ router.get('/api/admin/monitoring/audit-logs', isStaffOrAdmin, async (req, res) 
     const data = await getAuditLogs({ staffEmail, action, resourceType, resourceId, startDate, endDate, limit, offset });
     res.json(data);
   } catch (error: unknown) {
-    res.status(500).json({ error: 'Failed to get audit logs', details: getErrorMessage(error) });
+    res.status(500).json({ error: 'Failed to get audit logs', details: safeErrorDetail(error) });
   }
 });
 
@@ -169,7 +169,7 @@ router.get('/api/admin/monitoring/email-health', isStaffOrAdmin, async (_req, re
 
     res.json({ stats, recentEvents });
   } catch (error: unknown) {
-    res.status(500).json({ error: 'Failed to get email health stats', details: getErrorMessage(error) });
+    res.status(500).json({ error: 'Failed to get email health stats', details: safeErrorDetail(error) });
   }
 });
 
@@ -187,7 +187,7 @@ router.get('/api/admin/monitoring/push-status', isStaffOrAdmin, async (_req, res
       subscriptionCount,
     });
   } catch (error: unknown) {
-    res.status(500).json({ error: 'Failed to get push notification status', details: getErrorMessage(error) });
+    res.status(500).json({ error: 'Failed to get push notification status', details: safeErrorDetail(error) });
   }
 });
 
@@ -201,7 +201,7 @@ router.get('/api/admin/monitoring/auto-approve-config', isStaffOrAdmin, async (_
       trackmanImports,
     });
   } catch (error: unknown) {
-    res.status(500).json({ error: 'Failed to get auto-approve config', details: getErrorMessage(error) });
+    res.status(500).json({ error: 'Failed to get auto-approve config', details: safeErrorDetail(error) });
   }
 });
 

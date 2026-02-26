@@ -15,7 +15,7 @@ import { recordUsage, ensureSessionForBooking } from '../../core/bookingService/
 import { updateVisitorTypeByUserId } from '../../core/visitors';
 import { PRICING } from '../../core/billing/pricingConfig';
 import { refundGuestPassForParticipant } from '../../core/billing/guestPassConsumer';
-import { getErrorMessage } from '../../utils/errorUtils';
+import { getErrorMessage, safeErrorDetail } from '../../utils/errorUtils';
 import { getTodayPacific } from '../../utils/dateUtils';
 import { broadcastBookingRosterUpdate } from '../../core/websocket';
 
@@ -1143,7 +1143,7 @@ router.post('/api/admin/trackman/auto-resolve-same-email', isStaffOrAdmin, async
     });
   } catch (error: unknown) {
     logger.error('Error auto-resolving bookings', { error: error instanceof Error ? error : new Error(String(error)) });
-    res.status(500).json({ error: getErrorMessage(error) || 'Failed to auto-resolve bookings' });
+    res.status(500).json({ error: 'Failed to auto-resolve bookings', details: safeErrorDetail(error) });
   }
 });
 
@@ -3200,7 +3200,7 @@ router.delete('/api/admin/trackman/reset-data', isStaffOrAdmin, async (req, res)
   } catch (error: unknown) {
     await client.query('ROLLBACK');
     logger.error('Trackman reset error', { error: error instanceof Error ? error : new Error(String(error)) });
-    res.status(500).json({ error: 'Failed to reset Trackman data: ' + getErrorMessage(error) });
+    res.status(500).json({ error: 'Failed to reset Trackman data', details: safeErrorDetail(error) });
   } finally {
     client.release();
   }
@@ -3564,7 +3564,7 @@ router.post('/api/admin/backfill-sessions', isStaffOrAdmin, async (req, res) => 
       error: getErrorMessage(error)
     });
     
-    res.status(500).json({ error: 'Failed to backfill sessions: ' + (getErrorMessage(error) || 'Unknown error') });
+    res.status(500).json({ error: 'Failed to backfill sessions', details: safeErrorDetail(error) });
   } finally {
     client.release();
   }
@@ -3679,7 +3679,7 @@ router.post('/api/admin/trackman/cleanup-duplicates', isStaffOrAdmin, async (req
   } catch (error: unknown) {
     await client.query('ROLLBACK');
     logger.error('[Trackman Cleanup Duplicates] Error', { error: error instanceof Error ? error : new Error(String(error)) });
-    res.status(500).json({ error: 'Failed to cleanup duplicates: ' + (getErrorMessage(error) || 'Unknown error') });
+    res.status(500).json({ error: 'Failed to cleanup duplicates', details: safeErrorDetail(error) });
   } finally {
     client.release();
   }

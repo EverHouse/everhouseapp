@@ -35,7 +35,7 @@ import {
   createBookingForMember,
   tryMatchByBayDateTime,
 } from './webhook-billing';
-import { getErrorMessage } from '../../utils/errorUtils';
+import { getErrorMessage, safeErrorDetail } from '../../utils/errorUtils';
 
 const router = Router();
 
@@ -1374,7 +1374,7 @@ router.post('/api/admin/trackman-webhooks/backfill', isAdmin, async (req, res) =
     });
   } catch (error: unknown) {
     logger.error('[Trackman Backfill] Error', { error: error instanceof Error ? error : new Error(String(error)) });
-    res.status(500).json({ error: 'Failed to run backfill', details: getErrorMessage(error) });
+    res.status(500).json({ error: 'Failed to run backfill', details: safeErrorDetail(error) });
   }
 });
 
@@ -1452,7 +1452,7 @@ router.post('/api/trackman/replay-webhooks-to-dev', isAdmin, async (req, res) =>
     });
   } catch (error: unknown) {
     logger.error('[Trackman Replay] Error', { error: error instanceof Error ? error : new Error(String(error)) });
-    res.status(500).json({ error: 'Failed to replay webhooks', details: getErrorMessage(error) });
+    res.status(500).json({ error: 'Failed to replay webhooks', details: safeErrorDetail(error) });
   }
 });
 

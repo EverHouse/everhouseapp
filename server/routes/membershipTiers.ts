@@ -7,7 +7,7 @@ import { isAdmin, isStaffOrAdmin } from '../core/middleware';
 import { invalidateTierCache, clearTierCache } from '../core/tierService';
 import { syncMembershipTiersToStripe, getTierSyncStatus, cleanupOrphanStripeProducts, syncTierFeaturesToStripe, syncCafeItemsToStripe, pullTierFeaturesFromStripe, pullCafeItemsFromStripe } from '../core/stripe/products';
 import { logFromRequest } from '../core/auditLog';
-import { getErrorMessage, getErrorCode } from '../utils/errorUtils';
+import { getErrorMessage, getErrorCode, safeErrorDetail } from '../utils/errorUtils';
 import { getCached, setCache, invalidateCache as invalidateQueryCache } from '../core/queryCache';
 
 const TIERS_CACHE_KEY = 'membership_tiers';
@@ -247,7 +247,7 @@ router.post('/api/admin/stripe/sync-products', isStaffOrAdmin, async (req, res) 
     });
   } catch (error: unknown) {
     logger.error('[Admin] Stripe sync error', { error: error instanceof Error ? error : new Error(String(error)) });
-    res.status(500).json({ error: 'Failed to sync products to Stripe', message: getErrorMessage(error) });
+    res.status(500).json({ error: 'Failed to sync products to Stripe', details: safeErrorDetail(error) });
   }
 });
 
@@ -296,7 +296,7 @@ router.post('/api/admin/stripe/pull-from-stripe', isStaffOrAdmin, async (req, re
     });
   } catch (error: unknown) {
     logger.error('[Admin] Pull from Stripe error', { error: error instanceof Error ? error : new Error(String(error)) });
-    res.status(500).json({ error: 'Failed to pull from Stripe', message: getErrorMessage(error) });
+    res.status(500).json({ error: 'Failed to pull from Stripe', details: safeErrorDetail(error) });
   }
 });
 

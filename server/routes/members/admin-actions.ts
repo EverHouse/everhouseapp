@@ -17,7 +17,7 @@ import { cascadeEmailChange, previewEmailChangeImpact } from '../../core/memberS
 import { getAvailableTiersForChange, previewTierChange, commitTierChange } from '../../core/stripe/tierChanges';
 import { logFromRequest } from '../../core/auditLog';
 import { previewMerge, executeMerge, findPotentialDuplicates } from '../../core/userMerge';
-import { getErrorMessage } from '../../utils/errorUtils';
+import { getErrorMessage, safeErrorDetail } from '../../utils/errorUtils';
 import { invalidateCache } from '../../core/queryCache';
 
 const router = Router();
@@ -1329,7 +1329,7 @@ router.get('/api/members/:userId/duplicates', isStaffOrAdmin, async (req, res) =
     res.json({ duplicates });
   } catch (error: unknown) {
     logger.error('[Duplicates] Error finding duplicates', { error: error instanceof Error ? error : new Error(String(error)) });
-    res.status(500).json({ error: getErrorMessage(error) || 'Failed to find duplicates' });
+    res.status(500).json({ error: 'Failed to find duplicates' });
   }
 });
 
@@ -1345,7 +1345,7 @@ router.post('/api/members/merge/preview', isAdmin, async (req, res) => {
     res.json(preview);
   } catch (error: unknown) {
     logger.error('[Merge Preview] Error', { error: error instanceof Error ? error : new Error(String(error)) });
-    res.status(400).json({ error: getErrorMessage(error) || 'Failed to preview merge' });
+    res.status(400).json({ error: 'Failed to preview merge' });
   }
 });
 
@@ -1369,7 +1369,7 @@ router.post('/api/members/merge/execute', isAdmin, async (req, res) => {
     res.json(result);
   } catch (error: unknown) {
     logger.error('[Merge Execute] Error', { error: error instanceof Error ? error : new Error(String(error)) });
-    res.status(400).json({ error: getErrorMessage(error) || 'Failed to merge users' });
+    res.status(400).json({ error: 'Failed to merge users' });
   }
 });
 

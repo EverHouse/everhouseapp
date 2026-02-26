@@ -16,7 +16,7 @@ import pRetry, { AbortError } from 'p-retry';
 import { invalidateCache } from '../core/queryCache';
 import { broadcastDirectoryUpdate } from '../core/websocket';
 import { FilterOperatorEnum } from '@hubspot/api-client/lib/codegen/crm/contacts';
-import { getErrorMessage } from '../utils/errorUtils';
+import { getErrorMessage, safeErrorDetail } from '../utils/errorUtils';
 import { denormalizeTierForHubSpot } from '../utils/tierUtils';
 
 /**
@@ -1225,7 +1225,7 @@ router.post('/api/hubspot/sync-tiers', isStaffOrAdmin, async (req, res) => {
     });
   } catch (error: unknown) {
     logger.error('[Tier Sync] Error', { error: error instanceof Error ? error : new Error(String(error)) });
-    res.status(500).json({ error: 'Tier sync failed: ' + getErrorMessage(error) });
+    res.status(500).json({ error: 'Tier sync failed', details: safeErrorDetail(error) });
   }
 });
 
@@ -1329,7 +1329,7 @@ router.put('/api/hubspot/contacts/:id/tier', isStaffOrAdmin, async (req, res) =>
     });
   } catch (error: unknown) {
     logger.error('[Tier Update] Error updating contact', { error: error instanceof Error ? error : new Error(String(error)), extra: { id } });
-    res.status(500).json({ error: 'Failed to update tier: ' + getErrorMessage(error) });
+    res.status(500).json({ error: 'Failed to update tier', details: safeErrorDetail(error) });
   }
 });
 
@@ -1569,7 +1569,7 @@ router.post('/api/hubspot/push-db-tiers', isStaffOrAdmin, async (req, res) => {
     });
   } catch (error: unknown) {
     logger.error('[DB Tier Push] Error', { error: error instanceof Error ? error : new Error(String(error)) });
-    res.status(500).json({ error: 'DB tier push failed: ' + getErrorMessage(error) });
+    res.status(500).json({ error: 'DB tier push failed', details: safeErrorDetail(error) });
   }
 });
 
@@ -1671,7 +1671,7 @@ router.post('/api/hubspot/sync-billing-providers', isStaffOrAdmin, async (req, r
     });
   } catch (error: unknown) {
     logger.error('[HubSpot Sync] Error syncing billing providers', { error: error instanceof Error ? error : new Error(String(error)) });
-    res.status(500).json({ error: 'Sync failed: ' + getErrorMessage(error) });
+    res.status(500).json({ error: 'Sync failed', details: safeErrorDetail(error) });
   }
 });
 

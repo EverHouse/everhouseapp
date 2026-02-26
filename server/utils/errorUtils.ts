@@ -50,3 +50,31 @@ export function getErrorStack(error: unknown): string | undefined {
 export function getErrorProperty(error: unknown, key: string): unknown {
   return hasProperty(error, key) ? error[key] : undefined;
 }
+
+const SENSITIVE_PATTERNS = [
+  /postgres(?:ql)?:\/\/[^\s]+/gi,
+  /mysql:\/\/[^\s]+/gi,
+  /mongodb(?:\+srv)?:\/\/[^\s]+/gi,
+  /redis:\/\/[^\s]+/gi,
+  /sk_(?:live|test)_[A-Za-z0-9]+/g,
+  /pk_(?:live|test)_[A-Za-z0-9]+/g,
+  /rk_(?:live|test)_[A-Za-z0-9]+/g,
+  /Bearer\s+[A-Za-z0-9._-]+/gi,
+  /password[=:]\s*\S+/gi,
+  /secret[=:]\s*\S+/gi,
+  /apikey[=:]\s*\S+/gi,
+  /token[=:]\s*\S+/gi,
+];
+
+export function safeErrorDetail(error: unknown): string {
+  const raw = getErrorMessage(error);
+  let sanitized = raw;
+  for (const pattern of SENSITIVE_PATTERNS) {
+    sanitized = sanitized.replace(pattern, '[REDACTED]');
+  }
+  const firstLine = sanitized.split('\n')[0];
+  if (firstLine.length > 200) {
+    return firstLine.slice(0, 200) + '…';
+  }
+  return firstLine;
+}

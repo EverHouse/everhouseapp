@@ -5,7 +5,7 @@ import fs from 'fs';
 import { isStaffOrAdmin } from '../../core/middleware';
 import { importTrackmanBookings, getImportRuns, rescanUnmatchedBookings } from '../../core/trackmanImport';
 import { logFromRequest } from '../../core/auditLog';
-import { getErrorMessage } from '../../utils/errorUtils';
+import { getErrorMessage, safeErrorDetail } from '../../utils/errorUtils';
 import { logger } from '../../core/logger';
 import { getSessionUser } from '../../types/session';
 
@@ -75,7 +75,7 @@ router.post('/api/admin/trackman/import', isStaffOrAdmin, async (req, res) => {
     });
   } catch (error: unknown) {
     logger.error('Import error', { error: error instanceof Error ? error : new Error(String(error)) });
-    res.status(500).json({ error: getErrorMessage(error) || 'Failed to import bookings' });
+    res.status(500).json({ error: 'Failed to import bookings' });
   }
 });
 
@@ -98,7 +98,7 @@ router.post('/api/admin/trackman/upload', isStaffOrAdmin, upload.single('file'),
     });
   } catch (error: unknown) {
     logger.error('Upload/Import error', { error: error instanceof Error ? error : new Error(String(error)) });
-    res.status(500).json({ error: getErrorMessage(error) || 'Failed to upload and import bookings' });
+    res.status(500).json({ error: 'Failed to upload and import bookings' });
   } finally {
     if (csvPath && fs.existsSync(csvPath)) {
       try {
@@ -135,7 +135,7 @@ router.post('/api/admin/trackman/rescan', isStaffOrAdmin, async (req, res) => {
     });
   } catch (error: unknown) {
     logger.error('Rescan error', { error: error instanceof Error ? error : new Error(String(error)) });
-    res.status(500).json({ error: getErrorMessage(error) || 'Failed to rescan unmatched bookings' });
+    res.status(500).json({ error: 'Failed to rescan unmatched bookings' });
   }
 });
 

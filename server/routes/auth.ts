@@ -1380,7 +1380,7 @@ router.post('/api/auth/test-welcome-email', async (req, res) => {
     }
   } catch (error: unknown) {
     logger.error('Test welcome email error', { error: error instanceof Error ? error : new Error(String(error)) });
-    res.status(500).json({ error: getErrorMessage(error) || 'Failed to send test email' });
+    res.status(500).json({ error: 'Failed to send test email' });
   }
 });
 
