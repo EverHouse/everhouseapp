@@ -84,7 +84,13 @@ export function resetSupabaseAvailability(): void {
   lastAvailabilityCheck = 0;
 }
 
+let supabaseAnon: SupabaseClient | null = null;
+
 export function getSupabaseAnon(): SupabaseClient {
+  if (supabaseAnon) {
+    return supabaseAnon;
+  }
+
   const supabaseUrl = process.env.SUPABASE_URL;
   const anonKey = process.env.SUPABASE_ANON_KEY;
 
@@ -92,12 +98,14 @@ export function getSupabaseAnon(): SupabaseClient {
     throw new Error('Missing SUPABASE_URL environment variable');
   }
 
-  return createClient(supabaseUrl, anonKey || '', {
+  supabaseAnon = createClient(supabaseUrl, anonKey || '', {
     auth: {
       autoRefreshToken: false,
       persistSession: false,
     },
   });
+
+  return supabaseAnon;
 }
 
 export function isSupabaseConfigured(): boolean {

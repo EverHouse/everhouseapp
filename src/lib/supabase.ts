@@ -28,7 +28,12 @@ export function getSupabase(): SupabaseClient | null {
       realtime: {
         params: {
           eventsPerSecond: 10
-        }
+        },
+        heartbeatIntervalMs: 25000,
+        reconnectAfterMs: (tries: number) => {
+          return Math.min(1000 * Math.pow(2, tries), 30000);
+        },
+        timeout: 30000,
       }
     });
     return supabaseClient;

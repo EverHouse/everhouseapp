@@ -13,6 +13,14 @@ export interface UseSupabaseRealtimeOptions {
 }
 
 const DEFAULT_TABLES = ['notifications', 'booking_sessions', 'announcements', 'trackman_unmatched_bookings'];
+const MAX_RETRIES = 3;
+const BASE_RETRY_DELAY = 3000;
+
+function getRetryDelay(attempt: number): number {
+  const exponentialDelay = BASE_RETRY_DELAY * Math.pow(2, attempt);
+  const jitter = Math.random() * 1000;
+  return exponentialDelay + jitter;
+}
 
 export function useSupabaseRealtime(options: UseSupabaseRealtimeOptions = {}) {
   const {
@@ -24,14 +32,13 @@ export function useSupabaseRealtime(options: UseSupabaseRealtimeOptions = {}) {
     onTrackmanUnmatchedUpdate
   } = options;
 
-  const channelsRef = useRef<RealtimeChannel[]>([]);
-  const isSubscribedRef = useRef(false);
+  const channelsRef = useRef<Map<string, RealtimeChannel>>(new Map());
   const retryCountRef = useRef<Record<string, number>>({});
   const retryTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const mountedRef = useRef(true);
 
   const handleNotification = useCallback((payload: Record<string, unknown>) => {
     window.dispatchEvent(new CustomEvent('member-notification', { detail: payload }));
-    // Only emit if WebSocket is not handling events (Supabase Realtime acts as fallback)
     if (!window.__wsConnected) {
       bookingEvents.emit();
     }
@@ -40,7 +47,6 @@ export function useSupabaseRealtime(options: UseSupabaseRealtimeOptions = {}) {
 
   const handleBookingUpdate = useCallback((payload: Record<string, unknown>) => {
     window.dispatchEvent(new CustomEvent('booking-update', { detail: payload }));
-    // Only emit if WebSocket is not handling events (Supabase Realtime acts as fallback)
     if (!window.__wsConnected) {
       bookingEvents.emit();
     }
@@ -57,164 +63,124 @@ export function useSupabaseRealtime(options: UseSupabaseRealtimeOptions = {}) {
     onTrackmanUnmatchedUpdate?.(payload);
   }, [onTrackmanUnmatchedUpdate]);
 
-  useEffect(() => {
-    const supabase = getSupabase();
-    if (!supabase) {
-      return;
+  const getHandler = useCallback((table: string) => {
+    switch (table) {
+      case 'notifications': return handleNotification;
+      case 'booking_sessions': return handleBookingUpdate;
+      case 'announcements': return handleAnnouncementUpdate;
+      case 'trackman_unmatched_bookings': return handleTrackmanUnmatchedUpdate;
+      default: return (payload: Record<string, unknown>) => {
+        window.dispatchEvent(new CustomEvent(`${table}-update`, { detail: payload }));
+      };
+    }
+  }, [handleNotification, handleBookingUpdate, handleAnnouncementUpdate, handleTrackmanUnmatchedUpdate]);
+
+  const getChannelName = useCallback((table: string) => {
+    if (table === 'notifications' && userEmail) {
+      return `realtime-${table}-${userEmail}`;
+    }
+    return `realtime-${table}`;
+  }, [userEmail]);
+
+  const subscribeToTable = useCallback((supabase: ReturnType<typeof getSupabase>, table: string) => {
+    if (!supabase || !mountedRef.current) return;
+
+    const existingChannel = channelsRef.current.get(table);
+    if (existingChannel) {
+      try {
+        supabase.removeChannel(existingChannel);
+      } catch {
+        // Channel may already be removed
+      }
+      channelsRef.current.delete(table);
     }
 
-    if (isSubscribedRef.current) {
-      return;
-    }
+    const channelName = getChannelName(table);
+    const handler = getHandler(table);
 
-    const subscribeToTables = async () => {
-      const channels: RealtimeChannel[] = [];
+    const filter = (table === 'notifications' && userEmail)
+      ? { event: '*' as const, schema: 'public', table, filter: `user_email=eq.${userEmail}` }
+      : { event: '*' as const, schema: 'public', table };
 
-      for (const table of tables) {
-        let channel: RealtimeChannel;
+    const channel = supabase
+      .channel(channelName)
+      .on('postgres_changes', filter, (payload) => {
+        handler(payload);
+      });
 
-        if (table === 'notifications' && userEmail) {
-          channel = supabase
-            .channel(`realtime-${table}-${userEmail}`)
-            .on(
-              'postgres_changes',
-              {
-                event: '*',
-                schema: 'public',
-                table,
-                filter: `user_email=eq.${userEmail}`
-              },
-              (payload) => {
-                handleNotification(payload);
-              }
-            );
-        } else if (table === 'notifications') {
-          channel = supabase
-            .channel(`realtime-${table}`)
-            .on(
-              'postgres_changes',
-              {
-                event: '*',
-                schema: 'public',
-                table
-              },
-              (payload) => {
-                handleNotification(payload);
-              }
-            );
-        } else if (table === 'booking_sessions') {
-          channel = supabase
-            .channel(`realtime-${table}`)
-            .on(
-              'postgres_changes',
-              {
-                event: '*',
-                schema: 'public',
-                table
-              },
-              (payload) => {
-                handleBookingUpdate(payload);
-              }
-            );
-        } else if (table === 'announcements') {
-          channel = supabase
-            .channel(`realtime-${table}`)
-            .on(
-              'postgres_changes',
-              {
-                event: '*',
-                schema: 'public',
-                table
-              },
-              (payload) => {
-                handleAnnouncementUpdate(payload);
-              }
-            );
-        } else if (table === 'trackman_unmatched_bookings') {
-          channel = supabase
-            .channel(`realtime-${table}`)
-            .on(
-              'postgres_changes',
-              {
-                event: '*',
-                schema: 'public',
-                table
-              },
-              (payload) => {
-                handleTrackmanUnmatchedUpdate(payload);
-              }
-            );
-        } else {
-          channel = supabase
-            .channel(`realtime-${table}`)
-            .on(
-              'postgres_changes',
-              {
-                event: '*',
-                schema: 'public',
-                table
-              },
-              (payload) => {
-                window.dispatchEvent(new CustomEvent(`${table}-update`, { detail: payload }));
-              }
-            );
+    channel.subscribe((status, err) => {
+      if (!mountedRef.current) return;
+
+      if (status === 'SUBSCRIBED') {
+        console.log(`[Supabase Realtime] Subscribed to ${table}`);
+        retryCountRef.current[table] = 0;
+      } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+        const currentRetries = retryCountRef.current[table] || 0;
+        const errMsg = err ? ` (${err.message || err})` : '';
+
+        if (currentRetries >= MAX_RETRIES) {
+          console.warn(`[Supabase Realtime] Max retries reached for ${table}, disabling${errMsg}`);
+          try {
+            supabase.removeChannel(channel);
+          } catch {
+            // Ignore
+          }
+          channelsRef.current.delete(table);
+          return;
         }
 
-        channel.subscribe((status) => {
-          if (status === 'SUBSCRIBED') {
-            console.log(`[Supabase Realtime] Subscribed to ${table}`);
-            retryCountRef.current[table] = 0;
-          } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-            const currentRetries = retryCountRef.current[table] || 0;
-            console.warn(`[Supabase Realtime] ${status} for ${table} (attempt ${currentRetries + 1}/3)`);
-            if (currentRetries < 3) {
-              retryCountRef.current[table] = currentRetries + 1;
-              if (retryTimersRef.current[table]) {
-                clearTimeout(retryTimersRef.current[table]);
-              }
-              retryTimersRef.current[table] = setTimeout(() => {
-                delete retryTimersRef.current[table];
-                try {
-                  supabase.removeChannel(channel);
-                } catch {}
-                const idx = channelsRef.current.indexOf(channel);
-                if (idx !== -1) {
-                  channelsRef.current.splice(idx, 1);
-                }
-                isSubscribedRef.current = false;
-                subscribeToTables();
-              }, 5000);
-            } else {
-              console.warn(`[Supabase Realtime] Max retries reached for ${table}, giving up`);
-            }
-          } else if (status === 'CLOSED') {
-            console.log(`[Supabase Realtime] Channel closed for ${table}`);
-            const idx = channelsRef.current.indexOf(channel);
-            if (idx !== -1) {
-              channelsRef.current.splice(idx, 1);
-            }
-          }
-        });
+        retryCountRef.current[table] = currentRetries + 1;
+        const delay = getRetryDelay(currentRetries);
+        console.warn(`[Supabase Realtime] ${status} for ${table} (attempt ${currentRetries + 1}/${MAX_RETRIES})${errMsg}, retrying in ${Math.round(delay / 1000)}s`);
 
-        channels.push(channel);
+        if (retryTimersRef.current[table]) {
+          clearTimeout(retryTimersRef.current[table]);
+        }
+
+        retryTimersRef.current[table] = setTimeout(() => {
+          delete retryTimersRef.current[table];
+          if (!mountedRef.current) return;
+          subscribeToTable(supabase, table);
+        }, delay);
+      } else if (status === 'CLOSED') {
+        console.log(`[Supabase Realtime] Channel closed for ${table}`);
+        channelsRef.current.delete(table);
       }
+    });
 
-      channelsRef.current = channels;
-      isSubscribedRef.current = true;
-    };
+    channelsRef.current.set(table, channel);
+  }, [getChannelName, getHandler, userEmail]);
 
-    subscribeToTables();
+  useEffect(() => {
+    mountedRef.current = true;
+    const supabase = getSupabase();
+    if (!supabase) {
+      return () => {
+        mountedRef.current = false;
+      };
+    }
+
+    retryCountRef.current = {};
+
+    for (const table of tables) {
+      subscribeToTable(supabase, table);
+    }
 
     return () => {
+      mountedRef.current = false;
       Object.values(retryTimersRef.current).forEach(clearTimeout);
       retryTimersRef.current = {};
       channelsRef.current.forEach((channel) => {
-        supabase.removeChannel(channel);
+        try {
+          supabase.removeChannel(channel);
+        } catch {
+          // Ignore cleanup errors
+        }
       });
-      channelsRef.current = [];
-      isSubscribedRef.current = false;
+      channelsRef.current.clear();
+      retryCountRef.current = {};
     };
-  }, [userEmail, tables, handleNotification, handleBookingUpdate, handleAnnouncementUpdate, handleTrackmanUnmatchedUpdate]);
+  }, [userEmail, tables, subscribeToTable]);
 
   return {
     isConfigured: !!getSupabase()
