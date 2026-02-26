@@ -258,6 +258,7 @@ async function initializeApp() {
     res.setHeader('X-Frame-Options', 'SAMEORIGIN');
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
     res.setHeader('Permissions-Policy', 'camera=(self), microphone=(), geolocation=()');
+    res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
     res.setHeader('Content-Security-Policy', [
       "default-src 'self'",
       "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com https://accounts.google.com https://*.hs-scripts.com https://*.hsforms.net https://*.hscollectedforms.net https://*.hs-banner.com https://*.hs-analytics.net https://*.hsadspixel.net https://*.hubspot.com https://*.usemessages.com",
@@ -271,11 +272,9 @@ async function initializeApp() {
       "object-src 'none'",
       "base-uri 'self'",
       "form-action 'self'",
-      isProduction ? "upgrade-insecure-requests" : "",
-    ].filter(Boolean).join('; '));
-    if (isProduction) {
-      res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
-    }
+      "upgrade-insecure-requests",
+    ].join('; '));
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
     next();
   });
 
@@ -394,28 +393,24 @@ async function initializeApp() {
     res.type('text/plain');
     res.send([
       'User-agent: *',
-      'Allow: /$',
-      'Allow: /membership',
-      'Allow: /contact',
-      'Allow: /gallery',
-      'Allow: /whats-on',
-      'Allow: /private-hire',
-      'Allow: /menu',
-      'Allow: /faq',
-      'Allow: /about',
-      'Allow: /tour',
-      'Allow: /day-pass',
-      'Allow: /privacy',
-      'Allow: /terms',
       'Disallow: /admin',
-      'Disallow: /api',
-      'Disallow: /checkout',
+      'Disallow: /dashboard',
+      'Disallow: /api/',
       'Disallow: /login',
-      'Disallow: /auth',
+      'Disallow: /checkout',
+      'Disallow: /profile',
+      'Disallow: /book',
+      'Disallow: /member-events',
+      'Disallow: /member-wellness',
+      'Disallow: /updates',
+      'Disallow: /history',
+      'Disallow: /auth/',
       'Disallow: /reset-password',
       'Disallow: /nfc-checkin',
+      'Disallow: /dev-preview/',
       'Disallow: /_health',
       'Disallow: /healthz',
+      'Allow: /',
       '',
       `Sitemap: ${siteOrigin}/sitemap.xml`,
     ].join('\n') + '\n');

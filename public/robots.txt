@@ -1,18 +1,4 @@
 User-agent: *
-Allow: /
-Allow: /membership
-Allow: /membership/apply
-Allow: /whats-on
-Allow: /private-hire
-Allow: /private-hire/inquire
-Allow: /menu
-Allow: /gallery
-Allow: /contact
-Allow: /faq
-Allow: /tours
-Allow: /day-pass
-Allow: /privacy
-Allow: /terms
 Disallow: /admin
 Disallow: /dashboard
 Disallow: /api/
@@ -26,6 +12,10 @@ Disallow: /updates
 Disallow: /history
 Disallow: /auth/
 Disallow: /reset-password
+Disallow: /nfc-checkin
 Disallow: /dev-preview/
+Disallow: /_health
+Disallow: /healthz
+Allow: /
 
 Sitemap: https://everclub.app/sitemap.xml
