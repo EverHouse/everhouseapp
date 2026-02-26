@@ -32,6 +32,14 @@ process.on('unhandledRejection', (reason, promise) => {
   logger.error('[Process] Unhandled Rejection:', { extra: { errorMessage } });
 });
 
+process.on('beforeExit', (code) => {
+  logger.warn(`[Process] beforeExit with code ${code} — event loop drained`);
+});
+
+process.on('exit', (code) => {
+  console.error(`[Process] exit with code ${code}`);
+});
+
 process.on('SIGTERM', () => {
   logger.info('[Process] Received SIGTERM signal');
   gracefulShutdown('SIGTERM');
