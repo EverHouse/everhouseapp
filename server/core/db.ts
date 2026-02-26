@@ -6,13 +6,14 @@ export const isProduction = process.env.NODE_ENV === 'production';
 
 const poolerUrl = process.env.DATABASE_POOLER_URL;
 const directUrl = process.env.DATABASE_URL;
-export const usingPooler = !!poolerUrl;
+const poolerEnabled = process.env.ENABLE_PGBOUNCER === 'true';
+export const usingPooler = poolerEnabled && !!poolerUrl;
 
 const sslConfig = { rejectUnauthorized: false };
 const needsSsl = isProduction || usingPooler;
 
 const basePool = new Pool({
-  connectionString: poolerUrl || directUrl,
+  connectionString: usingPooler ? poolerUrl : directUrl,
   connectionTimeoutMillis: 10000,
   idleTimeoutMillis: 30000,
   max: parseInt(process.env.DB_POOL_MAX || '20', 10),
