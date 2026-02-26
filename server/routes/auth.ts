@@ -149,41 +149,55 @@ async function upsertUserWithTier(data: UpsertUserData): Promise<void> {
   }
 }
 
+const SUPABASE_AUTH_TIMEOUT = 10000;
+
+function withTimeout<T>(promise: Promise<T>, label: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(`${label} timed out after ${SUPABASE_AUTH_TIMEOUT / 1000}s`)), SUPABASE_AUTH_TIMEOUT)
+    )
+  ]);
+}
+
 async function createSupabaseToken(user: { id: string, email: string, role: string, firstName?: string, lastName?: string }): Promise<string | null> {
   try {
-    // Check if Supabase is available before attempting to call it
     const available = await isSupabaseAvailable();
     if (!available) {
-      // Silently skip - Supabase features disabled
       return null;
     }
     
     const supabase = getSupabaseAdmin();
     
-    await supabase.auth.admin.createUser({
-      email: user.email,
-      email_confirm: true,
-      user_metadata: {
-        first_name: user.firstName,
-        last_name: user.lastName,
-        app_role: user.role,
-      }
-    }).catch((err) => { logger.warn('[Auth] Non-critical Supabase user creation failed:', err); });
-    
-    const { data: linkData, error: linkError } = await supabase.auth.admin.generateLink({
-      type: 'magiclink',
-      email: user.email,
-      options: {
-        data: {
+    await withTimeout(
+      supabase.auth.admin.createUser({
+        email: user.email,
+        email_confirm: true,
+        user_metadata: {
           first_name: user.firstName,
           last_name: user.lastName,
           app_role: user.role,
         }
-      }
-    });
+      }),
+      'Supabase createUser'
+    ).catch((err) => { logger.warn('[Auth] Non-critical Supabase user creation failed:', err); });
+    
+    const { data: linkData, error: linkError } = await withTimeout(
+      supabase.auth.admin.generateLink({
+        type: 'magiclink',
+        email: user.email,
+        options: {
+          data: {
+            first_name: user.firstName,
+            last_name: user.lastName,
+            app_role: user.role,
+          }
+        }
+      }),
+      'Supabase generateLink'
+    );
 
     if (linkError) {
-      // Only log non-network errors
       if (!getErrorMessage(linkError)?.includes('fetch failed') && !getErrorMessage(linkError)?.includes('ENOTFOUND')) {
         logger.error('[Supabase] generateLink error', { extra: { linkError } });
       }
@@ -196,10 +210,13 @@ async function createSupabaseToken(user: { id: string, email: string, role: stri
     
     const hashedToken = linkData?.properties?.hashed_token;
     if (hashedToken) {
-      const { data: otpData, error: otpError } = await supabase.auth.verifyOtp({
-        token_hash: hashedToken,
-        type: 'magiclink',
-      });
+      const { data: otpData, error: otpError } = await withTimeout(
+        supabase.auth.verifyOtp({
+          token_hash: hashedToken,
+          type: 'magiclink',
+        }),
+        'Supabase verifyOtp'
+      );
       
       if (otpError) {
         if (!otpError.message?.includes('fetch failed') && !otpError.message?.includes('ENOTFOUND')) {
@@ -215,11 +232,12 @@ async function createSupabaseToken(user: { id: string, email: string, role: stri
     
     return null;
   } catch (error: unknown) {
-    // Suppress network-related errors since we already logged the availability status
-    if (!getErrorMessage(error)?.includes('fetch failed') && 
-        !getErrorMessage(error)?.includes('ENOTFOUND') && 
-        !getErrorMessage(error)?.includes('ECONNREFUSED')) {
-      logger.error('[Supabase] Failed to generate token', { error: error instanceof Error ? error : new Error(getErrorMessage(error)) });
+    const msg = getErrorMessage(error);
+    if (!msg?.includes('fetch failed') && 
+        !msg?.includes('ENOTFOUND') && 
+        !msg?.includes('ECONNREFUSED') &&
+        !msg?.includes('timed out')) {
+      logger.error('[Supabase] Failed to generate token', { error: error instanceof Error ? error : new Error(msg) });
     }
     return null;
   }
