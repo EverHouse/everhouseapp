@@ -20,7 +20,7 @@ export const SafeAreaBottomOverlay: React.FC<SafeAreaBottomOverlayProps> = ({ ch
       style={{ zIndex: 'var(--z-nav)' }}
     >
       <div
-        className={`transition-opacity duration-normal ease-out ${isHidden ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
+        className={`transition-[opacity,visibility] duration-normal ease-out ${isHidden ? 'opacity-0 pointer-events-none invisible' : 'opacity-100 visible'}`}
       >
         {children}
       </div>
