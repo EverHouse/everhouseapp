@@ -59,10 +59,6 @@ publicDir = "dist/public"
 defaultBucketID = "replit-objstore-a74e2fa8-3e0a-44cd-bca4-3046e4e3b9c2"
 
 [[ports]]
-localPort = 80
-externalPort = 80
-
-[[ports]]
 localPort = 3001
 externalPort = 3001
 
