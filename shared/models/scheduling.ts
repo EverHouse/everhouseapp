@@ -330,7 +330,13 @@ export const trackmanWebhookEventTypeEnum = pgEnum("trackman_webhook_event_type"
   "booking_update",
   "purchase_update",
   "purchase_paid",
-  "unknown"
+  "unknown",
+  "booking.created",
+  "booking.updated",
+  "booking.cancelled",
+  "booking.deleted",
+  "booking.confirmed",
+  "booking.modified"
 ]);
 
 export const trackmanBaySlotStatusEnum = pgEnum("trackman_bay_slot_status", [

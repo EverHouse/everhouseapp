@@ -103,7 +103,26 @@ export async function logWebhookEvent(
       }
     }
     
-    const dedupKey = trackmanBookingId ? `${trackmanBookingId}_${eventType.toLowerCase()}` : null;
+    const sigParts: string[] = [];
+    const v2Booking = (payload as any)?.booking;
+    const v1Data = (payload as any)?.data;
+    if (v2Booking?.start) {
+      if (v2Booking.start) sigParts.push(`s:${v2Booking.start}`);
+      if (v2Booking.end) sigParts.push(`e:${v2Booking.end}`);
+      if (v2Booking.bay?.ref) sigParts.push(`b:${v2Booking.bay.ref}`);
+      if (v2Booking.status) sigParts.push(`st:${v2Booking.status}`);
+    } else if (v1Data) {
+      if (v1Data.start_time) sigParts.push(`s:${v1Data.start_time}`);
+      if (v1Data.end_time) sigParts.push(`e:${v1Data.end_time}`);
+      if (v1Data.bay_name || v1Data.bay_id || v1Data.bay_serial) sigParts.push(`b:${v1Data.bay_name || v1Data.bay_id || v1Data.bay_serial}`);
+      if (v1Data.status) sigParts.push(`st:${v1Data.status}`);
+    }
+    const contentSig = sigParts.length > 0 ? sigParts.join('|') : null;
+    const dedupKey = trackmanBookingId
+      ? contentSig
+        ? `${trackmanBookingId}_${eventType.toLowerCase()}_${contentSig}`
+        : `${trackmanBookingId}_${eventType.toLowerCase()}`
+      : null;
     
     const result = await db.execute(sql`INSERT INTO trackman_webhook_events 
        (event_type, payload, trackman_booking_id, trackman_user_id, matched_booking_id, matched_user_id, processed_at, processing_error, dedup_key)

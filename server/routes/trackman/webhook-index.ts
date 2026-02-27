@@ -21,11 +21,13 @@ import {
 import { validateTrackmanWebhookSignature, logWebhookEvent, resolveLinkedEmail, findMemberByEmail } from './webhook-validation';
 import { 
   handleBookingUpdate, 
+  handleBookingModification,
   tryAutoApproveBooking, 
   cancelBookingByTrackmanId,
   saveToUnmatchedBookings,
   createUnmatchedBookingRequest,
 } from './webhook-handlers';
+import type { ExistingBookingData } from './webhook-handlers';
 import { recalculateSessionFees } from '../../core/billing/unifiedFeeService';
 import { ensureSessionForBooking } from '../../core/bookingService/sessionManager';
 
@@ -105,14 +107,16 @@ function extractTrackmanBookingId(payload: TrackmanWebhookPayload | TrackmanV2We
 
 /**
  * Check if webhook is a duplicate using idempotency guard
- * Uses trackmanBookingId + status as the dedup key so the same booking
- * can have different events processed (e.g. created then cancelled).
+ * Uses trackmanBookingId + status + content signature as the dedup key so the same booking
+ * can have different events processed (e.g. created then cancelled, or modifications).
  * Returns true if this is a NEW webhook (not a duplicate)
  * Returns false if this is a DUPLICATE webhook
  */
-async function checkWebhookIdempotency(trackmanBookingId: string, status?: string): Promise<boolean> {
+async function checkWebhookIdempotency(trackmanBookingId: string, status?: string, contentSignature?: string): Promise<boolean> {
   try {
-    const dedupKey = status ? `${trackmanBookingId}_${status.toLowerCase()}` : trackmanBookingId;
+    const dedupKey = contentSignature
+      ? `${trackmanBookingId}_${(status || '').toLowerCase()}_${contentSignature}`
+      : status ? `${trackmanBookingId}_${status.toLowerCase()}` : trackmanBookingId;
     const existing = await db.execute(sql`SELECT id FROM trackman_webhook_events WHERE dedup_key = ${dedupKey} LIMIT 1`);
     const isNewWebhook = existing.rows.length === 0;
     
@@ -129,6 +133,28 @@ async function checkWebhookIdempotency(trackmanBookingId: string, status?: strin
     });
     return true;
   }
+}
+
+function buildContentSignature(payload: any): string | undefined {
+  const parts: string[] = [];
+
+  const booking = payload?.booking;
+  if (booking) {
+    if (booking.start) parts.push(`s:${booking.start}`);
+    if (booking.end) parts.push(`e:${booking.end}`);
+    if (booking.bay?.ref) parts.push(`b:${booking.bay.ref}`);
+    if (booking.status) parts.push(`st:${booking.status}`);
+  }
+
+  const data = payload?.data;
+  if (data && parts.length === 0) {
+    if (data.start_time) parts.push(`s:${data.start_time}`);
+    if (data.end_time) parts.push(`e:${data.end_time}`);
+    if (data.bay_name || data.bay_id || data.bay_serial) parts.push(`b:${data.bay_name || data.bay_id || data.bay_serial}`);
+    if (data.status) parts.push(`st:${data.status}`);
+  }
+
+  return parts.length > 0 ? parts.join('|') : undefined;
 }
 
 router.post('/api/webhooks/trackman', async (req: Request, res: Response) => {
@@ -170,11 +196,12 @@ router.post('/api/webhooks/trackman', async (req: Request, res: Response) => {
   const payload: TrackmanWebhookPayload = req.body;
   
   // Check for duplicate webhook using idempotency guard BEFORE processing
-  // Include status in dedup key so the same booking can have create + cancel webhooks processed
+  // Include status + content signature in dedup key so modifications with changed bay/time get through
   const trackmanBookingIdFromPayload = extractTrackmanBookingId(payload);
   const webhookStatus = (payload as any)?.booking?.status || (payload as any)?.data?.status || (payload as any)?.event_type;
+  const contentSig = buildContentSignature(payload);
   if (trackmanBookingIdFromPayload) {
-    const isNewWebhook = await checkWebhookIdempotency(trackmanBookingIdFromPayload, webhookStatus);
+    const isNewWebhook = await checkWebhookIdempotency(trackmanBookingIdFromPayload, webhookStatus, contentSig);
     if (!isNewWebhook) {
       logger.info('[Trackman Webhook] Duplicate webhook detected - returning early', {
         extra: { trackmanBookingId: trackmanBookingIdFromPayload, status: webhookStatus }
@@ -220,7 +247,9 @@ router.post('/api/webhooks/trackman', async (req: Request, res: Response) => {
       // Step 1: Try direct match via trackman_booking_id (staff paste the Trackman booking ID number to confirm bookings)
       if (v2Result.normalized.trackmanBookingId) {
         const directMatch = await db.execute(
-          sql`SELECT id, user_email, user_name FROM booking_requests WHERE trackman_booking_id = ${v2Result.normalized.trackmanBookingId} LIMIT 1`
+          sql`SELECT id, user_email, user_name, resource_id, start_time, end_time, request_date,
+                     duration_minutes, session_id, status, declared_player_count
+              FROM booking_requests WHERE trackman_booking_id = ${v2Result.normalized.trackmanBookingId} LIMIT 1`
         );
         if (directMatch.rows.length > 0) {
           matchedBookingId = directMatch.rows[0].id;
@@ -229,6 +258,38 @@ router.post('/api/webhooks/trackman', async (req: Request, res: Response) => {
           logger.info('[Trackman Webhook] V2: Matched via trackman_booking_id', {
             extra: { bookingId: matchedBookingId, trackmanBookingId, status: v2Result.normalized.status }
           });
+
+          if (!isCancelledStatus) {
+            const existingData: ExistingBookingData = {
+              id: directMatch.rows[0].id as number,
+              userEmail: directMatch.rows[0].user_email as string,
+              userName: directMatch.rows[0].user_name as string,
+              resourceId: directMatch.rows[0].resource_id as number | null,
+              startTime: directMatch.rows[0].start_time as string,
+              endTime: directMatch.rows[0].end_time as string,
+              requestDate: directMatch.rows[0].request_date as string,
+              durationMinutes: directMatch.rows[0].duration_minutes as number | null,
+              sessionId: directMatch.rows[0].session_id as number | null,
+              status: directMatch.rows[0].status as string,
+              declaredPlayerCount: directMatch.rows[0].declared_player_count as number | null,
+            };
+
+            const modResult = await handleBookingModification(existingData, {
+              resourceId,
+              parsedDate: v2Result.normalized.parsedDate!,
+              parsedStartTime: v2Result.normalized.parsedStartTime!,
+              parsedEndTime: v2Result.normalized.parsedEndTime,
+              playerCount: v2Result.normalized.playerCount,
+              trackmanBookingId: v2Result.normalized.trackmanBookingId!,
+            });
+
+            if (modResult.modified) {
+              eventType = 'booking.modified';
+              logger.info('[Trackman Webhook] V2: Applied booking modification', {
+                extra: { bookingId: matchedBookingId, changes: modResult.changes, conflictWarning: modResult.conflictWarning }
+              });
+            }
+          }
         }
       }
       
@@ -427,6 +488,7 @@ router.get('/api/admin/trackman-webhooks/stats', isStaffOrAdmin, async (req: Req
         COUNT(*) FILTER (WHERE processing_error IS NOT NULL) as errors,
         COUNT(*) FILTER (WHERE event_type = 'booking.created') as created,
         COUNT(*) FILTER (WHERE event_type = 'booking.cancelled') as cancelled,
+        COUNT(*) FILTER (WHERE event_type = 'booking.modified') as modified,
         COUNT(*) FILTER (WHERE twe.matched_booking_id IS NOT NULL AND br.is_unmatched = true) as matched_but_unlinked
       FROM trackman_webhook_events twe
       LEFT JOIN booking_requests br ON twe.matched_booking_id = br.id
@@ -458,6 +520,7 @@ router.get('/api/admin/trackman-webhook/stats', isStaffOrAdmin, async (req: Requ
         COUNT(*) FILTER (WHERE processing_error IS NOT NULL) as errors,
         COUNT(*) FILTER (WHERE event_type = 'booking.created') as created,
         COUNT(*) FILTER (WHERE event_type = 'booking.cancelled') as cancelled,
+        COUNT(*) FILTER (WHERE event_type = 'booking.modified') as modified,
         COUNT(*) FILTER (WHERE twe.matched_booking_id IS NOT NULL AND br.is_unmatched = true) as matched_but_unlinked
       FROM trackman_webhook_events twe
       LEFT JOIN booking_requests br ON twe.matched_booking_id = br.id

@@ -34,7 +34,287 @@ import { getErrorMessage } from '../../utils/errorUtils';
 import { createSessionWithUsageTracking, ensureSessionForBooking } from '../../core/bookingService/sessionManager';
 import { recalculateSessionFees } from '../../core/billing/unifiedFeeService';
 import { createPrepaymentIntent } from '../../core/billing/prepaymentService';
-import { createDraftInvoiceForBooking } from '../../core/billing/bookingInvoiceService';
+import { createDraftInvoiceForBooking, syncBookingInvoice } from '../../core/billing/bookingInvoiceService';
+import { checkUnifiedAvailability as checkAvailabilityForModification } from '../../core/bookingService/availabilityGuard';
+
+export interface BookingModificationResult {
+  modified: boolean;
+  changes: string[];
+  conflictWarning?: string;
+}
+
+export interface ExistingBookingData {
+  id: number;
+  userEmail: string;
+  userName: string;
+  resourceId: number | null;
+  startTime: string;
+  endTime: string;
+  requestDate: string;
+  durationMinutes: number | null;
+  sessionId: number | null;
+  status: string;
+  declaredPlayerCount: number | null;
+}
+
+export async function handleBookingModification(
+  existing: ExistingBookingData,
+  incoming: {
+    resourceId: number | null;
+    parsedDate: string;
+    parsedStartTime: string;
+    parsedEndTime: string | undefined;
+    playerCount: number;
+    trackmanBookingId: string;
+  }
+): Promise<BookingModificationResult> {
+  const changes: string[] = [];
+  const bookingId = existing.id;
+  const sessionId = existing.sessionId;
+
+  const terminalStatuses = ['cancelled', 'declined', 'cancellation_pending'];
+  if (terminalStatuses.includes(existing.status)) {
+    logger.info('[Trackman Webhook] Skipping modification for booking in terminal status', {
+      extra: { bookingId, status: existing.status, trackmanBookingId: incoming.trackmanBookingId }
+    });
+    return { modified: false, changes: [] };
+  }
+
+  const existingStartTime = existing.startTime instanceof Date
+    ? existing.startTime.toISOString().substring(11, 16)
+    : typeof existing.startTime === 'string' ? existing.startTime.substring(0, 5) : '';
+  const existingEndTime = existing.endTime instanceof Date
+    ? existing.endTime.toISOString().substring(11, 16)
+    : typeof existing.endTime === 'string' ? existing.endTime.substring(0, 5) : '';
+  const existingDate = existing.requestDate instanceof Date
+    ? existing.requestDate.toISOString().split('T')[0]
+    : String(existing.requestDate);
+
+  const bayChanged = incoming.resourceId != null && existing.resourceId != null
+    ? incoming.resourceId !== existing.resourceId
+    : incoming.resourceId != null && existing.resourceId == null;
+  const timeChanged = incoming.parsedStartTime !== existingStartTime ||
+    (incoming.parsedEndTime && incoming.parsedEndTime !== existingEndTime);
+  const dateChanged = incoming.parsedDate !== existingDate;
+  const playerCountChanged = incoming.playerCount != null &&
+    existing.declaredPlayerCount != null
+    ? incoming.playerCount !== existing.declaredPlayerCount
+    : false;
+
+  if (!bayChanged && !timeChanged && !dateChanged && !playerCountChanged) {
+    logger.info('[Trackman Webhook] No modifications detected for linked booking', {
+      extra: { bookingId, trackmanBookingId: incoming.trackmanBookingId }
+    });
+    return { modified: false, changes: [] };
+  }
+
+  const oldResourceId = existing.resourceId;
+  const newResourceId = incoming.resourceId || existing.resourceId;
+  const newStartTime = incoming.parsedStartTime;
+  const newEndTime = incoming.parsedEndTime || existingEndTime;
+  const newDate = incoming.parsedDate;
+  const newDuration = calculateDurationMinutes(newStartTime, newEndTime);
+
+  let conflictWarning: string | undefined;
+  if ((bayChanged || timeChanged || dateChanged) && newResourceId) {
+    try {
+      const availability = await checkAvailabilityForModification(
+        newResourceId, newDate, newStartTime, newEndTime, sessionId ?? undefined
+      );
+      if (!availability.available) {
+        conflictWarning = `Conflict at new slot: ${availability.conflictTitle || availability.conflictType || 'schedule conflict'}`;
+        logger.warn('[Trackman Webhook] Modification has conflict at new slot — applying anyway (Trackman is source of truth)', {
+          extra: {
+            bookingId,
+            trackmanBookingId: incoming.trackmanBookingId,
+            conflictType: availability.conflictType,
+            conflictTitle: availability.conflictTitle,
+            newResourceId,
+            newDate,
+            newStartTime,
+            newEndTime
+          }
+        });
+      }
+    } catch (conflictCheckErr: unknown) {
+      logger.warn('[Trackman Webhook] Failed to check conflicts for modification — proceeding anyway', {
+        extra: { bookingId, error: (conflictCheckErr as Error).message }
+      });
+    }
+  }
+
+  if (bayChanged) {
+    changes.push(`Bay changed: ${oldResourceId} → ${newResourceId}`);
+  }
+  if (timeChanged) {
+    changes.push(`Time changed: ${existingStartTime}-${existingEndTime} → ${newStartTime}-${newEndTime}`);
+  }
+  if (dateChanged) {
+    changes.push(`Date changed: ${existingDate} → ${newDate}`);
+  }
+  if (playerCountChanged) {
+    changes.push(`Player count changed: ${existing.declaredPlayerCount} → ${incoming.playerCount}`);
+  }
+
+  try {
+    const staffNoteAddition = ` [Modified via Trackman: ${changes.join(', ')}]`;
+
+    await db.execute(sql`UPDATE booking_requests
+       SET start_time = ${newStartTime},
+           end_time = ${newEndTime},
+           request_date = ${newDate},
+           duration_minutes = ${newDuration},
+           resource_id = ${newResourceId},
+           trackman_player_count = ${incoming.playerCount},
+           last_trackman_sync_at = NOW(),
+           staff_notes = COALESCE(staff_notes, '') || ${staffNoteAddition},
+           updated_at = NOW()
+       WHERE id = ${bookingId}`);
+
+    if (sessionId) {
+      if (bayChanged || timeChanged || dateChanged) {
+        await db.execute(sql`UPDATE booking_sessions
+           SET start_time = ${newStartTime},
+               end_time = ${newEndTime},
+               session_date = ${newDate},
+               resource_id = ${newResourceId},
+               updated_at = NOW()
+           WHERE id = ${sessionId}`);
+      }
+
+      try {
+        await recalculateSessionFees(sessionId, 'trackman_modification');
+        logger.info('[Trackman Webhook] Recalculated fees after modification', {
+          extra: { bookingId, sessionId, changes }
+        });
+
+        syncBookingInvoice(bookingId, sessionId).catch((syncErr: unknown) => {
+          logger.warn('[Trackman Webhook] Non-blocking: Failed to sync invoice after modification', {
+            extra: { bookingId, sessionId, error: (syncErr as Error).message }
+          });
+        });
+      } catch (recalcErr: unknown) {
+        logger.warn('[Trackman Webhook] Failed to recalculate fees after modification', {
+          extra: { bookingId, sessionId, error: (recalcErr as Error).message }
+        });
+      }
+    }
+
+    if (bayChanged) {
+      try {
+        broadcastAvailabilityUpdate({
+          resourceId: oldResourceId!,
+          resourceType: 'simulator',
+          date: existingDate,
+          action: 'cancelled'
+        });
+        broadcastAvailabilityUpdate({
+          resourceId: newResourceId!,
+          resourceType: 'simulator',
+          date: newDate,
+          action: 'booked'
+        });
+      } catch (broadcastErr: unknown) {
+        logger.warn('[Trackman Webhook] Failed to broadcast availability after bay change', {
+          extra: { bookingId, error: (broadcastErr as Error).message }
+        });
+      }
+    } else if (timeChanged || dateChanged) {
+      try {
+        broadcastAvailabilityUpdate({
+          resourceId: newResourceId!,
+          resourceType: 'simulator',
+          date: newDate,
+          action: 'booked'
+        });
+        if (dateChanged) {
+          broadcastAvailabilityUpdate({
+            resourceId: newResourceId!,
+            resourceType: 'simulator',
+            date: existingDate,
+            action: 'cancelled'
+          });
+        }
+      } catch (broadcastErr: unknown) {
+        logger.warn('[Trackman Webhook] Failed to broadcast availability after time/date change', {
+          extra: { bookingId, error: (broadcastErr as Error).message }
+        });
+      }
+    }
+
+    const changesSummary = changes.join(', ');
+    const memberName = existing.userName || existing.userEmail || 'Unknown';
+
+    broadcastToStaff({
+      type: 'trackman_booking_modified',
+      title: 'Booking Modified via Trackman',
+      message: `${memberName}'s booking on ${newDate} was modified: ${changesSummary}${conflictWarning ? ` ⚠️ ${conflictWarning}` : ''}`,
+      data: {
+        bookingId,
+        memberName,
+        memberEmail: existing.userEmail,
+        date: newDate,
+        changes,
+        conflictWarning,
+        trackmanBookingId: incoming.trackmanBookingId
+      }
+    });
+
+    await notifyAllStaff(
+      'Booking Modified via Trackman',
+      `${memberName}'s booking was modified: ${changesSummary}${conflictWarning ? ` — ${conflictWarning}` : ''}`,
+      'trackman_booking',
+      {
+        relatedId: bookingId,
+        relatedType: 'trackman_booking'
+      }
+    );
+
+    if (existing.userEmail && (bayChanged || timeChanged || dateChanged)) {
+      try {
+        const bayLabel = newResourceId ? `Bay ${newResourceId}` : '';
+        const modMessage = bayChanged
+          ? `Your booking on ${newDate} has been moved to ${bayLabel} at ${newStartTime}.`
+          : dateChanged
+          ? `Your booking has been moved to ${newDate} at ${newStartTime}${bayLabel ? ` (${bayLabel})` : ''}.`
+          : `Your booking on ${newDate} has been updated to ${newStartTime}-${newEndTime}${bayLabel ? ` (${bayLabel})` : ''}.`;
+
+        await notifyMember(
+          {
+            userEmail: existing.userEmail,
+            title: 'Booking Updated',
+            message: modMessage,
+            type: 'booking_approved',
+            relatedId: bookingId,
+            relatedType: 'booking',
+            url: '/bookings'
+          },
+          {
+            sendPush: true,
+            sendWebSocket: true,
+            sendEmail: false
+          }
+        );
+      } catch (memberNotifyErr: unknown) {
+        logger.warn('[Trackman Webhook] Failed to notify member about modification', {
+          extra: { bookingId, error: (memberNotifyErr as Error).message }
+        });
+      }
+    }
+
+    logger.info('[Trackman Webhook] Successfully applied booking modification', {
+      extra: { bookingId, sessionId, trackmanBookingId: incoming.trackmanBookingId, changes, conflictWarning }
+    });
+
+    return { modified: true, changes, conflictWarning };
+  } catch (error: unknown) {
+    logger.error('[Trackman Webhook] Failed to apply booking modification', {
+      error: error as Error,
+      extra: { bookingId, trackmanBookingId: incoming.trackmanBookingId, changes }
+    });
+    return { modified: false, changes: [] };
+  }
+}
 
 export async function tryAutoApproveBooking(
   customerEmail: string,

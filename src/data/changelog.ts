@@ -8,6 +8,20 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.34.0",
+    date: "2026-02-27",
+    title: "Trackman Booking Modification Webhooks",
+    changes: [
+      "New: Trackman booking modifications (bay changes, time changes, date changes) are now automatically reflected in the app when Trackman sends a Booking Update webhook",
+      "New: When staff move a booking to a different bay or adjust the time in Trackman, the app updates the booking, session, fees, and invoice automatically",
+      "New: Staff receive real-time notifications when a Trackman booking is modified, with details about what changed",
+      "New: Members receive push notifications when their booking is moved to a different bay or time",
+      "New: Conflict detection runs on modified bookings — if the new slot has a conflict, staff are warned (Trackman remains source of truth)",
+      "New: Booking modification events appear as 'booking.modified' in the Trackman webhook stats with a purple badge",
+      "Fix: Webhook idempotency guard now includes content-aware signatures (bay, time, status) so modification webhooks are no longer incorrectly rejected as duplicates",
+    ]
+  },
+  {
     version: "8.33.0",
     date: "2026-02-27",
     title: "Staff Command Center: React Query Migration & Instant Data Refresh",
