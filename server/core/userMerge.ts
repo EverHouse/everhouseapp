@@ -350,8 +350,10 @@ export async function executeMerge(
     if (primaryGuestPass.rows.length > 0 && secondaryGuestPass.rows.length > 0) {
       const pRow = primaryGuestPass.rows[0] as { id: number; passes_used: number; passes_total: number };
       const sRow = secondaryGuestPass.rows[0] as { id: number; passes_used: number; passes_total: number };
-      const mergedUsed = Math.min(pRow.passes_used + sRow.passes_used, Math.max(pRow.passes_total, sRow.passes_total));
-      await tx.execute(sql`UPDATE guest_passes SET passes_used = ${mergedUsed}, passes_total = GREATEST(passes_total, ${sRow.passes_total}) WHERE id = ${pRow.id}`);
+      await tx.execute(sql`UPDATE guest_passes SET 
+         passes_total = GREATEST(passes_total, ${sRow.passes_total}),
+         passes_used = LEAST(${pRow.passes_used + sRow.passes_used}, GREATEST(passes_total, ${sRow.passes_total}))
+         WHERE id = ${pRow.id}`);
       await tx.execute(sql`DELETE FROM guest_passes WHERE id = ${sRow.id}`);
     } else if (secondaryGuestPass.rows.length > 0) {
       await tx.execute(sql`UPDATE guest_passes SET member_email = ${primaryEmail} WHERE LOWER(member_email) = ${secondaryEmail}`);
