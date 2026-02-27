@@ -1,7 +1,7 @@
 {
   "name": "ehmembersapp",
   "private": true,
-  "version": "3.20",
+  "version": "3.21",
   "type": "module",
   "scripts": {
     "dev": "rm -rf node_modules/.vite && concurrently --kill-others-on-fail --names backend,frontend --prefix-colors blue,green \"npm run server\" \"npm run frontend\"",

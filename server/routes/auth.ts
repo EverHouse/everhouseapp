@@ -1059,7 +1059,7 @@ router.post('/api/auth/logout', (req, res) => {
   });
 });
 
-router.get('/api/auth/session', (req, res) => {
+router.get('/api/auth/session', async (req, res) => {
   const sessionUser = getSessionUser(req);
   
   if (!sessionUser?.email) {
@@ -1070,6 +1070,12 @@ router.get('/api/auth/session', (req, res) => {
     return res.status(401).json({ error: 'Session expired', authenticated: false });
   }
   
+  const freshRole = await getUserRole(sessionUser.email);
+  if (freshRole !== sessionUser.role) {
+    sessionUser.role = freshRole;
+    req.session.save(() => {});
+  }
+
   res.json({
     authenticated: true,
     member: {
@@ -1082,7 +1088,7 @@ router.get('/api/auth/session', (req, res) => {
       tags: sessionUser.tags || [],
       mindbodyClientId: sessionUser.mindbodyClientId || '',
       status: sessionUser.status || 'Active',
-      role: sessionUser.role || 'member',
+      role: freshRole,
       dateOfBirth: sessionUser.dateOfBirth || null
     }
   });

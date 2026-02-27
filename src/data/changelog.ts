@@ -8,6 +8,14 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.45.0",
+    date: "2026-02-27",
+    title: "Live Role Refresh on Session Check",
+    changes: [
+      "Fix: Staff/admin role changes now take effect immediately — the session endpoint re-checks the role from the database on every request instead of returning the stale role from login time",
+    ]
+  },
+  {
     version: "8.44.0",
     date: "2026-02-27",
     title: "HubSpot Visitor Status Fix",
