@@ -1916,75 +1916,102 @@ export async function devConfirmBooking(params: DevConfirmParams) {
         });
         throw { statusCode: 500, error: 'Failed to create billing session. Cannot approve booking without billing.' };
       }
+    }
 
-      if (sessionId) {
-        const requestParticipants = booking.request_participants as Array<{
-          email?: string;
-          type: 'member' | 'guest';
-          userId?: string;
-          name?: string;
-        }> | null;
+    if (sessionId) {
+      const requestParticipants = booking.request_participants as Array<{
+        email?: string;
+        type: 'member' | 'guest';
+        userId?: string;
+        name?: string;
+      }> | null;
 
-        let participantsCreated = 0;
-        let slotNumber = 2;
-        if (requestParticipants && Array.isArray(requestParticipants)) {
-          for (const rp of requestParticipants) {
-            if (!rp || typeof rp !== 'object') continue;
+      const existingParticipants = await tx.execute(sql`
+        SELECT user_id, display_name, participant_type FROM booking_participants
+         WHERE session_id = ${sessionId} AND participant_type != 'owner'
+      `);
+      const existingUserIds = new Set(
+        (existingParticipants.rows as any[])
+          .filter(p => p.user_id)
+          .map(p => String(p.user_id))
+      );
+      const existingGuestNames = new Set(
+        (existingParticipants.rows as any[])
+          .filter(p => !p.user_id && p.participant_type === 'guest')
+          .map(p => (p.display_name || '').toLowerCase())
+      );
 
-            let resolvedUserId = rp.userId || null;
-            let resolvedName = rp.name || '';
-            let participantType = rp.type === 'member' ? 'member' : 'guest';
+      let participantsCreated = 0;
+      if (requestParticipants && Array.isArray(requestParticipants)) {
+        for (const rp of requestParticipants) {
+          if (!rp || typeof rp !== 'object') continue;
 
-            if (resolvedUserId && !resolvedName) {
-              const userResult = await tx.execute(sql`
-                SELECT name, first_name, last_name, email FROM users WHERE id = ${resolvedUserId}
-              `);
-              if (userResult.rows.length > 0) {
+          let resolvedUserId = rp.userId || null;
+          let resolvedName = rp.name || '';
+          let participantType = rp.type === 'member' ? 'member' : 'guest';
+
+          if (resolvedUserId && !resolvedName) {
+            const userResult = await tx.execute(sql`
+              SELECT name, first_name, last_name, email FROM users WHERE id = ${resolvedUserId}
+            `);
+            if (userResult.rows.length > 0) {
+              const u = userResult.rows[0] as Record<string, any>;
+              resolvedName = u.name || `${u.first_name || ''} ${u.last_name || ''}`.trim() || u.email || 'Member';
+            }
+          }
+
+          if (!resolvedUserId && rp.email) {
+            const userResult = await tx.execute(sql`
+              SELECT id, name, first_name, last_name FROM users WHERE LOWER(email) = LOWER(${rp.email})
+            `);
+            if (userResult.rows.length > 0) {
+              resolvedUserId = (userResult.rows[0] as any).id;
+              participantType = 'member';
+              if (!resolvedName) {
                 const u = userResult.rows[0] as Record<string, any>;
-                resolvedName = u.name || `${u.first_name || ''} ${u.last_name || ''}`.trim() || u.email || 'Member';
+                resolvedName = u.name || `${u.first_name || ''} ${u.last_name || ''}`.trim();
               }
             }
-
-            if (!resolvedUserId && rp.email) {
-              const userResult = await tx.execute(sql`
-                SELECT id, name, first_name, last_name FROM users WHERE LOWER(email) = LOWER(${rp.email})
-              `);
-              if (userResult.rows.length > 0) {
-                resolvedUserId = (userResult.rows[0] as any).id;
-                participantType = 'member';
-                if (!resolvedName) {
-                  const u = userResult.rows[0] as Record<string, any>;
-                  resolvedName = u.name || `${u.first_name || ''} ${u.last_name || ''}`.trim();
-                }
-              }
-            }
-
-            if (!resolvedName) {
-              resolvedName = rp.name || rp.email || (participantType === 'guest' ? 'Guest' : 'Member');
-            }
-
-            try {
-              await tx.execute(sql`
-                INSERT INTO booking_participants (session_id, user_id, participant_type, display_name, created_at)
-                 VALUES (${sessionId}, ${resolvedUserId}, ${participantType}, ${resolvedName}, NOW())
-                 ON CONFLICT (session_id, user_id) DO NOTHING
-              `);
-              participantsCreated++;
-            } catch (partErr: unknown) {
-              logger.error('[Dev Confirm] Failed to create participant', { extra: { partErr } });
-            }
-
           }
-        }
 
-        try {
-          const feeResult = await recalculateSessionFees(sessionId, 'approval');
-          if (feeResult?.totalSessionFee) {
-            totalFeeCents = feeResult.totalSessionFee;
+          if (!resolvedName) {
+            resolvedName = rp.name || rp.email || (participantType === 'guest' ? 'Guest' : 'Member');
           }
-        } catch (feeError: unknown) {
-          logger.warn('[Dev Confirm] Failed to calculate fees', { extra: { feeError } });
+
+          if (resolvedUserId && existingUserIds.has(String(resolvedUserId))) {
+            continue;
+          }
+          if (!resolvedUserId && participantType === 'guest' && existingGuestNames.has(resolvedName.toLowerCase())) {
+            continue;
+          }
+
+          try {
+            await tx.execute(sql`
+              INSERT INTO booking_participants (session_id, user_id, participant_type, display_name, created_at)
+               VALUES (${sessionId}, ${resolvedUserId}, ${participantType}, ${resolvedName}, NOW())
+               ON CONFLICT (session_id, user_id) DO NOTHING
+            `);
+            participantsCreated++;
+            if (resolvedUserId) existingUserIds.add(String(resolvedUserId));
+            if (!resolvedUserId && participantType === 'guest') existingGuestNames.add(resolvedName.toLowerCase());
+          } catch (partErr: unknown) {
+            logger.error('[Dev Confirm] Failed to create participant', { extra: { partErr } });
+          }
+
         }
+      }
+
+      logger.info('[Dev Confirm] Participants transferred from request', {
+        extra: { bookingId, sessionId, participantsCreated, totalRequested: requestParticipants?.length || 0 }
+      });
+
+      try {
+        const feeResult = await recalculateSessionFees(sessionId, 'approval');
+        if (feeResult?.totalSessionFee) {
+          totalFeeCents = feeResult.totalSessionFee;
+        }
+      } catch (feeError: unknown) {
+        logger.warn('[Dev Confirm] Failed to calculate fees', { extra: { feeError } });
       }
     }
 
