@@ -1,21 +1,61 @@
 let audioContext: AudioContext | null = null;
+let audioUnlocked = false;
+
+const setupUnlockListeners = () => {
+  if (typeof window === 'undefined') return;
+
+  const unlock = () => {
+    if (audioUnlocked) return;
+
+    if (!audioContext) {
+      try {
+        audioContext = new (window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext)();
+      } catch (e: unknown) {
+        return;
+      }
+    }
+
+    const removeListeners = () => {
+      document.removeEventListener('touchstart', unlock);
+      document.removeEventListener('touchend', unlock);
+      document.removeEventListener('click', unlock);
+    };
+
+    if (audioContext.state === 'suspended') {
+      audioContext.resume().then(() => {
+        audioUnlocked = true;
+        removeListeners();
+      });
+    } else {
+      audioUnlocked = true;
+      removeListeners();
+    }
+  };
+
+  document.addEventListener('touchstart', unlock, { passive: true });
+  document.addEventListener('touchend', unlock, { passive: true });
+  document.addEventListener('click', unlock);
+};
+
+setupUnlockListeners();
 
 const getAudioContext = (): AudioContext | null => {
   if (typeof window === 'undefined') return null;
-  
+
   if (!audioContext) {
     try {
       audioContext = new (window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext)();
     } catch (e: unknown) {
-      console.warn('Web Audio API not supported');
       return null;
     }
   }
-  
+
   if (audioContext.state === 'suspended') {
     audioContext.resume();
+    return null;
   }
-  
+
+  audioUnlocked = true;
   return audioContext;
 };
 
@@ -163,7 +203,7 @@ export const playSound = (type: keyof typeof sounds) => {
   try {
     sounds[type]?.();
   } catch (e: unknown) {
-    console.warn('Sound playback failed:', e);
+    // silently ignore
   }
 };
 
