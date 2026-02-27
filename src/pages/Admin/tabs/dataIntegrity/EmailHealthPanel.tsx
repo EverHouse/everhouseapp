@@ -45,13 +45,19 @@ function getEventIcon(type: string): string {
   return 'mail';
 }
 
+function ensureUtc(s: string): string {
+  let n = s.replace(' ', 'T');
+  if (!n.includes('Z') && !n.includes('+') && !/T[\d:]+[-+]/.test(n)) n += 'Z';
+  return n;
+}
+
 function formatTimestamp(dateStr: string): string {
-  const d = new Date(dateStr);
+  const d = new Date(ensureUtc(dateStr));
   const diff = Date.now() - d.getTime();
   if (diff < 60000) return `${Math.round(diff / 1000)}s ago`;
   if (diff < 3600000) return `${Math.round(diff / 60000)}m ago`;
   if (diff < 86400000) return `${Math.round(diff / 3600000)}h ago`;
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'America/Los_Angeles' });
 }
 
 const EmailHealthPanel: React.FC<Props> = ({ isOpen, onToggle }) => {

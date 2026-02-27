@@ -35,14 +35,20 @@ const ACTION_CATEGORIES: Record<string, string[]> = {
   'System': ['import_trackman', 'sync_hubspot', 'data_migration'],
 };
 
+function ensureUtc(s: string): string {
+  let n = s.replace(' ', 'T');
+  if (!n.includes('Z') && !n.includes('+') && !/T[\d:]+[-+]/.test(n)) n += 'Z';
+  return n;
+}
+
 function formatTimestamp(dateStr: string): string {
-  const d = new Date(dateStr);
+  const d = new Date(ensureUtc(dateStr));
   const now = Date.now();
   const diff = now - d.getTime();
   if (diff < 60000) return `${Math.round(diff / 1000)}s ago`;
   if (diff < 3600000) return `${Math.round(diff / 60000)}m ago`;
   if (diff < 86400000) return `${Math.round(diff / 3600000)}h ago`;
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'America/Los_Angeles' });
 }
 
 function getActionColor(action: string): string {

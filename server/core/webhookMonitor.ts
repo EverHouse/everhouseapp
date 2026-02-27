@@ -64,13 +64,13 @@ export async function getWebhookEvents(params: WebhookQueryParams): Promise<{ ev
     eventType: String(row.event_type),
     trackmanBookingId: String(row.trackman_booking_id || ''),
     trackmanUserId: String(row.trackman_user_id || ''),
-    processedAt: (row.processed_at as any)?.toISOString?.() || (row.processed_at ? String(row.processed_at) : null),
+    processedAt: (row.processed_at as any)?.toISOString?.() || (row.processed_at ? new Date(String(row.processed_at) + 'Z').toISOString() : null),
     processingError: row.processing_error ? String(row.processing_error) : null,
     matchedBookingId: row.matched_booking_id ? Number(row.matched_booking_id) : null,
     matchedUserId: row.matched_user_id ? Number(row.matched_user_id) : null,
-    createdAt: (row.created_at as any)?.toISOString?.() || String(row.created_at),
+    createdAt: (row.created_at as any)?.toISOString?.() || new Date(String(row.created_at) + 'Z').toISOString(),
     retryCount: Number(row.retry_count || 0),
-    lastRetryAt: (row.last_retry_at as any)?.toISOString?.() || (row.last_retry_at ? String(row.last_retry_at) : null),
+    lastRetryAt: (row.last_retry_at as any)?.toISOString?.() || (row.last_retry_at ? new Date(String(row.last_retry_at) + 'Z').toISOString() : null),
     status: (row.processing_error ? 'failed' : row.processed_at ? 'processed' : 'pending') as 'pending' | 'failed' | 'processed',
   }));
 

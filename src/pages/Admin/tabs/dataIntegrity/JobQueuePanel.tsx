@@ -19,9 +19,15 @@ interface JobQueueData {
   oldestPending: string | null;
 }
 
+function ensureUtc(s: string): string {
+  let n = s.replace(' ', 'T');
+  if (!n.includes('Z') && !n.includes('+') && !/T[\d:]+[-+]/.test(n)) n += 'Z';
+  return n;
+}
+
 function formatTime(dateStr: string | null): string {
   if (!dateStr) return '-';
-  const d = new Date(dateStr);
+  const d = new Date(ensureUtc(dateStr));
   const diff = Date.now() - d.getTime();
   if (diff < 3600000) return `${Math.round(diff / 60000)}m ago`;
   if (diff < 86400000) return `${Math.round(diff / 3600000)}h ago`;

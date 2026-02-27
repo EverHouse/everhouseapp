@@ -16,9 +16,15 @@ interface SchedulerStatus {
   isEnabled: boolean;
 }
 
+function ensureUtc(s: string): string {
+  let n = s.replace(' ', 'T');
+  if (!n.includes('Z') && !n.includes('+') && !/T[\d:]+[-+]/.test(n)) n += 'Z';
+  return n;
+}
+
 function formatRelativeTime(dateStr: string | null): string {
   if (!dateStr) return 'Never';
-  const diff = Date.now() - new Date(dateStr).getTime();
+  const diff = Date.now() - new Date(ensureUtc(dateStr)).getTime();
   if (diff < 60000) return `${Math.round(diff / 1000)}s ago`;
   if (diff < 3600000) return `${Math.round(diff / 60000)}m ago`;
   if (diff < 86400000) return `${Math.round(diff / 3600000)}h ago`;
@@ -49,7 +55,7 @@ function getStatusInfo(scheduler: SchedulerStatus): { color: string; bgClass: st
     return { color: 'bg-gray-400', bgClass: '' };
   }
   if (scheduler.lastRunAt && scheduler.intervalMs > 0) {
-    const elapsed = Date.now() - new Date(scheduler.lastRunAt).getTime();
+    const elapsed = Date.now() - new Date(ensureUtc(scheduler.lastRunAt)).getTime();
     if (elapsed > scheduler.intervalMs * 2) {
       return { color: 'bg-yellow-500', bgClass: 'bg-yellow-50 dark:bg-yellow-900/20' };
     }
@@ -95,7 +101,7 @@ const SchedulerMonitorPanel: React.FC<Props> = ({ isOpen, onToggle }) => {
   const errorCount = schedulers.filter(s => s.lastResult === 'error').length;
   const warningCount = schedulers.filter(s => {
     if (s.lastResult !== 'success' || !s.lastRunAt || s.intervalMs <= 0) return false;
-    return (Date.now() - new Date(s.lastRunAt).getTime()) > s.intervalMs * 2;
+    return (Date.now() - new Date(ensureUtc(s.lastRunAt)).getTime()) > s.intervalMs * 2;
   }).length;
   const disabledCount = schedulers.filter(s => !s.isEnabled).length;
 
