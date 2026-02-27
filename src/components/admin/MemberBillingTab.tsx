@@ -858,6 +858,7 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({
   const handleGetPaymentLink = async () => {
     setIsGettingPaymentLink(true);
     setError(null);
+    const linkWindow = window.open('about:blank', '_blank');
     try {
       const res = await fetch(`/api/member-billing/${encodeURIComponent(memberEmail)}/payment-link`, {
         method: 'POST',
@@ -866,12 +867,21 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({
       if (res.ok) {
         const data = await res.json();
         if (data.url) {
-          window.open(data.url, '_blank');
+          if (linkWindow) {
+            linkWindow.location.href = data.url;
+          } else {
+            window.location.href = data.url;
+          }
+        } else {
+          linkWindow?.close();
+          setError('No payment link URL returned');
         }
       } else {
+        linkWindow?.close();
         setError(getApiErrorMessage(res, 'get payment link'));
       }
     } catch (err: unknown) {
+      linkWindow?.close();
       setError(getNetworkErrorMessage());
     } finally {
       setIsGettingPaymentLink(false);
@@ -881,6 +891,7 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({
   const handleOpenBillingPortal = async () => {
     setIsOpeningBillingPortal(true);
     setError(null);
+    const portalWindow = window.open('about:blank', '_blank');
     try {
       const res = await fetch('/api/my/billing/portal', {
         method: 'POST',
@@ -891,12 +902,21 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({
       if (res.ok) {
         const data = await res.json();
         if (data.url) {
-          window.open(data.url, '_blank');
+          if (portalWindow) {
+            portalWindow.location.href = data.url;
+          } else {
+            window.location.href = data.url;
+          }
+        } else {
+          portalWindow?.close();
+          setError('No billing portal URL returned');
         }
       } else {
+        portalWindow?.close();
         setError(getApiErrorMessage(res, 'open billing portal'));
       }
     } catch (err: unknown) {
+      portalWindow?.close();
       setError(getNetworkErrorMessage());
     } finally {
       setIsOpeningBillingPortal(false);

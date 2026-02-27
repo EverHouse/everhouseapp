@@ -111,6 +111,7 @@ export default function BillingSection({ isDark }: Props) {
 
   const handleOpenBillingPortal = async () => {
     setOpeningPortal(true);
+    const portalWindow = window.open('about:blank', '_blank');
     try {
       const emailParam = viewAsUser?.email ? JSON.stringify({ email: viewAsUser.email }) : '{}';
       const res = await fetch('/api/my/billing/portal', {
@@ -121,11 +122,17 @@ export default function BillingSection({ isDark }: Props) {
       });
       const data = await res.json();
       if (data.url) {
-        window.open(data.url, '_blank');
+        if (portalWindow) {
+          portalWindow.location.href = data.url;
+        } else {
+          window.location.href = data.url;
+        }
       } else {
+        portalWindow?.close();
         showToast(data.error || 'Unable to open billing portal', 'error');
       }
     } catch {
+      portalWindow?.close();
       showToast('Failed to open billing portal', 'error');
     } finally {
       setOpeningPortal(false);
