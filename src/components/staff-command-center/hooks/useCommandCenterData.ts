@@ -462,9 +462,7 @@ export function useCommandCenterData(userEmail?: string) {
   }, [queryClient]);
 
   const updateBayStatuses = useCallback((_updater: (prev: BayStatus[]) => BayStatus[]) => {
-    queryClient.invalidateQueries({ queryKey: commandCenterKeys.todaysBookings(today, weekAhead) });
-    queryClient.invalidateQueries({ queryKey: commandCenterKeys.facility() });
-  }, [queryClient, today, weekAhead]);
+  }, []);
 
   const updateTodaysBookings = useCallback((updater: (prev: BookingRequest[]) => BookingRequest[]) => {
     queryClient.setQueryData(
