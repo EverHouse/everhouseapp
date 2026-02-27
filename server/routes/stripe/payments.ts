@@ -1078,7 +1078,7 @@ router.post('/api/stripe/staff/charge-saved-card', isStaffOrAdmin, async (req: R
     }
 
     // Get member and their Stripe customer
-    const memberResult = await db.execute(sql`SELECT id, email, name, first_name, last_name, stripe_customer_id 
+    const memberResult = await db.execute(sql`SELECT id, email, first_name, last_name, stripe_customer_id 
        FROM users WHERE LOWER(email) = LOWER(${memberEmail})`);
 
     if (memberResult.rows.length === 0) {
@@ -1086,13 +1086,13 @@ router.post('/api/stripe/staff/charge-saved-card', isStaffOrAdmin, async (req: R
     }
 
     const member = memberResult.rows[0] as unknown as DbMemberRow;
-    const memberName = member.name || [member.first_name, member.last_name].filter(Boolean).join(' ') || member.email;
+    const memberName = [member.first_name, member.last_name].filter(Boolean).join(' ') || member.email;
 
     const participantResult = await db.execute(sql`SELECT bp.id, bp.session_id, bp.cached_fee_cents, bp.payment_status, bp.participant_type, bp.display_name,
        br.id as booking_id, bs.trackman_booking_id
        FROM booking_participants bp
        JOIN booking_sessions bs ON bp.session_id = bs.id
-       JOIN booking_requests br ON br.trackman_booking_id = bs.trackman_booking_id
+       LEFT JOIN booking_requests br ON br.session_id = bs.id
        WHERE bp.id IN (${sql.join(participantIds.map((id: number) => sql`${id}`), sql`, `)}) AND bp.payment_status = 'pending'`);
 
     if (participantResult.rows.length === 0) {
