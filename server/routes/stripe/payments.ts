@@ -1280,7 +1280,11 @@ router.post('/api/stripe/staff/charge-saved-card', isStaffOrAdmin, async (req: R
            VALUES (${member.id}, ${invoiceResult.paymentIntentId}, ${member.stripe_customer_id}, ${authoritativeAmountCents}, 'succeeded', 'booking_fee', 'Staff charged via invoice', ${resolvedBookingId}, ${resolvedSessionId})
            ON CONFLICT (stripe_payment_intent_id) DO UPDATE SET status = 'succeeded', updated_at = NOW()`);
 
-        const staffActionDetails = JSON.stringify({
+      });
+
+      try {
+        await db.execute(sql`INSERT INTO staff_actions (action_type, staff_email, staff_name, target_email, details, created_at)
+           VALUES ('charge_saved_card', ${staffEmail}, ${staffName || ''}, ${member.email}, ${JSON.stringify({
             amountCents: authoritativeAmountCents,
             cardCharged: invoiceResult.amountCharged || authoritativeAmountCents,
             balanceApplied: invoiceResult.amountFromBalance || 0,
@@ -1290,10 +1294,10 @@ router.post('/api/stripe/staff/charge-saved-card', isStaffOrAdmin, async (req: R
             invoiceId: invoiceResult.invoiceId,
             bookingId: resolvedBookingId,
             sessionId: resolvedSessionId
-          });
-        await tx.execute(sql`INSERT INTO staff_actions (action_type, staff_email, staff_name, target_email, details, created_at)
-           VALUES ('charge_saved_card', ${staffEmail}, ${staffName || ''}, ${member.email}, ${staffActionDetails}, NOW())`);
-      });
+          })}, NOW())`);
+      } catch (auditErr: unknown) {
+        logger.warn('[Stripe] Failed to log staff action (non-blocking)', { extra: { auditErr: auditErr instanceof Error ? auditErr.message : String(auditErr) } });
+      }
 
       broadcastBillingUpdate({
         action: 'payment_succeeded',
