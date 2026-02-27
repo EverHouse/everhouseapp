@@ -241,6 +241,13 @@ export function closeWebSocketServer(): void {
     });
     wss = null;
   }
+
+  if (sessionPool) {
+    sessionPool.end().catch((err) => {
+      logger.error('[WebSocket] Error closing session pool:', { error: err });
+    });
+    sessionPool = null;
+  }
 }
 
 export function initWebSocketServer(server: Server) {

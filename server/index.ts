@@ -101,13 +101,13 @@ const isProduction = process.env.NODE_ENV === 'production';
 const PORT = Number(process.env.PORT) || (isProduction ? 5001 : 3001);
 
 httpServer = http.createServer((req, res) => {
-  if (req.url === '/' && req.method === 'GET' && !expressApp) {
+  if (req.url === '/healthz' || req.url === '/_health') {
     res.writeHead(200, { 'Content-Type': 'text/plain' });
     res.end('OK');
     return;
   }
 
-  if (req.url === '/healthz' || req.url === '/_health') {
+  if (req.url === '/' && req.method === 'GET' && !isReady) {
     res.writeHead(200, { 'Content-Type': 'text/plain' });
     res.end('OK');
     return;
