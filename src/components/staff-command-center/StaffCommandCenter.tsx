@@ -510,7 +510,6 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
         }));
       }
     } else {
-      pendingQrBookingRef.current = null;
       optimisticUpdateRef.current = null;
       updateTodaysBookings(prev => prev.map(b => 
         b.id === booking.id ? { ...b, status: originalStatus } : b
@@ -540,6 +539,8 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
           bookingId: id,
           mode: 'manage' as const,
         });
+      } else {
+        pendingQrBookingRef.current = null;
       }
     }
     
