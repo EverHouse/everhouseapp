@@ -85,6 +85,8 @@ export function UnifiedBookingSheet(props: UnifiedBookingSheetProps) {
     const filledCount = validation ? validation.actualPlayerCount : 0;
     const totalCount = validation ? validation.expectedPlayerCount : (declaredPlayerCount || 1);
 
+    const rosterLocked = !!(logic.paymentSuccess || logic.rosterData?.financialSummary?.allPaid);
+
     const manageModeTitle = ownerName || logic.fetchedContext?.ownerName || 'Booking Details';
 
     const handleManagedClose = () => {
@@ -188,7 +190,7 @@ export function UnifiedBookingSheet(props: UnifiedBookingSheetProps) {
                     <select
                       value={logic.editingPlayerCount}
                       onChange={(e) => logic.handleManageModeUpdatePlayerCount(Number(e.target.value))}
-                      disabled={logic.isUpdatingPlayerCount}
+                      disabled={logic.isUpdatingPlayerCount || rosterLocked}
                       className="px-2 py-1 rounded-lg bg-white dark:bg-white/10 border border-primary/20 dark:border-white/20 text-primary dark:text-white text-xs disabled:opacity-50"
                     >
                       {[1, 2, 3, 4].map(n => (
@@ -197,6 +199,9 @@ export function UnifiedBookingSheet(props: UnifiedBookingSheetProps) {
                     </select>
                     {logic.isUpdatingPlayerCount && (
                       <span className="material-symbols-outlined animate-spin text-sm text-primary/50 dark:text-white/50">progress_activity</span>
+                    )}
+                    {rosterLocked && (
+                      <span className="material-symbols-outlined text-sm text-green-500" title="Locked — payment collected">lock</span>
                     )}
                   </div>
                 </div>
@@ -244,6 +249,7 @@ export function UnifiedBookingSheet(props: UnifiedBookingSheetProps) {
                   setReassignSearchOpen={logic.setReassignSearchOpen}
                   handleReassignOwner={logic.handleReassignOwner}
                   bookingId={bookingId}
+                  rosterLocked={rosterLocked}
                 />
               </ErrorBoundary>
 

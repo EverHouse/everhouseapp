@@ -32,6 +32,7 @@ interface ManageModeRosterProps {
   setReassignSearchOpen: (open: boolean) => void;
   handleReassignOwner: (newMemberEmail: string) => Promise<void>;
   bookingId?: number;
+  rosterLocked?: boolean;
 }
 
 export function ManageModeRoster({
@@ -64,6 +65,7 @@ export function ManageModeRoster({
   setReassignSearchOpen,
   handleReassignOwner,
   bookingId,
+  rosterLocked,
 }: ManageModeRosterProps) {
   const filledMembers = (rosterData?.members.filter(m => (m.userEmail || m.guestInfo) && m.slotNumber <= editingPlayerCount) || []);
   const emptySlotNumbers: number[] = [];
@@ -145,7 +147,7 @@ export function ManageModeRoster({
               ) : null}
             </div>
           </div>
-          {isOwner ? (
+          {rosterLocked ? null : isOwner ? (
             <button
               onClick={() => setReassignSearchOpen(!reassignSearchOpen)}
               className="p-2.5 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/30 active:bg-blue-200 dark:active:bg-blue-900/50 text-blue-500 transition-colors flex-shrink-0"
@@ -170,7 +172,7 @@ export function ManageModeRoster({
             </button>
           )}
         </div>
-        {isOwner && reassignSearchOpen && (
+        {isOwner && reassignSearchOpen && !rosterLocked && (
           <div className="mt-2 pt-2 border-t border-green-200 dark:border-green-700">
             <div className="flex items-center justify-between mb-1">
               <span className="text-xs font-medium text-primary/60 dark:text-white/60">Search new owner</span>
@@ -202,6 +204,22 @@ export function ManageModeRoster({
     const isSearching = manageModeSearchSlot === slotNumber;
     const isGuestForm = manageModeGuestForm === slotNumber;
     const memberSlot = rosterData?.members.find(m => m.slotNumber === slotNumber);
+
+    if (rosterLocked) {
+      return (
+        <div key={`empty-${slotNumber}`} className="p-3 rounded-xl border-2 border-dashed border-primary/20 dark:border-white/20">
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold bg-primary/10 dark:bg-white/10 text-primary/40 dark:text-white/40">
+              {slotNumber}
+            </div>
+            <div>
+              <p className="text-sm text-primary/50 dark:text-white/50">Empty Slot</p>
+              <p className="text-xs text-green-600 dark:text-green-400">${guestFeeDollars} — Paid</p>
+            </div>
+          </div>
+        </div>
+      );
+    }
 
     if (isGuestForm) {
       return (
