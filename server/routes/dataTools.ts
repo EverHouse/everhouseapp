@@ -2650,12 +2650,12 @@ router.post('/api/data-tools/cleanup-ghost-fees', isAdmin, async (req: Request, 
       logFromRequest(req, {
         action: 'cleanup_ghost_fees',
         resourceType: 'booking_participants',
-        details: `Waived ${ghostResult.rows.length} ghost fees, marked ${pastPendingResult.rows.length} past fees as paid`
+        details: { summary: `Waived ${ghostResult.rows.length} ghost fees, marked ${pastPendingResult.rows.length} past fees as paid` }
       });
     }
 
-    const ghostTotal = ghostResult.rows.reduce((sum: number, r: any) => sum + (r.cached_fee_cents || 0), 0);
-    const pastTotal = pastPendingResult.rows.reduce((sum: number, r: any) => sum + (r.cached_fee_cents || 0), 0);
+    const ghostTotal = ghostResult.rows.reduce((sum: number, r: Record<string, unknown>) => sum + (Number(r.cached_fee_cents) || 0), 0);
+    const pastTotal = pastPendingResult.rows.reduce((sum: number, r: Record<string, unknown>) => sum + (Number(r.cached_fee_cents) || 0), 0);
 
     res.json({
       dryRun,

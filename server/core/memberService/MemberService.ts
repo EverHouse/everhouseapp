@@ -390,7 +390,7 @@ class MemberServiceClass {
     
     const row = result.rows[0] as Record<string, unknown>;
     const staff: StaffRecord = {
-      id: row.id as string,
+      id: Number(row.id),
       email: row.email as string,
       normalizedEmail: normalized,
       name: row.name as string,

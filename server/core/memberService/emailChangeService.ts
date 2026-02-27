@@ -126,14 +126,14 @@ export async function cascadeEmailChange(
         if (user.stripe_customer_id) {
           const { getStripeClient } = await import('../stripe/client');
           const stripe = await getStripeClient();
-          await stripe.customers.update(user.stripe_customer_id, { email: normalizedNewEmailForSync });
+          await stripe.customers.update(String(user.stripe_customer_id), { email: normalizedNewEmailForSync });
           logger.info(`[EmailChangeService] Updated Stripe customer ${user.stripe_customer_id} email to ${normalizedNewEmailForSync}`);
         }
 
         if (user.hubspot_id) {
           const { getHubSpotClient } = await import('../integrations');
           const hubspotClient = await getHubSpotClient();
-          await hubspotClient.crm.contacts.basicApi.update(user.hubspot_id, {
+          await hubspotClient.crm.contacts.basicApi.update(String(user.hubspot_id), {
             properties: { email: normalizedNewEmailForSync },
           });
           logger.info(`[EmailChangeService] Updated HubSpot contact ${user.hubspot_id} email to ${normalizedNewEmailForSync}`);
@@ -190,7 +190,7 @@ export async function previewEmailChangeImpact(
       const result = await db.execute(
         sql`SELECT COUNT(*) as count FROM ${sql.raw(table)} WHERE LOWER(${sql.raw(column)}) = LOWER(${email.toLowerCase().trim()})`
       );
-      const count = parseInt(result.rows[0].count, 10);
+      const count = parseInt(String((result.rows[0] as Record<string, unknown>).count), 10);
       if (count > 0) {
         tables.push({ tableName: table, columnName: column, rowCount: count });
       }

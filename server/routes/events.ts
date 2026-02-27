@@ -1053,7 +1053,7 @@ router.delete('/api/rsvps/:event_id/:user_email', isAuthenticated, async (req, r
     const eventData = await db.select({
       title: events.title,
       eventDate: events.eventDate,
-    }).from(events).where(eq(events.id, parseInt(event_id)));
+    }).from(events).where(eq(events.id, parseInt(event_id as string)));
     
     if (eventData.length === 0) {
       return res.status(404).json({ error: 'Event not found' });
@@ -1061,15 +1061,15 @@ router.delete('/api/rsvps/:event_id/:user_email', isAuthenticated, async (req, r
     
     const evt = eventData[0];
     const formattedDate = formatDateDisplayWithDay(evt.eventDate);
-    const memberName = await getMemberDisplayName(user_email);
+    const memberName = await getMemberDisplayName(user_email as string);
     const staffMessage = `${memberName} cancelled their RSVP for ${evt.title} on ${formattedDate}`;
     
     await db.transaction(async (tx) => {
       await tx.update(eventRsvps)
         .set({ status: 'cancelled' })
         .where(and(
-          eq(eventRsvps.eventId, parseInt(event_id)),
-          eq(eventRsvps.userEmail, user_email)
+          eq(eventRsvps.eventId, parseInt(event_id as string)),
+          eq(eventRsvps.userEmail, user_email as string)
         ));
     });
     
@@ -1077,15 +1077,15 @@ router.delete('/api/rsvps/:event_id/:user_email', isAuthenticated, async (req, r
       'Event RSVP Cancelled',
       staffMessage,
       'event_rsvp_cancelled',
-      { relatedId: parseInt(event_id), relatedType: 'event', url: '/admin/calendar' }
+      { relatedId: parseInt(event_id as string), relatedType: 'event', url: '/admin/calendar' }
     ).catch((err: unknown) => logger.warn('Failed to notify staff of RSVP cancellation', { error: err instanceof Error ? err : new Error(getErrorMessage(err)) }));
     
     notifyMember({
-      userEmail: user_email,
+      userEmail: user_email as string,
       title: 'RSVP Cancelled',
       message: `Your RSVP for "${evt.title}" on ${formattedDate} has been cancelled`,
       type: 'event',
-      relatedId: parseInt(event_id),
+      relatedId: parseInt(event_id as string),
       relatedType: 'event',
       url: '/member-events'
     }).catch((err: unknown) => logger.warn('Failed to notify member of RSVP cancellation', { error: err instanceof Error ? err : new Error(getErrorMessage(err)) }));

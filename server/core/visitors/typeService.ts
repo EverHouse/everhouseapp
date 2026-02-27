@@ -208,8 +208,8 @@ export async function calculateVisitorTypeFromHistory(email: string): Promise<Vi
     let purchaseDate: Date | null = null;
     
     if (lastPurchase) {
-      const itemName = (lastPurchase.item_name || '').toLowerCase();
-      purchaseDate = new Date(lastPurchase.activity_date);
+      const itemName = (String((lastPurchase as Record<string, unknown>).item_name || '')).toLowerCase();
+      purchaseDate = new Date(String((lastPurchase as Record<string, unknown>).activity_date));
       
       if (itemName.includes('classpass')) {
         purchaseType = 'classpass';
@@ -224,7 +224,7 @@ export async function calculateVisitorTypeFromHistory(email: string): Promise<Vi
     
     let guestDate: Date | null = null;
     if (lastGuestAppearance) {
-      guestDate = new Date(lastGuestAppearance.activity_date);
+      guestDate = new Date(String((lastGuestAppearance as Record<string, unknown>).activity_date));
     }
     
     if (!purchaseType && !guestDate) {

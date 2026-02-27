@@ -595,11 +595,12 @@ router.post('/api/stripe/terminal/process-subscription-payment', isStaffOrAdmin,
     if (userCheck.rows.length === 0) {
       return res.status(400).json({ error: 'User not found. Cannot process payment without a linked member account.' });
     }
-    const pendingUser = userCheck.rows[0];
+    const pendingUser = userCheck.rows[0] as Record<string, unknown>;
+    const pendingUserStatus = pendingUser.membership_status as string;
     const allowedStatuses = ['pending', 'incomplete'];
-    if (!allowedStatuses.includes(pendingUser.membership_status)) {
+    if (!allowedStatuses.includes(pendingUserStatus)) {
       return res.status(400).json({ 
-        error: `Cannot process payment for member with status "${pendingUser.membership_status}". Expected "pending" or "incomplete" status.`
+        error: `Cannot process payment for member with status "${pendingUserStatus}". Expected "pending" or "incomplete" status.`
       });
     }
     
@@ -656,7 +657,8 @@ router.post('/api/stripe/terminal/process-subscription-payment', isStaffOrAdmin,
       logger.error('[Terminal] Error listing existing PIs:', { extra: { error: getErrorMessage(listErr) } });
     }
 
-    const invoicePI = (typeof invoice.payment_intent === 'object' && invoice.payment_intent !== null) ? invoice.payment_intent as Stripe.PaymentIntent : null;
+    const invoiceRaw = invoice as unknown as Record<string, unknown>;
+    const invoicePI = (typeof invoiceRaw.payment_intent === 'object' && invoiceRaw.payment_intent !== null) ? invoiceRaw.payment_intent as Stripe.PaymentIntent : null;
     let paymentIntent: Stripe.PaymentIntent;
     
     if (invoicePI && invoicePI.id) {
@@ -670,7 +672,7 @@ router.post('/api/stripe/terminal/process-subscription-payment', isStaffOrAdmin,
       let readerLabel = readerId;
       try {
         const readerObj = await stripe.terminal.readers.retrieve(readerId);
-        readerLabel = readerObj.label || readerId;
+        readerLabel = ('label' in readerObj ? (readerObj as Stripe.Terminal.Reader).label : null) || readerId;
       } catch (_) { /* use readerId as fallback label */ }
 
       try {
@@ -734,7 +736,7 @@ router.post('/api/stripe/terminal/process-subscription-payment', isStaffOrAdmin,
       let readerLabel = readerId;
       try {
         const readerObj = await stripe.terminal.readers.retrieve(readerId);
-        readerLabel = readerObj.label || readerId;
+        readerLabel = ('label' in readerObj ? (readerObj as Stripe.Terminal.Reader).label : null) || readerId;
       } catch (_) { /* use readerId as fallback label */ }
 
       let subDescription = 'Membership activation';
@@ -908,9 +910,10 @@ router.post('/api/stripe/terminal/confirm-subscription-payment', isStaffOrAdmin,
     if (piMetadata.requiresInvoiceReconciliation === 'true' && latestInvoice && latestInvoice.status !== 'paid') {
       try {
         if (latestInvoice.status === 'open') {
-          const invoicePiId = typeof latestInvoice.payment_intent === 'string'
-            ? latestInvoice.payment_intent
-            : (typeof latestInvoice.payment_intent === 'object' && latestInvoice.payment_intent !== null) ? (latestInvoice.payment_intent as Stripe.PaymentIntent).id : null;
+          const latestInvRaw = latestInvoice as unknown as Record<string, unknown>;
+          const invoicePiId = typeof latestInvRaw.payment_intent === 'string'
+            ? latestInvRaw.payment_intent
+            : (typeof latestInvRaw.payment_intent === 'object' && latestInvRaw.payment_intent !== null) ? (latestInvRaw.payment_intent as Stripe.PaymentIntent).id : null;
           if (invoicePiId) {
             try {
               await stripe.paymentIntents.cancel(invoicePiId);

@@ -1748,7 +1748,7 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
                 EXISTS(
                   SELECT 1 FROM booking_participants WHERE session_id = ${existing.sessionId} AND payment_status = 'paid'
                 ) AS has_paid_participants`);
-              hasPaidFees = paidCheck.rows[0]?.has_paid || paidCheck.rows[0]?.has_paid_participants;
+              hasPaidFees = Boolean((paidCheck.rows[0] as Record<string, unknown>)?.has_paid) || Boolean((paidCheck.rows[0] as Record<string, unknown>)?.has_paid_participants);
             } catch (err) { logger.debug('Failed to parse fee, assuming paid', { error: err }); hasPaidFees = true; }
           }
           if (hasPaidFees) {
@@ -1779,7 +1779,7 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
                 SELECT 1 FROM booking_participants 
                 WHERE session_id = ${existing.sessionId} AND payment_status = 'paid'
               ) AS has_paid_participants`);
-            hasCompletedPayments = paymentCheck.rows[0]?.has_snapshot || paymentCheck.rows[0]?.has_paid_participants;
+            hasCompletedPayments = Boolean((paymentCheck.rows[0] as Record<string, unknown>)?.has_snapshot) || Boolean((paymentCheck.rows[0] as Record<string, unknown>)?.has_paid_participants);
           } catch (checkErr: unknown) {
             hasCompletedPayments = true;
             process.stderr.write(`[Trackman Import] FAIL-CLOSED: Could not check payment status for booking #${existing.id}, treating as frozen: ${getErrorMessage(checkErr)}\n`);
@@ -2090,13 +2090,13 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
             try {
               const mergeParsedPlayersForSession = parseNotesForPlayers(row.notes);
               await createTrackmanSessionAndParticipants({
-                bookingId: placeholder.id,
+                bookingId: Number(placeholder.id),
                 trackmanBookingId: row.bookingId,
                 resourceId: parsedBayId,
                 sessionDate: bookingDate,
                 startTime: startTime,
                 endTime: endTime,
-                durationMinutes: row.durationMins,
+                durationMinutes: Number(row.durationMins),
                 ownerEmail: matchedEmail,
                 ownerName: row.userName || matchedEmail,
                 parsedPlayers: mergeParsedPlayersForSession,

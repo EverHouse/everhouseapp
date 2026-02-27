@@ -4,6 +4,24 @@ import { logger } from '../logger';
 import { ACTIVE_BOOKING_STATUSES } from '../../../shared/constants/statuses';
 import { toTextArrayLiteral } from '../../utils/sqlArrayLiteral';
 
+interface UserIdRow {
+  id: number;
+}
+
+interface BookingConflictRow {
+  booking_id: number;
+  resource_name: string;
+  request_date: string;
+  start_time: string;
+  end_time: string;
+  owner_name: string | null;
+  owner_email: string;
+}
+
+interface ParticipantConflictRow extends BookingConflictRow {
+  invite_status: string;
+}
+
 const OCCUPIED_STATUSES = [...ACTIVE_BOOKING_STATUSES, 'checked_in', 'attended'];
 
 export interface ConflictingBooking {
@@ -76,7 +94,8 @@ export async function findConflictingBookings(
     const memberResult = await db.execute(
       sql`SELECT id FROM users WHERE LOWER(email) = LOWER(${normalizedEmail}) LIMIT 1`
     );
-    const memberId = memberResult.rows[0]?.id;
+    const memberRows = memberResult.rows as unknown as UserIdRow[];
+    const memberId = memberRows[0]?.id;
 
     const ownerResult = await db.execute(sql`
       SELECT 
@@ -95,14 +114,15 @@ export async function findConflictingBookings(
         ${excludeBookingId ? sql`AND br.id != ${excludeBookingId}` : sql``}
     `);
     
-    for (const row of ownerResult.rows) {
-      if (timePeriodsOverlap(startTime, endTime, row.start_time, row.end_time)) {
+    const ownerRows = ownerResult.rows as unknown as BookingConflictRow[];
+    for (const row of ownerRows) {
+      if (timePeriodsOverlap(startTime, endTime, String(row.start_time), String(row.end_time))) {
         conflicts.push({
           bookingId: row.booking_id,
           resourceName: row.resource_name,
-          requestDate: row.request_date,
-          startTime: row.start_time,
-          endTime: row.end_time,
+          requestDate: String(row.request_date),
+          startTime: String(row.start_time),
+          endTime: String(row.end_time),
           ownerName: row.owner_name,
           ownerEmail: row.owner_email,
           conflictType: 'owner'
@@ -132,16 +152,17 @@ export async function findConflictingBookings(
           ${excludeBookingId ? sql`AND br.id != ${excludeBookingId}` : sql``}
       `);
       
-      for (const row of participantResult.rows) {
-        if (timePeriodsOverlap(startTime, endTime, row.start_time, row.end_time)) {
+      const participantRows = participantResult.rows as unknown as ParticipantConflictRow[];
+      for (const row of participantRows) {
+        if (timePeriodsOverlap(startTime, endTime, String(row.start_time), String(row.end_time))) {
           const isDuplicate = conflicts.some(c => c.bookingId === row.booking_id);
           if (!isDuplicate) {
             conflicts.push({
               bookingId: row.booking_id,
               resourceName: row.resource_name,
-              requestDate: row.request_date,
-              startTime: row.start_time,
-              endTime: row.end_time,
+              requestDate: String(row.request_date),
+              startTime: String(row.start_time),
+              endTime: String(row.end_time),
               ownerName: row.owner_name,
               ownerEmail: row.owner_email,
               conflictType: 'participant'
@@ -172,16 +193,17 @@ export async function findConflictingBookings(
         ${excludeBookingId ? sql`AND br.id != ${excludeBookingId}` : sql``}
     `);
     
-    for (const row of linkedMemberResult.rows) {
-      if (timePeriodsOverlap(startTime, endTime, row.start_time, row.end_time)) {
+    const linkedRows = linkedMemberResult.rows as unknown as BookingConflictRow[];
+    for (const row of linkedRows) {
+      if (timePeriodsOverlap(startTime, endTime, String(row.start_time), String(row.end_time))) {
         const isDuplicate = conflicts.some(c => c.bookingId === row.booking_id);
         if (!isDuplicate) {
           conflicts.push({
             bookingId: row.booking_id,
             resourceName: row.resource_name,
-            requestDate: row.request_date,
-            startTime: row.start_time,
-            endTime: row.end_time,
+            requestDate: String(row.request_date),
+            startTime: String(row.start_time),
+            endTime: String(row.end_time),
             ownerName: row.owner_name,
             ownerEmail: row.owner_email,
             conflictType: 'participant'

@@ -333,7 +333,7 @@ router.post('/api/stripe/create-payment-intent', isStaffOrAdmin, async (req: Req
 
       const snapshotResult = await db.execute(sql`INSERT INTO booking_fee_snapshots (booking_id, session_id, participant_fees, total_cents, status)
            VALUES (${bookingId}, ${sessionId}, ${JSON.stringify(serverFees)}, ${serverTotal}, 'pending') RETURNING id`);
-      snapshotId = (snapshotResult.rows[0] as Record<string, unknown>).id;
+      snapshotId = (snapshotResult.rows[0] as Record<string, unknown>).id as number;
       logger.info('[Stripe] Created fee snapshot for booking : $ with participants', { extra: { snapshotId, bookingId, serverTotal_100_ToFixed_2: (serverTotal/100).toFixed(2), serverFeesLength: serverFees.length } });
     } else {
       if (serverTotal < 50) {
@@ -362,13 +362,13 @@ router.post('/api/stripe/create-payment-intent', isStaffOrAdmin, async (req: Req
       const participantDetails = await db.execute(sql`SELECT id, display_name, participant_type FROM booking_participants WHERE id = ANY(${participantIdsLiteral}::int[])`);
 
       const feeLineItems: BookingFeeLineItem[] = [];
-      for (const detail of participantDetails.rows) {
-        const fee = pendingFees.find(f => f.participantId === detail.id);
+      for (const rawDetail of participantDetails.rows as Array<Record<string, unknown>>) {
+        const fee = pendingFees.find(f => f.participantId === rawDetail.id);
         if (!fee || fee.totalCents <= 0) continue;
         feeLineItems.push({
-          participantId: detail.id,
-          displayName: detail.display_name || (detail.participant_type === 'guest' ? 'Guest' : 'Member'),
-          participantType: detail.participant_type as 'owner' | 'member' | 'guest',
+          participantId: rawDetail.id as number,
+          displayName: (rawDetail.display_name as string) || (rawDetail.participant_type === 'guest' ? 'Guest' : 'Member'),
+          participantType: rawDetail.participant_type as 'owner' | 'member' | 'guest',
           overageCents: fee.overageCents || 0,
           guestCents: fee.guestCents || 0,
           totalCents: fee.totalCents,
@@ -539,7 +539,7 @@ router.post('/api/stripe/confirm-payment', isStaffOrAdmin, async (req: Request, 
     
     broadcastBillingUpdate({
       action: 'payment_succeeded',
-      memberEmail: paymentRecord?.memberEmail || paymentRecord?.member_email,
+      memberEmail: paymentRecord?.memberEmail || paymentRecord?.member_email || undefined,
       amount: paymentRecord?.amountCents || paymentRecord?.amount_cents
     });
 
@@ -1237,12 +1237,12 @@ router.post('/api/stripe/staff/charge-saved-card', isStaffOrAdmin, async (req: R
 
     // Try to use existing draft invoice from booking approval
     let invoiceResult;
-    const existingInvoiceId = resolvedBookingId ? await getBookingInvoiceId(resolvedBookingId) : null;
+    const existingInvoiceId = resolvedBookingId ? await getBookingInvoiceId(Number(resolvedBookingId)) : null;
     
     if (existingInvoiceId) {
       try {
         invoiceResult = await finalizeAndPayInvoice({
-          bookingId: resolvedBookingId,
+          bookingId: Number(resolvedBookingId),
           paymentMethodId: paymentMethod.id,
           offSession: true,
         });
@@ -1260,8 +1260,8 @@ router.post('/api/stripe/staff/charge-saved-card', isStaffOrAdmin, async (req: R
     if (!invoiceResult) {
       await createDraftInvoiceForBooking({
         customerId: member.stripe_customer_id,
-        bookingId: resolvedBookingId,
-        sessionId: resolvedSessionId,
+        bookingId: Number(resolvedBookingId),
+        sessionId: Number(resolvedSessionId),
         trackmanBookingId,
         feeLineItems,
         metadata: {
@@ -1275,7 +1275,7 @@ router.post('/api/stripe/staff/charge-saved-card', isStaffOrAdmin, async (req: R
         purpose: 'booking_fee',
       });
       invoiceResult = await finalizeAndPayInvoice({
-        bookingId: resolvedBookingId,
+        bookingId: Number(resolvedBookingId),
         paymentMethodId: paymentMethod.id,
         offSession: true,
       });
@@ -2465,7 +2465,7 @@ router.post('/api/payments/refund', isStaffOrAdmin, async (req: Request, res: Re
             reversedGuestCents: number;
           }> = [];
 
-          for (const entry of ledgerResult.rows as DbLedgerRow[]) {
+          for (const entry of ledgerResult.rows as unknown as DbLedgerRow[]) {
             const originalOverageCents = Math.round((parseFloat(entry.overage_fee) || 0) * 100);
             const originalGuestCents = Math.round((parseFloat(entry.guest_fee) || 0) * 100);
 

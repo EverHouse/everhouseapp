@@ -270,7 +270,31 @@ export type AuditAction =
   | 'confirm_conference_prepayment'
   | 'checkout_session_expired'
   | 'initiate_billing_migration'
-  | 'cancel_billing_migration';
+  | 'cancel_billing_migration'
+  | 'stripe_customer_linked'
+  | 'stripe_customer_deleted'
+  | 'payment_method_auto_updated'
+  | 'charge_dispute_updated'
+  | 'checkout_async_payment_failed'
+  | 'checkout_async_payment_succeeded'
+  | 'invoice_payment_action_required'
+  | 'invoice_overdue'
+  | 'setup_intent_succeeded'
+  | 'setup_intent_failed'
+  | 'assign_session'
+  | 'complete_booking'
+  | 'cancel_stale_booking'
+  | 'bulk_cancel_stale_bookings'
+  | 'activate_stuck_member'
+  | 'recalculate_guest_passes'
+  | 'release_guest_pass_hold'
+  | 'cancel_orphaned_pi'
+  | 'delete_orphan_enrollment'
+  | 'delete_orphan_rsvp'
+  | 'accept_tier'
+  | 'mark_booking_paid'
+  | 'booking_creation'
+  | 'cleanup_ghost_fees';
 
 export type ActorType = 'staff' | 'member' | 'system';
 
@@ -331,7 +355,13 @@ export type ResourceType =
   | 'bug_report'
   | 'day_pass'
   | 'inquiry'
-  | 'guest_pass';
+  | 'guest_pass'
+  | 'checkout_session'
+  | 'dispute'
+  | 'booking_request'
+  | 'wellness_enrollment'
+  | 'event_rsvp'
+  | 'payment_intent';
 
 interface AuditLogParams {
   staffEmail: string;

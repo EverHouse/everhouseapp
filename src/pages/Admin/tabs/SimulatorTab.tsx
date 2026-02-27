@@ -1084,7 +1084,7 @@ const SimulatorTab: React.FC = () => {
                                             )}
                                             {feeEstimate.feeBreakdown.guestsCharged > 0 && (
                                                 <div className="flex items-center justify-between text-xs">
-                                                    <span className="text-gray-600 dark:text-gray-400">{feeEstimate.feeBreakdown.guestsCharged} guest{feeEstimate.feeBreakdown.guestsCharged > 1 ? 's' : ''} @ ${feeEstimate.feeBreakdown.guestFeePerUnit || guestFeeDollars}</span>
+                                                    <span className="text-gray-600 dark:text-gray-400">{feeEstimate.feeBreakdown.guestsCharged} guest{feeEstimate.feeBreakdown.guestsCharged > 1 ? 's' : ''} @ ${String((feeEstimate.feeBreakdown as Record<string, unknown>).guestFeePerUnit || guestFeeDollars)}</span>
                                                     <span className="text-amber-700 dark:text-amber-300">${feeEstimate.feeBreakdown.guestFees}</span>
                                                 </div>
                                             )}

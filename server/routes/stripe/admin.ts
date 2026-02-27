@@ -26,6 +26,24 @@ import { sensitiveActionRateLimiter, checkoutRateLimiter } from '../../middlewar
 import { logFromRequest } from '../../core/auditLog';
 import { getErrorMessage, getErrorCode, safeErrorDetail } from '../../utils/errorUtils';
 
+interface MemberSyncRow {
+  id: number;
+  email: string;
+  first_name: string | null;
+  last_name: string | null;
+  stripe_subscription_id: string | null;
+  stripe_customer_id: string | null;
+  membership_status: string | null;
+  billing_provider: string | null;
+  stripe_current_period_end: string | null;
+  join_date: string | null;
+  tier: string | null;
+}
+
+interface TierNameRow {
+  name: string;
+}
+
 const router = Router();
 
 router.post('/api/admin/check-expiring-cards', isAdmin, async (req: Request, res: Response) => {
@@ -718,7 +736,7 @@ router.post('/api/stripe/sync-member-subscriptions', isStaffOrAdmin, sensitiveAc
        FROM users
        WHERE stripe_subscription_id IS NOT NULL OR stripe_customer_id IS NOT NULL`);
 
-    const members = membersResult.rows;
+    const members = membersResult.rows as unknown as MemberSyncRow[];
     let synced = 0;
     let updated = 0;
     let errorCount = 0;
@@ -730,14 +748,14 @@ router.post('/api/stripe/sync-member-subscriptions', isStaffOrAdmin, sensitiveAc
 
       if (metadataTierSlug) {
         const tierResult = await db.execute(sql`SELECT name FROM membership_tiers WHERE slug = ${metadataTierSlug}`);
-        if (tierResult.rows.length > 0) return (tierResult.rows[0] as Record<string, unknown>).name as string;
+        if (tierResult.rows.length > 0) return (tierResult.rows[0] as unknown as TierNameRow).name;
         if (metadataTierName) return metadataTierName;
       }
 
       const priceId = subscription.items?.data?.[0]?.price?.id;
       if (priceId) {
         const tierResult = await db.execute(sql`SELECT name FROM membership_tiers WHERE stripe_price_id = ${priceId} OR founding_price_id = ${priceId}`);
-        if (tierResult.rows.length > 0) return (tierResult.rows[0] as Record<string, unknown>).name as string;
+        if (tierResult.rows.length > 0) return (tierResult.rows[0] as unknown as TierNameRow).name;
       }
 
       return null;
@@ -747,14 +765,15 @@ router.post('/api/stripe/sync-member-subscriptions', isStaffOrAdmin, sensitiveAc
     for (let i = 0; i < members.length; i += BATCH_SIZE) {
       const batch = members.slice(i, i + BATCH_SIZE);
       const results = await Promise.allSettled(batch.map(async (member) => {
-        const memberName = [member.first_name, member.last_name].filter(Boolean).join(' ') || member.email;
+        const memberName = [member.first_name, member.last_name].filter(Boolean).join(' ') || String(member.email);
 
         if (member.stripe_subscription_id) {
           try {
-            const subscription = await stripe.subscriptions.retrieve(member.stripe_subscription_id);
+            const subscription = await stripe.subscriptions.retrieve(member.stripe_subscription_id as string);
             const mappedStatus = statusMap[subscription.status] || subscription.status;
-            const periodEnd = subscription.current_period_end
-              ? new Date(subscription.current_period_end * 1000)
+            const subData = subscription as unknown as Record<string, unknown>;
+            const periodEnd = subData.current_period_end
+              ? new Date(Number(subData.current_period_end) * 1000)
               : null;
             const resolvedTier = await resolveTierFromSubscription(subscription);
             const changes: string[] = [];
@@ -768,7 +787,7 @@ router.post('/api/stripe/sync-member-subscriptions', isStaffOrAdmin, sensitiveAc
             }
 
             const existingEnd = member.stripe_current_period_end
-              ? new Date(member.stripe_current_period_end).toISOString()
+              ? new Date(member.stripe_current_period_end as string).toISOString()
               : null;
             const newEnd = periodEnd ? periodEnd.toISOString() : null;
             if (existingEnd !== newEnd) {
@@ -806,24 +825,24 @@ router.post('/api/stripe/sync-member-subscriptions', isStaffOrAdmin, sensitiveAc
 
               await db.execute(sql`UPDATE users SET ${sql.join(updateParts, sql`, `)} WHERE id = ${member.id}`);
               updated++;
-              details.push({ email: member.email, action: 'updated', changes } as any);
+              details.push({ email: String(member.email), action: 'updated', changes });
             }
             synced++;
           } catch (err: unknown) {
             if (getErrorCode(err) === 'resource_missing') {
               await db.execute(sql`UPDATE users SET stripe_subscription_id = NULL, updated_at = NOW() WHERE id = ${member.id}`);
               updated++;
-              details.push({ email: member.email, action: 'cleared', changes: ['subscription not found in Stripe — cleared'] } as any);
+              details.push({ email: String(member.email), action: 'cleared', changes: ['subscription not found in Stripe — cleared'] });
               synced++;
             } else {
               errorCount++;
-              details.push({ email: member.email, action: 'error', changes: [getErrorMessage(err)] } as any);
+              details.push({ email: String(member.email), action: 'error', changes: [getErrorMessage(err)] });
             }
           }
         } else if (member.stripe_customer_id) {
           try {
             const subscriptions = await stripe.subscriptions.list({
-              customer: member.stripe_customer_id,
+              customer: member.stripe_customer_id as string,
               status: 'active',
               limit: 1,
             });
@@ -831,8 +850,9 @@ router.post('/api/stripe/sync-member-subscriptions', isStaffOrAdmin, sensitiveAc
             if (subscriptions.data.length > 0) {
               const sub = subscriptions.data[0];
               const mappedStatus = statusMap[sub.status] || sub.status;
-              const periodEnd = sub.current_period_end
-                ? new Date(sub.current_period_end * 1000)
+              const subObj = sub as unknown as Record<string, unknown>;
+              const periodEnd = subObj.current_period_end
+                ? new Date(Number(subObj.current_period_end) * 1000)
                 : null;
               const resolvedTier = await resolveTierFromSubscription(sub);
 
@@ -856,12 +876,12 @@ router.post('/api/stripe/sync-member-subscriptions', isStaffOrAdmin, sensitiveAc
               updated++;
               const changeDetails = [`linked subscription ${sub.id}`, `status: ${mappedStatus}`];
               if (resolvedTier) changeDetails.push(`tier: ${resolvedTier}`);
-              details.push({ email: member.email, action: 'linked', changes: changeDetails } as any);
+              details.push({ email: String(member.email), action: 'linked', changes: changeDetails });
             }
             synced++;
           } catch (err: unknown) {
             errorCount++;
-            details.push({ email: member.email, action: 'error', changes: [getErrorMessage(err)] } as any);
+            details.push({ email: String(member.email), action: 'error', changes: [getErrorMessage(err)] });
           }
         }
       }));

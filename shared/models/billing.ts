@@ -42,7 +42,7 @@ export interface FeeBreakdown {
     actualPlayerCount: number;
     sessionDuration: number;
     sessionDate: string;
-    source: 'preview' | 'approval' | 'checkin' | 'stripe' | 'roster_update' | 'trackman_webhook' | 'sync_cleanup' | 'staff_action' | 'staff_add_member' | 'staff_add_guest' | 'reschedule';
+    source: 'preview' | 'approval' | 'checkin' | 'stripe' | 'roster_update' | 'trackman_webhook' | 'sync_cleanup' | 'staff_action' | 'staff_add_member' | 'staff_add_guest' | 'reschedule' | 'staff_booking' | 'booking_creation' | 'trackman_modification';
   };
   totalSessionFee?: number;
   participantsUpdated?: boolean;
@@ -64,7 +64,7 @@ export interface FeeComputeParams {
     displayName: string;
     participantType: 'owner' | 'member' | 'guest';
   }>;
-  source: 'preview' | 'approval' | 'checkin' | 'stripe' | 'roster_update' | 'trackman_webhook' | 'sync_cleanup' | 'staff_action' | 'staff_add_member' | 'staff_add_guest' | 'reschedule';
+  source: 'preview' | 'approval' | 'checkin' | 'stripe' | 'roster_update' | 'trackman_webhook' | 'sync_cleanup' | 'staff_action' | 'staff_add_member' | 'staff_add_guest' | 'reschedule' | 'staff_booking' | 'booking_creation' | 'trackman_modification';
   excludeSessionFromUsage?: boolean;
   isConferenceRoom?: boolean;
 }

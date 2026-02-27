@@ -18,6 +18,19 @@ import {
 import { getSessionParticipants } from '../core/bookingService/sessionManager';
 import { invalidateCachedFees, recalculateSessionFees } from '../core/billing/unifiedFeeService';
 
+interface OwnerRow {
+  id: string;
+  email: string;
+  first_name: string | null;
+  last_name: string | null;
+}
+
+interface FeeRow {
+  total_cents: string | null;
+  overage_cents: string | null;
+  guest_cents: string | null;
+}
+
 const router = Router();
 
 function mapServiceError(res: Response, error: unknown): Response | void {
@@ -311,7 +324,7 @@ router.post('/api/admin/booking/:bookingId/recalculate-fees', isStaffOrAdmin, as
     const sessionUser = getSessionUser(req);
     if (!sessionUser) return res.status(401).json({ error: 'Authentication required' });
 
-    const bookingId = parseInt(req.params.bookingId);
+    const bookingId = parseInt(String(req.params.bookingId));
     if (isNaN(bookingId)) return res.status(400).json({ error: 'Invalid booking ID' });
 
     const booking = await getBookingWithSession(bookingId);
@@ -336,7 +349,7 @@ router.post('/api/admin/booking/:bookingId/recalculate-fees', isStaffOrAdmin, as
            LIMIT 1`
         );
 
-        const owner = ownerResult.rows[0];
+        const owner = ownerResult.rows[0] as unknown as OwnerRow | undefined;
         const ownerUserId = owner?.id || null;
         const ownerName = owner ? `${owner.first_name || ''} ${owner.last_name || ''}`.trim() || booking.owner_email : booking.owner_email;
 
@@ -348,9 +361,10 @@ router.post('/api/admin/booking/:bookingId/recalculate-fees', isStaffOrAdmin, as
           WHERE session_id = ${booking.session_id}
         `);
 
-        const feeTotalCents = parseInt(feeResult.rows[0]?.total_cents || '0');
-        const overageCents = parseInt(feeResult.rows[0]?.overage_cents || '0');
-        const guestCents = parseInt(feeResult.rows[0]?.guest_cents || '0');
+        const feeRow = feeResult.rows[0] as unknown as FeeRow | undefined;
+        const feeTotalCents = parseInt(feeRow?.total_cents || '0');
+        const overageCents = parseInt(feeRow?.overage_cents || '0');
+        const guestCents = parseInt(feeRow?.guest_cents || '0');
 
         if (feeTotalCents > 0) {
           const { createPrepaymentIntent } = await import('../core/billing/prepaymentService');

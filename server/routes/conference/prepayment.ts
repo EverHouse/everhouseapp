@@ -11,6 +11,40 @@ import { getSessionUser } from '../../types/session';
 import { logger } from '../../core/logger';
 import { logFromRequest } from '../../core/auditLog';
 
+interface ExistingPrepaymentRow {
+  id: number;
+  status: string;
+  payment_intent_id: string | null;
+}
+
+interface UserRow {
+  id: string;
+  stripe_customer_id: string | null;
+  first_name: string | null;
+  last_name: string | null;
+}
+
+interface PrepaymentInsertRow {
+  id: number;
+}
+
+interface PrepaymentDetailRow {
+  id: number;
+  member_email: string;
+  booking_date: string;
+  start_time: string;
+  duration_minutes: number;
+  amount_cents: number;
+  payment_type: string;
+  payment_intent_id: string | null;
+  status: string;
+  created_at: string;
+  expires_at: string;
+  completed_at: string | null;
+  booking_request_id: number | null;
+  stripe_payment_intent_id: string | null;
+}
+
 const router = Router();
 
 interface PrepayEstimateRequest {
@@ -157,7 +191,7 @@ router.post('/api/member/conference/prepay/create-intent', isAuthenticated, asyn
     );
 
     if (existingPrepayment.rows.length > 0) {
-      const existing = existingPrepayment.rows[0];
+      const existing = existingPrepayment.rows[0] as unknown as ExistingPrepaymentRow;
 
       if (existing.status === 'succeeded' || existing.status === 'completed') {
         return res.json({
@@ -200,7 +234,7 @@ router.post('/api/member/conference/prepay/create-intent', isAuthenticated, asyn
       return res.status(404).json({ error: 'User not found' });
     }
 
-    const user = userResult.rows[0];
+    const user = userResult.rows[0] as unknown as UserRow;
     const memberName = [user.first_name, user.last_name].filter(Boolean).join(' ') || normalizedEmail.split('@')[0];
 
     const { customerId: stripeCustomerId } = await getOrCreateStripeCustomer(
@@ -254,20 +288,20 @@ router.post('/api/member/conference/prepay/create-intent', isAuthenticated, asyn
 
           logger.info('[ConferencePrepay] Credit applied successfully', {
             extra: { 
-              prepaymentId: prepaymentResult.rows[0].id, 
+              prepaymentId: (prepaymentResult.rows[0] as unknown as PrepaymentInsertRow).id, 
               memberEmail: normalizedEmail, 
               amountCents: totalCents,
               balanceRef
             }
           });
 
-          try { logFromRequest(req, { action: 'create_conference_prepayment', resourceType: 'payment', resourceId: String(prepaymentResult.rows[0].id), details: { memberEmail: normalizedEmail, date, startTime, durationMinutes, overageMinutes, amountCents: totalCents, paymentType: 'credit', balanceRef } }); } catch (auditErr) { logger.warn('[Audit] Failed to log create_conference_prepayment:', auditErr); }
+          try { logFromRequest(req, { action: 'create_conference_prepayment', resourceType: 'payment', resourceId: String((prepaymentResult.rows[0] as unknown as PrepaymentInsertRow).id), details: { memberEmail: normalizedEmail, date, startTime, durationMinutes, overageMinutes, amountCents: totalCents, paymentType: 'credit', balanceRef } }); } catch (auditErr) { logger.warn('[Audit] Failed to log create_conference_prepayment:', auditErr); }
 
           return res.json({
             creditApplied: true,
             amountCents: totalCents,
             creditReferenceId: balanceRef,
-            prepaymentId: prepaymentResult.rows[0].id,
+            prepaymentId: (prepaymentResult.rows[0] as unknown as PrepaymentInsertRow).id,
             paymentRequired: false
           });
         }
@@ -314,20 +348,20 @@ router.post('/api/member/conference/prepay/create-intent', isAuthenticated, asyn
 
       logger.info('[ConferencePrepay] Paid in full via balance', {
         extra: { 
-          prepaymentId: prepaymentResult.rows[0].id,
+          prepaymentId: (prepaymentResult.rows[0] as unknown as PrepaymentInsertRow).id,
           memberEmail: normalizedEmail, 
           amountCents: totalCents,
           balanceRef
         }
       });
 
-      try { logFromRequest(req, { action: 'create_conference_prepayment', resourceType: 'payment', resourceId: String(prepaymentResult.rows[0].id), details: { memberEmail: normalizedEmail, date, startTime, durationMinutes, overageMinutes, amountCents: totalCents, paymentType: 'balance', balanceRef } }); } catch (auditErr) { logger.warn('[Audit] Failed to log create_conference_prepayment:', auditErr); }
+      try { logFromRequest(req, { action: 'create_conference_prepayment', resourceType: 'payment', resourceId: String((prepaymentResult.rows[0] as unknown as PrepaymentInsertRow).id), details: { memberEmail: normalizedEmail, date, startTime, durationMinutes, overageMinutes, amountCents: totalCents, paymentType: 'balance', balanceRef } }); } catch (auditErr) { logger.warn('[Audit] Failed to log create_conference_prepayment:', auditErr); }
 
       return res.json({
         creditApplied: true,
         amountCents: totalCents,
         creditReferenceId: balanceRef,
-        prepaymentId: prepaymentResult.rows[0].id,
+        prepaymentId: (prepaymentResult.rows[0] as unknown as PrepaymentInsertRow).id,
         paymentRequired: false
       });
     }
@@ -339,16 +373,17 @@ router.post('/api/member/conference/prepay/create-intent', isAuthenticated, asyn
          RETURNING id`
     );
 
+    const insertedRow = prepaymentResult.rows[0] as unknown as PrepaymentInsertRow;
     const stripe = await getStripeClient();
     await stripe.paymentIntents.update(result.paymentIntentId!, {
       metadata: {
-        conferenceBookingId: prepaymentResult.rows[0].id.toString()
+        conferenceBookingId: insertedRow.id.toString()
       }
     });
 
     logger.info('[ConferencePrepay] Payment intent created', {
       extra: { 
-        prepaymentId: prepaymentResult.rows[0].id,
+        prepaymentId: insertedRow.id,
         paymentIntentId: result.paymentIntentId,
         memberEmail: normalizedEmail, 
         totalCents,
@@ -356,7 +391,7 @@ router.post('/api/member/conference/prepay/create-intent', isAuthenticated, asyn
       }
     });
 
-    try { logFromRequest(req, { action: 'create_conference_prepayment', resourceType: 'payment', resourceId: String(prepaymentResult.rows[0].id), details: { memberEmail: normalizedEmail, date, startTime, durationMinutes, overageMinutes, amountCents: totalCents, paymentType: 'stripe', paymentIntentId: result.paymentIntentId, balanceApplied: result.balanceApplied } }); } catch (auditErr) { logger.warn('[Audit] Failed to log create_conference_prepayment:', auditErr); }
+    try { logFromRequest(req, { action: 'create_conference_prepayment', resourceType: 'payment', resourceId: String(insertedRow.id), details: { memberEmail: normalizedEmail, date, startTime, durationMinutes, overageMinutes, amountCents: totalCents, paymentType: 'stripe', paymentIntentId: result.paymentIntentId, balanceApplied: result.balanceApplied } }); } catch (auditErr) { logger.warn('[Audit] Failed to log create_conference_prepayment:', auditErr); }
 
     res.json({
       clientSecret: result.clientSecret,
@@ -364,7 +399,7 @@ router.post('/api/member/conference/prepay/create-intent', isAuthenticated, asyn
       totalCents,
       balanceApplied: result.balanceApplied,
       remainingCents: result.remainingCents,
-      prepaymentId: prepaymentResult.rows[0].id,
+      prepaymentId: insertedRow.id,
       paymentRequired: true
     });
   } catch (error: unknown) {
@@ -399,7 +434,7 @@ router.post('/api/member/conference/prepay/:id/confirm', isAuthenticated, async 
       return res.status(404).json({ error: 'Prepayment not found' });
     }
 
-    const prepayment = prepaymentResult.rows[0];
+    const prepayment = prepaymentResult.rows[0] as unknown as PrepaymentDetailRow;
 
     if (prepayment.member_email.toLowerCase() !== sessionUser.email.toLowerCase()) {
       return res.status(403).json({ error: 'Not authorized to confirm this prepayment' });
@@ -468,7 +503,7 @@ router.get('/api/member/conference/prepay/:id', isAuthenticated, async (req: Req
       return res.status(404).json({ error: 'Prepayment not found' });
     }
 
-    const prepayment = prepaymentResult.rows[0];
+    const prepayment = prepaymentResult.rows[0] as unknown as PrepaymentDetailRow;
 
     if (prepayment.member_email.toLowerCase() !== sessionUser.email.toLowerCase()) {
       return res.status(403).json({ error: 'Not authorized to view this prepayment' });

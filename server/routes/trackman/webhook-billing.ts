@@ -340,7 +340,7 @@ export async function createBookingForMember(
           const sessionIdToCheck = newSessionId || (sessionCheck.rows as Array<Record<string, unknown>>)[0]?.session_id;
           const participantFees = await db.execute(sql`SELECT COALESCE(SUM(cached_fee_cents), 0) as total_fees FROM booking_participants WHERE session_id = ${sessionIdToCheck}`);
           const totalFees = (participantFees.rows as Array<Record<string, unknown>>)[0]?.total_fees || 0;
-          if (totalFees > 0) {
+          if (Number(totalFees) > 0) {
             feeInfo = ` Estimated fees: $${(Number(totalFees) / 100).toFixed(2)}.`;
           }
         } catch (e: unknown) {

@@ -19,7 +19,7 @@ router.post('/api/account/delete-request', isAuthenticated, async (req: Request,
       return res.status(404).json({ error: 'User not found' });
     }
     
-    const user = userResult.rows[0];
+    const user = userResult.rows[0] as unknown as { id: number; email: string; first_name: string | null; last_name: string | null };
     const userName = `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.email;
 
     const existingRequest = await db.execute(sql`SELECT id FROM account_deletion_requests 

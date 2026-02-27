@@ -234,7 +234,7 @@ export async function refundGuestPassForParticipant(
             new Promise<never>((_, reject) => 
               setTimeout(() => reject(new Error('Stripe prices.retrieve timed out after 5s')), 5000)
             )
-          ]) as Stripe.Price;
+          ]) as { unit_amount: number | null };
           if (price.unit_amount) {
             guestFeeCents = price.unit_amount;
           }

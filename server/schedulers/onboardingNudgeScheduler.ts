@@ -36,18 +36,19 @@ async function processOnboardingNudges(): Promise<void> {
 
     logger.info(`[Onboarding Nudge] Found ${membersResult.rows.length} stalled members to nudge`);
 
-    for (const member of membersResult.rows) {
-      const hoursSinceSignup = (Date.now() - new Date(member.created_at).getTime()) / (1000 * 60 * 60);
-      const currentNudgeCount = member.onboarding_nudge_count || 0;
+    for (const rawMember of membersResult.rows) {
+      const member = rawMember as Record<string, unknown>;
+      const hoursSinceSignup = (Date.now() - new Date(String(member.created_at)).getTime()) / (1000 * 60 * 60);
+      const currentNudgeCount = (member.onboarding_nudge_count as number) || 0;
 
       let sendResult: { success: boolean; error?: string } = { success: false };
 
       if (currentNudgeCount === 0 && hoursSinceSignup >= 24) {
-        sendResult = await sendOnboardingNudge24h(member.email, member.first_name);
+        sendResult = await sendOnboardingNudge24h(String(member.email), String(member.first_name));
       } else if (currentNudgeCount === 1 && hoursSinceSignup >= 72) {
-        sendResult = await sendOnboardingNudge72h(member.email, member.first_name);
+        sendResult = await sendOnboardingNudge72h(String(member.email), String(member.first_name));
       } else if (currentNudgeCount === 2 && hoursSinceSignup >= 168) {
-        sendResult = await sendOnboardingNudge7d(member.email, member.first_name);
+        sendResult = await sendOnboardingNudge7d(String(member.email), String(member.first_name));
       } else {
         continue;
       }

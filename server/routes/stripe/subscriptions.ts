@@ -670,9 +670,10 @@ router.post('/api/stripe/subscriptions/confirm-inline-payment', isStaffOrAdmin, 
             }
           }
 
-          const invoicePiId = typeof invoice.payment_intent === 'string'
-            ? invoice.payment_intent
-            : (typeof invoice.payment_intent === 'object' && invoice.payment_intent !== null) ? (invoice.payment_intent as Stripe.PaymentIntent).id : null;
+          const invoicePaymentIntent = (invoice as unknown as Record<string, unknown>).payment_intent;
+          const invoicePiId = typeof invoicePaymentIntent === 'string'
+            ? invoicePaymentIntent
+            : (typeof invoicePaymentIntent === 'object' && invoicePaymentIntent !== null) ? (invoicePaymentIntent as Stripe.PaymentIntent).id : null;
           if (invoicePiId && invoicePiId !== paymentIntentId) {
             try {
               await stripe.paymentIntents.cancel(invoicePiId);
@@ -711,7 +712,7 @@ router.post('/api/stripe/subscriptions/confirm-inline-payment', isStaffOrAdmin, 
       
       if (userResult.length > 0) {
         userEmail = userResult[0].email;
-        tierName = userResult[0].tier;
+        tierName = userResult[0].tier || '';
         
         await db.update(users).set({ membershipStatus: 'active', billingProvider: 'stripe', updatedAt: new Date() }).where(eq(users.id, userId));
         logger.info('[Stripe Subscriptions] Activated member', { extra: { userEmail } });
@@ -725,7 +726,7 @@ router.post('/api/stripe/subscriptions/confirm-inline-payment', isStaffOrAdmin, 
         
         if (custResult.length > 0) {
           userEmail = custResult[0].email;
-          tierName = custResult[0].tier;
+          tierName = custResult[0].tier || '';
           
           await db.update(users).set({ membershipStatus: 'active', billingProvider: 'stripe', updatedAt: new Date() }).where(eq(users.stripeCustomerId, piCustId));
           logger.info('[Stripe Subscriptions] Activated member via customer ID', { extra: { userEmail } });
@@ -1005,7 +1006,7 @@ router.post('/api/stripe/subscriptions/send-activation-link', isStaffOrAdmin, as
 
 router.delete('/api/stripe/subscriptions/cleanup-pending/:userId', isStaffOrAdmin, async (req: Request, res: Response) => {
   try {
-    const { userId } = req.params;
+    const userId = req.params.userId as string;
     const sessionUser = getSessionUser(req);
     
     const userResult = await db.select({

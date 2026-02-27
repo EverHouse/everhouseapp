@@ -321,6 +321,7 @@ router.get('/api/members/:email/history', isStaffOrAdmin, async (req, res) => {
       resourceType: resources.type,
       userEmail: bookingRequests.userEmail,
       userName: bookingRequests.userName,
+      sessionId: bookingRequests.sessionId,
     })
       .from(bookingRequests)
       .leftJoin(resources, eq(bookingRequests.resourceId, resources.id))

@@ -825,7 +825,7 @@ export async function createSessionWithUsageTracking(
     }));
     
     const resourceResult = await db.execute(sql`SELECT type FROM resources WHERE id = ${request.resourceId}`);
-    const resourceType = resourceResult.rows[0]?.type || 'simulator';
+    const resourceType = String((resourceResult.rows[0] as Record<string, unknown>)?.type || 'simulator');
 
     // Step 4: Calculate billing using the centralized billing calculator (pre-transaction)
     const billingResult = await calculateFullSessionBilling(

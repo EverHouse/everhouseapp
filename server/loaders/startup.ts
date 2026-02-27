@@ -3,6 +3,7 @@ import { seedTrainingSections } from '../routes/training';
 import { getStripeSync } from '../core/stripe';
 import { getStripeEnvironmentInfo, getStripeClient } from '../core/stripe/client';
 import { runMigrations } from 'stripe-replit-sync';
+import type Stripe from 'stripe';
 import { enableRealtimeForTable } from '../core/supabase/client';
 import { initMemberSyncSettings } from '../core/memberSync';
 import { getErrorMessage } from '../utils/errorUtils';
@@ -194,9 +195,9 @@ export async function runStartupTasks(): Promise<void> {
         ];
 
         try {
-          const webhookObj = result?.webhook || result;
+          const webhookObj = ((result as Record<string, unknown>)?.webhook || result) as Record<string, unknown>;
           if (webhookObj?.id) {
-            const currentEvents = webhookObj.enabled_events || [];
+            const currentEvents = (webhookObj.enabled_events || []) as string[];
             const missingEvents = requiredEvents.filter(
               (e: string) => !currentEvents.includes(e) && !currentEvents.includes('*')
             );
@@ -204,8 +205,8 @@ export async function runStartupTasks(): Promise<void> {
               logger.info(`[Stripe] Webhook missing ${missingEvents.length} event types, updating...`, { extra: { missingEvents } });
               const { getStripeClient } = await import('../core/stripe/client');
               const stripe = await getStripeClient();
-              await stripe.webhookEndpoints.update(webhookObj.id, {
-                enabled_events: requiredEvents as any,
+              await stripe.webhookEndpoints.update(String(webhookObj.id), {
+                enabled_events: requiredEvents as unknown as Stripe.WebhookEndpointUpdateParams.EnabledEvent[],
               });
               logger.info('[Stripe] Webhook events updated successfully');
             } else {

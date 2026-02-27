@@ -138,7 +138,7 @@ const TeamTab: React.FC = () => {
           role: member.role,
         }),
       }),
-    onMutate: async (member) => {
+    onMutate: async (member: TeamMember) => {
       await queryClient.cancelQueries({ queryKey: ['staff-users'] });
       const previous = queryClient.getQueryData<TeamMember[]>(['staff-users']);
       queryClient.setQueryData<TeamMember[]>(['staff-users'], (old = []) =>

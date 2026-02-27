@@ -254,7 +254,7 @@ const Profile: React.FC = () => {
       const previous = queryClient.getQueryData<PreferencesData>(['memberPreferences', user?.email]);
       queryClient.setQueryData<PreferencesData>(['memberPreferences', user?.email], (old) => {
         if (!old) return old;
-        return { ...old, ...data };
+        return { ...old, ...(data as Partial<PreferencesData>) };
       });
       return { previous };
     },
@@ -327,7 +327,7 @@ const Profile: React.FC = () => {
       const previous = queryClient.getQueryData<PreferencesData>(['memberPreferences', user?.email]);
       queryClient.setQueryData<PreferencesData>(['memberPreferences', user?.email], (old) => {
         if (!old) return old;
-        return { ...old, ...data };
+        return { ...old, ...(data as Partial<PreferencesData>) };
       });
       return { previous };
     },

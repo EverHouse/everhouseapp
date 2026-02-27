@@ -7,6 +7,17 @@ import { notifyAllStaff } from '../core/notificationService';
 import { getStripeClient } from '../core/stripe/client';
 import { logger } from '../core/logger';
 
+interface GracePeriodMemberRow {
+  id: number;
+  email: string;
+  first_name: string | null;
+  last_name: string | null;
+  tier: string | null;
+  grace_period_start: string;
+  grace_period_email_count: number;
+  stripe_customer_id: string | null;
+}
+
 const GRACE_PERIOD_HOUR = 10;
 const GRACE_PERIOD_DAYS = 3;
 
@@ -73,7 +84,7 @@ async function processGracePeriodMembers(): Promise<void> {
     
     logger.info(`[Grace Period] Found ${membersResult.rows.length} members in grace period`);
     
-    for (const member of membersResult.rows) {
+    for (const member of membersResult.rows as unknown as GracePeriodMemberRow[]) {
       const { id, email, first_name, last_name, tier, grace_period_start, grace_period_email_count, stripe_customer_id } = member;
       const memberName = `${first_name || ''} ${last_name || ''}`.trim() || email;
       const newEmailCount = (grace_period_email_count || 0) + 1;
@@ -81,7 +92,7 @@ async function processGracePeriodMembers(): Promise<void> {
       try {
         const reactivationLink = await getReactivationLink(stripe_customer_id);
         
-        await sendGracePeriodReminderEmail(email, {
+        await sendGracePeriodReminderEmail(email as string, {
           memberName,
           currentDay: newEmailCount,
           totalDays: GRACE_PERIOD_DAYS,

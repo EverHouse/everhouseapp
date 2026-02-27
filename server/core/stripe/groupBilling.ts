@@ -189,8 +189,10 @@ export async function getBillingGroupByPrimaryEmail(primaryEmail: string): Promi
         sql`SELECT email, first_name, last_name FROM users WHERE LOWER(email) = ANY(${toTextArrayLiteral(memberEmails)}::text[])`
       )
     : { rows: [] };
+  interface GroupUserRow { email: string; first_name: string | null; last_name: string | null }
+  const typedRows = allMemberUsers.rows as unknown as GroupUserRow[];
   const memberUserMap = new Map(
-    allMemberUsers.rows.map((r: Record<string, unknown>) => [(r.email as string).toLowerCase(), r])
+    typedRows.map((r) => [r.email.toLowerCase(), r])
   );
 
   const memberInfos: GroupMemberInfo[] = [];
@@ -277,7 +279,7 @@ export async function createBillingGroup(params: {
       sql`SELECT stripe_customer_id FROM users WHERE LOWER(email) = ${params.primaryEmail.toLowerCase()}`
     );
     
-    const stripeCustomerId = primaryUserResult.rows[0]?.stripe_customer_id || null;
+    const stripeCustomerId = (primaryUserResult.rows[0] as unknown as { stripe_customer_id: string | null } | undefined)?.stripe_customer_id || null;
     
     const groupId = await db.transaction(async (tx) => {
       const result = await tx.insert(billingGroups).values({

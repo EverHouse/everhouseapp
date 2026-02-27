@@ -187,7 +187,7 @@ export async function getGuestPassesRemaining(memberEmail: string): Promise<numb
          )`
     );
     
-    const usedPasses = parseInt(result.rows[0]?.guest_count || '0');
+    const usedPasses = parseInt(String((result.rows[0] as Record<string, unknown>)?.guest_count || '0'));
     
     return Math.max(0, limits.guest_passes_per_month - usedPasses);
   } catch (error: unknown) {

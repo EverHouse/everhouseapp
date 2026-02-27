@@ -20,7 +20,22 @@ import {
   deleteFromSheet
 } from '../core/googleSheets/announcementSync';
 import { systemSettings } from '../../shared/models/system';
-import { safeErrorDetail } from '../utils/errorUtils';
+import { safeErrorDetail, getErrorMessage } from '../utils/errorUtils';
+
+interface AnnouncementRow {
+  id: number;
+  title: string;
+  message: string | null;
+  priority: string | null;
+  is_active: boolean;
+  starts_at: string | null;
+  ends_at: string | null;
+  link_type: string | null;
+  link_target: string | null;
+  show_as_banner: boolean;
+  created_by: string | null;
+  created_at: string | null;
+}
 
 const router = Router();
 
@@ -63,7 +78,7 @@ router.get('/api/announcements', async (req, res) => {
       endDate: a.endsAt ? formatDatePacific(new Date(a.endsAt)) : undefined,
       linkType: a.linkType || undefined,
       linkTarget: a.linkTarget || undefined,
-      showAsBanner: (a as unknown as Record<string, unknown>).show_as_banner === true
+      showAsBanner: (a as unknown as { show_as_banner: boolean }).show_as_banner === true
     }));
     
     res.json(formatted);
@@ -136,7 +151,7 @@ router.get('/api/announcements/export', isStaffOrAdmin, async (req, res) => {
     
     // Build CSV rows
     const rows = results.map(a => {
-      const showBanner = (a as unknown as Record<string, unknown>).show_as_banner === true ? 'Yes' : 'No';
+      const showBanner = (a as unknown as { show_as_banner: boolean }).show_as_banner === true ? 'Yes' : 'No';
       return [
         a.id,
         escapeCsv(a.title),
@@ -202,8 +217,8 @@ router.post('/api/announcements', isStaffOrAdmin, async (req, res) => {
       )
       RETURNING *
     `);
-    const resultRows = (result as { rows?: Record<string, unknown>[] }).rows || (result as unknown as Record<string, unknown>[]);
-    const newAnnouncement = (Array.isArray(resultRows) ? resultRows[0] : resultRows) as Record<string, unknown>;
+    const resultRows = result.rows as unknown as AnnouncementRow[];
+    const newAnnouncement = resultRows[0];
     
     const responseData = {
       id: newAnnouncement.id.toString(),
@@ -212,19 +227,19 @@ router.post('/api/announcements', isStaffOrAdmin, async (req, res) => {
       type: 'announcement' as const,
       priority: (newAnnouncement.priority || 'normal') as 'normal' | 'high' | 'urgent',
       date: 'Just now',
-      createdAt: newAnnouncement.created_at ? new Date(newAnnouncement.created_at as string).toISOString() : new Date().toISOString(),
-      startDate: newAnnouncement.starts_at ? formatDatePacific(new Date(newAnnouncement.starts_at as string)) : undefined,
-      endDate: newAnnouncement.ends_at ? formatDatePacific(new Date(newAnnouncement.ends_at as string)) : undefined,
-      linkType: (newAnnouncement.link_type as string) || undefined,
-      linkTarget: (newAnnouncement.link_target as string) || undefined,
-      showAsBanner: (newAnnouncement.show_as_banner as boolean) || false
+      createdAt: newAnnouncement.created_at ? new Date(newAnnouncement.created_at).toISOString() : new Date().toISOString(),
+      startDate: newAnnouncement.starts_at ? formatDatePacific(new Date(newAnnouncement.starts_at)) : undefined,
+      endDate: newAnnouncement.ends_at ? formatDatePacific(new Date(newAnnouncement.ends_at)) : undefined,
+      linkType: newAnnouncement.link_type || undefined,
+      linkTarget: newAnnouncement.link_target || undefined,
+      showAsBanner: newAnnouncement.show_as_banner || false
     };
     
     // Broadcast real-time update to all connected clients
     broadcastAnnouncementUpdate('created', responseData);
     
     // Log audit trail
-    logFromRequest(req, 'create_announcement', 'announcement', newAnnouncement.id.toString(), title, {
+    logFromRequest(req, 'create_announcement', 'announcement', String(newAnnouncement.id), title, {
       message: description,
       priority: 'normal',
       startsAt: startDate,
@@ -240,7 +255,7 @@ router.post('/api/announcements', isStaffOrAdmin, async (req, res) => {
           title: title,
           body: description || title,
           url: '/updates?tab=announcements',
-          tag: `announcement-${newAnnouncement.id}`
+          tag: `announcement-${String(newAnnouncement.id)}`
         });
       } catch (pushErr: unknown) {
         logger.error('Failed to send push notifications for announcement', { extra: { error: getErrorMessage(pushErr) } });
@@ -249,7 +264,7 @@ router.post('/api/announcements', isStaffOrAdmin, async (req, res) => {
     
     getLinkedSheetId().then(sheetId => {
       if (sheetId) {
-        pushSingleAnnouncement(sheetId, newAnnouncement).catch(err => {
+        pushSingleAnnouncement(sheetId, newAnnouncement as unknown as Record<string, unknown>).catch(err => {
           logger.error('Failed to sync new announcement to Google Sheet', { extra: { error: getErrorMessage(err) } });
         });
       }
@@ -288,8 +303,8 @@ router.put('/api/announcements/:id', isStaffOrAdmin, async (req, res) => {
       RETURNING *
     `);
     
-    const resultsRows = (results as { rows?: Record<string, unknown>[] }).rows || (results as unknown as Record<string, unknown>[]);
-    const updated = (Array.isArray(resultsRows) ? resultsRows[0] : resultsRows) as Record<string, unknown>;
+    const resultsRows = results.rows as unknown as AnnouncementRow[];
+    const updated = resultsRows[0];
     
     if (!updated) {
       return res.status(404).json({ error: 'Announcement not found' });
@@ -301,20 +316,20 @@ router.put('/api/announcements/:id', isStaffOrAdmin, async (req, res) => {
       desc: updated.message || '',
       type: 'announcement' as const,
       priority: (updated.priority || 'normal') as 'normal' | 'high' | 'urgent',
-      date: updated.created_at ? new Date(updated.created_at as string).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: CLUB_TIMEZONE }) : 'Just now',
-      createdAt: updated.created_at ? new Date(updated.created_at as string).toISOString() : new Date().toISOString(),
-      startDate: updated.starts_at ? formatDatePacific(new Date(updated.starts_at as string)) : undefined,
-      endDate: updated.ends_at ? formatDatePacific(new Date(updated.ends_at as string)) : undefined,
-      linkType: (updated.link_type as string) || undefined,
-      linkTarget: (updated.link_target as string) || undefined,
-      showAsBanner: (updated.show_as_banner as boolean) || false
+      date: updated.created_at ? new Date(updated.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: CLUB_TIMEZONE }) : 'Just now',
+      createdAt: updated.created_at ? new Date(updated.created_at).toISOString() : new Date().toISOString(),
+      startDate: updated.starts_at ? formatDatePacific(new Date(updated.starts_at)) : undefined,
+      endDate: updated.ends_at ? formatDatePacific(new Date(updated.ends_at)) : undefined,
+      linkType: updated.link_type || undefined,
+      linkTarget: updated.link_target || undefined,
+      showAsBanner: updated.show_as_banner || false
     };
     
     // Broadcast real-time update to all connected clients
     broadcastAnnouncementUpdate('updated', responseData);
     
     // Log audit trail
-    logFromRequest(req, 'update_announcement', 'announcement', updated.id.toString(), title, {
+    logFromRequest(req, 'update_announcement', 'announcement', String(updated.id), title, {
       message: description,
       priority: updated.priority || 'normal',
       startsAt: startDate,
@@ -330,7 +345,7 @@ router.put('/api/announcements/:id', isStaffOrAdmin, async (req, res) => {
           title: title,
           body: description || title,
           url: '/updates?tab=announcements',
-          tag: `announcement-${updated.id}`
+          tag: `announcement-${String(updated.id)}`
         });
       } catch (pushErr: unknown) {
         logger.error('Failed to send push notifications for announcement', { extra: { error: getErrorMessage(pushErr) } });
@@ -339,7 +354,7 @@ router.put('/api/announcements/:id', isStaffOrAdmin, async (req, res) => {
     
     getLinkedSheetId().then(sheetId => {
       if (sheetId) {
-        pushSingleAnnouncement(sheetId, updated).catch(err => {
+        pushSingleAnnouncement(sheetId, updated as unknown as Record<string, unknown>).catch(err => {
           logger.error('Failed to sync updated announcement to Google Sheet', { extra: { error: getErrorMessage(err) } });
         });
       }

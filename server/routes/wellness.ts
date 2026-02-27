@@ -682,16 +682,14 @@ router.put('/api/wellness-classes/:id', isStaffOrAdmin, async (req, res) => {
                   return `${endHours.toString().padStart(2, '0')}:${endMins.toString().padStart(2, '0')}:00`;
                 };
                 
-                const startTime24 = convertTime(row.time);
-                const endTime24 = calcEndTime(startTime24, row.duration || updated.duration);
+                const startTime24 = convertTime(row.time as string);
+                const endTime24 = calcEndTime(startTime24, (row.duration as string) || (updated.duration as string));
                 
-                // First remove any existing blocks for this instance
-                await removeWellnessAvailabilityBlocks(row.id);
-                // Then create new blocks
+                await removeWellnessAvailabilityBlocks(row.id as number);
                 await createWellnessAvailabilityBlocks(
-                  row.id, row.date, startTime24, endTime24, 
+                  row.id as number, row.date as string, startTime24, endTime24, 
                   newBlockSimulators, newBlockConferenceRoom, 
-                  recurringUserEmail, row.title || updated.title
+                  recurringUserEmail, (row.title as string) || (updated.title as string)
                 );
               } catch (blockError: unknown) {
                 logger.error(`Failed to create blocks for recurring wellness class ${row.id}`, { extra: { error: blockError } });
@@ -699,9 +697,9 @@ router.put('/api/wellness-classes/:id', isStaffOrAdmin, async (req, res) => {
             }
           } else {
             // Blocking was disabled - remove blocks from all recurring instances
-            for (const row of recurringResult.rows) {
+            for (const row of recurringResult.rows as Array<Record<string, unknown>>) {
               try {
-                await removeWellnessAvailabilityBlocks(row.id);
+                await removeWellnessAvailabilityBlocks(row.id as number);
               } catch (blockError: unknown) {
                 logger.error(`Failed to remove blocks for recurring wellness class ${row.id}`, { extra: { error: blockError } });
               }
@@ -936,10 +934,10 @@ router.post('/api/wellness-enrollments', isAuthenticated, async (req, res) => {
     const memberName = await getMemberDisplayName(user_email);
     
     // Check capacity and determine if this should be a waitlist enrollment
-    const capacity = cls.capacity;
-    const enrolledCount = cls.enrolled_count;
+    const capacity = cls.capacity as number | null;
+    const enrolledCount = cls.enrolled_count as number;
     const waitlistEnabled = cls.waitlist_enabled;
-    const isAtCapacity = capacity !== null && enrolledCount >= capacity;
+    const isAtCapacity = capacity !== null && capacity !== undefined && enrolledCount >= capacity;
     
     // If at capacity and no waitlist, reject enrollment
     if (isAtCapacity && !waitlistEnabled) {
@@ -1018,7 +1016,8 @@ router.post('/api/wellness-enrollments', isAuthenticated, async (req, res) => {
 
 router.delete('/api/wellness-enrollments/:class_id/:user_email', isAuthenticated, async (req, res) => {
   try {
-    const { class_id, user_email: rawUserEmail } = req.params;
+    const { class_id: rawClassId, user_email: rawUserEmail } = req.params;
+    const class_id = rawClassId as string;
     const user_email = decodeURIComponent(rawUserEmail as string).trim().toLowerCase();
     const enrollmentEmail = user_email;
     

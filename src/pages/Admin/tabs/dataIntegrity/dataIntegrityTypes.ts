@@ -67,6 +67,8 @@ export interface IssueContext {
   booking2Status?: string;
   member2Email?: string;
   member2Name?: string;
+  issueKey?: string;
+  linkedBookingId?: number;
 }
 
 export interface IgnoreInfo {

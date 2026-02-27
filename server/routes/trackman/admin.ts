@@ -2890,7 +2890,7 @@ router.put('/api/admin/booking/:bookingId/members/:slotId/link', isStaffOrAdmin,
           });
 
           broadcastBookingRosterUpdate({
-            bookingId: parseInt(bookingId),
+            bookingId: parseInt(bookingId as string),
             sessionId: sessionId as number,
             action: 'participant_added',
             memberEmail: memberEmail.toLowerCase(),
@@ -2965,7 +2965,7 @@ router.put('/api/admin/booking/:bookingId/members/:slotId/link', isStaffOrAdmin,
     });
 
     broadcastBookingRosterUpdate({
-      bookingId: parseInt(bookingId),
+      bookingId: parseInt(bookingId as string),
       sessionId: sessionId as number,
       action: 'participant_added',
       memberEmail: memberEmail.toLowerCase(),
@@ -3022,7 +3022,7 @@ router.put('/api/admin/booking/:bookingId/members/:slotId/unlink', isStaffOrAdmi
     });
 
     broadcastBookingRosterUpdate({
-      bookingId: parseInt(bookingId),
+      bookingId: parseInt(bookingId as string),
       sessionId: sessionId as number,
       action: 'participant_removed',
       memberEmail: String(memberEmail).toLowerCase(),

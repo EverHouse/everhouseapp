@@ -121,7 +121,7 @@ export async function commitTierChange(
         sql`SELECT name FROM membership_tiers WHERE stripe_price_id = ${currentPriceId} OR founding_price_id = ${currentPriceId}`
       );
       if (currentTierResult.rows.length > 0) {
-        currentTierName = currentTierResult.rows[0].name;
+        currentTierName = String((currentTierResult.rows[0] as Record<string, unknown>).name);
       }
     }
     

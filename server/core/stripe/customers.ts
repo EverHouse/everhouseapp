@@ -7,6 +7,36 @@ import { getErrorMessage, getErrorCode, isStripeError } from '../../utils/errorU
 
 import { toTextArrayLiteral } from '../../utils/sqlArrayLiteral';
 import { logger } from '../logger';
+
+interface UserRow {
+  id: string;
+  email: string;
+  stripe_customer_id: string | null;
+  membership_status: string | null;
+  tier: string | null;
+  first_name: string | null;
+  last_name: string | null;
+  phone: string | null;
+  archived_at: string | null;
+  hubspot_id: string | null;
+  lifetime_visits: number | null;
+}
+
+interface LinkedEmailRow {
+  linked_email: string;
+}
+
+interface StripeCustomerRow {
+  stripe_customer_id: string | null;
+  email: string;
+  priority?: number;
+}
+
+interface HubspotRow {
+  stripe_customer_id: string | null;
+  email: string;
+  hubspot_id: string | null;
+}
 const PLACEHOLDER_EMAIL_PATTERNS = [
   '@visitors.evenhouse.club',
   '@trackman.local',
@@ -64,7 +94,7 @@ export async function resolveUserByEmail(email: string): Promise<ResolvedUser | 
   const directMatch = await db.execute(sql`SELECT id, email, stripe_customer_id, membership_status, tier, first_name, last_name
      FROM users WHERE LOWER(email) = ${normalizedEmail} AND archived_at IS NULL`);
   if (directMatch.rows.length > 0) {
-    const u = directMatch.rows[0] as Record<string, unknown>;
+    const u = directMatch.rows[0] as unknown as UserRow;
     return {
       userId: u.id,
       primaryEmail: u.email,
@@ -84,7 +114,7 @@ export async function resolveUserByEmail(email: string): Promise<ResolvedUser | 
        WHERE LOWER(ule.linked_email) = ${normalizedEmail} AND u.archived_at IS NULL
        LIMIT 1`);
     if (linkedMatch.rows.length > 0) {
-      const u = linkedMatch.rows[0] as Record<string, unknown>;
+      const u = linkedMatch.rows[0] as unknown as UserRow;
       return {
         userId: u.id,
         primaryEmail: u.email,
@@ -107,7 +137,7 @@ export async function resolveUserByEmail(email: string): Promise<ResolvedUser | 
          AND archived_at IS NULL
        LIMIT 1`);
     if (manualMatch.rows.length > 0) {
-      const u = manualMatch.rows[0] as Record<string, unknown>;
+      const u = manualMatch.rows[0] as unknown as UserRow;
       return {
         userId: u.id,
         primaryEmail: u.email,
@@ -140,11 +170,11 @@ export async function getOrCreateStripeCustomer(
   
   const userResult = await db.execute(sql`SELECT stripe_customer_id, tier, first_name, last_name, email, phone, archived_at FROM users WHERE id = ${userId}`);
   
-  const userRow = (userResult.rows as Array<Record<string, unknown>>)[0];
+  const userRow = (userResult.rows as unknown as UserRow[])[0];
   const userTier = tier || userRow?.tier;
   const resolvedName = name || (userRow?.first_name && userRow?.last_name
     ? `${userRow.first_name} ${userRow.last_name}`.trim()
-    : (userRow?.first_name as string) || undefined);
+    : userRow?.first_name || undefined);
   
   if (userRow?.stripe_customer_id) {
     const existingCustomerId = userRow.stripe_customer_id as string;
@@ -152,8 +182,8 @@ export async function getOrCreateStripeCustomer(
       const stripeForValidation = await getStripeClient();
       const existingCustomer = await stripeForValidation.customers.retrieve(existingCustomerId);
       
-      const firstName = userRow?.first_name;
-      const lastName = userRow?.last_name;
+      const firstName = userRow?.first_name as string | null;
+      const lastName = userRow?.last_name as string | null;
       
       // Update metadata and name if missing
       const cust = existingCustomer as Stripe.Customer | Stripe.DeletedCustomer;
@@ -175,7 +205,7 @@ export async function getOrCreateStripeCustomer(
         if (firstName) updateMetadata.firstName = firstName;
         if (lastName) updateMetadata.lastName = lastName;
         
-        const userPhone = userRow?.phone;
+        const userPhone = userRow?.phone as string | null;
         await stripeForValidation.customers.update(existingCustomerId, {
           metadata: updateMetadata,
           ...(resolvedName && !('name' in existingCustomer && existingCustomer.name) ? { name: resolvedName } : {}),
@@ -196,7 +226,7 @@ export async function getOrCreateStripeCustomer(
   }
 
   const linkedEmailsResult = await db.execute(sql`SELECT linked_email FROM user_linked_emails WHERE LOWER(primary_email) = LOWER(${email})`);
-  const linkedEmails = linkedEmailsResult.rows.map((r: Record<string, unknown>) => (r.linked_email as string).toLowerCase());
+  const linkedEmails = (linkedEmailsResult.rows as unknown as LinkedEmailRow[]).map(r => r.linked_email.toLowerCase());
   const allEmails = [email.toLowerCase(), ...linkedEmails];
   const uniqueEmails = [...new Set(allEmails)];
 
@@ -211,8 +241,9 @@ export async function getOrCreateStripeCustomer(
      ORDER BY priority ASC, u.created_at DESC
      LIMIT 1`);
   
-  if (existingFromLinkedResult.rows[0]?.stripe_customer_id) {
-    const existingCustomerId = existingFromLinkedResult.rows[0].stripe_customer_id;
+  const existingLinkedRow = (existingFromLinkedResult.rows as unknown as StripeCustomerRow[])[0];
+  if (existingLinkedRow?.stripe_customer_id) {
+    const existingCustomerId = existingLinkedRow.stripe_customer_id;
     try {
       const stripeForValidation = await getStripeClient();
       await stripeForValidation.customers.retrieve(existingCustomerId);
@@ -243,22 +274,24 @@ export async function getOrCreateStripeCustomer(
      FROM users u 
      WHERE u.id = ${userId} AND u.hubspot_id IS NOT NULL`);
 
-  if (hubspotResult.rows[0]?.hubspot_id) {
+  const hubspotRow = (hubspotResult.rows as unknown as HubspotRow[])[0];
+  if (hubspotRow?.hubspot_id) {
     const hubspotMatchResult = await db.execute(sql`SELECT u.stripe_customer_id, u.email
        FROM users u
-       WHERE u.hubspot_id = ${hubspotResult.rows[0].hubspot_id}
+       WHERE u.hubspot_id = ${hubspotRow.hubspot_id}
          AND u.id != ${userId}
          AND u.stripe_customer_id IS NOT NULL
          AND u.archived_at IS NULL
        ORDER BY u.membership_status = 'active' DESC, u.lifetime_visits DESC
        LIMIT 1`);
 
-    if (hubspotMatchResult.rows[0]?.stripe_customer_id) {
-      const existingCustomerId = hubspotMatchResult.rows[0].stripe_customer_id;
+    const hubspotMatchRow = (hubspotMatchResult.rows as unknown as StripeCustomerRow[])[0];
+    if (hubspotMatchRow?.stripe_customer_id) {
+      const existingCustomerId = hubspotMatchRow.stripe_customer_id;
       try {
         const stripeForValidation = await getStripeClient();
         await stripeForValidation.customers.retrieve(existingCustomerId);
-        logger.info(`[Stripe] Found existing customer ${existingCustomerId} via HubSpot ID match for user ${userId} (matched user: ${hubspotMatchResult.rows[0].email})`);
+        logger.info(`[Stripe] Found existing customer ${existingCustomerId} via HubSpot ID match for user ${userId} (matched user: ${hubspotMatchRow.email})`);
         
         await db.execute(sql`UPDATE users SET stripe_customer_id = ${existingCustomerId}, archived_at = NULL, archived_by = NULL, updated_at = NOW() WHERE id = ${userId}`);
         if (userRow?.archived_at) {
@@ -322,7 +355,8 @@ export async function getOrCreateStripeCustomer(
           if (!ownershipVerified) {
             const alreadyLinkedResult = await db.execute(sql`SELECT id, email FROM users WHERE stripe_customer_id = ANY(${toTextArrayLiteral(sortedCustomers.map(c => c.id))}::text[]) AND id != ${userId} AND archived_at IS NULL LIMIT 1`);
             if (alreadyLinkedResult.rows.length > 0) {
-              logger.warn(`[Stripe] Customer(s) found via linked email ${searchEmail} but already linked to different user ${alreadyLinkedResult.rows[0].email} — skipping to prevent cross-linking`);
+              const alreadyLinkedRow = alreadyLinkedResult.rows[0] as unknown as { id: string; email: string };
+              logger.warn(`[Stripe] Customer(s) found via linked email ${searchEmail} but already linked to different user ${alreadyLinkedRow.email} — skipping to prevent cross-linking`);
               continue;
             }
             
@@ -379,8 +413,8 @@ export async function getOrCreateStripeCustomer(
   if (userTier) {
     metadata.tier = userTier;
   }
-  const firstName = userRow?.first_name;
-  const lastName = userRow?.last_name;
+  const firstName = userRow?.first_name as string | null;
+  const lastName = userRow?.last_name as string | null;
   if (firstName) metadata.firstName = firstName;
   if (lastName) metadata.lastName = lastName;
   if (linkedEmails.length > 0) {
@@ -388,7 +422,7 @@ export async function getOrCreateStripeCustomer(
   }
 
   try {
-    const userPhone = userRow?.phone;
+    const userPhone = userRow?.phone as string | null;
 
     if (foundCustomerId) {
       customerId = foundCustomerId;
@@ -460,7 +494,7 @@ export async function syncCustomerMetadataToStripe(
       return { success: false, error: 'User not found' };
     }
     
-    const user = userResult.rows[0];
+    const user = userResult.rows[0] as unknown as UserRow;
     if (!user.stripe_customer_id) {
       return { success: false, error: 'No Stripe customer linked' };
     }
@@ -504,7 +538,8 @@ export async function syncAllCustomerMetadata(): Promise<{ synced: number; faile
   
   const stripe = await getStripeClient();
   
-  for (const user of result.rows) {
+  for (const rawUser of result.rows) {
+    const user = rawUser as unknown as UserRow;
     try {
       const metadata: Record<string, string> = {
         userId: user.id,
@@ -524,7 +559,7 @@ export async function syncAllCustomerMetadata(): Promise<{ synced: number; faile
         updateParams.phone = user.phone;
       }
       
-      await stripe.customers.update(user.stripe_customer_id, updateParams);
+      await stripe.customers.update(user.stripe_customer_id!, updateParams);
       synced++;
     } catch (error: unknown) {
       logger.error(`[Stripe] Failed to sync metadata for ${user.email}:`, { extra: { detail: getErrorMessage(error) } });

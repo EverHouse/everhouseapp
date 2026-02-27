@@ -344,9 +344,10 @@ router.get('/api/booking-requests', async (req, res) => {
       });
     }
     
-    const enrichedResult = result.map((booking: Record<string, unknown>) => {
+    const enrichedResult = result.map((booking) => {
+      const mutableBooking = booking as Record<string, unknown>;
       if (!isStaffRequest) {
-        delete booking.staff_notes;
+        delete mutableBooking.staff_notes;
       }
       const memberCounts = (booking.session_id ? memberCountsMap.get(booking.session_id) : undefined) || { total: 0, filled: 0 };
       const actualGuestCount = (booking.session_id ? guestCountsMap.get(booking.session_id) : undefined) || 0;
@@ -360,7 +361,7 @@ router.get('/api/booking-requests', async (req, res) => {
       } else if (memberCounts.total > 0) {
         totalPlayerCount = memberCounts.total + actualGuestCount;
       } else {
-        totalPlayerCount = Math.max(legacyGuestCount + 1, 1);
+        totalPlayerCount = Math.max((legacyGuestCount as number) + 1, 1);
       }
       
       const isPrimaryBooker = booking.user_email?.toLowerCase() === requestingUserEmail;
@@ -642,7 +643,7 @@ router.post('/api/booking-requests', bookingRateLimiter, async (req, res) => {
               if (!participant.name) {
                 participant.name = existingUser.name || 
                   `${existingUser.firstName || ''} ${existingUser.lastName || ''}`.trim() || 
-                  existingUser.email;
+                  existingUser.email || undefined;
               }
               logger.info('[Booking] Resolved email for directory-selected participant', { extra: { participantEmail: participant.email } });
             }
@@ -758,7 +759,7 @@ router.post('/api/booking-requests', bookingRateLimiter, async (req, res) => {
       await client.query('ROLLBACK');
       throw error;
     } finally {
-      try { client.release(); } catch (releaseErr) { logger.warn('[Booking] Client release failed:', releaseErr); }
+      try { client.release(); } catch (releaseErr: unknown) { logger.warn('[Booking] Client release failed:', { extra: { error: releaseErr } }); }
     }
     
     // Ensure session exists for auto-confirmed conference room bookings
@@ -831,7 +832,7 @@ router.post('/api/booking-requests', bookingRateLimiter, async (req, res) => {
         const sessionResult = await db.execute(sql`SELECT session_id FROM booking_requests WHERE id = ${row.id} LIMIT 1`);
         const confSessionId = sessionResult.rows[0]?.session_id as number | null;
         if (confSessionId) {
-          await recalculateSessionFees(confSessionId, 'booking_creation');
+          await recalculateSessionFees(confSessionId, 'approval');
           await syncBookingInvoice(row.id, confSessionId);
           
           // Auto-finalize and pay using Stripe credit balance
@@ -1210,9 +1211,9 @@ router.put('/api/booking-requests/:id/member-cancel', async (req, res) => {
       try {
         const guestParticipants = await db.execute(sql`SELECT display_name FROM booking_participants
            WHERE session_id = ${existing.sessionId} AND participant_type = 'guest' AND used_guest_pass = true`);
-        for (const guest of guestParticipants.rows) {
+        for (const guest of guestParticipants.rows as Array<Record<string, unknown>>) {
           try {
-            await refundGuestPass(existing.userEmail, guest.display_name || undefined, false);
+            await refundGuestPass(existing.userEmail, (guest.display_name as string) || undefined, false);
             logger.info('[Member Cancel] Refunded guest pass for participant', { extra: { bookingId, guestName: guest.display_name, ownerEmail: existing.userEmail } });
           } catch (refundErr: unknown) {
             logger.error('[Member Cancel] Failed to refund guest pass (non-blocking)', { extra: { bookingId, guestName: guest.display_name, error: getErrorMessage(refundErr) } });
@@ -1254,9 +1255,9 @@ router.put('/api/booking-requests/:id/member-cancel', async (req, res) => {
           
           if (paidParticipants.rows.length > 0) {
             const stripe = await getStripeClient();
-            for (const participant of paidParticipants.rows) {
+            for (const rawParticipant of paidParticipants.rows as Array<Record<string, unknown>>) {
               try {
-                const pi = await stripe.paymentIntents.retrieve(participant.stripe_payment_intent_id);
+                const pi = await stripe.paymentIntents.retrieve(rawParticipant.stripe_payment_intent_id as string);
                 if (pi.status === 'succeeded' && pi.latest_charge) {
                   const refund = await stripe.refunds.create({
                     charge: pi.latest_charge as string,
@@ -1264,17 +1265,17 @@ router.put('/api/booking-requests/:id/member-cancel', async (req, res) => {
                     metadata: {
                       type: 'booking_cancelled',
                       bookingId: bookingId.toString(),
-                      participantId: participant.id.toString()
+                      participantId: String(rawParticipant.id)
                     }
                   }, {
-                    idempotencyKey: `refund_cancel_participant_${bookingId}_${participant.stripe_payment_intent_id}`
+                    idempotencyKey: `refund_cancel_participant_${bookingId}_${rawParticipant.stripe_payment_intent_id}`
                   });
                   refundedAmountCents += refund.amount;
-                  refundType = refundType === 'overage' ? 'both' : 'guest_fees';
-                  logger.info('[Member Cancel] Refunded guest fee for : $, refund', { extra: { participantDisplay_name: participant.display_name, participantCached_fee_cents_100_ToFixed_2: (participant.cached_fee_cents / 100).toFixed(2), refundId: refund.id } });
+                  refundType = refundType === 'none' ? 'guest_fees' : 'both';
+                  logger.info('[Member Cancel] Refunded guest fee for : $, refund', { extra: { participantDisplay_name: rawParticipant.display_name, participantCached_fee_cents_100_ToFixed_2: (Number(rawParticipant.cached_fee_cents) / 100).toFixed(2), refundId: refund.id } });
                 }
               } catch (refundErr: unknown) {
-                logger.error('[Member Cancel] Failed to refund participant', { extra: { id: participant.id, error: getErrorMessage(refundErr) } });
+                logger.error('[Member Cancel] Failed to refund participant', { extra: { id: rawParticipant.id, error: getErrorMessage(refundErr) } });
               }
             }
           }

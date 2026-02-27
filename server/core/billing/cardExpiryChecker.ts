@@ -85,7 +85,7 @@ export async function checkExpiringCards(): Promise<CheckExpiringCardsResult> {
             const memberName = [user.first_name, user.last_name].filter(Boolean).join(' ') || 'Member';
             const cardLast4 = pm.card.last4 || '****';
 
-            await sendCardExpiringEmail(userEmail, {
+            await sendCardExpiringEmail(String(userEmail), {
               memberName,
               cardLast4,
               expiryMonth: expMonth,
@@ -93,7 +93,7 @@ export async function checkExpiringCards(): Promise<CheckExpiringCardsResult> {
             });
 
             await notifyMember({
-              userEmail,
+              userEmail: String(userEmail),
               title: 'Card Expiring Soon',
               message: `Your payment card ending in ${cardLast4} expires ${String(expMonth).padStart(2, '0')}/${expYear}. Please update your payment method.`,
               type: 'card_expiring',

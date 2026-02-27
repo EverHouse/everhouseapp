@@ -17,6 +17,58 @@ import { PRICING } from '../core/billing/pricingConfig';
 
 const router = Router();
 
+interface MemberBillingRow {
+  id: number;
+  email: string;
+  first_name: string | null;
+  last_name: string | null;
+  billing_provider: string | null;
+  stripe_customer_id: string | null;
+  stripe_subscription_id: string | null;
+  mindbody_client_id: string | null;
+  tier: string | null;
+  billing_migration_requested_at: string | null;
+  migration_status: string | null;
+  migration_billing_start_date: string | null;
+  migration_requested_by: string | null;
+  migration_tier_snapshot: string | null;
+  membership_status: string | null;
+}
+
+interface OutstandingTotalRow {
+  total_cents: string;
+}
+
+interface OutstandingItemRow {
+  booking_id: number;
+  trackman_booking_id: string | null;
+  booking_date: Date | string;
+  start_time: string;
+  end_time: string;
+  resource_name: string | null;
+  participant_id: number;
+  participant_type: string;
+  display_name: string;
+  cached_fee_cents: number;
+  payment_status: string;
+}
+
+interface UnfilledRow {
+  booking_id: number;
+  trackman_booking_id: string | null;
+  booking_date: Date | string;
+  start_time: string;
+  end_time: string;
+  resource_name: string | null;
+  declared_player_count: number | string | null;
+  filled_count: number | string;
+}
+
+interface TierRow {
+  stripe_price_id: string;
+  name: string;
+}
+
 type SubscriptionSelectionMode = 'pauseable' | 'resumable' | 'cancellable' | 'discountable';
 
 async function findEligibleSubscription(
@@ -88,10 +140,10 @@ async function findEligibleSubscription(
     : { subscription: null, error: errorMessages[mode] };
 }
 
-async function getMemberByEmail(email: string) {
+async function getMemberByEmail(email: string): Promise<MemberBillingRow | null> {
   const result = await db.execute(sql`SELECT id, email, first_name, last_name, billing_provider, stripe_customer_id, stripe_subscription_id, mindbody_client_id, tier, billing_migration_requested_at, migration_status, migration_billing_start_date, migration_requested_by, migration_tier_snapshot, membership_status
      FROM users WHERE LOWER(email) = ${email.toLowerCase()}`);
-  return result.rows[0] || null;
+  return (result.rows[0] as unknown as MemberBillingRow) || null;
 }
 
 router.get('/api/member-billing/:email', isStaffOrAdmin, async (req, res) => {
@@ -222,7 +274,7 @@ router.get('/api/member-billing/:email', isStaffOrAdmin, async (req, res) => {
           AND bp.payment_status = 'pending'
           AND COALESCE(bp.cached_fee_cents, 0) > 0
       `);
-      const totalCents = parseInt(outstandingResult.rows[0]?.total_cents || '0');
+      const totalCents = parseInt(String((outstandingResult.rows[0] as unknown as OutstandingTotalRow)?.total_cents) || '0');
       billingInfo.outstandingBalanceCents = totalCents;
       billingInfo.outstandingBalanceDollars = totalCents / 100;
     } catch (outstandingErr) {
@@ -267,8 +319,8 @@ router.get('/api/member-billing/:email/outstanding', isStaffOrAdmin, async (req,
       ORDER BY br.request_date DESC, br.start_time ASC
     `);
 
-    const items = result.rows.map(row => {
-      const feeCents = row.cached_fee_cents || 0;
+    const items = (result.rows as unknown as OutstandingItemRow[]).map(row => {
+      const feeCents = Number(row.cached_fee_cents) || 0;
       const feeLabel = row.participant_type === 'guest' ? 'Guest Fee' : 'Overage Fee';
       const bookingDate = row.booking_date instanceof Date
         ? formatDatePacific(row.booking_date)
@@ -315,7 +367,7 @@ router.get('/api/member-billing/:email/outstanding', isStaffOrAdmin, async (req,
     `);
 
     const guestFeeCents = Math.round(PRICING.GUEST_FEE_DOLLARS * 100);
-    for (const row of unfilledResult.rows) {
+    for (const row of (unfilledResult.rows as unknown as UnfilledRow[])) {
       const declared = parseInt(String(row.declared_player_count)) || 1;
       const filled = parseInt(String(row.filled_count)) || 0;
       const unfilled = Math.max(0, declared - filled);
@@ -343,7 +395,7 @@ router.get('/api/member-billing/:email/outstanding', isStaffOrAdmin, async (req,
       }
     }
 
-    const totalOutstandingCents = items.reduce((sum, item) => sum + item.feeCents, 0);
+    const totalOutstandingCents = items.reduce((sum, item) => sum + Number(item.feeCents), 0);
 
     res.json({
       totalOutstandingCents,
@@ -660,7 +712,7 @@ router.post('/api/member-billing/:email/credit', isStaffOrAdmin, async (req, res
       const memberName = member.first_name && member.last_name 
         ? `${member.first_name} ${member.last_name}` 
         : email;
-      const custResult = await getOrCreateStripeCustomer(member.id, email as string, memberName, member.tier);
+      const custResult = await getOrCreateStripeCustomer(String(member.id), String(email), memberName, member.tier);
       stripeCustomerId = custResult.customerId;
       logger.info('[MemberBilling] Stripe customer for', { extra: { custResultIsNew_Created_Found_existing: custResult.isNew ? 'Created' : 'Found existing', stripeCustomerId, email } });
     }
@@ -940,7 +992,8 @@ router.post('/api/member-billing/:email/migrate-to-stripe', isStaffOrAdmin, asyn
     }
 
     const tierResult = await db.execute(sql`SELECT stripe_price_id, name FROM membership_tiers WHERE slug = ${currentTier} AND stripe_price_id IS NOT NULL`);
-    if (tierResult.rows.length === 0) {
+    const tierRows = tierResult.rows as unknown as TierRow[];
+    if (tierRows.length === 0) {
       return res.status(400).json({ error: `Tier '${currentTier}' does not have a valid Stripe price configured` });
     }
 

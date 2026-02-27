@@ -11,7 +11,7 @@ The Ever Club Members App is a private members club application designed for gol
 
 ### Core Architecture
 - **Naming Conventions**: `snake_case` for PostgreSQL tables/columns; `camelCase` for Drizzle schemas, API JSON payloads, and React/TypeScript frontend. Raw database rows must not be exposed in API responses.
-- **Type Safety**: Fix underlying schemas or DTOs to resolve TypeScript mismatches; avoid using `as any`.
+- **Type Safety**: Fix underlying schemas or DTOs to resolve TypeScript mismatches; avoid using `as any`. All raw SQL `db.execute()` results must be typed with row interfaces and cast via `as unknown as RowType[]`. The codebase maintains 0 TypeScript errors.
 - **Database Interaction**: Use Drizzle ORM query builders or parameterized `sql` template literals for all SQL queries; raw string-interpolated SQL is forbidden.
 - **Timezone**: All date/time operations must explicitly use Pacific Time (`America/Los_Angeles`).
 - **Audit Logging**: All staff actions must be logged.

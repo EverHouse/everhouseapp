@@ -486,7 +486,7 @@ router.post('/api/admin/hubspot/deals/batch-delete', isStaffOrAdmin, async (req:
     
     for (const deal of deals) {
       try {
-        await hubspot.crm.deals.basicApi.archive(deal.hubspot_deal_id);
+        await hubspot.crm.deals.basicApi.archive(String((deal as Record<string, unknown>).hubspot_deal_id));
         deleted++;
       } catch (err: unknown) {
         if ((err as Record<string, unknown>)?.code === 404 || (err as Record<string, unknown>)?.statusCode === 404 || (err as Error)?.message?.includes('NOT_FOUND')) {

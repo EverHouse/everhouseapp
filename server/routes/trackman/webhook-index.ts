@@ -252,8 +252,8 @@ router.post('/api/webhooks/trackman', async (req: Request, res: Response) => {
               FROM booking_requests WHERE trackman_booking_id = ${v2Result.normalized.trackmanBookingId} LIMIT 1`
         );
         if (directMatch.rows.length > 0) {
-          matchedBookingId = directMatch.rows[0].id;
-          matchedUserId = directMatch.rows[0].user_email;
+          matchedBookingId = (directMatch.rows[0] as Record<string, unknown>).id as number;
+          matchedUserId = (directMatch.rows[0] as Record<string, unknown>).user_email as string;
           
           logger.info('[Trackman Webhook] V2: Matched via trackman_booking_id', {
             extra: { bookingId: matchedBookingId, trackmanBookingId, status: v2Result.normalized.status }

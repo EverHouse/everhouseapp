@@ -107,8 +107,9 @@ async function checkSessionConflict(
        LIMIT 1
     `);
     
-    if (result.rows.length > 0) {
-      const conflict = result.rows[0];
+    const rows = result.rows as Array<{ id: number; start_time: string; end_time: string }>;
+    if (rows.length > 0) {
+      const conflict = rows[0];
       return {
         hasConflict: true,
         conflictDetails: {
@@ -244,14 +245,16 @@ export async function getAvailableSlots(
     
     const bookedSlots: { start: number; end: number }[] = [];
     
-    for (const session of sessions.rows) {
+    const sessionRows = sessions.rows as Array<{ start_time: string; end_time: string }>;
+    for (const session of sessionRows) {
       bookedSlots.push({
         start: parseTimeToMinutes(session.start_time),
         end: parseTimeToMinutes(session.end_time)
       });
     }
     
-    for (const block of blocks.rows) {
+    const blockRows = blocks.rows as Array<{ start_time: string; end_time: string }>;
+    for (const block of blockRows) {
       bookedSlots.push({
         start: parseTimeToMinutes(block.start_time),
         end: parseTimeToMinutes(block.end_time)
@@ -313,7 +316,8 @@ export async function isResourceAvailableForDate(
          AND end_time IS NULL
     `);
     
-    const parsePromises = closures.rows.map(async (closure) => {
+    const closureRows = closures.rows as Array<{ id: number; affected_areas: string | null }>;
+    const parsePromises = closureRows.map(async (closure) => {
       if (closure.affected_areas) {
         const affectedIds = await parseAffectedAreas(closure.affected_areas);
         return affectedIds.includes(resourceId);

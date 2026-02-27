@@ -102,6 +102,7 @@ export interface IssueContext {
   bookingDate?: string;
   resourceName?: string;
   resourceId?: number;
+  sessionId?: number;
   startTime?: string;
   endTime?: string;
   className?: string;
@@ -111,6 +112,7 @@ export interface IssueContext {
   eventDate?: string;
   tourDate?: string;
   guestName?: string;
+  linkedBookingId?: number;
   syncType?: 'hubspot' | 'calendar' | 'stripe';
   syncComparison?: SyncComparisonData[];
   hubspotContactId?: string;

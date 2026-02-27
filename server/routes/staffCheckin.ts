@@ -24,6 +24,181 @@ import { finalizeInvoicePaidOutOfBand, voidBookingInvoice, syncBookingInvoice, g
 
 const router = Router();
 
+interface SettleParticipantRow {
+  payment_status: string;
+  cached_fee_cents: number;
+}
+
+interface StripeCustomerRow {
+  stripe_customer_id: string;
+}
+
+interface BookingContextRow {
+  booking_id: number;
+  session_id: number | null;
+  resource_id: number;
+  owner_id: string;
+  owner_email: string;
+  owner_name: string;
+  booking_date: string;
+  start_time: string;
+  end_time: string;
+  member_notes: string | null;
+  declared_player_count: number;
+  resource_name: string;
+}
+
+interface UserIdRow {
+  id: string;
+}
+
+interface CountRow {
+  count: string;
+}
+
+interface MemberParticipantRow {
+  id: number;
+  display_name: string;
+  user_id: string | null;
+  resolved_user_id: string | null;
+}
+
+interface ParticipantDetailRow {
+  participant_id: number;
+  display_name: string;
+  participant_type: 'owner' | 'member' | 'guest';
+  user_id: string | null;
+  payment_status: string;
+  waiver_reviewed_at: string | null;
+  used_guest_pass: boolean;
+  cached_total_fee: string;
+}
+
+interface SnapshotRow {
+  participant_fees: unknown;
+}
+
+interface AuditRow {
+  action: string;
+  staff_email: string;
+  staff_name: string | null;
+  reason: string | null;
+  created_at: Date;
+}
+
+interface PaymentBookingRow {
+  session_id: number | null;
+  owner_email: string;
+  resource_name: string;
+  resource_id: number;
+  booking_date: string;
+  start_time: string;
+  end_time: string;
+  declared_player_count: number;
+  owner_name: string;
+}
+
+interface ParticipantStatusRow {
+  payment_status: string;
+  participant_type: string;
+  display_name: string;
+  session_date: string;
+}
+
+interface PaymentIntentIdRow {
+  stripe_payment_intent_id: string;
+}
+
+interface PendingParticipantRow {
+  id: number;
+  payment_status: string;
+}
+
+interface IdRow {
+  id: number;
+}
+
+interface IdSessionRow {
+  id: number;
+  session_id: number;
+}
+
+interface SessionBookingRow {
+  session_id: number;
+  booking_id: number;
+}
+
+interface ParticipantCheckRow {
+  id: number;
+  session_id: number;
+  display_name: string;
+  booking_id: number;
+}
+
+interface SessionIdRow {
+  session_id: number;
+}
+
+interface DirectAddBookingRow {
+  session_id: number | null;
+  resource_id: number;
+  request_date: string;
+  owner_email: string;
+  user_name: string;
+  start_time: string;
+  end_time: string;
+  resource_name?: string;
+  user_email?: string;
+}
+
+interface TierRow {
+  tier_name: string;
+  guest_passes: number;
+}
+
+interface MemberMatchRow {
+  id: string;
+  name: string;
+  email: string;
+}
+
+interface FeeSumRow {
+  total_cents: string;
+  overage_cents: string;
+  guest_cents: string;
+}
+
+interface OwnerRow {
+  id: string;
+  name: string;
+}
+
+interface MemberDetailRow {
+  id: string;
+  email: string;
+  name: string;
+  tier_name: string;
+  can_book_simulators: boolean;
+}
+
+interface MatchingGuestRow {
+  id: number;
+  display_name: string;
+}
+
+interface QrBookingRow {
+  id: number;
+  start_time: string;
+  end_time: string;
+  bay_name: string;
+  resource_type: string;
+}
+
+interface WaiverBookingRow {
+  session_id: number;
+  owner_email: string;
+}
+
 const settlementInFlight = new Set<number>();
 
 async function getMemberDisplayName(email: string): Promise<string> {
@@ -60,8 +235,8 @@ async function settleBookingInvoiceAfterCheckin(bookingId: number, sessionId: nu
       sql`SELECT payment_status, cached_fee_cents FROM booking_participants WHERE session_id = ${sessionId}`
     );
     
-    const participants = participantResult.rows;
-    const allSettled = participants.every((p: { payment_status: string }) => 
+    const participants = participantResult.rows as unknown as SettleParticipantRow[];
+    const allSettled = participants.every((p) => 
       p.payment_status === 'paid' || p.payment_status === 'waived'
     );
     
@@ -74,7 +249,7 @@ async function settleBookingInvoiceAfterCheckin(bookingId: number, sessionId: nu
       return;
     }
     
-    const anyPaid = participants.some((p: { payment_status: string; cached_fee_cents: number }) => 
+    const anyPaid = participants.some((p) => 
       p.payment_status === 'paid' && (p.cached_fee_cents || 0) > 0
     );
     
@@ -85,7 +260,7 @@ async function settleBookingInvoiceAfterCheckin(bookingId: number, sessionId: nu
            JOIN booking_requests br ON LOWER(u.email) = LOWER(br.user_email) 
            WHERE br.id = ${bookingId} LIMIT 1`
         );
-        const customerId = userResult.rows[0]?.stripe_customer_id;
+        const customerId = (userResult.rows as unknown as StripeCustomerRow[])[0]?.stripe_customer_id;
         if (customerId) {
           await finalizeInvoicePaidOutOfBand({
             bookingId,
@@ -190,12 +365,11 @@ router.get('/api/bookings/:id/staff-checkin-context', isStaffOrAdmin, async (req
       return res.status(404).json({ error: 'Booking not found' });
     }
 
-    const booking = result.rows[0];
+    const booking = (result.rows as unknown as BookingContextRow[])[0];
     const participants: ParticipantFee[] = [];
     let totalOutstanding = 0;
     
-    // If booking has no session, try to find/create one for fee calculation
-    let sessionId = booking.session_id;
+    let sessionId: number | null = booking.session_id;
     if (!sessionId && booking.resource_id) {
       try {
         const bookingDuration = Math.round(
@@ -204,7 +378,7 @@ router.get('/api/bookings/:id/staff-checkin-context', isStaffOrAdmin, async (req
         );
         
         const userResult = await db.execute(sql`SELECT id FROM users WHERE LOWER(email) = LOWER(${booking.owner_email})`);
-        const userId = (userResult.rows[0]?.id as string) || null;
+        const userId = (userResult.rows as unknown as UserIdRow[])[0]?.id || null;
 
         const sessionResult = await ensureSessionForBooking({
           bookingId,
@@ -226,7 +400,7 @@ router.get('/api/bookings/:id/staff-checkin-context', isStaffOrAdmin, async (req
             SELECT COUNT(*) as count FROM booking_participants 
             WHERE session_id = ${sessionId} AND participant_type = 'guest'
           `);
-          const existingGuestCount = parseInt(existingGuests.rows[0]?.count || '0');
+          const existingGuestCount = parseInt((existingGuests.rows as unknown as CountRow[])[0]?.count || '0');
           
           const guestsToCreate = playerCount - 1 - existingGuestCount;
           if (guestsToCreate > 0) {
@@ -257,10 +431,10 @@ router.get('/api/bookings/:id/staff-checkin-context', isStaffOrAdmin, async (req
         
         const orphanedIds: number[] = [];
         const orphanedNames: string[] = [];
-        for (const p of memberParticipants.rows) {
+        for (const p of memberParticipants.rows as unknown as MemberParticipantRow[]) {
           if (!p.user_id || !p.resolved_user_id) {
-            orphanedIds.push(p.id);
-            orphanedNames.push(p.display_name);
+            orphanedIds.push(p.id as number);
+            orphanedNames.push(p.display_name as string);
           }
         }
         
@@ -320,7 +494,7 @@ router.get('/api/bookings/:id/staff-checkin-context', isStaffOrAdmin, async (req
           AND stripe_payment_intent_id IS NOT NULL
       `);
       
-      for (const row of snapshotResult.rows) {
+      for (const row of snapshotResult.rows as unknown as SnapshotRow[]) {
         const fees = row.participant_fees;
         if (Array.isArray(fees)) {
           for (const fee of fees) {
@@ -331,7 +505,7 @@ router.get('/api/bookings/:id/staff-checkin-context', isStaffOrAdmin, async (req
         }
       }
       
-      for (const p of participantsResult.rows) {
+      for (const p of participantsResult.rows as unknown as ParticipantDetailRow[]) {
         const calculatedFee = feeMap.get(p.participant_id) || 0;
         const cachedFee = parseFloat(p.cached_total_fee) || 0;
         
@@ -360,7 +534,7 @@ router.get('/api/bookings/:id/staff-checkin-context', isStaffOrAdmin, async (req
           displayName: p.display_name,
           participantType: p.participant_type,
           userId: p.user_id,
-          paymentStatus: p.payment_status || 'pending',
+          paymentStatus: (p.payment_status || 'pending') as 'pending' | 'paid' | 'waived',
           overageFee,
           guestFee,
           totalFee,
@@ -402,7 +576,7 @@ router.get('/api/bookings/:id/staff-checkin-context', isStaffOrAdmin, async (req
       participants,
       totalOutstanding,
       hasUnpaidBalance: totalOutstanding > 0,
-      auditHistory: auditResult.rows.map(a => ({
+      auditHistory: (auditResult.rows as unknown as AuditRow[]).map(a => ({
         action: a.action,
         staffEmail: a.staff_email,
         staffName: a.staff_name,
@@ -457,8 +631,8 @@ router.patch('/api/bookings/:id/payments', isStaffOrAdmin, async (req: Request, 
       return res.status(404).json({ error: 'Booking not found' });
     }
 
-    const booking = bookingResult.rows[0];
-    let sessionId = booking.session_id;
+    const booking = (bookingResult.rows as unknown as PaymentBookingRow[])[0];
+    let sessionId: number | null = booking.session_id;
 
     // Ensure fees are calculated and persisted to DB before taking any payment action
     // This handles the case where we no longer write on GET requests
@@ -483,7 +657,7 @@ router.patch('/api/bookings/:id/payments', isStaffOrAdmin, async (req: Request, 
          LEFT JOIN booking_sessions bs ON bp.session_id = bs.id
          WHERE bp.id = ${participantId}`);
       
-      const participant = participantResult.rows[0];
+      const participant = (participantResult.rows as unknown as ParticipantStatusRow[])[0];
       const previousStatus = participant?.payment_status || 'pending';
       const isGuest = participant?.participant_type === 'guest';
       const guestName = participant?.display_name || 'Guest';
@@ -619,9 +793,9 @@ router.patch('/api/bookings/:id/payments', isStaffOrAdmin, async (req: Request, 
         WHERE booking_id = ${bookingId}
           AND status IN ('pending', 'requires_payment_method', 'requires_action', 'requires_confirmation', 'requires_capture')
       `);
-      for (const row of spiResult.rows) {
+      for (const row of spiResult.rows as unknown as PaymentIntentIdRow[]) {
         if (row.stripe_payment_intent_id) {
-          intentIds.add(row.stripe_payment_intent_id as string);
+          intentIds.add(row.stripe_payment_intent_id);
         }
       }
 
@@ -634,9 +808,9 @@ router.patch('/api/bookings/:id/payments', isStaffOrAdmin, async (req: Request, 
             AND payment_status = 'pending'
             AND stripe_payment_intent_id NOT LIKE 'balance-%'
         `);
-        for (const row of bpResult.rows) {
+        for (const row of bpResult.rows as unknown as PaymentIntentIdRow[]) {
           if (row.stripe_payment_intent_id) {
-            intentIds.add(row.stripe_payment_intent_id as string);
+            intentIds.add(row.stripe_payment_intent_id);
           }
         }
       }
@@ -709,7 +883,7 @@ router.patch('/api/bookings/:id/payments', isStaffOrAdmin, async (req: Request, 
           );
 
           const userResult = await db.execute(sql`SELECT id FROM users WHERE LOWER(email) = LOWER(${booking.owner_email})`);
-          const userId = userResult.rows[0]?.id || null;
+          const userId = (userResult.rows as unknown as UserIdRow[])[0]?.id || null;
 
           const sessionResult = await ensureSessionForBooking({
             bookingId,
@@ -731,7 +905,7 @@ router.patch('/api/bookings/:id/payments', isStaffOrAdmin, async (req: Request, 
               SELECT COUNT(*) as count FROM booking_participants 
               WHERE session_id = ${sessionId} AND participant_type = 'guest'
             `);
-            const existingGuestCount = parseInt(existingGuests.rows[0]?.count || '0');
+            const existingGuestCount = parseInt((existingGuests.rows as unknown as CountRow[])[0]?.count || '0');
             const guestsToCreate = playerCount - 1 - existingGuestCount;
             if (guestsToCreate > 0) {
               const guestNumbers = Array.from({length: guestsToCreate}, (_, i) => existingGuestCount + i + 2);
@@ -759,8 +933,9 @@ router.patch('/api/bookings/:id/payments', isStaffOrAdmin, async (req: Request, 
       const pendingParticipants = await db.execute(sql`SELECT id, payment_status FROM booking_participants 
          WHERE session_id = ${sessionId} AND payment_status = 'pending'`);
 
-      const pendingIds = pendingParticipants.rows.map(p => p.id);
-      const previousStatuses = pendingParticipants.rows.map(p => p.payment_status);
+      const typedPending = pendingParticipants.rows as unknown as PendingParticipantRow[];
+      const pendingIds = typedPending.map(p => p.id);
+      const previousStatuses = typedPending.map(p => p.payment_status);
       if (pendingIds.length > 0) {
         await db.execute(sql`UPDATE booking_participants SET payment_status = ${newStatus} WHERE id = ANY(${toIntArrayLiteral(pendingIds)}::int[])`);
 
@@ -869,7 +1044,7 @@ router.patch('/api/bookings/:id/payments', isStaffOrAdmin, async (req: Request, 
 
       logFromRequest(req, 'update_payment_status', 'booking', bookingId.toString(), booking.resource_name || `Booking #${bookingId}`, {
         action: action === 'confirm_all' ? 'confirm_all' : 'waive_all',
-        participantCount: pendingParticipants.rows.length,
+        participantCount: typedPending.length,
         newStatus: newStatus,
         reason: reason || null
       });
@@ -890,7 +1065,7 @@ router.patch('/api/bookings/:id/payments', isStaffOrAdmin, async (req: Request, 
       return res.json({ 
         success: true, 
         message: `All payments ${action === 'confirm_all' ? 'confirmed' : 'waived'}`,
-        updatedCount: pendingParticipants.rows.length
+        updatedCount: typedPending.length
       });
     }
 
@@ -1028,7 +1203,7 @@ router.post('/api/booking-participants/:id/mark-waiver-reviewed', isStaffOrAdmin
         return { notFound: true } as const;
       }
 
-      const { session_id: sessionId, booking_id: bookingId, display_name } = participantCheck.rows[0];
+      const { session_id: sessionId, booking_id: bookingId, display_name } = (participantCheck.rows as unknown as ParticipantCheckRow[])[0];
 
       await tx.execute(sql`
         UPDATE booking_participants 
@@ -1089,7 +1264,7 @@ router.post('/api/bookings/:bookingId/mark-all-waivers-reviewed', isStaffOrAdmin
         return { notFound: true, updatedCount: 0 } as const;
       }
 
-      const { session_id } = bookingResult.rows[0];
+      const { session_id } = (bookingResult.rows as unknown as SessionIdRow[])[0];
 
       const result = await tx.execute(sql`
         UPDATE booking_participants 
@@ -1100,7 +1275,8 @@ router.post('/api/bookings/:bookingId/mark-all-waivers-reviewed', isStaffOrAdmin
         RETURNING id
       `);
 
-      for (const row of result.rows) {
+      const typedRows = result.rows as unknown as IdRow[];
+      for (const row of typedRows) {
         await logPaymentAudit({
           bookingId,
           sessionId: session_id,
@@ -1116,11 +1292,11 @@ router.post('/api/bookings/:bookingId/mark-all-waivers-reviewed', isStaffOrAdmin
       logFromRequest(req, 'review_waiver', 'booking', bookingId.toString(), `Booking #${bookingId}`, {
         action: 'all_waivers_marked_reviewed',
         sessionId: session_id,
-        waiverCount: result.rows.length,
-        participantIds: result.rows.map(r => r.id)
+        waiverCount: typedRows.length,
+        participantIds: typedRows.map(r => r.id)
       });
 
-      return { notFound: false, updatedCount: result.rows.length } as const;
+      return { notFound: false, updatedCount: typedRows.length } as const;
     });
 
     if (txResult.notFound) {
@@ -1151,8 +1327,9 @@ router.post('/api/bookings/bulk-review-all-waivers', isStaffOrAdmin, async (req:
         RETURNING id, session_id
       `);
 
-      const sessionIds = result.rows.map(r => r.session_id);
-      const participantIds = result.rows.map(r => r.id);
+      const bulkRows = result.rows as unknown as IdSessionRow[];
+      const sessionIds = bulkRows.map(r => r.session_id);
+      const participantIds = bulkRows.map(r => r.id);
 
       if (sessionIds.length > 0) {
         const bookingLookup = await tx.execute(
@@ -1160,9 +1337,10 @@ router.post('/api/bookings/bulk-review-all-waivers', isStaffOrAdmin, async (req:
            FROM booking_requests br 
            WHERE br.session_id = ANY(${toIntArrayLiteral(sessionIds)}::int[])`
         );
-        const sessionToBooking = new Map(bookingLookup.rows.map(r => [r.session_id, r.booking_id]));
+        const typedLookup = bookingLookup.rows as unknown as SessionBookingRow[];
+        const sessionToBooking = new Map(typedLookup.map(r => [r.session_id, r.booking_id]));
 
-        const bookingIds = result.rows.map(r => sessionToBooking.get(r.session_id) || null);
+        const bookingIds = bulkRows.map(r => sessionToBooking.get(r.session_id) || null);
 
         for (let i = 0; i < participantIds.length; i++) {
           await logPaymentAudit({
@@ -1180,10 +1358,10 @@ router.post('/api/bookings/bulk-review-all-waivers', isStaffOrAdmin, async (req:
 
       logFromRequest(req, 'review_waiver', 'bulk_waiver', 'all', 'Bulk waiver review', {
         action: 'bulk_review_all_stale_waivers',
-        count: result.rows.length
+        count: bulkRows.length
       });
 
-      return result.rows.length;
+      return bulkRows.length;
     });
 
     res.json({ success: true, updatedCount });
@@ -1260,14 +1438,13 @@ router.post('/api/bookings/:id/staff-direct-add', isStaffOrAdmin, async (req: Re
       return res.status(404).json({ error: 'Booking not found' });
     }
 
-    const booking = bookingResult.rows[0];
-    let sessionId = booking.session_id;
+    const booking = (bookingResult.rows as unknown as DirectAddBookingRow[])[0];
+    let sessionId: number | null = booking.session_id;
     
-    // Calculate booking duration for slot_duration on new participants
     const slotDuration = booking.start_time && booking.end_time 
       ? Math.round((new Date(`2000-01-01T${booking.end_time}`).getTime() - 
                    new Date(`2000-01-01T${booking.start_time}`).getTime()) / 60000)
-      : 60; // fallback to 60 if times missing
+      : 60;
 
     if (!sessionId) {
       const sessionResult = await ensureSessionForBooking({
@@ -1296,7 +1473,7 @@ router.post('/api/bookings/:id/staff-direct-add', isStaffOrAdmin, async (req: Re
       `);
 
       if (ownerTierResult.rows.length > 0) {
-        const ownerTier = ownerTierResult.rows[0];
+        const ownerTier = (ownerTierResult.rows as unknown as TierRow[])[0];
         // Use shared tier rules instead of hardcoded check
         const tierCheck = await enforceSocialTierRules(
           ownerTier.tier_name || 'Social',
@@ -1320,7 +1497,7 @@ router.post('/api/bookings/:id/staff-direct-add', isStaffOrAdmin, async (req: Re
           WHERE LOWER(email) = LOWER(${guestEmail}) AND archived_at IS NULL
         `);
         if (memberCheck.rows.length > 0) {
-          matchedMember = memberCheck.rows[0];
+          matchedMember = (memberCheck.rows as unknown as MemberMatchRow[])[0];
         }
       }
 
@@ -1367,14 +1544,15 @@ router.post('/api/bookings/:id/staff-direct-add', isStaffOrAdmin, async (req: Re
               WHERE session_id = ${sessionId}
             `);
             
-            const totalCents = parseInt(feeResult.rows[0]?.total_cents || '0');
-            const overageCents = parseInt(feeResult.rows[0]?.overage_cents || '0');
-            const guestCents = parseInt(feeResult.rows[0]?.guest_cents || '0');
+            const typedFees = feeResult.rows as unknown as FeeSumRow[];
+            const totalCents = parseInt(typedFees[0]?.total_cents || '0');
+            const overageCents = parseInt(typedFees[0]?.overage_cents || '0');
+            const guestCents = parseInt(typedFees[0]?.guest_cents || '0');
             
             if (totalCents > 0) {
               const ownerResult = await db.execute(sql`SELECT id, COALESCE(first_name || ' ' || last_name, email) as name 
                  FROM users WHERE LOWER(email) = LOWER(${booking.owner_email}) LIMIT 1`);
-              const owner = ownerResult.rows[0];
+              const owner = (ownerResult.rows as unknown as OwnerRow[])[0];
               
               const prepayResult = await createPrepaymentIntent({
                 sessionId,
@@ -1455,14 +1633,15 @@ router.post('/api/bookings/:id/staff-direct-add', isStaffOrAdmin, async (req: Re
             WHERE session_id = ${sessionId}
           `);
           
-          const totalCents = parseInt(feeResult.rows[0]?.total_cents || '0');
-          const overageCents = parseInt(feeResult.rows[0]?.overage_cents || '0');
-          const guestCents = parseInt(feeResult.rows[0]?.guest_cents || '0');
+          const typedFees2 = feeResult.rows as unknown as FeeSumRow[];
+          const totalCents = parseInt(typedFees2[0]?.total_cents || '0');
+          const overageCents = parseInt(typedFees2[0]?.overage_cents || '0');
+          const guestCents = parseInt(typedFees2[0]?.guest_cents || '0');
           
           if (totalCents > 0) {
             const ownerResult = await db.execute(sql`SELECT id, COALESCE(first_name || ' ' || last_name, email) as name 
                FROM users WHERE LOWER(email) = LOWER(${booking.owner_email}) LIMIT 1`);
-            const owner = ownerResult.rows[0];
+            const owner = (ownerResult.rows as unknown as OwnerRow[])[0];
             
             const prepayResult = await createPrepaymentIntent({
               sessionId,
@@ -1524,7 +1703,7 @@ router.post('/api/bookings/:id/staff-direct-add', isStaffOrAdmin, async (req: Re
         return res.status(404).json({ error: 'Member not found' });
       }
 
-      const member = memberResult.rows[0];
+      const member = (memberResult.rows as unknown as MemberDetailRow[])[0];
 
       const existingParticipant = await db.execute(sql`SELECT id FROM booking_participants WHERE session_id = ${sessionId} AND user_id = ${member.id}`);
 
@@ -1553,7 +1732,7 @@ router.post('/api/bookings/:id/staff-direct-add', isStaffOrAdmin, async (req: Re
       
       if (matchingGuest.rowCount && matchingGuest.rowCount > 0) {
         // Remove the guest entry since this person is actually a member
-        const guestIds = matchingGuest.rows.map(r => r.id);
+        const guestIds = (matchingGuest.rows as unknown as MatchingGuestRow[]).map(r => r.id);
         await db.execute(sql`DELETE FROM booking_participants WHERE id = ANY(${toIntArrayLiteral(guestIds)}::int[])`);
         logger.info('[Staff Add Member] Removed duplicate guest entries for member in session', { extra: { guestIdsLength: guestIds.length, memberEmail: member.email, sessionId } });
       }
@@ -1656,15 +1835,15 @@ router.post('/api/staff/qr-checkin', isStaffOrAdmin, async (req: Request, res: R
         `);
 
         if (bookingResult.rows.length > 0) {
-          const booking = bookingResult.rows[0];
+          const booking = (bookingResult.rows as unknown as QrBookingRow[])[0];
           bookingInfo = {
             hasBooking: true,
-            bookingId: booking.id as number,
+            bookingId: booking.id,
             bookingDetails: {
-              bayName: (booking.bay_name as string) || 'Unassigned',
-              startTime: booking.start_time as string,
-              endTime: booking.end_time as string,
-              resourceType: (booking.resource_type as string) || 'golf_simulator'
+              bayName: booking.bay_name || 'Unassigned',
+              startTime: booking.start_time,
+              endTime: booking.end_time,
+              resourceType: booking.resource_type || 'golf_simulator'
             }
           };
         }

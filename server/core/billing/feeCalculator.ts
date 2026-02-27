@@ -5,6 +5,17 @@ import { getErrorMessage } from '../../utils/errorUtils';
 
 import { toIntArrayLiteral } from '../../utils/sqlArrayLiteral';
 import { logger } from '../logger';
+
+interface ParticipantFeeRow {
+  participant_id: number;
+  participant_type: string;
+  user_id: number | null;
+  payment_status: string | null;
+  cached_fee_cents: number;
+  ledger_fee: string;
+  tier_guest_fee_cents: number | null;
+}
+
 export interface ParticipantFee {
   participantId: number;
   amountCents: number;
@@ -50,7 +61,7 @@ export async function calculateAndCacheParticipantFees(
       const fees: ParticipantFee[] = [];
       const feesToUpdate: Array<{id: number; cents: number}> = [];
       
-      for (const row of participantsResult.rows) {
+      for (const row of participantsResult.rows as unknown as ParticipantFeeRow[]) {
         if (row.payment_status === 'paid' || row.payment_status === 'waived') {
           continue;
         }

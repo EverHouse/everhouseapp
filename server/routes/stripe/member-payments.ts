@@ -1,3 +1,4 @@
+import Stripe from 'stripe';
 import { logger } from '../../core/logger';
 import { Router, Request, Response } from 'express';
 import { isAuthenticated } from '../../core/middleware';
@@ -22,6 +23,120 @@ import { alertOnExternalServiceError } from '../../core/errorAlerts';
 import { getErrorCode, getErrorMessage } from '../../utils/errorUtils';
 import { toIntArrayLiteral } from '../../utils/sqlArrayLiteral';
 import { getBookingInvoiceId, finalizeAndPayInvoice, createDraftInvoiceForBooking } from '../../core/billing/bookingInvoiceService';
+
+interface BookingRow {
+  id: number;
+  session_id: number | null;
+  user_email: string;
+  user_name: string | null;
+  status: string;
+  trackman_booking_id: string | null;
+  user_id: string | null;
+  first_name: string | null;
+  last_name: string | null;
+}
+
+interface ParticipantRow {
+  id: number;
+  participant_type: string;
+  display_name: string | null;
+  cached_fee_cents: number;
+}
+
+interface SnapshotRow {
+  id: number;
+  participant_fees: string;
+  status: string;
+  stripe_payment_intent_id: string | null;
+  total_cents: number;
+}
+
+interface UserRow {
+  id: string;
+  stripe_customer_id: string | null;
+  first_name: string | null;
+  last_name: string | null;
+  email: string;
+}
+
+interface StripeCustomerIdRow {
+  stripe_customer_id: string | null;
+}
+
+interface BalanceParticipantRow {
+  participant_id: number;
+  session_id: number;
+  participant_type: string;
+  display_name: string | null;
+  payment_status: string | null;
+  cached_fee_cents: number;
+  session_date: string;
+  start_time: string;
+  end_time: string;
+  resource_name: string | null;
+  ledger_fee: string;
+  pending_snapshot_count: string;
+  total_snapshot_count: string;
+  owner_email?: string;
+}
+
+interface GuestBalanceRow {
+  participant_id: number;
+  session_id: number;
+  participant_type: string;
+  display_name: string | null;
+  payment_status: string | null;
+  cached_fee_cents: number;
+  session_date: string;
+  start_time: string;
+  end_time: string;
+  resource_name: string | null;
+  owner_email: string;
+  pending_snapshot_count: string;
+  total_snapshot_count: string;
+}
+
+interface UncachedSessionRow {
+  session_id: number;
+}
+
+interface SessionDataRow {
+  session_date: string;
+  resource_name: string | null;
+  participant_type: string | null;
+  display_name: string | null;
+}
+
+interface UnfilledRow {
+  session_id: number;
+  session_date: string;
+  start_time: string;
+  end_time: string;
+  resource_name: string | null;
+  declared_player_count: string;
+  non_owner_count: string;
+}
+
+interface BalancePayParticipantRow {
+  participant_id: number;
+  session_id: number;
+  cached_fee_cents: number;
+  ledger_fee: string;
+  pending_snapshot_count: string;
+  total_snapshot_count: string;
+}
+
+interface BalancePayGuestRow {
+  participant_id: number;
+  session_id: number;
+  cached_fee_cents: number;
+  pending_snapshot_count: string;
+  total_snapshot_count: string;
+}
+
+interface IdRow {
+  id: number;
+}
 
 const router = Router();
 
@@ -49,7 +164,7 @@ router.post('/api/member/bookings/:id/pay-fees', isAuthenticated, paymentRateLim
       return res.status(404).json({ error: 'Booking not found' });
     }
 
-    const booking = bookingResult.rows[0];
+    const booking = bookingResult.rows[0] as unknown as BookingRow;
 
     if (booking.status === 'cancelled' || booking.status === 'cancellation_pending' || booking.status === 'declined') {
       return res.status(400).json({ error: 'Cannot pay for a cancelled or declined booking' });
@@ -63,8 +178,6 @@ router.post('/api/member/bookings/:id/pay-fees', isAuthenticated, paymentRateLim
       return res.status(400).json({ error: 'Booking has no session' });
     }
 
-    // Get all pending participants (guests, members, and owner for overage fees)
-    // The payment_status filter ensures we only see unpaid fees - no snapshot filtering needed
     const pendingParticipants = await db.execute(sql`
       SELECT bp.id, bp.participant_type, bp.display_name, bp.cached_fee_cents
        FROM booking_participants bp
@@ -77,7 +190,8 @@ router.post('/api/member/bookings/:id/pay-fees', isAuthenticated, paymentRateLim
       return res.status(400).json({ error: 'No unpaid fees found' });
     }
 
-    const participantIds = pendingParticipants.rows.map(r => r.id);
+    const typedParticipants = pendingParticipants.rows as unknown as ParticipantRow[];
+    const participantIds = typedParticipants.map(r => r.id);
     
     let breakdown;
     try {
@@ -191,7 +305,7 @@ router.post('/api/member/bookings/:id/pay-fees', isAuthenticated, paymentRateLim
     }
 
     const feeLineItems: BookingFeeLineItem[] = [];
-    for (const p of pendingParticipants.rows) {
+    for (const p of typedParticipants) {
       const fee = pendingFees.find(f => f.participantId === p.id);
       if (!fee || fee.totalCents <= 0) continue;
       const isGuest = p.participant_type === 'guest';
@@ -209,7 +323,7 @@ router.post('/api/member/bookings/:id/pay-fees', isAuthenticated, paymentRateLim
       INSERT INTO booking_fee_snapshots (booking_id, session_id, participant_fees, total_cents, status)
        VALUES (${bookingId}, ${booking.session_id}, ${JSON.stringify(serverFees)}, ${serverTotal}, 'pending') RETURNING id
     `);
-    const snapshotId = (snapshotResult.rows[0] as any).id;
+    const snapshotId = (snapshotResult.rows[0] as unknown as IdRow).id;
 
     const draftResult = await createDraftInvoiceForBooking({
       customerId: stripeCustomerId,
@@ -245,7 +359,7 @@ router.post('/api/member/bookings/:id/pay-fees', isAuthenticated, paymentRateLim
     logger.info('[Stripe] Member invoice payment created for booking', { extra: { bookingId, invoiceId: draftResult.invoiceId, paymentIntentId: invoiceResult.paymentIntentId, totalDollars: (serverTotal / 100).toFixed(2) } });
 
     const participantFeesList = pendingFees.map(f => {
-      const participant = pendingParticipants.rows.find(p => p.id === f.participantId);
+      const participant = typedParticipants.find(p => p.id === f.participantId);
       return {
         id: f.participantId,
         displayName: participant?.display_name || 'Guest',
@@ -317,7 +431,7 @@ router.post('/api/member/bookings/:id/confirm-payment', isAuthenticated, async (
       return res.status(404).json({ error: 'Booking not found' });
     }
 
-    const booking = bookingResult.rows[0];
+    const booking = bookingResult.rows[0] as unknown as BookingRow;
 
     if (booking.user_email?.toLowerCase() !== sessionEmail.toLowerCase()) {
       return res.status(403).json({ error: 'Only the booking owner can confirm payment' });
@@ -333,15 +447,14 @@ router.post('/api/member/bookings/:id/confirm-payment', isAuthenticated, async (
       return res.status(404).json({ error: 'Payment record not found' });
     }
 
-    const snapshot = snapshotResult.rows[0];
+    const snapshot = snapshotResult.rows[0] as unknown as SnapshotRow;
 
     if (snapshot.status === 'completed') {
       return res.json({ success: true, message: 'Payment already confirmed' });
     }
 
-    // Verify fee snapshot is still valid before charging
-    const currentFees = await computeFeeBreakdown({ sessionId: booking.session_id, source: 'stripe' as const });
-    const snapshotFees = snapshot.participant_fees;
+    const currentFees = await computeFeeBreakdown({ sessionId: booking.session_id!, source: 'stripe' as const });
+    const snapshotFees = typeof snapshot.participant_fees === 'string' ? JSON.parse(snapshot.participant_fees) : snapshot.participant_fees;
     const snapshotTotal = Array.isArray(snapshotFees) 
       ? snapshotFees.reduce((sum: number, f: Record<string, unknown>) => sum + ((f.amountCents as number) || 0), 0)
       : 0;
@@ -368,7 +481,7 @@ router.post('/api/member/bookings/:id/confirm-payment', isAuthenticated, async (
 
     let participantFees: Array<{ id: number; amountCents?: number }> = [];
     try {
-      participantFees = JSON.parse(snapshot.participant_fees || '[]');
+      participantFees = JSON.parse(typeof snapshot.participant_fees === 'string' ? snapshot.participant_fees : '[]');
     } catch (parseErr: unknown) {
       logger.error('[MemberPayments] Failed to parse participant_fees for snapshot', { extra: { snapshot_id: snapshot.id, data: ':', parseErr } });
     }
@@ -447,7 +560,7 @@ router.post('/api/member/invoices/:invoiceId/pay', isAuthenticated, async (req: 
       return res.status(404).json({ error: 'User not found' });
     }
 
-    const user = userResult.rows[0];
+    const user = userResult.rows[0] as unknown as UserRow;
     const stripeCustomerId = user.stripe_customer_id;
 
     if (!stripeCustomerId) {
@@ -542,7 +655,8 @@ router.post('/api/member/invoices/:invoiceId/confirm', isAuthenticated, async (r
       SELECT stripe_customer_id FROM users WHERE LOWER(email) = ${sessionEmail.toLowerCase()}
     `);
 
-    const stripeCustomerId = userResult.rows[0]?.stripe_customer_id;
+    const confirmUser = (userResult.rows as unknown as StripeCustomerIdRow[])[0];
+    const stripeCustomerId = confirmUser?.stripe_customer_id;
     if (!stripeCustomerId) {
       return res.status(400).json({ error: 'No billing account found' });
     }
@@ -562,9 +676,10 @@ router.post('/api/member/invoices/:invoiceId/confirm', isAuthenticated, async (r
 
     try {
       const invoice = await stripe.invoices.retrieve(invoiceId);
-      const invoicePiId = typeof invoice.payment_intent === 'string'
-        ? invoice.payment_intent
-        : (typeof invoice.payment_intent === 'object' && invoice.payment_intent !== null) ? (invoice.payment_intent as Stripe.PaymentIntent).id : null;
+      const rawPi = (invoice as unknown as Record<string, unknown>).payment_intent;
+      const invoicePiId = typeof rawPi === 'string'
+        ? rawPi
+        : (typeof rawPi === 'object' && rawPi !== null) ? (rawPi as Stripe.PaymentIntent).id : null;
       if (invoicePiId && invoicePiId !== paymentIntentId) {
         try {
           await stripe.paymentIntents.cancel(invoicePiId);
@@ -581,7 +696,7 @@ router.post('/api/member/invoices/:invoiceId/confirm', isAuthenticated, async (r
       try {
         await stripe.invoices.update(invoiceId, {
           metadata: {
-            ...((invoice.metadata as Record<string, string>) || {}),
+            ...(((invoice as unknown as Record<string, unknown>).metadata as Record<string, string>) || {}),
             reconciled_by_pi: paymentIntentId,
             reconciliation_source: 'member_payment',
           }
@@ -604,7 +719,8 @@ router.post('/api/member/invoices/:invoiceId/confirm', isAuthenticated, async (r
       });
 
       try {
-        const invoiceBookingId = invoice.metadata?.bookingId ? parseInt(invoice.metadata.bookingId) : null;
+        const invoiceMeta = (invoice as unknown as Record<string, unknown>).metadata as Record<string, string> | null;
+        const invoiceBookingId = invoiceMeta?.bookingId ? parseInt(invoiceMeta.bookingId) : null;
         if (invoiceBookingId) {
           broadcastBookingInvoiceUpdate({
             bookingId: invoiceBookingId,
@@ -667,7 +783,7 @@ router.post('/api/member/guest-passes/purchase', isAuthenticated, async (req: Re
       return res.status(404).json({ error: 'User not found' });
     }
 
-    const user = userResult.rows[0];
+    const user = userResult.rows[0] as unknown as UserRow;
     const memberName = [user.first_name, user.last_name].filter(Boolean).join(' ') || sessionEmail.split('@')[0];
 
     let stripeCustomerId = user.stripe_customer_id;
@@ -679,7 +795,7 @@ router.post('/api/member/guest-passes/purchase', isAuthenticated, async (req: Re
     const description = `${quantity} Guest Pass${quantity > 1 ? 'es' : ''} - Ever Club`;
 
     const result = await createBalanceAwarePayment({
-      stripeCustomerId,
+      stripeCustomerId: stripeCustomerId!,
       userId: user.id?.toString() || sessionEmail,
       email: sessionEmail,
       memberName,
@@ -907,9 +1023,7 @@ router.get('/api/member/balance', isAuthenticated, async (req: Request, res: Res
       amountCents: number;
     }> = [];
 
-    for (const row of result.rows) {
-      // Include fee if participant has cached_fee_cents OR ledger_fee
-      // The payment_status filter already ensures we only see unpaid fees
+    for (const row of result.rows as unknown as BalanceParticipantRow[]) {
       let amountCents = 0;
       
       if (row.cached_fee_cents > 0) {
@@ -931,8 +1045,7 @@ router.get('/api/member/balance', isAuthenticated, async (req: Request, res: Res
       }
     }
 
-    for (const row of guestResult.rows) {
-      // Include all guest fees with cached_fee_cents > 0
+    for (const row of guestResult.rows as unknown as GuestBalanceRow[]) {
       const amountCents = row.cached_fee_cents || GUEST_FEE_CENTS;
       const dateStr = row.session_date ? new Date(row.session_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/Los_Angeles' }) : '';
       breakdown.push({
@@ -945,7 +1058,6 @@ router.get('/api/member/balance', isAuthenticated, async (req: Request, res: Res
       });
     }
 
-    // On-the-fly fee computation for uncached sessions
     const existingSessionIds = new Set(breakdown.map(b => b.sessionId));
     try {
       const uncachedResult = await db.execute(sql`
@@ -961,8 +1073,8 @@ router.get('/api/member/balance', isAuthenticated, async (req: Request, res: Res
          LIMIT 20
       `);
 
-      const uncachedSessions = uncachedResult.rows
-        .map(r => r.session_id as number)
+      const uncachedSessions = (uncachedResult.rows as unknown as UncachedSessionRow[])
+        .map(r => r.session_id)
         .filter(sid => !existingSessionIds.has(sid));
 
       if (uncachedSessions.length > 0) {
@@ -983,7 +1095,7 @@ router.get('/api/member/balance', isAuthenticated, async (req: Request, res: Res
                    LEFT JOIN booking_participants bp ON bp.id = ${p.participantId}
                    WHERE bs.id = ${sessionId}
                 `);
-                const sData = sessionDataResult.rows[0];
+                const sData = sessionDataResult.rows[0] as unknown as SessionDataRow | undefined;
                 const dateStr = sData?.session_date ? new Date(sData.session_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/Los_Angeles' }) : '';
 
                 const isGuest = sData?.participant_type === 'guest';
@@ -1050,7 +1162,7 @@ router.get('/api/member/balance', isAuthenticated, async (req: Request, res: Res
        GROUP BY bs.id, bs.session_date, bs.start_time, bs.end_time, r.name, br.declared_player_count, bp.user_id
     `);
 
-    for (const row of unfilledResult.rows) {
+    for (const row of unfilledResult.rows as unknown as UnfilledRow[]) {
       const declaredCount = parseInt(row.declared_player_count, 10) || 1;
       const nonOwnerCount = parseInt(row.non_owner_count, 10) || 0;
       const unfilledSlots = Math.max(0, declaredCount - 1 - nonOwnerCount);
@@ -1140,8 +1252,7 @@ router.post('/api/member/balance/pay', isAuthenticated, async (req: Request, res
 
     const participantFees: Array<{id: number; amountCents: number}> = [];
 
-    for (const row of result.rows) {
-      // Include all pending fees - the payment_status filter already ensures we only see unpaid fees
+    for (const row of result.rows as unknown as BalancePayParticipantRow[]) {
       let amountCents = 0;
       if (row.cached_fee_cents > 0) {
         amountCents = row.cached_fee_cents;
@@ -1153,8 +1264,7 @@ router.post('/api/member/balance/pay', isAuthenticated, async (req: Request, res
       }
     }
 
-    for (const row of guestResult.rows) {
-      // Include all guest fees with cached_fee_cents > 0
+    for (const row of guestResult.rows as unknown as BalancePayGuestRow[]) {
       const amountCents = row.cached_fee_cents || GUEST_FEE_CENTS;
       participantFees.push({ id: row.participant_id, amountCents });
     }
@@ -1180,14 +1290,13 @@ router.post('/api/member/balance/pay', isAuthenticated, async (req: Request, res
       `);
       
       if (existingSnapshot.rows.length > 0) {
-        const existing = existingSnapshot.rows[0] as any;
-        const existingFees = existing.participant_fees || {};
-        const existingApplyCredit = existingFees.applyCredit !== false;
-        const existingParticipantIds = (existingFees.fees || []).map((p: Record<string, unknown>) => p.id).sort().join(',');
+        const existing = existingSnapshot.rows[0] as unknown as SnapshotRow;
+        const parsedFees = typeof existing.participant_fees === 'string' ? JSON.parse(existing.participant_fees) : (existing.participant_fees || {});
+        const existingApplyCredit = parsedFees.applyCredit !== false;
+        const existingParticipantIds = (parsedFees.fees || []).map((p: Record<string, unknown>) => p.id).sort().join(',');
         const newParticipantIds = participantFees.map(p => p.id).sort().join(',');
         const participantsMatch = existingParticipantIds === newParticipantIds;
         
-        // Reuse snapshot only if applyCredit setting matches, amounts match, and participants match
         if (existing.stripe_payment_intent_id && 
             existing.total_cents === totalCents && 
             participantsMatch &&
@@ -1214,7 +1323,7 @@ router.post('/api/member/balance/pay', isAuthenticated, async (req: Request, res
           INSERT INTO booking_fee_snapshots (booking_id, session_id, participant_fees, total_cents, status)
            VALUES (NULL, NULL, ${JSON.stringify(snapshotData)}, ${totalCents}, 'pending') RETURNING id
         `);
-        snapshotId = (snapshotResult.rows[0] as any).id;
+        snapshotId = (snapshotResult.rows[0] as unknown as IdRow).id;
       }
     });
     
@@ -1420,7 +1529,7 @@ router.post('/api/member/bookings/:bookingId/cancel-payment', isAuthenticated, a
       return res.status(401).json({ error: 'Not authenticated' });
     }
 
-    const bookingId = parseInt(req.params.bookingId as any);
+    const bookingId = parseInt(req.params.bookingId as string);
     if (isNaN(bookingId)) {
       return res.status(400).json({ error: 'Invalid booking ID' });
     }

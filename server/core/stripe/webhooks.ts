@@ -1115,7 +1115,8 @@ async function handlePaymentIntentSucceeded(client: PoolClient, paymentIntent: S
       if (validatedParticipantIds.length === 0) {
         deferredActions.push(async () => {
           try {
-            const refund = await stripe.refunds.create({
+            const stripeClient = await getStripeClient();
+            const refund = await stripeClient.refunds.create({
               payment_intent: id,
               reason: 'duplicate',
               metadata: {
@@ -1136,7 +1137,8 @@ async function handlePaymentIntentSucceeded(client: PoolClient, paymentIntent: S
       } else {
         deferredActions.push(async () => {
           try {
-            const refund = await stripe.refunds.create({
+            const stripeClient = await getStripeClient();
+            const refund = await stripeClient.refunds.create({
               payment_intent: id,
               amount: overpaymentCents,
               reason: 'duplicate',
@@ -3114,7 +3116,7 @@ async function handleSubscriptionCreated(client: PoolClient, subscription: Strip
 
     try {
       const subDiscounts = subscription.discounts?.filter((d): d is Stripe.Discount => typeof d !== 'string');
-      let subCoupon = subDiscounts?.[0]?.coupon;
+      let subCoupon = (subDiscounts?.[0] as unknown as Record<string, unknown>)?.coupon as Stripe.Coupon | string | undefined;
       if (!subCoupon) {
         for (const item of (subscription.items?.data || [])) {
           const itemDiscounts = (item as any).discounts?.filter((d: any): d is Stripe.Discount => typeof d === 'object' && d !== null && 'coupon' in d);
@@ -3947,7 +3949,7 @@ async function handleSubscriptionUpdated(client: PoolClient, subscription: Strip
 
     try {
       const updatedDiscounts = subscription.discounts?.filter((d): d is Stripe.Discount => typeof d !== 'string');
-      let currentCoupon = updatedDiscounts?.[0]?.coupon;
+      let currentCoupon = (updatedDiscounts?.[0] as unknown as Record<string, unknown>)?.coupon as Stripe.Coupon | string | undefined;
       if (!currentCoupon) {
         for (const item of (subscription.items?.data || [])) {
           const itemDiscounts = (item as any).discounts?.filter((d: any): d is Stripe.Discount => typeof d === 'object' && d !== null && 'coupon' in d);
@@ -4731,7 +4733,8 @@ async function handleCustomerUpdated(client: PoolClient, customer: Stripe.Custom
       
       deferredActions.push(async () => {
         try {
-          await stripe.customers.update(stripeCustomerId, { email: currentEmail });
+          const stripeClient = await getStripeClient();
+          await stripeClient.customers.update(stripeCustomerId, { email: currentEmail });
           logger.info(`[Stripe Webhook] Auto-corrected Stripe customer ${stripeCustomerId} email from ${stripeEmail} to ${currentEmail}`);
           await notifyAllStaff(
             'Stripe Email Auto-Corrected',
@@ -4831,13 +4834,12 @@ async function handleTrialWillEnd(client: PoolClient, subscription: Stripe.Subsc
 
     deferredActions.push(async () => {
       try {
-        await notifyMember(
-          memberEmail,
-          'Trial Ending Soon',
-          `Your trial membership ends on ${trialEndStr}. After that, your membership will automatically continue with regular billing. Visit your billing page to review your plan.`,
-          'trial_ending',
-          { sendPush: true }
-        );
+        await notifyMember({
+          userEmail: memberEmail,
+          title: 'Trial Ending Soon',
+          message: `Your trial membership ends on ${trialEndStr}. After that, your membership will automatically continue with regular billing. Visit your billing page to review your plan.`,
+          type: 'trial_ending',
+        }, { sendPush: true });
       } catch (err: unknown) {
         logger.error('[Stripe Webhook] Failed to send trial ending notification:', { error: err });
       }
@@ -4915,13 +4917,12 @@ async function handlePaymentMethodAttached(client: PoolClient, paymentMethod: St
       const member = memberResult.rows[0];
       deferredActions.push(async () => {
         try {
-          await notifyMember(
-            member.email,
-            'Payment Method Updated',
-            'Your new payment method has been added successfully. Any pending payments will be retried automatically.',
-            'billing',
-            { sendPush: false }
-          );
+          await notifyMember({
+            userEmail: member.email,
+            title: 'Payment Method Updated',
+            message: 'Your new payment method has been added successfully. Any pending payments will be retried automatically.',
+            type: 'billing',
+          }, { sendPush: false });
         } catch (err: unknown) {
           logger.error('[Stripe Webhook] Failed to send payment method notification:', { error: err });
         }
@@ -5066,7 +5067,7 @@ export async function handleCustomerDeleted(client: PoolClient, customer: Stripe
           'Stripe Customer Deleted',
           `${user.display_name || user.email} - their Stripe customer was deleted externally. Billing is now disconnected.`,
           'billing',
-          { urgent: true }
+          { sendPush: true }
         );
       } catch (err: unknown) {
         logger.error('[Stripe Webhook] Failed to notify staff about customer deletion:', { error: getErrorMessage(err) });
@@ -5152,13 +5153,12 @@ export async function handlePaymentMethodDetached(client: PoolClient, paymentMet
 
     deferredActions.push(async () => {
       try {
-        await notifyMember(
-          user.email,
-          'Payment Method Removed',
-          'Your payment method was removed. Please add a new one to avoid billing issues.',
-          'payment_method_update',
-          { sendPush: false }
-        );
+        await notifyMember({
+          userEmail: user.email,
+          title: 'Payment Method Removed',
+          message: 'Your payment method was removed. Please add a new one to avoid billing issues.',
+          type: 'payment_method_update',
+        }, { sendPush: false });
       } catch (err: unknown) {
         logger.error('[Stripe Webhook] Failed to notify member about payment method detach:', { error: getErrorMessage(err) });
       }
@@ -5204,13 +5204,12 @@ export async function handlePaymentMethodUpdated(client: PoolClient, paymentMeth
       if (expiryDate <= thirtyDaysFromNow) {
         deferredActions.push(async () => {
           try {
-            await notifyMember(
-              user.email,
-              'Card Expiring Soon',
-              `Your card ending in ${last4} expires soon. Please update your payment method.`,
-              'card_expiring',
-              { sendPush: false }
-            );
+            await notifyMember({
+              userEmail: user.email,
+              title: 'Card Expiring Soon',
+              message: `Your card ending in ${last4} expires soon. Please update your payment method.`,
+              type: 'card_expiring',
+            }, { sendPush: false });
           } catch (err: unknown) {
             logger.error('[Stripe Webhook] Failed to notify member about expiring card:', { error: getErrorMessage(err) });
           }
@@ -5273,13 +5272,12 @@ export async function handlePaymentMethodAutoUpdated(client: PoolClient, payment
 
     deferredActions.push(async () => {
       try {
-        await notifyMember(
-          user.email,
-          'Card Details Auto-Updated',
-          'Your card details were automatically updated by your bank. No action needed.',
-          'billing_alert',
-          { sendPush: false }
-        );
+        await notifyMember({
+          userEmail: user.email,
+          title: 'Card Details Auto-Updated',
+          message: 'Your card details were automatically updated by your bank. No action needed.',
+          type: 'billing_alert',
+        }, { sendPush: false });
       } catch (err: unknown) {
         logger.error('[Stripe Webhook] Failed to notify member about auto-updated card:', { error: getErrorMessage(err) });
       }
@@ -5356,7 +5354,7 @@ export async function handleChargeDisputeUpdated(client: PoolClient, dispute: St
           'Dispute Status Updated',
           `Dispute ${id} status changed to ${statusDescription}. Amount: $${(amount / 100).toFixed(2)}. Reason: ${reason || 'unknown'}.${paymentIntentId ? ` Payment Intent: ${paymentIntentId}` : ''}`,
           'billing',
-          { urgent: status === 'needs_response' || status === 'warning_needs_response' }
+          { sendPush: status === 'needs_response' || status === 'warning_needs_response' }
         );
       } catch (err: unknown) {
         logger.error('[Stripe Webhook] Failed to notify staff about dispute update:', { error: getErrorMessage(err) });
@@ -5736,7 +5734,7 @@ async function handleInvoicePaymentActionRequired(client: PoolClient, invoice: I
       try {
         await logSystemAction({
           action: 'invoice_payment_action_required',
-          resourceType: 'invoice',
+          resourceType: 'invoices',
           resourceId: invoice.id,
           details: {
             email: displayEmail,
@@ -5807,7 +5805,7 @@ async function handleInvoiceOverdue(client: PoolClient, invoice: InvoiceWithLega
           'Overdue Invoice',
           `Overdue invoice for ${userEmail}: $${(amountDue / 100).toFixed(2)}. Invoice ${invoice.id}`,
           'billing',
-          { urgent: true, sendPush: true }
+          { sendPush: true }
         );
       } catch (err: unknown) {
         logger.error('[Stripe Webhook] Failed to notify staff about overdue invoice:', { error: getErrorMessage(err) });
@@ -5818,7 +5816,7 @@ async function handleInvoiceOverdue(client: PoolClient, invoice: InvoiceWithLega
       try {
         await logSystemAction({
           action: 'invoice_overdue',
-          resourceType: 'invoice',
+          resourceType: 'invoices',
           resourceId: invoice.id,
           details: {
             email: userEmail,

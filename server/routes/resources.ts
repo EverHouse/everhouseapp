@@ -590,7 +590,7 @@ router.put('/api/bookings/:id/member-cancel', isAuthenticated, async (req, res) 
     const result = await memberCancelBooking(bookingId, userEmail, sessionUserRole, actingAsEmail);
     
     if (result.isPending) {
-      logFromRequest(req, 'cancellation_requested', 'booking', id, undefined, {
+      logFromRequest(req, 'cancellation_requested', 'booking', id as string, undefined, {
         member_email: result.existing.userEmail,
         trackman_booking_id: result.existing.trackmanBookingId
       });

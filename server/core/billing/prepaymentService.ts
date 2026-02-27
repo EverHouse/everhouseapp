@@ -5,6 +5,37 @@ import { db } from '../../db';
 import { sql } from 'drizzle-orm';
 import { logger } from '../logger';
 
+interface UnmatchedCheckRow {
+  is_unmatched: boolean;
+  user_email: string | null;
+  user_name: string | null;
+}
+
+interface ExemptCheckRow {
+  role: string | null;
+  tier: string | null;
+  unlimited_access: boolean;
+}
+
+interface InvoiceRow {
+  stripe_invoice_id: string | null;
+}
+
+interface ResourceTypeRow {
+  resource_type: string;
+}
+
+interface TrackmanRow {
+  trackman_booking_id: string | null;
+}
+
+interface ParticipantLineItemRow {
+  id: number;
+  participant_type: string;
+  display_name: string | null;
+  cached_fee_cents: string;
+}
+
 export interface CreatePrepaymentIntentParams {
   sessionId: number;
   bookingId: number;
@@ -51,7 +82,7 @@ export async function createPrepaymentIntent(
     sql`SELECT is_unmatched, user_email, user_name FROM booking_requests WHERE id = ${bookingId} LIMIT 1`
   );
   if (unmatchedCheck.rows.length > 0) {
-    const booking = unmatchedCheck.rows[0];
+    const booking = unmatchedCheck.rows[0] as unknown as UnmatchedCheckRow;
     if (booking.is_unmatched && (!booking.user_email || !booking.user_email.includes('@'))) {
       logger.info('[Prepayment] Skipping - unmatched booking without assigned member (ghost booking prevention)', {
         extra: { bookingId, sessionId, isUnmatched: booking.is_unmatched, userEmail: booking.user_email || '(empty)', userName: booking.user_name }
@@ -68,7 +99,7 @@ export async function createPrepaymentIntent(
        WHERE LOWER(u.email) = LOWER(${userEmail}) LIMIT 1`
     );
     if (exemptCheck.rows.length > 0) {
-      const { role, tier, unlimited_access } = exemptCheck.rows[0];
+      const { role, tier, unlimited_access } = exemptCheck.rows[0] as unknown as ExemptCheckRow;
       const normalizedRole = (role || '').toLowerCase();
       if (['staff', 'admin', 'golf_instructor'].includes(normalizedRole) || unlimited_access) {
         logger.info('[Prepayment] Skipping - exempt from fees', { 
@@ -84,8 +115,9 @@ export async function createPrepaymentIntent(
       sql`SELECT stripe_invoice_id FROM booking_requests WHERE id = ${bookingId} LIMIT 1`
     );
 
-    if (existingInvoice.rows[0]?.stripe_invoice_id) {
-      logger.info('[Prepayment] Skipping - draft invoice already exists for booking', { extra: { bookingId, invoiceId: existingInvoice.rows[0].stripe_invoice_id } });
+    const existingInvoiceRow = existingInvoice.rows[0] as unknown as InvoiceRow | undefined;
+    if (existingInvoiceRow?.stripe_invoice_id) {
+      logger.info('[Prepayment] Skipping - draft invoice already exists for booking', { extra: { bookingId, invoiceId: existingInvoiceRow.stripe_invoice_id } });
       return null;
     }
 
@@ -95,12 +127,12 @@ export async function createPrepaymentIntent(
        LEFT JOIN resources r ON br.resource_id = r.id
        WHERE br.id = ${bookingId} LIMIT 1`
     );
-    const resourceType = resourceTypeResult.rows[0]?.resource_type || 'simulator';
+    const resourceType = (resourceTypeResult.rows[0] as unknown as ResourceTypeRow | undefined)?.resource_type || 'simulator';
 
     const trackmanResult = await db.execute(
       sql`SELECT trackman_booking_id FROM booking_requests WHERE id = ${bookingId} LIMIT 1`
     );
-    const trackmanBookingId = trackmanResult.rows[0]?.trackman_booking_id || null;
+    const trackmanBookingId = (trackmanResult.rows[0] as unknown as TrackmanRow | undefined)?.trackman_booking_id || null;
 
     const { customerId } = await getOrCreateStripeCustomer(userId || userEmail, userEmail, userName);
 
@@ -157,7 +189,7 @@ async function buildParticipantLineItems(
     }
 
     const lineItems: BookingFeeLineItem[] = [];
-    for (const row of participantsResult.rows) {
+    for (const row of participantsResult.rows as unknown as ParticipantLineItemRow[]) {
       const feeCents = parseInt(row.cached_fee_cents) || 0;
       if (feeCents <= 0) continue;
 

@@ -178,7 +178,7 @@ export function MemberFlow({
             }).catch(err => console.error('Failed to save ID image:', err));
           }
           
-          onSuccess();
+          onSuccess({ id: data.userId || 'member-' + Date.now(), email: form.email, name: `${form.firstName} ${form.lastName}` });
           return;
         }
         

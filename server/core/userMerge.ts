@@ -291,6 +291,8 @@ export async function executeMerge(
   
   let stripeCustomerToUpdateId: string | null = null;
   let stripeOrphanedIdForMetadata: string | null = null;
+  let combinedVisitsTotal = 0;
+  let transferHubspotIdFlag = false;
 
   // Check for active sessions (cannot merge user who is currently playing)
   const activeSession = await db.execute(sql`
@@ -312,7 +314,7 @@ export async function executeMerge(
        SET user_email = ${primaryEmail}, user_id = ${primaryUserId}, updated_at = NOW(),
            staff_notes = COALESCE(staff_notes, '') || ' [Merged from ' || ${secondaryEmail} || ']'
        WHERE (LOWER(user_email) = ${secondaryEmail} OR user_id = ${secondaryUserId})`);
-    recordsMerged.bookings = (bookingsResult as any).rowCount || 0;
+    recordsMerged.bookings = (bookingsResult as unknown as { rowCount: number }).rowCount || 0;
     
     // Visits are tracked via booking_requests status - no separate table to update
     // Just count how many attended bookings were transferred
@@ -322,26 +324,26 @@ export async function executeMerge(
     
     // Update wellness enrollments
     const wellnessResult = await tx.execute(sql`UPDATE wellness_enrollments SET user_email = ${primaryEmail} WHERE LOWER(user_email) = ${secondaryEmail}`);
-    recordsMerged.wellnessBookings = (wellnessResult as any).rowCount || 0;
+    recordsMerged.wellnessBookings = (wellnessResult as unknown as { rowCount: number }).rowCount || 0;
     
     // Update event RSVPs (uses user_email column)
     const eventRsvpsResult = await tx.execute(sql`UPDATE event_rsvps SET user_email = ${primaryEmail} WHERE LOWER(user_email) = ${secondaryEmail}`);
-    recordsMerged.eventRsvps = (eventRsvpsResult as any).rowCount || 0;
+    recordsMerged.eventRsvps = (eventRsvpsResult as unknown as { rowCount: number }).rowCount || 0;
     
     // Update notifications (uses user_email column)
     const notificationsResult = await tx.execute(sql`UPDATE notifications SET user_email = ${primaryEmail} WHERE LOWER(user_email) = ${secondaryEmail}`);
-    recordsMerged.notifications = (notificationsResult as any).rowCount || 0;
+    recordsMerged.notifications = (notificationsResult as unknown as { rowCount: number }).rowCount || 0;
     
     const memberNotesResult = await tx.execute(sql`UPDATE member_notes SET member_email = ${primaryEmail}, updated_at = NOW() WHERE LOWER(member_email) = ${secondaryEmail}`);
-    recordsMerged.memberNotes = (memberNotesResult as any).rowCount || 0;
+    recordsMerged.memberNotes = (memberNotesResult as unknown as { rowCount: number }).rowCount || 0;
     
     // Update guest check-ins (uses member_email column)
     const guestCheckInsResult = await tx.execute(sql`UPDATE guest_check_ins SET member_email = ${primaryEmail} WHERE LOWER(member_email) = ${secondaryEmail}`);
-    recordsMerged.guestCheckIns = (guestCheckInsResult as any).rowCount || 0;
+    recordsMerged.guestCheckIns = (guestCheckInsResult as unknown as { rowCount: number }).rowCount || 0;
     
     // Update usage ledger (uses member_id column)
     const usageLedgerResult = await tx.execute(sql`UPDATE usage_ledger SET member_id = ${primaryUserId} WHERE member_id = ${secondaryUserId}`);
-    recordsMerged.usageLedger = (usageLedgerResult as any).rowCount || 0;
+    recordsMerged.usageLedger = (usageLedgerResult as unknown as { rowCount: number }).rowCount || 0;
     
     await tx.execute(sql`UPDATE communication_logs SET member_email = ${primaryEmail}, updated_at = NOW() WHERE LOWER(member_email) = ${secondaryEmail}`);
     
@@ -361,7 +363,7 @@ export async function executeMerge(
     
     // Update guests created by secondary user
     const guestsResult = await tx.execute(sql`UPDATE guests SET created_by_member_id = ${primaryUserId} WHERE created_by_member_id = ${secondaryUserId}`);
-    recordsMerged.guests = (guestsResult as any).rowCount || 0;
+    recordsMerged.guests = (guestsResult as unknown as { rowCount: number }).rowCount || 0;
     
     // Update booking participants (uses user_id column)
     // DEDUPLICATE: If primary user is already in a session, remove secondary user's duplicate record
@@ -370,17 +372,17 @@ export async function executeMerge(
        AND session_id IN (SELECT session_id FROM booking_participants WHERE user_id = ${primaryUserId})`);
     
     const bookingParticipantsResult = await tx.execute(sql`UPDATE booking_participants SET user_id = ${primaryUserId} WHERE user_id = ${secondaryUserId}`);
-    recordsMerged.bookingParticipants = (bookingParticipantsResult as any).rowCount || 0;
+    recordsMerged.bookingParticipants = (bookingParticipantsResult as unknown as { rowCount: number }).rowCount || 0;
     
     // Update day pass purchases (uses user_id and purchaser_email columns)
     const dayPassResult = await tx.execute(sql`UPDATE day_pass_purchases SET user_id = ${primaryUserId}, purchaser_email = ${primaryEmail} 
        WHERE user_id = ${secondaryUserId} OR LOWER(purchaser_email) = ${secondaryEmail}`);
-    recordsMerged.dayPassPurchases = (dayPassResult as any).rowCount || 0;
+    recordsMerged.dayPassPurchases = (dayPassResult as unknown as { rowCount: number }).rowCount || 0;
     
     // Update legacy purchases (uses user_id and member_email columns)
     const legacyPurchasesResult = await tx.execute(sql`UPDATE legacy_purchases SET user_id = ${primaryUserId}, member_email = ${primaryEmail} 
        WHERE user_id = ${secondaryUserId} OR LOWER(member_email) = ${secondaryEmail}`);
-    recordsMerged.legacyPurchases = (legacyPurchasesResult as any).rowCount || 0;
+    recordsMerged.legacyPurchases = (legacyPurchasesResult as unknown as { rowCount: number }).rowCount || 0;
     
     // Update group members (uses member_email column)
     // DEDUPLICATE: If primary email is already in a group, remove secondary email's duplicate record
@@ -389,7 +391,7 @@ export async function executeMerge(
        AND billing_group_id IN (SELECT billing_group_id FROM group_members WHERE LOWER(member_email) = ${primaryEmail})`);
     
     const groupMembersResult = await tx.execute(sql`UPDATE group_members SET member_email = ${primaryEmail} WHERE LOWER(member_email) = ${secondaryEmail}`);
-    recordsMerged.groupMembers = (groupMembersResult as any).rowCount || 0;
+    recordsMerged.groupMembers = (groupMembersResult as unknown as { rowCount: number }).rowCount || 0;
     
     // Update push subscriptions (uses user_email column)
     // DEDUPLICATE: If same endpoint exists for primary, remove secondary's duplicate subscription
@@ -398,33 +400,33 @@ export async function executeMerge(
        AND endpoint IN (SELECT endpoint FROM push_subscriptions WHERE LOWER(user_email) = ${primaryEmail})`);
     
     const pushSubscriptionsResult = await tx.execute(sql`UPDATE push_subscriptions SET user_email = ${primaryEmail} WHERE LOWER(user_email) = ${secondaryEmail}`);
-    recordsMerged.pushSubscriptions = (pushSubscriptionsResult as any).rowCount || 0;
+    recordsMerged.pushSubscriptions = (pushSubscriptionsResult as unknown as { rowCount: number }).rowCount || 0;
     
     await tx.execute(sql`DELETE FROM user_dismissed_notices 
        WHERE LOWER(user_email) = ${secondaryEmail}
        AND (notice_type, notice_id) IN (SELECT notice_type, notice_id FROM user_dismissed_notices WHERE LOWER(user_email) = ${primaryEmail})`);
     const dismissedNoticesResult = await tx.execute(sql`UPDATE user_dismissed_notices SET user_email = ${primaryEmail} WHERE LOWER(user_email) = ${secondaryEmail}`);
-    recordsMerged.dismissedNotices = (dismissedNoticesResult as any).rowCount || 0;
+    recordsMerged.dismissedNotices = (dismissedNoticesResult as unknown as { rowCount: number }).rowCount || 0;
     
     // Update billing groups where user is primary payer (uses primary_email column)
     const billingGroupsResult = await tx.execute(sql`UPDATE billing_groups SET primary_email = ${primaryEmail} WHERE LOWER(primary_email) = ${secondaryEmail}`);
-    recordsMerged.billingGroups = (billingGroupsResult as any).rowCount || 0;
+    recordsMerged.billingGroups = (billingGroupsResult as unknown as { rowCount: number }).rowCount || 0;
     
     // Update bug reports (uses user_email column)
     const bugReportsResult = await tx.execute(sql`UPDATE bug_reports SET user_email = ${primaryEmail} WHERE LOWER(user_email) = ${secondaryEmail}`);
-    recordsMerged.bugReports = (bugReportsResult as any).rowCount || 0;
+    recordsMerged.bugReports = (bugReportsResult as unknown as { rowCount: number }).rowCount || 0;
     
     // Update data export requests (uses user_email column)
     const dataExportResult = await tx.execute(sql`UPDATE data_export_requests SET user_email = ${primaryEmail} WHERE LOWER(user_email) = ${secondaryEmail}`);
-    recordsMerged.dataExportRequests = (dataExportResult as any).rowCount || 0;
+    recordsMerged.dataExportRequests = (dataExportResult as unknown as { rowCount: number }).rowCount || 0;
     
     // Update HubSpot deals (uses member_email column)
     const hubspotDealsResult = await tx.execute(sql`UPDATE hubspot_deals SET member_email = ${primaryEmail} WHERE LOWER(member_email) = ${secondaryEmail}`);
-    recordsMerged.hubspotDeals = (hubspotDealsResult as any).rowCount || 0;
+    recordsMerged.hubspotDeals = (hubspotDealsResult as unknown as { rowCount: number }).rowCount || 0;
     
     // Update Stripe payment intents (uses user_id column)
     const stripePaymentIntentsResult = await tx.execute(sql`UPDATE stripe_payment_intents SET user_id = ${primaryUserId} WHERE user_id = ${secondaryUserId}`);
-    recordsMerged.stripePaymentIntents = (stripePaymentIntentsResult as any).rowCount || 0;
+    recordsMerged.stripePaymentIntents = (stripePaymentIntentsResult as unknown as { rowCount: number }).rowCount || 0;
     
     // Update user_linked_emails (uses primary_email column, not user_id)
     await tx.execute(sql`UPDATE user_linked_emails SET primary_email = ${primaryEmail} WHERE LOWER(primary_email) = ${secondaryEmail}`);
@@ -442,6 +444,7 @@ export async function executeMerge(
     }
     
     const combinedVisits = (primaryUser.lifetimeVisits || 0) + (secondaryUser.lifetimeVisits || 0);
+    combinedVisitsTotal = combinedVisits;
     
     const earlierJoinDate = primaryUser.joinDate && secondaryUser.joinDate
       ? (new Date(primaryUser.joinDate) < new Date(secondaryUser.joinDate) ? primaryUser.joinDate : secondaryUser.joinDate)
@@ -471,6 +474,7 @@ export async function executeMerge(
     // This prevents losing billing history when merging a fresh duplicate into the active payer
     const transferStripeId = !primaryUser.stripeCustomerId && secondaryUser.stripeCustomerId;
     const transferHubspotId = !primaryUser.hubspotId && secondaryUser.hubspotId;
+    transferHubspotIdFlag = !!transferHubspotId;
     
     let resolvedStripeCustomerId: string | null = null;
     let orphanedStripeCustomerId: string | null = null;
@@ -580,8 +584,8 @@ export async function executeMerge(
     extra: { primaryUserId, secondaryUserId, performedBy, recordsMerged }
   });
   
-  const primaryHubspotId = primaryUser.hubspotId || (transferHubspotId ? secondaryUser.hubspotId : null);
-  const secondaryHubspotId = transferHubspotId ? null : secondaryUser.hubspotId;
+  const primaryHubspotId = primaryUser.hubspotId || (transferHubspotIdFlag ? secondaryUser.hubspotId : null);
+  const secondaryHubspotId = transferHubspotIdFlag ? null : secondaryUser.hubspotId;
   
   if (primaryHubspotId && secondaryHubspotId && primaryHubspotId !== secondaryHubspotId) {
     try {
@@ -611,7 +615,7 @@ export async function executeMerge(
     primaryUserId,
     secondaryUserId,
     recordsMerged,
-    mergedLifetimeVisits: combinedVisits,
+    mergedLifetimeVisits: combinedVisitsTotal,
     secondaryArchived: true,
   };
 }
@@ -745,16 +749,16 @@ export async function consolidateStripeCustomers(
   let reason: string;
   
   if (secondaryHasSub && !primaryHasSub) {
-    keptCustomerId = secondary.stripe_customer_id;
-    orphanedCustomerId = primary.stripe_customer_id;
+    keptCustomerId = String(secondary.stripe_customer_id);
+    orphanedCustomerId = String(primary.stripe_customer_id);
     reason = 'secondary_has_active_subscription';
   } else if (primaryHasSub && !secondaryHasSub) {
-    keptCustomerId = primary.stripe_customer_id;
-    orphanedCustomerId = secondary.stripe_customer_id;
+    keptCustomerId = String(primary.stripe_customer_id);
+    orphanedCustomerId = String(secondary.stripe_customer_id);
     reason = 'primary_has_active_subscription';
   } else {
-    keptCustomerId = primary.stripe_customer_id;
-    orphanedCustomerId = secondary.stripe_customer_id;
+    keptCustomerId = String(primary.stripe_customer_id);
+    orphanedCustomerId = String(secondary.stripe_customer_id);
     reason = primaryHasSub && secondaryHasSub ? 'both_have_subscriptions_kept_primary' : 'neither_has_subscription_kept_primary';
   }
   
@@ -764,7 +768,7 @@ export async function consolidateStripeCustomers(
     const stripe = await getStripeClient();
     await stripe.customers.update(keptCustomerId, {
       metadata: {
-        mergedFromEmail: secondary.email,
+        mergedFromEmail: String(secondary.email),
         mergedFromUserId: secondaryUserId,
         consolidatedAt: new Date().toISOString(),
         orphanedStripeCustomerId: orphanedCustomerId

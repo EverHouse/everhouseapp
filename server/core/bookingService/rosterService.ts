@@ -224,7 +224,7 @@ export async function getBookingWithSession(bookingId: number): Promise<BookingW
     LEFT JOIN resources r ON br.resource_id = r.id
     LEFT JOIN users u ON LOWER(br.user_email) = LOWER(u.email)
     WHERE br.id = ${bookingId}`);
-  return (result.rows[0] as BookingWithSession) || null;
+  return (result.rows[0] as unknown as BookingWithSession) || null;
 }
 
 export async function getBookingParticipants(
@@ -878,7 +878,7 @@ export async function addParticipant(params: AddParticipantParams): Promise<AddP
         ownerEmail: booking.owner_email,
         source: 'staff_manual',
         createdBy: userEmail
-      }, tx);
+      });
 
       sessionId = sessionResult.sessionId || null;
 
@@ -1559,6 +1559,7 @@ export async function updateDeclaredPlayerCount(params: UpdatePlayerCountParams)
     return {
       previousCount,
       sessionId: booking.session_id as number | null,
+      ownerEmail: String(booking.user_email || ''),
     };
   });
 
@@ -1574,7 +1575,7 @@ export async function updateDeclaredPlayerCount(params: UpdatePlayerCountParams)
         bookingId,
         sessionId: txResult.sessionId,
         action: 'roster_updated',
-        memberEmail: booking.owner_email,
+        memberEmail: txResult.ownerEmail,
       });
     } catch (feeError: unknown) {
       logger.error('[rosterService] Failed to recalculate session fees after player count update', {
@@ -1672,7 +1673,7 @@ export async function applyRosterBatch(params: BatchRosterUpdateParams): Promise
         ownerEmail: booking.owner_email,
         source: 'staff_manual',
         createdBy: staffEmail
-      }, tx);
+      });
 
       sessionId = sessionResult.sessionId || null;
 

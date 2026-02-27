@@ -1297,7 +1297,7 @@ const DirectoryTab: React.FC = () => {
 
                 <p className="text-xs text-gray-500 dark:text-gray-400">
                     {memberTab === 'visitors' 
-                        ? `Showing ${visitors.length} of ${visitorsTotal.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' })} visitor${visitorsTotal !== 1 ? 's' : ''}`
+                        ? `Showing ${visitors.length} of ${visitorsTotal.toLocaleString('en-US')} visitor${visitorsTotal !== 1 ? 's' : ''}`
                         : memberTab === 'team'
                         ? `${filteredTeamMembers.length} team member${filteredTeamMembers.length !== 1 ? 's' : ''}`
                         : `${filteredList.length} ${memberTab === 'former' ? 'former ' : ''}member${filteredList.length !== 1 ? 's' : ''} found`
@@ -1500,7 +1500,7 @@ const DirectoryTab: React.FC = () => {
                         )}
 
                         <span className="text-sm text-gray-500 dark:text-white/60">
-                            {visitorsTotal.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' })} {visitorArchiveView === 'archived' ? 'archived' : ''} contacts
+                            {visitorsTotal.toLocaleString('en-US')} {visitorArchiveView === 'archived' ? 'archived' : ''} contacts
                         </span>
                     </div>
                 )}

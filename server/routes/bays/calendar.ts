@@ -10,6 +10,22 @@ import { getSessionUser } from '../../types/session';
 import { getTodayPacific } from '../../utils/dateUtils';
 import { toIntArrayLiteral } from '../../utils/sqlArrayLiteral';
 
+interface PaymentStatusRow {
+  booking_id: number;
+  total_owed: string;
+  all_participants_paid: boolean;
+}
+
+interface FeeSnapshotRow {
+  booking_id: number;
+  snapshot_created_at: string;
+}
+
+interface FilledSlotsRow {
+  booking_id: number;
+  filled_count: string;
+}
+
 const router = Router();
 
 router.get('/api/conference-room-bookings', async (req, res) => {
@@ -185,9 +201,9 @@ router.get('/api/approved-bookings', isStaffOrAdmin, async (req, res) => {
         INNER JOIN booking_fee_snapshots bfs ON bfs.session_id = br.session_id AND bfs.status IN ('completed', 'paid')
         WHERE br.id = ANY(${bookingIdsLiteral}::int[])
       `);
-      feeSnapshotPaidSet = new Set<number>(feeSnapshotResult.rows.map((r: { booking_id: number }) => r.booking_id));
+      feeSnapshotPaidSet = new Set<number>((feeSnapshotResult.rows as unknown as FeeSnapshotRow[]).map(r => r.booking_id));
 
-      for (const row of paymentStatusResult.rows) {
+      for (const row of paymentStatusResult.rows as unknown as PaymentStatusRow[]) {
         const totalOwed = parseFloat(row.total_owed) || 0;
         const snapshotPaid = (feeSnapshotPaidSet.has(row.booking_id) && totalOwed === 0) || row.all_participants_paid === true;
         paymentStatusMap.set(row.booking_id, {
@@ -212,7 +228,7 @@ router.get('/api/approved-bookings', isStaffOrAdmin, async (req, res) => {
         WHERE br.id = ANY(${bookingIdsLiteral}::int[])
       `);
       
-      for (const row of filledSlotsResult.rows) {
+      for (const row of filledSlotsResult.rows as unknown as FilledSlotsRow[]) {
         filledSlotsMap.set(row.booking_id, parseInt(row.filled_count) || 0);
       }
     }

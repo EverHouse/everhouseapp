@@ -1437,7 +1437,7 @@ function buildFeatureKeysForTier(tier: TierRecord): Array<{ lookupKey: string; n
   ];
 
   for (const { field, key, name } of booleanMap) {
-    if (tier[field]) {
+    if ((tier as unknown as Record<string, unknown>)[field]) {
       features.push({ lookupKey: key, name });
     }
   }
@@ -1637,63 +1637,67 @@ export async function syncCafeItemsToStripe(): Promise<{
   try {
     const stripe = await getStripeClient();
     const cafeItemResult = await db.execute(sql`SELECT id, name, description, price, category, stripe_product_id, stripe_price_id FROM cafe_items WHERE is_active = true ORDER BY category, sort_order`);
-    const cafeItemRows = cafeItemResult.rows as Array<Record<string, unknown>>;
+    const cafeItemRows = cafeItemResult.rows as unknown as Array<Record<string, unknown>>;
 
     logger.info(`[Cafe Sync] Starting sync for ${cafeItemRows.length} active cafe items`);
 
     for (const item of cafeItemRows) {
       try {
-        const priceCents = Math.round(parseFloat(item.price) * 100);
+        const itemName = String(item.name);
+        const itemId = String(item.id);
+        const itemDescription = item.description ? String(item.description) : undefined;
+        const itemCategory = String(item.category || '');
+        const priceCents = Math.round(parseFloat(String(item.price)) * 100);
         if (priceCents <= 0) {
-          logger.info(`[Cafe Sync] Skipping ${item.name}: No price`);
+          logger.info(`[Cafe Sync] Skipping ${itemName}: No price`);
           skipped++;
           continue;
         }
 
-        const metadata = {
+        const metadata: Record<string, string> = {
           source: 'ever_house_app',
-          cafe_item_id: item.id.toString(),
-          category: item.category,
+          cafe_item_id: itemId,
+          category: itemCategory,
           product_type: 'one_time',
           app_category: 'cafe',
         };
 
-        let stripeProductId = item.stripe_product_id;
-        let stripePriceId = item.stripe_price_id;
+        let stripeProductId = item.stripe_product_id as string | null;
+        let stripePriceId = item.stripe_price_id as string | null;
 
         if (stripeProductId) {
           await stripe.products.update(stripeProductId, {
-            name: item.name,
-            description: item.description || undefined,
+            name: itemName,
+            description: itemDescription,
             metadata,
           });
-          logger.info(`[Cafe Sync] Updated product for ${item.name}`);
+          logger.info(`[Cafe Sync] Updated product for ${itemName}`);
         } else {
           const existingProduct = await findExistingStripeProduct(
             stripe,
-            item.name,
+            itemName,
             'cafe_item_id',
-            item.id.toString()
+            itemId
           );
 
           if (existingProduct) {
             stripeProductId = existingProduct.id;
             await stripe.products.update(stripeProductId, {
-              name: item.name,
-              description: item.description || undefined,
+              name: itemName,
+              description: itemDescription,
               metadata,
             });
-            logger.info(`[Cafe Sync] Reusing existing Stripe product ${stripeProductId} for ${item.name}`);
+            logger.info(`[Cafe Sync] Reusing existing Stripe product ${stripeProductId} for ${itemName}`);
           } else {
             const newProduct = await stripe.products.create({
-              name: item.name,
-              description: item.description || undefined,
+              name: itemName,
+              description: itemDescription,
               metadata,
             }, {
-              idempotencyKey: `product_cafe_${item.id}`
+              idempotencyKey: `product_cafe_${itemId}`
             });
             stripeProductId = newProduct.id;
-            logger.info(`[Cafe Sync] Created product for ${item.name}: ${stripeProductId}`);
+            logger.info(`[Cafe Sync] Created product for ${itemName}: ${stripeProductId}`);
           }
         }
 
@@ -1704,7 +1708,7 @@ export async function syncCafeItemsToStripe(): Promise<{
             if (existingPrice.unit_amount !== priceCents) {
               await stripe.prices.update(stripePriceId, { active: false });
               needNewPrice = true;
-              logger.info(`[Cafe Sync] Price changed for ${item.name}, creating new price`);
+              logger.info(`[Cafe Sync] Price changed for ${itemName}, creating new price`);
             }
           } catch (err) {
             logger.debug('[Cafe Sync] Failed to retrieve existing Stripe price, will create new one', { error: err instanceof Error ? err.message : err });
@@ -1716,24 +1720,24 @@ export async function syncCafeItemsToStripe(): Promise<{
 
         if (needNewPrice) {
           const newPrice = await stripe.prices.create({
-            product: stripeProductId,
+            product: stripeProductId as string,
             unit_amount: priceCents,
             currency: 'usd',
             metadata: {
-              cafe_item_id: item.id.toString(),
+              cafe_item_id: itemId,
             },
           }, {
-            idempotencyKey: `price_cafe_${item.id}_${priceCents}`
+            idempotencyKey: `price_cafe_${itemId}_${priceCents}`
           });
           stripePriceId = newPrice.id;
-          logger.info(`[Cafe Sync] Created price for ${item.name}: ${stripePriceId}`);
+          logger.info(`[Cafe Sync] Created price for ${itemName}: ${stripePriceId}`);
         }
 
-        await db.execute(sql`UPDATE cafe_items SET stripe_product_id = ${stripeProductId}, stripe_price_id = ${stripePriceId} WHERE id = ${item.id}`);
+        await db.execute(sql`UPDATE cafe_items SET stripe_product_id = ${stripeProductId}, stripe_price_id = ${stripePriceId} WHERE id = ${itemId}`);
 
         synced++;
       } catch (error: unknown) {
-        logger.error(`[Cafe Sync] Error syncing ${item.name}:`, { extra: { detail: getErrorMessage(error) } });
+        logger.error(`[Cafe Sync] Error syncing ${String(item.name)}:`, { extra: { detail: getErrorMessage(error) } });
         failed++;
       }
     }
@@ -1966,7 +1970,7 @@ export async function pullCafeItemsFromStripe(): Promise<{
     logger.info(`[Reverse Sync] Found ${activeStripeProducts.length} active and ${inactiveStripeProductIds.length} inactive cafe products in Stripe`);
 
     const existingCafeCount = await db.execute(sql`SELECT COUNT(*) FROM cafe_items WHERE is_active = true`);
-    const localCafeItems = parseInt((existingCafeCount.rows[0] as Record<string, unknown>).count as string, 10);
+    const localCafeItems = parseInt(String((existingCafeCount.rows as unknown as Array<{ count: string }>)[0].count), 10);
 
     if (activeStripeProducts.length === 0 && localCafeItems > 0) {
       logger.warn(`[Reverse Sync] Stripe has 0 cafe products but local DB has ${localCafeItems} active items. Skipping pull to preserve local data. Run "Sync to Stripe" first to push cafe items.`);
@@ -2005,7 +2009,7 @@ export async function pullCafeItemsFromStripe(): Promise<{
         const existing = await db.execute(sql`SELECT id FROM cafe_items WHERE stripe_product_id = ${product.id} OR id = ${cafeItemId} LIMIT 1`);
 
         if (existing.rows.length > 0) {
-          const existingId = (existing.rows[0] as Record<string, unknown>).id;
+          const existingId = (existing.rows[0] as unknown as { id: number }).id;
           await db.execute(sql`UPDATE cafe_items SET
               name = ${product.name}, description = ${product.description || null}, price = ${priceDecimal}, category = ${category},
               image_url = COALESCE(${imageUrl}, image_url), stripe_product_id = ${product.id}, stripe_price_id = ${stripePriceId},
@@ -2029,9 +2033,10 @@ export async function pullCafeItemsFromStripe(): Promise<{
     for (const stripeProductId of inactiveStripeProductIds) {
       try {
         const result = await db.execute(sql`UPDATE cafe_items SET is_active = false WHERE stripe_product_id = ${stripeProductId} AND is_active = true RETURNING id, name`);
-        if (result.rowCount && result.rowCount > 0) {
-          deactivated += result.rowCount;
-          for (const row of (result.rows as Array<Record<string, unknown>>)) {
+        const deactivateResult = result as unknown as { rowCount: number; rows: Array<{ id: number; name: string }> };
+        if (deactivateResult.rowCount && deactivateResult.rowCount > 0) {
+          deactivated += deactivateResult.rowCount;
+          for (const row of deactivateResult.rows) {
             logger.info(`[Reverse Sync] Deactivated cafe item "${row.name}" (Stripe product inactive)`);
           }
         }

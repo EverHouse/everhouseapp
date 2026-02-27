@@ -1328,7 +1328,7 @@ router.put('/api/hubspot/contacts/:id/tier', isStaffOrAdmin, async (req, res) =>
       updatedBy: staffUser?.name || 'Unknown'
     });
   } catch (error: unknown) {
-    logger.error('[Tier Update] Error updating contact', { error: error instanceof Error ? error : new Error(String(error)), extra: { id } });
+    logger.error('[Tier Update] Error updating contact', { error: error instanceof Error ? error : new Error(String(error)), extra: { contactId: req.params.id } });
     res.status(500).json({ error: 'Failed to update tier', details: safeErrorDetail(error) });
   }
 });

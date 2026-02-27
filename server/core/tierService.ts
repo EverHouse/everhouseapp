@@ -69,7 +69,7 @@ export async function getTierLimits(tierName: string): Promise<TierLimits> {
       return DEFAULT_TIER_LIMITS;
     }
     
-    const data = result.rows[0] as TierLimits;
+    const data = result.rows[0] as unknown as TierLimits;
     tierCache.set(cacheKey, { data, expiry: Date.now() + CACHE_TTL_MS });
     
     return data;

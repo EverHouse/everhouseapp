@@ -9,6 +9,32 @@ import { PaymentStatusService } from '../billing/PaymentStatusService';
 import { getErrorMessage } from '../../utils/errorUtils';
 
 import { logger } from '../logger';
+
+interface ExistingIntentRow {
+  stripe_payment_intent_id: string;
+  status: string;
+  amount_cents: number;
+}
+
+interface PaymentRecordRow {
+  id: number;
+  user_id: string;
+  stripe_payment_intent_id: string;
+  stripe_customer_id: string;
+  amount_cents: number;
+  purpose: string;
+  booking_id: number | null;
+  session_id: number | null;
+  product_name: string | null;
+  status: string;
+}
+
+interface PaymentStatusRow {
+  status: string;
+  amount_cents: number;
+  purpose: string;
+}
+
 /**
  * Generate a deterministic idempotency key for Stripe payment intents.
  * This prevents duplicate charges when users click pay multiple times.
@@ -89,7 +115,7 @@ export async function createPaymentIntent(
        LIMIT 1`);
 
     if (existingIntentResult.rows.length > 0) {
-      const existingIntent = existingIntentResult.rows[0];
+      const existingIntent = existingIntentResult.rows[0] as unknown as ExistingIntentRow;
       const stripeClient = await getStripeClient();
       const existingPI = await stripeClient.paymentIntents.retrieve(existingIntent.stripe_payment_intent_id);
       logger.info(`[Stripe] Reusing existing PaymentIntent ${existingPI.id} for booking #${bookingId}`);
@@ -359,7 +385,7 @@ export async function confirmPaymentSuccess(
     const localRecord = await db.execute(sql`SELECT id, user_id, stripe_payment_intent_id, amount_cents, purpose, booking_id, session_id, product_name, status FROM stripe_payment_intents WHERE stripe_payment_intent_id = ${paymentIntentId}`);
 
     if (localRecord.rows[0]) {
-      const record = localRecord.rows[0];
+      const record = localRecord.rows[0] as unknown as PaymentRecordRow;
       
       await logBillingAudit({
         memberEmail: paymentIntent.metadata.email || '',
@@ -375,7 +401,7 @@ export async function confirmPaymentSuccess(
           participantsUpdated: result.participantsUpdated,
           snapshotsUpdated: result.snapshotsUpdated
         },
-        newValue: `Stripe payment of $${(record.amount_cents / 100).toFixed(2)} for ${record.purpose}`,
+        newValue: `Stripe payment of $${(Number(record.amount_cents) / 100).toFixed(2)} for ${record.purpose}`,
         performedBy,
         performedByName
       });
@@ -398,10 +424,11 @@ export async function getPaymentIntentStatus(
     return null;
   }
 
+  const row = result.rows[0] as unknown as PaymentStatusRow;
   return {
-    status: result.rows[0].status,
-    amountCents: result.rows[0].amount_cents,
-    purpose: result.rows[0].purpose
+    status: row.status,
+    amountCents: row.amount_cents,
+    purpose: row.purpose
   };
 }
 

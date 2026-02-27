@@ -29,7 +29,7 @@ router.post('/api/member/nfc-checkin', isAuthenticated, async (req: Request, res
     const member = memberResult.rows[0];
     const memberId = member.id.toString();
 
-    const status = member.membership_status?.toLowerCase() || '';
+    const status = String((member as Record<string, unknown>).membership_status || '').toLowerCase();
     const blockedStatuses = ['cancelled', 'suspended', 'terminated', 'inactive'];
     if (blockedStatuses.includes(status)) {
       return res.status(403).json({ error: 'Your membership is not active. Please speak to staff.' });
