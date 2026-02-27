@@ -714,7 +714,20 @@ export async function voidBookingInvoice(bookingId: number): Promise<{
       } else {
         const amountPaid = invoice.amount_paid || 0;
         const customerId = typeof invoice.customer === 'string' ? invoice.customer : invoice.customer?.id;
-        if (amountPaid > 0 && customerId) {
+
+        const alreadyRefunded = await db.execute(sql`
+          SELECT COUNT(*) as cnt FROM stripe_payment_intents
+          WHERE booking_id = ${bookingId}
+            AND stripe_payment_intent_id LIKE 'balance-%'
+            AND status = 'refunded'
+        `);
+        const alreadyHandled = Number((alreadyRefunded.rows[0] as any)?.cnt || 0) > 0;
+
+        if (alreadyHandled) {
+          logger.info('[BookingInvoice] Balance refund already processed for this booking, skipping', {
+            extra: { bookingId, invoiceId }
+          });
+        } else if (amountPaid > 0 && customerId) {
           try {
             const balanceTxn = await stripe.customers.createBalanceTransaction(
               customerId,

@@ -39,6 +39,7 @@ interface CancelResult {
 interface SideEffectsManifest {
   stripeRefunds: Array<{ paymentIntentId: string; type: 'refund' | 'cancel'; idempotencyKey: string }>;
   stripeSnapshotRefunds: Array<{ paymentIntentId: string; idempotencyKey: string }>;
+  balanceRefunds: Array<{ stripeCustomerId: string; amountCents: number; bookingId: number; balanceRecordId: string; description: string }>;
   invoiceVoid: { bookingId: number } | null;
   calendarDeletion: { eventId: string; resourceId: number | null } | null;
   notifications: {
@@ -154,6 +155,7 @@ export class BookingStateService {
       const sideEffects: SideEffectsManifest = {
         stripeRefunds: [],
         stripeSnapshotRefunds: [],
+        balanceRefunds: [],
         invoiceVoid: { bookingId },
         calendarDeletion: booking.calendarEventId ? { eventId: booking.calendarEventId, resourceId: booking.resourceId } : null,
         notifications: {},
@@ -214,6 +216,26 @@ export class BookingStateService {
               paymentIntentId: participant.stripePaymentIntentId,
               type: 'refund',
               idempotencyKey: `refund_cancel_participant_${bookingId}_${participant.stripePaymentIntentId}`,
+            });
+          }
+        }
+
+        const balancePaymentRecords = await tx.execute(sql`
+          SELECT stripe_payment_intent_id, stripe_customer_id, amount_cents
+          FROM stripe_payment_intents
+          WHERE booking_id = ${bookingId}
+            AND stripe_payment_intent_id LIKE 'balance-%'
+            AND status = 'succeeded'
+        `);
+
+        for (const rec of balancePaymentRecords.rows as any[]) {
+          if (rec.stripe_customer_id && rec.amount_cents > 0) {
+            sideEffects.balanceRefunds.push({
+              stripeCustomerId: rec.stripe_customer_id,
+              amountCents: rec.amount_cents,
+              bookingId,
+              balanceRecordId: rec.stripe_payment_intent_id,
+              description: `Refund for cancelled booking #${bookingId}`,
             });
           }
         }
@@ -398,6 +420,7 @@ export class BookingStateService {
       const sideEffects: SideEffectsManifest = {
         stripeRefunds: [],
         stripeSnapshotRefunds: [],
+        balanceRefunds: [],
         invoiceVoid: { bookingId },
         calendarDeletion: existing.calendarEventId ? { eventId: existing.calendarEventId, resourceId: existing.resourceId } : null,
         notifications: {},
@@ -464,6 +487,26 @@ export class BookingStateService {
               paymentIntentId: participant.stripePaymentIntentId,
               type: 'refund',
               idempotencyKey: `refund_complete_participant_${bookingId}_${participant.stripePaymentIntentId}`,
+            });
+          }
+        }
+
+        const balancePaymentRecords = await tx.execute(sql`
+          SELECT stripe_payment_intent_id, stripe_customer_id, amount_cents
+          FROM stripe_payment_intents
+          WHERE booking_id = ${bookingId}
+            AND stripe_payment_intent_id LIKE 'balance-%'
+            AND status = 'succeeded'
+        `);
+
+        for (const rec of balancePaymentRecords.rows as any[]) {
+          if (rec.stripe_customer_id && rec.amount_cents > 0) {
+            sideEffects.balanceRefunds.push({
+              stripeCustomerId: rec.stripe_customer_id,
+              amountCents: rec.amount_cents,
+              bookingId,
+              balanceRecordId: rec.stripe_payment_intent_id,
+              description: `Refund for cancelled booking #${bookingId}`,
             });
           }
         }
@@ -677,6 +720,34 @@ export class BookingStateService {
         const msg = `Failed to handle refund ${refundItem.paymentIntentId.substring(0, 12)}: ${getErrorMessage(err)}`;
         errors.push(msg);
         logger.error('[BookingStateService] Stripe refund failed', { extra: { paymentIntentId: refundItem.paymentIntentId, error: getErrorMessage(err) } });
+      }
+    }
+
+    for (const balanceRefund of manifest.balanceRefunds) {
+      try {
+        const stripe = await getStripeClient();
+        const balanceTxn = await stripe.customers.createBalanceTransaction(
+          balanceRefund.stripeCustomerId,
+          {
+            amount: -balanceRefund.amountCents,
+            currency: 'usd',
+            description: balanceRefund.description,
+          }
+        );
+        logger.info('[BookingStateService] Restored customer credit balance', {
+          extra: { bookingId: balanceRefund.bookingId, balanceRecordId: balanceRefund.balanceRecordId, amountCents: balanceRefund.amountCents, balanceTransactionId: balanceTxn.id }
+        });
+        await db.execute(sql`
+          UPDATE stripe_payment_intents
+          SET status = 'refunded', updated_at = NOW(),
+              description = COALESCE(description, '') || ${` [Refund: ${balanceTxn.id}]`}
+          WHERE stripe_payment_intent_id = ${balanceRefund.balanceRecordId}
+            AND status = 'succeeded'
+        `);
+      } catch (err: unknown) {
+        const msg = `Failed to restore credit balance for ${balanceRefund.balanceRecordId}: ${getErrorMessage(err)}`;
+        errors.push(msg);
+        logger.error('[BookingStateService] Balance refund failed', { extra: { ...balanceRefund, error: getErrorMessage(err) } });
       }
     }
 
