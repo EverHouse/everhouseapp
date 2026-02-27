@@ -235,7 +235,7 @@
 
 @theme {
   --font-family-display: "Playfair Display", Georgia, serif;
-  --font-family-sans: "Plus Jakarta Sans", sans-serif;
+  --font-family-sans: "Geologica", sans-serif;
   --font-family-serif: "Playfair Display", Georgia, serif;
   
   --color-primary: #293515;
@@ -296,7 +296,7 @@ html, body {
   -webkit-tap-highlight-color: transparent;
   background-color: #F2F2EC;
   color: var(--brand-primary);
-  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-family: 'Geologica', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }

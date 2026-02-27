@@ -9,7 +9,7 @@ export default {
     extend: {
       fontFamily: {
         display: ["Playfair Display", "Georgia", "serif"],
-        sans: ["Plus Jakarta Sans", "sans-serif"],
+        sans: ["Geologica", "sans-serif"],
         serif: ["Playfair Display", "Georgia", "serif"],
       },
       colors: {
