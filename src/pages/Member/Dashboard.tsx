@@ -372,12 +372,19 @@ const Dashboard: React.FC = () => {
       date: formatDate(r.event_date),
       rawDate: r.event_date.split('T')[0],
       time: formatTime12Hour(r.start_time),
-      endTime: '',
+      endTime: r.end_time ? formatTime12Hour(r.end_time) : '',
       details: r.location || '',
       sortKey: `${r.event_date}T${r.start_time}`,
       raw: r
     })),
-    ...dbWellnessEnrollments.map(w => ({
+    ...dbWellnessEnrollments.map(w => {
+      const durationMin = parseInt(w.duration) || 60;
+      const [hh, mm] = w.time.substring(0, 5).split(':').map(Number);
+      const endTotalMin = hh * 60 + mm + durationMin;
+      const endH = Math.floor(endTotalMin / 60) % 24;
+      const endM = endTotalMin % 60;
+      const wellnessEndTime = `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
+      return {
       id: `wellness-${w.id}`,
       dbId: w.id,
       classId: w.class_id,
@@ -386,12 +393,13 @@ const Dashboard: React.FC = () => {
       resourceType: 'wellness_class',
       date: formatDate(w.date),
       rawDate: w.date.split('T')[0],
-      time: w.time,
-      endTime: '',
+      time: formatTime12Hour(w.time),
+      endTime: formatTime12Hour(wellnessEndTime),
       details: `${w.category} with ${w.instructor}`,
       sortKey: `${w.date}T${w.time}`,
       raw: w
-    })),
+    };
+    }),
     ...dbConferenceRoomBookings
       .filter(c => {
         const isDuplicate = dbBookingRequests.some(r => 

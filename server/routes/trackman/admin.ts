@@ -2476,7 +2476,9 @@ router.get('/api/admin/booking/:id/members', isStaffOrAdmin, async (req, res) =>
         
         const emptyMemberSlots = feeEligibleMembers.filter(m => !m.userEmail && !m.guestInfo);
         const guestParticipantCount = participantsResult.rows.filter((p: DbRow) => p.participant_type === 'guest').length;
-        const unaccountedEmptySlots = Math.max(0, emptyMemberSlots.length - guestParticipantCount);
+        const linkedGuestSlots = feeEligibleMembers.filter(m => m.guestInfo).length;
+        const unlinkedGuestParticipants = Math.max(0, guestParticipantCount - linkedGuestSlots);
+        const unaccountedEmptySlots = Math.max(0, emptyMemberSlots.length - unlinkedGuestParticipants);
         const emptySlotFees = unaccountedEmptySlots * PRICING.GUEST_FEE_DOLLARS;
         guestFeesWithoutPass += emptySlotFees;
       } else {
