@@ -345,7 +345,17 @@ export async function executeMerge(
     
     await tx.execute(sql`UPDATE communication_logs SET member_email = ${primaryEmail}, updated_at = NOW() WHERE LOWER(member_email) = ${secondaryEmail}`);
     
-    await tx.execute(sql`UPDATE guest_passes SET member_email = ${primaryEmail} WHERE LOWER(member_email) = ${secondaryEmail}`);
+    const primaryGuestPass = await tx.execute(sql`SELECT id, passes_used, passes_total FROM guest_passes WHERE LOWER(member_email) = ${primaryEmail} LIMIT 1`);
+    const secondaryGuestPass = await tx.execute(sql`SELECT id, passes_used, passes_total FROM guest_passes WHERE LOWER(member_email) = ${secondaryEmail} LIMIT 1`);
+    if (primaryGuestPass.rows.length > 0 && secondaryGuestPass.rows.length > 0) {
+      const pRow = primaryGuestPass.rows[0] as { id: number; passes_used: number; passes_total: number };
+      const sRow = secondaryGuestPass.rows[0] as { id: number; passes_used: number; passes_total: number };
+      const mergedUsed = Math.min(pRow.passes_used + sRow.passes_used, Math.max(pRow.passes_total, sRow.passes_total));
+      await tx.execute(sql`UPDATE guest_passes SET passes_used = ${mergedUsed}, passes_total = GREATEST(passes_total, ${sRow.passes_total}) WHERE id = ${pRow.id}`);
+      await tx.execute(sql`DELETE FROM guest_passes WHERE id = ${sRow.id}`);
+    } else if (secondaryGuestPass.rows.length > 0) {
+      await tx.execute(sql`UPDATE guest_passes SET member_email = ${primaryEmail} WHERE LOWER(member_email) = ${secondaryEmail}`);
+    }
     
     // Update guests created by secondary user
     const guestsResult = await tx.execute(sql`UPDATE guests SET created_by_member_id = ${primaryUserId} WHERE created_by_member_id = ${secondaryUserId}`);
@@ -388,7 +398,9 @@ export async function executeMerge(
     const pushSubscriptionsResult = await tx.execute(sql`UPDATE push_subscriptions SET user_email = ${primaryEmail} WHERE LOWER(user_email) = ${secondaryEmail}`);
     recordsMerged.pushSubscriptions = (pushSubscriptionsResult as any).rowCount || 0;
     
-    // Update dismissed notices (uses user_email column)
+    await tx.execute(sql`DELETE FROM user_dismissed_notices 
+       WHERE LOWER(user_email) = ${secondaryEmail}
+       AND (notice_type, notice_id) IN (SELECT notice_type, notice_id FROM user_dismissed_notices WHERE LOWER(user_email) = ${primaryEmail})`);
     const dismissedNoticesResult = await tx.execute(sql`UPDATE user_dismissed_notices SET user_email = ${primaryEmail} WHERE LOWER(user_email) = ${secondaryEmail}`);
     recordsMerged.dismissedNotices = (dismissedNoticesResult as any).rowCount || 0;
     
