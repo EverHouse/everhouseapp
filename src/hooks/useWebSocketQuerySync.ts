@@ -4,6 +4,7 @@ import { bookingsKeys, simulatorKeys } from './queries/useBookingsQueries';
 import { financialsKeys } from './queries/useFinancialsQueries';
 import { cafeKeys } from './queries/useCafeQueries';
 import { toursKeys } from './queries/useToursQueries';
+import { commandCenterKeys } from './queries/useCommandCenterQueries';
 
 const directoryKeys = {
   all: ['directory'] as const,
@@ -27,6 +28,10 @@ export function useWebSocketQuerySync() {
   const queryClient = useQueryClient();
 
   useEffect(() => {
+    const invalidateCommandCenterBookings = () => {
+      queryClient.invalidateQueries({ queryKey: commandCenterKeys.all });
+    };
+
     const handleBookingUpdate = (event: CustomEvent) => {
       const detail = event.detail;
       if (!detail) return;
@@ -35,6 +40,7 @@ export function useWebSocketQuerySync() {
 
       queryClient.invalidateQueries({ queryKey: bookingsKeys.all });
       queryClient.invalidateQueries({ queryKey: simulatorKeys.all });
+      invalidateCommandCenterBookings();
 
       if (detail.eventType === 'check_in' || detail.eventType === 'check_out' || detail.eventType === 'payment') {
         queryClient.invalidateQueries({ queryKey: financialsKeys.all });
@@ -57,6 +63,11 @@ export function useWebSocketQuerySync() {
       }
     };
 
+    const handleBookingActionCompleted = () => {
+      if (import.meta.env.DEV) console.log('[WebSocketQuerySync] Invalidating command center for booking-action-completed');
+      invalidateCommandCenterBookings();
+    };
+
     const handleCafeMenuUpdate = (event: CustomEvent) => {
       if (import.meta.env.DEV) console.log('[WebSocketQuerySync] Invalidating cafe queries');
       queryClient.invalidateQueries({ queryKey: cafeKeys.all });
@@ -66,6 +77,7 @@ export function useWebSocketQuerySync() {
       const detail = event.detail;
       if (import.meta.env.DEV) console.log('[WebSocketQuerySync] Invalidating tour queries for action:', detail?.action);
       queryClient.invalidateQueries({ queryKey: toursKeys.all });
+      queryClient.invalidateQueries({ queryKey: commandCenterKeys.scheduling() });
     };
 
     const handleDirectoryUpdate = (event: CustomEvent) => {
@@ -73,6 +85,7 @@ export function useWebSocketQuerySync() {
       if (import.meta.env.DEV) console.log('[WebSocketQuerySync] Invalidating directory queries for action:', detail?.action);
       queryClient.invalidateQueries({ queryKey: directoryKeys.all });
       queryClient.invalidateQueries({ queryKey: directoryKeys.team() });
+      queryClient.invalidateQueries({ queryKey: commandCenterKeys.hubspotContacts() });
     };
 
     const handleBillingUpdate = (event: CustomEvent) => {
@@ -118,6 +131,7 @@ export function useWebSocketQuerySync() {
       queryClient.invalidateQueries({ queryKey: ['closures'] });
       queryClient.invalidateQueries({ queryKey: bookingsKeys.all });
       queryClient.invalidateQueries({ queryKey: ['book-golf'] });
+      queryClient.invalidateQueries({ queryKey: commandCenterKeys.facility() });
     };
 
     const handleBookingRosterUpdate = (event: CustomEvent) => {
@@ -126,6 +140,7 @@ export function useWebSocketQuerySync() {
       queryClient.invalidateQueries({ queryKey: simulatorKeys.all });
       queryClient.invalidateQueries({ queryKey: financialsKeys.all });
       queryClient.invalidateQueries({ queryKey: ['book-golf'] });
+      invalidateCommandCenterBookings();
     };
 
     const handleBookingInvoiceUpdate = (event: CustomEvent) => {
@@ -154,12 +169,14 @@ export function useWebSocketQuerySync() {
       if (import.meta.env.DEV) console.log('[WebSocketQuerySync] Invalidating queries for booking-auto-confirmed');
       queryClient.invalidateQueries({ queryKey: bookingsKeys.all });
       queryClient.invalidateQueries({ queryKey: simulatorKeys.all });
+      invalidateCommandCenterBookings();
     };
 
     const handleBookingConfirmed = (event: CustomEvent) => {
       if (import.meta.env.DEV) console.log('[WebSocketQuerySync] Invalidating queries for booking-confirmed');
       queryClient.invalidateQueries({ queryKey: bookingsKeys.all });
       queryClient.invalidateQueries({ queryKey: simulatorKeys.all });
+      invalidateCommandCenterBookings();
     };
 
     const handleAvailabilityUpdate = (event: CustomEvent) => {
@@ -167,9 +184,11 @@ export function useWebSocketQuerySync() {
       queryClient.invalidateQueries({ queryKey: bookingsKeys.all });
       queryClient.invalidateQueries({ queryKey: simulatorKeys.all });
       queryClient.invalidateQueries({ queryKey: ['book-golf'] });
+      queryClient.invalidateQueries({ queryKey: commandCenterKeys.facility() });
     };
 
     window.addEventListener('booking-update', handleBookingUpdate as EventListener);
+    window.addEventListener('booking-action-completed', handleBookingActionCompleted as EventListener);
     window.addEventListener('cafe-menu-update', handleCafeMenuUpdate as EventListener);
     window.addEventListener('tour-update', handleTourUpdate as EventListener);
     window.addEventListener('directory-update', handleDirectoryUpdate as EventListener);
@@ -190,6 +209,7 @@ export function useWebSocketQuerySync() {
 
     return () => {
       window.removeEventListener('booking-update', handleBookingUpdate as EventListener);
+      window.removeEventListener('booking-action-completed', handleBookingActionCompleted as EventListener);
       window.removeEventListener('cafe-menu-update', handleCafeMenuUpdate as EventListener);
       window.removeEventListener('tour-update', handleTourUpdate as EventListener);
       window.removeEventListener('directory-update', handleDirectoryUpdate as EventListener);

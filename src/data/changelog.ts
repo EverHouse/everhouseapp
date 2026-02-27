@@ -8,6 +8,19 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.33.0",
+    date: "2026-02-27",
+    title: "Staff Command Center: React Query Migration & Instant Data Refresh",
+    isMajor: true,
+    changes: [
+      "Performance: Staff Command Center now uses React Query instead of raw fetch polling — eliminates ~50% of duplicate API calls on the admin dashboard",
+      "Performance: Removed the 5-minute polling interval that re-fetched 14 endpoints every cycle — data now refreshes instantly via WebSocket events when bookings, tours, closures, or other data changes",
+      "Performance: HubSpot contact lookups are now cached for 10 minutes (contacts rarely change) instead of re-fetched every 5 minutes",
+      "Improvement: Stale data windows reduced from up to 5 minutes to near-instant — when a booking is approved, checked in, or cancelled, the Command Center reflects it immediately",
+      "Improvement: Anti-flicker strategy ensures old data stays visible while new data loads in the background — no more blank screens during refreshes",
+    ]
+  },
+  {
     version: "8.32.0",
     date: "2026-02-25",
     title: "Real-Time Sync Gap Audit & Fixes",
