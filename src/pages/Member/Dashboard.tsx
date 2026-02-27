@@ -1050,8 +1050,13 @@ const Dashboard: React.FC = () => {
                 return (
                   <React.Fragment key={item.id}>
                     <GlassRow 
-                      title={item.title} 
-                      subtitle={`${item.date} • ${item.details}`} 
+                      title={`${item.date} • ${item.time}${item.endTime ? ` - ${item.endTime}` : ''}`} 
+                      subtitle={item.type === 'booking' || item.type === 'booking_request' 
+                        ? item.title + ((item as DashboardBookingItem).isLinkedMember && (item as DashboardBookingItem).primaryBookerName ? ` • Booked by ${(item as DashboardBookingItem).primaryBookerName?.split(' ')[0]}` : '')
+                        : item.type === 'rsvp' 
+                          ? `${item.title}${item.details ? ` • ${item.details}` : ''}`
+                          : `${item.title}${item.details ? ` • ${item.details}` : ''}`
+                      } 
                       icon={getIconForType(item.resourceType)} 
                       color={isDark ? "text-secondary" : "text-primary"}
                       actions={actions}

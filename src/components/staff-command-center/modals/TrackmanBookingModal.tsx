@@ -239,7 +239,6 @@ export function TrackmanBookingModal({
 
     try {
       await onConfirm(booking.id, trimmedId);
-      showToast(`Booking confirmed for ${booking.user_name}`, 'success');
       setExternalId('');
       onClose();
     } catch (err: unknown) {
