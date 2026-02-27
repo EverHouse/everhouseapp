@@ -5,8 +5,7 @@ import { eq, and, sql } from 'drizzle-orm';
 import { isStaffOrAdmin } from '../core/middleware';
 import { logAndRespond, logger } from '../core/logger';
 import { getSessionUser } from '../types/session';
-import { notifyMember, notifyFeeWaived } from '../core/notificationService';
-import { sendFeeWaivedEmail } from '../emails/paymentEmails';
+import { notifyMember } from '../core/notificationService';
 import { computeFeeBreakdown, applyFeeBreakdownToParticipants, recalculateSessionFees } from '../core/billing/unifiedFeeService';
 import { consumeGuestPassForParticipant, canUseGuestPass } from '../core/billing/guestPassConsumer';
 import { createPrepaymentIntent } from '../core/billing/prepaymentService';
@@ -587,33 +586,6 @@ router.patch('/api/bookings/:id/payments', isStaffOrAdmin, async (req: Request, 
         reason: reason || null
       });
 
-      if (action === 'waive') {
-        try {
-          const participantEmailResult = await db.execute(sql`SELECT bp.user_email, bp.display_name, bp.cached_fee_cents
-             FROM booking_participants bp
-             WHERE bp.id = ${participantId}`);
-          
-          if (participantEmailResult.rows[0]) {
-            const { user_email, display_name, cached_fee_cents } = participantEmailResult.rows[0];
-            const recipientEmail = user_email || booking.owner_email;
-            const feeAmount = (cached_fee_cents || 0) / 100;
-            const memberName = display_name || await getMemberDisplayName(recipientEmail);
-            
-            await notifyFeeWaived(recipientEmail, feeAmount, reason, bookingId);
-            
-            await sendFeeWaivedEmail(recipientEmail, {
-              memberName,
-              originalAmount: feeAmount,
-              reason,
-              bookingDescription: `${booking.resource_name} on ${new Date().toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' })}`
-            });
-            
-            logger.info('[StaffCheckin] Sent waiver notification to', { extra: { recipientEmail } });
-          }
-        } catch (notifyErr: unknown) {
-          logger.error('[StaffCheckin] Failed to send waiver notification', { extra: { notifyErr } });
-        }
-      }
 
       settleBookingInvoiceAfterCheckin(bookingId, sessionId, booking.owner_email).catch((err: unknown) => {
         logger.error('[StaffCheckin] Invoice settlement failed after check-in — requires manual review', {
@@ -894,33 +866,6 @@ router.patch('/api/bookings/:id/payments', isStaffOrAdmin, async (req: Request, 
         }
       }
 
-      if (action === 'waive_all' && pendingParticipants.rows.length > 0) {
-        try {
-          const totalWaivedResult = await db.execute(sql`SELECT COALESCE(SUM(COALESCE(cached_fee_cents, 0)), 0) as total_cents
-             FROM booking_participants
-             WHERE id = ANY(${toIntArrayLiteral(pendingParticipants.rows.map(p => p.id))}::int[])`);
-          const totalWaived = (parseInt(totalWaivedResult.rows[0]?.total_cents) || 0) / 100;
-          const ownerName = await getMemberDisplayName(booking.owner_email);
-          
-          await notifyFeeWaived(
-            booking.owner_email,
-            totalWaived,
-            reason || 'Bulk waiver applied',
-            bookingId
-          );
-          
-          await sendFeeWaivedEmail(booking.owner_email, {
-            memberName: ownerName,
-            originalAmount: totalWaived,
-            reason: reason || 'Bulk waiver applied',
-            bookingDescription: `${booking.resource_name} on ${new Date().toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' })} (${pendingParticipants.rows.length} participant${pendingParticipants.rows.length > 1 ? 's' : ''})`
-          });
-          
-          logger.info('[StaffCheckin] Sent bulk waiver notification to for participants', { extra: { bookingOwner_email: booking.owner_email, pendingParticipantsRowsLength: pendingParticipants.rows.length } });
-        } catch (notifyErr: unknown) {
-          logger.error('[StaffCheckin] Failed to send bulk waiver notification', { extra: { notifyErr } });
-        }
-      }
 
       logFromRequest(req, 'update_payment_status', 'booking', bookingId.toString(), booking.resource_name || `Booking #${bookingId}`, {
         action: action === 'confirm_all' ? 'confirm_all' : 'waive_all',

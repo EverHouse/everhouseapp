@@ -525,6 +525,7 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
       updateRecentActivity(prev => prev.filter(a => a.id !== newActivity.id));
       
       if (result.requiresRoster) {
+        pendingQrBookingRef.current = null;
         setBookingSheet({
           isOpen: true,
           trackmanBookingId: null,
@@ -532,6 +533,7 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
           mode: 'manage' as const,
         });
       } else if (result.requiresPayment) {
+        pendingQrBookingRef.current = null;
         setBookingSheet({
           isOpen: true,
           trackmanBookingId: null,

@@ -8,6 +8,17 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.42.0",
+    date: "2026-02-27",
+    title: "Notification & Check-in Fixes",
+    changes: [
+      "Fix: QR code booking check-in no longer gets stuck on 'processing' — check-in confirmation sound now plays only once even when multiple events arrive simultaneously",
+      "Fix: QR check-in properly clears pending state when payment or roster action is required, preventing stale data on subsequent scans",
+      "Improvement: Booking modification notifications now display times in 12-hour format (e.g., '1:00 PM' instead of '13:00') for both staff and member notifications",
+      "Removed: Fee waiver email and push notifications to members — staff-only audit logging is preserved",
+    ]
+  },
+  {
     version: "8.41.0",
     date: "2026-02-27",
     title: "Reschedule Feature Removed",

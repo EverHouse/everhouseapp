@@ -51,18 +51,27 @@ const CheckInConfirmationModal: React.FC<CheckInConfirmationModalProps> = ({
   bookingDetails
 }) => {
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const soundPlayedRef = useRef(false);
 
   const statusLower = membershipStatus?.toLowerCase() || '';
   const isActive = statusLower === 'active' || statusLower === 'trialing';
 
   useEffect(() => {
     if (isOpen) {
-      const showWarning = !isActive && statusLower !== '';
-      playSound(showWarning ? 'checkinWarning' : 'checkinSuccess');
+      if (!soundPlayedRef.current) {
+        const showWarning = !isActive && statusLower !== '';
+        playSound(showWarning ? 'checkinWarning' : 'checkinSuccess');
+        soundPlayedRef.current = true;
+      }
 
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+      }
       timerRef.current = setTimeout(() => {
         onClose();
       }, bookingDetails ? 6000 : 4000);
+    } else {
+      soundPlayedRef.current = false;
     }
     return () => {
       if (timerRef.current) {

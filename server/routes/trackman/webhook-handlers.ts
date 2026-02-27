@@ -2,7 +2,7 @@ import { logger } from '../../core/logger';
 import { sendNotificationToUser, broadcastToStaff, broadcastAvailabilityUpdate } from '../../core/websocket';
 import { notifyAllStaff, notifyMember } from '../../core/notificationService';
 import { linkAndNotifyParticipants } from '../../core/bookingEvents';
-import { formatDatePacific, formatTimePacific } from '../../utils/dateUtils';
+import { formatDatePacific, formatTimePacific, formatTime12Hour, formatNotificationDateTime } from '../../utils/dateUtils';
 import { checkUnifiedAvailability } from '../../core/bookingService/availabilityGuard';
 import { cancelPaymentIntent, getStripeClient } from '../../core/stripe';
 import { BookingStateService } from '../../core/bookingService';
@@ -147,7 +147,7 @@ export async function handleBookingModification(
     changes.push(`Bay changed: ${oldResourceId} → ${newResourceId}`);
   }
   if (timeChanged) {
-    changes.push(`Time changed: ${existingStartTime}-${existingEndTime} → ${newStartTime}-${newEndTime}`);
+    changes.push(`Time changed: ${formatTime12Hour(existingStartTime)}-${formatTime12Hour(existingEndTime)} → ${formatTime12Hour(newStartTime)}-${formatTime12Hour(newEndTime)}`);
   }
   if (dateChanged) {
     changes.push(`Date changed: ${existingDate} → ${newDate}`);
@@ -274,11 +274,13 @@ export async function handleBookingModification(
     if (existing.userEmail && (bayChanged || timeChanged || dateChanged)) {
       try {
         const bayLabel = newResourceId ? `Bay ${newResourceId}` : '';
+        const formattedStart = formatTime12Hour(newStartTime);
+        const formattedEnd = formatTime12Hour(newEndTime);
         const modMessage = bayChanged
-          ? `Your booking on ${newDate} has been moved to ${bayLabel} at ${newStartTime}.`
+          ? `Your booking on ${newDate} has been moved to ${bayLabel} at ${formattedStart}.`
           : dateChanged
-          ? `Your booking has been moved to ${newDate} at ${newStartTime}${bayLabel ? ` (${bayLabel})` : ''}.`
-          : `Your booking on ${newDate} has been updated to ${newStartTime}-${newEndTime}${bayLabel ? ` (${bayLabel})` : ''}.`;
+          ? `Your booking has been moved to ${newDate} at ${formattedStart}${bayLabel ? ` (${bayLabel})` : ''}.`
+          : `Your booking on ${newDate} has been updated to ${formattedStart}-${formattedEnd}${bayLabel ? ` (${bayLabel})` : ''}.`;
 
         await notifyMember(
           {
