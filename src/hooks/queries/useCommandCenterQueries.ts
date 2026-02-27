@@ -1,6 +1,7 @@
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { fetchWithCredentials } from './useFetch';
 import { getTodayPacific, addDaysToPacificDate } from '../../utils/dateUtils';
+import type { BookingRequest, Tour, DBEvent, WellnessClass, Closure, RecentActivity, StaffNotification, Announcement } from '../../components/staff-command-center/types';
 
 export const commandCenterKeys = {
   all: ['command-center'] as const,
@@ -24,7 +25,7 @@ export function useCommandCenterTodaysBookings() {
   return useQuery({
     queryKey: commandCenterKeys.todaysBookings(today, weekAhead),
     queryFn: () =>
-      fetchWithCredentials<any[]>(
+      fetchWithCredentials<BookingRequest[]>(
         `/api/approved-bookings?start_date=${today}&end_date=${weekAhead}`
       ),
     placeholderData: keepPreviousData,
@@ -39,7 +40,7 @@ export function useCommandCenterUpcomingBookings() {
   return useQuery({
     queryKey: commandCenterKeys.upcomingBookings(today, futureDate),
     queryFn: () =>
-      fetchWithCredentials<any[]>(
+      fetchWithCredentials<BookingRequest[]>(
         `/api/approved-bookings?start_date=${today}&end_date=${futureDate}`
       ),
     placeholderData: keepPreviousData,
@@ -48,8 +49,8 @@ export function useCommandCenterUpcomingBookings() {
 }
 
 interface PendingRequestsResult {
-  bookingRequests: any[];
-  pendingBookings: any[];
+  bookingRequests: BookingRequest[];
+  pendingBookings: BookingRequest[];
 }
 
 export function useCommandCenterPendingRequests() {
@@ -72,9 +73,9 @@ export function useCommandCenterPendingRequests() {
 }
 
 interface SchedulingResult {
-  tours: any[];
-  events: any[];
-  wellness: any[];
+  tours: Tour[];
+  events: DBEvent[];
+  wellness: WellnessClass[];
 }
 
 export function useCommandCenterScheduling() {
@@ -99,9 +100,9 @@ export function useCommandCenterScheduling() {
 }
 
 interface FacilityResult {
-  bays: any[];
-  resources: any[];
-  closures: any[];
+  bays: Record<string, unknown>[];
+  resources: Record<string, unknown>[];
+  closures: Closure[];
 }
 
 export function useCommandCenterFacility() {
@@ -126,8 +127,8 @@ export function useCommandCenterFacility() {
 }
 
 interface ActivityResult {
-  recentActivity: any[];
-  notifications: any[];
+  recentActivity: RecentActivity[];
+  notifications: StaffNotification[];
 }
 
 export function useCommandCenterActivity(userEmail?: string) {
@@ -207,7 +208,7 @@ export function useCommandCenterHubSpotContacts() {
 export function useCommandCenterAnnouncements() {
   return useQuery({
     queryKey: commandCenterKeys.announcements(),
-    queryFn: () => fetchWithCredentials<any[]>('/api/announcements'),
+    queryFn: () => fetchWithCredentials<Announcement[]>('/api/announcements'),
     placeholderData: keepPreviousData,
     staleTime: 1000 * 60 * 5,
   });

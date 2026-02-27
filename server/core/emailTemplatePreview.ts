@@ -6,6 +6,7 @@ import { getPassWithQrHtml, getRedemptionConfirmationHtml } from '../emails/pass
 import { getPaymentReceiptHtml, getPaymentFailedHtml, getOutstandingBalanceHtml, getFeeWaivedHtml, getPurchaseReceiptHtml } from '../emails/paymentEmails';
 import { getMembershipRenewalHtml, getMembershipFailedHtml, getCardExpiringHtml, getGracePeriodReminderHtml, getMembershipActivationHtml } from '../emails/membershipEmails';
 import { getIntegrityAlertEmailHtml } from '../emails/integrityAlertEmail';
+import type { IntegrityCheckResult } from './dataIntegrity';
 
 export interface EmailTemplateInfo {
   id: string;
@@ -172,7 +173,7 @@ export async function renderTemplatePreview(templateId: string): Promise<string 
           { checkName: 'Orphaned Bookings', status: 'warning', issueCount: 3, issues: [], lastRun: new Date(), durationMs: 1200 },
           { checkName: 'Duplicate Members', status: 'fail', issueCount: 1, issues: [], lastRun: new Date(), durationMs: 800 },
           { checkName: 'Stripe Sync', status: 'pass', issueCount: 0, issues: [], lastRun: new Date(), durationMs: 500 },
-        ] as any[],
+        ] as IntegrityCheckResult[],
         [
           {
             category: 'data_quality' as const,

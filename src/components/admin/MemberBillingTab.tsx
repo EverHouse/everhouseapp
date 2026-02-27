@@ -1628,7 +1628,8 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({
             };
             
             const categoryOrder = ['add_funds', 'subscription', 'membership', 'sim_walk_in', 'guest_pass', 'payment', 'invoice', 'cafe', 'retail', 'other'];
-            const groupedPurchases = purchases.reduce((acc: Record<string, Array<any>>, purchase: any) => {
+            type PurchaseRecord = { id: number | string; category?: string; itemCategory?: string; description?: string; amount?: number; date?: string; created_at?: string; product_name?: string; quantity?: number; status?: string; saleDate?: string; amountCents?: number; salePriceCents?: number; source?: string; type?: string; itemName?: string };
+            const groupedPurchases = purchases.reduce((acc: Record<string, PurchaseRecord[]>, purchase: PurchaseRecord) => {
               const category = purchase.itemCategory || purchase.category || 'other';
               if (!acc[category]) {
                 acc[category] = [];
@@ -1660,7 +1661,7 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({
                         </span>
                       </h4>
                       <div className="space-y-3">
-                        {categoryPurchases.slice(0, 5).map((purchase: any) => {
+                        {categoryPurchases.slice(0, 5).map((purchase: PurchaseRecord) => {
                           const displayDate = purchase.saleDate || purchase.date;
                           const displayAmount = purchase.salePriceCents || purchase.amountCents || 0;
                           const displaySource = purchase.source || (purchase.type === 'stripe' ? 'Stripe' : '');

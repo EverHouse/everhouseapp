@@ -544,7 +544,7 @@ router.delete('/api/members/:email/permanent', isAdmin, async (req, res) => {
         const hubspot = await getHubSpotClient();
         const searchResult = await hubspot.crm.contacts.searchApi.doSearch({
           filterGroups: [{
-            filters: [{ propertyName: 'email', operator: 'EQ' as any, value: normalizedEmail }]
+            filters: [{ propertyName: 'email', operator: 'EQ' as unknown as import('@hubspot/api-client/lib/codegen/crm/contacts').FilterOperatorEnum, value: normalizedEmail }]
           }],
           properties: ['email'],
           limit: 1,
@@ -1393,7 +1393,7 @@ router.post('/api/members/backfill-discount-codes', isAdmin, async (req, res) =>
         try {
           const subscription = await stripe.subscriptions.retrieve(row.stripe_subscription_id as string);
           const discounts = subscription.discounts?.filter((d): d is Stripe.Discount => typeof d !== 'string');
-          const couponName = (discounts?.[0] as any)?.coupon?.name;
+          const couponName = (discounts?.[0] as unknown as { coupon?: { name?: string } })?.coupon?.name;
           
           if (couponName) {
             await db.execute(

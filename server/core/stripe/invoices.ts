@@ -73,7 +73,7 @@ export async function createInvoice(params: CreateInvoiceParams): Promise<{
           invoice: invoice.id,
           price: item.priceId as string,
           quantity: item.quantity ?? 1,
-        } as any, { idempotencyKey: `invitem_${invoice.id}_${idx}_${item.priceId}` });
+        } as Stripe.InvoiceItemCreateParams, { idempotencyKey: `invitem_${invoice.id}_${idx}_${item.priceId}` });
       } else if (item.amountCents && item.description) {
         const itemDescHash = createHash('md5').update(item.description).digest('hex').slice(0, 8);
         await stripe.invoiceItems.create({

@@ -997,7 +997,7 @@ router.post('/api/auth/verify-otp', async (req, res) => {
     
     req.session.user = member;
 
-    const supabaseToken = await createSupabaseToken(member as any);
+    const supabaseToken = await createSupabaseToken(member as unknown as { id: string; email: string; role: string; firstName?: string; lastName?: string });
     
     await upsertUserWithTier({
       email: member.email,
@@ -1007,7 +1007,7 @@ router.post('/api/auth/verify-otp', async (req, res) => {
       phone: member.phone,
       mindbodyClientId: member.mindbodyClientId,
       tags: member.tags || [],
-      membershipStartDate: (member as any).membershipStartDate || '',
+      membershipStartDate: (member as unknown as Record<string, unknown>).membershipStartDate as string || '',
       role
     });
     

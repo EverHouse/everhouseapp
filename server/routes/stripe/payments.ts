@@ -2847,7 +2847,7 @@ router.get('/api/payments/daily-summary', isStaffOrAdmin, async (req: Request, r
       
       transactionCount += 1;
 
-      const invoiceId = (ch as any).invoice;
+      const invoiceId = (ch as unknown as Record<string, unknown>).invoice as string | { id: string } | null;
       if (invoiceId) invoiceIds.add(typeof invoiceId === 'string' ? invoiceId : invoiceId.id);
 
       if (invoiceId) {
@@ -2996,7 +2996,7 @@ router.post('/api/stripe/staff/charge-subscription-invoice', isStaffOrAdmin, asy
     });
 
     broadcastBillingUpdate({
-      action: 'subscription_updated' as any,
+      action: 'subscription_updated',
       memberEmail: userEmail as string,
       customerId: customer?.id
     });

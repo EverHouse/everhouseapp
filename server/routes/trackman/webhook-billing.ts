@@ -236,7 +236,7 @@ export async function createBookingForMember(
          WHERE id = ${pendingBookingId} AND trackman_booking_id IS NULL
          RETURNING id`);
       
-      if ((pendingUpdateResult as any).rowCount === 0) {
+      if ((pendingUpdateResult as unknown as { rowCount: number }).rowCount === 0) {
         logger.warn('[Trackman Webhook] Pending booking was already linked by another process', {
           extra: { pendingBookingId, trackmanBookingId, email: member.email }
         });
@@ -618,7 +618,7 @@ export async function tryMatchByBayDateTime(
        WHERE id = ${bookingId} AND trackman_booking_id IS NULL
        RETURNING id`);
     
-    if ((updateResult as any).rowCount === 0) {
+    if ((updateResult as unknown as { rowCount: number }).rowCount === 0) {
       logger.warn('[Trackman Webhook] Bay/date/time match found but booking was already linked by another process', {
         extra: { bookingId, trackmanBookingId }
       });

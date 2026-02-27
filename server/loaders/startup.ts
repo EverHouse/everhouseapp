@@ -132,7 +132,7 @@ export async function runStartupTasks(): Promise<void> {
     const databaseUrl = process.env.DATABASE_URL;
     if (databaseUrl) {
       logger.info('[Stripe] Initializing Stripe schema...');
-      await retryWithBackoff(() => runMigrations({ databaseUrl, schema: 'stripe' } as any), 'Stripe schema migration');
+      await retryWithBackoff(() => runMigrations({ databaseUrl, schema: 'stripe' } as unknown as Parameters<typeof runMigrations>[0]), 'Stripe schema migration');
       logger.info('[Stripe] Schema ready');
 
       const stripeSync = await retryWithBackoff(() => getStripeSync(), 'Stripe sync init');
@@ -141,7 +141,7 @@ export async function runStartupTasks(): Promise<void> {
       if (replitDomains) {
         const webhookUrl = `https://${replitDomains}/api/stripe/webhook`;
         logger.info('[Stripe] Setting up managed webhook...');
-        const result = await retryWithBackoff(() => (stripeSync as any).findOrCreateManagedWebhook(webhookUrl), 'Stripe webhook setup');
+        const result = await retryWithBackoff(() => (stripeSync as unknown as { findOrCreateManagedWebhook: (url: string) => Promise<unknown> }).findOrCreateManagedWebhook(webhookUrl), 'Stripe webhook setup');
         logger.info('[Stripe] Webhook configured');
 
         const requiredEvents = [
@@ -227,7 +227,7 @@ export async function runStartupTasks(): Promise<void> {
         logger.error('[Stripe Env] Validation failed', { error: err instanceof Error ? err : new Error(String(err)) });
       }
 
-      (stripeSync as any).syncBackfill()
+      (stripeSync as unknown as { syncBackfill: () => Promise<void> }).syncBackfill()
         .then(() => logger.info('[Stripe] Data sync complete'))
         .catch((err: unknown) => {
           logger.error('[Stripe] Data sync error', { error: err instanceof Error ? err : new Error(String(err)) });
@@ -271,9 +271,9 @@ export async function runStartupTasks(): Promise<void> {
       
       import('../core/stripe/customerSync.js')
         .then(({ syncStripeCustomersForMindBodyMembers }) => syncStripeCustomersForMindBodyMembers())
-        .then((result: any) => {
-          if (result.created > 0 || result.linked > 0) {
-            logger.info('[Stripe] Customer sync complete', { extra: { created: result.created, linked: result.linked } });
+        .then((result) => {
+          if (result.updated > 0 || result.cleared > 0) {
+            logger.info('[Stripe] Customer sync complete', { extra: { updated: result.updated, cleared: result.cleared } });
           }
         })
         .catch((err: unknown) => logger.error('[Stripe] Customer sync failed', { error: err instanceof Error ? err : new Error(String(err)) }));

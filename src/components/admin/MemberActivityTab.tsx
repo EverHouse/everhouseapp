@@ -175,12 +175,12 @@ const MemberActivityTab: React.FC<MemberActivityTabProps> = ({
     });
 
     (visitHistory || []).filter((v: VisitHistoryItem & { isWalkIn?: boolean }) => v.isWalkIn).forEach((visit: VisitHistoryItem) => {
-      const dateStr = (visit as any).bookingDate || visit.visit_date;
+      const dateStr = (visit as VisitHistoryItem & { bookingDate?: string }).bookingDate || visit.visit_date;
       activities.push({
         id: `walkin-${visit.id}`,
         type: 'visit',
         date: new Date(dateStr),
-        data: { ...visit, role: 'Walk-in' } as any,
+        data: { ...visit, role: 'Walk-in' } as VisitHistoryItem & { role: string },
       });
     });
 
@@ -203,7 +203,7 @@ const MemberActivityTab: React.FC<MemberActivityTabProps> = ({
         if (a.type === 'visit') return true;
         if (a.type === 'booking' && visitHistoryIds.has(a.data?.id as number)) return true;
         if (a.type === 'event') {
-          const eventDate = new Date((a.data as any)?.eventDate);
+          const eventDate = new Date((a.data as EventRsvpItem)?.eventDate ?? '');
           return eventDate < now;
         }
         if (a.type === 'wellness' && a.data?.status === 'attended') return true;
@@ -402,7 +402,7 @@ const MemberActivityTab: React.FC<MemberActivityTabProps> = ({
           {type === 'booking' && renderBookingItem(data as BookingHistoryItem)}
           {type === 'event' && renderEventItem(data as EventRsvpItem)}
           {type === 'wellness' && renderWellnessItem(data as WellnessHistoryItem)}
-          {type === 'visit' && renderVisitItem(data as any)}
+          {type === 'visit' && renderVisitItem(data as VisitHistoryItem & { isWalkIn?: boolean; resource_name?: string; check_in_time?: string; role?: string; resourceName?: string; date?: string; bookingDate?: string; startTime?: string; endTime?: string; checkedInBy?: string; hostName?: string; instructor?: string; location?: string })}
         </div>
       </div>
     );

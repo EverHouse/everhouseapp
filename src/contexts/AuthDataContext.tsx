@@ -283,7 +283,7 @@ export const AuthDataProvider: React.FC<{children: ReactNode}> = ({ children }) 
   const loginWithMember = useCallback((member: MemberProfile) => {
     const memberProfile: MemberProfile = {
       id: member.id,
-      name: [(member as any).firstName, (member as any).lastName].filter(Boolean).join(' ') || member.email || 'Member',
+      name: [(member as unknown as { firstName?: string }).firstName, (member as unknown as { lastName?: string }).lastName].filter(Boolean).join(' ') || member.email || 'Member',
       tier: member.tier || 'Core',
       tags: member.tags || [],
       status: 'Active',

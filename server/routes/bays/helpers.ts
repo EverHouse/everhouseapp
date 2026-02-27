@@ -48,7 +48,7 @@ export async function isStaffOrAdminCheck(email: string): Promise<boolean> {
       'SELECT id FROM staff_users WHERE LOWER(email) = LOWER($1) AND is_active = true',
       [email]
     );
-    return (result as any).rows.length > 0;
+    return (result as unknown as { rows: Array<Record<string, unknown>> }).rows.length > 0;
   } catch (error: unknown) {
     return false;
   }

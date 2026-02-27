@@ -142,19 +142,19 @@ async function executeJob(job: { id: number; jobType: string; payload: Record<st
   try {
     switch (jobType) {
       case 'send_payment_receipt':
-        await sendPaymentReceiptEmail(payload.to as string, { memberName: payload.memberName as string, amount: payload.amount as string, date: payload.date as string, description: payload.description as string, transactionId: payload.paymentMethod as string } as any);
+        await sendPaymentReceiptEmail(payload.to as string, { memberName: payload.memberName as string, amount: Number(payload.amount), date: new Date(payload.date as string), description: payload.description as string, transactionId: payload.paymentMethod as string });
         break;
       case 'send_payment_failed_email':
-        await sendPaymentFailedEmail(payload.to as string, { memberName: payload.memberName as string, amount: payload.amount as string, reason: payload.reason as string, updateCardUrl: payload.retryDate as string } as any);
+        await sendPaymentFailedEmail(payload.to as string, { memberName: payload.memberName as string, amount: Number(payload.amount), reason: payload.reason as string, updateCardUrl: payload.retryDate as string });
         break;
       case 'send_membership_renewal_email':
-        await sendMembershipRenewalEmail(payload.to as string, { memberName: payload.memberName as string, planName: payload.tier as string, nextBillingDate: payload.nextBillingDate as string, amount: payload.amount as string } as any);
+        await sendMembershipRenewalEmail(payload.to as string, { memberName: payload.memberName as string, planName: payload.tier as string, nextBillingDate: new Date(payload.nextBillingDate as string), amount: Number(payload.amount) });
         break;
       case 'send_membership_failed_email':
-        await sendMembershipFailedEmail(payload.to as string, { memberName: payload.memberName as string, planName: payload.tier as string, reason: payload.reason as string, amount: (payload.amount as string) || '0' } as any);
+        await sendMembershipFailedEmail(payload.to as string, { memberName: payload.memberName as string, planName: payload.tier as string, reason: payload.reason as string, amount: Number(payload.amount) || 0 });
         break;
       case 'send_pass_with_qr_email':
-        await sendPassWithQrEmail(payload.to as string, payload.passPurchase as any);
+        await sendPassWithQrEmail(payload.to as string, payload.passPurchase as unknown as { passId: number; type: string; quantity: number; purchaseDate: Date });
         break;
       case 'notify_payment_success':
         await notifyPaymentSuccess(payload.userEmail as string, Number(payload.amount), payload.description as string);
@@ -170,35 +170,35 @@ async function executeJob(job: { id: number; jobType: string; payload: Record<st
           userEmail: payload.userEmail as string,
           title: payload.title as string,
           message: payload.message as string,
-          type: payload.type as any,
+          type: payload.type as 'info' | 'success' | 'warning' | 'error' | 'system' | 'booking' | 'booking_approved' | 'booking_declined' | 'booking_reminder' | 'booking_cancelled',
           relatedId: payload.relatedId as number,
           relatedType: payload.relatedType as string,
         });
         break;
       case 'notify_all_staff':
-        await notifyAllStaff(payload.title as string, payload.message as string, payload.type as any, {
+        await notifyAllStaff(payload.title as string, payload.message as string, payload.type as 'info' | 'success' | 'warning' | 'error' | 'system' | 'booking' | 'booking_approved' | 'booking_declined' | 'booking_reminder' | 'booking_cancelled', {
           relatedId: payload.relatedId as number,
           relatedType: payload.relatedType as string,
           url: payload.actionUrl as string,
         });
         break;
       case 'broadcast_billing_update':
-        broadcastBillingUpdate(payload as any);
+        broadcastBillingUpdate(payload as unknown as Parameters<typeof broadcastBillingUpdate>[0]);
         break;
       case 'broadcast_day_pass_update':
-        broadcastDayPassUpdate(payload as any);
+        broadcastDayPassUpdate(payload as unknown as Parameters<typeof broadcastDayPassUpdate>[0]);
         break;
       case 'send_notification_to_user':
-        sendNotificationToUser(payload.userEmail as string, payload.notification as any);
+        sendNotificationToUser(payload.userEmail as string, payload.notification as unknown as { type: string; title: string; message: string; data?: Record<string, unknown> });
         break;
       case 'sync_to_hubspot':
-        await queuePaymentSyncToHubSpot(payload as any);
+        await queuePaymentSyncToHubSpot(payload as unknown as Parameters<typeof queuePaymentSyncToHubSpot>[0]);
         break;
       case 'sync_company_to_hubspot':
-        await syncCompanyToHubSpot(payload as any);
+        await syncCompanyToHubSpot(payload as unknown as Parameters<typeof syncCompanyToHubSpot>[0]);
         break;
       case 'sync_day_pass_to_hubspot':
-        await queueDayPassSyncToHubSpot(payload as any);
+        await queueDayPassSyncToHubSpot(payload as unknown as Parameters<typeof queueDayPassSyncToHubSpot>[0]);
         break;
       case 'upsert_transaction_cache':
         const { upsertTransactionCache } = await import('./stripe/transactionCache');
@@ -241,7 +241,7 @@ async function executeJob(job: { id: number; jobType: string; payload: Record<st
       }
       case 'update_member_tier':
         const { processMemberTierUpdate } = await import('./memberTierUpdateProcessor');
-        await processMemberTierUpdate(payload as any);
+        await processMemberTierUpdate(payload as unknown as Parameters<typeof processMemberTierUpdate>[0]);
         break;
       case 'generic_async_task':
         logger.info(`[JobQueue] Executing generic task: ${payload.description || 'no description'}`);

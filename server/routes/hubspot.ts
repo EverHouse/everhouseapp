@@ -16,6 +16,7 @@ import pRetry, { AbortError } from 'p-retry';
 import { invalidateCache } from '../core/queryCache';
 import { broadcastDirectoryUpdate } from '../core/websocket';
 import { FilterOperatorEnum } from '@hubspot/api-client/lib/codegen/crm/contacts';
+import { AssociationSpecAssociationCategoryEnum } from '@hubspot/api-client/lib/codegen/crm/associations/v4';
 import { getErrorMessage, safeErrorDetail } from '../utils/errorUtils';
 import { denormalizeTierForHubSpot } from '../utils/tierUtils';
 
@@ -330,11 +331,11 @@ async function fetchRecentlyModifiedContacts(sinceTimestamp: number): Promise<Re
     };
     
     const response = await retryableHubSpotRequest(() => 
-      hubspot.crm.contacts.searchApi.doSearch(searchRequest as any)
+      hubspot.crm.contacts.searchApi.doSearch(searchRequest)
     );
     
-    modifiedContacts = modifiedContacts.concat((response as any).results);
-    after = (response as any).paging?.next?.after;
+    modifiedContacts = modifiedContacts.concat(response.results as unknown as Record<string, unknown>[]);
+    after = response.paging?.next?.after;
   } while (after);
   
   return modifiedContacts.map(transformHubSpotContact);
@@ -389,10 +390,10 @@ async function fetchAllHubSpotContacts(forceRefresh: boolean = false): Promise<R
   
   do {
     const response = await retryableHubSpotRequest(() => 
-      (hubspot.crm.contacts.basicApi as any).getPage(100, after, HUBSPOT_CONTACT_PROPERTIES)
+      hubspot.crm.contacts.basicApi.getPage(100, after, HUBSPOT_CONTACT_PROPERTIES)
     );
-    allContacts = allContacts.concat((response as any).results);
-    after = (response as any).paging?.next?.after;
+    allContacts = allContacts.concat(response.results as unknown as Record<string, unknown>[]);
+    after = response.paging?.next?.after;
   } while (after);
   
   if (!isProduction) logger.info('[HubSpot] Full sync: fetched contacts', { extra: { allContactsLength: allContacts.length } });
@@ -834,7 +835,7 @@ async function enrichEventDeal(
         associations: [{
           to: { id: contactId },
           types: [{
-            associationCategory: 'HUBSPOT_DEFINED' as any,
+            associationCategory: AssociationSpecAssociationCategoryEnum.HubspotDefined,
             associationTypeId: 3
           }]
         }]
@@ -1123,10 +1124,10 @@ router.post('/api/hubspot/sync-tiers', isStaffOrAdmin, async (req, res) => {
     
     do {
       const response = await retryableHubSpotRequest(() => 
-        (hubspot.crm.contacts.basicApi as any).getPage(100, after, properties)
+        hubspot.crm.contacts.basicApi.getPage(100, after, properties)
       );
-      allContacts = allContacts.concat((response as any).results);
-      after = (response as any).paging?.next?.after;
+      allContacts = allContacts.concat(response.results as unknown as Record<string, unknown>[]);
+      after = response.paging?.next?.after;
     } while (after);
     
     logger.info('[Tier Sync] Fetched contacts from HubSpot', { extra: { allContactsLength: allContacts.length } });
@@ -1144,7 +1145,8 @@ router.post('/api/hubspot/sync-tiers', isStaffOrAdmin, async (req, res) => {
     const updateBatch: { id: string; properties: { membership_tier: string } }[] = [];
     
     for (const contact of allContacts) {
-      const hubspotEmail = ((contact.properties as any).email || '').toLowerCase().trim();
+      const contactProps = contact.properties as Record<string, string>;
+      const hubspotEmail = (contactProps.email || '').toLowerCase().trim();
       if (!hubspotEmail) continue;
       
       const csvData = csvByEmail.get(hubspotEmail);
@@ -1154,7 +1156,7 @@ router.post('/api/hubspot/sync-tiers', isStaffOrAdmin, async (req, res) => {
       }
       
       results.matched++;
-      const currentTier = (contact.properties as any).membership_tier || '';
+      const currentTier = contactProps.membership_tier || '';
       const newTier = csvData.tier;
       
       // Skip if tiers match (case-insensitive comparison)
@@ -1685,10 +1687,10 @@ router.get('/api/hubspot/products', isStaffOrAdmin, async (req, res) => {
     
     do {
       const response = await retryableHubSpotRequest(() => 
-        (hubspot.crm.products.basicApi as any).getPage(100, after, properties)
+        hubspot.crm.products.basicApi.getPage(100, after, properties)
       );
-      allProducts = allProducts.concat((response as any).results);
-      after = (response as any).paging?.next?.after;
+      allProducts = allProducts.concat(response.results as unknown as Record<string, unknown>[]);
+      after = response.paging?.next?.after;
     } while (after);
     
     const products = allProducts.map((product: Record<string, unknown>) => {
@@ -1757,7 +1759,7 @@ router.post('/api/admin/hubspot/set-forms-token', isAdmin, async (req: Request, 
       return res.status(400).json({ error: 'A valid token is required' });
     }
     const { setPrivateAppToken } = await import('../core/hubspot/formSync');
-    const userEmail = (req as any).user?.email || 'admin';
+    const userEmail = getSessionUser(req)?.email || 'admin';
     await setPrivateAppToken(token, userEmail);
     const { syncHubSpotFormSubmissions } = await import('../core/hubspot/formSync');
     const syncResult = await syncHubSpotFormSubmissions({ force: true });

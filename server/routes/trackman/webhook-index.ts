@@ -81,25 +81,26 @@ async function notifyMemberBookingConfirmed(
  * Extract trackmanBookingId from webhook payload (handles both V1 and V2 formats)
  */
 function extractTrackmanBookingId(payload: TrackmanWebhookPayload | TrackmanV2WebhookPayload | Record<string, unknown>): string | undefined {
-  // V2 format: payload.booking.id
-  if ((payload as any)?.booking?.id !== undefined) {
-    return String((payload.booking as any).id);
+  const p = payload as Record<string, unknown>;
+  const booking = p.booking as Record<string, unknown> | undefined;
+  const data = p.data as Record<string, unknown> | undefined;
+
+  if (booking?.id !== undefined) {
+    return String(booking.id);
   }
   
-  // V1 format: payload.data.id or payload.data.booking_id
-  if ((payload as any)?.data?.id !== undefined) {
-    return String((payload as any).data.id);
+  if (data?.id !== undefined) {
+    return String(data.id);
   }
-  if ((payload as any)?.data?.booking_id !== undefined) {
-    return String((payload as any).data.booking_id);
+  if (data?.booking_id !== undefined) {
+    return String(data.booking_id);
   }
   
-  // Fallback: direct payload.id or payload.booking_id
-  if ((payload as any)?.id !== undefined) {
-    return String((payload as any).id);
+  if (p.id !== undefined) {
+    return String(p.id);
   }
-  if (payload?.booking !== undefined) {
-    return String(payload.booking);
+  if (booking !== undefined) {
+    return String(booking);
   }
   
   return undefined;
@@ -135,18 +136,19 @@ async function checkWebhookIdempotency(trackmanBookingId: string, status?: strin
   }
 }
 
-function buildContentSignature(payload: any): string | undefined {
+function buildContentSignature(payload: Record<string, unknown>): string | undefined {
   const parts: string[] = [];
 
-  const booking = payload?.booking;
+  const booking = payload?.booking as Record<string, unknown> | undefined;
   if (booking) {
     if (booking.start) parts.push(`s:${booking.start}`);
     if (booking.end) parts.push(`e:${booking.end}`);
-    if (booking.bay?.ref) parts.push(`b:${booking.bay.ref}`);
+    const bay = booking.bay as Record<string, unknown> | undefined;
+    if (bay?.ref) parts.push(`b:${bay.ref}`);
     if (booking.status) parts.push(`st:${booking.status}`);
   }
 
-  const data = payload?.data;
+  const data = payload?.data as Record<string, unknown> | undefined;
   if (data && parts.length === 0) {
     if (data.start_time) parts.push(`s:${data.start_time}`);
     if (data.end_time) parts.push(`e:${data.end_time}`);
@@ -198,8 +200,11 @@ router.post('/api/webhooks/trackman', async (req: Request, res: Response) => {
   // Check for duplicate webhook using idempotency guard BEFORE processing
   // Include status + content signature in dedup key so modifications with changed bay/time get through
   const trackmanBookingIdFromPayload = extractTrackmanBookingId(payload);
-  const webhookStatus = (payload as any)?.booking?.status || (payload as any)?.data?.status || (payload as any)?.event_type;
-  const contentSig = buildContentSignature(payload);
+  const pRec = payload as unknown as Record<string, unknown>;
+  const pBooking = pRec.booking as Record<string, unknown> | undefined;
+  const pData = pRec.data as Record<string, unknown> | undefined;
+  const webhookStatus = (pBooking?.status as string) || (pData?.status as string) || (pRec.event_type as string);
+  const contentSig = buildContentSignature(payload as unknown as Record<string, unknown>);
   if (trackmanBookingIdFromPayload) {
     const isNewWebhook = await checkWebhookIdempotency(trackmanBookingIdFromPayload, webhookStatus, contentSig);
     if (!isNewWebhook) {
@@ -404,7 +409,7 @@ router.post('/api/webhooks/trackman', async (req: Request, res: Response) => {
     
     await logWebhookEvent(
       eventType,
-      payload as any,
+      payload as unknown as Record<string, unknown>,
       trackmanBookingId,
       trackmanUserId,
       matchedBookingId,
@@ -417,7 +422,7 @@ router.post('/api/webhooks/trackman', async (req: Request, res: Response) => {
     
     await logWebhookEvent(
       'error',
-      payload as any,
+      payload as unknown as Record<string, unknown>,
       undefined,
       undefined,
       undefined,
@@ -563,8 +568,8 @@ router.post('/api/admin/linked-emails', isStaffOrAdmin, async (req: Request, res
       return res.status(409).json({ error: 'This email is already linked to a member' });
     }
     
-    const session = req.session as any;
-    const createdBy = session?.email || 'unknown';
+    const session = req.session as unknown as Record<string, unknown>;
+    const createdBy = (session?.email as string) || 'unknown';
     
     await db.execute(sql`INSERT INTO user_linked_emails (primary_email, linked_email, source, created_by)
        VALUES (${primaryEmail.toLowerCase()}, ${linkedEmail.toLowerCase()}, ${'trackman_resolution'}, ${createdBy})`);
@@ -1183,10 +1188,10 @@ router.post('/api/admin/bookings/:id/simulate-confirm', isStaffOrAdmin, async (r
        WHERE id = ${bookingId}`);
 
     try {
-      const dateStr = typeof booking.request_date === 'string' ? booking.request_date : formatDatePacific(booking.request_date as any);
+      const dateStr = typeof booking.request_date === 'string' ? booking.request_date : formatDatePacific(new Date(booking.request_date as string | number));
       const timeStr = typeof booking.start_time === 'string' 
         ? booking.start_time.substring(0, 5) 
-        : formatTimePacific(booking.start_time as any);
+        : formatTimePacific(new Date(booking.start_time as string | number));
       
       await notifyMember({
         userEmail: booking.user_email as string,

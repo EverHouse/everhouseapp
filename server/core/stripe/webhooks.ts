@@ -3119,9 +3119,9 @@ async function handleSubscriptionCreated(client: PoolClient, subscription: Strip
       let subCoupon = (subDiscounts?.[0] as unknown as Record<string, unknown>)?.coupon as Stripe.Coupon | string | undefined;
       if (!subCoupon) {
         for (const item of (subscription.items?.data || [])) {
-          const itemDiscounts = (item as any).discounts?.filter((d: any): d is Stripe.Discount => typeof d === 'object' && d !== null && 'coupon' in d);
-          if (itemDiscounts?.[0]?.coupon) {
-            subCoupon = itemDiscounts[0].coupon;
+          const rawItemDiscounts = ((item as unknown as Record<string, unknown>).discounts as Array<unknown> | undefined)?.filter((d: unknown): d is { coupon: Stripe.Coupon | string } => typeof d === 'object' && d !== null && 'coupon' in d);
+          if (rawItemDiscounts?.[0]?.coupon) {
+            subCoupon = rawItemDiscounts[0].coupon;
             break;
           }
         }
@@ -3952,9 +3952,9 @@ async function handleSubscriptionUpdated(client: PoolClient, subscription: Strip
       let currentCoupon = (updatedDiscounts?.[0] as unknown as Record<string, unknown>)?.coupon as Stripe.Coupon | string | undefined;
       if (!currentCoupon) {
         for (const item of (subscription.items?.data || [])) {
-          const itemDiscounts = (item as any).discounts?.filter((d: any): d is Stripe.Discount => typeof d === 'object' && d !== null && 'coupon' in d);
-          if (itemDiscounts?.[0]?.coupon) {
-            currentCoupon = itemDiscounts[0].coupon;
+          const rawItemDiscounts = ((item as unknown as Record<string, unknown>).discounts as Array<unknown> | undefined)?.filter((d: unknown): d is { coupon: Stripe.Coupon | string } => typeof d === 'object' && d !== null && 'coupon' in d);
+          if (rawItemDiscounts?.[0]?.coupon) {
+            currentCoupon = rawItemDiscounts[0].coupon;
             break;
           }
         }

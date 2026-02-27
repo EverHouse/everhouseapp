@@ -574,7 +574,7 @@ router.post('/api/member-billing/:email/cancel', isStaffOrAdmin, async (req, res
 
     const now = new Date();
     const thirtyDaysFromNow = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
-    const currentPeriodEnd = new Date((subscription as any).current_period_end * 1000);
+    const currentPeriodEnd = new Date((subscription as unknown as Record<string, number>).current_period_end * 1000);
     
     let cancelAtTimestamp: number;
     let effectiveDate: Date;
@@ -997,7 +997,7 @@ router.post('/api/member-billing/:email/migrate-to-stripe', isStaffOrAdmin, asyn
       return res.status(400).json({ error: `Tier '${currentTier}' does not have a valid Stripe price configured` });
     }
 
-    const staffEmail = (req.session as any)?.user?.email || (req.session as any)?.passport?.user?.email || 'staff';
+    const staffEmail = req.session?.user?.email || (req.session as unknown as Record<string, unknown>)?.passport && ((req.session as unknown as Record<string, Record<string, Record<string, string>>>)?.passport?.user?.email) || 'staff';
 
     await db.execute(sql`UPDATE users SET 
       migration_status = 'pending',

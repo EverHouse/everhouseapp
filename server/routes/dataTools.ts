@@ -2109,7 +2109,7 @@ router.post('/api/data-tools/fix-trackman-ghost-bookings', isAdmin, async (req: 
             `);
           }
           
-          await recalculateSessionFees(sessionId, 'staff_manual' as any);
+          await recalculateSessionFees(sessionId, 'staff_action');
           
           const todayPacific = getTodayPacific();
           const isPastBooking = booking.requestDate < todayPacific;

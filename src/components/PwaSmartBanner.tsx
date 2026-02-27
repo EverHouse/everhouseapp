@@ -22,7 +22,7 @@ const PwaSmartBanner: React.FC<PwaSmartBannerProps> = ({
   useEffect(() => {
     const isStandalone =
       window.matchMedia('(display-mode: standalone)').matches ||
-      (navigator as any).standalone === true;
+      (navigator as unknown as { standalone?: boolean }).standalone === true;
 
     if (isStandalone) return;
 

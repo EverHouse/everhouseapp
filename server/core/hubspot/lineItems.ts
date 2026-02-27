@@ -5,6 +5,7 @@ import { hubspotDeals, hubspotLineItems, hubspotProductMappings } from '../../..
 import { logBillingAudit } from '../auditLog';
 import { eq } from 'drizzle-orm';
 import { retryableHubSpotRequest } from './request';
+import { AssociationSpecAssociationCategoryEnum } from '@hubspot/api-client/lib/codegen/crm/associations/v4';
 
 import { logger } from '../logger';
 export async function addLineItemToDeal(
@@ -57,7 +58,7 @@ export async function addLineItemToDeal(
         lineItemId,
         'deals',
         hubspotDealId,
-        [{ associationCategory: 'HUBSPOT_DEFINED' as any, associationTypeId: 20 }]
+        [{ associationCategory: AssociationSpecAssociationCategoryEnum.HubspotDefined, associationTypeId: 20 }]
       )
     );
     

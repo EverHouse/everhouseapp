@@ -49,7 +49,7 @@ interface IntegrityResultsPanelProps {
     originalEmail?: string;
     isUnmatched?: boolean;
   }) => void;
-  fixIssueMutation: UseMutationResult<{ success: boolean; message: string }, Error, { endpoint: string; body: Record<string, unknown> }, unknown>;
+  fixIssueMutation: UseMutationResult<{ success: boolean; message: string }, unknown, { endpoint: string; body: Record<string, unknown> }, unknown>;
   fixingIssues: Set<string>;
   isRefreshing: boolean;
   openIgnoreModal: (issue: IntegrityIssue, checkName: string) => void;
@@ -1345,7 +1345,7 @@ const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
                                       )}
                                     </button>
                                   )}
-                                  {!issue.ignored && (issue.context?.email || (issue.context?.memberEmails && issue.context.memberEmails.length > 0)) && ((issue.context as any)?.stripeCustomerIds || issue.context?.stripeCustomerId) && (
+                                  {!issue.ignored && (issue.context?.email || (issue.context?.memberEmails && issue.context.memberEmails.length > 0)) && ((issue.context as IssueContext & { stripeCustomerIds?: string[] })?.stripeCustomerIds || issue.context?.stripeCustomerId) && (
                                     <button
                                       onClick={() => handleViewProfile(issue.context!.email || (issue.context!.memberEmails as unknown as string[] | undefined)?.[0])}
                                       disabled={loadingMemberEmail === (issue.context!.email || (issue.context!.memberEmails as unknown as string[] | undefined)?.[0])}
@@ -1379,7 +1379,7 @@ const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
                                       </button>
                                     </>
                                   )}
-                                  {!issue.ignored && issue.context?.userId && (issue.context as any)?.mindbodyClientId === 'none' && (
+                                  {!issue.ignored && issue.context?.userId && (issue.context as IssueContext & { mindbodyClientId?: string })?.mindbodyClientId === 'none' && (
                                     <>
                                       <button
                                         onClick={() => handleViewProfile(issue.context!.memberEmail!)}

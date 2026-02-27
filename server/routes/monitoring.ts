@@ -164,7 +164,7 @@ router.get('/api/admin/monitoring/email-health', isStaffOrAdmin, async (_req, re
       eventType: String(row.event_type || ''),
       recipientEmail: row.recipient_email ? String(row.recipient_email) : null,
       subject: row.subject ? String(row.subject) : null,
-      createdAt: (row.created_at as any)?.toISOString?.() || (row.created_at ? new Date(String(row.created_at) + 'Z').toISOString() : ''),
+      createdAt: (row.created_at instanceof Date ? row.created_at.toISOString() : (row.created_at ? new Date(String(row.created_at) + 'Z').toISOString() : '')),
     }));
 
     res.json({ stats, recentEvents });

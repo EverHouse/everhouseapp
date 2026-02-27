@@ -181,7 +181,7 @@ const BlocksTab: React.FC = () => {
             setNewReasonLabel('');
             showToast('Closure reason added', 'success');
         },
-        onError: (error: any) => {
+        onError: (error: Error) => {
             showToast(error.message || 'Failed to add reason', 'error');
         },
         onSettled: () => {
@@ -204,7 +204,7 @@ const BlocksTab: React.FC = () => {
             closeReasonDrawer();
             showToast('Closure reason updated', 'success');
         },
-        onError: (error: any) => {
+        onError: (error: Error) => {
             showToast(error.message || 'Failed to update reason', 'error');
         },
         onSettled: () => {
@@ -242,7 +242,7 @@ const BlocksTab: React.FC = () => {
         onSuccess: () => {
             showToast('Closure reason reactivated', 'success');
         },
-        onError: (error: any) => {
+        onError: (error: Error) => {
             showToast(error.message || 'Failed to reactivate reason', 'error');
         },
         onSettled: () => {
@@ -259,7 +259,7 @@ const BlocksTab: React.FC = () => {
             setNewNoticeTypeName('');
             showToast('Notice type added', 'success');
         },
-        onError: (error: any) => {
+        onError: (error: Error) => {
             showToast(error.message || 'Failed to add notice type', 'error');
         },
         onSettled: () => {
@@ -277,7 +277,7 @@ const BlocksTab: React.FC = () => {
             closeNoticeTypeDrawer();
             showToast('Notice type updated', 'success');
         },
-        onError: (error: any) => {
+        onError: (error: Error) => {
             showToast(error.message || 'Failed to update notice type', 'error');
         },
         onSettled: () => {
@@ -398,7 +398,7 @@ const BlocksTab: React.FC = () => {
                 );
             }
         },
-        onError: (error: any) => {
+        onError: (error: Error) => {
             showToast(error.message || 'Failed to save notice', 'error');
         },
         onSettled: () => {

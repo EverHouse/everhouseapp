@@ -113,8 +113,8 @@ export function NewUserDrawer({
       if (tiersRes.ok) {
         const tiersData = await tiersRes.json();
         const subscriptionTiers = tiersData
-          .filter((t: any) => t.product_type === 'subscription' && t.stripe_price_id)
-          .map((t: any) => ({
+          .filter((t: { id: number; name: string; slug: string; price_cents: number; stripe_price_id?: string; product_type?: string }) => t.product_type === 'subscription' && t.stripe_price_id)
+          .map((t: { id: number; name: string; slug: string; price_cents: number; stripe_price_id?: string; product_type?: string }) => ({
             id: t.id,
             name: t.name,
             slug: t.slug,
@@ -144,8 +144,8 @@ export function NewUserDrawer({
       if (billingGroupsRes.ok) {
         const groupsData = await billingGroupsRes.json();
         const activeGroups = (groupsData || [])
-          .filter((g: any) => g.isActive && g.stripeSubscriptionId)
-          .map((g: any) => ({
+          .filter((g: { id: number; isActive: boolean; stripeSubscriptionId?: string; primaryEmail: string; primaryName: string; groupName: string; type?: string; members?: unknown[] }) => g.isActive && g.stripeSubscriptionId)
+          .map((g: { id: number; isActive: boolean; stripeSubscriptionId?: string; primaryEmail: string; primaryName: string; groupName: string; type?: string; members?: unknown[] }) => ({
             id: g.id,
             primaryEmail: g.primaryEmail,
             primaryName: g.primaryName,
@@ -381,14 +381,14 @@ export function NewUserDrawer({
           setIsLoading={setIsLoading}
           setError={setError}
           setStep={setVisitorStep}
-          onSuccess={((user: any) => {
+          onSuccess={(user: { id: string; email: string; name: string }) => {
             setCreatedUser(user);
             setVisitorStep('success');
             onSuccess?.({ ...user, mode: 'visitor' });
-          }) as any}
+          }}
           createdUser={createdUser}
           onClose={handleClose}
-          onBookNow={onBookNow ? () => onBookNow(createdUser as any) : undefined}
+          onBookNow={onBookNow ? () => { if (createdUser) onBookNow({ id: createdUser.id, email: createdUser.email, name: createdUser.name, phone: '' }); } : undefined}
           showToast={showToast}
           scannedIdImage={scannedIdImage}
           onShowIdScanner={() => setShowIdScanner(true)}

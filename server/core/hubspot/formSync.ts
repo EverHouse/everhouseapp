@@ -167,12 +167,12 @@ function inferFormTypeFromPageUrl(pageUrl: string | undefined, defaultType: stri
 async function discoverFormsViaSDK(client: Client): Promise<HubSpotForm[]> {
   try {
     const response = await client.marketing.forms.formsApi.getPage();
-    const forms: HubSpotForm[] = (response.results || []).map((f: any) => ({
-      id: f.id,
-      name: f.name,
-      formType: f.formType,
-      createdAt: f.createdAt,
-      updatedAt: f.updatedAt,
+    const forms: HubSpotForm[] = (response.results || []).map((f) => ({
+      id: f.id as string,
+      name: f.name as string,
+      formType: f.formType as string,
+      createdAt: String(f.createdAt),
+      updatedAt: String(f.updatedAt),
     }));
     logger.info(`[HubSpot FormSync] Discovered ${forms.length} forms via typed SDK (Private App token with forms scope)`);
     return forms;

@@ -517,7 +517,7 @@ class MemberServiceClass {
       isAdmin: role === 'admin',
       tier: row.tier as string,
       tierId: row.tier_id as number,
-      tierConfig: tierConfig as any,
+      tierConfig: tierConfig as unknown as MembershipTier,
       phone: row.phone as string,
       tags,
       stripeCustomerId: row.stripe_customer_id as string,

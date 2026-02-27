@@ -134,7 +134,7 @@ export async function handleCancellationCascade(
            WHERE stripe_payment_intent_id = ${row.stripe_payment_intent_id} AND status = 'succeeded'
            RETURNING stripe_payment_intent_id`);
         
-      if ((claimResult as any).rowCount === 0) {
+      if ((claimResult as unknown as { rowCount: number }).rowCount === 0) {
           logger.info('[cancellation-cascade] Prepayment already claimed or refunded, skipping', {
             extra: { bookingId, paymentIntentId: row.stripe_payment_intent_id }
           });
@@ -307,7 +307,7 @@ export async function handleCancellationCascade(
 }
 
 export async function fetchAllResources() {
-  const cached = getCached<any[]>(RESOURCE_CACHE_KEY);
+  const cached = getCached<Record<string, unknown>[]>(RESOURCE_CACHE_KEY);
   if (cached) return cached;
 
   const result = await withRetry(() =>
@@ -1234,7 +1234,7 @@ export async function markBookingAsEvent(params: {
         resourceId: resourceId,
         trackmanBookingId: unmatchedBooking.trackmanBookingId,
         isUnmatched: true,
-      } as any;
+      } as unknown as typeof bookingRequests.$inferSelect;
       isFromUnmatched = true;
     }
   }
@@ -1298,7 +1298,7 @@ export async function markBookingAsEvent(params: {
               resourceId: resource.id,
               requestDate: unmatched.bookingDate,
               isUnmatched: true
-            } as any);
+            } as unknown as typeof bookingRequests.$inferSelect);
           }
         }
       }
@@ -2457,7 +2457,7 @@ export async function isStaffOrAdminEmail(sessionEmail: string): Promise<boolean
         'SELECT id FROM staff_users WHERE LOWER(email) = LOWER($1) AND is_active = true',
         [sessionEmail]
       );
-      return (result as any).rows.length > 0;
+      return ((result as unknown as { rows: unknown[] }).rows).length > 0;
     } catch (e: unknown) {
       logger.warn('[resources] Staff check query failed:', e);
     }

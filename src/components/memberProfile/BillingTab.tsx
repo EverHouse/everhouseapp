@@ -35,9 +35,9 @@ const BillingTab: React.FC<BillingTabProps> = ({
           memberId={String(memberId)} 
           currentTier={displayedTier}
           onTierUpdate={onTierUpdate}
-          guestPassInfo={guestPassInfo as any}
+          guestPassInfo={guestPassInfo ? { remainingPasses: guestPassInfo.remainingPasses, totalUsed: guestPassInfo.usedPasses } : undefined}
           guestHistory={guestHistory}
-          guestCheckInsHistory={guestCheckInsHistory as any}
+          guestCheckInsHistory={guestCheckInsHistory.map(c => ({ id: c.id, guestName: c.guest_name ?? null, checkInDate: c.check_in_date }))}
           purchases={purchases}
         />
       </div>

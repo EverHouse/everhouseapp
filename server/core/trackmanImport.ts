@@ -1,6 +1,6 @@
 import { db } from '../db';
 import { getErrorMessage, getErrorCode } from '../utils/errorUtils';
-import { users, bookingRequests, trackmanUnmatchedBookings, trackmanImportRuns, notifications, bookingSessions, bookingParticipants, usageLedger, guests as guestsTable, availabilityBlocks, facilityClosures } from '../../shared/schema';
+import { users, bookingRequests, trackmanUnmatchedBookings, trackmanImportRuns, notifications, bookingSessions, bookingParticipants, usageLedger, guests as guestsTable, availabilityBlocks, facilityClosures, participantTypeEnum } from '../../shared/schema';
 import { eq, or, ilike, sql, and } from 'drizzle-orm';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -1013,7 +1013,7 @@ async function createTrackmanSessionAndParticipants(input: SessionCreationInput)
           sessionId,
           userId: p.userId || null,
           guestId: p.guestId || null,
-          participantType: p.participantType as any,
+          participantType: p.participantType as typeof participantTypeEnum.enumValues[number],
           displayName: p.displayName || 'Unknown',
           slotDuration: p.slotDuration || null
         }).returning();
@@ -1463,7 +1463,6 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
               // Create Facility Closure (container)
               const [closure] = await db.insert(facilityClosures).values({
                 title: `Lesson: ${row.userName || 'Private Instruction'}`,
-                resourceId,
                 startDate: bookingDate,
                 endDate: bookingDate,
                 startTime: startTime,
@@ -1473,17 +1472,17 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
                 visibility: 'Staff Only',
                 isActive: true,
                 createdBy: 'trackman_import'
-              } as any).returning();
+              }).returning();
               
-              // Create Availability Block (time slot)
               await db.insert(availabilityBlocks).values({
                 closureId: closure.id,
                 resourceId,
                 blockDate: bookingDate,
                 startTime: startTime,
                 endTime: endTime || startTime,
-                reason: `Lesson - ${row.userName}`
-              } as any);
+                blockType: 'private_event',
+                notes: `Lesson - ${row.userName}`
+              });
               
               process.stderr.write(`[Trackman Import] Converted staff lesson to block: ${row.userEmail} -> "${row.userName}" on ${bookingDate}\n`);
             } catch (blockErr: unknown) {

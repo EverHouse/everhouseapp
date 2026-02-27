@@ -2,6 +2,7 @@ import { db } from '../../db';
 import { getErrorMessage } from '../../utils/errorUtils';
 import { sql } from 'drizzle-orm';
 import { logger } from '../logger';
+import type { ContactMembershipStatus } from './constants';
 
 export type HubSpotOperation = 
   | 'create_contact'
@@ -109,7 +110,7 @@ export async function processHubSpotQueue(batchSize: number = 10): Promise<{
     
     try {
       // Execute the operation
-      await executeHubSpotOperation(job.operation as string, job.payload as any);
+      await executeHubSpotOperation(job.operation as string, job.payload as Record<string, unknown>);
       
       // Mark as completed
       await db.execute(sql`UPDATE hubspot_sync_queue 
@@ -236,7 +237,7 @@ async function executeHubSpotOperation(operation: string, payload: Record<string
     case 'update_contact':
       await stages.updateContactMembershipStatus(
         payload.email as string,
-        payload.status as any,
+        payload.status as ContactMembershipStatus,
         (payload.performedBy as string) || 'system'
       );
       break;
@@ -251,22 +252,22 @@ async function executeHubSpotOperation(operation: string, payload: Record<string
       
     case 'sync_tier':
       // Sync tier change to HubSpot contact and deal
-      await members.syncTierToHubSpot(payload as any);
+      await members.syncTierToHubSpot(payload as unknown as { email: string; newTier: string; oldTier?: string; changedBy?: string; changedByName?: string });
       break;
       
     case 'sync_company':
-      await companies.syncCompanyToHubSpot(payload as any);
+      await companies.syncCompanyToHubSpot(payload as unknown as Parameters<typeof companies.syncCompanyToHubSpot>[0]);
       break;
       
     case 'sync_day_pass':
       // Use the stripe hubspotSync version which handles line items on deals
       const dayPassSync = await import('../stripe/hubspotSync');
-      await dayPassSync.syncDayPassToHubSpot(payload as any);
+      await dayPassSync.syncDayPassToHubSpot(payload as unknown as Parameters<typeof dayPassSync.syncDayPassToHubSpot>[0]);
       break;
       
     case 'sync_payment':
       const hubspotSync = await import('../stripe/hubspotSync');
-      await hubspotSync.syncPaymentToHubSpot(payload as any);
+      await hubspotSync.syncPaymentToHubSpot(payload as unknown as Parameters<typeof hubspotSync.syncPaymentToHubSpot>[0]);
       break;
       
     default:

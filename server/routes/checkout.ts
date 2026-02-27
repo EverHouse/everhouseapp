@@ -30,7 +30,7 @@ router.post('/api/checkout/sessions', checkoutRateLimiter, async (req, res) => {
     const parseResult = checkoutSessionSchema.safeParse(req.body);
     
     if (!parseResult.success) {
-      const firstError = (parseResult.error as any).errors?.[0] || parseResult.error.issues?.[0];
+      const firstError = parseResult.error.issues?.[0];
       return res.status(400).json({ error: firstError.message || 'Invalid input' });
     }
     

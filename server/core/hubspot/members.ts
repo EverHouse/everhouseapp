@@ -13,6 +13,7 @@ import { isPlaceholderEmail } from '../stripe/customers';
 import { getTodayPacific } from '../../utils/dateUtils';
 
 import { FilterOperatorEnum } from '@hubspot/api-client/lib/codegen/crm/contacts';
+import { AssociationSpecAssociationCategoryEnum } from '@hubspot/api-client/lib/codegen/crm/associations/v4';
 import { logger } from '../logger';
 export interface AddMemberInput {
   firstName: string;
@@ -212,7 +213,7 @@ export async function createMembershipDeal(
       dealId,
       'contacts',
       contactId,
-      [{ associationCategory: 'HUBSPOT_DEFINED' as any, associationTypeId: 3 }]
+      [{ associationCategory: AssociationSpecAssociationCategoryEnum.HubspotDefined, associationTypeId: 3 }]
     )
   );
   
@@ -648,7 +649,7 @@ export async function createMemberWithDeal(input: AddMemberInput): Promise<AddMe
           membership_status, billing_provider, hubspot_id, 
           tags, discount_code, data_source, join_date, created_at, updated_at
         ) VALUES (${normalizedEmail}, ${firstName}, ${lastName}, ${phone || null}, 'member', ${tier}, 'active', 'stripe', ${contactId}, ${JSON.stringify(tags)}, ${discountReason || null}, 'staff_manual', ${startDate || getTodayPacific()}, NOW(), NOW())
-        RETURNING id`) as any;
+        RETURNING id`) as unknown as { rows: Array<{ id: number }> };
     } catch (userError: unknown) {
       logger.error('[AddMember] Failed to create user in database:', { error: userError });
       return { success: false, error: 'Failed to create user record in database' };

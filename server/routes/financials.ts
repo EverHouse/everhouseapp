@@ -317,7 +317,7 @@ router.post('/api/financials/backfill-stripe-cache', isStaffOrAdmin, async (req:
             metadata: inv.metadata,
             source: 'backfill',
             invoiceId: inv.id,
-            paymentIntentId: typeof (inv as any).payment_intent === 'string' ? (inv as any).payment_intent as string : undefined,
+            paymentIntentId: (inv as unknown as Record<string, unknown>).payment_intent ? (typeof (inv as unknown as Record<string, unknown>).payment_intent === 'string' ? (inv as unknown as Record<string, unknown>).payment_intent as string : ((inv as unknown as Record<string, unknown>).payment_intent as { id: string }).id) : undefined,
           });
           invoicesProcessed++;
         }
@@ -707,7 +707,7 @@ router.get('/api/financials/subscriptions', isStaffOrAdmin, async (req: Request,
         currency: price?.currency || 'usd',
         interval: price?.recurring?.interval || 'month',
         status: sub.status,
-        currentPeriodEnd: (sub as any).current_period_end,
+        currentPeriodEnd: (sub as unknown as Record<string, unknown>).current_period_end as number,
         cancelAtPeriodEnd: sub.cancel_at_period_end,
       };
     });
@@ -762,7 +762,7 @@ router.post('/api/financials/subscriptions/:subscriptionId/send-reminder', isSta
       memberName: customer.name || 'Member',
       amount,
       description: `${product?.name || 'Membership'} subscription payment is past due`,
-      dueDate: new Date((subscription as any).current_period_end * 1000).toLocaleDateString('en-US', {
+      dueDate: new Date(((subscription as unknown as Record<string, unknown>).current_period_end as number) * 1000).toLocaleDateString('en-US', {
         weekday: 'long',
         year: 'numeric',
         month: 'long',

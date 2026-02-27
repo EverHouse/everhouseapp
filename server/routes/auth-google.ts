@@ -114,7 +114,7 @@ router.post('/api/auth/google/verify', async (req, res) => {
       dateOfBirth: user.dateOfBirth || null,
     };
 
-    req.session.user = member as any;
+    req.session.user = member as unknown as typeof req.session.user;
 
     if (!user.googleId || user.googleId !== googleUser.sub) {
       const existingGoogleLink = await db.select({ id: users.id, email: users.email })
@@ -233,7 +233,7 @@ router.post('/api/auth/google/callback', async (req, res) => {
       dateOfBirth: user.dateOfBirth || null,
     };
 
-    req.session.user = member as any;
+    req.session.user = member as unknown as typeof req.session.user;
 
     if (!user.googleId || user.googleId !== googleUser.sub) {
       const existingGoogleLink = await db.select({ id: users.id, email: users.email })

@@ -111,8 +111,8 @@ export const MemberSearchInput: React.FC<MemberSearchInputProps> = ({
       if (res.ok) {
         const data = await res.json();
         const results: SelectedMember[] = data
-          .filter((r: any) => !excludeEmailsLower.includes(r.email?.toLowerCase() || ''))
-          .map((r: any) => ({
+          .filter((r: { id: string | number; email?: string; emailRedacted?: string; name?: string; tier?: string; membershipStatus?: string }) => !excludeEmailsLower.includes(r.email?.toLowerCase() || ''))
+          .map((r: { id: string | number; email?: string; emailRedacted?: string; name?: string; tier?: string; membershipStatus?: string }) => ({
             id: r.id,
             email: r.email || r.emailRedacted || '',
             name: r.name || 'Unknown',

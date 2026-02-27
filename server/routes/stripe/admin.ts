@@ -537,7 +537,7 @@ router.post('/api/stripe/staff/send-reactivation-link', isStaffOrAdmin, async (r
     }
 
     logFromRequest(req, {
-      action: 'send_reactivation_link' as any,
+      action: 'send_reactivation_link',
       resourceType: 'member',
       resourceId: String(member.id),
       resourceName: memberName as string,

@@ -106,8 +106,8 @@ Even if quality is poor, still attempt to extract whatever information is visibl
     const quality = parsed.quality || { isReadable: false, qualityIssues: ['parse_error'] };
 
     logFromRequest(req, 'scan_id', 'member', undefined, undefined, {
-      isReadable: (quality as any).isReadable,
-      qualityIssues: (quality as any).qualityIssues,
+      isReadable: (quality as Record<string, unknown>).isReadable,
+      qualityIssues: (quality as Record<string, unknown>).qualityIssues,
       fieldsExtracted: Object.entries(data).filter(([_, v]) => v !== null).map(([k]) => k),
     });
 

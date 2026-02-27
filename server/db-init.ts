@@ -427,8 +427,8 @@ export async function ensureDatabaseConstraints() {
         WHERE billing_provider = 'hubspot'
         RETURNING email
       `);
-      if ((hubspotFix as any).rows?.length > 0) {
-        logger.info(`[DB Init] Migrated ${(hubspotFix as any).rows.length} users from billing_provider='hubspot' to 'manual'`);
+      if ((hubspotFix as unknown as { rows?: unknown[] }).rows?.length && (hubspotFix as unknown as { rows?: unknown[] }).rows!.length > 0) {
+        logger.info(`[DB Init] Migrated ${(hubspotFix as unknown as { rows?: unknown[] }).rows!.length} users from billing_provider='hubspot' to 'manual'`);
       }
     } catch (err: unknown) {
       logger.warn(`[DB Init] Skipping billing provider CHECK constraint: ${getErrorMessage(err)}`);

@@ -1415,7 +1415,7 @@ export async function syncCommunicationLogsFromHubSpot(): Promise<{ synced: numb
         );
         
         // Filter to recent calls only
-        const recentCalls = (response as any).results.filter((call: Record<string, unknown>) => {
+        const recentCalls = (response as unknown as { results: Array<Record<string, unknown>> }).results.filter((call: Record<string, unknown>) => {
           const callProps = call.properties as Record<string, unknown> | undefined;
           const timestamp = callProps?.hs_timestamp as string | undefined;
           if (!timestamp) return false;

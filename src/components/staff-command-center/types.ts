@@ -150,7 +150,7 @@ export interface QuickLink {
 
 export interface RecentActivity {
   id: string;
-  type: 'booking_created' | 'booking_approved' | 'check_in' | 'cancellation' | 'tour' | 'notification';
+  type: 'booking_created' | 'booking_approved' | 'booking_declined' | 'booking_no_show' | 'booking_checked_in' | 'check_in' | 'cancellation' | 'tour' | 'notification';
   timestamp: string;
   primary_text: string;
   secondary_text: string;
@@ -164,7 +164,7 @@ export interface Alert {
   message: string;
   timestamp: string;
   is_read?: boolean;
-  data?: Record<string, any>;
+  data?: Record<string, unknown>;
 }
 
 export interface StaffNotification {

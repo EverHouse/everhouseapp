@@ -545,11 +545,11 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
         const res = await fetch(`/api/visitors/search?query=${encodeURIComponent(fullName)}&limit=5&includeStaff=true&includeMembers=true`, { credentials: 'include' });
         if (res.ok) {
           const data = await res.json();
-          const matches = data.filter((v: any) => {
+          const matches = data.filter((v: { id: string; email: string; name?: string; firstName?: string; lastName?: string }) => {
             const vName = (v.name || `${v.firstName} ${v.lastName}`).toLowerCase().trim();
             return vName === fullName.toLowerCase();
           });
-          setPotentialDuplicates(matches.map((v: any) => ({
+          setPotentialDuplicates(matches.map((v: { id: string; email: string; name?: string; firstName?: string; lastName?: string }) => ({
             id: v.id,
             email: v.email,
             name: v.name || `${v.firstName} ${v.lastName}`

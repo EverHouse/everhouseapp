@@ -53,20 +53,10 @@ export function useCommandCenterData(userEmail?: string) {
     }));
     allPending = [...allPending, ...pending];
 
-    const pendingBookings = (raw.pendingBookings || []).map((b: any) => {
-      const email = b.user_email || b.userEmail;
-      const originalName = b.user_name || b.userName;
+    const pendingBookings = (raw.pendingBookings || []).map((b: BookingRequest) => {
       return {
         ...b,
-        id: b.id,
-        user_name: getDisplayName(email, originalName),
-        user_email: email,
-        bay_name: b.bay_name || b.bayName,
-        resource_id: b.resource_id || b.resourceId,
-        request_date: b.request_date || b.requestDate,
-        start_time: b.start_time || b.startTime,
-        end_time: b.end_time || b.endTime,
-        status: b.status || 'pending',
+        user_name: getDisplayName(b.user_email, b.user_name),
         source: 'booking' as const
       };
     });
@@ -92,16 +82,16 @@ export function useCommandCenterData(userEmail?: string) {
     const nowTime = getNowTimePacific();
     const normalizeTime = (t: string) => t ? t.slice(0, 5) : '00:00';
 
-    return raw.filter((b: any) => {
+    return raw.filter((b: BookingRequest) => {
       const bookingDate = b.request_date;
       const startTime = normalizeTime(b.start_time);
       if (bookingDate > today) return true;
       if (bookingDate === today && startTime >= nowTime) return true;
       return false;
-    }).sort((a: any, b: any) => {
+    }).sort((a: BookingRequest, b: BookingRequest) => {
       if (a.request_date !== b.request_date) return String(a.request_date).localeCompare(String(b.request_date));
       return normalizeTime(a.start_time).localeCompare(normalizeTime(b.start_time));
-    }).map((b: any) => ({
+    }).map((b: BookingRequest) => ({
       id: b.id,
       resource_name: b.resource_name || b.bay_name || 'Booking',
       resource_type: b.resource_type || 'simulator',
@@ -433,15 +423,15 @@ export function useCommandCenterData(userEmail?: string) {
   const weekAhead = addDaysToPacificDate(today, 7);
 
   const updatePendingRequests = useCallback((updater: (prev: BookingRequest[]) => BookingRequest[]) => {
-    queryClient.setQueryData(commandCenterKeys.pendingRequests(), (old: any) => {
+    queryClient.setQueryData(commandCenterKeys.pendingRequests(), (old: { bookingRequests: BookingRequest[]; pendingBookings: BookingRequest[] } | undefined) => {
       if (!old) return old;
 
       const pendingStatuses = new Set(['pending', 'pending_approval', 'cancellation_pending']);
-      const derivePendingFromRaw = (raw: any): BookingRequest[] => {
+      const derivePendingFromRaw = (raw: { bookingRequests: BookingRequest[]; pendingBookings: BookingRequest[] }): BookingRequest[] => {
         const requests = (raw.bookingRequests || [])
           .filter((r: BookingRequest) => pendingStatuses.has(r.status))
           .map((r: BookingRequest) => ({ ...r, source: 'booking_request' as const }));
-        const bookings = (raw.pendingBookings || []).map((b: any) => ({
+        const bookings = (raw.pendingBookings || []).map((b: BookingRequest) => ({
           ...b,
           source: 'booking' as const
         }));
@@ -451,9 +441,9 @@ export function useCommandCenterData(userEmail?: string) {
       const currentFromCache = derivePendingFromRaw(old);
       const updated = updater(currentFromCache);
 
-      const nonPendingRequests = old.bookingRequests.filter((r: any) => !pendingStatuses.has(r.status));
-      const bookingRequestItems = updated.filter((r: any) => r.source === 'booking_request');
-      const pendingBookingItems = updated.filter((r: any) => r.source === 'booking');
+      const nonPendingRequests = old.bookingRequests.filter((r: BookingRequest) => !pendingStatuses.has(r.status));
+      const bookingRequestItems = updated.filter((r: BookingRequest & { source?: string }) => r.source === 'booking_request');
+      const pendingBookingItems = updated.filter((r: BookingRequest & { source?: string }) => r.source === 'booking');
       return {
         bookingRequests: [...nonPendingRequests, ...bookingRequestItems],
         pendingBookings: pendingBookingItems.length > 0 ? pendingBookingItems : old.pendingBookings,
@@ -467,9 +457,9 @@ export function useCommandCenterData(userEmail?: string) {
   const updateTodaysBookings = useCallback((updater: (prev: BookingRequest[]) => BookingRequest[]) => {
     queryClient.setQueryData(
       commandCenterKeys.todaysBookings(today, weekAhead),
-      (old: any[]) => {
+      (old: BookingRequest[] | undefined) => {
         if (!old) return old;
-        return updater(old as BookingRequest[]);
+        return updater(old);
       }
     );
   }, [queryClient, today, weekAhead]);
@@ -477,7 +467,7 @@ export function useCommandCenterData(userEmail?: string) {
   const updateRecentActivity = useCallback((updater: (prev: RecentActivity[]) => RecentActivity[]) => {
     queryClient.setQueryData(
       commandCenterKeys.activity(userEmail),
-      (old: any) => {
+      (old: { recentActivity?: RecentActivity[] } | undefined) => {
         if (!old) return old;
         return {
           ...old,

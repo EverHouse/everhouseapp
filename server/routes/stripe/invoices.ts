@@ -84,7 +84,7 @@ router.post('/api/stripe/invoices', isStaffOrAdmin, async (req: Request, res: Re
         sql`SELECT email FROM users WHERE stripe_customer_id = ${customerId}`
       );
       if (memberLookup.rows.length > 0) {
-        const memberEmail = (memberLookup.rows[0] as any).email;
+        const memberEmail = (memberLookup.rows[0] as Record<string, unknown>).email as string;
         sendNotificationToUser(memberEmail, {
           type: 'billing_update',
           title: 'New Invoice',
@@ -124,7 +124,7 @@ router.post('/api/stripe/invoices/:invoiceId/finalize', isStaffOrAdmin, async (r
           sql`SELECT email FROM users WHERE stripe_customer_id = ${customerId}`
         );
         if (memberLookup.rows.length > 0) {
-          const memberEmail = (memberLookup.rows[0] as any).email;
+          const memberEmail = (memberLookup.rows[0] as Record<string, unknown>).email as string;
           sendNotificationToUser(memberEmail, {
             type: 'billing_update',
             title: 'Invoice Ready',
@@ -184,7 +184,7 @@ router.post('/api/stripe/invoices/:invoiceId/void', isStaffOrAdmin, async (req: 
           sql`SELECT email FROM users WHERE stripe_customer_id = ${customerId}`
         );
         if (memberLookup.rows.length > 0) {
-          const memberEmail = (memberLookup.rows[0] as any).email;
+          const memberEmail = (memberLookup.rows[0] as Record<string, unknown>).email as string;
           sendNotificationToUser(memberEmail, {
             type: 'billing_update',
             title: 'Invoice Voided',
@@ -234,7 +234,7 @@ router.get('/api/my-invoices', async (req: Request, res: Response) => {
       sql`SELECT stripe_customer_id FROM users WHERE LOWER(email) = ${targetEmail.toLowerCase()}`
     );
     
-    const stripeCustomerId = (userResult.rows[0] as any)?.stripe_customer_id;
+    const stripeCustomerId = (userResult.rows[0] as Record<string, unknown> | undefined)?.stripe_customer_id as string | undefined;
     
     if (!stripeCustomerId) {
       return res.json({ invoices: [], count: 0 });

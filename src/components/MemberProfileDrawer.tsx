@@ -1289,7 +1289,7 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
                         HubSpot Deals: <strong>{mergePreview.recordsToMerge.hubspotDeals?.source ?? 0}</strong>
                       </div>
                     )}
-                    {mergePreview.recordsToMerge?.stripePaymentIntents !== undefined && (mergePreview.recordsToMerge.stripePaymentIntents as any)?.source > 0 && (
+                    {mergePreview.recordsToMerge?.stripePaymentIntents !== undefined && (mergePreview.recordsToMerge.stripePaymentIntents?.source ?? 0) > 0 && (
                       <div className={`${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
                         <span className="material-symbols-outlined text-sm align-middle mr-1">credit_card</span>
                         Payment Intents: <strong>{mergePreview.recordsToMerge.stripePaymentIntents?.source ?? 0}</strong>
@@ -1304,11 +1304,11 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
                         Conflicts/Recommendations:
                       </p>
                       <ul className={`text-xs mt-1 space-y-1 ${isDark ? 'text-amber-300' : 'text-amber-600'}`}>
-                        {mergePreview.conflicts?.map((c: any, i: number) => (
-                          <li key={`conflict-${i}`}>• {typeof c === 'string' ? c : `${c.field}: ${c.sourceValue} vs ${c.targetValue}`}</li>
+                        {mergePreview.conflicts?.map((c: { field: string; sourceValue: unknown; targetValue: unknown }, i: number) => (
+                          <li key={`conflict-${i}`}>• {`${c.field}: ${String(c.sourceValue)} vs ${String(c.targetValue)}`}</li>
                         ))}
-                        {mergePreview.recommendations?.map((r: any, i: number) => (
-                          <li key={`rec-${i}`}>• {typeof r === 'string' ? r : `${r.field}: ${r.recommendation}`}</li>
+                        {mergePreview.recommendations?.map((r: { field: string; recommendation: string }, i: number) => (
+                          <li key={`rec-${i}`}>• {`${r.field}: ${r.recommendation}`}</li>
                         ))}
                       </ul>
                     </div>

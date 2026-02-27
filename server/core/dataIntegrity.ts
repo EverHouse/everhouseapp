@@ -40,7 +40,7 @@ interface MemberRow {
   [key: string]: unknown;
 }
 import { syncCustomerMetadataToStripe } from './stripe/customers';
-import { alertOnCriticalIntegrityIssues, alertOnHighIntegrityIssues } from './dataAlerts';
+import { alertOnCriticalIntegrityIssues, alertOnHighIntegrityIssues, type IntegrityCheckSummary } from './dataAlerts';
 import { logIntegrityAudit } from './auditLog';
 import { denormalizeTierForHubSpot } from '../utils/tierUtils';
 import { retryableHubSpotRequest } from './hubspot/request';
@@ -1338,7 +1338,7 @@ async function checkTierReconciliation(): Promise<IntegrityCheckResult> {
           hubspot.crm.contacts.batchApi.read({
             inputs: hsBatch.map((m: MemberRow) => ({ id: m.hubspot_id as string })),
             properties: ['membership_tier']
-          } as any)
+          } as unknown as Parameters<typeof hubspot.crm.contacts.batchApi.read>[0])
         );
         for (const contact of ((readResult as unknown as Record<string, unknown>).results as Array<{ id: string; properties?: Record<string, string> }> || [])) {
           hubspotTierMap.set(contact.id, (contact.properties?.membership_tier || '').toLowerCase().trim());
@@ -2531,8 +2531,8 @@ export async function runAllIntegrityChecks(triggeredBy: 'manual' | 'scheduled' 
       status: c.status,
       issueCount: c.issueCount
     }));
-    await alertOnCriticalIntegrityIssues(checkSummaries as any, severityMap);
-    await alertOnHighIntegrityIssues(checkSummaries as any, severityMap);
+    await alertOnCriticalIntegrityIssues(checkSummaries as IntegrityCheckSummary[], severityMap);
+    await alertOnHighIntegrityIssues(checkSummaries as IntegrityCheckSummary[], severityMap);
   } catch (err: unknown) {
     if (!isProduction) logger.error('[DataIntegrity] Failed to store history:', { error: err });
   }
@@ -2850,7 +2850,7 @@ export async function bulkPushToHubSpot(dryRun: boolean = true): Promise<{
         properties: ['firstname', 'lastname', 'email', 'membership_tier']
       };
       const readResult = await retryableHubSpotRequest(() =>
-        hubspot.crm.contacts.batchApi.read(readInput as any)
+        hubspot.crm.contacts.batchApi.read(readInput as unknown as Parameters<typeof hubspot.crm.contacts.batchApi.read>[0])
       );
       for (const contact of ((readResult as unknown as Record<string, unknown>).results as Array<{ id: string; properties?: Record<string, string> }> || [])) {
         hsContactMap[contact.id] = contact.properties || {};

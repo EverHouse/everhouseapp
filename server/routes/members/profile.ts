@@ -541,8 +541,8 @@ router.get('/api/members/:email/history', isStaffOrAdmin, async (req, res) => {
       isWalkIn: true,
     }));
 
-    const combinedVisitHistory = [...visitHistory, ...walkInItems].sort((a: any, b: any) =>
-      new Date(b.bookingDate).getTime() - new Date(a.bookingDate).getTime()
+    const combinedVisitHistory = [...visitHistory, ...walkInItems].sort((a, b) =>
+      new Date(b.bookingDate as string).getTime() - new Date(a.bookingDate as string).getTime()
     );
 
     // Calculate total attended visits including bookings, walk-ins, events, and wellness
@@ -642,12 +642,12 @@ router.put('/api/members/:id/role', isAdmin, async (req, res) => {
           }
         })
         .returning();
-      logFromRequest(req, 'change_member_role', 'user', req.params.id as any, '', { newRole: req.body.role, tags: req.body.tags });
+      logFromRequest(req, 'change_member_role', 'user', req.params.id as string, '', { newRole: req.body.role, tags: req.body.tags });
       return res.json(insertResult[0]);
     }
     
     invalidateCache('members_directory');
-    logFromRequest(req, 'change_member_role', 'user', req.params.id as any, '', { newRole: req.body.role, tags: req.body.tags });
+    logFromRequest(req, 'change_member_role', 'user', req.params.id as string, '', { newRole: req.body.role, tags: req.body.tags });
     res.json(result[0]);
   } catch (error: unknown) {
     logger.error('API error updating member', { error: error instanceof Error ? error : new Error(String(error)) });

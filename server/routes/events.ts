@@ -852,7 +852,7 @@ router.get('/api/rsvps', async (req, res) => {
               'SELECT id FROM staff_users WHERE LOWER(email) = LOWER($1) AND is_active = true',
               [sessionEmail]
             );
-            isStaff = (result as any).rows.length > 0;
+            isStaff = (result as unknown as { rows: Array<Record<string, unknown>> }).rows.length > 0;
           } catch (error: unknown) {
             logger.warn('[events] Staff check query failed', { error: error instanceof Error ? error : new Error(getErrorMessage(error)) });
           }

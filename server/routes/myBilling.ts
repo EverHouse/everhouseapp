@@ -180,7 +180,7 @@ router.get('/api/my/billing/invoices', requireAuth, async (req, res) => {
     
     const invoices = (invoicesResult.invoices || []).map((inv) => ({
       id: inv.id,
-      number: (inv as any).number,
+      number: (inv as unknown as Record<string, unknown>).number as string | null,
       status: inv.status,
       amountDue: inv.amountDue,
       amountPaid: inv.amountPaid,
@@ -568,7 +568,7 @@ router.get('/api/my-billing/account-balance', requireAuth, async (req, res) => {
 // Sync member to Stripe - create or find customer by email
 router.post('/api/member-billing/:email/sync-stripe', requireStaffAuth, async (req, res) => {
   try {
-    const targetEmail = decodeURIComponent(req.params.email as any).trim().toLowerCase();
+    const targetEmail = decodeURIComponent(req.params.email as string).trim().toLowerCase();
     
     const result = await db.execute(sql`SELECT id, email, first_name, last_name, stripe_customer_id, tier FROM users WHERE LOWER(email) = ${targetEmail.toLowerCase()}`);
     
@@ -597,7 +597,7 @@ router.post('/api/member-billing/:email/sync-stripe', requireStaffAuth, async (r
 // Sync customer metadata to Stripe
 router.post('/api/member-billing/:email/sync-metadata', requireStaffAuth, async (req, res) => {
   try {
-    const targetEmail = decodeURIComponent(req.params.email as any).trim().toLowerCase();
+    const targetEmail = decodeURIComponent(req.params.email as string).trim().toLowerCase();
     
     const result = await db.execute(sql`SELECT id, email, first_name, last_name, stripe_customer_id, tier FROM users WHERE LOWER(email) = ${targetEmail.toLowerCase()}`);
     
@@ -632,7 +632,7 @@ router.post('/api/member-billing/:email/sync-metadata', requireStaffAuth, async 
 // Sync tier from Stripe subscription - fetches active subscription and updates tier based on product name
 router.post('/api/member-billing/:email/sync-tier-from-stripe', requireStaffAuth, async (req, res) => {
   try {
-    const targetEmail = decodeURIComponent(req.params.email as any).trim().toLowerCase();
+    const targetEmail = decodeURIComponent(req.params.email as string).trim().toLowerCase();
     
     const result = await db.execute(sql`SELECT id, email, first_name, last_name, stripe_customer_id, tier FROM users WHERE LOWER(email) = ${targetEmail.toLowerCase()}`);
     
@@ -754,7 +754,7 @@ router.post('/api/member-billing/:email/sync-tier-from-stripe', requireStaffAuth
 // Backfill transaction cache for individual member
 router.post('/api/member-billing/:email/backfill-cache', requireStaffAuth, async (req, res) => {
   try {
-    const targetEmail = decodeURIComponent(req.params.email as any).trim().toLowerCase();
+    const targetEmail = decodeURIComponent(req.params.email as string).trim().toLowerCase();
     
     const result = await db.execute(sql`SELECT id, email, stripe_customer_id FROM users WHERE LOWER(email) = ${targetEmail.toLowerCase()}`);
     
@@ -843,7 +843,7 @@ router.post('/api/my/billing/request-cancellation', requireAuth, async (req, res
     const subscription = subscriptions.data[0];
     const now = new Date();
     const thirtyDaysFromNow = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
-    const currentPeriodEnd = new Date((subscription as any).current_period_end * 1000);
+    const currentPeriodEnd = new Date((subscription as unknown as Record<string, number>).current_period_end * 1000);
     const effectiveDate = thirtyDaysFromNow > currentPeriodEnd ? thirtyDaysFromNow : currentPeriodEnd;
     const cancelAtTimestamp = Math.floor(effectiveDate.getTime() / 1000);
     

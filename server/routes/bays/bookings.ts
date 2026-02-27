@@ -34,6 +34,13 @@ interface SanitizedParticipant {
   name?: string;
 }
 
+interface InvoicePayResult {
+  paidInFull: boolean;
+  status: string;
+  clientSecret?: string | null;
+  amountFromBalance?: number;
+}
+
 interface BookingInsertRow {
   id: number;
   userEmail: string;
@@ -55,6 +62,12 @@ interface BookingInsertRow {
   requestParticipants: SanitizedParticipant[];
   createdAt: Date | null;
   updatedAt: Date | null;
+  staffNotes?: string | null;
+  suggestedTime?: string | null;
+  reviewedBy?: string | null;
+  reviewedAt?: Date | null;
+  calendarEventId?: string | null;
+  _invoicePayResult?: InvoicePayResult;
 }
 
 const router = Router();
@@ -841,7 +854,7 @@ router.post('/api/booking-requests', bookingRateLimiter, async (req, res) => {
             logger.info('[ConferenceRoom] Invoice finalized and payment attempted', {
               extra: { bookingId: row.id, sessionId: confSessionId, paidInFull: payResult.paidInFull, status: payResult.status }
             });
-            (row as any)._invoicePayResult = payResult;
+            row._invoicePayResult = payResult;
           } catch (payErr: unknown) {
             logger.warn('[ConferenceRoom] Invoice finalize/pay failed (will be collected at check-in)', {
               extra: { bookingId: row.id, error: (payErr as Error).message }
@@ -906,19 +919,19 @@ router.post('/api/booking-requests', bookingRateLimiter, async (req, res) => {
       end_time: row.endTime,
       notes: row.notes,
       status: row.status,
-      staff_notes: (row as any).staffNotes,
-      suggested_time: (row as any).suggestedTime,
-      reviewed_by: (row as any).reviewedBy,
-      reviewed_at: (row as any).reviewedAt,
+      staff_notes: row.staffNotes,
+      suggested_time: row.suggestedTime,
+      reviewed_by: row.reviewedBy,
+      reviewed_at: row.reviewedAt,
       created_at: row.createdAt,
       updated_at: row.updatedAt,
-      calendar_event_id: (row as any).calendarEventId,
-      ...((row as any)._invoicePayResult ? {
+      calendar_event_id: row.calendarEventId,
+      ...(row._invoicePayResult ? {
         invoicePayment: {
-          paidInFull: (row as any)._invoicePayResult.paidInFull,
-          status: (row as any)._invoicePayResult.status,
-          clientSecret: (row as any)._invoicePayResult.clientSecret || null,
-          amountFromBalance: (row as any)._invoicePayResult.amountFromBalance || 0,
+          paidInFull: row._invoicePayResult.paidInFull,
+          status: row._invoicePayResult.status,
+          clientSecret: row._invoicePayResult.clientSecret || null,
+          amountFromBalance: row._invoicePayResult.amountFromBalance || 0,
         }
       } : {})
     });

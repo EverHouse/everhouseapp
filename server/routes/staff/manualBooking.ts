@@ -279,7 +279,7 @@ router.post('/api/staff/manual-booking', isStaffOrAdmin, async (req, res) => {
         endTime: dbRow.end_time as string,
         status: dbRow.status as string,
         declaredPlayerCount: dbRow.declared_player_count as number,
-        requestParticipants: (dbRow.request_participants as any[]) || [],
+        requestParticipants: (dbRow.request_participants as unknown as unknown[]) || [],
         trackmanExternalId: dbRow.trackman_external_id as string,
         origin: dbRow.origin as string,
         createdAt: dbRow.created_at,

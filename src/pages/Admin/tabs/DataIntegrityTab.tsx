@@ -816,7 +816,7 @@ const DataIntegrityTab: React.FC = () => {
   });
 
   const fixIssueMutation = useMutation({
-    mutationFn: (params: { endpoint: string; body: Record<string, any> }) =>
+    mutationFn: (params: { endpoint: string; body: Record<string, unknown> }) =>
       postWithCredentials<{ success: boolean; message: string }>(params.endpoint, params.body),
     onMutate: (params) => {
       const recordId = params.body.recordId || params.body.userId || params.body.primaryUserId;
@@ -839,7 +839,7 @@ const DataIntegrityTab: React.FC = () => {
       queryClient.setQueryData(['data-integrity', 'cached'], (old: CachedResultsResponse | undefined) => {
         if (!old?.hasCached || !recordId) return old;
         const rid = String(recordId);
-        const matchesIssue = (issue: any) => {
+        const matchesIssue = (issue: { recordId?: string | number; id?: string | number; context?: { userId?: number } }) => {
           const id = issue.recordId ?? issue.id;
           if (id != null && String(id) === rid) return true;
           if (issue.context?.userId && String(issue.context.userId) === rid) return true;
@@ -945,28 +945,30 @@ const DataIntegrityTab: React.FC = () => {
       try {
         const statusData = await fetchWithCredentials<BackgroundJobStatus>('/api/data-tools/cleanup-stripe-customers/status');
         if (statusData.hasJob && statusData.job) {
-          setStripeCleanupProgress(statusData.job.progress as any);
+          if (statusData.job.progress != null) {
+            setStripeCleanupProgress(statusData.job.progress as unknown as { phase: string; totalCustomers: number; checked: number; emptyFound: number; skippedActiveCount: number; deleted: number; errors: number });
+          }
           if (statusData.job.status === 'completed') {
             setIsRunningStripeCleanup(false);
             setStripeCleanupProgress(null);
-            const r = statusData.job.result as any;
+            const r = statusData.job.result as Record<string, unknown> | undefined;
             if (r) {
               setStripeCleanupResult({
-                success: r.success,
-                message: r.message,
-                dryRun: r.dryRun,
-                totalCustomers: r.totalCustomers,
-                emptyCount: r.emptyCount,
-                skippedActiveCount: r.skippedActiveCount,
-                customers: r.customers,
-                deleted: r.deleted,
-                deletedCount: r.deletedCount,
+                success: r.success as boolean,
+                message: r.message as string,
+                dryRun: r.dryRun as boolean | undefined,
+                totalCustomers: r.totalCustomers as number | undefined,
+                emptyCount: r.emptyCount as number | undefined,
+                skippedActiveCount: r.skippedActiveCount as number | undefined,
+                customers: r.customers as Array<{ id: string; email: string; name: string; created: string }> | undefined,
+                deleted: r.deleted as Array<{ id: string; email: string }> | undefined,
+                deletedCount: r.deletedCount as number | undefined,
               });
             }
           } else if (statusData.job.status === 'failed') {
             setIsRunningStripeCleanup(false);
             setStripeCleanupProgress(null);
-            setStripeCleanupResult({ success: false, message: (statusData.job as any).error || 'Job failed' });
+            setStripeCleanupResult({ success: false, message: statusData.job.error || 'Job failed' });
           }
         } else if (!statusData.hasJob) {
           setIsRunningStripeCleanup(false);
@@ -1019,21 +1021,23 @@ const DataIntegrityTab: React.FC = () => {
       try {
         const statusData = await fetchWithCredentials<BackgroundJobStatus>('/api/data-tools/archive-stale-visitors/status');
         if (statusData.hasJob && statusData.job) {
-          setVisitorArchiveProgress(statusData.job.progress as any);
+          if (statusData.job.progress != null) {
+            setVisitorArchiveProgress(statusData.job.progress as unknown as { phase: string; totalVisitors: number; checked: number; eligibleCount: number; keptCount: number; archived: number; errors: number });
+          }
           if (statusData.job.status === 'completed') {
             setIsRunningVisitorArchive(false);
             setVisitorArchiveProgress(null);
-            const r = statusData.job.result as any;
+            const r = statusData.job.result as Record<string, unknown> | undefined;
             if (r) {
               setVisitorArchiveResult({
-                success: r.success,
-                message: r.message,
-                dryRun: r.dryRun,
-                totalScanned: r.totalScanned,
-                eligibleCount: r.eligibleCount,
-                keptCount: r.keptCount,
-                archivedCount: r.archivedCount,
-                sampleArchived: r.sampleArchived,
+                success: r.success as boolean,
+                message: r.message as string,
+                dryRun: r.dryRun as boolean | undefined,
+                totalScanned: r.totalScanned as number | undefined,
+                eligibleCount: r.eligibleCount as number | undefined,
+                keptCount: r.keptCount as number | undefined,
+                archivedCount: r.archivedCount as number | undefined,
+                sampleArchived: r.sampleArchived as Array<{ name: string; email: string }> | undefined,
               });
             }
           } else if (statusData.job.status === 'failed') {
@@ -1291,9 +1295,9 @@ const DataIntegrityTab: React.FC = () => {
     onSuccess: (data) => {
       if (data.success) {
         setPlaceholderAccounts({
-          stripeCustomers: (data.stripeCustomers || []) as any,
-          hubspotContacts: (data.hubspotContacts || []) as any,
-          localDatabaseUsers: (data.localDatabaseUsers || []) as any,
+          stripeCustomers: (data.stripeCustomers || []) as Array<{ id: string; email: string; name: string; created: number }>,
+          hubspotContacts: (data.hubspotContacts || []) as Array<{ id: string; email: string; name: string }>,
+          localDatabaseUsers: (data.localDatabaseUsers || []) as Array<{ id: string; email: string; name: string; status: string; createdAt: string }>,
           totals: {
             stripe: data.totals?.stripe || 0,
             hubspot: data.totals?.hubspot || 0,
@@ -2048,7 +2052,7 @@ const DataIntegrityTab: React.FC = () => {
         loadingMemberEmail={loadingMemberEmail}
         handleViewProfile={handleViewProfile}
         setBookingSheet={setBookingSheet}
-        fixIssueMutation={fixIssueMutation as any}
+        fixIssueMutation={fixIssueMutation}
         fixingIssues={fixingIssues}
         isRefreshing={runIntegrityMutation.isPending}
         openIgnoreModal={openIgnoreModal}

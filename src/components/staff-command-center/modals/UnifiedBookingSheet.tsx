@@ -394,7 +394,7 @@ export function UnifiedBookingSheet(props: UnifiedBookingSheetProps) {
           assigningToStaff={logic.assigningToStaff}
           handleMarkAsEvent={logic.handleMarkAsEvent}
           executeMarkAsEvent={logic.executeMarkAsEvent}
-          handleAssignToStaff={logic.handleAssignToStaff as any}
+          handleAssignToStaff={(staff) => logic.handleAssignToStaff({ id: String(staff.id), email: staff.email, first_name: staff.name.split(' ')[0] || '', last_name: staff.name.split(' ').slice(1).join(' ') || '', role: '', user_id: null })}
           getRoleBadge={logic.getRoleBadge}
           onDeleteBooking={logic.handleDeleteBooking}
           deleting={logic.deleting}

@@ -265,11 +265,11 @@ const RosterManager: React.FC<RosterManagerProps> = ({
           setConflictDetails({
             memberName: member.name,
             conflictingBooking: conflict ? {
-              id: (conflict as any).id || 0,
-              date: (conflict as any).date || booking?.requestDate || 'Unknown',
-              startTime: (conflict as any).startTime || booking?.startTime || 'Unknown',
-              endTime: (conflict as any).endTime || booking?.endTime || 'Unknown',
-              resourceName: (conflict as any).resourceName || booking?.resourceName || undefined
+              id: (conflict as Record<string, unknown>).id as number || 0,
+              date: (conflict as Record<string, unknown>).date as string || booking?.requestDate || 'Unknown',
+              startTime: (conflict as Record<string, unknown>).startTime as string || booking?.startTime || 'Unknown',
+              endTime: (conflict as Record<string, unknown>).endTime as string || booking?.endTime || 'Unknown',
+              resourceName: (conflict as Record<string, unknown>).resourceName as string || booking?.resourceName || undefined
             } : {
               id: 0,
               date: booking?.requestDate || 'Unknown',

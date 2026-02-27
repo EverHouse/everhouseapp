@@ -71,9 +71,10 @@ export async function logWebhookEvent(
     
     if (trackmanBookingId) {
       const bookingData = payload?.data || payload?.booking || {};
-      const startTime = (bookingData as any)?.start || (bookingData as any)?.start_time || (payload as any)?.start_time || '';
-      const endTime = (bookingData as any)?.end || (bookingData as any)?.end_time || (payload as any)?.end_time || '';
-      const status = (bookingData as any)?.status || (payload as any)?.status || eventType;
+      const bd = bookingData as Record<string, unknown>;
+      const startTime = (bd?.start as string) || (bd?.start_time as string) || (payload.start_time as string) || '';
+      const endTime = (bd?.end as string) || (bd?.end_time as string) || (payload.end_time as string) || '';
+      const status = (bd?.status as string) || (payload.status as string) || eventType;
       
       const recentDupe = await db.execute(sql`SELECT id, payload FROM trackman_webhook_events 
          WHERE trackman_booking_id = ${trackmanBookingId} 
@@ -104,12 +105,13 @@ export async function logWebhookEvent(
     }
     
     const sigParts: string[] = [];
-    const v2Booking = (payload as any)?.booking;
-    const v1Data = (payload as any)?.data;
+    const v2Booking = payload.booking as Record<string, unknown> | undefined;
+    const v1Data = payload.data as Record<string, unknown> | undefined;
     if (v2Booking?.start) {
       if (v2Booking.start) sigParts.push(`s:${v2Booking.start}`);
       if (v2Booking.end) sigParts.push(`e:${v2Booking.end}`);
-      if (v2Booking.bay?.ref) sigParts.push(`b:${v2Booking.bay.ref}`);
+      const v2Bay = v2Booking.bay as Record<string, unknown> | undefined;
+      if (v2Bay?.ref) sigParts.push(`b:${v2Bay.ref}`);
       if (v2Booking.status) sigParts.push(`st:${v2Booking.status}`);
     } else if (v1Data) {
       if (v1Data.start_time) sigParts.push(`s:${v1Data.start_time}`);

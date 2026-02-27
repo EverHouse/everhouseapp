@@ -7,6 +7,7 @@ import { logger } from '../../core/logger';
 import { z } from 'zod';
 import { getHubSpotClient } from '../../core/integrations';
 import { retryableHubSpotRequest } from '../../core/hubspot/request';
+import { FilterOperatorEnum } from '@hubspot/api-client/lib/codegen/crm/contacts';
 
 const router = Router();
 
@@ -260,7 +261,7 @@ async function syncProfileToExternalServices(
           filterGroups: [{
             filters: [{
               propertyName: 'email',
-              operator: 'EQ' as any,
+              operator: FilterOperatorEnum.Eq,
               value: email.toLowerCase(),
             }],
           }],
@@ -268,8 +269,9 @@ async function syncProfileToExternalServices(
           limit: 1,
         })
       );
-      if ((searchResponse as any).results && (searchResponse as any).results.length > 0) {
-        const contactId = (searchResponse as any).results[0].id;
+      const searchResults = (searchResponse as unknown as { results?: Array<{ id: string }> }).results;
+      if (searchResults && searchResults.length > 0) {
+        const contactId = searchResults[0].id;
         await retryableHubSpotRequest(() =>
           hubspot.crm.contacts.basicApi.update(contactId, {
             properties: {

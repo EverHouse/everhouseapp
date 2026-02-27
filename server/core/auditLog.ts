@@ -294,7 +294,8 @@ export type AuditAction =
   | 'accept_tier'
   | 'mark_booking_paid'
   | 'booking_creation'
-  | 'cleanup_ghost_fees';
+  | 'cleanup_ghost_fees'
+  | 'send_reactivation_link';
 
 export type ActorType = 'staff' | 'member' | 'system';
 

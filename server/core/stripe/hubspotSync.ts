@@ -3,6 +3,7 @@ import { hubspotDeals, hubspotLineItems } from '../../../shared/schema';
 import { logBillingAudit } from '../auditLog';
 import { eq, sql } from 'drizzle-orm';
 import { getHubSpotClient } from '../integrations';
+import type { AssociationSpecAssociationCategoryEnum } from '@hubspot/api-client/lib/codegen/crm/associations/v4';
 
 import { logger } from '../logger';
 export interface SyncPaymentParams {
@@ -81,7 +82,7 @@ export async function syncPaymentToHubSpot(params: SyncPaymentParams): Promise<v
       lineItemId,
       'deals',
       hubspotDealId,
-      [{ associationCategory: 'HUBSPOT_DEFINED' as any, associationTypeId: 20 }]
+      [{ associationCategory: 'HUBSPOT_DEFINED' as unknown as AssociationSpecAssociationCategoryEnum, associationTypeId: 20 }]
     );
 
     await db.insert(hubspotLineItems).values({
@@ -184,7 +185,7 @@ export async function syncDayPassToHubSpot(params: SyncDayPassParams): Promise<v
         lineItemId,
         'deals',
         hubspotDealId,
-        [{ associationCategory: 'HUBSPOT_DEFINED' as any, associationTypeId: 20 }]
+        [{ associationCategory: 'HUBSPOT_DEFINED' as unknown as AssociationSpecAssociationCategoryEnum, associationTypeId: 20 }]
       );
 
       await db.insert(hubspotLineItems).values({

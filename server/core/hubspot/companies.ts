@@ -2,6 +2,8 @@ import { getHubSpotClient } from '../integrations';
 import { getErrorMessage, getErrorCode, getErrorStatusCode } from '../../utils/errorUtils';
 import { isProduction } from '../db';
 import { retryableHubSpotRequest } from './request';
+import { FilterOperatorEnum } from '@hubspot/api-client/lib/codegen/crm/contacts';
+import { AssociationSpecAssociationCategoryEnum } from '@hubspot/api-client/lib/codegen/crm/associations/v4';
 
 import { logger } from '../logger';
 export interface SyncCompanyInput {
@@ -143,7 +145,7 @@ export async function syncCompanyToHubSpot(
             filterGroups: [{
               filters: [{
                 propertyName: 'email',
-                operator: 'EQ' as any,
+                operator: FilterOperatorEnum.Eq,
                 value: normalizedEmail
               }]
             }],
@@ -173,7 +175,7 @@ export async function syncCompanyToHubSpot(
             companyId!,
             'contacts',
             contactId!,
-            [{ associationCategory: 'HUBSPOT_DEFINED' as any, associationTypeId: 280 }]
+            [{ associationCategory: AssociationSpecAssociationCategoryEnum.HubspotDefined, associationTypeId: 280 }]
           )
         );
 

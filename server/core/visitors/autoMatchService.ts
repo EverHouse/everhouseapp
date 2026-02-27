@@ -440,7 +440,7 @@ export async function autoMatchSingleBooking(
       const user = await findMatchingUser({ email: parsed.memberEmail });
       if (user) {
         const sessionId = await maybeCreateSession(
-          user.id as any, 
+          user.id as unknown as number, 
           user.email, 
           `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email
         );

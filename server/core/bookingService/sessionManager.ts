@@ -14,7 +14,8 @@ import {
   InsertBookingParticipant,
   InsertUsageLedger,
   BookingSession,
-  BookingParticipant
+  BookingParticipant,
+  bookingSourceEnum
 } from '../../../shared/schema';
 import { eq, and, isNull, sql } from 'drizzle-orm';
 import { logger } from '../logger';
@@ -69,7 +70,7 @@ export async function createSession(
       startTime: request.startTime,
       endTime: request.endTime,
       trackmanBookingId: request.trackmanBookingId,
-      source: source as any,
+      source: source as typeof bookingSourceEnum.enumValues[number],
       createdBy: request.createdBy
     };
     
@@ -355,7 +356,7 @@ export async function recordUsage(
           input.memberId 
             ? eq(usageLedger.memberId, input.memberId) 
             : isNull(usageLedger.memberId),
-          eq(usageLedger.source, source as any)
+          eq(usageLedger.source, source as typeof bookingSourceEnum.enumValues[number])
         )
       )
       .limit(1);
@@ -394,7 +395,7 @@ export async function recordUsage(
       guestFee: input.guestFee?.toString() ?? '0.00',
       tierAtBooking,
       paymentMethod: input.paymentMethod ?? 'unpaid',
-      source: source as any
+      source: source as typeof bookingSourceEnum.enumValues[number]
     };
     
     await dbCtx.insert(usageLedger).values(usageData);

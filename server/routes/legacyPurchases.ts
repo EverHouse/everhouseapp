@@ -299,7 +299,7 @@ async function getUnifiedPurchasesForEmail(email: string): Promise<UnifiedPurcha
       itemName: cleanStripeDescription(record.description as string, record.purpose as string),
       itemCategory: record.purpose as string,
       amountCents: record.amount_cents as number,
-      date: safeToISOString(record.created_at as any),
+      date: safeToISOString(record.created_at as string | Date | null),
       status: 'paid',
       source: 'Stripe',
       stripePaymentIntentId: record.stripe_payment_intent_id as string,
@@ -319,15 +319,15 @@ async function getUnifiedPurchasesForEmail(email: string): Promise<UnifiedPurcha
   
   unifiedCashCheckPayments = cashCheckResult.rows.map((record: Record<string, unknown>) => {
     const actionDetails = (record.details as Record<string, unknown>) || {};
-    const paymentMethod = (actionDetails as any).paymentMethod || (actionDetails as any).payment_method || 'cash';
+    const paymentMethod = (actionDetails as Record<string, unknown>).paymentMethod || (actionDetails as Record<string, unknown>).payment_method || 'cash';
     
     return {
       id: `cash-${record.id}`,
       type: 'legacy' as const,
-      itemName: (actionDetails as any).description || 'Cash/Check Payment',
+      itemName: ((actionDetails as Record<string, unknown>).description as string) || 'Cash/Check Payment',
       itemCategory: 'payment',
-      amountCents: (actionDetails as any).amountCents || (actionDetails as any).amount_cents || 0,
-      date: safeToISOString(record.created_at as any),
+      amountCents: ((actionDetails as Record<string, unknown>).amountCents as number) || ((actionDetails as Record<string, unknown>).amount_cents as number) || 0,
+      date: safeToISOString(record.created_at as string | Date | null),
       status: 'paid',
       source: paymentMethod === 'check' ? 'Check' : 'Cash',
     };
@@ -786,7 +786,7 @@ async function createLegacyLineItem(
         lineItemId,
         'deals',
         dealId,
-        [{ associationCategory: 'HUBSPOT_DEFINED' as any, associationTypeId: 20 }]
+        [{ associationCategory: 'HUBSPOT_DEFINED' as unknown as import('@hubspot/api-client/lib/codegen/crm/associations/v4').AssociationSpecAssociationCategoryEnum, associationTypeId: 20 }]
       )
     );
     

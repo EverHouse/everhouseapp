@@ -62,11 +62,11 @@ router.get('/api/tier-features', async (req, res) => {
       
       let value: string | number | boolean | null = null;
       if (row.value_text !== null && row.value_text !== '') {
-        value = row.value_text as any;
+        value = row.value_text as string;
       } else if (row.value_number !== null && row.value_number !== 0) {
         value = parseFloat(row.value_number as string);
       } else if (row.value_boolean !== null) {
-        value = row.value_boolean as any;
+        value = row.value_boolean as boolean;
       }
       
       valuesByFeature[row.feature_id as number][row.tier_id as number] = {
@@ -101,7 +101,7 @@ router.get('/api/tier-features', async (req, res) => {
             } else if (mapping.type === 'number') {
               derivedValue = rawValue !== null && rawValue !== 0 ? Number(rawValue) : null;
             } else {
-              derivedValue = rawValue as any;
+              derivedValue = rawValue as string;
             }
           }
           
@@ -297,11 +297,11 @@ router.put('/api/tier-features/:featureId/values/:tierId', isAdmin, async (req, 
     const row = result.rows[0];
     let returnValue: string | number | boolean | null = null;
     if (row.value_text !== null) {
-      returnValue = row.value_text as any;
+      returnValue = row.value_text as string;
     } else if (row.value_number !== null) {
       returnValue = parseFloat(row.value_number as string);
     } else if (row.value_boolean !== null) {
-      returnValue = row.value_boolean as any;
+      returnValue = row.value_boolean as boolean;
     }
 
     logFromRequest(req, 'update_tier_feature_value', 'tier_feature', String(row.feature_id), undefined, { tierId: row.tier_id, value: returnValue });

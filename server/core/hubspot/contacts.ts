@@ -2,6 +2,7 @@ import { getHubSpotClient } from '../integrations';
 import { getErrorMessage, getErrorCode, getErrorStatusCode } from '../../utils/errorUtils';
 import { isProduction } from '../db';
 import { retryableHubSpotRequest } from './request';
+import { FilterOperatorEnum } from '@hubspot/api-client/lib/codegen/crm/contacts';
 
 import { logger } from '../logger';
 export interface SmsPreferences {
@@ -29,7 +30,7 @@ export async function syncSmsPreferencesToHubSpot(
         filterGroups: [{
           filters: [{
             propertyName: 'email',
-            operator: 'EQ' as any,
+            operator: FilterOperatorEnum.Eq,
             value: normalizedEmail
           }]
         }],
@@ -124,7 +125,7 @@ export async function syncDayPassPurchaseToHubSpot(
           filterGroups: [{
             filters: [{
               propertyName: 'email',
-              operator: 'EQ' as any,
+              operator: FilterOperatorEnum.Eq,
               value: normalizedEmail
             }]
           }],
@@ -201,7 +202,7 @@ export async function syncDayPassPurchaseToHubSpot(
             filterGroups: [{
               filters: [{
                 propertyName: 'email',
-                operator: 'EQ' as any,
+                operator: FilterOperatorEnum.Eq,
                 value: normalizedEmail
               }]
             }],

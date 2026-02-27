@@ -837,7 +837,7 @@ router.get('/api/wellness-enrollments', async (req, res) => {
               'SELECT id FROM staff_users WHERE LOWER(email) = LOWER($1) AND is_active = true',
               [sessionEmail]
             );
-            isStaff = (result as any).rows.length > 0;
+            isStaff = ((result as unknown as { rows: unknown[] }).rows || []).length > 0;
           } catch (e: unknown) {
             logger.warn('[wellness] Staff check query failed', { extra: { error: e } });
           }
@@ -958,7 +958,7 @@ router.post('/api/wellness-enrollments', isAuthenticated, async (req, res) => {
         .values({
           classId: parseInt(class_id as string),
           userEmail: user_email as string,
-          status: 'confirmed' as any,
+          status: 'confirmed',
           isWaitlisted: isWaitlisted as boolean
         })
         .returning();
@@ -967,7 +967,7 @@ router.post('/api/wellness-enrollments', isAuthenticated, async (req, res) => {
         userEmail: user_email as string,
         title: isWaitlisted ? 'Added to Waitlist' : 'Wellness Class Confirmed',
         message: memberMessage,
-        type: 'wellness_booking' as any,
+        type: 'wellness_booking',
         relatedId: parseInt(class_id as string),
         relatedType: 'wellness_class'
       });
@@ -1136,7 +1136,7 @@ router.delete('/api/wellness-enrollments/:class_id/:user_email', isAuthenticated
             userEmail: promotedEmail as string,
             title: 'Spot Available - You\'re In!',
             message: promotedMessage,
-            type: 'wellness_booking' as any,
+            type: 'wellness_booking',
             relatedId: parseInt(class_id as string),
             relatedType: 'wellness_class'
           });

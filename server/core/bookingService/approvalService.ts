@@ -189,7 +189,7 @@ export async function validateTrackmanId(trackmanBookingId: string, bookingId: n
             FROM booking_fee_snapshots
             WHERE booking_id = ${duplicateId} AND stripe_payment_intent_id IS NOT NULL
           `);
-          for (const snapshot of allSnapshots.rows as any[]) {
+          for (const snapshot of allSnapshots.rows as unknown as Array<{ id: number; stripe_payment_intent_id: string; total_cents: number }>) {
             try {
               const pi = await stripe.paymentIntents.retrieve(snapshot.stripe_payment_intent_id);
               if (pi.status === 'succeeded') {
@@ -679,7 +679,7 @@ export async function approveBooking(params: ApproveBookingParams) {
       url: '/sims'
     }).catch(err => logger.error('Push notification failed:', { extra: { err } }));
 
-    notifyLinkedMembers(bookingId, updated as any);
+    notifyLinkedMembers(bookingId, updated as unknown as BookingUpdateResult);
 
     bookingEvents.publish('booking_approved', {
       bookingId,
@@ -708,7 +708,7 @@ export async function approveBooking(params: ApproveBookingParams) {
       data: { bookingId, eventType: 'booking_approved' }
     }, { action: 'booking_approved', bookingId, triggerSource: 'approval.ts' });
 
-    notifyApprovalParticipants(bookingId, updated as any);
+    notifyApprovalParticipants(bookingId, updated as unknown as BookingUpdateResult);
   }
 
   return { updated, isConferenceRoom };
@@ -1659,7 +1659,7 @@ export async function checkinBooking(params: CheckinBookingParams) {
       WHERE bp.session_id = ${existing.session_id} AND bp.payment_status = 'pending' AND (bp.cached_fee_cents IS NULL OR bp.cached_fee_cents = 0)
     `);
 
-    if (parseInt((nullFeesCheck.rows[0] as any)?.null_count) > 0) {
+    if (parseInt((nullFeesCheck.rows[0] as unknown as { null_count: string })?.null_count) > 0) {
       try {
         await recalculateSessionFees(existing.session_id, 'checkin');
         logger.info('[Check-in Guard] Recalculated fees for session - some participants had NULL or zero cached_fee_cents', { extra: { existingSession_id: existing.session_id } });
@@ -1679,7 +1679,7 @@ export async function checkinBooking(params: CheckinBookingParams) {
       WHERE bp.session_id = ${existing.session_id} AND bp.payment_status = 'pending'
     `);
 
-    for (const p of balanceResult.rows as any[]) {
+    for (const p of balanceResult.rows as unknown as Array<{ participant_id: number; display_name: string; participant_type: string; payment_status: string; fee_amount: string }>) {
       const amount = parseFloat(p.fee_amount);
       if (amount > 0) {
         totalOutstanding += amount;
@@ -1697,7 +1697,7 @@ export async function checkinBooking(params: CheckinBookingParams) {
         FROM conference_prepayments
         WHERE booking_id = ${bookingId} AND status IN ('succeeded', 'completed')
       `);
-      const prepaidTotal = parseFloat((prepaidResult.rows[0] as any)?.prepaid_total || '0');
+      const prepaidTotal = parseFloat((prepaidResult.rows[0] as unknown as { prepaid_total: string })?.prepaid_total || '0');
       if (prepaidTotal > 0) {
         totalOutstanding = Math.max(0, totalOutstanding - prepaidTotal);
         logger.info('[Check-in Guard] Deducted conference prepayment from outstanding balance', {
@@ -1924,13 +1924,14 @@ export async function devConfirmBooking(params: DevConfirmParams) {
         SELECT user_id, display_name, participant_type FROM booking_participants
          WHERE session_id = ${sessionId} AND participant_type != 'owner'
       `);
+      const typedParticipantRows = existingParticipants.rows as unknown as Array<{ user_id: string | null; display_name: string | null; participant_type: string }>;
       const existingUserIds = new Set(
-        (existingParticipants.rows as any[])
+        typedParticipantRows
           .filter(p => p.user_id)
           .map(p => String(p.user_id))
       );
       const existingGuestNames = new Set(
-        (existingParticipants.rows as any[])
+        typedParticipantRows
           .filter(p => !p.user_id && p.participant_type === 'guest')
           .map(p => (p.display_name || '').toLowerCase())
       );
@@ -1949,8 +1950,8 @@ export async function devConfirmBooking(params: DevConfirmParams) {
               SELECT name, first_name, last_name, email FROM users WHERE id = ${resolvedUserId}
             `);
             if (userResult.rows.length > 0) {
-              const u = userResult.rows[0] as Record<string, any>;
-              resolvedName = u.name || `${u.first_name || ''} ${u.last_name || ''}`.trim() || u.email || 'Member';
+              const u = userResult.rows[0] as Record<string, unknown>;
+              resolvedName = (u.name as string) || `${(u.first_name as string) || ''} ${(u.last_name as string) || ''}`.trim() || (u.email as string) || 'Member';
             }
           }
 
@@ -1959,11 +1960,11 @@ export async function devConfirmBooking(params: DevConfirmParams) {
               SELECT id, name, first_name, last_name FROM users WHERE LOWER(email) = LOWER(${rp.email})
             `);
             if (userResult.rows.length > 0) {
-              resolvedUserId = (userResult.rows[0] as any).id;
+              resolvedUserId = (userResult.rows[0] as unknown as { id: string }).id;
               participantType = 'member';
               if (!resolvedName) {
-                const u = userResult.rows[0] as Record<string, any>;
-                resolvedName = u.name || `${u.first_name || ''} ${u.last_name || ''}`.trim();
+                const u = userResult.rows[0] as Record<string, unknown>;
+                resolvedName = (u.name as string) || `${(u.first_name as string) || ''} ${(u.last_name as string) || ''}`.trim();
               }
             }
           }
@@ -2056,7 +2057,7 @@ export async function devConfirmBooking(params: DevConfirmParams) {
         const formattedDate = formatDateDisplayWithDay(dateStr);
         const formattedTime = formatTime12Hour(timeStr);
 
-        for (const participant of participantsResult.rows as any[]) {
+        for (const participant of participantsResult.rows as unknown as Array<{ user_email: string; first_name: string | null; last_name: string | null }>) {
           const participantEmail = participant.user_email?.toLowerCase();
           if (!participantEmail) continue;
 
@@ -2185,7 +2186,7 @@ export async function completeCancellation(params: CompleteCancellationParams) {
        WHERE booking_id = ${bookingId} AND stripe_payment_intent_id IS NOT NULL
     `);
 
-    await Promise.allSettled((allSnapshots.rows as any[]).map(async (snapshot) => {
+    await Promise.allSettled((allSnapshots.rows as unknown as Array<{ id: number; stripe_payment_intent_id: string; snapshot_status: string; total_cents: number }>).map(async (snapshot) => {
       try {
         const pi = await stripe.paymentIntents.retrieve(snapshot.stripe_payment_intent_id);
 

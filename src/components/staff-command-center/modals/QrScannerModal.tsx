@@ -8,7 +8,7 @@ interface QrScannerModalProps {
 }
 
 const QrScannerModal: React.FC<QrScannerModalProps> = ({ isOpen, onClose, onScanSuccess }) => {
-  const qrScannerRef = useRef<any>(null);
+  const qrScannerRef = useRef<{ getState: () => number; stop: () => Promise<void>; start: (cameraId: Record<string, string>, config: Record<string, unknown>, onSuccess: (text: string) => void, onError: (err: unknown) => void) => Promise<void> } | null>(null);
   const hasScannedRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const [cameraPermission, setCameraPermission] = useState<'idle' | 'pending' | 'granted' | 'denied'>('idle');
@@ -63,7 +63,7 @@ const QrScannerModal: React.FC<QrScannerModalProps> = ({ isOpen, onClose, onScan
         }
 
         const qrScanner = new Html5Qrcode(elementId);
-        qrScannerRef.current = qrScanner;
+        qrScannerRef.current = qrScanner as unknown as typeof qrScannerRef.current;
         setCameraPermission('granted');
 
         await qrScanner.start(

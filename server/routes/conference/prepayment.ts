@@ -253,7 +253,7 @@ router.post('/api/member/conference/prepay/create-intent', isAuthenticated, asyn
       const customer = await stripe.customers.retrieve(stripeCustomerId);
       
       if (!customer.deleted) {
-        const customerBalance = (customer as any).balance || 0;
+        const customerBalance = (customer as unknown as { balance?: number }).balance || 0;
         const availableCredit = customerBalance < 0 ? Math.abs(customerBalance) : 0;
 
         if (availableCredit >= totalCents) {

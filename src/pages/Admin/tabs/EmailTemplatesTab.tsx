@@ -75,7 +75,7 @@ const EmailTemplatesTab: React.FC = () => {
       setSavingKey(key);
       await queryClient.cancelQueries({ queryKey: ['settings'] });
       const previous = queryClient.getQueryData(['settings']);
-      queryClient.setQueryData(['settings'], (old: any) => {
+      queryClient.setQueryData(['settings'], (old: Record<string, { value: string }> | undefined) => {
         if (!old) return old;
         return { ...old, [key]: { ...old[key], value } };
       });

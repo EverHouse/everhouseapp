@@ -223,7 +223,7 @@ async function gatherMemberData(email: string): Promise<MemberDataExport> {
       joinDate: profile.join_date,
       createdAt: profile.created_at,
     } : null,
-    bookings: bookingsResult.rows.map((b: any) => ({
+    bookings: bookingsResult.rows.map((b: Record<string, unknown>) => ({
       id: b.id,
       bayId: b.bay_id,
       date: b.request_date,
@@ -234,7 +234,7 @@ async function gatherMemberData(email: string): Promise<MemberDataExport> {
       notes: b.notes,
       createdAt: b.created_at,
     })),
-    linkedBookings: linkedBookingsResult.rows.map((lb: any) => ({
+    linkedBookings: linkedBookingsResult.rows.map((lb: Record<string, unknown>) => ({
       bookingId: lb.id,
       date: lb.request_date,
       startTime: lb.start_time,
@@ -247,7 +247,7 @@ async function gatherMemberData(email: string): Promise<MemberDataExport> {
       memberStatus: lb.member_status,
       addedAt: lb.added_at,
     })),
-    notifications: notificationsResult.rows.map((n: any) => ({
+    notifications: notificationsResult.rows.map((n: Record<string, unknown>) => ({
       title: n.title,
       message: n.message,
       type: n.type,
@@ -255,55 +255,55 @@ async function gatherMemberData(email: string): Promise<MemberDataExport> {
       createdAt: n.created_at,
     })),
     guestPasses: guestPassesResult.rows[0] ? {
-      used: (guestPassesResult.rows[0] as any).passes_used,
-      total: (guestPassesResult.rows[0] as any).passes_total,
-      lastReset: (guestPassesResult.rows[0] as any).last_reset_date,
+      used: (guestPassesResult.rows[0] as Record<string, unknown>).passes_used,
+      total: (guestPassesResult.rows[0] as Record<string, unknown>).passes_total,
+      lastReset: (guestPassesResult.rows[0] as Record<string, unknown>).last_reset_date,
     } : null,
-    eventRsvps: eventRsvpsResult.rows.map((r: any) => ({
+    eventRsvps: eventRsvpsResult.rows.map((r: Record<string, unknown>) => ({
       eventId: r.event_id,
       status: r.status,
       createdAt: r.created_at,
     })),
-    memberNotes: memberNotesResult.rows.map((n: any) => ({
+    memberNotes: memberNotesResult.rows.map((n: Record<string, unknown>) => ({
       content: n.content,
       createdBy: n.created_by_name,
       createdAt: n.created_at,
     })),
-    communicationLogs: communicationLogsResult.rows.map((c: any) => ({
+    communicationLogs: communicationLogsResult.rows.map((c: Record<string, unknown>) => ({
       type: c.type,
       direction: c.direction,
       subject: c.subject,
       occurredAt: c.occurred_at,
     })),
-    billingHistory: billingResult.rows.map((b: any) => ({
+    billingHistory: billingResult.rows.map((b: Record<string, unknown>) => ({
       action: b.action_type,
       details: b.action_details,
       value: b.new_value,
       createdAt: b.created_at,
     })),
-    bookingMemberships: bookingMembershipsResult.rows.map((bm: any) => ({
+    bookingMemberships: bookingMembershipsResult.rows.map((bm: Record<string, unknown>) => ({
       bookingId: bm.booking_id,
       isPrimary: bm.is_primary,
       status: bm.status,
       addedAt: bm.added_at,
     })),
-    guestCheckIns: guestCheckInsResult.rows.map((g: any) => ({
+    guestCheckIns: guestCheckInsResult.rows.map((g: Record<string, unknown>) => ({
       guestName: g.guest_name,
       guestEmail: g.guest_email,
       checkInDate: g.check_in_date,
       notes: g.check_in_notes,
       createdAt: g.created_at,
     })),
-    wellnessEnrollments: wellnessEnrollmentsResult.rows.map((w: any) => ({
+    wellnessEnrollments: wellnessEnrollmentsResult.rows.map((w: Record<string, unknown>) => ({
       classId: w.class_id,
       status: w.status,
       createdAt: w.created_at,
     })),
     preferences: profile ? {
-      emailNotifications: (profile as any).email_notifications_enabled,
-      smsNotifications: (profile as any).sms_notifications_enabled,
-      bookingReminders: (profile as any).booking_reminders_enabled,
-      marketingEmails: (profile as any).marketing_emails_enabled,
+      emailNotifications: (profile as Record<string, unknown>).email_notifications_enabled,
+      smsNotifications: (profile as Record<string, unknown>).sms_notifications_enabled,
+      bookingReminders: (profile as Record<string, unknown>).booking_reminders_enabled,
+      marketingEmails: (profile as Record<string, unknown>).marketing_emails_enabled,
     } : null,
   };
 }

@@ -150,7 +150,7 @@ export async function enableRealtimeForTable(tableName: string): Promise<boolean
 
     const quotedTable = `"public"."${tableName.replace(/"/g, '')}"`;
     const { error: pubError } = await Promise.race([
-      supabase.rpc('exec_sql' as any, {
+      supabase.rpc('exec_sql' as unknown as string, {
         query: `ALTER PUBLICATION supabase_realtime ADD TABLE ${quotedTable}`
       }).maybeSingle(),
       timeoutPromise

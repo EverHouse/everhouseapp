@@ -1364,7 +1364,7 @@ export function MemberFlow({
           <option value="">No discount</option>
           {discounts.map(discount => (
             <option key={discount.id} value={discount.code}>
-              {(discount as any).name || discount.code} ({discount.percentOff}% off)
+              {(discount as { id: string; code: string; percentOff: number; name?: string }).name || discount.code} ({discount.percentOff}% off)
             </option>
           ))}
         </select>

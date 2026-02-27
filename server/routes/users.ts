@@ -126,7 +126,7 @@ router.put('/api/staff-users/:id', isAdmin, async (req, res) => {
     const { email: rawEmail, name, first_name, last_name, phone, job_title, role, is_active } = req.body;
     const email = rawEmail?.trim()?.toLowerCase();
     
-    const updateData: Record<string, any> = {};
+    const updateData: Record<string, unknown> = {};
     if (email !== undefined) updateData.email = normalizeEmail(email);
     if (name !== undefined) updateData.name = name;
     if (first_name !== undefined) updateData.firstName = first_name;
@@ -161,7 +161,7 @@ router.put('/api/staff-users/:id', isAdmin, async (req, res) => {
       return res.status(404).json({ error: 'Staff user not found' });
     }
     
-    logFromRequest(req, 'update_staff_user', 'staff_user', req.params.id as any, '', { changes: req.body });
+    logFromRequest(req, 'update_staff_user', 'staff_user', req.params.id as string, '', { changes: req.body });
     res.json({
       id: result[0].id,
       email: result[0].email,
@@ -194,7 +194,7 @@ router.delete('/api/staff-users/:id', isAdmin, async (req, res) => {
       return res.status(404).json({ error: 'Staff user not found' });
     }
     
-    logFromRequest(req, 'delete_staff_user', 'staff_user', req.params.id as any, '', {});
+    logFromRequest(req, 'delete_staff_user', 'staff_user', req.params.id as string, '', {});
     res.json({ 
       message: 'Staff user removed', 
       staff: {
@@ -287,7 +287,7 @@ router.put('/api/admin-users/:id', isAdmin, async (req, res) => {
     const { email: rawEmail, name, first_name, last_name, phone, job_title, is_active } = req.body;
     const email = rawEmail?.trim()?.toLowerCase();
     
-    const updateData: Record<string, any> = {};
+    const updateData: Record<string, unknown> = {};
     if (email !== undefined) updateData.email = normalizeEmail(email);
     if (name !== undefined) updateData.name = name;
     if (first_name !== undefined) updateData.firstName = first_name;
@@ -315,7 +315,7 @@ router.put('/api/admin-users/:id', isAdmin, async (req, res) => {
       return res.status(404).json({ error: 'Admin user not found' });
     }
     
-    logFromRequest(req, 'update_admin_user', 'staff_user', req.params.id as any, '', { changes: req.body });
+    logFromRequest(req, 'update_admin_user', 'staff_user', req.params.id as string, '', { changes: req.body });
     res.json({
       id: result[0].id,
       email: result[0].email,
@@ -365,7 +365,7 @@ router.delete('/api/admin-users/:id', isAdmin, async (req, res) => {
       return res.status(404).json({ error: 'Admin user not found' });
     }
     
-    logFromRequest(req, 'delete_admin_user', 'staff_user', req.params.id as any, '', {});
+    logFromRequest(req, 'delete_admin_user', 'staff_user', req.params.id as string, '', {});
     res.json({ 
       message: 'Admin user removed', 
       admin: {

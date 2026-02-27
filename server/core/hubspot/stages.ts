@@ -6,6 +6,7 @@ import { hubspotDeals, hubspotLineItems } from '../../../shared/schema';
 import { logBillingAudit } from '../auditLog';
 import { eq, and } from 'drizzle-orm';
 import { retryableHubSpotRequest } from './request';
+import { FilterOperatorEnum } from '@hubspot/api-client/lib/codegen/crm/contacts';
 import { validateMembershipPipeline, isValidStage } from './pipeline';
 import { isPlaceholderEmail } from '../stripe/customers';
 
@@ -169,7 +170,7 @@ export async function syncMemberToHubSpot(
         filterGroups: [{
           filters: [{
             propertyName: 'email',
-            operator: 'EQ' as any,
+            operator: FilterOperatorEnum.Eq,
             value: email.toLowerCase()
           }]
         }],
@@ -566,7 +567,7 @@ export async function ensureHubSpotPropertiesExist(): Promise<{ success: boolean
             await retryableHubSpotRequest(() =>
               hubspot.crm.properties.coreApi.update('contacts', prop.name, {
                 options: allOptions,
-              } as any)
+              } as Parameters<typeof hubspot.crm.properties.coreApi.update>[2])
             );
             logger.info(`[HubSpot] Added options to ${prop.name}: ${missingOptions.map((o: { label: string }) => o.label).join(', ')}`);
           }

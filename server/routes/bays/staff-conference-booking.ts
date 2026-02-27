@@ -224,9 +224,9 @@ router.post('/api/staff/conference-room/booking', isStaffOrAdmin, async (req: Re
        AND (start_time < ${endTime} AND end_time > ${startTimeWithSeconds})`);
 
     if (overlapCheck.rows.length > 0) {
-      const conflict = overlapCheck.rows[0] as any;
-      const conflictStart = conflict.start_time?.substring(0, 5);
-      const conflictEnd = conflict.end_time?.substring(0, 5);
+      const conflict = overlapCheck.rows[0] as Record<string, unknown>;
+      const conflictStart = typeof conflict.start_time === 'string' ? conflict.start_time.substring(0, 5) : undefined;
+      const conflictEnd = typeof conflict.end_time === 'string' ? conflict.end_time.substring(0, 5) : undefined;
       const errorMsg = conflictStart && conflictEnd
         ? `This time slot conflicts with an existing booking from ${formatTime12Hour(conflictStart)} to ${formatTime12Hour(conflictEnd)}. Please adjust your time or duration.`
         : 'This time slot conflicts with an existing booking';

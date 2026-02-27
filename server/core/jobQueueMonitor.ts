@@ -54,7 +54,7 @@ export async function getJobQueueMonitorData(): Promise<JobQueueMonitorData> {
     id: Number(r.id),
     jobType: String(r.job_type),
     lastError: String(r.last_error || ''),
-    createdAt: (r.created_at as any)?.toISOString?.() || String(r.created_at),
+    createdAt: r.created_at instanceof Date ? r.created_at.toISOString() : String(r.created_at),
     retryCount: Number(r.retry_count),
     maxRetries: Number(r.max_retries),
   }));
@@ -70,7 +70,7 @@ export async function getJobQueueMonitorData(): Promise<JobQueueMonitorData> {
   const recentCompleted = completedResult.rows.map((r: Record<string, unknown>) => ({
     id: Number(r.id),
     jobType: String(r.job_type),
-    processedAt: (r.processed_at as any)?.toISOString?.() || String(r.processed_at),
+    processedAt: r.processed_at instanceof Date ? r.processed_at.toISOString() : String(r.processed_at),
   }));
 
   const oldestResult = await db.execute(sql`

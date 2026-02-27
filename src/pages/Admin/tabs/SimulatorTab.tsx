@@ -102,7 +102,7 @@ const SimulatorTab: React.FC = () => {
     
     const requests: BookingRequest[] = useMemo(() => {
         const fromRequests = bookingRequestsData.map((r: BookingRequest) => ({ ...r, source: 'booking_request' as const }));
-        const fromPending = pendingBookingsData.map((b: any) => ({
+        const fromPending = pendingBookingsData.map((b) => ({
             id: b.id,
             user_email: b.user_email,
             user_name: b.first_name && b.last_name ? `${b.first_name} ${b.last_name}` : b.user_email,
@@ -980,7 +980,7 @@ const SimulatorTab: React.FC = () => {
                         memberNameMap={memberNameMap}
                         actionInProgress={actionInProgress}
                         navigateToTab={navigateToTab}
-                        setBookingSheet={setBookingSheet as any}
+                        setBookingSheet={setBookingSheet as (sheet: Record<string, unknown> | null) => void}
                         setTrackmanModal={setTrackmanModal}
                         setSelectedRequest={setSelectedRequest}
                         setActionModal={setActionModal}
@@ -989,14 +989,14 @@ const SimulatorTab: React.FC = () => {
                         isBookingUnmatched={isBookingUnmatched}
                         handleRefresh={handleRefresh}
                         showToast={showToast}
-                        confirm={confirm as any}
+                        confirm={confirm as (opts: { title: string; message: string; confirmText: string; variant: string }) => Promise<boolean>}
                         guestFeeDollars={guestFeeDollars}
                         overageRatePerBlockDollars={overageRatePerBlockDollars}
                         tierMinutes={tierMinutes}
                         startDate={startDate}
                         endDate={endDate}
-                        queryClient={queryClient as any}
-                        simulatorKeys={simulatorKeys as any}
+                        queryClient={queryClient as unknown as { setQueryData: (key: unknown, updater: unknown) => void; invalidateQueries: (opts: { queryKey: unknown }) => void }}
+                        simulatorKeys={simulatorKeys as unknown as { allRequests: () => string[]; approvedBookings: (start: string, end: string) => string[] }}
                         activeView={activeView}
                         queueMaxHeight={queueMaxHeight}
                         setActionInProgress={setActionInProgress}
@@ -1014,7 +1014,7 @@ const SimulatorTab: React.FC = () => {
                         availabilityBlocks={availabilityBlocks}
                         memberStatusMap={memberStatusMap}
                         memberNameMap={memberNameMap}
-                        setBookingSheet={setBookingSheet as any}
+                        setBookingSheet={setBookingSheet as (sheet: Record<string, unknown> | null) => void}
                         setStaffManualBookingDefaults={setStaffManualBookingDefaults}
                         setStaffManualBookingModalOpen={setStaffManualBookingModalOpen}
                         setTrackmanModal={setTrackmanModal}

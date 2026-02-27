@@ -42,8 +42,8 @@ export async function validateMembershipPipeline(): Promise<{
       hubspot.crm.pipelines.pipelinesApi.getAll('deals')
     );
     
-    const membershipPipeline = (pipelinesResponse as any).results.find(
-      (p: Record<string, unknown>) => p.id === MEMBERSHIP_PIPELINE_ID || (p.label as string)?.toLowerCase().includes('membership')
+    const membershipPipeline = pipelinesResponse.results.find(
+      (p) => p.id === MEMBERSHIP_PIPELINE_ID || p.label?.toLowerCase().includes('membership')
     );
     
     if (!membershipPipeline) {
@@ -56,7 +56,7 @@ export async function validateMembershipPipeline(): Promise<{
       };
     }
     
-    const validStages = membershipPipeline.stages?.map((s: any) => s.id as string) || [];
+    const validStages = membershipPipeline.stages?.map((s) => s.id) || [];
     
     const requiredStages = Object.values(HUBSPOT_STAGE_IDS);
     const missingStages = requiredStages.filter(s => !validStages.includes(s));

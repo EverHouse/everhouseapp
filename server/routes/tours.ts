@@ -567,8 +567,8 @@ async function fetchHubSpotTourMeetings(): Promise<HubSpotMeetingDetails[]> {
     let guestPhone: string | null = null;
     
     const associations = meeting.associations;
-    if ((associations?.contacts as any)?.results?.length > 0) {
-      const contactId = (associations.contacts as any).results[0].id;
+    if ((associations?.contacts as unknown as { results?: Array<{ id: string }> })?.results?.length) {
+      const contactId = (associations!.contacts as unknown as { results: Array<{ id: string }> }).results[0].id;
       try {
         const contact = await hubspot.crm.contacts.basicApi.getById(contactId, [
           'firstname', 'lastname', 'email', 'phone'
@@ -664,19 +664,20 @@ export async function syncToursFromHubSpot(): Promise<{ synced: number; created:
       );
       
       if (response.results) {
-        const filteredMeetings = (response as any).results.filter((meeting: Record<string, unknown>) => {
-          const startTime = (meeting.properties as any).hs_meeting_start_time;
+        const filteredMeetings = response.results.filter((meeting) => {
+          const props = meeting.properties as Record<string, string | null>;
+          const startTime = props.hs_meeting_start_time;
           if (!startTime) return false;
           const meetingDate = new Date(startTime);
           if (meetingDate < oneYearAgo) return false;
-          const title = ((meeting.properties as any).hs_meeting_title || '').toLowerCase();
-          const location = ((meeting.properties as any).hs_meeting_location || '').toLowerCase();
-          const externalUrl = ((meeting.properties as any).hs_meeting_external_url || '').toLowerCase();
+          const title = (props.hs_meeting_title || '').toLowerCase();
+          const location = (props.hs_meeting_location || '').toLowerCase();
+          const externalUrl = (props.hs_meeting_external_url || '').toLowerCase();
           return title.includes('tour') || 
                  location.includes('tourbooking') || 
                  externalUrl.includes('tourbooking');
         });
-        allMeetings.push(...filteredMeetings as any);
+        allMeetings.push(...filteredMeetings as Array<{ id: string; properties: Record<string, string | null>; associations?: Record<string, unknown> }>);
       }
       after = response.paging?.next?.after;
     } while (after);
@@ -691,11 +692,12 @@ export async function syncToursFromHubSpot(): Promise<{ synced: number; created:
       const hubspotMeetingId = meeting.id;
       const props = meeting.properties;
       
-      const title = (props as any).hs_meeting_title || 'Tour';
-      const startTimeRaw = (props as any).hs_meeting_start_time;
-      const endTimeRaw = (props as any).hs_meeting_end_time;
-      const outcome = ((props as any).hs_meeting_outcome || '').toLowerCase();
-      const notes = (props as any).hs_meeting_body || (props as any).hs_internal_meeting_notes || '';
+      const typedProps = props as Record<string, string | null>;
+      const title = typedProps.hs_meeting_title || 'Tour';
+      const startTimeRaw = typedProps.hs_meeting_start_time;
+      const endTimeRaw = typedProps.hs_meeting_end_time;
+      const outcome = (typedProps.hs_meeting_outcome || '').toLowerCase();
+      const notes = typedProps.hs_meeting_body || typedProps.hs_internal_meeting_notes || '';
       
       if (!startTimeRaw) continue;
       
@@ -714,8 +716,8 @@ export async function syncToursFromHubSpot(): Promise<{ synced: number; created:
       let guestPhone: string | null = null;
       
       const associations = meeting.associations;
-      if ((associations as any)?.contacts?.results?.length > 0) {
-        const contactId = (associations as any).contacts.results[0].id;
+      if ((associations as unknown as { contacts?: { results?: Array<{ id: string }> } })?.contacts?.results?.length) {
+        const contactId = (associations as unknown as { contacts: { results: Array<{ id: string }> } }).contacts.results[0].id;
         try {
           const contact = await hubspot.crm.contacts.basicApi.getById(contactId, [
             'firstname', 'lastname', 'email', 'phone'

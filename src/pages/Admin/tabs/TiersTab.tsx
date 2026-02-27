@@ -149,7 +149,7 @@ const TiersTab: React.FC = () => {
         queryFn: async () => {
             const data = await fetchWithCredentials<TierRecord[]>('/api/membership-tiers');
             return data.map((t: TierRecord) => ({
-                ...t as any,
+                ...t,
                 highlighted_features: Array.isArray(t.highlighted_features) ? t.highlighted_features : 
                     (typeof t.highlighted_features === 'string' ? JSON.parse(t.highlighted_features || '[]') : []),
                 all_features: typeof t.all_features === 'object' && t.all_features !== null ? t.all_features :

@@ -1150,7 +1150,7 @@ router.post('/api/stripe/terminal/process-existing-payment', isStaffOrAdmin, asy
     let readerLabel = readerId;
     try {
       const readerObj = await stripe.terminal.readers.retrieve(readerId);
-      readerLabel = (readerObj as any).label || readerId;
+      readerLabel = (readerObj as unknown as Record<string, string>).label || readerId;
     } catch (e: unknown) { /* reader label is cosmetic, ignore */ }
 
     const updateParams: Stripe.PaymentIntentUpdateParams = {
@@ -1366,13 +1366,14 @@ router.post('/api/stripe/terminal/confirm-save-card', isStaffOrAdmin, async (req
     let reusablePaymentMethodId = pmId;
 
     if (pm.type === 'card_present') {
-      const latestAttempt = (setupIntent as any).latest_attempt;
-      const generatedCard = latestAttempt?.payment_method_details?.card_present?.generated_card;
-      if (generatedCard) {
-        reusablePaymentMethodId = generatedCard;
+      const latestAttempt = (setupIntent as unknown as Record<string, unknown>).latest_attempt as Record<string, unknown> | undefined;
+      const generatedCard = (latestAttempt?.payment_method_details as Record<string, unknown> | undefined)?.card_present as Record<string, unknown> | undefined;
+      const generatedCardId = generatedCard?.generated_card as string | undefined;
+      if (generatedCardId) {
+        reusablePaymentMethodId = generatedCardId;
         logger.info('[Terminal] Found generated_card from SetupAttempt', { extra: { reusablePaymentMethodId } });
-      } else if ((pm.card_present as any)?.generated_card) {
-        reusablePaymentMethodId = (pm.card_present as any).generated_card;
+      } else if ((pm.card_present as unknown as Record<string, unknown> | undefined)?.generated_card) {
+        reusablePaymentMethodId = (pm.card_present as unknown as Record<string, unknown>).generated_card as string;
         logger.info('[Terminal] Found generated_card from PaymentMethod object (fallback)', { extra: { reusablePaymentMethodId } });
       } else {
         logger.warn('[Terminal] No generated_card found for card_present PM — card may not be reusable for online payments', { extra: { pmId, setupIntentId } });
