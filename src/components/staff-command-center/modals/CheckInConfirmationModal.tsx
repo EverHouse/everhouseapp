@@ -62,7 +62,7 @@ const CheckInConfirmationModal: React.FC<CheckInConfirmationModalProps> = ({
 
       timerRef.current = setTimeout(() => {
         onClose();
-      }, 4000);
+      }, bookingDetails ? 6000 : 4000);
     }
     return () => {
       if (timerRef.current) {
@@ -70,7 +70,7 @@ const CheckInConfirmationModal: React.FC<CheckInConfirmationModalProps> = ({
         timerRef.current = null;
       }
     };
-  }, [isOpen, onClose, isActive, statusLower]);
+  }, [isOpen, onClose, isActive, statusLower, bookingDetails]);
 
   if (!isOpen) return null;
   const isExpired = statusLower === 'expired';
@@ -141,7 +141,7 @@ const CheckInConfirmationModal: React.FC<CheckInConfirmationModalProps> = ({
 
           {bookingDetails && (
             <div className="mt-3 flex items-center justify-center gap-1.5 text-white/85 text-sm">
-              <span className="material-symbols-outlined text-base">sports_golf</span>
+              <span className="material-symbols-outlined text-base">{bookingDetails.resourceType === 'conference_room' ? 'meeting_room' : 'sports_golf'}</span>
               <span className="font-medium">
                 {bookingDetails.bayName} · {formatResourceType(bookingDetails.resourceType)} · {formatTime(bookingDetails.startTime)} – {formatTime(bookingDetails.endTime)}
               </span>

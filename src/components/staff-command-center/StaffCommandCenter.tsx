@@ -170,6 +170,22 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
             }));
             refresh();
           }
+        } else if (result.alreadyCheckedIn && result.hasBooking && result.bookingId) {
+          const booking = data.todaysBookings.find(b => b.id === result.bookingId);
+          if (booking) {
+            pendingQrBookingRef.current = {
+              memberName: result.memberName,
+              pinnedNotes: result.pinnedNotes || [],
+              tier: result.tier,
+              membershipStatus: result.membershipStatus,
+              bookingDetails: result.bookingDetails || null
+            };
+            handleCheckIn(booking);
+            showToast(`Already checked in — now checking in for booking...`, 'info');
+          } else {
+            playSound('tap');
+            showToast('Already checked in. Booking found but not loaded — try checking in from the bookings list.', 'info');
+          }
         } else if (result.alreadyCheckedIn) {
           playSound('tap');
           showToast('This member was already checked in just now', 'info');
