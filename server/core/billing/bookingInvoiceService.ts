@@ -159,7 +159,7 @@ export async function createDraftInvoiceForBooking(
     metadata: invoiceMetadata,
     pending_invoice_items_behavior: 'exclude',
   }, {
-    idempotencyKey: `invoice_booking_${bookingId}`
+    idempotencyKey: `invoice_booking_${bookingId}_${Date.now()}`
   });
 
   try {
@@ -443,7 +443,46 @@ export async function finalizeAndPayInvoice(params: {
     };
   }
 
-  const invoicePiId = extractPaymentIntentId(finalizedInvoice);
+  let invoicePiId = extractPaymentIntentId(finalizedInvoice);
+
+  if (!invoicePiId && offSession && paymentMethodId) {
+    logger.info('[BookingInvoice] No PI after finalization, paying invoice explicitly with saved card', {
+      extra: { bookingId, invoiceId, paymentMethodId }
+    });
+    const paidInvoice = await stripe.invoices.pay(invoiceId, {
+      payment_method: paymentMethodId,
+    });
+    const amountFromBalance = computeBalanceApplied(paidInvoice);
+    const amountCharged = paidInvoice.amount_paid - amountFromBalance;
+    const resultPiId = extractPaymentIntentId(paidInvoice) || `invoice-pay-${invoiceId}`;
+
+    try {
+      broadcastBookingInvoiceUpdate({
+        bookingId,
+        action: 'invoice_paid',
+        invoiceId,
+        paidInFull: true,
+        totalCents: paidInvoice.amount_paid,
+      });
+    } catch (err: unknown) {
+      logger.warn('[BookingInvoice] Failed to broadcast invoice paid (explicit pay path)', {
+        extra: { bookingId, invoiceId, error: getErrorMessage(err) }
+      });
+    }
+
+    return {
+      invoiceId,
+      paymentIntentId: resultPiId,
+      clientSecret: '',
+      status: 'succeeded',
+      paidInFull: true,
+      hostedInvoiceUrl: paidInvoice.hosted_invoice_url,
+      invoicePdf: paidInvoice.invoice_pdf,
+      amountFromBalance,
+      amountCharged: Math.max(0, amountCharged),
+    };
+  }
+
   if (!invoicePiId) {
     throw new Error('Invoice finalization did not create a PaymentIntent');
   }

@@ -13,6 +13,7 @@ import { logFromRequest } from '../core/auditLog';
 import { getErrorMessage, safeErrorDetail } from '../utils/errorUtils';
 import { formatDatePacific } from '../utils/dateUtils';
 import { notifyMember, notifyAllStaff } from '../core/notificationService';
+import { PRICING } from '../core/billing/pricingConfig';
 
 const router = Router();
 
@@ -287,6 +288,60 @@ router.get('/api/member-billing/:email/outstanding', isStaffOrAdmin, async (req,
         feeLabel,
       };
     });
+
+    const unfilledResult = await db.execute(sql`
+      SELECT 
+        br.id as booking_id,
+        br.trackman_booking_id,
+        br.request_date as booking_date,
+        br.start_time,
+        br.end_time,
+        r.name as resource_name,
+        br.declared_player_count,
+        COUNT(DISTINCT bp.id) as filled_count
+      FROM booking_requests br
+      LEFT JOIN resources r ON br.resource_id = r.id
+      LEFT JOIN booking_participants bp ON bp.session_id = br.session_id
+      WHERE LOWER(br.user_email) = LOWER(${email})
+        AND br.request_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
+        AND br.request_date >= (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date - INTERVAL '30 days'
+        AND br.session_id IS NOT NULL
+        AND NOT EXISTS (
+          SELECT 1 FROM booking_fee_snapshots bfs 
+          WHERE bfs.session_id = br.session_id AND bfs.status IN ('completed', 'paid')
+        )
+      GROUP BY br.id, br.trackman_booking_id, br.request_date, br.start_time, br.end_time, r.name, br.declared_player_count
+      HAVING COALESCE(br.declared_player_count, 1) > COUNT(DISTINCT bp.id)
+    `);
+
+    const guestFeeCents = Math.round(PRICING.GUEST_FEE_DOLLARS * 100);
+    for (const row of unfilledResult.rows) {
+      const declared = parseInt(String(row.declared_player_count)) || 1;
+      const filled = parseInt(String(row.filled_count)) || 0;
+      const unfilled = Math.max(0, declared - filled);
+      if (unfilled <= 0) continue;
+      const alreadyHasItem = items.some(i => i.bookingId === row.booking_id);
+      if (alreadyHasItem) continue;
+      const bookingDate = row.booking_date instanceof Date
+        ? formatDatePacific(row.booking_date)
+        : String(row.booking_date || '').split('T')[0];
+      for (let g = 0; g < unfilled; g++) {
+        items.push({
+          bookingId: row.booking_id,
+          trackmanBookingId: row.trackman_booking_id || null,
+          bookingDate,
+          startTime: row.start_time,
+          endTime: row.end_time,
+          resourceName: row.resource_name || null,
+          participantId: null as unknown as number,
+          participantType: 'guest',
+          displayName: `Unfilled Guest Slot`,
+          feeCents: guestFeeCents,
+          feeDollars: PRICING.GUEST_FEE_DOLLARS,
+          feeLabel: 'Guest Fee (no pass)',
+        });
+      }
+    }
 
     const totalOutstandingCents = items.reduce((sum, item) => sum + item.feeCents, 0);
 

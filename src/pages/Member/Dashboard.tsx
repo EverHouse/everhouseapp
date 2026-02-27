@@ -1095,7 +1095,6 @@ const Dashboard: React.FC = () => {
                     if (s === 'cancellation_pending') return { label: 'Cancel Pending', color: 'bg-orange-500' };
                     return { label: formatStatusLabel(s || ''), color: 'bg-gray-400' };
                   }
-                  if (item.type === 'conference_room_calendar') return { label: 'Confirmed', color: 'bg-green-500' };
                   if (item.type === 'rsvp') return { label: "RSVP'd", color: 'bg-green-500' };
                   if (item.type === 'wellness') return { label: 'Enrolled', color: 'bg-green-500' };
                   return undefined;
@@ -1105,28 +1104,13 @@ const Dashboard: React.FC = () => {
                   const chips: { icon: string; label: string }[] = [];
                   if (item.type === 'booking' || item.type === 'booking_request') {
                     const raw = item.raw as DBBookingRequest;
-                    const bayOrResource = raw.bay_name || raw.resource_name;
-                    if (bayOrResource) {
-                      chips.push({ icon: 'location_on', label: bayOrResource });
-                    }
+                    const playerCount = raw.declared_player_count || 1;
+                    chips.push({ icon: 'group', label: `${playerCount} Player${playerCount !== 1 ? 's' : ''}` });
                     if (raw.duration_minutes) {
                       const hrs = Math.floor(raw.duration_minutes / 60);
                       const mins = raw.duration_minutes % 60;
                       chips.push({ icon: 'schedule', label: hrs > 0 ? (mins > 0 ? `${hrs}h ${mins}m` : `${hrs} Hour${hrs > 1 ? 's' : ''}`) : `${mins} min` });
                     } else if (raw.start_time && raw.end_time) {
-                      const [sh, sm] = raw.start_time.split(':').map(Number);
-                      const [eh, em] = raw.end_time.split(':').map(Number);
-                      const dur = (eh * 60 + em) - (sh * 60 + sm);
-                      if (dur > 0) {
-                        const hrs = Math.floor(dur / 60);
-                        const mins = dur % 60;
-                        chips.push({ icon: 'schedule', label: hrs > 0 ? (mins > 0 ? `${hrs}h ${mins}m` : `${hrs} Hour${hrs > 1 ? 's' : ''}`) : `${mins} min` });
-                      }
-                    }
-                  } else if (item.type === 'conference_room_calendar') {
-                    chips.push({ icon: 'location_on', label: 'Conference Room' });
-                    const raw = item.raw as DashboardBookingItem;
-                    if (raw.start_time && raw.end_time) {
                       const [sh, sm] = raw.start_time.split(':').map(Number);
                       const [eh, em] = raw.end_time.split(':').map(Number);
                       const dur = (eh * 60 + em) - (sh * 60 + sm);
@@ -1142,7 +1126,7 @@ const Dashboard: React.FC = () => {
                     if (raw.category) chips.push({ icon: 'category', label: raw.category });
                   } else if (item.type === 'wellness') {
                     const raw = item.raw as DBWellnessEnrollment;
-                    if (raw.category) chips.push({ icon: 'self_improvement', label: raw.category });
+                    if (raw.category) chips.push({ icon: 'category', label: raw.category });
                     if (raw.instructor) chips.push({ icon: 'person', label: raw.instructor });
                   }
                   return chips;
