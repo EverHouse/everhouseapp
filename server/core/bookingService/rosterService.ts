@@ -563,8 +563,8 @@ export async function previewRosterFees(
   if (booking.session_id) {
     const [paidCheck, feeSnapshotCheck] = await Promise.all([
       db.execute(sql`SELECT 
-           COUNT(*) FILTER (WHERE payment_status = 'paid') as paid_count,
-           COUNT(*) FILTER (WHERE cached_fee_cents > 0) as total_with_fees,
+           COUNT(*) FILTER (WHERE payment_status IN ('paid', 'waived')) as paid_count,
+           COUNT(*) FILTER (WHERE cached_fee_cents > 0 OR payment_status IN ('paid', 'waived')) as total_with_fees,
            COUNT(*) FILTER (WHERE payment_status = 'pending' OR (payment_status IS NULL AND cached_fee_cents > 0)) as pending_count
          FROM booking_participants 
          WHERE session_id = ${booking.session_id}`),
