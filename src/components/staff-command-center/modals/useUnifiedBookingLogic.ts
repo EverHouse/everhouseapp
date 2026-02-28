@@ -136,6 +136,7 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
   const [isQuickAddingGuest, setIsQuickAddingGuest] = useState(false);
   const pollingTimerRef = useRef<NodeJS.Timeout | null>(null);
   const pollingCountRef = useRef(0);
+  const isPollingFetchingRef = useRef(false);
   const wsRefreshTimerRef = useRef<NodeJS.Timeout | null>(null);
   const rosterFetchIdRef = useRef(0);
 
@@ -339,7 +340,9 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
   const startPaymentPolling = useCallback(() => {
     stopPaymentPolling();
     pollingCountRef.current = 0;
+    isPollingFetchingRef.current = false;
     pollingTimerRef.current = setInterval(async () => {
+      if (isPollingFetchingRef.current) return;
       pollingCountRef.current++;
       if (pollingCountRef.current > 5) {
         stopPaymentPolling();
@@ -349,6 +352,7 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
       }
       try {
         if (!bookingId) return;
+        isPollingFetchingRef.current = true;
         const res = await fetch(`/api/admin/booking/${bookingId}/members`, {
           credentials: 'include',
           headers: { 'Cache-Control': 'no-cache' }
@@ -366,6 +370,8 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
         }
       } catch {
         // ignore polling errors
+      } finally {
+        isPollingFetchingRef.current = false;
       }
     }, 2000);
   }, [bookingId, stopPaymentPolling, fetchRosterData]);

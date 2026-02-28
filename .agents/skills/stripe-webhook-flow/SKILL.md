@@ -455,6 +455,12 @@ When `voidBookingInvoice` processes a paid invoice, it resolves the `paymentInte
 
 **Rule:** When resolving a payment intent for refund, always check `invoice.metadata.terminalPaymentIntentId` as a fallback after `invoice.payment_intent`.
 
+### add_funds Must Not Be Deferred (v8.53.0)
+
+The `createBalanceTransaction` call for `add_funds` checkout sessions must execute inside the main webhook handler (not as a deferred action). If the Stripe API call fails, the webhook must return 500 so Stripe retries. Only notifications and emails should be deferred. This is an **approved exception** to the "no external API in handlers" rule because the financial operation has an idempotency key (`add_funds_${sessionId}`) and must not be silently lost.
+
+**Rule:** Any deferred action that creates, transfers, or destroys money must be moved into the main handler with an idempotency key. Only notifications, emails, and cache updates belong in deferred actions.
+
 ### Day Pass Deferred Action Pattern (v8.26.7, Bug 18)
 
 Day pass purchases from `handleCheckoutSessionCompleted` and `handleCheckoutSessionAsyncPaymentSucceeded` record the purchase via `recordDayPassPurchaseFromWebhook()` as a **deferred action** (runs after COMMIT), not inside the webhook transaction. This ensures the day pass recording doesn't hold the transaction open during Stripe API calls, and the existing idempotency protection in `recordDayPassPurchaseFromWebhook` prevents duplicates if Stripe retries.

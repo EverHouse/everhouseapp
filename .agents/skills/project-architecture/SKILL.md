@@ -174,10 +174,17 @@ Database query results may return `Date` objects for date columns. Any function 
 ### 19a. Transaction Lock Ordering (v8.51.0)
 When multiple webhook handlers can run concurrently for the same member, they MUST update tables in a consistent order to prevent PostgreSQL deadlocks. The canonical order is: `users` first, then `hubspot_deals`, then other dependent tables. This was fixed in `handleInvoicePaymentSucceeded` which previously locked `hubspot_deals` before `users`.
 
+### 19b. Trackman Webhook Transaction Wrapping (v8.53.0)
+`tryAutoApproveBooking` wraps the status update + session creation in `db.transaction()` — if session creation fails, the entire transaction rolls back atomically instead of leaving a ghost "approved" booking with no session. `handleBookingModification` wraps `booking_requests` + `booking_sessions` updates in `db.transaction()` — prevents time/bay/date drift between the two tables on connection failure. Fee recalculation (`recalculateSessionFees`) and invoice sync run AFTER the transaction commits (not inside it) to avoid holding the transaction open during external API calls.
+
+### 19c. Deferred Actions Must Not Move Money (v8.53.0)
+Any deferred action (post-COMMIT) that creates, transfers, or destroys money must be moved into the main webhook handler with an idempotency key. If the Stripe API call fails in a deferred action, the webhook has already returned 200 and Stripe will never retry — causing silent money loss. Only notifications, emails, WebSocket broadcasts, and cache updates belong in deferred actions. The `add_funds` `createBalanceTransaction` was moved from deferred to the handler body in v8.53.0.
+
 ### 20. Frontend Async Race Protection (v8.26.7)
 All async fetches in React hooks MUST use one of these patterns to prevent stale responses from overwriting current state:
 - **AbortController + isCurrent flag**: `useEffect` cleanup sets `isCurrent = false` and calls `controller.abort()`. The async callback checks `isCurrent` after `await`.
 - **fetchIdRef counter**: Increment a `useRef` counter at the start of each fetch. After `await`, check that the counter hasn't changed. Used in `fetchRosterData()` in `useUnifiedBookingLogic.ts`.
+- **isFetching guard for setInterval**: `startPaymentPolling` uses `isPollingFetchingRef` to prevent overlapping fetches when the network is slow. If a fetch is already in flight, the next interval tick is skipped.
 - **Booking-specific**: `calculateFees` in `useUnifiedBookingLogic.ts` uses both AbortController and isCurrent flag. Payment polling uses bookingId comparison to stop on navigation.
 
 ---

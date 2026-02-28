@@ -201,29 +201,33 @@ export async function handleBookingModification(
   try {
     const staffNoteAddition = ` [Modified via Trackman: ${changes.join(', ')}]`;
 
-    await db.execute(sql`UPDATE booking_requests
-       SET start_time = ${newStartTime},
-           end_time = ${newEndTime},
-           request_date = ${newDate},
-           duration_minutes = ${newDuration},
-           resource_id = ${newResourceId},
-           trackman_player_count = ${incoming.playerCount},
-           last_trackman_sync_at = NOW(),
-           staff_notes = COALESCE(staff_notes, '') || ${staffNoteAddition},
-           updated_at = NOW()
-       WHERE id = ${bookingId}`);
+    await db.transaction(async (tx) => {
+      await tx.execute(sql`UPDATE booking_requests
+         SET start_time = ${newStartTime},
+             end_time = ${newEndTime},
+             request_date = ${newDate},
+             duration_minutes = ${newDuration},
+             resource_id = ${newResourceId},
+             trackman_player_count = ${incoming.playerCount},
+             last_trackman_sync_at = NOW(),
+             staff_notes = COALESCE(staff_notes, '') || ${staffNoteAddition},
+             updated_at = NOW()
+         WHERE id = ${bookingId}`);
+
+      if (sessionId) {
+        if (bayChanged || timeChanged || dateChanged) {
+          await tx.execute(sql`UPDATE booking_sessions
+             SET start_time = ${newStartTime},
+                 end_time = ${newEndTime},
+                 session_date = ${newDate},
+                 resource_id = ${newResourceId},
+                 updated_at = NOW()
+             WHERE id = ${sessionId}`);
+        }
+      }
+    });
 
     if (sessionId) {
-      if (bayChanged || timeChanged || dateChanged) {
-        await db.execute(sql`UPDATE booking_sessions
-           SET start_time = ${newStartTime},
-               end_time = ${newEndTime},
-               session_date = ${newDate},
-               resource_id = ${newResourceId},
-               updated_at = NOW()
-           WHERE id = ${sessionId}`);
-      }
-
       try {
         await recalculateSessionFees(sessionId, 'trackman_modification');
         logger.info('[Trackman Webhook] Recalculated fees after modification', {
@@ -366,6 +370,7 @@ export async function tryAutoApproveBooking(
   startTime: string,
   trackmanBookingId: string
 ): Promise<{ matched: boolean; bookingId?: number; resourceId?: number; sessionId?: number; sessionFailed?: boolean }> {
+  let matchedBookingId: number | undefined;
   try {
     const result = await db.execute(sql`SELECT br.id, br.user_email, br.user_name, br.staff_notes, br.resource_id, 
               br.start_time, br.end_time, br.duration_minutes, br.session_id,
@@ -392,55 +397,65 @@ export async function tryAutoApproveBooking(
     
     const pendingBooking = pendingRows[0];
     const bookingId = pendingBooking.id;
+    matchedBookingId = bookingId;
     const resourceId = pendingBooking.resource_id;
     
     const updatedNotes = (pendingBooking.staff_notes || '') + ' [Auto-approved via Trackman webhook]';
     
-    const updateResult = await db.execute(sql`UPDATE booking_requests 
-       SET status = 'approved', 
-           trackman_booking_id = ${trackmanBookingId}, 
-           staff_notes = ${updatedNotes},
-           reviewed_by = 'trackman_webhook',
-           reviewed_at = NOW(),
-           updated_at = NOW()
-       WHERE id = ${bookingId} AND trackman_booking_id IS NULL
-       RETURNING id`);
+    const txResult = await db.transaction(async (tx) => {
+      const updateResult = await tx.execute(sql`UPDATE booking_requests 
+         SET status = 'approved', 
+             trackman_booking_id = ${trackmanBookingId}, 
+             staff_notes = ${updatedNotes},
+             reviewed_by = 'trackman_webhook',
+             reviewed_at = NOW(),
+             updated_at = NOW()
+         WHERE id = ${bookingId} AND trackman_booking_id IS NULL
+         RETURNING id`);
+      
+      const updateRows = updateResult.rows as unknown as IdRow[];
+      if (updateRows.length === 0) {
+        logger.warn('[Trackman Webhook] Pending booking was already linked by another process', {
+          extra: { bookingId, trackmanBookingId, email: customerEmail, date: slotDate, time: startTime }
+        });
+        return { matched: false as const };
+      }
+      
+      let createdSessionId: number | undefined;
+      
+      if (!pendingBooking.session_id && resourceId) {
+        const sessionResult = await ensureSessionForBooking({
+          bookingId,
+          resourceId,
+          sessionDate: slotDate,
+          startTime: String(pendingBooking.start_time),
+          endTime: String(pendingBooking.end_time),
+          ownerEmail: String(pendingBooking.user_email),
+          ownerName: pendingBooking.user_name ? String(pendingBooking.user_name) : undefined,
+          ownerUserId: pendingBooking.user_id ? String(pendingBooking.user_id) : undefined,
+          trackmanBookingId,
+          source: 'trackman_webhook',
+          createdBy: 'trackman_webhook'
+        });
+
+        if (sessionResult.sessionId) {
+          createdSessionId = sessionResult.sessionId;
+        } else {
+          logger.warn('[Trackman Webhook] Session creation failed for matched pending booking, transaction will rollback', {
+            extra: { bookingId, trackmanBookingId, error: sessionResult.error }
+          });
+          throw new Error(`Session creation failed: ${sessionResult.error || 'unknown'}`);
+        }
+      }
+      
+      return { matched: true as const, bookingId, resourceId, sessionId: createdSessionId };
+    });
     
-    const updateRows = updateResult.rows as unknown as IdRow[];
-    if (updateRows.length === 0) {
-      logger.warn('[Trackman Webhook] Pending booking was already linked by another process', {
-        extra: { bookingId, trackmanBookingId, email: customerEmail, date: slotDate, time: startTime }
-      });
+    if (!txResult.matched) {
       return { matched: false };
     }
     
-    let createdSessionId: number | undefined;
-    
-    if (!pendingBooking.session_id && resourceId) {
-      const sessionResult = await ensureSessionForBooking({
-        bookingId,
-        resourceId,
-        sessionDate: slotDate,
-        startTime: String(pendingBooking.start_time),
-        endTime: String(pendingBooking.end_time),
-        ownerEmail: String(pendingBooking.user_email),
-        ownerName: pendingBooking.user_name ? String(pendingBooking.user_name) : undefined,
-        ownerUserId: pendingBooking.user_id ? String(pendingBooking.user_id) : undefined,
-        trackmanBookingId,
-        source: 'trackman_webhook',
-        createdBy: 'trackman_webhook'
-      });
-
-      if (sessionResult.sessionId) {
-        createdSessionId = sessionResult.sessionId;
-      } else {
-        logger.warn('[Trackman Webhook] Session creation failed for matched pending booking, reverting to pending', {
-          extra: { bookingId, trackmanBookingId, error: sessionResult.error }
-        });
-        await db.execute(sql`UPDATE booking_requests SET status = 'pending', updated_at = NOW() WHERE id = ${bookingId}`);
-        return { matched: true, bookingId, sessionFailed: true };
-      }
-    }
+    const createdSessionId = 'sessionId' in txResult ? txResult.sessionId : undefined;
     
     logger.info('[Trackman Webhook] Auto-approved pending booking', {
       extra: { bookingId, trackmanBookingId, email: customerEmail, date: slotDate, time: startTime, sessionId: createdSessionId }
@@ -492,6 +507,13 @@ export async function tryAutoApproveBooking(
     
     return { matched: true, bookingId, resourceId, sessionId: createdSessionId };
   } catch (e: unknown) {
+    const errMsg = e instanceof Error ? e.message : String(e);
+    if (errMsg.startsWith('Session creation failed:')) {
+      logger.warn('[Trackman Webhook] Auto-approve transaction rolled back due to session creation failure', {
+        extra: { trackmanBookingId, email: customerEmail, date: slotDate, time: startTime, error: errMsg }
+      });
+      return { matched: true, bookingId: matchedBookingId, sessionFailed: true };
+    }
     logger.error('[Trackman Webhook] Failed to auto-approve booking', { error: e as Error });
     return { matched: false };
   }

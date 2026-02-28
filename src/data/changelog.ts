@@ -8,6 +8,18 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.53.0",
+    date: "2026-02-28",
+    title: "Crash Recovery & Atomicity Fixes",
+    isMajor: true,
+    changes: [
+      "Fix: add_funds balance credit now executes inside the webhook handler (not deferred) — if the Stripe API call fails, the webhook returns 500 and Stripe retries instead of silently losing the member's money",
+      "Fix: Trackman auto-approve booking now wraps status update + session creation in a database transaction — a server crash can no longer leave a booking stuck in 'approved' with no billing session",
+      "Fix: Trackman booking modification now wraps booking_requests + booking_sessions updates in a single transaction — prevents time/bay/date drift between the two tables if the connection drops mid-update",
+      "Fix: Payment polling in the Staff booking sheet now uses an isFetching guard to prevent promise piling — slow network responses no longer cause overlapping fetches that thrash the UI with stale data",
+    ]
+  },
+  {
     version: "8.52.0",
     date: "2026-02-28",
     title: "Financial Exploit & Race Condition Fixes",
