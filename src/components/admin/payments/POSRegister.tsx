@@ -29,7 +29,7 @@ type CategoryTab = 'all' | 'passes' | 'cafe' | 'merch';
 const PASS_PRODUCTS = [
   { productId: 'prod_TvPiZ9a7L3BqZX', name: 'Day Pass - Coworking', priceCents: 3500, icon: 'workspace_premium' },
   { productId: 'prod_TvPiHiafkZcoKR', name: 'Day Pass - Golf Sim', priceCents: 5000, icon: 'sports_golf' },
-  { productId: 'prod_SimGuestFee25', name: 'Guest Fee - Simulator', priceCents: 2500, icon: 'person_add' },
+  { productId: 'prod_U44zVd9eX7Ujsd', name: 'Guest Fee - Simulator', priceCents: 2500, icon: 'person_add' },
 ];
 
 const CAFE_CATEGORY_ICONS: Record<string, string> = {
@@ -433,6 +433,11 @@ const POSRegister: React.FC = () => {
   const handleGuestReceiptSubmit = async () => {
     const email = guestReceiptEmail.trim().toLowerCase();
     if (!email || !paymentIntentId) return;
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setError('Please enter a valid email address');
+      return;
+    }
 
     setAttachingEmail(true);
     setError(null);
@@ -922,14 +927,14 @@ const POSRegister: React.FC = () => {
                     placeholder="customer@example.com"
                     className="w-full px-3 py-2.5 rounded-xl bg-white/80 dark:bg-white/10 border border-primary/20 dark:border-white/20 text-primary dark:text-white placeholder:text-primary/40 dark:placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-primary/30 text-sm mb-3"
                     onKeyDown={(e) => {
-                      if (e.key === 'Enter' && guestReceiptEmail.trim()) {
+                      if (e.key === 'Enter' && guestReceiptEmail.trim() && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(guestReceiptEmail.trim())) {
                         handleGuestReceiptSubmit();
                       }
                     }}
                   />
                   <button
                     onClick={handleGuestReceiptSubmit}
-                    disabled={!guestReceiptEmail.trim() || attachingEmail || receiptSending}
+                    disabled={!guestReceiptEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(guestReceiptEmail.trim()) || attachingEmail || receiptSending}
                     className="w-full py-3 px-6 rounded-xl font-semibold bg-primary dark:bg-lavender text-white transition-colors hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
                     <span className="material-symbols-outlined text-lg">email</span>
