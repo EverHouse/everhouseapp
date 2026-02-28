@@ -455,7 +455,7 @@ const FaqsAdmin: React.FC = () => {
                     })}
                 </div>
             )}
-            <FloatingActionButton onClick={openCreate} color="brand" label="Add FAQ" />
+            <FloatingActionButton onClick={openCreate} color="brand" label="Add FAQ" extended text="Add FAQ" />
         </div>
     );
 };

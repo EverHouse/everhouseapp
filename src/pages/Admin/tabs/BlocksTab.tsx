@@ -1643,6 +1643,8 @@ const BlocksTab: React.FC = () => {
                 icon="add"
                 label="New Notice"
                 onClick={openNewClosure}
+                extended
+                text="New Notice"
             />
             </>
             )}

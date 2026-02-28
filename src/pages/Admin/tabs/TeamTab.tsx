@@ -700,7 +700,7 @@ const TeamTab: React.FC = () => {
         </div>
       </ModalShell>
 
-      {isAdmin && <FloatingActionButton onClick={() => setIsAddingPerson(true)} color="brand" label="Add team member" />}
+      {isAdmin && <FloatingActionButton onClick={() => setIsAddingPerson(true)} color="brand" label="Add team member" extended text="Add Member" />}
       <ConfirmDialogComponent />
     </AnimatedPage>
   );

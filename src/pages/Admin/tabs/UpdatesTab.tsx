@@ -353,7 +353,7 @@ const UpdatesTab: React.FC = () => {
 
                 {activeSubTab === 'alerts' && renderAlertsTab()}
                 {activeSubTab === 'announcements' && <AnnouncementManager triggerCreate={triggerCreateAnnouncement} />}
-                <FloatingActionButton onClick={handleCreateAnnouncement} color="purple" label="Add announcement" />
+                <FloatingActionButton onClick={handleCreateAnnouncement} color="purple" label="Add announcement" extended text="Add Announcement" />
             </AnimatedPage>
     );
 };

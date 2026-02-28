@@ -474,6 +474,8 @@ const GalleryAdmin: React.FC = () => {
                 onClick={openCreate}
                 color="brand"
                 label="Add new image"
+                extended
+                text="Add Image"
             />
         </div>
     );

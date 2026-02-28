@@ -1266,7 +1266,7 @@ const TiersTab: React.FC = () => {
             </div>
 
             {activeSubTab === 'tiers' && (
-                <FloatingActionButton onClick={openCreate} color="brand" icon="add" label="Add new tier" />
+                <FloatingActionButton onClick={openCreate} color="brand" icon="add" label="Add new tier" extended text="Add Tier" />
             )}
             {activeSubTab === 'discounts' && (
                 <FloatingActionButton 
@@ -1276,7 +1276,9 @@ const TiersTab: React.FC = () => {
                     }} 
                     color="brand" 
                     icon="add" 
-                    label="Create new coupon" 
+                    label="Create new coupon"
+                    extended
+                    text="Add Coupon"
                 />
             )}
             <ConfirmDialogComponent />

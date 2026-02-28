@@ -136,7 +136,9 @@ const EventsTab: React.FC = () => {
                         }
                     }} 
                     color={activeSubTab === 'events' ? 'green' : 'purple'} 
-                    label={activeSubTab === 'events' ? 'Add event' : 'Add wellness session'} 
+                    label={activeSubTab === 'events' ? 'Add event' : 'Add wellness session'}
+                    extended
+                    text={activeSubTab === 'events' ? 'Add Event' : 'Add Session'}
                 />
             </div>
     );

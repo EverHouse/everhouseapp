@@ -733,7 +733,9 @@ const AvailabilityBlocksContent: React.FC = () => {
             <FloatingActionButton 
                 onClick={openCreate} 
                 color="amber" 
-                label="Add block" 
+                label="Add block"
+                extended
+                text="Add Block"
             />
         </div>
     );
