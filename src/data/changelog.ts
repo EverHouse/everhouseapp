@@ -10,11 +10,17 @@ export const changelog: ChangelogEntry[] = [
   {
     version: "8.50.0",
     date: "2026-02-28",
-    title: "Search Portal Fix & Component Unification",
+    title: "Search Portal Fix, Card Layout & Component Unification",
     changes: [
       "Fix: Member search dropdown no longer clips behind modals, drawers, or scrollable containers — results now render via a portal overlay that floats above all page content",
+      "Fix: Click-outside detection now correctly closes the search dropdown even when no results are shown",
+      "Fix: Segmented Button selected tab text is now fully readable in dark mode — changed from muted bone color to white",
       "Improvement: Add Member modal, Roster Manager, and Manual Booking modal now use the shared member search component instead of independent implementations — consistent search behavior and portaled results everywhere",
+      "Improvement: Roster Manager search now filters out members already on the roster via ID-based exclusion, preventing duplicate additions",
       "Improvement: Book Golf, History, and Wellness pages now use M3 Segmented Button for tab switching instead of underline-style tabs — better touch targets and visual consistency",
+      "Improvement: Events and Wellness cards now show a chevron indicator so it's clear they expand to reveal actions like RSVP and Cancel",
+      "Improvement: Events and Wellness card lists use tighter spacing and reduced padding — content fills the screen width instead of floating in a narrow centered column",
+      "Improvement: Dashboard schedule cards for RSVP'd events no longer show the club address — all events are at the club so the location line was redundant clutter",
     ]
   },
   {
