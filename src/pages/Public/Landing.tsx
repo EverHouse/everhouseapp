@@ -215,7 +215,7 @@ const Landing: React.FC = () => {
         </div>
       </div>
 
-      <div>
+      <div className="space-y-24 py-24 px-6 md:px-20 bg-bone dark:bg-[#141414]">
         <EditorialShowcase
           overline="Tour-Level Technology"
           title={<>Trackman Golf <em style={{ fontStyle: 'italic' }}>Simulators</em></>}
