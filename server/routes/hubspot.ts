@@ -1989,10 +1989,10 @@ router.get('/api/admin/hubspot/marketing-contacts-audit', isAdmin, async (_req: 
     }
 
     const now = new Date();
+    const ninetyDaysAgo = new Date(now);
+    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
     const sixMonthsAgo = new Date(now);
     sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-    const twelveMonthsAgo = new Date(now);
-    twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
 
     const auditContacts: MarketingAuditContact[] = allContacts.map(contact => {
       const props = contact.properties as Record<string, string | null | undefined>;
@@ -2008,6 +2008,15 @@ router.get('/api/admin/hubspot/marketing-contacts-audit', isAdmin, async (_req: 
         !!(props.hs_email_hard_bounce_reason_enum) ||
         (props.hs_email_bounce || '').toLowerCase() === 'true';
 
+      const emailOptedOut =
+        (props.hs_email_optout || '').toLowerCase() === 'true';
+
+      const totalEmailsDelivered = parseInt(props.hs_email_delivered || '0', 10) || 0;
+      const totalEmailsOpened = parseInt(props.hs_email_open || '0', 10) || 0;
+      const sendsSinceLastEngagement = parseInt(props.hs_email_sends_since_last_engagement || '0', 10) || 0;
+      const neverEngaged = totalEmailsDelivered > 0 && totalEmailsOpened === 0;
+      const highSendsNoEngagement = sendsSinceLastEngagement >= 10;
+
       const lastEmailOpen = props.hs_email_last_open_date || null;
       const lastEmailClick = props.hs_email_last_click_date || null;
       const lastBooking = lastActivityMap[email] || null;
@@ -2022,56 +2031,73 @@ router.get('/api/admin/hubspot/marketing-contacts-audit', isAdmin, async (_req: 
       const isActiveInDb = localStatus ? activeStatuses.includes(localStatus) : false;
       const isActiveInHubSpot = activeStatuses.includes(membershipStatus);
 
-      if (isActiveInDb || isActiveInHubSpot) {
-        category = 'keep';
-        reasons.push('Active member');
-      } else if (emailBounced) {
+      const hasEngagement90d = checkRecentEngagement(lastEmailOpen, lastEmailClick, ninetyDaysAgo);
+
+      if (emailBounced) {
         category = 'safe_to_remove';
         reasons.push('Email has hard bounced');
+      } else if (emailOptedOut && !isActiveInDb && !isActiveInHubSpot) {
+        category = 'safe_to_remove';
+        reasons.push('Contact opted out of email');
+        if (membershipStatus) reasons.push(`Status: ${membershipStatus}`);
+      } else if (isActiveInDb || isActiveInHubSpot) {
+        if (emailOptedOut) {
+          category = 'review';
+          reasons.push('Active member but opted out of email');
+        } else {
+          category = 'keep';
+          reasons.push('Active member');
+        }
       } else if (terminatedStatuses.includes(membershipStatus)) {
-        const hasRecentEngagement = checkRecentEngagement(lastEmailOpen, lastEmailClick, sixMonthsAgo);
-
-        if (!hasRecentEngagement && !lastBooking) {
+        if (neverEngaged && totalEmailsDelivered >= 3) {
           category = 'safe_to_remove';
-          reasons.push(`Membership status: ${membershipStatus}`);
-          reasons.push('No booking history');
-          reasons.push('No recent email engagement');
-        } else if (!hasRecentEngagement) {
+          reasons.push(`Status: ${membershipStatus}`);
+          reasons.push(`${totalEmailsDelivered} emails sent, 0 ever opened`);
+        } else if (!hasEngagement90d) {
           category = 'safe_to_remove';
-          reasons.push(`Membership status: ${membershipStatus}`);
-          reasons.push('No recent email engagement (6+ months)');
+          reasons.push(`Status: ${membershipStatus}`);
+          reasons.push('No email engagement in 90 days');
+          if (highSendsNoEngagement) reasons.push(`${sendsSinceLastEngagement} sends since last engagement`);
           if (lastBooking) reasons.push(`Last booking: ${lastBooking}`);
         } else {
           category = 'review';
-          reasons.push(`Membership status: ${membershipStatus}`);
-          reasons.push('Has recent email engagement');
+          reasons.push(`Status: ${membershipStatus}`);
+          reasons.push('Engaged in last 90 days');
           if (lastBooking) reasons.push(`Last booking: ${lastBooking}`);
         }
-      } else if (lifecycleStage === 'lead' && !membershipStatus) {
-        const hasRecentEngagement = checkRecentEngagement(lastEmailOpen, lastEmailClick, sixMonthsAgo);
+      } else if (lifecycleStage === 'lead' || (!membershipStatus && lifecycleStage !== 'customer')) {
         const createdAt = props.createdate ? new Date(props.createdate) : null;
-        const isOldLead = createdAt && createdAt < twelveMonthsAgo;
+        const isOldLead = createdAt && createdAt < sixMonthsAgo;
 
-        if (!hasRecentEngagement && isOldLead) {
+        if (neverEngaged && totalEmailsDelivered >= 3) {
           category = 'safe_to_remove';
           reasons.push('Non-member lead');
-          reasons.push('Created over 12 months ago');
-          reasons.push('No recent email engagement');
-        } else if (!hasRecentEngagement) {
+          reasons.push(`${totalEmailsDelivered} emails sent, 0 ever opened`);
+        } else if (!hasEngagement90d && isOldLead) {
+          category = 'safe_to_remove';
+          reasons.push('Non-member lead');
+          reasons.push('Created over 6 months ago');
+          reasons.push('No email engagement in 90 days');
+          if (highSendsNoEngagement) reasons.push(`${sendsSinceLastEngagement} sends since last engagement`);
+        } else if (!hasEngagement90d) {
           category = 'review';
           reasons.push('Non-member lead');
-          reasons.push('No recent email engagement');
+          reasons.push('No email engagement in 90 days');
+          if (createdAt) reasons.push(`Created: ${normalizeDateToYYYYMMDD(props.createdate || null) || 'unknown'}`);
         } else {
           category = 'review';
-          reasons.push('Non-member lead with some engagement');
+          reasons.push('Non-member lead with recent engagement');
+          if (createdAt) reasons.push(`Created: ${normalizeDateToYYYYMMDD(props.createdate || null) || 'unknown'}`);
         }
-      } else if (!membershipStatus && lifecycleStage !== 'customer') {
-        const hasRecentEngagement = checkRecentEngagement(lastEmailOpen, lastEmailClick, sixMonthsAgo);
-        if (!hasRecentEngagement) {
+      } else if (!membershipStatus) {
+        if (neverEngaged && totalEmailsDelivered >= 3) {
+          category = 'safe_to_remove';
+          reasons.push('No membership status');
+          reasons.push(`${totalEmailsDelivered} emails sent, 0 ever opened`);
+        } else if (!hasEngagement90d) {
           category = 'review';
-          reasons.push('No membership status set');
-          reasons.push('Not a customer lifecycle stage');
-          reasons.push('No recent email engagement');
+          reasons.push('No membership status');
+          reasons.push('No email engagement in 90 days');
         } else {
           category = 'keep';
           reasons.push('Has recent email engagement');
