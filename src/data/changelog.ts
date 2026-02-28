@@ -89,8 +89,8 @@ export const changelog: ChangelogEntry[] = [
     date: "2026-02-27",
     title: "Heritage Typography System",
     changes: [
-      "New: App now uses Geologica (variable, 100–900 weight) for all body text and UI elements, replacing the previous font stack",
-      "New: Playfair Display (Bold) used for major headings, establishing a heritage luxury aesthetic",
+      "New: App now uses Instrument Sans (variable, 400–700 weight) for all body text, labels, and UI elements",
+      "New: Newsreader (variable serif) used for display and headline typography, establishing a luxury editorial aesthetic",
       "Improvement: Fonts loaded non-render-blocking via media='print' onload pattern with font-display: swap fallback — no impact on page load speed",
     ]
   },

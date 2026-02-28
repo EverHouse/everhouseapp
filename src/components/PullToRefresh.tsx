@@ -445,7 +445,7 @@ const PullToRefresh: React.FC<PullToRefreshProps> = ({ children, onRefresh, disa
             }
 
             .ptr-release-text {
-              font-family: 'Geologica', sans-serif;
+              font-family: 'Instrument Sans', sans-serif;
               font-size: 12px;
               font-weight: 500;
               color: rgba(255,255,255,0.9);
@@ -564,7 +564,7 @@ const PullToRefresh: React.FC<PullToRefreshProps> = ({ children, onRefresh, disa
             }
 
             .ptr-tagline {
-              font-family: 'Playfair Display', serif;
+              font-family: 'Newsreader', serif;
               color: white;
               font-size: 1rem;
               text-align: center;

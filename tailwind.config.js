@@ -8,9 +8,9 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        display: ["Playfair Display", "Georgia", "serif"],
-        sans: ["Geologica", "sans-serif"],
-        serif: ["Playfair Display", "Georgia", "serif"],
+        display: ["Newsreader", "Georgia", "serif"],
+        sans: ["Instrument Sans", "sans-serif"],
+        serif: ["Newsreader", "Georgia", "serif"],
       },
       colors: {
         primary: {

@@ -135,7 +135,7 @@ const WalkingGolferLoader: React.FC<WalkingGolferLoaderProps> = ({ isVisible = t
         }
 
         .tagline-text {
-          font-family: 'Playfair Display', serif;
+          font-family: 'Newsreader', serif;
           color: white;
           font-size: 1rem;
           text-align: center;

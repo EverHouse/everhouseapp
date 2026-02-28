@@ -39,7 +39,7 @@ const About: React.FC = () => {
         style={{ marginTop: 'calc(-1 * var(--header-offset))', paddingTop: 'var(--header-offset)' }}
       >
         <section className="px-6 pt-8 md:pt-12 pb-10 text-center animate-content-enter">
-          <h1 className="text-4xl md:text-5xl font-bold tracking-tight text-primary dark:text-white mb-3" style={{ fontFamily: "'Playfair Display', serif" }}>
+          <h1 className="text-4xl md:text-5xl font-bold tracking-tight text-primary dark:text-white mb-3" style={{ fontFamily: "'Newsreader', serif" }}>
             About Ever Club
           </h1>
           <p className="text-primary/70 dark:text-white/70 text-lg font-medium max-w-md mx-auto">
@@ -49,7 +49,7 @@ const About: React.FC = () => {
 
         <section className="px-6 pb-10 animate-content-enter-delay-1">
           <div className="max-w-2xl mx-auto">
-            <h2 className="text-2xl font-bold text-primary dark:text-white mb-4" style={{ fontFamily: "'Playfair Display', serif" }}>
+            <h2 className="text-2xl font-bold text-primary dark:text-white mb-4" style={{ fontFamily: "'Newsreader', serif" }}>
               Our Story
             </h2>
             <div className="space-y-4 text-sm text-primary/70 dark:text-white/70 leading-relaxed">
@@ -68,7 +68,7 @@ const About: React.FC = () => {
 
         <section className="px-6 pb-10 animate-content-enter-delay-2">
           <div className="max-w-2xl mx-auto">
-            <h2 className="text-2xl font-bold text-primary dark:text-white mb-6" style={{ fontFamily: "'Playfair Display', serif" }}>
+            <h2 className="text-2xl font-bold text-primary dark:text-white mb-6" style={{ fontFamily: "'Newsreader', serif" }}>
               What We Offer
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -92,7 +92,7 @@ const About: React.FC = () => {
 
         <section className="px-6 pb-10">
           <div className="max-w-2xl mx-auto">
-            <h2 className="text-2xl font-bold text-primary dark:text-white mb-6" style={{ fontFamily: "'Playfair Display', serif" }}>
+            <h2 className="text-2xl font-bold text-primary dark:text-white mb-6" style={{ fontFamily: "'Newsreader', serif" }}>
               Our Values
             </h2>
             <div className="space-y-4">
@@ -116,7 +116,7 @@ const About: React.FC = () => {
 
         <section className="px-6 py-10 mb-4">
           <div className="bg-primary rounded-2xl p-8 text-center max-w-2xl mx-auto">
-            <h2 className="text-2xl font-bold text-white mb-3" style={{ fontFamily: "'Playfair Display', serif" }}>
+            <h2 className="text-2xl font-bold text-white mb-3" style={{ fontFamily: "'Newsreader', serif" }}>
               Ready to Experience Ever Club?
             </h2>
             <p className="text-white/70 text-sm mb-6 max-w-sm mx-auto">
