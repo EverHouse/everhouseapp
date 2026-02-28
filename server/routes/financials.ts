@@ -615,7 +615,7 @@ router.get('/api/financials/subscriptions', isStaffOrAdmin, async (req: Request,
     
     const listParams: Stripe.SubscriptionListParams = {
       limit: pageLimit,
-      expand: ['data.customer', 'data.items.data.price'],
+      expand: ['data.customer', 'data.items.data.price', 'data.items.data.price.product'],
       status: statusFilter,
     };
     
@@ -664,7 +664,7 @@ router.get('/api/financials/subscriptions', isStaffOrAdmin, async (req: Request,
               customer: row.stripe_customer_id, 
               status: statusFilter,
               limit: 100,
-              expand: ['data.items.data.price', 'data.customer']
+              expand: ['data.items.data.price', 'data.items.data.price.product', 'data.customer']
             });
             return { subs: custSubs.data, row };
           })
@@ -707,17 +707,19 @@ router.get('/api/financials/subscriptions', isStaffOrAdmin, async (req: Request,
       const customer = sub.customer as Stripe.Customer;
       const item = sub.items.data[0];
       const price = item?.price;
+      const product = price?.product as Stripe.Product | undefined;
+      const productName = product && typeof product === 'object' ? product.name : null;
       
       return {
         id: sub.id,
         memberEmail: customer?.email || 'Unknown',
         memberName: customer?.name || customer?.email || 'Unknown',
-        planName: price?.nickname || 'Subscription Plan',
+        planName: productName || price?.nickname || 'Subscription Plan',
         amount: price?.unit_amount || 0,
         currency: price?.currency || 'usd',
         interval: price?.recurring?.interval || 'month',
         status: sub.status,
-        currentPeriodEnd: (sub as StripeSubscriptionExpanded).current_period_end,
+        currentPeriodEnd: (sub as unknown as { current_period_end: number }).current_period_end || 0,
         cancelAtPeriodEnd: sub.cancel_at_period_end,
       };
     });

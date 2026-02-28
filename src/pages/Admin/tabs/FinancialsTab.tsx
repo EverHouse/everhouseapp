@@ -353,7 +353,7 @@ const SubscriptionsSubTab: React.FC = () => {
                 </div>
                 <div className="grid grid-cols-2 gap-2 text-sm mb-3">
                   <div>
-                    <span className="text-primary/50 dark:text-white/50 text-xs">Plan</span>
+                    <span className="text-primary/50 dark:text-white/50 text-xs">Tier</span>
                     <p className="text-primary dark:text-white">{sub.planName}</p>
                   </div>
                   <div>
@@ -400,7 +400,7 @@ const SubscriptionsSubTab: React.FC = () => {
                 <thead>
                   <tr className="border-b border-primary/10 dark:border-white/10">
                     <th className="text-left px-4 py-3 text-xs font-semibold text-primary/60 dark:text-white/60 uppercase tracking-wider">Member</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-primary/60 dark:text-white/60 uppercase tracking-wider">Plan</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-primary/60 dark:text-white/60 uppercase tracking-wider">Tier</th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-primary/60 dark:text-white/60 uppercase tracking-wider">Amount</th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-primary/60 dark:text-white/60 uppercase tracking-wider">Status</th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-primary/60 dark:text-white/60 uppercase tracking-wider">Next Billing</th>
