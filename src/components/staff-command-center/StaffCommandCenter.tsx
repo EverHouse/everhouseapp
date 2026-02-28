@@ -566,8 +566,8 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
       <AnimatedPage className="pb-40">
         <div className="flex items-start justify-between mb-4 lg:mb-6 animate-content-enter-delay-1">
           <div>
-            <h1 className="text-xl lg:text-2xl font-bold text-primary dark:text-white">Welcome, {actualUser?.name?.split(' ')[0] || 'Staff'}</h1>
-            <p className="text-xs lg:text-sm text-primary/60 dark:text-white/60">{formatTodayDate()}</p>
+            <h1 className="text-3xl lg:text-4xl font-bold text-primary dark:text-white">Welcome, {actualUser?.name?.split(' ')[0] || 'Staff'}</h1>
+            <p className="text-sm lg:text-base text-primary/60 dark:text-white/60">{formatTodayDate()}</p>
           </div>
           <div className="flex flex-col items-end gap-1.5">
             <div className="flex items-center gap-2">
