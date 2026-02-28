@@ -2535,7 +2535,8 @@ html.dark .border-accessible {
   *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
+    transition-property: background-color, color, border-color, outline-color, fill, stroke, box-shadow !important;
+    transition-duration: 50ms !important;
   }
   
   .animate-spin {
@@ -2578,7 +2579,11 @@ html.dark .border-accessible {
   [class*="animate-list-item-delay-"],
   [class*="animate-fab-item-"],
   .animate-slide-up-stagger,
-  [class*="animate-content-enter-delay-"] {
+  [class*="animate-content-enter-delay-"],
+  .animate-dialog-scale-in,
+  .animate-drawer-content-enter,
+  .animate-tab-enter,
+  .animate-tab-exit {
     opacity: 1 !important;
     transform: none !important;
   }

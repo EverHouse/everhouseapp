@@ -577,6 +577,17 @@ const PullToRefresh: React.FC<PullToRefreshProps> = ({ children, onRefresh, disa
               justify-content: center;
               align-items: center;
             }
+
+            @media (prefers-reduced-motion: reduce) {
+              .ptr-fill-overlay,
+              .ptr-loader-exit,
+              .ptr-loader-content,
+              .ptr-content-exit {
+                animation: none !important;
+                opacity: 1 !important;
+                transform: none !important;
+              }
+            }
           `}</style>
         </div>,
         document.body

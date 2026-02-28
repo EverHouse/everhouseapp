@@ -180,7 +180,7 @@ const History: React.FC = () => {
                     <MotionListItem 
                       key={`${visit.type}-${visit.id}`} 
                       index={index}
-                      className={`rounded-xl p-4 border glass-card ${isDark ? 'border-white/25' : 'border-black/10'}`}
+                      className={`rounded-xl p-4 border glass-card hover:shadow-md transition-shadow ${isDark ? 'border-white/25' : 'border-black/10'}`}
                     >
                       <div className="flex items-start justify-between mb-2">
                         <div>
@@ -357,7 +357,7 @@ const History: React.FC = () => {
                               <MotionListItem 
                                 key={purchase.id} 
                                 index={monthIndex + index + 1}
-                                className={`rounded-xl p-4 border glass-card ${isDark ? 'border-white/25' : 'border-black/10'}`}
+                                className={`rounded-xl p-4 border glass-card hover:shadow-md transition-shadow ${isDark ? 'border-white/25' : 'border-black/10'}`}
                               >
                                 <div className="flex items-start justify-between gap-3">
                                   <div className="flex-1">

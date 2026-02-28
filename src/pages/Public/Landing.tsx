@@ -19,6 +19,8 @@ interface MembershipTier {
   highlighted_features: string[];
 }
 
+const HERO_ANIM_KEY = 'ever_hero_played';
+
 const Landing: React.FC = () => {
   const navigate = useNavigate();
   const { setPageReady } = usePageReady();
@@ -26,6 +28,11 @@ const Landing: React.FC = () => {
   const [tiers, setTiers] = useState<MembershipTier[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { offset: parallaxOffset, opacity: parallaxOpacity, gradientShift, ref: heroRef } = useParallax({ speed: 0.25, maxOffset: 120 });
+  const [heroAnimPlayed] = useState(() => {
+    const played = sessionStorage.getItem(HERO_ANIM_KEY) === '1';
+    if (!played) sessionStorage.setItem(HERO_ANIM_KEY, '1');
+    return played;
+  });
 
   useEffect(() => {
     if (!sessionChecked) return;
@@ -118,7 +125,7 @@ const Landing: React.FC = () => {
           <img 
             src="/images/hero-lounge-optimized.webp" 
             alt="Ever Members Club indoor lounge and social space in Tustin, Orange County" 
-            className="absolute inset-0 w-full h-[120%] object-cover object-[center_35%] will-change-transform animate-hero-bg"
+            className={`absolute inset-0 w-full h-[120%] object-cover object-[center_35%] will-change-transform ${heroAnimPlayed ? '' : 'animate-hero-bg'}`}
             loading="eager"
             fetchPriority="high"
             decoding="sync"
@@ -127,7 +134,7 @@ const Landing: React.FC = () => {
             }}
           />
           <div 
-            className="absolute inset-0 transition-opacity duration-normal animate-hero-overlay"
+            className={`absolute inset-0 transition-opacity duration-normal ${heroAnimPlayed ? '' : 'animate-hero-overlay'}`}
             style={{
               background: `linear-gradient(to top, rgba(0,0,0,${0.7 + gradientShift * 0.003}) 0%, rgba(0,0,0,${0.45 + gradientShift * 0.005}) 20%, rgba(0,0,0,0.2) 35%, rgba(0,0,0,0.08) 50%, transparent 60%)`
             }}
@@ -136,19 +143,19 @@ const Landing: React.FC = () => {
         
         <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/80 via-black/20 to-transparent pointer-events-none z-[1]" />
 
-        <div className="absolute left-4 right-4 mx-auto bottom-12 md:left-12 md:right-auto md:mx-0 md:bottom-20 z-10 w-auto md:max-w-xl animate-hero-headline">
+        <div className={`absolute left-4 right-4 mx-auto bottom-12 md:left-12 md:right-auto md:mx-0 md:bottom-20 z-10 w-auto md:max-w-xl ${heroAnimPlayed ? '' : 'animate-hero-headline'}`}>
           <div className="bg-black/40 backdrop-blur-3xl border border-white/10 p-8 md:p-12 rounded-xl text-center md:text-left">
             <h1 className="mb-4 text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.5)]">
               <span className="block text-4xl md:text-6xl font-normal italic" style={{ fontFamily: 'var(--font-display)' }}>Your</span>
               <span className="block text-3xl md:text-5xl font-bold uppercase tracking-[0.25em] mt-1" style={{ fontFamily: 'var(--font-body)' }}>Office. Course. Club.</span>
             </h1>
-            <p className="text-sm text-white/70 mb-2 max-w-sm leading-relaxed animate-hero-tagline mx-auto md:mx-0" style={{ fontFamily: 'var(--font-body)' }}>
+            <p className={`text-sm text-white/70 mb-2 max-w-sm leading-relaxed ${heroAnimPlayed ? '' : 'animate-hero-tagline'} mx-auto md:mx-0`} style={{ fontFamily: 'var(--font-body)' }}>
               Orange County's private club for professionals who work, play, and connect — all under one roof.
             </p>
-            <p className="text-[10px] text-white/40 uppercase tracking-[0.3em] mb-6 animate-hero-tagline" style={{ fontFamily: 'var(--font-label)' }}>
+            <p className={`text-[10px] text-white/40 uppercase tracking-[0.3em] mb-6 ${heroAnimPlayed ? '' : 'animate-hero-tagline'}`} style={{ fontFamily: 'var(--font-label)' }}>
               Formerly Even House · Tustin, CA
             </p>
-            <div className="flex flex-wrap gap-4 animate-hero-cta justify-center md:justify-start">
+            <div className={`flex flex-wrap gap-4 ${heroAnimPlayed ? '' : 'animate-hero-cta'} justify-center md:justify-start`}>
               <Link
                 to="/tour"
                 className="border border-white/40 bg-transparent hover:bg-white/10 text-white px-6 py-3 uppercase tracking-[0.2em] text-[10px] font-medium transition-all drop-shadow-[0_2px_10px_rgba(0,0,0,0.5)]"

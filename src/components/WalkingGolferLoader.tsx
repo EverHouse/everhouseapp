@@ -161,6 +161,16 @@ const WalkingGolferLoader: React.FC<WalkingGolferLoaderProps> = ({ isVisible = t
           justify-content: center;
           align-items: center;
         }
+
+        @media (prefers-reduced-motion: reduce) {
+          .loader-exit,
+          .content-exit,
+          .tagline-text {
+            animation: none !important;
+            opacity: 1 !important;
+            transform: none !important;
+          }
+        }
       `}</style>
     </div>
   );

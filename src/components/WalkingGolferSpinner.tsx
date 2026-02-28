@@ -46,7 +46,7 @@ const WalkingGolferSpinner: React.FC<WalkingGolferSpinnerProps> = ({
   }
 
   return (
-    <div className={`inline-flex items-center justify-center ${className}`}>
+    <div className={`inline-flex items-center justify-center animate-content-enter ${className}`}>
       <img 
         src={imageSrc}
         alt="Animated golfer mascot walking on golf course" 
