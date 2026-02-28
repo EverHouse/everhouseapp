@@ -1458,7 +1458,7 @@ router.post('/api/hubspot/webhooks', async (req, res) => {
               if (exclusionCheck.rows.length > 0) {
                 logger.info('[HubSpot Webhook] Skipping excluded/deleted email', { extra: { email, propertyName, propertyValue } });
               } else {
-                const userCheck = await db.execute(sql`SELECT role, billing_provider, stripe_subscription_id, membership_status, first_name, last_name, tier FROM users WHERE LOWER(email) = ${email}`);
+                const userCheck = await db.execute(sql`SELECT role, billing_provider, stripe_subscription_id, membership_status, first_name, last_name, tier, data_source, visitor_type FROM users WHERE LOWER(email) = ${email}`);
                 const existingUser = userCheck.rows[0];
                 const isStripeProtected = existingUser?.billing_provider === 'stripe';
                 const isVisitorProtected = existingUser?.role === 'visitor';
@@ -1486,11 +1486,17 @@ router.post('/api/hubspot/webhooks', async (req, res) => {
 
                     const nonNotifiableStatuses = ['non-member', 'visitor', 'lead'];
                     const billingProvider = existingUser?.billing_provider;
+                    const dataSource = existingUser?.data_source;
+                    const visitorType = existingUser?.visitor_type;
                     const changeSource = hasMindbodyId || billingProvider === 'mindbody'
                       ? 'via MindBody'
                       : billingProvider === 'stripe' || isStripeProtected
                         ? 'via Stripe'
-                        : 'via App';
+                        : visitorType === 'day_pass'
+                          ? 'via Quick Guest Checkout'
+                          : dataSource === 'APP'
+                            ? 'via App'
+                            : 'via HubSpot sync';
                     if (prevStatus && !nonNotifiableStatuses.includes(prevStatus) && newStatus === 'non-member') {
                       await notifyAllStaff(
                         'Member Status Changed',
