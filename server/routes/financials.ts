@@ -615,7 +615,7 @@ router.get('/api/financials/subscriptions', isStaffOrAdmin, async (req: Request,
     
     const listParams: Stripe.SubscriptionListParams = {
       limit: pageLimit,
-      expand: ['data.customer', 'data.items.data.price', 'data.items.data.price.product'],
+      expand: ['data.customer', 'data.items.data.price'],
       status: statusFilter,
     };
     
@@ -664,7 +664,7 @@ router.get('/api/financials/subscriptions', isStaffOrAdmin, async (req: Request,
               customer: row.stripe_customer_id, 
               status: statusFilter,
               limit: 100,
-              expand: ['data.items.data.price', 'data.items.data.price.product', 'data.customer']
+              expand: ['data.items.data.price', 'data.customer']
             });
             return { subs: custSubs.data, row };
           })
@@ -703,12 +703,43 @@ router.get('/api/financials/subscriptions', isStaffOrAdmin, async (req: Request,
     allSubs.push(...additionalSubs);
     const subscriptions = { data: allSubs, has_more: globalSubscriptions.has_more, object: 'list' as const, url: '' };
 
+    const productIds = new Set<string>();
+    for (const sub of subscriptions.data) {
+      for (const item of sub.items.data) {
+        if (item.price?.product && typeof item.price.product === 'string') {
+          productIds.add(item.price.product);
+        }
+      }
+    }
+    
+    const productMap = new Map<string, string>();
+    if (productIds.size > 0) {
+      const productBatches = Array.from(productIds);
+      const PRODUCT_BATCH_SIZE = 10;
+      for (let i = 0; i < productBatches.length; i += PRODUCT_BATCH_SIZE) {
+        const batch = productBatches.slice(i, i + PRODUCT_BATCH_SIZE);
+        const results = await Promise.allSettled(
+          batch.map(id => stripe.products.retrieve(id))
+        );
+        for (let j = 0; j < results.length; j++) {
+          const result = results[j];
+          if (result.status === 'fulfilled') {
+            productMap.set(result.value.id, result.value.name);
+          } else {
+            logger.warn('[Financials] Failed to fetch product', { extra: { productId: batch[j], error: result.reason?.message } });
+          }
+        }
+      }
+    }
+
     const subscriptionItems: SubscriptionListItem[] = subscriptions.data.map(sub => {
       const customer = sub.customer as Stripe.Customer;
       const item = sub.items.data[0];
       const price = item?.price;
-      const product = price?.product as Stripe.Product | undefined;
-      const productName = product && typeof product === 'object' ? product.name : null;
+      const productId = price?.product;
+      const productName = typeof productId === 'string' 
+        ? productMap.get(productId) 
+        : (productId && typeof productId === 'object' ? (productId as Stripe.Product).name : null);
       
       return {
         id: sub.id,
