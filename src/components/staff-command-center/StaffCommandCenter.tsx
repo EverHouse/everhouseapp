@@ -642,53 +642,7 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
             />
           </div>
 
-          {/* Row 1: Booking Requests, Upcoming Wellness, Alerts + Notice Board */}
-          <div className="grid grid-cols-3 gap-6">
-            <BookingQueuesSection
-              pendingRequests={data.pendingRequests}
-              todaysBookings={data.todaysBookings}
-              unmatchedBookings={unmatchedBookings}
-              today={today}
-              actionInProgress={actionInProgress}
-              onOpenTrackman={handleOpenTrackman}
-              onApprove={handleApprove}
-              onDeny={handleDeny}
-              onCheckIn={handleCheckIn}
-              onCompleteCancellation={handleCompleteCancellation}
-              onPaymentClick={(bookingId) => setBillingModal({ isOpen: true, bookingId })}
-              onRosterClick={(bookingId) => setBookingSheet({ isOpen: true, trackmanBookingId: null, bookingId, mode: 'manage' as const })}
-              onAssignMember={(booking) => setBookingSheet({
-                isOpen: true,
-                trackmanBookingId: booking.trackman_booking_id || null,
-                bayName: booking.bay_name || `Bay ${booking.resource_id}`,
-                bookingDate: booking.request_date || booking.slot_date,
-                timeSlot: `${formatTime12Hour(booking.start_time)} - ${formatTime12Hour(booking.end_time)}`,
-                matchedBookingId: Number(booking.id),
-                isRelink: false,
-                importedName: booking.user_name || undefined,
-                notes: booking.notes || undefined
-              })}
-              variant="desktop-top"
-            />
-            <TodayScheduleSection
-              upcomingTours={data.upcomingTours}
-              upcomingEvents={data.upcomingEvents}
-              upcomingWellness={data.upcomingWellness}
-              nextTour={data.nextTour}
-              nextEvent={data.nextEvent}
-              nextScheduleItem={data.nextScheduleItem}
-              nextActivityItem={data.nextActivityItem}
-              today={today}
-              variant="desktop-wellness"
-            />
-            <NoticeBoardWidget
-              closures={data.closures}
-              upcomingClosure={data.upcomingClosure}
-              announcements={data.announcements}
-            />
-          </div>
-
-          {/* Row 2: Upcoming Bookings, Upcoming Events, Alerts */}
+          {/* Row 2: Today's Bookings, Booking Requests, Internal Notice Board */}
           <div className="grid grid-cols-3 gap-6">
             <BookingQueuesSection
               pendingRequests={data.pendingRequests}
@@ -715,6 +669,52 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
                 notes: booking.notes || undefined
               })}
               variant="desktop-bottom"
+            />
+            <BookingQueuesSection
+              pendingRequests={data.pendingRequests}
+              todaysBookings={data.todaysBookings}
+              unmatchedBookings={unmatchedBookings}
+              today={today}
+              actionInProgress={actionInProgress}
+              onOpenTrackman={handleOpenTrackman}
+              onApprove={handleApprove}
+              onDeny={handleDeny}
+              onCheckIn={handleCheckIn}
+              onCompleteCancellation={handleCompleteCancellation}
+              onPaymentClick={(bookingId) => setBillingModal({ isOpen: true, bookingId })}
+              onRosterClick={(bookingId) => setBookingSheet({ isOpen: true, trackmanBookingId: null, bookingId, mode: 'manage' as const })}
+              onAssignMember={(booking) => setBookingSheet({
+                isOpen: true,
+                trackmanBookingId: booking.trackman_booking_id || null,
+                bayName: booking.bay_name || `Bay ${booking.resource_id}`,
+                bookingDate: booking.request_date || booking.slot_date,
+                timeSlot: `${formatTime12Hour(booking.start_time)} - ${formatTime12Hour(booking.end_time)}`,
+                matchedBookingId: Number(booking.id),
+                isRelink: false,
+                importedName: booking.user_name || undefined,
+                notes: booking.notes || undefined
+              })}
+              variant="desktop-top"
+            />
+            <NoticeBoardWidget
+              closures={data.closures}
+              upcomingClosure={data.upcomingClosure}
+              announcements={data.announcements}
+            />
+          </div>
+
+          {/* Row 3: Upcoming Wellness, Upcoming Events, Alerts */}
+          <div className="grid grid-cols-3 gap-6">
+            <TodayScheduleSection
+              upcomingTours={data.upcomingTours}
+              upcomingEvents={data.upcomingEvents}
+              upcomingWellness={data.upcomingWellness}
+              nextTour={data.nextTour}
+              nextEvent={data.nextEvent}
+              nextScheduleItem={data.nextScheduleItem}
+              nextActivityItem={data.nextActivityItem}
+              today={today}
+              variant="desktop-wellness"
             />
             <TodayScheduleSection
               upcomingTours={data.upcomingTours}
