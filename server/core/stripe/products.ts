@@ -949,9 +949,9 @@ export async function ensureGuestPassProduct(): Promise<{
   action: 'created' | 'exists' | 'error';
 }> {
   const GUEST_PASS_SLUG = 'guest-pass';
-  const GUEST_PASS_NAME = 'Guest Pass';
+  const GUEST_PASS_NAME = 'Guest Fee';
   const GUEST_PASS_PRICE_CENTS = PRICING.GUEST_FEE_CENTS;
-  const GUEST_PASS_DESCRIPTION = 'Bring a guest to the club';
+  const GUEST_PASS_DESCRIPTION = 'Guest fee for simulator use';
 
   try {
     const stripe = await getStripeClient();
