@@ -870,7 +870,7 @@ const BookGolf: React.FC = () => {
       <section className="mb-8 pt-6 md:pt-4 animate-content-enter-delay-1">
         <h1 className={`leading-none mb-3 ${isDark ? 'text-white' : 'text-primary'}`} style={{ fontFamily: 'var(--font-display)' }}>
           <span className="block text-4xl md:text-5xl">Book</span>
-          <span className="block text-4xl md:text-5xl">{activeTab === 'simulator' ? 'Simulator' : 'Conference'}</span>
+          <span className="block text-4xl md:text-5xl italic">{activeTab === 'simulator' ? 'Simulator' : 'Conference'}</span>
         </h1>
         <p className={`text-base leading-relaxed ${isDark ? 'text-white/60' : 'text-primary/60'}`} style={{ fontFamily: 'var(--font-body)' }}>Reserve simulators or conference room.</p>
       </section>

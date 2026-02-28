@@ -75,10 +75,10 @@ const PlayerSlotEditor: React.FC<PlayerSlotEditorProps> = ({
         <section className={`rounded-xl p-4 border glass-card ${isDark ? 'border-white/25' : 'border-black/10'}`}>
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
-              <span className={`text-[11px] font-semibold uppercase tracking-[0.2em] ${isDark ? 'text-white/80' : 'text-primary/80'}`} style={{ fontFamily: 'var(--font-label)' }}>How many players?</span>
+              <span className={`text-[11px] font-bold uppercase tracking-[0.2em] ${isDark ? 'text-white/80' : 'text-primary/80'}`} style={{ fontFamily: 'var(--font-label)' }}>How many players?</span>
             </div>
           </div>
-          <div className={`flex gap-2 p-1 rounded-xl border ${isDark ? 'bg-black/20 border-white/20' : 'bg-black/5 border-black/5'}`}>
+          <div className={`flex gap-2 p-1 rounded-xl border ${isDark ? 'bg-transparent border-white/15' : 'bg-black/5 border-black/5'}`}>
             {playerCounts.map(count => (
               <button
                 key={count}
@@ -86,7 +86,7 @@ const PlayerSlotEditor: React.FC<PlayerSlotEditorProps> = ({
                 aria-pressed={playerCount === count}
                 className={`flex-1 py-3 rounded-[4px] transition-all duration-fast active:scale-95 focus:ring-2 focus:ring-accent focus:outline-none ${
                   playerCount === count
-                    ? 'bg-accent text-[#293515] shadow-glow'
+                    ? (isDark ? 'bg-white text-primary' : 'bg-primary text-white')
                     : (isDark ? 'text-white/80 hover:bg-white/5 hover:text-white' : 'text-primary/80 hover:bg-black/5 hover:text-primary')
                 }`}
               >
@@ -101,7 +101,7 @@ const PlayerSlotEditor: React.FC<PlayerSlotEditorProps> = ({
       {slots.length > 0 && (
         <section className={`rounded-xl p-4 border glass-card relative z-10 overflow-hidden ${isDark ? 'border-white/25' : 'border-black/10'}`}>
           <div className="flex items-center gap-2 mb-3">
-            <span className={`text-[11px] font-semibold uppercase tracking-[0.2em] ${isDark ? 'text-white/80' : 'text-primary/80'}`} style={{ fontFamily: 'var(--font-label)' }}>Additional Players</span>
+            <span className={`text-[11px] font-bold uppercase tracking-[0.2em] ${isDark ? 'text-white/80' : 'text-primary/80'}`} style={{ fontFamily: 'var(--font-label)' }}>Additional Players</span>
             <span className={`text-xs ${isDark ? 'text-white/50' : 'text-primary/50'}`}>(Optional)</span>
           </div>
 
@@ -128,7 +128,7 @@ const PlayerSlotEditor: React.FC<PlayerSlotEditorProps> = ({
                         onClick={() => handleTypeChange(index, 'member')}
                         className={`px-3 py-1.5 text-xs font-medium transition-all duration-fast ${
                           slot.type === 'member'
-                            ? 'bg-accent text-[#293515]'
+                            ? (isDark ? 'bg-white text-primary' : 'bg-primary text-white')
                             : (isDark ? 'bg-white/5 text-white/60 hover:bg-white/10' : 'bg-black/5 text-primary/60 hover:bg-black/10')
                         }`}
                       >
@@ -139,7 +139,7 @@ const PlayerSlotEditor: React.FC<PlayerSlotEditorProps> = ({
                         onClick={() => handleTypeChange(index, 'guest')}
                         className={`px-3 py-1.5 text-xs font-medium transition-all duration-fast ${
                           slot.type === 'guest'
-                            ? 'bg-accent text-[#293515]'
+                            ? (isDark ? 'bg-white text-primary' : 'bg-primary text-white')
                             : (isDark ? 'bg-white/5 text-white/60 hover:bg-white/10' : 'bg-black/5 text-primary/60 hover:bg-black/10')
                         }`}
                       >
@@ -152,10 +152,10 @@ const PlayerSlotEditor: React.FC<PlayerSlotEditorProps> = ({
                     {slot.selectedId ? (
                       <div className={`flex items-center gap-2 px-3 py-2.5 rounded-lg border ${
                         isDark 
-                          ? 'bg-accent/10 border-accent/30' 
-                          : 'bg-accent/10 border-accent/30'
+                          ? 'bg-white/10 border-white/20' 
+                          : 'bg-primary/5 border-primary/20'
                       }`}>
-                        <span className="material-symbols-outlined text-accent text-lg">
+                        <span className={`material-symbols-outlined text-lg ${isDark ? 'text-white/70' : 'text-primary/70'}`}>
                           {slot.type === 'member' ? 'person' : 'person_add'}
                         </span>
                         <div className="flex-1 min-w-0">
