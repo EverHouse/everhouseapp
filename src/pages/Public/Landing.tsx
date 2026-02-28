@@ -134,31 +134,31 @@ const Landing: React.FC = () => {
           />
         </div>
         
-        <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/60 via-black/20 to-transparent pointer-events-none z-[1]" />
+        <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/80 via-black/20 to-transparent pointer-events-none z-[1]" />
 
-        <div className="absolute left-6 bottom-12 md:left-12 md:bottom-20 z-10 max-w-xl animate-hero-headline">
-          <div className="bg-white/10 backdrop-blur-xl border border-white/20 p-8 md:p-12 rounded-xl">
-            <h1 className="mb-4 text-white text-shadow-sm">
-              <span className="block text-4xl md:text-6xl font-light italic" style={{ fontFamily: 'var(--font-display)' }}>Your</span>
+        <div className="absolute left-4 right-4 mx-auto bottom-12 md:left-12 md:right-auto md:mx-0 md:bottom-20 z-10 w-auto md:max-w-xl animate-hero-headline">
+          <div className="bg-black/40 backdrop-blur-3xl border border-white/10 p-8 md:p-12 rounded-xl text-center md:text-left">
+            <h1 className="mb-4 text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.5)]">
+              <span className="block text-4xl md:text-6xl font-normal italic" style={{ fontFamily: 'var(--font-display)' }}>Your</span>
               <span className="block text-3xl md:text-5xl font-bold uppercase tracking-[0.25em] mt-1" style={{ fontFamily: 'var(--font-body)' }}>Office. Course. Club.</span>
             </h1>
-            <p className="text-sm text-white/70 mb-2 max-w-sm leading-relaxed animate-hero-tagline" style={{ fontFamily: 'var(--font-body)' }}>
+            <p className="text-sm text-white/70 mb-2 max-w-sm leading-relaxed animate-hero-tagline mx-auto md:mx-0" style={{ fontFamily: 'var(--font-body)' }}>
               Orange County's private club for professionals who work, play, and connect — all under one roof.
             </p>
             <p className="text-[10px] text-white/40 uppercase tracking-[0.3em] mb-6 animate-hero-tagline" style={{ fontFamily: 'var(--font-label)' }}>
               Formerly Even House · Tustin, CA
             </p>
-            <div className="flex flex-wrap gap-4 animate-hero-cta">
+            <div className="flex flex-wrap gap-4 animate-hero-cta justify-center md:justify-start">
               <Link
                 to="/tour"
-                className="border border-white/40 bg-transparent hover:bg-white/10 text-white px-6 py-3 uppercase tracking-[0.2em] text-[10px] font-medium transition-all"
+                className="border border-white/40 bg-transparent hover:bg-white/10 text-white px-6 py-3 uppercase tracking-[0.2em] text-[10px] font-medium transition-all drop-shadow-[0_2px_10px_rgba(0,0,0,0.5)]"
                 style={{ fontFamily: 'var(--font-label)' }}
               >
                 Private Tour
               </Link>
               <Link
                 to="/membership"
-                className="border border-white/40 bg-transparent hover:bg-white/10 text-white px-6 py-3 uppercase tracking-[0.2em] text-[10px] font-medium transition-all"
+                className="border border-white/40 bg-transparent hover:bg-white/10 text-white px-6 py-3 uppercase tracking-[0.2em] text-[10px] font-medium transition-all drop-shadow-[0_2px_10px_rgba(0,0,0,0.5)]"
                 style={{ fontFamily: 'var(--font-label)' }}
               >
                 Explore Membership
