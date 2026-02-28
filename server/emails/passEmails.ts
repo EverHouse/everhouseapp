@@ -97,7 +97,7 @@ export async function getPassWithQrHtml(passDetails: PassDetails): Promise<strin
           <!-- Headline -->
           <tr>
             <td style="text-align: center; padding-bottom: 16px;">
-              <h1 style="margin: 0; font-family: 'Playfair Display', Georgia, serif; font-size: 32px; font-weight: 400; color: ${CLUB_COLORS.deepGreen};">
+              <h1 style="margin: 0; font-family: 'Newsreader', Georgia, serif; font-size: 32px; font-weight: 400; color: ${CLUB_COLORS.deepGreen};">
                 Your Pass is Ready
               </h1>
             </td>
@@ -234,7 +234,7 @@ function getGolfPassContent(details: RedemptionDetails, formattedType: string, f
           <!-- Headline -->
           <tr>
             <td style="text-align: center; padding-bottom: 16px;">
-              <h1 style="margin: 0; font-family: 'Playfair Display', Georgia, serif; font-size: 32px; font-weight: 400; color: ${CLUB_COLORS.deepGreen};">
+              <h1 style="margin: 0; font-family: 'Newsreader', Georgia, serif; font-size: 32px; font-weight: 400; color: ${CLUB_COLORS.deepGreen};">
                 Welcome to Ever Club
               </h1>
             </td>
@@ -326,7 +326,7 @@ function getWorkspacePassContent(details: RedemptionDetails, formattedType: stri
           <!-- Headline -->
           <tr>
             <td style="text-align: center; padding-bottom: 16px;">
-              <h1 style="margin: 0; font-family: 'Playfair Display', Georgia, serif; font-size: 32px; font-weight: 400; color: ${CLUB_COLORS.deepGreen};">
+              <h1 style="margin: 0; font-family: 'Newsreader', Georgia, serif; font-size: 32px; font-weight: 400; color: ${CLUB_COLORS.deepGreen};">
                 Welcome to Ever Club
               </h1>
             </td>

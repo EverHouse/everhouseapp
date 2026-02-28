@@ -61,7 +61,7 @@ export function getFirstVisitHtml(params: { firstName?: string }): string {
   const content = `
           <tr>
             <td style="text-align: center; padding-bottom: 16px;">
-              <h1 style="margin: 0; font-family: 'Playfair Display', Georgia, serif; font-size: 32px; font-weight: 400; color: ${CLUB_COLORS.deepGreen};">
+              <h1 style="margin: 0; font-family: 'Newsreader', Georgia, serif; font-size: 32px; font-weight: 400; color: ${CLUB_COLORS.deepGreen};">
                 ${greeting}
               </h1>
             </td>

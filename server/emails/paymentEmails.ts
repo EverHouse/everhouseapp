@@ -85,7 +85,7 @@ export function getPaymentReceiptHtml(params: PaymentReceiptParams): string {
           <!-- Headline -->
           <tr>
             <td style="text-align: center; padding-bottom: 16px;">
-              <h1 style="margin: 0; font-family: 'Playfair Display', Georgia, serif; font-size: 32px; font-weight: 400; color: ${CLUB_COLORS.deepGreen};">
+              <h1 style="margin: 0; font-family: 'Newsreader', Georgia, serif; font-size: 32px; font-weight: 400; color: ${CLUB_COLORS.deepGreen};">
                 Payment Received
               </h1>
             </td>
@@ -168,7 +168,7 @@ export function getPaymentFailedHtml(params: PaymentFailedParams): string {
           <!-- Headline -->
           <tr>
             <td style="text-align: center; padding-bottom: 16px;">
-              <h1 style="margin: 0; font-family: 'Playfair Display', Georgia, serif; font-size: 32px; font-weight: 400; color: ${CLUB_COLORS.deepGreen};">
+              <h1 style="margin: 0; font-family: 'Newsreader', Georgia, serif; font-size: 32px; font-weight: 400; color: ${CLUB_COLORS.deepGreen};">
                 Payment Issue
               </h1>
             </td>
@@ -245,7 +245,7 @@ export function getOutstandingBalanceHtml(params: OutstandingBalanceParams): str
           <!-- Headline -->
           <tr>
             <td style="text-align: center; padding-bottom: 16px;">
-              <h1 style="margin: 0; font-family: 'Playfair Display', Georgia, serif; font-size: 32px; font-weight: 400; color: ${CLUB_COLORS.deepGreen};">
+              <h1 style="margin: 0; font-family: 'Newsreader', Georgia, serif; font-size: 32px; font-weight: 400; color: ${CLUB_COLORS.deepGreen};">
                 Outstanding Balance
               </h1>
             </td>
@@ -330,7 +330,7 @@ export function getFeeWaivedHtml(params: FeeWaivedParams): string {
           <!-- Headline -->
           <tr>
             <td style="text-align: center; padding-bottom: 16px;">
-              <h1 style="margin: 0; font-family: 'Playfair Display', Georgia, serif; font-size: 32px; font-weight: 400; color: ${CLUB_COLORS.deepGreen};">
+              <h1 style="margin: 0; font-family: 'Newsreader', Georgia, serif; font-size: 32px; font-weight: 400; color: ${CLUB_COLORS.deepGreen};">
                 Fee Waived
               </h1>
             </td>
@@ -534,7 +534,7 @@ export function getPurchaseReceiptHtml(params: PurchaseReceiptParams): string {
   const content = `
           <tr>
             <td style="text-align: center; padding-bottom: 16px;">
-              <h1 style="margin: 0; font-family: 'Playfair Display', Georgia, serif; font-size: 32px; font-weight: 400; color: ${CLUB_COLORS.deepGreen};">
+              <h1 style="margin: 0; font-family: 'Newsreader', Georgia, serif; font-size: 32px; font-weight: 400; color: ${CLUB_COLORS.deepGreen};">
                 Purchase Receipt
               </h1>
             </td>

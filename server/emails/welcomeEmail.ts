@@ -39,7 +39,7 @@ export function getWelcomeEmailHtml(firstName?: string): string {
           <!-- Headline -->
           <tr>
             <td style="text-align: center; padding-bottom: 16px;">
-              <h1 style="margin: 0; font-family: 'Playfair Display', Georgia, serif; font-size: 32px; font-weight: 400; color: ${CLUB_COLORS.deepGreen};">
+              <h1 style="margin: 0; font-family: 'Newsreader', Georgia, serif; font-size: 32px; font-weight: 400; color: ${CLUB_COLORS.deepGreen};">
                 ${greeting}
               </h1>
             </td>

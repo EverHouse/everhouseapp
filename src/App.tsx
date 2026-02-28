@@ -640,7 +640,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const headerBtnClasses = "text-white hover:opacity-70 active:scale-95 transition-opacity duration-fast";
 
   const headerContent = showHeader ? (
-    <header className={`fixed top-0 left-0 right-0 flex items-center px-4 sm:px-6 min-h-16 pt-[env(safe-area-inset-top,0px)] pointer-events-auto transition-[box-shadow,border-color] duration-normal ${headerClasses}`} style={{ zIndex: 'var(--z-header)' }} role="banner">
+    <header className={`fixed top-0 left-0 right-0 h-16 flex items-center px-4 sm:px-6 mt-[env(safe-area-inset-top,0px)] pointer-events-auto transition-[box-shadow,border-color] duration-normal ${headerClasses}`} style={{ zIndex: 'var(--z-header)' }} role="banner">
       {/* Left section - flex-1 for symmetric spacing with right */}
       <div className="flex-1 flex justify-start">
         {isMemberRoute ? (
@@ -672,7 +672,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       {/* Center section - auto width, centered between equal flex-1 sides */}
       <div className="flex-shrink-0 flex justify-center">
         {isMemberRoute ? (
-          <h1 className="text-3xl lg:text-4xl font-bold text-[#F2F2EC] truncate leading-none translate-y-[1px]" style={{ fontFamily: 'var(--font-headline)', fontOpticalSizing: 'auto', letterSpacing: '-0.02em' }}>
+          <h1 className="text-3xl lg:text-4xl font-bold text-[#F2F2EC] truncate leading-none translate-y-1" style={{ fontFamily: 'var(--font-headline)', fontOpticalSizing: 'auto', letterSpacing: '-0.02em' }}>
             {getPageTitle()}
           </h1>
         ) : (

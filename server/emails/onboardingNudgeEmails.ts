@@ -62,7 +62,7 @@ function getNudge24hHtml(firstName?: string): string {
           <!-- Headline -->
           <tr>
             <td style="text-align: center; padding-bottom: 16px;">
-              <h1 style="margin: 0; font-family: 'Playfair Display', Georgia, serif; font-size: 28px; font-weight: 400; color: ${CLUB_COLORS.deepGreen};">
+              <h1 style="margin: 0; font-family: 'Newsreader', Georgia, serif; font-size: 28px; font-weight: 400; color: ${CLUB_COLORS.deepGreen};">
                 Your membership is waiting
               </h1>
             </td>
@@ -102,7 +102,7 @@ function getNudge72hHtml(firstName?: string): string {
           <!-- Headline -->
           <tr>
             <td style="text-align: center; padding-bottom: 16px;">
-              <h1 style="margin: 0; font-family: 'Playfair Display', Georgia, serif; font-size: 28px; font-weight: 400; color: ${CLUB_COLORS.deepGreen};">
+              <h1 style="margin: 0; font-family: 'Newsreader', Georgia, serif; font-size: 28px; font-weight: 400; color: ${CLUB_COLORS.deepGreen};">
                 3 things to try at Ever Club
               </h1>
             </td>
@@ -208,7 +208,7 @@ function getNudge7dHtml(firstName?: string): string {
           <!-- Headline -->
           <tr>
             <td style="text-align: center; padding-bottom: 16px;">
-              <h1 style="margin: 0; font-family: 'Playfair Display', Georgia, serif; font-size: 28px; font-weight: 400; color: ${CLUB_COLORS.deepGreen};">
+              <h1 style="margin: 0; font-family: 'Newsreader', Georgia, serif; font-size: 28px; font-weight: 400; color: ${CLUB_COLORS.deepGreen};">
                 Need help getting started?
               </h1>
             </td>

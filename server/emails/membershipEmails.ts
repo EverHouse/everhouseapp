@@ -84,7 +84,7 @@ export function getMembershipRenewalHtml(params: MembershipRenewalParams): strin
           <!-- Headline -->
           <tr>
             <td style="text-align: center; padding-bottom: 16px;">
-              <h1 style="margin: 0; font-family: 'Playfair Display', Georgia, serif; font-size: 32px; font-weight: 400; color: ${CLUB_COLORS.deepGreen};">
+              <h1 style="margin: 0; font-family: 'Newsreader', Georgia, serif; font-size: 32px; font-weight: 400; color: ${CLUB_COLORS.deepGreen};">
                 Membership Renewed
               </h1>
             </td>
@@ -167,7 +167,7 @@ export function getMembershipFailedHtml(params: MembershipFailedParams): string 
           <!-- Headline -->
           <tr>
             <td style="text-align: center; padding-bottom: 16px;">
-              <h1 style="margin: 0; font-family: 'Playfair Display', Georgia, serif; font-size: 32px; font-weight: 400; color: ${CLUB_COLORS.deepGreen};">
+              <h1 style="margin: 0; font-family: 'Newsreader', Georgia, serif; font-size: 32px; font-weight: 400; color: ${CLUB_COLORS.deepGreen};">
                 Membership Payment Failed
               </h1>
             </td>
@@ -246,7 +246,7 @@ export function getCardExpiringHtml(params: CardExpiringParams): string {
           <!-- Headline -->
           <tr>
             <td style="text-align: center; padding-bottom: 16px;">
-              <h1 style="margin: 0; font-family: 'Playfair Display', Georgia, serif; font-size: 32px; font-weight: 400; color: ${CLUB_COLORS.deepGreen};">
+              <h1 style="margin: 0; font-family: 'Newsreader', Georgia, serif; font-size: 32px; font-weight: 400; color: ${CLUB_COLORS.deepGreen};">
                 Card Expiring Soon
               </h1>
             </td>
@@ -422,7 +422,7 @@ export function getGracePeriodReminderHtml(params: GracePeriodReminderParams): s
           <!-- Headline -->
           <tr>
             <td style="text-align: center; padding-bottom: 16px;">
-              <h1 style="margin: 0; font-family: 'Playfair Display', Georgia, serif; font-size: 32px; font-weight: 400; color: ${isUrgent ? urgentStyles.headlineColor : CLUB_COLORS.deepGreen};">
+              <h1 style="margin: 0; font-family: 'Newsreader', Georgia, serif; font-size: 32px; font-weight: 400; color: ${isUrgent ? urgentStyles.headlineColor : CLUB_COLORS.deepGreen};">
                 ${headline}
               </h1>
             </td>

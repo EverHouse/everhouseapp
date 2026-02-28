@@ -147,8 +147,8 @@ const AdminDashboard: React.FC = () => {
   };
 
   const headerContent = (
-    <header className="fixed top-0 left-0 right-0 lg:left-64 flex items-center justify-between px-4 md:px-6 min-h-16 pt-[env(safe-area-inset-top,0px)] bg-[#293515] shadow-md transition-all duration-fast text-[#F2F2EC] pointer-events-auto" style={{ zIndex: 'var(--z-header)' }}>
-      <div className="flex items-center flex-shrink-0 w-[88px] lg:w-0">
+    <header className="fixed top-0 left-0 right-0 lg:left-64 h-16 flex items-center justify-between px-4 md:px-6 mt-[env(safe-area-inset-top,0px)] bg-[#293515] shadow-md transition-all duration-fast text-[#F2F2EC] pointer-events-auto" style={{ zIndex: 'var(--z-header)' }}>
+      <div className="flex items-center flex-shrink-0 w-[88px] lg:w-0 h-full">
         <button 
           onClick={() => setIsMobileSidebarOpen(true)}
           className="tactile-btn flex items-center justify-center min-w-[44px] min-h-[44px] hover:opacity-70 transition-opacity lg:hidden"
@@ -158,7 +158,7 @@ const AdminDashboard: React.FC = () => {
         </button>
       </div>
       
-      <h1 className="text-3xl lg:text-4xl font-bold text-[#F2F2EC] text-center truncate flex-1 leading-none translate-y-[1px]" style={{ fontFamily: 'var(--font-headline)', fontOpticalSizing: 'auto', letterSpacing: '-0.02em' }}>
+      <h1 className="text-3xl lg:text-4xl font-bold text-[#F2F2EC] text-center truncate flex-1 leading-none translate-y-1" style={{ fontFamily: 'var(--font-headline)', fontOpticalSizing: 'auto', letterSpacing: '-0.02em' }}>
         {getTabTitle()}
       </h1>
 
