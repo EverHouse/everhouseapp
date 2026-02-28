@@ -18,7 +18,7 @@ const isTouchDevice = () => {
   return 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 };
 
-const PullToRefresh: React.FC<PullToRefreshProps> = ({ children, onRefresh, disabled = false, className = '' }) => {
+const PullToRefresh: React.FC<PullToRefreshProps> = ({ children, disabled = false, className = '' }) => {
   const [pullDistance, setPullDistance] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isFillingScreen, setIsFillingScreen] = useState(false);
@@ -98,20 +98,11 @@ const PullToRefresh: React.FC<PullToRefreshProps> = ({ children, onRefresh, disa
     await new Promise(resolve => setTimeout(resolve, 350));
     
     setIsFillingScreen(false);
-
-    if (onRefresh) {
-      setIsRefreshing(true);
-      try {
-        await onRefresh();
-      } finally {
-        setIsRefreshing(false);
-      }
-    } else {
-      setIsRefreshing(true);
-      sessionStorage.setItem('ptr-reload', '1');
-      window.location.reload();
-    }
-  }, [isRefreshing, isFillingScreen, onRefresh]);
+    setIsRefreshing(true);
+    
+    sessionStorage.setItem('ptr-reload', '1');
+    window.location.reload();
+  }, [isRefreshing, isFillingScreen]);
 
   useEffect(() => {
     if (!isTouchCapable) return;
@@ -201,7 +192,6 @@ const PullToRefresh: React.FC<PullToRefreshProps> = ({ children, onRefresh, disa
   const isFillingScreenRef = useRef(isFillingScreen);
   const pullDistanceRef = useRef(pullDistance);
   const animateSpringBackRef = useRef(animateSpringBack);
-  const onRefreshRef = useRef(onRefresh);
 
   useEffect(() => { disabledRef.current = disabled; }, [disabled]);
   useEffect(() => { isModalOpenRef.current = isModalOpen; }, [isModalOpen]);
@@ -210,7 +200,6 @@ const PullToRefresh: React.FC<PullToRefreshProps> = ({ children, onRefresh, disa
   useEffect(() => { isFillingScreenRef.current = isFillingScreen; }, [isFillingScreen]);
   useEffect(() => { pullDistanceRef.current = pullDistance; }, [pullDistance]);
   useEffect(() => { animateSpringBackRef.current = animateSpringBack; }, [animateSpringBack]);
-  useEffect(() => { onRefreshRef.current = onRefresh; }, [onRefresh]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -271,19 +260,10 @@ const PullToRefresh: React.FC<PullToRefreshProps> = ({ children, onRefresh, disa
         await new Promise(resolve => setTimeout(resolve, 350));
 
         setIsFillingScreen(false);
+        setIsRefreshing(true);
 
-        if (onRefreshRef.current) {
-          setIsRefreshing(true);
-          try {
-            await onRefreshRef.current();
-          } finally {
-            setIsRefreshing(false);
-          }
-        } else {
-          setIsRefreshing(true);
-          sessionStorage.setItem('ptr-reload', '1');
-          window.location.reload();
-        }
+        sessionStorage.setItem('ptr-reload', '1');
+        window.location.reload();
       } else {
         if (currentPullDistance > 5) {
           animateSpringBackRef.current(currentPullDistance);
