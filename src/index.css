@@ -336,7 +336,7 @@ html, body {
 }
 
 html.dark, html.dark body {
-  background-color: #141414;
+  background-color: #293515;
   color: #F2F2EC;
 }
 
@@ -924,7 +924,7 @@ body.has-fab .back-to-top:not(.with-nav) {
 }
 
 .liquid-bg {
-  background: #141414;
+  background: #293515;
 }
 
 /* --- Liquid Glass System (Futuristic iOS-inspired) --- */

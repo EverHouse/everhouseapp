@@ -26,7 +26,7 @@ const EditorialShowcase: React.FC<EditorialShowcaseProps> = ({
 }) => {
   return (
     <section className={`${className}`}>
-      <div className="flex flex-col md:flex-row md:min-h-[600px] lg:min-h-[700px] rounded-2xl overflow-hidden shadow-2xl shadow-black/5 bg-bone dark:bg-[#1a1a1a]">
+      <div className="flex flex-col md:flex-row md:min-h-[600px] lg:min-h-[700px] rounded-2xl overflow-hidden shadow-2xl shadow-black/5 bg-bone dark:bg-[#293515]">
         <div className={`relative overflow-hidden h-72 md:h-auto md:w-1/2 ${reversed ? 'md:order-2' : 'md:order-1'}`}>
           <img
             src={image}

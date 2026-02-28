@@ -159,7 +159,7 @@ const BookTour: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen pb-0 overflow-x-hidden relative bg-bone dark:bg-[#141414]">
+    <div className="min-h-screen pb-0 overflow-x-hidden relative bg-bone dark:bg-[#293515]">
       <SEO
         title="Book a Tour | Ever Club — Golf & Social Club, OC"
         description="Schedule a free 30-min tour of Ever Club in Tustin. See Trackman simulators, coworking, café & wellness at OC's top private club."

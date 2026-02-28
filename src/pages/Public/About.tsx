@@ -35,7 +35,7 @@ const About: React.FC = () => {
         url="/about"
       />
       <div
-        className="flex flex-col min-h-screen bg-bone dark:bg-[#141414] overflow-x-hidden"
+        className="flex flex-col min-h-screen bg-bone dark:bg-[#293515] overflow-x-hidden"
         style={{ marginTop: 'calc(-1 * var(--header-offset))', paddingTop: 'var(--header-offset)' }}
       >
         <section className="px-6 pt-8 md:pt-12 pb-10 text-center animate-content-enter">

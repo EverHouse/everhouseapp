@@ -99,10 +99,10 @@ const PublicCafe: React.FC = () => {
     <AnimatedPage>
     <SEO title="Café Menu | Ever Club — Tustin, OC" description="Explore the Ever Club café menu. Farm-to-table breakfast, artisan lunch, craft coffee & curated beverages at OC's premier indoor golf & social club." url="/menu" />
     <div 
-      className="flex flex-col min-h-screen bg-[#EAEBE6] dark:bg-[#141414] overflow-x-hidden w-full max-w-full"
+      className="flex flex-col min-h-screen bg-[#EAEBE6] dark:bg-[#293515] overflow-x-hidden w-full max-w-full"
       style={{ marginTop: 'calc(-1 * var(--header-offset))', paddingTop: 'var(--header-offset)' }}
     >
-      <section className="px-6 pt-4 md:pt-2 pb-6 bg-[#EAEBE6] dark:bg-[#141414] animate-content-enter">
+      <section className="px-6 pt-4 md:pt-2 pb-6 bg-[#EAEBE6] dark:bg-[#293515] animate-content-enter">
         <h1 className="text-3xl sm:text-4xl md:text-5xl text-primary dark:text-white mb-4 leading-none" style={{ fontFamily: 'var(--font-display)' }}>Cafe Menu</h1>
         <p className="text-base text-primary/70 dark:text-white/70 leading-relaxed max-w-[90%]" style={{ fontFamily: 'var(--font-body)' }}>
           Curated bites and beverages at the House. From artisan coffee to light fare.

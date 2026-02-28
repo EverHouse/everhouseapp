@@ -190,7 +190,7 @@ const AdminDashboard: React.FC = () => {
   );
 
   return (
-    <div className="min-h-screen bg-bone font-sans dark:bg-[#141414] transition-colors duration-normal flex flex-col relative">
+    <div className="min-h-screen bg-bone font-sans dark:bg-[#293515] transition-colors duration-normal flex flex-col relative">
       
       <StaffSidebar 
         activeTab={activeTab} 

@@ -110,7 +110,7 @@ const Gallery: React.FC = () => {
       <SEO title="Gallery & Photos | Ever Club — Golf Club in OC" description="See inside Ever Club in Tustin. Photos of Trackman golf simulators, lounge, café, coworking spaces & member events at OC's private social club." url="/gallery" />
       <AnimatedPage>
       <div 
-        className="flex flex-col min-h-screen bg-bone dark:bg-[#141414] overflow-x-hidden"
+        className="flex flex-col min-h-screen bg-bone dark:bg-[#293515] overflow-x-hidden"
         style={{ marginTop: 'calc(-1 * var(--header-offset))', paddingTop: 'var(--header-offset)' }}
       >
         <div className="px-5 pt-4 md:pt-2 pb-6 animate-content-enter">
@@ -156,7 +156,7 @@ const Gallery: React.FC = () => {
           )}
         </div>
 
-        <section className="px-6 py-10 text-center bg-bone dark:bg-[#141414]">
+        <section className="px-6 py-10 text-center bg-bone dark:bg-[#293515]">
           <p className="text-primary/60 dark:text-white/60 text-sm mb-4">Like what you see?</p>
           <Link to="/tour" className="inline-block px-8 py-4 bg-primary text-white rounded-[4px] font-bold text-sm tracking-widest uppercase hover:bg-primary/90 transition-all duration-normal active:scale-[0.98] shadow-[0_4px_16px_rgba(41,53,21,0.3)]">
             Book Your Private Tour

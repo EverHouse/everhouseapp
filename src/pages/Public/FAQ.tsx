@@ -83,7 +83,7 @@ const FAQ: React.FC = () => {
     <AnimatedPage>
     <SEO title="FAQ — Frequently Asked Questions | Ever Club" description="Got questions about Ever Club? Find answers about memberships, Trackman golf simulators, events, hours, day passes & more at our Tustin, OC location." url="/faq" />
     <div 
-      className="flex flex-col min-h-screen bg-bone dark:bg-[#141414] overflow-x-hidden"
+      className="flex flex-col min-h-screen bg-bone dark:bg-[#293515] overflow-x-hidden"
       style={{ marginTop: 'calc(-1 * var(--header-offset))', paddingTop: 'var(--header-offset)' }}
     >
       <div className="px-6 pt-4 md:pt-2 pb-4 animate-content-enter">

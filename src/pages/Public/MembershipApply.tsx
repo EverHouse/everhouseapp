@@ -143,7 +143,7 @@ const MembershipApply: React.FC = () => {
   } text-primary dark:text-white placeholder:text-gray-400 dark:placeholder-white/40`;
 
   return (
-    <div className="min-h-screen pb-0 overflow-x-hidden relative bg-bone dark:bg-[#141414]">
+    <div className="min-h-screen pb-0 overflow-x-hidden relative bg-bone dark:bg-[#293515]">
       <SEO title="Apply for Membership | Ever Club — OC Golf Club" description="Join OC's premier indoor golf & social club. Apply for membership at Ever Club in Tustin — Trackman simulators, workspace, wellness & community." url="/membership/apply" />
       <div 
         className="fixed top-0 left-0 right-0 bg-primary"

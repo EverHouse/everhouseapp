@@ -346,7 +346,7 @@ const ManualBookingModal: React.FC<{
                                     {showDropdown && searchResults.length > 0 && (
                                         <div 
                                             ref={dropdownRef}
-                                            className="absolute z-50 w-full mt-1 bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-white/20 rounded-lg shadow-lg max-h-60 overflow-y-auto"
+                                            className="absolute z-50 w-full mt-1 bg-white dark:bg-[#293515] border border-gray-200 dark:border-white/20 rounded-lg shadow-lg max-h-60 overflow-y-auto"
                                         >
                                             {searchResults.map((member, idx) => (
                                                 <button

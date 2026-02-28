@@ -4,7 +4,7 @@ import SEO from '../../components/SEO';
 
 const PrivacyPolicy: React.FC = () => {
   return (
-    <div className="min-h-screen bg-bone dark:bg-[#141414] text-primary dark:text-bone pt-24 pb-12">
+    <div className="min-h-screen bg-bone dark:bg-[#293515] text-primary dark:text-bone pt-24 pb-12">
       <SEO title="Privacy Policy | Ever Club" description="Ever Club privacy policy. Learn how we collect, use, and protect your personal information at our Tustin, CA indoor golf & social club." url="/privacy" />
       <div className="max-w-4xl mx-auto px-6">
         <h1 className="text-3xl sm:text-4xl md:text-5xl mb-8 leading-none" style={{ fontFamily: 'var(--font-display)' }}>Privacy Policy</h1>

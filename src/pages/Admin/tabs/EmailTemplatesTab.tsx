@@ -353,9 +353,9 @@ const EmailTemplatesTab: React.FC = () => {
                 </span>
               </div>
 
-              <div className="relative bg-bone dark:bg-[#1a1a1a]" style={{ minHeight: '600px' }}>
+              <div className="relative bg-bone dark:bg-[#293515]" style={{ minHeight: '600px' }}>
                 {previewLoading && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-bone/80 dark:bg-[#1a1a1a]/80 z-10">
+                  <div className="absolute inset-0 flex items-center justify-center bg-bone/80 dark:bg-[#293515]/80 z-10">
                     <WalkingGolferSpinner size="sm" />
                   </div>
                 )}

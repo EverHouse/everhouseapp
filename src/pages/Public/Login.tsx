@@ -342,7 +342,7 @@ const Login: React.FC = () => {
 
   if (otpSent) {
     return (
-      <div className="flex flex-col min-h-screen bg-bone dark:bg-[#141414] overflow-x-hidden">
+      <div className="flex flex-col min-h-screen bg-bone dark:bg-[#293515] overflow-x-hidden">
         <div className="flex-1 flex flex-col justify-center px-6 py-12">
           <div className="w-full max-w-sm mx-auto space-y-8">
             <div className="text-center">
@@ -425,7 +425,7 @@ const Login: React.FC = () => {
   }
 
   return (
-    <div className="flex flex-col min-h-screen bg-bone dark:bg-[#141414] overflow-x-hidden">
+    <div className="flex flex-col min-h-screen bg-bone dark:bg-[#293515] overflow-x-hidden">
       <div className="flex-1 flex flex-col justify-center px-6 py-12">
         <div className="w-full max-w-sm mx-auto space-y-8">
             
