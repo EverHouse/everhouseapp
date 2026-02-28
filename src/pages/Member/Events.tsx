@@ -347,7 +347,7 @@ const MemberEvents: React.FC = () => {
                               <span className="text-[10px] font-bold uppercase tracking-wider bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded-md whitespace-nowrap">Open</span>
                             )}
                           </div>
-                          <h3 className={`text-lg md:text-xl font-bold ${isDark ? 'text-white' : 'text-primary'}`}>{event.title}</h3>
+                          <h3 className={`text-2xl md:text-3xl font-bold leading-none translate-y-[2px] ${isDark ? 'text-white' : 'text-primary'}`} style={{ fontFamily: 'var(--font-headline)', fontOpticalSizing: 'auto', letterSpacing: '-0.02em' }}>{event.title}</h3>
                         </div>
                         <div className="flex flex-col items-end flex-shrink-0">
                           <span className={`text-sm md:text-base font-bold ${isDark ? 'text-accent' : 'text-primary'}`}>{event.date}</span>

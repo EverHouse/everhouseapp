@@ -811,8 +811,8 @@ export const EventsAdminContent: React.FC = () => {
                                                     </span>
                                                 )}
                                             </div>
-                                            <div className="flex-1 min-w-0">
-                                                <h4 className="font-bold text-lg text-primary dark:text-white leading-tight mb-1 truncate">{event.title}</h4>
+                                            <div className="flex-1 min-w-0 flex flex-col justify-center">
+                                                <h4 className="font-bold text-2xl text-primary dark:text-white leading-none mb-1 truncate translate-y-[2px]" style={{ fontFamily: 'var(--font-headline)', fontOpticalSizing: 'auto', letterSpacing: '-0.02em' }}>{event.title}</h4>
                                                 <span className="inline-block text-[10px] font-bold uppercase tracking-wider bg-primary/10 dark:bg-white/10 text-primary/80 dark:text-white/80 px-1.5 py-0.5 rounded mb-2">{event.category}</span>
                                                 <p className="text-xs text-gray-500 dark:text-gray-400">{formatDate(event.event_date)} • {formatTime(event.start_time)}</p>
                                             </div>
@@ -896,8 +896,8 @@ export const EventsAdminContent: React.FC = () => {
                                                     </span>
                                                 )}
                                             </div>
-                                            <div className="flex-1 min-w-0">
-                                                <h4 className="font-bold text-lg text-primary dark:text-white leading-tight mb-1 truncate">{event.title}</h4>
+                                            <div className="flex-1 min-w-0 flex flex-col justify-center">
+                                                <h4 className="font-bold text-2xl text-primary dark:text-white leading-none mb-1 truncate translate-y-[2px]" style={{ fontFamily: 'var(--font-headline)', fontOpticalSizing: 'auto', letterSpacing: '-0.02em' }}>{event.title}</h4>
                                                 <span className="inline-block text-[10px] font-bold uppercase tracking-wider bg-primary/10 dark:bg-white/10 text-primary/80 dark:text-white/80 px-1.5 py-0.5 rounded mb-2">{event.category}</span>
                                                 <p className="text-xs text-gray-500 dark:text-gray-400">{formatDate(event.event_date)} • {formatTime(event.start_time)}</p>
                                             </div>

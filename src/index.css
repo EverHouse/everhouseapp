@@ -726,14 +726,12 @@ h1 {
   font-family: var(--font-display);
   font-optical-sizing: auto;
   letter-spacing: -0.03em;
-  margin-bottom: 1.5rem;
 }
 
 h2, h3, h4, h5, h6 {
   font-family: var(--font-headline);
   font-optical-sizing: auto;
   letter-spacing: -0.02em;
-  margin-bottom: 1rem;
 }
 
 p, li, td, th, dd, dt, blockquote, figcaption {
