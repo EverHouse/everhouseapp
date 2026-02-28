@@ -123,11 +123,11 @@ const ProductsSubTab: React.FC<ProductsSubTabProps> = ({ activeSubTab }) => {
   const membershipProducts = products.filter(p => p.product_type === 'membership');
   const feeProducts = products.filter(p => p.product_type === 'fee' || p.product_type === 'pass');
 
-  const renderProduct = (product: ProductMapping) => {
+  const renderProduct = (product: ProductMapping, index: number) => {
     const isEditing = editingId === product.id;
     
     return (
-      <div key={product.id} className="p-4 rounded-xl bg-gray-50 dark:bg-black/20 border border-gray-200 dark:border-white/10 tactile-row">
+      <div key={product.id} className={`p-4 rounded-xl bg-gray-50 dark:bg-black/20 border border-gray-200 dark:border-white/10 tactile-row ${index < 10 ? `animate-list-item-delay-${index}` : 'animate-list-item'}`}>
         <div className="flex items-start justify-between">
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-1">
@@ -218,11 +218,11 @@ const ProductsSubTab: React.FC<ProductsSubTabProps> = ({ activeSubTab }) => {
     );
   };
 
-  const renderDiscountRule = (rule: DiscountRule) => {
+  const renderDiscountRule = (rule: DiscountRule, index: number) => {
     const isEditing = editingId === rule.id;
     
     return (
-      <div key={rule.id} className="p-4 rounded-xl bg-gray-50 dark:bg-black/20 border border-gray-200 dark:border-white/10">
+      <div key={rule.id} className={`p-4 rounded-xl bg-gray-50 dark:bg-black/20 border border-gray-200 dark:border-white/10 ${index < 10 ? `animate-list-item-delay-${index}` : 'animate-list-item'}`}>
         <div className="flex items-start justify-between">
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-1">
@@ -307,12 +307,12 @@ const ProductsSubTab: React.FC<ProductsSubTabProps> = ({ activeSubTab }) => {
   if (activeSubTab === 'membership') {
     return (
       <div ref={productsRef} className="space-y-4">
-        <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center justify-between mb-2 animate-content-enter">
           <p className="text-sm text-gray-500 dark:text-gray-400">
             {membershipProducts.length} membership product{membershipProducts.length !== 1 ? 's' : ''} linked to HubSpot
           </p>
         </div>
-        {membershipProducts.map(renderProduct)}
+        {membershipProducts.map((p, i) => renderProduct(p, i))}
         {membershipProducts.length === 0 && (
           <p className="text-center py-8 text-gray-500">No membership products configured</p>
         )}
@@ -323,12 +323,12 @@ const ProductsSubTab: React.FC<ProductsSubTabProps> = ({ activeSubTab }) => {
   if (activeSubTab === 'fees') {
     return (
       <div ref={productsRef} className="space-y-4">
-        <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center justify-between mb-2 animate-content-enter">
           <p className="text-sm text-gray-500 dark:text-gray-400">
             {feeProducts.length} fee product{feeProducts.length !== 1 ? 's' : ''} for charges and passes
           </p>
         </div>
-        {feeProducts.map(renderProduct)}
+        {feeProducts.map((p, i) => renderProduct(p, i))}
         {feeProducts.length === 0 && (
           <p className="text-center py-8 text-gray-500">No fee products configured</p>
         )}
@@ -339,12 +339,12 @@ const ProductsSubTab: React.FC<ProductsSubTabProps> = ({ activeSubTab }) => {
   if (activeSubTab === 'discounts') {
     return (
       <div ref={productsRef} className="space-y-4">
-        <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center justify-between mb-2 animate-content-enter">
           <p className="text-sm text-gray-500 dark:text-gray-400">
             {discountRules.length} discount rule{discountRules.length !== 1 ? 's' : ''} based on member tags
           </p>
         </div>
-        {discountRules.map(renderDiscountRule)}
+        {discountRules.map((r, i) => renderDiscountRule(r, i))}
         {discountRules.length === 0 && (
           <p className="text-center py-8 text-gray-500">No discount rules configured</p>
         )}

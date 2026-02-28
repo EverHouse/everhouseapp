@@ -1477,7 +1477,7 @@ html.dark .border-accessible {
 @keyframes staggerFadeIn {
   0% {
     opacity: 0;
-    transform: translateY(16px) scale(0.97);
+    transform: translateY(10px) scale(0.98);
   }
   100% {
     opacity: 1;
@@ -1519,7 +1519,7 @@ html.dark .border-accessible {
 /* Dynamic stagger with CSS variable - use style={{ '--stagger-index': index }} */
 .animate-slide-up-stagger {
   opacity: 0;
-  animation: staggerFadeIn 0.45s var(--spring-smooth) forwards;
+  animation: staggerFadeIn 0.5s var(--m3-emphasized-decel) forwards;
   animation-delay: calc(var(--stagger-index, 0) * 50ms);
 }
 
@@ -1903,7 +1903,7 @@ html.dark .border-accessible {
 @keyframes pageEnter {
   0% {
     opacity: 0;
-    transform: translateY(8px);
+    transform: translateY(6px);
   }
   100% {
     opacity: 1;
@@ -1925,11 +1925,11 @@ html.dark .border-accessible {
 @keyframes pageContentEnter {
   0% {
     opacity: 0;
-    transform: translateY(16px);
+    transform: translateY(10px) scale(0.98);
   }
   100% {
     opacity: 1;
-    transform: translateY(0);
+    transform: translateY(0) scale(1);
   }
 }
 
@@ -1968,11 +1968,11 @@ html.dark .border-accessible {
 @keyframes listItemEnter {
   0% {
     opacity: 0;
-    transform: translateY(20px);
+    transform: translateY(10px) scale(0.98);
   }
   100% {
     opacity: 1;
-    transform: translateY(0);
+    transform: translateY(0) scale(1);
   }
 }
 
