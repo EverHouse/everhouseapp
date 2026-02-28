@@ -590,7 +590,7 @@ const Profile: React.FC = () => {
          {/* Account Balance Section - only for members, not staff/admin */}
          {!isStaffOrAdminProfile && (
            <Section title="Account Balance" isDark={isDark} staggerIndex={2}>
-             <div className="p-4">
+             <div className="py-3 px-6">
                <div className="flex items-center justify-between mb-4">
                  <div className="flex items-center gap-4">
                    <span className={`material-symbols-outlined ${isDark ? 'opacity-70' : 'text-primary/70'}`}>account_balance_wallet</span>
@@ -655,7 +655,7 @@ const Profile: React.FC = () => {
          )}
 
          <Section title="Settings" isDark={isDark} staggerIndex={4}>
-            <div className={`p-4 flex items-center justify-between transition-colors ${isDark ? 'hover:bg-white/5' : 'hover:bg-black/5'}`}>
+            <div className={`py-3 px-6 w-full flex items-center justify-between transition-colors ${isDark ? 'hover:bg-white/5' : 'hover:bg-black/5'}`}>
               <div className="flex items-center gap-4">
                 <span className={`material-symbols-outlined ${isDark ? 'opacity-70' : 'text-primary/70'}`}>notifications</span>
                 <div>
@@ -683,7 +683,7 @@ const Profile: React.FC = () => {
             {/* Email/SMS opt-in toggles - only for members */}
             {!isStaffOrAdminProfile && (
               <>
-                <div className={`p-4 flex items-center justify-between transition-colors ${isDark ? 'hover:bg-white/5' : 'hover:bg-black/5'}`}>
+                <div className={`py-3 px-6 w-full flex items-center justify-between transition-colors ${isDark ? 'hover:bg-white/5' : 'hover:bg-black/5'}`}>
                   <div className="flex items-center gap-4">
                     <span className={`material-symbols-outlined ${isDark ? 'opacity-70' : 'text-primary/70'}`}>mail</span>
                     <div>
@@ -700,7 +700,7 @@ const Profile: React.FC = () => {
                     label="Email Updates"
                   />
                 </div>
-                <div className={`p-4 flex items-center justify-between transition-colors ${isDark ? 'hover:bg-white/5' : 'hover:bg-black/5'}`}>
+                <div className={`py-3 px-6 w-full flex items-center justify-between transition-colors ${isDark ? 'hover:bg-white/5' : 'hover:bg-black/5'}`}>
                   <div className="flex items-center gap-4">
                     <span className={`material-symbols-outlined ${isDark ? 'opacity-70' : 'text-primary/70'}`}>sms</span>
                     <div>
@@ -792,7 +792,7 @@ const Profile: React.FC = () => {
          </Section>
 
          <Section title="Connected Accounts" isDark={isDark} staggerIndex={5}>
-           <div className="p-4 transition-colors">
+           <div className="py-3 px-6 w-full transition-colors">
              <div className="flex items-center justify-between">
                <div className="flex items-center gap-4">
                  <svg className="w-5 h-5" viewBox="0 0 24 24">
@@ -840,7 +840,7 @@ const Profile: React.FC = () => {
              </div>
            </div>
 
-           <div className={`px-4 pb-3 ${isDark ? 'opacity-50' : 'text-primary/40'}`}>
+           <div className={`py-3 px-6 ${isDark ? 'opacity-50' : 'text-primary/40'}`}>
              <div className="flex items-center gap-3">
                <svg className="w-5 h-5" viewBox="0 0 24 24">
                  <path fill="currentColor" d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/>
@@ -855,7 +855,7 @@ const Profile: React.FC = () => {
 
          {/* Password Setup Banner for Staff/Admin */}
          {showPasswordSetupBanner && isStaffOrAdminProfile && (
-           <div className={`rounded-2xl p-4 mb-4 ${isDark ? 'bg-accent/20 border border-accent/30' : 'bg-amber-50 border border-amber-200'}`}>
+           <div className={`rounded-xl p-4 mb-4 ${isDark ? 'bg-accent/20 border border-accent/30' : 'bg-amber-50 border border-amber-200'}`}>
              <div className="flex items-start gap-3">
                <span className={`material-symbols-outlined text-xl ${isDark ? 'text-accent' : 'text-amber-600'}`}>key</span>
                <div className="flex-1">
@@ -896,7 +896,7 @@ const Profile: React.FC = () => {
          {isStaffOrAdminProfile && (
            <Section title="Security" isDark={isDark} staggerIndex={6}>
               <div 
-                className={`p-4 flex items-center justify-between transition-colors cursor-pointer tactile-row ${isDark ? 'hover:bg-white/5' : 'hover:bg-black/5'}`}
+                className={`py-3 px-6 w-full flex items-center justify-between transition-colors cursor-pointer tactile-row ${isDark ? 'hover:bg-white/5' : 'hover:bg-black/5'}`}
                 role="button"
                 tabIndex={0}
                 onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setShowPasswordSection(!showPasswordSection); } }}
@@ -997,7 +997,7 @@ const Profile: React.FC = () => {
          {/* Logout Button */}
          <button
            onClick={logout}
-           className={`w-full p-4 rounded-2xl font-semibold text-sm transition-colors flex items-center justify-center gap-2 ${
+           className={`w-full p-4 rounded-xl font-semibold text-sm transition-colors flex items-center justify-center gap-2 ${
              isDark 
                ? 'glass-card text-red-400 hover:bg-red-500/20' 
                : 'bg-red-50 text-red-600 hover:bg-red-100'
@@ -1009,7 +1009,7 @@ const Profile: React.FC = () => {
 
          {/* View as Banner for admin viewing member */}
          {isAdminViewingAs && (
-           <div className={`rounded-2xl p-4 ${isDark ? 'bg-accent/20 border border-accent/30' : 'bg-amber-50 border border-amber-200'}`}>
+           <div className={`rounded-xl p-4 ${isDark ? 'bg-accent/20 border border-accent/30' : 'bg-amber-50 border border-amber-200'}`}>
              <div className="flex items-center gap-3">
                <span className={`material-symbols-outlined text-xl ${isDark ? 'text-accent' : 'text-amber-600'}`}>visibility</span>
                <div className="flex-1">
@@ -1159,15 +1159,15 @@ const Profile: React.FC = () => {
 
 const Section: React.FC<{title: string; children: React.ReactNode; isDark?: boolean; staggerIndex?: number}> = ({ title, children, isDark = true, staggerIndex }) => (
   <div className="animate-slide-up-stagger" style={staggerIndex !== undefined ? { '--stagger-index': staggerIndex } as React.CSSProperties : undefined}>
-     <h3 className={`text-xs font-bold uppercase tracking-wider ml-2 mb-3 ${isDark ? 'opacity-70' : 'text-primary/70'}`}>{title}</h3>
-     <div className={`rounded-2xl overflow-hidden glass-card p-0 divide-y ${isDark ? 'divide-white/20 border-white/25' : 'divide-black/5 border-black/10'}`}>
+     <h3 className={`text-2xl leading-tight ml-2 mb-3 ${isDark ? 'text-white' : 'text-primary'}`} style={{ fontFamily: 'var(--font-headline)' }}>{title}</h3>
+     <div className={`rounded-xl overflow-hidden glass-card px-0 divide-y ${isDark ? 'divide-white/20 border-white/25' : 'divide-black/5 border-black/10'}`}>
         {children}
      </div>
   </div>
 );
 
 const Row: React.FC<{icon: string; label: string; value?: string; toggle?: boolean; arrow?: boolean; isDark?: boolean; onClick?: () => void}> = ({ icon, label, value, toggle, arrow, isDark = true, onClick }) => (
-   <div onClick={onClick} {...(onClick ? { role: 'button', tabIndex: 0, onKeyDown: (e: React.KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } } } : {})} className={`py-3 px-4 w-full flex items-center justify-between transition-colors cursor-pointer tactile-row ${isDark ? 'hover:bg-white/5' : 'hover:bg-black/5'}`}>
+   <div onClick={onClick} {...(onClick ? { role: 'button', tabIndex: 0, onKeyDown: (e: React.KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } } } : {})} className={`py-3 px-6 w-full flex items-center justify-between transition-colors cursor-pointer tactile-row ${isDark ? 'hover:bg-white/5' : 'hover:bg-black/5'}`}>
       <div className="flex items-center gap-4">
          <span className={`material-symbols-outlined ${isDark ? 'opacity-70' : 'text-primary/70'}`}>{icon}</span>
          <span className={`font-medium text-sm ${isDark ? '' : 'text-primary'}`}>{label}</span>

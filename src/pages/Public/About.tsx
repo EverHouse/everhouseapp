@@ -39,17 +39,17 @@ const About: React.FC = () => {
         style={{ marginTop: 'calc(-1 * var(--header-offset))', paddingTop: 'var(--header-offset)' }}
       >
         <section className="px-6 pt-8 md:pt-12 pb-10 text-center animate-content-enter">
-          <h1 className="text-4xl md:text-5xl font-bold tracking-tight text-primary dark:text-white mb-3" style={{ fontFamily: "'Newsreader', serif" }}>
+          <h1 className="text-5xl text-primary dark:text-white mb-3 leading-none" style={{ fontFamily: 'var(--font-display)' }}>
             About Ever Club
           </h1>
-          <p className="text-primary/70 dark:text-white/70 text-lg font-medium max-w-md mx-auto">
+          <p className="text-base text-primary/70 dark:text-white/70 font-medium max-w-md mx-auto leading-relaxed" style={{ fontFamily: 'var(--font-body)' }}>
             Orange County's Premier Indoor Golf & Social Club
           </p>
         </section>
 
         <section className="px-6 pb-10 animate-content-enter-delay-1">
           <div className="max-w-2xl mx-auto">
-            <h2 className="text-2xl font-bold text-primary dark:text-white mb-4" style={{ fontFamily: "'Newsreader', serif" }}>
+            <h2 className="text-2xl text-primary dark:text-white mb-4 leading-tight" style={{ fontFamily: 'var(--font-headline)' }}>
               Our Story
             </h2>
             <div className="space-y-4 text-sm text-primary/70 dark:text-white/70 leading-relaxed">
@@ -68,14 +68,14 @@ const About: React.FC = () => {
 
         <section className="px-6 pb-10 animate-content-enter-delay-2">
           <div className="max-w-2xl mx-auto">
-            <h2 className="text-2xl font-bold text-primary dark:text-white mb-6" style={{ fontFamily: "'Newsreader', serif" }}>
+            <h2 className="text-2xl text-primary dark:text-white mb-6 leading-tight" style={{ fontFamily: 'var(--font-headline)' }}>
               What We Offer
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {OFFERINGS.map((item) => (
                 <div
                   key={item.title}
-                  className="bg-white dark:bg-[#1a1d15] rounded-2xl p-5 border border-black/5 dark:border-white/10 shadow-sm dark:shadow-black/20"
+                  className="bg-white dark:bg-[#1a1d15] rounded-xl p-5 border border-black/5 dark:border-white/10 shadow-sm dark:shadow-black/20"
                 >
                   <div className="flex items-center gap-3 mb-2">
                     <div className="flex items-center justify-center size-10 rounded-full bg-bone dark:bg-white/5 text-primary dark:text-white shrink-0">
@@ -92,14 +92,14 @@ const About: React.FC = () => {
 
         <section className="px-6 pb-10">
           <div className="max-w-2xl mx-auto">
-            <h2 className="text-2xl font-bold text-primary dark:text-white mb-6" style={{ fontFamily: "'Newsreader', serif" }}>
+            <h2 className="text-2xl text-primary dark:text-white mb-6 leading-tight" style={{ fontFamily: 'var(--font-headline)' }}>
               Our Values
             </h2>
             <div className="space-y-4">
               {VALUES.map((value) => (
                 <div
                   key={value.title}
-                  className="flex items-start gap-4 bg-[#E8E8E0]/50 dark:bg-white/5 rounded-2xl p-5"
+                  className="flex items-start gap-4 bg-[#E8E8E0]/50 dark:bg-white/5 rounded-xl p-5"
                 >
                   <div className="flex items-center justify-center size-10 rounded-full bg-primary/10 dark:bg-white/10 text-primary dark:text-white shrink-0 mt-0.5">
                     <span className="material-symbols-outlined text-xl">{value.icon}</span>
@@ -115,8 +115,8 @@ const About: React.FC = () => {
         </section>
 
         <section className="px-6 py-10 mb-4">
-          <div className="bg-primary rounded-2xl p-8 text-center max-w-2xl mx-auto">
-            <h2 className="text-2xl font-bold text-white mb-3" style={{ fontFamily: "'Newsreader', serif" }}>
+          <div className="bg-primary rounded-xl p-8 text-center max-w-2xl mx-auto">
+            <h2 className="text-2xl text-white mb-3 leading-tight" style={{ fontFamily: 'var(--font-headline)' }}>
               Ready to Experience Ever Club?
             </h2>
             <p className="text-white/70 text-sm mb-6 max-w-sm mx-auto">
@@ -125,14 +125,14 @@ const About: React.FC = () => {
             <div className="flex flex-col sm:flex-row justify-center gap-3">
               <Link
                 to="/tours"
-                className="inline-flex items-center justify-center gap-2 bg-[#F2F2EC] text-[#293515] px-6 py-3.5 rounded-xl font-bold text-sm hover:opacity-90 transition-opacity"
+                className="inline-flex items-center justify-center gap-2 bg-[#F2F2EC] text-[#293515] px-6 py-3.5 rounded-[4px] font-bold text-sm hover:opacity-90 transition-opacity"
               >
                 Book a Tour
                 <span className="material-symbols-outlined text-lg">arrow_forward</span>
               </Link>
               <Link
                 to="/membership"
-                className="inline-flex items-center justify-center gap-2 border border-white/30 text-white px-6 py-3.5 rounded-xl font-bold text-sm hover:bg-white/10 transition-colors"
+                className="inline-flex items-center justify-center gap-2 border border-white/30 text-white px-6 py-3.5 rounded-[4px] font-bold text-sm hover:bg-white/10 transition-colors"
               >
                 Explore Membership
               </Link>

@@ -321,7 +321,7 @@ const SubscriptionsSubTab: React.FC = () => {
 
       {filteredSubscriptions.length === 0 ? (
         <div className="flex items-center justify-center min-h-[300px]">
-          <div className="bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl p-8 max-w-md w-full">
+          <div className="bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-xl p-8 max-w-md w-full">
             <div className="flex flex-col items-center text-center gap-4">
               <div className="w-16 h-16 rounded-full bg-primary/10 dark:bg-lavender/20 flex items-center justify-center">
                 <span className="material-symbols-outlined text-4xl text-primary dark:text-lavender">subscriptions</span>
@@ -347,11 +347,11 @@ const SubscriptionsSubTab: React.FC = () => {
                     <p className="text-xs text-primary/60 dark:text-white/60 truncate">{sub.memberEmail}</p>
                   </div>
                   <div className="flex items-center gap-1.5 ml-2 flex-shrink-0">
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getSubscriptionStatusBadge(sub.status)}`}>
+                    <span className={`px-2 py-0.5 rounded-[4px] text-xs font-medium ${getSubscriptionStatusBadge(sub.status)}`}>
                       {sub.status === 'past_due' ? 'Past Due' : sub.status.charAt(0).toUpperCase() + sub.status.slice(1)}
                     </span>
                     {sub.cancelAtPeriodEnd && (
-                      <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400">
+                      <span className="px-2 py-0.5 rounded-[4px] text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400">
                         Canceling
                       </span>
                     )}
@@ -400,7 +400,7 @@ const SubscriptionsSubTab: React.FC = () => {
           </div>
 
           {/* Desktop table view */}
-          <div className="hidden md:block bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl overflow-hidden">
+          <div className="hidden md:block bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-xl overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
@@ -433,11 +433,11 @@ const SubscriptionsSubTab: React.FC = () => {
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
-                          <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${getSubscriptionStatusBadge(sub.status)}`}>
+                          <span className={`px-2.5 py-1 rounded-[4px] text-xs font-medium ${getSubscriptionStatusBadge(sub.status)}`}>
                             {sub.status === 'past_due' ? 'Past Due' : sub.status.charAt(0).toUpperCase() + sub.status.slice(1)}
                           </span>
                           {sub.cancelAtPeriodEnd && (
-                            <span className="px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400">
+                            <span className="px-2 py-1 rounded-[4px] text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400">
                               Canceling
                             </span>
                           )}
@@ -675,7 +675,7 @@ const InvoicesSubTab: React.FC = () => {
 
       {filteredInvoices.length === 0 ? (
         <div className="flex items-center justify-center min-h-[300px]">
-          <div className="bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl p-8 max-w-md w-full">
+          <div className="bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-xl p-8 max-w-md w-full">
             <div className="flex flex-col items-center text-center gap-4">
               <div className="w-16 h-16 rounded-full bg-primary/10 dark:bg-lavender/20 flex items-center justify-center">
                 <span className="material-symbols-outlined text-4xl text-primary dark:text-lavender">description</span>
@@ -700,7 +700,7 @@ const InvoicesSubTab: React.FC = () => {
                     <p className="font-medium text-primary dark:text-white truncate">{invoice.memberName}</p>
                     <p className="text-xs text-primary/60 dark:text-white/60 truncate">{invoice.memberEmail}</p>
                   </div>
-                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ml-2 flex-shrink-0 ${getInvoiceStatusBadge(invoice.status)}`}>
+                  <span className={`px-2 py-0.5 rounded-[4px] text-xs font-medium ml-2 flex-shrink-0 ${getInvoiceStatusBadge(invoice.status)}`}>
                     {invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1)}
                   </span>
                 </div>
@@ -755,7 +755,7 @@ const InvoicesSubTab: React.FC = () => {
           </div>
 
           {/* Desktop table view */}
-          <div className="hidden md:block bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl overflow-hidden">
+          <div className="hidden md:block bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-xl overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
@@ -795,7 +795,7 @@ const InvoicesSubTab: React.FC = () => {
                         </div>
                       </td>
                       <td className="px-4 py-3">
-                        <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${getInvoiceStatusBadge(invoice.status)}`}>
+                        <span className={`px-2.5 py-1 rounded-[4px] text-xs font-medium ${getInvoiceStatusBadge(invoice.status)}`}>
                           {invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1)}
                         </span>
                       </td>

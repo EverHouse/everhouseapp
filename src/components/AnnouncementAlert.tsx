@@ -90,7 +90,7 @@ const AnnouncementAlert: React.FC = () => {
 
   return (
     <article 
-      className={`mb-6 p-4 rounded-2xl border cursor-pointer transition-all duration-fast ${cardColors} focus-visible:ring-2 focus-visible:ring-[#CCB8E4] focus-visible:outline-none`}
+      className={`mb-6 p-4 rounded-xl border cursor-pointer transition-all duration-fast ${cardColors} focus-visible:ring-2 focus-visible:ring-[#CCB8E4] focus-visible:outline-none`}
       onClick={handleViewAll}
       onKeyDown={handleKeyDown}
       onKeyUp={handleKeyUp}
@@ -131,7 +131,7 @@ const AnnouncementAlert: React.FC = () => {
           </div>
           
           <div className="flex items-center justify-between mt-2">
-            <span className={`text-[10px] uppercase font-bold tracking-wide ${labelColor}`}>
+            <span className={`text-[10px] uppercase font-bold tracking-widest ${labelColor}`}>
               {labelText}
             </span>
             <span className={`text-xs font-medium flex items-center gap-1 ${isDark ? 'text-white/70' : 'text-gray-600'}`}>

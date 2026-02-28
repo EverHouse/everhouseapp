@@ -84,7 +84,7 @@ export const OverduePaymentsSection: React.FC<OverduePaymentsSectionProps> = ({ 
 
   if (loading) {
     return (
-      <div className={`${isDesktop ? 'h-full min-h-[280px]' : 'min-h-[200px]'} flex flex-col bg-white/40 dark:bg-white/[0.08] backdrop-blur-xl border border-white/60 dark:border-white/[0.12] rounded-2xl pt-4 overflow-hidden shadow-liquid dark:shadow-liquid-dark`}>
+      <div className={`${isDesktop ? 'h-full min-h-[280px]' : 'min-h-[200px]'} flex flex-col bg-white/40 dark:bg-white/[0.08] backdrop-blur-xl border border-white/60 dark:border-white/[0.12] rounded-xl pt-4 overflow-hidden shadow-liquid dark:shadow-liquid-dark`}>
         <div className="flex items-center justify-center flex-1">
           <WalkingGolferSpinner size="sm" variant="auto" />
         </div>
@@ -95,15 +95,15 @@ export const OverduePaymentsSection: React.FC<OverduePaymentsSectionProps> = ({ 
   return (
     <>
       <div 
-        className={`${isDesktop ? 'h-full min-h-[280px]' : 'min-h-[200px]'} flex flex-col bg-white/40 dark:bg-white/[0.08] backdrop-blur-xl border border-white/60 dark:border-white/[0.12] rounded-2xl pt-4 overflow-hidden shadow-liquid dark:shadow-liquid-dark ${count > 0 ? 'border-l-4 border-l-red-500' : ''}`}
+        className={`${isDesktop ? 'h-full min-h-[280px]' : 'min-h-[200px]'} flex flex-col bg-white/40 dark:bg-white/[0.08] backdrop-blur-xl border border-white/60 dark:border-white/[0.12] rounded-xl pt-4 overflow-hidden shadow-liquid dark:shadow-liquid-dark ${count > 0 ? 'border-l-4 border-l-red-500' : ''}`}
         role="region"
         aria-label={count > 0 ? `Overdue Payments - ${count} outstanding` : 'Overdue Payments'}
       >
         <div className="flex items-center justify-between mb-3 lg:mb-4 flex-shrink-0 px-4">
           <div className="flex items-center gap-2">
-            <h3 className="font-bold text-primary dark:text-white">Overdue Payments</h3>
+            <h3 className="font-bold text-primary dark:text-white" style={{ fontFamily: 'var(--font-headline)' }}>Overdue Payments</h3>
             {count > 0 && (
-              <span className="px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-400 rounded-full flex items-center gap-1">
+              <span className="px-2 py-0.5 text-[10px] font-semibold uppercase tracking-widest bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-400 rounded-[4px] flex items-center gap-1">
                 <span className="material-symbols-outlined text-xs">warning</span>
                 {count}
               </span>
@@ -113,7 +113,7 @@ export const OverduePaymentsSection: React.FC<OverduePaymentsSectionProps> = ({ 
             <button
               onClick={handleBulkReviewWaivers}
               disabled={bulkReviewing}
-              className="px-3 py-1.5 text-xs font-medium bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 rounded-full hover:bg-amber-200 dark:hover:bg-amber-900/60 transition-colors disabled:opacity-50 flex items-center gap-1"
+              className="px-3 py-1.5 text-xs font-medium bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 rounded-[4px] hover:bg-amber-200 dark:hover:bg-amber-900/60 transition-colors disabled:opacity-50 flex items-center gap-1"
             >
               <span className="material-symbols-outlined text-sm">check_circle</span>
               {bulkReviewing ? 'Reviewing...' : `Review All Waivers (${staleWaiverCount})`}
@@ -146,7 +146,7 @@ export const OverduePaymentsSection: React.FC<OverduePaymentsSectionProps> = ({ 
                         ${payment.totalOutstanding.toFixed(2)}
                       </span>
                     ) : payment.unreviewedWaivers > 0 ? (
-                      <span className="px-2 py-0.5 text-xs font-medium bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 rounded-full">
+                      <span className="px-2 py-0.5 text-xs font-medium bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 rounded-[4px]">
                         Needs Review
                       </span>
                     ) : null}

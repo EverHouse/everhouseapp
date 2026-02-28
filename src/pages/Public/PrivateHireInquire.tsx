@@ -195,7 +195,7 @@ const PrivateHireInquire: React.FC = () => {
       <div className="px-4 pb-12">
         <div className="max-w-xl mx-auto">
           <div className="text-center mb-8">
-            <h1 className="text-3xl md:text-4xl font-serif font-light text-primary dark:text-white mb-3">
+            <h1 className="text-5xl text-primary dark:text-white mb-3 leading-none" style={{ fontFamily: 'var(--font-display)' }}>
               Host Your Event
             </h1>
             <p className="text-primary/60 dark:text-white/60 text-sm md:text-base">
@@ -204,23 +204,23 @@ const PrivateHireInquire: React.FC = () => {
           </div>
 
           {success ? (
-            <div className="bg-white/60 dark:bg-white/5 backdrop-blur-xl rounded-[2rem] border border-white/80 dark:border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.08)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.3)] p-8 text-center">
+            <div className="bg-white/60 dark:bg-white/5 backdrop-blur-xl rounded-xl border border-white/80 dark:border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.08)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.3)] p-8 text-center">
               <div className="w-20 h-20 bg-green-100 dark:bg-green-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
                 <span className="material-symbols-outlined text-4xl text-green-600 dark:text-green-400">check_circle</span>
               </div>
-              <h2 className="text-2xl font-bold text-primary dark:text-white mb-3">Thank You!</h2>
+              <h2 className="text-2xl text-primary dark:text-white mb-3 leading-tight" style={{ fontFamily: 'var(--font-headline)' }}>Thank You!</h2>
               <p className="text-primary/70 dark:text-white/70 mb-8 max-w-sm mx-auto">
                 We've received your event inquiry and will be in touch soon to discuss the details.
               </p>
               <Link 
                 to="/private-hire"
-                className="inline-block px-8 py-4 bg-primary text-white rounded-[2rem] font-semibold hover:scale-[1.02] active:scale-[0.98] transition-all duration-fast"
+                className="inline-block px-8 py-4 bg-primary text-white rounded-[4px] font-semibold hover:scale-[1.02] active:scale-[0.98] transition-all duration-fast"
               >
                 Back to Private Hire
               </Link>
             </div>
           ) : (
-            <div className="bg-white/60 dark:bg-white/5 backdrop-blur-xl rounded-[2rem] border border-white/80 dark:border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.08)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.3)] overflow-hidden">
+            <div className="bg-white/60 dark:bg-white/5 backdrop-blur-xl rounded-xl border border-white/80 dark:border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.08)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.3)] overflow-hidden">
               <div className="flex items-center justify-center gap-3 py-6 border-b border-primary/10 dark:border-white/10">
                 <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm transition-all duration-fast ${step === 1 ? 'bg-primary text-white' : 'bg-primary/10 dark:bg-white/10 text-primary dark:text-white'}`}>1</div>
                 <div className="w-16 h-0.5 bg-primary/20 dark:bg-white/20" />
@@ -347,14 +347,14 @@ const PrivateHireInquire: React.FC = () => {
                     <button
                       type="button"
                       onClick={handleNext}
-                      className="w-full py-4 bg-primary text-white rounded-[2rem] font-semibold hover:scale-[1.02] active:scale-[0.98] transition-all duration-fast"
+                      className="w-full py-4 bg-primary text-white rounded-[4px] font-semibold hover:scale-[1.02] active:scale-[0.98] transition-all duration-fast"
                     >
                       Next
                     </button>
                   </div>
                 ) : (
                   <div className="space-y-5">
-                    <h3 className="text-xl font-bold text-primary dark:text-white font-serif">Event Details</h3>
+                    <h3 className="text-2xl text-primary dark:text-white leading-tight" style={{ fontFamily: 'var(--font-headline)' }}>Event Details</h3>
 
                     <div className="grid grid-cols-2 gap-4">
                       <div>
@@ -495,14 +495,14 @@ const PrivateHireInquire: React.FC = () => {
                       <button
                         type="button"
                         onClick={handleBack}
-                        className="tactile-btn flex-1 py-4 bg-primary/10 dark:bg-white/10 text-primary dark:text-white rounded-[2rem] font-semibold hover:bg-primary/20 dark:hover:bg-white/20 transition-all duration-fast"
+                        className="tactile-btn flex-1 py-4 bg-primary/10 dark:bg-white/10 text-primary dark:text-white rounded-[4px] font-semibold hover:bg-primary/20 dark:hover:bg-white/20 transition-all duration-fast"
                       >
                         Previous
                       </button>
                       <button
                         type="submit"
                         disabled={loading}
-                        className="flex-1 py-4 bg-primary text-white rounded-[2rem] font-semibold hover:scale-[1.02] active:scale-[0.98] transition-all duration-fast disabled:opacity-50 flex items-center justify-center gap-2"
+                        className="flex-1 py-4 bg-primary text-white rounded-[4px] font-semibold hover:scale-[1.02] active:scale-[0.98] transition-all duration-fast disabled:opacity-50 flex items-center justify-center gap-2"
                       >
                         {loading ? (
                           <>

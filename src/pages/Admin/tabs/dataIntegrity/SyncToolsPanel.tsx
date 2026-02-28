@@ -109,7 +109,7 @@ const SyncToolsPanel: React.FC<SyncToolsPanelProps> = ({
   const [toolsRef] = useAutoAnimate();
 
   return (
-    <div className="mb-6 bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl p-4">
+    <div className="mb-6 bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-xl p-4">
       <button
         onClick={() => setShowDataTools(!showDataTools)}
         className="flex items-center justify-between w-full text-left"

@@ -118,7 +118,7 @@ const OverduePaymentsPanel: React.FC<SectionProps> = ({ onClose, variant = 'moda
   const wrapper = (
     <>
       {variant === 'card' ? (
-        <div className="bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl p-5 min-h-[300px]">
+        <div className="bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-xl p-5 min-h-[300px]">
           <div className="flex items-center gap-2 mb-4">
             <span className="material-symbols-outlined text-red-600 dark:text-red-400">warning</span>
             <h3 className="font-bold text-primary dark:text-white">Overdue Payments</h3>
@@ -141,7 +141,7 @@ const OverduePaymentsPanel: React.FC<SectionProps> = ({ onClose, variant = 'moda
           {content}
         </div>
       ) : (
-        <div className="bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl p-4">
+        <div className="bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-xl p-4">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <span className="material-symbols-outlined text-red-600 dark:text-red-400">warning</span>

@@ -188,7 +188,7 @@ function ConfirmDialogComponent({
         >
           <div
             className={`
-              rounded-2xl p-6 shadow-2xl
+              rounded-xl p-6 shadow-2xl
               backdrop-blur-xl backdrop-saturate-150
               ${isDark 
                 ? 'bg-[#1a1d15]/90 border border-white/10 shadow-black/50' 

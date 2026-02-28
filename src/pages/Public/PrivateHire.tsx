@@ -58,7 +58,7 @@ const PrivateHire: React.FC = () => {
          </div>
          
          <div className="relative z-10 flex flex-col items-center text-center">
-           <h1 className="text-3xl sm:text-4xl md:text-5xl font-semibold tracking-tight leading-[1.05] mb-4 text-white text-shadow-sm font-serif animate-hero-headline">
+           <h1 className="text-5xl leading-none mb-4 text-white text-shadow-sm animate-hero-headline" style={{ fontFamily: 'var(--font-display)' }}>
              Curated spaces for <br/> unforgettable moments.
            </h1>
            <p className="text-sm sm:text-base text-white/80 mb-4 sm:mb-5 max-w-md tracking-wide leading-relaxed animate-hero-tagline">
@@ -70,7 +70,7 @@ const PrivateHire: React.FC = () => {
            <div className="flex flex-col gap-3 w-full max-w-xs animate-hero-cta">
              <Link 
                to="/private-hire/inquire"
-               className="w-full py-4 rounded-2xl bg-white/30 backdrop-blur-xl text-white font-bold text-xs uppercase tracking-[0.15em] shadow-lg hover:scale-[1.02] hover:bg-white/40 transition-all duration-fast text-center border border-white/40"
+               className="w-full py-4 rounded-[4px] bg-white/30 backdrop-blur-xl text-white font-bold text-xs uppercase tracking-[0.15em] shadow-lg hover:scale-[1.02] hover:bg-white/40 transition-all duration-fast text-center border border-white/40"
              >
                Plan Your Event
              </Link>
@@ -83,7 +83,7 @@ const PrivateHire: React.FC = () => {
        <section className="py-20 px-4 md:px-6 bg-bone dark:bg-[#141414]">
          <div className="max-w-7xl mx-auto">
            <div className="text-center mb-12 px-2">
-             <h2 className="text-3xl md:text-4xl font-light text-primary dark:text-white mb-4 font-serif">
+             <h2 className="text-2xl text-primary dark:text-white mb-4 leading-tight" style={{ fontFamily: 'var(--font-headline)' }}>
                Explore the Space
              </h2>
              <p className="text-primary/60 dark:text-white/60 max-w-2xl mx-auto">
@@ -97,7 +97,7 @@ const PrivateHire: React.FC = () => {
        <section className="py-20 px-4 md:px-6 bg-bone dark:bg-[#141414]">
          <div className="max-w-7xl mx-auto">
            <div className="text-center mb-12 px-2">
-             <h2 className="text-3xl md:text-4xl font-light text-primary dark:text-white mb-4 font-serif">
+             <h2 className="text-2xl text-primary dark:text-white mb-4 leading-tight" style={{ fontFamily: 'var(--font-headline)' }}>
                Tailored to Your Vision
              </h2>
              <p className="text-primary/60 dark:text-white/60 max-w-2xl mx-auto">
@@ -117,7 +117,7 @@ const PrivateHire: React.FC = () => {
              ].map((feature, i) => (
                <div
                  key={feature.title}
-                 className="flex flex-col p-6 bg-white/40 dark:bg-white/5 backdrop-blur-xl border border-white/60 dark:border-white/10 rounded-[2rem] shadow-[0_8px_32px_rgba(0,0,0,0.1),inset_0_1px_1px_rgba(255,255,255,0.6)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.3)] animate-slide-up-stagger"
+                 className="flex flex-col p-6 bg-white/40 dark:bg-white/5 backdrop-blur-xl border border-white/60 dark:border-white/10 rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.1),inset_0_1px_1px_rgba(255,255,255,0.6)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.3)] animate-slide-up-stagger"
                  style={{ '--stagger-index': i } as React.CSSProperties}
                >
                  <span className="material-symbols-outlined text-3xl text-primary dark:text-white mb-3">{feature.icon}</span>
@@ -169,10 +169,10 @@ const PrivateHire: React.FC = () => {
 };
 
 const SpaceCard: React.FC<{ title: string; cap: string; img: string; tags: string[]; desc: string; index?: number }> = ({ title, cap, img, tags, desc, index = 0 }) => (
-  <div className="group relative flex flex-col rounded-[2rem] overflow-hidden backdrop-blur-xl bg-white/40 dark:bg-white/5 border border-white/60 dark:border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.1),inset_0_1px_1px_rgba(255,255,255,0.6)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.3)] hover:scale-[1.02] hover:-translate-y-1 transition-all duration-[400ms] animate-slide-up-stagger" style={{ '--stagger-index': index + 1 } as React.CSSProperties}>
+  <div className="group relative flex flex-col rounded-xl overflow-hidden backdrop-blur-xl bg-white/40 dark:bg-white/5 border border-white/60 dark:border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.1),inset_0_1px_1px_rgba(255,255,255,0.6)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.3)] hover:scale-[1.02] hover:-translate-y-1 transition-all duration-[400ms] animate-slide-up-stagger" style={{ '--stagger-index': index + 1 } as React.CSSProperties}>
      <div className="h-56 bg-cover bg-center relative" style={{backgroundImage: `url("${img}")`}}>
         <div className="absolute inset-0 bg-gradient-to-t from-white/40 dark:from-black/40 to-transparent"></div>
-        <div className="absolute top-4 right-4 bg-black/30 backdrop-blur-md border border-white/30 px-3 py-1.5 rounded-full flex items-center gap-1 shadow-[0_0_12px_rgba(0,0,0,0.2)]">
+        <div className="absolute top-4 right-4 bg-black/30 backdrop-blur-md border border-white/30 px-2 py-1.5 rounded-[4px] flex items-center gap-1 shadow-[0_0_12px_rgba(0,0,0,0.2)]">
            <span className="material-symbols-outlined text-sm text-white drop-shadow">groups</span>
            <span className="text-[10px] font-bold text-white uppercase drop-shadow">{cap}</span>
         </div>
@@ -182,7 +182,7 @@ const SpaceCard: React.FC<{ title: string; cap: string; img: string; tags: strin
         <p className="text-sm text-primary/60 dark:text-white/60 mb-4 line-clamp-2 leading-relaxed">{desc}</p>
         <div className="flex flex-wrap gap-2">
            {tags.map((tag: string) => (
-             <span key={tag} className="px-3 py-1 bg-white/60 dark:bg-white/10 backdrop-blur border border-white/80 dark:border-white/10 rounded-full text-[10px] font-bold uppercase tracking-wide text-primary dark:text-white shadow-sm dark:shadow-black/20">{tag}</span>
+             <span key={tag} className="w-fit px-2 py-1 bg-white/60 dark:bg-white/10 backdrop-blur border border-white/80 dark:border-white/10 rounded-[4px] text-[10px] font-bold uppercase tracking-widest text-primary dark:text-white shadow-sm dark:shadow-black/20">{tag}</span>
            ))}
         </div>
      </div>

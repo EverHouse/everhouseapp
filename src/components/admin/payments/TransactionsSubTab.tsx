@@ -143,7 +143,7 @@ const DailySummaryCard: React.FC<SectionProps> = ({ onClose, variant = 'modal' }
       ) : summary ? (
         <>
           <div className="text-center">
-            <p className="text-sm font-medium text-primary/60 dark:text-white/60 uppercase tracking-wide">
+            <p className="text-sm font-medium text-primary/60 dark:text-white/60 uppercase tracking-widest">
               {formatDate(summary.date)}
             </p>
             <p className="text-4xl font-bold text-green-600 dark:text-green-400 mt-1">
@@ -194,7 +194,7 @@ const DailySummaryCard: React.FC<SectionProps> = ({ onClose, variant = 'modal' }
 
   if (variant === 'card') {
     return (
-      <div className="bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl p-5">
+      <div className="bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-xl p-5">
         <div className="flex items-center gap-2 mb-4">
           <span className="material-symbols-outlined text-emerald-600 dark:text-emerald-400">summarize</span>
           <h3 className="font-bold text-primary dark:text-white">Daily Summary</h3>
@@ -205,7 +205,7 @@ const DailySummaryCard: React.FC<SectionProps> = ({ onClose, variant = 'modal' }
   }
 
   return (
-    <div className="bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl p-4">
+    <div className="bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-xl p-4">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <span className="material-symbols-outlined text-emerald-600 dark:text-emerald-400">summarize</span>
@@ -389,7 +389,7 @@ const PendingAuthorizationsSection: React.FC<SectionProps> = ({ onClose, variant
       {selectedAuth && actionType && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={resetModal} aria-hidden="true">
           <div 
-            className="bg-white dark:bg-surface-dark rounded-2xl w-full max-w-sm shadow-xl p-5"
+            className="bg-white dark:bg-surface-dark rounded-xl w-full max-w-sm shadow-xl p-5"
             onClick={(e) => e.stopPropagation()}
           >
             {success ? (
@@ -543,7 +543,7 @@ const PendingAuthorizationsSection: React.FC<SectionProps> = ({ onClose, variant
 
   if (variant === 'card') {
     return (
-      <div className="bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl p-5">
+      <div className="bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-xl p-5">
         <div className="flex items-center gap-2 mb-4">
           <span className="material-symbols-outlined text-blue-600 dark:text-blue-400">hourglass_top</span>
           <h3 className="font-bold text-primary dark:text-white">Pending Authorizations</h3>
@@ -559,7 +559,7 @@ const PendingAuthorizationsSection: React.FC<SectionProps> = ({ onClose, variant
   }
 
   return (
-    <div className="bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl p-4">
+    <div className="bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-xl p-4">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <span className="material-symbols-outlined text-blue-600 dark:text-blue-400">hourglass_top</span>
@@ -660,7 +660,7 @@ const FutureBookingsSection: React.FC<SectionProps> = ({ onClose, variant = 'mod
   const sectionContent = (
     <>
       {variant === 'card' ? (
-        <div className="bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl p-5">
+        <div className="bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-xl p-5">
           <div className="flex items-center gap-2 mb-4">
             <span className="material-symbols-outlined text-green-600 dark:text-green-400">event_upcoming</span>
             <h3 className="font-bold text-primary dark:text-white">Future Bookings</h3>
@@ -673,7 +673,7 @@ const FutureBookingsSection: React.FC<SectionProps> = ({ onClose, variant = 'mod
           {content}
         </div>
       ) : (
-        <div className="bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl p-4">
+        <div className="bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-xl p-4">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <span className="material-symbols-outlined text-green-600 dark:text-green-400">event_upcoming</span>
@@ -877,7 +877,7 @@ const FailedPaymentsSection: React.FC<SectionProps> = ({ onClose, variant = 'mod
       {selectedEmail && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setSelectedEmail(null)}>
           <div 
-            className="bg-white dark:bg-surface-dark rounded-2xl w-full max-w-sm shadow-xl p-5"
+            className="bg-white dark:bg-surface-dark rounded-xl w-full max-w-sm shadow-xl p-5"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-4">
@@ -911,7 +911,7 @@ const FailedPaymentsSection: React.FC<SectionProps> = ({ onClose, variant = 'mod
   if (variant === 'card') {
     return (
       <>
-        <div className="bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl p-5">
+        <div className="bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-xl p-5">
           <div className="flex items-center gap-2 mb-4">
             <span className="material-symbols-outlined text-red-600 dark:text-red-400">error</span>
             <h3 className="font-bold text-primary dark:text-white">Failed Payments</h3>
@@ -930,7 +930,7 @@ const FailedPaymentsSection: React.FC<SectionProps> = ({ onClose, variant = 'mod
 
   return (
     <>
-      <div className="bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl p-4">
+      <div className="bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-xl p-4">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <span className="material-symbols-outlined text-red-600 dark:text-red-400">error</span>
@@ -988,7 +988,7 @@ const RefundsSection: React.FC<SectionProps> = ({ onClose, variant = 'modal' }) 
 
   if (variant === 'card') {
     return (
-      <div className="bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl p-5">
+      <div className="bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-xl p-5">
         <div className="flex items-center gap-2 mb-4">
           <span className="material-symbols-outlined text-purple-600 dark:text-purple-400">undo</span>
           <h3 className="font-bold text-primary dark:text-white">Refund History</h3>
@@ -1004,7 +1004,7 @@ const RefundsSection: React.FC<SectionProps> = ({ onClose, variant = 'modal' }) 
   }
 
   return (
-    <div className="bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl p-4">
+    <div className="bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-xl p-4">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <span className="material-symbols-outlined text-purple-600 dark:text-purple-400">undo</span>
@@ -1021,7 +1021,7 @@ const RefundsSection: React.FC<SectionProps> = ({ onClose, variant = 'modal' }) 
 
 const QuickInvoiceCard: React.FC = () => {
   return (
-    <div className="bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl p-5">
+    <div className="bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-xl p-5">
       <div className="flex items-center gap-2 mb-4">
         <span className="material-symbols-outlined text-primary dark:text-lavender">description</span>
         <h3 className="font-bold text-primary dark:text-white">Quick Invoice</h3>
@@ -1148,7 +1148,7 @@ const MobileTransactionsView: React.FC = () => {
           <button
             key={action.id}
             onClick={() => setActiveSection(action.id)}
-            className={`${action.bgClass} ${action.textClass} ${action.borderClass} ${action.hoverClass} border backdrop-blur-md rounded-2xl p-4 flex flex-col items-center gap-2 min-h-[100px] shadow-lg active:scale-95 transition-all duration-normal relative animate-list-item-delay-${Math.min(index, 10)}`}
+            className={`${action.bgClass} ${action.textClass} ${action.borderClass} ${action.hoverClass} border backdrop-blur-md rounded-xl p-4 flex flex-col items-center gap-2 min-h-[100px] shadow-lg active:scale-95 transition-all duration-normal relative animate-list-item-delay-${Math.min(index, 10)}`}
           >
             <span className={`material-symbols-outlined text-3xl ${action.iconClass}`}>{action.icon}</span>
             <span className="font-semibold text-sm">{action.label}</span>

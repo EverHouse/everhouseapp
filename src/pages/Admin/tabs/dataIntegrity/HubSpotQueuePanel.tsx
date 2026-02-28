@@ -59,7 +59,7 @@ const HubSpotQueuePanel: React.FC<Props> = ({ isOpen, onToggle }) => {
   const stats = data?.stats || { pending: 0, failed: 0, completed_24h: 0, processing: 0 };
 
   return (
-    <div className="mb-6 bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl p-4">
+    <div className="mb-6 bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-xl p-4">
       <button onClick={onToggle} className="flex items-center justify-between w-full text-left">
         <div className="flex items-center gap-2">
           <span aria-hidden="true" className="material-symbols-outlined text-primary dark:text-white">sync</span>

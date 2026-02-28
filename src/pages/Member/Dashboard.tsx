@@ -835,7 +835,7 @@ const Dashboard: React.FC = () => {
         
         <div className="mb-6 animate-slide-up-stagger" style={{ '--stagger-index': 0 } as React.CSSProperties}>
           <div className="flex items-center gap-3">
-            <h1 className={`text-4xl lg:text-5xl font-bold leading-none ${isDark ? 'text-white' : 'text-primary'}`} style={{ fontFamily: 'var(--font-display)', fontOpticalSizing: 'auto', letterSpacing: '-0.03em' }}>
+            <h1 className={`text-5xl font-bold leading-none ${isDark ? 'text-white' : 'text-primary'}`} style={{ fontFamily: 'var(--font-display)', fontOpticalSizing: 'auto', letterSpacing: '-0.03em' }}>
               {getGreeting()}, {user?.name.split(' ')[0]}
             </h1>
           </div>
@@ -861,14 +861,14 @@ const Dashboard: React.FC = () => {
                   role="button"
                   tabIndex={0}
                   onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setIsCardOpen(true); } }}
-                  className={`relative h-56 lg:h-full lg:min-h-56 w-full rounded-[1.5rem] overflow-hidden cursor-pointer transition-all duration-emphasis ease-out group animate-slide-up-stagger active:scale-[0.98] hover:scale-[1.015] hover:shadow-2xl ${isExpired ? 'grayscale-[30%]' : ''}`}
+                  className={`relative h-56 lg:h-full lg:min-h-56 w-full rounded-xl overflow-hidden cursor-pointer transition-all duration-emphasis ease-out group animate-slide-up-stagger active:scale-[0.98] hover:scale-[1.015] hover:shadow-2xl ${isExpired ? 'grayscale-[30%]' : ''}`}
                   style={{ '--stagger-index': 2 } as React.CSSProperties}
                 >
                   <div className="absolute inset-0" style={{ backgroundColor: cardBgColor }}></div>
                   <div className="absolute inset-0" style={{ background: 'linear-gradient(135deg, rgba(255,255,255,0.25) 0%, rgba(255,255,255,0.05) 100%)' }}></div>
                   <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E")` }}></div>
-                  <div className="absolute inset-0 border border-white/30 rounded-[1.5rem] backdrop-blur-xl" style={{ boxShadow: 'inset 0 1px 0 0 rgba(255,255,255,0.2)' }}></div>
-                  <div className="absolute inset-0 overflow-hidden rounded-[1.5rem] opacity-0 group-hover:opacity-100 transition-opacity duration-normal pointer-events-none">
+                  <div className="absolute inset-0 border border-white/30 rounded-xl backdrop-blur-xl" style={{ boxShadow: 'inset 0 1px 0 0 rgba(255,255,255,0.2)' }}></div>
+                  <div className="absolute inset-0 overflow-hidden rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-normal pointer-events-none">
                     <div className="holographic-shimmer absolute -inset-full"></div>
                   </div>
                   <div className="absolute inset-0 p-6 flex flex-col justify-between z-10">
@@ -937,7 +937,7 @@ const Dashboard: React.FC = () => {
           {/* Your Schedule - Combined Bookings, Events & Wellness */}
           <div className="animate-slide-up-stagger" style={{ '--stagger-index': 4 } as React.CSSProperties}>
             <div className="flex justify-between items-center mb-4 px-1">
-              <h3 className={`text-sm font-bold uppercase tracking-wider ${isDark ? 'text-white/80' : 'text-primary/80'}`} style={{ fontFamily: 'var(--font-label)', letterSpacing: '0.1em' }}>Your Schedule</h3>
+              <h3 className={`text-2xl leading-tight ${isDark ? 'text-white' : 'text-primary'}`} style={{ fontFamily: 'var(--font-headline)' }}>Your Schedule</h3>
               <button
                 onClick={() => { startNavigation(); navigate('/book'); }}
                 className={`tactile-btn text-xs font-semibold flex items-center gap-1 ${isDark ? 'text-accent' : 'text-brand-green'}`}
@@ -1166,7 +1166,7 @@ const Dashboard: React.FC = () => {
                 );
               }) : (
                 <div className="space-y-4 animate-pop-in">
-                  <div className={`flex flex-col items-center justify-center text-center py-6 px-6 rounded-2xl ${isDark ? 'bg-white/5' : 'bg-primary/[0.03]'}`}>
+                  <div className={`flex flex-col items-center justify-center text-center py-6 px-6 rounded-xl ${isDark ? 'bg-white/5' : 'bg-primary/[0.03]'}`}>
                     <div className="relative mb-3">
                       <div className={`w-14 h-14 rounded-full flex items-center justify-center ${isDark ? 'bg-accent/20' : 'bg-accent/10'}`}>
                         <span className={`material-symbols-outlined text-2xl ${isDark ? 'text-accent' : 'text-brand-green'}`}>sports_golf</span>
@@ -1184,7 +1184,7 @@ const Dashboard: React.FC = () => {
                     </button>
                   </div>
 
-                  <div className={`flex items-center gap-3 py-4 px-5 rounded-2xl ${isDark ? 'bg-white/5' : 'bg-primary/[0.03]'}`}>
+                  <div className={`flex items-center gap-3 py-4 px-5 rounded-xl ${isDark ? 'bg-white/5' : 'bg-primary/[0.03]'}`}>
                     <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${isDark ? 'bg-lavender/20' : 'bg-lavender/10'}`}>
                       <span className={`material-symbols-outlined text-xl ${isDark ? 'text-lavender' : 'text-primary/70'}`}>event</span>
                     </div>
@@ -1194,7 +1194,7 @@ const Dashboard: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className={`flex items-center gap-3 py-4 px-5 rounded-2xl ${isDark ? 'bg-white/5' : 'bg-primary/[0.03]'}`}>
+                  <div className={`flex items-center gap-3 py-4 px-5 rounded-xl ${isDark ? 'bg-white/5' : 'bg-primary/[0.03]'}`}>
                     <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${isDark ? 'bg-amber-500/20' : 'bg-amber-100'}`}>
                       <span className={`material-symbols-outlined text-xl ${isDark ? 'text-amber-400' : 'text-amber-600'}`}>how_to_reg</span>
                     </div>
@@ -1272,7 +1272,7 @@ const Dashboard: React.FC = () => {
         const cardTextColor = isExpiredModal ? '#F9FAFB' : (isStaffOrAdminProfile ? '#F2F2EC' : tierColors.text);
         return (
           <div className="flex flex-col items-center">
-            <div className={`w-full rounded-[2rem] relative overflow-hidden shadow-2xl flex flex-col ${isExpiredModal ? 'grayscale-[30%]' : ''}`} style={{ backgroundColor: cardBgColor }}>
+            <div className={`w-full rounded-xl relative overflow-hidden shadow-2xl flex flex-col ${isExpiredModal ? 'grayscale-[30%]' : ''}`} style={{ backgroundColor: cardBgColor }}>
               
               {/* Close Button */}
               <button onClick={() => setIsCardOpen(false)} className="absolute top-4 right-4 w-8 h-8 rounded-full flex items-center justify-center z-10" style={{ backgroundColor: `${cardTextColor}33`, color: cardTextColor }}>

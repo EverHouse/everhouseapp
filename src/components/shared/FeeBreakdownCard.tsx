@@ -42,7 +42,7 @@ const FeeBreakdownCard: React.FC<FeeBreakdownCardProps> = ({
     <div className={`w-full ${compact ? 'px-2 py-2' : 'px-3 sm:px-4 py-3'} rounded-xl backdrop-blur-md border ${isDark ? 'bg-black/70 border-white/20' : 'bg-white/90 border-black/10 shadow-lg'}`}>
       <div className={`flex items-center gap-2 ${compact ? 'mb-1' : 'mb-2'}`}>
         <span className={`material-symbols-outlined ${compact ? 'text-base' : 'text-lg'} ${totalFee > 0 ? (isDark ? 'text-amber-400' : 'text-amber-600') : (isDark ? 'text-green-400' : 'text-green-600')}`}>receipt_long</span>
-        <span className={`${compact ? 'text-[10px]' : 'text-xs'} font-bold uppercase tracking-wider ${isDark ? 'text-white/80' : 'text-primary/80'}`}>Estimated Fees</span>
+        <span className={`${compact ? 'text-[10px]' : 'text-xs'} font-bold uppercase tracking-widest ${isDark ? 'text-white/80' : 'text-primary/80'}`}>Estimated Fees</span>
       </div>
       <div className="space-y-1">
         {overageFee > 0 && (

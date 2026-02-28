@@ -115,7 +115,7 @@ const CheckInConfirmationModal: React.FC<CheckInConfirmationModalProps> = ({
         aria-hidden="true"
       />
       <div
-        className="relative w-full max-w-sm rounded-2xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-300"
+        className="relative w-full max-w-sm rounded-xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-300"
         style={{ position: 'relative', zIndex: 1 }}
         onClick={(e) => e.stopPropagation()}
       >

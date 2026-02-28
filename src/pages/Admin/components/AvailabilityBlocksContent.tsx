@@ -512,7 +512,7 @@ const AvailabilityBlocksContent: React.FC = () => {
             )}
 
             {pastBlocks.length > 0 && (
-                <div className="mt-6 rounded-2xl border border-gray-200 dark:border-white/20 overflow-hidden">
+                <div className="mt-6 rounded-xl border border-gray-200 dark:border-white/20 overflow-hidden">
                     <button
                         onClick={() => setShowPastAccordion(!showPastAccordion)}
                         className="tactile-row w-full flex items-center justify-between p-4 bg-gray-50 dark:bg-white/5 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"

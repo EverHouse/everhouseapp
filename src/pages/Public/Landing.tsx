@@ -135,14 +135,14 @@ const Landing: React.FC = () => {
         </div>
         
         <div className="relative z-10 flex flex-col items-center text-center">
-          <h1 className="text-3xl sm:text-4xl md:text-5xl font-semibold tracking-tight leading-[1.05] mb-4 text-white text-shadow-sm font-serif animate-hero-headline">
+          <h1 className="text-3xl sm:text-4xl md:text-5xl font-semibold tracking-tight leading-[1.05] mb-4 text-white text-shadow-sm animate-hero-headline" style={{ fontFamily: 'var(--font-display)' }}>
             Your Office. <br/> Your Course. <br/> Your Club.
           </h1>
           <p className="text-sm sm:text-base text-white/80 mb-8 sm:mb-10 max-w-sm tracking-wide animate-hero-tagline">
             Formerly Even House — Orange County's private club for professionals who work, play, and connect — all under one roof.
           </p>
           <div className="flex flex-col gap-3 w-full max-w-xs animate-hero-cta">
-             <Link to="/tour" className="w-full py-4 rounded-2xl bg-white text-primary font-bold text-xs uppercase tracking-[0.15em] shadow-lg hover:scale-[1.02] hover:bg-white/90 transition-all duration-fast text-center">
+             <Link to="/tour" className="w-full py-4 rounded-[4px] bg-white text-primary font-bold text-xs uppercase tracking-[0.15em] shadow-lg hover:scale-[1.02] hover:bg-white/90 transition-all duration-fast text-center">
                 Book Your Private Tour
              </Link>
              <Link to="/membership" className="tactile-btn w-full py-3 text-white font-medium text-sm hover:opacity-80 transition-opacity flex items-center justify-center gap-2 group">
@@ -166,7 +166,7 @@ const Landing: React.FC = () => {
             href="https://www.forbes.com/sites/mikedojc/2025/09/09/even-house-turns-indoor-golf-into-a-community-social-hub/" 
             target="_blank" 
             rel="noreferrer"
-            className="backdrop-blur-xl bg-white/40 dark:bg-white/5 p-6 rounded-[1.5rem] border border-white/60 dark:border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.08),inset_0_1px_1px_rgba(255,255,255,0.6)] hover:bg-white/60 dark:hover:bg-white/10 hover:scale-[1.01] transition-all duration-normal flex flex-col"
+            className="backdrop-blur-xl bg-white/40 dark:bg-white/5 p-6 rounded-xl border border-white/60 dark:border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.08),inset_0_1px_1px_rgba(255,255,255,0.6)] hover:bg-white/60 dark:hover:bg-white/10 hover:scale-[1.01] transition-all duration-normal flex flex-col"
           >
             <p className="text-xl font-bold text-primary/80 dark:text-white/80 tracking-tight mb-4" style={{ fontFamily: 'Georgia, serif' }}>Forbes</p>
             <blockquote className="text-sm text-primary/80 dark:text-white/80 leading-relaxed flex-1">
@@ -179,7 +179,7 @@ const Landing: React.FC = () => {
             href="https://hypebeast.com/2025/2/even-house-membership-golf-club-for-the-next-generation" 
             target="_blank" 
             rel="noreferrer"
-            className="backdrop-blur-xl bg-white/40 dark:bg-white/5 p-6 rounded-[1.5rem] border border-white/60 dark:border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.08),inset_0_1px_1px_rgba(255,255,255,0.6)] hover:bg-white/60 dark:hover:bg-white/10 hover:scale-[1.01] transition-all duration-normal flex flex-col"
+            className="backdrop-blur-xl bg-white/40 dark:bg-white/5 p-6 rounded-xl border border-white/60 dark:border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.08),inset_0_1px_1px_rgba(255,255,255,0.6)] hover:bg-white/60 dark:hover:bg-white/10 hover:scale-[1.01] transition-all duration-normal flex flex-col"
           >
             <p className="text-lg font-black text-primary/80 dark:text-white/80 uppercase tracking-tighter mb-4">Hypebeast</p>
             <blockquote className="text-sm text-primary/80 dark:text-white/80 leading-relaxed flex-1">
@@ -192,7 +192,7 @@ const Landing: React.FC = () => {
             href="https://www.foxla.com/video/fmc-t05loqz15hed9sfa" 
             target="_blank" 
             rel="noreferrer"
-            className="backdrop-blur-xl bg-white/40 dark:bg-white/5 p-6 rounded-[1.5rem] border border-white/60 dark:border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.08),inset_0_1px_1px_rgba(255,255,255,0.6)] hover:bg-white/60 dark:hover:bg-white/10 hover:scale-[1.01] transition-all duration-normal flex flex-col"
+            className="backdrop-blur-xl bg-white/40 dark:bg-white/5 p-6 rounded-xl border border-white/60 dark:border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.08),inset_0_1px_1px_rgba(255,255,255,0.6)] hover:bg-white/60 dark:hover:bg-white/10 hover:scale-[1.01] transition-all duration-normal flex flex-col"
           >
             <p className="text-lg font-black text-primary/80 dark:text-white/80 uppercase tracking-wide mb-4">Fox 11</p>
             <blockquote className="text-sm text-primary/80 dark:text-white/80 leading-relaxed flex-1">
@@ -243,13 +243,13 @@ const Landing: React.FC = () => {
 
       <section className="px-6 pb-12 bg-bone dark:bg-[#141414] animate-content-enter-delay-3">
          <div className="text-center mb-8">
-            <h2 className="text-3xl font-bold text-primary dark:text-white mb-2">Membership Tiers</h2>
-            <p className="text-primary/70 dark:text-white/70 text-sm">Select the plan that fits your lifestyle.</p>
+            <h2 className="text-2xl text-primary dark:text-white mb-2 leading-tight" style={{ fontFamily: 'var(--font-headline)' }}>Membership Tiers</h2>
+            <p className="text-base text-primary/70 dark:text-white/70 leading-relaxed" style={{ fontFamily: 'var(--font-body)' }}>Select the plan that fits your lifestyle.</p>
          </div>
          
          <div className="flex flex-col gap-4">
             {socialTier && (
-            <div className="backdrop-blur-xl bg-white/50 dark:bg-white/5 p-6 rounded-[2rem] border border-white/60 dark:border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.08),inset_0_1px_1px_rgba(255,255,255,0.6)] hover:scale-[1.02] hover:-translate-y-1 transition-all duration-[400ms]">
+            <div className="backdrop-blur-xl bg-white/50 dark:bg-white/5 p-6 rounded-xl border border-white/60 dark:border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.08),inset_0_1px_1px_rgba(255,255,255,0.6)] hover:scale-[1.02] hover:-translate-y-1 transition-all duration-[400ms]">
                 <div className="flex justify-between items-center mb-2">
                     <h3 className="text-xl font-bold text-primary dark:text-white">{socialTier.name}</h3>
                     <span className="text-lg font-bold text-primary dark:text-white">{extractPrice(socialTier.price_string)}<span className="text-xs font-medium opacity-60">{extractSuffix(socialTier.price_string)}</span></span>
@@ -260,16 +260,16 @@ const Landing: React.FC = () => {
                         <li key={idx} className="flex gap-2 text-xs font-bold text-primary/80 dark:text-white/80"><span className="material-symbols-outlined text-sm">check</span> {feature}</li>
                     ))}
                 </ul>
-                <Link to="/membership" className="tactile-btn w-full py-3 rounded-xl bg-white/60 dark:bg-white/10 backdrop-blur border border-white/80 text-primary dark:text-white font-bold text-xs hover:bg-white/80 transition-all duration-normal block text-center">View Details</Link>
+                <Link to="/membership" className="tactile-btn w-full py-3 rounded-[4px] bg-white/60 dark:bg-white/10 backdrop-blur border border-white/80 text-primary dark:text-white font-bold text-xs hover:bg-white/80 transition-all duration-normal block text-center">View Details</Link>
             </div>
             )}
 
             {coreTier && (
-            <div className="backdrop-blur-xl bg-primary/90 p-6 rounded-[2rem] border border-white/20 shadow-[0_8px_32px_rgba(0,0,0,0.2),0_0_20px_rgba(41,53,21,0.3),inset_0_1px_1px_rgba(255,255,255,0.1)] hover:scale-[1.02] hover:-translate-y-1 transition-all duration-[400ms] relative overflow-hidden">
+            <div className="backdrop-blur-xl bg-primary/90 p-6 rounded-xl border border-white/20 shadow-[0_8px_32px_rgba(0,0,0,0.2),0_0_20px_rgba(41,53,21,0.3),inset_0_1px_1px_rgba(255,255,255,0.1)] hover:scale-[1.02] hover:-translate-y-1 transition-all duration-[400ms] relative overflow-hidden">
                 <div className="flex justify-between items-start mb-2 relative z-10">
                     <div className="flex items-center gap-2">
                         <h3 className="text-xl font-bold text-white">{coreTier.name}</h3>
-                        {coreTier.is_popular && <span className="bg-accent/90 backdrop-blur text-primary text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider shadow-sm border border-white/20">Popular</span>}
+                        {coreTier.is_popular && <span className="bg-accent/90 backdrop-blur text-primary text-[10px] font-bold w-fit px-2 py-0.5 rounded-[4px] uppercase tracking-widest shadow-sm border border-white/20">Popular</span>}
                     </div>
                     <span className="text-lg font-bold text-white">{extractPrice(coreTier.price_string)}<span className="text-xs font-medium opacity-60">{extractSuffix(coreTier.price_string)}</span></span>
                 </div>
@@ -279,12 +279,12 @@ const Landing: React.FC = () => {
                         <li key={idx} className="flex gap-2 text-xs font-bold text-white/90"><span className="material-symbols-outlined text-sm text-accent">check</span> {feature}</li>
                     ))}
                 </ul>
-                <Link to="/membership" className="tactile-btn w-full py-3 rounded-xl bg-white/95 dark:bg-white/10 backdrop-blur text-primary dark:text-white font-bold text-xs hover:bg-white transition-all duration-normal relative z-10 shadow-md block text-center">View Details</Link>
+                <Link to="/membership" className="tactile-btn w-full py-3 rounded-[4px] bg-white/95 dark:bg-white/10 backdrop-blur text-primary dark:text-white font-bold text-xs hover:bg-white transition-all duration-normal relative z-10 shadow-md block text-center">View Details</Link>
             </div>
             )}
 
             {corporateTier && (
-            <div className="backdrop-blur-xl bg-white/50 dark:bg-white/5 p-6 rounded-[2rem] border border-white/60 dark:border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.08),inset_0_1px_1px_rgba(255,255,255,0.6)] hover:scale-[1.02] hover:-translate-y-1 transition-all duration-[400ms]">
+            <div className="backdrop-blur-xl bg-white/50 dark:bg-white/5 p-6 rounded-xl border border-white/60 dark:border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.08),inset_0_1px_1px_rgba(255,255,255,0.6)] hover:scale-[1.02] hover:-translate-y-1 transition-all duration-[400ms]">
                 <div className="flex justify-between items-center mb-2">
                     <h3 className="text-xl font-bold text-primary dark:text-white">{corporateTier.name}</h3>
                     <span className="text-lg font-bold text-primary dark:text-white">{extractPrice(corporateTier.price_string)}<span className="text-xs font-medium opacity-60">{extractSuffix(corporateTier.price_string)}</span></span>
@@ -295,7 +295,7 @@ const Landing: React.FC = () => {
                         <li key={idx} className="flex gap-2 text-xs font-bold text-primary/80 dark:text-white/80"><span className="material-symbols-outlined text-sm">check</span> {feature}</li>
                     ))}
                 </ul>
-                <Link to="/membership/corporate" className="tactile-btn w-full py-3 rounded-xl bg-white/60 dark:bg-white/10 backdrop-blur border border-white/80 text-primary dark:text-white font-bold text-xs hover:bg-white/80 transition-all duration-normal block text-center">View Details</Link>
+                <Link to="/membership/corporate" className="tactile-btn w-full py-3 rounded-[4px] bg-white/60 dark:bg-white/10 backdrop-blur border border-white/80 text-primary dark:text-white font-bold text-xs hover:bg-white/80 transition-all duration-normal block text-center">View Details</Link>
             </div>
             )}
 
@@ -307,7 +307,7 @@ const Landing: React.FC = () => {
       </section>
 
       <section className="px-6 py-10 bg-bone dark:bg-[#141414] animate-content-enter-delay-4">
-        <h3 className="text-center text-2xl font-bold text-primary dark:text-white mb-6">Join 200+ Members</h3>
+        <h3 className="text-center text-2xl text-primary dark:text-white mb-6 leading-tight" style={{ fontFamily: 'var(--font-headline)' }}>Join 200+ Members</h3>
         <div className="flex justify-center items-center gap-0 overflow-x-auto">
           <div className="flex-1 min-w-0 text-center px-3">
             <p className="text-xl sm:text-2xl font-bold text-primary dark:text-white">4</p>
@@ -333,7 +333,7 @@ const Landing: React.FC = () => {
 
       <section className="px-6 py-12 bg-bone dark:bg-[#141414] animate-content-enter-delay-5">
         <div className="max-w-2xl mx-auto text-center">
-          <span className="text-6xl text-primary/20 dark:text-white/20 font-serif leading-none block mb-2">"</span>
+          <span className="text-6xl text-primary/20 dark:text-white/20 leading-none block mb-2" style={{ fontFamily: 'var(--font-display)' }}>"</span>
           <blockquote className="text-lg sm:text-xl italic text-primary/90 dark:text-white/90 mb-4 leading-relaxed -mt-8">
             Ever Club has become my second office. The golf is incredible, but the community is what keeps me coming back.
           </blockquote>
@@ -342,13 +342,13 @@ const Landing: React.FC = () => {
       </section>
 
       <div className="px-4 pb-12 animate-content-enter-delay-6">
-         <div className="relative rounded-[2rem] overflow-hidden h-[400px] group backdrop-blur-xl border border-white/20 shadow-[0_8px_32px_rgba(0,0,0,0.2),inset_0_1px_1px_rgba(255,255,255,0.1)] hover:scale-[1.01] transition-all duration-[400ms]">
+         <div className="relative rounded-xl overflow-hidden h-[400px] group backdrop-blur-xl border border-white/20 shadow-[0_8px_32px_rgba(0,0,0,0.2),inset_0_1px_1px_rgba(255,255,255,0.1)] hover:scale-[1.01] transition-all duration-[400ms]">
             <div className="absolute inset-0 bg-[url('/images/gallery/gallery-l1050555.webp')] bg-cover bg-center opacity-70 transition-transform duration-emphasis group-hover:scale-105"></div>
             <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/40 to-black/20"></div>
             <div className="absolute inset-0 p-8 flex flex-col justify-center items-center text-center">
-                <span className="px-4 py-1.5 bg-white/15 backdrop-blur-md border border-white/30 rounded-full text-white/90 text-xs font-bold uppercase tracking-[0.2em] mb-4 shadow-[0_0_12px_rgba(255,255,255,0.1)]">Host with Us</span>
-                <h2 className="text-4xl font-bold text-white mb-6 leading-tight drop-shadow-lg">Private Events &<br/>Full Buyouts</h2>
-                <Link to="/private-hire" className="px-8 py-3 bg-white/95 backdrop-blur text-primary rounded-xl font-bold text-sm hover:scale-105 hover:bg-white transition-all duration-normal shadow-[0_8px_24px_rgba(0,0,0,0.2)] inline-block">
+                <span className="w-fit px-2 py-1.5 bg-white/15 backdrop-blur-md border border-white/30 rounded-[4px] text-white/90 text-xs font-bold uppercase tracking-widest mb-4 shadow-[0_0_12px_rgba(255,255,255,0.1)]">Host with Us</span>
+                <h2 className="text-2xl text-white mb-6 leading-tight drop-shadow-lg" style={{ fontFamily: 'var(--font-headline)' }}>Private Events &<br/>Full Buyouts</h2>
+                <Link to="/private-hire" className="px-8 py-3 bg-white/95 backdrop-blur text-primary rounded-[4px] font-bold text-sm hover:scale-105 hover:bg-white transition-all duration-normal shadow-[0_8px_24px_rgba(0,0,0,0.2)] inline-block">
                     Inquire Now
                 </Link>
             </div>
@@ -357,9 +357,9 @@ const Landing: React.FC = () => {
 
       <section className="px-6 py-16 bg-bone dark:bg-[#141414]">
         <div className="max-w-md mx-auto text-center">
-          <h2 className="text-2xl sm:text-3xl font-bold text-primary dark:text-white mb-3 font-serif">See it for yourself.</h2>
+          <h2 className="text-2xl text-primary dark:text-white mb-3 leading-tight" style={{ fontFamily: 'var(--font-headline)' }}>See it for yourself.</h2>
           <p className="text-sm sm:text-base text-primary/60 dark:text-white/60 mb-8">Book a private tour and experience Ever Club firsthand.</p>
-          <Link to="/tour" className="inline-block px-10 py-4 rounded-2xl bg-primary text-white font-bold text-xs uppercase tracking-[0.15em] shadow-lg hover:scale-[1.02] hover:bg-primary/90 transition-all duration-fast">
+          <Link to="/tour" className="inline-block px-10 py-4 rounded-[4px] bg-primary text-white font-bold text-xs uppercase tracking-[0.15em] shadow-lg hover:scale-[1.02] hover:bg-primary/90 transition-all duration-fast">
             Book Your Private Tour
           </Link>
         </div>

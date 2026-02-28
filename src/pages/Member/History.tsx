@@ -135,8 +135,8 @@ const History: React.FC = () => {
     <AnimatedPage>
       <SwipeablePage className="px-6 lg:px-8 xl:px-12 relative overflow-hidden">
         <section className="mb-4 pt-4 md:pt-2 animate-content-enter-delay-1">
-          <h1 className={`text-3xl font-bold leading-tight drop-shadow-md ${isDark ? 'text-white' : 'text-primary'}`}>History</h1>
-          <p className={`text-sm font-medium mt-1 ${isDark ? 'text-white/70' : 'text-primary/70'}`}>Your past visits</p>
+          <h1 className={`text-2xl leading-tight ${isDark ? 'text-white' : 'text-primary'}`} style={{ fontFamily: 'var(--font-headline)' }}>History</h1>
+          <p className={`text-base leading-relaxed mt-1 ${isDark ? 'text-white/70' : 'text-primary/70'}`} style={{ fontFamily: 'var(--font-body)' }}>Your past visits</p>
         </section>
 
         <section className={`mb-6 border-b -mx-6 px-6 animate-content-enter-delay-2 ${isDark ? 'border-white/25' : 'border-black/10'}`}>
@@ -151,7 +151,7 @@ const History: React.FC = () => {
           {isLoading ? (
             <div className="animate-pulse space-y-4">
               {[1, 2, 3].map(i => (
-                <div key={i} className={`h-24 rounded-2xl ${isDark ? 'bg-white/5' : 'bg-black/5'}`} />
+                <div key={i} className={`h-24 rounded-xl ${isDark ? 'bg-white/5' : 'bg-black/5'}`} />
               ))}
             </div>
           ) : activeTab === 'visits' ? (
@@ -160,7 +160,7 @@ const History: React.FC = () => {
                 {visits.length} past visit{visits.length !== 1 ? 's' : ''}
               </div>
               {visits.length === 0 ? (
-                <div className={`text-center py-12 rounded-2xl border glass-card animate-pop-in ${isDark ? 'border-white/25' : 'border-black/10'}`}>
+                <div className={`text-center py-12 rounded-xl border glass-card animate-pop-in ${isDark ? 'border-white/25' : 'border-black/10'}`}>
                   <span className={`material-symbols-outlined text-5xl mb-4 ${isDark ? 'text-white/30' : 'text-primary/30'}`}>history</span>
                   <p className={`${isDark ? 'text-white/80' : 'text-primary/80'}`}>No past visits yet</p>
                 </div>
@@ -177,12 +177,12 @@ const History: React.FC = () => {
                       <div className="flex items-start justify-between mb-2">
                         <div>
                           <div className="flex items-center gap-2 mb-1 flex-wrap">
-                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide flex items-center gap-1 ${getRoleBadgeStyle(visit.role)}`}>
+                            <span className={`w-fit px-2 py-0.5 rounded-[4px] text-[10px] font-bold uppercase tracking-widest flex items-center gap-1 ${getRoleBadgeStyle(visit.role)}`}>
                               <span className="material-symbols-outlined text-xs">{getRoleIcon(visit.role, visit.type)}</span>
                               {visit.role}
                             </span>
                             {visit.category && visit.type === 'booking' && (
-                              <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${
+                              <span className={`w-fit px-2 py-0.5 rounded-[4px] text-[10px] font-bold uppercase tracking-widest ${
                                 isConferenceRoom
                                   ? (isDark ? 'bg-blue-500/15 text-blue-300' : 'bg-blue-100 text-blue-700')
                                   : (isDark ? 'bg-white/10 text-white/70' : 'bg-gray-100 text-gray-700')
@@ -243,7 +243,7 @@ const History: React.FC = () => {
                 {purchases.length} payment{purchases.length !== 1 ? 's' : ''}
               </div>
               {purchases.length === 0 ? (
-                <div className={`text-center py-12 rounded-2xl border glass-card animate-pop-in ${isDark ? 'border-white/25' : 'border-black/10'}`}>
+                <div className={`text-center py-12 rounded-xl border glass-card animate-pop-in ${isDark ? 'border-white/25' : 'border-black/10'}`}>
                   <span className={`material-symbols-outlined text-5xl mb-4 ${isDark ? 'text-white/30' : 'text-primary/30'}`}>payments</span>
                   <p className={`${isDark ? 'text-white/80' : 'text-primary/80'}`}>No payments yet</p>
                   <p className={`text-sm mt-1 ${isDark ? 'text-white/50' : 'text-primary/50'}`}>Your payment history will appear here</p>
@@ -354,11 +354,11 @@ const History: React.FC = () => {
                                 <div className="flex items-start justify-between gap-3">
                                   <div className="flex-1">
                                     <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide flex items-center gap-1 ${getCategoryStyle(purchase.itemCategory || '')}`}>
+                                      <span className={`w-fit px-2 py-0.5 rounded-[4px] text-[10px] font-bold uppercase tracking-widest flex items-center gap-1 ${getCategoryStyle(purchase.itemCategory || '')}`}>
                                         <span className="material-symbols-outlined text-xs">{getCategoryIcon(purchase.itemCategory || '')}</span>
                                         {formatCategoryLabel(purchase.itemCategory)}
                                       </span>
-                                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide ${getSourceStyle(purchase.source)}`}>
+                                      <span className={`w-fit px-2 py-0.5 rounded-[4px] text-[10px] font-bold uppercase tracking-widest ${getSourceStyle(purchase.source)}`}>
                                         {purchase.source}
                                       </span>
                                       {(purchase.quantity ?? 1) > 1 && (

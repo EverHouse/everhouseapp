@@ -181,7 +181,7 @@ export const StaffDirectAddModal: React.FC<StaffDirectAddModalProps> = ({
 
   const modalContent = (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm overflow-y-auto">
-      <div className="w-full max-w-md bg-white dark:bg-[#1a1d12] rounded-2xl shadow-2xl border border-primary/20 dark:border-white/10 overflow-visible">
+      <div className="w-full max-w-md bg-white dark:bg-[#1a1d12] rounded-xl shadow-2xl border border-primary/20 dark:border-white/10 overflow-visible">
         <div className="px-6 py-4 border-b border-primary/10 dark:border-white/10 bg-primary/5 dark:bg-white/5">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-bold text-primary dark:text-white flex items-center gap-2">

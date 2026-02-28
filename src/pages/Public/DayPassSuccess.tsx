@@ -18,12 +18,12 @@ const DayPassSuccess: React.FC = () => {
   return (
     <div className="flex flex-col min-h-screen bg-bone dark:bg-[#141414] overflow-x-hidden">
       <div className="flex-1 flex items-center justify-center px-6 py-12">
-        <div className="bg-white dark:bg-[#1a1d15] rounded-[2rem] p-8 shadow-sm dark:shadow-none border border-black/5 dark:border-white/10 max-w-md w-full text-center animate-pop-in">
+        <div className="bg-white dark:bg-[#1a1d15] rounded-xl p-8 shadow-sm dark:shadow-none border border-black/5 dark:border-white/10 max-w-md w-full text-center animate-pop-in">
           <div className="w-20 h-20 bg-green-100 dark:bg-green-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
             <span className="material-symbols-outlined text-5xl text-green-600 dark:text-green-400">check_circle</span>
           </div>
           
-          <h1 className="text-2xl font-bold text-primary dark:text-white mb-3">Thank You!</h1>
+          <h1 className="text-2xl text-primary dark:text-white mb-3 leading-tight" style={{ fontFamily: 'var(--font-headline)' }}>Thank You!</h1>
           <p className="text-primary/70 dark:text-white/70 mb-6">
             Your day pass purchase was successful.
           </p>
@@ -41,7 +41,7 @@ const DayPassSuccess: React.FC = () => {
           <div className="space-y-3">
             <button
               onClick={() => { startNavigation(); navigate('/'); }}
-              className="tactile-btn w-full flex justify-center items-center gap-2 rounded-xl bg-primary px-4 py-3.5 text-sm font-bold text-white shadow-md hover:bg-primary/90 transition-all duration-fast"
+              className="tactile-btn w-full flex justify-center items-center gap-2 rounded-[4px] bg-primary px-4 py-3.5 text-sm font-bold text-white shadow-md hover:bg-primary/90 transition-all duration-fast"
             >
               <span className="material-symbols-outlined text-[18px]">home</span>
               Back to Home

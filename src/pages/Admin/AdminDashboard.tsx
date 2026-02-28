@@ -147,7 +147,7 @@ const AdminDashboard: React.FC = () => {
   };
 
   const headerContent = (
-    <header className="fixed top-0 left-0 right-0 lg:left-64 h-16 flex items-center justify-between px-4 md:px-6 mt-[env(safe-area-inset-top,0px)] bg-[#293515] shadow-md transition-all duration-fast text-[#F2F2EC] pointer-events-auto" style={{ zIndex: 'var(--z-header)' }}>
+    <header className="fixed top-0 left-0 right-0 lg:left-64 h-20 flex items-center justify-between px-4 md:px-6 mt-[env(safe-area-inset-top,0px)] bg-[#293515] shadow-md transition-all duration-fast text-[#F2F2EC] pointer-events-auto" style={{ zIndex: 'var(--z-header)' }}>
       <div className="flex items-center flex-shrink-0 w-[88px] lg:w-0 h-full">
         <button 
           onClick={() => setIsMobileSidebarOpen(true)}
@@ -158,7 +158,7 @@ const AdminDashboard: React.FC = () => {
         </button>
       </div>
       
-      <h1 className="text-xl font-light text-[#F2F2EC] text-center truncate flex-1 leading-none uppercase tracking-[0.4em] translate-y-[2px]" style={{ fontFamily: 'var(--font-label)' }}>
+      <h1 className="text-xl font-light text-[#F2F2EC] text-center truncate flex-1 leading-none uppercase tracking-[0.3em] translate-y-[1px]" style={{ fontFamily: 'var(--font-label)' }}>
         {getTabTitle()}
       </h1>
 
@@ -597,7 +597,7 @@ const StaffTrainingGuide: React.FC = () => {
                 {sections.map((section) => (
                     <div 
                         key={section.id}
-                        className="tactile-row group bg-white/60 dark:bg-white/5 backdrop-blur-sm rounded-2xl border border-primary/10 dark:border-white/25 overflow-hidden print:border print:border-gray-200 print:break-inside-avoid hover:bg-white/80 dark:hover:bg-white/10 transition-colors cursor-pointer"
+                        className="tactile-row group bg-white/60 dark:bg-white/5 backdrop-blur-sm rounded-xl border border-primary/10 dark:border-white/25 overflow-hidden print:border print:border-gray-200 print:break-inside-avoid hover:bg-white/80 dark:hover:bg-white/10 transition-colors cursor-pointer"
                         role="button"
                         tabIndex={0}
                         onClick={() => setExpandedSection(expandedSection === String(section.id) ? null : String(section.id))}

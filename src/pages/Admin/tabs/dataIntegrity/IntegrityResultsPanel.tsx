@@ -896,7 +896,7 @@ const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
             return (
               <div
                 key={result.checkName}
-                className="bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl overflow-hidden"
+                className="bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-xl overflow-hidden"
               >
                 <button
                   onClick={() => toggleCheck(result.checkName)}
@@ -1662,7 +1662,7 @@ const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
       </div>
 
       {results.length > 0 && results.every(r => r.status === 'pass') && (
-        <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-2xl">
+        <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl">
           <EmptyState
             icon="verified"
             title="All Checks Passed!"

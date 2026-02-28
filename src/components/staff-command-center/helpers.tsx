@@ -34,7 +34,7 @@ export const GlassListRow: React.FC<{
   <div 
     onClick={onClick}
     style={style}
-    className={`flex items-center gap-3 py-3 px-4 w-full hover:bg-primary/[0.06] dark:hover:bg-white/[0.08] transition-colors cursor-pointer border-b border-primary/[0.06] dark:border-white/[0.06] last:border-b-0 ${className}`}
+    className={`flex items-center gap-3 py-3 px-6 w-full hover:bg-primary/[0.06] dark:hover:bg-white/[0.08] transition-colors cursor-pointer border-b border-primary/[0.06] dark:border-white/[0.06] last:border-b-0 ${className}`}
     {...(onClick ? { role: 'button' as const, tabIndex: 0, onKeyDown: (e: React.KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } } } : {})}
   >
     {children}

@@ -34,7 +34,7 @@ const StripeTerminalPanel: React.FC<Props> = ({ isOpen, onToggle }) => {
   const onlineCount = readers.filter(r => r.status === 'online').length;
 
   return (
-    <div className="mb-6 bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl p-4">
+    <div className="mb-6 bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-xl p-4">
       <button onClick={onToggle} className="tactile-btn flex items-center justify-between w-full text-left">
         <div className="flex items-center gap-2">
           <span aria-hidden="true" className="material-symbols-outlined text-primary dark:text-white">point_of_sale</span>

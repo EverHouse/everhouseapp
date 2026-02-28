@@ -229,7 +229,7 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
                               this.state.error?.message?.toLowerCase().includes('load failed');
       return (
         <div className="flex items-center justify-center h-screen bg-[#141414] text-white p-6">
-          <div className="glass-card rounded-2xl p-8 max-w-md text-center">
+          <div className="glass-card rounded-xl p-8 max-w-md text-center">
             <span className="material-symbols-outlined text-6xl text-red-400 mb-4">
               {isNetworkError ? 'wifi_off' : 'error'}
             </span>
@@ -640,7 +640,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const headerBtnClasses = "text-white hover:opacity-70 active:scale-95 transition-opacity duration-fast";
 
   const headerContent = showHeader ? (
-    <header className={`fixed top-0 left-0 right-0 h-16 flex items-center px-4 sm:px-6 mt-[env(safe-area-inset-top,0px)] pointer-events-auto transition-[box-shadow,border-color] duration-normal ${headerClasses}`} style={{ zIndex: 'var(--z-header)' }} role="banner">
+    <header className={`fixed top-0 left-0 right-0 h-20 flex items-center px-4 sm:px-6 mt-[env(safe-area-inset-top,0px)] pointer-events-auto transition-[box-shadow,border-color] duration-normal ${headerClasses}`} style={{ zIndex: 'var(--z-header)' }} role="banner">
       {/* Left section - flex-1 for symmetric spacing with right */}
       <div className="flex-1 flex justify-start">
         {isMemberRoute ? (
@@ -672,7 +672,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       {/* Center section - auto width, centered between equal flex-1 sides */}
       <div className="flex-shrink-0 flex justify-center">
         {isMemberRoute ? (
-          <h1 className="text-xl font-light text-[#F2F2EC] truncate leading-none uppercase tracking-[0.4em] translate-y-[2px]" style={{ fontFamily: 'var(--font-label)' }}>
+          <h1 className="text-xl font-light text-[#F2F2EC] truncate leading-none uppercase tracking-[0.3em] translate-y-[1px]" style={{ fontFamily: 'var(--font-label)' }}>
             {getPageTitle()}
           </h1>
         ) : (

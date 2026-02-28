@@ -418,7 +418,7 @@ export const WellnessAdminContent: React.FC = () => {
                                     <div className="min-w-0 flex-1">
                                         <div className="flex items-center gap-2 mb-1">
                                             {cls.conflict_detected && (
-                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-orange-500 text-white text-[10px] font-bold uppercase tracking-wider">
+                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-[4px] bg-orange-500 text-white text-[10px] font-bold uppercase tracking-widest">
                                                     <span aria-hidden="true" className="material-symbols-outlined text-[12px]">sync_problem</span>
                                                     Conflict
                                                 </span>

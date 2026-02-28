@@ -30,10 +30,10 @@ const GlassRow: React.FC<GlassRowProps> = ({ title, subtitle, icon, color, actio
          tabIndex: 0,
          onKeyDown: (e: React.KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } }
        } : {})}
-       className={`glass-card p-4 flex items-center gap-4 group animate-slide-up-stagger ${onClick ? 'tactile-row cursor-pointer card-pressable glass-interactive transition-transform active:scale-[0.98]' : ''}`} 
+       className={`glass-card px-6 py-4 flex items-center gap-4 group animate-slide-up-stagger ${onClick ? 'tactile-row cursor-pointer card-pressable glass-interactive transition-transform active:scale-[0.98]' : ''}`} 
        style={staggerIndex !== undefined ? { '--stagger-index': staggerIndex, animationFillMode: 'both' } as React.CSSProperties : { animationFillMode: 'both' }}
      >
-        <div className={`w-12 h-12 rounded-[1.5rem] glass-button flex items-center justify-center ${color}`}>
+        <div className={`w-12 h-12 rounded-xl glass-button flex items-center justify-center ${color}`}>
            <span className="material-symbols-outlined text-[24px]">{icon}</span>
         </div>
         <div className="flex-1 min-w-0">
@@ -49,7 +49,7 @@ const GlassRow: React.FC<GlassRowProps> = ({ title, subtitle, icon, color, actio
                   <button 
                       key={idx} 
                       onClick={(e) => { e.stopPropagation(); action.onClick(); }} 
-                      className={`w-11 h-11 rounded-[1rem] glass-button flex items-center justify-center active:scale-90 ${isDark ? 'text-white/80 hover:text-white' : 'text-primary/80 hover:text-primary'}`}
+                      className={`w-11 h-11 rounded-[4px] glass-button flex items-center justify-center active:scale-90 ${isDark ? 'text-white/80 hover:text-white' : 'text-primary/80 hover:text-primary'}`}
                       aria-label={action.label}
                   >
                       <span className="material-symbols-outlined text-[18px]">{action.icon}</span>

@@ -127,8 +127,8 @@ const BuyDayPass: React.FC = () => {
     <div className="flex flex-col min-h-screen bg-bone dark:bg-[#141414] overflow-x-hidden">
       <SEO title="Day Pass — Golf Simulator & Coworking | Ever Club" description="No membership needed. Buy a day pass for Trackman golf simulators or coworking at Ever Club in Tustin, OC. Walk in & experience the club." url="/day-pass" />
       <div className="px-6 pt-4 md:pt-2 pb-6 text-center animate-pop-in">
-        <h1 className="text-3xl font-bold tracking-tight text-primary dark:text-white mb-3">Day Passes</h1>
-        <p className="text-primary/70 dark:text-white/70 text-sm leading-relaxed max-w-xs mx-auto">
+        <h1 className="text-5xl text-primary dark:text-white mb-3 leading-none" style={{ fontFamily: 'var(--font-display)' }}>Day Passes</h1>
+        <p className="text-base text-primary/70 dark:text-white/70 leading-relaxed max-w-xs mx-auto" style={{ fontFamily: 'var(--font-body)' }}>
           Experience Ever Club as a guest. No membership required.
         </p>
         <div className="flex flex-wrap justify-center gap-x-6 gap-y-2 text-xs text-primary/60 dark:text-white/60 mt-3">
@@ -148,9 +148,9 @@ const BuyDayPass: React.FC = () => {
       </div>
 
       <section className="px-4 mb-6">
-        <div className="bg-white dark:bg-[#1a1d15] rounded-[2rem] p-6 shadow-sm dark:shadow-none border border-black/5 dark:border-white/10">
-          <h2 className="text-lg font-bold text-primary dark:text-white mb-4 flex items-center gap-2">
-            <span className="material-symbols-outlined text-xl">person</span>
+        <div className="bg-white dark:bg-[#1a1d15] rounded-xl p-6 shadow-sm dark:shadow-none border border-black/5 dark:border-white/10">
+          <h2 className="text-2xl text-primary dark:text-white mb-4 flex items-center gap-2 leading-tight" style={{ fontFamily: 'var(--font-headline)' }}>
+            <span className="material-symbols-outlined text-xl translate-y-[1px]">person</span>
             Your Information
           </h2>
           
@@ -193,13 +193,13 @@ const BuyDayPass: React.FC = () => {
       )}
 
       <section className="px-4 mb-8">
-        <h2 className="text-lg font-bold text-primary dark:text-white mb-4 flex items-center gap-2 px-2">
-          <span className="material-symbols-outlined text-xl">confirmation_number</span>
+        <h2 className="text-2xl text-primary dark:text-white mb-4 flex items-center gap-2 px-2 leading-tight" style={{ fontFamily: 'var(--font-headline)' }}>
+          <span className="material-symbols-outlined text-xl translate-y-[1px]">confirmation_number</span>
           Available Passes
         </h2>
 
         {tiers.length === 0 ? (
-          <div className="bg-white dark:bg-[#1a1d15] rounded-2xl border border-black/5 dark:border-white/10">
+          <div className="bg-white dark:bg-[#1a1d15] rounded-xl border border-black/5 dark:border-white/10">
             <EmptyState
               icon="confirmation_number"
               title="No day passes available"
@@ -212,7 +212,7 @@ const BuyDayPass: React.FC = () => {
             {tiers.map((tier) => (
               <div 
                 key={tier.id}
-                className="tactile-card bg-white dark:bg-[#1a1d15] rounded-2xl p-5 border border-black/5 dark:border-white/10 shadow-sm dark:shadow-none"
+                className="tactile-card bg-white dark:bg-[#1a1d15] rounded-xl p-5 border border-black/5 dark:border-white/10 shadow-sm dark:shadow-none"
               >
                 <div className="flex justify-between items-start mb-3">
                   <div className="flex-1">
@@ -231,7 +231,7 @@ const BuyDayPass: React.FC = () => {
                 <button
                   onClick={() => handlePurchase(tier)}
                   disabled={processingSlug !== null || !tier.stripePriceId}
-                  className="tactile-btn w-full flex justify-center items-center gap-2 rounded-xl bg-primary px-4 py-3.5 text-sm font-bold text-white shadow-md hover:bg-primary/90 transition-all duration-fast disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="tactile-btn w-full flex justify-center items-center gap-2 rounded-[4px] bg-primary px-4 py-3.5 text-sm font-bold text-white shadow-md hover:bg-primary/90 transition-all duration-fast disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {processingSlug === tier.slug ? (
                     <>
@@ -254,7 +254,7 @@ const BuyDayPass: React.FC = () => {
       </section>
 
       <section className="px-4 mb-8">
-        <div className="bg-[#E8E8E0]/50 dark:bg-white/5 rounded-2xl p-5">
+        <div className="bg-[#E8E8E0]/50 dark:bg-white/5 rounded-xl p-5">
           <h3 className="text-base font-bold text-primary dark:text-white mb-3 flex items-center gap-2">
             <span className="material-symbols-outlined text-lg">info</span>
             How It Works
@@ -277,12 +277,12 @@ const BuyDayPass: React.FC = () => {
       </section>
 
       <section className="px-4 py-8 mb-4">
-        <div className="bg-primary rounded-2xl p-6 text-center">
-          <h3 className="text-xl font-bold text-white mb-2">Want more than a day pass?</h3>
+        <div className="bg-primary rounded-xl p-6 text-center">
+          <h3 className="text-2xl text-white mb-2 leading-tight" style={{ fontFamily: 'var(--font-headline)' }}>Want more than a day pass?</h3>
           <p className="text-white/70 text-sm mb-4">Become a member and enjoy unlimited access plus exclusive benefits.</p>
           <button 
             onClick={() => { startNavigation(); navigate('/membership'); }}
-            className="tactile-btn bg-bone text-primary px-6 py-3 rounded-xl font-bold text-sm hover:bg-white transition-colors"
+            className="tactile-btn bg-bone text-primary px-6 py-3 rounded-[4px] font-bold text-sm hover:bg-white transition-colors"
           >
             Explore Memberships
           </button>
@@ -292,7 +292,7 @@ const BuyDayPass: React.FC = () => {
       <section className="px-6 py-10 text-center">
         <p className="text-primary/60 dark:text-white/60 text-sm mb-2">Loved your visit?</p>
         <p className="text-primary/80 dark:text-white/80 text-sm font-medium mb-4">Membership gives you unlimited access, priority booking, and a community of professionals.</p>
-        <Link to="/tour" className="inline-block px-8 py-4 bg-primary text-white rounded-2xl font-bold text-sm tracking-widest uppercase hover:bg-primary/90 transition-all duration-normal active:scale-[0.98] shadow-[0_4px_16px_rgba(41,53,21,0.3)]">
+        <Link to="/tour" className="inline-block px-8 py-4 bg-primary text-white rounded-[4px] font-bold text-sm tracking-widest uppercase hover:bg-primary/90 transition-all duration-normal active:scale-[0.98] shadow-[0_4px_16px_rgba(41,53,21,0.3)]">
           Book a Tour
         </Link>
       </section>

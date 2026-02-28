@@ -7,7 +7,7 @@ const PrivacyPolicy: React.FC = () => {
     <div className="min-h-screen bg-bone dark:bg-[#141414] text-primary dark:text-bone pt-24 pb-12">
       <SEO title="Privacy Policy | Ever Club" description="Ever Club privacy policy. Learn how we collect, use, and protect your personal information at our Tustin, CA indoor golf & social club." url="/privacy" />
       <div className="max-w-4xl mx-auto px-6">
-        <h1 className="text-4xl md:text-5xl font-display mb-8">Privacy Policy</h1>
+        <h1 className="text-5xl mb-8 leading-none" style={{ fontFamily: 'var(--font-display)' }}>Privacy Policy</h1>
         <p className="text-sm opacity-60 mb-12">Last updated: January 20, 2026</p>
 
         <div className="space-y-8 leading-relaxed font-sans text-lg">
@@ -18,7 +18,7 @@ const PrivacyPolicy: React.FC = () => {
           </section>
 
           <section>
-            <h2 className="text-2xl font-display mb-4">Collecting Personal Information</h2>
+            <h2 className="text-2xl mb-4 leading-tight" style={{ fontFamily: 'var(--font-headline)' }}>Collecting Personal Information</h2>
             <p className="mb-4">
               When you visit the Site, we collect certain information about your device, your interaction with the Site, and information necessary to process your purchases. We may also collect additional information if you contact us for customer support.
             </p>
@@ -36,7 +36,7 @@ const PrivacyPolicy: React.FC = () => {
           </section>
 
           <section className="bg-white/50 dark:bg-white/5 p-6 rounded-xl border border-primary/10 dark:border-white/10">
-            <h2 className="text-2xl font-display mb-4">Text Messaging & SMS Privacy</h2>
+            <h2 className="text-2xl mb-4 leading-tight" style={{ fontFamily: 'var(--font-headline)' }}>Text Messaging & SMS Privacy</h2>
             <p className="mb-4">
               We value your privacy and the information you consent to share in relation to our SMS marketing service. We use this information to send you text notifications (for your bookings, including abandoned checkout reminders), marketing offers, and transactional texts, including requests for reviews from us.
             </p>
@@ -60,14 +60,14 @@ const PrivacyPolicy: React.FC = () => {
           </section>
 
           <section>
-            <h2 className="text-2xl font-display mb-4">Sharing Personal Information</h2>
+            <h2 className="text-2xl mb-4 leading-tight" style={{ fontFamily: 'var(--font-headline)' }}>Sharing Personal Information</h2>
             <p>
               We share your Personal Information with service providers to help us provide our services and fulfill our contracts with you, as described above. For example, we use Stripe for payment processing and HubSpot for customer relationship management.
             </p>
           </section>
 
           <section>
-            <h2 className="text-2xl font-display mb-4">Your Rights</h2>
+            <h2 className="text-2xl mb-4 leading-tight" style={{ fontFamily: 'var(--font-headline)' }}>Your Rights</h2>
             <p className="mb-4">
               If you are a resident of California, you have the right to access the personal information we hold about you, to port it to a new service, and to ask that your personal information be corrected, updated, or erased.
             </p>
@@ -77,21 +77,21 @@ const PrivacyPolicy: React.FC = () => {
           </section>
 
           <section>
-            <h2 className="text-2xl font-display mb-4">Data Retention</h2>
+            <h2 className="text-2xl mb-4 leading-tight" style={{ fontFamily: 'var(--font-headline)' }}>Data Retention</h2>
             <p>
               When you place an order or make a booking through the Site, we will maintain your Order Information for our records unless and until you ask us to delete this information.
             </p>
           </section>
 
           <section>
-            <h2 className="text-2xl font-display mb-4">Changes</h2>
+            <h2 className="text-2xl mb-4 leading-tight" style={{ fontFamily: 'var(--font-headline)' }}>Changes</h2>
             <p>
               We may update this privacy policy from time to time in order to reflect, for example, changes to our practices or for other operational, legal or regulatory reasons.
             </p>
           </section>
 
           <section>
-            <h2 className="text-2xl font-display mb-4">Contact Us</h2>
+            <h2 className="text-2xl mb-4 leading-tight" style={{ fontFamily: 'var(--font-headline)' }}>Contact Us</h2>
             <p>
               For more information about our privacy practices, if you have questions, or if you would like to make a complaint, please contact us by email at <a href="mailto:info@everclub.app" className="underline font-bold hover:opacity-80 transition-opacity">info@everclub.app</a>.
             </p>

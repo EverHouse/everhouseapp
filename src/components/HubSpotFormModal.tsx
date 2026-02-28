@@ -126,7 +126,7 @@ const HubSpotFormModal: React.FC<HubSpotFormModalProps> = ({
         <div className="p-4">
           <button
             onClick={handleClose}
-            className="w-full py-4 min-h-[44px] bg-primary dark:bg-accent text-white dark:text-brand-green rounded-[2rem] font-semibold hover:scale-[1.02] active:scale-[0.98] transition-all duration-[400ms] ease-in-out"
+            className="w-full py-4 min-h-[44px] bg-primary dark:bg-accent text-white dark:text-brand-green rounded-[4px] font-semibold hover:scale-[1.02] active:scale-[0.98] transition-all duration-[400ms] ease-in-out"
           >
             Close
           </button>
@@ -140,7 +140,7 @@ const HubSpotFormModal: React.FC<HubSpotFormModalProps> = ({
           type="button"
           onClick={handleSubmit}
           disabled={loading}
-          className="w-full py-4 min-h-[44px] bg-primary dark:bg-accent text-white dark:text-brand-green rounded-[2rem] font-semibold hover:scale-[1.02] active:scale-[0.98] transition-all duration-[400ms] ease-in-out disabled:opacity-50 flex items-center justify-center gap-2"
+          className="w-full py-4 min-h-[44px] bg-primary dark:bg-accent text-white dark:text-brand-green rounded-[4px] font-semibold hover:scale-[1.02] active:scale-[0.98] transition-all duration-[400ms] ease-in-out disabled:opacity-50 flex items-center justify-center gap-2"
         >
           {loading ? (
             <>

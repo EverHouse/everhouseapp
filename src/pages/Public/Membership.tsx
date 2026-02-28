@@ -116,7 +116,7 @@ const MembershipOverview: React.FC = () => {
         </div>
         <div className="space-y-5">
           {[1, 2, 3, 4].map(i => (
-            <div key={i} className="h-64 bg-white/50 dark:bg-white/5 rounded-[2rem] animate-pulse"></div>
+            <div key={i} className="h-64 bg-white/50 dark:bg-white/5 rounded-xl animate-pulse"></div>
           ))}
         </div>
       </div>
@@ -134,8 +134,8 @@ const MembershipOverview: React.FC = () => {
     <div className="px-4 pt-4 pb-0 flex flex-col gap-8 bg-bone dark:bg-[#141414] min-h-screen overflow-x-hidden">
       <div className="text-center px-2 animate-content-enter">
         <p className="text-primary/40 dark:text-white/40 text-[10px] font-bold uppercase tracking-[0.3em] mb-2">Est. 2025</p>
-        <h1 className="text-3xl font-medium tracking-tight text-primary dark:text-white mb-3">Your Office. Your Course. Your Club.</h1>
-        <p className="text-primary/70 dark:text-white/70 text-base font-light leading-relaxed max-w-[320px] mx-auto">
+        <h1 className="text-5xl text-primary dark:text-white mb-3 leading-none" style={{ fontFamily: 'var(--font-display)' }}>Your Office. Your Course. Your Club.</h1>
+        <p className="text-base text-primary/70 dark:text-white/70 leading-relaxed max-w-[320px] mx-auto" style={{ fontFamily: 'var(--font-body)' }}>
           Select the membership that fits how you work, play, and connect.
         </p>
       </div>
@@ -167,14 +167,14 @@ const MembershipOverview: React.FC = () => {
 
           if (tier.is_popular) {
             return (
-              <div key={tier.id} className="relative flex flex-col p-6 backdrop-blur-xl bg-primary/90 rounded-[2rem] overflow-hidden text-white border border-white/20 shadow-[0_8px_32px_rgba(0,0,0,0.2),0_0_20px_rgba(41,53,21,0.3),inset_0_1px_1px_rgba(255,255,255,0.1)] hover:scale-[1.02] hover:-translate-y-1 transition-all duration-[400ms]">
+              <div key={tier.id} className="relative flex flex-col p-6 backdrop-blur-xl bg-primary/90 rounded-xl overflow-hidden text-white border border-white/20 shadow-[0_8px_32px_rgba(0,0,0,0.2),0_0_20px_rgba(41,53,21,0.3),inset_0_1px_1px_rgba(255,255,255,0.1)] hover:scale-[1.02] hover:-translate-y-1 transition-all duration-[400ms]">
                 <div className="absolute top-0 right-0 w-48 h-48 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl pointer-events-none"></div>
                 <div className="flex justify-between items-start mb-4 relative z-10">
                   <div className="pr-2">
                     <h2 className="text-xl font-semibold mb-2">{tier.name} Membership</h2>
                     <p className="text-sm text-white/70 leading-relaxed font-light">{tier.description}</p>
                   </div>
-                  <span className="shrink-0 px-3 py-1 bg-accent/90 backdrop-blur text-primary text-[10px] font-bold rounded-full uppercase tracking-wider shadow-sm border border-white/20 mt-1">
+                  <span className="shrink-0 w-fit px-2 py-1 bg-accent/90 backdrop-blur text-primary text-[10px] font-bold rounded-[4px] uppercase tracking-widest shadow-sm border border-white/20 mt-1">
                     Popular
                   </span>
                 </div>
@@ -192,7 +192,7 @@ const MembershipOverview: React.FC = () => {
                 </ul>
                 <button 
                   onClick={handleClick}
-                  className="w-full relative z-10 py-4 px-6 rounded-2xl bg-white/95 backdrop-blur text-primary font-bold text-sm tracking-widest uppercase hover:bg-white/80 transition-all duration-normal active:scale-[0.98] shadow-[0_4px_16px_rgba(0,0,0,0.2)]"
+                  className="w-full relative z-10 py-4 px-6 rounded-[4px] bg-white/95 backdrop-blur text-primary font-bold text-sm tracking-widest uppercase hover:bg-white/80 transition-all duration-normal active:scale-[0.98] shadow-[0_4px_16px_rgba(0,0,0,0.2)]"
                 >
                   {btnText}
                 </button>
@@ -224,9 +224,9 @@ const MembershipOverview: React.FC = () => {
         </p>
       </div>
       
-      <div className="bg-white/40 dark:bg-white/5 backdrop-blur-xl rounded-3xl p-6 border border-white/60 dark:border-white/10 shadow-sm dark:shadow-black/20 animate-content-enter-delay-3">
+      <div className="bg-white/40 dark:bg-white/5 backdrop-blur-xl rounded-xl p-6 border border-white/60 dark:border-white/10 shadow-sm dark:shadow-black/20 animate-content-enter-delay-3">
         <div className="text-center mb-8">
-          <h3 className="text-2xl font-medium text-primary dark:text-white mb-2">How to Join</h3>
+          <h3 className="text-2xl text-primary dark:text-white mb-2 leading-tight" style={{ fontFamily: 'var(--font-headline)' }}>How to Join</h3>
           <p className="text-primary/60 dark:text-white/60 text-sm font-light">Your path to membership in 3 simple steps</p>
         </div>
         
@@ -274,7 +274,7 @@ const MembershipOverview: React.FC = () => {
         <div className="mt-8 text-center">
           <button 
             onClick={() => navigate('/membership/apply')}
-            className="tactile-btn px-8 py-4 rounded-2xl bg-primary text-white font-bold text-sm tracking-widest uppercase hover:bg-primary/90 transition-all duration-normal active:scale-[0.98] shadow-[0_4px_16px_rgba(41,53,21,0.3)]"
+            className="tactile-btn px-8 py-4 rounded-[4px] bg-primary text-white font-bold text-sm tracking-widest uppercase hover:bg-primary/90 transition-all duration-normal active:scale-[0.98] shadow-[0_4px_16px_rgba(41,53,21,0.3)]"
           >
             Apply Now — Limited Membership
           </button>
@@ -284,7 +284,7 @@ const MembershipOverview: React.FC = () => {
         </div>
       </div>
 
-      <div className="bg-white/40 dark:bg-white/5 backdrop-blur-xl rounded-3xl p-5 border border-white/60 dark:border-white/10 shadow-sm dark:shadow-black/20 animate-content-enter-delay-4">
+      <div className="bg-white/40 dark:bg-white/5 backdrop-blur-xl rounded-xl p-5 border border-white/60 dark:border-white/10 shadow-sm dark:shadow-black/20 animate-content-enter-delay-4">
         <div className="flex items-center gap-3 mb-4">
            <div className="p-2 bg-primary/5 dark:bg-white/5 rounded-xl text-primary dark:text-white">
               <span className="material-symbols-outlined font-light">id_card</span>
@@ -297,7 +297,7 @@ const MembershipOverview: React.FC = () => {
         <div className="grid grid-cols-2 gap-3">
            <button 
              onClick={() => setSelectedPass('workspace')}
-             className={`flex flex-col gap-2 p-3 rounded-2xl border transition-all duration-fast text-left ${selectedPass === 'workspace' ? 'bg-primary text-white border-primary shadow-md dark:shadow-black/20' : 'bg-white/40 dark:bg-white/5 border-white/50 dark:border-white/10 hover:bg-white/60 dark:hover:bg-white/10 hover:scale-[1.02] text-primary dark:text-white'}`}
+             className={`flex flex-col gap-2 p-3 rounded-xl border transition-all duration-fast text-left ${selectedPass === 'workspace' ? 'bg-primary text-white border-primary shadow-md dark:shadow-black/20' : 'bg-white/40 dark:bg-white/5 border-white/50 dark:border-white/10 hover:bg-white/60 dark:hover:bg-white/10 hover:scale-[1.02] text-primary dark:text-white'}`}
            >
               <span className={`material-symbols-outlined font-light ${selectedPass === 'workspace' ? 'text-white' : 'text-primary dark:text-white'}`}>work</span>
               <div>
@@ -307,7 +307,7 @@ const MembershipOverview: React.FC = () => {
            </button>
            <button 
              onClick={() => setSelectedPass('sim')}
-             className={`flex flex-col gap-2 p-3 rounded-2xl border transition-all duration-fast text-left ${selectedPass === 'sim' ? 'bg-primary text-white border-primary shadow-md dark:shadow-black/20' : 'bg-white/40 dark:bg-white/5 border-white/50 dark:border-white/10 hover:bg-white/60 dark:hover:bg-white/10 hover:scale-[1.02] text-primary dark:text-white'}`}
+             className={`flex flex-col gap-2 p-3 rounded-xl border transition-all duration-fast text-left ${selectedPass === 'sim' ? 'bg-primary text-white border-primary shadow-md dark:shadow-black/20' : 'bg-white/40 dark:bg-white/5 border-white/50 dark:border-white/10 hover:bg-white/60 dark:hover:bg-white/10 hover:scale-[1.02] text-primary dark:text-white'}`}
            >
               <span className={`material-symbols-outlined font-light ${selectedPass === 'sim' ? 'text-white' : 'text-primary dark:text-white'}`}>sports_golf</span>
               <div>
@@ -333,7 +333,7 @@ const MembershipOverview: React.FC = () => {
 };
 
 const MembershipCard: React.FC<{ title: string; price: string; suffix?: string; desc: string; features: string[]; onClick: () => void; btnText?: string }> = ({ title, price, suffix="/mo", desc, features, onClick, btnText="Apply" }) => (
-  <div className="relative flex flex-col p-6 bg-white/50 dark:bg-white/5 backdrop-blur-xl rounded-[2rem] border border-white/60 dark:border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.08),inset_0_1px_1px_rgba(255,255,255,0.6)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.3)] hover:scale-[1.02] hover:-translate-y-1 transition-all duration-[400ms]">
+  <div className="relative flex flex-col p-6 bg-white/50 dark:bg-white/5 backdrop-blur-xl rounded-xl border border-white/60 dark:border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.08),inset_0_1px_1px_rgba(255,255,255,0.6)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.3)] hover:scale-[1.02] hover:-translate-y-1 transition-all duration-[400ms]">
     <div className="mb-4">
       <h2 className="text-xl font-semibold text-primary dark:text-white mb-2">{title}</h2>
       <p className="text-sm text-primary/70 dark:text-white/70 leading-relaxed font-light">{desc}</p>
@@ -350,7 +350,7 @@ const MembershipCard: React.FC<{ title: string; price: string; suffix?: string; 
         </li>
       ))}
     </ul>
-    <button onClick={onClick} className="w-full py-4 px-6 rounded-2xl bg-primary dark:bg-white/15 text-white font-bold text-sm tracking-widest uppercase hover:bg-primary/90 dark:hover:bg-white/25 transition-all duration-normal active:scale-[0.98] shadow-[0_4px_16px_rgba(41,53,21,0.3)] dark:shadow-[0_4px_16px_rgba(0,0,0,0.3)] border border-transparent dark:border-white/20">
+    <button onClick={onClick} className="w-full py-4 px-6 rounded-[4px] bg-primary dark:bg-white/15 text-white font-bold text-sm tracking-widest uppercase hover:bg-primary/90 dark:hover:bg-white/25 transition-all duration-normal active:scale-[0.98] shadow-[0_4px_16px_rgba(41,53,21,0.3)] dark:shadow-[0_4px_16px_rgba(0,0,0,0.3)] border border-transparent dark:border-white/20">
       {btnText}
     </button>
   </div>
@@ -382,11 +382,11 @@ const Corporate: React.FC = () => {
       <div className="px-6 pt-6 pb-12 flex flex-col gap-6 bg-bone dark:bg-[#141414] min-h-screen">
         <div className="flex flex-col gap-2 mb-2 pt-4 animate-content-enter">
             <div className="flex items-center gap-2">
-                <span className="px-4 py-1 bg-white/50 dark:bg-white/5 backdrop-blur text-primary dark:text-white text-[10px] font-bold rounded-full uppercase tracking-wider border border-primary/5 dark:border-white/10 shadow-sm dark:shadow-black/20">
+                <span className="w-fit px-2 py-1 bg-white/50 dark:bg-white/5 backdrop-blur text-primary dark:text-white text-[10px] font-bold rounded-[4px] uppercase tracking-widest border border-primary/5 dark:border-white/10 shadow-sm dark:shadow-black/20">
                     For the team
                 </span>
             </div>
-            <h1 className="text-4xl font-medium tracking-tight text-primary dark:text-white leading-[1.1] mt-4">
+            <h1 className="text-5xl text-primary dark:text-white leading-none mt-4" style={{ fontFamily: 'var(--font-display)' }}>
                 Corporate <br/>Membership
             </h1>
             <p className="text-primary/70 dark:text-white/70 text-base font-light leading-relaxed max-w-xs mt-2">
@@ -394,7 +394,7 @@ const Corporate: React.FC = () => {
             </p>
         </div>
 
-        <div className="bg-white/40 dark:bg-white/5 backdrop-blur-xl rounded-[2rem] p-8 shadow-sm dark:shadow-black/20 border border-white/60 dark:border-white/10 animate-content-enter-delay-1">
+        <div className="bg-white/40 dark:bg-white/5 backdrop-blur-xl rounded-xl p-8 shadow-sm dark:shadow-black/20 border border-white/60 dark:border-white/10 animate-content-enter-delay-1">
             <ul className="space-y-8">
                 <li className="flex gap-4 items-center">
                     <div className="w-10 h-10 rounded-full bg-[#E8E8E0] dark:bg-white/5 flex items-center justify-center shrink-0">
@@ -428,11 +428,11 @@ const Corporate: React.FC = () => {
 
         <div className="mt-4 animate-content-enter-delay-2">
              <div className="flex justify-between items-center mb-6 px-2">
-                <h2 className="text-2xl font-medium text-primary dark:text-white tracking-tight">Volume Discounts</h2>
-                <span className="px-3 py-1 bg-white/50 dark:bg-white/5 rounded-full border border-primary/5 dark:border-white/10 text-[10px] font-bold text-primary/60 dark:text-white/60 uppercase tracking-wider">Per employee / mo</span>
+                <h2 className="text-2xl text-primary dark:text-white leading-tight" style={{ fontFamily: 'var(--font-headline)' }}>Volume Discounts</h2>
+                <span className="w-fit px-2 py-1 bg-white/50 dark:bg-white/5 rounded-[4px] border border-primary/5 dark:border-white/10 text-[10px] font-bold text-primary/60 dark:text-white/60 uppercase tracking-widest">Per employee / mo</span>
              </div>
              
-             <div className="bg-white/40 dark:bg-white/5 backdrop-blur-md rounded-[2rem] border border-white/60 dark:border-white/10 shadow-sm dark:shadow-black/20 overflow-hidden divide-y divide-primary/5 dark:divide-white/10">
+             <div className="bg-white/40 dark:bg-white/5 backdrop-blur-md rounded-xl border border-white/60 dark:border-white/10 shadow-sm dark:shadow-black/20 overflow-hidden divide-y divide-primary/5 dark:divide-white/10">
                 <DiscountRow count="1–4" price={`$${corporateBasePrice}`} icon="1+" isActive={employeeCount < 5} />
                 {[...corporateTiers].sort((a, b) => a.minMembers - b.minMembers).map((t, i, arr) => {
                   const nextTier = arr[i + 1];
@@ -446,7 +446,7 @@ const Corporate: React.FC = () => {
                 })}
              </div>
 
-             <div className="bg-white/60 dark:bg-white/5 backdrop-blur-xl rounded-[2rem] border border-white/60 dark:border-white/10 shadow-sm dark:shadow-black/20 p-6 mt-6">
+             <div className="bg-white/60 dark:bg-white/5 backdrop-blur-xl rounded-xl border border-white/60 dark:border-white/10 shadow-sm dark:shadow-black/20 p-6 mt-6">
                 <div className="flex flex-col gap-4">
                    <div className="flex justify-between items-center">
                       <span className="text-sm font-medium text-primary dark:text-white">Team Size</span>
@@ -470,13 +470,13 @@ const Corporate: React.FC = () => {
                 <div className="mt-6 pt-6 border-t border-primary/10 dark:border-white/10">
                    <div className="flex items-center justify-between mb-2">
                       <span className="text-xs font-medium text-primary/60 dark:text-white/60 uppercase tracking-wider">Current Tier</span>
-                      <span className="px-3 py-1 bg-primary/10 dark:bg-white/10 rounded-full text-xs font-bold text-primary dark:text-white">{getPricingTier(employeeCount)}</span>
+                      <span className="px-3 py-1 bg-primary/10 dark:bg-white/10 rounded-[4px] text-xs font-bold text-primary dark:text-white">{getPricingTier(employeeCount)}</span>
                    </div>
                    <div className="flex items-center justify-between mb-4">
                       <span className="text-xs font-medium text-primary/60 dark:text-white/60 uppercase tracking-wider">Price per Employee</span>
                       <span className="text-xl font-bold text-primary dark:text-white">${getPricePerEmployee(employeeCount)}<span className="text-sm font-medium text-primary/60 dark:text-white/60">/mo</span></span>
                    </div>
-                   <div className="flex items-center justify-between p-4 bg-primary/5 dark:bg-white/5 rounded-2xl">
+                   <div className="flex items-center justify-between p-4 bg-primary/5 dark:bg-white/5 rounded-xl">
                       <span className="text-sm font-semibold text-primary dark:text-white">Estimated Monthly Total</span>
                       <span className="text-2xl font-bold text-primary dark:text-white">${(employeeCount * getPricePerEmployee(employeeCount)).toLocaleString('en-US')}</span>
                    </div>
@@ -488,7 +488,7 @@ const Corporate: React.FC = () => {
              </p>
         </div>
 
-        <Link to={`/checkout?tier=corporate&qty=${employeeCount}`} className="w-full py-5 px-6 rounded-2xl bg-primary text-white font-bold text-sm uppercase tracking-widest hover:bg-primary/90 shadow-xl shadow-primary/20 flex items-center justify-center gap-3 mt-4 mb-8 group animate-content-enter-delay-3">
+        <Link to={`/checkout?tier=corporate&qty=${employeeCount}`} className="w-full py-5 px-6 rounded-[4px] bg-primary text-white font-bold text-sm uppercase tracking-widest hover:bg-primary/90 shadow-xl shadow-primary/20 flex items-center justify-center gap-3 mt-4 mb-8 group animate-content-enter-delay-3">
             Join as Corporate
             <span className="material-symbols-outlined text-[20px] group-hover:translate-x-1 transition-transform">arrow_forward</span>
         </Link>
@@ -577,7 +577,7 @@ const CompareFeatures: React.FC = () => {
           <div className="h-8 bg-primary/10 dark:bg-white/10 rounded-lg w-48 mx-auto mb-3"></div>
           <div className="h-4 bg-primary/10 dark:bg-white/10 rounded w-64 mx-auto"></div>
         </div>
-        <div className="h-96 bg-white/50 dark:bg-white/5 rounded-3xl animate-pulse"></div>
+        <div className="h-96 bg-white/50 dark:bg-white/5 rounded-xl animate-pulse"></div>
       </div>
     );
   }
@@ -586,13 +586,13 @@ const CompareFeatures: React.FC = () => {
     <AnimatedPage>
     <div className="flex flex-col gap-6 pt-6 px-4 pb-12 bg-bone dark:bg-[#141414] min-h-screen">
        <div className="text-center px-2 pt-4 animate-content-enter">
-        <h2 className="text-3xl font-medium tracking-tight text-primary dark:text-white mb-3">Compare Features</h2>
+        <h2 className="text-5xl text-primary dark:text-white mb-3 leading-none" style={{ fontFamily: 'var(--font-display)' }}>Compare Features</h2>
         <p className="text-primary/70 dark:text-white/70 text-base font-light leading-relaxed max-w-[320px] mx-auto">
           Select up to 3 memberships to compare side-by-side.
         </p>
       </div>
       
-      <div className="bg-white/40 dark:bg-white/5 backdrop-blur-xl rounded-3xl p-4 shadow-sm dark:shadow-black/20 border border-white/60 dark:border-white/10 animate-content-enter-delay-1">
+      <div className="bg-white/40 dark:bg-white/5 backdrop-blur-xl rounded-xl p-4 shadow-sm dark:shadow-black/20 border border-white/60 dark:border-white/10 animate-content-enter-delay-1">
         <h3 className="text-xs font-bold text-primary/50 dark:text-white/50 mb-3 uppercase tracking-wider">Select to Compare (Max 3)</h3>
         <div className="flex flex-wrap gap-2">
           {tierNames.map(t => {
@@ -602,7 +602,7 @@ const CompareFeatures: React.FC = () => {
                     key={t} 
                     onClick={() => toggleTier(t)}
                     disabled={!isSelected && selectedTiers.length >= 3}
-                    className={`px-4 py-2 rounded-full text-xs font-bold border flex items-center gap-1 transition-all duration-fast ${isSelected ? 'bg-primary text-white border-primary shadow-sm dark:shadow-black/20' : 'bg-white/30 dark:bg-white/5 text-primary/60 dark:text-white/60 border-primary/10 dark:border-white/10 hover:border-primary/20 dark:hover:border-white/20'} ${!isSelected && selectedTiers.length >= 3 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    className={`px-4 py-2 rounded-[4px] text-xs font-bold border flex items-center gap-1 transition-all duration-fast ${isSelected ? 'bg-primary text-white border-primary shadow-sm dark:shadow-black/20' : 'bg-white/30 dark:bg-white/5 text-primary/60 dark:text-white/60 border-primary/10 dark:border-white/10 hover:border-primary/20 dark:hover:border-white/20'} ${!isSelected && selectedTiers.length >= 3 ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
                     {isSelected && <span className="material-symbols-outlined text-[14px]">check</span>} {t}
                 </button>
@@ -611,7 +611,7 @@ const CompareFeatures: React.FC = () => {
         </div>
       </div>
 
-      <div className="w-full bg-white/40 dark:bg-white/5 backdrop-blur-xl rounded-3xl p-4 shadow-sm dark:shadow-black/20 border border-white/60 dark:border-white/10 overflow-x-auto animate-content-enter-delay-2">
+      <div className="w-full bg-white/40 dark:bg-white/5 backdrop-blur-xl rounded-xl p-4 shadow-sm dark:shadow-black/20 border border-white/60 dark:border-white/10 overflow-x-auto animate-content-enter-delay-2">
         <div className="min-w-[320px]">
           <div className="grid grid-cols-[25%_1fr_1fr_1fr] gap-1 mb-4 border-b border-primary/5 dark:border-white/10 pb-4 items-end">
              <div className="text-[10px] font-bold text-primary/40 dark:text-white/40 uppercase tracking-widest pl-1">Features</div>

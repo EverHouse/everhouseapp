@@ -114,8 +114,8 @@ const Gallery: React.FC = () => {
         style={{ marginTop: 'calc(-1 * var(--header-offset))', paddingTop: 'var(--header-offset)' }}
       >
         <div className="px-5 pt-4 md:pt-2 pb-6 animate-content-enter">
-          <h1 className="text-3xl font-medium tracking-tight text-primary dark:text-white leading-tight">Gallery</h1>
-          <p className="text-primary/70 dark:text-white/70 text-base mt-2 font-light">Explore the exclusive spaces of Ever Club.</p>
+          <h1 className="text-5xl text-primary dark:text-white leading-none" style={{ fontFamily: 'var(--font-display)' }}>Gallery</h1>
+          <p className="text-base text-primary/70 dark:text-white/70 mt-2 leading-relaxed" style={{ fontFamily: 'var(--font-body)' }}>Explore the exclusive spaces of Ever Club.</p>
         </div>
 
         <div className="pl-5 pr-5 py-2 w-full overflow-x-auto scrollbar-hide mb-6 animate-content-enter-delay-1">
@@ -158,7 +158,7 @@ const Gallery: React.FC = () => {
 
         <section className="px-6 py-10 text-center bg-bone dark:bg-[#141414]">
           <p className="text-primary/60 dark:text-white/60 text-sm mb-4">Like what you see?</p>
-          <Link to="/tour" className="inline-block px-8 py-4 bg-primary text-white rounded-2xl font-bold text-sm tracking-widest uppercase hover:bg-primary/90 transition-all duration-normal active:scale-[0.98] shadow-[0_4px_16px_rgba(41,53,21,0.3)]">
+          <Link to="/tour" className="inline-block px-8 py-4 bg-primary text-white rounded-[4px] font-bold text-sm tracking-widest uppercase hover:bg-primary/90 transition-all duration-normal active:scale-[0.98] shadow-[0_4px_16px_rgba(41,53,21,0.3)]">
             Book Your Private Tour
           </Link>
         </section>
@@ -188,7 +188,7 @@ const FilterButton: React.FC<{label: string; active?: boolean; onClick?: () => v
         active 
         ? 'bg-primary text-white shadow-md dark:shadow-black/20' 
         : 'bg-white/40 dark:bg-white/5 text-primary dark:text-white border border-white/50 dark:border-white/10 hover:bg-white/60 dark:hover:bg-white/10 backdrop-blur-md'
-    } tactile-btn px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-fast whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed`}
+    } tactile-btn px-5 py-2.5 rounded-[4px] text-sm font-semibold transition-all duration-fast whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed`}
   >
     {label}
   </button>
@@ -213,14 +213,14 @@ const GalleryItem: React.FC<GalleryItemProps> = React.memo(({ img, title, catego
   
   return (
     <div 
-      className={`tactile-card break-inside-avoid relative group rounded-2xl overflow-hidden shadow-sm dark:shadow-black/20 cursor-pointer mb-4 border border-white/20 dark:border-white/10 active:scale-[0.98] transition-transform animate-list-item-delay-${Math.min(index, 10)}`}
+      className={`tactile-card break-inside-avoid relative group rounded-xl overflow-hidden shadow-sm dark:shadow-black/20 cursor-pointer mb-4 border border-white/20 dark:border-white/10 active:scale-[0.98] transition-transform animate-list-item-delay-${Math.min(index, 10)}`}
       onClick={handleClick}
       role="button"
       tabIndex={0}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleClick(); } }}
     >
       {!loaded && !error && (
-        <div className={`w-full ${skeletonHeight} bg-gradient-to-br from-gray-200 dark:from-white/10 via-gray-100 dark:via-white/5 to-gray-200 dark:to-white/10 rounded-2xl overflow-hidden`}>
+        <div className={`w-full ${skeletonHeight} bg-gradient-to-br from-gray-200 dark:from-white/10 via-gray-100 dark:via-white/5 to-gray-200 dark:to-white/10 rounded-xl overflow-hidden`}>
           <div className="w-full h-full shimmer-effect" />
         </div>
       )}
@@ -234,7 +234,7 @@ const GalleryItem: React.FC<GalleryItemProps> = React.memo(({ img, title, catego
         onError={() => setError(true)}
       />
       {error && (
-        <div className={`w-full ${skeletonHeight} bg-gray-200 dark:bg-white/5 flex items-center justify-center rounded-2xl`}>
+        <div className={`w-full ${skeletonHeight} bg-gray-200 dark:bg-white/5 flex items-center justify-center rounded-xl`}>
           <span className="material-symbols-outlined text-gray-400 dark:text-white/50 text-3xl">broken_image</span>
         </div>
       )}
@@ -315,7 +315,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ images, currentIndex, onClose
       )}
 
       <div 
-        className="max-w-[90vw] max-h-[80vh] rounded-2xl overflow-hidden"
+        className="max-w-[90vw] max-h-[80vh] rounded-xl overflow-hidden"
         onClick={(e) => e.stopPropagation()}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
@@ -326,7 +326,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ images, currentIndex, onClose
           src={images[currentIndex]}
           alt="Gallery full view"
           loading="lazy"
-          className="max-w-full max-h-[80vh] object-contain rounded-2xl animate-content-enter"
+          className="max-w-full max-h-[80vh] object-contain rounded-xl animate-content-enter"
         />
       </div>
     </div>,

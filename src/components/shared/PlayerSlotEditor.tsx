@@ -72,10 +72,10 @@ const PlayerSlotEditor: React.FC<PlayerSlotEditorProps> = ({
   return (
     <>
       {showPlayerCountSelector && (
-        <section className={`rounded-2xl p-4 border glass-card ${isDark ? 'border-white/25' : 'border-black/10'}`}>
+        <section className={`rounded-xl p-4 border glass-card ${isDark ? 'border-white/25' : 'border-black/10'}`}>
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
-              <span className={`text-xs font-bold uppercase tracking-wider ${isDark ? 'text-white/80' : 'text-primary/80'}`}>How many players?</span>
+              <span className={`text-xs font-bold uppercase tracking-widest ${isDark ? 'text-white/80' : 'text-primary/80'}`}>How many players?</span>
             </div>
           </div>
           <div className={`flex gap-2 p-1 rounded-xl border ${isDark ? 'bg-black/20 border-white/20' : 'bg-black/5 border-black/5'}`}>
@@ -99,9 +99,9 @@ const PlayerSlotEditor: React.FC<PlayerSlotEditorProps> = ({
       )}
 
       {slots.length > 0 && (
-        <section className={`rounded-2xl p-4 border glass-card relative z-10 overflow-hidden ${isDark ? 'border-white/25' : 'border-black/10'}`}>
+        <section className={`rounded-xl p-4 border glass-card relative z-10 overflow-hidden ${isDark ? 'border-white/25' : 'border-black/10'}`}>
           <div className="flex items-center gap-2 mb-3">
-            <span className={`text-xs font-bold uppercase tracking-wider ${isDark ? 'text-white/80' : 'text-primary/80'}`}>Additional Players</span>
+            <span className={`text-xs font-bold uppercase tracking-widest ${isDark ? 'text-white/80' : 'text-primary/80'}`}>Additional Players</span>
             <span className={`text-xs ${isDark ? 'text-white/50' : 'text-primary/50'}`}>(Optional)</span>
           </div>
 

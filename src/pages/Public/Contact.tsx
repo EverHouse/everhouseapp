@@ -70,8 +70,8 @@ const Contact: React.FC = () => {
     <SEO title="Contact Us | Ever Club — Tustin, OC" description="Contact Ever Club at 15771 Red Hill Ave, Ste 500, Tustin, CA 92780. Membership inquiries, private events, tours & questions. (949) 545-5855." url="/contact" />
     <div className="flex flex-col min-h-screen bg-bone dark:bg-[#141414] overflow-x-hidden">
       <div className="px-6 pt-4 md:pt-2 pb-6 text-center animate-content-enter">
-        <h1 className="text-3xl font-bold tracking-tight text-primary dark:text-white mb-3">Get in Touch</h1>
-        <p className="text-primary/70 dark:text-white/70 text-sm leading-relaxed max-w-xs mx-auto">
+        <h1 className="text-5xl text-primary dark:text-white mb-3 leading-none" style={{ fontFamily: 'var(--font-display)' }}>Get in Touch</h1>
+        <p className="text-base text-primary/70 dark:text-white/70 leading-relaxed max-w-xs mx-auto" style={{ fontFamily: 'var(--font-body)' }}>
            We look forward to hearing from you. Please fill out the form below or visit us in Tustin.
         </p>
         <div className="mt-4">
@@ -88,7 +88,7 @@ const Contact: React.FC = () => {
            <ContactCard icon="call" title="CALL US" value="(949) 545-5855" href="tel:9495455855" />
            <ContactCard icon="mail" title="EMAIL US" value="info@joinever.club" href="mailto:info@joinever.club" />
            <div 
-             className="group flex items-center justify-between bg-zinc-700/50 p-4 rounded-2xl border border-black/5 dark:border-white/10 shadow-sm dark:shadow-black/20 opacity-60 cursor-default"
+             className="group flex items-center justify-between bg-zinc-700/50 p-4 rounded-xl border border-black/5 dark:border-white/10 shadow-sm dark:shadow-black/20 opacity-60 cursor-default"
            >
               <div className="flex items-center gap-4">
                    <div className="flex items-center justify-center size-12 rounded-full bg-white/10 text-white shrink-0">
@@ -105,9 +105,9 @@ const Contact: React.FC = () => {
       </section>
 
       <section className="px-4 mb-8">
-         <div className="bg-[#E8E8E0]/50 dark:bg-white/5 rounded-2xl p-6">
-            <h2 className="text-lg font-bold text-primary dark:text-white mb-4 flex items-center gap-2">
-               <span className="material-symbols-outlined text-xl">schedule</span>
+         <div className="bg-[#E8E8E0]/50 dark:bg-white/5 rounded-xl p-6">
+            <h2 className="text-2xl text-primary dark:text-white mb-4 flex items-center gap-2 leading-tight" style={{ fontFamily: 'var(--font-headline)' }}>
+               <span className="material-symbols-outlined text-xl translate-y-[1px]">schedule</span>
                Hours of Operation
             </h2>
             <div className="space-y-3 text-sm">
@@ -132,8 +132,8 @@ const Contact: React.FC = () => {
       </section>
 
       <section className="px-4 mb-12">
-         <div className="bg-white dark:bg-[#1a1d15] rounded-[2rem] p-6 shadow-sm dark:shadow-black/20 border border-black/5 dark:border-white/10">
-            <h2 className="text-xl font-bold text-primary dark:text-white mb-6">Send a Message</h2>
+         <div className="bg-white dark:bg-[#1a1d15] rounded-xl p-6 shadow-sm dark:shadow-black/20 border border-black/5 dark:border-white/10">
+            <h2 className="text-2xl text-primary dark:text-white mb-6 leading-tight" style={{ fontFamily: 'var(--font-headline)' }}>Send a Message</h2>
             
             {isSubmitted ? (
                 <div className="py-12 flex flex-col items-center text-center animate-in fade-in zoom-in duration-500">
@@ -144,7 +144,7 @@ const Contact: React.FC = () => {
                     <p className="text-primary/60 dark:text-white/60">Thank you for reaching out. Our team will respond to your inquiry shortly.</p>
                     <p className="text-primary/60 dark:text-white/60 mt-2">In the meantime, book a private tour to experience the club firsthand.</p>
                     <div className="mt-6">
-                      <Link to="/tour" className="inline-block px-8 py-4 bg-primary text-white rounded-2xl font-bold text-sm tracking-widest uppercase hover:bg-primary/90 transition-all duration-normal active:scale-[0.98]">
+                      <Link to="/tour" className="inline-block px-8 py-4 bg-primary text-white rounded-[4px] font-bold text-sm tracking-widest uppercase hover:bg-primary/90 transition-all duration-normal active:scale-[0.98]">
                         Book a Tour
                       </Link>
                     </div>
@@ -227,7 +227,7 @@ const Contact: React.FC = () => {
       </section>
 
       <section className="px-4 mb-12">
-        <div className="w-full h-64 rounded-[2rem] overflow-hidden relative border border-black/5 dark:border-white/10">
+        <div className="w-full h-64 rounded-xl overflow-hidden relative border border-black/5 dark:border-white/10">
             <iframe
               src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3318.7!2d-117.8272!3d33.709!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x80dcdfe2e5f3b3f5%3A0x0!2s15771%20Red%20Hill%20Ave%20%23500%2C%20Tustin%2C%20CA%2092780!5e0!3m2!1sen!2sus!4v1702850000000!5m2!1sen!2sus"
               className="w-full h-full border-0"
@@ -262,12 +262,12 @@ const Contact: React.FC = () => {
       </section>
 
       <section className="px-4 py-8 mb-4">
-        <div className="bg-primary rounded-2xl p-6 text-center">
-          <h3 className="text-xl font-bold text-white mb-2">Ready to become a member?</h3>
+        <div className="bg-primary rounded-xl p-6 text-center">
+          <h3 className="text-2xl text-white mb-2 leading-tight" style={{ fontFamily: 'var(--font-headline)' }}>Ready to become a member?</h3>
           <p className="text-white/70 text-sm mb-4">Join our community of golfers, creatives, and wellness enthusiasts.</p>
           <button 
             onClick={() => { startNavigation(); navigate('/membership'); }}
-            className="tactile-btn bg-white text-primary px-6 py-3 rounded-xl font-bold text-sm hover:bg-white/90 transition-colors"
+            className="tactile-btn bg-white text-primary px-6 py-3 rounded-[4px] font-bold text-sm hover:bg-white/90 transition-colors"
           >
             Apply for Membership
           </button>
@@ -283,7 +283,7 @@ const Contact: React.FC = () => {
 const ContactCard: React.FC<{icon: string; title: string; value: string; href?: string}> = ({ icon, title, value, href }) => {
   const Wrapper = href ? 'a' : 'div';
   return (
-    <Wrapper href={href} className="tactile-card group flex items-center justify-between bg-white dark:bg-[#1a1d15] p-4 rounded-2xl border border-black/5 dark:border-white/10 shadow-sm dark:shadow-black/20 hover:shadow-md transition-all duration-fast cursor-pointer">
+    <Wrapper href={href} className="tactile-card group flex items-center justify-between bg-white dark:bg-[#1a1d15] p-4 rounded-xl border border-black/5 dark:border-white/10 shadow-sm dark:shadow-black/20 hover:shadow-md transition-all duration-fast cursor-pointer">
        <div className="flex items-center gap-4">
             <div className="flex items-center justify-center size-12 rounded-full bg-bone dark:bg-white/5 text-primary dark:text-white shrink-0">
                 <span className="material-symbols-outlined text-[24px]">{icon}</span>

@@ -312,7 +312,7 @@ const MemberUpdates: React.FC = () => {
       {isLoading ? (
         <div className="space-y-4">
           {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className={`p-5 rounded-2xl animate-pulse ${isDark ? 'bg-white/[0.03]' : 'bg-white'}`}>
+            <div key={i} className={`p-5 rounded-xl animate-pulse ${isDark ? 'bg-white/[0.03]' : 'bg-white'}`}>
               <div className="flex items-center gap-2 mb-3">
                 <div className={`w-2 h-2 rounded-full ${isDark ? 'bg-white/20' : 'bg-gray-200'}`} />
                 <div className={`h-3 w-16 rounded ${isDark ? 'bg-white/10' : 'bg-gray-200'}`} />
@@ -354,7 +354,7 @@ const MemberUpdates: React.FC = () => {
             return (
               <MotionListItem 
                 key={item.id}
-                className={`rounded-2xl transition-all duration-fast overflow-hidden ${priorityCardClass}`}
+                className={`rounded-xl transition-all duration-fast overflow-hidden ${priorityCardClass}`}
               >
                 <div 
                   className={`p-5 ${hasLongDesc || hasLink ? 'cursor-pointer' : ''}`}
@@ -451,7 +451,7 @@ const MemberUpdates: React.FC = () => {
       {closuresLoading ? (
         <div className="space-y-4">
           {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className={`p-5 rounded-2xl animate-pulse ${isDark ? 'bg-white/[0.03]' : 'bg-white'}`}>
+            <div key={i} className={`p-5 rounded-xl animate-pulse ${isDark ? 'bg-white/[0.03]' : 'bg-white'}`}>
               <div className="flex items-center gap-2 mb-3">
                 <div className={`w-10 h-10 rounded-xl ${isDark ? 'bg-white/10' : 'bg-gray-200'}`} />
                 <div className="flex-1">
@@ -513,7 +513,7 @@ const MemberUpdates: React.FC = () => {
     
     return (
       <MotionListItem 
-        className={`rounded-2xl transition-all duration-fast overflow-hidden ${
+        className={`rounded-xl transition-all duration-fast overflow-hidden ${
           isUpcoming
             ? isDark ? 'bg-blue-500/10 shadow-layered-dark' : 'bg-blue-50 shadow-layered'
             : isClosure
@@ -637,7 +637,7 @@ const MemberUpdates: React.FC = () => {
       {notificationsLoading ? (
         <div className="space-y-4">
           {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className={`p-4 rounded-2xl animate-pulse ${isDark ? 'bg-white/[0.03]' : 'bg-white'}`}>
+            <div key={i} className={`p-4 rounded-xl animate-pulse ${isDark ? 'bg-white/[0.03]' : 'bg-white'}`}>
               <div className="flex items-center gap-3">
                 <div className={`w-10 h-10 rounded-full ${isDark ? 'bg-white/10' : 'bg-gray-200'}`} />
                 <div className="flex-1">
@@ -682,7 +682,7 @@ const MemberUpdates: React.FC = () => {
             {notifications.map((notification) => (
               <MotionListItem
                 key={notification.id}
-                className={`rounded-2xl transition-all duration-fast overflow-hidden cursor-pointer ${
+                className={`rounded-xl transition-all duration-fast overflow-hidden cursor-pointer ${
                   notification.read
                     ? isDark ? 'bg-white/[0.02] shadow-layered-dark' : 'bg-white/70 shadow-layered'
                     : isDark ? 'bg-white/[0.05] shadow-layered-dark' : 'bg-white shadow-layered'

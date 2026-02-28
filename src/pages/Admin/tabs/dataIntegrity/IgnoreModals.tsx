@@ -34,7 +34,7 @@ const IgnoreModals: React.FC<IgnoreModalsProps> = ({
     <>
       {ignoreModal.isOpen && ignoreModal.issue && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-900 rounded-2xl max-w-md w-full p-6 space-y-4">
+          <div className="bg-white dark:bg-gray-900 rounded-xl max-w-md w-full p-6 space-y-4">
             <h3 className="text-lg font-bold text-primary dark:text-white">Ignore Issue</h3>
             <p className="text-sm text-gray-600 dark:text-gray-400">{ignoreModal.issue.description}</p>
             
@@ -90,7 +90,7 @@ const IgnoreModals: React.FC<IgnoreModalsProps> = ({
 
       {bulkIgnoreModal.isOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-900 rounded-2xl max-w-md w-full p-6 space-y-4">
+          <div className="bg-white dark:bg-gray-900 rounded-xl max-w-md w-full p-6 space-y-4">
             <h3 className="text-lg font-bold text-primary dark:text-white">Exclude All Issues</h3>
             <p className="text-sm text-gray-600 dark:text-gray-400">
               Exclude {bulkIgnoreModal.issues.length} issues from "{bulkIgnoreModal.checkName}"

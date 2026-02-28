@@ -1315,7 +1315,7 @@ const DirectoryTab: React.FC = () => {
                 )}
 
                 {!formerLoading && formerError && memberTab === 'former' && (
-                    <div className="flex flex-col items-center justify-center py-16 px-6 rounded-2xl border-2 border-dashed border-red-200 dark:border-red-500/25 bg-red-50 dark:bg-red-500/5">
+                    <div className="flex flex-col items-center justify-center py-16 px-6 rounded-xl border-2 border-dashed border-red-200 dark:border-red-500/25 bg-red-50 dark:bg-red-500/5">
                         <span aria-hidden="true" className="material-symbols-outlined text-6xl mb-4 text-red-400 dark:text-red-400/70">cloud_off</span>
                         <h3 className="text-lg font-bold mb-2 text-red-600 dark:text-red-400">
                             Failed to load former members
@@ -1510,7 +1510,7 @@ const DirectoryTab: React.FC = () => {
                 )}
 
                 {!visitorsLoading && visitorsError && memberTab === 'visitors' && (
-                    <div className="flex flex-col items-center justify-center py-16 px-6 rounded-2xl border-2 border-dashed border-red-200 dark:border-red-500/25 bg-red-50 dark:bg-red-500/5">
+                    <div className="flex flex-col items-center justify-center py-16 px-6 rounded-xl border-2 border-dashed border-red-200 dark:border-red-500/25 bg-red-50 dark:bg-red-500/5">
                         <span aria-hidden="true" className="material-symbols-outlined text-6xl mb-4 text-red-400 dark:text-red-400/70">cloud_off</span>
                         <h3 className="text-lg font-bold mb-2 text-red-600 dark:text-red-400">
                             Failed to load visitors
@@ -1768,7 +1768,7 @@ const DirectoryTab: React.FC = () => {
                 )}
 
                 {!teamLoading && teamError && memberTab === 'team' && (
-                    <div className="flex flex-col items-center justify-center py-16 px-6 rounded-2xl border-2 border-dashed border-red-200 dark:border-red-500/25 bg-red-50 dark:bg-red-500/5">
+                    <div className="flex flex-col items-center justify-center py-16 px-6 rounded-xl border-2 border-dashed border-red-200 dark:border-red-500/25 bg-red-50 dark:bg-red-500/5">
                         <span aria-hidden="true" className="material-symbols-outlined text-6xl mb-4 text-red-400 dark:text-red-400/70">cloud_off</span>
                         <h3 className="text-lg font-bold mb-2 text-red-600 dark:text-red-400">
                             Failed to load team
@@ -2131,7 +2131,7 @@ const DirectoryTab: React.FC = () => {
 
             {assignTierModalOpen && memberToAssignTier && createPortal(
                 <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-                    <div className="bg-white dark:bg-surface-dark rounded-2xl p-6 w-full max-w-md shadow-2xl">
+                    <div className="bg-white dark:bg-surface-dark rounded-xl p-6 w-full max-w-md shadow-2xl">
                         <h3 className="text-xl font-bold text-primary dark:text-white mb-2">Assign Tier</h3>
                         <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
                             Select a membership tier for <span className="font-bold">{memberToAssignTier.name}</span>

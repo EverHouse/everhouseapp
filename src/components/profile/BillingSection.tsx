@@ -161,7 +161,7 @@ export default function BillingSection({ isDark }: Props) {
 
   if (loading) {
     return (
-      <div className={`rounded-2xl overflow-hidden ${isDark ? 'bg-white/5' : 'bg-white'}`}>
+      <div className={`rounded-xl overflow-hidden ${isDark ? 'bg-white/5' : 'bg-white'}`}>
         <div className="p-4">
           <div className="animate-pulse space-y-3">
             <div className={`h-4 w-32 rounded ${isDark ? 'bg-white/10' : 'bg-gray-200'}`} />
@@ -215,7 +215,7 @@ export default function BillingSection({ isDark }: Props) {
     
     if (billingInfo.stripeError) {
       return (
-        <div className={`rounded-2xl overflow-hidden ${isDark ? 'bg-white/5' : 'bg-white'}`}>
+        <div className={`rounded-xl overflow-hidden ${isDark ? 'bg-white/5' : 'bg-white'}`}>
           <div className="p-4">
             <div className="flex items-center gap-3">
               <span className={`material-symbols-outlined ${isDark ? 'opacity-70' : 'text-primary/70'}`}>
@@ -234,7 +234,7 @@ export default function BillingSection({ isDark }: Props) {
     }
     
     return (
-      <div className={`rounded-2xl overflow-hidden ${isDark ? 'bg-white/5' : 'bg-white'}`}>
+      <div className={`rounded-xl overflow-hidden ${isDark ? 'bg-white/5' : 'bg-white'}`}>
         <div className={`p-4 ${isDark ? '' : ''}`}>
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
@@ -397,7 +397,7 @@ export default function BillingSection({ isDark }: Props) {
     const hasPaymentMethod = billingInfo.paymentMethods && billingInfo.paymentMethods.length > 0;
     
     return (
-      <div className={`rounded-2xl overflow-hidden ${isDark ? 'bg-white/5' : 'bg-white'}`}>
+      <div className={`rounded-xl overflow-hidden ${isDark ? 'bg-white/5' : 'bg-white'}`}>
         <div className="p-4">
           <div className="flex items-center gap-3 mb-3">
             <span className={`material-symbols-outlined ${isDark ? 'opacity-70' : 'text-primary/70'}`}>
@@ -503,7 +503,7 @@ export default function BillingSection({ isDark }: Props) {
 
   if (billingInfo.billingProvider === 'family_addon') {
     return (
-      <div className={`rounded-2xl overflow-hidden ${isDark ? 'bg-white/5' : 'bg-white'}`}>
+      <div className={`rounded-xl overflow-hidden ${isDark ? 'bg-white/5' : 'bg-white'}`}>
         <div className="p-4">
           <div className="flex items-center gap-3 mb-3">
             <span className={`material-symbols-outlined ${isDark ? 'opacity-70' : 'text-primary/70'}`}>
@@ -528,7 +528,7 @@ export default function BillingSection({ isDark }: Props) {
 
   if (billingInfo.billingProvider === 'comped') {
     return (
-      <div className={`rounded-2xl overflow-hidden ${isDark ? 'bg-white/5' : 'bg-white'}`}>
+      <div className={`rounded-xl overflow-hidden ${isDark ? 'bg-white/5' : 'bg-white'}`}>
         <div className="p-4">
           <div className="flex items-center gap-3">
             <span className={`material-symbols-outlined ${isDark ? 'opacity-70' : 'text-primary/70'}`}>

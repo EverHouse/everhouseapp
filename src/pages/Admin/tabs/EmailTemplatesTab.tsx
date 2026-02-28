@@ -197,7 +197,7 @@ const EmailTemplatesTab: React.FC = () => {
         </div>
       )}
 
-      <div className="bg-white/60 dark:bg-white/5 backdrop-blur-lg rounded-2xl border border-primary/10 dark:border-white/20 overflow-hidden">
+      <div className="bg-white/60 dark:bg-white/5 backdrop-blur-lg rounded-xl border border-primary/10 dark:border-white/20 overflow-hidden">
         <button
           onClick={() => setControlsOpen(!controlsOpen)}
           className="tactile-btn w-full px-6 py-4 flex items-center justify-between"
@@ -293,7 +293,7 @@ const EmailTemplatesTab: React.FC = () => {
 
       <div className="flex gap-6">
         <div className="hidden lg:block w-72 flex-shrink-0">
-          <div className="bg-white/80 dark:bg-white/[0.05] backdrop-blur-xl border border-white/20 dark:border-white/10 rounded-2xl shadow-lg overflow-hidden sticky top-32">
+          <div className="bg-white/80 dark:bg-white/[0.05] backdrop-blur-xl border border-white/20 dark:border-white/10 rounded-xl shadow-lg overflow-hidden sticky top-32">
             <div className="max-h-[calc(100vh-180px)] overflow-y-auto">
               {sortedCategories.map(category => (
                 <div key={category}>
@@ -338,7 +338,7 @@ const EmailTemplatesTab: React.FC = () => {
 
         <div className="flex-1 min-w-0">
           {selectedTemplate && (
-            <div className="bg-white/80 dark:bg-white/[0.05] backdrop-blur-xl border border-white/20 dark:border-white/10 rounded-2xl shadow-lg overflow-hidden">
+            <div className="bg-white/80 dark:bg-white/[0.05] backdrop-blur-xl border border-white/20 dark:border-white/10 rounded-xl shadow-lg overflow-hidden">
               <div className="px-5 py-4 border-b border-primary/5 dark:border-white/5 flex items-center justify-between">
                 <div>
                   <h2 className="text-lg font-bold text-primary dark:text-white">

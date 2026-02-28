@@ -169,7 +169,7 @@ const BugReportsAdmin: React.FC = () => {
                             {openCount} open {openCount === 1 ? 'report' : 'reports'}
                         </p>
                     </div>
-                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${isDark ? 'glass-button' : 'bg-white border border-black/10'}`}>
+                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${isDark ? 'glass-button' : 'bg-white border border-black/10'}`}>
                         <span className={`material-symbols-outlined ${isDark ? 'text-white' : 'text-primary'}`} aria-hidden="true">bug_report</span>
                     </div>
                 </div>
@@ -194,7 +194,7 @@ const BugReportsAdmin: React.FC = () => {
                 {isLoading ? (
                     <div className="space-y-3">
                         {[1, 2, 3].map(i => (
-                            <div key={i} className={`h-24 rounded-2xl animate-pulse ${isDark ? 'bg-white/5' : 'bg-black/5'}`} />
+                            <div key={i} className={`h-24 rounded-xl animate-pulse ${isDark ? 'bg-white/5' : 'bg-black/5'}`} />
                         ))}
                     </div>
                 ) : reports.length === 0 ? (
@@ -210,7 +210,7 @@ const BugReportsAdmin: React.FC = () => {
                             <button
                                 key={report.id}
                                 onClick={() => openDetail(report)}
-                                className={`w-full text-left p-4 rounded-2xl transition-colors tactile-card animate-slide-up-stagger ${isDark ? 'glass-card hover:bg-white/5' : 'bg-white border border-black/5 hover:shadow-md'}`}
+                                className={`w-full text-left p-4 rounded-xl transition-colors tactile-card animate-slide-up-stagger ${isDark ? 'glass-card hover:bg-white/5' : 'bg-white border border-black/5 hover:shadow-md'}`}
                                 style={{ '--stagger-index': idx } as React.CSSProperties}
                             >
                                 <div className="flex items-start justify-between gap-3">

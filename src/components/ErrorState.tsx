@@ -61,7 +61,7 @@ const ErrorState: React.FC<ErrorStateProps> = ({
               ${isCompact ? 'px-4 py-2 text-sm' : 'px-6 py-3 text-base'}
               bg-red-500 hover:bg-red-600
               text-white 
-              rounded-2xl font-semibold 
+              rounded-[4px] font-semibold 
               hover:scale-[1.02] active:scale-[0.98] 
               transition-all duration-normal
               shadow-lg hover:shadow-xl

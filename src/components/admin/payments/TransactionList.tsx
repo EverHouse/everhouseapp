@@ -222,7 +222,7 @@ const RecentTransactionsSection = forwardRef<TransactionListRef, SectionProps>((
       {selectedTxId && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={handleCloseNotes} aria-hidden="true">
           <div 
-            className="bg-white dark:bg-surface-dark rounded-2xl w-full max-w-md shadow-xl"
+            className="bg-white dark:bg-surface-dark rounded-xl w-full max-w-md shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between p-4 border-b border-primary/10 dark:border-white/10">
@@ -286,7 +286,7 @@ const RecentTransactionsSection = forwardRef<TransactionListRef, SectionProps>((
       {refundTarget && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => { setRefundTarget(null); setRefundError(null); }}>
           <div
-            className="bg-white dark:bg-surface-dark rounded-2xl w-full max-w-md shadow-xl"
+            className="bg-white dark:bg-surface-dark rounded-xl w-full max-w-md shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between p-4 border-b border-primary/10 dark:border-white/10">
@@ -414,7 +414,7 @@ const RecentTransactionsSection = forwardRef<TransactionListRef, SectionProps>((
 
   if (variant === 'card') {
     return (
-      <div className="bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl p-5">
+      <div className="bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-xl p-5">
         <div className="flex items-center gap-2 mb-4">
           <span className="material-symbols-outlined text-blue-600 dark:text-blue-400">receipt_long</span>
           <h3 className="font-bold text-primary dark:text-white">Today's Transactions</h3>
@@ -430,7 +430,7 @@ const RecentTransactionsSection = forwardRef<TransactionListRef, SectionProps>((
   }
 
   return (
-    <div className="bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl p-4">
+    <div className="bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-xl p-4">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <span className="material-symbols-outlined text-blue-600 dark:text-blue-400">receipt_long</span>

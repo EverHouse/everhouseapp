@@ -153,7 +153,7 @@ const SettingsTab: React.FC = () => {
         </div>
       )}
 
-      <div className="bg-white/60 dark:bg-white/5 backdrop-blur-lg rounded-2xl p-6 border border-primary/10 dark:border-white/20">
+      <div className="bg-white/60 dark:bg-white/5 backdrop-blur-lg rounded-xl p-6 border border-primary/10 dark:border-white/20">
         <div className="flex items-center gap-3 mb-6">
           <div className="w-10 h-10 rounded-xl bg-primary/10 dark:bg-white/10 flex items-center justify-center">
             <span aria-hidden="true" className="material-symbols-outlined text-primary dark:text-white">tune</span>
@@ -217,7 +217,7 @@ const SettingsTab: React.FC = () => {
         </div>
       </div>
 
-      <div className="bg-white/60 dark:bg-white/5 backdrop-blur-lg rounded-2xl p-6 border border-primary/10 dark:border-white/20">
+      <div className="bg-white/60 dark:bg-white/5 backdrop-blur-lg rounded-xl p-6 border border-primary/10 dark:border-white/20">
         <div className="flex items-center gap-3 mb-6">
           <div className="w-10 h-10 rounded-xl bg-primary/10 dark:bg-white/10 flex items-center justify-center">
             <span aria-hidden="true" className="material-symbols-outlined text-primary dark:text-white">category</span>
@@ -257,7 +257,7 @@ const SettingsTab: React.FC = () => {
         </div>
       </div>
 
-      <div className="bg-white/60 dark:bg-white/5 backdrop-blur-lg rounded-2xl p-6 border border-primary/10 dark:border-white/20">
+      <div className="bg-white/60 dark:bg-white/5 backdrop-blur-lg rounded-xl p-6 border border-primary/10 dark:border-white/20">
         <div className="flex items-center gap-3 mb-6">
           <div className="w-10 h-10 rounded-xl bg-primary/10 dark:bg-white/10 flex items-center justify-center">
             <span aria-hidden="true" className="material-symbols-outlined text-primary dark:text-white">notifications</span>
@@ -301,7 +301,7 @@ const SettingsTab: React.FC = () => {
         </div>
       </div>
 
-      <div className="bg-white/60 dark:bg-white/5 backdrop-blur-lg rounded-2xl p-6 border border-primary/10 dark:border-white/20">
+      <div className="bg-white/60 dark:bg-white/5 backdrop-blur-lg rounded-xl p-6 border border-primary/10 dark:border-white/20">
         <div className="flex items-center gap-3 mb-6">
           <div className="w-10 h-10 rounded-xl bg-primary/10 dark:bg-white/10 flex items-center justify-center">
             <span aria-hidden="true" className="material-symbols-outlined text-primary dark:text-white">nfc</span>
@@ -346,7 +346,7 @@ const SettingsTab: React.FC = () => {
       </div>
 
       {hasChanges && (
-        <div className="fixed bottom-20 lg:bottom-6 left-4 right-4 lg:left-72 lg:right-8 bg-white/80 dark:bg-white/10 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl shadow-lg p-4 flex items-center justify-between gap-4 z-50 animate-slide-up">
+        <div className="fixed bottom-20 lg:bottom-6 left-4 right-4 lg:left-72 lg:right-8 bg-white/80 dark:bg-white/10 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-xl shadow-lg p-4 flex items-center justify-between gap-4 z-50 animate-slide-up">
           <p className="text-sm text-gray-600 dark:text-gray-400">
             You have unsaved changes
           </p>

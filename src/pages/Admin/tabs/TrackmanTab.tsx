@@ -487,7 +487,7 @@ const TrackmanTab: React.FC = () => {
 
   return (
     <div className="px-6 pb-4 space-y-6">
-      <div className="glass-card p-6 rounded-2xl border border-primary/10 dark:border-white/25">
+      <div className="glass-card p-6 rounded-xl border border-primary/10 dark:border-white/25">
         <h2 className="text-lg font-bold text-primary dark:text-white mb-4 flex items-center gap-2">
           <span aria-hidden="true" className="material-symbols-outlined">upload_file</span>
           Import Trackman Bookings
@@ -510,7 +510,7 @@ const TrackmanTab: React.FC = () => {
           onDragLeave={handleDragLeave}
           onClick={() => !uploadMutation.isPending && fileInputRef.current?.click()}
           className={`
-            border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all duration-fast
+            border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all duration-fast
             ${isDragging 
               ? 'border-accent bg-accent/10' 
               : 'border-primary/20 dark:border-white/20 hover:border-accent hover:bg-accent/5'}
@@ -577,7 +577,7 @@ const TrackmanTab: React.FC = () => {
       </div>
 
       {importRuns.length > 0 && (
-        <div className="glass-card p-6 rounded-2xl border border-primary/10 dark:border-white/25">
+        <div className="glass-card p-6 rounded-xl border border-primary/10 dark:border-white/25">
           <h2 className="text-lg font-bold text-primary dark:text-white mb-4 flex items-center gap-2">
             <span aria-hidden="true" className="material-symbols-outlined">history</span>
             Import History
@@ -602,7 +602,7 @@ const TrackmanTab: React.FC = () => {
         </div>
       )}
 
-      <div ref={unmatchedSectionRef} className="glass-card p-6 rounded-2xl border border-primary/10 dark:border-white/25">
+      <div ref={unmatchedSectionRef} className="glass-card p-6 rounded-xl border border-primary/10 dark:border-white/25">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-bold text-primary dark:text-white flex items-center gap-2">
             <span aria-hidden="true" className="material-symbols-outlined">warning</span>
@@ -814,7 +814,7 @@ const TrackmanTab: React.FC = () => {
       </div>
 
       {needsPlayersBookings.length > 0 && (
-        <div ref={needsPlayersSectionRef} className="glass-card p-6 rounded-2xl border border-primary/10 dark:border-white/25">
+        <div ref={needsPlayersSectionRef} className="glass-card p-6 rounded-xl border border-primary/10 dark:border-white/25">
           <h2 className="text-lg font-bold text-primary dark:text-white mb-4 flex items-center gap-2">
             <span aria-hidden="true" className="material-symbols-outlined">group_add</span>
             Needs Players ({needsPlayersTotalCount})

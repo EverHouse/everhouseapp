@@ -656,7 +656,7 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
               <div className="flex items-center gap-2 mt-1 flex-wrap">
                 <TierBadge tier={displayedTier || member.rawTier || member.tier} size="md" showNoTier={true} lastTier={member.lastTier} membershipStatus={member.membershipStatus} />
                 {member.status && typeof member.status === 'string' && member.status.toLowerCase() !== 'active' && (
-                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                  <span className={`w-fit px-2 py-0.5 rounded-[4px] text-[10px] font-bold uppercase tracking-widest ${
                     getMemberStatusColor(member.status, isDark)
                   }`}>
                     {getMemberStatusLabel(member.status)}
@@ -1008,7 +1008,7 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
 
         {showDeleteModal && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4">
-            <div className={`${isDark ? 'bg-gray-800' : 'bg-white'} rounded-2xl p-6 max-w-md w-full shadow-xl`}>
+            <div className={`${isDark ? 'bg-gray-800' : 'bg-white'} rounded-xl p-6 max-w-md w-full shadow-xl`}>
               <div className="flex items-center gap-3 mb-4">
                 <span className="material-symbols-outlined text-3xl text-red-500">warning</span>
                 <h3 className={`text-lg font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>
@@ -1079,7 +1079,7 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
 
         {showMergeModal && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4">
-            <div className={`${isDark ? 'bg-gray-800' : 'bg-white'} rounded-2xl p-6 max-w-lg w-full shadow-xl max-h-[90vh] overflow-y-auto`}>
+            <div className={`${isDark ? 'bg-gray-800' : 'bg-white'} rounded-xl p-6 max-w-lg w-full shadow-xl max-h-[90vh] overflow-y-auto`}>
               <div className="flex items-center gap-3 mb-4">
                 <span className="material-symbols-outlined text-3xl text-indigo-500">merge</span>
                 <h3 className={`text-lg font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>

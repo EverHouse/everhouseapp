@@ -26,7 +26,7 @@ const ResourceCard: React.FC<ResourceCardProps> = ({ resource, selected, onClick
         <div className="flex-1">
           <div className="flex justify-between items-center mb-0.5">
             <span className={`font-bold text-base ${isDark ? 'text-white/60' : 'text-primary/60'}`}>{resource.name}</span>
-            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider ${
+            <span className={`w-fit text-[10px] font-bold px-2 py-0.5 rounded-[4px] uppercase tracking-widest ${
               isDark ? 'bg-amber-500/20 text-amber-400' : 'bg-amber-100 text-amber-700'
             }`}>
               Requested
@@ -56,7 +56,7 @@ const ResourceCard: React.FC<ResourceCardProps> = ({ resource, selected, onClick
         <div className="flex justify-between items-center mb-0.5">
           <span className={`font-bold text-base ${isDark ? 'text-white' : 'text-primary'}`}>{resource.name}</span>
           {resource.badge && (
-            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider ${selected ? 'bg-accent text-primary' : (isDark ? 'bg-white/10 text-white/70' : 'bg-black/10 text-primary/70')}`}>
+            <span className={`w-fit text-[10px] font-bold px-2 py-0.5 rounded-[4px] uppercase tracking-widest ${selected ? 'bg-accent text-primary' : (isDark ? 'bg-white/10 text-white/70' : 'bg-black/10 text-primary/70')}`}>
               {resource.badge}
             </span>
           )}

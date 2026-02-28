@@ -25,7 +25,7 @@ const EditorialSection: React.FC<EditorialSectionProps> = ({
       <div className={`max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 lg:gap-16 items-center ${reversed ? 'md:flex-row-reverse' : ''}`}>
         {/* Image */}
         <div className={`${reversed ? 'md:order-2' : 'md:order-1'}`}>
-          <div className="overflow-hidden rounded-2xl group">
+          <div className="overflow-hidden rounded-xl group">
             <img
               src={image}
               alt={title}
@@ -37,10 +37,10 @@ const EditorialSection: React.FC<EditorialSectionProps> = ({
 
         {/* Text Content */}
         <div className={`${reversed ? 'md:order-1' : 'md:order-2'} flex flex-col justify-center`}>
-          <h2 className="text-3xl md:text-4xl lg:text-5xl font-serif font-semibold text-primary dark:text-white leading-tight mb-4 md:mb-6">
+          <h2 className="text-3xl md:text-4xl lg:text-5xl font-semibold text-primary dark:text-white leading-tight mb-4 md:mb-6" style={{ fontFamily: 'var(--font-headline)' }}>
             {title}
           </h2>
-          <p className="text-base md:text-lg font-sans text-primary/70 dark:text-white/70 leading-relaxed mb-6 md:mb-8">
+          <p className="text-base md:text-lg text-primary/70 dark:text-white/70 leading-relaxed mb-6 md:mb-8" style={{ fontFamily: 'var(--font-body)' }}>
             {description}
           </p>
           {ctaLabel && ctaLink && (

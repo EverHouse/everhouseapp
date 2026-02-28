@@ -172,7 +172,7 @@ export function SwipeableListItem({
       {/* Action containers positioned behind the card, clipped independently */}
       {leftActions.length > 0 && (
         <div 
-          className={`absolute inset-0 flex items-stretch rounded-2xl overflow-hidden transition-opacity duration-instant ${showLeftActions ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+          className={`absolute inset-0 flex items-stretch rounded-xl overflow-hidden transition-opacity duration-instant ${showLeftActions ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
           style={{ zIndex: 1 }}
         >
           <div className="flex">
@@ -202,7 +202,7 @@ export function SwipeableListItem({
 
       {rightActions.length > 0 && (
         <div 
-          className={`absolute inset-0 flex items-stretch justify-end rounded-2xl overflow-hidden transition-opacity duration-instant ${showRightActions ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+          className={`absolute inset-0 flex items-stretch justify-end rounded-xl overflow-hidden transition-opacity duration-instant ${showRightActions ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
           style={{ zIndex: 1 }}
         >
           <div className={`flex-1 ${rightActions.length > 0 ? colorClasses[rightActions[0].color].split(' ')[0] : ''}`} />

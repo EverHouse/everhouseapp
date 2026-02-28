@@ -923,7 +923,7 @@ const SimulatorTab: React.FC = () => {
 
     return (
             <AnimatedPage className="flex flex-col">
-                <div className="w-full bg-white dark:bg-surface-dark rounded-2xl shadow-lg border border-gray-200 dark:border-white/25 flex flex-col">
+                <div className="w-full bg-white dark:bg-surface-dark rounded-xl shadow-lg border border-gray-200 dark:border-white/25 flex flex-col">
                 <div className="lg:hidden flex items-center justify-between border-b border-gray-200 dark:border-white/25 mb-0 animate-content-enter-delay-1 px-4 py-3">
                     <div className="flex">
                         <button

@@ -52,7 +52,7 @@ const TourCard: React.FC<TourCardProps> = ({ tour, isToday = false, isPast = fal
   const isMenuOpen = statusMenuTourId === tour.id;
   
   return (
-    <div className={`p-4 rounded-2xl border tactile-card ${tour.status === 'checked_in' 
+    <div className={`p-4 rounded-xl border tactile-card ${tour.status === 'checked_in' 
       ? 'bg-green-500/10 border-green-500/30' 
       : tour.status === 'no-show'
         ? 'bg-red-500/5 border-red-500/20'
@@ -226,7 +226,7 @@ const ToursTab: React.FC = () => {
       )}
 
       {toursData.todayTours.length === 0 && (
-        <div className="text-center py-8 bg-white/40 dark:bg-white/5 rounded-2xl">
+        <div className="text-center py-8 bg-white/40 dark:bg-white/5 rounded-xl">
           <span aria-hidden="true" className="material-symbols-outlined text-4xl text-primary/30 dark:text-white/70 mb-2">event_available</span>
           <p className="text-primary/80 dark:text-white/80 text-sm">No tours scheduled for today</p>
         </div>

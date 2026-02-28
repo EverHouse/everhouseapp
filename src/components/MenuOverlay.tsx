@@ -123,7 +123,7 @@ const MenuOverlay: React.FC<MenuOverlayProps> = ({ isOpen, onClose }) => {
             <div className={`mt-4 pt-6 border-t animate-slide-up-stagger ${isDark ? 'border-[#F2F2EC]/10' : 'border-[#293515]/10'}`} style={{ '--stagger-index': 6 } as React.CSSProperties}>
                 <button 
                     onClick={() => handleNav('/contact')}
-                    className={`w-full group flex items-center justify-between px-4 py-3 min-h-[44px] rounded-[2rem] glass-button border tactile-btn ${isDark ? 'border-white/20' : 'border-black/20'}`}
+                    className={`w-full group flex items-center justify-between px-4 py-3 min-h-[44px] rounded-[4px] glass-button border tactile-btn ${isDark ? 'border-white/20' : 'border-black/20'}`}
                 >
                     <span className={`text-xl font-bold ${isDark ? 'text-[#F2F2EC]' : 'text-[#293515]'}`}>Contact Us</span>
                     <span className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-full glass-button flex items-center justify-center group-hover:scale-110 transition-all duration-[400ms] ease-in-out">

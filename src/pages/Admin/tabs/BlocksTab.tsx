@@ -793,7 +793,7 @@ const BlocksTab: React.FC = () => {
             </div>
 
             {showClosureReasonsSection && (
-                <div className="bg-white/60 dark:bg-white/5 backdrop-blur-sm border border-white/80 dark:border-white/10 rounded-2xl p-4 mb-4">
+                <div className="bg-white/60 dark:bg-white/5 backdrop-blur-sm border border-white/80 dark:border-white/10 rounded-xl p-4 mb-4">
                     <div className="space-y-4">
                         <p className="text-xs text-gray-500 dark:text-white/60">
                             Manage the dropdown options shown when creating closures. Lower sort order appears first.
@@ -872,7 +872,7 @@ const BlocksTab: React.FC = () => {
             )}
 
             {showNoticeTypesSection && (
-                <div className="bg-white/60 dark:bg-white/5 backdrop-blur-sm border border-white/80 dark:border-white/10 rounded-2xl p-4 mb-4">
+                <div className="bg-white/60 dark:bg-white/5 backdrop-blur-sm border border-white/80 dark:border-white/10 rounded-xl p-4 mb-4">
                     <div className="space-y-4">
                         <p className="text-xs text-gray-500 dark:text-white/60">
                             Manage notice categories used when creating closures. Preset types cannot be edited or deleted.
@@ -957,7 +957,7 @@ const BlocksTab: React.FC = () => {
                                 <div 
                                     key={closure.id}
                                     onClick={() => handleEditClosure(closure)}
-                                    className="bg-white/60 dark:bg-white/5 backdrop-blur-sm border border-white/80 dark:border-white/10 border-l-4 border-l-cyan-500 rounded-2xl shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-colors duration-fast overflow-hidden group animate-slide-up-stagger cursor-pointer tactile-card"
+                                    className="bg-white/60 dark:bg-white/5 backdrop-blur-sm border border-white/80 dark:border-white/10 border-l-4 border-l-cyan-500 rounded-xl shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-colors duration-fast overflow-hidden group animate-slide-up-stagger cursor-pointer tactile-card"
                                     style={{ '--stagger-index': index } as React.CSSProperties}
                                 >
                                     <div className="p-4 flex items-start justify-between gap-3">
@@ -1014,7 +1014,7 @@ const BlocksTab: React.FC = () => {
                         return (
                             <div 
                                 key={closure.id} 
-                                className={`bg-white/60 dark:bg-white/5 backdrop-blur-sm border border-white/80 dark:border-white/10 rounded-2xl shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-colors duration-fast overflow-hidden group animate-pop-in tactile-card ${
+                                className={`bg-white/60 dark:bg-white/5 backdrop-blur-sm border border-white/80 dark:border-white/10 rounded-xl shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-colors duration-fast overflow-hidden group animate-pop-in tactile-card ${
                                     blocking 
                                         ? 'border-l-4 border-l-red-500'
                                         : 'border-l-4 border-l-amber-500'
@@ -1166,7 +1166,7 @@ const BlocksTab: React.FC = () => {
             )}
 
             {pastClosures.length > 0 && (
-                <div className="mt-6 bg-white/60 dark:bg-white/5 backdrop-blur-sm border border-white/80 dark:border-white/10 rounded-2xl overflow-hidden">
+                <div className="mt-6 bg-white/60 dark:bg-white/5 backdrop-blur-sm border border-white/80 dark:border-white/10 rounded-xl overflow-hidden">
                     <button
                         onClick={() => setShowPastAccordion(!showPastAccordion)}
                         className="w-full flex items-center justify-between p-4 hover:bg-gray-50/50 dark:hover:bg-white/5 transition-colors"

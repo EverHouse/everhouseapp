@@ -163,8 +163,8 @@ const WhatsOn: React.FC = () => {
       style={{ marginTop: 'calc(-1 * var(--header-offset))', paddingTop: 'var(--header-offset)' }}
     >
       <section className="px-6 pt-4 md:pt-2 pb-6 bg-[#EAEBE6] dark:bg-[#141414] animate-content-enter">
-        <h1 className="text-5xl font-light text-primary dark:text-white mb-4 tracking-tight">What's On</h1>
-        <p className="text-primary/70 dark:text-white/70 text-base leading-relaxed max-w-[90%]">
+        <h1 className="text-5xl text-primary dark:text-white mb-4 leading-none" style={{ fontFamily: 'var(--font-display)' }}>What's On</h1>
+        <p className="text-base text-primary/70 dark:text-white/70 leading-relaxed max-w-[90%]" style={{ fontFamily: 'var(--font-body)' }}>
            Curated experiences at Ever Club. Join us for culture, conversation, and community in Tustin.
         </p>
       </section>
@@ -174,7 +174,7 @@ const WhatsOn: React.FC = () => {
           <button
             key={f}
             onClick={() => setFilter(f)}
-            className={`tactile-btn px-4 py-2 min-h-[44px] rounded-full text-sm font-bold whitespace-nowrap transition-all duration-fast flex-shrink-0 ${
+            className={`tactile-btn px-4 py-2 min-h-[44px] rounded-[4px] text-sm font-bold whitespace-nowrap transition-all duration-fast flex-shrink-0 ${
               filter === f
                 ? 'bg-primary text-white'
                 : 'bg-white dark:bg-white/5 text-primary dark:text-white hover:bg-primary/10 dark:hover:bg-white/10'
@@ -206,7 +206,7 @@ const WhatsOn: React.FC = () => {
             return (
               <div 
                 key={itemId} 
-                className={`tactile-card bg-white dark:bg-[#1a1d15] rounded-2xl overflow-hidden shadow-layered dark:shadow-black/20 transition-all duration-fast animate-list-item-delay-${Math.min(index, 10)}`}
+                className={`tactile-card bg-white dark:bg-[#1a1d15] rounded-xl overflow-hidden shadow-layered dark:shadow-black/20 transition-all duration-fast animate-list-item-delay-${Math.min(index, 10)}`}
               >
                 <div 
                   onClick={() => setExpandedId(isExpanded ? null : itemId)}
@@ -277,7 +277,7 @@ const WhatsOn: React.FC = () => {
                           target="_blank" 
                           rel="noopener noreferrer"
                           onClick={(e) => e.stopPropagation()}
-                          className="w-full bg-[#F05537] hover:bg-[#d94a2f] text-white py-3 rounded-xl flex items-center justify-center gap-2 font-bold text-sm transition-colors"
+                          className="w-full bg-[#F05537] hover:bg-[#d94a2f] text-white py-3 rounded-[4px] flex items-center justify-center gap-2 font-bold text-sm transition-colors"
                         >
                           <span>Get Tickets</span>
                           <span className="material-symbols-outlined text-sm">open_in_new</span>
@@ -288,13 +288,13 @@ const WhatsOn: React.FC = () => {
                           target="_blank" 
                           rel="noopener noreferrer"
                           onClick={(e) => e.stopPropagation()}
-                          className="w-full bg-primary hover:bg-[#1e2810] text-white py-3 rounded-xl flex items-center justify-center gap-2 font-bold text-sm transition-colors"
+                          className="w-full bg-primary hover:bg-[#1e2810] text-white py-3 rounded-[4px] flex items-center justify-center gap-2 font-bold text-sm transition-colors"
                         >
                           <span>Learn More</span>
                           <span className="material-symbols-outlined text-sm">open_in_new</span>
                         </a>
                       ) : (
-                        <div className="w-full bg-bone dark:bg-white/5 py-3 rounded-xl flex items-center justify-center px-4">
+                        <div className="w-full bg-bone dark:bg-white/5 py-3 rounded-[4px] flex items-center justify-center px-4">
                           <span className="text-xs font-medium text-primary/60 dark:text-white/60">Members Only Event</span>
                         </div>
                       )
@@ -305,13 +305,13 @@ const WhatsOn: React.FC = () => {
                           target="_blank" 
                           rel="noopener noreferrer"
                           onClick={(e) => e.stopPropagation()}
-                          className="w-full bg-primary hover:bg-[#1e2810] text-white py-3 rounded-xl flex items-center justify-center gap-2 font-bold text-sm transition-colors"
+                          className="w-full bg-primary hover:bg-[#1e2810] text-white py-3 rounded-[4px] flex items-center justify-center gap-2 font-bold text-sm transition-colors"
                         >
                           <span>Learn More</span>
                           <span className="material-symbols-outlined text-sm">open_in_new</span>
                         </a>
                       ) : (
-                        <div className="w-full bg-bone dark:bg-white/5 py-3 rounded-xl flex items-center justify-center px-4">
+                        <div className="w-full bg-bone dark:bg-white/5 py-3 rounded-[4px] flex items-center justify-center px-4">
                           <span className="text-xs font-medium text-primary/60 dark:text-white/60">Members Only Wellness</span>
                         </div>
                       )
@@ -325,7 +325,7 @@ const WhatsOn: React.FC = () => {
           {hasMore && (
             <button
               onClick={loadMore}
-              className="tactile-btn w-full bg-white dark:bg-[#1a1d15] hover:bg-bone dark:hover:bg-white/5 text-primary dark:text-white py-4 rounded-2xl flex items-center justify-center gap-2 font-bold text-sm transition-colors shadow-layered dark:shadow-black/20 mt-4"
+              className="tactile-btn w-full bg-white dark:bg-[#1a1d15] hover:bg-bone dark:hover:bg-white/5 text-primary dark:text-white py-4 rounded-xl flex items-center justify-center gap-2 font-bold text-sm transition-colors shadow-layered dark:shadow-black/20 mt-4"
             >
               <span>Load More</span>
               <span className="text-xs text-primary/50 dark:text-white/50">({combinedItems.length - displayCount} remaining)</span>
@@ -336,12 +336,12 @@ const WhatsOn: React.FC = () => {
       </div>
 
       <section className="px-4 py-8 mb-4">
-        <div className="bg-primary rounded-2xl p-6 text-center">
-          <h3 className="text-xl font-bold text-white mb-2">Want full access?</h3>
+        <div className="bg-primary rounded-xl p-6 text-center">
+          <h3 className="text-2xl text-white mb-2 leading-tight" style={{ fontFamily: 'var(--font-headline)' }}>Want full access?</h3>
           <p className="text-white/70 text-sm mb-4">Join Ever Club and unlock exclusive member-only events and wellness classes.</p>
           <button 
             onClick={() => { startNavigation(); navigate('/membership'); }}
-            className="tactile-btn bg-bone dark:bg-white text-primary px-6 py-3 rounded-xl font-bold text-sm hover:bg-white transition-colors"
+            className="tactile-btn bg-bone dark:bg-white text-primary px-6 py-3 rounded-[4px] font-bold text-sm hover:bg-white transition-colors"
           >
             Explore Membership
           </button>
@@ -350,7 +350,7 @@ const WhatsOn: React.FC = () => {
 
       <section className="px-6 py-10 text-center">
         <p className="text-primary/60 dark:text-white/60 text-sm mb-4">Want to attend? Membership gives you access to all events and classes.</p>
-        <Link to="/tour" className="inline-block px-8 py-4 bg-primary text-white rounded-2xl font-bold text-sm tracking-widest uppercase hover:bg-primary/90 transition-all duration-normal active:scale-[0.98] shadow-[0_4px_16px_rgba(41,53,21,0.3)]">
+        <Link to="/tour" className="inline-block px-8 py-4 bg-primary text-white rounded-[4px] font-bold text-sm tracking-widest uppercase hover:bg-primary/90 transition-all duration-normal active:scale-[0.98] shadow-[0_4px_16px_rgba(41,53,21,0.3)]">
           Book a Tour
         </Link>
       </section>

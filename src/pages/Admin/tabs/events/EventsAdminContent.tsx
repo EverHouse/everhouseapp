@@ -30,7 +30,7 @@ const NeedsReviewSection: React.FC<NeedsReviewSectionProps> = ({ events, isLoadi
     }
     
     return (
-        <div className="rounded-2xl border border-amber-500/30 bg-amber-500/5 dark:bg-amber-500/10 backdrop-blur-sm overflow-hidden mb-4">
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 dark:bg-amber-500/10 backdrop-blur-sm overflow-hidden mb-4">
             <button
                 onClick={onToggleExpanded}
                 className="w-full flex items-center justify-between p-4 hover:bg-amber-500/5 transition-colors"
@@ -75,7 +75,7 @@ const NeedsReviewSection: React.FC<NeedsReviewSectionProps> = ({ events, isLoadi
                                         <div className="flex-1 min-w-0">
                                             <div className="flex items-center gap-2 mb-1 flex-wrap">
                                                 {event.conflict_detected && (
-                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-orange-500 text-white text-[10px] font-bold uppercase tracking-wider">
+                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-[4px] bg-orange-500 text-white text-[10px] font-bold uppercase tracking-widest">
                                                         <span className="material-symbols-outlined text-[12px]">sync_problem</span>
                                                         Conflict Detected
                                                     </span>
@@ -102,13 +102,13 @@ const NeedsReviewSection: React.FC<NeedsReviewSectionProps> = ({ events, isLoadi
                                             )}
                                             <div className="flex items-center gap-2 mt-1 flex-wrap">
                                                 {event.source && (
-                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 dark:bg-white/10 text-primary/70 dark:text-white/70 text-xs">
+                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-[4px] bg-primary/10 dark:bg-white/10 text-primary/70 dark:text-white/70 text-xs">
                                                         <span className="material-symbols-outlined text-xs">sync</span>
                                                         {event.source}
                                                     </span>
                                                 )}
                                                 {event.category && (
-                                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-primary/10 dark:bg-white/10 text-primary/70 dark:text-white/70 text-xs">
+                                                    <span className="inline-flex items-center px-2 py-0.5 rounded-[4px] bg-primary/10 dark:bg-white/10 text-primary/70 dark:text-white/70 text-xs">
                                                         {event.category}
                                                     </span>
                                                 )}

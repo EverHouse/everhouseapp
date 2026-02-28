@@ -343,7 +343,7 @@ const RosterManager: React.FC<RosterManagerProps> = ({
     const labels = { owner: 'Owner', member: 'Member', guest: 'Guest' };
     
     return (
-      <span className={`px-2 py-0.5 text-[11px] font-bold rounded border ${styles[type]}`}>
+      <span className={`w-fit px-2 py-0.5 text-[11px] font-bold uppercase tracking-widest rounded-[4px] border ${styles[type]}`}>
         {labels[type]}
       </span>
     );
@@ -396,7 +396,7 @@ const RosterManager: React.FC<RosterManagerProps> = ({
 
   if (loading) {
     return (
-      <div className={`glass-card rounded-3xl p-6 ${isDark ? 'border-white/10' : 'border-black/5'}`}>
+      <div className={`glass-card rounded-xl p-6 ${isDark ? 'border-white/10' : 'border-black/5'}`}>
         <div className="flex items-center justify-center py-8">
           <WalkingGolferSpinner size="sm" />
         </div>
@@ -406,7 +406,7 @@ const RosterManager: React.FC<RosterManagerProps> = ({
 
   return (
     <>
-      <div className={`glass-card rounded-3xl overflow-hidden ${isDark ? 'border-white/10' : 'border-black/5'}`}>
+      <div className={`glass-card rounded-xl overflow-hidden ${isDark ? 'border-white/10' : 'border-black/5'}`}>
         <div className={`px-5 py-4 border-b ${isDark ? 'border-white/10' : 'border-black/5'}`}>
           <div className="flex items-center justify-between">
             <h3 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-[#293515]'}`}>
@@ -420,7 +420,7 @@ const RosterManager: React.FC<RosterManagerProps> = ({
 
         <div ref={rosterListRef} className="p-5 space-y-3">
           {ownerParticipant && (
-            <div className={`flex items-center gap-3 p-3 rounded-2xl ${isDark ? 'bg-white/5' : 'bg-black/[0.02]'}`}>
+            <div className={`flex items-center gap-3 px-6 py-3 rounded-xl ${isDark ? 'bg-white/5' : 'bg-black/[0.02]'}`}>
               <Avatar name={ownerParticipant.displayName} size="md" />
               <div className="flex-1 min-w-0">
                 <p className={`font-semibold truncate ${isDark ? 'text-white' : 'text-[#293515]'}`}>
@@ -434,7 +434,7 @@ const RosterManager: React.FC<RosterManagerProps> = ({
           {otherParticipants.map(participant => (
             <div 
               key={participant.id}
-              className={`flex items-center gap-3 p-3 rounded-2xl ${isDark ? 'bg-white/5' : 'bg-black/[0.02]'}`}
+              className={`flex items-center gap-3 px-6 py-3 rounded-xl ${isDark ? 'bg-white/5' : 'bg-black/[0.02]'}`}
             >
               <Avatar name={participant.displayName} size="md" />
               <div className="flex-1 min-w-0">
@@ -465,7 +465,7 @@ const RosterManager: React.FC<RosterManagerProps> = ({
           ))}
 
           {remainingSlots > 0 && canManage && !rosterLocked && (
-            <div className={`flex flex-col gap-2 p-3 rounded-2xl border-2 border-dashed ${
+            <div className={`flex flex-col gap-2 p-3 rounded-xl border-2 border-dashed ${
               isDark ? 'border-white/20' : 'border-black/10'
             }`}>
               <p className={`text-sm font-medium text-center ${isDark ? 'text-white/50' : 'text-[#293515]/50'}`}>
@@ -497,7 +497,7 @@ const RosterManager: React.FC<RosterManagerProps> = ({
           )}
 
           {remainingSlots > 0 && !canManage && (
-            <div className={`p-3 rounded-2xl border-2 border-dashed text-center ${
+            <div className={`p-3 rounded-xl border-2 border-dashed text-center ${
               isDark ? 'border-white/20' : 'border-black/10'
             }`}>
               <p className={`text-sm ${isDark ? 'text-white/50' : 'text-[#293515]/50'}`}>
@@ -730,7 +730,7 @@ const RosterManager: React.FC<RosterManagerProps> = ({
         size="sm"
       >
         <div className="p-4 space-y-4">
-          <div className={`flex items-center gap-3 p-4 rounded-2xl ${
+          <div className={`flex items-center gap-3 p-4 rounded-xl ${
             isDark ? 'bg-amber-500/10 border border-amber-500/20' : 'bg-amber-50 border border-amber-200'
           }`}>
             <span className={`material-symbols-outlined text-3xl ${isDark ? 'text-amber-400' : 'text-amber-600'}`}>
@@ -747,7 +747,7 @@ const RosterManager: React.FC<RosterManagerProps> = ({
           </div>
 
           {conflictDetails?.conflictingBooking && (
-            <div className={`p-4 rounded-2xl ${isDark ? 'bg-white/5' : 'bg-black/[0.02]'}`}>
+            <div className={`p-4 rounded-xl ${isDark ? 'bg-white/5' : 'bg-black/[0.02]'}`}>
               <h4 className={`text-sm font-bold mb-2 ${isDark ? 'text-white/80' : 'text-[#293515]/80'}`}>
                 Conflicting Booking Details
               </h4>

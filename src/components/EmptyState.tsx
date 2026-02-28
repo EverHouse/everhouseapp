@@ -51,7 +51,7 @@ const EmptyState: React.FC<EmptyStateProps> = ({
             ${isCompact ? 'px-4 py-2 text-sm' : 'px-6 py-3 text-base'}
             bg-primary dark:bg-accent 
             text-white dark:text-brand-green 
-            rounded-2xl font-semibold 
+            rounded-[4px] font-semibold 
             hover:scale-[1.02] active:scale-[0.98] 
             transition-all duration-normal
             shadow-lg hover:shadow-xl

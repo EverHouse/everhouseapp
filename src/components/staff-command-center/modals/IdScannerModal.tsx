@@ -271,7 +271,7 @@ const IdScannerModal: React.FC<IdScannerModalProps> = ({ isOpen, onClose, onScan
             aria-modal="true"
             aria-label="ID Scanner"
             onClick={(e) => e.stopPropagation()}
-            className={`relative w-full max-w-lg ${bgClass} rounded-2xl shadow-2xl border ${borderClass}`}
+            className={`relative w-full max-w-lg ${bgClass} rounded-xl shadow-2xl border ${borderClass}`}
           >
             <div className={`flex items-center justify-between p-4 border-b ${borderClass}`}>
               <h3 className={`text-xl font-bold ${textClass}`}>

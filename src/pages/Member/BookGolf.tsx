@@ -868,12 +868,12 @@ const BookGolf: React.FC = () => {
     <AnimatedPage>
     <SwipeablePage className="px-6 lg:px-8 xl:px-12 relative">
       <section className="mb-6 pt-4 md:pt-2 animate-content-enter-delay-1">
-        <h1 className={`text-3xl font-bold leading-tight drop-shadow-md ${isDark ? 'text-white' : 'text-primary'}`}>Book</h1>
-        <p className={`text-sm font-medium mt-1 ${isDark ? 'text-white/70' : 'text-primary/70'}`}>Reserve simulators or conference room.</p>
+        <h1 className={`text-2xl leading-tight ${isDark ? 'text-white' : 'text-primary'}`} style={{ fontFamily: 'var(--font-headline)' }}>Book</h1>
+        <p className={`text-base leading-relaxed mt-1 ${isDark ? 'text-white/70' : 'text-primary/70'}`} style={{ fontFamily: 'var(--font-body)' }}>Reserve simulators or conference room.</p>
       </section>
 
       {effectiveUser?.status && !['active', 'trialing'].includes(effectiveUser.status.toLowerCase()) ? (
-        <section className={`rounded-2xl p-6 border text-center glass-card ${isDark ? 'border-white/25' : 'border-black/10'}`}>
+        <section className={`rounded-xl p-6 border text-center glass-card ${isDark ? 'border-white/25' : 'border-black/10'}`}>
           <span className="material-symbols-outlined text-4xl text-accent mb-4">lock</span>
           <h3 className={`text-lg font-bold mb-2 ${isDark ? 'text-white' : 'text-primary'}`}>Membership Not Active</h3>
           <p className={`text-sm mb-4 ${isDark ? 'text-white/80' : 'text-primary/80'}`}>
@@ -907,7 +907,7 @@ const BookGolf: React.FC = () => {
         </section>
 
         {activeTab === 'simulator' && isTierLoaded && !canBookSimulators ? (
-        <section className={`rounded-2xl p-6 border text-center glass-card ${isDark ? 'border-white/25' : 'border-black/10'}`}>
+        <section className={`rounded-xl p-6 border text-center glass-card ${isDark ? 'border-white/25' : 'border-black/10'}`}>
           <span className="material-symbols-outlined text-4xl text-accent mb-4">lock</span>
           <h3 className={`text-lg font-bold mb-2 ${isDark ? 'text-white' : 'text-primary'}`}>Upgrade to Book Simulators</h3>
           <p className={`text-sm mb-4 ${isDark ? 'text-white/80' : 'text-primary/80'}`}>
@@ -922,7 +922,7 @@ const BookGolf: React.FC = () => {
           </a>
         </section>
       ) : activeTab === 'conference' && isTierLoaded && !canBookConference ? (
-        <section className={`rounded-2xl p-6 border text-center glass-card ${isDark ? 'border-white/25' : 'border-black/10'}`}>
+        <section className={`rounded-xl p-6 border text-center glass-card ${isDark ? 'border-white/25' : 'border-black/10'}`}>
           <span className="material-symbols-outlined text-4xl text-accent mb-4">lock</span>
           <h3 className={`text-lg font-bold mb-2 ${isDark ? 'text-white' : 'text-primary'}`}>Upgrade for Conference Room Access</h3>
           <p className={`text-sm mb-4 ${isDark ? 'text-white/80' : 'text-primary/80'}`}>
@@ -953,7 +953,7 @@ const BookGolf: React.FC = () => {
             />
           )}
 
-          <section className={`rounded-2xl p-4 border glass-card ${isDark ? 'border-white/25' : 'border-black/10'}`}>
+          <section className={`rounded-xl p-4 border glass-card ${isDark ? 'border-white/25' : 'border-black/10'}`}>
             <div className="flex items-center justify-between mb-3">
               <span className={`text-xs font-bold uppercase tracking-wider ${isDark ? 'text-white/80' : 'text-primary/80'}`}>Date & Duration</span>
             </div>

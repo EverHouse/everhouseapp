@@ -1726,7 +1726,7 @@ const DataIntegrityTab: React.FC = () => {
 
   return (
     <div className="space-y-6 animate-slide-up-stagger pb-32" style={{ '--stagger-index': 0 } as React.CSSProperties}>
-      <div className="mb-6 bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl p-6">
+      <div className="mb-6 bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-xl p-6">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <span aria-hidden="true" className="material-symbols-outlined text-primary dark:text-white text-[24px]">monitoring</span>
@@ -1852,7 +1852,7 @@ const DataIntegrityTab: React.FC = () => {
       </div>
 
       {isLoadingCached && !meta && (
-        <div className="bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl p-8 text-center">
+        <div className="bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-xl p-8 text-center">
           <span aria-hidden="true" className="material-symbols-outlined animate-spin text-3xl text-primary/40 dark:text-white/40 mb-2">progress_activity</span>
           <p className="text-sm text-primary/60 dark:text-white/60">Loading cached results...</p>
         </div>
@@ -1879,7 +1879,7 @@ const DataIntegrityTab: React.FC = () => {
         </div>
       )}
 
-      <div className="mb-6 bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl p-4">
+      <div className="mb-6 bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-xl p-4">
         <button
           onClick={() => setShowCalendars(!showCalendars)}
           className="tactile-row flex items-center justify-between w-full text-left"
@@ -1926,7 +1926,7 @@ const DataIntegrityTab: React.FC = () => {
         )}
       </div>
 
-      <div className="mb-6 bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl p-4">
+      <div className="mb-6 bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-xl p-4">
         <button
           onClick={() => setShowHistory(!showHistory)}
           className="tactile-row flex items-center justify-between w-full text-left"
@@ -2012,7 +2012,7 @@ const DataIntegrityTab: React.FC = () => {
         )}
       </div>
 
-      <div className="mb-6 bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-2xl p-4">
+      <div className="mb-6 bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-xl p-4">
         <button
           onClick={() => setShowActivityLog(!showActivityLog)}
           className="tactile-row flex items-center justify-between w-full text-left"

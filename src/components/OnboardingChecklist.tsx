@@ -168,7 +168,7 @@ const OnboardingChecklist: React.FC = () => {
   };
 
   return (
-    <div className="mb-6 glass-card rounded-2xl p-5 backdrop-blur-xl bg-white/30 dark:bg-white/5 border border-white/20 animate-pop-in">
+    <div className="mb-6 glass-card rounded-xl p-5 backdrop-blur-xl bg-white/30 dark:bg-white/5 border border-white/20 animate-pop-in">
       <div className="flex items-start justify-between mb-4">
         <div>
           <h3 className="text-lg font-bold text-primary dark:text-white">
@@ -202,7 +202,7 @@ const OnboardingChecklist: React.FC = () => {
             key={step.key}
             onClick={() => !step.completed && handleStepAction(step)}
             disabled={step.completed}
-            className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all duration-fast text-left tactile-row ${
+            className={`w-full flex items-center gap-3 px-6 py-3 rounded-[4px] transition-all duration-fast text-left tactile-row ${
               step.completed
                 ? 'bg-accent/10 dark:bg-accent/5'
                 : 'hover:bg-primary/5 dark:hover:bg-white/5 cursor-pointer'

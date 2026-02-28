@@ -34,7 +34,7 @@ const MetricCard: React.FC<MetricCardProps> = ({ icon, label, value, subtext, is
     type="button"
     onClick={onClick}
     aria-label={ariaLabel}
-    className={`flex flex-col items-start p-4 rounded-2xl backdrop-blur-xl border transition-transform active:scale-95 focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none tactile-card ${
+    className={`flex flex-col items-start p-4 rounded-xl backdrop-blur-xl border transition-transform active:scale-95 focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none tactile-card ${
       isDark 
         ? 'bg-white/10 border-white/20 hover:bg-white/15' 
         : 'bg-white/30 border-white/20 hover:bg-white/40'

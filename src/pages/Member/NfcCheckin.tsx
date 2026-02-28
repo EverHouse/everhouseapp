@@ -93,7 +93,7 @@ const NfcCheckin: React.FC = () => {
         )}
 
         {state === 'not_logged_in' && (
-          <div className="rounded-2xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-300">
+          <div className="rounded-xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-300">
             <div className="bg-gradient-to-br from-gray-700 via-gray-600 to-gray-800 p-8 text-center">
               <div className="w-16 h-16 rounded-full bg-white/20 flex items-center justify-center mx-auto mb-4">
                 <span className="material-symbols-outlined text-4xl text-white">login</span>
@@ -113,7 +113,7 @@ const NfcCheckin: React.FC = () => {
         )}
 
         {state === 'error' && (
-          <div className="rounded-2xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-300">
+          <div className="rounded-xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-300">
             <div className="bg-gradient-to-br from-red-700 via-red-600 to-red-800 p-8 text-center">
               <div className="w-16 h-16 rounded-full bg-white/20 flex items-center justify-center mx-auto mb-4">
                 <span className="material-symbols-outlined text-4xl text-yellow-300">warning</span>

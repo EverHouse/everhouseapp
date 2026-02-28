@@ -201,7 +201,7 @@ function CorporateCheckoutForm({ tier, email, initialQuantity }: CorporateChecko
   if (showStripeCheckout) {
     return (
       <div className="space-y-6">
-        <div className="glass-card rounded-2xl p-4 backdrop-blur-xl bg-white/30 dark:bg-white/5 border border-white/20">
+        <div className="glass-card rounded-xl p-4 backdrop-blur-xl bg-white/30 dark:bg-white/5 border border-white/20">
           <div className="space-y-2 text-sm">
             <div className="flex items-center justify-between">
               <div className="text-primary/70 dark:text-white/70">
@@ -235,7 +235,7 @@ function CorporateCheckoutForm({ tier, email, initialQuantity }: CorporateChecko
   return (
     <div className="space-y-6">
       <div className="text-center mb-8">
-        <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-accent/20 flex items-center justify-center">
+        <div className="w-16 h-16 mx-auto mb-4 rounded-xl bg-accent/20 flex items-center justify-center">
           <span className="material-symbols-outlined text-3xl text-accent">corporate_fare</span>
         </div>
         <h2 className="text-2xl font-bold text-primary dark:text-white mb-2">Corporate Membership</h2>
@@ -362,7 +362,7 @@ function CorporateCheckoutForm({ tier, email, initialQuantity }: CorporateChecko
         </div>
       </div>
 
-      <div className="glass-card rounded-2xl p-5 backdrop-blur-xl bg-white/40 dark:bg-white/5 border border-white/30 dark:border-white/10">
+      <div className="glass-card rounded-xl p-5 backdrop-blur-xl bg-white/40 dark:bg-white/5 border border-white/30 dark:border-white/10">
         <h3 className="font-semibold text-primary dark:text-white mb-4 flex items-center gap-2">
           <span className="material-symbols-outlined text-accent">receipt_long</span>
           Price Summary
@@ -546,7 +546,7 @@ function DayPassesSection() {
       </div>
 
       {selectedProduct ? (
-        <div className="glass-card rounded-2xl p-6 md:p-8 max-w-md mx-auto">
+        <div className="glass-card rounded-xl p-6 md:p-8 max-w-md mx-auto">
           <h2 className="text-xl font-semibold text-primary dark:text-white mb-4">
             Complete Your Purchase
           </h2>
@@ -632,7 +632,7 @@ function DayPassesSection() {
           {products.map((product) => (
             <div
               key={product.id}
-              className="glass-card rounded-2xl p-6 flex flex-col hover:shadow-lg transition-shadow"
+              className="glass-card rounded-xl p-6 flex flex-col hover:shadow-lg transition-shadow"
             >
               <div className="flex items-start gap-3 mb-4">
                 <div className="w-10 h-10 rounded-xl bg-primary/10 dark:bg-white/10 flex items-center justify-center">
@@ -804,7 +804,7 @@ function CheckoutSuccess() {
         {customerEmail && (
           <p className="text-primary/60 dark:text-white/60 mb-4">A confirmation has been sent to {customerEmail}</p>
         )}
-        <div className="glass-card rounded-2xl p-6 max-w-md mx-auto mb-8 text-left">
+        <div className="glass-card rounded-xl p-6 max-w-md mx-auto mb-8 text-left">
           <h3 className="font-bold text-primary dark:text-white mb-3">What's Next?</h3>
           <ul className="space-y-2 text-primary/70 dark:text-white/70 text-sm">
             <li className="flex items-start gap-2">
@@ -852,7 +852,7 @@ function CheckoutSuccess() {
         </div>
       )}
 
-      <div className="glass-card rounded-2xl p-6 max-w-md mx-auto mb-8 text-left backdrop-blur-xl bg-white/40 dark:bg-white/5 border border-white/30 dark:border-white/10">
+      <div className="glass-card rounded-xl p-6 max-w-md mx-auto mb-8 text-left backdrop-blur-xl bg-white/40 dark:bg-white/5 border border-white/30 dark:border-white/10">
         <h3 className="font-bold text-primary dark:text-white mb-4 flex items-center gap-2">
           <span className="material-symbols-outlined text-accent">rocket_launch</span>
           What's Next
@@ -941,7 +941,7 @@ export default function Checkout() {
             <CheckoutSuccess />
           </div>
         ) : tier ? (
-          <div className="animate-content-enter glass-card rounded-2xl p-6 md:p-8 backdrop-blur-xl bg-white/50 dark:bg-white/5 border border-white/30 dark:border-white/10">
+          <div className="animate-content-enter glass-card rounded-xl p-6 md:p-8 backdrop-blur-xl bg-white/50 dark:bg-white/5 border border-white/30 dark:border-white/10">
             {isCorporate ? (
               <CorporateCheckoutForm 
                 tier={tier} 

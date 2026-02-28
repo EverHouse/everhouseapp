@@ -434,7 +434,7 @@ const BookingRequestsPanel: React.FC<BookingRequestsPanelProps> = ({
                                                     ]}
                                                 >
                                                     <div 
-                                                        className={`p-4 rounded-2xl animate-pop-in cursor-pointer shadow-sm ${
+                                                        className={`p-4 rounded-xl animate-pop-in cursor-pointer shadow-sm ${
                                                             isOptimisticNew
                                                                 ? 'bg-green-50/80 dark:bg-green-500/10 border-2 border-dashed border-green-300 dark:border-green-500/30 opacity-70'
                                                                 : isActionPending

@@ -349,7 +349,7 @@ const Login: React.FC = () => {
               <div className="w-16 h-16 bg-primary text-bone dark:text-[#141414] rounded-full flex items-center justify-center mx-auto text-2xl mb-6 shadow-xl dark:shadow-black/20">
                 <span className="material-symbols-outlined text-3xl">dialpad</span>
               </div>
-              <h2 className="text-3xl font-bold tracking-tight text-primary dark:text-white">
+              <h2 className="text-2xl text-primary dark:text-white leading-tight" style={{ fontFamily: 'var(--font-headline)' }}>
                 Enter Your Code
               </h2>
               <p className="mt-4 text-base text-primary/60 dark:text-white/60 font-medium leading-relaxed">
@@ -365,7 +365,7 @@ const Login: React.FC = () => {
               </div>
             )}
 
-            <div className="bg-white dark:bg-[#1a1d15] py-8 px-6 shadow-sm dark:shadow-black/20 rounded-2xl border border-black/5 dark:border-white/10 space-y-6">
+            <div className="bg-white dark:bg-[#1a1d15] py-8 px-6 shadow-sm dark:shadow-black/20 rounded-xl border border-black/5 dark:border-white/10 space-y-6">
               <div className="flex justify-center gap-2">
                 {otpInputs.map((digit, idx) => (
                   <input
@@ -431,7 +431,7 @@ const Login: React.FC = () => {
             
             <div className="text-center">
                 <img src="/assets/logos/EH-guy-icon.webp" alt="Ever Club" className="w-16 h-16 mx-auto mb-6 rounded-xl" />
-                <h2 className="text-3xl font-bold tracking-tight text-primary dark:text-white">
+                <h2 className="text-2xl text-primary dark:text-white leading-tight" style={{ fontFamily: 'var(--font-headline)' }}>
                     Member's Portal
                 </h2>
                 <p className="mt-2 text-base text-primary/60 dark:text-white/60 font-medium">
@@ -446,7 +446,7 @@ const Login: React.FC = () => {
               </div>
             )}
 
-            <div className="bg-white dark:bg-[#1a1d15] py-8 px-6 shadow-sm dark:shadow-black/20 rounded-2xl border border-black/5 dark:border-white/10 space-y-4">
+            <div className="bg-white dark:bg-[#1a1d15] py-8 px-6 shadow-sm dark:shadow-black/20 rounded-xl border border-black/5 dark:border-white/10 space-y-4">
                 <form onSubmit={showPasswordField && hasPassword ? handlePasswordLogin : handleRequestOTP} className="space-y-4">
                   <div>
                     <label htmlFor="login-email" className="sr-only">Membership Email</label>

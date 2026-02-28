@@ -157,8 +157,8 @@ const Wellness: React.FC = () => {
     <AnimatedPage>
     <SwipeablePage className="px-6 relative overflow-hidden">
       <section className="mb-4 pt-4 md:pt-2 animate-content-enter-delay-1">
-        <h1 className={`text-3xl font-bold leading-tight drop-shadow-md ${isDark ? 'text-white' : 'text-primary'}`}>Wellness</h1>
-        <p className={`text-sm font-medium mt-1 ${isDark ? 'text-white/70' : 'text-primary/70'}`}>Book your next session.</p>
+        <h1 className={`text-2xl leading-tight ${isDark ? 'text-white' : 'text-primary'}`} style={{ fontFamily: 'var(--font-headline)' }}>Wellness</h1>
+        <p className={`text-base leading-relaxed mt-1 ${isDark ? 'text-white/70' : 'text-primary/70'}`} style={{ fontFamily: 'var(--font-body)' }}>Book your next session.</p>
       </section>
 
       <section className={`mb-8 border-b -mx-6 px-6 animate-content-enter-delay-2 ${isDark ? 'border-white/25' : 'border-black/10'}`}>
@@ -791,7 +791,7 @@ const ClassCard: React.FC<ClassCardProps> = ({ title, date, time, instructor, du
 };
 
 const MedSpaCard: React.FC<{title: string; subtitle?: string; children: React.ReactNode; isDark?: boolean}> = ({ title, subtitle, children, isDark = true }) => (
-  <div className={`rounded-2xl p-5 border glass-card ${isDark ? 'border-white/20' : 'border-black/10'}`}>
+  <div className={`rounded-xl p-5 border glass-card ${isDark ? 'border-white/20' : 'border-black/10'}`}>
     <div className="flex items-center justify-between mb-4">
       <h3 className={`font-bold text-xl ${isDark ? 'text-white' : 'text-primary'}`}>
         {title}

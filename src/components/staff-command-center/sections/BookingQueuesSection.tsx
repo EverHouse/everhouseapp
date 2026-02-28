@@ -34,20 +34,20 @@ const PendingRequestsCard = memo<PendingRequestsCardProps>(({
 
   return (
     <div 
-      className={`flex flex-col bg-white/40 dark:bg-white/[0.08] backdrop-blur-xl border border-white/60 dark:border-white/[0.12] rounded-2xl pt-4 shadow-liquid dark:shadow-liquid-dark overflow-hidden ${pendingRequests.length > 0 ? `border-l-4 ${hasCancellations ? 'border-l-red-500' : 'border-l-amber-500'}` : ''}`}
+      className={`flex flex-col bg-white/40 dark:bg-white/[0.08] backdrop-blur-xl border border-white/60 dark:border-white/[0.12] rounded-xl pt-4 shadow-liquid dark:shadow-liquid-dark overflow-hidden ${pendingRequests.length > 0 ? `border-l-4 ${hasCancellations ? 'border-l-red-500' : 'border-l-amber-500'}` : ''}`}
       role="region"
       aria-label={pendingRequests.length > 0 ? `Booking Requests - ${pendingRequests.length} pending, action required` : 'Booking Requests'}
     >
       <div className="flex items-center justify-between mb-4 flex-shrink-0 px-4">
         <div className="flex items-center gap-2">
-          <h3 className={`font-bold text-primary dark:text-white ${variant === 'desktop' ? 'text-sm' : ''}`}>Booking Requests</h3>
+          <h3 className={`font-bold text-primary dark:text-white ${variant === 'desktop' ? 'text-sm' : ''}`} style={{ fontFamily: 'var(--font-headline)' }}>Booking Requests</h3>
           {pendingRequests.length > 0 && (
-            <span className="px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 rounded-full">
+            <span className="px-2 py-0.5 text-[10px] font-semibold uppercase tracking-widest bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 rounded-[4px]">
               Action Required
             </span>
           )}
           {cancellationCount > 0 && (
-            <span className="px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-400 rounded-full">
+            <span className="px-2 py-0.5 text-[10px] font-semibold uppercase tracking-widest bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-400 rounded-[4px]">
               {cancellationCount} Cancellation{cancellationCount !== 1 ? 's' : ''}
             </span>
           )}
@@ -78,7 +78,7 @@ const PendingRequestsCard = memo<PendingRequestsCardProps>(({
                         <div className="flex items-center justify-between gap-2">
                           <div className="flex items-center gap-2">
                             <p className="font-semibold text-sm text-primary dark:text-white truncate">{request.user_name}</p>
-                            <span className="px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-400 rounded-full">
+                            <span className="px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-widest bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-400 rounded-[4px]">
                               Cancellation
                             </span>
                           </div>
@@ -212,12 +212,12 @@ const UpcomingBookingsCard = memo<UpcomingBookingsCardProps>(({
   
   return (
     <div 
-      className="flex flex-col bg-white/40 dark:bg-white/[0.08] backdrop-blur-xl border border-white/60 dark:border-white/[0.12] rounded-2xl pt-4 shadow-liquid dark:shadow-liquid-dark overflow-hidden"
+      className="flex flex-col bg-white/40 dark:bg-white/[0.08] backdrop-blur-xl border border-white/60 dark:border-white/[0.12] rounded-xl pt-4 shadow-liquid dark:shadow-liquid-dark overflow-hidden"
       role="region"
       aria-label={hasUnmatchedBookings ? "Today's Bookings - some need member assignment" : "Today's Bookings"}
     >
       <div className="flex items-center justify-between mb-4 flex-shrink-0 px-4">
-        <h3 className="font-bold text-primary dark:text-white">Today's Bookings</h3>
+        <h3 className="font-bold text-primary dark:text-white" style={{ fontFamily: 'var(--font-headline)' }}>Today's Bookings</h3>
         <button onClick={() => navigateToTab('simulator')} className="tactile-btn text-xs text-primary/80 dark:text-white/80 hover:underline">View all</button>
       </div>
       <div className="space-y-3">
@@ -245,7 +245,7 @@ const UpcomingBookingsCard = memo<UpcomingBookingsCardProps>(({
                     <div className="flex items-center gap-2 mb-1">
                       {isUnmatched ? (
                         <>
-                          <span className="px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 rounded-full">
+                          <span className="px-2 py-0.5 text-[11px] font-semibold uppercase tracking-widest bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 rounded-[4px]">
                             Needs Assignment
                           </span>
                           {booking.resource_type === 'conference_room' ? (
@@ -441,28 +441,28 @@ export const BookingQueuesSection: React.FC<BookingQueuesSectionProps> = ({
   const getStatusBadge = (booking: BookingRequest) => {
     if (booking.status === 'attended' && booking.has_unpaid_fees && (booking.total_owed ?? 0) > 0) {
       return (
-        <span className="px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 rounded-full">
+        <span className="px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-widest bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 rounded-[4px]">
           Payment Due
         </span>
       );
     }
     if (booking.status === 'attended') {
       return (
-        <span className="px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400 rounded-full">
+        <span className="px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-widest bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400 rounded-[4px]">
           Checked In
         </span>
       );
     }
     if (booking.status === 'cancellation_pending') {
       return (
-        <span className="px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-400 rounded-full">
+        <span className="px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-widest bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-400 rounded-[4px]">
           Cancellation Pending
         </span>
       );
     }
     if (booking.is_unmatched) {
       return (
-        <span className="px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 rounded-full">
+        <span className="px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-widest bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 rounded-[4px]">
           Needs Assignment
         </span>
       );

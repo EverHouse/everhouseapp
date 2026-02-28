@@ -148,8 +148,8 @@
 
 :root {
   /* Header Offset - centralized calculation for header height + safe area */
-  --header-height: 72px;
-  --header-offset: calc(max(88px, calc(env(safe-area-inset-top, 0px) + var(--header-height))));
+  --header-height: 80px;
+  --header-offset: calc(max(96px, calc(env(safe-area-inset-top, 0px) + var(--header-height))));
   
   /* Safe Area / Nav Clearance */
   --nav-bottom-offset: 2rem; /* bottom-8 = 32px = 2rem */
@@ -236,7 +236,7 @@
   --liquid-glass-outer-shadow: 0 8px 32px rgba(0, 0, 0, 0.1), 0 2px 8px rgba(0, 0, 0, 0.05);
   --liquid-glass-outer-shadow-dark: 0 8px 32px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(0, 0, 0, 0.2);
   --liquid-transition: background-color 0.3s ease-in-out, color 0.3s ease-in-out, border-color 0.3s ease-in-out, transform 0.3s ease-in-out, opacity 0.3s ease-in-out;
-  --liquid-radius: 1rem;
+  --liquid-radius: 12px;
 }
 
 @theme {
@@ -763,7 +763,7 @@ input, select, textarea {
 .flex.items-center > h4,
 .flex.items-center > h5,
 .flex.items-center > h6 {
-  transform: translateY(2px);
+  transform: translateY(1px);
 }
 
 /* Consistent icon-text gap in flex rows */

@@ -266,7 +266,7 @@ const MemberEvents: React.FC = () => {
     <AnimatedPage>
     <SwipeablePage className="px-6 relative overflow-hidden">
       <section className="mb-4 pt-4 md:pt-2 animate-content-enter-delay-1">
-        <p className={`text-sm font-medium ${isDark ? 'text-white/70' : 'text-primary/70'}`}>Discover what's happening at the House.</p>
+        <p className={`text-base leading-relaxed ${isDark ? 'text-white/70' : 'text-primary/70'}`} style={{ fontFamily: 'var(--font-body)' }}>Discover what's happening at the House.</p>
       </section>
 
       <section className={`mb-6 border-b -mx-6 px-6 animate-content-enter-delay-2 ${isDark ? 'border-white/25' : 'border-black/10'}`}>
@@ -316,26 +316,26 @@ const MemberEvents: React.FC = () => {
                       <div className="flex gap-4 items-start">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide ${isDark ? 'bg-lavender/20 text-lavender' : 'bg-brand-green/20 text-brand-green'}`} style={{ fontFamily: 'var(--font-label)' }}>{event.category}</span>
+                            <span className={`w-fit px-2 py-0.5 rounded-[4px] text-[10px] font-bold uppercase tracking-widest ${isDark ? 'bg-lavender/20 text-lavender' : 'bg-brand-green/20 text-brand-green'}`} style={{ fontFamily: 'var(--font-label)' }}>{event.category}</span>
                             {event.source === 'eventbrite' && (
-                              <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide bg-[#F05537]/20 text-[#F05537]" style={{ fontFamily: 'var(--font-label)' }}>Eventbrite</span>
+                              <span className="w-fit px-2 py-0.5 rounded-[4px] text-[10px] font-bold uppercase tracking-widest bg-[#F05537]/20 text-[#F05537]" style={{ fontFamily: 'var(--font-label)' }}>Eventbrite</span>
                             )}
                             {isPendingRsvp ? (
-                              <span className="text-[10px] font-bold uppercase tracking-wider bg-accent/60 text-brand-green px-1.5 py-0.5 rounded-md whitespace-nowrap animate-pulse flex items-center gap-1">
+                              <span className="w-fit text-[10px] font-bold uppercase tracking-widest bg-accent/60 text-brand-green px-2 py-0.5 rounded-[4px] whitespace-nowrap animate-pulse flex items-center gap-1">
                                 <span className="w-1.5 h-1.5 bg-brand-green rounded-full animate-ping"></span>
                                 RSVP'ing
                               </span>
                             ) : isPendingCancel ? (
-                              <span className="text-[10px] font-bold uppercase tracking-wider bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded-md whitespace-nowrap animate-pulse flex items-center gap-1">
+                              <span className="w-fit text-[10px] font-bold uppercase tracking-widest bg-red-500/20 text-red-400 px-2 py-0.5 rounded-[4px] whitespace-nowrap animate-pulse flex items-center gap-1">
                                 <span className="w-1.5 h-1.5 bg-red-400 rounded-full animate-ping"></span>
                                 Cancelling
                               </span>
                             ) : isRsvpd ? (
-                              <span className="text-[10px] font-bold uppercase tracking-wider bg-accent text-brand-green px-1.5 py-0.5 rounded-md whitespace-nowrap transition-all duration-fast">Going</span>
+                              <span className="w-fit text-[10px] font-bold uppercase tracking-widest bg-accent text-brand-green px-2 py-0.5 rounded-[4px] whitespace-nowrap transition-all duration-fast">Going</span>
                             ) : event.source === 'eventbrite' ? (
-                              <span className="text-[10px] font-bold uppercase tracking-wider bg-[#F05537]/20 text-[#F05537] px-1.5 py-0.5 rounded-md whitespace-nowrap">Ticketed</span>
+                              <span className="w-fit text-[10px] font-bold uppercase tracking-widest bg-[#F05537]/20 text-[#F05537] px-2 py-0.5 rounded-[4px] whitespace-nowrap">Ticketed</span>
                             ) : (
-                              <span className="text-[10px] font-bold uppercase tracking-wider bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded-md whitespace-nowrap">Open</span>
+                              <span className="w-fit text-[10px] font-bold uppercase tracking-widest bg-green-500/20 text-green-400 px-2 py-0.5 rounded-[4px] whitespace-nowrap">Open</span>
                             )}
                           </div>
                           <h3 className={`text-xl font-bold leading-none translate-y-[1px] ${isDark ? 'text-white' : 'text-primary'}`} style={{ fontFamily: 'var(--font-headline)', fontOpticalSizing: 'auto', letterSpacing: '-0.02em' }}>{event.title}</h3>

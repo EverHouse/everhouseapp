@@ -131,7 +131,7 @@ const AddMemberModal: React.FC<AddMemberModalProps> = ({
               <button
                 key={member.id}
                 onClick={() => handleSelectMember(member)}
-                className={`w-full flex items-center gap-3 p-3 rounded-2xl transition-colors ${
+                className={`w-full flex items-center gap-3 p-3 rounded-xl transition-colors ${
                   isDark 
                     ? 'hover:bg-white/10 active:bg-white/15' 
                     : 'hover:bg-black/5 active:bg-black/10'

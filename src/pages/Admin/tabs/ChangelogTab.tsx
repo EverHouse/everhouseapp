@@ -795,7 +795,7 @@ const ChangelogTab: React.FC = () => {
                             : 'bg-gray-300 dark:bg-gray-600'
                     }`} />
                     
-                    <div className="bg-white/60 dark:bg-white/5 backdrop-blur-sm rounded-2xl p-5 border border-primary/10 dark:border-white/25">
+                    <div className="bg-white/60 dark:bg-white/5 backdrop-blur-sm rounded-xl p-5 border border-primary/10 dark:border-white/25">
                         <div className="flex items-start justify-between mb-3">
                             <div>
                                 <div className="flex items-center gap-2 mb-1">
@@ -919,7 +919,7 @@ const ChangelogTab: React.FC = () => {
                             return (
                                 <div
                                     key={entry.id}
-                                    className="rounded-2xl bg-white dark:bg-white/[0.03] shadow-layered dark:shadow-layered-dark overflow-hidden animate-slide-up-stagger tactile-row"
+                                    className="rounded-xl bg-white dark:bg-white/[0.03] shadow-layered dark:shadow-layered-dark overflow-hidden animate-slide-up-stagger tactile-row"
                                     style={{ '--stagger-index': index } as React.CSSProperties}
                                 >
                                     <div className="flex gap-3 p-4">

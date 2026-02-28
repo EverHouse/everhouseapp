@@ -192,7 +192,7 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     <ToastContext.Provider value={{ showToast, hideToast }}>
       {children}
       <div
-        className="fixed top-[env(safe-area-inset-top,0px)] mt-16 right-4 flex flex-col gap-3 pointer-events-none"
+        className="fixed top-[env(safe-area-inset-top,0px)] mt-20 right-4 flex flex-col gap-3 pointer-events-none"
         style={{ zIndex: 'var(--z-toast)', maxWidth: '420px' }}
       >
         {toasts.map(toast => (

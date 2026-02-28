@@ -103,8 +103,8 @@ const PublicCafe: React.FC = () => {
       style={{ marginTop: 'calc(-1 * var(--header-offset))', paddingTop: 'var(--header-offset)' }}
     >
       <section className="px-6 pt-4 md:pt-2 pb-6 bg-[#EAEBE6] dark:bg-[#141414] animate-content-enter">
-        <h1 className="text-5xl font-light text-primary dark:text-white mb-4 tracking-tight">Cafe Menu</h1>
-        <p className="text-primary/70 dark:text-white/70 text-base leading-relaxed max-w-[90%]">
+        <h1 className="text-5xl text-primary dark:text-white mb-4 leading-none" style={{ fontFamily: 'var(--font-display)' }}>Cafe Menu</h1>
+        <p className="text-base text-primary/70 dark:text-white/70 leading-relaxed max-w-[90%]" style={{ fontFamily: 'var(--font-body)' }}>
           Curated bites and beverages at the House. From artisan coffee to light fare.
         </p>
       </section>
@@ -117,7 +117,7 @@ const PublicCafe: React.FC = () => {
           <button
             key={cat}
             onClick={() => setActiveCategory(cat)}
-            className={`tactile-btn px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all duration-fast flex-shrink-0 min-h-[44px] ${
+            className={`tactile-btn px-4 py-2 rounded-[4px] text-sm font-bold whitespace-nowrap transition-all duration-fast flex-shrink-0 min-h-[44px] ${
               activeCategory === cat
                 ? 'bg-primary text-white'
                 : 'bg-white dark:bg-white/5 text-primary dark:text-white hover:bg-primary/10 dark:hover:bg-white/10'

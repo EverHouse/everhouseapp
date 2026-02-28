@@ -352,12 +352,12 @@ export const TrackmanWebhookEventsSection: React.FC<TrackmanWebhookEventsSection
   const totalPages = Math.ceil(webhookTotalCount / ITEMS_PER_PAGE);
 
   return (
-    <div ref={sectionRef} className="glass-card p-4 md:p-6 rounded-2xl border border-primary/10 dark:border-white/25">
+    <div ref={sectionRef} className="glass-card p-4 md:p-6 rounded-xl border border-primary/10 dark:border-white/25">
       <button
         onClick={handleToggle}
         className="w-full flex items-center justify-between"
       >
-        <h2 className="text-base md:text-lg font-bold text-primary dark:text-white flex items-center gap-2">
+        <h2 className="text-base md:text-lg font-bold text-primary dark:text-white flex items-center gap-2" style={{ fontFamily: 'var(--font-headline)' }}>
           <TrackmanIcon size={22} />
           Trackman Bookings Synced
           {webhookStats?.webhookStats?.total_events > 0 && (
@@ -458,7 +458,7 @@ export const TrackmanWebhookEventsSection: React.FC<TrackmanWebhookEventsSection
                       <div className="flex items-start justify-between gap-2 md:gap-3">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-1.5 md:gap-2 flex-wrap">
-                            <span className={`px-1.5 md:px-2 py-0.5 rounded-full text-xs font-medium ${getEventBadgeColor(eventType)}`}>
+                            <span className={`px-1.5 md:px-2 py-0.5 rounded-[4px] text-xs font-medium ${getEventBadgeColor(eventType)}`}>
                               {eventType}
                             </span>
                             {bayName && (
@@ -468,13 +468,13 @@ export const TrackmanWebhookEventsSection: React.FC<TrackmanWebhookEventsSection
                               </span>
                             )}
                             {hasError && (
-                              <span className="px-1.5 md:px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-500/20 dark:text-red-400 flex items-center gap-0.5 md:gap-1">
+                              <span className="px-1.5 md:px-2 py-0.5 rounded-[4px] text-xs font-medium bg-red-100 text-red-800 dark:bg-red-500/20 dark:text-red-400 flex items-center gap-0.5 md:gap-1">
                                 <span className="material-symbols-outlined text-xs">error</span>
                                 Error
                               </span>
                             )}
                             {event.matched_booking_id && !event.linked_booking_unmatched && (
-                              <span className={`px-1.5 md:px-2 py-0.5 rounded-full text-xs font-medium flex items-center gap-0.5 md:gap-1 ${
+                              <span className={`px-1.5 md:px-2 py-0.5 rounded-[4px] text-xs font-medium flex items-center gap-0.5 md:gap-1 ${
                                 event.was_auto_linked 
                                   ? 'bg-blue-100 text-blue-800 dark:bg-blue-500/20 dark:text-blue-400'
                                   : 'bg-green-100 text-green-800 dark:bg-green-500/20 dark:text-green-400'
@@ -708,7 +708,7 @@ export const TrackmanWebhookEventsSection: React.FC<TrackmanWebhookEventsSection
 
       {showReplayModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => setShowReplayModal(false)} aria-hidden="true">
-          <div className="w-full max-w-md bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 space-y-4" onClick={e => e.stopPropagation()}>
+          <div className="w-full max-w-md bg-white dark:bg-gray-800 rounded-xl shadow-xl p-6 space-y-4" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-bold text-primary dark:text-white">Replay Webhooks to Dev</h3>
               <button onClick={() => setShowReplayModal(false)} className="p-1 hover:bg-gray-100 dark:hover:bg-white/10 rounded-full">

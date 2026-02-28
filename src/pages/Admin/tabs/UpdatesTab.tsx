@@ -251,7 +251,7 @@ const UpdatesTab: React.FC = () => {
             <div ref={notificationsRef} className="space-y-3">
             {notificationsLoading ? (
                 Array.from({ length: 4 }).map((_, i) => (
-                    <div key={i} className="p-4 rounded-2xl animate-pulse bg-white dark:bg-white/[0.03]">
+                    <div key={i} className="p-4 rounded-xl animate-pulse bg-white dark:bg-white/[0.03]">
                         <div className="flex gap-3">
                             <div className="w-10 h-10 rounded-lg bg-gray-200 dark:bg-white/10" />
                             <div className="flex-1">
@@ -272,7 +272,7 @@ const UpdatesTab: React.FC = () => {
                         <div
                             key={notif.id}
                             onClick={() => handleNotificationClick(notif)}
-                            className={`tactile-row rounded-2xl transition-colors cursor-pointer overflow-hidden animate-pop-in ${
+                            className={`tactile-row rounded-xl transition-colors cursor-pointer overflow-hidden animate-pop-in ${
                                 notif.is_read 
                                     ? 'bg-white hover:bg-gray-50 dark:bg-white/[0.03] dark:hover:bg-white/[0.06]' 
                                     : 'bg-accent/10 hover:bg-accent/15 border border-accent/30 dark:border-accent/20'

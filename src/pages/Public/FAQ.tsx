@@ -87,8 +87,8 @@ const FAQ: React.FC = () => {
       style={{ marginTop: 'calc(-1 * var(--header-offset))', paddingTop: 'var(--header-offset)' }}
     >
       <div className="px-6 pt-4 md:pt-2 pb-4 animate-content-enter">
-        <h1 className="text-3xl font-bold tracking-tight text-primary dark:text-white mb-2">Frequently Asked Questions</h1>
-        <p className="text-primary/70 dark:text-white/70 text-base font-medium">Common questions about membership, amenities, and policies.</p>
+        <h1 className="text-5xl text-primary dark:text-white mb-2 leading-none" style={{ fontFamily: 'var(--font-display)' }}>Frequently Asked Questions</h1>
+        <p className="text-base text-primary/70 dark:text-white/70 leading-relaxed" style={{ fontFamily: 'var(--font-body)' }}>Common questions about membership, amenities, and policies.</p>
       </div>
 
       {!loading && categories.length > 0 && (
@@ -152,7 +152,7 @@ const AccordionItem: React.FC<{ question: string; answer: string }> = ({ questio
   const [isOpen, setIsOpen] = useState(false);
 
   return (
-    <div className="tactile-row border border-primary/10 dark:border-white/10 rounded-xl overflow-hidden bg-white/40 dark:bg-white/5 backdrop-blur-xl">
+    <div className="tactile-row border border-primary/10 dark:border-white/10 rounded-xl overflow-hidden bg-white/40 dark:bg-white/5 backdrop-blur-xl" style={{ borderRadius: '12px' }}>
       <button 
         onClick={() => setIsOpen(!isOpen)}
         className="w-full flex items-center justify-between p-4 text-left font-bold text-primary dark:text-white hover:bg-primary/5 dark:hover:bg-white/5 transition-colors"

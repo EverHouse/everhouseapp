@@ -31,9 +31,9 @@ const NextTourWidget: React.FC<NextTourWidgetProps> = ({ nextTour, isDesktop, on
   return (
     <button 
       onClick={onNavigate}
-      className={`${isDesktop ? 'h-full' : ''} bg-white/40 dark:bg-white/[0.08] backdrop-blur-xl border border-white/60 dark:border-white/[0.12] rounded-2xl ${isDesktop ? 'p-4' : 'p-3'} text-left hover:bg-white/80 dark:hover:bg-white/10 transition-colors shadow-liquid dark:shadow-liquid-dark ${isDesktop ? 'flex flex-col' : ''}`}
+      className={`${isDesktop ? 'h-full' : ''} bg-white/40 dark:bg-white/[0.08] backdrop-blur-xl border border-white/60 dark:border-white/[0.12] rounded-xl ${isDesktop ? 'p-4' : 'p-3'} text-left hover:bg-white/80 dark:hover:bg-white/10 transition-colors shadow-liquid dark:shadow-liquid-dark ${isDesktop ? 'flex flex-col' : ''}`}
     >
-      <h3 className={`font-bold text-primary dark:text-white ${isDesktop ? 'mb-3' : 'text-sm mb-2'}`}>Next Tour</h3>
+      <h3 className={`font-bold text-primary dark:text-white ${isDesktop ? 'mb-3' : 'text-sm mb-2'}`} style={{ fontFamily: 'var(--font-headline)' }}>Next Tour</h3>
       <div className={`${hasTour ? 'bg-primary/5 dark:bg-white/10' : ''} rounded-lg ${hasTour ? (isDesktop ? 'p-3' : 'p-2') : ''} ${isDesktop ? 'flex-1 flex flex-col justify-center' : ''}`}>
         <p className={`font-bold text-primary dark:text-white ${hasTour ? (isDesktop ? 'text-2xl' : 'text-xl') : (isDesktop ? 'text-base' : 'text-sm')}`}>
           {getTimeLeft()}
@@ -123,9 +123,9 @@ const NextEventWidget: React.FC<NextEventWidgetProps> = ({ nextActivityItem, nex
   return (
     <button 
       onClick={handleClick}
-      className={`${isDesktop ? 'h-full' : ''} bg-white/40 dark:bg-white/[0.08] backdrop-blur-xl border border-white/60 dark:border-white/[0.12] rounded-2xl ${isDesktop ? 'p-4' : 'p-3'} text-left hover:bg-white/80 dark:hover:bg-white/10 transition-colors shadow-liquid dark:shadow-liquid-dark ${isDesktop ? 'flex flex-col' : ''}`}
+      className={`${isDesktop ? 'h-full' : ''} bg-white/40 dark:bg-white/[0.08] backdrop-blur-xl border border-white/60 dark:border-white/[0.12] rounded-xl ${isDesktop ? 'p-4' : 'p-3'} text-left hover:bg-white/80 dark:hover:bg-white/10 transition-colors shadow-liquid dark:shadow-liquid-dark ${isDesktop ? 'flex flex-col' : ''}`}
     >
-      <h3 className={`font-bold text-primary dark:text-white ${isDesktop ? 'mb-3' : 'text-sm mb-2'}`}>{getTitle()}</h3>
+      <h3 className={`font-bold text-primary dark:text-white ${isDesktop ? 'mb-3' : 'text-sm mb-2'}`} style={{ fontFamily: 'var(--font-headline)' }}>{getTitle()}</h3>
       <div className={`${hasItem ? 'bg-primary/5 dark:bg-white/10' : ''} rounded-lg ${hasItem ? (isDesktop ? 'p-3' : 'p-2') : ''} ${isDesktop ? 'flex-1 flex flex-col justify-center' : ''}`}>
         <p className={`font-bold text-primary dark:text-white ${hasItem ? (isDesktop ? 'text-2xl' : 'text-xl') : (isDesktop ? 'text-base' : 'text-sm')}`}>
           {getTimeLeft()}
@@ -149,9 +149,9 @@ interface WellnessCardProps {
 }
 
 const WellnessCard: React.FC<WellnessCardProps> = ({ isDesktopGrid, isDesktop, upcomingWellness, today, onNavigateToWellness }) => (
-  <div className={`${isDesktopGrid ? 'h-full min-h-[280px]' : 'min-h-[200px]'} flex flex-col bg-white/40 dark:bg-white/[0.08] backdrop-blur-xl border border-white/60 dark:border-white/[0.12] rounded-2xl pt-4 shadow-liquid dark:shadow-liquid-dark overflow-hidden`}>
+  <div className={`${isDesktopGrid ? 'h-full min-h-[280px]' : 'min-h-[200px]'} flex flex-col bg-white/40 dark:bg-white/[0.08] backdrop-blur-xl border border-white/60 dark:border-white/[0.12] rounded-xl pt-4 shadow-liquid dark:shadow-liquid-dark overflow-hidden`}>
     <div className="flex items-center justify-between mb-3 lg:mb-4 flex-shrink-0 px-4">
-      <h3 className="font-bold text-primary dark:text-white">Upcoming Wellness</h3>
+      <h3 className="font-bold text-primary dark:text-white" style={{ fontFamily: 'var(--font-headline)' }}>Upcoming Wellness</h3>
       <button onClick={onNavigateToWellness} className="text-xs text-primary/80 dark:text-white/80 hover:underline">View all</button>
     </div>
     {upcomingWellness.length === 0 ? (
@@ -190,9 +190,9 @@ interface EventsCardProps {
 }
 
 const EventsCard: React.FC<EventsCardProps> = ({ isDesktopGrid, isDesktop, upcomingEvents, today, onNavigateToEvents }) => (
-  <div className={`${isDesktopGrid ? 'h-full min-h-[280px]' : 'min-h-[200px]'} flex flex-col bg-white/40 dark:bg-white/[0.08] backdrop-blur-xl border border-white/60 dark:border-white/[0.12] rounded-2xl pt-4 shadow-liquid dark:shadow-liquid-dark overflow-hidden`}>
+  <div className={`${isDesktopGrid ? 'h-full min-h-[280px]' : 'min-h-[200px]'} flex flex-col bg-white/40 dark:bg-white/[0.08] backdrop-blur-xl border border-white/60 dark:border-white/[0.12] rounded-xl pt-4 shadow-liquid dark:shadow-liquid-dark overflow-hidden`}>
     <div className="flex items-center justify-between mb-3 lg:mb-4 flex-shrink-0 px-4">
-      <h3 className="font-bold text-primary dark:text-white">Upcoming Events</h3>
+      <h3 className="font-bold text-primary dark:text-white" style={{ fontFamily: 'var(--font-headline)' }}>Upcoming Events</h3>
       <button onClick={onNavigateToEvents} className="text-xs text-primary/80 dark:text-white/80 hover:underline">View all</button>
     </div>
     {upcomingEvents.length === 0 ? (

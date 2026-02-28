@@ -307,7 +307,7 @@ const GroupBillingManager: React.FC<GroupBillingManagerProps> = ({ memberEmail }
 
   if (isLoading) {
     return (
-      <div className="p-4 bg-gray-50 dark:bg-white/5 rounded-lg">
+      <div className="p-4 bg-gray-50 dark:bg-white/5 rounded-xl">
         <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400 text-sm">
           <span className="material-symbols-outlined animate-spin text-base">progress_activity</span>
           Loading group billing info...
@@ -318,7 +318,7 @@ const GroupBillingManager: React.FC<GroupBillingManagerProps> = ({ memberEmail }
 
   return (
     <div className="space-y-4">
-      <div className="p-4 bg-gray-50 dark:bg-white/5 rounded-lg">
+      <div className="p-4 bg-gray-50 dark:bg-white/5 rounded-xl">
         <div className="flex items-center gap-2 mb-4">
           <span className="material-symbols-outlined text-primary dark:text-white text-lg">groups</span>
           <p className="text-sm font-semibold text-primary dark:text-white">Group Billing</p>
@@ -520,7 +520,7 @@ const GroupBillingManager: React.FC<GroupBillingManagerProps> = ({ memberEmail }
               <div className="mb-4 p-3 bg-primary/5 dark:bg-white/5 rounded-lg">
                 <div className="flex items-center gap-2 mb-1">
                   <span className="material-symbols-outlined text-primary dark:text-accent text-sm">credit_card</span>
-                  <p className="text-xs font-semibold text-primary/60 dark:text-white/60 uppercase tracking-wide">
+                  <p className="text-xs font-semibold text-primary/60 dark:text-white/60 uppercase tracking-widest">
                     {isCorporateGroup ? 'Account Owner' : 'Primary Payer'}
                   </p>
                 </div>
@@ -541,7 +541,7 @@ const GroupBillingManager: React.FC<GroupBillingManagerProps> = ({ memberEmail }
 
               <div className="mb-3">
                 <div className="flex items-center justify-between mb-2">
-                  <p className="text-xs font-semibold text-primary/60 dark:text-white/60 uppercase tracking-wide">
+                  <p className="text-xs font-semibold text-primary/60 dark:text-white/60 uppercase tracking-widest">
                     {isCorporateGroup && familyGroup.maxSeats
                       ? `${familyGroup.members.length + 1} of ${familyGroup.maxSeats} seats filled`
                       : `Group Members (${familyGroup.members.length})`}

@@ -330,7 +330,7 @@ const TeamTab: React.FC = () => {
   if (!isAdmin) {
     return (
       <AnimatedPage>
-        <div className="bg-white dark:bg-surface-dark rounded-2xl p-8 border border-gray-200 dark:border-white/25 text-center animate-content-enter-delay-1">
+        <div className="bg-white dark:bg-surface-dark rounded-xl p-8 border border-gray-200 dark:border-white/25 text-center animate-content-enter-delay-1">
           <span className="material-symbols-outlined text-6xl mb-4 text-gray-400 dark:text-white/40">lock</span>
           <h3 className="text-lg font-bold text-primary dark:text-white mb-2">Admin Access Required</h3>
           <p className="text-sm text-gray-500 dark:text-gray-400">
@@ -343,7 +343,7 @@ const TeamTab: React.FC = () => {
 
   return (
     <AnimatedPage>
-      <div className="bg-white/60 dark:bg-white/5 backdrop-blur-lg rounded-2xl p-6 border border-primary/10 dark:border-white/20 animate-content-enter-delay-1">
+      <div className="bg-white/60 dark:bg-white/5 backdrop-blur-lg rounded-xl p-6 border border-primary/10 dark:border-white/20 animate-content-enter-delay-1">
         <div className="flex items-center justify-between mb-4">
           <div>
             <h3 className="text-lg font-bold text-primary dark:text-white">Manage Team</h3>
