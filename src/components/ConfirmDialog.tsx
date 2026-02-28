@@ -24,22 +24,25 @@ interface ConfirmDialogState extends ConfirmDialogOptions {
 
 const variantStyles = {
   danger: {
-    light: 'bg-red-500 hover:bg-red-600 active:bg-red-700',
-    dark: 'bg-red-600 hover:bg-red-700 active:bg-red-800',
+    light: 'bg-red-500/15 text-red-600 hover:bg-red-500/25',
+    dark: 'bg-red-500/20 text-red-400 hover:bg-red-500/30',
     icon: 'error',
-    iconColor: 'text-red-500'
+    iconColor: 'text-red-500',
+    spinnerBorder: 'border-red-600/30 border-t-red-600 dark:border-red-400/30 dark:border-t-red-400'
   },
   warning: {
-    light: 'bg-amber-500 hover:bg-amber-600 active:bg-amber-700',
-    dark: 'bg-amber-600 hover:bg-amber-700 active:bg-amber-800',
+    light: 'bg-amber-500/15 text-amber-600 hover:bg-amber-500/25',
+    dark: 'bg-amber-500/20 text-amber-400 hover:bg-amber-500/30',
     icon: 'warning',
-    iconColor: 'text-amber-500'
+    iconColor: 'text-amber-500',
+    spinnerBorder: 'border-amber-600/30 border-t-amber-600 dark:border-amber-400/30 dark:border-t-amber-400'
   },
   info: {
-    light: 'bg-blue-500 hover:bg-blue-600 active:bg-blue-700',
-    dark: 'bg-blue-600 hover:bg-blue-700 active:bg-blue-800',
+    light: 'bg-blue-500/15 text-blue-600 hover:bg-blue-500/25',
+    dark: 'bg-blue-500/20 text-blue-400 hover:bg-blue-500/30',
     icon: 'info',
-    iconColor: 'text-blue-500'
+    iconColor: 'text-blue-500',
+    spinnerBorder: 'border-blue-600/30 border-t-blue-600 dark:border-blue-400/30 dark:border-t-blue-400'
   }
 };
 
@@ -230,8 +233,8 @@ function ConfirmDialogComponent({
                     transition-all duration-fast ease-out
                     disabled:opacity-50 disabled:cursor-not-allowed tactile-btn
                     ${isDark 
-                      ? 'bg-white/10 hover:bg-white/15 active:bg-white/20 text-white border border-white/10' 
-                      : 'bg-gray-100 hover:bg-gray-200 active:bg-gray-300 text-gray-700 border border-gray-200'
+                      ? 'text-white/70 hover:bg-white/5 active:bg-white/10' 
+                      : 'text-primary/70 hover:bg-primary/5 active:bg-primary/10'
                     }
                   `}
                 >
@@ -244,7 +247,7 @@ function ConfirmDialogComponent({
                   onClick={handleConfirm}
                   disabled={isLoading}
                   className={`
-                    flex-1 px-4 py-3 rounded-xl font-medium text-sm text-white
+                    flex-1 px-4 py-3 rounded-xl font-medium text-sm
                     transition-all duration-fast ease-out
                     disabled:opacity-70 disabled:cursor-not-allowed tactile-btn
                     ${isDark ? variantConfig.dark : variantConfig.light}
@@ -253,7 +256,7 @@ function ConfirmDialogComponent({
                 >
                   {isLoading ? (
                     <>
-                      <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      <span className={`w-4 h-4 border-2 rounded-full animate-spin ${variantConfig.spinnerBorder}`} />
                       <span>Loading...</span>
                     </>
                   ) : (

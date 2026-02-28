@@ -233,12 +233,20 @@ export function SwipeableListItem({
       {/* Card container - no overflow-hidden so border shows fully */}
       <div
         className={`relative ${isTransitioning ? 'transition-transform duration-fast ease-out' : ''}`}
-        style={{ transform: `translateX(${translateX}px)`, zIndex: 2 }}
+        style={{
+          transform: `translateX(${translateX}px)${translateX !== 0 && !isTransitioning ? ' scale(1.02)' : ''}`,
+          boxShadow: translateX !== 0 && !isTransitioning ? '0 8px 24px rgba(0,0,0,0.12)' : 'none',
+          zIndex: 2,
+          transition: isTransitioning ? undefined : 'box-shadow 0.15s ease'
+        }}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
         onClick={translateX !== 0 ? close : undefined}
       >
+        {translateX !== 0 && !isTransitioning && (
+          <div className="absolute inset-0 rounded-xl bg-black/5 dark:bg-white/[0.08] pointer-events-none" style={{ zIndex: 3 }} />
+        )}
         {children}
       </div>
     </div>

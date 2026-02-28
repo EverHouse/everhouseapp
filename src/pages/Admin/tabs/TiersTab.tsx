@@ -1072,6 +1072,7 @@ const TiersTab: React.FC = () => {
                                                         checked={feature.values[selectedTier.id]?.value === true}
                                                         onChange={(val) => debouncedUpdateFeatureValue(feature.id, selectedTier.id, val)}
                                                         label={feature.displayLabel}
+                                                        loading={updateFeatureValueMutation.isPending}
                                                     />
                                                 ) : feature.valueType === 'number' ? (
                                                     <input

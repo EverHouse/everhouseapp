@@ -157,3 +157,78 @@ export function logApiError(context: string, details: ApiErrorDetails): void {
     requestId: details.requestId
   });
 }
+
+const backendErrorPatterns: Array<{ test: (msg: string) => boolean; friendly: string }> = [
+  {
+    test: (msg) => /unique.?constraint|duplicate key|UNIQUE_CONSTRAINT/i.test(msg),
+    friendly: 'This record already exists. Please try a different value.',
+  },
+  {
+    test: (msg) => /foreign.?key|violates foreign key|FOREIGN_KEY/i.test(msg),
+    friendly: 'This item is referenced by other records and cannot be modified.',
+  },
+  {
+    test: (msg) => /not.?null|null value in column|NOT_NULL/i.test(msg),
+    friendly: 'A required field is missing. Please fill in all required fields.',
+  },
+  {
+    test: (msg) => /check.?constraint|CHECK_CONSTRAINT/i.test(msg),
+    friendly: "The provided value doesn't meet the requirements. Please check and try again.",
+  },
+  {
+    test: (msg) => /timeout|ETIMEDOUT|ECONNREFUSED/i.test(msg),
+    friendly: 'The server is taking too long to respond. Please try again.',
+  },
+  {
+    test: (msg) => /stripe/i.test(msg) && /card|declined/i.test(msg),
+    friendly: 'Your payment could not be processed. Please check your card details.',
+  },
+  {
+    test: (msg) => /^Internal/i.test(msg) || /stack|at \//i.test(msg),
+    friendly: 'Something went wrong. Please try again or contact support.',
+  },
+];
+
+/**
+ * Translate common backend error strings to user-friendly messages.
+ * Returns the original message if no pattern matches.
+ */
+export function mapBackendError(message: string): string {
+  for (const pattern of backendErrorPatterns) {
+    if (pattern.test(message)) {
+      return pattern.friendly;
+    }
+  }
+  return message;
+}
+
+/**
+ * Extract error from API response, map it through backend error patterns,
+ * and return a user-friendly string.
+ *
+ * Fallback chain: extractApiError → mapBackendError → getApiErrorMessage (status-based) → generic fallback.
+ */
+export async function extractUserFriendlyError(response: Response, context?: string): Promise<string> {
+  let rawMessage: string | null = null;
+
+  try {
+    const body = await response.clone().json();
+    if (body.error && typeof body.error === 'string') {
+      rawMessage = body.error;
+    } else if (body.message && typeof body.message === 'string') {
+      rawMessage = body.message;
+    }
+  } catch {
+    // Response body is not JSON or already consumed
+  }
+
+  if (rawMessage) {
+    const mapped = mapBackendError(rawMessage);
+    if (mapped !== rawMessage) {
+      return mapped;
+    }
+    return rawMessage;
+  }
+
+  return getApiErrorMessage(response, context);
+}

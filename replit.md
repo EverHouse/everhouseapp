@@ -1,7 +1,7 @@
 # Ever Club Members App
 
 ## Overview
-The Ever Club Members App is a private members club application designed for golf and wellness centers. It aims to be a central digital hub for managing golf simulator bookings, wellness service appointments, and club events. The project's vision is to enhance member satisfaction and operational efficiency for private clubs through comprehensive membership management, facility booking, and community-building tools.
+The Ever Club Members App is a private members club application for golf and wellness centers. Its purpose is to serve as a central digital hub for managing golf simulator bookings, wellness service appointments, and club events. The project aims to enhance member satisfaction and operational efficiency through comprehensive membership management, facility booking, and community-building tools.
 
 ## User Preferences
 - **Communication Style**: The founder is non-technical. Always explain changes in plain English, focusing on the business/member impact. Avoid unnecessary technical jargon.
@@ -11,58 +11,55 @@ The Ever Club Members App is a private members club application designed for gol
 
 ### Core Architecture
 - **Naming Conventions**: `snake_case` for PostgreSQL tables/columns; `camelCase` for Drizzle schemas, API JSON payloads, and React/TypeScript frontend. Raw database rows must not be exposed in API responses.
-- **Type Safety**: Fix underlying schemas or DTOs to resolve TypeScript mismatches; `as any`, `Record<string, any>`, and `as Record<string, unknown>` are forbidden (codebase has 0 of each). All raw SQL `db.execute()` results must be typed with per-query row interfaces and cast via `as unknown as RowType[]`. Stripe SDK expanded properties use typed interfaces (e.g., `StripeInvoiceExpanded`, `StripeSubscriptionExpanded`). HubSpot responses use typed contact/result interfaces. Integration settings use typed `IntegrationSettings`/`OAuthCredentials` interfaces. Error objects use typed error interfaces (e.g., `HubSpotErrorObject`, `EarlyReturnError`). The codebase maintains 0 TypeScript errors. Only 3 intentional `: any` remain (logger index signature, 2 Drizzle auto-seed functions with eslint-disable). Only 2 intentional `as unknown as Record<string, boolean | ...>` remain (TiersTab dynamic field access).
-- **Database Interaction**: Use Drizzle ORM query builders or parameterized `sql` template literals for all SQL queries; raw string-interpolated SQL is forbidden.
+- **Type Safety**: Strict TypeScript with zero errors, disallowing `as any` and similar constructs. All raw SQL results must be typed, and Stripe/HubSpot integrations use specific typed interfaces.
+- **Database Interaction**: Drizzle ORM query builders or parameterized `sql` template literals are mandatory; raw string-interpolated SQL is forbidden.
 - **Timezone**: All date/time operations must explicitly use Pacific Time (`America/Los_Angeles`).
 - **Audit Logging**: All staff actions must be logged.
 - **API/Frontend Consistency**: API response field names must align exactly with frontend TypeScript interfaces.
-- **Database & Data Integrity**: Uses PostgreSQL, Supabase Realtime, and Drizzle ORM with CASCADE constraints.
-- **Real-time Updates**: Implements WebSocket broadcasting for booking and invoice changes. Supabase Realtime subscriptions cover `notifications`, `booking_sessions`, `announcements`, and `trackman_unmatched_bookings` tables. Staff Command Center uses React Query (`useCommandCenterQueries.ts`) with WebSocket-driven cache invalidation via `useWebSocketQuerySync.ts` — no polling. `commandCenterKeys` factory in `src/hooks/queries/useCommandCenterQueries.ts` defines query keys; all hooks use `placeholderData: keepPreviousData` for anti-flicker.
-- **Member Dashboard**: Member schedule uses a chronological card layout with rich visual cards for bookings, events, and wellness sessions. Cards show player count, start/end times, and "Add to Calendar" functionality.
+- **Database & Data Integrity**: PostgreSQL, Supabase Realtime, and Drizzle ORM with CASCADE constraints.
+- **Real-time Updates**: WebSocket broadcasting for booking and invoice changes, powered by Supabase Realtime subscriptions. Staff Command Center uses React Query with WebSocket-driven cache invalidation.
+- **Member Dashboard**: Features a chronological card layout for bookings, events, and wellness sessions with "Add to Calendar" functionality.
 
 ### UI/UX & Frontend
-- **Design System**: Liquid Glass UI system, utilizing Tailwind CSS v4 and supporting dark mode.
-- **Interactions**: Features spring-physics for motion and drag-to-dismiss functionality.
+- **Design System**: Liquid Glass UI system using Tailwind CSS v4, supporting dark mode, with spring-physics motion and drag-to-dismiss functionality.
 - **Technology Stack**: React 19, Vite, and state management using Zustand/TanStack libraries.
-- **Component Design**: Sheets and modals follow a structure of a Header, a scrollable Body for content, and a Sticky Footer for actions.
-- **Button Hierarchy**: Differentiates between primary, secondary, and destructive actions.
-- **Accessibility**: Adheres to WCAG conventions including skip navigation, focus trapping, proper roles and attributes for interactive elements (e.g., `role="button"`, `role="combobox"`), form labels, and image alt text. Accent text color on light surfaces uses `text-accent-dark` (#8B6FA8, 4.7:1 on bone) instead of `text-accent` (#CCB8E4, 1.7:1 — fails WCAG). Dark mode uses `text-accent` (6.6:1 on dark green). Pattern: `text-accent-dark dark:text-accent`. Form validation uses semantic `error` color token (red-600/#DC2626) instead of amber. `IconButton` component (`src/components/ui/IconButton.tsx`) enforces `aria-label` as required prop. Toasts positioned bottom-center (mobile) / bottom-left (desktop) per M3 Snackbar spec.
+- **Component Design**: Sheets and modals follow a Header, scrollable Body, and Sticky Footer structure. Button hierarchy differentiates primary, secondary, and destructive actions.
+- **Accessibility**: Adheres to WCAG conventions including skip navigation, focus trapping, proper roles/attributes, form labels, and image alt text. Specific color token usage for accessibility.
+- **M3 Components**: Custom `SegmentedButton` and `Chip` components supporting M3 design principles, light/dark mode, and touch targets.
+- **Interaction Polish**: Enhanced visual feedback for interactive elements like `SwipeableListItem`, `SlideUpDrawer`, `Toggle`, and `ConfirmDialog`.
+- **Mutation Patterns**: `useAppMutation` hook provides automatic success/error toasts, haptic feedback, optimistic updates with rollback, and query invalidation. Error messages are mapped to user-friendly strings.
 
 ### Core Domain Features
-- **Booking & Scheduling**: Implements a "Request & Hold" model, unified participant management, calendar synchronization, and an auto-complete scheduler. Booking conflicts are checked against all 6 active booking statuses. Trackman Booking Update webhooks handle creation, cancellation, AND modification — when staff move a booking to a different bay or adjust the time in Trackman, the app auto-updates the booking, session, fees, and invoice.
-- **Fees & Billing**: Features a unified fee service, dynamic pricing, prepayment, and guest fees, based on a "one invoice per booking" architecture. Supports dual payment paths (Stripe PaymentIntent for online, draft Stripe invoice for auto-approvals) and handles existing payments. Invoice lifecycle transitions through Draft, Finalize, and Pay/Void. Fee recalculation is triggered by roster changes and cascades to later same-day bookings. Roster is locked after invoice payment — admin override with logged reason required for post-payment changes. Credit balances are properly restored on booking cancellation refunds.
-- **Member Lifecycle**: Includes membership tiers, QR/NFC check-in, and onboarding processes. QR scan (`MEMBER:<uuid>`) auto-detects today's bookings — if found, routes to booking check-in (with Unified Booking Sheet for outstanding fees) instead of walk-in check-in. Confirmation modal shows booking details (bay, time, resource type) on success.
-- **Error Handling**: Empty catch blocks are prohibited; all `catch` blocks must re-throw, log, or use `safeDbOperation()`.
+- **Booking & Scheduling**: "Request & Hold" model, unified participant management, calendar synchronization, and auto-complete scheduler. Handles booking conflicts and auto-updates from Trackman webhooks.
+- **Fees & Billing**: Unified fee service, dynamic pricing, prepayment, and guest fees based on a "one invoice per booking" architecture. Supports dual payment paths and handles existing payments. Roster changes trigger fee recalculation, and payment locks the roster.
+- **Member Lifecycle**: Membership tiers, QR/NFC check-in, and onboarding processes. QR scans intelligently route to booking check-in or walk-in.
+- **Error Handling**: Prohibits empty catch blocks; all must re-throw, log, or use `safeDbOperation()`.
 - **Authentication**: All mutating API routes require authentication.
-- **Rate Limiting**: All public endpoints creating database records are rate-limited. Authenticated users get 600 req/min, unauthenticated IP-based traffic gets 2000 req/min.
-- **Scheduler Robustness**: Schedulers (auto-complete, expiry, integrity, auto-fix, cleanup, guest pass reset, refund reconciliation) use `isRunning` flags to prevent concurrent execution, catch-up windows, and claim slots to prevent double runs. They also include alerts for claim failures and handle graceful shutdowns.
-- **Stripe Integration Specifics**: Includes Stripe webhook safety, payment handler logic (auto-refunds, error handling for retries), stable idempotency keys (format: `tier-upgrade-{subId}-{priceId}-{itemId}`), coupon application, and specific requirements for `trial_end` and $0 subscriptions. Daily refund reconciliation (`reconcileDailyRefunds()`) heals split-brain scenarios where Stripe refunds succeed but database isn't updated.
-- **Data Integrity and Consistency**: Prevents double-charging, ensures orphaned invoice cleanup, uses optimistic locking for booking status transitions, and maintains atomicity for critical operations like billing group creation. NaN guards on all numeric route params. Cart item validation enforces non-negative finite `priceCents` and positive integer `quantity`. `usage_ledger.session_id` has an `ON DELETE CASCADE` FK to `booking_sessions.id`, preventing orphaned ledger entries. Tours sync exclusively from HubSpot Meetings (Google Calendar is only used for availability checks and creating calendar events for booked tours, not as a tour source).
-- **Tier Hierarchy Validation**: Startup validates DB membership tier slugs against `TIER_NAMES` in `shared/constants/tiers.ts`, logging drift warnings. Actual tier logic is DB-driven via `getTierLimits()`.
-- **Deferred Webhook Actions**: Post-commit webhook side-effects (notifications, HubSpot sync) log event context (`eventId`, `eventType`) for production debuggability.
-- **WebSocket Robustness**: Includes periodic session revalidation, cryptographic verification of session cookies, reconnect jitter, and guards against duplicate socket registrations.
-- **Supabase Hardening**: Frontend client sets `eventsPerSecond: 100` to prevent quota disconnects during batch updates. Realtime hook uses refs for optional callbacks to prevent re-subscription churn. Server anon client enforces `SUPABASE_ANON_KEY` presence (no empty-string fallback). ALL server-side Supabase network calls are wrapped with `Promise.race` / `withTimeout()` (10s) to prevent hangs on dropped connections — this includes `createSupabaseToken` (3 admin auth calls), all 6 Supabase auth route handlers in `server/supabase/auth.ts`, the `isSupabaseAuthenticated` middleware, the heartbeat scheduler, and `enableRealtimeForTable`. `server/supabase/auth.ts` delegates to the centralized singleton in `server/core/supabase/client.ts`. Only 3 `createClient()` calls exist: frontend singleton (`src/lib/supabase.ts`), server admin singleton, and server anon singleton (both in `server/core/supabase/client.ts`). Vite watcher ignores `.local/`, `.agents/`, `replit.nix`, and `.git/`.
+- **Rate Limiting**: Public endpoints creating database records are rate-limited.
+- **Scheduler Robustness**: Schedulers use `isRunning` flags, catch-up windows, and claim slots to prevent concurrent execution, with alerts for failures.
+- **Stripe Integration Specifics**: Includes webhook safety, payment handler logic (auto-refunds, idempotency keys), coupon application, and specific requirements for `trial_end` and $0 subscriptions. Daily refund reconciliation mechanism.
+- **Data Integrity and Consistency**: Prevents double-charging, ensures orphaned invoice cleanup, uses optimistic locking for booking status transitions, and maintains atomicity for critical operations. Strict validation for numeric parameters and cart items. `usage_ledger` has `ON DELETE CASCADE` to `booking_sessions`.
+- **Tier Hierarchy Validation**: Startup validates DB membership tier slugs against `TIER_NAMES`.
+- **Deferred Webhook Actions**: Post-commit webhook side-effects log event context for debuggability.
+- **WebSocket Robustness**: Features periodic session revalidation, cryptographic verification, reconnect jitter, and guards against duplicate socket registrations.
+- **Supabase Hardening**: Frontend client configures `eventsPerSecond`. Realtime hook uses refs for optional callbacks. Server-side Supabase network calls are wrapped with `Promise.race` / `withTimeout()` to prevent hangs. Limited and controlled `createClient()` calls.
 
-## Web Performance & Security
-- **Google Fonts**: Newsreader (variable serif, opsz 6–72, wght 200–800) and Instrument Sans (variable sans-serif, wght 400–700) loaded non-render-blocking via `media="print" onload` pattern with `font-display: swap` fallback. Luxury editorial aesthetic using four CSS variable roles: `--font-display` (Newsreader, -0.03em tracking, optical sizing) for hero/page titles, `--font-headline` (Newsreader, -0.02em tracking) for section headings, `--font-body` (Instrument Sans, weight 430, line-height 1.5) for body text/tables/lists, `--font-label` (Instrument Sans, weight 600, uppercase, 0.1em tracking) for nav links/buttons/tabs/badges. Global element selectors (h1-h6, p, li, td, nav a, button) cascade the system app-wide. Portal header bar titles use `--font-label` with `text-xl font-light uppercase tracking-[0.3em] translate-y-[1px]` for an architectural luxury index style.
-- **Typography Hierarchy**: Page Titles (Header Bar) = `text-xl font-light uppercase tracking-[0.3em] var(--font-label)`. Hero Titles = `text-5xl var(--font-display) leading-none`. Section Headers = `text-2xl var(--font-headline) leading-tight`. Body Text = `text-base var(--font-body) leading-relaxed`. Optical nudge = `translate-y-[1px]` for serif text next to icons.
-- **Edge-to-Edge Hover Pattern**: Card wrappers use `px-0 overflow-hidden` (zero horizontal padding); card headers use `px-6`; interactive rows (`GlassListRow`, Profile `Row`) use `py-3 px-6 w-full hover:bg-*`. The `glass-card` CSS default padding (`1.5rem`) only applies when no `p-*` class is present — use `p-0` on card wrappers containing row lists.
-- **Geometry Standards**: All cards/panels = `rounded-xl` (12px via `--liquid-radius: 12px`). All buttons/tags = `rounded-[4px]`. Tags must be `w-fit px-2 uppercase tracking-widest`. Header bar = `h-20` (80px) on all portals. Vertical rhythm = `gap-6` or `gap-8` between major sections.
-- **Sidebar Navigation**: All nav links use `var(--font-label)` (Instrument Sans), ALL CAPS `text-[11px] uppercase tracking-[0.2em]`. Active state = full opacity + `font-semibold` + `border-l-2 border-[#CCB8E4]` (lavender left border). No rounded pill/bubble backgrounds. Icons `text-[18px]`, text labels `translate-y-[1px]` for optical alignment. Sidebar separated from content by `border-r border-white/10`. Applies to `StaffSidebar.tsx`, `StaffMobileSidebar.tsx`, `MemberMenuOverlay.tsx`. Bottom nav (`MemberBottomNav.tsx`) uses same font treatment with a dot indicator.
-- **Material Symbols**: Icon font lazy-loaded via JavaScript after first paint using `requestAnimationFrame`. Icons hidden via `visibility: hidden` until font loads, then revealed by adding `icons-loaded` class to `<html>`. Prevents FOUC (flash of unstyled icon text).
-- **Splash Screen**: Walking golfer GIF with random tagline, 2-second minimum display. Brand requirement — do not remove.
-- **Hero Image**: Preloaded in `index.html` with `fetchpriority="high"` and server-side `Link` header for production.
-- **HubSpot**: Script deferred via `requestIdleCallback` (falls back to 3s `setTimeout`).
-- **Security Headers**: HSTS with preload, CSP with `upgrade-insecure-requests`, COOP `same-origin-allow-popups` (required for Google GSI popup sign-in), X-Content-Type-Options, X-Frame-Options, Referrer-Policy, Permissions-Policy. All headers sent in all environments.
-- **robots.txt**: Static file (`public/robots.txt`) and server route (`server/index.ts`) kept in sync. Disallow rules listed before Allow.
-- **Crawler Navigation**: Hidden navigation links rendered for search engine crawlers to improve site indexing and discoverability.
-
-## Startup Sequence
-- **Dev script** (`npm run dev`): Pre-flight cleanup (removes Vite cache, kills stale node processes), then uses `concurrently` to run backend (`tsx server/index.ts` on port 3001) and frontend (`vite` on port 5000) side-by-side. The old `dev:all` script with bash `&` operators has been removed.
-- **Workflow**: The "Dev Server" workflow simply runs `npm run dev` and waits for port 5000.
+### Web Performance & Security
+- **Google Fonts**: Newsreader and Instrument Sans loaded non-render-blocking with `font-display: swap` for a luxury editorial aesthetic using specific CSS variable roles.
+- **Typography Hierarchy**: Defined hierarchy for page titles, hero titles, section headers, and body text, with optical nudges.
+- **Edge-to-Edge Hover Pattern**: Consistent styling for card wrappers and interactive rows.
+- **Geometry Standards**: Standardized `rounded-xl` for cards/panels, `rounded-[4px]` for buttons/tags, header bar height, and vertical rhythm.
+- **Sidebar Navigation**: Consistent font treatment, ALL CAPS, and active state styling for all navigation elements.
+- **Material Symbols**: Icon font lazy-loaded via JavaScript with `requestAnimationFrame` to prevent FOUC.
+- **Splash Screen**: Required walking golfer GIF with random tagline, 2-second minimum display.
+- **Hero Image**: Preloaded in `index.html` with `fetchpriority="high"`.
+- **HubSpot**: Script deferred via `requestIdleCallback`.
+- **Security Headers**: HSTS, CSP with `upgrade-insecure-requests`, COOP, X-Content-Type-Options, X-Frame-Options, Referrer-Policy, Permissions-Policy.
+- **robots.txt**: Static file and server route kept in sync with disallow rules.
+- **Crawler Navigation**: Hidden navigation links for search engine indexing.
 
 ## External Dependencies
 - **Stripe**: Payment processing, subscriptions, and webhooks.
-- **HubSpot**: Two-way data synchronization. The app DB is the primary source of truth for membership status, tier, role, and billing provider, with HubSpot providing profile fill-in data.
+- **HubSpot**: Two-way data synchronization for membership and profile data.
 - **Communications**: In-app notifications, push notifications, and email via Resend.
 - **Other**: Trackman (booking CSV/webhooks), Eventbrite, Google Sheets, and OpenAI Vision (ID scanning).

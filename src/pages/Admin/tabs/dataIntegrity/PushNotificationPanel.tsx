@@ -102,6 +102,7 @@ const PushNotificationPanel: React.FC<Props> = ({ isOpen, onToggle }) => {
                   checked={status.pushEnabled}
                   onChange={(checked) => toggleMutation.mutate(checked)}
                   disabled={!status.vapidConfigured || toggleMutation.isPending}
+                  loading={toggleMutation.isPending}
                 />
               </div>
 

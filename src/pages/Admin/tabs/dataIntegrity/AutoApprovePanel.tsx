@@ -73,6 +73,7 @@ const AutoApprovePanel: React.FC<Props> = ({ isOpen, onToggle }) => {
                   checked={config.conferenceRooms}
                   onChange={(checked) => toggleMutation.mutate({ key: 'booking.auto_approve.conference_rooms', enabled: checked })}
                   disabled={toggleMutation.isPending}
+                  loading={toggleMutation.isPending}
                 />
               </div>
 
@@ -85,6 +86,7 @@ const AutoApprovePanel: React.FC<Props> = ({ isOpen, onToggle }) => {
                   checked={config.trackmanImports}
                   onChange={(checked) => toggleMutation.mutate({ key: 'booking.auto_approve.trackman_imports', enabled: checked })}
                   disabled={toggleMutation.isPending}
+                  loading={toggleMutation.isPending}
                 />
               </div>
 

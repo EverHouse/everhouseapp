@@ -218,7 +218,7 @@ export function SlideUpDrawer({
       >
         {!hideHandle && (
           <div className="flex justify-center pt-3 pb-1 cursor-grab active:cursor-grabbing">
-            <div className={`w-10 h-1 rounded-full ${isDark ? 'bg-white/20' : 'bg-gray-300'}`} />
+            <div className={`h-1 rounded-full transition-all duration-200 ease-out ${dragState.isDragging ? 'w-14 bg-[#CCB8E4]' : `w-10 ${isDark ? 'bg-white/20' : 'bg-gray-300'}`}`} />
           </div>
         )}
         

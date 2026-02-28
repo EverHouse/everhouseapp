@@ -178,6 +178,7 @@ const SchedulerMonitorPanel: React.FC<Props> = ({ isOpen, onToggle }) => {
                             onChange={(checked) => toggleMutation.mutate({ name: scheduler.taskName, enabled: checked })}
                             size="sm"
                             disabled={isJobQueue || toggleMutation.isPending}
+                            loading={toggleMutation.isPending}
                           />
                         </td>
                       </tr>

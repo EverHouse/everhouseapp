@@ -33,6 +33,7 @@ const GalleryAdmin: React.FC = () => {
     const [previewOrder, setPreviewOrder] = useState<GalleryImage[] | null>(null);
     const originalOrderRef = useRef<GalleryImage[] | null>(null);
     const [reorderError, setReorderError] = useState<string | null>(null);
+    const [togglingId, setTogglingId] = useState<number | null>(null);
     const { startAutoScroll, updatePosition, stopAutoScroll } = useDragAutoScroll();
     const [galleryRef] = useAutoAnimate();
 
@@ -145,6 +146,7 @@ const GalleryAdmin: React.FC = () => {
     };
 
     const handleToggleActive = async (image: GalleryImage) => {
+        setTogglingId(image.id);
         try {
             const res = await fetch(`/api/admin/gallery/${image.id}`, {
                 method: 'PUT',
@@ -158,6 +160,8 @@ const GalleryAdmin: React.FC = () => {
             }
         } catch (err: unknown) {
             console.error('Failed to toggle status:', err);
+        } finally {
+            setTogglingId(null);
         }
     };
 
@@ -433,13 +437,16 @@ const GalleryAdmin: React.FC = () => {
                                     <div className="flex items-center gap-2 mt-2 pt-2 border-t border-gray-200 dark:border-white/25">
                                         <button 
                                             onClick={() => handleToggleActive(image)}
+                                            disabled={togglingId === image.id}
                                             className={`tactile-btn flex-1 py-1.5 min-h-[44px] rounded-lg text-xs font-semibold transition-colors ${
+                                                togglingId === image.id ? 'opacity-60 animate-pulse pointer-events-none' : ''
+                                            } ${
                                                 image.isActive 
                                                     ? 'bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-900/30' 
                                                     : 'bg-gray-100 dark:bg-white/10 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-white/15'
                                             }`}
                                         >
-                                            {image.isActive ? 'Active' : 'Inactive'}
+                                            {togglingId === image.id ? 'Updating...' : image.isActive ? 'Active' : 'Inactive'}
                                         </button>
                                         <button 
                                             onClick={() => openEdit(image)}

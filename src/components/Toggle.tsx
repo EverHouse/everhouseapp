@@ -5,6 +5,7 @@ interface ToggleProps {
   checked: boolean;
   onChange: (checked: boolean) => void;
   disabled?: boolean;
+  loading?: boolean;
   size?: 'sm' | 'md';
   label?: string;
   className?: string;
@@ -14,6 +15,7 @@ const Toggle: React.FC<ToggleProps> = ({
   checked,
   onChange,
   disabled = false,
+  loading = false,
   size = 'md',
   label,
   className = '',
@@ -34,7 +36,7 @@ const Toggle: React.FC<ToggleProps> = ({
   const { track, thumb, translate } = sizes[size];
 
   const handleClick = () => {
-    if (!disabled) {
+    if (!disabled && !loading) {
       haptic.light();
       onChange(!checked);
     }
@@ -46,14 +48,16 @@ const Toggle: React.FC<ToggleProps> = ({
       role="switch"
       aria-checked={checked}
       aria-label={label}
+      aria-busy={loading || undefined}
       disabled={disabled}
       onClick={handleClick}
       className={`
         relative inline-flex items-center ${track} shrink-0 rounded-full p-[2px]
         border-2 transition-colors duration-fast ease-in-out tactile-btn
         focus:outline-none focus-visible:ring-2 focus-visible:ring-[#34C759]/50 focus-visible:ring-offset-2
-        ${disabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}
+        ${disabled ? 'opacity-40 cursor-not-allowed' : loading ? 'opacity-60 pointer-events-none' : 'cursor-pointer'}
         ${checked ? 'bg-[#34C759] border-[#34C759]' : 'bg-[#E5E5EA] border-[#E5E5EA]'}
+        ${loading ? 'animate-pulse' : ''}
         ${className}
       `}
     >
