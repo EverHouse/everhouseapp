@@ -34,14 +34,20 @@ const FILTER_TABS: { id: ActivityFilter; label: string; icon: string }[] = [
   { id: 'visits', label: 'Visits', icon: 'check_circle' },
 ];
 
-const formatDatePacific = (dateStr: string | null | undefined): string => {
+const formatDatePacific = (dateStr: string | Date | null | undefined): string => {
   if (!dateStr) return '';
   try {
-    const normalizedDate = dateStr.includes('T') ? dateStr : `${dateStr}T12:00:00`;
-    const d = new Date(normalizedDate);
+    let d: Date;
+    if (dateStr instanceof Date) {
+      d = dateStr;
+    } else {
+      const normalizedDate = dateStr.includes('T') ? dateStr : `${dateStr}T12:00:00`;
+      d = new Date(normalizedDate);
+    }
+    if (isNaN(d.getTime())) return '';
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'America/Los_Angeles' });
   } catch {
-    return dateStr || '';
+    return typeof dateStr === 'string' ? dateStr : '';
   }
 };
 
@@ -176,10 +182,11 @@ const MemberActivityTab: React.FC<MemberActivityTabProps> = ({
 
     (visitHistory || []).filter((v: VisitHistoryItem & { isWalkIn?: boolean }) => v.isWalkIn).forEach((visit: VisitHistoryItem) => {
       const dateStr = (visit as VisitHistoryItem & { bookingDate?: string }).bookingDate || visit.visit_date;
+      const parsed = dateStr ? new Date(dateStr.includes('T') ? dateStr : `${dateStr}T12:00:00`) : new Date();
       activities.push({
         id: `walkin-${visit.id}`,
         type: 'visit',
-        date: new Date(dateStr),
+        date: isNaN(parsed.getTime()) ? new Date() : parsed,
         data: { ...visit, role: 'Walk-in' } as VisitHistoryItem & { role: string },
       });
     });

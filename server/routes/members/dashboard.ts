@@ -464,6 +464,13 @@ router.get('/api/member/dashboard-data', isAuthenticated, async (req, res) => {
             WHERE LOWER(er.user_email) = ${userEmail}
               AND e.event_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
               AND er.status NOT IN ('cancelled')
+
+            UNION ALL
+
+            SELECT wiv.id
+            FROM walk_in_visits wiv
+            WHERE LOWER(wiv.member_email) = ${userEmail}
+              AND wiv.created_at::date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
           ) visits
         `);
         const rows = result.rows as Record<string, unknown>[];

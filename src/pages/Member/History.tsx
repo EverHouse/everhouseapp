@@ -17,8 +17,8 @@ import { useAutoAnimate } from '@formkit/auto-animate/react';
 
 interface UnifiedVisit {
   id: number;
-  type: 'booking' | 'wellness' | 'event';
-  role: 'Host' | 'Player' | 'Guest' | 'Wellness' | 'Event';
+  type: 'booking' | 'wellness' | 'event' | 'walk_in';
+  role: 'Host' | 'Player' | 'Guest' | 'Wellness' | 'Event' | 'Walk-in';
   date: string;
   startTime: string | null;
   endTime: string | null;
@@ -111,6 +111,8 @@ const History: React.FC = () => {
         return isDark ? 'bg-purple-500/20 text-purple-300' : 'bg-purple-100 text-purple-700';
       case 'Event':
         return isDark ? 'bg-pink-500/20 text-pink-300' : 'bg-pink-100 text-pink-700';
+      case 'Walk-in':
+        return isDark ? 'bg-emerald-500/20 text-emerald-300' : 'bg-emerald-100 text-emerald-700';
       default:
         return isDark ? 'bg-white/10 text-white/70' : 'bg-gray-100 text-gray-700';
     }
@@ -119,6 +121,7 @@ const History: React.FC = () => {
   const getRoleIcon = (role: string, type: string): string => {
     if (type === 'wellness') return 'spa';
     if (type === 'event') return 'celebration';
+    if (type === 'walk_in') return 'qr_code_scanner';
     switch (role) {
       case 'Host':
         return 'person';
@@ -212,7 +215,7 @@ const History: React.FC = () => {
                       </div>
                       <p className={`text-sm flex items-center gap-1 ${isDark ? 'text-white/70' : 'text-primary/70'}`}>
                         <span className="material-symbols-outlined text-sm">
-                          {visit.type === 'wellness' ? 'spa' : visit.type === 'event' ? 'location_on' : isConferenceRoom ? 'meeting_room' : 'golf_course'}
+                          {visit.type === 'walk_in' ? 'qr_code_scanner' : visit.type === 'wellness' ? 'spa' : visit.type === 'event' ? 'location_on' : isConferenceRoom ? 'meeting_room' : 'golf_course'}
                         </span>
                         {visit.resourceName}
                       </p>
@@ -232,6 +235,12 @@ const History: React.FC = () => {
                         <p className={`text-xs mt-2 flex items-center gap-1 ${isDark ? 'text-blue-300/80' : 'text-blue-600'}`}>
                           <span className="material-symbols-outlined text-xs">person</span>
                           Played with {visit.invitedBy}
+                        </p>
+                      )}
+                      {visit.role === 'Walk-in' && visit.invitedBy && (
+                        <p className={`text-xs mt-1 flex items-center gap-1 ${isDark ? 'text-emerald-300/80' : 'text-emerald-600'}`}>
+                          <span className="material-symbols-outlined text-xs">badge</span>
+                          Checked in by {visit.invitedBy}
                         </p>
                       )}
                       {visit.role === 'Wellness' && visit.invitedBy && (

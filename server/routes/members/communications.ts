@@ -290,6 +290,23 @@ router.get('/api/my-visits', isAuthenticated, async (req, res) => {
         WHERE LOWER(er.user_email) = ${targetEmail}
           AND e.event_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
           AND er.status NOT IN ('cancelled')
+        
+        UNION ALL
+        
+        SELECT 
+          wiv.id as visit_id,
+          'walk_in' as visit_type,
+          'Walk-in' as role,
+          wiv.created_at::date::text as date,
+          TO_CHAR(wiv.created_at, 'HH24:MI:SS') as start_time,
+          NULL as end_time,
+          'Walk-in Visit' as resource_name,
+          NULL as location,
+          NULL as category,
+          wiv.checked_in_by_name as invited_by
+        FROM walk_in_visits wiv
+        WHERE LOWER(wiv.member_email) = ${targetEmail}
+          AND wiv.created_at::date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
       ) all_visits
       ORDER BY visit_type, visit_id, date DESC
     `);
