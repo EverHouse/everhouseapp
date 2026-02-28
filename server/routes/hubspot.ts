@@ -1485,7 +1485,12 @@ router.post('/api/hubspot/webhooks', async (req, res) => {
                     const memberTier = existingUser?.tier || 'Unknown';
 
                     const nonNotifiableStatuses = ['non-member', 'visitor', 'lead'];
-                    const changeSource = hasMindbodyId ? 'via MindBody' : (isStripeProtected ? 'via Stripe' : 'via HubSpot');
+                    const billingProvider = existingUser?.billing_provider;
+                    const changeSource = hasMindbodyId || billingProvider === 'mindbody'
+                      ? 'via MindBody'
+                      : billingProvider === 'stripe' || isStripeProtected
+                        ? 'via Stripe'
+                        : 'via App';
                     if (prevStatus && !nonNotifiableStatuses.includes(prevStatus) && newStatus === 'non-member') {
                       await notifyAllStaff(
                         'Member Status Changed',
