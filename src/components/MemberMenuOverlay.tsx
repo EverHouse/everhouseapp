@@ -173,7 +173,7 @@ const MemberMenuOverlay: React.FC<MemberMenuOverlayProps> = ({ isOpen, onClose }
                 </button>
             </div>
             
-            <nav className="flex flex-col gap-1 flex-1 overflow-y-auto scrollbar-hide py-2 px-2">
+            <nav className="flex flex-col gap-0.5 flex-1 overflow-y-auto scrollbar-hide py-2 px-2">
               {MEMBER_MENU_ITEMS.map((item, index) => (
                 <MemberMenuLink
                   key={item.id}
@@ -192,14 +192,15 @@ const MemberMenuOverlay: React.FC<MemberMenuOverlayProps> = ({ isOpen, onClose }
                   haptic.light();
                   setShowBugReport(true);
                 }}
-                className={`tactile-row w-full flex items-center gap-4 px-4 py-3.5 rounded-xl text-left text-base font-medium transition-all duration-normal leading-tight min-h-[48px] ${
+                style={{ fontFamily: 'var(--font-label)' }}
+                className={`tactile-row w-full flex items-center gap-4 px-4 py-3.5 text-left transition-all duration-normal leading-tight min-h-[48px] border-l-2 border-transparent ${
                   isDark 
-                    ? 'text-[#F2F2EC]/60 hover:text-[#F2F2EC] hover:bg-white/5' 
-                    : 'text-[#293515]/60 hover:text-[#293515] hover:bg-black/5'
+                    ? 'text-[#F2F2EC]/50 hover:text-[#F2F2EC]/80' 
+                    : 'text-[#293515]/50 hover:text-[#293515]/80'
                 }`}
               >
-                <span className="material-symbols-outlined text-xl">bug_report</span>
-                <span>Report a Bug</span>
+                <span className="material-symbols-outlined text-[18px]">bug_report</span>
+                <span className="text-[11px] uppercase tracking-[0.2em] translate-y-[1px]">Report a Bug</span>
               </button>
             </div>
         </div>
@@ -240,41 +241,25 @@ const MemberMenuLink: React.FC<MemberMenuLinkProps> = ({ item, isActive, onClick
       type="button"
       onClick={onClick}
       onPointerUp={handlePointerUp}
-      style={{ '--stagger-index': staggerIndex, touchAction: 'manipulation', animationFillMode: 'both' } as React.CSSProperties}
-      className={`tactile-row relative flex items-center gap-4 px-4 py-3.5 rounded-xl text-left text-base font-medium transition-all duration-normal animate-slide-up-stagger leading-tight min-h-[48px] ${
+      style={{ '--stagger-index': staggerIndex, touchAction: 'manipulation', animationFillMode: 'both', fontFamily: 'var(--font-label)' } as React.CSSProperties}
+      className={`tactile-row flex items-center gap-4 px-4 py-3.5 text-left transition-all duration-normal animate-slide-up-stagger leading-tight min-h-[48px] ${
         isActive
           ? isDark 
-            ? 'text-[#F2F2EC]' 
-            : 'text-[#293515]'
+            ? 'text-[#F2F2EC] font-semibold border-l-2 border-[#CCB8E4]' 
+            : 'text-[#293515] font-semibold border-l-2 border-[#293515]'
           : isDark 
-            ? 'text-[#F2F2EC]/60 hover:text-[#F2F2EC] hover:bg-white/5' 
-            : 'text-[#293515]/60 hover:text-[#293515] hover:bg-black/5'
+            ? 'text-[#F2F2EC]/50 hover:text-[#F2F2EC]/80 border-l-2 border-transparent' 
+            : 'text-[#293515]/50 hover:text-[#293515]/80 border-l-2 border-transparent'
       }`}
     >
-      <div 
-        className={`absolute inset-0 rounded-xl transition-all duration-normal ${
-          isActive
-            ? isDark 
-              ? 'opacity-100 scale-100 bg-white/10 border border-white/20 shadow-[0_0_20px_rgba(255,255,255,0.08),inset_0_1px_1px_rgba(255,255,255,0.1)]' 
-              : 'opacity-100 scale-100 bg-white/80 border border-black/10 shadow-[0_4px_20px_rgba(0,0,0,0.08),inset_0_1px_1px_rgba(255,255,255,0.8)]'
-            : 'opacity-0 scale-95'
-        } backdrop-blur-md`}
-      />
-
-      <span className={`material-symbols-outlined text-xl relative z-10 ${
+      <span className={`material-symbols-outlined text-[18px] ${
         isActive 
-          ? isDark ? 'text-[#CCB8E4]' : 'text-[#293515]'
+          ? isDark ? 'filled text-[#CCB8E4]' : 'filled text-[#293515]'
           : ''
       }`}>
         {item.icon}
       </span>
-      <span className="relative z-10 flex-1">{item.label}</span>
-      
-      <span className={`relative z-10 w-2 h-2 rounded-full transition-all duration-normal ${
-        isActive 
-          ? isDark ? 'opacity-100 scale-100 bg-[#CCB8E4]' : 'opacity-100 scale-100 bg-[#293515]'
-          : 'opacity-0 scale-0'
-      }`} />
+      <span className="text-[11px] uppercase tracking-[0.2em] translate-y-[1px] flex-1">{item.label}</span>
     </button>
   );
 };

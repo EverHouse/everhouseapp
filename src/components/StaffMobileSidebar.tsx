@@ -107,21 +107,19 @@ export const StaffMobileSidebar: React.FC<StaffMobileSidebarProps> = ({
       <button
         onClick={() => handleNavClick(item.id)}
         onMouseEnter={() => prefetchStaffRoute(tabToPath[item.id])}
-        style={{ WebkitTapHighlightColor: 'transparent' }}
+        style={{ WebkitTapHighlightColor: 'transparent', fontFamily: 'var(--font-label)' }}
         className={`
-          tactile-row relative w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-all duration-fast
+          tactile-row w-full flex items-center gap-3 px-3 py-3 text-left transition-all duration-fast
           ${isActive 
-            ? 'text-white font-semibold' 
-            : 'text-white/70 hover:bg-white/10 hover:text-white'
+            ? 'text-white font-semibold border-l-2 border-[#CCB8E4]' 
+            : 'text-white/50 hover:text-white/80 border-l-2 border-transparent'
           }
         `}
       >
-        <div className={`absolute inset-0 rounded-xl bg-white/15 border border-white/25 shadow-[0_0_20px_rgba(255,255,255,0.08),inset_0_1px_1px_rgba(255,255,255,0.15)] backdrop-blur-md transition-all duration-normal ${isActive ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`} />
-        <span className={`material-symbols-outlined text-xl relative z-10 transition-colors duration-normal ${isActive ? 'filled text-[#CCB8E4]' : ''}`}>
+        <span className={`material-symbols-outlined text-[18px] transition-colors duration-normal ${isActive ? 'filled text-[#CCB8E4]' : ''}`}>
           {item.icon}
         </span>
-        <span className="text-sm relative z-10">{item.label}</span>
-        <span className={`relative z-10 ml-auto w-2 h-2 rounded-full bg-[#CCB8E4] transition-all duration-normal ${isActive ? 'opacity-100 scale-100' : 'opacity-0 scale-0'}`} />
+        <span className="text-[11px] uppercase tracking-[0.2em] translate-y-[1px]">{item.label}</span>
       </button>
     );
   };
@@ -156,7 +154,7 @@ export const StaffMobileSidebar: React.FC<StaffMobileSidebarProps> = ({
         </button>
 
         <nav className="flex-1 overflow-y-auto px-3 py-4">
-          <div className="space-y-1">
+          <div className="space-y-0.5">
             {MAIN_NAV_ITEMS.map(item => (
               <NavButton key={item.id} item={item} />
             ))}
@@ -164,10 +162,10 @@ export const StaffMobileSidebar: React.FC<StaffMobileSidebarProps> = ({
 
           {isAdmin && (
             <div className="mt-6 pt-4 border-t border-white/10">
-              <p className="px-3 mb-2 text-[10px] font-semibold text-white/40 uppercase tracking-wider">
+              <p className="px-3 mb-2 text-[10px] font-semibold text-white/30 uppercase tracking-[0.2em]" style={{ fontFamily: 'var(--font-label)' }}>
                 Admin
               </p>
-              <div className="space-y-1">
+              <div className="space-y-0.5">
                 {ADMIN_ITEMS.map(item => (
                   <NavButton key={item.id} item={item} />
                 ))}
@@ -179,10 +177,11 @@ export const StaffMobileSidebar: React.FC<StaffMobileSidebarProps> = ({
         <div className="px-3 py-4 border-t border-white/10 flex-shrink-0 space-y-3" style={{ paddingBottom: 'max(16px, env(safe-area-inset-bottom))' }}>
           <button
             onClick={() => setShowBugReport(true)}
-            className="tactile-row w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-all duration-fast text-white/70 hover:bg-white/10 hover:text-white"
+            style={{ fontFamily: 'var(--font-label)' }}
+            className="tactile-row w-full flex items-center gap-3 px-3 py-3 text-left transition-all duration-fast text-white/50 hover:text-white/80 border-l-2 border-transparent"
           >
-            <span className="material-symbols-outlined text-xl">bug_report</span>
-            <span className="text-sm">Report a Bug</span>
+            <span className="material-symbols-outlined text-[18px]">bug_report</span>
+            <span className="text-[11px] uppercase tracking-[0.2em] translate-y-[1px]">Report a Bug</span>
           </button>
           <p className="text-white/40 text-[10px] text-center">
             v{getLatestVersion().version} · Updated {new Date(getLatestVersion().date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'America/Los_Angeles' })}

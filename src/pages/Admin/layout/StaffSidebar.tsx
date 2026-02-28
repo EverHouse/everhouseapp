@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { TabType, tabToPath } from './types';
@@ -72,65 +72,32 @@ export const StaffSidebar: React.FC<StaffSidebarProps> = ({
       navigate(tabToPath[tab]);
     }
   }, [navigate, startNavigation, activeTab]);
-  const navContainerRef = useRef<HTMLDivElement>(null);
-  const buttonRefs = useRef<Map<TabType, HTMLButtonElement>>(new Map());
-  const [indicatorStyle, setIndicatorStyle] = useState<{ top: number; height: number } | null>(null);
-  
-  const updateIndicatorPosition = useCallback(() => {
-    const activeButton = buttonRefs.current.get(displayActiveTab);
-    const container = navContainerRef.current;
-    if (activeButton && container) {
-      setIndicatorStyle({
-        top: activeButton.offsetTop,
-        height: activeButton.offsetHeight
-      });
-    }
-  }, [displayActiveTab]);
-  
-  useEffect(() => {
-    const timer = setTimeout(updateIndicatorPosition, 50);
-    window.addEventListener('resize', updateIndicatorPosition);
-    return () => {
-      clearTimeout(timer);
-      window.removeEventListener('resize', updateIndicatorPosition);
-    };
-  }, [displayActiveTab, isAdmin, updateIndicatorPosition]);
-  
-  const setButtonRef = useCallback((id: TabType, el: HTMLButtonElement | null) => {
-    if (el) {
-      buttonRefs.current.set(id, el);
-    } else {
-      buttonRefs.current.delete(id);
-    }
-  }, []);
   
   const NavButton: React.FC<{ item: NavItem }> = ({ item }) => {
     const isActive = displayActiveTab === item.id;
     return (
       <button
-        ref={(el) => setButtonRef(item.id, el)}
         onClick={() => navigateToTab(item.id)}
         onMouseEnter={() => prefetchStaffRoute(tabToPath[item.id])}
-        style={{ WebkitTapHighlightColor: 'transparent' }}
+        style={{ WebkitTapHighlightColor: 'transparent', fontFamily: 'var(--font-label)' }}
         className={`
-          tactile-row relative w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-all duration-normal ease-out
+          tactile-row relative w-full flex items-center gap-3 px-3 py-3 text-left transition-all duration-normal ease-out
           ${isActive 
-            ? 'text-white font-semibold' 
-            : 'text-white/60 hover:text-white hover:bg-white/[0.07] group/nav'
+            ? 'text-white font-semibold border-l-2 border-[#CCB8E4]' 
+            : 'text-white/50 hover:text-white/80 border-l-2 border-transparent group/nav'
           }
         `}
       >
-        <span className={`material-symbols-outlined text-xl relative z-10 transition-colors duration-normal ${isActive ? 'filled text-[#CCB8E4]' : 'group-hover/nav:text-white/90'}`}>
+        <span className={`material-symbols-outlined text-[18px] transition-colors duration-normal ${isActive ? 'filled text-[#CCB8E4]' : 'group-hover/nav:text-white/70'}`}>
           {item.icon}
         </span>
-        <span className="text-sm relative z-10">{item.label}</span>
-        <span className={`relative z-10 ml-auto w-2 h-2 rounded-full bg-[#CCB8E4] transition-all duration-normal ${isActive ? 'opacity-100 scale-100' : 'opacity-0 scale-0'}`} />
+        <span className="text-[11px] uppercase tracking-[0.2em] translate-y-[1px]">{item.label}</span>
       </button>
     );
   };
 
   const sidebarContent = (
-    <aside className="hidden lg:flex flex-col w-64 h-screen fixed left-0 top-0 bg-gradient-to-b from-[#293515] via-[#1f2a0f] to-[#1a220c] isolate" style={{ zIndex: 9999 }}>
+    <aside className="hidden lg:flex flex-col w-64 h-screen fixed left-0 top-0 bg-gradient-to-b from-[#293515] via-[#1f2a0f] to-[#1a220c] border-r border-white/10 isolate" style={{ zIndex: 9999 }}>
       <div className="absolute inset-0 opacity-[0.03] pointer-events-none" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E")` }}></div>
       <button 
         onClick={() => { startNavigation(); navigate('/'); }}
@@ -148,17 +115,8 @@ export const StaffSidebar: React.FC<StaffSidebarProps> = ({
         </div>
       </button>
 
-      <nav ref={navContainerRef} className="relative flex-1 overflow-y-auto px-3 py-4">
-        {indicatorStyle && (
-          <div 
-            className="absolute left-3 right-3 rounded-xl bg-white/10 border border-white/20 shadow-[0_0_24px_rgba(204,184,228,0.1),0_4px_12px_rgba(0,0,0,0.15),inset_0_1px_1px_rgba(255,255,255,0.2)] backdrop-blur-xl pointer-events-none transition-all duration-emphasis ease-[cubic-bezier(0.34,1.56,0.64,1)]"
-            style={{ 
-              top: indicatorStyle.top,
-              height: indicatorStyle.height
-            }}
-          />
-        )}
-        <div className="space-y-1">
+      <nav className="relative flex-1 overflow-y-auto px-3 py-4">
+        <div className="space-y-0.5">
           {MAIN_NAV_ITEMS.map(item => (
             <NavButton key={item.id} item={item} />
           ))}
@@ -166,10 +124,10 @@ export const StaffSidebar: React.FC<StaffSidebarProps> = ({
 
         {isAdmin && (
           <div className="mt-6 pt-4 border-t border-white/10">
-            <p className="px-3 mb-3 text-xs font-semibold text-white/40 uppercase tracking-widest">
+            <p className="px-3 mb-2 text-[10px] font-semibold text-white/30 uppercase tracking-[0.2em]" style={{ fontFamily: 'var(--font-label)' }}>
               Admin
             </p>
-            <div className="space-y-1">
+            <div className="space-y-0.5">
               {ADMIN_ITEMS.map(item => (
                 <NavButton key={item.id} item={item} />
               ))}
