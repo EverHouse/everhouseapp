@@ -25,7 +25,7 @@ const taglines = [
 
 interface PullToRefreshProps {
   children: React.ReactNode;
-  onRefresh: () => Promise<void>;
+  onRefresh?: () => Promise<void> | void;
   disabled?: boolean;
   className?: string;
 }
@@ -40,11 +40,10 @@ const isTouchDevice = () => {
   return 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 };
 
-const PullToRefresh: React.FC<PullToRefreshProps> = ({ children, onRefresh, disabled = false, className = '' }) => {
+const PullToRefresh: React.FC<PullToRefreshProps> = ({ children, disabled = false, className = '' }) => {
   const [pullDistance, setPullDistance] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isFillingScreen, setIsFillingScreen] = useState(false);
-  const [isExiting, setIsExiting] = useState(false);
   const [isSpringBack, setIsSpringBack] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [tagline] = useState(() => taglines[Math.floor(Math.random() * taglines.length)]);
@@ -59,17 +58,14 @@ const PullToRefresh: React.FC<PullToRefreshProps> = ({ children, onRefresh, disa
   const settleTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const springBackAnimationRef = useRef<number | null>(null);
 
-  // Track modal open state via MutationObserver
   useEffect(() => {
     const checkModalState = () => {
       const modalCount = document.body.getAttribute('data-modal-count');
       setIsModalOpen(modalCount !== null && parseInt(modalCount, 10) > 0);
     };
     
-    // Check initial state
     checkModalState();
     
-    // Watch for attribute changes on body
     const observer = new MutationObserver((mutations) => {
       for (const mutation of mutations) {
         if (mutation.type === 'attributes' && mutation.attributeName === 'data-modal-count') {
@@ -127,22 +123,10 @@ const PullToRefresh: React.FC<PullToRefreshProps> = ({ children, onRefresh, disa
     setIsFillingScreen(false);
     setIsRefreshing(true);
     
-    try {
-      await onRefresh();
-    } catch (e: unknown) {
-      console.error('Refresh failed:', e);
-    }
-    
-    setIsExiting(true);
-    await new Promise(resolve => setTimeout(resolve, 550));
-    setIsRefreshing(false);
-    setIsExiting(false);
-  }, [isRefreshing, isFillingScreen, onRefresh]);
+    window.location.reload();
+  }, [isRefreshing, isFillingScreen]);
 
-  // Desktop scroll wheel support with settlement tracking
-  // Only register on touch devices to avoid blocking native wheel scroll on desktop
   useEffect(() => {
-    // Skip wheel listener on desktop - let browser handle wheel scroll natively
     if (!isTouchCapable) return;
     
     const container = containerRef.current;
@@ -153,32 +137,25 @@ const PullToRefresh: React.FC<PullToRefreshProps> = ({ children, onRefresh, disa
       
       const scrollTop = window.scrollY || document.documentElement.scrollTop;
       
-      // When at top and scrolling up
       if (scrollTop <= 5 && e.deltaY < 0) {
-        // If not yet settled at top, start settlement timer
         if (!isSettledAtTopRef.current && !isWheelPullingRef.current) {
-          // Clear any existing settle timeout
           if (settleTimeoutRef.current) {
             clearTimeout(settleTimeoutRef.current);
           }
-          // Start settlement - user needs to pause at top before PTR activates
           settleTimeoutRef.current = setTimeout(() => {
             isSettledAtTopRef.current = true;
           }, DESKTOP_SETTLE_DELAY);
           return;
         }
         
-        // Only allow pull-to-refresh if settled at top
         if (!isSettledAtTopRef.current) return;
         
-        // Accumulate upward scroll
         wheelAccumulatorRef.current += Math.abs(e.deltaY) * 0.3;
         wheelAccumulatorRef.current = Math.min(wheelAccumulatorRef.current, MAX_PULL);
         isWheelPullingRef.current = true;
         
         setPullDistance(wheelAccumulatorRef.current);
         
-        // Reset accumulator after a pause in scrolling
         if (wheelTimeoutRef.current) {
           clearTimeout(wheelTimeoutRef.current);
         }
@@ -186,7 +163,6 @@ const PullToRefresh: React.FC<PullToRefreshProps> = ({ children, onRefresh, disa
           if (wheelAccumulatorRef.current >= PULL_THRESHOLD && !isRefreshing && !isFillingScreen) {
             triggerRefresh();
           } else {
-            // Spring back animation instead of instant reset
             const currentDistance = wheelAccumulatorRef.current;
             wheelAccumulatorRef.current = 0;
             isWheelPullingRef.current = false;
@@ -198,7 +174,6 @@ const PullToRefresh: React.FC<PullToRefreshProps> = ({ children, onRefresh, disa
           }
         }, 150);
       } else if (scrollTop > 5) {
-        // Reset settlement when scrolled away from top
         isSettledAtTopRef.current = false;
         if (settleTimeoutRef.current) {
           clearTimeout(settleTimeoutRef.current);
@@ -211,7 +186,6 @@ const PullToRefresh: React.FC<PullToRefreshProps> = ({ children, onRefresh, disa
           animateSpringBack(currentDistance);
         }
       } else if (e.deltaY > 0 && scrollTop <= 5) {
-        // Scrolling down while at top - reset pull but maintain settlement
         if (wheelAccumulatorRef.current > 0) {
           const currentDistance = wheelAccumulatorRef.current;
           wheelAccumulatorRef.current = 0;
@@ -239,7 +213,6 @@ const PullToRefresh: React.FC<PullToRefreshProps> = ({ children, onRefresh, disa
   const isSpringBackRef = useRef(isSpringBack);
   const isFillingScreenRef = useRef(isFillingScreen);
   const pullDistanceRef = useRef(pullDistance);
-  const onRefreshRef = useRef(onRefresh);
   const animateSpringBackRef = useRef(animateSpringBack);
 
   useEffect(() => { disabledRef.current = disabled; }, [disabled]);
@@ -248,7 +221,6 @@ const PullToRefresh: React.FC<PullToRefreshProps> = ({ children, onRefresh, disa
   useEffect(() => { isSpringBackRef.current = isSpringBack; }, [isSpringBack]);
   useEffect(() => { isFillingScreenRef.current = isFillingScreen; }, [isFillingScreen]);
   useEffect(() => { pullDistanceRef.current = pullDistance; }, [pullDistance]);
-  useEffect(() => { onRefreshRef.current = onRefresh; }, [onRefresh]);
   useEffect(() => { animateSpringBackRef.current = animateSpringBack; }, [animateSpringBack]);
 
   useEffect(() => {
@@ -312,16 +284,7 @@ const PullToRefresh: React.FC<PullToRefreshProps> = ({ children, onRefresh, disa
         setIsFillingScreen(false);
         setIsRefreshing(true);
 
-        try {
-          await onRefreshRef.current();
-        } catch (err: unknown) {
-          console.error('Refresh failed:', err);
-        }
-
-        setIsExiting(true);
-        await new Promise(resolve => setTimeout(resolve, 550));
-        setIsRefreshing(false);
-        setIsExiting(false);
+        window.location.reload();
       } else {
         if (currentPullDistance > 5) {
           animateSpringBackRef.current(currentPullDistance);
@@ -353,7 +316,6 @@ const PullToRefresh: React.FC<PullToRefreshProps> = ({ children, onRefresh, disa
     };
   }, [isRefreshing, isFillingScreen]);
 
-  // Set body attribute for header fade effect
   useEffect(() => {
     const pullProgress = Math.min(pullDistance / PULL_THRESHOLD, 1);
     if (pullDistance > 0 || isFillingScreen || isRefreshing) {
@@ -369,7 +331,6 @@ const PullToRefresh: React.FC<PullToRefreshProps> = ({ children, onRefresh, disa
     };
   }, [pullDistance, isFillingScreen, isRefreshing]);
 
-  // Cleanup animation frame on unmount
   useEffect(() => {
     return () => {
       if (springBackAnimationRef.current) {
@@ -485,8 +446,8 @@ const PullToRefresh: React.FC<PullToRefreshProps> = ({ children, onRefresh, disa
       )}
 
       {isRefreshing && createPortal(
-        <div className={`ptr-loader-overlay ${isExiting ? 'ptr-loader-exit' : ''}`}>
-          <div className={`ptr-loader-content ${isExiting ? 'ptr-content-exit' : ''}`}>
+        <div className="ptr-loader-overlay">
+          <div className="ptr-loader-content">
             <div className="ptr-mascot">
               <img 
                 src="/assets/logos/walking-mascot-white.gif" 
@@ -509,20 +470,6 @@ const PullToRefresh: React.FC<PullToRefreshProps> = ({ children, onRefresh, disa
               will-change: transform;
             }
 
-            .ptr-loader-exit {
-              animation: ptrSlideUp 0.55s var(--m3-standard-accel) forwards;
-              pointer-events: none;
-            }
-
-            @keyframes ptrSlideUp {
-              0% {
-                transform: translateY(0);
-              }
-              100% {
-                transform: translateY(-100%);
-              }
-            }
-
             .ptr-loader-content {
               display: flex;
               flex-direction: column;
@@ -540,21 +487,6 @@ const PullToRefresh: React.FC<PullToRefreshProps> = ({ children, onRefresh, disa
               to {
                 opacity: 1;
                 transform: scale(1);
-              }
-            }
-
-            .ptr-content-exit {
-              animation: ptrContentFadeOut 0.3s var(--m3-standard-accel) forwards;
-            }
-
-            @keyframes ptrContentFadeOut {
-              0% {
-                opacity: 1;
-                transform: translateY(0);
-              }
-              100% {
-                opacity: 0;
-                transform: translateY(-30px);
               }
             }
 
@@ -580,9 +512,8 @@ const PullToRefresh: React.FC<PullToRefreshProps> = ({ children, onRefresh, disa
 
             @media (prefers-reduced-motion: reduce) {
               .ptr-fill-overlay,
-              .ptr-loader-exit,
-              .ptr-loader-content,
-              .ptr-content-exit {
+              .ptr-loader-overlay,
+              .ptr-loader-content {
                 animation: none !important;
                 opacity: 1 !important;
                 transform: none !important;
