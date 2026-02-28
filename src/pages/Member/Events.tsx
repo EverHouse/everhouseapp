@@ -294,7 +294,7 @@ const MemberEvents: React.FC = () => {
           {filteredAndSortedEvents.length === 0 ? (
             <EmptyEvents />
           ) : (
-            <MotionList ref={eventsParent} className="space-y-3">
+            <MotionList ref={eventsParent} className="space-y-3 -mx-6 px-3">
               {filteredAndSortedEvents.map((event, index) => {
                 const isExpanded = expandedEventId === event.id;
                 const isRsvpd = hasRsvp(event.id);

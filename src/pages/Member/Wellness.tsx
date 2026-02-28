@@ -476,7 +476,7 @@ const ClassesView: React.FC<{onBook: (cls: WellnessClass) => void; isDark?: bool
             ))}
         </div>
         
-        <MotionList ref={wellnessParent} className="space-y-3">
+        <MotionList ref={wellnessParent} className="space-y-3 -mx-6 px-3">
             {sortedClasses.length > 0 ? (
                 sortedClasses.map((cls) => {
                     const isExpanded = expandedId === cls.id;
