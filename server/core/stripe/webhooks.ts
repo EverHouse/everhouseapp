@@ -1840,16 +1840,6 @@ async function handleInvoicePaymentSucceeded(client: PoolClient, invoice: Invoic
     return deferredActions;
   }
 
-  await client.query(
-    `UPDATE hubspot_deals 
-     SET last_payment_status = 'current',
-         last_payment_check = NOW(),
-         last_sync_error = NULL,
-         updated_at = NOW()
-     WHERE LOWER(member_email) = LOWER($1)`,
-    [email]
-  );
-
   const priceId = (invoice.lines?.data?.[0] as unknown as { price?: { id: string } })?.price?.id;
   let restoreTierClause = '';
   let queryParams: (string | number | null)[] = [email];
@@ -1875,6 +1865,16 @@ async function handleInvoicePaymentSucceeded(client: PoolClient, invoice: Invoic
     queryParams
   );
   logger.info(`[Stripe Webhook] Cleared grace period and set billing_provider for ${email}`);
+
+  await client.query(
+    `UPDATE hubspot_deals 
+     SET last_payment_status = 'current',
+         last_payment_check = NOW(),
+         last_sync_error = NULL,
+         updated_at = NOW()
+     WHERE LOWER(member_email) = LOWER($1)`,
+    [email]
+  );
 
   if (currentPeriodEnd) {
     await client.query(
@@ -2991,9 +2991,15 @@ async function handleSubscriptionCreated(client: PoolClient, subscription: Strip
         logger.info(`[Stripe Webhook] Migration subscription detected for ${customerEmail} — migration_status set to completed`);
       }
 
-      const deferredCustomerEmail = customerEmail;
-      const deferredFirstName = firstName;
-      const deferredLastName = lastName;
+      email = customerEmail;
+      first_name = firstName;
+      last_name = lastName;
+      currentTier = tierSlug;
+      currentStatus = 'active';
+
+      const deferredCustomerEmail = email;
+      const deferredFirstName = first_name;
+      const deferredLastName = last_name;
       const deferredMetadataPhone = metadataPhone || undefined;
       const deferredTierName = tierName;
       const deferredActualStatus = actualStatus;
@@ -3065,12 +3071,6 @@ async function handleSubscriptionCreated(client: PoolClient, subscription: Strip
           }
         }
       });
-      
-      email = customerEmail;
-      first_name = firstName;
-      last_name = lastName;
-      currentTier = tierSlug;
-      currentStatus = 'active';
     } else {
       email = userResult.rows[0].email;
       first_name = userResult.rows[0].first_name;
