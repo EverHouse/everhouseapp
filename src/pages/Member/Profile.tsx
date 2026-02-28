@@ -1160,14 +1160,14 @@ const Profile: React.FC = () => {
 const Section: React.FC<{title: string; children: React.ReactNode; isDark?: boolean; staggerIndex?: number}> = ({ title, children, isDark = true, staggerIndex }) => (
   <div className="animate-slide-up-stagger" style={staggerIndex !== undefined ? { '--stagger-index': staggerIndex } as React.CSSProperties : undefined}>
      <h3 className={`text-xs font-bold uppercase tracking-wider ml-2 mb-3 ${isDark ? 'opacity-70' : 'text-primary/70'}`}>{title}</h3>
-     <div className={`rounded-2xl overflow-hidden glass-card divide-y ${isDark ? 'divide-white/20 border-white/25' : 'divide-black/5 border-black/10'}`}>
+     <div className={`rounded-2xl overflow-hidden glass-card p-0 divide-y ${isDark ? 'divide-white/20 border-white/25' : 'divide-black/5 border-black/10'}`}>
         {children}
      </div>
   </div>
 );
 
 const Row: React.FC<{icon: string; label: string; value?: string; toggle?: boolean; arrow?: boolean; isDark?: boolean; onClick?: () => void}> = ({ icon, label, value, toggle, arrow, isDark = true, onClick }) => (
-   <div onClick={onClick} {...(onClick ? { role: 'button', tabIndex: 0, onKeyDown: (e: React.KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } } } : {})} className={`p-4 flex items-center justify-between transition-colors cursor-pointer tactile-row ${isDark ? 'hover:bg-white/5' : 'hover:bg-black/5'}`}>
+   <div onClick={onClick} {...(onClick ? { role: 'button', tabIndex: 0, onKeyDown: (e: React.KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } } } : {})} className={`py-3 px-4 w-full flex items-center justify-between transition-colors cursor-pointer tactile-row ${isDark ? 'hover:bg-white/5' : 'hover:bg-black/5'}`}>
       <div className="flex items-center gap-4">
          <span className={`material-symbols-outlined ${isDark ? 'opacity-70' : 'text-primary/70'}`}>{icon}</span>
          <span className={`font-medium text-sm ${isDark ? '' : 'text-primary'}`}>{label}</span>

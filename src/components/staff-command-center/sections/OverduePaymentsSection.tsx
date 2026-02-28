@@ -84,7 +84,7 @@ export const OverduePaymentsSection: React.FC<OverduePaymentsSectionProps> = ({ 
 
   if (loading) {
     return (
-      <div className={`${isDesktop ? 'h-full min-h-[280px]' : 'min-h-[200px]'} flex flex-col bg-white/40 dark:bg-white/[0.08] backdrop-blur-xl border border-white/60 dark:border-white/[0.12] rounded-2xl p-4 shadow-liquid dark:shadow-liquid-dark`}>
+      <div className={`${isDesktop ? 'h-full min-h-[280px]' : 'min-h-[200px]'} flex flex-col bg-white/40 dark:bg-white/[0.08] backdrop-blur-xl border border-white/60 dark:border-white/[0.12] rounded-2xl pt-4 overflow-hidden shadow-liquid dark:shadow-liquid-dark`}>
         <div className="flex items-center justify-center flex-1">
           <WalkingGolferSpinner size="sm" variant="auto" />
         </div>
@@ -95,11 +95,11 @@ export const OverduePaymentsSection: React.FC<OverduePaymentsSectionProps> = ({ 
   return (
     <>
       <div 
-        className={`${isDesktop ? 'h-full min-h-[280px]' : 'min-h-[200px]'} flex flex-col bg-white/40 dark:bg-white/[0.08] backdrop-blur-xl border border-white/60 dark:border-white/[0.12] rounded-2xl p-4 shadow-liquid dark:shadow-liquid-dark ${count > 0 ? 'border-l-4 border-l-red-500' : ''}`}
+        className={`${isDesktop ? 'h-full min-h-[280px]' : 'min-h-[200px]'} flex flex-col bg-white/40 dark:bg-white/[0.08] backdrop-blur-xl border border-white/60 dark:border-white/[0.12] rounded-2xl pt-4 overflow-hidden shadow-liquid dark:shadow-liquid-dark ${count > 0 ? 'border-l-4 border-l-red-500' : ''}`}
         role="region"
         aria-label={count > 0 ? `Overdue Payments - ${count} outstanding` : 'Overdue Payments'}
       >
-        <div className="flex items-center justify-between mb-3 lg:mb-4 flex-shrink-0">
+        <div className="flex items-center justify-between mb-3 lg:mb-4 flex-shrink-0 px-4">
           <div className="flex items-center gap-2">
             <h3 className="font-bold text-primary dark:text-white">Overdue Payments</h3>
             {count > 0 && (
@@ -121,9 +121,9 @@ export const OverduePaymentsSection: React.FC<OverduePaymentsSectionProps> = ({ 
           )}
         </div>
 
-        <div ref={paymentsRef} className={`${isDesktop ? 'flex-1 overflow-y-auto pb-6' : ''} space-y-2`}>
+        <div ref={paymentsRef} className={`${isDesktop ? 'flex-1 overflow-y-auto pb-6' : ''}`}>
           {count === 0 ? (
-            <div className="flex-1 flex flex-col items-center justify-center py-8">
+            <div className="flex-1 flex flex-col items-center justify-center py-8 px-4">
               <EmptyState icon="payments" title="No overdue payments" description="All payments are up to date" variant="compact" />
             </div>
           ) : (
@@ -155,7 +155,7 @@ export const OverduePaymentsSection: React.FC<OverduePaymentsSectionProps> = ({ 
                 </GlassListRow>
               ))}
               {count > maxItems && (
-                <p className="text-xs text-center text-primary/70 dark:text-white/70 pt-2">
+                <p className="text-xs text-center text-primary/70 dark:text-white/70 pt-2 px-4">
                   +{count - maxItems} more overdue payments
                 </p>
               )}

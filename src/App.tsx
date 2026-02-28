@@ -672,7 +672,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       {/* Center section - auto width, centered between equal flex-1 sides */}
       <div className="flex-shrink-0 flex justify-center">
         {isMemberRoute ? (
-          <h1 className="text-2xl font-semibold text-[#F2F2EC] truncate leading-none uppercase tracking-[0.2em]" style={{ fontFamily: 'var(--font-label)' }}>
+          <h1 className="text-xl font-semibold text-[#F2F2EC] truncate leading-none uppercase tracking-[0.3em] translate-y-[2px]" style={{ fontFamily: 'var(--font-label)' }}>
             {getPageTitle()}
           </h1>
         ) : (
