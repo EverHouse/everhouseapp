@@ -265,8 +265,12 @@ const MemberEvents: React.FC = () => {
   return (
     <AnimatedPage>
     <SwipeablePage className="px-6 relative overflow-hidden">
-      <section className="mb-4 pt-4 md:pt-2 animate-content-enter-delay-1">
-        <p className={`text-base leading-relaxed ${isDark ? 'text-white/70' : 'text-primary/70'}`} style={{ fontFamily: 'var(--font-body)' }}>Discover what's happening at the House.</p>
+      <section className="mb-4 pt-6 md:pt-4 animate-content-enter-delay-1">
+        <h1 className={`leading-none mb-3 ${isDark ? 'text-white' : 'text-primary'}`} style={{ fontFamily: 'var(--font-display)' }}>
+          <span className="block text-4xl md:text-5xl">The</span>
+          <span className="block text-4xl md:text-5xl italic">Circuit</span>
+        </h1>
+        <p className={`text-base leading-relaxed max-w-md ${isDark ? 'text-white/60' : 'text-primary/60'}`} style={{ fontFamily: 'var(--font-body)' }}>Tournaments, socials, and private gatherings curated for the membership. Filter by category, then tap any event to view details and secure your RSVP.</p>
       </section>
 
       <section className={`mb-6 border-b -mx-6 px-6 animate-content-enter-delay-2 ${isDark ? 'border-white/25' : 'border-black/10'}`}>

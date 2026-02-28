@@ -134,9 +134,12 @@ const History: React.FC = () => {
   return (
     <AnimatedPage>
       <SwipeablePage className="px-6 lg:px-8 xl:px-12 relative overflow-hidden">
-        <section className="mb-4 pt-4 md:pt-2 animate-content-enter-delay-1">
-          <h1 className={`text-2xl leading-tight ${isDark ? 'text-white' : 'text-primary'}`} style={{ fontFamily: 'var(--font-headline)' }}>History</h1>
-          <p className={`text-base leading-relaxed mt-1 ${isDark ? 'text-white/70' : 'text-primary/70'}`} style={{ fontFamily: 'var(--font-body)' }}>Your past visits</p>
+        <section className="mb-4 pt-6 md:pt-4 animate-content-enter-delay-1">
+          <h1 className={`leading-none mb-3 ${isDark ? 'text-white' : 'text-primary'}`} style={{ fontFamily: 'var(--font-display)' }}>
+            <span className="block text-4xl md:text-5xl">Your</span>
+            <span className="block text-4xl md:text-5xl italic">Archive</span>
+          </h1>
+          <p className={`text-base leading-relaxed max-w-md ${isDark ? 'text-white/60' : 'text-primary/60'}`} style={{ fontFamily: 'var(--font-body)' }}>Every session, every event, every transaction — all in one place. Switch between visits and payments to review your complete membership history.</p>
         </section>
 
         <section className={`mb-6 border-b -mx-6 px-6 animate-content-enter-delay-2 ${isDark ? 'border-white/25' : 'border-black/10'}`}>

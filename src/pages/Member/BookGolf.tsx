@@ -869,10 +869,10 @@ const BookGolf: React.FC = () => {
     <SwipeablePage className="px-6 lg:px-8 xl:px-12 relative">
       <section className="mb-8 pt-6 md:pt-4 animate-content-enter-delay-1">
         <h1 className={`leading-none mb-3 ${isDark ? 'text-white' : 'text-primary'}`} style={{ fontFamily: 'var(--font-display)' }}>
-          <span className="block text-4xl md:text-5xl">Book</span>
-          <span className="block text-4xl md:text-5xl italic">{activeTab === 'simulator' ? 'Simulator' : 'Conference'}</span>
+          <span className="block text-4xl md:text-5xl">Your</span>
+          <span className="block text-4xl md:text-5xl italic">{activeTab === 'simulator' ? 'Session' : 'Room'}</span>
         </h1>
-        <p className={`text-base leading-relaxed ${isDark ? 'text-white/60' : 'text-primary/60'}`} style={{ fontFamily: 'var(--font-body)' }}>Reserve simulators or conference room.</p>
+        <p className={`text-base leading-relaxed max-w-md ${isDark ? 'text-white/60' : 'text-primary/60'}`} style={{ fontFamily: 'var(--font-body)' }}>{activeTab === 'simulator' ? 'Choose your party size, select a date, and reserve your preferred bay from the availability grid below. Sessions are confirmed instantly.' : 'Select your date, duration, and preferred conference space below. Ideal for private meetings, content sessions, or focused work.'}</p>
       </section>
 
       {effectiveUser?.status && !['active', 'trialing'].includes(effectiveUser.status.toLowerCase()) ? (
