@@ -33,10 +33,10 @@ export const TabTransition: React.FC<TabTransitionProps> = ({
         
         const enterTimer = setTimeout(() => {
           setAnimationPhase('idle');
-        }, 210);
+        }, 250);
         
         return () => clearTimeout(enterTimer);
-      }, 90);
+      }, 120);
       
       return () => clearTimeout(exitTimer);
     }
