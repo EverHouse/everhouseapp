@@ -937,7 +937,7 @@ const Dashboard: React.FC = () => {
           {/* Your Schedule - Combined Bookings, Events & Wellness */}
           <div className="animate-slide-up-stagger" style={{ '--stagger-index': 4 } as React.CSSProperties}>
             <div className="flex justify-between items-center mb-4 px-1">
-              <h3 className={`text-sm font-bold uppercase tracking-wider ${isDark ? 'text-white/80' : 'text-primary/80'}`}>Your Schedule</h3>
+              <h3 className={`text-sm font-bold uppercase tracking-wider ${isDark ? 'text-white/80' : 'text-primary/80'}`} style={{ fontFamily: 'var(--font-label)', letterSpacing: '0.1em' }}>Your Schedule</h3>
               <button
                 onClick={() => { startNavigation(); navigate('/book'); }}
                 className={`tactile-btn text-xs font-semibold flex items-center gap-1 ${isDark ? 'text-accent' : 'text-brand-green'}`}
@@ -1321,7 +1321,7 @@ const Dashboard: React.FC = () => {
               {/* Benefits Section */}
               <div className="px-6 pb-6" style={{ backgroundColor: cardBgColor }}>
                 <div className="rounded-xl p-4 space-y-3" style={{ backgroundColor: `${cardTextColor}10` }}>
-                  <h3 className="text-xs font-bold uppercase tracking-wider opacity-60 mb-3" style={{ color: cardTextColor }}>Membership Benefits</h3>
+                  <h3 className="text-sm font-bold uppercase tracking-wider opacity-60 mb-3" style={{ color: cardTextColor, fontFamily: 'var(--font-label)', letterSpacing: '0.1em' }}>Membership Benefits</h3>
                   
                   {user.joinDate && (
                     <div className="flex items-center justify-between">

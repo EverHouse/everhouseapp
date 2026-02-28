@@ -65,7 +65,7 @@ const ScheduleCard: React.FC<ScheduleCardProps> = ({
         </div>
       </div>
 
-      <h4 className={`text-lg font-bold leading-snug mb-1.5 ${isDark ? 'text-white' : 'text-primary'}`}>
+      <h4 className={`text-xl font-bold leading-tight mb-1.5 ${isDark ? 'text-white' : 'text-primary'}`} style={{ fontFamily: 'var(--font-headline)', fontOpticalSizing: 'auto' }}>
         {title}
       </h4>
 
