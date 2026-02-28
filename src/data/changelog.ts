@@ -8,6 +8,15 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.54.0",
+    date: "2026-02-28",
+    title: "3D Secure Broadcast & Webhook Lock Fixes",
+    changes: [
+      "Fix: Off-session card payments requiring 3D Secure authentication now broadcast 'payment_requires_action' instead of misleading 'payment_confirmed' — staff UI no longer shows a false success when the member's bank requires additional verification",
+      "Fix: Booking-fee fallback query in payment webhook now uses FOR UPDATE row locking — prevents concurrent webhook retries from double-processing the same participant payments",
+    ]
+  },
+  {
     version: "8.53.0",
     date: "2026-02-28",
     title: "Crash Recovery & Atomicity Fixes",

@@ -559,9 +559,14 @@ export async function finalizeAndPayInvoice(params: {
     });
 
     try {
+      const broadcastAction = pi.status === 'succeeded' 
+        ? 'invoice_paid' 
+        : pi.status === 'requires_action' 
+          ? 'payment_requires_action' 
+          : 'payment_confirmed';
       broadcastBookingInvoiceUpdate({
         bookingId,
-        action: pi.status === 'succeeded' ? 'invoice_paid' : 'payment_confirmed',
+        action: broadcastAction,
         invoiceId,
         paidInFull: pi.status === 'succeeded',
         totalCents: paidInvoice.amount_paid,

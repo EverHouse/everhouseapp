@@ -461,6 +461,18 @@ The `createBalanceTransaction` call for `add_funds` checkout sessions must execu
 
 **Rule:** Any deferred action that creates, transfers, or destroys money must be moved into the main handler with an idempotency key. Only notifications, emails, and cache updates belong in deferred actions.
 
+### 3D Secure Broadcast Accuracy (v8.54.0)
+
+When `finalizeAndPayInvoice` pays an invoice off-session and the bank requires 3D Secure (`pi.status === 'requires_action'`), the WebSocket broadcast must send `payment_requires_action` — NOT `payment_confirmed`. The frontend listens for `invoice_paid` and `payment_confirmed` to trigger the success UI; sending `payment_confirmed` for a `requires_action` PI causes staff to see a false payment success.
+
+**Rule:** All booking invoice WebSocket broadcasts must accurately reflect the Stripe PI status. Map `succeeded` → `invoice_paid`, `requires_action` → `payment_requires_action`, other → `payment_confirmed`.
+
+### Fallback Query Row Locking (v8.54.0)
+
+The booking-fee fallback path in `handlePaymentIntentSucceeded` (when no `feeSnapshotId` exists) must use `FOR UPDATE` on the `booking_participants` SELECT. Without it, concurrent webhook retries can both read the same pending participants and attempt to double-process them.
+
+**Rule:** Any SELECT used to find rows that will be updated in the same transaction must include `FOR UPDATE` to prevent concurrent processing.
+
 ### Day Pass Deferred Action Pattern (v8.26.7, Bug 18)
 
 Day pass purchases from `handleCheckoutSessionCompleted` and `handleCheckoutSessionAsyncPaymentSucceeded` record the purchase via `recordDayPassPurchaseFromWebhook()` as a **deferred action** (runs after COMMIT), not inside the webhook transaction. This ensures the day pass recording doesn't hold the transaction open during Stripe API calls, and the existing idempotency protection in `recordDayPassPurchaseFromWebhook` prevents duplicates if Stripe retries.
