@@ -569,12 +569,12 @@ const Profile: React.FC = () => {
                 <Row icon="mail" label="Email" value={user.email} isDark={isDark} />
                 <Row icon="call" label="Phone" value={formatPhoneNumber(staffDetails?.phone || user.phone)} isDark={isDark} />
                 {!isStaffOrAdminProfile && (
-                  <div className="px-4 pb-4 pt-1">
+                  <div className="px-4 pb-4 pt-3">
                     <button
                       onClick={handleStartEdit}
-                      className={`tactile-btn w-full flex items-center justify-center gap-1.5 px-4 py-3 rounded-[4px] text-sm font-bold transition-colors ${
+                      className={`tactile-btn w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-fast ${
                         isDark 
-                          ? 'bg-white/10 text-white hover:bg-white/20' 
+                          ? 'bg-accent/20 text-accent hover:bg-accent/30' 
                           : 'bg-primary/10 text-primary hover:bg-primary/20'
                       }`}
                     >
@@ -637,7 +637,11 @@ const Profile: React.FC = () => {
                ) : (
                  <button
                    onClick={() => setShowAddFunds(true)}
-                   className="w-full py-3 bg-primary text-white font-semibold rounded-xl hover:bg-primary/90 transition-colors flex items-center justify-center gap-2"
+                   className={`w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-medium text-sm transition-all duration-fast tactile-btn ${
+                     isDark 
+                       ? 'bg-accent/20 text-accent hover:bg-accent/30' 
+                       : 'bg-primary/10 text-primary hover:bg-primary/20'
+                   }`}
                  >
                    <span className="material-symbols-outlined text-lg">add</span>
                    Add Funds
