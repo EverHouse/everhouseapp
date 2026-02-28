@@ -1122,7 +1122,7 @@ const Dashboard: React.FC = () => {
                     }
                   } else if (item.type === 'rsvp') {
                     const raw = item.raw as DBRSVP;
-                    if (raw.location) chips.push({ icon: 'location_on', label: raw.location });
+                    
                     if (raw.category) chips.push({ icon: 'category', label: raw.category });
                   } else if (item.type === 'wellness') {
                     const raw = item.raw as DBWellnessEnrollment;
