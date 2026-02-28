@@ -123,8 +123,7 @@ const PullToRefresh: React.FC<PullToRefreshProps> = ({ children, disabled = fals
     setIsFillingScreen(false);
     setIsRefreshing(true);
     
-    await new Promise(resolve => setTimeout(resolve, 1200));
-    
+    sessionStorage.setItem('ptr-reload', '1');
     window.location.reload();
   }, [isRefreshing, isFillingScreen]);
 
@@ -286,8 +285,7 @@ const PullToRefresh: React.FC<PullToRefreshProps> = ({ children, disabled = fals
         setIsFillingScreen(false);
         setIsRefreshing(true);
 
-        await new Promise(resolve => setTimeout(resolve, 1200));
-
+        sessionStorage.setItem('ptr-reload', '1');
         window.location.reload();
       } else {
         if (currentPullDistance > 5) {
