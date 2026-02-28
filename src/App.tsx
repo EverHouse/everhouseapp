@@ -802,9 +802,14 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   );
 };
 
+const FilmGrain: React.FC = () => (
+  <div className="film-grain" aria-hidden="true" />
+);
+
 const App: React.FC = () => {
   return (
     <ErrorBoundary>
+      <FilmGrain />
       <QueryClientProvider client={queryClient}>
         <ThemeProvider>
           <DataProvider>
