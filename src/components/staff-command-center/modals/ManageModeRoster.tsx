@@ -176,7 +176,7 @@ export function ManageModeRoster({
           <div className="mt-2 pt-2 border-t border-green-200 dark:border-green-700">
             <div className="flex items-center justify-between mb-1">
               <span className="text-xs font-medium text-primary/60 dark:text-white/60">Search new owner</span>
-              <button onClick={() => setReassignSearchOpen(false)} className="text-primary/50 dark:text-white/50 hover:text-primary dark:hover:text-white">
+              <button onClick={() => setReassignSearchOpen(false)} className="text-primary/50 dark:text-white/50 hover:text-primary dark:hover:text-white" aria-label="Close search">
                 <span className="material-symbols-outlined text-sm">close</span>
               </button>
             </div>

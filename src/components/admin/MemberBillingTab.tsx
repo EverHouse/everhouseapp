@@ -1107,7 +1107,7 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({
         <div className={`p-3 rounded-lg flex items-center gap-2 ${isDark ? 'bg-red-500/10 border border-red-500/30' : 'bg-red-50 border border-red-200'}`}>
           <span className="material-symbols-outlined text-red-500 text-base">error</span>
           <p className={`text-sm ${isDark ? 'text-red-400' : 'text-red-600'}`}>{error}</p>
-          <button onClick={() => setError(null)} className="ml-auto p-1 hover:opacity-70">
+          <button onClick={() => setError(null)} className="ml-auto p-1 hover:opacity-70" aria-label="Dismiss error">
             <span className="material-symbols-outlined text-red-500 text-base">close</span>
           </button>
         </div>

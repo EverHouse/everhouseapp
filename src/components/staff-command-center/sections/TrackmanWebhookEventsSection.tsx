@@ -711,7 +711,7 @@ export const TrackmanWebhookEventsSection: React.FC<TrackmanWebhookEventsSection
           <div className="w-full max-w-md bg-white dark:bg-gray-800 rounded-xl shadow-xl p-6 space-y-4" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-bold text-primary dark:text-white">Replay Webhooks to Dev</h3>
-              <button onClick={() => setShowReplayModal(false)} className="p-1 hover:bg-gray-100 dark:hover:bg-white/10 rounded-full">
+              <button onClick={() => setShowReplayModal(false)} className="p-1 hover:bg-gray-100 dark:hover:bg-white/10 rounded-full" aria-label="Close">
                 <span className="material-symbols-outlined text-gray-500">close</span>
               </button>
             </div>

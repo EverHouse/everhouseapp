@@ -620,10 +620,10 @@ const StaffTrainingGuide: React.FC = () => {
                             </div>
                             {isAdmin && (
                                 <div className="flex gap-1 pr-4 print:hidden" onClick={(e) => e.stopPropagation()}>
-                                    <button onClick={() => openEditModal(section)} className="tactile-btn p-2 hover:bg-primary/10 dark:hover:bg-white/10 rounded-full">
+                                    <button onClick={() => openEditModal(section)} className="tactile-btn p-2 hover:bg-primary/10 dark:hover:bg-white/10 rounded-full" aria-label="Edit section">
                                         <span aria-hidden="true" className="material-symbols-outlined text-primary/80 dark:text-white/80">edit</span>
                                     </button>
-                                    <button onClick={() => handleDelete(section.id)} className="tactile-btn p-2 hover:bg-red-500/10 rounded-full">
+                                    <button onClick={() => handleDelete(section.id)} className="tactile-btn p-2 hover:bg-red-500/10 rounded-full" aria-label="Delete section">
                                         <span aria-hidden="true" className="material-symbols-outlined text-red-500/60">delete</span>
                                     </button>
                                 </div>
