@@ -57,23 +57,29 @@ const PrivateHire: React.FC = () => {
            />
          </div>
          
-         <div className="relative z-10 flex flex-col items-center text-center">
-           <h1 className="text-3xl sm:text-4xl md:text-5xl leading-none mb-4 text-white text-shadow-sm animate-hero-headline" style={{ fontFamily: 'var(--font-display)' }}>
-             Curated spaces for <br/> unforgettable moments.
-           </h1>
-           <p className="text-sm sm:text-base text-white/80 mb-4 sm:mb-5 max-w-md tracking-wide leading-relaxed animate-hero-tagline">
-             From intimate dinners to grand receptions, discover the perfect setting for your next event at our Tustin location. Our team handles every detail so you can focus on your guests.
-           </p>
-           <p className="text-xs text-white/50 uppercase tracking-[0.2em] mb-8 sm:mb-10 animate-hero-tagline font-light">
-             Private events for 10 to 600+ guests
-           </p>
-           <div className="flex flex-col gap-3 w-full max-w-xs animate-hero-cta">
-             <Link 
-               to="/private-hire/inquire"
-               className="w-full py-4 rounded-[4px] bg-white/30 backdrop-blur-xl text-white font-bold text-xs uppercase tracking-[0.15em] shadow-lg hover:scale-[1.02] hover:bg-white/40 transition-all duration-fast text-center border border-white/40"
-             >
-               Plan Your Event
-             </Link>
+         <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/60 via-black/20 to-transparent pointer-events-none z-[1]" />
+
+         <div className="absolute left-6 bottom-12 md:left-12 md:bottom-20 z-10 max-w-xl animate-hero-headline">
+           <div className="bg-white/10 backdrop-blur-xl border border-white/20 p-8 md:p-12 rounded-xl">
+             <h1 className="mb-4 text-white text-shadow-sm">
+               <span className="block text-4xl md:text-6xl font-light italic" style={{ fontFamily: 'var(--font-display)' }}>Curated</span>
+               <span className="block text-3xl md:text-5xl font-bold uppercase tracking-[0.25em] mt-1" style={{ fontFamily: 'var(--font-body)' }}>Spaces</span>
+             </h1>
+             <p className="text-sm text-white/70 mb-2 max-w-sm leading-relaxed animate-hero-tagline" style={{ fontFamily: 'var(--font-body)' }}>
+               From intimate dinners to grand receptions, discover the perfect setting for your next event. Our team handles every detail so you can focus on your guests.
+             </p>
+             <p className="text-[10px] text-white/40 uppercase tracking-[0.3em] mb-6 animate-hero-tagline" style={{ fontFamily: 'var(--font-label)' }}>
+               Private events for 10 to 600+ guests · Tustin, CA
+             </p>
+             <div className="flex flex-wrap gap-4 animate-hero-cta">
+               <Link
+                 to="/private-hire/inquire"
+                 className="border border-white/40 bg-transparent hover:bg-white/10 text-white px-6 py-3 uppercase tracking-[0.2em] text-[10px] font-medium transition-all"
+                 style={{ fontFamily: 'var(--font-label)' }}
+               >
+                 Plan Your Event
+               </Link>
+             </div>
            </div>
          </div>
        </div>

@@ -134,25 +134,37 @@ const Landing: React.FC = () => {
           />
         </div>
         
-        <div className="relative z-10 flex flex-col items-center text-center">
-          <h1 className="text-3xl sm:text-4xl md:text-5xl font-semibold tracking-tight leading-[1.05] mb-4 text-white text-shadow-sm animate-hero-headline" style={{ fontFamily: 'var(--font-display)' }}>
-            Your Office. <br/> Your Course. <br/> Your Club.
-          </h1>
-          <p className="text-sm sm:text-base text-white/80 mb-8 sm:mb-10 max-w-sm tracking-wide animate-hero-tagline">
-            Formerly Even House — Orange County's private club for professionals who work, play, and connect — all under one roof.
-          </p>
-          <div className="flex flex-col gap-3 w-full max-w-xs animate-hero-cta">
-             <Link to="/tour" className="w-full py-4 rounded-[4px] bg-white text-primary font-bold text-xs uppercase tracking-[0.15em] shadow-lg hover:scale-[1.02] hover:bg-white/90 transition-all duration-fast text-center">
-                Book Your Private Tour
-             </Link>
-             <Link to="/membership" className="tactile-btn w-full py-3 text-white font-medium text-sm hover:opacity-80 transition-opacity flex items-center justify-center gap-2 group">
+        <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/60 via-black/20 to-transparent pointer-events-none z-[1]" />
+
+        <div className="absolute left-6 bottom-12 md:left-12 md:bottom-20 z-10 max-w-xl animate-hero-headline">
+          <div className="bg-white/10 backdrop-blur-xl border border-white/20 p-8 md:p-12 rounded-xl">
+            <h1 className="mb-4 text-white text-shadow-sm">
+              <span className="block text-4xl md:text-6xl font-light italic" style={{ fontFamily: 'var(--font-display)' }}>Your</span>
+              <span className="block text-3xl md:text-5xl font-bold uppercase tracking-[0.25em] mt-1" style={{ fontFamily: 'var(--font-body)' }}>Office. Course. Club.</span>
+            </h1>
+            <p className="text-sm text-white/70 mb-2 max-w-sm leading-relaxed animate-hero-tagline" style={{ fontFamily: 'var(--font-body)' }}>
+              Orange County's private club for professionals who work, play, and connect — all under one roof.
+            </p>
+            <p className="text-[10px] text-white/40 uppercase tracking-[0.3em] mb-6 animate-hero-tagline" style={{ fontFamily: 'var(--font-label)' }}>
+              Formerly Even House · Tustin, CA
+            </p>
+            <div className="flex flex-wrap gap-4 animate-hero-cta">
+              <Link
+                to="/tour"
+                className="border border-white/40 bg-transparent hover:bg-white/10 text-white px-6 py-3 uppercase tracking-[0.2em] text-[10px] font-medium transition-all"
+                style={{ fontFamily: 'var(--font-label)' }}
+              >
+                Private Tour
+              </Link>
+              <Link
+                to="/membership"
+                className="border border-white/40 bg-transparent hover:bg-white/10 text-white px-6 py-3 uppercase tracking-[0.2em] text-[10px] font-medium transition-all"
+                style={{ fontFamily: 'var(--font-label)' }}
+              >
                 Explore Membership
-                <span className="material-symbols-outlined text-lg group-hover:translate-x-0.5 transition-transform">arrow_forward</span>
-             </Link>
+              </Link>
+            </div>
           </div>
-          <p className="mt-4 text-[10px] sm:text-xs text-white/60 uppercase tracking-[0.2em] font-medium animate-hero-cta">
-            Limited membership. Book a tour to secure your spot.
-          </p>
         </div>
       </div>
 
