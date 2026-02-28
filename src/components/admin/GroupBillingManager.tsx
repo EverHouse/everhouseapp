@@ -330,6 +330,7 @@ const GroupBillingManager: React.FC<GroupBillingManagerProps> = ({ memberEmail }
             <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
             <button
               onClick={() => setError(null)}
+              aria-label="Dismiss error"
               className="ml-auto p-1 hover:bg-red-100 dark:hover:bg-red-500/20 rounded"
             >
               <span className="material-symbols-outlined text-red-500 text-base">close</span>
@@ -435,6 +436,7 @@ const GroupBillingManager: React.FC<GroupBillingManagerProps> = ({ memberEmail }
                       <button
                         onClick={handleUpdateGroupName}
                         disabled={isSavingGroupName}
+                        aria-label="Save group name"
                         className="p-1 text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-500/10 rounded"
                       >
                         {isSavingGroupName ? (
@@ -448,6 +450,7 @@ const GroupBillingManager: React.FC<GroupBillingManagerProps> = ({ memberEmail }
                           setIsEditingGroupName(false);
                           setEditedGroupName('');
                         }}
+                        aria-label="Cancel editing group name"
                         className="p-1 text-gray-400 hover:bg-gray-100 dark:hover:bg-white/10 rounded"
                       >
                         <span className="material-symbols-outlined text-sm">close</span>

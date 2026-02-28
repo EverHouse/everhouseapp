@@ -801,6 +801,7 @@ const RedeemDayPassSection: React.FC<SectionProps> = ({ onClose, variant = 'moda
           <button
             onClick={handleSearch}
             disabled={!searchEmail.trim() || isSearching}
+            aria-label="Search visitor"
             className="tactile-btn shrink-0 px-3 py-3 rounded-xl bg-teal-500 text-white font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
             {isSearching ? (
@@ -839,6 +840,7 @@ const RedeemDayPassSection: React.FC<SectionProps> = ({ onClose, variant = 'moda
             <button
               onClick={handleManualPassIdSubmit}
               disabled={!manualPassId.trim() || redeemingId !== null}
+              aria-label="Submit pass ID"
               className="tactile-btn px-4 py-3 rounded-xl bg-teal-500 text-white font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {redeemingId !== null ? (
