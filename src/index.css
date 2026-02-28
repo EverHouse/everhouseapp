@@ -758,6 +758,23 @@ input, select, textarea {
   font-family: var(--font-body);
 }
 
+/* Optical baseline correction — serif fonts sit higher than Material Icons */
+.flex.items-center > h1,
+.flex.items-center > h2,
+.flex.items-center > h3,
+.flex.items-center > h4,
+.flex.items-center > h5,
+.flex.items-center > h6 {
+  transform: translateY(1px);
+}
+
+/* Consistent icon-text gap in flex rows */
+.material-symbols-outlined + span,
+.material-symbols-outlined + p,
+.material-symbols-outlined + div {
+  margin-left: 0.125rem;
+}
+
 /* Editorial Spacing — generous breathing room for luxury typography */
 /* Low specificity defaults — Tailwind utilities (p-*, px-*, py-*) override these */
 .glass-card:not([class*="p-"]):not([class*="px-"]):not([class*="py-"]),

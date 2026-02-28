@@ -161,14 +161,14 @@ const DailySummaryCard: React.FC<SectionProps> = ({ onClose, variant = 'modal' }
               .map(([key, cents]) => {
                 const cat = categoryLabels[key] || { label: key, icon: 'circle' };
                 return (
-                  <div key={key} className="flex items-center justify-between py-1">
-                    <div className="flex items-center gap-2">
-                      <span className="material-symbols-outlined text-lg text-primary/60 dark:text-white/60">
+                  <div key={key} className="flex items-center justify-between py-1.5">
+                    <div className="flex items-center gap-3">
+                      <span className="material-symbols-outlined text-xl text-primary/60 dark:text-white/60">
                         {cat.icon}
                       </span>
-                      <span className="text-sm text-primary dark:text-white">{cat.label}</span>
+                      <span className="text-base text-primary dark:text-white">{cat.label}</span>
                     </div>
-                    <span className="font-semibold text-primary dark:text-white">
+                    <span className="text-base font-semibold text-primary dark:text-white">
                       {formatCurrency(cents)}
                     </span>
                   </div>

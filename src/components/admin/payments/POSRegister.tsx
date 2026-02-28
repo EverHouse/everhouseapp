@@ -485,9 +485,9 @@ const POSRegister: React.FC = () => {
         addedProductId === product.productId ? 'scale-95 ring-2 ring-emerald-400/50' : ''
       }`}
     >
-      <span className="material-symbols-outlined text-2xl text-primary dark:text-white">{product.icon}</span>
-      <span className="text-xs font-medium text-primary dark:text-white leading-tight">{product.name}</span>
-      <span className="text-sm font-bold text-primary dark:text-white">
+      <span className="material-symbols-outlined text-3xl text-primary dark:text-white">{product.icon}</span>
+      <span className="text-sm font-medium text-primary dark:text-white leading-tight">{product.name}</span>
+      <span className="text-lg font-bold text-primary dark:text-white">
         ${(product.priceCents / 100).toFixed(2)}
       </span>
     </button>
