@@ -150,8 +150,8 @@ export const StaffMobileSidebar: React.FC<StaffMobileSidebarProps> = ({
             className="h-10 w-auto object-contain"
           />
           <div>
-            <h1 className="text-white font-bold text-lg leading-tight">Staff Portal</h1>
-            <p className="text-white/50 text-xs">Ever Club</p>
+            <h1 className="text-white font-bold text-lg leading-tight" style={{ fontFamily: 'var(--font-body)' }}>Staff Portal</h1>
+            <p className="text-white/50 text-xs" style={{ fontFamily: 'var(--font-body)' }}>Ever Club</p>
           </div>
         </button>
 
