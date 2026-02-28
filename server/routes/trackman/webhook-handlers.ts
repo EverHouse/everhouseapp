@@ -567,9 +567,9 @@ export async function saveToUnmatchedBookings(
     
     if (existingRows.length > 0) {
       await db.execute(sql`UPDATE trackman_unmatched_bookings 
-         SET booking_date = ${slotDate}, start_time = ${startTime}, end_time = ${endTime}, bay_number = ${resourceId},
-             original_email = ${customerEmail}, user_name = ${customerName}, player_count = ${playerCount}, 
-             match_attempt_reason = COALESCE(${reason}, match_attempt_reason),
+         SET booking_date = ${slotDate}, start_time = ${startTime}, end_time = ${endTime}, bay_number = ${resourceId ?? null},
+             original_email = ${customerEmail ?? null}, user_name = ${customerName ?? null}, player_count = ${playerCount}, 
+             match_attempt_reason = COALESCE(${reason ?? null}, match_attempt_reason),
              updated_at = NOW()
          WHERE trackman_booking_id = ${trackmanBookingId}`);
       return { success: true, id: existingRows[0].id };
@@ -578,7 +578,7 @@ export async function saveToUnmatchedBookings(
     const result = await db.execute(sql`INSERT INTO trackman_unmatched_bookings 
        (trackman_booking_id, booking_date, start_time, end_time, bay_number, 
         original_email, user_name, player_count, status, match_attempt_reason, created_at)
-       VALUES (${trackmanBookingId}, ${slotDate}, ${startTime}, ${endTime}, ${resourceId}, ${customerEmail}, ${customerName}, ${playerCount}, 'pending', ${reason || 'no_member_match'}, NOW())
+       VALUES (${trackmanBookingId}, ${slotDate}, ${startTime}, ${endTime}, ${resourceId ?? null}, ${customerEmail ?? null}, ${customerName ?? null}, ${playerCount}, 'pending', ${reason || 'no_member_match'}, NOW())
        RETURNING id`);
     const insertedRows = result.rows as unknown as IdRow[];
     
