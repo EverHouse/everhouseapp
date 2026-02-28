@@ -26,8 +26,8 @@ const EditorialShowcase: React.FC<EditorialShowcaseProps> = ({
 }) => {
   return (
     <section className={`bg-bone dark:bg-[#141414] ${className}`}>
-      <div className={`grid grid-cols-1 md:grid-cols-2 min-h-[600px] lg:min-h-[700px] ${reversed ? '' : ''}`}>
-        <div className={`relative overflow-hidden ${reversed ? 'md:order-2' : 'md:order-1'}`}>
+      <div className="flex flex-col md:flex-row md:min-h-[600px] lg:min-h-[700px]">
+        <div className={`relative overflow-hidden h-72 md:h-auto md:w-1/2 ${reversed ? 'md:order-2' : 'md:order-1'}`}>
           <img
             src={image}
             alt={imageAlt}
@@ -36,25 +36,23 @@ const EditorialShowcase: React.FC<EditorialShowcaseProps> = ({
           />
         </div>
 
-        <div className={`flex flex-col justify-center px-8 py-16 md:px-12 lg:px-20 md:py-20 lg:py-24 ${reversed ? 'md:order-1' : 'md:order-2'}`}>
+        <div className={`flex flex-col justify-center p-6 md:p-12 lg:px-20 lg:py-24 md:w-1/2 ${reversed ? 'md:order-1' : 'md:order-2'}`}>
           <span
-            className="text-[0.75rem] uppercase text-primary/50 dark:text-white/50 mb-6 block"
+            className="text-[10px] uppercase text-primary/50 dark:text-white/50 mb-6 block text-left"
             style={{
               fontFamily: 'var(--font-label)',
               fontWeight: 700,
-              fontStretch: '75%',
-              letterSpacing: '0.15em',
+              letterSpacing: '0.4em',
             }}
           >
             {overline}
           </span>
 
           <h2
-            className="text-primary dark:text-white mb-6 md:mb-8"
+            className="text-3xl md:text-4xl text-primary dark:text-white mb-6 md:mb-8"
             style={{
               fontFamily: 'var(--font-display)',
-              fontSize: 'clamp(2.25rem, 5vw, 6rem)',
-              lineHeight: 1,
+              lineHeight: 1.1,
               letterSpacing: '-0.02em',
             }}
           >
@@ -62,10 +60,9 @@ const EditorialShowcase: React.FC<EditorialShowcaseProps> = ({
           </h2>
 
           <p
-            className="text-base md:text-lg text-primary/70 dark:text-white/70 mb-8 md:mb-10 max-w-lg"
+            className="text-sm text-primary/70 dark:text-white/70 mb-8 md:mb-10 max-w-lg leading-relaxed"
             style={{
               fontFamily: 'var(--font-body)',
-              lineHeight: 1.75,
             }}
           >
             {description}
@@ -74,14 +71,10 @@ const EditorialShowcase: React.FC<EditorialShowcaseProps> = ({
           {ctaLabel && ctaLink && (
             <Link
               to={ctaLink}
-              className="inline-flex items-center gap-2 text-sm font-medium text-primary dark:text-white hover:text-primary/70 dark:hover:text-white/70 transition-colors group w-fit"
+              className="inline-flex items-center justify-center px-6 py-3 text-[11px] uppercase tracking-widest font-medium text-primary dark:text-white border border-primary/30 dark:border-white/30 hover:border-primary dark:hover:border-white hover:bg-primary/5 dark:hover:bg-white/5 transition-all w-fit"
+              style={{ fontFamily: 'var(--font-label)' }}
             >
-              <span className="border-b border-primary/30 dark:border-white/30 group-hover:border-primary/60 dark:group-hover:border-white/60 transition-colors pb-0.5">
-                {ctaLabel}
-              </span>
-              <span className="material-symbols-outlined text-lg group-hover:translate-x-1 transition-transform">
-                arrow_forward
-              </span>
+              {ctaLabel}
             </Link>
           )}
         </div>

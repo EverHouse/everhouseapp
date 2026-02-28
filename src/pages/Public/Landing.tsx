@@ -5,7 +5,6 @@ import BackToTop from '../../components/BackToTop';
 import { usePageReady } from '../../contexts/PageReadyContext';
 import { useData } from '../../contexts/DataContext';
 import { useParallax } from '../../hooks/useParallax';
-import EditorialSection from '../../components/layout/EditorialSection';
 import EditorialShowcase from '../../components/layout/EditorialShowcase';
 import { AnimatedPage } from '../../components/motion';
 import SEO from '../../components/SEO';
@@ -205,27 +204,31 @@ const Landing: React.FC = () => {
       </div>
 
       <div>
-        <EditorialSection
-          image="/images/golf-sims-optimized.webp"
+        <EditorialShowcase
+          overline="Tour-Level Technology"
           title={<>Trackman Golf <em style={{ fontStyle: 'italic' }}>Simulators</em></>}
-          description="Four state-of-the-art Trackman 4 bays for year-round play. Practice your swing, play world-class courses, or compete with friends — rain or shine. No tee time needed."
-          ctaLabel="Get a Day Pass"
+          description="Four state-of-the-art Trackman 4 bays deliver tour-level ball and club data for year-round play. Practice your swing, take on 100+ championship courses, or host a competitive league night — rain or shine, no tee time required."
+          image="/images/golf-sims-optimized.webp"
+          imageAlt="Trackman golf simulator bay at Ever Club"
+          ctaLabel="Book a Bay"
           ctaLink="/checkout?type=day-pass-golf-sim"
           reversed={true}
         />
 
-        <EditorialSection
+        <EditorialShowcase
+          overline="Curated Programming"
+          title={<>Events & <em style={{ fontStyle: 'italic' }}>Wellness</em></>}
+          description="From intimate wine tastings and chef-led dinners to golf socials and guided wellness workshops, our curated calendar is designed to spark connection and inspire something new every week."
           image="/images/private-dining-optimized.webp"
-          title={<>Curated Events & <em style={{ fontStyle: 'italic' }}>Wellness</em></>}
-          description="From intimate tastings to golf socials and wellness workshops, discover experiences designed to inspire and connect."
-          ctaLabel="See What's On"
+          imageAlt="Curated events and wellness programming at Ever Club"
+          ctaLabel="Explore Events"
           ctaLink="/whats-on"
           reversed={false}
         />
         
         <EditorialShowcase
           overline="Chef-Driven Cafe"
-          title={<>Farm-to-Table <em className="not-italic" style={{ fontStyle: 'italic' }}>Dining</em></>}
+          title={<>Farm-to-Table <em style={{ fontStyle: 'italic' }}>Dining</em></>}
           description="Thoughtfully crafted dishes and specialty coffee in a relaxed atmosphere. From morning espresso to afternoon bites, fuel your day with locally-sourced ingredients and a menu designed for both quick visits and lingering conversations."
           image="/images/cafe-bar-optimized.webp"
           imageAlt="Ever Club farm-to-table cafe and bar"
@@ -234,11 +237,13 @@ const Landing: React.FC = () => {
           reversed={true}
         />
         
-        <EditorialSection
-          image="/images/gallery/gallery-l1050509.webp"
+        <EditorialShowcase
+          overline="Designed for Focus"
           title={<>Luxury <em style={{ fontStyle: 'italic' }}>Workspaces</em></>}
-          description="Thoughtfully designed spaces where productivity meets comfort. High-speed wifi, private conference rooms, and an inspiring atmosphere."
-          ctaLabel="View Gallery"
+          description="Thoughtfully appointed private offices, conference rooms, and open lounges with high-speed fiber, espresso on demand, and an atmosphere built for deep work and creative collaboration."
+          image="/images/gallery/gallery-l1050509.webp"
+          imageAlt="Luxury co-working spaces at Ever Club"
+          ctaLabel="View Spaces"
           ctaLink="/gallery"
           reversed={false}
         />
