@@ -288,6 +288,11 @@ export async function approveBooking(params: ApproveBookingParams) {
       throw { statusCode: 404, error: 'Request not found' };
     }
 
+    const assignedBayForLock = resource_id || req_data.resourceId;
+    if (assignedBayForLock && req_data.requestDate) {
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${String(assignedBayForLock)} || '::' || ${req_data.requestDate}))`);
+    }
+
     const allowedForApproval = ['pending', 'pending_approval'];
     if (!allowedForApproval.includes(req_data.status || '')) {
       const alreadyApprovedStatuses = ['approved', 'confirmed', 'attended'];

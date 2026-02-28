@@ -6,7 +6,7 @@ import { eq, and, or, ne, desc, sql, SQL, inArray } from 'drizzle-orm';
 import { sendPushNotification } from '../push';
 import { checkDailyBookingLimit, getMemberTierByEmail, getTierLimits, getDailyBookedMinutes } from '../../core/tierService';
 import { notifyAllStaff } from '../../core/notificationService';
-import { formatNotificationDateTime, formatDateDisplayWithDay, formatTime12Hour, createPacificDate } from '../../utils/dateUtils';
+import { formatNotificationDateTime, formatDateDisplayWithDay, formatTime12Hour, createPacificDate, getTodayPacific } from '../../utils/dateUtils';
 import {logAndRespond, logger } from '../../core/logger';
 import { bookingEvents } from '../../core/bookingEvents';
 import { broadcastAvailabilityUpdate } from '../../core/websocket';
@@ -459,6 +459,11 @@ router.post('/api/booking-requests', bookingRateLimiter, async (req, res) => {
         validatedDate.getMonth() !== month - 1 || 
         validatedDate.getDate() !== day) {
       return res.status(400).json({ error: 'Invalid date - date does not exist (e.g., Feb 30)' });
+    }
+    
+    const todayPacific = getTodayPacific();
+    if (request_date < todayPacific) {
+      return res.status(400).json({ error: 'Cannot create bookings in the past' });
     }
     
     const sessionEmail = sessionUser.email?.toLowerCase() || '';

@@ -3625,7 +3625,7 @@ async function handleSubscriptionUpdated(client: PoolClient, subscription: Strip
       await client.query(
         `UPDATE users SET membership_status = 'active', billing_provider = 'stripe', stripe_current_period_end = COALESCE($2, stripe_current_period_end), updated_at = NOW() 
          WHERE id = $1 
-         AND (membership_status IS NULL OR membership_status IN ('pending', 'inactive', 'non-member', 'past_due'))
+         AND (membership_status IS NULL OR membership_status IN ('pending', 'inactive', 'non-member', 'past_due', 'trialing'))
          AND COALESCE(membership_status, '') NOT IN ('cancelled', 'suspended', 'terminated')`,
         [userId, subscriptionPeriodEnd]
       );
@@ -3670,7 +3670,7 @@ async function handleSubscriptionUpdated(client: PoolClient, subscription: Strip
              WHERE gm.billing_group_id = $1 
              AND gm.is_active = true
              AND LOWER(u.email) = LOWER(gm.member_email)
-             AND u.membership_status IN ('past_due', 'suspended')
+             AND u.membership_status IN ('past_due', 'suspended', 'trialing')
              AND (u.billing_provider IS NULL OR u.billing_provider = '' OR u.billing_provider = 'stripe' OR u.billing_provider = 'family_addon')
              RETURNING u.email`,
             [group.id]
