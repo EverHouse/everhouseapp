@@ -137,6 +137,7 @@ interface DashboardData {
   events: { id: number; title: string; event_date: string; start_time: string }[];
   guestPasses: GuestPasses | null;
   bannerAnnouncement: BannerAnnouncement | null;
+  lifetimeVisitCount?: number;
 }
 
 const formatDate = (dateStr: string): string => {
@@ -899,9 +900,12 @@ const Dashboard: React.FC = () => {
                           {user?.joinDate && (
                             <p className="text-xs mt-2" style={{ color: `${cardTextColor}80` }}>Joined {formatMemberSince(user.joinDate)}</p>
                           )}
-                          {user?.lifetimeVisits !== undefined && (
-                            <p className="text-xs" style={{ color: `${cardTextColor}80` }}>{user.lifetimeVisits} {user.lifetimeVisits === 1 ? 'lifetime visit' : 'lifetime visits'}</p>
-                          )}
+                          {(() => {
+                            const visitCount = dashboardData?.lifetimeVisitCount ?? user?.lifetimeVisits;
+                            return visitCount !== undefined ? (
+                              <p className="text-xs" style={{ color: `${cardTextColor}80` }}>{visitCount} {visitCount === 1 ? 'lifetime visit' : 'lifetime visits'}</p>
+                            ) : null;
+                          })()}
                         </>
                       )}
                     </div>

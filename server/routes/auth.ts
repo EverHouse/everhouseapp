@@ -1077,6 +1077,18 @@ router.get('/api/auth/session', async (req, res) => {
     req.session.save(() => {});
   }
 
+  let lifetimeVisits = 0;
+  try {
+    const visitResult = await db.execute(
+      sql`SELECT lifetime_visits FROM users WHERE LOWER(email) = LOWER(${sessionUser.email}) LIMIT 1`
+    );
+    const rows = visitResult.rows as Record<string, unknown>[];
+    if (rows.length > 0 && rows[0].lifetime_visits != null) {
+      lifetimeVisits = Number(rows[0].lifetime_visits);
+    }
+  } catch {
+  }
+
   res.json({
     authenticated: true,
     member: {
@@ -1090,7 +1102,8 @@ router.get('/api/auth/session', async (req, res) => {
       mindbodyClientId: sessionUser.mindbodyClientId || '',
       status: sessionUser.status || 'Active',
       role: freshRole,
-      dateOfBirth: sessionUser.dateOfBirth || null
+      dateOfBirth: sessionUser.dateOfBirth || null,
+      lifetimeVisits
     }
   });
 });

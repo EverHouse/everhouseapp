@@ -149,7 +149,7 @@ export const AuthDataProvider: React.FC<{children: ReactNode}> = ({ children }) 
               jobTitle: sessionData.member.jobTitle || '',
               role: sessionData.member.role || 'member',
               mindbodyClientId: sessionData.member.mindbodyClientId || '',
-              lifetimeVisits: 0,
+              lifetimeVisits: sessionData.member.lifetimeVisits || 0,
               lastBookingDate: undefined,
               dateOfBirth: sessionData.member.dateOfBirth || null
             };
