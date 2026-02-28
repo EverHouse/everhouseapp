@@ -149,7 +149,7 @@ interface WellnessCardProps {
 }
 
 const WellnessCard: React.FC<WellnessCardProps> = ({ isDesktopGrid, isDesktop, upcomingWellness, today, onNavigateToWellness }) => (
-  <div className={`${isDesktopGrid ? 'h-full min-h-[280px]' : 'min-h-[200px]'} flex flex-col bg-white/40 dark:bg-white/[0.08] backdrop-blur-xl border border-white/60 dark:border-white/[0.12] rounded-2xl p-4 shadow-liquid dark:shadow-liquid-dark`}>
+  <div className={`${isDesktopGrid ? 'h-full min-h-[280px]' : 'min-h-[200px]'} flex flex-col bg-white/40 dark:bg-white/[0.08] backdrop-blur-xl border border-white/60 dark:border-white/[0.12] rounded-2xl p-4 shadow-liquid dark:shadow-liquid-dark overflow-hidden`}>
     <div className="flex items-center justify-between mb-3 lg:mb-4 flex-shrink-0">
       <h3 className="font-bold text-primary dark:text-white">Upcoming Wellness</h3>
       <button onClick={onNavigateToWellness} className="text-xs text-primary/80 dark:text-white/80 hover:underline">View all</button>
@@ -159,7 +159,7 @@ const WellnessCard: React.FC<WellnessCardProps> = ({ isDesktopGrid, isDesktop, u
         <EmptyState icon="self_improvement" title="No classes scheduled" description={isDesktop ? "Wellness classes will appear here" : undefined} variant="compact" />
       </div>
     ) : (
-      <div className={`${isDesktop ? 'flex-1 overflow-y-auto pb-6' : ''} space-y-2`}>
+      <div className={`${isDesktop ? 'flex-1 overflow-y-auto pb-6' : ''}`}>
         {upcomingWellness.slice(0, isDesktop ? 5 : 3).map((wellness, index) => {
           const dateStr = typeof wellness.date === 'string' ? wellness.date.split('T')[0] : new Date(wellness.date).toISOString().split('T')[0];
           return (
@@ -190,7 +190,7 @@ interface EventsCardProps {
 }
 
 const EventsCard: React.FC<EventsCardProps> = ({ isDesktopGrid, isDesktop, upcomingEvents, today, onNavigateToEvents }) => (
-  <div className={`${isDesktopGrid ? 'h-full min-h-[280px]' : 'min-h-[200px]'} flex flex-col bg-white/40 dark:bg-white/[0.08] backdrop-blur-xl border border-white/60 dark:border-white/[0.12] rounded-2xl p-4 shadow-liquid dark:shadow-liquid-dark`}>
+  <div className={`${isDesktopGrid ? 'h-full min-h-[280px]' : 'min-h-[200px]'} flex flex-col bg-white/40 dark:bg-white/[0.08] backdrop-blur-xl border border-white/60 dark:border-white/[0.12] rounded-2xl p-4 shadow-liquid dark:shadow-liquid-dark overflow-hidden`}>
     <div className="flex items-center justify-between mb-3 lg:mb-4 flex-shrink-0">
       <h3 className="font-bold text-primary dark:text-white">Upcoming Events</h3>
       <button onClick={onNavigateToEvents} className="text-xs text-primary/80 dark:text-white/80 hover:underline">View all</button>
@@ -200,7 +200,7 @@ const EventsCard: React.FC<EventsCardProps> = ({ isDesktopGrid, isDesktop, upcom
         <EmptyState icon="celebration" title="No events scheduled" description={isDesktop ? "Events will appear here" : undefined} variant="compact" />
       </div>
     ) : (
-      <div className={`${isDesktop ? 'flex-1 overflow-y-auto pb-6' : ''} space-y-2`}>
+      <div className={`${isDesktop ? 'flex-1 overflow-y-auto pb-6' : ''}`}>
         {upcomingEvents.slice(0, isDesktop ? 5 : 3).map((event, index) => {
           const dateStr = event.event_date;
           const hasStartTime = event.start_time && event.start_time !== '00:00';

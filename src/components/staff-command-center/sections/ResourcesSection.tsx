@@ -21,7 +21,7 @@ const NoticeBoardCard = memo<NoticeBoardCardProps>(({
   upcomingClosure,
   navigateToTab
 }) => (
-  <div className={`${variant === 'desktop' ? 'h-full' : ''} bg-white/40 dark:bg-white/[0.08] backdrop-blur-xl border border-white/60 dark:border-white/[0.12] rounded-2xl p-4 shadow-liquid dark:shadow-liquid-dark ${variant === 'desktop' ? 'flex flex-col' : ''}`}>
+  <div className={`${variant === 'desktop' ? 'h-full' : ''} bg-white/40 dark:bg-white/[0.08] backdrop-blur-xl border border-white/60 dark:border-white/[0.12] rounded-2xl p-4 shadow-liquid dark:shadow-liquid-dark overflow-hidden ${variant === 'desktop' ? 'flex flex-col' : ''}`}>
     <div className="flex items-center justify-between mb-3 lg:mb-4">
       <h3 className="font-bold text-primary dark:text-white">Internal Notice Board</h3>
       <button onClick={() => navigateToTab('blocks')} className="text-xs text-primary/80 dark:text-white/80 hover:underline tactile-btn">Manage</button>

@@ -640,7 +640,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const headerBtnClasses = "text-white hover:opacity-70 active:scale-95 transition-opacity duration-fast";
 
   const headerContent = showHeader ? (
-    <header className={`fixed top-0 left-0 right-0 flex items-center px-4 sm:px-6 pt-[max(16px,env(safe-area-inset-top))] pb-4 pointer-events-auto transition-[box-shadow,border-color] duration-normal ${headerClasses}`} style={{ zIndex: 'var(--z-header)' }} role="banner">
+    <header className={`fixed top-0 left-0 right-0 flex items-center px-4 sm:px-6 min-h-16 pt-[env(safe-area-inset-top,0px)] pointer-events-auto transition-[box-shadow,border-color] duration-normal ${headerClasses}`} style={{ zIndex: 'var(--z-header)' }} role="banner">
       {/* Left section - flex-1 for symmetric spacing with right */}
       <div className="flex-1 flex justify-start">
         {isMemberRoute ? (
