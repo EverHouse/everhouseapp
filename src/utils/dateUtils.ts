@@ -29,6 +29,7 @@ const SHORT_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'S
 const LONG_MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
 export function formatDateLocal(dateStr: string, options?: Intl.DateTimeFormatOptions): string {
+  if (!dateStr) return 'Unknown date';
   const cleanDate = dateStr.split('T')[0];
   const [year, month, day] = cleanDate.split('-').map(Number);
   const dayOfWeek = getDayOfWeek(year, month, day);
@@ -47,6 +48,7 @@ export function formatDateShort(dateStr: string): string {
 }
 
 export function formatDateDisplay(dateStr: string): string {
+  if (!dateStr) return 'Unknown date';
   const cleanDate = dateStr.split('T')[0];
   const [, month, day] = cleanDate.split('-').map(Number);
   return `${SHORT_MONTHS[month - 1]} ${day}`;
@@ -119,6 +121,7 @@ export function getNowTimePacific(): string {
 }
 
 export function addDaysToPacificDate(dateStr: string, days: number): string {
+  if (!dateStr) return getTodayPacific();
   const [year, month, day] = dateStr.split('-').map(Number);
   const date = new Date(Date.UTC(year, month - 1, day + days));
   return date.toISOString().split('T')[0];
@@ -212,6 +215,7 @@ export function isFacilityOpen(): { isOpen: boolean; reason?: string } {
  * Optimized for Pacific timezone
  */
 export function getRelativeDateLabel(dateStr: string): string {
+  if (!dateStr) return 'Unknown date';
   const today = getTodayPacific();
   const cleanDate = dateStr.split('T')[0];
   

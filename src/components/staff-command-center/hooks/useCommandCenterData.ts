@@ -31,7 +31,7 @@ export function useCommandCenterData(userEmail?: string) {
   const memberNameByEmail = hubspotQuery.data ?? new Map<string, string>();
 
   const getDisplayName = useCallback((email: string | null | undefined, originalName: string | null): string => {
-    if (email) {
+    if (email && typeof email === 'string') {
       const hubspotName = memberNameByEmail.get(email.toLowerCase());
       if (hubspotName) return hubspotName;
     }

@@ -104,5 +104,3 @@ const SocialLink: React.FC<{href: string; icon: 'instagram' | 'linkedin' | 'tikt
     </a>
   );
 };
-
-export default Footer;
