@@ -15,6 +15,7 @@ import { formatPhoneNumber } from '../../../utils/formatting';
 import { getTierColor } from '../../../utils/tierUtils';
 import { getMemberStatusLabel, getMemberStatusBadgeClass } from '../../../utils/statusColors';
 import { AnimatedPage } from '../../../components/motion';
+import FloatingActionButton from '../../../components/FloatingActionButton';
 import { fetchWithCredentials, postWithCredentials } from '../../../hooks/queries/useFetch';
 import { useToast } from '../../../components/Toast';
 import { useAutoAnimate } from '@formkit/auto-animate/react';
@@ -2110,29 +2111,14 @@ const DirectoryTab: React.FC = () => {
                 defaultMode="member"
             />
 
-            {!drawerOpen && createPortal(
-                <div 
-                    className="fixed right-5 z-[9998]" 
-                    style={{ 
-                        bottom: isMobile 
-                            ? (isAtBottom 
-                                ? 'calc(24px + env(safe-area-inset-bottom, 0px))' 
-                                : 'calc(140px + env(safe-area-inset-bottom, 0px))')
-                            : '24px',
-                        transition: 'bottom 0.3s ease-out'
-                    }}
-                >
-                    <button
-                        onClick={() => setAddMemberModalOpen(true)}
-                        aria-label="Add new user"
-                        className="w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-all duration-normal hover:scale-110 active:scale-95 bg-green-600 text-white backdrop-blur-xl border border-white/30"
-                        title="Add New User"
-                    >
-                        <span className="material-symbols-outlined text-2xl" aria-hidden="true">person_add</span>
-                    </button>
-                </div>,
-                document.body
-            )}
+            <FloatingActionButton
+                onClick={() => setAddMemberModalOpen(true)}
+                color="green"
+                icon="person_add"
+                label="Add new user"
+                extended
+                text="Add User"
+            />
 
             {assignTierModalOpen && memberToAssignTier && createPortal(
                 <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
