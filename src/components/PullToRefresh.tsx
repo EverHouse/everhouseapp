@@ -123,6 +123,8 @@ const PullToRefresh: React.FC<PullToRefreshProps> = ({ children, disabled = fals
     setIsFillingScreen(false);
     setIsRefreshing(true);
     
+    await new Promise(resolve => setTimeout(resolve, 1200));
+    
     window.location.reload();
   }, [isRefreshing, isFillingScreen]);
 
@@ -283,6 +285,8 @@ const PullToRefresh: React.FC<PullToRefreshProps> = ({ children, disabled = fals
 
         setIsFillingScreen(false);
         setIsRefreshing(true);
+
+        await new Promise(resolve => setTimeout(resolve, 1200));
 
         window.location.reload();
       } else {
