@@ -29,7 +29,7 @@ type CategoryTab = 'all' | 'passes' | 'cafe' | 'merch';
 const PASS_PRODUCTS = [
   { productId: 'prod_TvPiZ9a7L3BqZX', name: 'Day Pass - Coworking', priceCents: 3500, icon: 'workspace_premium' },
   { productId: 'prod_TvPiHiafkZcoKR', name: 'Day Pass - Golf Sim', priceCents: 5000, icon: 'sports_golf' },
-  { productId: 'prod_U44zVd9eX7Ujsd', name: 'Guest Fee - Simulator', priceCents: 2500, icon: 'person_add' },
+  { productId: 'prod_TvPiDx3od1F7xY', name: 'Guest Fee - Simulator', priceCents: 2500, icon: 'person_add' },
 ];
 
 const CAFE_CATEGORY_ICONS: Record<string, string> = {
