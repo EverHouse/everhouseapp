@@ -10,7 +10,7 @@ export function getStripeAppearance(isDark: boolean): Appearance {
         colorText: '#ffffff',
         colorTextSecondary: '#a3a3a3',
         colorDanger: '#ff6b6b',
-        fontFamily: 'system-ui, sans-serif',
+        fontFamily: "'Instrument Sans', sans-serif",
         borderRadius: '8px',
         colorIcon: '#5fa36b',
       },
@@ -52,7 +52,7 @@ export function getStripeAppearance(isDark: boolean): Appearance {
       colorBackground: '#ffffff',
       colorText: '#31543C',
       colorDanger: '#df1b41',
-      fontFamily: 'system-ui, sans-serif',
+      fontFamily: "'Instrument Sans', sans-serif",
       borderRadius: '8px',
     },
   };
