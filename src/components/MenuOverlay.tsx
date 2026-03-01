@@ -20,6 +20,9 @@ const MenuOverlay: React.FC<MenuOverlayProps> = ({ isOpen, onClose }) => {
   const [isClosing, setIsClosing] = useState(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const originalBgRef = useRef<string>('');
+  const scrollingRef = useRef(false);
+  const touchStartYRef = useRef<number | null>(null);
+  const scrollCooldownRef = useRef<NodeJS.Timeout | null>(null);
 
   const menuBgColor = isDark ? '#141414' : '#F2F2EC';
 
@@ -116,13 +119,36 @@ const MenuOverlay: React.FC<MenuOverlayProps> = ({ isOpen, onClose }) => {
                 </button>
             </div>
             
-            <nav className="flex flex-col gap-0 flex-1 overflow-y-auto scrollbar-hide py-4">
-                <MenuLink label="Membership" onClick={() => handleNav('/membership')} staggerIndex={0} isDark={isDark} />
-                <MenuLink label="Cafe" onClick={() => handleNav('/menu')} staggerIndex={1} isDark={isDark} />
-                <MenuLink label="Host Events" onClick={() => handleNav('/private-hire')} staggerIndex={2} isDark={isDark} />
-                <MenuLink label="What's On" onClick={() => handleNav('/whats-on')} staggerIndex={3} isDark={isDark} />
-                <MenuLink label="Gallery" onClick={() => handleNav('/gallery')} staggerIndex={4} isDark={isDark} />
-                <MenuLink label="FAQ" onClick={() => handleNav('/faq')} staggerIndex={5} isDark={isDark} />
+            <nav
+              className="flex flex-col gap-0 flex-1 overflow-y-auto scrollbar-hide py-4"
+              onTouchStart={(e) => {
+                touchStartYRef.current = e.touches[0].clientY;
+                if (scrollCooldownRef.current) {
+                  clearTimeout(scrollCooldownRef.current);
+                  scrollCooldownRef.current = null;
+                }
+              }}
+              onTouchMove={(e) => {
+                if (touchStartYRef.current !== null && Math.abs(e.touches[0].clientY - touchStartYRef.current) > 8) {
+                  scrollingRef.current = true;
+                }
+              }}
+              onTouchEnd={() => {
+                touchStartYRef.current = null;
+                if (scrollingRef.current) {
+                  scrollCooldownRef.current = setTimeout(() => {
+                    scrollingRef.current = false;
+                    scrollCooldownRef.current = null;
+                  }, 300);
+                }
+              }}
+            >
+                <MenuLink label="Membership" onClick={() => handleNav('/membership')} staggerIndex={0} isDark={isDark} scrollingRef={scrollingRef} />
+                <MenuLink label="Cafe" onClick={() => handleNav('/menu')} staggerIndex={1} isDark={isDark} scrollingRef={scrollingRef} />
+                <MenuLink label="Host Events" onClick={() => handleNav('/private-hire')} staggerIndex={2} isDark={isDark} scrollingRef={scrollingRef} />
+                <MenuLink label="What's On" onClick={() => handleNav('/whats-on')} staggerIndex={3} isDark={isDark} scrollingRef={scrollingRef} />
+                <MenuLink label="Gallery" onClick={() => handleNav('/gallery')} staggerIndex={4} isDark={isDark} scrollingRef={scrollingRef} />
+                <MenuLink label="FAQ" onClick={() => handleNav('/faq')} staggerIndex={5} isDark={isDark} scrollingRef={scrollingRef} />
             </nav>
             
             <div className={`mt-4 pt-6 border-t animate-slide-up-stagger ${isDark ? 'border-[#F2F2EC]/10' : 'border-[#293515]/10'}`} style={{ '--stagger-index': 6 } as React.CSSProperties}>
@@ -150,23 +176,20 @@ interface MenuLinkProps {
   onClick: () => void;
   staggerIndex: number;
   isDark: boolean;
+  scrollingRef: React.MutableRefObject<boolean>;
 }
 
-const MenuLink: React.FC<MenuLinkProps> = ({ label, onClick, staggerIndex, isDark }) => {
-  const lastTapRef = useRef(0);
-  
-  const handlePointerUp = () => {
-    if (Date.now() - lastTapRef.current < 350) return;
-    lastTapRef.current = Date.now();
+const MenuLink: React.FC<MenuLinkProps> = ({ label, onClick, staggerIndex, isDark, scrollingRef }) => {
+  const handleClick = () => {
+    if (scrollingRef.current) return;
     onClick();
   };
-  
+
   return (
     <button 
       type="button"
-      onClick={onClick}
-      onPointerUp={handlePointerUp}
-      style={{ '--stagger-index': staggerIndex, touchAction: 'manipulation', animationFillMode: 'both', fontFamily: 'var(--font-label)' } as React.CSSProperties}
+      onClick={handleClick}
+      style={{ '--stagger-index': staggerIndex, touchAction: 'pan-y', animationFillMode: 'both', fontFamily: 'var(--font-label)' } as React.CSSProperties}
       className={`text-left text-sm uppercase tracking-[0.3em] font-medium py-4 transition-all duration-normal animate-slide-up-stagger leading-none min-h-[44px] hoverable-translate active:translate-x-2 tactile-row ${isDark ? 'text-[#F2F2EC]/70 hover:text-[#F2F2EC]' : 'text-[#293515]/70 hover:text-[#293515]'}`}
     >
       {label}

@@ -46,6 +46,9 @@ const MemberMenuOverlay: React.FC<MemberMenuOverlayProps> = ({ isOpen, onClose }
   const [showBugReport, setShowBugReport] = useState(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const originalBgRef = useRef<string>('');
+  const scrollingRef = useRef(false);
+  const touchStartYRef = useRef<number | null>(null);
+  const scrollCooldownRef = useRef<NodeJS.Timeout | null>(null);
 
   const menuBgColor = isDark ? '#141414' : '#F2F2EC';
 
@@ -178,7 +181,30 @@ const MemberMenuOverlay: React.FC<MemberMenuOverlayProps> = ({ isOpen, onClose }
                 </button>
             </div>
             
-            <nav className="flex flex-col gap-0.5 flex-1 overflow-y-auto scrollbar-hide py-2 px-2">
+            <nav
+              className="flex flex-col gap-0.5 flex-1 overflow-y-auto scrollbar-hide py-2 px-2"
+              onTouchStart={(e) => {
+                touchStartYRef.current = e.touches[0].clientY;
+                if (scrollCooldownRef.current) {
+                  clearTimeout(scrollCooldownRef.current);
+                  scrollCooldownRef.current = null;
+                }
+              }}
+              onTouchMove={(e) => {
+                if (touchStartYRef.current !== null && Math.abs(e.touches[0].clientY - touchStartYRef.current) > 8) {
+                  scrollingRef.current = true;
+                }
+              }}
+              onTouchEnd={() => {
+                touchStartYRef.current = null;
+                if (scrollingRef.current) {
+                  scrollCooldownRef.current = setTimeout(() => {
+                    scrollingRef.current = false;
+                    scrollCooldownRef.current = null;
+                  }, 300);
+                }
+              }}
+            >
               {MEMBER_MENU_ITEMS.map((item, index) => (
                 <MemberMenuLink
                   key={item.id}
@@ -187,6 +213,7 @@ const MemberMenuOverlay: React.FC<MemberMenuOverlayProps> = ({ isOpen, onClose }
                   onClick={() => handleNav(item.path)}
                   staggerIndex={index}
                   isDark={isDark}
+                  scrollingRef={scrollingRef}
                 />
               ))}
             </nav>
@@ -230,23 +257,20 @@ interface MemberMenuLinkProps {
   onClick: () => void;
   staggerIndex: number;
   isDark: boolean;
+  scrollingRef: React.MutableRefObject<boolean>;
 }
 
-const MemberMenuLink: React.FC<MemberMenuLinkProps> = ({ item, isActive, onClick, staggerIndex, isDark }) => {
-  const lastTapRef = useRef(0);
-  
-  const handlePointerUp = () => {
-    if (Date.now() - lastTapRef.current < 350) return;
-    lastTapRef.current = Date.now();
+const MemberMenuLink: React.FC<MemberMenuLinkProps> = ({ item, isActive, onClick, staggerIndex, isDark, scrollingRef }) => {
+  const handleClick = () => {
+    if (scrollingRef.current) return;
     onClick();
   };
-  
+
   return (
     <button 
       type="button"
-      onClick={onClick}
-      onPointerUp={handlePointerUp}
-      style={{ '--stagger-index': staggerIndex, touchAction: 'manipulation', animationFillMode: 'both', fontFamily: 'var(--font-label)' } as React.CSSProperties}
+      onClick={handleClick}
+      style={{ '--stagger-index': staggerIndex, touchAction: 'pan-y', animationFillMode: 'both', fontFamily: 'var(--font-label)' } as React.CSSProperties}
       className={`tactile-row flex items-center gap-4 px-4 py-3.5 text-left transition-all duration-normal animate-slide-up-stagger leading-tight min-h-[48px] ${
         isActive
           ? isDark 
