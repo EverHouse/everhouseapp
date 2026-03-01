@@ -8,6 +8,14 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.55.0",
+    date: "2026-03-01",
+    title: "Membership Apply Crash Fix",
+    changes: [
+      "Fix: Membership application page no longer crashes on load — replaced useBlocker (requires data router) with a BrowserRouter-compatible unsaved changes guard using popstate + beforeunload",
+    ]
+  },
+  {
     version: "8.54.0",
     date: "2026-02-28",
     title: "3D Secure Broadcast & Webhook Lock Fixes",
