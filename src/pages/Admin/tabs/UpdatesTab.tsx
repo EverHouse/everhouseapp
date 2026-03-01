@@ -5,6 +5,7 @@ import { useData } from '../../../contexts/DataContext';
 import { usePageReady } from '../../../contexts/PageReadyContext';
 import { formatDateTimePacific, formatRelativeTime } from '../../../utils/dateUtils';
 import { useNotificationSounds } from '../../../hooks/useNotificationSounds';
+import { useVisibilityAwareInterval } from '../../../hooks/useVisibilityAwareInterval';
 import FloatingActionButton from '../../../components/FloatingActionButton';
 import AnnouncementManager from '../../../components/admin/AnnouncementManager';
 import { AnimatedPage } from '../../../components/motion';
@@ -91,10 +92,10 @@ const UpdatesTab: React.FC = () => {
     useEffect(() => {
         if (actualUser?.email) {
             fetchNotifications();
-            const interval = setInterval(fetchNotifications, 30000);
-            return () => clearInterval(interval);
         }
     }, [actualUser?.email, fetchNotifications]);
+
+    useVisibilityAwareInterval(fetchNotifications, 120000, !!actualUser?.email);
 
     const getStaffNotificationRoute = (notif: StaffNotification): string | null => {
         const routeMap: Record<string, string> = {

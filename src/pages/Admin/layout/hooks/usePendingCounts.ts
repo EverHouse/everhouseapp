@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
 interface UsePendingCountsResult {
   pendingRequestsCount: number;
@@ -8,49 +8,37 @@ interface UsePendingCountsResult {
 
 export function usePendingCounts(): UsePendingCountsResult {
   const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
-  const fetchPendingCountRef = useRef<(() => Promise<void>) | undefined>(undefined);
 
-  const fetchPendingCount = useCallback(async () => {
-    try {
-      const res = await fetch('/api/admin/command-center', { credentials: 'include' });
-      if (res.ok) {
-        const data = await res.json();
-        const count = (data.counts?.pendingBookings || 0) + (data.pendingRequests?.length || 0);
-        setPendingRequestsCount(count);
-      }
-    } catch {
+  const handleCommandCenterData = useCallback((e: Event) => {
+    const data = (e as CustomEvent).detail;
+    if (data?.counts) {
+      const count = (data.counts.pendingBookings || 0) + (data.pendingRequests?.length || 0);
+      setPendingRequestsCount(count);
     }
   }, []);
 
-  fetchPendingCountRef.current = fetchPendingCount;
-
   useEffect(() => {
-    fetchPendingCount();
-    const interval = setInterval(fetchPendingCount, 30000);
-    
+    window.addEventListener('command-center-data', handleCommandCenterData);
+
     const handleBookingAction = () => {
       setPendingRequestsCount(prev => Math.max(0, prev - 1));
     };
     window.addEventListener('booking-action-completed', handleBookingAction);
-    
-    const handleBookingUpdate = () => {
-      fetchPendingCount();
-    };
-    window.addEventListener('booking-update', handleBookingUpdate);
-    
+
+    window.dispatchEvent(new CustomEvent('request-command-center-refresh'));
+
     return () => {
-      clearInterval(interval);
+      window.removeEventListener('command-center-data', handleCommandCenterData);
       window.removeEventListener('booking-action-completed', handleBookingAction);
-      window.removeEventListener('booking-update', handleBookingUpdate);
     };
-  }, [fetchPendingCount]);
+  }, [handleCommandCenterData]);
 
   const decrementPendingCount = useCallback(() => {
     setPendingRequestsCount(prev => Math.max(0, prev - 1));
   }, []);
 
   const refetch = useCallback(() => {
-    fetchPendingCountRef.current?.();
+    window.dispatchEvent(new CustomEvent('request-command-center-refresh'));
   }, []);
 
   return { pendingRequestsCount, decrementPendingCount, refetch };

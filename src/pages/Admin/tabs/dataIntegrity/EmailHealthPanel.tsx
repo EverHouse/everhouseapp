@@ -67,6 +67,7 @@ const EmailHealthPanel: React.FC<Props> = ({ isOpen, onToggle }) => {
     queryKey: ['admin', 'monitoring', 'email-health'],
     queryFn: () => fetchWithCredentials<EmailHealthData>('/api/admin/monitoring/email-health'),
     refetchInterval: 60000,
+    refetchIntervalInBackground: false,
     enabled: isOpen,
   });
 

@@ -1,5 +1,8 @@
 import { useEffect, useCallback } from 'react';
 import { useNotificationStore } from '../../../../stores/notificationStore';
+import { useVisibilityAwareInterval } from '../../../../hooks/useVisibilityAwareInterval';
+
+const POLL_INTERVAL = 120000;
 
 interface UseUnreadNotificationsResult {
   unreadNotifCount: number;
@@ -20,7 +23,6 @@ export function useUnreadNotifications(userEmail: string | undefined): UseUnread
     if (!userEmail) return;
     
     fetchUnreadCount(userEmail);
-    const interval = setInterval(() => fetchUnreadCount(userEmail), 30000);
     
     const handleNotificationsRead = () => fetchUnreadCount(userEmail);
     window.addEventListener('notifications-read', handleNotificationsRead);
@@ -32,12 +34,13 @@ export function useUnreadNotifications(userEmail: string | undefined): UseUnread
     window.addEventListener('booking-update', handleBookingUpdate);
     
     return () => {
-      clearInterval(interval);
       window.removeEventListener('notifications-read', handleNotificationsRead);
       window.removeEventListener('member-notification', handleMemberNotification);
       window.removeEventListener('booking-update', handleBookingUpdate);
     };
   }, [userEmail, fetchUnreadCount]);
+
+  useVisibilityAwareInterval(refreshUnreadCount, POLL_INTERVAL, !!userEmail);
 
   return { unreadNotifCount, refreshUnreadCount };
 }

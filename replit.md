@@ -17,7 +17,7 @@ The Ever Club Members App is a private members club application for golf and wel
 - **Audit Logging**: All staff actions must be logged.
 - **API/Frontend Consistency**: API response field names must align exactly with frontend TypeScript interfaces.
 - **Database & Data Integrity**: PostgreSQL, Supabase Realtime, and Drizzle ORM with CASCADE constraints.
-- **Real-time Updates**: WebSocket broadcasting for booking and invoice changes, powered by Supabase Realtime subscriptions. Staff Command Center uses React Query with WebSocket-driven cache invalidation.
+- **Real-time Updates**: WebSocket broadcasting for booking and invoice changes, powered by Supabase Realtime subscriptions. Staff Command Center uses React Query with WebSocket-driven cache invalidation. Safety-net polling uses 120s intervals with visibility-aware pausing (no polling when tab is hidden). `usePendingCounts` derives data from `useCommandCenter` via `command-center-data` CustomEvent to avoid duplicate API calls. Data integrity panels use `refetchIntervalInBackground: false`.
 - **Member Dashboard**: Features a chronological card layout for bookings, events, and wellness sessions with "Add to Calendar" functionality.
 
 ### UI/UX & Frontend

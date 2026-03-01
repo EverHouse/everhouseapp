@@ -20,7 +20,8 @@ const PushNotificationPanel: React.FC<Props> = ({ isOpen, onToggle }) => {
   const { data, isLoading } = useQuery({
     queryKey: ['admin', 'monitoring', 'push-status'],
     queryFn: () => fetchWithCredentials<PushStatus>('/api/admin/monitoring/push-status'),
-    refetchInterval: 30000,
+    refetchInterval: 60000,
+    refetchIntervalInBackground: false,
     enabled: isOpen,
   });
 

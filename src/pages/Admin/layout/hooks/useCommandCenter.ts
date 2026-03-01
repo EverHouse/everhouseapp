@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useVisibilityAwareInterval } from '../../../../hooks/useVisibilityAwareInterval';
 
 export interface CommandCenterCounts {
   pendingBookings: number;
@@ -77,6 +78,8 @@ interface UseCommandCenterResult {
   refetch: () => void;
 }
 
+const POLL_INTERVAL = 120000;
+
 const defaultCounts: CommandCenterCounts = {
   pendingBookings: 0,
   todaysBookings: 0,
@@ -117,6 +120,8 @@ export function useCommandCenter(): UseCommandCenterResult {
       const json = await res.json();
       setData(json);
       setError(null);
+
+      window.dispatchEvent(new CustomEvent('command-center-data', { detail: json }));
     } catch (err: unknown) {
       if (err instanceof Error && err.name === 'AbortError') return;
       console.error('Command center fetch error:', err);
@@ -138,23 +143,27 @@ export function useCommandCenter(): UseCommandCenterResult {
 
   useEffect(() => {
     fetchData();
-    const interval = setInterval(fetchData, 30000);
 
     const handleBookingAction = () => fetchData();
     const handleBookingUpdate = () => fetchData();
     
+    const handleRefreshRequest = () => fetchData();
+
     window.addEventListener('booking-action-completed', handleBookingAction);
     window.addEventListener('booking-update', handleBookingUpdate);
+    window.addEventListener('request-command-center-refresh', handleRefreshRequest);
 
     return () => {
-      clearInterval(interval);
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
       }
       window.removeEventListener('booking-action-completed', handleBookingAction);
       window.removeEventListener('booking-update', handleBookingUpdate);
+      window.removeEventListener('request-command-center-refresh', handleRefreshRequest);
     };
   }, [fetchData]);
+
+  useVisibilityAwareInterval(fetchData, POLL_INTERVAL);
 
   const refetch = useCallback(() => {
     fetchData();

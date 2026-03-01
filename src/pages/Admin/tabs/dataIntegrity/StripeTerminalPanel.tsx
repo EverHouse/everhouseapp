@@ -27,6 +27,7 @@ const StripeTerminalPanel: React.FC<Props> = ({ isOpen, onToggle }) => {
     queryKey: ['admin', 'stripe', 'terminal-readers'],
     queryFn: () => fetchWithCredentials<{ readers: TerminalReader[] }>('/api/stripe/terminal/readers'),
     refetchInterval: 60000,
+    refetchIntervalInBackground: false,
     enabled: isOpen,
   });
 
