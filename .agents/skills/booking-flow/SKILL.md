@@ -81,8 +81,9 @@ Staff approves via `PUT /api/booking-requests/:id` with `status: 'approved'`. Th
 **Pre-transaction validation** (runs outside transaction to avoid long locks):
 
 1. **Tier validation**: `getMemberTier(ownerEmail)` → ownerTier. Then `enforceSocialTierRules(ownerTier, participants)`:
-   - Check if any participant has `type: 'guest'`.
-   - If owner is Social tier and guests are present → return `{ allowed: false, errorType: 'social_tier_blocked' }`.
+   - Social tier members CAN book simulators and CAN have guests.
+   - They pay overage fees on the entire duration (daily allowance is 0 minutes) and guest fees on all guests (0 complimentary passes).
+   - The function allows the booking to proceed — guests are permitted but never fee-exempt.
 2. **Resolve identities**: For each participant with a `userId`, call `resolveUserIdToEmail(userId)` → build `userIdToEmail` map. This is needed because `usage_ledger.member_id` stores emails.
 3. **Calculate billing**: `calculateFullSessionBilling(sessionDate, durationMinutes, billingParticipants, ownerEmail, declaredPlayerCount, { resourceType })` → returns `billingBreakdown[]` with per-participant `minutesAllocated`, `overageFee`, `guestFee`, plus totals and `guestPassesUsed`.
 

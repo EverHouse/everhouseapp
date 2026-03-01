@@ -176,7 +176,7 @@ The `usedGuestPass` field on a booking participant record is an input to guest p
 
 1. **Staff = $0** — users with `role = 'staff'` or `role = 'admin'` always pay nothing, regardless of participant type.
 2. **Tier-based daily allowance** — each membership tier defines `daily_sim_minutes` and `daily_conf_room_minutes` in the `membership_tiers` table. Overages are calculated against the allowance for the resource type being booked.
-3. **Stripe products as price source** — on startup, `ensureSimulatorOverageProduct()` and `ensureGuestPassProduct()` read the Stripe price for the "Simulator Overage (30 min)" and "Guest Pass" products and call `updateOverageRate()` / `updateGuestFee()` to set in-memory rates.
+3. **Stripe products as price source** — on startup, `ensureSimulatorOverageProduct()`, `ensureGuestPassProduct()`, `ensureDayPassCoworkingProduct()`, and `ensureDayPassGolfSimProduct()` read Stripe prices and call `updateOverageRate()` / `updateGuestFee()` to set in-memory rates. All pass products are loaded dynamically from `membership_tiers` by slug (`guest-pass`, `day-pass-coworking`, `day-pass-golf-sim`) — no hardcoded Stripe IDs. The `ensure*Product()` functions create DB records and Stripe Products/Prices if missing, and sync canonical product names on startup.
 4. **Cancelled bookings = $0** — statuses `cancelled`, `declined`, `cancellation_pending` short-circuit to zero.
 5. **Effective player count ≥ 1** — prevents division by zero in per-participant minutes.
 6. **Simulator vs conference room** — separate daily allowances and separate usage tracking per resource type.
@@ -184,6 +184,15 @@ The `usedGuestPass` field on a booking participant record is an input to guest p
 8. **Fee calculation is post-commit only** — `recalculateSessionFees()` and `computeFeeBreakdown()` use the global `db` pool. They must NEVER run inside a `db.transaction()` block. See cascade behavior section above for the correct pattern.
 9. **Account credit payments need audit trails** — when `createPrepaymentIntent` returns `paidInFull: true` (account credit covered the full fee), call `logPaymentAudit()` with `paymentMethod: 'account_credit'`. Without this, credit-based payments have no audit record. (v8.26.7, Bug 17)
 10. **Cascade recalculation** — when a session's fees change (e.g., duration edit, roster change), all later same-day bookings for the same member must also be recalculated. `recalculateSessionFees()` handles this automatically unless `skipCascade: true` is passed.
+
+## Social Member Booking Fees
+
+Social members (`tier = 'social'`) can book golf simulators. Their fee treatment:
+- **Daily allowance**: 0 minutes (`daily_sim_minutes = 0`), so the ENTIRE booking duration is treated as overage.
+- **Overage**: Calculated at `$25.00` per 30-minute block. A 60-minute booking = 2 blocks = $50.00 before guest fees.
+- **Guest passes**: 0 complimentary passes per month (`guest_passes_per_month = 0`), so every guest incurs the flat `$25.00` guest fee.
+- **Owner absorbs time**: The host absorbs time from empty and guest slots, increasing their overage. A social member booking with a guest pays both the guest fee AND the overage for the guest's time.
+- **Tier rules**: `enforceSocialTierRules()` in `server/core/bookingService/tierRules.ts` explicitly allows social members to have guests.
 
 ## Daily Allowance / Included Minutes
 

@@ -59,7 +59,7 @@ Only if all 3 fail does it INSERT a new session. When called inside a transactio
 | `subscriptionSync.ts` | Subscription status sync |
 | `customers.ts` | Customer creation and lookup |
 | `customerSync.ts` | Customer metadata sync (user ID, tier) |
-| `products.ts` | Product/price catalog management |
+| `products.ts` | Product/price catalog management, `ensure*Product()` startup sync (guest-pass, day-pass-coworking, day-pass-golf-sim slugs) |
 | `invoices.ts` | Invoice generation and retrieval |
 | `reconciliation.ts` | Stripe vs local data reconciliation |
 | `tierChanges.ts` | Tier change proration handling |

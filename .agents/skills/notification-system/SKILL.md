@@ -269,6 +269,35 @@ The MindBody → Stripe migration flow uses notification type `billing_migration
 
 All migration notifications use `type: 'billing_migration'` (already listed in the NotificationType union above).
 
+## Status Change Source Attribution
+
+When member status changes, staff notifications include a dynamic "change source" string that identifies HOW the change originated. The attribution logic lives in the **caller** (not the notification service itself).
+
+### HubSpot Sync Attribution (`server/routes/hubspot.ts`)
+
+The HubSpot webhook handler determines the source using a priority chain based on the user's `billing_provider`, `data_source`, and `visitor_type`:
+
+| Condition | Source String |
+|---|---|
+| `billing_provider = 'mindbody'` or `mindbody_client_id` exists | "via MindBody" |
+| `billing_provider = 'stripe'` | "via Stripe" |
+| `visitor_type = 'day_pass'` | "via Quick Guest Checkout" |
+| `data_source = 'APP'` | "via App" |
+| Default | "via HubSpot sync" |
+
+The source string is interpolated into the notification message: `"...status changed to ${newStatus} ${changeSource}."` New guest contacts that enter as non-members are filtered out to prevent incorrect status change notifications.
+
+### Stripe Webhook Attribution (`server/core/stripe/webhooks.ts`)
+
+Stripe webhook notifications are implicitly attributed by event type:
+- `customer.subscription.paused` → "membership has been paused (frozen)"
+- `customer.subscription.resumed` → "membership has been resumed"
+- Reactivation from cancelled/deleted → "membership has been reactivated (was ${previousStatus})"
+
+### Staff Action Attribution (`server/routes/members/admin-actions.ts`)
+
+Staff tier/status changes are audit-logged with the performing staff member's email via `logFromRequest()`. The member receives a notification describing the action (Upgraded, Updated, Cleared) without exposing the staff member's identity.
+
 ## Rules
 
 1. Always use `notifyMember()` from `notificationService.ts` — never insert directly into the `notifications` table for member notifications.

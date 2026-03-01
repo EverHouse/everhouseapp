@@ -179,6 +179,7 @@ Sub-dirs: `drawers/`, `hooks/`, `modals/`, `sections/`.
 - `UpdateNotification.tsx` — PWA update prompt
 - `ErrorBoundary.tsx`, `PageErrorBoundary.tsx`, `FeatureErrorBoundary.tsx`
 - `WalkingGolferLoader.tsx`, `WalkingGolferSpinner.tsx` — Branded loading states
+- `PullToRefresh.tsx` — Pull-to-refresh with branded animation (wraps app in `App.tsx`)
 - And others (Avatar, Logo, SEO, Toggle, Input, etc.)
 
 ---
@@ -215,7 +216,7 @@ Sub-dirs: `drawers/`, `hooks/`, `modals/`, `sections/`.
 - `useSupabaseRealtime.ts` — Supabase realtime subscriptions
 - `usePricing.ts` — Stripe pricing data
 - `useTierPermissions.ts` — Tier-based feature gating
-- `useServiceWorkerUpdate.ts` — PWA update detection
+- `useServiceWorkerUpdate.ts` — PWA update detection (10-min interval + visibility change)
 - `useBreakpoint.ts` — Responsive breakpoint detection
 - `useScrollLock.ts`, `useScrollLockManager.ts` — Modal scroll locking
 - `useKeyboardDetection.ts` — Mobile keyboard handling
