@@ -64,7 +64,7 @@ const PrivateHire: React.FC = () => {
            />
          </div>
          
-         <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/80 via-black/20 to-transparent pointer-events-none z-[1]" />
+         <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/80 via-black/20 to-transparent pointer-events-none z-[1] rounded-b-[2.5rem]" />
 
          <div className={`absolute left-4 right-4 mx-auto bottom-12 md:left-12 md:right-auto md:mx-0 md:bottom-20 z-10 w-auto md:max-w-xl ${heroAnimPlayed ? '' : 'animate-hero-headline'}`}>
            <div className="bg-black/40 backdrop-blur-3xl border border-white/10 p-8 md:p-12 rounded-xl text-center md:text-left">
