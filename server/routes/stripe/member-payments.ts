@@ -1578,7 +1578,7 @@ router.post('/api/member/bookings/:bookingId/cancel-payment', isAuthenticated, a
     res.json({ success: result.success });
   } catch (error: unknown) {
     logger.error('[Member Payment] Error cancelling payment', { error: error instanceof Error ? error : new Error(String(error)) });
-    res.json({ success: false });
+    res.status(500).json({ success: false, error: 'Failed to cancel payment' });
   }
 });
 
