@@ -165,13 +165,7 @@ const BookTour: React.FC = () => {
         description="Schedule a free 30-min tour of Ever Club in Tustin. See Trackman simulators, coworking, café & wellness at OC's top private club."
         url="/tours"
       />
-      <div
-        className="fixed top-0 left-0 right-0 bg-primary"
-        style={{ height: 'env(safe-area-inset-top, 0px)', zIndex: 'var(--z-header)' }}
-        aria-hidden="true"
-      />
-
-      <div className="pt-[max(1rem,env(safe-area-inset-top))] px-4 pb-4">
+      <div className="pt-4 px-4 pb-4">
         <Link
           to="/"
           className="inline-flex items-center gap-1 text-primary/70 dark:text-white/70 hover:text-primary dark:hover:text-white transition-colors py-2"

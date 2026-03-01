@@ -176,13 +176,7 @@ const PrivateHireInquire: React.FC = () => {
   return (
     <div className="min-h-screen pb-0 overflow-x-hidden relative bg-bone dark:bg-[#141414]">
       <SEO title="Private Event Inquiry | Ever Club — OC Venue" description="Submit an inquiry for private events at Ever Club in Tustin, OC. Golf simulator parties, corporate events, celebrations & more." url="/private-hire/inquire" />
-      <div 
-        className="fixed top-0 left-0 right-0 bg-primary"
-        style={{ height: 'env(safe-area-inset-top, 0px)', zIndex: 'var(--z-header)' }}
-        aria-hidden="true"
-      />
-
-      <div className="pt-[max(1rem,env(safe-area-inset-top))] px-4 pb-4">
+      <div className="pt-4 px-4 pb-4">
         <Link 
           to="/private-hire" 
           className="tactile-btn inline-flex items-center gap-1 text-primary/70 dark:text-white/70 hover:text-primary dark:hover:text-white transition-colors py-2"

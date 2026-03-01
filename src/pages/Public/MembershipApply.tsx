@@ -177,13 +177,7 @@ const MembershipApply: React.FC = () => {
   return (
     <div className="min-h-screen pb-0 overflow-x-hidden relative bg-bone dark:bg-[#141414]">
       <SEO title="Apply for Membership | Ever Club — OC Golf Club" description="Join OC's premier indoor golf & social club. Apply for membership at Ever Club in Tustin — Trackman simulators, workspace, wellness & community." url="/membership/apply" />
-      <div 
-        className="fixed top-0 left-0 right-0 bg-primary"
-        style={{ height: 'env(safe-area-inset-top, 0px)', zIndex: 'var(--z-header)' }}
-        aria-hidden="true"
-      />
-
-      <div className="pt-[max(1rem,env(safe-area-inset-top))] px-4 pb-4">
+      <div className="pt-4 px-4 pb-4">
         <Link 
           to="/membership" 
           className="inline-flex items-center gap-1 text-primary/70 dark:text-white/70 hover:text-primary dark:hover:text-white transition-colors py-2"
