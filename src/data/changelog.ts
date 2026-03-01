@@ -8,6 +8,22 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.56.0",
+    date: "2026-03-01",
+    title: "Performance & Crash Fixes — Wellness, Dashboard, History",
+    isMajor: true,
+    changes: [
+      "Fix: Wellness page no longer crashes on load — server now caps active_only queries to a 60-day window (333 classes → ~16), cutting payload from 200KB to 18KB (91% reduction)",
+      "Fix: Dashboard no longer over-fetches all 333 wellness class objects — added LIMIT 5 to the 'Next Wellness Class' query since the dashboard only displays one",
+      "Perf: Wellness page now uses progressive rendering (20 classes at a time with 'Show More') instead of rendering all classes at once — eliminates DOM thrashing on large lists",
+      "Perf: Wellness page memoized sortedClasses, enrollment Set/Map for O(1) lookups, and wrapped ClassCard in React.memo — prevents unnecessary re-renders on scroll and filter changes",
+      "Perf: Removed useAutoAnimate from Wellness class list — auto-animate refs on large unbounded lists cause layout thrashing and crashes",
+      "Perf: History page visits tab now uses progressive rendering (20 at a time with 'Show More') instead of rendering all past visits at once",
+      "Perf: History page payments tab now uses progressive month rendering (3 months at a time with 'Show More') instead of rendering all payment months at once",
+      "Perf: CalendarGrid memoized sortedResources array — was being re-sorted on every render in two places; now computed once with useMemo",
+    ]
+  },
+  {
     version: "8.55.0",
     date: "2026-03-01",
     title: "Membership Apply & Conditional Animation Crash Fixes",

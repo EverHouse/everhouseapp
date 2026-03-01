@@ -289,6 +289,7 @@ router.get('/api/member/dashboard-data', isAuthenticated, async (req, res) => {
           ) w ON wc.id = w.class_id
           WHERE wc.archived_at IS NULL AND wc.date >= ${todayPacific}
           ORDER BY wc.date, wc.time
+          LIMIT 5
         `);
         return result.rows;
       } catch (error: unknown) {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useData } from '../../contexts/DataContext';
@@ -53,6 +53,10 @@ const History: React.FC = () => {
   const initialTab = searchParams.get('tab') === 'payments' ? 'payments' : 'visits';
   const [activeTab, setActiveTab] = useState<'visits' | 'payments'>(initialTab);
   const [payingInvoice, setPayingInvoice] = useState<UnifiedPurchase | null>(null);
+  const INITIAL_DISPLAY = 20;
+  const LOAD_MORE = 20;
+  const [visitsDisplayCount, setVisitsDisplayCount] = useState(INITIAL_DISPLAY);
+  const [paymentsMonthsCount, setPaymentsMonthsCount] = useState(3);
 
   const { data: visits = [], isLoading: visitsLoading, refetch: refetchVisits } = useQuery({
     queryKey: ['my-visits', user?.email],
@@ -171,9 +175,9 @@ const History: React.FC = () => {
                   <span className={`material-symbols-outlined text-5xl mb-4 ${isDark ? 'text-white/30' : 'text-primary/30'}`}>history</span>
                   <p className={`${isDark ? 'text-white/80' : 'text-primary/80'}`}>No past visits yet</p>
                 </div>
-              ) : (
+              ) : (<>
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                  {visits.map((visit, index) => {
+                  {visits.slice(0, visitsDisplayCount).map((visit, index) => {
                     const isConferenceRoom = visit.category === 'Conference Room';
                     
                     return (
@@ -249,7 +253,17 @@ const History: React.FC = () => {
                     </MotionListItem>
                   );})}
                 </div>
-              )}
+                {visits.length > visitsDisplayCount && (
+                  <div className="flex justify-center pt-3">
+                    <button
+                      onClick={() => setVisitsDisplayCount(prev => prev + LOAD_MORE)}
+                      className={`px-6 py-2.5 rounded-xl font-bold text-sm transition-all duration-fast active:scale-[0.98] ${isDark ? 'bg-white/10 text-white hover:bg-white/15 border border-white/20' : 'bg-primary/5 text-primary hover:bg-primary/10 border border-primary/15'}`}
+                    >
+                      Show More ({visits.length - visitsDisplayCount} remaining)
+                    </button>
+                  </div>
+                )}
+              </>)}
             </div>
           ) : activeTab === 'payments' ? (
             <div className="space-y-4">
@@ -347,8 +361,11 @@ const History: React.FC = () => {
                     });
                     
                     const sortedMonths = Object.keys(groupedByMonth).sort((a, b) => b.localeCompare(a));
+                    const displayedMonths = sortedMonths.slice(0, paymentsMonthsCount);
+                    const hasMoreMonths = sortedMonths.length > paymentsMonthsCount;
                     
-                    return sortedMonths.map((monthKey, monthIndex) => {
+                    return (<>
+                    {displayedMonths.map((monthKey, monthIndex) => {
                       const monthPurchases = groupedByMonth[monthKey];
                       const [year, month] = monthKey.split('-');
                       const monthLabel = new Date(parseInt(year), parseInt(month) - 1, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'America/Los_Angeles' });
@@ -439,7 +456,18 @@ const History: React.FC = () => {
                           </div>
                         </div>
                       );
-                    });
+                    })}
+                    {hasMoreMonths && (
+                      <div className="flex justify-center pt-2 pb-2">
+                        <button
+                          onClick={() => setPaymentsMonthsCount(prev => prev + 3)}
+                          className={`px-6 py-2.5 rounded-xl font-bold text-sm transition-all duration-fast active:scale-[0.98] ${isDark ? 'bg-white/10 text-white hover:bg-white/15 border border-white/20' : 'bg-primary/5 text-primary hover:bg-primary/10 border border-primary/15'}`}
+                        >
+                          Show More Months ({sortedMonths.length - paymentsMonthsCount} remaining)
+                        </button>
+                      </div>
+                    )}
+                    </>);
                   })()}
                 </div>
               )}
