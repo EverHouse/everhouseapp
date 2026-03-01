@@ -26,7 +26,6 @@ interface OverduePayment {
   endTime: string;
   resourceName: string;
   totalOutstanding: number;
-  unreviewedWaivers: number;
 }
 
 interface FailedPayment {
