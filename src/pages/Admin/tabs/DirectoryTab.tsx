@@ -18,7 +18,6 @@ import { AnimatedPage } from '../../../components/motion';
 import FloatingActionButton from '../../../components/FloatingActionButton';
 import { fetchWithCredentials, postWithCredentials } from '../../../hooks/queries/useFetch';
 import { useToast } from '../../../components/Toast';
-import { useAutoAnimate } from '@formkit/auto-animate/react';
 import { prefetchMemberProfile } from '../../../lib/prefetch';
 
 const TIER_OPTIONS = ['All', 'Social', 'Core', 'Premium', 'Corporate', 'VIP'] as const;
@@ -222,12 +221,6 @@ const DirectoryTab: React.FC = () => {
     const navigate = useNavigate();
     const queryClient = useQueryClient();
     
-    const [visitorsCardParent] = useAutoAnimate();
-    const [visitorsTbodyParent] = useAutoAnimate();
-    const [teamCardParent] = useAutoAnimate();
-    const [teamTbodyParent] = useAutoAnimate();
-    const [membersCardParent] = useAutoAnimate();
-    const [membersDesktopParent] = useAutoAnimate();
 
     const [searchQuery, setSearchQuery] = useState('');
     const [tierFilter, setTierFilter] = useState<string>('All');
@@ -1544,7 +1537,7 @@ const DirectoryTab: React.FC = () => {
                 {!visitorsLoading && !visitorsError && memberTab === 'visitors' && visitors.length > 0 && (
                     <div className="md:hidden flex-1 min-h-0 relative">
                         <div className="h-full overflow-y-auto pt-2 pb-24">
-                            <div ref={visitorsCardParent} className="space-y-3 px-1">
+                            <div className="space-y-3 px-1">
                                 {sortedVisitors.map((v, index) => (
                                     <div 
                                         key={v.id}
@@ -1687,7 +1680,7 @@ const DirectoryTab: React.FC = () => {
                                         </td>
                                     </tr>
                                 </thead>
-                                <tbody ref={visitorsTbodyParent}>
+                                <tbody >
                                     {sortedVisitors.map(v => (
                                         <tr 
                                             key={v.id}
@@ -1799,7 +1792,7 @@ const DirectoryTab: React.FC = () => {
                 {!teamLoading && !teamError && memberTab === 'team' && filteredTeamMembers.length > 0 && (
                     <div className="flex-1 min-h-0 relative">
                         <div className="h-full overflow-y-auto">
-                            <div ref={teamCardParent} className="md:hidden space-y-3 px-1 pt-2 pb-24">
+                            <div className="md:hidden space-y-3 px-1 pt-2 pb-24">
                                 {filteredTeamMembers.map((member, index) => (
                                     <div 
                                         key={member.staff_id}
@@ -1847,7 +1840,7 @@ const DirectoryTab: React.FC = () => {
                                         </td>
                                     </tr>
                                 </thead>
-                                <tbody ref={teamTbodyParent}>
+                                <tbody >
                                     {filteredTeamMembers.map(member => (
                                         <tr 
                                             key={member.staff_id}
@@ -1874,7 +1867,7 @@ const DirectoryTab: React.FC = () => {
                     <>
                         <div className="md:hidden relative">
                             <div className="pt-2 pb-24">
-                                <div ref={membersCardParent} className="space-y-3 px-1">
+                                <div className="space-y-3 px-1">
                                     {visibleItems.map((m, index) => (
                                         <div 
                                             key={m.email}
@@ -1989,7 +1982,7 @@ const DirectoryTab: React.FC = () => {
                                     <div className="px-3 flex items-center self-stretch overflow-hidden font-semibold text-gray-600 dark:text-gray-300 text-sm" style={{ width: '11%', minWidth: 0, minHeight: '44px' }}>Reactivation</div>
                                 )}
                             </div>
-                            <div ref={membersDesktopParent}>
+                            <div >
                                 {visibleItems.map(m => (
                                     <div 
                                         key={m.email}

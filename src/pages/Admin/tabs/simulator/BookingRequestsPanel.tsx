@@ -7,7 +7,6 @@ import type { BookingRequest, Resource } from './simulatorTypes';
 import { formatDateShortAdmin, groupBookingsByDate } from './simulatorUtils';
 import GuideBookings from '../../../../components/guides/GuideBookings';
 import { TrackmanIcon } from '../../../../components/icons/TrackmanIcon';
-import { useAutoAnimate } from '@formkit/auto-animate/react';
 import { useFeeEstimate } from '../../../../hooks/queries/useBookingsQueries';
 import { BookingStatusDropdown } from '../../../../components/BookingStatusDropdown';
 
@@ -102,8 +101,6 @@ const BookingRequestsPanel: React.FC<BookingRequestsPanelProps> = ({
     queueMaxHeight,
     setActionInProgress,
 }) => {
-    const [queueParent] = useAutoAnimate();
-    const [scheduledParent] = useAutoAnimate();
     return (
         <div 
             className={`lg:border border-gray-200 dark:border-white/25 relative rounded-xl ${activeView === 'requests' ? 'block' : 'hidden lg:block'}`}
@@ -145,7 +142,7 @@ const BookingRequestsPanel: React.FC<BookingRequestsPanelProps> = ({
                             <p className="text-gray-600 dark:text-white/70">No items in queue</p>
                         </div>
                     ) : (
-                        <div ref={queueParent} className="space-y-3">
+                        <div className="space-y-3">
                             {queueItems.map((item, index) => {
                                 const req = item;
                                 
@@ -393,7 +390,7 @@ const BookingRequestsPanel: React.FC<BookingRequestsPanelProps> = ({
                             <p className="text-primary/70 dark:text-white/70">No scheduled bookings {scheduledFilter !== 'all' ? `for ${scheduledFilter === 'week' ? 'this week' : scheduledFilter}` : ''}</p>
                         </div>
                     ) : (
-                        <div ref={scheduledParent} className="space-y-4">
+                        <div className="space-y-4">
                             {Array.from(groupBookingsByDate(scheduledBookings)).map(([date, bookings]) => (
                                 <div key={date}>
                                     <div className="flex items-center gap-2 mb-2">

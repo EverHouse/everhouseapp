@@ -10,10 +10,11 @@ export const changelog: ChangelogEntry[] = [
   {
     version: "8.55.0",
     date: "2026-03-01",
-    title: "Membership Apply & Facility Page Crash Fixes",
+    title: "Membership Apply & Conditional Animation Crash Fixes",
     changes: [
       "Fix: Membership application page no longer crashes on load — replaced useBlocker (requires data router) with a BrowserRouter-compatible unsaved changes guard",
       "Fix: Facility page no longer crashes when switching between Notices and Blocks tabs — removed auto-animate refs from conditionally rendered elements (known auto-animate issue with conditional parents)",
+      "Fix: Codebase-wide audit removed the same crash-prone auto-animate pattern from 6 additional pages — Directory, Changelog, History, Events, Wellness, and Booking Requests panels all had animation refs on tab-conditional elements that could crash on tab switch",
     ]
   },
   {

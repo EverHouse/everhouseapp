@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { useAutoAnimate } from '@formkit/auto-animate/react';
 import EmptyState from '../../../../components/EmptyState';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { formatDateDisplayWithDay } from '../../../../utils/dateUtils';
@@ -14,8 +13,6 @@ import { ParticipantDetailsModal } from './ParticipantDetailsModal';
 
 export const WellnessAdminContent: React.FC = () => {
     const queryClient = useQueryClient();
-    const [upcomingClassesRef] = useAutoAnimate();
-    const [pastClassesRef] = useAutoAnimate();
     const [activeCategory, setActiveCategory] = useState('all');
     const [isEditing, setIsEditing] = useState(false);
     const [editId, setEditId] = useState<number | null>(null);
@@ -476,7 +473,7 @@ export const WellnessAdminContent: React.FC = () => {
                                 <span aria-hidden="true" className="material-symbols-outlined text-green-500">schedule</span>
                                 <h3 className="text-2xl leading-tight font-bold text-primary dark:text-white" style={{ fontFamily: 'var(--font-headline)' }}>Upcoming ({upcomingClasses.length})</h3>
                             </div>
-                            <div ref={upcomingClassesRef} className="grid grid-cols-1 gap-4">
+                            <div className="grid grid-cols-1 gap-4">
                                 {upcomingClasses.slice(0, showAllUpcoming ? upcomingClasses.length : INITIAL_DISPLAY_COUNT).map((cls, index) => (
                                     <div key={cls.id} onClick={() => openEdit(cls)} className={`tactile-card bg-white dark:bg-surface-dark p-4 rounded-xl shadow-sm border border-gray-200 dark:border-white/20 flex flex-col gap-3 relative overflow-hidden cursor-pointer hover:border-primary/30 transition-colors animate-list-item-delay-${Math.min(index + 1, 10)}`}>
                                         <div className="flex gap-4">
@@ -532,7 +529,7 @@ export const WellnessAdminContent: React.FC = () => {
                             </button>
                             {showPastClasses && (
                             <>
-                            <div ref={pastClassesRef} className="grid grid-cols-1 gap-4 opacity-70">
+                            <div className="grid grid-cols-1 gap-4 opacity-70">
                                 {pastClasses.slice(0, showAllPast ? pastClasses.length : INITIAL_DISPLAY_COUNT).map((cls, index) => (
                                     <div key={cls.id} onClick={() => openEdit(cls)} className={`tactile-card bg-white dark:bg-surface-dark p-4 rounded-xl shadow-sm border border-gray-200 dark:border-white/20 flex flex-col gap-3 relative overflow-hidden cursor-pointer hover:border-primary/30 transition-colors animate-list-item-delay-${Math.min(index + 1, 10)}`}>
                                         <div className="flex gap-4">

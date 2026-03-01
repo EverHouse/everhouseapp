@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { useAutoAnimate } from '@formkit/auto-animate/react';
 import EmptyState from '../../../../components/EmptyState';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { usePageReady } from '../../../../contexts/PageReadyContext';
@@ -149,8 +148,6 @@ export const EventsAdminContent: React.FC = () => {
     const { setPageReady } = usePageReady();
     const { showToast } = useToast();
     const queryClient = useQueryClient();
-    const [upcomingEventsRef] = useAutoAnimate();
-    const [pastEventsRef] = useAutoAnimate();
     const [activeCategory, setActiveCategory] = useState('all');
     const [isEditing, setIsEditing] = useState(false);
     const [editId, setEditId] = useState<number | null>(null);
@@ -780,7 +777,7 @@ export const EventsAdminContent: React.FC = () => {
                                 <span aria-hidden="true" className="material-symbols-outlined text-green-500">schedule</span>
                                 <h3 className="text-2xl leading-tight font-bold text-primary dark:text-white" style={{ fontFamily: 'var(--font-headline)' }}>Upcoming ({upcomingEvents.length})</h3>
                             </div>
-                            <div ref={upcomingEventsRef} className="grid grid-cols-1 gap-4">
+                            <div className="grid grid-cols-1 gap-4">
                                 {upcomingEvents.map((event, index) => {
                                     const isPending = pendingEventIds.has(event.id);
                                     const isOptimistic = event.id < 0;
@@ -868,7 +865,7 @@ export const EventsAdminContent: React.FC = () => {
                             </button>
                             {showPastEvents && (
                             <>
-                            <div ref={pastEventsRef} className="grid grid-cols-1 gap-4 opacity-70">
+                            <div className="grid grid-cols-1 gap-4 opacity-70">
                                 {pastEvents.slice(0, showAllPastEvents ? pastEvents.length : 20).map((event, index) => {
                                     const isPending = pendingEventIds.has(event.id);
                                     return (

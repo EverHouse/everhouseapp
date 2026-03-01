@@ -13,7 +13,6 @@ import { formatTime12Hour, getRelativeDateLabel } from '../../utils/dateUtils';
 import InvoicePaymentModal from '../../components/billing/InvoicePaymentModal';
 import { AnimatedPage, MotionListItem } from '../../components/motion';
 import { TabTransition } from '../../components/motion/TabTransition';
-import { useAutoAnimate } from '@formkit/auto-animate/react';
 
 interface UnifiedVisit {
   id: number;
@@ -54,8 +53,6 @@ const History: React.FC = () => {
   const initialTab = searchParams.get('tab') === 'payments' ? 'payments' : 'visits';
   const [activeTab, setActiveTab] = useState<'visits' | 'payments'>(initialTab);
   const [payingInvoice, setPayingInvoice] = useState<UnifiedPurchase | null>(null);
-  const [visitsParent] = useAutoAnimate();
-  const [purchasesParent] = useAutoAnimate();
 
   const { data: visits = [], isLoading: visitsLoading, refetch: refetchVisits } = useQuery({
     queryKey: ['my-visits', user?.email],
@@ -175,7 +172,7 @@ const History: React.FC = () => {
                   <p className={`${isDark ? 'text-white/80' : 'text-primary/80'}`}>No past visits yet</p>
                 </div>
               ) : (
-                <div ref={visitsParent} className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
                   {visits.map((visit, index) => {
                     const isConferenceRoom = visit.category === 'Conference Room';
                     
@@ -266,7 +263,7 @@ const History: React.FC = () => {
                   <p className={`text-sm mt-1 ${isDark ? 'text-white/50' : 'text-primary/50'}`}>Your payment history will appear here</p>
                 </div>
               ) : (
-                <div ref={purchasesParent} className="space-y-6">
+                <div className="space-y-6">
                   {(() => {
                     const categoryIcons: Record<string, string> = {
                       sim_walk_in: 'golf_course',

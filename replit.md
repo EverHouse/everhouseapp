@@ -32,7 +32,8 @@ The Ever Club Members App is a private members club application for golf and wel
 - **Pull-to-Refresh**: `PullToRefresh` component wraps the app, triggers a hard reload, and displays a branded `WalkingGolferLoader` for a minimum duration. `prefers-reduced-motion` is respected.
 - **Mobile Status Bar Blending**: Uses `viewport-fit=cover`, `apple-mobile-web-app-status-bar-style: black-translucent`, and `theme-color` with `safe-area-inset-top` for header padding and background blending.
 - **Mutation Patterns**: `useAppMutation` hook provides automatic success/error toasts, haptic feedback, optimistic updates with rollback, and query invalidation. Error messages are user-friendly.
-- **Form Persistence**: `useFormPersistence` persists form data to sessionStorage. `useUnsavedChanges` blocks navigation for unsaved changes.
+- **Form Persistence**: `useFormPersistence` persists form data to sessionStorage. `useUnsavedChanges` uses `beforeunload` only (no popstate/history manipulation).
+- **Auto-Animate Safety Rule**: `useAutoAnimate` refs must NEVER be attached to elements inside conditional blocks (`{condition && <div ref={ref}>}`). Refs must always stay mounted while the hook is alive — or remove `useAutoAnimate` entirely and rely on CSS `animate-list-item` / `animate-content-enter` classes. Remaining safe usages exist in standalone pages and sub-components that fully mount/unmount.
 - **Prefetch System**: Route-level prefetch via `src/lib/prefetch.ts`, plus detail-level prefetch on hover/focus via `usePrefetchOnHover` hook.
 - **Connection Health**: `OfflineBanner` monitors network and WebSocket health. Staff header shows connection status. Cache invalidation on reconnection.
 - **Error Boundaries**: Three-tier system (Global → Page → Feature) using standardized `ErrorFallback` component.
