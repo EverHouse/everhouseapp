@@ -302,7 +302,7 @@ export async function sendDailyReminders() {
       
       for (const evt of eventReminders) {
         const message = `Reminder: ${evt.title} is tomorrow${evt.startTime ? ` at ${formatTime12Hour(evt.startTime)}` : ''}${evt.location ? ` - ${evt.location}` : ''}.`;
-        sendPushNotification(evt.userEmail, { title: 'Event Tomorrow', body: message, url: '/member-events' })
+        sendPushNotification(evt.userEmail, { title: 'Event Tomorrow', body: message, url: '/events' })
           .catch((err) => {
             results.pushFailed++;
             logger.warn('[push] Push reminder delivery failed', {
@@ -400,7 +400,7 @@ export async function sendDailyReminders() {
       
       for (const cls of wellnessReminders) {
         const message = `Reminder: ${cls.title} with ${cls.instructor} is tomorrow at ${cls.time}.`;
-        sendPushNotification(cls.userEmail, { title: 'Class Tomorrow', body: message, url: '/member-wellness' })
+        sendPushNotification(cls.userEmail, { title: 'Class Tomorrow', body: message, url: '/wellness' })
           .catch((err) => {
             results.pushFailed++;
             logger.warn('[push] Push reminder delivery failed', {

@@ -1005,7 +1005,7 @@ router.post('/api/rsvps', isAuthenticated, async (req, res) => {
     sendPushNotification(user_email, {
       title: 'RSVP Confirmed!',
       body: memberMessage,
-      url: '/member-events'
+      url: '/events'
     }).catch((err: unknown) => logger.error('Push notification failed', { error: err instanceof Error ? err : new Error(getErrorMessage(err)) }));
     
     // Send real-time WebSocket notification to member
@@ -1087,7 +1087,7 @@ router.delete('/api/rsvps/:event_id/:user_email', isAuthenticated, async (req, r
       type: 'event',
       relatedId: parseInt(event_id as string),
       relatedType: 'event',
-      url: '/member-events'
+      url: '/events'
     }).catch((err: unknown) => logger.warn('Failed to notify member of RSVP cancellation', { error: err instanceof Error ? err : new Error(getErrorMessage(err)) }));
     
     // Broadcast to staff for real-time updates

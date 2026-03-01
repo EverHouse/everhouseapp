@@ -327,8 +327,8 @@ const AdminProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children
 const ROUTE_INDICES: Record<string, number> = {
   '/dashboard': 0,
   '/book': 1,
-  '/member-wellness': 2,
-  '/member-events': 3,
+  '/wellness': 2,
+  '/events': 3,
   '/history': 4,
   '/updates': 5,
   '/profile': 6,
@@ -433,16 +433,18 @@ const AnimatedRoutes: React.FC = () => {
                 <DirectionalPageTransition><PageErrorBoundary pageName="BookGolf"><BookGolf /></PageErrorBoundary></DirectionalPageTransition>
               </MemberPortalRoute>
             } />
-            <Route path="/member-events" element={
+            <Route path="/events" element={
               <MemberPortalRoute>
                 <DirectionalPageTransition><PageErrorBoundary pageName="Events"><MemberEvents /></PageErrorBoundary></DirectionalPageTransition>
               </MemberPortalRoute>
             } />
-            <Route path="/member-wellness" element={
+            <Route path="/wellness" element={
               <MemberPortalRoute>
                 <DirectionalPageTransition><PageErrorBoundary pageName="Wellness"><MemberWellness /></PageErrorBoundary></DirectionalPageTransition>
               </MemberPortalRoute>
             } />
+            <Route path="/member-events" element={<Navigate to="/events" replace />} />
+            <Route path="/member-wellness" element={<Navigate to="/wellness" replace />} />
             <Route path="/profile" element={
               <MemberPortalRoute allowStaffAccess>
                 <DirectionalPageTransition><PageErrorBoundary pageName="Profile"><Profile /></PageErrorBoundary></DirectionalPageTransition>
@@ -550,7 +552,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     }
   }, [location.pathname]);
   
-  const isMemberRoute = ['/dashboard', '/book', '/member-events', '/member-wellness', '/profile', '/updates', '/history'].some(path => location.pathname.startsWith(path));
+  const isMemberRoute = ['/dashboard', '/book', '/events', '/wellness', '/profile', '/updates', '/history'].some(path => location.pathname.startsWith(path));
   const isAdminRoute = location.pathname.startsWith('/admin');
   const isLandingPage = location.pathname === '/';
   const isFullBleedHeroPage = isLandingPage || location.pathname === '/private-hire';
@@ -626,9 +628,9 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       if (path === '/dashboard') return 'Dashboard';
       if (path === '/profile') return 'Profile';
       if (path.startsWith('/book')) return 'Book';
-      if (path.startsWith('/member-wellness')) return 'Wellness';
+      if (path.startsWith('/wellness')) return 'Wellness';
       if (path.startsWith('/updates')) return 'Updates';
-      if (path.startsWith('/member-events')) return 'Events';
+      if (path.startsWith('/events')) return 'Events';
       if (path.startsWith('/history')) return 'History';
       return 'Dashboard';
   };

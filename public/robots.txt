@@ -6,8 +6,8 @@ Disallow: /login
 Disallow: /checkout
 Disallow: /profile
 Disallow: /book
-Disallow: /member-events
-Disallow: /member-wellness
+Disallow: /events
+Disallow: /wellness
 Disallow: /updates
 Disallow: /history
 Disallow: /auth/

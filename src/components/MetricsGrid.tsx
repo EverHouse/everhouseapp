@@ -167,7 +167,7 @@ const MetricsGrid: React.FC<MetricsGridProps> = ({
         value={wellnessValue}
         subtext={wellnessSubtext}
         isDark={isDark}
-        onClick={() => onNavigate('/member-wellness')}
+        onClick={() => onNavigate('/wellness')}
         ariaLabel={`Next Wellness: ${wellnessValue}${wellnessSubtext ? `, ${wellnessSubtext}` : ''}. Tap to view.`}
       />
       <MetricCard
@@ -176,7 +176,7 @@ const MetricsGrid: React.FC<MetricsGridProps> = ({
         value={eventValue}
         subtext={eventSubtext}
         isDark={isDark}
-        onClick={() => onNavigate('/member-events')}
+        onClick={() => onNavigate('/events')}
         ariaLabel={`Next Events: ${eventValue}${eventSubtext ? `, ${eventSubtext}` : ''}. Tap to view.`}
       />
     </div>

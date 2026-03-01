@@ -5,8 +5,8 @@ const prefetchedAPIs = new Set<string>();
 
 const routeImports: Record<string, () => Promise<{ default: React.ComponentType<Record<string, unknown>> }>> = {
   '/book': () => import('../pages/Member/BookGolf'),
-  '/member-events': () => import('../pages/Member/Events'),
-  '/member-wellness': () => import('../pages/Member/Wellness'),
+  '/events': () => import('../pages/Member/Events'),
+  '/wellness': () => import('../pages/Member/Wellness'),
   '/profile': () => import('../pages/Member/Profile'),
   '/dashboard': () => import('../pages/Member/Dashboard'),
   '/updates': () => import('../pages/Member/Updates'),
@@ -14,8 +14,8 @@ const routeImports: Record<string, () => Promise<{ default: React.ComponentType<
 
 const routeAPIs: Record<string, string[]> = {
   '/book': ['/api/bays'],
-  '/member-events': ['/api/events'],
-  '/member-wellness': ['/api/wellness-classes'],
+  '/events': ['/api/events'],
+  '/wellness': ['/api/wellness-classes'],
   '/updates': ['/api/announcements', '/api/closures'],
   '/dashboard': ['/api/member/dashboard-data'],
 };
@@ -39,7 +39,7 @@ export const prefetchRoute = (path: string) => {
 };
 
 export const prefetchAdjacentRoutes = (currentPath: string) => {
-  const navOrder = ['/dashboard', '/book', '/member-wellness', '/member-events', '/updates'];
+  const navOrder = ['/dashboard', '/book', '/wellness', '/events', '/updates'];
   const idx = navOrder.indexOf(currentPath);
   if (idx === -1) return;
   

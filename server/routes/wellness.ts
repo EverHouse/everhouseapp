@@ -1045,7 +1045,7 @@ router.post('/api/wellness-enrollments', isAuthenticated, async (req, res) => {
     sendPushNotification(user_email, {
       title: isWaitlisted ? 'Added to Waitlist' : 'Class Booked!',
       body: memberMessage,
-      url: '/member-wellness'
+      url: '/wellness'
     }).catch(err => logger.error('Push notification failed', { extra: { error: err } }));
     
     // Send real-time WebSocket notification to member
@@ -1163,7 +1163,7 @@ router.delete('/api/wellness-enrollments/:class_id/:user_email', isAuthenticated
       type: 'wellness',
       relatedId: parseInt(class_id),
       relatedType: 'wellness',
-      url: '/member-wellness'
+      url: '/wellness'
     });
     
     // If a regular enrollment was cancelled and there are waitlisted users, promote the first one
@@ -1205,7 +1205,7 @@ router.delete('/api/wellness-enrollments/:class_id/:user_email', isAuthenticated
           sendPushNotification(promotedEmail as string, {
             title: 'Spot Available - You\'re In!',
             body: promotedMessage,
-            url: '/member-wellness'
+            url: '/wellness'
           }).catch(err => logger.error('Push notification failed', { extra: { error: err } }));
           
           // Send real-time WebSocket notification

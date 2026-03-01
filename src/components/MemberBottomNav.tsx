@@ -13,8 +13,8 @@ interface MemberNavItem {
 const MEMBER_NAV_ITEMS: MemberNavItem[] = [
   { path: '/dashboard', icon: 'dashboard', label: 'Home' },
   { path: '/book', icon: 'book_online', label: 'Book' },
-  { path: '/member-wellness', icon: 'spa', label: 'Wellness' },
-  { path: '/member-events', icon: 'event', label: 'Events' },
+  { path: '/wellness', icon: 'spa', label: 'Wellness' },
+  { path: '/events', icon: 'event', label: 'Events' },
   { path: '/history', icon: 'history', label: 'History' },
 ];
 
