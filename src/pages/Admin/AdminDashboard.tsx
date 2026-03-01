@@ -19,7 +19,7 @@ import WalkingGolferSpinner from '../../components/WalkingGolferSpinner';
 import PullToRefresh from '../../components/PullToRefresh';
 import CheckInConfirmationModal from '../../components/staff-command-center/modals/CheckInConfirmationModal';
 
-import { TabType, StaffBottomNav, StaffSidebar, StaffNavigationRail, usePendingCounts, useUnreadNotifications, getTabFromPathname, tabToPath } from './layout';
+import { TabType, StaffBottomNav, StaffSidebar, StaffNavigationRail, usePendingCounts, useUnreadNotifications, useCommandCenter, getTabFromPathname, tabToPath } from './layout';
 
 // Loading fallback for lazy-loaded tabs - matches app aesthetic
 const TabLoadingFallback = () => (
@@ -38,6 +38,7 @@ const AdminDashboard: React.FC = () => {
   
   const activeTab = getTabFromPathname(location.pathname);
   
+  useCommandCenter();
   const { pendingRequestsCount, refetch: refetchPendingCounts } = usePendingCounts();
   const { unreadNotifCount } = useUnreadNotifications(actualUser?.email);
   const adminQueryClient = useQueryClient();
