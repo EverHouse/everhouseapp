@@ -12,7 +12,6 @@ import { TabTransition } from '../../../components/motion/TabTransition';
 import { useConfirmDialog } from '../../../components/ConfirmDialog';
 import { fetchWithCredentials, postWithCredentials, deleteWithCredentials, putWithCredentials } from '../../../hooks/queries/useFetch';
 import { isBlockingClosure } from '../../../utils/closureUtils';
-import { useAutoAnimate } from '@formkit/auto-animate/react';
 import WalkingGolferSpinner from '../../../components/WalkingGolferSpinner';
 
 interface BlocksClosure {
@@ -107,8 +106,6 @@ const BlocksTab: React.FC = () => {
     const [expandedNotices, setExpandedNotices] = useState<Set<number>>(new Set());
     const [showClosureReasonsSection, setShowClosureReasonsSection] = useState(false);
     const [newReasonLabel, setNewReasonLabel] = useState('');
-    const [needsReviewParent] = useAutoAnimate();
-    const [closuresParent] = useAutoAnimate();
     
     const [showNoticeTypesSection, setShowNoticeTypesSection] = useState(false);
     const [newNoticeTypeName, setNewNoticeTypeName] = useState('');
@@ -950,7 +947,7 @@ const BlocksTab: React.FC = () => {
                     <p className="text-xs text-gray-500 dark:text-white/60">
                         These calendar events were imported and need to be configured before members can see them.
                     </p>
-                    <div ref={needsReviewParent} className="space-y-2">
+                    <div className="space-y-2">
                         {needsReviewClosures.map((closure, index) => {
                             const missingFields = getMissingFields(closure);
                             return (
@@ -1005,7 +1002,7 @@ const BlocksTab: React.FC = () => {
                     <p>{closures.length === 0 ? 'No notices' : 'No notices match filters'}</p>
                 </div>
             ) : configuredClosures.length > 0 && (
-                <div ref={closuresParent} className="space-y-3">
+                <div className="space-y-3">
                     {configuredClosures.map((closure, index) => {
                         const blocking = isBlocking(closure.affectedAreas);
                         const isExpanded = expandedNotices.has(closure.id);
