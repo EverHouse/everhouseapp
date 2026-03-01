@@ -158,7 +158,7 @@ const AdminDashboard: React.FC = () => {
         </button>
       </div>
       
-      <h1 className="text-2xl font-normal italic text-[#F2F2EC] text-center truncate flex-1 leading-none lowercase translate-y-[1px] font-serif">
+      <h1 key={getTabTitle()} className="text-2xl font-normal italic text-[#F2F2EC] text-center truncate flex-1 leading-none lowercase translate-y-[1px] font-serif animate-header-title">
         {getTabTitle()}
       </h1>
 

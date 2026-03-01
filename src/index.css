@@ -2069,6 +2069,21 @@ html.dark .border-accessible {
   box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.1);
 }
 
+@keyframes headerTitleEnter {
+  0% {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-header-title {
+  animation: headerTitleEnter 0.3s var(--m3-emphasized-decel) forwards;
+}
+
 /* Fade In Animation */
 @keyframes fadeIn {
   from {
@@ -2580,6 +2595,7 @@ html.dark .border-accessible {
   [class*="animate-fab-item-"],
   .animate-slide-up-stagger,
   [class*="animate-content-enter-delay-"],
+  .animate-header-title,
   .animate-dialog-scale-in,
   .animate-drawer-content-enter,
   .animate-tab-enter,
