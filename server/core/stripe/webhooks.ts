@@ -4777,7 +4777,21 @@ async function handleCustomerUpdated(client: PoolClient, customer: Stripe.Custom
         });
         updates.push(`auto_reassignment_blocked (stripe_email=${stripeEmail} matches ${activeMatch.rows[0].email})`);
       } else if (activeMatch.rows.length > 1) {
-        logger.warn(`[Stripe Webhook] customer.updated: multiple active users match Stripe email ${stripeEmail} — skipping auto-reassignment, sending mismatch alert`);
+        logger.warn(`[Stripe Webhook] customer.updated: multiple active users match Stripe email ${stripeEmail} — skipping all auto-actions, notifying staff`);
+        deferredActions.push(async () => {
+          try {
+            await notifyAllStaff(
+              'Stripe Customer Email Change — Multiple Matches Found',
+              `Stripe customer ${stripeCustomerId} (currently ${currentEmail}) changed their email to ${stripeEmail}, but multiple active users share that email. No automatic action was taken. Please investigate and resolve manually.`,
+              'billing_alert',
+              { sendPush: true }
+            );
+          } catch (err: unknown) {
+            logger.error('[Stripe Webhook] Failed to send multiple-match alert:', { error: err });
+          }
+        });
+        updates.push(`multi_match_blocked (stripe_email=${stripeEmail})`);
+        return deferredActions;
       }
 
       logger.warn(`[Stripe Webhook] customer.updated: email mismatch for customer ${stripeCustomerId}: Stripe has ${stripeEmail}, app has ${currentEmail}. Auto-correcting Stripe to match app.`);

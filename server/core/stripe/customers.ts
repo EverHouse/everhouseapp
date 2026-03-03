@@ -443,7 +443,7 @@ export async function getOrCreateStripeCustomer(
         name: resolvedName || undefined,
         metadata: metadata,
         ...(userPhone ? { phone: userPhone } : {}),
-      }, { idempotencyKey: `cust_create_${email.toLowerCase()}` });
+      }, { idempotencyKey: `cust_create_${email.toLowerCase()}_${Date.now()}` });
       customerId = customer.id;
       isNew = true;
     }
@@ -451,6 +451,26 @@ export async function getOrCreateStripeCustomer(
     logger.error('[Stripe] Failed to create/update customer:', { error: error });
     await alertOnExternalServiceError('Stripe', error as Error, 'create or update customer');
     throw error;
+  }
+
+  if (isNew) {
+    try {
+      const verifyClient = await getStripeClient();
+      const verifyResult = await verifyClient.customers.retrieve(customerId);
+      const verifyCust = verifyResult as Stripe.Customer | Stripe.DeletedCustomer;
+      if ('deleted' in verifyCust && verifyCust.deleted) {
+        logger.error(`[Stripe] Newly created customer ${customerId} is marked as deleted — idempotency key returned stale result. Retrying without idempotency key.`);
+        const retryCustomer = await verifyClient.customers.create({
+          email: email.toLowerCase(),
+          name: resolvedName || undefined,
+          metadata: metadata,
+        });
+        customerId = retryCustomer.id;
+        logger.info(`[Stripe] Retry succeeded — created fresh customer ${customerId} for user ${userId}`);
+      }
+    } catch (verifyErr: unknown) {
+      logger.warn(`[Stripe] Could not verify newly created customer ${customerId} — proceeding`, { extra: { error: getErrorMessage(verifyErr) } });
+    }
   }
 
   await db.execute(sql`UPDATE users SET stripe_customer_id = ${customerId}, archived_at = NULL, archived_by = NULL, updated_at = NOW() WHERE id = ${userId}`);

@@ -281,14 +281,23 @@ router.post('/api/stripe/subscriptions/create-for-member', isStaffOrAdmin, async
         updatedAt: new Date(),
       }).where(eq(users.id, member.id));
     } catch (dbError) {
-      // Database update failed after Stripe subscription was created
-      // Roll back the Stripe subscription to prevent charging the customer without granting access
       if (stripeSubscription?.subscriptionId) {
         try {
           await cancelSubscription(stripeSubscription.subscriptionId);
-          logger.error('[Stripe] Rolled back subscription  due to database update failure', { extra: { subscriptionId: stripeSubscription.subscriptionId, dbError } });
+          logger.error('[Stripe] Rolled back subscription due to database update failure', { extra: { subscriptionId: stripeSubscription.subscriptionId, dbError } });
         } catch (cancelError) {
-          logger.error('[Stripe] CRITICAL: Failed to cancel subscription  during rollback. Customer was charged but access was not granted', { extra: { subscriptionId: stripeSubscription.subscriptionId, cancelError } });
+          logger.error('[Stripe] CRITICAL: Failed to cancel subscription during rollback — notifying staff for manual cleanup', { extra: { subscriptionId: stripeSubscription.subscriptionId, cancelError } });
+          try {
+            const { notifyAllStaff } = await import('../../core/websocket');
+            await notifyAllStaff(
+              'CRITICAL: Stripe Subscription Needs Manual Cancellation',
+              `Subscription ${stripeSubscription.subscriptionId} for ${member.email} was created but the database update failed, and the automatic rollback also failed. Please cancel subscription ${stripeSubscription.subscriptionId} manually in Stripe to prevent unauthorized charges.`,
+              'billing_alert',
+              { sendPush: true }
+            );
+          } catch {
+            logger.error('[Stripe] Failed to send staff notification for rollback failure');
+          }
           throw new Error(
             `Failed to complete subscription setup. Database error: ${dbError instanceof Error ? dbError.message : String(dbError)}. ` +
             `Rollback attempt failed: ${cancelError instanceof Error ? cancelError.message : String(cancelError)}. ` +
@@ -519,31 +528,50 @@ router.post('/api/stripe/subscriptions/create-new-member', isStaffOrAdmin, async
         try {
           await cancelSubscription(subscriptionResult.subscription.subscriptionId);
           logger.info('[Stripe] Emergency rollback: cancelled subscription', { extra: { subscriptionResultSubscriptionSubscriptionId: subscriptionResult.subscription.subscriptionId } });
-          if (!existingUserId) {
-            await db.delete(users).where(eq(users.id, userId));
-          } else {
-            await db.update(users).set({
-              membershipStatus: 'non-member', tier: null, billingProvider: null,
-              archivedAt: new Date(), archivedBy: 'system_rollback', updatedAt: new Date(),
-            }).where(eq(users.id, userId));
+          try {
+            if (!existingUserId) {
+              await db.delete(users).where(eq(users.id, userId));
+            } else {
+              await db.update(users).set({
+                membershipStatus: 'non-member', tier: null, billingProvider: null,
+                archivedAt: new Date(), archivedBy: 'system_rollback', updatedAt: new Date(),
+              }).where(eq(users.id, userId));
+            }
+          } catch (cleanupErr: unknown) {
+            logger.error('[Stripe] Failed to clean up user record after subscription rollback — user preserved for manual cleanup', { extra: { userId, error: getErrorMessage(cleanupErr) } });
           }
           return res.status(500).json({ 
             error: 'System error during activation. Payment has been voided. Please try again.' 
           });
         } catch (cancelError: unknown) {
-          logger.error('[Stripe] CRITICAL: Failed to cancel subscription  during rollback. User preserved for manual cleanup.', { extra: { subscriptionId: subscriptionResult.subscription.subscriptionId, error: getErrorMessage(cancelError) } });
+          logger.error('[Stripe] CRITICAL: Failed to cancel subscription during rollback — notifying staff for manual cleanup', { extra: { subscriptionId: subscriptionResult.subscription.subscriptionId, error: getErrorMessage(cancelError) } });
+          try {
+            const { notifyAllStaff } = await import('../../core/websocket');
+            await notifyAllStaff(
+              'CRITICAL: Stripe Subscription Needs Manual Cancellation',
+              `Subscription ${subscriptionResult.subscription.subscriptionId} for ${email} was created but the database update failed, and the automatic rollback also failed. Please cancel this subscription manually in Stripe.`,
+              'billing_alert',
+              { sendPush: true }
+            );
+          } catch {
+            logger.error('[Stripe] Failed to send staff notification for rollback failure');
+          }
           return res.status(500).json({ 
             error: 'CRITICAL: Account setup failed but the payment could not be automatically reversed. Please contact support immediately so we can issue a refund.' 
           });
         }
       }
-      if (!existingUserId) {
-        await db.delete(users).where(eq(users.id, userId));
-      } else {
-        await db.update(users).set({
-          membershipStatus: 'non-member', tier: null, billingProvider: null,
-          archivedAt: new Date(), archivedBy: 'system_rollback', updatedAt: new Date(),
-        }).where(eq(users.id, userId));
+      try {
+        if (!existingUserId) {
+          await db.delete(users).where(eq(users.id, userId));
+        } else {
+          await db.update(users).set({
+            membershipStatus: 'non-member', tier: null, billingProvider: null,
+            archivedAt: new Date(), archivedBy: 'system_rollback', updatedAt: new Date(),
+          }).where(eq(users.id, userId));
+        }
+      } catch (cleanupErr: unknown) {
+        logger.error('[Stripe] Failed to clean up user record during rollback — user preserved for manual cleanup', { extra: { userId, error: getErrorMessage(cleanupErr) } });
       }
       return res.status(500).json({ 
         error: 'System error during activation. Please try again.' 
@@ -1127,6 +1155,16 @@ router.delete('/api/stripe/subscriptions/cleanup-pending/:userId', isStaffOrAdmi
       }
     }
     
+    try {
+      await db.execute(sql`UPDATE event_rsvps SET matched_user_id = NULL WHERE matched_user_id = ${userId}`);
+      await db.execute(sql`DELETE FROM notifications WHERE user_email = ${user.email.toLowerCase()}`);
+      await db.execute(sql`DELETE FROM push_subscriptions WHERE user_email = ${user.email.toLowerCase()}`);
+      await db.execute(sql`DELETE FROM user_dismissed_notices WHERE user_email = ${user.email.toLowerCase()}`);
+      await db.execute(sql`DELETE FROM audit_log WHERE resource_id = ${userId} AND resource_type = 'member'`);
+    } catch (relErr: unknown) {
+      logger.warn('[Stripe] Some related records could not be cleared during pending cleanup — proceeding', { extra: { userId, error: getErrorMessage(relErr) } });
+    }
+
     await db.delete(users).where(eq(users.id, userId));
     
     const userName = [user.firstName, user.lastName].filter(Boolean).join(' ') || user.email;

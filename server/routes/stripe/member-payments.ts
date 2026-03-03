@@ -221,6 +221,41 @@ router.post('/api/member/bookings/:id/pay-fees', isAuthenticated, paymentRateLim
 
     const serverTotal = pendingFees.reduce((sum, p) => sum + p.totalCents, 0);
 
+    if (serverTotal === 0) {
+      const zeroFeeParticipantIds = pendingFees.map(p => p.participantId!);
+      await db.transaction(async (tx) => {
+        if (zeroFeeParticipantIds.length > 0) {
+          await tx.execute(sql`
+            UPDATE booking_participants 
+             SET payment_status = 'paid', paid_at = NOW(), updated_at = NOW(), cached_fee_cents = 0
+             WHERE id = ANY(${toIntArrayLiteral(zeroFeeParticipantIds)}::int[])
+          `);
+        }
+      });
+      logger.info('[Stripe] $0 fee booking — bypassed Stripe, marked participants as paid', { extra: { bookingId, participantCount: zeroFeeParticipantIds.length } });
+      
+      sendNotificationToUser(booking.user_email, {
+        type: 'billing_update',
+        title: 'Booking Confirmed',
+        message: 'Your booking fees have been resolved — no payment required.',
+        data: { bookingId, status: 'paid' }
+      });
+      broadcastBillingUpdate({ memberEmail: booking.user_email, action: 'payment_confirmed', bookingId, status: 'paid' });
+      broadcastBookingInvoiceUpdate({ bookingId, action: 'payment_confirmed' });
+      
+      return res.json({
+        paidInFull: true,
+        totalAmount: 0,
+        balanceApplied: 0,
+        remainingAmount: 0,
+        participantFees: pendingFees.map(f => ({
+          id: f.participantId,
+          displayName: f.displayName,
+          amount: 0
+        }))
+      });
+    }
+
     if (serverTotal < 50) {
       return res.status(400).json({ error: 'Total amount must be at least $0.50' });
     }
@@ -466,13 +501,17 @@ router.post('/api/member/bookings/:id/confirm-payment', isAuthenticated, async (
       : 0;
     const currentTotal = currentFees.totals.totalCents;
 
-    if (Math.abs(currentTotal - snapshotTotal) > 100) { // Allow $1 tolerance for rounding
-      return res.status(409).json({ 
-        error: 'Fee calculation has changed since booking. Please refresh and try again.',
-        code: 'FEE_SNAPSHOT_STALE',
-        snapshotTotal,
-        currentTotal
+    if (Math.abs(currentTotal - snapshotTotal) > 100) {
+      logger.warn('[Stripe] Fee drift detected during confirm-payment — proceeding since Stripe already charged', {
+        extra: { bookingId, snapshotTotal, currentTotal, difference: currentTotal - snapshotTotal, paymentIntentId }
       });
+      try {
+        await db.execute(sql`
+          UPDATE booking_sessions SET needs_review = true, review_reason = ${`Fee drift: snapshot ${snapshotTotal} cents vs current ${currentTotal} cents (diff: ${currentTotal - snapshotTotal}). Payment ${paymentIntentId} already succeeded.`} WHERE id = ${booking.session_id}
+        `);
+      } catch (flagErr: unknown) {
+        logger.error('[Stripe] Failed to flag session for review after fee drift', { extra: { error: getErrorMessage(flagErr) } });
+      }
     }
 
     const confirmResult = await confirmPaymentSuccess(
