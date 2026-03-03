@@ -1269,17 +1269,44 @@ router.post('/api/stripe/terminal/process-existing-payment', isStaffOrAdmin, asy
 
 router.post('/api/stripe/terminal/save-card', isStaffOrAdmin, async (req: Request, res: Response) => {
   try {
-    const { readerId, customerId, email: rawEmail, userId } = req.body;
+    const { readerId, customerId: rawCustomerId, email: rawEmail, userId } = req.body;
     const email = rawEmail?.trim()?.toLowerCase();
 
     if (!readerId) {
       return res.status(400).json({ error: 'Reader ID is required' });
     }
-    if (!customerId) {
-      return res.status(400).json({ error: 'Customer ID is required' });
+    if (!rawCustomerId && !email) {
+      return res.status(400).json({ error: 'Customer ID or email is required' });
     }
 
     const stripe = await getStripeClient();
+
+    let customerId = rawCustomerId;
+    if (email && userId) {
+      const { getOrCreateStripeCustomer } = await import('../../core/stripe/customers');
+      const custResult = await getOrCreateStripeCustomer(userId, email);
+      customerId = custResult.customerId;
+    } else if (customerId) {
+      try {
+        const customer = await stripe.customers.retrieve(customerId);
+        if ('deleted' in customer && customer.deleted) {
+          if (email && userId) {
+            const { getOrCreateStripeCustomer } = await import('../../core/stripe/customers');
+            const custResult = await getOrCreateStripeCustomer(userId, email);
+            customerId = custResult.customerId;
+          } else {
+            return res.status(400).json({ error: 'Customer has been deleted in Stripe. Please refresh and try again.' });
+          }
+        }
+      } catch (err: unknown) {
+        logger.error('[Terminal] Error validating customer for save-card', { error: getErrorMessage(err) });
+        return res.status(400).json({ error: 'Invalid Stripe customer. Please refresh and try again.' });
+      }
+    }
+
+    if (!customerId) {
+      return res.status(400).json({ error: 'Could not resolve a valid Stripe customer' });
+    }
 
     const setupIntent = await stripe.setupIntents.create({
       customer: customerId,

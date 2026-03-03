@@ -264,12 +264,11 @@ router.post('/api/my/billing/portal', requireAuth, async (req, res) => {
     }
     
     const stripe = await getStripeClient();
-    let customerId = member.stripe_customer_id as string;
+    const fullName = [member.first_name, member.last_name].filter(Boolean).join(' ') || undefined;
+    const customerResult = await getOrCreateStripeCustomer(String(member.id), member.email as string, fullName as string, member.tier as string);
+    const customerId = customerResult.customerId;
     
-    if (!customerId) {
-      const fullName = [member.first_name, member.last_name].filter(Boolean).join(' ') || undefined;
-      const result = await getOrCreateStripeCustomer(String(member.id), member.email as string, fullName as string, member.tier as string);
-      customerId = result.customerId;
+    if (customerResult.isNew || customerId !== member.stripe_customer_id) {
       await db.execute(sql`UPDATE users SET stripe_customer_id = ${customerId},
          billing_provider = CASE WHEN billing_provider IN ('mindbody', 'manual', 'comped') THEN billing_provider ELSE 'stripe' END
          WHERE LOWER(email) = LOWER(${targetEmail.toLowerCase()})`);
