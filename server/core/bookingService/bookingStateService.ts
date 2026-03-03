@@ -254,13 +254,6 @@ export class BookingStateService {
         }
 
         await tx.update(bookingParticipants)
-          .set({ paymentStatus: 'refunded' })
-          .where(and(
-            eq(bookingParticipants.sessionId, booking.sessionId),
-            eq(bookingParticipants.paymentStatus, 'paid'),
-          ));
-
-        await tx.update(bookingParticipants)
           .set({ cachedFeeCents: 0, paymentStatus: 'waived' })
           .where(and(
             eq(bookingParticipants.sessionId, booking.sessionId),
@@ -523,13 +516,6 @@ export class BookingStateService {
             });
           }
         }
-
-        await tx.update(bookingParticipants)
-          .set({ paymentStatus: 'refunded' })
-          .where(and(
-            eq(bookingParticipants.sessionId, existing.sessionId),
-            eq(bookingParticipants.paymentStatus, 'paid'),
-          ));
 
         const guestParticipants = await tx.select({
           id: bookingParticipants.id,

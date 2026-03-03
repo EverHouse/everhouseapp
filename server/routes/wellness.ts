@@ -110,7 +110,7 @@ async function createWellnessAvailabilityBlocks(
   
   for (const resourceId of resourceIds) {
     await db.execute(sql`INSERT INTO availability_blocks (resource_id, block_date, start_time, end_time, block_type, notes, created_by, wellness_class_id)
-       VALUES (${resourceId}, ${classDate}, ${startTime}, ${endTime || startTime}, ${'wellness'}, ${blockNotes}, ${createdBy || 'system'}, ${wellnessClassId})
+       VALUES (${resourceId}, ${classDate}, ${startTime}, ${endTime || startTime}, ${'wellness'}, ${blockNotes ?? null}, ${createdBy || 'system'}, ${wellnessClassId ?? null})
        ON CONFLICT DO NOTHING`);
   }
 }

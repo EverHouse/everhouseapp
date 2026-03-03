@@ -231,7 +231,8 @@ router.get('/api/member/dashboard-data', isAuthenticated, async (req, res) => {
         .from(bookingRequests)
         .leftJoin(resources, eq(bookingRequests.resourceId, resources.id))
         .where(and(...conditions))
-        .orderBy(desc(bookingRequests.createdAt));
+        .orderBy(desc(bookingRequests.createdAt))
+        .limit(200);
       } catch (error: unknown) {
         logger.warn('[dashboard-data] Failed to fetch booking requests', { error: error instanceof Error ? error : new Error(String(error)) });
         return [];

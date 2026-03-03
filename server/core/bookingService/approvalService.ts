@@ -1863,7 +1863,7 @@ export async function checkinBooking(params: CheckinBookingParams) {
       try { broadcastMemberStatsUpdated(booking.userEmail, { lifetimeVisits: updatedUser.lifetime_visits }); } catch (err: unknown) { logger.error('[Broadcast] Stats update error', { extra: { err } }); }
     }
 
-    const dateStr = String(booking.requestDate).split('T')[0];
+    const dateStr = booking.requestDate instanceof Date ? booking.requestDate.toISOString().split('T')[0] : String(booking.requestDate).split('T')[0];
     const formattedDate = formatDateDisplayWithDay(dateStr);
     const formattedTime = formatTime12Hour(booking.startTime);
 
@@ -1879,7 +1879,7 @@ export async function checkinBooking(params: CheckinBookingParams) {
   }
 
   if (newStatus === 'no_show' && booking.userEmail) {
-    const noShowDateStr = String(booking.requestDate).split('T')[0];
+    const noShowDateStr = booking.requestDate instanceof Date ? booking.requestDate.toISOString().split('T')[0] : String(booking.requestDate).split('T')[0];
     const formattedDate = formatDateDisplayWithDay(noShowDateStr);
     const formattedTime = formatTime12Hour(booking.startTime);
 

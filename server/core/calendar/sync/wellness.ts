@@ -164,14 +164,14 @@ export async function syncWellnessCalendarEvents(options?: { suppressAlert?: boo
           
           if (calendarIsNewer) {
             await db.execute(sql`UPDATE wellness_classes SET 
-                title = ${title}, time = ${startTime}, instructor = ${instructor}, duration = ${duration}, 
-                category = ${category}, spots = ${spots}, status = ${status}, description = ${description}, 
-                date = ${eventDate}, is_active = true, updated_at = NOW(),
-                image_url = COALESCE(${appMetadata.imageUrl}, image_url),
-                external_url = COALESCE(${appMetadata.externalUrl}, external_url),
-                google_event_etag = ${googleEtag}, google_event_updated_at = ${googleUpdatedAt}, last_synced_at = NOW(),
-                locally_edited = false, app_last_modified_at = NULL, needs_review = ${needsReview},
-                recurring_event_id = COALESCE(${recurringEventId}, recurring_event_id)
+                title = ${title ?? null}, time = ${startTime ?? null}, instructor = ${instructor ?? null}, duration = ${duration ?? null}, 
+                category = ${category ?? null}, spots = ${spots ?? null}, status = ${status ?? null}, description = ${description ?? null}, 
+                date = ${eventDate ?? null}, is_active = true, updated_at = NOW(),
+                image_url = COALESCE(${appMetadata.imageUrl ?? null}, image_url),
+                external_url = COALESCE(${appMetadata.externalUrl ?? null}, external_url),
+                google_event_etag = ${googleEtag ?? null}, google_event_updated_at = ${googleUpdatedAt ?? null}, last_synced_at = NOW(),
+                locally_edited = false, app_last_modified_at = NULL, needs_review = ${needsReview ?? null},
+                recurring_event_id = COALESCE(${recurringEventId ?? null}, recurring_event_id)
                WHERE google_calendar_id = ${googleEventId}`);
             updated++;
           } else {
