@@ -276,6 +276,8 @@ router.post('/api/stripe/subscriptions/create-for-member', isStaffOrAdmin, async
         tier: tierName,
         stripeSubscriptionId: stripeSubscription?.subscriptionId,
         membershipStatus: memberStatus,
+        archivedAt: null,
+        archivedBy: null,
         updatedAt: new Date(),
       }).where(eq(users.id, member.id));
     } catch (dbError) {

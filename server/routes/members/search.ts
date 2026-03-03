@@ -176,9 +176,9 @@ router.get('/api/members/directory', isStaffOrAdmin, async (req, res) => {
     if (statusFilter === 'active') {
       // Include trialing and past_due as active - they still have membership access
       statusCondition = sql`(
-        ${users.membershipStatus} IN ('active', 'trialing', 'past_due')
+        ${users.membershipStatus} IN ('active', 'trialing', 'past_due', 'pending')
         OR ${users.membershipStatus} IS NULL
-        OR (${users.stripeSubscriptionId} IS NOT NULL AND (${users.membershipStatus} = 'non-member' OR ${users.membershipStatus} = 'pending'))
+        OR (${users.stripeSubscriptionId} IS NOT NULL AND ${users.membershipStatus} = 'non-member')
       )`;
     } else if (statusFilter === 'former') {
       // past_due is NOT former - they're still active with a payment issue

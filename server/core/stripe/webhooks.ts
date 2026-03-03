@@ -2905,7 +2905,8 @@ async function handleSubscriptionCreated(client: PoolClient, subscription: Strip
           `UPDATE users SET 
             stripe_customer_id = $1, stripe_subscription_id = $2, membership_status = $3,
             billing_provider = 'stripe', stripe_current_period_end = COALESCE($4, stripe_current_period_end),
-            tier = COALESCE($5, tier), join_date = COALESCE(join_date, NOW()), updated_at = NOW()
+            tier = COALESCE($5, tier), join_date = COALESCE(join_date, NOW()),
+            archived_at = NULL, archived_by = NULL, updated_at = NOW()
            WHERE id = $6`,
           [customerId, subscription.id, actualStatus, subscriptionPeriodEnd, tierName, resolvedSub.userId]
         );
@@ -2946,6 +2947,8 @@ async function handleSubscriptionCreated(client: PoolClient, subscription: Strip
                  stripe_current_period_end = COALESCE($9, users.stripe_current_period_end),
                  tier = COALESCE(EXCLUDED.tier, users.tier),
                  role = 'member',
+                 archived_at = NULL,
+                 archived_by = NULL,
                  join_date = COALESCE(users.join_date, NOW()),
                  first_name = COALESCE(NULLIF(EXCLUDED.first_name, ''), users.first_name),
                  last_name = COALESCE(NULLIF(EXCLUDED.last_name, ''), users.last_name),
@@ -3085,6 +3088,8 @@ async function handleSubscriptionCreated(client: PoolClient, subscription: Strip
             WHEN membership_status IS NULL OR membership_status IN ('pending', 'inactive', 'non-member', 'terminated', 'cancelled', 'expired', 'former_member', 'deleted', 'suspended', 'frozen', 'froze', 'declined', 'churned') THEN $3
             ELSE membership_status 
           END,
+          archived_at = NULL,
+          archived_by = NULL,
           join_date = CASE WHEN join_date IS NULL AND $3 = 'active' THEN NOW() ELSE join_date END,
           updated_at = NOW()
         WHERE LOWER(email) = LOWER($4)`,
@@ -3608,7 +3613,8 @@ async function handleSubscriptionUpdated(client: PoolClient, subscription: Strip
 
     if (status === 'active') {
       await client.query(
-        `UPDATE users SET membership_status = 'active', billing_provider = 'stripe', stripe_current_period_end = COALESCE($2, stripe_current_period_end), updated_at = NOW() 
+        `UPDATE users SET membership_status = 'active', billing_provider = 'stripe', stripe_current_period_end = COALESCE($2, stripe_current_period_end),
+         archived_at = NULL, archived_by = NULL, updated_at = NOW() 
          WHERE id = $1 
          AND (membership_status IS NULL OR membership_status IN ('pending', 'inactive', 'non-member', 'past_due', 'trialing'))
          AND COALESCE(membership_status, '') NOT IN ('cancelled', 'suspended', 'terminated')`,
