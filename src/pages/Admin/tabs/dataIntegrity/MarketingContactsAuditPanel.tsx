@@ -46,6 +46,7 @@ interface RemoveResponse {
   success: boolean;
   removed: number;
   failed: number;
+  needsWorkflow?: boolean;
   errors?: string[];
 }
 
@@ -111,7 +112,12 @@ const MarketingContactsAuditPanel: React.FC<MarketingContactsAuditPanelProps> = 
     mutationFn: (contactIds: string[]) =>
       postWithCredentials('/api/admin/hubspot/remove-marketing-contacts', { contactIds }),
     onSuccess: (data, removedIds) => {
-      showToast(`Removed ${data.removed} contacts from marketing.${data.failed > 0 ? ` ${data.failed} failed.` : ''}`, data.failed > 0 ? 'warning' : 'success');
+      showToast(
+        data.needsWorkflow
+          ? `Flagged ${data.removed} contacts for removal. A HubSpot workflow is needed to complete the status change.${data.failed > 0 ? ` ${data.failed} failed.` : ''}`
+          : `Removed ${data.removed} contacts from marketing.${data.failed > 0 ? ` ${data.failed} failed.` : ''}`,
+        data.failed > 0 ? 'warning' : 'success'
+      );
       setSelectedContacts(new Set());
 
       if (data.removed > 0) {
@@ -437,11 +443,26 @@ const MarketingContactsAuditPanel: React.FC<MarketingContactsAuditPanelProps> = 
                   </div>
                 </div>
 
-                <p className="text-xs text-gray-400 dark:text-gray-500">
-                  Removing contacts from marketing does not delete them from HubSpot.
-                  They become non-marketing contacts and no longer count toward your marketing contact limit.
-                  You can re-add them as marketing contacts at any time from HubSpot.
-                </p>
+                <div className="bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/30 rounded-lg p-3 space-y-1.5">
+                  <p className="text-xs font-medium text-amber-800 dark:text-amber-300">
+                    How this works
+                  </p>
+                  <p className="text-xs text-amber-700 dark:text-amber-400">
+                    Clicking "Remove from Marketing" flags contacts with a <code className="bg-amber-100 dark:bg-amber-900/30 px-1 rounded">remove_from_marketing</code> property in HubSpot.
+                    HubSpot does not allow changing marketing status directly via API, so a one-time workflow setup is required:
+                  </p>
+                  <ol className="text-xs text-amber-700 dark:text-amber-400 list-decimal list-inside space-y-0.5">
+                    <li>In HubSpot, go to Automation &gt; Workflows &gt; Create workflow (Contact-based)</li>
+                    <li>Set enrollment trigger: <strong>remove_from_marketing</strong> is equal to <strong>True</strong></li>
+                    <li>Add action: <strong>Set marketing contact status</strong> &gt; <strong>Set as non-marketing</strong></li>
+                    <li>Optionally add a second action to clear the property back to False</li>
+                    <li>Turn on the workflow and re-enroll existing contacts</li>
+                  </ol>
+                  <p className="text-xs text-amber-600 dark:text-amber-500">
+                    Note: HubSpot processes non-marketing status changes at the start of your next billing cycle.
+                    Contacts are not deleted from HubSpot — they just stop counting toward your marketing contact limit.
+                  </p>
+                </div>
               </>
             )}
           </div>

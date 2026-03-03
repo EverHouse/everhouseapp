@@ -1943,6 +1943,7 @@ const MARKETING_AUDIT_PROPERTIES = [
   'hs_email_open',
   'hs_sa_first_engagement_date',
   'hs_last_sales_activity_date',
+  'remove_from_marketing',
 ];
 
 router.get('/api/admin/hubspot/marketing-contacts-audit', isAdmin, async (_req: Request, res: Response) => {
@@ -2019,8 +2020,11 @@ router.get('/api/admin/hubspot/marketing-contacts-audit', isAdmin, async (_req: 
       const lifecycleStage = (props.lifecyclestage || '').toLowerCase();
       const dbMember = dbMemberMap[email];
 
+      const alreadyFlaggedForRemoval =
+        (props.remove_from_marketing || '').toLowerCase() === 'true';
+
       const isMarketingContact =
-        (props.hs_marketable_status || '').toLowerCase() !== 'false';
+        (props.hs_marketable_status || '').toLowerCase() !== 'false' && !alreadyFlaggedForRemoval;
 
       const emailBounced =
         !!(props.hs_email_hard_bounce_reason_enum) ||
@@ -2187,6 +2191,40 @@ function checkRecentEngagement(
   return false;
 }
 
+async function ensureNonMarketingProperty(hubspot: any): Promise<boolean> {
+  const PROP_NAME = 'remove_from_marketing';
+  try {
+    await retryableHubSpotRequest(() =>
+      hubspot.crm.properties.coreApi.getByName('contacts', PROP_NAME)
+    );
+    return true;
+  } catch {
+    try {
+      await retryableHubSpotRequest(() =>
+        hubspot.crm.properties.coreApi.create('contacts', {
+          name: PROP_NAME,
+          label: 'Remove from Marketing',
+          type: 'enumeration',
+          fieldType: 'booleancheckbox',
+          groupName: 'contactinformation',
+          description: 'Set by Ever Club app to flag contacts for non-marketing status. Create a HubSpot workflow that triggers on this property to set marketing status.',
+          options: [
+            { label: 'True', value: 'true', displayOrder: 0 },
+            { label: 'False', value: 'false', displayOrder: 1 },
+          ],
+        })
+      );
+      logger.info('[HubSpot MarketingAudit] Created remove_from_marketing custom property');
+      return true;
+    } catch (createErr: unknown) {
+      logger.error('[HubSpot MarketingAudit] Failed to create custom property', {
+        error: createErr instanceof Error ? createErr : new Error(String(createErr)),
+      });
+      return false;
+    }
+  }
+}
+
 router.post('/api/admin/hubspot/remove-marketing-contacts', isAdmin, async (req: Request, res: Response) => {
   try {
     const { contactIds } = req.body as { contactIds: string[] };
@@ -2199,6 +2237,14 @@ router.post('/api/admin/hubspot/remove-marketing-contacts', isAdmin, async (req:
     }
 
     const hubspot = await getHubSpotClient();
+
+    const propReady = await ensureNonMarketingProperty(hubspot);
+    if (!propReady) {
+      return res.status(500).json({
+        error: 'Could not create the remove_from_marketing property in HubSpot. Check API permissions.',
+      });
+    }
+
     const batchSize = 100;
     let successCount = 0;
     let failCount = 0;
@@ -2208,13 +2254,11 @@ router.post('/api/admin/hubspot/remove-marketing-contacts', isAdmin, async (req:
       const batch = contactIds.slice(i, i + batchSize);
       try {
         await retryableHubSpotRequest(() =>
-          hubspot.apiRequest({
-            method: 'POST',
-            path: '/contacts/v1/contacts/set-marketing-status',
-            body: {
-              vids: batch.map(id => parseInt(id, 10)),
-              eligible: false,
-            },
+          hubspot.crm.contacts.batchApi.update({
+            inputs: batch.map(id => ({
+              id,
+              properties: { remove_from_marketing: 'true' },
+            })),
           })
         );
         successCount += batch.length;
@@ -2225,9 +2269,9 @@ router.post('/api/admin/hubspot/remove-marketing-contacts', isAdmin, async (req:
     }
 
     const sessionUser = getSessionUser(req);
-    logger.info('[HubSpot MarketingAudit] Marketing contacts removed', {
+    logger.info('[HubSpot MarketingAudit] Contacts flagged for non-marketing', {
       extra: {
-        removedCount: successCount,
+        flaggedCount: successCount,
         failedCount: failCount,
         performedBy: sessionUser?.email || 'unknown',
       },
@@ -2237,13 +2281,14 @@ router.post('/api/admin/hubspot/remove-marketing-contacts', isAdmin, async (req:
       success: true,
       removed: successCount,
       failed: failCount,
+      needsWorkflow: true,
       errors: errors.length > 0 ? errors : undefined,
     });
   } catch (error: unknown) {
-    logger.error('[HubSpot MarketingAudit] Failed to remove marketing contacts', {
+    logger.error('[HubSpot MarketingAudit] Failed to flag marketing contacts', {
       error: error instanceof Error ? error : new Error(String(error)),
     });
-    res.status(500).json({ error: 'Failed to remove marketing contacts' });
+    res.status(500).json({ error: 'Failed to flag marketing contacts for removal' });
   }
 });
 
