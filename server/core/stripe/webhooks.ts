@@ -5045,7 +5045,7 @@ export async function handleCustomerDeleted(client: PoolClient, customer: Stripe
     const user = userResult.rows[0];
 
     await client.query(
-      `UPDATE users SET stripe_customer_id = NULL, stripe_subscription_id = NULL, billing_provider = '' WHERE id = $1`,
+      `UPDATE users SET stripe_customer_id = NULL, stripe_subscription_id = NULL, billing_provider = NULL WHERE id = $1`,
       [user.id]
     );
 

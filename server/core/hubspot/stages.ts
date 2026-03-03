@@ -300,7 +300,7 @@ export async function syncMemberToHubSpot(
     if (targetLifecycleStage) {
       try {
         await retryableHubSpotRequest(() =>
-          hubspot.crm.contacts.basicApi.update(contactId, { properties: { lifecyclestage: '0' } })
+          hubspot.crm.contacts.basicApi.update(contactId, { properties: { lifecyclestage: '' } })
         );
       } catch (clearError: unknown) {
         logger.warn(`[HubSpot Sync] Could not clear lifecyclestage for ${email} before setting to '${targetLifecycleStage}':`, { error: clearError });

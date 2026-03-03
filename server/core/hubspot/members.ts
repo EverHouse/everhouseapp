@@ -1000,7 +1000,7 @@ export async function syncTierToHubSpot(params: {
     
     try {
       await retryableHubSpotRequest(() =>
-        hubspot.crm.contacts.basicApi.update(hubspotContactId, { properties: { lifecyclestage: '0' } })
+        hubspot.crm.contacts.basicApi.update(hubspotContactId, { properties: { lifecyclestage: '' } })
       );
     } catch (clearError: unknown) {
       logger.warn(`[HubSpot TierSync] Could not clear lifecyclestage for ${normalizedEmail} before setting to '${lifecyclestage}':`, { error: clearError });

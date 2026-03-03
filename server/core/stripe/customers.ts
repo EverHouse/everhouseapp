@@ -182,39 +182,43 @@ export async function getOrCreateStripeCustomer(
       const stripeForValidation = await getStripeClient();
       const existingCustomer = await stripeForValidation.customers.retrieve(existingCustomerId);
       
-      const firstName = userRow?.first_name as string | null;
-      const lastName = userRow?.last_name as string | null;
-      
-      // Update metadata and name if missing
       const cust = existingCustomer as Stripe.Customer | Stripe.DeletedCustomer;
-      const needsUpdate = !('deleted' in cust && cust.deleted) && (
-        !('metadata' in cust && cust.metadata?.userId) ||
-        !('name' in cust && cust.name) ||
-        (userTier && 'metadata' in cust && cust.metadata?.tier !== userTier) ||
-        (firstName && !('metadata' in cust && cust.metadata?.firstName)) ||
-        (lastName && !('metadata' in cust && cust.metadata?.lastName))
-      );
-      
-      if (needsUpdate) {
-        const updateMetadata: Record<string, string> = {
-          userId: userId,
-          source: 'even_house_app',
-          primaryEmail: email.toLowerCase(),
-        };
-        if (userTier) updateMetadata.tier = userTier;
-        if (firstName) updateMetadata.firstName = firstName;
-        if (lastName) updateMetadata.lastName = lastName;
+      if ('deleted' in cust && cust.deleted) {
+        logger.warn(`[Stripe] Customer ${existingCustomerId} is deleted in Stripe for user ${userId}, clearing and re-creating`);
+        await db.execute(sql`UPDATE users SET stripe_customer_id = NULL WHERE id = ${userId}`);
+      } else {
+        const firstName = userRow?.first_name as string | null;
+        const lastName = userRow?.last_name as string | null;
         
-        const userPhone = userRow?.phone as string | null;
-        await stripeForValidation.customers.update(existingCustomerId, {
-          metadata: updateMetadata,
-          ...(resolvedName && !('name' in existingCustomer && existingCustomer.name) ? { name: resolvedName } : {}),
-          ...(userPhone && !('phone' in existingCustomer && existingCustomer.phone) ? { phone: userPhone } : {}),
-        });
-        logger.info(`[Stripe] Updated metadata for existing customer ${existingCustomerId}`);
+        const needsUpdate = (
+          !('metadata' in cust && cust.metadata?.userId) ||
+          !('name' in cust && cust.name) ||
+          (userTier && 'metadata' in cust && cust.metadata?.tier !== userTier) ||
+          (firstName && !('metadata' in cust && cust.metadata?.firstName)) ||
+          (lastName && !('metadata' in cust && cust.metadata?.lastName))
+        );
+        
+        if (needsUpdate) {
+          const updateMetadata: Record<string, string> = {
+            userId: userId,
+            source: 'even_house_app',
+            primaryEmail: email.toLowerCase(),
+          };
+          if (userTier) updateMetadata.tier = userTier;
+          if (firstName) updateMetadata.firstName = firstName;
+          if (lastName) updateMetadata.lastName = lastName;
+          
+          const userPhone = userRow?.phone as string | null;
+          await stripeForValidation.customers.update(existingCustomerId, {
+            metadata: updateMetadata,
+            ...(resolvedName && !('name' in existingCustomer && existingCustomer.name) ? { name: resolvedName } : {}),
+            ...(userPhone && !('phone' in existingCustomer && existingCustomer.phone) ? { phone: userPhone } : {}),
+          });
+          logger.info(`[Stripe] Updated metadata for existing customer ${existingCustomerId}`);
+        }
+        
+        return { customerId: existingCustomerId, isNew: false };
       }
-      
-      return { customerId: existingCustomerId, isNew: false };
     } catch (validationError: unknown) {
       if (getErrorCode(validationError) === 'resource_missing') {
         logger.warn(`[Stripe] Stored customer ${existingCustomerId} no longer exists in Stripe for user ${userId}, clearing and re-creating`);
