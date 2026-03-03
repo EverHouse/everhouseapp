@@ -55,10 +55,17 @@ export const changelog: ChangelogEntry[] = [
       "Fix: Player count indicator no longer shows for conference room bookings on the dashboard",
       "Fix: Data export queries now include proper LIMIT clauses to prevent oversized responses",
       "Fix: One-time fee collection now properly reports payment failure status",
+      "Fix: Wellness calendar sync SQL queries now use null coalescing — prevents crashes when Google Calendar returns undefined fields during sync",
+      "Fix: Wellness availability block creation now properly handles null notes and class IDs — prevents insertion errors",
+      "Fix: Dashboard booking requests query now capped at 200 results — prevents oversized responses on member dashboard",
+      "Fix: Member dashboard calculations memoized — prevents unnecessary re-computation on re-renders",
       "Feature: Staff can now view and manage conference room prepayments on behalf of other members",
+      "Feature: Staff-only AI image generation endpoint added for creating club marketing visuals",
+      "Infra: Stripe auto-refund job queue type added for processing overpayment refunds asynchronously",
       "Infra: ESLint updated to latest major version to resolve dependency conflicts",
       "Infra: Input validation added across API endpoints with Zod schemas",
       "Infra: Route index auto-generation script added for developer reference",
+      "Infra: Staff training guide updated with current Trackman webhook modification documentation",
     ]
   },
   {
