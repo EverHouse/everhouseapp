@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAutoAnimate } from '@formkit/auto-animate/react';
 import { fetchWithCredentials, postWithCredentials } from '../../../../hooks/queries/useFetch';
 import { useToast } from '../../../../components/Toast';
@@ -105,15 +105,40 @@ const MarketingContactsAuditPanel: React.FC<MarketingContactsAuditPanelProps> = 
     retry: 1,
   });
 
+  const queryClient = useQueryClient();
+
   const removeMutation = useMutation<RemoveResponse, Error, string[]>({
     mutationFn: (contactIds: string[]) =>
       postWithCredentials('/api/admin/hubspot/remove-marketing-contacts', { contactIds }),
-    onSuccess: (data) => {
-      showToast(`Removed ${data.removed} contacts from marketing. ${data.failed > 0 ? `${data.failed} failed.` : ''} Refreshing audit data (may take a moment for HubSpot to update)...`, data.failed > 0 ? 'warning' : 'success');
+    onSuccess: (data, removedIds) => {
+      showToast(`Removed ${data.removed} contacts from marketing.${data.failed > 0 ? ` ${data.failed} failed.` : ''}`, data.failed > 0 ? 'warning' : 'success');
       setSelectedContacts(new Set());
-      setTimeout(() => {
-        auditQuery.refetch({ cancelRefetch: true });
-      }, 3000);
+
+      if (data.removed > 0) {
+        queryClient.setQueryData<AuditResponse>(['hubspot-marketing-audit'], (old) => {
+          if (!old) return old;
+          const removedSet = new Set(removedIds);
+          const filterOut = (list: AuditContact[]) => list.filter(c => !removedSet.has(c.hubspotId));
+          const newSafeToRemove = filterOut(old.safeToRemove);
+          const newNeedsReview = filterOut(old.needsReview);
+          const newKeep = filterOut(old.keep);
+          return {
+            ...old,
+            safeToRemove: newSafeToRemove,
+            needsReview: newNeedsReview,
+            keep: newKeep,
+            summary: {
+              ...old.summary,
+              totalMarketingContacts: old.summary.totalMarketingContacts - data.removed,
+              totalNonMarketing: old.summary.totalNonMarketing + data.removed,
+              safeToRemoveCount: newSafeToRemove.length,
+              needsReviewCount: newNeedsReview.length,
+              keepCount: newKeep.length,
+              potentialSavings: newSafeToRemove.length + newNeedsReview.length,
+            },
+          };
+        });
+      }
     },
     onError: (error) => {
       showToast(`Failed to remove contacts: ${error.message}`, 'error');
