@@ -72,20 +72,22 @@ export const NoticeFormDrawer: React.FC<NoticeFormDrawerProps> = ({
   });
 
   useEffect(() => {
+    let cancelled = false;
     fetch('/api/notice-types', { credentials: 'include' })
       .then(r => r.json())
-      .then(data => setNoticeTypes(data || []))
+      .then(data => { if (!cancelled) setNoticeTypes(data || []); })
       .catch(() => {});
     
     fetch('/api/closure-reasons', { credentials: 'include' })
       .then(r => r.json())
-      .then(data => setClosureReasons(data || []))
+      .then(data => { if (!cancelled) setClosureReasons(data || []); })
       .catch(() => {});
 
     fetch('/api/resources', { credentials: 'include' })
       .then(r => r.json())
-      .then(data => setResources(data || []))
+      .then(data => { if (!cancelled) setResources(data || []); })
       .catch(() => {});
+    return () => { cancelled = true; };
   }, []);
 
   useEffect(() => {

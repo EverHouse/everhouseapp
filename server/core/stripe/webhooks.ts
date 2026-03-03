@@ -1117,54 +1117,34 @@ async function handlePaymentIntentSucceeded(client: PoolClient, paymentIntent: S
       } } });
 
       if (validatedParticipantIds.length === 0) {
-        deferredActions.push(async () => {
-          try {
-            const stripeClient = await getStripeClient();
-            const refund = await stripeClient.refunds.create({
-              payment_intent: id,
-              reason: 'duplicate',
-              metadata: {
-                reason: 'all_participants_already_paid',
-                sessionId: String(snapshot.session_id),
-                bookingId: String(bookingId),
-                overpaymentCents: String(overpaymentCents),
-              }
-            }, {
-              idempotencyKey: `refund_overpayment_full_${id}_${bookingId}`
-            });
-            logger.info(`[Stripe Webhook] Full auto-refund issued for duplicate payment`, { extra: { refundId: refund.id, paymentIntentId: id, amountCents: amount } });
-          } catch (refundError: unknown) {
-            logger.error(`[Stripe Webhook] Failed to auto-refund duplicate payment — flagging for manual review`, { extra: { paymentIntentId: id, error: refundError } });
-            await db.execute(sql`
-              UPDATE booking_sessions SET needs_review = true, review_reason = ${`Auto-refund failed for overpayment: PI ${id}, ${overpaymentCents} cents. All participants already paid.`} WHERE id = ${snapshot.session_id}
-            `);
-          }
-        });
+        await queueJobInTransaction(client, 'stripe_auto_refund', {
+          paymentIntentId: id,
+          reason: 'duplicate',
+          metadata: {
+            reason: 'all_participants_already_paid',
+            sessionId: String(snapshot.session_id),
+            bookingId: String(bookingId),
+            overpaymentCents: String(overpaymentCents),
+          },
+          idempotencyKey: `refund_overpayment_full_${id}_${bookingId}`,
+          sessionId: snapshot.session_id,
+          reviewReason: `Auto-refund failed for overpayment: PI ${id}, ${overpaymentCents} cents. All participants already paid.`,
+        }, { priority: 10, maxRetries: 5 });
       } else {
-        deferredActions.push(async () => {
-          try {
-            const stripeClient = await getStripeClient();
-            const refund = await stripeClient.refunds.create({
-              payment_intent: id,
-              amount: overpaymentCents,
-              reason: 'duplicate',
-              metadata: {
-                reason: 'partial_participants_already_paid',
-                sessionId: String(snapshot.session_id),
-                bookingId: String(bookingId),
-                overpaymentCents: String(overpaymentCents),
-              }
-            }, {
-              idempotencyKey: `refund_overpayment_partial_${id}_${bookingId}_${overpaymentCents}`
-            });
-            logger.info(`[Stripe Webhook] Partial auto-refund issued for overpayment`, { extra: { refundId: refund.id, paymentIntentId: id, refundedCents: overpaymentCents } });
-          } catch (refundError: unknown) {
-            logger.error(`[Stripe Webhook] Failed to auto-refund partial overpayment — flagging for manual review`, { extra: { paymentIntentId: id, error: refundError } });
-            await db.execute(sql`
-              UPDATE booking_sessions SET needs_review = true, review_reason = ${`Partial auto-refund failed: PI ${id}, ${overpaymentCents} cents overpaid.`} WHERE id = ${snapshot.session_id}
-            `);
-          }
-        });
+        await queueJobInTransaction(client, 'stripe_auto_refund', {
+          paymentIntentId: id,
+          amountCents: overpaymentCents,
+          reason: 'duplicate',
+          metadata: {
+            reason: 'partial_participants_already_paid',
+            sessionId: String(snapshot.session_id),
+            bookingId: String(bookingId),
+            overpaymentCents: String(overpaymentCents),
+          },
+          idempotencyKey: `refund_overpayment_partial_${id}_${bookingId}_${overpaymentCents}`,
+          sessionId: snapshot.session_id,
+          reviewReason: `Partial auto-refund failed: PI ${id}, ${overpaymentCents} cents overpaid.`,
+        }, { priority: 10, maxRetries: 5 });
       }
     }
     

@@ -48,21 +48,26 @@ const ClosureAlert: React.FC = () => {
   }, [user?.email]);
 
   useEffect(() => {
+    const controller = new AbortController();
     const fetchClosures = async () => {
       try {
-        const res = await fetch('/api/closures');
+        const res = await fetch('/api/closures', { signal: controller.signal });
         if (res.ok) {
           const data = await res.json();
           setClosures(data);
         }
       } catch (error: unknown) {
+        if (error instanceof DOMException && error.name === 'AbortError') return;
         console.error('Failed to fetch closures:', error);
       } finally {
-        setIsLoading(false);
+        if (!controller.signal.aborted) {
+          setIsLoading(false);
+        }
       }
     };
     
     fetchClosures();
+    return () => controller.abort();
   }, []);
 
   const activeClosures = useMemo(() => {

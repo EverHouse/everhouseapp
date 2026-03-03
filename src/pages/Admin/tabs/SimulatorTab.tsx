@@ -252,11 +252,15 @@ const SimulatorTab: React.FC = () => {
     }, [isLoading, setPageReady]);
 
     useEffect(() => {
+        let cancelled = false;
+
         const openBookingById = async (bookingId: number | string) => {
             try {
                 const res = await fetch(`/api/booking-requests?id=${bookingId}`, { credentials: 'include' });
+                if (cancelled) return;
                 if (res.ok) {
                     const data = await res.json();
+                    if (cancelled) return;
                     if (data && data.length > 0) {
                         const booking = data[0];
                         const email = (booking.user_email || '').toLowerCase();
@@ -311,7 +315,10 @@ const SimulatorTab: React.FC = () => {
             openBookingById(pendingBookingId);
         }
         
-        return () => window.removeEventListener('open-booking-details', handleOpenBookingDetails);
+        return () => {
+            cancelled = true;
+            window.removeEventListener('open-booking-details', handleOpenBookingDetails);
+        };
     }, []);
 
     useEffect(() => {
@@ -641,13 +648,17 @@ const SimulatorTab: React.FC = () => {
 
 
     useEffect(() => {
+        let cancelled = false;
+
         const fetchDeclineSlots = async (bookingDate: string, resourceId: number) => {
             try {
                 const res = await fetch(`/api/bays/${resourceId}/availability?date=${bookingDate}`, {
                     credentials: 'include'
                 });
+                if (cancelled) return;
                 if (res.ok) {
                     const blocks = await res.json();
+                    if (cancelled) return;
                     const available = blocks
                         .filter((b: { block_type?: string; start_time?: string }) => b.block_type === 'available' || !b.block_type)
                         .map((b: { block_type?: string; start_time?: string }) => b.start_time?.substring(0, 5))
@@ -656,7 +667,9 @@ const SimulatorTab: React.FC = () => {
                 }
             } catch (err: unknown) {
                 console.error('Failed to fetch available slots:', err);
-                setDeclineAvailableSlots([]);
+                if (!cancelled) {
+                    setDeclineAvailableSlots([]);
+                }
             }
         };
 
@@ -667,6 +680,10 @@ const SimulatorTab: React.FC = () => {
                 fetchDeclineSlots(selectedRequest.request_date, selectedRequest.resource_id);
             }
         }
+
+        return () => {
+            cancelled = true;
+        };
     }, [actionModal, selectedRequest]);
 
     const pendingRequests = requests.filter(r => 

@@ -54,6 +54,7 @@ export type JobType =
   | 'update_member_tier'
   | 'stripe_credit_refund'
   | 'stripe_credit_consume'
+  | 'stripe_auto_refund'
   | 'generic_async_task';
 
 interface QueueJobOptions {
@@ -258,6 +259,32 @@ async function executeJob(job: { id: number; jobType: string; payload: Record<st
           }
         );
         logger.info(`[JobQueue] Consumed account credit of $${(Number(payload.amountCents) / 100).toFixed(2)} for ${payload.email}`);
+        break;
+      }
+      case 'stripe_auto_refund': {
+        const { getStripeClient: getStripeForRefund } = await import('./stripe/client');
+        const stripeRefund = await getStripeForRefund();
+        try {
+          const refundParams: Record<string, unknown> = {
+            payment_intent: payload.paymentIntentId as string,
+            reason: (payload.reason as string) || 'duplicate',
+            metadata: payload.metadata as Record<string, string>,
+          };
+          if (payload.amountCents) {
+            refundParams.amount = payload.amountCents as number;
+          }
+          const refund = await stripeRefund.refunds.create(
+            refundParams as Parameters<typeof stripeRefund.refunds.create>[0],
+            { idempotencyKey: payload.idempotencyKey as string }
+          );
+          logger.info(`[JobQueue] Auto-refund issued: ${refund.id} for PI ${payload.paymentIntentId}, amount: ${payload.amountCents || 'full'}`);
+        } catch (refundError: unknown) {
+          logger.error(`[JobQueue] Auto-refund failed for PI ${payload.paymentIntentId} — flagging for manual review`, { error: refundError });
+          if (payload.sessionId) {
+            await db.execute(sql`UPDATE booking_sessions SET needs_review = true, review_reason = ${payload.reviewReason as string} WHERE id = ${Number(payload.sessionId)}`);
+          }
+          throw refundError;
+        }
         break;
       }
       case 'update_member_tier':

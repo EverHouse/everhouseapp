@@ -144,10 +144,12 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
   }, [member?.rawTier, member?.tier]);
 
   useEffect(() => {
+    let cancelled = false;
     if (isOpen && visitorMode && isAdmin) {
       fetch('/api/members/add-options', { credentials: 'include' })
         .then(res => res.ok ? res.json() : null)
         .then(data => {
+          if (cancelled) return;
           if (data?.tiersWithIds) {
             setMembershipTiers(data.tiersWithIds);
             if (data.tiersWithIds.length > 0 && !selectedTierId) {
@@ -157,6 +159,7 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
         })
         .catch(() => {});
     }
+    return () => { cancelled = true; };
   }, [isOpen, visitorMode, isAdmin, selectedTierId]);
 
   const fetchMemberData = useCallback(async () => {

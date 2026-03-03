@@ -76,6 +76,15 @@ const Wellness: React.FC = () => {
   const activeTab: 'classes' | 'medspa' = searchParams.get('tab') === 'medspa' ? 'medspa' : 'classes';
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [confirmationMessage, setConfirmationMessage] = useState('Booking confirmed.');
+  const confirmationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (confirmationTimerRef.current) {
+        clearTimeout(confirmationTimerRef.current);
+      }
+    };
+  }, []);
 
   const setActiveTab = (tab: 'classes' | 'medspa') => {
     setSearchParams(prev => {
@@ -133,12 +142,14 @@ const Wellness: React.FC = () => {
       showToast(`RSVP confirmed for ${classData.title}!`, 'success');
       setConfirmationMessage(`RSVP confirmed for ${classData.title}!`);
       setShowConfirmation(true);
-      setTimeout(() => setShowConfirmation(false), 2500);
+      if (confirmationTimerRef.current) clearTimeout(confirmationTimerRef.current);
+      confirmationTimerRef.current = setTimeout(() => setShowConfirmation(false), 2500);
     } else {
       showToast(error || 'Unable to load data. Please try again.', 'error');
       setConfirmationMessage(error || 'Unable to load data. Please try again.');
       setShowConfirmation(true);
-      setTimeout(() => setShowConfirmation(false), 2500);
+      if (confirmationTimerRef.current) clearTimeout(confirmationTimerRef.current);
+      confirmationTimerRef.current = setTimeout(() => setShowConfirmation(false), 2500);
     }
   };
 

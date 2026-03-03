@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import { loadStripe, Stripe } from '@stripe/stripe-js';
 import { EmbeddedCheckoutProvider, EmbeddedCheckout } from '@stripe/react-stripe-js';
@@ -439,13 +439,25 @@ function DayPassesSection() {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const submittingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
+    return () => {
+      if (submittingTimerRef.current) {
+        clearTimeout(submittingTimerRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
     const fetchProducts = async () => {
       try {
-        const res = await fetch('/api/day-passes/products');
+        const res = await fetch('/api/day-passes/products', { signal: controller.signal });
+        if (controller.signal.aborted) return;
         if (!res.ok) throw new Error('Failed to fetch products');
         const data = await res.json();
+        if (controller.signal.aborted) return;
         const allProducts = data.products || [];
         if (filterType) {
           const filtered = allProducts.filter((p: DayPassProduct) => p.id === filterType || p.id.includes(filterType));
@@ -460,12 +472,16 @@ function DayPassesSection() {
         }
         setProducts(allProducts);
       } catch (err: unknown) {
+        if (controller.signal.aborted) return;
         setError((err instanceof Error ? err.message : String(err)));
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
       }
     };
     fetchProducts();
+    return () => controller.abort();
   }, [filterType]);
 
   useEffect(() => {
@@ -507,7 +523,7 @@ function DayPassesSection() {
       const { sessionUrl } = await res.json();
       if (sessionUrl) {
         window.location.href = sessionUrl;
-        setTimeout(() => setSubmitting(false), 2000);
+        submittingTimerRef.current = setTimeout(() => setSubmitting(false), 2000);
       } else {
         setSubmitting(false);
       }

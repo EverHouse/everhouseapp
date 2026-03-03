@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { AnimatedPage } from '../../../components/motion';
 import { TabTransition } from '../../../components/motion/TabTransition';
@@ -134,8 +134,17 @@ const SubscriptionsSubTab: React.FC = () => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<{ created: number; updated: number; skipped: number } | null>(null);
   const [localError, setLocalError] = useState<string | null>(null);
+  const successTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const errorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [subsMobileParent] = useAutoAnimate();
   const [subsTbodyParent] = useAutoAnimate();
+
+  useEffect(() => {
+    return () => {
+      if (successTimerRef.current) clearTimeout(successTimerRef.current);
+      if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
+    };
+  }, []);
 
   const { data: subscriptionsData, isLoading, error: queryError, refetch } = useSubscriptions(statusFilter);
   const subscriptions = subscriptionsData?.subscriptions || [];
@@ -167,11 +176,13 @@ const SubscriptionsSubTab: React.FC = () => {
       const data = await res.json();
       setSyncResult({ created: data.created, updated: data.updated, skipped: data.skipped });
       setSuccessMessage(`Synced from Stripe: ${data.created} created, ${data.updated} updated`);
-      setTimeout(() => setSuccessMessage(null), 5000);
+      if (successTimerRef.current) clearTimeout(successTimerRef.current);
+      successTimerRef.current = setTimeout(() => setSuccessMessage(null), 5000);
       refetch();
     } catch (err: unknown) {
       setLocalError((err instanceof Error ? err.message : String(err)));
-      setTimeout(() => setLocalError(null), 5000);
+      if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
+      errorTimerRef.current = setTimeout(() => setLocalError(null), 5000);
     } finally {
       setIsSyncing(false);
     }
@@ -195,10 +206,12 @@ const SubscriptionsSubTab: React.FC = () => {
         throw new Error(errData.error || 'Failed to send reminder');
       }
       setSuccessMessage('Payment reminder sent successfully');
-      setTimeout(() => setSuccessMessage(null), 3000);
+      if (successTimerRef.current) clearTimeout(successTimerRef.current);
+      successTimerRef.current = setTimeout(() => setSuccessMessage(null), 3000);
     } catch (err: unknown) {
       setLocalError((err instanceof Error ? err.message : String(err)));
-      setTimeout(() => setLocalError(null), 3000);
+      if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
+      errorTimerRef.current = setTimeout(() => setLocalError(null), 3000);
     } finally {
       setSendingReminder(null);
     }

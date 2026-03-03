@@ -105,6 +105,7 @@ export const MemberDataProvider: React.FC<{children: ReactNode}> = ({ children }
   }, [actualUser]);
 
   useEffect(() => {
+    let cancelled = false;
     const fetchInitialMembers = async () => {
       if (!sessionChecked || !actualUser) return;
       if (actualUser.role !== 'admin' && actualUser.role !== 'staff') return;
@@ -114,8 +115,10 @@ export const MemberDataProvider: React.FC<{children: ReactNode}> = ({ children }
       setIsFetchingMembers(true);
       try {
         const res = await fetch('/api/members/directory?status=active', { credentials: 'include' });
+        if (cancelled) return;
         if (res.ok) {
           const data = await res.json();
+          if (cancelled) return;
           const contacts = Array.isArray(data) ? data : (data.contacts || []);
           const formatted = contacts.map((c: DirectoryContact) => formatContact(c, 'Active'));
           setMembers(formatted);
@@ -133,10 +136,11 @@ export const MemberDataProvider: React.FC<{children: ReactNode}> = ({ children }
       } catch (err: unknown) {
         console.error('Failed to fetch initial members:', err);
       } finally {
-        setIsFetchingMembers(false);
+        if (!cancelled) setIsFetchingMembers(false);
       }
     };
     fetchInitialMembers();
+    return () => { cancelled = true; };
   }, [sessionChecked, actualUser]);
 
   const fetchFormerMembers = useCallback(async (forceRefresh = false) => {

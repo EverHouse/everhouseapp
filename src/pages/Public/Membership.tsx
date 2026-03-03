@@ -523,12 +523,15 @@ const CompareFeatures: React.FC = () => {
   }, [loading, setPageReady]);
 
   useEffect(() => {
+    const controller = new AbortController();
     const fetchData = async () => {
       try {
         const [tiersResponse, featuresResponse] = await Promise.all([
-          fetch('/api/membership-tiers?active=true'),
-          fetch('/api/tier-features')
+          fetch('/api/membership-tiers?active=true', { signal: controller.signal }),
+          fetch('/api/tier-features', { signal: controller.signal })
         ]);
+
+        if (controller.signal.aborted) return;
 
         if (tiersResponse.ok) {
           const data = await tiersResponse.json();
@@ -542,12 +545,16 @@ const CompareFeatures: React.FC = () => {
           setTierFeatures(activeFeatures);
         }
       } catch (error: unknown) {
+        if (controller.signal.aborted) return;
         console.error('Failed to fetch data:', error);
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
       }
     };
     fetchData();
+    return () => controller.abort();
   }, []);
 
   const toggleTier = (tier: string) => {

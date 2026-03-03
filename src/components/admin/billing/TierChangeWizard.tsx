@@ -44,11 +44,13 @@ export function TierChangeWizard({ isOpen, onClose, memberEmail, subscriptionId,
 
   useEffect(() => {
     if (isOpen) {
+      let cancelled = false;
       setSelectedPriceId('');
       setPreview(null);
       setError(null);
       fetch('/api/admin/tier-change/tiers', { credentials: 'include' })
         .then(r => {
+          if (cancelled) return;
           if (!r.ok) {
             setError(getApiErrorMessage(r, 'load tiers'));
             return;
@@ -56,16 +58,19 @@ export function TierChangeWizard({ isOpen, onClose, memberEmail, subscriptionId,
           return r.json();
         })
         .then(data => {
+          if (cancelled) return;
           if (data && data.tiers) {
             setTiers(data.tiers);
           }
         })
-        .catch(() => setError(getNetworkErrorMessage()));
+        .catch(() => { if (!cancelled) setError(getNetworkErrorMessage()); });
+      return () => { cancelled = true; };
     }
   }, [isOpen]);
 
   useEffect(() => {
     if (selectedPriceId && subscriptionId) {
+      let cancelled = false;
       setPreviewLoading(true);
       setError(null);
       fetch('/api/admin/tier-change/preview', {
@@ -75,6 +80,7 @@ export function TierChangeWizard({ isOpen, onClose, memberEmail, subscriptionId,
         body: JSON.stringify({ subscriptionId, newPriceId: selectedPriceId, immediate })
       })
         .then(r => {
+          if (cancelled) return;
           if (!r.ok) {
             setError(getApiErrorMessage(r, 'preview'));
             return;
@@ -82,14 +88,16 @@ export function TierChangeWizard({ isOpen, onClose, memberEmail, subscriptionId,
           return r.json();
         })
         .then(data => {
+          if (cancelled) return;
           if (data && data.preview) {
             setPreview(data.preview);
           } else if (data && data.error) {
             setError(data.error);
           }
         })
-        .catch(() => setError(getNetworkErrorMessage()))
-        .finally(() => setPreviewLoading(false));
+        .catch(() => { if (!cancelled) setError(getNetworkErrorMessage()); })
+        .finally(() => { if (!cancelled) setPreviewLoading(false); });
+      return () => { cancelled = true; };
     } else {
       setPreview(null);
     }

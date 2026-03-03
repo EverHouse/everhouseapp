@@ -48,9 +48,11 @@ const OnboardingChecklist: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
     const fetchStatus = async () => {
       try {
         const data = await fetchWithCredentials<OnboardingStatus>('/api/member/onboarding');
+        if (cancelled) return;
         if (isInStandaloneMode && data.steps) {
           const appStep = data.steps.find((s: OnboardingStep) => s.key === 'app');
           if (appStep && !appStep.completed) {
@@ -61,7 +63,9 @@ const OnboardingChecklist: React.FC = () => {
                 credentials: 'include',
                 body: JSON.stringify({ step: 'app' }),
               });
+              if (cancelled) return;
               const refreshed = await fetchWithCredentials<OnboardingStatus>('/api/member/onboarding');
+              if (cancelled) return;
               setStatus(refreshed);
               if (refreshed.isComplete && !refreshed.isDismissed) {
                 setCelebrating(true);
@@ -71,6 +75,7 @@ const OnboardingChecklist: React.FC = () => {
             } catch {}
           }
         }
+        if (cancelled) return;
         setStatus(data);
         if (data.isComplete && !data.isDismissed) {
           setCelebrating(true);
@@ -79,10 +84,11 @@ const OnboardingChecklist: React.FC = () => {
       } catch {
         // Silently fail - don't show checklist if endpoint fails
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
     fetchStatus();
+    return () => { cancelled = true; };
   }, []);
 
   const handleDismiss = async () => {

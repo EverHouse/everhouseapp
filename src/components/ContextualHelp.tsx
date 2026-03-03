@@ -28,6 +28,7 @@ export default function ContextualHelp({ guideIds, title = 'Page Guide' }: Conte
 
   useEffect(() => {
     if (!isOpen) return;
+    let cancelled = false;
     setLoading(true);
     fetch('/api/training-sections', { credentials: 'include' })
       .then(res => {
@@ -35,13 +36,15 @@ export default function ContextualHelp({ guideIds, title = 'Page Guide' }: Conte
         throw new Error('Failed to fetch');
       })
       .then(data => {
+        if (cancelled) return;
         const filtered = (data.sections as TrainingSectionDB[])
           .filter(s => guideIds.includes(s.guideId))
           .sort((a, b) => a.sortOrder - b.sortOrder);
         setSections(filtered);
       })
-      .catch(() => setSections([]))
-      .finally(() => setLoading(false));
+      .catch(() => { if (!cancelled) setSections([]); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
   }, [isOpen, guideIds]);
 
   return (
