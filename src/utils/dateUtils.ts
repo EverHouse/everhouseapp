@@ -49,8 +49,10 @@ export function formatDateShort(dateStr: string): string {
 
 export function formatDateDisplay(dateStr: string): string {
   if (!dateStr) return 'Unknown date';
-  const cleanDate = dateStr.split('T')[0];
+  const normalized = String(dateStr).replace(' ', 'T');
+  const cleanDate = normalized.split('T')[0];
   const [, month, day] = cleanDate.split('-').map(Number);
+  if (!month || !day || month < 1 || month > 12) return 'Unknown date';
   return `${SHORT_MONTHS[month - 1]} ${day}`;
 }
 
