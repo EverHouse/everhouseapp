@@ -1133,6 +1133,11 @@ router.delete('/api/stripe/subscriptions/cleanup-pending/:userId', isStaffOrAdmi
         error: `Cannot cleanup user with status "${user.membershipStatus}". Only pending users can be cleaned up.`
       });
     }
+
+    if (!acquireSubscriptionLock(user.email)) {
+      return res.status(409).json({ error: 'A subscription is currently being created for this member. Please wait and try again.' });
+    }
+    res.locals._cleanupEmail = user.email.toLowerCase();
     
     if (user.stripeCustomerId) {
       try {
@@ -1197,6 +1202,8 @@ router.delete('/api/stripe/subscriptions/cleanup-pending/:userId', isStaffOrAdmi
   } catch (error: unknown) {
     logger.error('[Stripe] Error cleaning up pending user', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to cleanup pending user' });
+  } finally {
+    if (res.locals._cleanupEmail) releaseSubscriptionLock(res.locals._cleanupEmail);
   }
 });
 
