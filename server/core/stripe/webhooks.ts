@@ -931,7 +931,7 @@ async function handleChargeDisputeClosed(client: PoolClient, dispute: Stripe.Dis
           logger.info(`[Stripe Webhook] Skipping charge.dispute.closed for ${terminalPayment.user_email} — billing_provider is '${disputeClosedBillingProvider}', not 'stripe'`);
         } else {
           await client.query(
-            `UPDATE users SET membership_status = 'active', billing_provider = 'stripe', updated_at = NOW() WHERE id = $1`,
+            `UPDATE users SET membership_status = 'active', billing_provider = 'stripe', archived_at = NULL, archived_by = NULL, updated_at = NOW() WHERE id = $1`,
             [terminalPayment.user_id]
           );
           logger.info(`[Stripe Webhook] Reactivated membership for user ${terminalPayment.user_id} - dispute won`);
@@ -2385,6 +2385,7 @@ async function handleCheckoutSessionCompleted(client: PoolClient, session: Strip
               billing_provider = 'stripe',
               tier = COALESCE($3, tier),
               join_date = COALESCE(join_date, NOW()),
+              archived_at = NULL, archived_by = NULL,
               updated_at = NOW()
             WHERE id = $4
             RETURNING id, email`,
@@ -2401,6 +2402,7 @@ async function handleCheckoutSessionCompleted(client: PoolClient, session: Strip
                 billing_provider = 'stripe',
                 tier = COALESCE($3, tier),
                 join_date = COALESCE(join_date, NOW()),
+                archived_at = NULL, archived_by = NULL,
                 updated_at = NOW()
               WHERE LOWER(email) = LOWER($4) AND stripe_customer_id IS NULL
               RETURNING id, email`,
@@ -2576,6 +2578,8 @@ async function handleCheckoutSessionCompleted(client: PoolClient, session: Strip
              billing_provider = 'stripe',
              membership_status = 'active',
              role = 'member',
+             archived_at = NULL,
+             archived_by = NULL,
              join_date = COALESCE(users.join_date, NOW()),
              tier = COALESCE(EXCLUDED.tier, users.tier),
              updated_at = NOW()`,
@@ -3231,6 +3235,7 @@ async function handleSubscriptionCreated(client: PoolClient, subscription: Strip
               WHEN membership_status IS NULL OR membership_status IN ('pending', 'inactive', 'non-member', 'terminated', 'cancelled', 'expired', 'former_member', 'deleted', 'suspended', 'frozen', 'froze', 'declined', 'churned') THEN $6
               ELSE membership_status 
             END, 
+            archived_at = NULL, archived_by = NULL,
             updated_at = NOW() 
           WHERE LOWER(email) = LOWER($2) 
           RETURNING id`,
@@ -4161,7 +4166,7 @@ async function handleSubscriptionResumed(client: PoolClient, subscription: Strip
     }
 
     await client.query(
-      `UPDATE users SET membership_status = 'active', billing_provider = 'stripe', stripe_current_period_end = COALESCE($2, stripe_current_period_end), updated_at = NOW() WHERE id = $1`,
+      `UPDATE users SET membership_status = 'active', billing_provider = 'stripe', stripe_current_period_end = COALESCE($2, stripe_current_period_end), archived_at = NULL, archived_by = NULL, updated_at = NOW() WHERE id = $1`,
       [userId, subscriptionPeriodEnd]
     );
     logger.info(`[Stripe Webhook] Subscription resumed: ${email} membership_status set to active`);

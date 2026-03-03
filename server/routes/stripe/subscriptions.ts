@@ -607,6 +607,8 @@ router.post('/api/stripe/subscriptions/create-new-member', isStaffOrAdmin, async
       
       await db.update(users).set({
         membershipStatus: 'active',
+        archivedAt: null,
+        archivedBy: null,
         updatedAt: new Date(),
       }).where(eq(users.id, userId));
     } else if (!subscriptionResult.subscription?.clientSecret) {
@@ -721,7 +723,7 @@ router.post('/api/stripe/subscriptions/confirm-inline-payment', isStaffOrAdmin, 
         userEmail = userResult[0].email;
         tierName = userResult[0].tier || '';
         
-        await db.update(users).set({ membershipStatus: 'active', billingProvider: 'stripe', updatedAt: new Date() }).where(eq(users.id, userId));
+        await db.update(users).set({ membershipStatus: 'active', billingProvider: 'stripe', archivedAt: null, archivedBy: null, updatedAt: new Date() }).where(eq(users.id, userId));
         logger.info('[Stripe Subscriptions] Activated member', { extra: { userEmail } });
       }
     } else if (paymentIntent.customer) {
@@ -735,7 +737,7 @@ router.post('/api/stripe/subscriptions/confirm-inline-payment', isStaffOrAdmin, 
           userEmail = custResult[0].email;
           tierName = custResult[0].tier || '';
           
-          await db.update(users).set({ membershipStatus: 'active', billingProvider: 'stripe', updatedAt: new Date() }).where(eq(users.stripeCustomerId, piCustId));
+          await db.update(users).set({ membershipStatus: 'active', billingProvider: 'stripe', archivedAt: null, archivedBy: null, updatedAt: new Date() }).where(eq(users.stripeCustomerId, piCustId));
           logger.info('[Stripe Subscriptions] Activated member via customer ID', { extra: { userEmail } });
         }
       }

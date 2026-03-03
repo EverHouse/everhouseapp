@@ -645,7 +645,7 @@ router.post('/api/stripe/terminal/process-subscription-payment', isStaffOrAdmin,
       } catch (payErr: unknown) {
         logger.warn('[Terminal] Could not mark $0 invoice as paid (may already be paid)', { extra: { error: getErrorMessage(payErr) } });
       }
-      await db.execute(sql`UPDATE users SET membership_status = 'active', updated_at = NOW() WHERE id = ${Number(userId)}`);
+      await db.execute(sql`UPDATE users SET membership_status = 'active', archived_at = NULL, archived_by = NULL, updated_at = NOW() WHERE id = ${Number(userId)}`);
       return res.json({ 
         success: true,
         freeActivation: true,
@@ -1049,6 +1049,8 @@ router.post('/api/stripe/terminal/confirm-subscription-payment', isStaffOrAdmin,
     await db.update(users)
       .set({ 
         membershipStatus: 'active',
+        archivedAt: null,
+        archivedBy: null,
         updatedAt: new Date()
       })
       .where(eq(users.id, userId));
