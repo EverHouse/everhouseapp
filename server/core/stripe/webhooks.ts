@@ -3133,38 +3133,44 @@ async function handleSubscriptionCreated(client: PoolClient, subscription: Strip
     const deferredNotifyMemberName = memberName;
     const deferredPlanName = planName;
 
-    deferredActions.push(async () => {
-      try {
-        await notifyMember({
-          userEmail: deferredNotifyEmail,
-          title: 'Subscription Started',
-          message: `Your ${deferredPlanName} subscription has been activated. Welcome!`,
-          type: 'membership_renewed',
-        });
-      } catch (notifyErr: unknown) {
-        logger.error('[Stripe Webhook] Notification failed (non-fatal):', { error: notifyErr });
-      }
-    });
+    const isActivated = subscription.status === 'active' || subscription.status === 'trialing';
 
-    deferredActions.push(async () => {
-      try {
-        await notifyAllStaff(
-          '🎉 New Member Joined',
-          `${deferredNotifyMemberName} (${deferredNotifyEmail}) has subscribed to ${deferredPlanName}.`,
-          'new_member',
-          { sendPush: true, url: '/admin/members' }
-        );
-      } catch (notifyErr: unknown) {
-        logger.error('[Stripe Webhook] Notification failed (non-fatal):', { error: notifyErr });
-      }
-    });
+    if (isActivated) {
+      deferredActions.push(async () => {
+        try {
+          await notifyMember({
+            userEmail: deferredNotifyEmail,
+            title: 'Subscription Started',
+            message: `Your ${deferredPlanName} subscription has been activated. Welcome!`,
+            type: 'membership_renewed',
+          });
+        } catch (notifyErr: unknown) {
+          logger.error('[Stripe Webhook] Notification failed (non-fatal):', { error: notifyErr });
+        }
+      });
 
-    broadcastBillingUpdate({
-      action: 'subscription_created',
-      memberEmail: email,
-      memberName,
-      planName
-    });
+      deferredActions.push(async () => {
+        try {
+          await notifyAllStaff(
+            '🎉 New Member Joined',
+            `${deferredNotifyMemberName} (${deferredNotifyEmail}) has subscribed to ${deferredPlanName}.`,
+            'new_member',
+            { sendPush: true, url: '/admin/members' }
+          );
+        } catch (notifyErr: unknown) {
+          logger.error('[Stripe Webhook] Notification failed (non-fatal):', { error: notifyErr });
+        }
+      });
+
+      broadcastBillingUpdate({
+        action: 'subscription_created',
+        memberEmail: email,
+        memberName,
+        planName
+      });
+    } else {
+      logger.info(`[Stripe Webhook] Subscription ${subscription.id} status is '${subscription.status}' — deferring activation notifications until payment completes`);
+    }
 
     // Closed-loop activation: Look up tier from metadata first, then price ID
     let activationTierSlug: string | null = null;
@@ -3610,8 +3616,52 @@ async function handleSubscriptionUpdated(client: PoolClient, subscription: Strip
       );
       logger.info(`[Stripe Webhook] Membership status set to active for ${email}`);
 
+      const activationStatuses = ['incomplete', 'incomplete_expired'];
       const reactivationStatuses = ['past_due', 'unpaid', 'suspended'];
-      if (previousAttributes?.status && reactivationStatuses.includes(previousAttributes.status)) {
+      if (previousAttributes?.status && activationStatuses.includes(previousAttributes.status)) {
+        const deferredActivationMemberName = memberName;
+        const deferredActivationEmail = email;
+        const planItem = subscription.items?.data?.[0];
+        const planProduct = planItem?.price?.product;
+        const deferredPlanName = typeof planProduct === 'object' && planProduct && 'name' in planProduct
+          ? (planProduct as Stripe.Product).name
+          : (subscription.metadata?.tier || 'Membership');
+
+        deferredActions.push(async () => {
+          try {
+            await notifyMember({
+              userEmail: deferredActivationEmail,
+              title: 'Subscription Started',
+              message: `Your ${deferredPlanName} subscription has been activated. Welcome!`,
+              type: 'membership_renewed',
+            });
+          } catch (notifyErr: unknown) {
+            logger.error('[Stripe Webhook] Notification failed (non-fatal):', { error: getErrorMessage(notifyErr) });
+          }
+        });
+
+        deferredActions.push(async () => {
+          try {
+            await notifyAllStaff(
+              '🎉 New Member Joined',
+              `${deferredActivationMemberName} (${deferredActivationEmail}) has subscribed to ${deferredPlanName}.`,
+              'new_member',
+              { sendPush: true, url: '/admin/members' }
+            );
+          } catch (notifyErr: unknown) {
+            logger.error('[Stripe Webhook] Notification failed (non-fatal):', { error: getErrorMessage(notifyErr) });
+          }
+        });
+
+        broadcastBillingUpdate({
+          action: 'subscription_created',
+          memberEmail: deferredActivationEmail,
+          memberName: deferredActivationMemberName,
+          planName: deferredPlanName
+        });
+
+        logger.info(`[Stripe Webhook] Subscription ${subscription.id} activated (was ${previousAttributes.status}) — sending New Member Joined notification`);
+      } else if (previousAttributes?.status && reactivationStatuses.includes(previousAttributes.status)) {
         const deferredReactivationMemberName = memberName;
         const deferredReactivationEmail = email;
         const deferredPreviousStatus = previousAttributes.status;
