@@ -1227,6 +1227,8 @@ router.post('/api/stripe/terminal/process-existing-payment', isStaffOrAdmin, asy
           terminalPayment: 'true',
           originalPaymentIntentId: paymentIntentId,
         },
+      }, {
+        idempotencyKey: `terminal_existing_${paymentIntentId}_${Math.floor(Date.now() / 300000)}`,
       });
       terminalPiId = newPi.id;
       logger.info('[Terminal] Created new card_present PI for terminal', { extra: { newPiId: newPi.id, originalPiId: paymentIntentId } });

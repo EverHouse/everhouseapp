@@ -636,6 +636,48 @@ router.post('/api/stripe/subscriptions/create-new-member', isStaffOrAdmin, async
   }
 });
 
+router.get('/api/stripe/subscriptions/refresh-intent/:subscriptionId', isStaffOrAdmin, async (req: Request, res: Response) => {
+  try {
+    const { subscriptionId } = req.params;
+    if (!subscriptionId) {
+      return res.status(400).json({ error: 'subscriptionId is required' });
+    }
+
+    const stripe = await getStripeClient();
+    const subscription = await stripe.subscriptions.retrieve(subscriptionId, {
+      expand: ['latest_invoice.payment_intent']
+    });
+
+    if (!subscription || subscription.status === 'canceled') {
+      return res.status(404).json({ error: 'Subscription not found or canceled' });
+    }
+
+    const invoice = subscription.latest_invoice as Stripe.Invoice | null;
+    if (!invoice) {
+      return res.status(404).json({ error: 'No invoice found for subscription' });
+    }
+
+    const pi = (invoice as StripeInvoiceExpanded).payment_intent;
+    if (!pi || typeof pi === 'string') {
+      return res.status(404).json({ error: 'No payment intent found' });
+    }
+
+    const paymentIntent = pi as Stripe.PaymentIntent;
+    if (['succeeded', 'canceled'].includes(paymentIntent.status)) {
+      return res.status(410).json({ error: `Payment intent is ${paymentIntent.status}` });
+    }
+
+    res.json({
+      clientSecret: paymentIntent.client_secret,
+      paymentIntentId: paymentIntent.id,
+      status: paymentIntent.status
+    });
+  } catch (error: unknown) {
+    logger.error('[Stripe] Error refreshing subscription intent', { error: error instanceof Error ? error : new Error(String(error)) });
+    res.status(500).json({ error: 'Failed to refresh payment intent' });
+  }
+});
+
 router.post('/api/stripe/subscriptions/confirm-inline-payment', isStaffOrAdmin, async (req: Request, res: Response) => {
   try {
     const { paymentIntentId, subscriptionId, userId } = req.body;

@@ -89,6 +89,25 @@ export function MemberFlow({
       }
       setStripeInstance(stripe);
 
+      if (subscriptionId && createdUserId && !form.joinExistingGroup) {
+        try {
+          const refreshRes = await fetch(`/api/stripe/subscriptions/refresh-intent/${subscriptionId}`, {
+            credentials: 'include'
+          });
+          if (refreshRes.ok) {
+            const refreshData = await refreshRes.json();
+            if (refreshData.clientSecret && !refreshData.clientSecret.startsWith('seti_')) {
+              setClientSecret(refreshData.clientSecret);
+              const piId = refreshData.clientSecret.split('_secret_')[0];
+              if (piId) setPaymentIntentId(piId);
+            }
+            setStripeLoading(false);
+            return;
+          }
+        } catch {
+        }
+      }
+
       if (form.joinExistingGroup && form.existingGroupId) {
         const discountedPrice = Math.round(selectedTier.priceCents * 0.8);
         
