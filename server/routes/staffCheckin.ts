@@ -229,7 +229,14 @@ async function settleBookingInvoiceAfterCheckin(bookingId: number, sessionId: nu
 
   try {
     const invoiceId = await getBookingInvoiceId(bookingId);
-    if (!invoiceId) return;
+    if (!invoiceId) {
+      syncBookingInvoice(bookingId, sessionId).catch((err: unknown) => {
+        logger.warn('[StaffCheckin] Non-blocking: Failed to create invoice for booking with no existing invoice', {
+          extra: { bookingId, sessionId, error: (err as Error).message }
+        });
+      });
+      return;
+    }
     
     const participantResult = await db.execute(
       sql`SELECT payment_status, cached_fee_cents FROM booking_participants WHERE session_id = ${sessionId}`

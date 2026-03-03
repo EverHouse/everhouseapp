@@ -961,7 +961,7 @@ export async function syncBookingInvoice(bookingId: number, sessionId: number): 
     const stripeInvoiceId = booking.stripe_invoice_id;
 
     if (!stripeInvoiceId) {
-      if (booking.status !== 'approved' && booking.status !== 'confirmed') return;
+      if (booking.status !== 'approved' && booking.status !== 'confirmed' && booking.status !== 'attended') return;
 
       const participantResult = await db.execute(sql`SELECT id, display_name, participant_type, cached_fee_cents
          FROM booking_participants
