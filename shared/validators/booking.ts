@@ -1,10 +1,15 @@
 import { z } from 'zod';
 
 const participantSchema = z.object({
-  email: z.string().email('Invalid participant email'),
+  email: z.string().email('Invalid participant email').optional(),
   type: z.enum(['member', 'guest']),
   name: z.string().max(200).optional(),
   userId: z.string().optional(),
+}).refine(data => {
+  if (data.type === 'guest') return !!data.email;
+  return !!(data.email || data.userId);
+}, {
+  message: 'Guests require email; members require email or userId',
 });
 
 export const createBookingRequestSchema = z.object({
