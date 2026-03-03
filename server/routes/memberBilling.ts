@@ -10,7 +10,7 @@ interface SessionWithPassport {
 import { isStaffOrAdmin } from '../core/middleware';
 import { db } from '../db';
 import { sql } from 'drizzle-orm';
-import { getStripeClient } from '../core/stripe/client';
+import { getStripeClient, getStripeEnvironmentInfo } from '../core/stripe/client';
 import { isPlaceholderEmail } from '../core/stripe/customers';
 import { getBillingGroupByMemberEmail } from '../core/stripe/groupBilling';
 import { listCustomerInvoices, getCustomerPaymentHistory } from '../core/stripe/invoices';
@@ -218,6 +218,10 @@ router.get('/api/member-billing/:email', isStaffOrAdmin, async (req, res) => {
     } else if (member.billing_provider === 'mindbody') {
       billingInfo.mindbodyClientId = member.mindbody_client_id;
       
+      if (!member.stripe_customer_id) {
+        logger.warn('[MemberBilling] MindBody member has no Stripe customer ID — payment methods cannot be fetched. Use "Link Stripe Customer" button.', { extra: { email } });
+      }
+      
       // Also fetch Stripe data for MindBody members who have a Stripe customer ID
       // This allows staff to view/charge one-off purchases through Stripe
       if (member.stripe_customer_id) {
@@ -239,22 +243,28 @@ router.get('/api/member-billing/:email', isStaffOrAdmin, async (req, res) => {
           }
           
           // Get payment methods on file
+          const stripeEnv = await getStripeEnvironmentInfo();
           const paymentMethods = await stripe.paymentMethods.list({
             customer: member.stripe_customer_id,
             type: 'card',
           });
-          if (paymentMethods.data.length > 0) {
-            billingInfo.paymentMethods = paymentMethods.data.map(pm => ({
-              id: pm.id,
-              brand: pm.card?.brand,
-              last4: pm.card?.last4,
-              expMonth: pm.card?.exp_month,
-              expYear: pm.card?.exp_year,
-            }));
-          }
+          logger.info('[MemberBilling] Payment methods lookup for MindBody member', { 
+            extra: { 
+              email, 
+              stripeCustomerId: member.stripe_customer_id,
+              stripeMode: stripeEnv.mode,
+              paymentMethodCount: paymentMethods.data.length 
+            } 
+          });
+          billingInfo.paymentMethods = paymentMethods.data.map(pm => ({
+            id: pm.id,
+            brand: pm.card?.brand,
+            last4: pm.card?.last4,
+            expMonth: pm.card?.exp_month,
+            expYear: pm.card?.exp_year,
+          }));
         } catch (stripeError: unknown) {
-          // Don't fail the whole request if Stripe lookup fails
-          logger.error('[MemberBilling] Stripe lookup for MindBody member failed', { extra: { stripeError: getErrorMessage(stripeError) } });
+          logger.error('[MemberBilling] Stripe lookup for MindBody member failed', { extra: { email, stripeCustomerId: member.stripe_customer_id, stripeError: getErrorMessage(stripeError) } });
         }
       }
     } else if (member.billing_provider === 'family_addon') {

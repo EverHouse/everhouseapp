@@ -311,7 +311,7 @@ const BookGolf: React.FC = () => {
   const { data: feeEstimateData, isLoading: feeEstimateLoading } = useQuery({
     queryKey: bookGolfKeys.feeEstimate(feeEstimateParams),
     queryFn: () => fetchWithCredentials<FeeEstimateResponse>(`/api/fee-estimate?${feeEstimateParams}`),
-    enabled: !!feeEstimateParams,
+    enabled: !!feeEstimateParams && activeTab === 'conference',
     staleTime: 1000 * 60,
   });
 
@@ -1443,7 +1443,7 @@ const BookGolf: React.FC = () => {
           )}
 
           {selectedResource && (
-            <section className="animate-content-enter pb-64">
+            <section className="animate-content-enter pb-32">
               <h3 className={`text-[11px] font-bold uppercase tracking-[0.2em] mb-3 ${isDark ? 'text-white/80' : 'text-primary/80'}`} style={{ fontFamily: 'var(--font-label)' }}>
                 Notes for Staff <span className="font-normal opacity-60">(optional)</span>
               </h3>
@@ -1490,21 +1490,22 @@ const BookGolf: React.FC = () => {
               </div>
             </div>
           )}
-          <FeeBreakdownCard
-            overageFee={estimatedFees.overageFee}
-            overageMinutes={estimatedFees.overageMinutes}
-            guestFees={estimatedFees.guestFees}
-            guestsCharged={estimatedFees.guestsCharged}
-            guestsUsingPasses={estimatedFees.guestsUsingPasses}
-            guestFeePerUnit={estimatedFees.guestFeePerUnit || guestFeeDollars}
-            totalFee={estimatedFees.totalFee}
-            passesRemainingAfter={guestPassInfo ? estimatedFees.passesRemainingAfter : undefined}
-            passesTotal={guestPassInfo?.passes_total}
-            tierLabel={effectiveUser?.tier}
-            resourceType={activeTab === 'conference' ? 'conference' : 'simulator'}
-            isDark={isDark}
-            guestsWithoutInfo={estimatedFees.guestCount - guestsWithInfo > 0 ? estimatedFees.guestCount - guestsWithInfo : undefined}
-          />
+          {activeTab === 'conference' && (
+            <FeeBreakdownCard
+              overageFee={estimatedFees.overageFee}
+              overageMinutes={estimatedFees.overageMinutes}
+              guestFees={estimatedFees.guestFees}
+              guestsCharged={estimatedFees.guestsCharged}
+              guestsUsingPasses={estimatedFees.guestsUsingPasses}
+              guestFeePerUnit={estimatedFees.guestFeePerUnit || guestFeeDollars}
+              totalFee={estimatedFees.totalFee}
+              passesRemainingAfter={guestPassInfo ? estimatedFees.passesRemainingAfter : undefined}
+              passesTotal={guestPassInfo?.passes_total}
+              tierLabel={effectiveUser?.tier}
+              resourceType="conference"
+              isDark={isDark}
+            />
+          )}
           </div>
           <button 
             onClick={() => { haptic.heavy(); handleConfirm(); }}

@@ -8,6 +8,15 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.60.0",
+    date: "2026-03-03",
+    title: "Cleaner Booking Request Flow",
+    changes: [
+      "Improvement: Estimated fees card removed from the simulator booking request page — members now see a clean 'Request Booking' button without confusing fee estimates that don't account for the final roster",
+      "Perf: Fee estimate API call no longer fires during simulator booking requests — reduces unnecessary server load since fees are only relevant after staff confirms the booking",
+    ]
+  },
+  {
     version: "8.59.0",
     date: "2026-03-03",
     title: "Application Pipeline & Booking Request Fixes",
