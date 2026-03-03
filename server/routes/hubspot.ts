@@ -2198,7 +2198,14 @@ async function ensureNonMarketingProperty(hubspot: any): Promise<boolean> {
       hubspot.crm.properties.coreApi.getByName('contacts', PROP_NAME)
     );
     return true;
-  } catch {
+  } catch (getErr: unknown) {
+    const status = (getErr as any)?.code ?? (getErr as any)?.response?.status ?? (getErr as any)?.statusCode;
+    if (status && status !== 404) {
+      logger.error('[HubSpot MarketingAudit] Failed to check custom property (non-404 error)', {
+        error: getErr instanceof Error ? getErr : new Error(String(getErr)),
+      });
+      return false;
+    }
     try {
       await retryableHubSpotRequest(() =>
         hubspot.crm.properties.coreApi.create('contacts', {
@@ -2246,8 +2253,8 @@ router.post('/api/admin/hubspot/remove-marketing-contacts', isAdmin, async (req:
     }
 
     const batchSize = 100;
-    let successCount = 0;
-    let failCount = 0;
+    const succeededIds: string[] = [];
+    const failedIds: string[] = [];
     const errors: string[] = [];
 
     for (let i = 0; i < contactIds.length; i += batchSize) {
@@ -2261,9 +2268,9 @@ router.post('/api/admin/hubspot/remove-marketing-contacts', isAdmin, async (req:
             })),
           })
         );
-        successCount += batch.length;
+        succeededIds.push(...batch);
       } catch (batchError: unknown) {
-        failCount += batch.length;
+        failedIds.push(...batch);
         errors.push(`Batch starting at index ${i}: ${getErrorMessage(batchError)}`);
       }
     }
@@ -2271,16 +2278,17 @@ router.post('/api/admin/hubspot/remove-marketing-contacts', isAdmin, async (req:
     const sessionUser = getSessionUser(req);
     logger.info('[HubSpot MarketingAudit] Contacts flagged for non-marketing', {
       extra: {
-        flaggedCount: successCount,
-        failedCount: failCount,
+        flaggedCount: succeededIds.length,
+        failedCount: failedIds.length,
         performedBy: sessionUser?.email || 'unknown',
       },
     });
 
     res.json({
       success: true,
-      removed: successCount,
-      failed: failCount,
+      removed: succeededIds.length,
+      failed: failedIds.length,
+      succeededIds,
       needsWorkflow: true,
       errors: errors.length > 0 ? errors : undefined,
     });

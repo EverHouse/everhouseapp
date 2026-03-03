@@ -46,6 +46,7 @@ interface RemoveResponse {
   success: boolean;
   removed: number;
   failed: number;
+  succeededIds?: string[];
   needsWorkflow?: boolean;
   errors?: string[];
 }
@@ -111,7 +112,7 @@ const MarketingContactsAuditPanel: React.FC<MarketingContactsAuditPanelProps> = 
   const removeMutation = useMutation<RemoveResponse, Error, string[]>({
     mutationFn: (contactIds: string[]) =>
       postWithCredentials('/api/admin/hubspot/remove-marketing-contacts', { contactIds }),
-    onSuccess: (data, removedIds) => {
+    onSuccess: (data) => {
       showToast(
         data.needsWorkflow
           ? `Flagged ${data.removed} contacts for removal. A HubSpot workflow is needed to complete the status change.${data.failed > 0 ? ` ${data.failed} failed.` : ''}`
@@ -120,10 +121,11 @@ const MarketingContactsAuditPanel: React.FC<MarketingContactsAuditPanelProps> = 
       );
       setSelectedContacts(new Set());
 
-      if (data.removed > 0) {
+      const actuallyRemoved = data.succeededIds ?? [];
+      if (actuallyRemoved.length > 0) {
         queryClient.setQueryData<AuditResponse>(['hubspot-marketing-audit'], (old) => {
           if (!old) return old;
-          const removedSet = new Set(removedIds);
+          const removedSet = new Set(actuallyRemoved);
           const filterOut = (list: AuditContact[]) => list.filter(c => !removedSet.has(c.hubspotId));
           const newSafeToRemove = filterOut(old.safeToRemove);
           const newNeedsReview = filterOut(old.needsReview);
@@ -135,8 +137,8 @@ const MarketingContactsAuditPanel: React.FC<MarketingContactsAuditPanelProps> = 
             keep: newKeep,
             summary: {
               ...old.summary,
-              totalMarketingContacts: old.summary.totalMarketingContacts - data.removed,
-              totalNonMarketing: old.summary.totalNonMarketing + data.removed,
+              totalMarketingContacts: old.summary.totalMarketingContacts - actuallyRemoved.length,
+              totalNonMarketing: old.summary.totalNonMarketing + actuallyRemoved.length,
               safeToRemoveCount: newSafeToRemove.length,
               needsReviewCount: newNeedsReview.length,
               keepCount: newKeep.length,

@@ -144,11 +144,17 @@ export async function logWebhookEvent(
         : `${trackmanBookingId}_${eventType.toLowerCase()}`
       : null;
     
-    const result = await db.execute(sql`INSERT INTO trackman_webhook_events 
-       (event_type, payload, trackman_booking_id, trackman_user_id, matched_booking_id, matched_user_id, processed_at, processing_error, dedup_key)
-       VALUES (${eventType}, ${JSON.stringify(redactedPayload)}, ${trackmanBookingId ?? null}, ${trackmanUserId ?? null}, ${matchedBookingId ?? null}, ${matchedUserId ?? null}, NOW(), ${error ?? null}, ${dedupKey})
-       RETURNING id`);
-    return (result.rows[0] as unknown as WebhookEventIdRow)?.id as number;
+    const result = dedupKey
+      ? await db.execute(sql`INSERT INTO trackman_webhook_events 
+         (event_type, payload, trackman_booking_id, trackman_user_id, matched_booking_id, matched_user_id, processed_at, processing_error, dedup_key)
+         VALUES (${eventType}, ${JSON.stringify(redactedPayload)}, ${trackmanBookingId ?? null}, ${trackmanUserId ?? null}, ${matchedBookingId ?? null}, ${matchedUserId ?? null}, NOW(), ${error ?? null}, ${dedupKey})
+         ON CONFLICT (dedup_key) DO NOTHING
+         RETURNING id`)
+      : await db.execute(sql`INSERT INTO trackman_webhook_events 
+         (event_type, payload, trackman_booking_id, trackman_user_id, matched_booking_id, matched_user_id, processed_at, processing_error, dedup_key)
+         VALUES (${eventType}, ${JSON.stringify(redactedPayload)}, ${trackmanBookingId ?? null}, ${trackmanUserId ?? null}, ${matchedBookingId ?? null}, ${matchedUserId ?? null}, NOW(), ${error ?? null}, ${dedupKey})
+         RETURNING id`);
+    return (result.rows[0] as unknown as WebhookEventIdRow)?.id as number ?? 0;
   } catch (e: unknown) {
     logger.error('[Trackman Webhook] Failed to log webhook event', { error: e as Error });
     return 0;
