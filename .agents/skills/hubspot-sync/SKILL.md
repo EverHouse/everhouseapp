@@ -70,7 +70,7 @@ When the app creates or updates a HubSpot contact, it sets:
 | membership_status    | membership_status        | Always pushed (app is primary brain)        |
 | billing_provider     | billing_provider         | Custom enumeration property                 |
 | lifecycle stage      | lifecyclestage           | `customer` for active, `other` for inactive |
-| join date            | membership_start_date    | Midnight UTC timestamp                      |
+| join date            | membership_start_date    | Midnight UTC timestamp (timezone-corrected v8.57.0) |
 | Stripe fields        | stripe_customer_id, etc. | Only pushed in live Stripe environments     |
 
 ### Tier Denormalization

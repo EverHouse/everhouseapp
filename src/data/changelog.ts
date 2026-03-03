@@ -29,6 +29,8 @@ export const changelog: ChangelogEntry[] = [
       "Fix: Member reactivation now properly clears archived status across all Stripe-related flows — reactivated members are no longer stuck as archived",
       "Fix: Membership activation notifications are now delayed until payment is confirmed — prevents premature welcome messages",
       "Fix: Stripe customer management improved for billing and card saving operations — more reliable customer lookup and creation",
+      "Fix: New and updated member subscriptions now properly clear archived status — pending members correctly appear in directory filters",
+      "Fix: Group pricing discounts now apply correctly during payment and activation",
     ]
   },
   {
@@ -44,9 +46,19 @@ export const changelog: ChangelogEntry[] = [
       "Fix: 'Bookings Stuck — Unpaid Fees' notifications use 6-hour deduplication and only flag past bookings with 'attended' status",
       "Fix: Fee calculations correctly handle members without identified tiers in preview mode",
       "Fix: Invoices are now ensured for all attended bookings — prevents missing billing records",
-      "Fix: Multiple data integrity fixes for booking refunds, dashboard queries, and data synchronization",
+      "Fix: Booking refund date handling corrected in approval service — prevents premature refund status updates",
+      "Fix: Foreign key constraints corrected for booking participants and schema field name mismatch resolved",
+      "Fix: HubSpot sync timezone issues corrected — dates now properly handled across timezones",
+      "Fix: Silent zero balance reporting in member billing now surfaces correctly",
+      "Fix: Frontend fetch requests now use AbortController with proper cleanup — prevents race conditions on rapid navigation",
       "Fix: System settings inserts now include required category and updatedBy fields",
+      "Fix: Player count indicator no longer shows for conference room bookings on the dashboard",
+      "Fix: Data export queries now include proper LIMIT clauses to prevent oversized responses",
+      "Fix: One-time fee collection now properly reports payment failure status",
       "Feature: Staff can now view and manage conference room prepayments on behalf of other members",
+      "Infra: ESLint updated to latest major version to resolve dependency conflicts",
+      "Infra: Input validation added across API endpoints with Zod schemas",
+      "Infra: Route index auto-generation script added for developer reference",
     ]
   },
   {

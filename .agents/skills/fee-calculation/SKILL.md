@@ -117,6 +117,8 @@ When roster changes trigger fee recalculation (via `recalculateSessionFees()`), 
 
 Note: As of v8.16.0 (2026-02-24), conference room bookings use the same invoice-based flow as simulators. Old `conference_prepayments` records are grandfathered at check-in.
 
+**Conference prepayment staff access (v8.57.0):** Staff and admin users can view and manage conference room prepayments on behalf of any member via `server/routes/conference/prepayment.ts`. Authorization checks permit admin/staff to act on any member's prepayments while restricting regular users to their own.
+
 ## Conference Room vs Simulator Differences
 
 The fee engine handles two resource types with distinct rules:
