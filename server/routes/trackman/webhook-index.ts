@@ -31,6 +31,7 @@ import {
 import type { ExistingBookingData } from './webhook-handlers';
 import { recalculateSessionFees } from '../../core/billing/unifiedFeeService';
 import { ensureSessionForBooking } from '../../core/bookingService/sessionManager';
+import { transferRequestParticipantsToSession } from '../../core/trackmanImport';
 
 interface TotalCountRow {
   total: string;
@@ -1079,7 +1080,7 @@ router.post('/api/admin/trackman-webhook/:eventId/auto-match', isStaffOrAdmin, a
     
     // Ensure session exists for newly approved booking
     try {
-      await ensureSessionForBooking({
+      const sessionResult = await ensureSessionForBooking({
         bookingId: match.id as number,
         resourceId: resourceId as number,
         sessionDate: pacificDate,
@@ -1091,6 +1092,44 @@ router.post('/api/admin/trackman-webhook/:eventId/auto-match', isStaffOrAdmin, a
         source: 'trackman_webhook',
         createdBy: 'staff_auto_match'
       });
+
+      if (sessionResult.sessionId && !sessionResult.error) {
+        let transferredCount = 0;
+        try {
+          const rpResult = await db.execute(sql`SELECT request_participants FROM booking_requests WHERE id = ${match.id}`);
+          const rpData = (rpResult.rows[0] as { request_participants: unknown })?.request_participants;
+          if (rpData && Array.isArray(rpData) && rpData.length > 0) {
+            transferredCount = await transferRequestParticipantsToSession(
+              sessionResult.sessionId, rpData, match.user_email as string, `staff auto-match booking #${match.id}`
+            );
+          }
+        } catch (rpErr: unknown) {
+          logger.warn('[Trackman Auto-Match] Non-blocking: Failed to transfer request_participants', {
+            extra: { bookingId: match.id, sessionId: sessionResult.sessionId, error: (rpErr as Error).message }
+          });
+        }
+
+        const playerCount = bookingData?.playerCount || bookingData?.player_count || bookingData?.numberOfPlayers || 1;
+        if (playerCount > 1) {
+          const startTimeStr = (match.start_time as string) || pacificStartTime;
+          const endTimeStr = (match.end_time as string) || pacificStartTime;
+          const slotDuration = startTimeStr && endTimeStr
+            ? Math.round((new Date(`2000-01-01T${endTimeStr}`).getTime() -
+                         new Date(`2000-01-01T${startTimeStr}`).getTime()) / 60000)
+            : 60;
+          const remainingSlots = Math.max(0, (playerCount - 1) - transferredCount);
+          for (let i = 0; i < remainingSlots; i++) {
+            await db.execute(sql`INSERT INTO booking_participants (session_id, user_id, participant_type, display_name, payment_status, slot_duration)
+              VALUES (${sessionResult.sessionId}, NULL, 'guest', ${`Guest ${transferredCount + i + 2}`}, 'pending', ${slotDuration})`);
+          }
+          if (transferredCount > 0 || remainingSlots > 0) {
+            await recalculateSessionFees(sessionResult.sessionId, 'staff_auto_match');
+            logger.info('[Trackman Auto-Match] Created participants for matched booking', {
+              extra: { bookingId: match.id, sessionId: sessionResult.sessionId, playerCount, transferredFromRequest: transferredCount, genericGuestSlots: remainingSlots }
+            });
+          }
+        }
+      }
     } catch (sessionErr: unknown) {
       logger.warn('[Trackman Auto-Match] Failed to ensure session', { extra: { bookingId: match.id, error: sessionErr } });
     }
@@ -1289,16 +1328,34 @@ router.post('/api/admin/bookings/:id/simulate-confirm', isStaffOrAdmin, async (r
              new Date(`2000-01-01T${booking.start_time}`).getTime()) / 60000
           );
 
-          for (let i = 1; Number(i) < Number(playerCount); i++) {
-            await db.execute(sql`INSERT INTO booking_participants (session_id, user_id, participant_type, display_name, payment_status, slot_duration)
-              VALUES (${sessionId}, ${null}, ${'guest'}, ${`Guest ${i + 1}`}, ${'pending'}, ${sessionDuration})`);
+          let transferredCount = 0;
+          try {
+            const rpResult = await db.execute(sql`SELECT request_participants FROM booking_requests WHERE id = ${bookingId}`);
+            const rpData = (rpResult.rows[0] as { request_participants: unknown })?.request_participants;
+            if (rpData && Array.isArray(rpData) && rpData.length > 0) {
+              transferredCount = await transferRequestParticipantsToSession(
+                sessionId as number, rpData, (booking.user_email as string) || '', `simulate confirm booking #${bookingId}`
+              );
+            }
+          } catch (rpErr: unknown) {
+            logger.warn('[Simulate Confirm] Non-blocking: Failed to transfer request_participants', {
+              extra: { bookingId, sessionId, error: (rpErr as Error).message }
+            });
           }
 
-          if (Number(playerCount) > 1) {
-            logger.info('[Simulate Confirm] Created guest participants', {
+          const remainingSlots = Math.max(0, (Number(playerCount) - 1) - transferredCount);
+          for (let i = 0; i < remainingSlots; i++) {
+            await db.execute(sql`INSERT INTO booking_participants (session_id, user_id, participant_type, display_name, payment_status, slot_duration)
+              VALUES (${sessionId}, ${null}, ${'guest'}, ${`Guest ${transferredCount + i + 2}`}, ${'pending'}, ${sessionDuration})`);
+          }
+
+          if (transferredCount > 0 || remainingSlots > 0) {
+            logger.info('[Simulate Confirm] Created participants', {
               bookingId,
               sessionId,
-              guestCount: Number(playerCount)- 1,
+              playerCount: Number(playerCount),
+              transferredFromRequest: transferredCount,
+              genericGuestSlots: remainingSlots,
               sessionDuration
             });
           }

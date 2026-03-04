@@ -1215,6 +1215,35 @@ export async function handleBookingUpdate(payload: TrackmanWebhookPayload): Prom
       endParsed?.time
     );
     
+    if (autoApproveResult.sessionId && normalized.playerCount > 1) {
+      try {
+        const existingCount = await db.execute(sql`SELECT COUNT(*) as cnt FROM booking_participants WHERE session_id = ${autoApproveResult.sessionId}`);
+        const currentParticipants = Number((existingCount.rows as Array<Record<string, unknown>>)[0]?.cnt || 0);
+        const targetTotal = normalized.playerCount;
+        const slotsToFill = Math.max(0, targetTotal - currentParticipants);
+        if (slotsToFill > 0) {
+          const timeResult = await db.execute(sql`SELECT start_time, end_time FROM booking_sessions WHERE id = ${autoApproveResult.sessionId}`);
+          const sessionRow = (timeResult.rows as Array<Record<string, unknown>>)[0];
+          const slotDuration = sessionRow?.start_time && sessionRow?.end_time
+            ? Math.round((new Date(`2000-01-01T${sessionRow.end_time}`).getTime() - 
+                         new Date(`2000-01-01T${sessionRow.start_time}`).getTime()) / 60000)
+            : 60;
+          for (let i = 0; i < slotsToFill; i++) {
+            await db.execute(sql`INSERT INTO booking_participants (session_id, user_id, participant_type, display_name, payment_status, slot_duration)
+              VALUES (${autoApproveResult.sessionId}, NULL, 'guest', ${`Guest ${currentParticipants + i + 1}`}, 'pending', ${slotDuration})`);
+          }
+          await recalculateSessionFees(autoApproveResult.sessionId, 'trackman_webhook');
+          logger.info('[Trackman Webhook] Backfilled generic guest slots after auto-approve', {
+            extra: { bookingId: autoApproveResult.bookingId, sessionId: autoApproveResult.sessionId, slotsToFill, currentParticipants, targetTotal }
+          });
+        }
+      } catch (backfillErr: unknown) {
+        logger.warn('[Trackman Webhook] Non-blocking: Failed to backfill guest slots after auto-approve', {
+          extra: { bookingId: autoApproveResult.bookingId, error: (backfillErr as Error).message }
+        });
+      }
+    }
+
     linkAndNotifyParticipants(autoApproveResult.bookingId, {
       trackmanBookingId: normalized.trackmanBookingId,
       linkedBy: 'trackman_webhook',

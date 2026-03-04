@@ -659,7 +659,7 @@ export async function tryMatchByBayDateTime(
     });
     
     try {
-      await ensureSessionForBooking({
+      const sessionResult = await ensureSessionForBooking({
         bookingId,
         resourceId,
         sessionDate: slotDate,
@@ -671,6 +671,40 @@ export async function tryMatchByBayDateTime(
         source: 'trackman_webhook',
         createdBy: 'trackman_auto_match'
       });
+
+      if (sessionResult.sessionId && !sessionResult.error) {
+        let transferredCount = 0;
+        try {
+          const rpResult = await db.execute(sql`SELECT request_participants FROM booking_requests WHERE id = ${bookingId}`);
+          const rpData = (rpResult.rows[0] as { request_participants: unknown })?.request_participants;
+          if (rpData && Array.isArray(rpData) && rpData.length > 0) {
+            transferredCount = await transferRequestParticipantsToSession(
+              sessionResult.sessionId, rpData, memberEmail, `bay/date/time auto-match booking #${bookingId}`
+            );
+          }
+        } catch (rpErr: unknown) {
+          logger.warn('[Trackman Webhook] Non-blocking: Failed to transfer request_participants during bay/date/time match', {
+            extra: { bookingId, sessionId: sessionResult.sessionId, error: (rpErr as Error).message }
+          });
+        }
+
+        const slotDuration = booking.start_time && booking.end_time
+          ? Math.round((new Date(`2000-01-01T${booking.end_time}`).getTime() - 
+                       new Date(`2000-01-01T${booking.start_time}`).getTime()) / 60000)
+          : 60;
+        const remainingSlots = Math.max(0, (playerCount - 1) - transferredCount);
+        for (let i = 0; i < remainingSlots; i++) {
+          await db.execute(sql`INSERT INTO booking_participants (session_id, user_id, participant_type, display_name, payment_status, slot_duration)
+            VALUES (${sessionResult.sessionId}, NULL, 'guest', ${`Guest ${transferredCount + i + 2}`}, 'pending', ${slotDuration})`);
+        }
+
+        if (transferredCount > 0 || remainingSlots > 0) {
+          await recalculateSessionFees(sessionResult.sessionId, 'trackman_auto_match');
+          logger.info('[Trackman Webhook] Created participants for bay/date/time matched booking', {
+            extra: { bookingId, sessionId: sessionResult.sessionId, playerCount, transferredFromRequest: transferredCount, genericGuestSlots: remainingSlots }
+          });
+        }
+      }
     } catch (sessionErr: unknown) {
       logger.warn('[Trackman Webhook] Failed to ensure session for bay/date/time match', { extra: { bookingId, error: sessionErr } });
     }
