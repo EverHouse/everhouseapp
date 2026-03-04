@@ -442,7 +442,7 @@ router.post('/api/stripe/staff/send-reactivation-link', isStaffOrAdmin, async (r
       } catch (portalError: unknown) {
         logger.warn('[Stripe] Could not create billing portal for member, using fallback link', { extra: { email: member.email, error: getErrorMessage(portalError) } });
       }
-    } else {
+    } else if (!usedInvoiceLink) {
       const tierName = (member.last_tier || member.tier) as string | null;
       if (tierName) {
         try {
@@ -568,6 +568,7 @@ router.post('/api/stripe/staff/send-reactivation-link', isStaffOrAdmin, async (r
         memberEmail: member.email as string,
         hadStripeCustomer: !!member.stripe_customer_id,
         usedCheckout,
+        usedInvoiceLink,
       }
     });
 
