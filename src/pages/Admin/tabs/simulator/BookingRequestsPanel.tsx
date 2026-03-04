@@ -55,7 +55,7 @@ export interface BookingRequestsPanelProps {
     setSelectedRequest: (req: BookingRequest | null) => void;
     setActionModal: (modal: 'approve' | 'decline' | null) => void;
     cancelBookingOptimistic: (booking: BookingRequest) => Promise<boolean>;
-    updateBookingStatusOptimistic: (booking: BookingRequest, status: 'attended' | 'no_show' | 'cancelled') => Promise<boolean>;
+    updateBookingStatusOptimistic: (booking: BookingRequest, status: 'attended' | 'no_show' | 'cancelled' | 'approved') => Promise<boolean>;
     isBookingUnmatched: (booking: BookingRequest) => boolean;
     handleRefresh: () => void;
     showToast: (msg: string, type: 'success' | 'error') => void;
@@ -565,6 +565,7 @@ const BookingRequestsPanel: React.FC<BookingRequestsPanelProps> = ({
                                                                     onStatusChange={async (status) => {
                                                                         await updateBookingStatusOptimistic(booking, status);
                                                                     }}
+                                                                    showRevert={true}
                                                                     size="sm"
                                                                     menuDirection="down"
                                                                 />
@@ -574,6 +575,7 @@ const BookingRequestsPanel: React.FC<BookingRequestsPanelProps> = ({
                                                                     onStatusChange={async (status) => {
                                                                         await updateBookingStatusOptimistic(booking, status);
                                                                     }}
+                                                                    showRevert={true}
                                                                     size="sm"
                                                                     menuDirection="down"
                                                                 />

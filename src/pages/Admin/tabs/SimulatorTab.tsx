@@ -459,12 +459,19 @@ const SimulatorTab: React.FC = () => {
 
     const updateBookingStatusOptimistic = useCallback(async (
         booking: BookingRequest,
-        newStatus: 'attended' | 'no_show' | 'cancelled'
+        newStatus: 'attended' | 'no_show' | 'cancelled' | 'approved'
     ): Promise<boolean> => {
         const bookingId = typeof booking.id === 'string' 
             ? parseInt(String(booking.id).replace('cal_', '')) 
             : booking.id;
         
+        if (newStatus === 'approved') {
+            const result = await revertToApprovedWithToast(bookingId);
+            await queryClient.invalidateQueries({ queryKey: simulatorKeys.allRequests() });
+            await queryClient.invalidateQueries({ queryKey: simulatorKeys.approvedBookings(calendarStartDate, calendarEndDate) });
+            return !!result.success;
+        }
+
         if (newStatus === 'attended' && checkinInProgressRef.current.has(bookingId)) {
             console.log('[Check-in v2] Already in progress for booking', bookingId);
             return false;
@@ -529,7 +536,7 @@ const SimulatorTab: React.FC = () => {
             }
             return false;
         }
-    }, [queryClient, calendarStartDate, calendarEndDate, showToast, checkInWithToast]);
+    }, [queryClient, calendarStartDate, calendarEndDate, showToast, checkInWithToast, revertToApprovedWithToast]);
 
     const showCancelConfirmation = useCallback((booking: BookingRequest) => {
         const hasTrackman = !!(booking.trackman_booking_id) || 
