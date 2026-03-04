@@ -2028,7 +2028,6 @@ export async function devConfirmBooking(params: DevConfirmParams) {
             await tx.execute(sql`
               INSERT INTO booking_participants (session_id, user_id, participant_type, display_name, created_at)
                VALUES (${sessionId}, ${resolvedUserId}, ${participantType}, ${resolvedName}, NOW())
-               ON CONFLICT (session_id, user_id) DO NOTHING
             `);
             participantsCreated++;
             if (resolvedUserId) existingUserIds.add(String(resolvedUserId));

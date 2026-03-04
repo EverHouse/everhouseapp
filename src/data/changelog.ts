@@ -13,6 +13,7 @@ export const changelog: ChangelogEntry[] = [
     title: "Booking Participant Fix & Billing Diagnostics",
     changes: [
       "Fix: Members can now add other members to simulator booking requests without the 'Invalid participant email' error — redacted emails (privacy mode) are no longer sent as participant data; the server resolves member info from userId instead",
+      "Fix: 'Dev Confirm' button on booking requests no longer fails with 'Failed to confirm booking' — removed an invalid database constraint reference that was crashing the participant insertion and rolling back the entire confirmation",
       "Improvement: MindBody member billing lookups now log Stripe environment mode and payment method count for faster troubleshooting",
       "Improvement: Warning logged when a MindBody member has no Stripe customer ID linked, with guidance to use the 'Link Stripe Customer' button",
     ]

@@ -2108,7 +2108,7 @@ router.post('/api/data-tools/fix-trackman-ghost-bookings', isAdmin, async (req: 
           await db.execute(sql`
             INSERT INTO booking_participants (session_id, user_id, participant_type, display_name, payment_status, slot_duration)
             VALUES (${sessionId}, ${userId}, 'owner', ${booking.userName || booking.userEmail}, 'pending', ${slotDuration})
-            ON CONFLICT (session_id, user_id) WHERE user_id IS NOT NULL DO NOTHING
+            ON CONFLICT DO NOTHING
           `);
           
           for (let i = 1; i < booking.playerCount; i++) {
