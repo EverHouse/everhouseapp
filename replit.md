@@ -87,6 +87,20 @@ The Ever Club Members App is a private members club application designed for gol
 - **Bulk Actions**: Staff can mark all stale bookings as attended from the data integrity dashboard.
 - **Trackman Events Section**: Expanded webhook event display with additional participant details for unmatched requests.
 
+### File Structure — Modular Splits (v8.68.0)
+The following large files have been split into sub-modules with barrel re-exports (all external import paths remain unchanged):
+- **Backend**:
+  - `server/core/stripe/webhooks/` — Webhook dispatcher + 8 handler files (was `webhooks.ts`, 6,149 lines)
+  - `server/core/trackman/` — CSV import pipeline in 7 files (was `trackmanImport.ts`, 4,213 lines)
+  - `server/routes/trackman/admin.ts` — Split into `admin-resolution.ts`, `admin-roster.ts`, `admin-maintenance.ts` sub-routers (was 4,040 lines)
+  - `server/core/integrity/` — Data integrity checks in 8 files (was `dataIntegrity.ts`, 3,891 lines)
+  - `server/routes/stripe/payments.ts` — Split into `booking-fees.ts`, `quick-charge.ts`, `payment-admin.ts`, `financial-reports.ts` sub-routers (was 3,160 lines)
+  - `server/core/resource/` — Resource service in 6 files (was `resourceService.ts`, 2,566 lines)
+- **Frontend**:
+  - `src/pages/Admin/tabs/dataIntegrity/` — 6 sub-components + hooks (was `DataIntegrityTab.tsx`, 2,314 lines)
+  - `src/pages/Admin/tabs/directory/` — 9 sub-components + hooks (was `DirectoryTab.tsx`, 2,233 lines)
+  - `src/components/admin/memberBilling/` — 11 sub-components + hooks (was `MemberBillingTab.tsx`, 2,130 lines)
+
 ### Developer Experience & Tooling
 - **Linting**: ESLint v9 flat config with `typescript-eslint`, `react-hooks`, and `react-refresh`.
 - **Formatting**: Prettier with `eslint-config-prettier`.

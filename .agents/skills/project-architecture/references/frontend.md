@@ -67,8 +67,8 @@ Staff/admin only:
 - `BlocksTab.tsx` — Availability blocks management
 - `CafeTab.tsx` — Cafe menu management
 - `ChangelogTab.tsx` — Changelog display
-- `DataIntegrityTab.tsx` — Data integrity dashboard
-- `DirectoryTab.tsx` — Member directory
+- `DataIntegrityTab.tsx` — Data integrity dashboard (slim orchestrator; logic split into `dataIntegrity/useDataIntegrityActions.ts`, `dataIntegrity/useDataIntegrityState.ts`, `dataIntegrity/HealthStatusGrid.tsx`, `dataIntegrity/IntegritySummaryStats.tsx`, `dataIntegrity/CalendarStatusSection.tsx`, `dataIntegrity/HistorySection.tsx`)
+- `DirectoryTab.tsx` — Member directory (slim orchestrator; logic split into `directory/useDirectoryData.ts`, `directory/useDirectoryFilters.ts`, `directory/ActiveMembersList.tsx`, `directory/FormerMembersList.tsx`, `directory/VisitorsList.tsx`, `directory/TeamList.tsx`, `directory/DirectoryFilters.tsx`, `directory/DirectoryListHeader.tsx`, `directory/directoryTypes.ts`)
 - `DiscountsSubTab.tsx` — Discount management
 - `EmailTemplatesTab.tsx` — Email template preview and management
 - `EventsTab.tsx` — Events management
@@ -113,7 +113,7 @@ Staff/admin only:
 
 | Directory | Contains |
 |-----------|----------|
-| `admin/` | Admin-specific UI (member drawers, data tools, settings panels). Sub-dirs: `billing/`, `payments/` |
+| `admin/` | Admin-specific UI (member drawers, data tools, settings panels). Sub-dirs: `billing/`, `payments/`, `memberBilling/` (split from `MemberBillingTab.tsx`) |
 | `billing/` | Payment forms, fee displays, invoice views |
 | `booking/` | Booking cards, calendar views, slot pickers |
 | `guides/` | Guided flows and walkthroughs |

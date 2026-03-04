@@ -53,7 +53,14 @@ Only if all 3 fail does it INSERT a new session. When called inside a transactio
 | File | Purpose |
 |------|---------|
 | `client.ts` | Stripe client initialization |
-| `webhooks.ts` | Stripe webhook event handlers |
+| `webhooks/index.ts` | Stripe webhook dispatcher (`processStripeWebhook`, `replayStripeEvent`) — barrel re-export |
+| `webhooks/framework.ts` | Deduplication (`tryClaimEvent`), event ordering, deferred actions, transaction cache |
+| `webhooks/handlers/payments.ts` | Payment intent, charge, dispute, and credit note handlers |
+| `webhooks/handlers/subscriptions.ts` | Subscription lifecycle handlers (created/updated/deleted/paused/resumed) |
+| `webhooks/handlers/invoices.ts` | Invoice payment and lifecycle handlers |
+| `webhooks/handlers/checkout.ts` | Checkout session completed handler |
+| `webhooks/handlers/customers.ts` | Customer and payment method handlers, setup intent handlers |
+| `webhooks/handlers/catalog.ts` | Product and price change handlers |
 | `payments.ts` | Payment intent creation and processing |
 | `subscriptions.ts` | Subscription CRUD |
 | `subscriptionSync.ts` | Subscription status sync |
@@ -141,7 +148,14 @@ Only if all 3 fail does it INSERT a new session. When called inside a transactio
 
 | File | Purpose |
 |------|---------|
-| `trackmanImport.ts` | CSV import, placeholder merging, Notes parsing (`M\|email\|name`, `G\|name`) |
+| `trackmanImport.ts` | Barrel re-export for `server/core/trackman/` |
+| `trackman/index.ts` | Re-exports all public Trackman import functions |
+| `trackman/service.ts` | Main orchestrator: `importTrackmanBookings`, `rescanUnmatchedBookings` |
+| `trackman/parser.ts` | CSV parsing, Notes parsing (`M\|email\|name`, `G\|name`) |
+| `trackman/matching.ts` | Member identification: `getAllHubSpotMembers`, `resolveEmail`, `findMembersByName` |
+| `trackman/sessionMapper.ts` | Session creation: `createTrackmanSessionAndParticipants` |
+| `trackman/resolution.ts` | Manual resolution: `resolveUnmatchedBooking`, `autoLinkEmailToOwner` |
+| `trackman/constants.ts` | Placeholder emails, instructor roles, status mappings |
 | `notificationService.ts` | In-app notification creation and delivery |
 | `websocket.ts` | WebSocket server, `broadcastToStaff()`, real-time updates |
 | `auditLog.ts` | `logFromRequest()` — ALL staff actions must be logged here |
@@ -156,7 +170,15 @@ Only if all 3 fail does it INSERT a new session. When called inside a transactio
 | `jobQueue.ts` | Background job queue processing |
 | `jobQueueMonitor.ts` | Job queue monitoring |
 | `logger.ts` | Structured logging with `logAndRespond()` |
-| `dataIntegrity.ts` | Data integrity checks and repairs |
+| `dataIntegrity.ts` | Barrel re-export for `server/core/integrity/` |
+| `integrity/index.ts` | Re-exports all data integrity functions |
+| `integrity/core.ts` | Interfaces, types, `runIntegrityChecks`, `safeCheck`, `generateIssueKey` |
+| `integrity/stripeChecks.ts` | Stripe subscription sync, duplicate customer, orphaned intent checks |
+| `integrity/hubspotChecks.ts` | HubSpot sync mismatch, deal stage drift, ID duplicate checks |
+| `integrity/bookingChecks.ts` | Overlapping bookings, orphaned sessions/participants, time validity |
+| `integrity/memberChecks.ts` | Members without email, stuck transitions, tier reconciliation |
+| `integrity/resolution.ts` | `resolveIssue`, `createIgnoreRule`, sync push/pull |
+| `integrity/cleanup.ts` | `runDataCleanup` and associated SQL operations |
 | `dataAlerts.ts` | Data anomaly alerting |
 | `databaseCleanup.ts` | Database cleanup utilities |
 | `errorAlerts.ts` | Error alerting to staff |
@@ -175,7 +197,13 @@ Only if all 3 fail does it INSERT a new session. When called inside a transactio
 | `safeDbOperation.ts` | Safe database operations wrapper (`safeDbOperation()`, `safeDbTransaction()`) |
 | `schedulerTracker.ts` | Scheduler execution tracking |
 | `walkInCheckinService.ts` | Walk-in check-in processing |
-| `resourceService.ts` | Resource/bay management logic |
+| `resourceService.ts` | Barrel re-export for `server/core/resource/` |
+| `resource/index.ts` | Re-exports all resource service functions |
+| `resource/service.ts` | Core CRUD: `fetchAllResources`, `fetchBookings`, `fetchPendingBookings` |
+| `resource/cancellation.ts` | `handleCancellationCascade`, `memberCancelBooking`, refund logic |
+| `resource/trackman.ts` | `linkTrackmanToMember`, `markBookingAsEvent`, unmatched booking handling |
+| `resource/availability.ts` | `fetchOverlappingNotices`, availability blocks, facility closures |
+| `resource/staffActions.ts` | `createManualBooking`, `assignWithPlayers`, `assignMemberToBooking` |
 | `queryCache.ts` | Query result caching |
 | `settingsHelper.ts` | App settings helper |
 | `webhookMonitor.ts` | Webhook monitoring |
