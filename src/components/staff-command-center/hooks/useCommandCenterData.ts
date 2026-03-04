@@ -256,11 +256,10 @@ export function useCommandCenterData(userEmail?: string) {
         const normalizedEndTime = c.endTime.slice(0, 5);
         if (normalizedEndTime <= nowTime) return false;
       }
-      if (c.title?.startsWith('Lesson:')) return false;
       return true;
     });
 
-    const futureClosures = raw.filter((c: Closure) => c.startDate > tomorrow && !c.title?.startsWith('Lesson:'))
+    const futureClosures = raw.filter((c: Closure) => c.startDate > tomorrow)
       .sort((a: Closure, b: Closure) => a.startDate.localeCompare(b.startDate));
 
     return {

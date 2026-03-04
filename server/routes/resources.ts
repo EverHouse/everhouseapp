@@ -272,11 +272,11 @@ router.post('/api/bookings/link-trackman-to-member', isStaffOrAdmin, async (req,
       }
       
       const staffEmail = getSessionUser(req)?.email || 'staff_link';
-      const closure = await convertToInstructorBlock(
+      const block = await convertToInstructorBlock(
         trackman_booking_id, ownerName, ownerEmail, bookingData, existingBooking, staffEmail
       );
       
-      logFromRequest(req, 'create_closure', 'closure', closure.id.toString(), ownerName, {
+      logFromRequest(req, 'create_block', 'availability_block', block.id.toString(), ownerName, {
         trackman_booking_id,
         instructor_email: ownerEmail,
         instructor_name: ownerName,
@@ -289,7 +289,7 @@ router.post('/api/bookings/link-trackman-to-member', isStaffOrAdmin, async (req,
       return res.json({
         success: true,
         convertedToAvailabilityBlock: true,
-        closureId: closure.id,
+        blockId: block.id,
         instructorName: ownerName,
         message: `Converted to lesson block for instructor ${ownerName}`
       });

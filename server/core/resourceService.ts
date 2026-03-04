@@ -904,22 +904,7 @@ export async function convertToInstructorBlock(
   existingBooking: { id: number } | null,
   staffEmail: string
 ) {
-  const [closure] = await db.insert(facilityClosures).values({
-    title: `Lesson: ${ownerName}`,
-    resourceId: bookingData.resourceId,
-    startDate: bookingData.requestDate,
-    endDate: bookingData.requestDate,
-    startTime: bookingData.startTime,
-    endTime: bookingData.endTime || bookingData.startTime,
-    reason: `Lesson: ${ownerName}`,
-    noticeType: 'private_event',
-    visibility: 'Staff Only',
-    isActive: true,
-    createdBy: staffEmail
-  } as typeof facilityClosures.$inferInsert).returning();
-  
-  await db.insert(availabilityBlocks).values({
-    closureId: closure.id,
+  const [block] = await db.insert(availabilityBlocks).values({
     resourceId: bookingData.resourceId,
     blockDate: bookingData.requestDate,
     startTime: bookingData.startTime,
@@ -927,7 +912,7 @@ export async function convertToInstructorBlock(
     blockType: 'blocked',
     notes: `Lesson - ${ownerName}`,
     createdBy: staffEmail
-  });
+  }).returning();
   
   if (existingBooking) {
     await db.delete(bookingRequests).where(eq(bookingRequests.id, existingBooking.id));
@@ -944,12 +929,12 @@ export async function convertToInstructorBlock(
   const { broadcastToStaff } = await import('./websocket');
   broadcastToStaff({
     type: 'availability_block_created',
-    closureId: closure.id,
+    blockId: block.id,
     instructorEmail: ownerEmail,
     instructorName: ownerName
   });
   
-  return closure;
+  return block;
 }
 
 export async function linkTrackmanToMember(

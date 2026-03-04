@@ -153,7 +153,6 @@ const MemberUpdates: React.FC = () => {
         const activeClosures = data
           .filter((c: Closure) => c.endDate >= todayStr)
           .filter((c: Closure) => {
-            if (c.title?.startsWith('Lesson:')) return false;
             // For members: only show notices where notifyMembers is true OR resources are affected
             // Staff/admin see all notices (unless in "View As" mode - then show member perspective)
             if (isStaffOrAdmin && !isViewingAsMember) return true;
