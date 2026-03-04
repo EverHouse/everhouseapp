@@ -22,6 +22,74 @@ import { staffUsers } from '../../shared/schema';
 
 import { logger } from './logger';
 
+export async function transferRequestParticipantsToSession(
+  sessionId: number,
+  requestParticipants: unknown,
+  ownerEmail: string,
+  logContext: string
+): Promise<number> {
+  const rpArray = Array.isArray(requestParticipants)
+    ? requestParticipants as Array<{ type: string; email?: string; name?: string; userId?: string }>
+    : [];
+  if (rpArray.length === 0) return 0;
+
+  const existingParts = await db.execute(sql`SELECT user_id, user_email, display_name, participant_type FROM booking_participants WHERE session_id = ${sessionId}`);
+  const existingRows = existingParts.rows as Array<{ user_id: string | null; user_email: string | null; display_name: string | null; participant_type: string }>;
+  const existingUserIds = new Set(existingRows.filter(r => r.user_id).map(r => r.user_id!));
+  const existingEmails = new Set(existingRows.filter(r => r.user_email).map(r => r.user_email!.toLowerCase()));
+  const existingGuestNames = new Set(existingRows.filter(r => r.participant_type === 'guest' && r.display_name).map(r => r.display_name!.toLowerCase()));
+  const ownerEmailLower = ownerEmail.toLowerCase();
+  existingEmails.add(ownerEmailLower);
+
+  let participantsAdded = 0;
+  for (const rp of rpArray) {
+    if (!rp || typeof rp !== 'object') continue;
+
+    if (rp.type === 'guest') {
+      const guestName = rp.name || 'Guest';
+      if (!existingGuestNames.has(guestName.toLowerCase())) {
+        await db.execute(sql`INSERT INTO booking_participants 
+           (session_id, display_name, participant_type, is_owner, created_at)
+           VALUES (${sessionId}, ${guestName}, 'guest', false, NOW())`);
+        existingGuestNames.add(guestName.toLowerCase());
+        participantsAdded++;
+      }
+    } else {
+      const rpEmail = rp.email?.toLowerCase()?.trim() || '';
+      if (rpEmail && rpEmail === ownerEmailLower) continue;
+
+      let rpUserRow: { id: string; email: string; first_name: string; last_name: string } | undefined;
+      if (rp.email) {
+        const rpUser = await db.execute(sql`SELECT id, email, first_name, last_name FROM users WHERE LOWER(email) = LOWER(${rp.email}) LIMIT 1`);
+        rpUserRow = rpUser.rows[0] as typeof rpUserRow;
+      } else if (rp.userId) {
+        const rpUser = await db.execute(sql`SELECT id, email, first_name, last_name FROM users WHERE id = ${rp.userId} LIMIT 1`);
+        rpUserRow = rpUser.rows[0] as typeof rpUserRow;
+      }
+
+      if (rpUserRow) {
+        if (existingUserIds.has(rpUserRow.id)) continue;
+        if (existingEmails.has(rpUserRow.email.toLowerCase())) continue;
+
+        const rpDisplayName = [rpUserRow.first_name, rpUserRow.last_name].filter(Boolean).join(' ') || rpUserRow.email;
+        await db.execute(sql`INSERT INTO booking_participants 
+           (session_id, user_id, user_email, display_name, participant_type, is_owner, created_at)
+           VALUES (${sessionId}, ${rpUserRow.id}, ${rpUserRow.email}, ${rpDisplayName}, 'member', false, NOW())`);
+        existingUserIds.add(rpUserRow.id);
+        existingEmails.add(rpUserRow.email.toLowerCase());
+        participantsAdded++;
+      }
+    }
+  }
+
+  if (participantsAdded > 0) {
+    logger.info(`[Participant Transfer] Transferred request_participants to session`, {
+      extra: { sessionId, participantsAdded, totalRequested: rpArray.length, context: logContext }
+    });
+  }
+  return participantsAdded;
+}
+
 interface UserIdRow {
   id: string;
 }
@@ -3024,12 +3092,55 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
        AND user_email != ''
        AND is_unmatched IS NOT TRUE
        AND last_trackman_sync_at >= NOW() - INTERVAL '1 hour'
-       RETURNING id, user_email, user_name`);
+       RETURNING id, user_email, user_name, resource_id, request_date, start_time, end_time, trackman_booking_id, session_id, request_participants, user_id`);
     
     if (autoApproved.rows.length > 0) {
       process.stderr.write(`[Trackman Import] Post-import cleanup: Auto-approved ${autoApproved.rows.length} pending member-linked bookings\n`);
-      for (const approved of autoApproved.rows) {
+      for (const approved of autoApproved.rows as Array<{
+        id: number; user_email: string; user_name: string | null; resource_id: number | null;
+        request_date: string; start_time: string; end_time: string; trackman_booking_id: string | null;
+        session_id: number | null; request_participants: unknown; user_id: string | null;
+      }>) {
         process.stderr.write(`[Trackman Import]   Auto-approved booking #${approved.id} for ${approved.user_name || approved.user_email}\n`);
+        
+        let targetSessionId = approved.session_id;
+        
+        if (!targetSessionId && approved.resource_id && approved.start_time && approved.end_time) {
+          try {
+            const sessionResult = await ensureSessionForBooking({
+              bookingId: approved.id,
+              resourceId: approved.resource_id,
+              sessionDate: String(approved.request_date),
+              startTime: String(approved.start_time),
+              endTime: String(approved.end_time),
+              ownerEmail: approved.user_email,
+              ownerName: approved.user_name || undefined,
+              ownerUserId: approved.user_id || undefined,
+              trackmanBookingId: approved.trackman_booking_id || undefined,
+              source: 'trackman_import_cleanup',
+              createdBy: 'trackman_import_cleanup'
+            });
+            if (sessionResult.sessionId) {
+              targetSessionId = sessionResult.sessionId;
+              process.stderr.write(`[Trackman Import]   Created session #${targetSessionId} for auto-approved booking #${approved.id}\n`);
+            }
+          } catch (sessionErr: unknown) {
+            process.stderr.write(`[Trackman Import]   Failed to create session for auto-approved booking #${approved.id}: ${getErrorMessage(sessionErr)}\n`);
+          }
+        }
+        
+        if (targetSessionId) {
+          try {
+            const transferred = await transferRequestParticipantsToSession(
+              targetSessionId, approved.request_participants, approved.user_email, `booking #${approved.id}`
+            );
+            if (transferred > 0) {
+              process.stderr.write(`[Trackman Import]   Transferred ${transferred} request_participants to session #${targetSessionId} for booking #${approved.id}\n`);
+            }
+          } catch (rpErr: unknown) {
+            process.stderr.write(`[Trackman Import]   Failed to transfer participants for booking #${approved.id}: ${getErrorMessage(rpErr)}\n`);
+          }
+        }
       }
     }
   } catch (cleanupErr: unknown) {
