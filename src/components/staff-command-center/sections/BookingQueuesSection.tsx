@@ -39,20 +39,26 @@ const PendingRequestsCard = memo<PendingRequestsCardProps>(({
       aria-label={pendingRequests.length > 0 ? `Booking Requests - ${pendingRequests.length} pending, action required` : 'Booking Requests'}
     >
       <div className="flex items-center justify-between mb-4 flex-shrink-0 px-4">
+        <h3 className="text-2xl leading-tight font-bold text-primary dark:text-white" style={{ fontFamily: 'var(--font-headline)' }}>Booking Requests</h3>
         <div className="flex items-center gap-2">
-          <h3 className="text-2xl leading-tight font-bold text-primary dark:text-white" style={{ fontFamily: 'var(--font-headline)' }}>Booking Requests</h3>
-          {pendingRequests.length > 0 && (
-            <span className="px-2 py-0.5 text-[10px] font-semibold uppercase tracking-widest bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 rounded-[4px]">
-              Action Required
-            </span>
-          )}
           {cancellationCount > 0 && (
             <span className="px-2 py-0.5 text-[10px] font-semibold uppercase tracking-widest bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-400 rounded-[4px]">
               {cancellationCount} Cancellation{cancellationCount !== 1 ? 's' : ''}
             </span>
           )}
+          {pendingRequests.length > 0 ? (
+            <button
+              onClick={() => navigateToTab('simulator')}
+              className="tactile-btn flex items-center gap-1 px-2 py-0.5 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 rounded-full text-xs font-medium hover:bg-amber-200 dark:hover:bg-amber-900/50 transition-colors"
+              title={`${pendingRequests.length} pending request${pendingRequests.length !== 1 ? 's' : ''}`}
+            >
+              <span className="material-symbols-outlined text-sm">assignment</span>
+              {pendingRequests.length}
+            </button>
+          ) : (
+            <button onClick={() => navigateToTab('simulator')} className="tactile-btn text-xs text-primary/80 dark:text-white/80 hover:underline">View all</button>
+          )}
         </div>
-        <button onClick={() => navigateToTab('simulator')} className="tactile-btn text-xs text-primary/80 dark:text-white/80 hover:underline">View all</button>
       </div>
       <div>
         {pendingRequests.length === 0 ? (

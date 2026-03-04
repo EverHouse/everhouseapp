@@ -595,8 +595,8 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
                 onClick={() => navigateToTab('simulator')}
                 className="tactile-btn flex lg:hidden items-center gap-1 px-2 py-0.5 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 rounded-full text-[10px] font-medium"
               >
-                <span className="material-symbols-outlined text-xs">pending_actions</span>
-                {pendingCount} pending
+                <span className="material-symbols-outlined text-xs">assignment</span>
+                {pendingCount}
               </button>
             )}
           </div>
@@ -609,8 +609,8 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
               onClick={() => navigateToTab('simulator')}
               className="tactile-btn flex items-center gap-1.5 px-3 py-1.5 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 rounded-full text-xs font-medium hover:bg-amber-200 dark:hover:bg-amber-900/50 transition-colors"
             >
-              <span className="material-symbols-outlined text-sm">pending_actions</span>
-              {pendingCount} pending request{pendingCount !== 1 ? 's' : ''}
+              <span className="material-symbols-outlined text-sm">assignment</span>
+              {pendingCount}
             </button>
           </div>
         )}
