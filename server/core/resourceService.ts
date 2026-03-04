@@ -1935,7 +1935,8 @@ export async function deleteBooking(bookingId: number, archivedBy: string, hardD
     startTime: bookingRequests.startTime,
     sessionId: bookingRequests.sessionId,
     archivedAt: bookingRequests.archivedAt,
-    trackmanBookingId: bookingRequests.trackmanBookingId
+    trackmanBookingId: bookingRequests.trackmanBookingId,
+    stripeInvoiceId: bookingRequests.stripeInvoiceId
   })
   .from(bookingRequests)
   .where(eq(bookingRequests.id, bookingId));
@@ -1959,6 +1960,17 @@ export async function deleteBooking(bookingId: number, archivedBy: string, hardD
   let cascadeResult: CancellationCascadeResult | undefined;
   
   if (hardDelete) {
+    if (booking.stripeInvoiceId) {
+      try {
+        const { voidBookingInvoice } = await import('./billing/bookingInvoiceService');
+        await voidBookingInvoice(bookingId);
+      } catch (voidErr: unknown) {
+        logger.warn('[DELETE /api/bookings] Failed to void invoice before hard delete', {
+          extra: { bookingId, stripeInvoiceId: booking.stripeInvoiceId, error: getErrorMessage(voidErr) }
+        });
+      }
+    }
+
     await db.transaction(async (tx) => {
       if (booking.sessionId) {
         await tx.execute(sql`DELETE FROM booking_participants WHERE session_id = ${booking.sessionId}`);
