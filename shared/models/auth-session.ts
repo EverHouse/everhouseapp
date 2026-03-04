@@ -100,6 +100,7 @@ export const users = pgTable("users", {
   migrationRequestedBy: text("migration_requested_by"),
   migrationTierSnapshot: text("migration_tier_snapshot"),
   migrationStatus: text("migration_status"),
+  requiresCardUpdate: boolean("requires_card_update").default(false),
 }, (table) => [
   index("users_stripe_customer_id_idx").on(table.stripeCustomerId),
   index("users_membership_status_idx").on(table.membershipStatus),
