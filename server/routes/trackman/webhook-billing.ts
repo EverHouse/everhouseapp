@@ -12,6 +12,7 @@ import { linkAndNotifyParticipants } from '../../core/bookingEvents';
 import { calculateDurationMinutes, NormalizedBookingFields } from './webhook-helpers';
 import { createPrepaymentIntent } from '../../core/billing/prepaymentService';
 import { syncBookingInvoice } from '../../core/billing/bookingInvoiceService';
+import { transferRequestParticipantsToSession } from '../../core/trackmanImport';
 
 export async function updateBaySlotCache(
   trackmanBookingId: string,
@@ -278,14 +279,30 @@ export async function createBookingForMember(
                            new Date(`2000-01-01T${startTime}`).getTime()) / 60000)
               : 60;
             
-            for (let i = 1; i < playerCount; i++) {
+            let transferredCount = 0;
+            try {
+              const rpResult = await db.execute(sql`SELECT request_participants FROM booking_requests WHERE id = ${pendingBookingId}`);
+              const rpData = (rpResult.rows[0] as { request_participants: unknown })?.request_participants;
+              if (rpData && Array.isArray(rpData) && rpData.length > 0) {
+                transferredCount = await transferRequestParticipantsToSession(
+                  newSessionId, rpData, member.email, `webhook auto-link booking #${pendingBookingId}`
+                );
+              }
+            } catch (rpErr: unknown) {
+              logger.warn('[Trackman Webhook] Non-blocking: Failed to transfer request_participants to session during auto-link', {
+                extra: { bookingId: pendingBookingId, sessionId: newSessionId, error: (rpErr as Error).message }
+              });
+            }
+            
+            const remainingSlots = Math.max(0, (playerCount - 1) - transferredCount);
+            for (let i = 0; i < remainingSlots; i++) {
               await db.execute(sql`INSERT INTO booking_participants (session_id, user_id, participant_type, display_name, payment_status, slot_duration)
-                VALUES (${newSessionId}, NULL, 'guest', ${`Guest ${i + 1}`}, 'pending', ${slotDuration})`);
+                VALUES (${newSessionId}, NULL, 'guest', ${`Guest ${transferredCount + i + 2}`}, 'pending', ${slotDuration})`);
             }
             
             const feeBreakdown = await recalculateSessionFees(newSessionId, 'trackman_webhook');
             logger.info('[Trackman Webhook] Created session and participants for linked booking', {
-              extra: { bookingId: pendingBookingId, sessionId: newSessionId, playerCount, slotDuration }
+              extra: { bookingId: pendingBookingId, sessionId: newSessionId, playerCount, slotDuration, transferredFromRequest: transferredCount, genericGuestSlots: remainingSlots }
             });
             
             if (feeBreakdown.totals.totalCents > 0) {
