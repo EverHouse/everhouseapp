@@ -32,6 +32,8 @@ interface MemberBillingTabProps {
   memberId?: string;
   currentTier?: string;
   onTierUpdate?: (tier: string) => void;
+  onMemberUpdated?: () => void;
+  onDrawerClose?: () => void;
   guestPassInfo?: { remainingPasses: number; totalUsed: number } | null;
   guestHistory?: GuestHistoryItem[];
   guestCheckInsHistory?: GuestCheckInItem[];
@@ -475,6 +477,7 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({
   memberId, 
   currentTier, 
   onTierUpdate,
+  onMemberUpdated,
   guestPassInfo,
   guestHistory = [],
   guestCheckInsHistory = [],
@@ -655,6 +658,7 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({
       if (res.ok) {
         setShowMigrationDialog(false);
         fetchBillingInfo();
+        onMemberUpdated?.();
         showSuccess('Migration initiated successfully');
       } else {
         setError(await extractApiError(res, 'initiate migration'));
@@ -676,6 +680,7 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({
       });
       if (res.ok) {
         fetchBillingInfo();
+        onMemberUpdated?.();
         showSuccess('Migration cancelled');
       } else {
         setError(await extractApiError(res, 'cancel migration'));
@@ -705,6 +710,7 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({
         setIsEditingTier(false);
         if (onTierUpdate) onTierUpdate(manualTier);
         fetchBillingInfo();
+        onMemberUpdated?.();
         showSuccess('Membership level updated');
       }
     } catch (err: unknown) {
@@ -727,6 +733,7 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({
       });
       if (res.ok) {
         await fetchBillingInfo();
+        onMemberUpdated?.();
         showSuccess('Billing source updated');
       } else {
         setError(getApiErrorMessage(res, 'update billing source'));
@@ -751,6 +758,7 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({
       if (res.ok) {
         const data = await res.json();
         await fetchBillingInfo();
+        onMemberUpdated?.();
         setShowPauseModal(false);
         const resumeDate = new Date(data.resumeDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'America/Los_Angeles' });
         showSuccess(`Subscription paused for ${durationDays} days. Billing resumes on ${resumeDate}.`);
@@ -774,6 +782,7 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({
       });
       if (res.ok) {
         await fetchBillingInfo();
+        onMemberUpdated?.();
         showSuccess('Subscription resumed');
       } else {
         setError(getApiErrorMessage(res, 'resume subscription'));
@@ -795,6 +804,7 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({
       });
       if (res.ok) {
         await fetchBillingInfo();
+        onMemberUpdated?.();
         setShowCancelModal(false);
         showSuccess('Subscription will be canceled at period end');
       } else {
@@ -982,6 +992,7 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({
       if (res.ok) {
         const data = await res.json();
         await fetchBillingInfo();
+        onMemberUpdated?.();
         showSuccess(data.created ? 'Created new Stripe customer' : 'Linked existing Stripe customer');
       } else {
         setError(getApiErrorMessage(res, 'sync to Stripe'));
@@ -1039,6 +1050,7 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({
       } catch (e: unknown) { /* continue */ }
       
       await fetchBillingInfo();
+      onMemberUpdated?.();
       
       if (results.length > 0) {
         showSuccess(`Stripe sync complete: ${results.join(', ')}`);
@@ -1076,6 +1088,7 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({
       if (res.ok) {
         const data = await res.json();
         await fetchBillingInfo();
+        onMemberUpdated?.();
         setShowCreateSubscriptionModal(false);
         setSelectedSubscriptionTier('');
         setSelectedCoupon('');
@@ -1959,6 +1972,7 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({
                     setShowCollectPayment(false);
                     setCollectPaymentMode('terminal');
                     fetchBillingInfo();
+                    onMemberUpdated?.();
                   } catch (err: unknown) {
                     setCollectPaymentError((err instanceof Error ? err.message : String(err)) || 'Failed to confirm payment');
                   }
@@ -2036,6 +2050,7 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({
                         setShowCollectPayment(false);
                         setCollectPaymentMode('terminal');
                         fetchBillingInfo();
+                        onMemberUpdated?.();
                       } catch (err: unknown) {
                         setCollectPaymentError((err instanceof Error ? err.message : String(err)) || 'Failed to charge card');
                       } finally {
@@ -2094,6 +2109,7 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({
                 showSuccess('Payment method updated successfully!');
                 setShowUpdateCardTerminal(false);
                 fetchBillingInfo();
+                onMemberUpdated?.();
               }}
               onError={(msg) => {
                 console.error('Terminal card save error:', msg);

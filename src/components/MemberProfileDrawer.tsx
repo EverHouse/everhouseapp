@@ -51,6 +51,7 @@ interface MemberProfileDrawerProps {
   onClose: () => void;
   onViewAs: (member: MemberProfile) => void;
   onMemberDeleted?: () => void;
+  onMemberUpdated?: () => void;
   visitorMode?: boolean;
 }
 
@@ -64,7 +65,7 @@ const TABS: { id: TabType; label: string; icon: string }[] = [
 
 const VISITOR_TABS: TabType[] = ['billing', 'activity', 'communications', 'notes'];
 
-const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, member, isAdmin, onClose, onViewAs, onMemberDeleted, visitorMode = false }) => {
+const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, member, isAdmin, onClose, onViewAs, onMemberDeleted, onMemberUpdated, visitorMode = false }) => {
   const { effectiveTheme } = useTheme();
   const { setDrawerOpen } = useBottomNav();
   const isDark = effectiveTheme === 'dark';
@@ -607,6 +608,7 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
             memberId={member.id}
             displayedTier={displayedTier}
             onTierUpdate={(newTier) => setDisplayedTier(newTier)}
+            onMemberUpdated={onMemberUpdated}
             guestPassInfo={history?.guestPassInfo}
             guestHistory={guestHistory}
             guestCheckInsHistory={history?.guestCheckInsHistory || []}
@@ -734,6 +736,7 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
                           setNewEmailValue('');
                           setEmailChangeError('');
                           fetchMemberData();
+                          onMemberUpdated?.();
                         } else {
                           setEmailChangeError(data.error || 'Failed to change email');
                         }

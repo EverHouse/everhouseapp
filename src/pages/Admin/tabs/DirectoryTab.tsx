@@ -2093,6 +2093,7 @@ const DirectoryTab: React.FC = () => {
                 onClose={() => { setIsViewingDetails(false); setSelectedMember(null); }}
                 onViewAs={() => { if (selectedMember) handleViewAs(selectedMember); }}
                 onMemberDeleted={refreshMembers}
+                onMemberUpdated={refreshMembers}
             />
 
             <NewUserDrawer
@@ -2193,6 +2194,7 @@ const DirectoryTab: React.FC = () => {
                 onClose={() => { setVisitorDetailsOpen(false); setSelectedVisitor(null); }}
                 onViewAs={() => {}}
                 onMemberDeleted={() => refetchVisitors()}
+                onMemberUpdated={() => refetchVisitors()}
                 visitorMode={true}
             />
         </AnimatedPage>

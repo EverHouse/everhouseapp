@@ -2250,6 +2250,9 @@ const DataIntegrityTab: React.FC = () => {
           setSelectedMember(null);
           runIntegrityMutation.mutate();
         }}
+        onMemberUpdated={() => {
+          runIntegrityMutation.mutate();
+        }}
       />
 
       <UnifiedBookingSheet

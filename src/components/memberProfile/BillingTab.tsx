@@ -8,6 +8,8 @@ interface BillingTabProps {
   memberId: string | number;
   displayedTier: string;
   onTierUpdate: (newTier: string) => void;
+  onMemberUpdated?: () => void;
+  onDrawerClose?: () => void;
   guestPassInfo: GuestPassInfo | null;
   guestHistory: GuestVisit[];
   guestCheckInsHistory: GuestCheckInItem[];
@@ -19,6 +21,8 @@ const BillingTab: React.FC<BillingTabProps> = ({
   memberId,
   displayedTier,
   onTierUpdate,
+  onMemberUpdated,
+  onDrawerClose,
   guestPassInfo,
   guestHistory,
   guestCheckInsHistory,
@@ -35,6 +39,8 @@ const BillingTab: React.FC<BillingTabProps> = ({
           memberId={String(memberId)} 
           currentTier={displayedTier}
           onTierUpdate={onTierUpdate}
+          onMemberUpdated={onMemberUpdated}
+          onDrawerClose={onDrawerClose}
           guestPassInfo={guestPassInfo ? { remainingPasses: guestPassInfo.remainingPasses, totalUsed: guestPassInfo.usedPasses } : undefined}
           guestHistory={guestHistory}
           guestCheckInsHistory={guestCheckInsHistory.map(c => ({ id: c.id, guestName: c.guest_name ?? null, checkInDate: c.check_in_date }))}
