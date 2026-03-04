@@ -28,7 +28,6 @@ export interface UnifiedBookingSheetProps {
   isRelink?: boolean;
   importedName?: string;
   notes?: string;
-  isLegacyReview?: boolean;
   originalEmail?: string;
   bookingId?: number;
   sessionId?: number | string | null;
@@ -59,7 +58,6 @@ export function UnifiedBookingSheet(props: UnifiedBookingSheetProps) {
     bookingDate,
     timeSlot,
     notes,
-    isLegacyReview,
     originalEmail,
     bookingId,
     ownerName,
@@ -348,7 +346,6 @@ export function UnifiedBookingSheet(props: UnifiedBookingSheetProps) {
           potentialDuplicates={logic.potentialDuplicates}
           isCheckingDuplicates={logic.isCheckingDuplicates}
           guestFeeDollars={logic.guestFeeDollars}
-          isLegacyReview={isLegacyReview}
           isLessonOrStaffBlock={logic.isLessonOrStaffBlock}
           isConferenceRoom={logic.isConferenceRoom}
           filledSlotsCount={logic.filledSlotsCount}

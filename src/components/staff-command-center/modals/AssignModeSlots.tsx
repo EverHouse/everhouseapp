@@ -18,7 +18,6 @@ interface AssignModeSlotsProps {
   potentialDuplicates: Array<{id: string; email: string; name: string}>;
   isCheckingDuplicates: boolean;
   guestFeeDollars: number;
-  isLegacyReview?: boolean;
   isLessonOrStaffBlock: boolean;
   isConferenceRoom: boolean;
   filledSlotsCount: number;
@@ -48,7 +47,6 @@ export function AssignModeSlots({
   potentialDuplicates,
   isCheckingDuplicates,
   guestFeeDollars,
-  isLegacyReview,
   isLessonOrStaffBlock,
   isConferenceRoom,
   filledSlotsCount,
@@ -319,19 +317,13 @@ export function AssignModeSlots({
         {!isLessonOrStaffBlock && (
           <div className="border-t border-primary/10 dark:border-white/10 pt-2">
             <p className="text-xs text-primary/50 dark:text-white/50 mb-1">Additional Players (Optional)</p>
-            {isLegacyReview ? (
-              <p className="text-xs text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-500/10 p-2 rounded-lg">
-                Add additional players after assigning the owner. This booking needs review first.
-              </p>
-            ) : (
-              <div className="space-y-2">
-                {[1, 2, 3].map(index => (
-                  <div key={index}>
-                    {renderSlot(index, false)}
-                  </div>
-                ))}
-              </div>
-            )}
+            <div className="space-y-2">
+              {[1, 2, 3].map(index => (
+                <div key={index}>
+                  {renderSlot(index, false)}
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>

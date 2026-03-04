@@ -44,7 +44,6 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
     isRelink,
     importedName,
     notes,
-    isLegacyReview,
     originalEmail,
     bookingId,
     sessionId,
@@ -1092,44 +1091,7 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
 
       let feesRecalculated = false;
       let resultBookingId = matchedBookingId;
-      let resolveMessage: string | null = null;
-
-      if (isLegacyReview && matchedBookingId) {
-        let numericId: number;
-        if (typeof matchedBookingId === 'string') {
-          numericId = parseInt(matchedBookingId.replace('review-', ''), 10);
-        } else {
-          numericId = matchedBookingId;
-        }
-        
-        if (isNaN(numericId)) {
-          throw new Error('Invalid booking ID for legacy resolution');
-        }
-        
-        const res = await fetch(`/api/admin/trackman/unmatched/${numericId}/resolve`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({
-            memberEmail: owner.email,
-            memberName: owner.name,
-            memberId: owner.id,
-            additional_players: additionalPlayers,
-            rememberEmail: true
-          })
-        });
-        
-        if (!res.ok) {
-          const data = await res.json();
-          throw new Error(data.error || data.message || 'Failed to resolve booking');
-        }
-        const data = await res.json();
-        feesRecalculated = data.feesRecalculated === true;
-        resolveMessage = data.message || null;
-        if (data.booking?.id) {
-          resultBookingId = typeof data.booking.id === 'number' ? data.booking.id : parseInt(data.booking.id, 10);
-        }
-      } else if (matchedBookingId && !isLegacyReview) {
+      if (matchedBookingId) {
         const res = await fetch(`/api/bookings/${matchedBookingId}/assign-with-players`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
@@ -1203,12 +1165,7 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
         }
       }
       
-      if (isLegacyReview) {
-        const hasWarning = resolveMessage && (resolveMessage.includes('Session') || resolveMessage.includes('session') || resolveMessage.includes('bay'));
-        showToast(resolveMessage || `Booking resolved and assigned to ${owner.name}`, hasWarning ? 'warning' : 'success', hasWarning ? 8000 : 3000);
-      } else {
-        showToast(`Booking assigned with ${filledSlotsCount} player${filledSlotsCount > 1 ? 's' : ''}${guestCount > 0 ? ` (${guestCount} guest${guestCount > 1 ? 's' : ''})` : ''}`, 'success');
-      }
+      showToast(`Booking assigned with ${filledSlotsCount} player${filledSlotsCount > 1 ? 's' : ''}${guestCount > 0 ? ` (${guestCount} guest${guestCount > 1 ? 's' : ''})` : ''}`, 'success');
       onSuccess?.({ memberEmail: owner.email, memberName: owner.name });
       onClose();
       
@@ -1323,33 +1280,7 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
     try {
       const staffName = `${staff.first_name} ${staff.last_name}`;
       
-      if (isLegacyReview && matchedBookingId) {
-        let numericId: number;
-        if (typeof matchedBookingId === 'string') {
-          numericId = parseInt(matchedBookingId.replace('review-', ''), 10);
-        } else {
-          numericId = matchedBookingId;
-        }
-        
-        if (isNaN(numericId)) {
-          throw new Error('Invalid booking ID for legacy resolution');
-        }
-        
-        const res = await fetch(`/api/admin/trackman/unmatched/${numericId}/resolve`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({
-            memberEmail: staff.email,
-            rememberEmail: false
-          })
-        });
-        
-        if (!res.ok) {
-          const data = await res.json();
-          throw new Error(data.error || data.message || 'Failed to assign to staff');
-        }
-      } else if (matchedBookingId) {
+      if (matchedBookingId) {
         const res = await fetch(`/api/bookings/${matchedBookingId}/assign-with-players`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },

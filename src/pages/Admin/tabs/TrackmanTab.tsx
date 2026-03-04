@@ -1243,7 +1243,6 @@ const TrackmanTab: React.FC = () => {
           }}
           importedName={assignPlayersModal.booking.userName || assignPlayersModal.booking.user_name}
           notes={assignPlayersModal.booking.notes || assignPlayersModal.booking.note}
-          isLegacyReview={false}
           originalEmail={assignPlayersModal.booking.originalEmail || assignPlayersModal.booking.original_email}
         />
       )}
