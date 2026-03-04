@@ -148,7 +148,7 @@ const AdminDashboard: React.FC = () => {
   };
 
   const headerContent = (
-    <header className="fixed top-0 left-0 right-0 md:left-20 lg:left-64 h-20 flex items-center justify-between px-4 md:px-6 bg-[#293515] shadow-md transition-all duration-fast text-[#F2F2EC] pointer-events-auto" style={{ zIndex: 'var(--z-header)', paddingTop: 'env(safe-area-inset-top, 0px)', boxSizing: 'content-box' }}>
+    <header className="fixed top-0 left-0 right-0 md:left-20 xl:left-64 h-20 flex items-center justify-between px-4 md:px-6 bg-[#293515] shadow-md transition-all duration-fast text-[#F2F2EC] pointer-events-auto" style={{ zIndex: 'var(--z-header)', paddingTop: 'env(safe-area-inset-top, 0px)', boxSizing: 'content-box' }}>
       <div className="flex items-center flex-shrink-0 w-[88px] md:w-0 h-full">
         <button 
           onClick={() => setIsMobileSidebarOpen(true)}
@@ -237,7 +237,7 @@ const AdminDashboard: React.FC = () => {
       
       {createPortal(headerContent, document.body)}
 
-      <main className="flex-1 px-4 md:px-8 pt-[calc(env(safe-area-inset-top,0px)+112px)] relative z-0 md:ml-20 lg:ml-64 w-full md:w-auto">
+      <main className="flex-1 px-4 md:px-8 pt-[calc(env(safe-area-inset-top,0px)+112px)] relative z-0 md:ml-20 xl:ml-64 w-full md:w-auto">
         <PullToRefresh onRefresh={handleAdminRefresh}>
           <TabTransition activeKey={activeTab} className="animate-content-enter">
             {activeTab === 'training' ? (
