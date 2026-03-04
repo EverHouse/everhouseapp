@@ -1243,17 +1243,38 @@ router.delete('/api/stripe/subscriptions/cleanup-pending/:userId', isStaffOrAdmi
       }
     }
     
-    try {
-      await db.execute(sql`UPDATE event_rsvps SET matched_user_id = NULL WHERE matched_user_id = ${userId}`);
-      await db.execute(sql`DELETE FROM notifications WHERE user_email = ${user.email.toLowerCase()}`);
-      await db.execute(sql`DELETE FROM push_subscriptions WHERE user_email = ${user.email.toLowerCase()}`);
-      await db.execute(sql`DELETE FROM user_dismissed_notices WHERE user_email = ${user.email.toLowerCase()}`);
-      await db.execute(sql`DELETE FROM audit_log WHERE resource_id = ${userId} AND resource_type = 'member'`);
-    } catch (relErr: unknown) {
-      logger.warn('[Stripe] Some related records could not be cleared during pending cleanup — proceeding', { extra: { userId, error: getErrorMessage(relErr) } });
+    const cleanupQueries = [
+      { name: 'event_rsvps', query: sql`UPDATE event_rsvps SET matched_user_id = NULL WHERE matched_user_id = ${userId}` },
+      { name: 'notifications', query: sql`DELETE FROM notifications WHERE user_email = ${user.email.toLowerCase()}` },
+      { name: 'push_subscriptions', query: sql`DELETE FROM push_subscriptions WHERE user_email = ${user.email.toLowerCase()}` },
+      { name: 'user_dismissed_notices', query: sql`DELETE FROM user_dismissed_notices WHERE user_email = ${user.email.toLowerCase()}` },
+      { name: 'audit_log', query: sql`DELETE FROM audit_log WHERE resource_id = ${userId} AND resource_type = 'member'` },
+      { name: 'booking_participants', query: sql`UPDATE booking_participants SET user_id = NULL WHERE user_id = ${userId}` },
+      { name: 'booking_requests', query: sql`UPDATE booking_requests SET user_id = NULL WHERE user_id = ${userId}` },
+      { name: 'magic_links', query: sql`DELETE FROM magic_links WHERE email = ${user.email.toLowerCase()}` },
+      { name: 'rate_limits', query: sql`DELETE FROM rate_limits WHERE key LIKE ${'otp_verify:' + user.email.toLowerCase() + '%'}` },
+      { name: 'guest_passes', query: sql`DELETE FROM guest_passes WHERE LOWER(member_email) = ${user.email.toLowerCase()}` },
+      { name: 'guest_pass_holds', query: sql`DELETE FROM guest_pass_holds WHERE LOWER(member_email) = ${user.email.toLowerCase()}` },
+      { name: 'usage_ledger', query: sql`DELETE FROM usage_ledger WHERE LOWER(member_id) = ${user.email.toLowerCase()}` },
+      { name: 'member_action_log', query: sql`DELETE FROM member_action_log WHERE LOWER(member_email) = ${user.email.toLowerCase()}` },
+    ];
+
+    const failedTables: string[] = [];
+    for (const { name, query } of cleanupQueries) {
+      try {
+        await db.execute(query);
+      } catch (relErr: unknown) {
+        failedTables.push(name);
+        logger.warn(`[Stripe] Failed to clean up ${name} during pending cleanup`, { extra: { userId, error: getErrorMessage(relErr) } });
+      }
     }
 
-    await db.delete(users).where(eq(users.id, userId));
+    try {
+      await db.delete(users).where(eq(users.id, userId));
+    } catch (deleteErr: unknown) {
+      logger.error('[Stripe] Failed to delete pending user — likely remaining FK constraint', { extra: { userId, failedTables, error: getErrorMessage(deleteErr) } });
+      return res.status(500).json({ error: `Failed to delete user. Related records in [${failedTables.join(', ')}] could not be cleared. Please resolve manually.` });
+    }
     
     const userName = [user.firstName, user.lastName].filter(Boolean).join(' ') || user.email;
     logger.info('[Stripe] Cleaned up pending user () by', { extra: { userEmail: user.email, userName, sessionUser: sessionUser?.email } });

@@ -1041,7 +1041,19 @@ async function handlePaymentIntentSucceeded(client: PoolClient, paymentIntent: S
     );
     
     if (snapshotResult.rows.length === 0) {
-      logger.error(`[Stripe Webhook] Fee snapshot ${feeSnapshotId} not found, already used, or locked by another process`);
+      logger.error(`[Stripe Webhook] Fee snapshot ${feeSnapshotId} not found, already used, or locked by another process — queueing auto-refund for orphaned payment`);
+      await queueJobInTransaction(client, 'stripe_auto_refund', {
+        paymentIntentId: id,
+        reason: 'duplicate',
+        metadata: {
+          reason: 'snapshot_not_found_or_already_used',
+          feeSnapshotId: String(feeSnapshotId),
+          bookingId: String(bookingId),
+        },
+        idempotencyKey: `refund_orphaned_snapshot_${id}_${feeSnapshotId}`,
+        sessionId: !isNaN(sessionId) ? sessionId : undefined,
+        reviewReason: `Auto-refund queued for orphaned payment: PI ${id}, $${amountDollars}. Fee snapshot ${feeSnapshotId} not found or already used.`,
+      }, { priority: 10, maxRetries: 5 });
       return deferredActions;
     }
     

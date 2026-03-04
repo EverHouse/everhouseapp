@@ -87,6 +87,13 @@ export async function createGuestPassHold(
     }
     
     await client.query(
+      `INSERT INTO guest_passes (member_email, passes_used, passes_total)
+       VALUES ($1, 0, 0)
+       ON CONFLICT (member_email) DO NOTHING`,
+      [emailLower]
+    );
+
+    await client.query(
       `SELECT id FROM guest_passes WHERE LOWER(member_email) = $1 FOR UPDATE`,
       [emailLower]
     );

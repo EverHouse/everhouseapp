@@ -115,6 +115,17 @@ export async function ensureSessionForBooking(params: {
     let sessionId: number | null = null;
     let created = false;
 
+    const lockClient = client || await pool.connect();
+    const manageLockClient = !client;
+    try {
+      const lockKey = `${params.resourceId}:${params.sessionDate}:${params.startTime}`;
+      let hash = 0;
+      for (let i = 0; i < lockKey.length; i++) {
+        hash = ((hash << 5) - hash + lockKey.charCodeAt(i)) | 0;
+      }
+      await lockClient.query(`SELECT pg_advisory_lock($1)`, [hash]);
+      try {
+
     if (params.trackmanBookingId) {
       const trackmanMatch = await q.query(
         `SELECT id FROM booking_sessions
@@ -231,6 +242,15 @@ export async function ensureSessionForBooking(params: {
     );
 
     return { sessionId, created };
+
+      } finally {
+        await lockClient.query(`SELECT pg_advisory_unlock($1)`, [hash]).catch(() => {});
+      }
+    } finally {
+      if (manageLockClient) {
+        lockClient.release();
+      }
+    }
   };
 
   try {

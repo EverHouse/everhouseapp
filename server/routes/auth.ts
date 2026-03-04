@@ -318,47 +318,65 @@ const checkMagicLinkRequestLimit = async (email: string, ip: string): Promise<{ 
   }
 };
 
-const checkOtpVerifyAttempts = async (email: string): Promise<{ allowed: boolean; retryAfter?: number }> => {
-  const key = `otp_verify:${email}`;
+const checkOtpVerifyAttempts = async (email: string, ip?: string): Promise<{ allowed: boolean; retryAfter?: number }> => {
+  const perIpKey = ip ? `otp_verify:${email}:${ip}` : `otp_verify:${email}`;
   const now = new Date();
   
   try {
     const result = await db.select({
       count: rateLimits.count,
       lockedUntil: rateLimits.lockedUntil,
-    }).from(rateLimits).where(eq(rateLimits.key, key));
+    }).from(rateLimits).where(eq(rateLimits.key, perIpKey));
     
-    if (result.length === 0) {
-      return { allowed: true };
+    if (result.length > 0) {
+      const { lockedUntil: locked_until } = result[0];
+      if (locked_until && new Date(locked_until) > now) {
+        const retryAfter = Math.ceil((new Date(locked_until).getTime() - now.getTime()) / 1000);
+        return { allowed: false, retryAfter: Math.max(0, retryAfter) };
+      }
+      
+      if (locked_until && new Date(locked_until) <= now) {
+        await db.delete(rateLimits).where(eq(rateLimits.key, perIpKey));
+      }
     }
-    
-    const { lockedUntil: locked_until } = result[0];
-    if (locked_until && new Date(locked_until) > now) {
-      const retryAfter = Math.ceil((new Date(locked_until).getTime() - now.getTime()) / 1000);
-      return { allowed: false, retryAfter: Math.max(0, retryAfter) };
-    }
-    
-    if (locked_until && new Date(locked_until) <= now) {
-      await db.delete(rateLimits).where(eq(rateLimits.key, key));
+
+    if (ip) {
+      const ipKey = `otp_verify_ip:${ip}`;
+      const ipResult = await db.select({
+        count: rateLimits.count,
+        lockedUntil: rateLimits.lockedUntil,
+      }).from(rateLimits).where(eq(rateLimits.key, ipKey));
+      
+      if (ipResult.length > 0) {
+        const { lockedUntil: ipLocked } = ipResult[0];
+        if (ipLocked && new Date(ipLocked) > now) {
+          const retryAfter = Math.ceil((new Date(ipLocked).getTime() - now.getTime()) / 1000);
+          return { allowed: false, retryAfter: Math.max(0, retryAfter) };
+        }
+        if (ipLocked && new Date(ipLocked) <= now) {
+          await db.delete(rateLimits).where(eq(rateLimits.key, ipKey));
+        }
+      }
     }
     
     return { allowed: true };
   } catch (error: unknown) {
-    // Fail-closed: deny requests when rate limiting is unavailable to prevent abuse
     logger.error('[RateLimit] Database error, denying request for safety', { error: error instanceof Error ? error : new Error(String(error)) });
     return { allowed: false, retryAfter: 60 };
   }
 };
 
-const recordOtpVerifyFailure = async (email: string): Promise<void> => {
-  const key = `otp_verify:${email}`;
+const OTP_VERIFY_IP_MAX_ATTEMPTS = 15;
+
+const recordOtpVerifyFailure = async (email: string, ip?: string): Promise<void> => {
   const now = new Date();
   const resetAt = new Date(now.getTime() + OTP_VERIFY_LOCKOUT);
   const lockedUntil = new Date(now.getTime() + OTP_VERIFY_LOCKOUT);
   
   try {
+    const perIpKey = ip ? `otp_verify:${email}:${ip}` : `otp_verify:${email}`;
     await db.execute(sql`INSERT INTO rate_limits (key, limit_type, count, reset_at, updated_at)
-       VALUES (${key}, 'otp_verify', 1, ${resetAt}, NOW())
+       VALUES (${perIpKey}, 'otp_verify', 1, ${resetAt}, NOW())
        ON CONFLICT (key) DO UPDATE SET
          count = rate_limits.count + 1,
          locked_until = CASE 
@@ -367,13 +385,28 @@ const recordOtpVerifyFailure = async (email: string): Promise<void> => {
          END,
          updated_at = NOW()
        RETURNING count`);
+
+    if (ip) {
+      const ipKey = `otp_verify_ip:${ip}`;
+      const ipLockedUntil = new Date(now.getTime() + OTP_VERIFY_LOCKOUT);
+      await db.execute(sql`INSERT INTO rate_limits (key, limit_type, count, reset_at, updated_at)
+         VALUES (${ipKey}, 'otp_verify_ip', 1, ${resetAt}, NOW())
+         ON CONFLICT (key) DO UPDATE SET
+           count = rate_limits.count + 1,
+           locked_until = CASE 
+             WHEN rate_limits.count + 1 >= ${OTP_VERIFY_IP_MAX_ATTEMPTS} THEN ${ipLockedUntil}
+             ELSE rate_limits.locked_until
+           END,
+           updated_at = NOW()
+         RETURNING count`);
+    }
   } catch (error: unknown) {
     logger.error('[RateLimit] Database error recording failure', { error: error instanceof Error ? error : new Error(String(error)) });
   }
 };
 
-const clearOtpVerifyAttempts = async (email: string): Promise<void> => {
-  const key = `otp_verify:${email}`;
+const clearOtpVerifyAttempts = async (email: string, ip?: string): Promise<void> => {
+  const key = ip ? `otp_verify:${email}:${ip}` : `otp_verify:${email}`;
   try {
     await db.delete(rateLimits).where(eq(rateLimits.key, key));
   } catch (error: unknown) {
@@ -799,17 +832,15 @@ router.post('/api/auth/verify-otp', async (req, res) => {
     
     let normalizedEmail = normalizeEmail(email);
     const normalizedCode = code.toString().trim();
+    const clientIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket.remoteAddress || '';
     
-    const attemptCheck = await checkOtpVerifyAttempts(normalizedEmail);
+    const attemptCheck = await checkOtpVerifyAttempts(normalizedEmail, clientIp);
     if (!attemptCheck.allowed) {
       return res.status(429).json({ 
         error: `Too many failed attempts. Please try again in ${Math.ceil((attemptCheck.retryAfter || 0) / 60)} minutes.` 
       });
     }
     
-    // SECURITY FIX: Use atomic UPDATE with CTE to prevent OTP replay race condition
-    // This preserves the "latest token" semantics while preventing concurrent requests
-    // from both succeeding with the same code
     const atomicResult = await db.execute(sql`WITH latest_token AS (
         SELECT id FROM magic_links
         WHERE email = ${normalizedEmail}
@@ -826,13 +857,13 @@ router.post('/api/auth/verify-otp', async (req, res) => {
       RETURNING *`);
     
     if (atomicResult.rows.length === 0) {
-      await recordOtpVerifyFailure(normalizedEmail);
+      await recordOtpVerifyFailure(normalizedEmail, clientIp);
       return res.status(400).json({ 
         error: 'Invalid or expired code. Please try again or request a new code.'
       });
     }
     
-    await clearOtpVerifyAttempts(normalizedEmail);
+    await clearOtpVerifyAttempts(normalizedEmail, clientIp);
     
     const otpRecord = atomicResult.rows[0];
     
