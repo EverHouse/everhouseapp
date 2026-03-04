@@ -603,26 +603,15 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
         </div>
 
         {/* Desktop Queue Stats - below header */}
-        {(pendingCount > 0 || unmatchedBookings.length > 0) && (
+        {pendingCount > 0 && (
           <div className="hidden lg:flex items-center gap-4 mb-4 animate-content-enter-delay-1">
-            {pendingCount > 0 && (
-              <button 
-                onClick={() => navigateToTab('simulator')}
-                className="tactile-btn flex items-center gap-1.5 px-3 py-1.5 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 rounded-full text-xs font-medium hover:bg-amber-200 dark:hover:bg-amber-900/50 transition-colors"
-              >
-                <span className="material-symbols-outlined text-sm">pending_actions</span>
-                {pendingCount} pending request{pendingCount !== 1 ? 's' : ''}
-              </button>
-            )}
-            {unmatchedBookings.length > 0 && (
-              <button 
-                onClick={() => navigateToTab('simulator')}
-                className="tactile-btn flex items-center gap-1.5 px-3 py-1.5 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 rounded-full text-xs font-medium hover:bg-orange-200 dark:hover:bg-orange-900/50 transition-colors"
-              >
-                <span className="material-symbols-outlined text-sm">link_off</span>
-                {unmatchedBookings.length} need{unmatchedBookings.length !== 1 ? '' : 's'} assignment
-              </button>
-            )}
+            <button 
+              onClick={() => navigateToTab('simulator')}
+              className="tactile-btn flex items-center gap-1.5 px-3 py-1.5 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 rounded-full text-xs font-medium hover:bg-amber-200 dark:hover:bg-amber-900/50 transition-colors"
+            >
+              <span className="material-symbols-outlined text-sm">pending_actions</span>
+              {pendingCount} pending request{pendingCount !== 1 ? 's' : ''}
+            </button>
           </div>
         )}
 

@@ -208,7 +208,8 @@ const UpcomingBookingsCard = memo<UpcomingBookingsCardProps>(({
   getSmartActionButton,
   onEditBooking
 }) => {
-  const hasUnmatchedBookings = mergedUpcomingBookings.some(b => b.is_unmatched);
+  const unmatchedCount = mergedUpcomingBookings.filter(b => b.is_unmatched).length;
+  const hasUnmatchedBookings = unmatchedCount > 0;
   
   return (
     <div 
@@ -218,7 +219,18 @@ const UpcomingBookingsCard = memo<UpcomingBookingsCardProps>(({
     >
       <div className="flex items-center justify-between mb-4 flex-shrink-0 px-4">
         <h3 className="text-2xl leading-tight font-bold text-primary dark:text-white" style={{ fontFamily: 'var(--font-headline)' }}>Today's Bookings</h3>
-        <button onClick={() => navigateToTab('simulator')} className="tactile-btn text-xs text-primary/80 dark:text-white/80 hover:underline">View all</button>
+        {unmatchedCount > 0 ? (
+          <button 
+            onClick={() => navigateToTab('simulator')}
+            className="tactile-btn flex items-center gap-1 px-2 py-0.5 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 rounded-full text-xs font-medium hover:bg-orange-200 dark:hover:bg-orange-900/50 transition-colors"
+            title={`${unmatchedCount} booking${unmatchedCount !== 1 ? 's' : ''} need${unmatchedCount !== 1 ? '' : 's'} assignment`}
+          >
+            <span className="material-symbols-outlined text-sm">link_off</span>
+            {unmatchedCount}
+          </button>
+        ) : (
+          <button onClick={() => navigateToTab('simulator')} className="tactile-btn text-xs text-primary/80 dark:text-white/80 hover:underline">View all</button>
+        )}
       </div>
       <div>
         {mergedUpcomingBookings.length === 0 ? (
