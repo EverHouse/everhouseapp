@@ -439,6 +439,62 @@ export async function tryAutoApproveBooking(
 
       if (sessionResult.sessionId) {
         createdSessionId = sessionResult.sessionId;
+        
+        try {
+          const rpResult = await db.execute(sql`SELECT request_participants FROM booking_requests WHERE id = ${bookingId}`);
+          const rpData = (rpResult.rows[0] as { request_participants: unknown })?.request_participants;
+          const rpArray = Array.isArray(rpData) ? rpData as Array<{ type: string; email?: string; name?: string; userId?: string }> : [];
+          
+          if (rpArray.length > 0) {
+            const existingParticipants = await db.execute(sql`SELECT user_id, display_name, participant_type FROM booking_participants WHERE session_id = ${createdSessionId}`);
+            const existingUserIds = new Set((existingParticipants.rows as Array<{ user_id: string | null }>).filter(r => r.user_id).map(r => r.user_id!));
+            const existingGuestNames = new Set((existingParticipants.rows as Array<{ participant_type: string; display_name: string | null }>).filter(r => r.participant_type === 'guest' && r.display_name).map(r => r.display_name!.toLowerCase()));
+            
+            let participantsAdded = 0;
+            for (const rp of rpArray) {
+              if (!rp || typeof rp !== 'object') continue;
+              
+              if (rp.type === 'guest') {
+                const guestName = rp.name || 'Guest';
+                if (!existingGuestNames.has(guestName.toLowerCase())) {
+                  await db.execute(sql`INSERT INTO booking_participants 
+                     (session_id, display_name, participant_type, is_owner, created_at)
+                     VALUES (${createdSessionId}, ${guestName}, 'guest', false, NOW())`);
+                  existingGuestNames.add(guestName.toLowerCase());
+                  participantsAdded++;
+                }
+              } else {
+                let rpUserRow: { id: string; email: string; first_name: string; last_name: string } | undefined;
+                
+                if (rp.email) {
+                  const rpUser = await db.execute(sql`SELECT id, email, first_name, last_name FROM users WHERE LOWER(email) = LOWER(${rp.email}) LIMIT 1`);
+                  rpUserRow = rpUser.rows[0] as typeof rpUserRow;
+                } else if (rp.userId) {
+                  const rpUser = await db.execute(sql`SELECT id, email, first_name, last_name FROM users WHERE id = ${rp.userId} LIMIT 1`);
+                  rpUserRow = rpUser.rows[0] as typeof rpUserRow;
+                }
+                
+                if (rpUserRow && !existingUserIds.has(rpUserRow.id)) {
+                  const rpDisplayName = [rpUserRow.first_name, rpUserRow.last_name].filter(Boolean).join(' ') || rpUserRow.email;
+                  await db.execute(sql`INSERT INTO booking_participants 
+                     (session_id, user_id, user_email, display_name, participant_type, is_owner, created_at)
+                     VALUES (${createdSessionId}, ${rpUserRow.id}, ${rpUserRow.email}, ${rpDisplayName}, 'member', false, NOW())`);
+                  existingUserIds.add(rpUserRow.id);
+                  participantsAdded++;
+                }
+              }
+            }
+            if (participantsAdded > 0) {
+              logger.info('[Trackman Webhook] Transferred request_participants to session', {
+                extra: { bookingId, sessionId: createdSessionId, participantsAdded, totalRequested: rpArray.length }
+              });
+            }
+          }
+        } catch (rpErr: unknown) {
+          logger.warn('[Trackman Webhook] Non-blocking: Failed to transfer request_participants to session', {
+            extra: { bookingId, sessionId: createdSessionId, error: (rpErr as Error).message }
+          });
+        }
       } else {
         logger.warn('[Trackman Webhook] Session creation failed for auto-approved booking — approval preserved, session will be created later', {
           extra: { bookingId, trackmanBookingId, error: sessionResult.error }
