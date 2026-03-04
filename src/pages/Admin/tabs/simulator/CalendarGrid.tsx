@@ -33,6 +33,7 @@ export interface CalendarGridProps {
     guestFeeDollars?: number;
     overageRatePerBlockDollars?: number;
     tierMinutes?: Record<string, number>;
+    prefetchDate?: (date: string) => void;
 }
 
 function CurrentTimeIndicator({ gridRef, nowMinutes, gridStartMinutes, totalColumns }: {
@@ -210,7 +211,14 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
     guestFeeDollars,
     overageRatePerBlockDollars,
     tierMinutes,
+    prefetchDate,
 }) => {
+    const getAdjacentDate = (offset: number) => {
+        const d = new Date(calendarDate);
+        d.setDate(d.getDate() + offset);
+        return d.toISOString().split('T')[0];
+    };
+
     const timeSlots = useMemo(() => {
         const slots: string[] = [];
         for (let hour = 8; hour <= 22; hour++) {
@@ -301,11 +309,9 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
                 <div className="flex items-center justify-center px-2 relative">
                     <div className="flex items-center gap-2 relative">
                         <button
-                            onClick={() => {
-                                const d = new Date(calendarDate);
-                                d.setDate(d.getDate() - 1);
-                                setCalendarDate(d.toISOString().split('T')[0]);
-                            }}
+                            onClick={() => setCalendarDate(getAdjacentDate(-1))}
+                            onMouseEnter={() => prefetchDate?.(getAdjacentDate(-1))}
+                            onTouchStart={() => prefetchDate?.(getAdjacentDate(-1))}
                             className="p-1.5 rounded-full text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-white/10 transition-colors"
                         >
                             <span aria-hidden="true" className="material-symbols-outlined text-xl">chevron_left</span>
@@ -318,11 +324,9 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
                             <span className="material-symbols-outlined text-sm opacity-60">calendar_month</span>
                         </button>
                         <button
-                            onClick={() => {
-                                const d = new Date(calendarDate);
-                                d.setDate(d.getDate() + 1);
-                                setCalendarDate(d.toISOString().split('T')[0]);
-                            }}
+                            onClick={() => setCalendarDate(getAdjacentDate(1))}
+                            onMouseEnter={() => prefetchDate?.(getAdjacentDate(1))}
+                            onTouchStart={() => prefetchDate?.(getAdjacentDate(1))}
                             className="p-1.5 rounded-full text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-white/10 transition-colors"
                         >
                             <span aria-hidden="true" className="material-symbols-outlined text-xl">chevron_right</span>
@@ -330,13 +334,13 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
                         
                         {showDatePicker && ReactDOM.createPortal(
                             <div 
-                                className="fixed inset-0 bg-black/30 flex items-center justify-center"
+                                className="fixed inset-0 bg-black/30 flex items-center justify-center p-4"
                                 style={{ zIndex: 9999 }}
-                                onMouseDown={() => setShowDatePicker(false)}
+                                onClick={() => setShowDatePicker(false)}
                             >
                                 <div 
-                                    className={`rounded-xl shadow-2xl p-5 min-w-[220px] ${isDark ? 'bg-[#1a1d15] border border-white/10' : 'bg-white border border-gray-300'}`}
-                                    onMouseDown={(e) => e.stopPropagation()}
+                                    className={`rounded-xl shadow-2xl p-5 w-full max-w-[280px] ${isDark ? 'bg-[#1a1d15] border border-white/10' : 'bg-white border border-gray-300'}`}
+                                    onClick={(e) => e.stopPropagation()}
                                 >
                                     <div className="flex flex-col gap-4">
                                         <div className={`text-center text-sm font-semibold mb-1 ${isDark ? 'text-white' : 'text-gray-700'}`}>
@@ -355,7 +359,7 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
                                         />
                                         <button
                                             type="button"
-                                            onMouseDown={(e) => {
+                                            onClick={(e) => {
                                                 e.stopPropagation();
                                                 setCalendarDate(getTodayPacific());
                                                 setShowDatePicker(false);
@@ -367,7 +371,7 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
                                         </button>
                                         <button
                                             type="button"
-                                            onMouseDown={(e) => {
+                                            onClick={(e) => {
                                                 e.stopPropagation();
                                                 setShowDatePicker(false);
                                             }}

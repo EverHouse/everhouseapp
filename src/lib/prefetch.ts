@@ -123,3 +123,4 @@ export const prefetchBookingDetail = (bookingId: number | string) => {
   prefetchedAPIs.add(key);
   fetch(`/api/admin/booking/${bookingId}/members`, { credentials: 'include' }).catch(() => {});
 };
+

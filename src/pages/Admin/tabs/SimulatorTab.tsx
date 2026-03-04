@@ -29,6 +29,7 @@ import {
     bookingsKeys,
     simulatorKeys,
 } from '../../../hooks/queries/useBookingsQueries';
+import { fetchWithCredentials } from '../../../hooks/queries/useFetch';
 
 import type { BookingRequest, Bay, Resource, CalendarClosure, AvailabilityBlock } from './simulator/simulatorTypes';
 import { formatDateShortAdmin } from './simulator/simulatorUtils';
@@ -74,7 +75,14 @@ const SimulatorTab: React.FC = () => {
     const calendarStartDate = calendarDate;
     const calendarEndDate = calendarDate;
     
+    const weekEndDate = useMemo(() => {
+        const d = new Date(today);
+        d.setDate(d.getDate() + 7);
+        return d.toISOString().split('T')[0];
+    }, [today]);
+    
     const { data: approvedBookingsData = [], isLoading: approvedLoading } = useApprovedBookings(calendarStartDate, calendarEndDate);
+    const { data: scheduledRangeData = [] } = useApprovedBookings(today, weekEndDate);
     const { data: availabilityBlocksData = [] } = useAvailabilityBlocks(calendarDate);
     
     const isLoading = resourcesLoading || baysLoading || requestsLoading || approvedLoading;
@@ -336,6 +344,22 @@ const SimulatorTab: React.FC = () => {
         queryClient.invalidateQueries({ queryKey: bookingsKeys.all });
         queryClient.invalidateQueries({ queryKey: simulatorKeys.all });
         setLastRefresh(new Date());
+    }, [queryClient]);
+
+    const prefetchedDates = useRef(new Set<string>());
+    const prefetchDate = useCallback((date: string) => {
+        if (prefetchedDates.current.has(date)) return;
+        prefetchedDates.current.add(date);
+        queryClient.prefetchQuery({
+            queryKey: simulatorKeys.approvedBookings(date, date),
+            queryFn: () => fetchWithCredentials<BookingRequest[]>(`/api/approved-bookings?start_date=${date}&end_date=${date}`),
+            staleTime: 1000 * 30,
+        });
+        queryClient.prefetchQuery({
+            queryKey: bookingsKeys.availability(date),
+            queryFn: () => fetchWithCredentials<AvailabilityBlock[]>(`/api/availability-blocks?date=${date}`),
+            staleTime: 1000 * 30,
+        });
     }, [queryClient]);
 
     useEffect(() => {
@@ -760,7 +784,7 @@ const SimulatorTab: React.FC = () => {
             return d.toISOString().split('T')[0];
         })();
         
-        return approvedBookings
+        return scheduledRangeData
             .filter(b => {
                 const isScheduledStatus = b.status === 'approved' || b.status === 'confirmed';
                 const isCheckedInToday = b.status === 'attended' && b.request_date === today;
@@ -777,7 +801,7 @@ const SimulatorTab: React.FC = () => {
                 }
                 return a.start_time.localeCompare(b.start_time);
             });
-    }, [approvedBookings, scheduledFilter]);
+    }, [scheduledRangeData, scheduledFilter]);
 
     const isBookingUnmatched = useCallback((booking: BookingRequest): boolean => {
         const email = (booking.user_email || '').toLowerCase();
@@ -1068,6 +1092,7 @@ const SimulatorTab: React.FC = () => {
                         guestFeeDollars={guestFeeDollars}
                         overageRatePerBlockDollars={overageRatePerBlockDollars}
                         tierMinutes={tierMinutes}
+                        prefetchDate={prefetchDate}
                     />
                 </div>
             )}
