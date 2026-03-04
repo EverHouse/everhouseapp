@@ -1875,6 +1875,11 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
           updateFields.isUnmatched = false;
           changes.push(`member: linked ${matchedEmail}`);
           
+          if (existing.status === 'pending' && normalizedStatus === 'approved') {
+            updateFields.status = 'approved';
+            changes.push('status: pending -> approved (member linked, confirmed on Trackman)');
+          }
+          
           // Email learning: if original email differs from matched member email, learn the association
           const originalEmail = row.userEmail?.toLowerCase().trim();
           if (originalEmail && 
@@ -3013,7 +3018,7 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
   try {
     const autoApproved = await db.execute(sql`UPDATE booking_requests 
        SET status = 'approved', updated_at = NOW(), staff_notes = COALESCE(staff_notes, '') || ' [Auto-approved by import: member linked]'
-       WHERE origin = 'trackman_import'
+       WHERE origin IN ('trackman_import', 'trackman_webhook')
        AND status = 'pending'
        AND user_email IS NOT NULL 
        AND user_email != ''

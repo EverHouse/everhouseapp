@@ -647,12 +647,11 @@ export async function createUnmatchedBookingRequest(
           }
         });
         
-        bookingStatus = 'pending';
         const conflictLabel = availability.conflictType === 'session'
           ? 'existing booking session'
           : (availability.conflictTitle || 'schedule conflict');
-        conflictNote = `[Pending: Conflicts with ${conflictLabel}]`;
-        logger.info('[Trackman Webhook] Setting to pending due to conflict — Trackman booking is valid, needs staff review', {
+        conflictNote = `[Conflict: overlaps with ${conflictLabel} — Trackman booking is authoritative]`;
+        logger.info('[Trackman Webhook] Conflict detected but keeping approved — Trackman is source of truth', {
           extra: { trackmanBookingId, conflictType: availability.conflictType, conflictTitle: availability.conflictTitle }
         });
       }
