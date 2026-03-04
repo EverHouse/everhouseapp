@@ -391,7 +391,7 @@ router.put('/api/admin/trackman/unmatched/:id/resolve', isStaffOrAdmin, async (r
     const { id } = req.params;
     const numericId = parseInt(id as string);
     if (isNaN(numericId)) return res.status(400).json({ error: 'Invalid booking ID' });
-    const { email: rawEmail, memberEmail: rawMemberEmail, rememberEmail } = req.body;
+    const { email: rawEmail, memberEmail: rawMemberEmail, rememberEmail, additional_players } = req.body;
     const email = rawEmail?.trim()?.toLowerCase();
     const memberEmail = rawMemberEmail?.trim()?.toLowerCase();
     const resolveEmail = memberEmail || email;
@@ -483,6 +483,22 @@ router.put('/api/admin/trackman/unmatched/:id/resolve', isStaffOrAdmin, async (r
     }
     
     const memberFullName = `${member.first_name} ${member.last_name}`.trim();
+    
+    if (Array.isArray(additional_players) && additional_players.length > 0) {
+      const rpEntries = additional_players.map((p: { type: string; email?: string; name?: string; userId?: string; guest_name?: string }) => {
+        if (p.type === 'guest_placeholder') {
+          return { type: 'guest', name: p.guest_name || p.name || 'Guest' };
+        }
+        return { type: p.type === 'visitor' ? 'visitor' : 'member', email: p.email, name: p.name, userId: p.userId };
+      });
+      await db.execute(sql`UPDATE booking_requests 
+         SET request_participants = ${JSON.stringify(rpEntries)}::jsonb,
+             updated_at = NOW()
+         WHERE id = ${booking.id}`);
+      logger.info('[Trackman Resolve] Saved additional players to request_participants', {
+        extra: { bookingId: booking.id, playerCount: rpEntries.length }
+      });
+    }
     
     if (booking.session_id) {
       const sessionExists = await db.execute(sql`SELECT id FROM booking_sessions WHERE id = ${booking.session_id} LIMIT 1`);

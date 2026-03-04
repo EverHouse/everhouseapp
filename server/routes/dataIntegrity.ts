@@ -1041,7 +1041,7 @@ router.post('/api/data-integrity/fix/delete-empty-session', isAdmin, async (req:
 router.post('/api/data-integrity/fix/assign-session-owner', isAdmin, async (req: Request, res) => {
   const client = await pool.connect();
   try {
-    const { sessionId, ownerEmail } = req.body;
+    const { sessionId, ownerEmail, additional_players } = req.body;
     if (!sessionId || !ownerEmail) return res.status(400).json({ success: false, message: 'sessionId and ownerEmail are required' });
 
     const session = await client.query(
@@ -1088,6 +1088,50 @@ router.post('/api/data-integrity/fix/assign-session-owner', isAdmin, async (req:
         `UPDATE booking_requests SET user_id = $1, user_email = $2, user_name = $3 WHERE id = $4 AND (user_email IS NULL OR user_email = '')`,
         [member.id, member.email, [member.first_name, member.last_name].filter(Boolean).join(' '), bookingId]
       );
+    }
+
+    if (Array.isArray(additional_players) && additional_players.length > 0) {
+      const rpEntries = additional_players.map((p: { type: string; email?: string; name?: string; userId?: string; guest_name?: string }) => {
+        if (p.type === 'guest_placeholder') {
+          return { type: 'guest', name: p.guest_name || p.name || 'Guest' };
+        }
+        return { type: p.type === 'visitor' ? 'visitor' : 'member', email: p.email, name: p.name, userId: p.userId };
+      });
+
+      for (const rp of rpEntries) {
+        if (rp.type === 'guest') {
+          await client.query(
+            `INSERT INTO booking_participants (session_id, display_name, participant_type, is_owner, created_at)
+             VALUES ($1, $2, 'guest', false, NOW())`,
+            [sessionId, rp.name || 'Guest']
+          );
+        } else if (rp.email) {
+          const playerUser = await client.query(
+            `SELECT id, email, first_name, last_name FROM users WHERE LOWER(email) = LOWER($1)`,
+            [rp.email]
+          );
+          if (playerUser.rows.length > 0) {
+            const pu = playerUser.rows[0];
+            await client.query(
+              `INSERT INTO booking_participants (session_id, user_id, user_email, display_name, participant_type, is_owner, created_at)
+               VALUES ($1, $2, $3, $4, 'member', false, NOW())
+               ON CONFLICT DO NOTHING`,
+              [sessionId, pu.id, pu.email, [pu.first_name, pu.last_name].filter(Boolean).join(' ') || pu.email]
+            );
+          }
+        }
+      }
+
+      if (bookingId) {
+        await client.query(
+          `UPDATE booking_requests SET request_participants = $1::jsonb, updated_at = NOW() WHERE id = $2`,
+          [JSON.stringify(rpEntries), bookingId]
+        );
+      }
+
+      logger.info('[DataIntegrity] Saved additional players for session owner assignment', {
+        extra: { sessionId, bookingId, playerCount: rpEntries.length }
+      });
     }
 
     await client.query('COMMIT');

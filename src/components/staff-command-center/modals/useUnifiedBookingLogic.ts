@@ -1112,6 +1112,9 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
           credentials: 'include',
           body: JSON.stringify({
             memberEmail: owner.email,
+            memberName: owner.name,
+            memberId: owner.id,
+            additional_players: additionalPlayers,
             rememberEmail: true
           })
         });
@@ -1189,7 +1192,8 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
           credentials: 'include',
           body: JSON.stringify({
             sessionId: sessionId,
-            ownerEmail: owner.email
+            ownerEmail: owner.email,
+            additional_players: additionalPlayers
           })
         });
 
