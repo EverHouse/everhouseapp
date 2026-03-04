@@ -2,7 +2,7 @@ import { logger } from '../core/logger';
 import { Router, Request, Response } from 'express';
 import * as crypto from 'crypto';
 import { isProduction } from '../core/db';
-import { getHubSpotClient } from '../core/integrations';
+import { getHubSpotClient, getHubSpotClientWithFallback } from '../core/integrations';
 import { db } from '../db';
 import { formSubmissions, users } from '../../shared/schema';
 import { and, eq, isNotNull, sql } from 'drizzle-orm';
@@ -2191,20 +2191,20 @@ function checkRecentEngagement(
   return false;
 }
 
-async function ensureNonMarketingProperty(hubspot: any): Promise<boolean> {
+async function ensureNonMarketingProperty(hubspot: any): Promise<'ready' | 'skip' | 'failed'> {
   const PROP_NAME = 'remove_from_marketing';
   try {
     await retryableHubSpotRequest(() =>
       hubspot.crm.properties.coreApi.getByName('contacts', PROP_NAME)
     );
-    return true;
+    return 'ready';
   } catch (getErr: unknown) {
     const status = (getErr as any)?.code ?? (getErr as any)?.response?.status ?? (getErr as any)?.statusCode;
     if (status && status !== 404) {
-      logger.error('[HubSpot MarketingAudit] Failed to check custom property (non-404 error)', {
+      logger.warn('[HubSpot MarketingAudit] Could not read property (non-404), will attempt create', {
         error: getErr instanceof Error ? getErr : new Error(String(getErr)),
+        status,
       });
-      return false;
     }
     try {
       await retryableHubSpotRequest(() =>
@@ -2222,12 +2222,18 @@ async function ensureNonMarketingProperty(hubspot: any): Promise<boolean> {
         })
       );
       logger.info('[HubSpot MarketingAudit] Created remove_from_marketing custom property');
-      return true;
+      return 'ready';
     } catch (createErr: unknown) {
-      logger.error('[HubSpot MarketingAudit] Failed to create custom property', {
+      const createStatus = (createErr as any)?.code ?? (createErr as any)?.response?.status ?? (createErr as any)?.statusCode;
+      if (createStatus === 409) {
+        logger.info('[HubSpot MarketingAudit] Property already exists (409 conflict)');
+        return 'ready';
+      }
+      logger.warn('[HubSpot MarketingAudit] Could not create property, will attempt batch update anyway', {
         error: createErr instanceof Error ? createErr : new Error(String(createErr)),
+        createStatus,
       });
-      return false;
+      return 'skip';
     }
   }
 }
@@ -2243,12 +2249,13 @@ router.post('/api/admin/hubspot/remove-marketing-contacts', isAdmin, async (req:
       return res.status(400).json({ error: 'Maximum 500 contacts per batch' });
     }
 
-    const hubspot = await getHubSpotClient();
+    const { client: hubspot, source } = await getHubSpotClientWithFallback();
+    logger.info(`[HubSpot MarketingAudit] Using ${source} client for marketing contact removal`);
 
-    const propReady = await ensureNonMarketingProperty(hubspot);
-    if (!propReady) {
+    const propStatus = await ensureNonMarketingProperty(hubspot);
+    if (propStatus === 'failed') {
       return res.status(500).json({
-        error: 'Could not create the remove_from_marketing property in HubSpot. Check API permissions.',
+        error: 'Could not verify the remove_from_marketing property in HubSpot. Check API permissions.',
       });
     }
 
@@ -2271,7 +2278,16 @@ router.post('/api/admin/hubspot/remove-marketing-contacts', isAdmin, async (req:
         succeededIds.push(...batch);
       } catch (batchError: unknown) {
         failedIds.push(...batch);
-        errors.push(`Batch starting at index ${i}: ${getErrorMessage(batchError)}`);
+        const errMsg = getErrorMessage(batchError);
+        errors.push(`Batch starting at index ${i}: ${errMsg}`);
+        if (errMsg.includes('remove_from_marketing') && errMsg.includes('not exist')) {
+          logger.error('[HubSpot MarketingAudit] Property does not exist. Please create it manually in HubSpot.', {
+            error: batchError instanceof Error ? batchError : new Error(String(batchError)),
+          });
+          return res.status(500).json({
+            error: 'The remove_from_marketing property does not exist in HubSpot and could not be auto-created. Please create a checkbox property named "remove_from_marketing" in HubSpot contact settings, then try again.',
+          });
+        }
       }
     }
 
@@ -2281,6 +2297,7 @@ router.post('/api/admin/hubspot/remove-marketing-contacts', isAdmin, async (req:
         flaggedCount: succeededIds.length,
         failedCount: failedIds.length,
         performedBy: sessionUser?.email || 'unknown',
+        clientSource: source,
       },
     });
 
