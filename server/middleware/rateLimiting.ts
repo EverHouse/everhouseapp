@@ -84,7 +84,7 @@ export const authRateLimiterByEmail = rateLimit({
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => `auth-email:${(req.body?.email || 'unknown').toLowerCase()}`,
+  keyGenerator: (req) => `auth-email:${String(req.body?.email || 'unknown').toLowerCase()}`,
   validate: false,
   handler: (req: Request, res: Response) => {
     logger.warn(`[RateLimit] Auth email limit exceeded for ${req.body?.email || 'unknown'}`);

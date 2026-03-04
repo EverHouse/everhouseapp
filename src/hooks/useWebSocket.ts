@@ -31,6 +31,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isConnectingRef = useRef(false);
+  const intentionalCloseRef = useRef(false);
 
   const emailToUse = effectiveEmail || user?.email;
   const isViewAsMode = effectiveEmail && effectiveEmail !== user?.email;
@@ -56,6 +57,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
     }
 
     isConnectingRef.current = true;
+    intentionalCloseRef.current = false;
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${protocol}//${window.location.host}/ws`;
@@ -176,10 +178,13 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
 
       ws.onclose = () => {
         isConnectingRef.current = false;
-        wsRef.current = null;
         window.__wsConnected = false;
         
-        if (emailToUse) {
+        if (wsRef.current === ws) {
+          wsRef.current = null;
+        }
+        
+        if (emailToUse && !intentionalCloseRef.current && wsRef.current === null) {
           const jitter = 2000 + Math.floor(Math.random() * 3000);
           reconnectTimeoutRef.current = setTimeout(() => {
             connect();
@@ -207,6 +212,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
         clearTimeout(reconnectTimeoutRef.current);
       }
       if (wsRef.current) {
+        intentionalCloseRef.current = true;
         wsRef.current.close();
         wsRef.current = null;
       }

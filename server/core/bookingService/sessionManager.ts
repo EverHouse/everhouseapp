@@ -293,7 +293,7 @@ export async function ensureSessionForBooking(params: {
 
         const existingNotes = existing[0]?.staffNotes || '';
         const shortError = errorMsg.length > 80 ? errorMsg.substring(0, 80) + '...' : errorMsg;
-        const failureNote = `[SESSION_CREATION_FAILED] Auto session failed (${getTodayPacific()}). Please create a session manually.`;
+        const failureNote = `[SESSION_CREATION_FAILED] Auto session failed (${getTodayPacific()}): ${shortError}. Please create a session manually.`;
         const updatedNotes = existingNotes ? `${existingNotes}\n${failureNote}` : failureNote;
 
         await db
