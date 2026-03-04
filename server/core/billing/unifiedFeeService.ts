@@ -577,7 +577,7 @@ export async function computeFeeBreakdown(params: FeeComputeParams): Promise<Fee
              SELECT LOWER(br.user_email) as identifier, 
                     COALESCE(SUM(
                       FLOOR(br.duration_minutes::float / GREATEST(1, COALESCE(br.declared_player_count, 1)))
-                      * GREATEST(1, COALESCE(br.declared_player_count, 1) - COALESCE(mc.member_count, 0))
+                      * GREATEST(1, COALESCE(br.declared_player_count, 1) - COALESCE(mc.member_count, GREATEST(0, COALESCE(br.declared_player_count, 1) - 1)))
                     ), 0) as mins
              FROM booking_requests br
              LEFT JOIN LATERAL (
@@ -585,7 +585,7 @@ export async function computeFeeBreakdown(params: FeeComputeParams): Promise<Fee
                FROM booking_participants bp
                WHERE bp.session_id = br.session_id
                AND bp.participant_type = 'member'
-             ) mc ON true
+             ) mc ON br.session_id IS NOT NULL
              WHERE LOWER(br.user_email) = ANY(${identifiersLiteral}::text[])
                AND br.request_date = ${sessionDate}
                AND br.status IN ('approved', 'confirmed', 'attended')

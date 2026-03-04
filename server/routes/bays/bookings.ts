@@ -1483,19 +1483,16 @@ async function calculateFeeEstimate(params: {
     { email: ownerEmail, displayName: 'Owner', participantType: 'owner' }
   ];
   
-  // Add additional members (other club members in the booking)
-  // This prevents them from being counted as empty slots (which would charge extra guest fees)
   const memberEmails = params.memberEmails || [];
   const emailToUserId = params.memberEmailToUserId || new Map<string, string>();
-  const inferredMemberCount = Math.max(0, playerCount - guestCount - 1);
-  const memberCount = memberEmails.length > 0 ? memberEmails.length : inferredMemberCount;
-  for (let i = 0; i < memberCount; i++) {
-    const memberEmail = memberEmails[i] || undefined;
-    const memberUserId = memberEmail ? emailToUserId.get(memberEmail) : undefined;
+  for (let i = 0; i < memberEmails.length; i++) {
+    const memberEmail = memberEmails[i];
+    if (!memberEmail) continue;
+    const memberUserId = emailToUserId.get(memberEmail);
     participants.push({ 
       userId: memberUserId,
       email: memberEmail, 
-      displayName: memberEmail ? `Member ${i + 1}` : `Estimated Member ${i + 1}`, 
+      displayName: `Member ${i + 1}`, 
       participantType: 'member' 
     });
   }
