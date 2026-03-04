@@ -362,7 +362,7 @@ When Trackman sends a Booking Update webhook with changes (bay, time, date), the
 
 **Key Implementation Files:**
 - `server/core/bookingService/tierRules.ts` — Tier validation rules, daily minute limits, Social tier guest restrictions, and `TierValidationResult` interface. See `references/server-flow.md#tier-validation-rules` for detailed documentation.
-- `server/core/bookingService/sessionManager.ts` — Session creation, participant linking, usage ledger recording, and guest pass deduction.
+- `server/core/bookingService/sessionManager.ts` — Session creation, participant linking, usage ledger recording, and guest pass deduction. `ensureSessionForBooking` uses `pg_advisory_xact_lock` when receiving an external transactional client, `pg_advisory_lock` with explicit unlock when managing its own client (v8.69.0). Session creation failure notes now include the truncated error message for staff observability (v8.69.0).
 - `server/core/bookingService/bookingStateService.ts` — `BookingStateService` class: centralized cancellation (member and Trackman), `completePendingCancellation()`, side-effects manifest for atomic cleanup (Stripe refunds, balance restoration, invoice void, calendar deletion, guest pass release, notifications).
 - `server/core/bookingService/conflictDetection.ts` — Booking conflict detection (owner and participant conflicts).
 - `server/core/bookingValidation.ts` — Centralized booking conflict detection (`checkBookingConflict`). Used by booking creation for consistent conflict validation with advisory locks.

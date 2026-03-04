@@ -119,7 +119,7 @@ All format the dollar amount as `$X.XX` and set appropriate `relatedType`/`relat
 - Session revalidation: every 5 minutes, all connections are re-verified against the database. Expired or revoked sessions are terminated automatically. Uses a dedicated connection pool (`max: 20`) to handle reconnection storms during deploys.
 - Heartbeat: every 30s, ping all connections. Terminate unresponsive ones. The heartbeat handler revalidates sessions when the 5-minute interval has elapsed (tracked via `lastSessionCheck` per connection), using the same `debounceKey` pattern that includes the action type to prevent cross-action debounce collisions.
 - Origin validation: allow Replit domains, localhost, production domains, and `ALLOWED_ORIGINS` env var.
-- Frontend reconnection: member WebSocket hook (`useWebSocket.ts`) uses randomized jitter (2-5s delay) for reconnection to prevent thundering herd. Staff WebSocket hook (`useStaffWebSocket.ts`) uses exponential backoff with `Math.pow(2, attempt)` scaling up to 30s max delay.
+- Frontend reconnection: member WebSocket hook (`useWebSocket.ts`) uses randomized jitter (2-5s delay) for reconnection to prevent thundering herd. Uses `intentionalCloseRef` to suppress reconnection on intentional close (component unmount), and a stale-socket guard (`wsRef.current === ws`) in `onclose` to prevent zombie reconnection loops during rapid email/view-as switches (v8.69.0). Staff WebSocket hook (`useStaffWebSocket.ts`) uses exponential backoff with `Math.pow(2, attempt)` scaling up to 30s max delay.
 
 ### Broadcast Functions
 
