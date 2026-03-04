@@ -236,8 +236,10 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
         const map = new Map<string, BookingRequest>();
         for (const b of approvedBookings) {
             if (b.request_date !== calendarDate || !b.resource_id) continue;
+            if (!b.start_time || !b.end_time) continue;
             const [bh, bm] = b.start_time.split(':').map(Number);
             const [eh, em] = b.end_time.split(':').map(Number);
+            if (isNaN(bh) || isNaN(bm) || isNaN(eh) || isNaN(em)) continue;
             const bookStart = bh * 60 + bm;
             const bookEnd = eh * 60 + em;
             for (let t = bookStart; t < bookEnd; t += 15) {
@@ -251,8 +253,10 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
         const map = new Map<string, BookingRequest>();
         for (const pr of pendingRequests) {
             if (pr.request_date !== calendarDate || !pr.resource_id) continue;
+            if (!pr.start_time || !pr.end_time) continue;
             const [prh, prm] = pr.start_time.split(':').map(Number);
             const [preh, prem] = pr.end_time.split(':').map(Number);
+            if (isNaN(prh) || isNaN(prm) || isNaN(preh) || isNaN(prem)) continue;
             const prStart = prh * 60 + prm;
             const prEnd = preh * 60 + prem;
             for (let t = prStart; t < prEnd; t += 15) {

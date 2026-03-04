@@ -205,10 +205,11 @@ const MemberUpdates: React.FC = () => {
 
   const markNotificationRead = async (notificationId: number) => {
     try {
-      await fetch(`/api/notifications/${notificationId}/read`, { 
-        method: 'POST',
+      const res = await fetch(`/api/notifications/${notificationId}/read`, { 
+        method: 'PUT',
         credentials: 'include' 
       });
+      if (!res.ok) return;
       setNotifications(prev => prev.map(n => n.id === notificationId ? { ...n, read: true } : n));
       setUnreadCount(prev => Math.max(0, prev - 1));
       useNotificationStore.getState().markAsRead(notificationId);
@@ -221,11 +222,12 @@ const MemberUpdates: React.FC = () => {
   const markAllRead = async () => {
     if (!user?.email) return;
     try {
-      await fetch(`/api/notifications/mark-all-read`, { 
+      const res = await fetch(`/api/notifications/mark-all-read`, { 
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include' 
       });
+      if (!res.ok) return;
       setNotifications(prev => prev.map(n => ({ ...n, read: true })));
       setUnreadCount(0);
       useNotificationStore.getState().markAllAsRead();
