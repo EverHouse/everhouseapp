@@ -369,7 +369,7 @@ export async function tryAutoApproveBooking(
   slotDate: string,
   startTime: string,
   trackmanBookingId: string
-): Promise<{ matched: boolean; bookingId?: number; resourceId?: number; sessionId?: number; sessionFailed?: boolean }> {
+): Promise<{ matched: boolean; bookingId?: number; resourceId?: number; sessionId?: number }> {
   let matchedBookingId: number | undefined;
   try {
     const result = await db.execute(sql`SELECT br.id, br.user_email, br.user_name, br.staff_notes, br.resource_id, 
@@ -402,60 +402,49 @@ export async function tryAutoApproveBooking(
     
     const updatedNotes = (pendingBooking.staff_notes || '') + ' [Auto-approved via Trackman webhook]';
     
-    const txResult = await db.transaction(async (tx) => {
-      const updateResult = await tx.execute(sql`UPDATE booking_requests 
-         SET status = 'approved', 
-             trackman_booking_id = ${trackmanBookingId}, 
-             staff_notes = ${updatedNotes},
-             reviewed_by = 'trackman_webhook',
-             reviewed_at = NOW(),
-             updated_at = NOW()
-         WHERE id = ${bookingId} AND trackman_booking_id IS NULL
-         RETURNING id`);
-      
-      const updateRows = updateResult.rows as unknown as IdRow[];
-      if (updateRows.length === 0) {
-        logger.warn('[Trackman Webhook] Pending booking was already linked by another process', {
-          extra: { bookingId, trackmanBookingId, email: customerEmail, date: slotDate, time: startTime }
-        });
-        return { matched: false as const };
-      }
-      
-      let createdSessionId: number | undefined;
-      
-      if (!pendingBooking.session_id && resourceId) {
-        const sessionResult = await ensureSessionForBooking({
-          bookingId,
-          resourceId,
-          sessionDate: slotDate,
-          startTime: String(pendingBooking.start_time),
-          endTime: String(pendingBooking.end_time),
-          ownerEmail: String(pendingBooking.user_email),
-          ownerName: pendingBooking.user_name ? String(pendingBooking.user_name) : undefined,
-          ownerUserId: pendingBooking.user_id ? String(pendingBooking.user_id) : undefined,
-          trackmanBookingId,
-          source: 'trackman_webhook',
-          createdBy: 'trackman_webhook'
-        });
-
-        if (sessionResult.sessionId) {
-          createdSessionId = sessionResult.sessionId;
-        } else {
-          logger.warn('[Trackman Webhook] Session creation failed for matched pending booking, transaction will rollback', {
-            extra: { bookingId, trackmanBookingId, error: sessionResult.error }
-          });
-          throw new Error(`Session creation failed: ${sessionResult.error || 'unknown'}`);
-        }
-      }
-      
-      return { matched: true as const, bookingId, resourceId, sessionId: createdSessionId };
-    });
+    const updateResult = await db.execute(sql`UPDATE booking_requests 
+       SET status = 'approved', 
+           trackman_booking_id = ${trackmanBookingId}, 
+           staff_notes = ${updatedNotes},
+           reviewed_by = 'trackman_webhook',
+           reviewed_at = NOW(),
+           updated_at = NOW()
+       WHERE id = ${bookingId} AND trackman_booking_id IS NULL
+       RETURNING id`);
     
-    if (!txResult.matched) {
+    const updateRows = updateResult.rows as unknown as IdRow[];
+    if (updateRows.length === 0) {
+      logger.warn('[Trackman Webhook] Pending booking was already linked by another process', {
+        extra: { bookingId, trackmanBookingId, email: customerEmail, date: slotDate, time: startTime }
+      });
       return { matched: false };
     }
     
-    const createdSessionId = 'sessionId' in txResult ? txResult.sessionId : undefined;
+    let createdSessionId: number | undefined;
+    
+    if (!pendingBooking.session_id && resourceId) {
+      const sessionResult = await ensureSessionForBooking({
+        bookingId,
+        resourceId,
+        sessionDate: slotDate,
+        startTime: String(pendingBooking.start_time),
+        endTime: String(pendingBooking.end_time),
+        ownerEmail: String(pendingBooking.user_email),
+        ownerName: pendingBooking.user_name ? String(pendingBooking.user_name) : undefined,
+        ownerUserId: pendingBooking.user_id ? String(pendingBooking.user_id) : undefined,
+        trackmanBookingId,
+        source: 'trackman_webhook',
+        createdBy: 'trackman_webhook'
+      });
+
+      if (sessionResult.sessionId) {
+        createdSessionId = sessionResult.sessionId;
+      } else {
+        logger.warn('[Trackman Webhook] Session creation failed for auto-approved booking — approval preserved, session will be created later', {
+          extra: { bookingId, trackmanBookingId, error: sessionResult.error }
+        });
+      }
+    }
     
     logger.info('[Trackman Webhook] Auto-approved pending booking', {
       extra: { bookingId, trackmanBookingId, email: customerEmail, date: slotDate, time: startTime, sessionId: createdSessionId }
@@ -507,13 +496,6 @@ export async function tryAutoApproveBooking(
     
     return { matched: true, bookingId, resourceId, sessionId: createdSessionId };
   } catch (e: unknown) {
-    const errMsg = e instanceof Error ? e.message : String(e);
-    if (errMsg.startsWith('Session creation failed:')) {
-      logger.warn('[Trackman Webhook] Auto-approve transaction rolled back due to session creation failure', {
-        extra: { trackmanBookingId, email: customerEmail, date: slotDate, time: startTime, error: errMsg }
-      });
-      return { matched: true, bookingId: matchedBookingId, sessionFailed: true };
-    }
     logger.error('[Trackman Webhook] Failed to auto-approve booking', { error: e as Error });
     return { matched: false };
   }
