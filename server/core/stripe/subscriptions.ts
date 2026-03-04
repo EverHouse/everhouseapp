@@ -22,6 +22,7 @@ export interface SubscriptionResult {
   currentPeriodEnd: Date;
   clientSecret?: string;
   amountDue?: number;
+  autoCharged?: boolean;
 }
 
 export async function createSubscription(params: CreateSubscriptionParams): Promise<{
@@ -33,10 +34,17 @@ export async function createSubscription(params: CreateSubscriptionParams): Prom
     const stripe = await getStripeClient();
     const { customerId, priceId, metadata = {}, couponId } = params;
     
+    const paymentMethods = await listCustomerPaymentMethods(customerId);
+    const defaultPaymentMethod = paymentMethods.length > 0 ? paymentMethods[0] : null;
+    const hasCardOnFile = !!defaultPaymentMethod;
+
+    logger.info(`[Stripe Subscriptions] Customer ${customerId} has ${paymentMethods.length} payment method(s), using ${hasCardOnFile ? 'auto-charge' : 'incomplete'} behavior`);
+
     const subscriptionParams: Stripe.SubscriptionCreateParams = {
       customer: customerId,
       items: [{ price: priceId }],
-      payment_behavior: 'default_incomplete',
+      payment_behavior: hasCardOnFile ? 'allow_incomplete' : 'default_incomplete',
+      ...(hasCardOnFile && defaultPaymentMethod ? { default_payment_method: defaultPaymentMethod.id } : {}),
       payment_settings: {
         save_default_payment_method: 'on_subscription',
         payment_method_types: ['card'],
@@ -125,6 +133,8 @@ export async function createSubscription(params: CreateSubscriptionParams): Prom
     
     logger.info(`[Stripe Subscriptions] Final: clientSecret=${!!clientSecret}, amountDue=${invoiceAmountDue}`);
     
+    const autoCharged = hasCardOnFile && invoiceAmountDue > 0 && subscription.status === 'active';
+
     return {
       success: true,
       subscription: {
@@ -133,6 +143,7 @@ export async function createSubscription(params: CreateSubscriptionParams): Prom
         currentPeriodEnd: new Date((subscription.items.data[0]?.current_period_end || 0) * 1000),
         clientSecret,
         amountDue: invoiceAmountDue,
+        autoCharged,
       },
     };
   } catch (error: unknown) {

@@ -366,11 +366,22 @@ router.post('/api/stripe/subscriptions/create-for-member', isStaffOrAdmin, subsc
       logger.error('[Stripe] Failed to send membership activation notification', { extra: { notifyError } });
     }
     
+    const autoCharged = stripeSubscription?.autoCharged === true;
+    let statusMessage: string;
+    if (autoCharged) {
+      statusMessage = `Successfully created ${tierName} subscription for ${memberName} — payment charged to card on file`;
+    } else if (memberStatus === 'active') {
+      statusMessage = `Successfully created ${tierName} subscription for ${memberName}`;
+    } else {
+      statusMessage = `Created ${tierName} subscription for ${memberName} — pending payment activation`;
+    }
+    
     res.json({
       success: true,
       subscription: subscriptionResult.subscription,
       customerId,
-      message: `Successfully created ${tierName} subscription for ${memberName}`
+      memberStatus,
+      message: statusMessage
     });
   } catch (error: unknown) {
     logger.error('[Stripe] Error creating subscription for member', { error: error instanceof Error ? error : new Error(String(error)) });
