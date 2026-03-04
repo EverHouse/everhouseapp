@@ -128,31 +128,31 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
         const result = await response.json();
         if (response.ok && result.success) {
           if (result.hasBooking && result.bookingId) {
-            const booking = data.todaysBookings.find(b => b.id === result.bookingId);
+            const booking = data.todaysBookings.find(b => Number(b.id) === Number(result.bookingId));
+            pendingQrBookingRef.current = {
+              memberName: result.memberName,
+              pinnedNotes: result.pinnedNotes || [],
+              tier: result.tier,
+              membershipStatus: result.membershipStatus,
+              bookingDetails: result.bookingDetails || null
+            };
             if (booking) {
-              pendingQrBookingRef.current = {
-                memberName: result.memberName,
-                pinnedNotes: result.pinnedNotes || [],
-                tier: result.tier,
-                membershipStatus: result.membershipStatus,
-                bookingDetails: result.bookingDetails || null
-              };
               handleCheckIn(booking);
               showToast(`Checking in ${result.memberName} for booking...`, 'info');
             } else {
-              window.dispatchEvent(new CustomEvent('walkin-checkin', {
-                detail: {
-                  data: {
-                    memberName: result.memberName,
-                    pinnedNotes: result.pinnedNotes || [],
-                    tier: result.tier,
-                    membershipStatus: result.membershipStatus,
-                    bookingDetails: result.bookingDetails || null
-                  }
-                }
-              }));
-              refresh();
-              showToast(`Booking found but not in today's list — checked in as walk-in`, 'info');
+              const syntheticBooking: BookingRequest = {
+                id: result.bookingId,
+                user_email: result.memberEmail,
+                user_name: result.memberName,
+                status: 'approved',
+                bay_name: result.bookingDetails?.bayName || 'Bay',
+                start_time: result.bookingDetails?.startTime || '',
+                end_time: result.bookingDetails?.endTime || '',
+                resource_type: result.bookingDetails?.resourceType || 'golf_simulator',
+                request_date: new Date().toISOString().split('T')[0],
+              } as BookingRequest;
+              handleCheckIn(syntheticBooking);
+              showToast(`Checking in ${result.memberName} for booking...`, 'info');
             }
           } else {
             window.dispatchEvent(new CustomEvent('walkin-checkin', {
@@ -168,20 +168,31 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
             refresh();
           }
         } else if (result.alreadyCheckedIn && result.hasBooking && result.bookingId) {
-          const booking = data.todaysBookings.find(b => b.id === result.bookingId);
+          const booking = data.todaysBookings.find(b => Number(b.id) === Number(result.bookingId));
+          pendingQrBookingRef.current = {
+            memberName: result.memberName,
+            pinnedNotes: result.pinnedNotes || [],
+            tier: result.tier,
+            membershipStatus: result.membershipStatus,
+            bookingDetails: result.bookingDetails || null
+          };
           if (booking) {
-            pendingQrBookingRef.current = {
-              memberName: result.memberName,
-              pinnedNotes: result.pinnedNotes || [],
-              tier: result.tier,
-              membershipStatus: result.membershipStatus,
-              bookingDetails: result.bookingDetails || null
-            };
             handleCheckIn(booking);
             showToast(`Already checked in — now checking in for booking...`, 'info');
           } else {
-            playSound('tap');
-            showToast('Already checked in. Booking found but not loaded — try checking in from the bookings list.', 'info');
+            const syntheticBooking: BookingRequest = {
+              id: result.bookingId,
+              user_email: result.memberEmail,
+              user_name: result.memberName,
+              status: 'approved',
+              bay_name: result.bookingDetails?.bayName || 'Bay',
+              start_time: result.bookingDetails?.startTime || '',
+              end_time: result.bookingDetails?.endTime || '',
+              resource_type: result.bookingDetails?.resourceType || 'golf_simulator',
+              request_date: new Date().toISOString().split('T')[0],
+            } as BookingRequest;
+            handleCheckIn(syntheticBooking);
+            showToast(`Already checked in — now checking in for booking...`, 'info');
           }
         } else if (result.alreadyCheckedIn) {
           playSound('tap');
@@ -200,7 +211,7 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
     try {
       const scanData = JSON.parse(decodedText);
       if (scanData.bookingId) {
-        const booking = data.todaysBookings.find(b => b.id === scanData.bookingId);
+        const booking = data.todaysBookings.find(b => Number(b.id) === Number(scanData.bookingId));
         if (booking) {
           handleCheckIn(booking);
           showToast(`Checking in ${booking.user_name}...`, 'info');

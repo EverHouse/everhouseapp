@@ -1833,7 +1833,7 @@ router.post('/api/staff/qr-checkin', isStaffOrAdmin, async (req: Request, res: R
           LEFT JOIN resources r ON br.resource_id = r.id
           WHERE LOWER(br.user_email) = LOWER(${result.memberEmail})
             AND br.request_date = (CURRENT_DATE AT TIME ZONE 'America/Chicago')::date
-            AND br.status = 'approved'
+            AND br.status IN ('approved', 'confirmed')
           ORDER BY ABS(EXTRACT(EPOCH FROM (br.start_time::time - (CURRENT_TIME AT TIME ZONE 'America/Chicago')::time))) ASC
           LIMIT 1
         `);
