@@ -9,7 +9,7 @@ interface StripeInvoiceExpanded extends Stripe.Invoice {
 import { db } from '../db';
 import { sql } from 'drizzle-orm';
 import { getStripeClient } from '../core/stripe/client';
-import { isPlaceholderEmail, getOrCreateStripeCustomer } from '../core/stripe/customers';
+import { isPlaceholderEmail, getOrCreateStripeCustomer, listCustomerPaymentMethods } from '../core/stripe/customers';
 import { listCustomerSubscriptions } from '../core/stripe/subscriptions';
 import { getBillingGroupByMemberEmail } from '../core/stripe/groupBilling';
 import { listCustomerInvoices } from '../core/stripe/invoices';
@@ -114,21 +114,10 @@ router.get('/api/my/billing', requireAuth, async (req, res) => {
         }
         
         // Always fetch payment methods and balance for any member with Stripe customer
-        const paymentMethods = await stripe.paymentMethods.list({
-          customer: member.stripe_customer_id as string,
-          type: 'card',
-        });
-        billingInfo.paymentMethods = paymentMethods.data.map(pm => ({
-          id: pm.id,
-          brand: pm.card?.brand,
-          last4: pm.card?.last4,
-          expMonth: pm.card?.exp_month,
-          expYear: pm.card?.exp_year,
-        }));
+        billingInfo.paymentMethods = await listCustomerPaymentMethods(member.stripe_customer_id as string);
         
         const customer = await stripe.customers.retrieve(member.stripe_customer_id as string);
         if (customer && !customer.deleted) {
-          // Return balance in cents (UI divides by 100 for display)
           billingInfo.customerBalance = (customer as Stripe.Customer).balance || 0;
         }
       } catch (stripeError: unknown) {

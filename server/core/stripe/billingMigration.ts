@@ -1,7 +1,7 @@
 import { db } from '../../db';
 import { sql } from 'drizzle-orm';
 import { getStripeClient } from './client';
-import { getOrCreateStripeCustomer } from './customers';
+import { getOrCreateStripeCustomer, listCustomerPaymentMethods } from './customers';
 import { alertOnExternalServiceError } from '../errorAlerts';
 import { notifyMember, notifyAllStaff } from '../notificationService';
 import { logSystemAction } from '../auditLog';
@@ -79,13 +79,9 @@ export async function executePendingMigration(userId: string, email: string): Pr
       customerId = customerResult.customerId;
     }
 
-    const paymentMethods = await stripe.paymentMethods.list({
-      customer: customerId,
-      type: 'card',
-      limit: 1,
-    });
+    const paymentMethods = await listCustomerPaymentMethods(customerId);
 
-    if (paymentMethods.data.length === 0) {
+    if (paymentMethods.length === 0) {
       logger.error(`${prefix} No card on file for ${email} (customer: ${customerId})`);
       await db.execute(sql`
         UPDATE users SET migration_status = 'failed', updated_at = NOW()
@@ -99,7 +95,7 @@ export async function executePendingMigration(userId: string, email: string): Pr
       return { success: false, error: 'No card on file' };
     }
 
-    const defaultPaymentMethod = paymentMethods.data[0].id;
+    const defaultPaymentMethod = paymentMethods[0].id;
 
     const existingSubscriptions = await stripe.subscriptions.list({
       customer: customerId,
@@ -208,7 +204,7 @@ export async function executePendingMigration(userId: string, email: string): Pr
       `);
 
       const memberName = [user.first_name, user.last_name].filter(Boolean).join(' ') || email;
-      const cardLast4 = paymentMethods.data[0].card?.last4 || '****';
+      const cardLast4 = paymentMethods[0].last4 || '****';
 
       await notifyMember({
         userEmail: email,

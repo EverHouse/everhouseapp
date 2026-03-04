@@ -594,3 +594,60 @@ export async function syncAllCustomerMetadata(): Promise<{ synced: number; faile
   logger.info(`[Stripe] Bulk metadata sync complete: ${synced} synced, ${failed} failed`);
   return { synced, failed };
 }
+
+export interface NormalizedPaymentMethod {
+  id: string;
+  brand: string | undefined;
+  last4: string | undefined;
+  expMonth: number | undefined;
+  expYear: number | undefined;
+}
+
+export async function listCustomerPaymentMethods(customerId: string): Promise<NormalizedPaymentMethod[]> {
+  const stripe = await getStripeClient();
+  const results: NormalizedPaymentMethod[] = [];
+  const seenIds = new Set<string>();
+
+  const cardMethods = await stripe.paymentMethods.list({
+    customer: customerId,
+    type: 'card',
+  });
+  for (const pm of cardMethods.data) {
+    if (!seenIds.has(pm.id)) {
+      seenIds.add(pm.id);
+      results.push({
+        id: pm.id,
+        brand: pm.card?.brand ?? undefined,
+        last4: pm.card?.last4 ?? undefined,
+        expMonth: pm.card?.exp_month ?? undefined,
+        expYear: pm.card?.exp_year ?? undefined,
+      });
+    }
+  }
+
+  try {
+    const customer = await stripe.customers.retrieve(customerId, {
+      expand: ['invoice_settings.default_payment_method'],
+    });
+    if (!customer.deleted) {
+      const defaultPm = (customer as Stripe.Customer).invoice_settings?.default_payment_method;
+      if (defaultPm && typeof defaultPm === 'object') {
+        const pm = defaultPm as Stripe.PaymentMethod;
+        if (!seenIds.has(pm.id) && pm.card) {
+          seenIds.add(pm.id);
+          results.push({
+            id: pm.id,
+            brand: pm.card.brand ?? undefined,
+            last4: pm.card.last4 ?? undefined,
+            expMonth: pm.card.exp_month ?? undefined,
+            expYear: pm.card.exp_year ?? undefined,
+          });
+        }
+      }
+    }
+  } catch (err) {
+    logger.warn('[Stripe] Failed to check default payment method', { extra: { customerId, error: getErrorMessage(err) } });
+  }
+
+  return results;
+}

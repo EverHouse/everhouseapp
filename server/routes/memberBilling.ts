@@ -11,7 +11,7 @@ import { isStaffOrAdmin } from '../core/middleware';
 import { db } from '../db';
 import { sql } from 'drizzle-orm';
 import { getStripeClient, getStripeEnvironmentInfo } from '../core/stripe/client';
-import { isPlaceholderEmail } from '../core/stripe/customers';
+import { isPlaceholderEmail, listCustomerPaymentMethods } from '../core/stripe/customers';
 import { getBillingGroupByMemberEmail } from '../core/stripe/groupBilling';
 import { listCustomerInvoices, getCustomerPaymentHistory } from '../core/stripe/invoices';
 import { listCustomerSubscriptions } from '../core/stripe/subscriptions';
@@ -188,17 +188,7 @@ router.get('/api/member-billing/:email', isStaffOrAdmin, async (req, res) => {
           billingInfo.activeSubscription = activeSub || null;
         }
 
-        const paymentMethods = await stripe.paymentMethods.list({
-          customer: member.stripe_customer_id,
-          type: 'card',
-        });
-        billingInfo.paymentMethods = paymentMethods.data.map(pm => ({
-          id: pm.id,
-          brand: pm.card?.brand,
-          last4: pm.card?.last4,
-          expMonth: pm.card?.exp_month,
-          expYear: pm.card?.exp_year,
-        }));
+        billingInfo.paymentMethods = await listCustomerPaymentMethods(member.stripe_customer_id);
 
         const invoicesResult = await listCustomerInvoices(member.stripe_customer_id);
         if (invoicesResult.success) {
@@ -242,27 +232,18 @@ router.get('/api/member-billing/:email', isStaffOrAdmin, async (req, res) => {
             billingInfo.customerBalanceDollars = balanceCents / 100;
           }
           
-          // Get payment methods on file
+          // Get payment methods on file (includes Link-saved cards and default PM)
           const stripeEnv = await getStripeEnvironmentInfo();
-          const paymentMethods = await stripe.paymentMethods.list({
-            customer: member.stripe_customer_id,
-            type: 'card',
-          });
+          const normalizedPMs = await listCustomerPaymentMethods(member.stripe_customer_id);
           logger.info('[MemberBilling] Payment methods lookup for MindBody member', { 
             extra: { 
               email, 
               stripeCustomerId: member.stripe_customer_id,
               stripeMode: stripeEnv.mode,
-              paymentMethodCount: paymentMethods.data.length 
+              paymentMethodCount: normalizedPMs.length 
             } 
           });
-          billingInfo.paymentMethods = paymentMethods.data.map(pm => ({
-            id: pm.id,
-            brand: pm.card?.brand,
-            last4: pm.card?.last4,
-            expMonth: pm.card?.exp_month,
-            expYear: pm.card?.exp_year,
-          }));
+          billingInfo.paymentMethods = normalizedPMs;
         } catch (stripeError: unknown) {
           logger.error('[MemberBilling] Stripe lookup for MindBody member failed', { extra: { email, stripeCustomerId: member.stripe_customer_id, stripeError: getErrorMessage(stripeError) } });
         }
@@ -990,13 +971,9 @@ router.post('/api/member-billing/:email/migrate-to-stripe', isStaffOrAdmin, asyn
     }
 
     const stripe = await getStripeClient();
-    let paymentMethods: Stripe.PaymentMethod[] = [];
+    let paymentMethods: { id: string; brand?: string; last4?: string; expMonth?: number; expYear?: number }[] = [];
     if (member.stripe_customer_id) {
-      const pmResult = await stripe.paymentMethods.list({
-        customer: member.stripe_customer_id,
-        type: 'card',
-      });
-      paymentMethods = pmResult.data;
+      paymentMethods = await listCustomerPaymentMethods(member.stripe_customer_id);
     }
 
     if (paymentMethods.length === 0) {
@@ -1025,8 +1002,8 @@ router.post('/api/member-billing/:email/migrate-to-stripe', isStaffOrAdmin, asyn
       updated_at = NOW()
     WHERE LOWER(email) = ${email}`);
 
-    const card = paymentMethods[0]?.card;
-    const cardDisplay = card ? `${card.brand?.toUpperCase()} ••••${card.last4}` : 'card on file';
+    const firstPm = paymentMethods[0];
+    const cardDisplay = firstPm?.brand ? `${firstPm.brand.toUpperCase()} ••••${firstPm.last4}` : 'card on file';
     const dateDisplay = formatDatePacific(parsedDate);
     const memberName = [member.first_name, member.last_name].filter(Boolean).join(' ') || email;
 
@@ -1046,7 +1023,7 @@ router.post('/api/member-billing/:email/migrate-to-stripe', isStaffOrAdmin, asyn
     await logFromRequest(req, 'initiate_billing_migration', 'billing', member.id?.toString() || null, email, {
       billingStartDate: billingStartDate,
       tier: currentTier,
-      cardLast4: card?.last4 || 'unknown',
+      cardLast4: firstPm?.last4 || 'unknown',
     });
 
     logger.info('[MemberBilling] Migration initiated for member', { extra: { email, billingStartDate, tier: currentTier, requestedBy: staffEmail } });
@@ -1121,19 +1098,14 @@ router.get('/api/member-billing/:email/migration-status', isStaffOrAdmin, async 
     let hasCardOnFile = false;
     if (member.stripe_customer_id) {
       try {
-        const stripe = await getStripeClient();
-        const pmResult = await stripe.paymentMethods.list({
-          customer: member.stripe_customer_id,
-          type: 'card',
-        });
-        hasCardOnFile = pmResult.data.length > 0;
+        const pms = await listCustomerPaymentMethods(member.stripe_customer_id);
+        hasCardOnFile = pms.length > 0;
         if (hasCardOnFile) {
-          const card = pmResult.data[0].card;
           migrationInfo.cardOnFile = {
-            brand: card?.brand,
-            last4: card?.last4,
-            expMonth: card?.exp_month,
-            expYear: card?.exp_year,
+            brand: pms[0].brand,
+            last4: pms[0].last4,
+            expMonth: pms[0].expMonth,
+            expYear: pms[0].expYear,
           };
         }
       } catch (stripeErr: unknown) {
