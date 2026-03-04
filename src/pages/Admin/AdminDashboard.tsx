@@ -179,38 +179,38 @@ const AdminDashboard: React.FC = () => {
             </span>
           )}
         </button>
-        <div className="relative">
-          <button 
-            onClick={() => navigate('/profile')}
-            className="tactile-btn flex items-center justify-center min-w-[44px] min-h-[44px] hover:opacity-70 transition-opacity rounded-full"
-            aria-label="View profile"
-          >
+        <button 
+          onClick={() => navigate('/profile')}
+          className="tactile-btn flex items-center justify-center min-w-[44px] min-h-[44px] hover:opacity-70 transition-opacity rounded-full"
+          aria-label="View profile"
+        >
+          <div className="relative">
             <Avatar name={actualUser?.name} email={actualUser?.email} size="md" />
-          </button>
-          <span
-            className={`absolute bottom-0.5 right-0.5 w-2.5 h-2.5 rounded-full border-2 border-[#293515] transition-colors duration-200 ${
-              !navigator.onLine
-                ? 'bg-red-500'
-                : staffWsConnected
-                  ? 'bg-emerald-400'
-                  : 'bg-amber-400 animate-pulse'
-            }`}
-            aria-label={
-              !navigator.onLine
-                ? 'Offline'
-                : staffWsConnected
-                  ? 'All connections healthy'
-                  : 'Live updates degraded'
-            }
-            title={
-              !navigator.onLine
-                ? 'Offline'
-                : staffWsConnected
-                  ? 'All connections healthy'
-                  : 'Live updates degraded — reconnecting'
-            }
-          />
-        </div>
+            <span
+              className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-[#293515] transition-colors duration-200 ${
+                !navigator.onLine
+                  ? 'bg-red-500'
+                  : staffWsConnected
+                    ? 'bg-emerald-400'
+                    : 'bg-amber-400 animate-pulse'
+              }`}
+              aria-label={
+                !navigator.onLine
+                  ? 'Offline'
+                  : staffWsConnected
+                    ? 'All connections healthy'
+                    : 'Live updates degraded'
+              }
+              title={
+                !navigator.onLine
+                  ? 'Offline'
+                  : staffWsConnected
+                    ? 'All connections healthy'
+                    : 'Live updates degraded — reconnecting'
+              }
+            />
+          </div>
+        </button>
       </div>
     </header>
   );

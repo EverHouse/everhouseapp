@@ -13,12 +13,11 @@ import { useToast } from '../Toast';
 import { getTodayPacific, formatTime12Hour } from '../../utils/dateUtils';
 import { StaffCommandCenterSkeleton } from '../skeletons';
 import { AnimatedPage } from '../motion';
-import { useStaffWebSocketContext } from '../../contexts/StaffWebSocketContext';
 import { useBookingActions } from '../../hooks/useBookingActions';
 import { playSound } from '../../utils/sounds';
 
 import { useCommandCenterData } from './hooks/useCommandCenterData';
-import { formatLastSynced, formatTodayDate } from './helpers';
+import { formatTodayDate } from './helpers';
 import { getLatestVersion } from '../../data/changelog-version';
 import { BookingQueuesSection } from './sections/BookingQueuesSection';
 import { TodayScheduleSection } from './sections/TodayScheduleSection';
@@ -46,7 +45,6 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
   const { isAtBottom } = useBottomNav();
   const isMobile = useIsMobile();
   const { actualUser, refreshMembers } = useData();
-  const { isConnected: wsConnected } = useStaffWebSocketContext();
   const { checkInWithToast, staffCancelWithToast } = useBookingActions();
   
   const navigateToTab = useCallback((tab: TabType) => {
@@ -592,16 +590,6 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
             <p className="text-sm lg:text-base text-primary/60 dark:text-white/60 mt-1">{formatTodayDate()}</p>
           </div>
           <div className="flex flex-col items-end gap-1.5">
-            <div className="flex items-center gap-2">
-              <div className={`flex items-center gap-1 text-[10px] lg:text-xs ${wsConnected ? 'text-green-600 dark:text-green-400' : 'text-gray-400 dark:text-white/30'}`} title={wsConnected ? 'Live updates active' : 'Connecting to live updates...'}>
-                <span className={`w-1.5 h-1.5 rounded-full ${wsConnected ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}></span>
-                <span className="hidden sm:inline">{wsConnected ? 'Live' : 'Connecting...'}</span>
-              </div>
-              <div className="flex items-center gap-1 text-[10px] lg:text-xs text-gray-500 dark:text-white/50">
-                <span className="material-symbols-outlined text-xs lg:text-sm">sync</span>
-                <span>{formatLastSynced(data.lastSynced)}</span>
-              </div>
-            </div>
             {pendingCount > 0 && (
               <button 
                 onClick={() => navigateToTab('simulator')}
