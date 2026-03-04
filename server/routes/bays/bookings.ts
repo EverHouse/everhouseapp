@@ -851,7 +851,6 @@ router.post('/api/booking-requests', bookingRateLimiter, validateBody(createBook
           await recalculateSessionFees(confSessionId, 'approval');
           await syncBookingInvoice(row.id, confSessionId);
           
-          // Auto-finalize and pay using Stripe credit balance
           try {
             const payResult = await finalizeAndPayInvoice({ bookingId: row.id });
             logger.info('[ConferenceRoom] Invoice finalized and payment attempted', {
@@ -859,9 +858,11 @@ router.post('/api/booking-requests', bookingRateLimiter, validateBody(createBook
             });
             row._invoicePayResult = payResult;
           } catch (payErr: unknown) {
-            logger.warn('[ConferenceRoom] Invoice finalize/pay failed (will be collected at check-in)', {
+            logger.warn('[ConferenceRoom] Invoice finalize/pay failed — reverting to pending for staff review', {
               extra: { bookingId: row.id, error: (payErr as Error).message }
             });
+            await db.execute(sql`UPDATE booking_requests SET status = 'pending', updated_at = NOW() WHERE id = ${row.id}`);
+            row.status = 'pending';
           }
         }
       } catch (invoiceErr: unknown) {

@@ -251,6 +251,7 @@ const MAGIC_LINK_REQUEST_LIMIT = 3;
 const MAGIC_LINK_REQUEST_WINDOW = 15 * 60 * 1000;
 const OTP_VERIFY_MAX_ATTEMPTS = 5;
 const OTP_VERIFY_LOCKOUT = 15 * 60 * 1000;
+const OTP_VERIFY_EMAIL_MAX_ATTEMPTS = 20;
 
 const checkOtpRequestLimit = async (email: string, ip: string): Promise<{ allowed: boolean; retryAfter?: number }> => {
   const key = `otp_request:${email}:${ip}`;
@@ -319,7 +320,8 @@ const checkMagicLinkRequestLimit = async (email: string, ip: string): Promise<{ 
 };
 
 const checkOtpVerifyAttempts = async (email: string, ip?: string): Promise<{ allowed: boolean; retryAfter?: number }> => {
-  const perIpKey = ip ? `otp_verify:${email}:${ip}` : `otp_verify:${email}`;
+  const effectiveIp = ip || 'unknown';
+  const perIpKey = `otp_verify:${email}:${effectiveIp}`;
   const now = new Date();
   
   try {
@@ -340,22 +342,37 @@ const checkOtpVerifyAttempts = async (email: string, ip?: string): Promise<{ all
       }
     }
 
-    if (ip) {
-      const ipKey = `otp_verify_ip:${ip}`;
-      const ipResult = await db.select({
-        count: rateLimits.count,
-        lockedUntil: rateLimits.lockedUntil,
-      }).from(rateLimits).where(eq(rateLimits.key, ipKey));
-      
-      if (ipResult.length > 0) {
-        const { lockedUntil: ipLocked } = ipResult[0];
-        if (ipLocked && new Date(ipLocked) > now) {
-          const retryAfter = Math.ceil((new Date(ipLocked).getTime() - now.getTime()) / 1000);
-          return { allowed: false, retryAfter: Math.max(0, retryAfter) };
-        }
-        if (ipLocked && new Date(ipLocked) <= now) {
-          await db.delete(rateLimits).where(eq(rateLimits.key, ipKey));
-        }
+    const ipKey = `otp_verify_ip:${effectiveIp}`;
+    const ipResult = await db.select({
+      count: rateLimits.count,
+      lockedUntil: rateLimits.lockedUntil,
+    }).from(rateLimits).where(eq(rateLimits.key, ipKey));
+    
+    if (ipResult.length > 0) {
+      const { lockedUntil: ipLocked } = ipResult[0];
+      if (ipLocked && new Date(ipLocked) > now) {
+        const retryAfter = Math.ceil((new Date(ipLocked).getTime() - now.getTime()) / 1000);
+        return { allowed: false, retryAfter: Math.max(0, retryAfter) };
+      }
+      if (ipLocked && new Date(ipLocked) <= now) {
+        await db.delete(rateLimits).where(eq(rateLimits.key, ipKey));
+      }
+    }
+
+    const emailKey = `otp_verify_email:${email}`;
+    const emailResult = await db.select({
+      count: rateLimits.count,
+      lockedUntil: rateLimits.lockedUntil,
+    }).from(rateLimits).where(eq(rateLimits.key, emailKey));
+    
+    if (emailResult.length > 0) {
+      const { lockedUntil: emailLocked } = emailResult[0];
+      if (emailLocked && new Date(emailLocked) > now) {
+        const retryAfter = Math.ceil((new Date(emailLocked).getTime() - now.getTime()) / 1000);
+        return { allowed: false, retryAfter: Math.max(0, retryAfter) };
+      }
+      if (emailLocked && new Date(emailLocked) <= now) {
+        await db.delete(rateLimits).where(eq(rateLimits.key, emailKey));
       }
     }
     
@@ -372,9 +389,10 @@ const recordOtpVerifyFailure = async (email: string, ip?: string): Promise<void>
   const now = new Date();
   const resetAt = new Date(now.getTime() + OTP_VERIFY_LOCKOUT);
   const lockedUntil = new Date(now.getTime() + OTP_VERIFY_LOCKOUT);
+  const effectiveIp = ip || 'unknown';
   
   try {
-    const perIpKey = ip ? `otp_verify:${email}:${ip}` : `otp_verify:${email}`;
+    const perIpKey = `otp_verify:${email}:${effectiveIp}`;
     await db.execute(sql`INSERT INTO rate_limits (key, limit_type, count, reset_at, updated_at)
        VALUES (${perIpKey}, 'otp_verify', 1, ${resetAt}, NOW())
        ON CONFLICT (key) DO UPDATE SET
@@ -386,29 +404,41 @@ const recordOtpVerifyFailure = async (email: string, ip?: string): Promise<void>
          updated_at = NOW()
        RETURNING count`);
 
-    if (ip) {
-      const ipKey = `otp_verify_ip:${ip}`;
-      const ipLockedUntil = new Date(now.getTime() + OTP_VERIFY_LOCKOUT);
-      await db.execute(sql`INSERT INTO rate_limits (key, limit_type, count, reset_at, updated_at)
-         VALUES (${ipKey}, 'otp_verify_ip', 1, ${resetAt}, NOW())
-         ON CONFLICT (key) DO UPDATE SET
-           count = rate_limits.count + 1,
-           locked_until = CASE 
-             WHEN rate_limits.count + 1 >= ${OTP_VERIFY_IP_MAX_ATTEMPTS} THEN ${ipLockedUntil}
-             ELSE rate_limits.locked_until
-           END,
-           updated_at = NOW()
-         RETURNING count`);
-    }
+    const ipKey = `otp_verify_ip:${effectiveIp}`;
+    await db.execute(sql`INSERT INTO rate_limits (key, limit_type, count, reset_at, updated_at)
+       VALUES (${ipKey}, 'otp_verify_ip', 1, ${resetAt}, NOW())
+       ON CONFLICT (key) DO UPDATE SET
+         count = rate_limits.count + 1,
+         locked_until = CASE 
+           WHEN rate_limits.count + 1 >= ${OTP_VERIFY_IP_MAX_ATTEMPTS} THEN ${lockedUntil}
+           ELSE rate_limits.locked_until
+         END,
+         updated_at = NOW()
+       RETURNING count`);
+
+    const emailKey = `otp_verify_email:${email}`;
+    await db.execute(sql`INSERT INTO rate_limits (key, limit_type, count, reset_at, updated_at)
+       VALUES (${emailKey}, 'otp_verify_email', 1, ${resetAt}, NOW())
+       ON CONFLICT (key) DO UPDATE SET
+         count = rate_limits.count + 1,
+         locked_until = CASE 
+           WHEN rate_limits.count + 1 >= ${OTP_VERIFY_EMAIL_MAX_ATTEMPTS} THEN ${lockedUntil}
+           ELSE rate_limits.locked_until
+         END,
+         updated_at = NOW()
+       RETURNING count`);
   } catch (error: unknown) {
     logger.error('[RateLimit] Database error recording failure', { error: error instanceof Error ? error : new Error(String(error)) });
   }
 };
 
 const clearOtpVerifyAttempts = async (email: string, ip?: string): Promise<void> => {
-  const key = ip ? `otp_verify:${email}:${ip}` : `otp_verify:${email}`;
+  const effectiveIp = ip || 'unknown';
+  const perIpKey = `otp_verify:${email}:${effectiveIp}`;
+  const emailKey = `otp_verify_email:${email}`;
   try {
-    await db.delete(rateLimits).where(eq(rateLimits.key, key));
+    await db.delete(rateLimits).where(eq(rateLimits.key, perIpKey));
+    await db.delete(rateLimits).where(eq(rateLimits.key, emailKey));
   } catch (error: unknown) {
     logger.error('[RateLimit] Database error clearing attempts', { error: error instanceof Error ? error : new Error(String(error)) });
   }

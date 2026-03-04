@@ -846,7 +846,31 @@ export async function createSessionWithUsageTracking(
     const resourceResult = await db.execute(sql`SELECT type FROM resources WHERE id = ${request.resourceId}`);
     const resourceType = String((resourceResult.rows[0] as { type?: string })?.type || 'simulator');
 
-    // Step 4: Calculate billing using the centralized billing calculator (pre-transaction)
+    // Step 4+5: Acquire a user-level advisory lock to serialize billing reads and
+    // session writes for the same member on the same day. Without this lock, two
+    // concurrent bookings can both read 0 prior usage and skip overage fees.
+    const userLockKey = `usage::${request.ownerEmail.toLowerCase()}::${request.sessionDate}`;
+    let userLockHash = 0;
+    for (let i = 0; i < userLockKey.length; i++) {
+      userLockHash = ((userLockHash << 5) - userLockHash + userLockKey.charCodeAt(i)) | 0;
+    }
+
+    // When an externalTx is provided, the caller owns the transaction. Use a
+    // transaction-scoped lock on that connection so it stays held until the
+    // caller commits. When we manage the transaction ourselves, use a
+    // session-level lock on a separate client so it spans both the billing
+    // read and the write transaction.
+    if (externalTx) {
+      await externalTx.execute(sql`SELECT pg_advisory_xact_lock(${userLockHash})`);
+    }
+
+    const lockClient = externalTx ? null : await pool.connect();
+    try {
+    if (lockClient) {
+      await lockClient.query(`SELECT pg_advisory_lock($1)`, [userLockHash]);
+    }
+    try {
+
     const billingResult = await calculateFullSessionBilling(
       request.sessionDate,
       request.durationMinutes,
@@ -856,8 +880,6 @@ export async function createSessionWithUsageTracking(
       { resourceType }
     );
     
-    // Step 5: Execute database writes - either within external transaction or our own
-    // This ensures all-or-nothing: if any step fails, everything rolls back
     const executeDbWrites = async (tx: TransactionContext) => {
       // FIRST: Check if an overlapping session already exists (e.g., from Trackman import)
       // This prevents "Double-booking not allowed" errors when Trackman sessions
@@ -1201,12 +1223,25 @@ export async function createSessionWithUsageTracking(
       }
     });
     
-    return {
-      success: true,
+    const result = {
+      success: true as const,
       session: txResult.session,
       participants: txResult.linkedParticipants,
       usageLedgerEntries: txResult.ledgerEntriesCreated
     };
+
+    return result;
+
+    } finally {
+      if (lockClient) {
+        await lockClient.query(`SELECT pg_advisory_unlock($1)`, [userLockHash]).catch(() => {});
+      }
+    }
+    } finally {
+      if (lockClient) {
+        lockClient.release();
+      }
+    }
   } catch (error: unknown) {
     logger.error('[createSessionWithUsageTracking] Error:', { error });
     return {
