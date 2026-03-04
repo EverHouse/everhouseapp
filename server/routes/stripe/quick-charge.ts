@@ -411,7 +411,7 @@ router.post('/api/stripe/staff/quick-charge/confirm', isStaffOrAdmin, validateBo
     
     broadcastBillingUpdate({
       action: 'payment_succeeded',
-      memberEmail: paymentRecord?.memberEmail || paymentRecord?.member_email,
+      memberEmail: (paymentRecord?.memberEmail || paymentRecord?.member_email) || undefined,
       amount: paymentRecord?.amountCents || paymentRecord?.amount_cents
     });
 
@@ -537,7 +537,7 @@ router.post('/api/stripe/staff/charge-saved-card-pos', isStaffOrAdmin, validateB
           thresholdCents: SAVED_CARD_APPROVAL_THRESHOLD_CENTS
         });
       }
-      logFromRequest(req, 'large_charge_approved', 'payment', null, memberEmail, {
+      logFromRequest(req, 'large_charge_approved', 'payment', undefined, memberEmail, {
         amountCents: numericAmount,
         approvedBy: staffEmail,
         role: 'admin',

@@ -15,8 +15,20 @@ interface State {
 
 const GLOBAL_RELOAD_KEY = 'global_error_reload_count';
 const GLOBAL_RELOAD_TIMESTAMP = 'global_error_reload_timestamp';
+const CHUNK_RELOAD_KEY = 'chunk_error_reload';
 const MAX_GLOBAL_RELOADS = 3;
 const RELOAD_WINDOW_MS = 120000;
+
+function isChunkLoadError(error: Error): boolean {
+  const message = error.message || '';
+  return (
+    message.includes('Importing a module script failed') ||
+    message.includes('Failed to fetch dynamically imported module') ||
+    message.includes('Loading chunk') ||
+    message.includes('Loading CSS chunk') ||
+    (error.name === 'TypeError' && message.includes('Failed to fetch'))
+  );
+}
 
 function getGlobalReloadCount(): number {
   const timestamp = sessionStorage.getItem(GLOBAL_RELOAD_TIMESTAMP);
@@ -57,9 +69,20 @@ class ErrorBoundary extends Component<Props, State> {
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error('[ErrorBoundary] Caught error:', error, errorInfo);
     this.props.onError?.(error, errorInfo);
+
+    if (isChunkLoadError(error)) {
+      const alreadyReloaded = sessionStorage.getItem(CHUNK_RELOAD_KEY);
+      if (!alreadyReloaded) {
+        sessionStorage.setItem(CHUNK_RELOAD_KEY, '1');
+        window.location.reload();
+        return;
+      }
+      sessionStorage.removeItem(CHUNK_RELOAD_KEY);
+    }
   }
 
   componentDidMount() {
+    sessionStorage.removeItem(CHUNK_RELOAD_KEY);
     this.setState({ reloadAttempts: getGlobalReloadCount() });
   }
 

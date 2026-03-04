@@ -30,6 +30,11 @@ async function getCredentials() {
     }
   });
 
+  if (!response.ok) {
+    const text = await response.text().catch(() => '(no body)');
+    throw new Error(`Stripe connector request failed (${response.status}): ${text.slice(0, 200)}`);
+  }
+
   const data = await response.json();
   
   connectionSettings = data.items?.[0];

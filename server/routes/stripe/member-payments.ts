@@ -1191,7 +1191,7 @@ router.get('/api/member/balance', isAuthenticated, async (req: Request, res: Res
                   description: isGuest
                     ? `Guest: ${sData?.display_name || 'Guest'} - ${dateStr}`
                     : `${sData?.resource_name || 'Booking'} - ${dateStr}`,
-                  date: sData?.session_date,
+                  date: sData?.session_date || dateStr,
                   amountCents: p.totalCents
                 });
 
