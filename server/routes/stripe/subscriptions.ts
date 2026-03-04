@@ -1055,66 +1055,82 @@ router.post('/api/stripe/subscriptions/send-activation-link', isStaffOrAdmin, as
       logger.info('[Activation Link] Created pending user with tier', { extra: { email, tierName: tier.name } });
     }
     
-    const { customerId } = await getOrCreateStripeCustomer(
-      userId,
-      email,
-      memberName,
-      tier.name
-    );
+    let customerId: string;
+    let checkoutSession: Stripe.Checkout.Session;
     
-    await db.update(users).set({ stripeCustomerId: customerId }).where(eq(users.id, userId));
-    
-    const stripe = await getStripeClient();
-    
-    // Use environment-aware URLs
-    const replitDomains = process.env.REPLIT_DOMAINS?.split(',')[0];
-    const baseUrl = replitDomains ? `https://${replitDomains}` : 'https://everclub.app';
-    
-    const successUrl = `${baseUrl}/welcome?session_id={CHECKOUT_SESSION_ID}`;
-    const cancelUrl = `${baseUrl}/`;
-    
-    const sessionParams: Stripe.Checkout.SessionCreateParams = {
-      customer: customerId,
-      mode: 'subscription',
-      line_items: [{
-        price: tier.stripePriceId,
-        quantity: 1,
-      }],
-      success_url: successUrl,
-      cancel_url: cancelUrl,
-      metadata: {
+    try {
+      const customerResult = await getOrCreateStripeCustomer(
         userId,
-        memberEmail: email,
-        tier: tier.name,
-        tierSlug: tier.slug,
-        createdBy: sessionUser?.email || 'staff',
-        isNewMember: 'true',
-        source: 'activation_link'
-      },
-      subscription_data: {
+        email,
+        memberName,
+        tier.name
+      );
+      customerId = customerResult.customerId;
+      
+      await db.update(users).set({ stripeCustomerId: customerId }).where(eq(users.id, userId));
+      
+      const stripe = await getStripeClient();
+      
+      const replitDomains = process.env.REPLIT_DOMAINS?.split(',')[0];
+      const baseUrl = replitDomains ? `https://${replitDomains}` : 'https://everclub.app';
+      
+      const successUrl = `${baseUrl}/welcome?session_id={CHECKOUT_SESSION_ID}`;
+      const cancelUrl = `${baseUrl}/`;
+      
+      const sessionParams: Stripe.Checkout.SessionCreateParams = {
+        customer: customerId,
+        mode: 'subscription',
+        line_items: [{
+          price: tier.stripePriceId,
+          quantity: 1,
+        }],
+        success_url: successUrl,
+        cancel_url: cancelUrl,
         metadata: {
           userId,
           memberEmail: email,
           tier: tier.name,
           tierSlug: tier.slug,
-          isNewMember: 'true'
+          createdBy: sessionUser?.email || 'staff',
+          isNewMember: 'true',
+          source: 'activation_link'
+        },
+        subscription_data: {
+          metadata: {
+            userId,
+            memberEmail: email,
+            tier: tier.name,
+            tierSlug: tier.slug,
+            isNewMember: 'true'
+          }
+        },
+        expires_at: Math.floor(Date.now() / 1000) + (23 * 60 * 60),
+      };
+      
+      if (couponId) {
+        sessionParams.discounts = [{ coupon: couponId }];
+        if (sessionParams.metadata) {
+          sessionParams.metadata.couponApplied = couponId;
         }
-      },
-      expires_at: Math.floor(Date.now() / 1000) + (23 * 60 * 60), // 23 hours (Stripe max is 24h)
-    };
-    
-    if (couponId) {
-      sessionParams.discounts = [{ coupon: couponId }];
-      if (sessionParams.metadata) {
-        sessionParams.metadata.couponApplied = couponId;
       }
-    }
-    
-    const checkoutSession = await stripe.checkout.sessions.create(sessionParams);
-    
-    if (!checkoutSession.url) {
-      logger.error('[Activation Link] Stripe returned no checkout URL for session', { extra: { checkoutSessionId: checkoutSession.id } });
-      return res.status(500).json({ error: 'Failed to create checkout session - no URL returned' });
+      
+      checkoutSession = await stripe.checkout.sessions.create(sessionParams);
+      
+      if (!checkoutSession.url) {
+        logger.error('[Activation Link] Stripe returned no checkout URL for session', { extra: { checkoutSessionId: checkoutSession.id } });
+        throw new Error('Failed to create checkout session - no URL returned');
+      }
+    } catch (stripeErr: unknown) {
+      logger.error('[Activation Link] Stripe call failed, rolling back pending user', { extra: { email, userId, error: getErrorMessage(stripeErr) } });
+      if (!existingUserId) {
+        try {
+          await db.delete(users).where(eq(users.id, userId));
+          logger.info('[Activation Link] Cleaned up newly-created pending user after Stripe failure', { extra: { userId, email } });
+        } catch (cleanupErr: unknown) {
+          logger.error('[Activation Link] Failed to clean up pending user after Stripe failure', { extra: { userId, email, error: getErrorMessage(cleanupErr) } });
+        }
+      }
+      return res.status(500).json({ error: 'Failed to create checkout session. Please try again.' });
     }
     
     logger.info('[Activation Link] Created checkout session for', { extra: { checkoutSessionId: checkoutSession.id, email } });

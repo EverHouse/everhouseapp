@@ -1869,11 +1869,20 @@ async function handleInvoicePaymentSucceeded(client: PoolClient, invoice: Invoic
   );
 
   if (currentPeriodEnd) {
-    await client.query(
-      `UPDATE users SET stripe_current_period_end = $1, updated_at = NOW()
-       WHERE LOWER(email) = LOWER($2)`,
-      [nextBillingDate, email]
-    );
+    const invoiceSubscriptionId = typeof invoice.subscription === 'string' ? invoice.subscription : invoice.subscription?.id;
+    if (invoiceSubscriptionId) {
+      await client.query(
+        `UPDATE users SET stripe_current_period_end = $1, updated_at = NOW()
+         WHERE LOWER(email) = LOWER($2) AND (stripe_subscription_id IS NULL OR stripe_subscription_id = $3)`,
+        [nextBillingDate, email, invoiceSubscriptionId]
+      );
+    } else {
+      await client.query(
+        `UPDATE users SET stripe_current_period_end = $1, updated_at = NOW()
+         WHERE LOWER(email) = LOWER($2)`,
+        [nextBillingDate, email]
+      );
+    }
   }
 
   const localEmail = email;
@@ -2266,11 +2275,14 @@ async function handleCheckoutSessionCompleted(client: PoolClient, session: Strip
         : memberEmail;
 
       const stripe = await getStripeClient();
-      const transaction = await stripe.customers.createBalanceTransaction(
-        customerId,
-        { amount: -amountCents, currency: 'usd', description: `Account balance top-up via checkout (${session.id})` },
-        { idempotencyKey: `add_funds_${session.id}` }
-      );
+      const transaction = await Promise.race([
+        stripe.customers.createBalanceTransaction(
+          customerId,
+          { amount: -amountCents, currency: 'usd', description: `Account balance top-up via checkout (${session.id})` },
+          { idempotencyKey: `add_funds_${session.id}` }
+        ),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Stripe balance transaction timed out after 5s')), 5000))
+      ]);
       const newBalanceDollars = Math.abs(transaction.ending_balance) / 100;
       logger.info(`[Stripe Webhook] Successfully added $${amountDollars.toFixed(2)} to balance for ${memberEmail}. New balance: $${newBalanceDollars.toFixed(2)}`);
 
@@ -2681,45 +2693,49 @@ async function handleCheckoutSessionCompleted(client: PoolClient, session: Strip
     const customerId = typeof session.customer === 'string' ? session.customer : session.customer?.id || null;
     const purchaserName = [firstName, lastName].filter(Boolean).join(' ') || email;
 
+    const dayPassResult = await recordDayPassPurchaseFromWebhook({
+      productSlug,
+      email,
+      firstName,
+      lastName,
+      phone,
+      amountCents,
+      paymentIntentId,
+      customerId
+    });
+
+    if (!dayPassResult.success) {
+      throw new Error(`Failed to record day pass purchase: ${dayPassResult.error}`);
+    }
+
+    logger.info(`[Stripe Webhook] Day pass purchase recorded: ${dayPassResult.purchaseId}`);
+
+    const deferredDayPassResult = dayPassResult;
+    const deferredPurchaserName = purchaserName;
+    const deferredDayPassEmail = email;
+    const deferredProductSlug = productSlug;
+
     deferredActions.push(async () => {
       try {
-        const result = await recordDayPassPurchaseFromWebhook({
-          productSlug,
-          email,
-          firstName,
-          lastName,
-          phone,
-          amountCents,
-          paymentIntentId,
-          customerId
-        });
-
-        if (!result.success) {
-          logger.error(`[Stripe Webhook] Failed to record day pass purchase:`, { error: result.error });
-          return;
-        }
-
-        logger.info(`[Stripe Webhook] Day pass purchase recorded: ${result.purchaseId}`);
-
         broadcastDayPassUpdate({
           action: 'day_pass_purchased',
-          passId: result.purchaseId!,
-          purchaserEmail: email,
-          purchaserName: purchaserName,
-          productType: productSlug,
-          remainingUses: result.remainingUses ?? 1,
-          quantity: result.quantity ?? 1,
+          passId: deferredDayPassResult.purchaseId!,
+          purchaserEmail: deferredDayPassEmail,
+          purchaserName: deferredPurchaserName,
+          productType: deferredProductSlug,
+          remainingUses: deferredDayPassResult.remainingUses ?? 1,
+          quantity: deferredDayPassResult.quantity ?? 1,
           purchasedAt: new Date().toISOString(),
         });
 
         try {
-          await sendPassWithQrEmail(email, {
-            passId: parseInt(result.purchaseId!, 10),
-            type: productSlug,
+          await sendPassWithQrEmail(deferredDayPassEmail, {
+            passId: parseInt(deferredDayPassResult.purchaseId!, 10),
+            type: deferredProductSlug,
             quantity: 1,
             purchaseDate: new Date()
           });
-          logger.info(`[Stripe Webhook] QR pass email sent to ${email}`);
+          logger.info(`[Stripe Webhook] QR pass email sent to ${deferredDayPassEmail}`);
         } catch (emailError: unknown) {
           logger.error('[Stripe Webhook] Failed to send QR pass email:', { error: emailError });
         }
@@ -2727,7 +2743,7 @@ async function handleCheckoutSessionCompleted(client: PoolClient, session: Strip
         try {
           await notifyAllStaff(
             'Day Pass Purchased',
-            `${purchaserName} (${email}) purchased a ${productSlug} day pass.`,
+            `${deferredPurchaserName} (${deferredDayPassEmail}) purchased a ${deferredProductSlug} day pass.`,
             'day_pass',
             { sendPush: false, sendWebSocket: true }
           );
@@ -2744,7 +2760,7 @@ async function handleCheckoutSessionCompleted(client: PoolClient, session: Strip
             productSlug,
             amountCents,
             paymentIntentId,
-            purchaseId: result.purchaseId
+            purchaseId: deferredDayPassResult.purchaseId
           });
         } catch (hubspotError: unknown) {
           logger.error('[Stripe Webhook] Failed to queue HubSpot sync for day pass:', { error: hubspotError });

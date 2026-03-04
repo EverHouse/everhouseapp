@@ -981,6 +981,31 @@ export async function createSessionWithUsageTracking(
                     `Transaction rolled back.`
                   );
                 }
+              } else {
+                const tierResult = await tx.execute(sql`
+                  SELECT mt.guest_passes_per_month 
+                  FROM users u 
+                  JOIN membership_tiers mt ON u.tier = mt.name 
+                  WHERE LOWER(u.email) = ${emailLower}
+                `);
+                const monthlyAllocation = tierResult.rows?.[0] 
+                  ? (tierResult.rows[0] as { guest_passes_per_month: number }).guest_passes_per_month as number || 0 
+                  : 0;
+                
+                if (monthlyAllocation < passesToConvert) {
+                  throw new Error(
+                    `Insufficient guest pass allocation: tier allows ${monthlyAllocation}, need ${passesToConvert}. ` +
+                    `Transaction rolled back.`
+                  );
+                }
+                
+                await tx.execute(sql`
+                  INSERT INTO guest_passes (member_email, passes_total, passes_used)
+                  VALUES (${emailLower}, ${monthlyAllocation}, 0)
+                `);
+                logger.info('[createSessionWithUsageTracking] Created guest pass record for first-time user (hold conversion)', {
+                  extra: { ownerEmail: request.ownerEmail, monthlyAllocation, passesToConvert }
+                });
               }
               
               // Convert hold to actual usage
