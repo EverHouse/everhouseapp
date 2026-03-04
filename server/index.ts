@@ -28,6 +28,10 @@ interface IncomingMessageWithExpressProps extends http.IncomingMessage {
 }
 
 process.on('uncaughtException', (error) => {
+  if (error instanceof Error && error.message?.includes('Release called on client which has already been released')) {
+    logger.warn('[Process] Suppressed benign pool double-release error (pg-pool internal auto-release race)');
+    return;
+  }
   logger.error('[Process] Uncaught Exception - shutting down:', { error: error as Error });
   setTimeout(() => process.exit(1), 3000);
 });

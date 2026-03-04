@@ -238,7 +238,11 @@ export async function handleBookingModification(
                 logger.error('[Trackman Webhook] Conflicting session has linked bookings — unlinking and deleting (Trackman is source of truth, cascades to participants)', {
                   extra: { bookingId, sessionId, conflictSessionId: r.id, linkedCount, newResourceId, newDate, newStartTime, newEndTime }
                 });
-                await tx.execute(sql`UPDATE booking_requests SET session_id = NULL WHERE session_id = ${r.id}`);
+                await tx.execute(sql`UPDATE booking_requests 
+                   SET session_id = NULL, 
+                       status = CASE WHEN status = 'approved' THEN 'needs_review' ELSE status END,
+                       notes = COALESCE(notes, '') || ' [Displaced by Trackman modification of booking #' || ${String(bookingId)} || ' — needs staff review]'
+                   WHERE session_id = ${r.id}`);
                 await tx.execute(sql`DELETE FROM booking_sessions WHERE id = ${r.id}`);
               }
             }

@@ -1,5 +1,5 @@
 import { schedulerTracker } from '../core/schedulerTracker';
-import { pool } from '../core/db';
+import { pool, safeRelease } from '../core/db';
 import type { PoolClient } from 'pg';
 import { getStripeClient } from '../core/stripe';
 import { PaymentStatusService } from '../core/billing/PaymentStatusService';
@@ -105,7 +105,7 @@ async function reconcilePendingSnapshots(): Promise<{ synced: number; errors: nu
     schedulerTracker.recordRun('Fee Snapshot Reconciliation', false, String(error));
     return { synced, errors: errors + 1 };
   } finally {
-    if (client && !released) { try { client.release(); } catch {} }
+    if (client && !released) { safeRelease(client); }
   }
 }
 
@@ -242,7 +242,7 @@ async function cancelAbandonedPaymentIntents(): Promise<{ cancelled: number; err
     schedulerTracker.recordRun('Fee Snapshot Reconciliation', false, String(error));
     return { cancelled, errors: errors + 1 };
   } finally {
-    if (client && !released) { try { client.release(); } catch {} }
+    if (client && !released) { safeRelease(client); }
   }
 }
 
@@ -376,7 +376,7 @@ async function reconcileStalePaymentIntents(): Promise<{ reconciled: number; err
     schedulerTracker.recordRun('Fee Snapshot Reconciliation', false, String(error));
     return { reconciled, errors: errors + 1 };
   } finally {
-    if (client && !released) { try { client.release(); } catch {} }
+    if (client && !released) { safeRelease(client); }
   }
 }
 

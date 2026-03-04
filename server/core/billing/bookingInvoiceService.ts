@@ -142,7 +142,7 @@ async function addLineItemsToInvoice(
           participantType: li.participantType,
         },
       }, {
-        idempotencyKey: `invitem_overage_${invoiceId}_${li.participantId || 'unknown'}`
+        idempotencyKey: `invitem_overage_${invoiceId}_${li.participantId || 'unknown'}_${li.overageCents}`
       });
     }
 
@@ -159,7 +159,7 @@ async function addLineItemsToInvoice(
           participantType: li.participantType,
         },
       }, {
-        idempotencyKey: `invitem_guest_${invoiceId}_${li.participantId || 'unknown'}`
+        idempotencyKey: `invitem_guest_${invoiceId}_${li.participantId || 'unknown'}_${li.guestCents}`
       });
     }
   }
