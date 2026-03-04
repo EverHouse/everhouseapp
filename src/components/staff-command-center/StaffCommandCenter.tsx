@@ -325,6 +325,28 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
     }
   };
 
+  const handleDevConfirm = async (bookingId: number | string) => {
+    const apiId = typeof bookingId === 'string' ? parseInt(String(bookingId).replace('cal_', '')) : bookingId;
+    try {
+      const res = await fetch(`/api/admin/bookings/${apiId}/dev-confirm`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include'
+      });
+      const resData = await res.json();
+      if (res.ok) {
+        const totalFee = (resData.totalFeeCents || 0) / 100;
+        showToast(`Confirmed! Total fees: $${totalFee.toFixed(2)}`, 'success');
+        window.dispatchEvent(new CustomEvent('booking-action-completed'));
+        refresh();
+      } else {
+        throw new Error(resData.error || 'Failed to confirm');
+      }
+    } catch (err: unknown) {
+      throw err;
+    }
+  };
+
   const handleApprove = async (request: BookingRequest) => {
     const apiId = typeof request.id === 'string' ? parseInt(String(request.id).replace('cal_', '')) : request.id;
     setActionInProgress(`approve-${request.id}`);
@@ -836,6 +858,7 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
         onClose={() => setTrackmanModal({ isOpen: false, booking: null })}
         booking={trackmanModal.booking}
         onConfirm={handleTrackmanConfirm}
+        onDevConfirm={handleDevConfirm}
       />
 
       <UnifiedBookingSheet

@@ -8,6 +8,15 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.62.0",
+    date: "2026-03-04",
+    title: "Dev Confirm Moved to Trackman Modal",
+    changes: [
+      "Improvement: 'Skip Trackman (Dev Confirm)' button moved inside the Book on Trackman modal — sits right below the normal Confirm Booking button so the entire booking workflow lives in one place",
+      "Cleanup: Removed standalone Dev Confirm button from booking request queue cards for a cleaner layout",
+    ]
+  },
+  {
     version: "8.61.0",
     date: "2026-03-03",
     title: "Booking Participant Fix & Billing Diagnostics",

@@ -374,6 +374,28 @@ const SimulatorTab: React.FC = () => {
         }
     }, [requests, showToast, handleRefresh]);
 
+    const handleDevConfirm = useCallback(async (bookingId: number | string) => {
+        const apiId = typeof bookingId === 'string' ? parseInt(String(bookingId).replace('cal_', '')) : bookingId;
+        try {
+            const res = await fetch(`/api/admin/bookings/${apiId}/dev-confirm`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include'
+            });
+            const data = await res.json();
+            if (res.ok) {
+                const totalFee = (data.totalFeeCents || 0) / 100;
+                showToast(`Confirmed! Total fees: $${totalFee.toFixed(2)}`, 'success');
+                window.dispatchEvent(new CustomEvent('booking-action-completed'));
+                handleRefresh();
+            } else {
+                throw new Error(data.error || 'Failed to confirm');
+            }
+        } catch (err: unknown) {
+            throw err;
+        }
+    }, [showToast, handleRefresh]);
+
     const handleLinkTrackmanToMember = useCallback((event: {
         trackmanBookingId: string;
         bayName?: string;
@@ -1340,6 +1362,7 @@ const SimulatorTab: React.FC = () => {
               onClose={() => setTrackmanModal({ isOpen: false, booking: null })}
               booking={trackmanModal.booking}
               onConfirm={handleTrackmanConfirm}
+              onDevConfirm={handleDevConfirm}
             />
 
             <StaffManualBookingModal

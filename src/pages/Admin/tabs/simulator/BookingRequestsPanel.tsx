@@ -329,33 +329,6 @@ const BookingRequestsPanel: React.FC<BookingRequestsPanelProps> = ({
                                                 Deny
                                             </button>
                                         </div>
-                                        {import.meta.env.DEV && (
-                                            <button
-                                                onClick={async () => {
-                                                    try {
-                                                        const res = await fetch(`/api/admin/bookings/${req.id}/dev-confirm`, {
-                                                            method: 'POST',
-                                                            headers: { 'Content-Type': 'application/json' },
-                                                            credentials: 'include'
-                                                        });
-                                                        const data = await res.json();
-                                                        if (res.ok) {
-                                                            const totalFee = (data.totalFeeCents || 0) / 100;
-                                                            showToast(`Confirmed! Total fees: $${totalFee.toFixed(2)}`, 'success');
-                                                            handleRefresh();
-                                                        } else {
-                                                            showToast(data.error || 'Failed to confirm', 'error');
-                                                        }
-                                                    } catch (err: unknown) {
-                                                        showToast('Failed to confirm booking', 'error');
-                                                    }
-                                                }}
-                                                className="w-full mt-2 py-1.5 px-3 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-lg text-xs font-medium flex items-center justify-center gap-1.5 hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors border border-dashed border-green-400 dark:border-green-500/50"
-                                            >
-                                                <span aria-hidden="true" className="material-symbols-outlined text-sm">check_circle</span>
-                                                Dev Confirm
-                                            </button>
-                                        )}
                                     </div>
                                 );
                             })}

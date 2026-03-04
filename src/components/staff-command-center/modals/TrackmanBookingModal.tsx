@@ -25,6 +25,7 @@ interface TrackmanBookingModalProps {
   booking: BookingRequest | null;
   guests?: Guest[];
   onConfirm: (bookingId: number | string, trackmanBookingId: string) => Promise<void>;
+  onDevConfirm?: (bookingId: number | string) => Promise<void>;
 }
 
 function generateNotesText(booking: BookingRequest | null, guests: Guest[] = [], enrichedParticipants: EnrichedParticipant[] = []): string {
@@ -87,7 +88,8 @@ export function TrackmanBookingModal({
   onClose, 
   booking, 
   guests = [],
-  onConfirm 
+  onConfirm,
+  onDevConfirm
 }: TrackmanBookingModalProps) {
   const { showToast } = useToast();
   const [externalId, setExternalId] = useState('');
@@ -109,6 +111,7 @@ export function TrackmanBookingModal({
       setShowSuccessOverlay(false);
       setExternalId('');
       setError(null);
+      setIsDevConfirming(false);
       if (closeTimerRef.current) {
         clearTimeout(closeTimerRef.current);
         closeTimerRef.current = null;
@@ -249,6 +252,24 @@ export function TrackmanBookingModal({
       setIsSubmitting(false);
     }
   }, [booking, externalId, onConfirm, onClose, showToast]);
+
+  const [isDevConfirming, setIsDevConfirming] = useState(false);
+
+  const handleDevConfirm = useCallback(async () => {
+    if (!booking || !onDevConfirm) return;
+    setError(null);
+    setIsDevConfirming(true);
+    try {
+      await onDevConfirm(booking.id);
+      onClose();
+    } catch (err: unknown) {
+      const errorMsg = (err instanceof Error ? err.message : String(err)) || 'Failed to dev-confirm booking';
+      setError(errorMsg);
+      showToast(errorMsg, 'error');
+    } finally {
+      setIsDevConfirming(false);
+    }
+  }, [booking, onDevConfirm, onClose, showToast]);
 
   const handleClose = useCallback(() => {
     setExternalId('');
@@ -411,6 +432,26 @@ export function TrackmanBookingModal({
               </>
             )}
           </button>
+
+          {onDevConfirm && (
+            <button
+              onClick={handleDevConfirm}
+              disabled={isDevConfirming || autoApproved}
+              className="tactile-btn w-full py-2.5 px-4 bg-transparent text-green-700 dark:text-green-400 font-medium rounded-xl transition-all flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-40 border border-dashed border-green-400 dark:border-green-500/50 hover:bg-green-50 dark:hover:bg-green-900/20 text-sm"
+            >
+              {isDevConfirming ? (
+                <>
+                  <span className="material-symbols-outlined animate-spin text-sm">progress_activity</span>
+                  Confirming...
+                </>
+              ) : (
+                <>
+                  <span className="material-symbols-outlined text-sm">developer_mode</span>
+                  Skip Trackman (Dev Confirm)
+                </>
+              )}
+            </button>
+          )}
         </div>
 
         {autoApproved && (
