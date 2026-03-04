@@ -613,6 +613,22 @@ router.delete('/api/members/:email/permanent', isAdmin, async (req, res) => {
     const sessionIds = (sessionIdsResult.rows as { session_id: number }[]).map((r) => r.session_id);
     deletionLog.push(`booking_session_ids_found (${sessionIds.length})`);
 
+    const invoiceBookings = await db.execute(sql`SELECT id, stripe_invoice_id FROM booking_requests WHERE (LOWER(user_email) = ${normalizedEmail} OR user_id = ${userId}) AND stripe_invoice_id IS NOT NULL`);
+    const invoiceRows = invoiceBookings.rows as { id: number; stripe_invoice_id: string }[];
+    if (invoiceRows.length > 0) {
+      const { voidBookingInvoice } = await import('../../core/billing/bookingInvoiceService');
+      for (const row of invoiceRows) {
+        try {
+          await voidBookingInvoice(row.id);
+        } catch (voidErr: unknown) {
+          logger.warn('[Admin] Failed to void invoice during member purge', {
+            extra: { bookingId: row.id, invoiceId: row.stripe_invoice_id, error: (voidErr as Error).message }
+          });
+        }
+      }
+      deletionLog.push(`stripe_invoices_voided (${invoiceRows.length})`);
+    }
+
     await db.execute(sql`DELETE FROM booking_fee_snapshots WHERE booking_id IN (SELECT id FROM booking_requests WHERE LOWER(user_email) = ${normalizedEmail} OR user_id = ${userId})`);
     deletionLog.push('booking_fee_snapshots (by booking)');
 

@@ -1314,10 +1314,23 @@ router.post('/api/data-integrity/fix/cancel-stale-booking', isAdmin, async (req:
       UPDATE booking_requests 
       SET status = 'cancelled', cancellation_reason = 'Auto-cancelled: stale booking past start time', updated_at = NOW()
       WHERE id = ${recordId} AND status IN ('pending', 'approved')
+      RETURNING stripe_invoice_id
     `);
 
     if (result.rowCount === 0) {
       return res.status(404).json({ success: false, message: 'Booking not found or not in pending/approved status' });
+    }
+
+    const invoiceId = (result.rows[0] as { stripe_invoice_id: string | null })?.stripe_invoice_id;
+    if (invoiceId) {
+      try {
+        const { voidBookingInvoice } = await import('../core/billing/bookingInvoiceService');
+        await voidBookingInvoice(recordId);
+      } catch (voidErr: unknown) {
+        logger.warn('[DataIntegrity] Failed to void invoice for cancelled stale booking', {
+          extra: { bookingId: recordId, invoiceId, error: getErrorMessage(voidErr) }
+        });
+      }
     }
 
     logFromRequest(req, 'cancel_stale_booking', 'booking_request', String(recordId), `Cancelled stale booking #${recordId} via data integrity`, { bookingId: recordId });
@@ -1338,11 +1351,26 @@ router.post('/api/data-integrity/fix/bulk-cancel-stale-bookings', isAdmin, async
         AND (request_date + start_time::time) < ((NOW() AT TIME ZONE 'America/Los_Angeles') - INTERVAL '24 hours')
         AND request_date >= CURRENT_DATE - INTERVAL '7 days'
         AND user_email NOT LIKE '%@trackman.local'
+      RETURNING id, stripe_invoice_id
     `);
 
     const count = result.rowCount || 0;
 
-    logFromRequest(req, 'bulk_cancel_stale_bookings', 'booking_request', undefined, `Bulk cancelled ${count} stale bookings via data integrity`, { cancelledCount: count });
+    const invoiceRows = (result.rows as { id: number; stripe_invoice_id: string | null }[]).filter(r => r.stripe_invoice_id);
+    if (invoiceRows.length > 0) {
+      const { voidBookingInvoice } = await import('../core/billing/bookingInvoiceService');
+      for (const row of invoiceRows) {
+        try {
+          await voidBookingInvoice(row.id);
+        } catch (voidErr: unknown) {
+          logger.warn('[DataIntegrity] Failed to void invoice during bulk stale cancel', {
+            extra: { bookingId: row.id, invoiceId: row.stripe_invoice_id, error: getErrorMessage(voidErr) }
+          });
+        }
+      }
+    }
+
+    logFromRequest(req, 'bulk_cancel_stale_bookings', 'booking_request', undefined, `Bulk cancelled ${count} stale bookings via data integrity`, { cancelledCount: count, invoicesVoided: invoiceRows.length });
 
     res.json({ success: true, message: `Cancelled ${count} stale bookings`, cancelledCount: count });
   } catch (error: unknown) {
