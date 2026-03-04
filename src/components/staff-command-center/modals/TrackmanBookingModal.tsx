@@ -433,7 +433,7 @@ export function TrackmanBookingModal({
             )}
           </button>
 
-          {onDevConfirm && (
+          {onDevConfirm && import.meta.env.DEV && (
             <button
               onClick={handleDevConfirm}
               disabled={isDevConfirming || autoApproved}
