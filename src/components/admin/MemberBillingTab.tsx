@@ -478,6 +478,7 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({
   currentTier, 
   onTierUpdate,
   onMemberUpdated,
+  onDrawerClose,
   guestPassInfo,
   guestHistory = [],
   guestCheckInsHistory = [],
@@ -660,6 +661,7 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({
         fetchBillingInfo();
         onMemberUpdated?.();
         showSuccess('Migration initiated successfully');
+        setTimeout(() => onDrawerClose?.(), 600);
       } else {
         setError(await extractApiError(res, 'initiate migration'));
       }
@@ -682,6 +684,7 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({
         fetchBillingInfo();
         onMemberUpdated?.();
         showSuccess('Migration cancelled');
+        setTimeout(() => onDrawerClose?.(), 600);
       } else {
         setError(await extractApiError(res, 'cancel migration'));
       }
@@ -712,6 +715,7 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({
         fetchBillingInfo();
         onMemberUpdated?.();
         showSuccess('Membership level updated');
+        setTimeout(() => onDrawerClose?.(), 600);
       }
     } catch (err: unknown) {
       console.error('Error updating tier:', err);
@@ -735,6 +739,7 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({
         await fetchBillingInfo();
         onMemberUpdated?.();
         showSuccess('Billing source updated');
+        setTimeout(() => onDrawerClose?.(), 600);
       } else {
         setError(getApiErrorMessage(res, 'update billing source'));
       }
@@ -762,6 +767,7 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({
         setShowPauseModal(false);
         const resumeDate = new Date(data.resumeDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'America/Los_Angeles' });
         showSuccess(`Subscription paused for ${durationDays} days. Billing resumes on ${resumeDate}.`);
+        setTimeout(() => onDrawerClose?.(), 600);
       } else {
         setError(getApiErrorMessage(res, 'pause subscription'));
       }
@@ -784,6 +790,7 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({
         await fetchBillingInfo();
         onMemberUpdated?.();
         showSuccess('Subscription resumed');
+        setTimeout(() => onDrawerClose?.(), 600);
       } else {
         setError(getApiErrorMessage(res, 'resume subscription'));
       }
@@ -807,6 +814,7 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({
         onMemberUpdated?.();
         setShowCancelModal(false);
         showSuccess('Subscription will be canceled at period end');
+        setTimeout(() => onDrawerClose?.(), 600);
       } else {
         setError(getApiErrorMessage(res, 'cancel subscription'));
       }
@@ -1093,6 +1101,7 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({
         setSelectedSubscriptionTier('');
         setSelectedCoupon('');
         showSuccess(data.message || 'Subscription created successfully');
+        setTimeout(() => onDrawerClose?.(), 600);
       } else {
         setError(getApiErrorMessage(res, 'create subscription'));
       }
@@ -1766,6 +1775,8 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({
           onSuccess={() => {
             fetchBillingInfo();
             setShowTierChangeModal(false);
+            onMemberUpdated?.();
+            setTimeout(() => onDrawerClose?.(), 600);
           }}
         />
       )}

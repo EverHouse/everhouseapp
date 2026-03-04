@@ -609,6 +609,7 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
             displayedTier={displayedTier}
             onTierUpdate={(newTier) => setDisplayedTier(newTier)}
             onMemberUpdated={onMemberUpdated}
+            onDrawerClose={onClose}
             guestPassInfo={history?.guestPassInfo}
             guestHistory={guestHistory}
             guestCheckInsHistory={history?.guestCheckInsHistory || []}

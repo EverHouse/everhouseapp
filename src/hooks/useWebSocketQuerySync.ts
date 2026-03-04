@@ -89,16 +89,19 @@ export function useWebSocketQuerySync() {
     };
 
     const handleBillingUpdate = (event: CustomEvent) => {
-      if (import.meta.env.DEV) console.log('[WebSocketQuerySync] Invalidating billing/financials queries');
+      if (import.meta.env.DEV) console.log('[WebSocketQuerySync] Invalidating billing/financials/directory queries');
       queryClient.invalidateQueries({ queryKey: financialsKeys.all });
       queryClient.invalidateQueries({ queryKey: ['member'] });
+      queryClient.invalidateQueries({ queryKey: directoryKeys.all });
+      queryClient.invalidateQueries({ queryKey: commandCenterKeys.facility() });
     };
 
     const handleTierUpdate = (event: CustomEvent) => {
-      if (import.meta.env.DEV) console.log('[WebSocketQuerySync] Invalidating member/profile queries for tier update');
+      if (import.meta.env.DEV) console.log('[WebSocketQuerySync] Invalidating member/profile/directory queries for tier update');
       queryClient.invalidateQueries({ queryKey: ['members'] });
       queryClient.invalidateQueries({ queryKey: ['member'] });
       queryClient.invalidateQueries({ queryKey: ['membership-tiers'] });
+      queryClient.invalidateQueries({ queryKey: directoryKeys.all });
     };
 
     const handleMemberStatsUpdated = (event: CustomEvent) => {
