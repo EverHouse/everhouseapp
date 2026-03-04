@@ -216,8 +216,11 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
           handleCheckIn(booking);
           showToast(`Checking in ${booking.user_name}...`, 'info');
         } else {
-          playSound('checkinWarning');
-          showToast('Booking not found for today.', 'error');
+          const result = await checkInWithToast(scanData.bookingId, { status: 'attended' });
+          if (result?.success) {
+            window.dispatchEvent(new CustomEvent('booking-action-completed'));
+            refresh();
+          }
         }
       } else {
         playSound('checkinWarning');
@@ -856,7 +859,7 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
         onOpenBillingModal={(bookingId) => setBillingModal({ isOpen: true, bookingId })}
         onCollectPayment={(bookingId) => setBillingModal({ isOpen: true, bookingId })}
         onCheckIn={async (bookingId: number, targetStatus?: 'attended' | 'no_show') => {
-          const booking = data.todaysBookings.find(b => b.id === bookingId);
+          const booking = data.todaysBookings.find(b => Number(b.id) === Number(bookingId));
           if (booking) {
             handleCheckIn(booking, targetStatus);
           } else {
