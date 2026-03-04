@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import SlideUpDrawer from './SlideUpDrawer';
 import { useTheme } from '../contexts/ThemeContext';
 import { useToast } from './Toast';
@@ -16,12 +16,51 @@ export function WaiverModal({ isOpen, onComplete, currentVersion }: WaiverModalP
   const [agreed, setAgreed] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [scrolledToBottom, setScrolledToBottom] = useState(false);
+  const endOfWaiverRef = useRef<HTMLDivElement>(null);
+
+  const markScrolledToBottom = useCallback(() => {
+    setScrolledToBottom(true);
+  }, []);
+
+  useEffect(() => {
+    if (isOpen) {
+      setScrolledToBottom(false);
+      setAgreed(false);
+    }
+  }, [isOpen, currentVersion]);
+
+  useEffect(() => {
+    if (!isOpen || scrolledToBottom) return;
+    if (typeof IntersectionObserver === 'undefined') return;
+
+    const sentinel = endOfWaiverRef.current;
+    if (!sentinel) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          markScrolledToBottom();
+          observer.disconnect();
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    const timer = setTimeout(() => {
+      observer.observe(sentinel);
+    }, 500);
+
+    return () => {
+      clearTimeout(timer);
+      observer.disconnect();
+    };
+  }, [isOpen, scrolledToBottom, markScrolledToBottom]);
 
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const target = e.target as HTMLDivElement;
-    const isAtBottom = target.scrollHeight - target.scrollTop <= target.clientHeight + 50;
+    const isAtBottom = target.scrollHeight - target.scrollTop <= target.clientHeight + 100;
     if (isAtBottom && !scrolledToBottom) {
-      setScrolledToBottom(true);
+      markScrolledToBottom();
     }
   };
 
@@ -164,6 +203,7 @@ export function WaiverModal({ isOpen, onComplete, currentVersion }: WaiverModalP
           <p className={`font-medium ${isDark ? 'text-[#a3e635]' : 'text-primary'}`}>
             — End of Waiver Document —
           </p>
+          <div ref={endOfWaiverRef} aria-hidden="true" className="h-px w-full" />
         </div>
       </div>
     </SlideUpDrawer>
