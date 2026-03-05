@@ -30,6 +30,8 @@ interface DirectoryFiltersProps {
     setDiscountFilter: (f: string) => void;
     showMissingTierOnly: boolean;
     setShowMissingTierOnly: (v: boolean) => void;
+    showRecentlyAdded: boolean;
+    setShowRecentlyAdded: (v: boolean) => void;
     sortField: SortField;
     setSortField: (f: SortField) => void;
     sortDirection: SortDirection;
@@ -62,6 +64,7 @@ const DirectoryFilters: React.FC<DirectoryFiltersProps> = ({
     billingFilter, setBillingFilter,
     discountFilter, setDiscountFilter,
     showMissingTierOnly, setShowMissingTierOnly,
+    showRecentlyAdded, setShowRecentlyAdded,
     sortField, setSortField,
     sortDirection, setSortDirection,
     filtersOpen, setFiltersOpen,
@@ -273,6 +276,25 @@ const DirectoryFilters: React.FC<DirectoryFiltersProps> = ({
                                                 {getMemberStatusLabel(status)}
                                             </button>
                                         ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {memberTab === 'active' && (
+                                <div className="space-y-1.5">
+                                    <span className="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase">Quick Filters</span>
+                                    <div className="flex flex-wrap gap-1.5">
+                                        <button
+                                            onClick={() => setShowRecentlyAdded(!showRecentlyAdded)}
+                                            className={`tactile-btn px-2 py-0.5 rounded text-[11px] font-bold transition-colors flex-shrink-0 whitespace-nowrap flex items-center gap-1 ${
+                                                showRecentlyAdded
+                                                    ? 'bg-blue-600 text-white'
+                                                    : 'bg-gray-200 dark:bg-white/15 text-gray-400 dark:text-white/40 hover:bg-gray-300 dark:hover:bg-white/30'
+                                            }`}
+                                        >
+                                            <span className="material-symbols-outlined text-[12px]">schedule</span>
+                                            Recently Added (24h)
+                                        </button>
                                     </div>
                                 </div>
                             )}

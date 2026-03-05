@@ -139,6 +139,19 @@ export const initialVisitorForm: VisitorFormData = {
   zipCode: '',
 };
 
+export interface RecentCreation {
+  email: string;
+  name: string;
+  timestamp: number;
+}
+
+export interface EmailCheckResult {
+  exists: boolean;
+  userName?: string;
+  role?: string;
+  membershipStatus?: string;
+}
+
 export interface MemberFlowProps {
   step: MemberStep;
   form: MemberFormData;
@@ -158,6 +171,9 @@ export interface MemberFlowProps {
   showToast: (message: string, type?: 'success' | 'error' | 'info' | 'warning') => void;
   scannedIdImage: { base64: string; mimeType: string } | null;
   onShowIdScanner: () => void;
+  recentCreations: RecentCreation[];
+  emailCheckResult: EmailCheckResult | null;
+  onEmailBlur: (email: string) => void;
 }
 
 export interface VisitorFlowProps {
@@ -177,4 +193,7 @@ export interface VisitorFlowProps {
   showToast: (message: string, type?: 'success' | 'error' | 'info' | 'warning') => void;
   scannedIdImage: { base64: string; mimeType: string } | null;
   onShowIdScanner: () => void;
+  recentCreations: RecentCreation[];
+  emailCheckResult: EmailCheckResult | null;
+  onEmailBlur: (email: string) => void;
 }

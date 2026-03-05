@@ -212,6 +212,8 @@ const DirectoryTab: React.FC = () => {
                     setDiscountFilter={filters.setDiscountFilter}
                     showMissingTierOnly={filters.showMissingTierOnly}
                     setShowMissingTierOnly={filters.setShowMissingTierOnly}
+                    showRecentlyAdded={filters.showRecentlyAdded}
+                    setShowRecentlyAdded={filters.setShowRecentlyAdded}
                     sortField={filters.sortField}
                     setSortField={filters.setSortField}
                     sortDirection={filters.sortDirection}

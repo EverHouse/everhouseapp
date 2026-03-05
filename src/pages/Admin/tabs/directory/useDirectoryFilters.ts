@@ -26,6 +26,7 @@ export function useDirectoryFilters({ members, formerMembers, memberTab }: UseDi
     const [billingFilter, setBillingFilter] = useState<BillingFilter>('All');
     const [discountFilter, setDiscountFilter] = useState<string>('All');
     const [showMissingTierOnly, setShowMissingTierOnly] = useState(false);
+    const [showRecentlyAdded, setShowRecentlyAdded] = useState(false);
     const [sortField, setSortField] = useState<SortField>('name');
     const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
     const [filtersOpen, setFiltersOpen] = useState(false);
@@ -121,6 +122,7 @@ export function useDirectoryFilters({ members, formerMembers, memberTab }: UseDi
             setBillingFilter('All');
             setDiscountFilter('All');
             setShowMissingTierOnly(false);
+            setShowRecentlyAdded(false);
         }
     }, [memberTab]);
 
@@ -145,6 +147,7 @@ export function useDirectoryFilters({ members, formerMembers, memberTab }: UseDi
             if (billingFilter !== 'All') filters.push({ key: 'billing', label: `Billing: ${billingFilter}`, onRemove: () => setBillingFilter('All') });
             if (discountFilter !== 'All') filters.push({ key: 'discount', label: `Discount: ${discountFilter}`, onRemove: () => setDiscountFilter('All') });
         } else if (memberTab === 'active') {
+            if (showRecentlyAdded) filters.push({ key: 'recent', label: 'Recently Added (24h)', onRemove: () => setShowRecentlyAdded(false) });
             if (tierFilter !== 'All') filters.push({ key: 'tier', label: `Tier: ${tierFilter}`, onRemove: () => setTierFilter('All') });
             if (membershipStatusFilter !== 'All') filters.push({ key: 'status', label: `Status: ${getMemberStatusLabel(membershipStatusFilter)}`, onRemove: () => setMembershipStatusFilter('All') });
             if (appUsageFilter !== 'All') filters.push({ key: 'app', label: `App: ${appUsageFilter}`, onRemove: () => setAppUsageFilter('All') });
@@ -153,13 +156,22 @@ export function useDirectoryFilters({ members, formerMembers, memberTab }: UseDi
         }
 
         return filters;
-    }, [memberTab, tierFilter, statusFilter, membershipStatusFilter, appUsageFilter, billingFilter, discountFilter, visitorTypeFilter, visitorSourceFilter, purchaseFilter]);
+    }, [memberTab, tierFilter, statusFilter, membershipStatusFilter, appUsageFilter, billingFilter, discountFilter, visitorTypeFilter, visitorSourceFilter, purchaseFilter, showRecentlyAdded]);
 
     const activeFilterCount = activeFilters.length;
 
     const filteredList = useMemo(() => {
         let filtered = regularMembers;
         
+        if (showRecentlyAdded && memberTab === 'active') {
+            const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+            filtered = filtered.filter(m => {
+                if (!m.joinDate) return false;
+                const joinDate = new Date(m.joinDate);
+                return joinDate >= twentyFourHoursAgo;
+            });
+        }
+
         if (showMissingTierOnly && memberTab === 'active') {
             filtered = filtered.filter(m => !m.rawTier || m.rawTier.trim() === '');
         }
@@ -253,7 +265,7 @@ export function useDirectoryFilters({ members, formerMembers, memberTab }: UseDi
         });
         
         return filtered;
-    }, [regularMembers, tierFilter, appUsageFilter, statusFilter, membershipStatusFilter, billingFilter, discountFilter, memberTab, searchQuery, sortField, sortDirection, showMissingTierOnly]);
+    }, [regularMembers, tierFilter, appUsageFilter, statusFilter, membershipStatusFilter, billingFilter, discountFilter, memberTab, searchQuery, sortField, sortDirection, showMissingTierOnly, showRecentlyAdded]);
 
     const handleSort = useCallback((field: SortField) => {
         if (sortField === field) {
@@ -285,6 +297,7 @@ export function useDirectoryFilters({ members, formerMembers, memberTab }: UseDi
         billingFilter, setBillingFilter,
         discountFilter, setDiscountFilter,
         showMissingTierOnly, setShowMissingTierOnly,
+        showRecentlyAdded, setShowRecentlyAdded,
         sortField, setSortField,
         sortDirection, setSortDirection,
         filtersOpen, setFiltersOpen,

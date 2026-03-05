@@ -187,7 +187,7 @@ router.post('/api/stripe/subscriptions/create-for-member', isStaffOrAdmin, subsc
     const memberEmail = rawMemberEmail?.trim()?.toLowerCase();
     const sessionUser = getSessionUser(req);
 
-    if (!acquireSubscriptionLock(memberEmail)) {
+    if (!await acquireSubscriptionLock(memberEmail)) {
       logger.warn('[Stripe] Subscription creation already in progress', { extra: { memberEmail } });
       return res.status(409).json({ error: 'A subscription is already being created for this member. Please wait for the current request to complete.' });
     }
@@ -381,7 +381,7 @@ router.post('/api/stripe/subscriptions/create-for-member', isStaffOrAdmin, subsc
     res.status(500).json({ error: 'Failed to create subscription', details: safeErrorDetail(error) });
   } finally {
     const emailToRelease = req.body?.memberEmail?.trim()?.toLowerCase();
-    if (emailToRelease) releaseSubscriptionLock(emailToRelease);
+    if (emailToRelease) await releaseSubscriptionLock(emailToRelease);
   }
 });
 
@@ -391,7 +391,7 @@ router.post('/api/stripe/subscriptions/create-new-member', isStaffOrAdmin, subsc
     const email = rawEmail?.trim()?.toLowerCase();
     const sessionUser = getSessionUser(req);
 
-    if (!acquireSubscriptionLock(email)) {
+    if (!await acquireSubscriptionLock(email)) {
       logger.warn('[Stripe] Subscription creation already in progress for new member', { extra: { email } });
       return res.status(409).json({ error: 'A subscription is already being created for this email. Please wait for the current request to complete.' });
     }
@@ -675,7 +675,7 @@ router.post('/api/stripe/subscriptions/create-new-member', isStaffOrAdmin, subsc
     res.status(500).json({ error: 'Failed to create subscription', details: safeErrorDetail(error) });
   } finally {
     const emailToRelease = req.body?.email?.trim()?.toLowerCase();
-    if (emailToRelease) releaseSubscriptionLock(emailToRelease);
+    if (emailToRelease) await releaseSubscriptionLock(emailToRelease);
   }
 });
 
@@ -1198,7 +1198,7 @@ router.delete('/api/stripe/subscriptions/cleanup-pending/:userId', isStaffOrAdmi
       });
     }
 
-    if (!acquireSubscriptionLock(user.email)) {
+    if (!await acquireSubscriptionLock(user.email)) {
       return res.status(409).json({ error: 'A subscription is currently being created for this member. Please wait and try again.' });
     }
     res.locals._cleanupEmail = user.email.toLowerCase();
@@ -1288,7 +1288,7 @@ router.delete('/api/stripe/subscriptions/cleanup-pending/:userId', isStaffOrAdmi
     logger.error('[Stripe] Error cleaning up pending user', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to cleanup pending user' });
   } finally {
-    if (res.locals._cleanupEmail) releaseSubscriptionLock(res.locals._cleanupEmail);
+    if (res.locals._cleanupEmail) await releaseSubscriptionLock(res.locals._cleanupEmail);
   }
 });
 

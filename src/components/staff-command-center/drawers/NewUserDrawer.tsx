@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useTheme } from '../../../contexts/ThemeContext';
 import { useBottomNav } from '../../../contexts/BottomNavContext';
 import { useToast } from '../../Toast';
@@ -18,6 +18,9 @@ import {
   NewUserDrawerProps,
   initialMemberForm,
   initialVisitorForm,
+  RecentCreation,
+  EmailCheckResult,
+  EMAIL_REGEX,
 } from './newUser/newUserTypes';
 
 export function NewUserDrawer({
@@ -55,6 +58,12 @@ export function NewUserDrawer({
   const [subMemberScannedIds, setSubMemberScannedIds] = useState<Record<number, { base64: string; mimeType: string }>>({});
   const [scanningSubMemberIndex, setScanningSubMemberIndex] = useState<number | null>(null);
 
+  const recentCreationsRef = useRef<RecentCreation[]>([]);
+  const [recentCreations, setRecentCreations] = useState<RecentCreation[]>([]);
+  const [emailCheckResult, setEmailCheckResult] = useState<EmailCheckResult | null>(null);
+  const [cooldownRemaining, setCooldownRemaining] = useState(0);
+  const cooldownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   useEffect(() => {
     if (isOpen) {
       setDrawerOpen(true);
@@ -64,6 +73,49 @@ export function NewUserDrawer({
       resetForm();
     }
   }, [isOpen, setDrawerOpen]);
+
+  useEffect(() => {
+    return () => {
+      if (cooldownTimerRef.current) clearInterval(cooldownTimerRef.current);
+    };
+  }, []);
+
+  const startCooldown = useCallback((seconds: number) => {
+    setCooldownRemaining(seconds);
+    if (cooldownTimerRef.current) clearInterval(cooldownTimerRef.current);
+    cooldownTimerRef.current = setInterval(() => {
+      setCooldownRemaining(prev => {
+        if (prev <= 1) {
+          if (cooldownTimerRef.current) clearInterval(cooldownTimerRef.current);
+          cooldownTimerRef.current = null;
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  }, []);
+
+  const addRecentCreation = useCallback((email: string, name: string) => {
+    const entry: RecentCreation = { email: email.toLowerCase(), name, timestamp: Date.now() };
+    recentCreationsRef.current = [...recentCreationsRef.current, entry];
+    setRecentCreations([...recentCreationsRef.current]);
+  }, []);
+
+  const handleEmailBlur = useCallback(async (email: string) => {
+    setEmailCheckResult(null);
+    if (!email || !EMAIL_REGEX.test(email)) return;
+
+    try {
+      const res = await fetch(`/api/visitors/check-email?email=${encodeURIComponent(email.trim())}`, { credentials: 'include' });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.exists) {
+          setEmailCheckResult(data);
+        }
+      }
+    } catch {
+    }
+  }, []);
 
   const resetForm = useCallback(() => {
     setMemberStep('form');
@@ -76,6 +128,7 @@ export function NewUserDrawer({
     setScannedIdImage(null);
     setSubMemberScannedIds({});
     setScanningSubMemberIndex(null);
+    setEmailCheckResult(null);
   }, [defaultMode]);
   
   const handleCleanupPendingUser = async () => {
@@ -256,10 +309,17 @@ export function NewUserDrawer({
       maxHeight="full"
     >
       <div className="px-4 pt-2 pb-4">
+        {cooldownRemaining > 0 && (
+          <div className={`mb-3 p-2.5 rounded-lg flex items-center gap-2 ${isDark ? 'bg-amber-900/20 border border-amber-700 text-amber-400' : 'bg-amber-50 border border-amber-200 text-amber-700'}`}>
+            <span className="material-symbols-outlined text-lg">timer</span>
+            <span className="text-sm">Please wait {cooldownRemaining}s before adding another user</span>
+          </div>
+        )}
         <div className="flex gap-2 mb-4">
           <button
             onClick={() => handleModeChange('member')}
-            className={`tactile-btn flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
+            disabled={cooldownRemaining > 0}
+            className={`tactile-btn flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
               mode === 'member'
                 ? 'bg-emerald-600 text-white'
                 : isDark
@@ -272,7 +332,8 @@ export function NewUserDrawer({
           </button>
           <button
             onClick={() => handleModeChange('visitor')}
-            className={`tactile-btn flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
+            disabled={cooldownRemaining > 0}
+            className={`tactile-btn flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
               mode === 'visitor'
                 ? 'bg-emerald-600 text-white'
                 : isDark
@@ -362,6 +423,8 @@ export function NewUserDrawer({
           onSuccess={(user) => {
             setCreatedUser(user);
             setMemberStep('success');
+            addRecentCreation(user.email, user.name);
+            startCooldown(5);
             onSuccess?.({ ...user, mode: 'member' });
           }}
           createdUser={createdUser}
@@ -369,6 +432,9 @@ export function NewUserDrawer({
           showToast={showToast}
           scannedIdImage={scannedIdImage}
           onShowIdScanner={() => setShowIdScanner(true)}
+          recentCreations={recentCreations}
+          emailCheckResult={emailCheckResult}
+          onEmailBlur={handleEmailBlur}
         />
         ) : (
         <VisitorFlow
@@ -384,6 +450,8 @@ export function NewUserDrawer({
           onSuccess={(user: { id: string; email: string; name: string }) => {
             setCreatedUser(user);
             setVisitorStep('success');
+            addRecentCreation(user.email, user.name);
+            startCooldown(5);
             onSuccess?.({ ...user, mode: 'visitor' });
           }}
           createdUser={createdUser}
@@ -392,6 +460,9 @@ export function NewUserDrawer({
           showToast={showToast}
           scannedIdImage={scannedIdImage}
           onShowIdScanner={() => setShowIdScanner(true)}
+          recentCreations={recentCreations}
+          emailCheckResult={emailCheckResult}
+          onEmailBlur={handleEmailBlur}
         />
         )}
       </div>

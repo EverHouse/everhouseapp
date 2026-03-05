@@ -1,6 +1,7 @@
 import rateLimit from 'express-rate-limit';
 import { Request, Response } from 'express';
 import { logger } from '../core/logger';
+import { pool } from '../core/db';
 
 const getClientKey = (req: Request): string => {
   const userId = req.session?.user?.id;
@@ -143,33 +144,69 @@ export const subscriptionCreationRateLimiter = rateLimit({
   }
 });
 
-const subscriptionLocks = new Map<string, number>();
-
 const LOCK_TIMEOUT_MS = 120_000;
 
-function cleanExpiredLocks() {
-  const now = Date.now();
-  for (const [key, timestamp] of subscriptionLocks) {
-    if (now - timestamp > LOCK_TIMEOUT_MS) {
-      subscriptionLocks.delete(key);
-    }
+const subscriptionLocksMemory = new Map<string, number>();
+
+let dbLocksInitialized = false;
+async function ensureLocksTable(): Promise<boolean> {
+  if (dbLocksInitialized) return true;
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS subscription_locks (
+        email TEXT PRIMARY KEY,
+        locked_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        locked_by TEXT
+      )
+    `);
+    dbLocksInitialized = true;
+    return true;
+  } catch (err) {
+    logger.warn('[SubscriptionLock] Failed to create locks table, falling back to memory', { extra: { error: String(err) } });
+    return false;
   }
 }
 
-setInterval(cleanExpiredLocks, 60_000).unref();
-
-export function acquireSubscriptionLock(email: string): boolean {
+export async function acquireSubscriptionLock(email: string, lockedBy?: string): Promise<boolean> {
   const key = email.toLowerCase();
-  const existing = subscriptionLocks.get(key);
+  const dbReady = await ensureLocksTable();
+
+  if (dbReady) {
+    try {
+      const result = await pool.query(
+        `INSERT INTO subscription_locks (email, locked_at, locked_by)
+         VALUES ($1, NOW(), $2)
+         ON CONFLICT (email) DO UPDATE
+         SET locked_at = EXCLUDED.locked_at, locked_by = EXCLUDED.locked_by
+         WHERE subscription_locks.locked_at < NOW() - INTERVAL '${LOCK_TIMEOUT_MS} milliseconds'
+         RETURNING email`,
+        [key, lockedBy || null]
+      );
+      return result.rowCount !== null && result.rowCount > 0;
+    } catch (err) {
+      logger.warn('[SubscriptionLock] DB lock failed, falling back to memory', { extra: { error: String(err) } });
+    }
+  }
+
+  const existing = subscriptionLocksMemory.get(key);
   if (existing && Date.now() - existing < LOCK_TIMEOUT_MS) {
     return false;
   }
-  subscriptionLocks.set(key, Date.now());
+  subscriptionLocksMemory.set(key, Date.now());
   return true;
 }
 
-export function releaseSubscriptionLock(email: string): void {
-  subscriptionLocks.delete(email.toLowerCase());
+export async function releaseSubscriptionLock(email: string): Promise<void> {
+  const key = email.toLowerCase();
+  subscriptionLocksMemory.delete(key);
+
+  if (dbLocksInitialized) {
+    try {
+      await pool.query('DELETE FROM subscription_locks WHERE email = $1', [key]);
+    } catch (err) {
+      logger.warn('[SubscriptionLock] DB lock release failed', { extra: { error: String(err) } });
+    }
+  }
 }
 
 export const memberLookupRateLimiter = rateLimit({

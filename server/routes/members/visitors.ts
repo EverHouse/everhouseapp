@@ -1064,4 +1064,57 @@ router.delete('/api/visitors/:id', isStaffOrAdmin, async (req, res) => {
   }
 });
 
+router.get('/api/visitors/check-email', isStaffOrAdmin, async (req, res) => {
+  try {
+    const email = (req.query.email as string || '').trim().toLowerCase();
+    if (!email) {
+      return res.status(400).json({ error: 'Email is required' });
+    }
+
+    const result = await db.execute(sql`
+      SELECT id, first_name, last_name, email, role, membership_status, archived_at
+      FROM users
+      WHERE LOWER(email) = ${email}
+      AND archived_at IS NULL
+      LIMIT 1
+    `);
+
+    if (result.rows.length > 0) {
+      const user = result.rows[0] as { id: string; first_name: string | null; last_name: string | null; role: string | null; membership_status: string | null };
+      const name = [user.first_name, user.last_name].filter(Boolean).join(' ') || email;
+      return res.json({
+        exists: true,
+        userName: name,
+        role: user.role || 'visitor',
+        membershipStatus: user.membership_status,
+      });
+    }
+
+    const linkedResult = await db.execute(sql`
+      SELECT u.id, u.first_name, u.last_name, u.email, u.role, u.membership_status
+      FROM users u
+      INNER JOIN user_linked_emails ule ON ule.user_id = u.id
+      WHERE LOWER(ule.linked_email) = ${email}
+      AND u.archived_at IS NULL
+      LIMIT 1
+    `);
+
+    if (linkedResult.rows.length > 0) {
+      const user = linkedResult.rows[0] as { id: string; first_name: string | null; last_name: string | null; role: string | null; membership_status: string | null };
+      const name = [user.first_name, user.last_name].filter(Boolean).join(' ') || email;
+      return res.json({
+        exists: true,
+        userName: name,
+        role: user.role || 'visitor',
+        membershipStatus: user.membership_status,
+      });
+    }
+
+    return res.json({ exists: false });
+  } catch (error: unknown) {
+    logger.error('[Visitors] Check email error', { error: error instanceof Error ? error : new Error(String(error)) });
+    res.status(500).json({ error: 'Failed to check email' });
+  }
+});
+
 export default router;

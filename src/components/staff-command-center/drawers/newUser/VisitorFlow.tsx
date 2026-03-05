@@ -8,6 +8,8 @@ import {
   DayPassProduct,
   EMAIL_REGEX,
   getStripePromise,
+  RecentCreation,
+  EmailCheckResult,
 } from './newUserTypes';
 import WalkingGolferSpinner from '../../../WalkingGolferSpinner';
 
@@ -28,6 +30,9 @@ export function VisitorFlow({
   showToast,
   scannedIdImage,
   onShowIdScanner,
+  recentCreations,
+  emailCheckResult,
+  onEmailBlur,
 }: VisitorFlowProps) {
   const [stripeInstance, setStripeInstance] = useState<Stripe | null>(null);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
@@ -140,6 +145,7 @@ export function VisitorFlow({
     setStripeError(null);
   };
 
+  const proceedSubmittingRef = useRef(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const getInputClass = (fieldName: string) => `w-full px-3 py-2.5 rounded-lg border ${
@@ -160,6 +166,8 @@ export function VisitorFlow({
   const errorMsgClass = 'text-red-500 text-xs mt-1 flex items-center gap-1';
 
   const handleProceedToPayment = () => {
+    if (proceedSubmittingRef.current) return;
+
     const errors: Record<string, string> = {};
     if (!form.productId) errors.productId = 'Please select a day pass';
     if (!form.firstName) errors.firstName = 'First name is required';
@@ -173,6 +181,10 @@ export function VisitorFlow({
       setError('Please fill in all required fields');
       return;
     }
+
+    proceedSubmittingRef.current = true;
+    setTimeout(() => { proceedSubmittingRef.current = false; }, 1000);
+
     setError(null);
     setStep('payment');
   };
@@ -416,6 +428,7 @@ export function VisitorFlow({
             setForm(prev => ({ ...prev, email: e.target.value }));
             if (fieldErrors.email) setFieldErrors(prev => ({ ...prev, email: '' }));
           }}
+          onBlur={() => onEmailBlur(form.email)}
           placeholder="email@example.com"
           className={getInputClass('email')}
         />
@@ -425,6 +438,25 @@ export function VisitorFlow({
             {fieldErrors.email}
           </p>
         )}
+        {emailCheckResult?.exists && (
+          <div className={`mt-1.5 p-2 rounded-lg flex items-start gap-2 text-xs ${isDark ? 'bg-amber-900/20 border border-amber-700 text-amber-400' : 'bg-amber-50 border border-amber-200 text-amber-700'}`}>
+            <span className="material-symbols-outlined text-sm mt-0.5 shrink-0">warning</span>
+            <span>A {emailCheckResult.role || 'user'} named <strong>{emailCheckResult.userName}</strong> already exists with this email ({emailCheckResult.membershipStatus || 'active'}). Are you sure this is correct?</span>
+          </div>
+        )}
+        {(() => {
+          const recentMatch = recentCreations.find(r => r.email === form.email.trim().toLowerCase() && (Date.now() - r.timestamp) < 600000);
+          if (recentMatch) {
+            const minsAgo = Math.round((Date.now() - recentMatch.timestamp) / 60000);
+            return (
+              <div className={`mt-1.5 p-2 rounded-lg flex items-start gap-2 text-xs ${isDark ? 'bg-orange-900/20 border border-orange-700 text-orange-400' : 'bg-orange-50 border border-orange-200 text-orange-700'}`}>
+                <span className="material-symbols-outlined text-sm mt-0.5 shrink-0">history</span>
+                <span>You created a record for <strong>{recentMatch.name}</strong> {minsAgo < 1 ? 'just now' : `${minsAgo} min ago`}. Is this a different person?</span>
+              </div>
+            );
+          }
+          return null;
+        })()}
       </div>
 
       <div className="space-y-1">
