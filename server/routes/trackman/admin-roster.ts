@@ -1434,6 +1434,11 @@ router.put('/api/admin/booking/:bookingId/members/:slotId/link', isStaffOrAdmin,
           await db.execute(sql`UPDATE booking_participants SET user_id = ${userId}, display_name = ${displayName} WHERE id = ${slotId}`);
           
           await db.execute(sql`DELETE FROM booking_participants WHERE session_id = ${sessionId} AND user_id = ${userId} AND id != ${slotId}`);
+
+          if (slot.participant_type === 'owner') {
+            await db.execute(sql`UPDATE booking_requests SET user_id = ${userId}, user_email = ${memberEmail.toLowerCase()}, user_name = ${displayName}, updated_at = NOW() WHERE id = ${bookingId}`);
+            logger.info('[Link Member] Updated booking_requests owner to match linked owner slot', { extra: { bookingId, userId, displayName, memberEmail } });
+          }
           
           if (req.body.deferFeeRecalc !== true) {
             try {

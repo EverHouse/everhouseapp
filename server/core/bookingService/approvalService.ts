@@ -1534,7 +1534,7 @@ export async function revertToApproved(params: { bookingId: number; staffEmail: 
          FROM booking_sessions bs
          WHERE bp.session_id = $1 AND bp.payment_status = 'waived'
            AND bs.id = bp.session_id
-           AND COALESCE(bs.source, '') NOT IN ('trackman_import', 'trackman_webhook')`,
+           AND (bs.source IS NULL OR bs.source::text NOT IN ('trackman_import', 'trackman_webhook'))`,
         [existing.sessionId]
       );
     }
