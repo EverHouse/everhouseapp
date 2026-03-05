@@ -216,6 +216,15 @@ export async function checkUnifiedAvailabilityWithLock(
       };
     }
     
+    const requestConflict = await import('../bookingValidation').then(m => m.checkBookingConflict(resourceId, date, startTime, endTime));
+    if (requestConflict.hasConflict) {
+      return {
+        available: false,
+        conflictType: 'session',
+        conflictTitle: 'Pending Booking Request'
+      };
+    }
+    
     return { available: true };
   } catch (error: unknown) {
     logger.error('[checkUnifiedAvailabilityWithLock] Error:', { error });

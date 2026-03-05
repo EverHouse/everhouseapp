@@ -1275,10 +1275,12 @@ router.put('/api/booking-requests/:id/member-cancel', async (req, res) => {
       logger.info('[Member Cancel] Late cancellation — preserving booking invoice for fee collection', { extra: { bookingId } });
     }
     
-    try {
-      await cancelPendingPaymentIntentsForBooking(bookingId);
-    } catch (cancelIntentsErr: unknown) {
-      logger.error('[Member Cancel] Failed to cancel pending payment intents (non-blocking)', { extra: { cancelIntentsErr } });
+    if (!shouldSkipRefund) {
+      try {
+        await cancelPendingPaymentIntentsForBooking(bookingId);
+      } catch (cancelIntentsErr: unknown) {
+        logger.error('[Member Cancel] Failed to cancel pending payment intents (non-blocking)', { extra: { cancelIntentsErr } });
+      }
     }
     
     let refundedAmountCents = 0;

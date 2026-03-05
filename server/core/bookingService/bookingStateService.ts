@@ -274,26 +274,6 @@ export class BookingStateService {
           await tx.execute(sql`UPDATE booking_participants SET payment_status = 'refund_pending' WHERE id = ANY(${toIntArrayLiteral(paidParticipantIds)}::int[])`);
         }
 
-        const guestParticipants = await tx.select({
-          id: bookingParticipants.id,
-          displayName: bookingParticipants.displayName,
-          usedGuestPass: bookingParticipants.usedGuestPass,
-        })
-          .from(bookingParticipants)
-          .where(and(
-            eq(bookingParticipants.sessionId, booking.sessionId),
-            eq(bookingParticipants.participantType, 'guest'),
-          ));
-
-        for (const guest of guestParticipants) {
-          if (guest.usedGuestPass) {
-            try {
-              await refundGuestPass(booking.userEmail, guest.displayName || undefined, false);
-            } catch (guestErr: unknown) {
-              logger.error('[BookingStateService] Failed to refund guest pass in transaction', { extra: { error: getErrorMessage(guestErr) } });
-            }
-          }
-        }
       }
 
       await tx.execute(sql`
