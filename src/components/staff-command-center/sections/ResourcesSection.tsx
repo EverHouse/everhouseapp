@@ -4,7 +4,7 @@ import EmptyState from '../../EmptyState';
 import { formatTime12Hour, isFacilityOpen, formatDateDisplayWithDay } from '../../../utils/dateUtils';
 import { isBlockingClosure, getNoticeTypeLabel, getNoticeSecondaryTag } from '../../../utils/closureUtils';
 import type { BayStatus, Closure, Announcement, TabType, RecentActivity, StaffNotification } from '../types';
-import { tabToPath } from '../../../pages/Admin/layout/types';
+import { tabToPath } from '../../../lib/nav-constants';
 
 interface NoticeBoardCardProps {
   variant: 'desktop' | 'mobile' | 'mobile-notice-only' | 'mobile-facility-only';

@@ -15,6 +15,8 @@ export const TabTransition: React.FC<TabTransitionProps> = ({
   const prevKeyRef = useRef(activeKey);
   const isFirstRender = useRef(true);
   const frozenChildrenRef = useRef<React.ReactNode>(null);
+  const exitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const enterTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (isFirstRender.current) {
@@ -24,22 +26,26 @@ export const TabTransition: React.FC<TabTransitionProps> = ({
     }
 
     if (activeKey !== prevKeyRef.current) {
+      if (exitTimerRef.current) clearTimeout(exitTimerRef.current);
+      if (enterTimerRef.current) clearTimeout(enterTimerRef.current);
+
       frozenChildrenRef.current = null;
       setAnimationPhase('exiting');
       
-      const exitTimer = setTimeout(() => {
+      exitTimerRef.current = setTimeout(() => {
         setAnimationPhase('entering');
         prevKeyRef.current = activeKey;
         
-        const enterTimer = setTimeout(() => {
+        enterTimerRef.current = setTimeout(() => {
           setAnimationPhase('idle');
         }, 250);
-        
-        return () => clearTimeout(enterTimer);
       }, 120);
-      
-      return () => clearTimeout(exitTimer);
     }
+
+    return () => {
+      if (exitTimerRef.current) clearTimeout(exitTimerRef.current);
+      if (enterTimerRef.current) clearTimeout(enterTimerRef.current);
+    };
   }, [activeKey]);
 
   const animationClass = 

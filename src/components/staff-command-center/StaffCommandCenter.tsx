@@ -30,7 +30,7 @@ import { UnifiedBookingSheet } from './modals/UnifiedBookingSheet';
 import { StaffManualBookingModal } from './modals/StaffManualBookingModal';
 import { NewUserDrawer } from './drawers/NewUserDrawer';
 import type { SelectedMember } from '../shared/MemberSearchInput';
-import { tabToPath } from '../../pages/Admin/layout/types';
+import { tabToPath } from '../../lib/nav-constants';
 import type { StaffCommandCenterProps, BookingRequest, RecentActivity, TabType } from './types';
 
 interface OptimisticUpdateRef {

@@ -5,7 +5,7 @@ import { formatTime12Hour, getNowTimePacific, getTodayPacific, formatRelativeTim
 import { DateBlock, GlassListRow } from '../helpers';
 import { useAsyncAction } from '../../../hooks/useAsyncAction';
 import type { BookingRequest, TabType } from '../types';
-import { tabToPath } from '../../../pages/Admin/layout/types';
+import { tabToPath } from '../../../lib/nav-constants';
 import { BookingStatusDropdown } from '../../../components/BookingStatusDropdown';
 
 interface PendingRequestsCardProps {

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import type { TabType, QuickLink } from '../types';
 import { EMPLOYEE_RESOURCES_LINKS, ADMIN_LINKS, ADMIN_ROUTE_LINKS } from '../helpers';
 import { useNavigationLoading } from '../../../contexts/NavigationLoadingContext';
-import { tabToPath } from '../../../pages/Admin/layout/types';
+import { tabToPath } from '../../../lib/nav-constants';
 
 interface QuickActionsGridProps {
   isAdmin?: boolean;

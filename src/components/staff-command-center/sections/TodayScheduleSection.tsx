@@ -4,7 +4,7 @@ import EmptyState from '../../EmptyState';
 import { formatTime12Hour } from '../../../utils/dateUtils';
 import { DateBlock, GlassListRow, getWellnessIcon, getEventIcon, formatTimeLeft } from '../helpers';
 import type { Tour, DBEvent, WellnessClass, TabType, NextScheduleItem, NextActivityItem } from '../types';
-import { tabToPath } from '../../../pages/Admin/layout/types';
+import { tabToPath } from '../../../lib/nav-constants';
 
 interface NextTourWidgetProps {
   nextTour: Tour | null;
