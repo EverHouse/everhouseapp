@@ -421,7 +421,8 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
             role: users.role,
             tier: users.tier,
             migrationStatus: users.migrationStatus,
-            archivedAt: users.archivedAt
+            archivedAt: users.archivedAt,
+            lastManualFixAt: users.lastManualFixAt,
           })
             .from(users)
             .where(eq(users.email, email))
@@ -444,10 +445,14 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
           const isCurrentlyActive = existingUser[0]?.membershipStatus === 'active';
           const isMindBodyActiveAllowStatus = isMindBodyBilled && isCurrentlyActive;
           const hasPendingMigration = existingUser[0]?.migrationStatus === 'pending';
-          const isStatusProtected = isVisitorProtected || !isMindBodyActiveAllowStatus || hasPendingMigration;
-          const isMindBodyDeactivation = isMindBodyBilled && isCurrentlyActive && status !== 'active' && !hasPendingMigration;
+          const recentlyManuallyFixed = existingUser[0]?.lastManualFixAt &&
+            (Date.now() - new Date(existingUser[0].lastManualFixAt).getTime()) < 60 * 60 * 1000;
+          const isStatusProtected = isVisitorProtected || !isMindBodyActiveAllowStatus || hasPendingMigration || !!recentlyManuallyFixed;
+          const isMindBodyDeactivation = isMindBodyBilled && isCurrentlyActive && status !== 'active' && !hasPendingMigration && !recentlyManuallyFixed;
 
-          if (hasPendingMigration && isMindBodyBilled && isCurrentlyActive && status !== 'active') {
+          if (recentlyManuallyFixed) {
+            logger.info(`[MemberSync] MANUAL FIX PROTECTED: Skipping status/tier update for ${email} — manually fixed recently`);
+          } else if (hasPendingMigration && isMindBodyBilled && isCurrentlyActive && status !== 'active') {
             logger.info(`[MemberSync] Skipping deactivation cascade for ${email} — pending migration to Stripe`);
           } else if (existingUser[0]?.billingProvider === 'stripe') {
             stripeProtectedCount++;
@@ -1029,7 +1034,8 @@ export async function syncRelevantMembersFromHubSpot(): Promise<{ synced: number
             role: users.role,
             tier: users.tier,
             migrationStatus: users.migrationStatus,
-            archivedAt: users.archivedAt
+            archivedAt: users.archivedAt,
+            lastManualFixAt: users.lastManualFixAt,
           })
             .from(users)
             .where(eq(users.email, email))
@@ -1052,10 +1058,14 @@ export async function syncRelevantMembersFromHubSpot(): Promise<{ synced: number
           const isCurrentlyActive = existingUser[0]?.membershipStatus === 'active';
           const isMindBodyActiveAllowStatus = isMindBodyBilled && isCurrentlyActive;
           const hasPendingMigration = existingUser[0]?.migrationStatus === 'pending';
-          const isStatusProtected = isVisitorProtected || !isMindBodyActiveAllowStatus || hasPendingMigration;
-          const isMindBodyDeactivation = isMindBodyBilled && isCurrentlyActive && status !== 'active' && !hasPendingMigration;
+          const recentlyManuallyFixed = existingUser[0]?.lastManualFixAt &&
+            (Date.now() - new Date(existingUser[0].lastManualFixAt).getTime()) < 60 * 60 * 1000;
+          const isStatusProtected = isVisitorProtected || !isMindBodyActiveAllowStatus || hasPendingMigration || !!recentlyManuallyFixed;
+          const isMindBodyDeactivation = isMindBodyBilled && isCurrentlyActive && status !== 'active' && !hasPendingMigration && !recentlyManuallyFixed;
 
-          if (hasPendingMigration && isMindBodyBilled && isCurrentlyActive && status !== 'active') {
+          if (recentlyManuallyFixed) {
+            logger.info(`[MemberSync] MANUAL FIX PROTECTED: Skipping status/tier update for ${email} — manually fixed recently`);
+          } else if (hasPendingMigration && isMindBodyBilled && isCurrentlyActive && status !== 'active') {
             logger.info(`[MemberSync] Skipping deactivation cascade for ${email} — pending migration to Stripe`);
           } else if (existingUser[0]?.billingProvider === 'stripe') {
             stripeProtectedCount++;
