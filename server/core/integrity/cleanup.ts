@@ -163,35 +163,27 @@ export async function autoFixMissingTiers(): Promise<{
       logger.info(`[AutoFix] Set billing_provider='mindbody' for ${billingProviderResult.rows.length} members with MindBody IDs: ${emails}`);
     }
 
-    // Safety net — primary enforcement via trg_copy_tier_on_link trigger
-    const fixResult = await db.execute(sql`
-      WITH tier_fixes AS (
-        SELECT DISTINCT ON (u1.id)
-          u1.id as id_to_fix,
-          u1.email as email_to_fix,
-          primary_user.tier as tier_to_copy
-        FROM users u1
-        JOIN user_linked_emails ule ON LOWER(ule.linked_email) = LOWER(u1.email)
-        JOIN users primary_user ON LOWER(primary_user.email) = LOWER(ule.primary_email) 
-          AND primary_user.tier IS NOT NULL
-        WHERE u1.role = 'member' 
-          AND u1.membership_status = 'active' 
-          AND u1.tier IS NULL
-          AND u1.email NOT LIKE '%test%'
-          AND u1.email NOT LIKE '%example.com'
-        ORDER BY u1.id, primary_user.updated_at DESC NULLS LAST
-      )
-      UPDATE users u
-      SET tier = tf.tier_to_copy, updated_at = NOW()
-      FROM tier_fixes tf
-      WHERE u.id = tf.id_to_fix
-      RETURNING u.email, u.tier
+    const unmergdLinkedUsers = await db.execute(sql`
+      SELECT DISTINCT ON (u1.id)
+        u1.id, u1.email as linked_email, ule.primary_email
+      FROM users u1
+      JOIN user_linked_emails ule ON LOWER(ule.linked_email) = LOWER(u1.email)
+      JOIN users primary_user ON LOWER(primary_user.email) = LOWER(ule.primary_email)
+      WHERE u1.role = 'member' 
+        AND u1.membership_status = 'active' 
+        AND u1.email NOT LIKE '%test%'
+        AND u1.email NOT LIKE '%example.com'
+      ORDER BY u1.id
     `);
 
-    fixedFromAlternateEmail = (fixResult as { rowCount?: number }).rowCount || 0;
+    fixedFromAlternateEmail = unmergdLinkedUsers.rows.length;
 
     if (fixedFromAlternateEmail > 0) {
-      logger.info(`[AutoFix] Fixed ${fixedFromAlternateEmail} members missing tier by copying from verified linked email`);
+      const details = (unmergdLinkedUsers.rows as unknown as { linked_email: string; primary_email: string }[])
+        .slice(0, 10)
+        .map(r => `${r.linked_email} → ${r.primary_email}`)
+        .join(', ');
+      logger.warn(`[AutoFix] ${fixedFromAlternateEmail} linked users still have separate user records — should be merged into primary: ${details}`);
     }
 
     const hubspotTierCandidates = await db.execute(sql`

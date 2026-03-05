@@ -740,38 +740,12 @@ export async function setupInstantDataTriggers(): Promise<void> {
 
   try {
     await db.execute(sql`
-      CREATE OR REPLACE FUNCTION auto_copy_tier_on_link()
-      RETURNS TRIGGER
-      LANGUAGE plpgsql
-      SET search_path = ''
-      AS $$
-      DECLARE
-        primary_tier TEXT;
-      BEGIN
-        SELECT tier INTO primary_tier
-        FROM public.users
-        WHERE LOWER(email) = LOWER(NEW.primary_email) AND tier IS NOT NULL
-        LIMIT 1;
-
-        IF primary_tier IS NOT NULL THEN
-          UPDATE public.users
-          SET tier = primary_tier, updated_at = NOW()
-          WHERE LOWER(email) = LOWER(NEW.linked_email) AND tier IS NULL;
-        END IF;
-
-        RETURN NEW;
-      END;
-      $$;
-
       DROP TRIGGER IF EXISTS trg_copy_tier_on_link ON user_linked_emails;
-      CREATE TRIGGER trg_copy_tier_on_link
-      AFTER INSERT ON user_linked_emails
-      FOR EACH ROW
-      EXECUTE FUNCTION auto_copy_tier_on_link();
+      DROP FUNCTION IF EXISTS auto_copy_tier_on_link();
     `);
-    logger.info('[DB Init] Trigger: auto_copy_tier_on_link created');
+    logger.info('[DB Init] Removed legacy trg_copy_tier_on_link trigger (linked users should be merged, not given separate tiers)');
   } catch (err: unknown) {
-    logger.warn(`[DB Init] Skipping auto_copy_tier_on_link trigger: ${getErrorMessage(err)}`);
+    logger.warn(`[DB Init] Skipping trg_copy_tier_on_link cleanup: ${getErrorMessage(err)}`);
   }
 
   try {
