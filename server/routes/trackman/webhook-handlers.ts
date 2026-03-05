@@ -271,31 +271,30 @@ export async function handleBookingModification(
             const newSessionId = (newSessionResult.rows[0] as { id: number }).id;
             await tx.execute(sql`UPDATE booking_requests SET session_id = ${newSessionId} WHERE id = ${bookingId}`);
 
-            const userLookup = await tx.execute(sql`SELECT u.id as user_id
-               FROM users u WHERE LOWER(u.email) = LOWER(${existing.userEmail}) LIMIT 1`);
-            const userId = userLookup.rows.length > 0 ? (userLookup.rows[0] as { user_id: string }).user_id : null;
-            await tx.execute(sql`INSERT INTO booking_participants
-               (session_id, user_id, participant_type, display_name, payment_status, created_at)
-               VALUES (${newSessionId}, ${userId}, 'owner', ${existing.userName || existing.userEmail}, 'waived', NOW())`);
+            const existingParticipants = await tx.execute(sql`SELECT user_id, participant_type, display_name, payment_status, slot_duration
+               FROM booking_participants WHERE session_id = ${sessionId}`);
+            const partRows = existingParticipants.rows as Array<{ user_id: string | null; participant_type: string; display_name: string | null; payment_status: string; slot_duration: number | null }>;
+            let copiedCount = 0;
+            for (const p of partRows) {
+              await tx.execute(sql`INSERT INTO booking_participants
+                 (session_id, user_id, participant_type, display_name, payment_status, slot_duration, created_at)
+                 VALUES (${newSessionId}, ${p.user_id}, ${p.participant_type}, ${p.display_name}, ${p.payment_status}, ${p.slot_duration}, NOW())`);
+              copiedCount++;
+            }
 
-            const rpResult = await tx.execute(sql`SELECT request_participants FROM booking_requests WHERE id = ${bookingId}`);
-            const rpData = (rpResult.rows as Array<Record<string, unknown>>)[0]?.request_participants;
-            let transferredCount = 0;
-            if (rpData) {
-              try {
-                transferredCount = await transferRequestParticipantsToSession(
-                  newSessionId, rpData, existing.userEmail, `modification detach booking #${bookingId}`
-                );
-              } catch (rpErr: unknown) {
-                logger.warn('[Trackman Webhook] Non-blocking: Failed to transfer request_participants during detach', {
-                  extra: { bookingId, newSessionId, error: (rpErr as Error).message }
-                });
-              }
+            if (copiedCount === 0) {
+              const userLookup = await tx.execute(sql`SELECT u.id as user_id
+                 FROM users u WHERE LOWER(u.email) = LOWER(${existing.userEmail}) LIMIT 1`);
+              const userId = userLookup.rows.length > 0 ? (userLookup.rows[0] as { user_id: string }).user_id : null;
+              await tx.execute(sql`INSERT INTO booking_participants
+                 (session_id, user_id, participant_type, display_name, payment_status, created_at)
+                 VALUES (${newSessionId}, ${userId}, 'owner', ${existing.userName || existing.userEmail}, 'waived', NOW())`);
+              copiedCount = 1;
             }
 
             newSessionIdForFees = newSessionId;
-            logger.info('[Trackman Webhook] Created new session and re-linked booking with participants', {
-              extra: { bookingId, oldSessionId: sessionId, newSessionId, newResourceId, newDate, newStartTime, newEndTime, transferredParticipants: transferredCount }
+            logger.info('[Trackman Webhook] Created new session and copied participants from old session', {
+              extra: { bookingId, oldSessionId: sessionId, newSessionId, newResourceId, newDate, newStartTime, newEndTime, copiedParticipants: copiedCount }
             });
           } else {
             await tx.execute(sql`UPDATE booking_sessions
@@ -312,6 +311,29 @@ export async function handleBookingModification(
     });
 
     const effectiveSessionId = newSessionIdForFees || sessionId;
+    if (effectiveSessionId && incoming.playerCount > 1) {
+      try {
+        const existingCount = await db.execute(sql`SELECT COUNT(*) as cnt FROM booking_participants WHERE session_id = ${effectiveSessionId}`);
+        const currentParticipants = Number((existingCount.rows as Array<Record<string, unknown>>)[0]?.cnt || 0);
+        const targetTotal = incoming.playerCount;
+        const slotsToFill = Math.max(0, targetTotal - currentParticipants);
+        if (slotsToFill > 0) {
+          const slotDuration = newDuration || 60;
+          for (let i = 0; i < slotsToFill; i++) {
+            await db.execute(sql`INSERT INTO booking_participants (session_id, user_id, participant_type, display_name, payment_status, slot_duration)
+              VALUES (${effectiveSessionId}, NULL, 'guest', ${`Guest ${currentParticipants + i + 1}`}, 'waived', ${slotDuration})`);
+          }
+          logger.info('[Trackman Webhook] Backfilled guest slots after modification', {
+            extra: { bookingId, sessionId: effectiveSessionId, slotsToFill, currentParticipants, targetTotal }
+          });
+        }
+      } catch (backfillErr: unknown) {
+        logger.warn('[Trackman Webhook] Non-blocking: Failed to backfill guest slots after modification', {
+          extra: { bookingId, sessionId: effectiveSessionId, error: (backfillErr as Error).message }
+        });
+      }
+    }
+
     if (effectiveSessionId) {
       try {
         await recalculateSessionFees(effectiveSessionId, 'trackman_modification');
