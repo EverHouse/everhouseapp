@@ -17,6 +17,7 @@ import type { Request } from 'express';
 import { getErrorMessage, safeErrorDetail } from '../utils/errorUtils';
 import { validateBody } from '../middleware/validate';
 import { resolveIssueSchema, syncPushPullSchema, ignoreIssueSchema, bulkIgnoreSchema, placeholderDeleteSchema, recordIdSchema, userIdSchema, unlinkHubspotSchema, mergeHubspotSchema, mergeStripeSchema, changeBillingProviderSchema, acceptTierSchema, reviewItemSchema, assignSessionOwnerSchema, cancelOrphanedPiSchema, dryRunSchema } from '../../shared/validators/dataIntegrity';
+import { queueIntegrityFixSync } from '../core/hubspot/queueHelpers';
 
 const router = Router();
 
@@ -1094,48 +1095,86 @@ router.post('/api/data-integrity/fix/merge-stripe-customers', isAdmin, validateB
 });
 
 router.post('/api/data-integrity/fix/deactivate-stale-member', isAdmin, validateBody(userIdSchema), async (req: Request, res) => {
+  const client = await pool.connect();
   try {
     const { userId } = req.body;
+    const staffEmail = getSessionUser(req)?.email || 'unknown';
 
-    const result = await db.execute(sql`
-      UPDATE users 
-      SET membership_status = 'inactive', updated_at = NOW() 
-      WHERE id = ${userId} AND billing_provider = 'mindbody'
-    `);
+    await client.query('BEGIN');
+    await client.query(`SELECT pg_advisory_xact_lock($1)`, [userId]);
+
+    const result = await client.query(
+      `UPDATE users 
+       SET membership_status = 'inactive', updated_at = NOW(),
+           last_manual_fix_at = NOW(), last_manual_fix_by = $2
+       WHERE id = $1 AND billing_provider = 'mindbody'
+       RETURNING email, tier`,
+      [userId, staffEmail]
+    );
 
     if (result.rowCount === 0) {
+      await client.query('ROLLBACK');
       return res.status(404).json({ success: false, message: `User ${userId} not found or not a MindBody user` });
+    }
+
+    await client.query('COMMIT');
+
+    const userEmail = result.rows[0]?.email;
+    if (userEmail) {
+      queueIntegrityFixSync({ email: userEmail, status: 'inactive', tier: result.rows[0]?.tier || '', fixAction: 'deactivate_stale', performedBy: staffEmail }).catch(err => logger.warn('[DataIntegrity] HubSpot sync queue failed', { extra: { error: getErrorMessage(err) } }));
     }
 
     logFromRequest(req, 'deactivate_stale_member', 'user', userId.toString(), 'Deactivated stale MindBody member', { userId });
 
     res.json({ success: true, message: `Deactivated MindBody member #${userId}` });
   } catch (error: unknown) {
+    await client.query('ROLLBACK').catch(() => {});
     logger.error('[DataIntegrity] Deactivate stale member error', { extra: { error: getErrorMessage(error) } });
     res.status(500).json({ success: false, message: 'Operation failed', details: safeErrorDetail(error) });
+  } finally {
+    safeRelease(client);
   }
 });
 
 router.post('/api/data-integrity/fix/change-billing-provider', isAdmin, validateBody(changeBillingProviderSchema), async (req: Request, res) => {
+  const client = await pool.connect();
   try {
     const { userId, newProvider } = req.body;
+    const staffEmail = getSessionUser(req)?.email || 'unknown';
 
-    const result = await db.execute(sql`
-      UPDATE users 
-      SET billing_provider = ${newProvider}, updated_at = NOW() 
-      WHERE id = ${userId}
-    `);
+    await client.query('BEGIN');
+    await client.query(`SELECT pg_advisory_xact_lock($1)`, [userId]);
+
+    const result = await client.query(
+      `UPDATE users 
+       SET billing_provider = $2, updated_at = NOW(),
+           last_manual_fix_at = NOW(), last_manual_fix_by = $3
+       WHERE id = $1
+       RETURNING email, tier, membership_status`,
+      [userId, newProvider, staffEmail]
+    );
 
     if (result.rowCount === 0) {
+      await client.query('ROLLBACK');
       return res.status(404).json({ success: false, message: `User ${userId} not found` });
+    }
+
+    await client.query('COMMIT');
+
+    const userEmail = result.rows[0]?.email;
+    if (userEmail) {
+      queueIntegrityFixSync({ email: userEmail, billingProvider: newProvider, tier: result.rows[0]?.tier || '', status: result.rows[0]?.membership_status || '', fixAction: 'change_billing_provider', performedBy: staffEmail }).catch(err => logger.warn('[DataIntegrity] HubSpot sync queue failed', { extra: { error: getErrorMessage(err) } }));
     }
 
     logFromRequest(req, 'change_billing_provider', 'user', userId.toString(), `Changed billing provider to ${newProvider}`, { userId, newProvider });
 
     res.json({ success: true, message: `Changed billing provider to ${newProvider} for user #${userId}` });
   } catch (error: unknown) {
+    await client.query('ROLLBACK').catch(() => {});
     logger.error('[DataIntegrity] Change billing provider error', { extra: { error: getErrorMessage(error) } });
     res.status(500).json({ success: false, message: 'Operation failed', details: safeErrorDetail(error) });
+  } finally {
+    safeRelease(client);
   }
 });
 
@@ -1312,25 +1351,44 @@ router.post('/api/data-integrity/fix/bulk-attend-stale-bookings', isAdmin, async
 });
 
 router.post('/api/data-integrity/fix/activate-stuck-member', isAdmin, validateBody(userIdSchema), async (req: Request, res) => {
+  const client = await pool.connect();
   try {
     const { userId } = req.body;
+    const staffEmail = getSessionUser(req)?.email || 'unknown';
 
-    const result = await db.execute(sql`
-      UPDATE users 
-      SET membership_status = 'active', updated_at = NOW()
-      WHERE id = ${userId} AND membership_status IN ('pending', 'non-member')
-    `);
+    await client.query('BEGIN');
+    await client.query(`SELECT pg_advisory_xact_lock($1)`, [userId]);
+
+    const result = await client.query(
+      `UPDATE users 
+       SET membership_status = 'active', updated_at = NOW(),
+           last_manual_fix_at = NOW(), last_manual_fix_by = $2
+       WHERE id = $1 AND membership_status IN ('pending', 'non-member')
+       RETURNING email, tier`,
+      [userId, staffEmail]
+    );
 
     if (result.rowCount === 0) {
+      await client.query('ROLLBACK');
       return res.status(404).json({ success: false, message: 'User not found or not in pending/non-member status' });
+    }
+
+    await client.query('COMMIT');
+
+    const userEmail = result.rows[0]?.email;
+    if (userEmail) {
+      queueIntegrityFixSync({ email: userEmail, status: 'active', tier: result.rows[0]?.tier || '', fixAction: 'activate_stuck', performedBy: staffEmail }).catch(err => logger.warn('[DataIntegrity] HubSpot sync queue failed', { extra: { error: getErrorMessage(err) } }));
     }
 
     logFromRequest(req, 'activate_stuck_member', 'user', String(userId), `Activated stuck member #${userId} via data integrity`, { userId });
 
     res.json({ success: true, message: `Activated stuck member #${userId}` });
   } catch (error: unknown) {
+    await client.query('ROLLBACK').catch(() => {});
     logger.error('[DataIntegrity] Activate stuck member error', { extra: { error: getErrorMessage(error) } });
     res.status(500).json({ success: false, message: 'Operation failed', details: safeErrorDetail(error) });
+  } finally {
+    safeRelease(client);
   }
 });
 
@@ -1444,25 +1502,44 @@ router.post('/api/data-integrity/fix/delete-orphan-rsvp', isAdmin, validateBody(
 });
 
 router.post('/api/data-integrity/fix/accept-tier', isAdmin, validateBody(acceptTierSchema), async (req: Request, res) => {
+  const client = await pool.connect();
   try {
     const { userId, acceptedTier, source } = req.body;
+    const staffEmail = getSessionUser(req)?.email || 'unknown';
 
-    const result = await db.execute(sql`
-      UPDATE users 
-      SET tier = ${acceptedTier}, updated_at = NOW()
-      WHERE id = ${userId}
-    `);
+    await client.query('BEGIN');
+    await client.query(`SELECT pg_advisory_xact_lock($1)`, [userId]);
+
+    const result = await client.query(
+      `UPDATE users 
+       SET tier = $2, updated_at = NOW(),
+           last_manual_fix_at = NOW(), last_manual_fix_by = $3
+       WHERE id = $1
+       RETURNING email, membership_status`,
+      [userId, acceptedTier, staffEmail]
+    );
 
     if (result.rowCount === 0) {
+      await client.query('ROLLBACK');
       return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    await client.query('COMMIT');
+
+    const userEmail = result.rows[0]?.email;
+    if (userEmail) {
+      queueIntegrityFixSync({ email: userEmail, tier: acceptedTier, status: result.rows[0]?.membership_status || '', fixAction: 'accept_tier', performedBy: staffEmail }).catch(err => logger.warn('[DataIntegrity] HubSpot sync queue failed', { extra: { error: getErrorMessage(err) } }));
     }
 
     logFromRequest(req, 'accept_tier', 'user', String(userId), `Accepted tier "${acceptedTier}" from ${source} for user #${userId} via data integrity`, { userId, acceptedTier, source });
 
     res.json({ success: true, message: `Accepted tier "${acceptedTier}" from ${source} for user #${userId}` });
   } catch (error: unknown) {
+    await client.query('ROLLBACK').catch(() => {});
     logger.error('[DataIntegrity] Accept tier error', { extra: { error: getErrorMessage(error) } });
     res.status(500).json({ success: false, message: 'Operation failed', details: safeErrorDetail(error) });
+  } finally {
+    safeRelease(client);
   }
 });
 

@@ -127,7 +127,6 @@ export async function autoFixMissingTiers(): Promise<{
       logger.info(`[AutoFix] Normalized membership_status case for ${normalizedStatusCase} members: ${details}`);
     }
 
-    // Safety net — primary enforcement via trg_auto_billing_provider trigger
     const stripeProviderResult = await db.execute(sql`
       UPDATE users SET billing_provider = 'stripe', updated_at = NOW()
       WHERE membership_status = 'active'
@@ -137,6 +136,7 @@ export async function autoFixMissingTiers(): Promise<{
         AND role != 'visitor'
         AND email NOT LIKE '%test%'
         AND email NOT LIKE '%example.com'
+        AND (last_manual_fix_at IS NULL OR last_manual_fix_at < NOW() - INTERVAL '1 hour')
       RETURNING email
     `);
     const fixedStripeProvider = stripeProviderResult.rows.length;
@@ -155,6 +155,7 @@ export async function autoFixMissingTiers(): Promise<{
         AND role != 'visitor'
         AND email NOT LIKE '%test%'
         AND email NOT LIKE '%example.com'
+        AND (last_manual_fix_at IS NULL OR last_manual_fix_at < NOW() - INTERVAL '1 hour')
       RETURNING email
     `);
     fixedBillingProvider = billingProviderResult.rows.length + fixedStripeProvider;
@@ -172,6 +173,7 @@ export async function autoFixMissingTiers(): Promise<{
         AND (u.tier IS NOT NULL OR u.membership_status = 'active')
         AND u.email NOT LIKE '%test%'
         AND u.email NOT LIKE '%example.com'
+        AND (u.last_manual_fix_at IS NULL OR u.last_manual_fix_at < NOW() - INTERVAL '1 hour')
       RETURNING u.email, u.tier
     `);
 

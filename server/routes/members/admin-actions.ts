@@ -8,7 +8,7 @@ import { isStaffOrAdmin, isAdmin } from '../../core/middleware';
 import { getSessionUser } from '../../types/session';
 import { TIER_NAMES } from '../../../shared/constants/tiers';
 import { getTierRank } from './helpers';
-import { createMemberLocally, queueMemberCreation, getAllDiscountRules, handleTierChange, queueTierSync } from '../../core/hubspot';
+import { createMemberLocally, queueMemberCreation, getAllDiscountRules, handleTierChange, queueTierSync, syncTierToHubSpot } from '../../core/hubspot';
 import Stripe from 'stripe';
 import { changeSubscriptionTier, pauseSubscription } from '../../core/stripe';
 import { notifyMember } from '../../core/notificationService';
@@ -78,13 +78,13 @@ router.patch('/api/members/:email/tier', isStaffOrAdmin, validateBody(tierChange
       await client.query('BEGIN');
       if (normalizedTier) {
         await client.query(
-          'UPDATE users SET tier = $1, updated_at = $2 WHERE LOWER(email) = $3',
-          [normalizedTier, new Date(), normalizedEmail]
+          'UPDATE users SET tier = $1, updated_at = $2, last_manual_fix_at = NOW(), last_manual_fix_by = $3 WHERE LOWER(email) = $4',
+          [normalizedTier, new Date(), sessionUser?.email || 'unknown', normalizedEmail]
         );
       } else {
         await client.query(
-          'UPDATE users SET last_tier = tier, tier = NULL, membership_status = $1, updated_at = $2 WHERE LOWER(email) = $3',
-          ['non-member', new Date(), normalizedEmail]
+          'UPDATE users SET last_tier = tier, tier = NULL, membership_status = $1, updated_at = $2, last_manual_fix_at = NOW(), last_manual_fix_by = $3 WHERE LOWER(email) = $4',
+          ['non-member', new Date(), sessionUser?.email || 'unknown', normalizedEmail]
         );
       }
       await client.query('COMMIT');
@@ -112,18 +112,28 @@ router.patch('/api/members/:email/tier', isStaffOrAdmin, validateBody(tierChange
       );
 
       if (!hubspotResult.success && hubspotResult.error) {
-        logger.warn('[Members] HubSpot tier change failed for , queuing for retry', { extra: { normalizedEmail, hubspotResultError: hubspotResult.error } });
-        await queueTierSync({
-          email: normalizedEmail,
-          newTier: normalizedTier,
-          oldTier: oldTierDisplay || 'None',
-          changedBy: performedBy,
-          changedByName: performedByName
-        });
+        logger.warn('[Members] HubSpot deal tier change failed, queuing for retry', { extra: { normalizedEmail, hubspotResultError: hubspotResult.error } });
       }
-    } else {
-      logger.info('[Members] Tier cleared for , skipping HubSpot sync (no product mapping for cleared tier)', { extra: { normalizedEmail } });
     }
+
+    syncTierToHubSpot({
+      email: normalizedEmail,
+      newTier: normalizedTier || '',
+      oldTier: oldTierDisplay || 'None',
+      changedBy: performedBy,
+      changedByName: performedByName
+    }).catch(err => {
+      logger.warn('[Members] HubSpot contact tier sync failed, queuing for retry', { extra: { normalizedEmail, error: getErrorMessage(err) } });
+      queueTierSync({
+        email: normalizedEmail,
+        newTier: normalizedTier || '',
+        oldTier: oldTierDisplay || 'None',
+        changedBy: performedBy,
+        changedByName: performedByName
+      }).catch(queueErr => {
+        logger.error('[Members] Failed to queue tier sync retry', { extra: { normalizedEmail, error: getErrorMessage(queueErr) } });
+      });
+    });
 
     let stripeSync = { success: true, warning: null as string | null };
 

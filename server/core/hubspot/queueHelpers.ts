@@ -36,6 +36,31 @@ export interface TierSyncParams {
   changedByName?: string;
 }
 
+export interface IntegrityFixSyncParams {
+  email: string;
+  status?: string;
+  tier?: string;
+  billingProvider?: string;
+  fixAction: string;
+  performedBy?: string;
+}
+
+export async function queueIntegrityFixSync(params: IntegrityFixSyncParams): Promise<void> {
+  const emailKey = params.email.toLowerCase();
+
+  await enqueueHubSpotSync('sync_tier', {
+    email: emailKey,
+    newTier: params.tier || '',
+    oldTier: '',
+    changedBy: params.performedBy || 'data_integrity',
+    changedByName: 'Data Integrity Fix',
+  }, {
+    priority: 2,
+    idempotencyKey: `integrity_fix_${emailKey}_${params.fixAction}_${Date.now()}`,
+    maxRetries: 3
+  });
+}
+
 export async function queueTierSync(params: TierSyncParams): Promise<void> {
   const newTierKey = (params.newTier || 'none').replace(/\s+/g, '_');
   const emailKey = params.email.toLowerCase();

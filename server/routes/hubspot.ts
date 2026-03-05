@@ -1388,7 +1388,7 @@ router.post('/api/hubspot/webhooks', async (req, res) => {
               if (exclusionCheck.rows.length > 0) {
                 logger.info('[HubSpot Webhook] Skipping excluded/deleted email', { extra: { email, propertyName, propertyValue } });
               } else {
-                const userCheck = await db.execute(sql`SELECT role, billing_provider, stripe_subscription_id, membership_status, first_name, last_name, tier, data_source, visitor_type, archived_at FROM users WHERE LOWER(email) = ${email}`);
+                const userCheck = await db.execute(sql`SELECT role, billing_provider, stripe_subscription_id, membership_status, first_name, last_name, tier, data_source, visitor_type, archived_at, last_manual_fix_at FROM users WHERE LOWER(email) = ${email}`);
                 const existingUser = userCheck.rows[0];
 
                 if (!existingUser) {
@@ -1398,10 +1398,14 @@ router.post('/api/hubspot/webhooks', async (req, res) => {
                 } else {
                   const isStripeProtected = existingUser.billing_provider === 'stripe';
                   const isVisitorProtected = existingUser.role === 'visitor';
+                  const recentManualFix = existingUser.last_manual_fix_at &&
+                    (Date.now() - new Date(existingUser.last_manual_fix_at as string).getTime()) < 60 * 60 * 1000;
 
                   if (isStatusOrTier) {
                     if (isVisitorProtected) {
                       logger.info('[HubSpot Webhook] VISITOR PROTECTED: Skipping update for visitor', { extra: { email, propertyName, propertyValue } });
+                    } else if (recentManualFix) {
+                      logger.info('[HubSpot Webhook] MANUAL FIX PROTECTED: Skipping status/tier change — user was manually fixed recently', { extra: { email, propertyName, propertyValue, fixedAt: existingUser.last_manual_fix_at } });
                     } else if (propertyName === 'membership_status') {
                       const newStatus = (propertyValue || 'non-member').toLowerCase();
 

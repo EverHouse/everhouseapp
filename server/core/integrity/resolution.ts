@@ -322,27 +322,43 @@ export async function syncPull(params: SyncPullParams): Promise<{ success: boole
     const hsTierValue = props.membership_tier || null;
     const appTier = hubspotTierToAppTier(hsTierValue);
 
-    const userResult = await db.execute(sql`SELECT email FROM users WHERE id = ${userId}`);
-    const userEmail = userResult.rows[0]?.email;
+    const userResult = await db.execute(sql`
+      SELECT email, billing_provider, last_manual_fix_at FROM users WHERE id = ${userId}
+    `);
+    const user = userResult.rows[0] as { email: string; billing_provider: string | null; last_manual_fix_at: Date | null } | undefined;
+    const userEmail = user?.email;
+
+    const recentlyFixed = user?.last_manual_fix_at &&
+      (Date.now() - new Date(user.last_manual_fix_at).getTime()) < 60 * 60 * 1000;
+
+    if (recentlyFixed) {
+      logger.info(`[Integrity] Skipping syncPull tier/status for user ${userId} — manually fixed ${Math.round((Date.now() - new Date(user!.last_manual_fix_at!).getTime()) / 60000)} min ago`);
+    }
+
+    const isStripeProtected = user?.billing_provider === 'stripe';
 
     await db.execute(sql`
       UPDATE users SET
-        first_name = ${props.firstname || null},
-        last_name = ${props.lastname || null},
-        phone = ${props.phone || null},
-        membership_tier = ${appTier},
-        tier = ${appTier},
+        first_name = COALESCE(${props.firstname ?? null}, first_name),
+        last_name = COALESCE(${props.lastname ?? null}, last_name),
+        phone = COALESCE(${props.phone ?? null}, phone),
+        membership_tier = CASE WHEN ${recentlyFixed || isStripeProtected ? 'skip' : 'apply'} = 'apply' 
+          THEN COALESCE(${appTier}, membership_tier) ELSE membership_tier END,
+        tier = CASE WHEN ${recentlyFixed || isStripeProtected ? 'skip' : 'apply'} = 'apply' 
+          THEN COALESCE(${appTier}, tier) ELSE tier END,
         updated_at = NOW()
       WHERE id = ${userId}
     `);
 
-    if (userEmail) {
+    if (userEmail && !recentlyFixed) {
       syncCustomerMetadataToStripe(String(userEmail)).catch((err) => { logger.error('[Integrity] Stripe metadata sync failed:', err); });
     }
 
     return {
       success: true,
-      message: `Pulled HubSpot data to app user ${userId}`
+      message: recentlyFixed
+        ? `Pulled HubSpot profile data (name/phone) to app user ${userId} — tier protected by recent manual fix`
+        : `Pulled HubSpot data to app user ${userId}`
     };
   }
 
