@@ -452,7 +452,7 @@ router.post('/api/events', isStaffOrAdmin, async (req, res) => {
 router.put('/api/events/:id', isStaffOrAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const { title, description, event_date, start_time, end_time, location, category, image_url, max_attendees, external_url, block_bookings, block_simulators, block_conference_room } = req.body;
+    const { title, description, event_date, start_time, end_time, location, category, image_url, max_attendees, visibility, requires_rsvp, external_url, block_bookings, block_simulators, block_conference_room } = req.body;
     
     const trimmedTitle = title?.toString().trim();
     const trimmedEventDate = event_date?.toString().trim();
@@ -517,6 +517,8 @@ router.put('/api/events/:id', isStaffOrAdmin, async (req, res) => {
       category,
       imageUrl: image_url,
       maxAttendees: max_attendees,
+      visibility: visibility || 'public',
+      requiresRsvp: requires_rsvp || false,
       externalUrl: external_url || null,
       blockBookings: newBlockBookings,
       blockSimulators: newBlockSimulators,
@@ -549,6 +551,16 @@ router.put('/api/events/:id', isStaffOrAdmin, async (req, res) => {
         if (calendarId) {
           const calendarTitle = category ? `[${category}] ${trimmedTitle}` : trimmedTitle;
           const eventDescription = [description, location ? `Location: ${location}` : ''].filter(Boolean).join('\n');
+          const extendedProps: Record<string, string> = {
+            'ehApp_type': 'event',
+            'ehApp_id': id as string,
+          };
+          if (image_url) extendedProps['ehApp_imageUrl'] = image_url;
+          if (external_url) extendedProps['ehApp_externalUrl'] = external_url;
+          if (max_attendees) extendedProps['ehApp_maxAttendees'] = String(max_attendees);
+          if (visibility) extendedProps['ehApp_visibility'] = visibility;
+          if (requires_rsvp !== undefined && requires_rsvp !== null) extendedProps['ehApp_requiresRsvp'] = String(requires_rsvp);
+          if (location) extendedProps['ehApp_location'] = location;
           await updateCalendarEvent(
             existing[0].googleCalendarId,
             calendarId,
@@ -556,7 +568,8 @@ router.put('/api/events/:id', isStaffOrAdmin, async (req, res) => {
             eventDescription,
             trimmedEventDate,
             trimmedStartTime,
-            trimmedEndTime || trimmedStartTime
+            trimmedEndTime || trimmedStartTime,
+            extendedProps
           );
         }
       } catch (calError: unknown) {

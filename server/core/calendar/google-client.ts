@@ -115,7 +115,8 @@ export async function updateCalendarEvent(
   description: string,
   date: string,
   startTime: string,
-  endTime: string
+  endTime: string,
+  extendedProperties?: Record<string, string>
 ): Promise<boolean> {
   try {
     if (!date || !startTime) {
@@ -125,22 +126,28 @@ export async function updateCalendarEvent(
     
     const calendar = await getGoogleCalendarClient();
     
+    const requestBody: Record<string, unknown> = {
+      summary,
+      description,
+      start: {
+        dateTime: getPacificISOString(date, startTime),
+        timeZone: 'America/Los_Angeles',
+      },
+      end: {
+        dateTime: getPacificISOString(date, endTime || startTime),
+        timeZone: 'America/Los_Angeles',
+      },
+    };
+    
+    if (extendedProperties) {
+      requestBody.extendedProperties = { private: extendedProperties };
+    }
+    
     await withCalendarRetry(
-      () => calendar.events.update({
+      () => calendar.events.patch({
         calendarId,
         eventId,
-        requestBody: {
-          summary,
-          description,
-          start: {
-            dateTime: getPacificISOString(date, startTime),
-            timeZone: 'America/Los_Angeles',
-          },
-          end: {
-            dateTime: getPacificISOString(date, endTime || startTime),
-            timeZone: 'America/Los_Angeles',
-          },
-        },
+        requestBody,
       }),
       'updateCalendarEvent'
     );
