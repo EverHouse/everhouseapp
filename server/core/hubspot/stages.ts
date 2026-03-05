@@ -35,7 +35,8 @@ import {
   BillingProvider,
   DB_STATUS_TO_HUBSPOT_STATUS,
   DB_BILLING_PROVIDER_TO_HUBSPOT,
-  DB_TIER_TO_HUBSPOT
+  DB_TIER_TO_HUBSPOT,
+  getDbStatusToHubSpotMapping
 } from './constants';
 
 export async function updateDealStage(
@@ -239,7 +240,8 @@ export async function syncMemberToHubSpot(
     let targetLifecycleStage: string | null = null;
     if (status && !isMindbodyBilled) {
       const normalizedStatus = status.toLowerCase();
-      const hubspotStatus = DB_STATUS_TO_HUBSPOT_STATUS[normalizedStatus] || 'Suspended';
+      const statusMapping = await getDbStatusToHubSpotMapping();
+      const hubspotStatus = statusMapping[normalizedStatus] || 'Suspended';
       properties.membership_status = hubspotStatus;
       updated.status = true;
       

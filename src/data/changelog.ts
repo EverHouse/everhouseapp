@@ -8,6 +8,18 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.74.0",
+    date: "2026-03-05",
+    title: "Admin Settings Expansion",
+    changes: [
+      "Feature: Contact info, social media links, and display hours are now editable from Admin Settings — no more code changes needed to update phone, email, address, or operating hours",
+      "Feature: Resource operating hours and slot durations (golf, conference, wellness, tours) configurable from Admin Settings — changes take effect immediately for availability and booking validation",
+      "Feature: HubSpot pipeline, stage, tier, and status mappings editable from Admin Settings — CRM field mappings can be updated without deployment",
+      "Feature: Notification timing (daily reminders, morning closures, onboarding nudges, grace periods) and trial coupon code configurable from Admin Settings",
+      "Feature: Apple Messages for Business toggle and Business ID in Admin Settings — enable or disable the messaging channel from the settings page",
+    ]
+  },
+  {
     version: "8.73.0",
     date: "2026-03-05",
     title: "Booking Ownership & Revert Fixes",

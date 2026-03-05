@@ -1,6 +1,6 @@
 import { getGoogleCalendarClient } from '../integrations';
 import { createPacificDate } from '../../utils/dateUtils';
-import { CALENDAR_CONFIG, TimeSlot, BusyPeriod } from './config';
+import { CALENDAR_CONFIG, getResourceConfig, TimeSlot, BusyPeriod } from './config';
 import { getCalendarIdByName } from './cache';
 
 import { logger } from '../logger';
@@ -87,16 +87,17 @@ export async function getCalendarAvailability(
   date: string,
   durationMinutes?: number
 ): Promise<{ slots: TimeSlot[]; calendarId: string | null; error?: string }> {
-  const config = CALENDAR_CONFIG[resourceType];
-  if (!config) {
+  const staticConfig = CALENDAR_CONFIG[resourceType];
+  if (!staticConfig) {
     return { slots: [], calendarId: null, error: 'Invalid resource type' };
   }
   
-  const calendarId = await getCalendarIdByName(config.name);
+  const calendarId = await getCalendarIdByName(staticConfig.name);
   if (!calendarId) {
-    return { slots: [], calendarId: null, error: `Calendar "${config.name}" not found` };
+    return { slots: [], calendarId: null, error: `Calendar "${staticConfig.name}" not found` };
   }
   
+  const config = await getResourceConfig(resourceType);
   const busyPeriods = await getCalendarBusyTimes(calendarId, date);
   const slotDuration = durationMinutes || config.slotDuration;
   const slots = generateTimeSlots(date, busyPeriods, config.businessHours, slotDuration);

@@ -6,7 +6,7 @@ import { tours, dismissedHubspotMeetings } from '../../shared/schema';
 import { eq, gte, asc, desc, and, sql, or, ilike, inArray } from 'drizzle-orm';
 import { isStaffOrAdmin } from '../core/middleware';
 import { getHubSpotClient } from '../core/integrations';
-import { CALENDAR_CONFIG, getCalendarIdByName, getCalendarAvailability, createCalendarEventOnCalendar } from '../core/calendar/index';
+import { CALENDAR_CONFIG, getResourceConfig, getCalendarIdByName, getCalendarAvailability, createCalendarEventOnCalendar } from '../core/calendar/index';
 import { safeSendEmail } from '../utils/resend';
 import { notifyAllStaff } from '../core/notificationService';
 import { getTodayPacific } from '../utils/dateUtils';
@@ -1029,7 +1029,9 @@ router.post('/api/tours/schedule', checkoutRateLimiter, async (req, res) => {
     }
 
     const [startHours, startMinutes] = startTime.split(':').map(Number);
-    const { businessHours, slotDuration } = CALENDAR_CONFIG.tours;
+    const toursConfig = await getResourceConfig('tours');
+    const { businessHours } = toursConfig;
+    const slotDuration = toursConfig.slotDuration ?? 30;
 
     if (startHours < businessHours.start || startHours >= businessHours.end) {
       return res.status(400).json({ error: `Tours are only available between ${String(businessHours.start).padStart(2, '0')}:00 and ${String(businessHours.end).padStart(2, '0')}:00 Pacific` });
