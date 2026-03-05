@@ -192,6 +192,13 @@ The following large files have been split into sub-modules with barrel re-export
 - **HubSpot Contact Mappings**: Tier name mappings and status mappings configurable from admin settings. Async wrapper functions (`getDbStatusToHubSpotMapping`, `getTierToHubSpotMapping`) read from settings with hardcoded fallbacks. Pipeline ID and stage ID settings removed (deal sync fully removed).
 - **Notification & Communication**: Daily reminder hour, morning closure hour, onboarding nudge hour, grace period hour/days, max onboarding nudges, and trial coupon code all read from settings at runtime via `getSettingValue()`. HubSpot stage/tier/status collapsible sections in UI use expand/collapse pattern.
 
+### Bug Fixes (v8.77.1)
+- **CafeTab controlled/uncontrolled fix**: Added `|| ''` fallback to `value={newItem.category}` in `CafeTab.tsx` select input to prevent React controlled/uncontrolled warnings when category is undefined.
+- **AdminDashboard circular import fix**: Replaced barrel import from `./layout` with direct imports from individual modules (`./layout/types`, `./layout/StaffBottomNav`, `./layout/StaffSidebar`, etc.) to reduce HMR invalidation chain and fix Vite HMR churn.
+- **AdminDashboard training step inputs**: Added `|| ''` fallback to `step.title` and `step.content` inputs in the TrainingSectionModal to prevent controlled/uncontrolled warnings.
+- **TodayScheduleSection null crash fix**: Changed `nextEvent &&` to `nextEvent != null &&` before using the `in` operator, preventing TypeError when `nextEvent` is null/undefined.
+- **AlertsCard null guard**: Added `(notifications || [])` guard on `.filter()` and `!notifications ||` check on `.length` to prevent crash when notifications prop is null/undefined.
+
 ### Booking Data Integrity Fixes (v8.73.0)
 - **Owner slot link sync**: When staff links a member to an empty owner slot via `PUT /api/admin/booking/:bookingId/members/:slotId/link`, the `booking_requests` row (`user_id`, `user_email`, `user_name`) is now updated to match the new owner. Previously, the participant record was updated but the booking header still showed the original Trackman import name, causing a visible mismatch between the booking title and the roster owner.
 - **Booking source enum fix**: `revertToApproved()` and the Member Balance endpoint (`/api/member/balance`) no longer use `COALESCE(bs.source, '')` to check for Trackman-sourced sessions — PostgreSQL rejected the empty string as an invalid `booking_source` enum value. Fixed to use `(bs.source IS NULL OR bs.source::text NOT IN (...))`, which correctly handles NULL sources without enum coercion errors.

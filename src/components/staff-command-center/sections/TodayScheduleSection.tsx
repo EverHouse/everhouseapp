@@ -61,8 +61,8 @@ const NextEventWidget: React.FC<NextEventWidgetProps> = ({ nextActivityItem, nex
   const event = nextActivityItem?.event;
   const wellness = nextActivityItem?.wellness;
   
-  const useFallbackEvent = nextEvent && !nextActivityItem && 'event_date' in nextEvent;
-  const useFallbackWellness = nextEvent && !nextActivityItem && 'date' in nextEvent;
+  const useFallbackEvent = nextEvent != null && !nextActivityItem && 'event_date' in nextEvent;
+  const useFallbackWellness = nextEvent != null && !nextActivityItem && 'date' in nextEvent;
   const fallbackEvent = useFallbackEvent ? nextEvent as DBEvent : null;
   const fallbackWellness = useFallbackWellness ? nextEvent as WellnessClass : null;
   

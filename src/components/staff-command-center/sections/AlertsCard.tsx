@@ -101,7 +101,7 @@ function getNotificationIcon(type: string): string {
 
 export const AlertsCard: React.FC<AlertsCardProps> = ({ notifications, onAlertClick }) => {
   const [alertsListRef] = useAutoAnimate();
-  const unreadCount = notifications.filter(n => !n.is_read).length;
+  const unreadCount = (notifications || []).filter(n => !n.is_read).length;
   
   return (
     <div className="flex-1 min-h-[200px] bg-white/40 dark:bg-white/[0.08] backdrop-blur-xl border border-white/60 dark:border-white/[0.12] rounded-xl pt-4 shadow-liquid dark:shadow-liquid-dark flex flex-col overflow-hidden">
@@ -117,7 +117,7 @@ export const AlertsCard: React.FC<AlertsCardProps> = ({ notifications, onAlertCl
         <span className="text-xs text-primary/80 dark:text-white/80">Recent</span>
       </div>
       
-      {notifications.length === 0 ? (
+      {!notifications || notifications.length === 0 ? (
         <div className="flex-1 flex items-center justify-center">
           <EmptyState icon="notifications_none" title="No new alerts" variant="compact" />
         </div>

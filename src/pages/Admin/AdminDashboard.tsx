@@ -456,13 +456,13 @@ const TrainingSectionModal: React.FC<TrainingModalProps> = ({ isOpen, onClose, s
                                 </div>
                                 <input
                                     type="text"
-                                    value={step.title}
+                                    value={step.title || ''}
                                     onChange={(e) => handleStepChange(index, 'title', e.target.value)}
                                     className="w-full px-3 py-2 rounded-lg border border-primary/20 dark:border-white/25 bg-white/60 dark:bg-white/5 text-primary dark:text-white text-sm"
                                     placeholder="Step title"
                                 />
                                 <textarea
-                                    value={step.content}
+                                    value={step.content || ''}
                                     onChange={(e) => handleStepChange(index, 'content', e.target.value)}
                                     className="w-full px-3 py-2 rounded-lg border border-primary/20 dark:border-white/25 bg-white/60 dark:bg-white/5 text-primary dark:text-white text-sm resize-none"
                                     rows={3}
