@@ -283,9 +283,24 @@ export async function handleBookingModification(
                (session_id, user_id, participant_type, display_name, payment_status, created_at)
                VALUES (${newSessionId}, ${userId}, 'owner', ${existing.userName || existing.userEmail}, 'waived', NOW())`);
 
+            const rpResult = await tx.execute(sql`SELECT request_participants FROM booking_requests WHERE id = ${bookingId}`);
+            const rpData = (rpResult.rows as Array<Record<string, unknown>>)[0]?.request_participants;
+            let transferredCount = 0;
+            if (rpData) {
+              try {
+                transferredCount = await transferRequestParticipantsToSession(
+                  newSessionId, rpData, existing.userEmail, `modification detach booking #${bookingId}`
+                );
+              } catch (rpErr: unknown) {
+                logger.warn('[Trackman Webhook] Non-blocking: Failed to transfer request_participants during detach', {
+                  extra: { bookingId, newSessionId, error: (rpErr as Error).message }
+                });
+              }
+            }
+
             newSessionIdForFees = newSessionId;
-            logger.info('[Trackman Webhook] Created new session and re-linked booking with owner participant', {
-              extra: { bookingId, oldSessionId: sessionId, newSessionId, newResourceId, newDate, newStartTime, newEndTime }
+            logger.info('[Trackman Webhook] Created new session and re-linked booking with participants', {
+              extra: { bookingId, oldSessionId: sessionId, newSessionId, newResourceId, newDate, newStartTime, newEndTime, transferredParticipants: transferredCount }
             });
           } else {
             await tx.execute(sql`UPDATE booking_sessions
