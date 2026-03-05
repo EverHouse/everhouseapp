@@ -1398,8 +1398,11 @@ router.post('/api/hubspot/webhooks', async (req, res) => {
                 } else {
                   const isStripeProtected = existingUser.billing_provider === 'stripe';
                   const isVisitorProtected = existingUser.role === 'visitor';
+                  const fixTime = existingUser.last_manual_fix_at instanceof Date
+                    ? existingUser.last_manual_fix_at.getTime()
+                    : new Date(existingUser.last_manual_fix_at as string).getTime();
                   const recentManualFix = existingUser.last_manual_fix_at &&
-                    (Date.now() - new Date(existingUser.last_manual_fix_at as string).getTime()) < 60 * 60 * 1000;
+                    (Date.now() - fixTime) < 60 * 60 * 1000;
 
                   if (isStatusOrTier) {
                     if (isVisitorProtected) {
@@ -1418,7 +1421,7 @@ router.post('/api/hubspot/webhooks', async (req, res) => {
                         await db.execute(sql`UPDATE users SET membership_status = ${newStatus}, updated_at = NOW() WHERE LOWER(email) = ${email}`);
                         logger.info('[HubSpot Webhook] Updated DB membership_status for to', { extra: { email, newStatus } });
 
-                        const activeStatuses = ['active', 'trialing'];
+                        const activeStatuses = ['active', 'trialing', 'past_due'];
                         const inactiveStatuses = ['expired', 'terminated', 'cancelled', 'canceled', 'inactive', 'churned', 'declined', 'suspended', 'frozen', 'non-member'];
                         const hubspotMemberName = `${existingUser.first_name || ''} ${existingUser.last_name || ''}`.trim() || email;
                         const memberTier = existingUser.tier || 'Unknown';

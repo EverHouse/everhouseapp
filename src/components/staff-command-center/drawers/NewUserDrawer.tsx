@@ -80,18 +80,18 @@ export function NewUserDrawer({
     };
   }, []);
 
+  useEffect(() => {
+    if (cooldownRemaining <= 0 && cooldownTimerRef.current) {
+      clearInterval(cooldownTimerRef.current);
+      cooldownTimerRef.current = null;
+    }
+  }, [cooldownRemaining]);
+
   const startCooldown = useCallback((seconds: number) => {
     setCooldownRemaining(seconds);
     if (cooldownTimerRef.current) clearInterval(cooldownTimerRef.current);
     cooldownTimerRef.current = setInterval(() => {
-      setCooldownRemaining(prev => {
-        if (prev <= 1) {
-          if (cooldownTimerRef.current) clearInterval(cooldownTimerRef.current);
-          cooldownTimerRef.current = null;
-          return 0;
-        }
-        return prev - 1;
-      });
+      setCooldownRemaining(prev => prev <= 1 ? 0 : prev - 1);
     }, 1000);
   }, []);
 

@@ -40,7 +40,7 @@ interface AnnouncementRow {
 
 const router = Router();
 
-const BANNER_FIRST = sql`CASE WHEN show_as_banner = true THEN 0 ELSE 1 END`;
+const BANNER_FIRST = sql`CASE WHEN ${announcements.showAsBanner} = true THEN 0 ELSE 1 END`;
 
 router.get('/api/announcements', async (req, res) => {
   try {
@@ -79,7 +79,7 @@ router.get('/api/announcements', async (req, res) => {
       endDate: a.endsAt ? formatDatePacific(new Date(a.endsAt)) : undefined,
       linkType: a.linkType || undefined,
       linkTarget: a.linkTarget || undefined,
-      showAsBanner: (a as unknown as { show_as_banner: boolean }).show_as_banner === true
+      showAsBanner: a.showAsBanner === true
     }));
     
     res.json(formatted);
@@ -97,7 +97,7 @@ router.get('/api/announcements/banner', async (req, res) => {
       .where(
         and(
           eq(announcements.isActive, true),
-          sql`show_as_banner = true`,
+          eq(announcements.showAsBanner, true),
           or(
             isNull(announcements.startsAt),
             lte(announcements.startsAt, now)
@@ -152,7 +152,7 @@ router.get('/api/announcements/export', isStaffOrAdmin, async (req, res) => {
     
     // Build CSV rows
     const rows = results.map(a => {
-      const showBanner = (a as unknown as { show_as_banner: boolean }).show_as_banner === true ? 'Yes' : 'No';
+      const showBanner = a.showAsBanner === true ? 'Yes' : 'No';
       return [
         a.id,
         escapeCsv(a.title),
@@ -198,26 +198,28 @@ router.post('/api/announcements', isStaffOrAdmin, async (req, res) => {
     
     const userEmail = getSessionUser(req)?.email || 'system';
     
-    if (showAsBanner) {
-      await db.execute(sql`UPDATE announcements SET show_as_banner = false WHERE show_as_banner = true`);
-    }
-    
-    const result = await db.execute(sql`
-      INSERT INTO announcements (title, message, priority, starts_at, ends_at, link_type, link_target, created_by, show_as_banner, is_active)
-      VALUES (
-        ${title},
-        ${description || ''},
-        'normal',
-        ${startDate ? createPacificDate(startDate, '00:00:00') : null},
-        ${endDate ? createPacificDate(endDate, '23:59:59') : null},
-        ${linkType || null},
-        ${linkTarget || null},
-        ${userEmail},
-        ${showAsBanner || false},
-        true
-      )
-      RETURNING *
-    `);
+    const result = await db.transaction(async (tx) => {
+      if (showAsBanner) {
+        await tx.execute(sql`UPDATE announcements SET show_as_banner = false WHERE show_as_banner = true`);
+      }
+      
+      return await tx.execute(sql`
+        INSERT INTO announcements (title, message, priority, starts_at, ends_at, link_type, link_target, created_by, show_as_banner, is_active)
+        VALUES (
+          ${title},
+          ${description || ''},
+          'normal',
+          ${startDate ? createPacificDate(startDate, '00:00:00') : null},
+          ${endDate ? createPacificDate(endDate, '23:59:59') : null},
+          ${linkType || null},
+          ${linkTarget || null},
+          ${userEmail},
+          ${showAsBanner || false},
+          true
+        )
+        RETURNING *
+      `);
+    });
     const resultRows = result.rows as unknown as AnnouncementRow[];
     const newAnnouncement = resultRows[0];
     
@@ -287,22 +289,24 @@ router.put('/api/announcements/:id', isStaffOrAdmin, async (req, res) => {
       return res.status(400).json({ error: 'Title is required' });
     }
     
-    if (showAsBanner) {
-      await db.execute(sql`UPDATE announcements SET show_as_banner = false WHERE show_as_banner = true AND id != ${parseInt(id as string)}`);
-    }
-    
-    const results = await db.execute(sql`
-      UPDATE announcements
-      SET title = ${title},
-          message = ${description || ''},
-          starts_at = ${startDate ? createPacificDate(startDate, '00:00:00') : null},
-          ends_at = ${endDate ? createPacificDate(endDate, '23:59:59') : null},
-          link_type = ${linkType || null},
-          link_target = ${linkTarget || null},
-          show_as_banner = ${showAsBanner || false}
-      WHERE id = ${parseInt(id as string)}
-      RETURNING *
-    `);
+    const results = await db.transaction(async (tx) => {
+      if (showAsBanner) {
+        await tx.execute(sql`UPDATE announcements SET show_as_banner = false WHERE show_as_banner = true AND id != ${parseInt(id as string)}`);
+      }
+      
+      return await tx.execute(sql`
+        UPDATE announcements
+        SET title = ${title},
+            message = ${description || ''},
+            starts_at = ${startDate ? createPacificDate(startDate, '00:00:00') : null},
+            ends_at = ${endDate ? createPacificDate(endDate, '23:59:59') : null},
+            link_type = ${linkType || null},
+            link_target = ${linkTarget || null},
+            show_as_banner = ${showAsBanner || false}
+        WHERE id = ${parseInt(id as string)}
+        RETURNING *
+      `);
+    });
     
     const resultsRows = results.rows as unknown as AnnouncementRow[];
     const updated = resultsRows[0];
