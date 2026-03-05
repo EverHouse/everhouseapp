@@ -12,7 +12,8 @@ export type HubSpotOperation =
   | 'sync_tier'
   | 'sync_company'
   | 'sync_day_pass'
-  | 'sync_payment';
+  | 'sync_payment'
+  | 'enrich_event_deal';
 
 interface QueueIdRow {
   id: number;
@@ -288,6 +289,12 @@ async function executeHubSpotOperation(operation: string, payload: Record<string
       const hubspotSync = await import('../stripe/hubspotSync');
       await hubspotSync.syncPaymentToHubSpot(payload as unknown as Parameters<typeof hubspotSync.syncPaymentToHubSpot>[0]);
       break;
+
+    case 'enrich_event_deal': {
+      const { enrichEventDealFromQueue } = await import('../../routes/hubspot');
+      await enrichEventDealFromQueue(payload as { email: string; fields: Array<{ name: string; value: string }> });
+      break;
+    }
       
     default:
       throw new Error(`Unknown HubSpot operation: ${operation}`);

@@ -287,6 +287,7 @@ export function NewUserDrawer({
     setMode(newMode);
     setError(null);
     setEmailCheckResult(null);
+    resetForm();
   };
 
   const currentStep = mode === 'member' ? memberStep : visitorStep;

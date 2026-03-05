@@ -1,6 +1,5 @@
-import { pool, safeRelease } from './db';
 import { alertOnScheduledTaskFailure } from './dataAlerts';
-import { PoolClient } from 'pg';
+import { db } from '../db';
 
 import { logger } from './logger';
 export async function safeDbOperation<T>(
@@ -21,30 +20,18 @@ export async function safeDbOperation<T>(
 
 export async function safeDbTransaction<T>(
   label: string,
-  callback: (client: PoolClient) => Promise<T>,
+  callback: (tx: Parameters<Parameters<typeof db.transaction>[0]>[0]) => Promise<T>,
   critical: boolean = true
 ): Promise<T> {
-  let client: PoolClient | null = null;
   try {
-    client = await pool.connect();
-    await client.query('BEGIN');
-    const result = await callback(client);
-    await client.query('COMMIT');
-    return result;
+    return await db.transaction(async (tx) => {
+      return await callback(tx);
+    });
   } catch (error: unknown) {
-    if (client) {
-      try {
-        await client.query('ROLLBACK');
-      } catch (err) {
-        logger.warn('[safeDbTransaction] ROLLBACK failed, reporting original error', { error: err });
-      }
-    }
     logger.error(`[safeDbTransaction] ${label}:`, { error: error });
     if (critical) {
       await alertOnScheduledTaskFailure(label, error instanceof Error ? error : String(error));
     }
     throw error;
-  } finally {
-    if (client) safeRelease(client);
   }
 }

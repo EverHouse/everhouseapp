@@ -19,6 +19,7 @@ import { FilterOperatorEnum } from '@hubspot/api-client/lib/codegen/crm/contacts
 import { AssociationSpecAssociationCategoryEnum } from '@hubspot/api-client/lib/codegen/crm/associations/v4';
 import { getErrorMessage, safeErrorDetail } from '../utils/errorUtils';
 import { denormalizeTierForHubSpot, denormalizeTierForHubSpotAsync } from '../utils/tierUtils';
+import { enqueueHubSpotSync } from '../core/hubspot/queue';
 
 interface HubSpotApiObject {
   id: string;
@@ -847,6 +848,10 @@ async function enrichEventDeal(
   }
 }
 
+export async function enrichEventDealFromQueue(payload: { email: string; fields: Array<{ name: string; value: string }> }): Promise<void> {
+  await enrichEventDeal(payload.email, payload.fields);
+}
+
 const HUBSPOT_PORTAL_ID_DEFAULT = '244200670';
 const HUBSPOT_FORMS: Record<string, string> = {
   'tour-request': process.env.HUBSPOT_FORM_TOUR_REQUEST || '',
@@ -1027,11 +1032,9 @@ router.post('/api/hubspot/forms/:formType', async (req, res) => {
       if (formType === 'private-hire' || formType === 'event-inquiry') {
         const emailValue = getFieldValue('email') || '';
         if (emailValue) {
-          setTimeout(() => {
-            enrichEventDeal(emailValue, fields).catch(err => 
-              logger.error('[HubSpot DealEnrich] Background enrichment failed', { extra: { err } })
-            );
-          }, 5000);
+          enqueueHubSpotSync('enrich_event_deal', { email: emailValue, fields }, { priority: 5 }).catch(err =>
+            logger.error('[HubSpot DealEnrich] Failed to enqueue enrichment', { extra: { err } })
+          );
         }
       }
     } catch (dbError: unknown) {
@@ -1050,26 +1053,11 @@ function parseCSV(content: string): Record<string, string>[] {
   const lines = content.trim().split('\n');
   if (lines.length < 2) return [];
   
-  const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+  const headers = parseCsvLine(lines[0]);
   const rows: Record<string, string>[] = [];
   
   for (let i = 1; i < lines.length; i++) {
-    const values: string[] = [];
-    let current = '';
-    let inQuotes = false;
-    
-    for (const char of lines[i]) {
-      if (char === '"') {
-        inQuotes = !inQuotes;
-      } else if (char === ',' && !inQuotes) {
-        values.push(current.trim());
-        current = '';
-      } else {
-        current += char;
-      }
-    }
-    values.push(current.trim());
-    
+    const values = parseCsvLine(lines[i]);
     const row: Record<string, string> = {};
     headers.forEach((header, idx) => {
       row[header] = values[idx] || '';
@@ -1078,6 +1066,41 @@ function parseCSV(content: string): Record<string, string>[] {
   }
   
   return rows;
+}
+
+function parseCsvLine(line: string): string[] {
+  const values: string[] = [];
+  let current = '';
+  let inQuotes = false;
+  let i = 0;
+
+  while (i < line.length) {
+    const char = line[i];
+    if (inQuotes) {
+      if (char === '"') {
+        if (i + 1 < line.length && line[i + 1] === '"') {
+          current += '"';
+          i += 2;
+          continue;
+        }
+        inQuotes = false;
+      } else {
+        current += char;
+      }
+    } else {
+      if (char === '"') {
+        inQuotes = true;
+      } else if (char === ',') {
+        values.push(current.trim());
+        current = '';
+      } else {
+        current += char;
+      }
+    }
+    i++;
+  }
+  values.push(current.trim());
+  return values;
 }
 
 // Sync membership tiers from CSV to HubSpot
@@ -1290,7 +1313,6 @@ router.put('/api/hubspot/contacts/:id/tier', isStaffOrAdmin, async (req, res) =>
       .set({
         tier: tierData.tier,
         tierId: tierData.tier_id,
-        membershipStatus: 'active',
       })
       .where(eq(users.id, localUser.id));
     
