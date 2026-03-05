@@ -281,7 +281,17 @@ export async function ensureDatabaseConstraints() {
         AS $$
         DECLARE
           conflict_count INTEGER;
+          bypass TEXT;
         BEGIN
+          BEGIN
+            bypass := current_setting('app.bypass_overlap_check', true);
+          EXCEPTION WHEN OTHERS THEN
+            bypass := '';
+          END;
+          IF bypass = 'true' THEN
+            RETURN NEW;
+          END IF;
+
           SELECT COUNT(*) INTO conflict_count
           FROM public.booking_sessions
           WHERE resource_id = NEW.resource_id

@@ -201,6 +201,7 @@ export async function handleBookingModification(
 
   try {
     const staffNoteAddition = ` [Modified via Trackman: ${changes.join(', ')}]`;
+    let newSessionIdForFees: number | null = null;
 
     await db.transaction(async (tx) => {
       await tx.execute(sql`UPDATE booking_requests
@@ -217,6 +218,14 @@ export async function handleBookingModification(
 
       if (sessionId) {
         if (bayChanged || timeChanged || dateChanged) {
+          const otherActiveBookings = await tx.execute(sql`SELECT COUNT(*) as cnt
+             FROM booking_requests
+             WHERE session_id = ${sessionId}
+               AND id != ${bookingId}
+               AND status NOT IN ('cancelled', 'rejected', 'declined')`);
+          const otherCount = parseInt((otherActiveBookings.rows[0] as { cnt: string }).cnt, 10) || 0;
+          const isSharedSession = otherCount > 0;
+
           const conflictingSessions = await tx.execute(sql`SELECT bs.id, 
                (SELECT COUNT(*) FROM booking_requests br WHERE br.session_id = bs.id AND br.status NOT IN ('cancelled', 'rejected')) AS linked_bookings
              FROM booking_sessions bs
@@ -254,32 +263,52 @@ export async function handleBookingModification(
               }
             }
           }
-          await tx.execute(sql`UPDATE booking_sessions
-             SET start_time = ${newStartTime},
-                 end_time = ${newEndTime},
-                 session_date = ${newDate},
-                 resource_id = ${newResourceId},
-                 updated_at = NOW()
-             WHERE id = ${sessionId}`);
+
+          await tx.execute(sql`SET LOCAL app.bypass_overlap_check = 'true'`);
+          if (isSharedSession) {
+            logger.info('[Trackman Webhook] Session is shared with other bookings — detaching and creating new session', {
+              extra: { bookingId, sessionId, otherActiveBookings: otherCount, newResourceId, newDate, newStartTime, newEndTime }
+            });
+            const newSessionResult = await tx.execute(sql`INSERT INTO booking_sessions
+               (resource_id, session_date, start_time, end_time, trackman_booking_id, source, created_by, created_at, updated_at)
+               VALUES (${newResourceId}, ${newDate}, ${newStartTime}, ${newEndTime}, ${incoming.trackmanBookingId}, 'trackman_webhook', 'trackman_webhook', NOW(), NOW())
+               RETURNING id`);
+            const newSessionId = (newSessionResult.rows[0] as { id: number }).id;
+            await tx.execute(sql`UPDATE booking_requests SET session_id = ${newSessionId} WHERE id = ${bookingId}`);
+            newSessionIdForFees = newSessionId;
+            logger.info('[Trackman Webhook] Created new session and re-linked booking', {
+              extra: { bookingId, oldSessionId: sessionId, newSessionId, newResourceId, newDate, newStartTime, newEndTime }
+            });
+          } else {
+            await tx.execute(sql`UPDATE booking_sessions
+               SET start_time = ${newStartTime},
+                   end_time = ${newEndTime},
+                   session_date = ${newDate},
+                   resource_id = ${newResourceId},
+                   trackman_booking_id = ${incoming.trackmanBookingId},
+                   updated_at = NOW()
+               WHERE id = ${sessionId}`);
+          }
         }
       }
     });
 
-    if (sessionId) {
+    const effectiveSessionId = newSessionIdForFees || sessionId;
+    if (effectiveSessionId) {
       try {
-        await recalculateSessionFees(sessionId, 'trackman_modification');
+        await recalculateSessionFees(effectiveSessionId, 'trackman_modification');
         logger.info('[Trackman Webhook] Recalculated fees after modification', {
-          extra: { bookingId, sessionId, changes }
+          extra: { bookingId, sessionId: effectiveSessionId, changes }
         });
 
-        syncBookingInvoice(bookingId, sessionId).catch((syncErr: unknown) => {
+        syncBookingInvoice(bookingId, effectiveSessionId).catch((syncErr: unknown) => {
           logger.warn('[Trackman Webhook] Non-blocking: Failed to sync invoice after modification', {
-            extra: { bookingId, sessionId, error: (syncErr as Error).message }
+            extra: { bookingId, sessionId: effectiveSessionId, error: (syncErr as Error).message }
           });
         });
       } catch (recalcErr: unknown) {
         logger.warn('[Trackman Webhook] Failed to recalculate fees after modification', {
-          extra: { bookingId, sessionId, error: (recalcErr as Error).message }
+          extra: { bookingId, sessionId: effectiveSessionId, error: (recalcErr as Error).message }
         });
       }
     }
