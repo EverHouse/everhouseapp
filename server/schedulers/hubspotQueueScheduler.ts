@@ -6,19 +6,20 @@ import { getErrorMessage } from '../utils/errorUtils';
 
 const PROCESS_INTERVAL_MS = 30 * 1000; // 30 seconds
 let isProcessing = false;
+let consecutiveFailures = 0;
+const ALERT_AFTER_CONSECUTIVE_FAILURES = 3;
 
 async function processQueue(): Promise<void> {
   if (isProcessing) {
-    return; // Skip if already processing
+    return;
   }
   
   isProcessing = true;
   
   try {
-    // First, recover any jobs stuck in 'processing' state (server crash recovery)
     await recoverStuckProcessingJobs();
     
-    const stats = await processHubSpotQueue(50); // Process up to 50 jobs per batch
+    const stats = await processHubSpotQueue(50);
     
     if (stats.processed > 0) {
       logger.info('[HubSpot Queue] Batch processed', {
@@ -37,14 +38,29 @@ async function processQueue(): Promise<void> {
       });
     }
 
+    if (consecutiveFailures > 0) {
+      logger.info(`[HubSpot Queue] Recovered after ${consecutiveFailures} consecutive failure(s)`);
+    }
+    consecutiveFailures = 0;
     schedulerTracker.recordRun('HubSpot Queue', true);
     
   } catch (error: unknown) {
-    logger.error('[HubSpot Queue] Scheduler error', { error: getErrorMessage(error) });
-    try {
-      await alertOnScheduledTaskFailure('HubSpot Queue Processor', error instanceof Error ? error : getErrorMessage(error));
-    } catch (alertError: unknown) {
-      // Ignore alert failures
+    consecutiveFailures++;
+    logger.error('[HubSpot Queue] Scheduler error', { 
+      error: getErrorMessage(error),
+      extra: { consecutiveFailures }
+    });
+    
+    if (consecutiveFailures >= ALERT_AFTER_CONSECUTIVE_FAILURES) {
+      try {
+        await alertOnScheduledTaskFailure(
+          'HubSpot Queue Processor',
+          error instanceof Error ? error : getErrorMessage(error),
+          { context: `Failed ${consecutiveFailures} consecutive times` }
+        );
+      } catch (alertError: unknown) {
+        // Ignore alert failures
+      }
     }
     schedulerTracker.recordRun('HubSpot Queue', false, getErrorMessage(error));
   } finally {

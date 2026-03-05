@@ -1,4 +1,5 @@
 import { db } from '../../db';
+import { queryWithRetry } from '../db';
 import { getErrorMessage } from '../../utils/errorUtils';
 import { sql } from 'drizzle-orm';
 import { logger } from '../logger';
@@ -97,19 +98,19 @@ export async function processHubSpotQueue(batchSize: number = 10): Promise<{
 }> {
   const stats = { processed: 0, succeeded: 0, failed: 0 };
   
-  // Atomically claim pending jobs using UPDATE ... RETURNING
-  // This prevents race conditions with parallel workers
-  const result = await db.execute(sql`
-    UPDATE hubspot_sync_queue
+  const result = await queryWithRetry(
+    `UPDATE hubspot_sync_queue
     SET status = 'processing', updated_at = NOW()
     WHERE id IN (
       SELECT id FROM hubspot_sync_queue
       WHERE (status = 'pending' OR (status = 'failed' AND next_retry_at <= NOW()))
       ORDER BY priority ASC, created_at ASC
-      LIMIT ${batchSize}
+      LIMIT $1
     )
-    RETURNING id, operation, payload, retry_count, max_retries
-  `);
+    RETURNING id, operation, payload, retry_count, max_retries`,
+    [batchSize],
+    3
+  );
   
   if (result.rows.length === 0) {
     return stats;
