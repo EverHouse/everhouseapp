@@ -1093,7 +1093,7 @@ router.get('/api/member/balance', isAuthenticated, async (req: Request, res: Res
        WHERE LOWER(pu.email) = ${memberEmail}
          AND (bp.payment_status = 'pending' OR bp.payment_status IS NULL)
          AND bp.participant_type IN ('owner', 'member')
-         AND COALESCE(bs.source, '') NOT IN ('trackman_import', 'trackman_webhook')
+         AND (bs.source IS NULL OR bs.source::text NOT IN ('trackman_import', 'trackman_webhook'))
        ORDER BY bs.session_date DESC, bs.start_time DESC
     `);
 
@@ -1122,7 +1122,7 @@ router.get('/api/member/balance', isAuthenticated, async (req: Request, res: Res
          AND (bp.payment_status = 'pending' OR bp.payment_status IS NULL)
          AND LOWER(owner_u.email) = ${memberEmail}
          AND bp.cached_fee_cents > 0
-         AND COALESCE(bs.source, '') NOT IN ('trackman_import', 'trackman_webhook')
+         AND (bs.source IS NULL OR bs.source::text NOT IN ('trackman_import', 'trackman_webhook'))
        ORDER BY bs.session_date DESC, bs.start_time DESC
     `);
 
@@ -1182,7 +1182,7 @@ router.get('/api/member/balance', isAuthenticated, async (req: Request, res: Res
            AND (bp.payment_status = 'pending' OR bp.payment_status IS NULL)
            AND COALESCE(bp.cached_fee_cents, 0) = 0
            AND bs.session_date >= CURRENT_DATE - INTERVAL '90 days'
-           AND COALESCE(bs.source, '') NOT IN ('trackman_import', 'trackman_webhook')
+           AND (bs.source IS NULL OR bs.source::text NOT IN ('trackman_import', 'trackman_webhook'))
          LIMIT 20
       `);
 
@@ -1272,7 +1272,7 @@ router.get('/api/member/balance', isAuthenticated, async (req: Request, res: Res
          AND (bp.payment_status = 'pending' OR bp.payment_status IS NULL)
          AND COALESCE(br.declared_player_count, 1) > 1
          AND (bs.session_date AT TIME ZONE 'America/Los_Angeles')::date >= (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
-         AND COALESCE(bs.source, '') NOT IN ('trackman_import', 'trackman_webhook')
+         AND (bs.source IS NULL OR bs.source::text NOT IN ('trackman_import', 'trackman_webhook'))
        GROUP BY bs.id, bs.session_date, bs.start_time, bs.end_time, r.name, br.declared_player_count, bp.user_id
     `);
 
@@ -1346,7 +1346,7 @@ router.post('/api/member/balance/pay', isAuthenticated, async (req: Request, res
        WHERE LOWER(pu.email) = ${memberEmail}
          AND (bp.payment_status = 'pending' OR bp.payment_status IS NULL)
          AND bp.participant_type IN ('owner', 'member')
-         AND COALESCE(bs.source, '') NOT IN ('trackman_import', 'trackman_webhook')
+         AND (bs.source IS NULL OR bs.source::text NOT IN ('trackman_import', 'trackman_webhook'))
     `);
 
     const guestResult = await db.execute(sql`
@@ -1365,7 +1365,7 @@ router.post('/api/member/balance/pay', isAuthenticated, async (req: Request, res
          AND (bp.payment_status = 'pending' OR bp.payment_status IS NULL)
          AND LOWER(owner_u.email) = ${memberEmail}
          AND bp.cached_fee_cents > 0
-         AND COALESCE(bs.source, '') NOT IN ('trackman_import', 'trackman_webhook')
+         AND (bs.source IS NULL OR bs.source::text NOT IN ('trackman_import', 'trackman_webhook'))
     `);
 
     const participantFees: Array<{id: number; amountCents: number}> = [];

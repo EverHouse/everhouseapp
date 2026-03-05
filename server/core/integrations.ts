@@ -31,8 +31,10 @@ interface ConnectorApiResponse {
 let hubspotConnectionSettings: ConnectionItem | null = null;
 let googleCalendarConnectionSettings: ConnectionItem | null = null;
 
+let hubspotTokenRefreshPromise: Promise<string> | null = null;
+
 export async function getHubSpotAccessToken() {
-  const TOKEN_REFRESH_BUFFER_MS = 5 * 60 * 1000; // Refresh 5 minutes before expiry
+  const TOKEN_REFRESH_BUFFER_MS = 5 * 60 * 1000;
   
   if (hubspotConnectionSettings) {
     const hsSettings = hubspotConnectionSettings.settings;
@@ -44,7 +46,20 @@ export async function getHubSpotAccessToken() {
       return cachedToken as string;
     }
   }
+
+  if (hubspotTokenRefreshPromise) {
+    return hubspotTokenRefreshPromise;
+  }
   
+  hubspotTokenRefreshPromise = fetchHubSpotToken();
+  try {
+    return await hubspotTokenRefreshPromise;
+  } finally {
+    hubspotTokenRefreshPromise = null;
+  }
+}
+
+async function fetchHubSpotToken(): Promise<string> {
   const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME || 'connectors.replit.com';
   const xReplitToken = process.env.REPL_IDENTITY 
     ? 'repl ' + process.env.REPL_IDENTITY 
