@@ -338,14 +338,20 @@ export async function reconcileDailyRefunds() {
           ON CONFLICT (stripe_payment_intent_id) DO UPDATE SET status = ${newStatus}, updated_at = NOW()`);
         
         if (isFullRefund) {
-          const participantResult = await db.execute(sql`UPDATE booking_participants 
+          const participantResult = await db.execute(sql`UPDATE booking_participants
              SET payment_status = 'refunded', refunded_at = NOW()
              WHERE stripe_payment_intent_id = ${paymentIntentId} AND payment_status = 'paid'
-             RETURNING id, display_name`);
+             RETURNING id, user_id`);
           
           if (participantResult.rowCount && participantResult.rowCount > 0) {
             participantsHealed += participantResult.rowCount;
-            logger.warn(`[Reconcile] Healed ${participantResult.rowCount} participant(s) marked refunded for PI ${paymentIntentId}`);
+            const userIds = (participantResult.rows as Array<{ user_id: string | null }>).map(r => r.user_id).filter(Boolean);
+            let emailInfo = '';
+            if (userIds.length > 0) {
+              const emailResult = await db.execute(sql`SELECT email FROM users WHERE id = ANY(${userIds})`);
+              emailInfo = ': ' + (emailResult.rows as Array<{ email: string }>).map(r => r.email).join(', ');
+            }
+            logger.warn(`[Reconcile] Healed ${participantResult.rowCount} participant(s) marked refunded for PI ${paymentIntentId}${emailInfo}`);
           }
         }
       }
