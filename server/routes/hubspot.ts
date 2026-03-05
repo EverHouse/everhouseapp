@@ -267,7 +267,6 @@ const router = Router();
 // Shared cache for all HubSpot contacts (used by both active and former member views)
 let allContactsCache: { data: HubSpotContact[] | null; timestamp: number; lastModifiedCheck: number } = { data: null, timestamp: 0, lastModifiedCheck: 0 };
 const ALL_CONTACTS_CACHE_TTL = 30 * 60 * 1000; // 30 minutes for full refresh
-const INCREMENTAL_SYNC_INTERVAL = 5 * 60 * 1000; // Check for updates every 5 minutes
 
 // Track if a background refresh is in progress
 let backgroundRefreshInProgress = false;
@@ -377,76 +376,14 @@ function transformHubSpotContact(contact: HubSpotApiObject): HubSpotContact {
 }
 
 /**
- * Fetch only contacts modified since the given timestamp using HubSpot Search API
- * This is much more efficient than fetching all contacts when we only need updates
- */
-async function fetchRecentlyModifiedContacts(sinceTimestamp: number): Promise<HubSpotContact[]> {
-  const hubspot = await getHubSpotClient();
-  
-  let modifiedContacts: HubSpotApiObject[] = [];
-  let after: string | undefined = undefined;
-  
-  do {
-    const searchRequest = {
-      filterGroups: [{
-        filters: [{
-          propertyName: 'lastmodifieddate',
-          operator: FilterOperatorEnum.Gte,
-          value: sinceTimestamp.toString()
-        }]
-      }],
-      properties: HUBSPOT_CONTACT_PROPERTIES,
-      limit: 100,
-      after: after || '0'
-    };
-    
-    const response = await retryableHubSpotRequest(() => 
-      hubspot.crm.contacts.searchApi.doSearch(searchRequest)
-    );
-    
-    modifiedContacts = modifiedContacts.concat(response.results as unknown as HubSpotApiObject[]);
-    after = response.paging?.next?.after;
-  } while (after);
-  
-  return modifiedContacts.map(transformHubSpotContact);
-}
-
-/**
- * Fetch and cache all HubSpot contacts with incremental sync support
+ * Fetch and cache all HubSpot contacts
  * - Full refresh: Every 30 minutes or on force refresh
- * - Incremental sync: Every 5 minutes, only fetches recently modified contacts
+ * - Webhook-driven invalidation: Cache cleared when HubSpot webhooks fire
  */
 async function fetchAllHubSpotContacts(forceRefresh: boolean = false): Promise<HubSpotContact[]> {
   const now = Date.now();
   
-  // If we have cache and it's within TTL, check if we need incremental sync
   if (!forceRefresh && allContactsCache.data && (now - allContactsCache.timestamp) < ALL_CONTACTS_CACHE_TTL) {
-    // Check if we should do an incremental sync
-    if ((now - allContactsCache.lastModifiedCheck) > INCREMENTAL_SYNC_INTERVAL) {
-      try {
-        const modifiedContacts = await fetchRecentlyModifiedContacts(allContactsCache.lastModifiedCheck);
-        
-        if (modifiedContacts.length > 0) {
-          // Enrich the modified contacts with DB data FIRST (before updating cache)
-          const enrichedModified = await enrichContactsWithDbData(modifiedContacts);
-          
-          // Now merge enriched contacts into cache, preserving existing enriched data for unchanged contacts
-          const contactMap = new Map(allContactsCache.data.map((c) => [c.id, c]));
-          for (const contact of enrichedModified) {
-            contactMap.set(contact.id, contact);
-          }
-          
-          allContactsCache.data = Array.from(contactMap.values());
-          if (!isProduction) logger.info('[HubSpot] Incremental sync: updated contacts', { extra: { modifiedContactsLength: modifiedContacts.length } });
-        }
-        
-        allContactsCache.lastModifiedCheck = now;
-      } catch (err: unknown) {
-        // Incremental sync failed, continue with cached data
-        if (!isProduction) logger.warn('[HubSpot] Incremental sync failed, using cached data', { extra: { err } });
-      }
-    }
-    
     return allContactsCache.data;
   }
   
@@ -698,19 +635,6 @@ router.get('/api/hubspot/contacts', isStaffOrAdmin, async (req, res) => {
   const hasFreshCache = allContactsCache.data && (now - allContactsCache.timestamp) < ALL_CONTACTS_CACHE_TTL;
   
   if (hasFreshCache && !forceRefresh) {
-    const needsIncrementalSync = (now - allContactsCache.lastModifiedCheck) > INCREMENTAL_SYNC_INTERVAL;
-    
-    if (needsIncrementalSync && !backgroundRefreshInProgress) {
-      backgroundRefreshInProgress = true;
-      fetchAllHubSpotContacts(false)
-        .catch(err => {
-          if (!isProduction) logger.warn('[HubSpot] Background incremental sync failed', { extra: { err } });
-        })
-        .finally(() => {
-          backgroundRefreshInProgress = false;
-        });
-    }
-    
     const filteredContacts = filterContacts(allContactsCache.data!);
     return res.json(buildResponse(filteredContacts, false, backgroundRefreshInProgress));
   }
@@ -1433,20 +1357,26 @@ router.post('/api/hubspot/webhooks', async (req, res) => {
       logger.info('[HubSpot Webhook] Received: for object , =', { extra: { subscriptionType, objectId, propertyName, propertyValue } });
       
       if (subscriptionType === 'contact.propertyChange') {
-        // Handle contact property changes (tier, status)
-        if (propertyName === 'membership_tier' || propertyName === 'membership_status') {
-          // Invalidate cache to pick up the change on next fetch
-          allContactsCache.timestamp = 0;
-          
-          invalidateCache('members_directory');
+        allContactsCache.timestamp = 0;
+        invalidateCache('members_directory');
+        broadcastDirectoryUpdate('synced');
 
-          // Broadcast to all connected clients
-          broadcastDirectoryUpdate('synced');
-          
-          logger.info('[HubSpot Webhook] Contact changed to', { extra: { objectId, propertyName, propertyValue } });
-          
-          // INSTANT DATABASE UPDATE: Update the user's status/tier immediately
-          // This ensures MindBody billing status changes are reflected instantly
+        const PROFILE_PROPERTIES = new Set([
+          'firstname', 'lastname', 'phone',
+          'address', 'city', 'state', 'zip',
+          'date_of_birth', 'mindbody_client_id',
+          'membership_discount_reason', 'membership_start_date',
+          'eh_email_updates_opt_in', 'eh_sms_updates_opt_in',
+          'hs_sms_promotional', 'hs_sms_customer_updates', 'hs_sms_reminders',
+          'stripe_delinquent'
+        ]);
+
+        const isStatusOrTier = propertyName === 'membership_tier' || propertyName === 'membership_status';
+        const isProfileProperty = PROFILE_PROPERTIES.has(propertyName);
+
+        if (isStatusOrTier || isProfileProperty) {
+          logger.info('[HubSpot Webhook] Contact property changed', { extra: { objectId, propertyName, propertyValue } });
+
           try {
             const hubspot = await getHubSpotClient();
             const contact = await hubspot.crm.contacts.basicApi.getById(objectId, ['email', 'membership_status', 'membership_tier', 'mindbody_client_id']);
@@ -1458,76 +1388,165 @@ router.post('/api/hubspot/webhooks', async (req, res) => {
               if (exclusionCheck.rows.length > 0) {
                 logger.info('[HubSpot Webhook] Skipping excluded/deleted email', { extra: { email, propertyName, propertyValue } });
               } else {
-                const userCheck = await db.execute(sql`SELECT role, billing_provider, stripe_subscription_id, membership_status, first_name, last_name, tier, data_source, visitor_type FROM users WHERE LOWER(email) = ${email}`);
+                const userCheck = await db.execute(sql`SELECT role, billing_provider, stripe_subscription_id, membership_status, first_name, last_name, tier, data_source, visitor_type, archived_at FROM users WHERE LOWER(email) = ${email}`);
                 const existingUser = userCheck.rows[0];
-                const isStripeProtected = existingUser?.billing_provider === 'stripe';
-                const isVisitorProtected = existingUser?.role === 'visitor';
 
-                if (isVisitorProtected) {
-                  logger.info('[HubSpot Webhook] VISITOR PROTECTED: Skipping update for visitor', { extra: { email, propertyName, propertyValue } });
-                } else if (propertyName === 'membership_status') {
-                  const newStatus = (propertyValue || 'non-member').toLowerCase();
+                if (!existingUser) {
+                  logger.info('[HubSpot Webhook] No local user found for email, skipping', { extra: { email, propertyName } });
+                } else if (existingUser.archived_at) {
+                  logger.info('[HubSpot Webhook] Skipping archived user', { extra: { email, propertyName } });
+                } else {
+                  const isStripeProtected = existingUser.billing_provider === 'stripe';
+                  const isVisitorProtected = existingUser.role === 'visitor';
 
-                  if (isStripeProtected) {
-                    logger.info('[HubSpot Webhook] STRIPE WINS: Skipping status change for Stripe-billed member', { extra: { email, newStatus } });
-                  } else if (newStatus === 'non-member' && existingUser?.stripe_subscription_id) {
-                    logger.info('[HubSpot Webhook] Skipping status change to \'non-member\' for - has active Stripe subscription', { extra: { email } });
-                  } else {
-                    const prevStatus = existingUser?.membership_status;
-                    await db.execute(sql`UPDATE users SET membership_status = ${newStatus}, updated_at = NOW() WHERE LOWER(email) = ${email}`);
-                    logger.info('[HubSpot Webhook] Updated DB membership_status for to', { extra: { email, newStatus } });
+                  if (isStatusOrTier) {
+                    if (isVisitorProtected) {
+                      logger.info('[HubSpot Webhook] VISITOR PROTECTED: Skipping update for visitor', { extra: { email, propertyName, propertyValue } });
+                    } else if (propertyName === 'membership_status') {
+                      const newStatus = (propertyValue || 'non-member').toLowerCase();
 
-                    const activeStatuses = ['active', 'trialing'];
-                    const inactiveStatuses = ['expired', 'terminated', 'cancelled', 'canceled', 'inactive', 'churned', 'declined', 'suspended', 'frozen', 'non-member'];
-                    const hubspotMemberName = existingUser
-                      ? `${existingUser.first_name || ''} ${existingUser.last_name || ''}`.trim() || email
-                      : email;
-                    const memberTier = existingUser?.tier || 'Unknown';
+                      if (isStripeProtected) {
+                        logger.info('[HubSpot Webhook] STRIPE WINS: Skipping status change for Stripe-billed member', { extra: { email, newStatus } });
+                      } else if (newStatus === 'non-member' && existingUser.stripe_subscription_id) {
+                        logger.info('[HubSpot Webhook] Skipping status change to \'non-member\' for - has active Stripe subscription', { extra: { email } });
+                      } else {
+                        const prevStatus = existingUser.membership_status;
+                        await db.execute(sql`UPDATE users SET membership_status = ${newStatus}, updated_at = NOW() WHERE LOWER(email) = ${email}`);
+                        logger.info('[HubSpot Webhook] Updated DB membership_status for to', { extra: { email, newStatus } });
 
-                    const nonNotifiableStatuses = ['non-member', 'visitor', 'lead'];
-                    const billingProvider = existingUser?.billing_provider;
-                    const dataSource = existingUser?.data_source;
-                    const visitorType = existingUser?.visitor_type;
-                    const changeSource = hasMindbodyId || billingProvider === 'mindbody'
-                      ? 'via MindBody'
-                      : billingProvider === 'stripe' || isStripeProtected
-                        ? 'via Stripe'
-                        : visitorType === 'day_pass'
-                          ? 'via Quick Guest Checkout'
-                          : dataSource === 'APP'
-                            ? 'via App'
-                            : 'via HubSpot sync';
-                    if (prevStatus && typeof prevStatus === 'string' && !nonNotifiableStatuses.includes(prevStatus) && newStatus === 'non-member') {
-                      await notifyAllStaff(
-                        'Member Status Changed',
-                        `${hubspotMemberName} (${email}) status changed to non-member ${changeSource} (was ${prevStatus}).`,
-                        'member_status_change',
-                        { sendPush: true, url: '/admin/members' }
-                      );
-                    } else if (activeStatuses.includes(newStatus) && !activeStatuses.includes((prevStatus || '') as string)) {
-                      await notifyAllStaff(
-                        '🎉 New Member Activated',
-                        `${hubspotMemberName} (${email}) is now active ${changeSource} (${memberTier} tier).`,
-                        'new_member',
-                        { sendPush: true, url: '/admin/members' }
-                      );
-                    } else if (inactiveStatuses.includes(newStatus) && !inactiveStatuses.includes((prevStatus || '') as string)) {
-                      await notifyAllStaff(
-                        'Member Status Changed',
-                        `${hubspotMemberName} (${email}) status changed to ${newStatus} ${changeSource}.`,
-                        'member_status_change',
-                        { sendPush: true, url: '/admin/members' }
-                      );
+                        const activeStatuses = ['active', 'trialing'];
+                        const inactiveStatuses = ['expired', 'terminated', 'cancelled', 'canceled', 'inactive', 'churned', 'declined', 'suspended', 'frozen', 'non-member'];
+                        const hubspotMemberName = `${existingUser.first_name || ''} ${existingUser.last_name || ''}`.trim() || email;
+                        const memberTier = existingUser.tier || 'Unknown';
+
+                        const nonNotifiableStatuses = ['non-member', 'visitor', 'lead'];
+                        const billingProvider = existingUser.billing_provider;
+                        const dataSource = existingUser.data_source;
+                        const visitorType = existingUser.visitor_type;
+                        const changeSource = hasMindbodyId || billingProvider === 'mindbody'
+                          ? 'via MindBody'
+                          : billingProvider === 'stripe' || isStripeProtected
+                            ? 'via Stripe'
+                            : visitorType === 'day_pass'
+                              ? 'via Quick Guest Checkout'
+                              : dataSource === 'APP'
+                                ? 'via App'
+                                : 'via HubSpot sync';
+                        if (prevStatus && typeof prevStatus === 'string' && !nonNotifiableStatuses.includes(prevStatus) && newStatus === 'non-member') {
+                          await notifyAllStaff(
+                            'Member Status Changed',
+                            `${hubspotMemberName} (${email}) status changed to non-member ${changeSource} (was ${prevStatus}).`,
+                            'member_status_change',
+                            { sendPush: true, url: '/admin/members' }
+                          );
+                        } else if (activeStatuses.includes(newStatus) && !activeStatuses.includes((prevStatus || '') as string)) {
+                          await notifyAllStaff(
+                            '🎉 New Member Activated',
+                            `${hubspotMemberName} (${email}) is now active ${changeSource} (${memberTier} tier).`,
+                            'new_member',
+                            { sendPush: true, url: '/admin/members' }
+                          );
+                        } else if (inactiveStatuses.includes(newStatus) && !inactiveStatuses.includes((prevStatus || '') as string)) {
+                          await notifyAllStaff(
+                            'Member Status Changed',
+                            `${hubspotMemberName} (${email}) status changed to ${newStatus} ${changeSource}.`,
+                            'member_status_change',
+                            { sendPush: true, url: '/admin/members' }
+                          );
+                        }
+                      }
+                    } else if (propertyName === 'membership_tier') {
+                      if (isStripeProtected) {
+                        logger.info('[HubSpot Webhook] STRIPE WINS: Skipping tier change for Stripe-billed member', { extra: { email, propertyValue } });
+                      } else {
+                        const normalizedTier = normalizeTierName(propertyValue || '');
+                        if (normalizedTier) {
+                          await db.execute(sql`UPDATE users SET tier = ${normalizedTier}, updated_at = NOW() WHERE LOWER(email) = ${email}`);
+                          logger.info('[HubSpot Webhook] Updated DB tier for', { extra: { email, normalizedTier } });
+                        }
+                      }
                     }
-                  }
-                } else if (propertyName === 'membership_tier') {
-                  if (isStripeProtected) {
-                    logger.info('[HubSpot Webhook] STRIPE WINS: Skipping tier change for Stripe-billed member', { extra: { email, propertyValue } });
-                  } else {
-                    const normalizedTier = normalizeTierName(propertyValue || '');
-                    if (normalizedTier) {
-                      await db.execute(sql`UPDATE users SET tier = ${normalizedTier}, updated_at = NOW() WHERE LOWER(email) = ${email}`);
-                      logger.info('[HubSpot Webhook] Updated DB tier for to', { extra: { email, normalizedTier } });
+                  } else if (isProfileProperty) {
+                    const val = propertyValue || '';
+                    const parseOptIn = (v: string): boolean | null => {
+                      if (!v) return null;
+                      const lower = v.toLowerCase();
+                      return lower === 'true' || lower === 'yes' || lower === '1';
+                    };
+
+                    const COALESCE_MAP: Record<string, string> = {
+                      firstname: 'first_name',
+                      lastname: 'last_name',
+                      phone: 'phone',
+                      address: 'street_address',
+                      city: 'city',
+                      state: 'state',
+                      zip: 'zip_code',
+                      mindbody_client_id: 'mindbody_client_id',
+                    };
+
+                    const DATE_COALESCE_MAP: Record<string, string> = {
+                      date_of_birth: 'date_of_birth',
+                    };
+
+                    const OVERWRITE_MAP: Record<string, string> = {
+                      membership_discount_reason: 'discount_code',
+                    };
+
+                    const JOIN_DATE_PROP = 'membership_start_date';
+
+                    const OPT_IN_MAP: Record<string, string> = {
+                      eh_email_updates_opt_in: 'email_opt_in',
+                      eh_sms_updates_opt_in: 'sms_opt_in',
+                      hs_sms_promotional: 'sms_promo_opt_in',
+                      hs_sms_customer_updates: 'sms_transactional_opt_in',
+                      hs_sms_reminders: 'sms_reminders_opt_in',
+                      stripe_delinquent: 'stripe_delinquent',
+                    };
+
+                    let updated = false;
+
+                    const normalizeDate = (v: string): string | null => {
+                      if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
+                      const ms = Number(v);
+                      if (!isNaN(ms) && ms > 0) return new Date(ms).toISOString().split('T')[0];
+                      const d = new Date(v);
+                      if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
+                      return null;
+                    };
+
+                    if (COALESCE_MAP[propertyName] && val) {
+                      const dbCol = COALESCE_MAP[propertyName];
+                      const result = await db.execute(sql`UPDATE users SET ${sql.raw(dbCol)} = ${val}, updated_at = NOW() WHERE LOWER(email) = ${email} AND (${sql.raw(dbCol)} IS NULL OR ${sql.raw(dbCol)} = '')`);
+                      updated = (result.rowCount ?? 0) > 0;
+                    } else if (DATE_COALESCE_MAP[propertyName] && val) {
+                      const dbCol = DATE_COALESCE_MAP[propertyName];
+                      const dateVal = normalizeDate(val);
+                      if (dateVal) {
+                        const result = await db.execute(sql`UPDATE users SET ${sql.raw(dbCol)} = ${dateVal}::date, updated_at = NOW() WHERE LOWER(email) = ${email} AND ${sql.raw(dbCol)} IS NULL`);
+                        updated = (result.rowCount ?? 0) > 0;
+                      }
+                    } else if (OVERWRITE_MAP[propertyName]) {
+                      const dbCol = OVERWRITE_MAP[propertyName];
+                      await db.execute(sql`UPDATE users SET ${sql.raw(dbCol)} = ${val || null}, updated_at = NOW() WHERE LOWER(email) = ${email}`);
+                      updated = true;
+                    } else if (propertyName === JOIN_DATE_PROP && val) {
+                      const dateVal = normalizeDate(val);
+                      const result = dateVal
+                        ? await db.execute(sql`UPDATE users SET join_date = ${dateVal}::date, updated_at = NOW() WHERE LOWER(email) = ${email} AND join_date IS NULL`)
+                        : { rowCount: 0 };
+                      updated = (result.rowCount ?? 0) > 0;
+                    } else if (OPT_IN_MAP[propertyName]) {
+                      const dbCol = OPT_IN_MAP[propertyName];
+                      const boolVal = parseOptIn(val);
+                      if (boolVal !== null) {
+                        await db.execute(sql`UPDATE users SET ${sql.raw(dbCol)} = ${boolVal}, updated_at = NOW() WHERE LOWER(email) = ${email}`);
+                        updated = true;
+                      }
+                    }
+
+                    if (updated) {
+                      logger.info('[HubSpot Webhook] Updated profile property', { extra: { email, propertyName, propertyValue: val } });
                     }
                   }
                 }

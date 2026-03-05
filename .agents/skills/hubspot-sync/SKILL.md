@@ -107,9 +107,20 @@ Deal creation is currently disabled (functions return early). The pipeline infra
 
 ## Data Flow: HubSpot → App
 
-### Member Sync (Daily at 3 AM Pacific)
+### Webhook-First Inbound Sync (Primary)
 
-`syncAllMembersFromHubSpot` in `server/core/memberSync.ts` runs daily:
+The `POST /api/hubspot/webhooks` endpoint handles `contact.propertyChange` events in real-time. This is the primary mechanism for HubSpot → App data flow:
+
+- **Status/tier changes**: `membership_status` and `membership_tier` — applied immediately with STRIPE WINS and visitor protection rules.
+- **Profile properties**: `firstname`, `lastname`, `phone`, `address`, `city`, `state`, `zip`, `date_of_birth`, `mindbody_client_id`, `membership_start_date` — COALESCE (only fill if DB value is null/empty).
+- **Overwrite properties**: `membership_discount_reason` — always overwrites DB value.
+- **Opt-in preferences**: `eh_email_updates_opt_in`, `eh_sms_updates_opt_in`, `hs_sms_promotional`, `hs_sms_customer_updates`, `hs_sms_reminders`, `stripe_delinquent` — parsed as boolean, always overwrites (HubSpot is authoritative for communication preferences).
+- **Protection rules**: Skip if in `sync_exclusions`, skip if `archived_at IS NOT NULL`, STRIPE WINS for status/tier, skip visitors for status changes, skip unknown users (no upsert).
+- **Cache invalidation**: Every handled property change invalidates the contact cache and broadcasts a directory update via WebSocket.
+
+### Weekly Reconciliation Sync (Safety Net — Sunday 3 AM Pacific)
+
+`syncAllMembersFromHubSpot` in `server/core/memberSync.ts` runs weekly as a safety net:
 
 1. Fetch all contacts from HubSpot (paginated, 100 per page).
 2. Skip contacts in the `sync_exclusions` table (permanently deleted members).
@@ -159,10 +170,12 @@ See [references/sync-operations.md](references/sync-operations.md) for detailed 
 
 ## HubSpot Contact Cache (Routes Layer)
 
-The `/api/hubspot/contacts` endpoint maintains an in-memory cache with two refresh strategies:
+The `/api/hubspot/contacts` endpoint maintains an in-memory cache:
 
 - **Full refresh:** Every 30 minutes, fetch all contacts and enrich with DB data (visit counts, join dates, booking history).
-- **Incremental sync:** Every 5 minutes, fetch only contacts modified since last check via `lastmodifieddate` filter.
+- **Webhook-driven invalidation:** When a HubSpot webhook fires for any handled property change, the cache timestamp is reset to 0, forcing a fresh rebuild on the next request.
+
+The 5-minute incremental poll (`fetchRecentlyModifiedContacts`) was removed — webhooks handle real-time changes.
 
 Contacts are enriched with: lifetime visits (bookings + events + wellness + walk-ins), computed join date (batch-import-aware logic with Nov 12, 2025 cutoff), and former-member classification.
 
@@ -201,7 +214,7 @@ Contacts are enriched with: lifetime visits (bookings + events + wellness + walk
 | `server/core/hubspotQueueMonitor.ts` | Queue stats for admin dashboard |
 | `server/core/stripe/hubspotSync.ts` | Payment and day-pass line item sync |
 | `server/schedulers/hubspotQueueScheduler.ts` | Queue processor (every 2 min) |
-| `server/schedulers/memberSyncScheduler.ts` | Daily member sync (3 AM Pacific) |
+| `server/schedulers/memberSyncScheduler.ts` | Weekly member sync (Sunday 3 AM Pacific) |
 | `server/schedulers/hubspotFormSyncScheduler.ts` | Form sync (every 30 min) |
 | `server/routes/hubspot.ts` | API routes, contact cache, webhook validation |
 

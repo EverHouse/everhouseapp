@@ -29,7 +29,8 @@ export function getPacificHour(): number {
 /**
  * Get Pacific date parts from current time
  */
-export function getPacificDateParts(): { year: number; month: number; day: number; hour: number; minute: number } {
+export function getPacificDateParts(): { year: number; month: number; day: number; hour: number; minute: number; dayOfWeek: number } {
+  const now = new Date();
   const formatter = new Intl.DateTimeFormat('en-US', {
     timeZone: CLUB_TIMEZONE,
     year: 'numeric',
@@ -37,16 +38,20 @@ export function getPacificDateParts(): { year: number; month: number; day: numbe
     day: '2-digit',
     hour: '2-digit',
     minute: '2-digit',
-    hourCycle: 'h23' // Use 0-23 range (not hour12: false which can return 24)
+    hourCycle: 'h23'
   });
-  const parts = formatter.formatToParts(new Date());
+  const parts = formatter.formatToParts(now);
   const get = (type: string) => parseInt(parts.find(p => p.type === type)?.value || '0', 10);
+  const dowFormatter = new Intl.DateTimeFormat('en-US', { timeZone: CLUB_TIMEZONE, weekday: 'short' });
+  const dayName = dowFormatter.format(now);
+  const dayMap: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
   return {
     year: get('year'),
     month: get('month'),
     day: get('day'),
     hour: get('hour'),
-    minute: get('minute')
+    minute: get('minute'),
+    dayOfWeek: dayMap[dayName] ?? 0
   };
 }
 

@@ -4,48 +4,54 @@ import { getPacificDateParts } from '../utils/dateUtils';
 import { logger } from '../core/logger';
 
 const SYNC_HOUR = 3;
+const SYNC_DAY = 0; // Sunday
 let currentTimeoutId: NodeJS.Timeout | null = null;
 
-function getMillisecondsUntil3amPacific(): number {
+function getMillisecondsUntilNextSunday3amPacific(): number {
   const parts = getPacificDateParts();
-  const now = new Date();
-  
-  const targetHour = SYNC_HOUR;
-  let hoursUntilSync = targetHour - parts.hour;
-  
-  if (hoursUntilSync <= 0) {
-    hoursUntilSync += 24;
+
+  let daysUntilSunday = SYNC_DAY - parts.dayOfWeek;
+  if (daysUntilSunday < 0) daysUntilSunday += 7;
+
+  if (daysUntilSunday === 0 && parts.hour >= SYNC_HOUR) {
+    daysUntilSunday = 7;
   }
-  
+
+  let hoursUntilSync = SYNC_HOUR - parts.hour + (daysUntilSunday * 24);
+  if (daysUntilSunday === 0 && parts.hour < SYNC_HOUR) {
+    hoursUntilSync = SYNC_HOUR - parts.hour;
+  }
+
   const minutesRemaining = 60 - parts.minute;
   const totalMinutes = (hoursUntilSync - 1) * 60 + minutesRemaining;
-  
-  return totalMinutes * 60 * 1000;
+
+  return Math.max(totalMinutes * 60 * 1000, 60000);
 }
 
-async function runDailyMemberSync(): Promise<void> {
-  logger.info('[MemberSync] Starting daily off-hours sync...');
+async function runWeeklyMemberSync(): Promise<void> {
+  logger.info('[MemberSync] Starting weekly reconciliation sync...');
   try {
     const result = await syncAllMembersFromHubSpot();
-    logger.info(`[MemberSync] Daily sync complete - Synced: ${result.synced}, Errors: ${result.errors}`);
+    logger.info(`[MemberSync] Weekly reconciliation complete - Synced: ${result.synced}, Errors: ${result.errors}`);
     schedulerTracker.recordRun('Member Sync', true);
     await setLastMemberSyncTime(Date.now());
   } catch (err: unknown) {
-    logger.error('[MemberSync] Daily sync failed:', { error: err as Error });
+    logger.error('[MemberSync] Weekly reconciliation failed:', { error: err as Error });
     schedulerTracker.recordRun('Member Sync', false, String(err));
   }
   
-  const nextRun = getMillisecondsUntil3amPacific();
-  currentTimeoutId = setTimeout(runDailyMemberSync, nextRun);
-  logger.info(`[MemberSync] Next sync scheduled in ${Math.round(nextRun / 1000 / 60 / 60)} hours`);
+  const nextRun = getMillisecondsUntilNextSunday3amPacific();
+  currentTimeoutId = setTimeout(runWeeklyMemberSync, nextRun);
+  const days = Math.round(nextRun / 1000 / 60 / 60 / 24);
+  logger.info(`[MemberSync] Next reconciliation scheduled in ~${days} days (Sunday 3am Pacific)`);
 }
 
 export function startMemberSyncScheduler(): void {
-  const msUntilSync = getMillisecondsUntil3amPacific();
-  const hoursUntilSync = Math.round(msUntilSync / 1000 / 60 / 60);
+  const msUntilSync = getMillisecondsUntilNextSunday3amPacific();
+  const days = Math.round(msUntilSync / 1000 / 60 / 60 / 24);
   
-  currentTimeoutId = setTimeout(runDailyMemberSync, msUntilSync);
-  logger.info(`[Startup] Member sync scheduler enabled (runs daily at 3am Pacific, next run in ~${hoursUntilSync} hours)`);
+  currentTimeoutId = setTimeout(runWeeklyMemberSync, msUntilSync);
+  logger.info(`[Startup] Member sync scheduler enabled (runs weekly Sunday 3am Pacific, next run in ~${days} days)`);
 }
 
 export function stopMemberSyncScheduler(): void {
