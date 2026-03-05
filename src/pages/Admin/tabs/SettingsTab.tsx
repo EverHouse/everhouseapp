@@ -5,10 +5,6 @@ import Toggle from '../../../components/Toggle';
 import WalkingGolferSpinner from '../../../components/WalkingGolferSpinner';
 
 interface SettingsState {
-  clubName: string;
-  supportEmail: string;
-  timezoneDisplay: string;
-  categoryLabels: Record<string, string>;
   dataIntegrityAlerts: boolean;
   syncFailureAlerts: boolean;
   contactPhone: string;
@@ -43,24 +39,6 @@ interface SettingsState {
   gracePeriodDays: string;
   trialCouponCode: string;
 }
-
-const CATEGORY_KEYS = [
-  'guest_pass',
-  'guest_sim_fee',
-  'sim_walk_in',
-  'membership',
-  'cafe',
-  'retail',
-  'other'
-] as const;
-
-const TIMEZONE_OPTIONS = [
-  { value: 'America/Los_Angeles', label: 'Pacific Time (PT)' },
-  { value: 'America/Denver', label: 'Mountain Time (MT)' },
-  { value: 'America/Chicago', label: 'Central Time (CT)' },
-  { value: 'America/New_York', label: 'Eastern Time (ET)' },
-  { value: 'UTC', label: 'UTC' },
-];
 
 const HUBSPOT_STAGE_KEYS = [
   { key: 'day_pass_tour_request', label: 'Day Pass / Tour Request' },
@@ -158,13 +136,6 @@ const SettingsTab: React.FC = () => {
   };
 
   const defaultSettings: SettingsState = {
-    clubName: 'Ever Club',
-    supportEmail: 'support@everclub.app',
-    timezoneDisplay: 'America/Los_Angeles',
-    categoryLabels: {
-      guest_pass: 'Guest Pass', guest_sim_fee: 'Guest Sim Fee', sim_walk_in: 'Sim Walk-In',
-      membership: 'Membership', cafe: 'Cafe', retail: 'Retail', other: 'Other',
-    },
     dataIntegrityAlerts: true,
     syncFailureAlerts: true,
     contactPhone: '(949) 545-5855',
@@ -220,11 +191,6 @@ const SettingsTab: React.FC = () => {
     queryFn: async () => {
       const data = await fetchWithCredentials<Record<string, { value: string }>>('/api/settings');
 
-      const categoryLabels: Record<string, string> = {};
-      for (const key of CATEGORY_KEYS) {
-        categoryLabels[key] = data[`category.${key}`]?.value || key.replace(/_/g, ' ');
-      }
-
       const hubspotStages: Record<string, string> = {};
       for (const s of HUBSPOT_STAGE_KEYS) {
         hubspotStages[s.key] = data[`hubspot.stage.${s.key}`]?.value || defaultSettings.hubspotStages[s.key] || '';
@@ -241,10 +207,6 @@ const SettingsTab: React.FC = () => {
       }
 
       return {
-        clubName: data['app.club_name']?.value || 'Ever Club',
-        supportEmail: data['app.support_email']?.value || 'support@everclub.app',
-        timezoneDisplay: data['app.timezone_display']?.value || 'America/Los_Angeles',
-        categoryLabels,
         dataIntegrityAlerts: data['notifications.data_integrity_alerts']?.value !== 'false',
         syncFailureAlerts: data['notifications.sync_failure_alerts']?.value !== 'false',
         contactPhone: data['contact.phone']?.value || defaultSettings.contactPhone,
@@ -292,9 +254,6 @@ const SettingsTab: React.FC = () => {
   const saveMutation = useMutation({
     mutationFn: async (settingsToSave: SettingsState) => {
       const payload: Record<string, string> = {
-        'app.club_name': settingsToSave.clubName,
-        'app.support_email': settingsToSave.supportEmail,
-        'app.timezone_display': settingsToSave.timezoneDisplay,
         'notifications.data_integrity_alerts': String(settingsToSave.dataIntegrityAlerts),
         'notifications.sync_failure_alerts': String(settingsToSave.syncFailureAlerts),
         'contact.phone': settingsToSave.contactPhone,
@@ -327,9 +286,6 @@ const SettingsTab: React.FC = () => {
         'scheduling.trial_coupon_code': settingsToSave.trialCouponCode,
       };
 
-      for (const [key, label] of Object.entries(settingsToSave.categoryLabels ?? {})) {
-        payload[`category.${key}`] = label;
-      }
       for (const [key, val] of Object.entries(settingsToSave.hubspotStages ?? {})) {
         payload[`hubspot.stage.${key}`] = val;
       }
@@ -401,28 +357,6 @@ const SettingsTab: React.FC = () => {
           {errorMessage}
         </div>
       )}
-
-      <div className={sectionClass}>
-        <SectionHeader icon="tune" title="App Display Settings" subtitle="Configure how the app appears to users" />
-        <div className="space-y-4">
-          <div>
-            <FieldLabel>Club Name</FieldLabel>
-            <input type="text" value={settings.clubName} onChange={(e) => updateField('clubName', e.target.value)} className={inputClass} placeholder="Club name" />
-          </div>
-          <div>
-            <FieldLabel>Support Email</FieldLabel>
-            <input type="email" value={settings.supportEmail} onChange={(e) => updateField('supportEmail', e.target.value)} className={inputClass} placeholder="support@example.com" />
-          </div>
-          <div>
-            <FieldLabel>Time Zone Display</FieldLabel>
-            <select value={settings.timezoneDisplay} onChange={(e) => updateField('timezoneDisplay', e.target.value)} className={inputClass}>
-              {TIMEZONE_OPTIONS.map(opt => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-      </div>
 
       <div className={sectionClass}>
         <SectionHeader icon="contacts" title="Contact & Social Media" subtitle="Club contact info displayed on public pages" />
@@ -567,32 +501,6 @@ const SettingsTab: React.FC = () => {
               </div>
             ))}
           </div>
-        </div>
-      </div>
-
-      <div className={sectionClass}>
-        <SectionHeader icon="category" title="Purchase Category Labels" subtitle="Customize display names for purchase categories" />
-        <div className="space-y-3">
-          {CATEGORY_KEYS.map(key => (
-            <div key={key} className="flex items-center gap-4">
-              <div className="w-32 flex-shrink-0">
-                <span className="text-xs font-mono text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-black/30 px-2 py-1 rounded">{key}</span>
-              </div>
-              <input
-                type="text"
-                value={settings.categoryLabels?.[key] ?? ''}
-                onChange={(e) => {
-                  setSettings(prev => ({
-                    ...prev,
-                    categoryLabels: { ...(prev.categoryLabels ?? {}), [key]: e.target.value }
-                  }));
-                  setHasChanges(true);
-                }}
-                className={inputSmClass}
-                placeholder="Display label"
-              />
-            </div>
-          ))}
         </div>
       </div>
 

@@ -11,16 +11,6 @@ import { invalidateSettingsCache } from '../core/settingsHelper';
 const router = Router();
 
 const DEFAULT_SETTINGS: Record<string, { value: string; category: string }> = {
-  'app.club_name': { value: 'Ever Club', category: 'display' },
-  'app.support_email': { value: 'support@everclub.com', category: 'display' },
-  'app.timezone_display': { value: 'America/Los_Angeles', category: 'display' },
-  'category.guest_pass': { value: 'Guest Pass', category: 'categories' },
-  'category.guest_sim_fee': { value: 'Guest Sim Fee', category: 'categories' },
-  'category.sim_walk_in': { value: 'Sim Walk-In', category: 'categories' },
-  'category.membership': { value: 'Membership', category: 'categories' },
-  'category.cafe': { value: 'Cafe', category: 'categories' },
-  'category.retail': { value: 'Retail', category: 'categories' },
-  'category.other': { value: 'Other', category: 'categories' },
   'notifications.data_integrity_alerts': { value: 'true', category: 'notifications' },
   'notifications.sync_failure_alerts': { value: 'true', category: 'notifications' },
 
