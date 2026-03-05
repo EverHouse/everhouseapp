@@ -1,7 +1,8 @@
 import rateLimit from 'express-rate-limit';
 import { Request, Response } from 'express';
 import { logger } from '../core/logger';
-import { pool } from '../core/db';
+import { db } from '../db';
+import { sql } from 'drizzle-orm';
 
 const getClientKey = (req: Request): string => {
   const userId = req.session?.user?.id;
@@ -152,7 +153,7 @@ let dbLocksInitialized = false;
 async function ensureLocksTable(): Promise<boolean> {
   if (dbLocksInitialized) return true;
   try {
-    await pool.query(`
+    await db.execute(sql`
       CREATE TABLE IF NOT EXISTS subscription_locks (
         email TEXT PRIMARY KEY,
         locked_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -173,16 +174,15 @@ export async function acquireSubscriptionLock(email: string, lockedBy?: string):
 
   if (dbReady) {
     try {
-      const result = await pool.query(
-        `INSERT INTO subscription_locks (email, locked_at, locked_by)
-         VALUES ($1, NOW(), $2)
-         ON CONFLICT (email) DO UPDATE
-         SET locked_at = EXCLUDED.locked_at, locked_by = EXCLUDED.locked_by
-         WHERE subscription_locks.locked_at < NOW() - INTERVAL '${LOCK_TIMEOUT_MS} milliseconds'
-         RETURNING email`,
-        [key, lockedBy || null]
-      );
-      return result.rowCount !== null && result.rowCount > 0;
+      const result = await db.execute(sql`
+        INSERT INTO subscription_locks (email, locked_at, locked_by)
+        VALUES (${key}, NOW(), ${lockedBy || null})
+        ON CONFLICT (email) DO UPDATE
+        SET locked_at = EXCLUDED.locked_at, locked_by = EXCLUDED.locked_by
+        WHERE subscription_locks.locked_at < NOW() - INTERVAL '120 seconds'
+        RETURNING email
+      `);
+      return result.rows.length > 0;
     } catch (err) {
       logger.warn('[SubscriptionLock] DB lock failed, falling back to memory', { extra: { error: String(err) } });
     }
@@ -202,7 +202,7 @@ export async function releaseSubscriptionLock(email: string): Promise<void> {
 
   if (dbLocksInitialized) {
     try {
-      await pool.query('DELETE FROM subscription_locks WHERE email = $1', [key]);
+      await db.execute(sql`DELETE FROM subscription_locks WHERE email = ${key}`);
     } catch (err) {
       logger.warn('[SubscriptionLock] DB lock release failed', { extra: { error: String(err) } });
     }

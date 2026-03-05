@@ -396,17 +396,19 @@ export async function ensureDatabaseConstraints() {
       `);
       logger.info('[DB Init] Billing provider CHECK constraint created/verified');
 
-      for (const val of ['auto-complete', 'manual-auto-complete', 'system']) {
+      const bookingSourceValues = ['auto-complete', 'manual-auto-complete', 'system'] as const;
+      for (const val of bookingSourceValues) {
         try {
-          await db.execute(sql.raw(`ALTER TYPE booking_source ADD VALUE IF NOT EXISTS '${val}'`));
+          await db.execute(sql`ALTER TYPE booking_source ADD VALUE IF NOT EXISTS ${val}`);
         } catch {
         }
       }
       logger.info('[DB Init] booking_source enum values synced');
 
-      for (const val of ['refund_pending']) {
+      const paymentStatusValues = ['refund_pending'] as const;
+      for (const val of paymentStatusValues) {
         try {
-          await db.execute(sql.raw(`ALTER TYPE participant_payment_status ADD VALUE IF NOT EXISTS '${val}'`));
+          await db.execute(sql`ALTER TYPE participant_payment_status ADD VALUE IF NOT EXISTS ${val}`);
         } catch {
         }
       }
@@ -415,19 +417,10 @@ export async function ensureDatabaseConstraints() {
       await db.execute(sql`ALTER TABLE users ALTER COLUMN billing_provider SET DEFAULT 'stripe'`);
       logger.info('[DB Init] billing_provider column default set to stripe');
 
-      const migrationCols = [
-        { col: 'migration_billing_start_date', type: 'TIMESTAMP' },
-        { col: 'migration_requested_by', type: 'TEXT' },
-        { col: 'migration_tier_snapshot', type: 'TEXT' },
-        { col: 'migration_status', type: 'TEXT' },
-      ];
-      for (const { col, type } of migrationCols) {
-        try {
-          await db.execute(sql.raw(`ALTER TABLE users ADD COLUMN IF NOT EXISTS ${col} ${type}`));
-        } catch (colErr: unknown) {
-          logger.warn(`[DB Init] Skipping migration column ${col}: ${getErrorMessage(colErr)}`);
-        }
-      }
+      try { await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS migration_billing_start_date TIMESTAMP`); } catch {}
+      try { await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS migration_requested_by TEXT`); } catch {}
+      try { await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS migration_tier_snapshot TEXT`); } catch {}
+      try { await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS migration_status TEXT`); } catch {}
       logger.info('[DB Init] Billing migration columns verified');
       
       const hubspotFix = await db.execute(sql`
