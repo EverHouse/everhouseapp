@@ -133,7 +133,8 @@ export const AnnouncementDataProvider: React.FC<{children: ReactNode}> = ({ chil
           endDate: item.endDate || null,
           linkType: item.linkType || null,
           linkTarget: item.linkTarget || null,
-          notifyMembers: item.notifyMembers || false
+          notifyMembers: item.notifyMembers || false,
+          showAsBanner: item.showAsBanner || false
         })
       });
       if (res.ok) {
