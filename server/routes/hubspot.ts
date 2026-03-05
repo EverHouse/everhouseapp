@@ -17,6 +17,7 @@ import { invalidateCache } from '../core/queryCache';
 import { broadcastDirectoryUpdate } from '../core/websocket';
 import { getErrorMessage, getErrorStatusCode, safeErrorDetail } from '../utils/errorUtils';
 import { denormalizeTierForHubSpot, denormalizeTierForHubSpotAsync } from '../utils/tierUtils';
+import { syncRelevantMembersFromHubSpot, getLastMemberSyncTime, setLastMemberSyncTime } from '../core/memberSync';
 
 
 interface HubSpotApiObject {
@@ -2225,6 +2226,65 @@ router.post('/api/admin/hubspot/remove-marketing-contacts', isAdmin, async (req:
       error: error instanceof Error ? error : new Error(String(error)),
     });
     res.status(500).json({ error: 'Failed to flag marketing contacts for removal' });
+  }
+});
+
+router.get('/api/hubspot/sync-status', isStaffOrAdmin, async (_req: Request, res: Response) => {
+  try {
+    const lastSync = getLastMemberSyncTime();
+    res.json({ lastSyncTime: lastSync ? new Date(lastSync).toISOString() : null });
+  } catch (error: unknown) {
+    logger.error('[HubSpot] Failed to get sync status', { error: error instanceof Error ? error : new Error(String(error)) });
+    res.status(500).json({ error: 'Failed to get sync status' });
+  }
+});
+
+router.post('/api/hubspot/sync-all-members', isStaffOrAdmin, async (_req: Request, res: Response) => {
+  try {
+    const result = await syncRelevantMembersFromHubSpot();
+    await setLastMemberSyncTime(Date.now());
+    allContactsCache = { data: null, timestamp: 0, lastModifiedCheck: 0 };
+    res.json({ synced: result.synced, errors: result.errors });
+  } catch (error: unknown) {
+    logger.error('[HubSpot] Failed to sync all members', { error: error instanceof Error ? error : new Error(String(error)) });
+    res.status(500).json({ error: 'Failed to sync members from HubSpot', details: safeErrorDetail(error) });
+  }
+});
+
+router.post('/api/hubspot/push-members-to-hubspot', isStaffOrAdmin, async (_req: Request, res: Response) => {
+  try {
+    const membersResult = await db.execute(sql`
+      SELECT email, membership_status, billing_provider, tier, hubspot_id, first_name, last_name
+      FROM users
+      WHERE membership_status = 'active' AND email IS NOT NULL
+      ORDER BY email
+    `);
+    const members = membersResult.rows as unknown as BillingProviderMemberRow[];
+
+    let synced = 0;
+    let errors = 0;
+    const { syncMemberToHubSpot } = await import('../core/hubspot/stages');
+
+    for (const member of members) {
+      try {
+        await syncMemberToHubSpot({
+          email: member.email,
+          status: member.membership_status || undefined,
+          tier: member.tier || undefined,
+          billingProvider: member.billing_provider || undefined,
+        });
+        synced++;
+      } catch (err: unknown) {
+        errors++;
+        logger.warn('[HubSpot Push] Failed to push member', { extra: { email: member.email, error: getErrorMessage(err as Error) } });
+      }
+    }
+
+    allContactsCache = { data: null, timestamp: 0, lastModifiedCheck: 0 };
+    res.json({ synced, errors });
+  } catch (error: unknown) {
+    logger.error('[HubSpot] Failed to push members to HubSpot', { error: error instanceof Error ? error : new Error(String(error)) });
+    res.status(500).json({ error: 'Failed to push members to HubSpot', details: safeErrorDetail(error) });
   }
 });
 
