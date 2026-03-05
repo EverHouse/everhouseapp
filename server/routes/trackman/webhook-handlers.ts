@@ -275,8 +275,16 @@ export async function handleBookingModification(
                RETURNING id`);
             const newSessionId = (newSessionResult.rows[0] as { id: number }).id;
             await tx.execute(sql`UPDATE booking_requests SET session_id = ${newSessionId} WHERE id = ${bookingId}`);
+
+            const userLookup = await tx.execute(sql`SELECT u.id as user_id
+               FROM users u WHERE LOWER(u.email) = LOWER(${existing.userEmail}) LIMIT 1`);
+            const userId = userLookup.rows.length > 0 ? (userLookup.rows[0] as { user_id: string }).user_id : null;
+            await tx.execute(sql`INSERT INTO booking_participants
+               (session_id, user_id, participant_type, display_name, payment_status, created_at)
+               VALUES (${newSessionId}, ${userId}, 'owner', ${existing.userName || existing.userEmail}, 'waived', NOW())`);
+
             newSessionIdForFees = newSessionId;
-            logger.info('[Trackman Webhook] Created new session and re-linked booking', {
+            logger.info('[Trackman Webhook] Created new session and re-linked booking with owner participant', {
               extra: { bookingId, oldSessionId: sessionId, newSessionId, newResourceId, newDate, newStartTime, newEndTime }
             });
           } else {
@@ -313,10 +321,26 @@ export async function handleBookingModification(
       }
     }
 
-    if (bayChanged) {
+    if (bayChanged && oldResourceId) {
+      try {
+        await updateBaySlotCache(
+          incoming.trackmanBookingId,
+          oldResourceId,
+          existingDate,
+          existingStartTime,
+          existingEndTime,
+          'cancelled',
+          existing.userEmail
+        );
+      } catch (cacheErr: unknown) {
+        logger.warn('[Trackman Webhook] Non-blocking: Failed to clean up old bay slot cache', {
+          extra: { bookingId, oldResourceId, error: (cacheErr as Error).message }
+        });
+      }
+
       try {
         broadcastAvailabilityUpdate({
-          resourceId: oldResourceId!,
+          resourceId: oldResourceId,
           resourceType: 'simulator',
           date: existingDate,
           action: 'cancelled'
