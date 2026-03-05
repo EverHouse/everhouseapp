@@ -16,17 +16,11 @@ export async function runDataCleanup(): Promise<{
   orphanedNotifications: number;
   orphanedBookings: number;
   normalizedEmails: number;
-  orphanedFeeSnapshots: number;
-  orphanedEnrollments: number;
-  orphanedParticipants: number;
   expiredHolds: number;
 }> {
   let orphanedNotifications = 0;
   let orphanedBookings = 0;
   let normalizedEmails = 0;
-  let orphanedFeeSnapshots = 0;
-  let orphanedEnrollments = 0;
-  let orphanedParticipants = 0;
   let expiredHolds = 0;
 
   try {
@@ -93,47 +87,20 @@ export async function runDataCleanup(): Promise<{
     `);
     normalizedEmails = Number((emailResult.rows[0] as unknown as TotalRow)?.total || 0);
 
-    const feeSnapshotResult = await db.execute(sql`
-      DELETE FROM booking_fee_snapshots bfs
-      WHERE NOT EXISTS (SELECT 1 FROM booking_requests br WHERE br.id = bfs.booking_id)
-        AND bfs.status NOT IN ('paid', 'captured')
-      RETURNING id
-    `);
-    orphanedFeeSnapshots = feeSnapshotResult.rows.length;
-
-    if (orphanedFeeSnapshots > 0) {
-      logger.info(`[DataCleanup] Removed ${orphanedFeeSnapshots} orphaned fee snapshots`);
-    }
-
-    const enrollmentResult = await db.execute(sql`
-      DELETE FROM wellness_enrollments we
-      WHERE NOT EXISTS (SELECT 1 FROM wellness_classes wc WHERE wc.id = we.class_id)
-      RETURNING id
-    `);
-    orphanedEnrollments = enrollmentResult.rows.length;
-
-    const participantResult = await db.execute(sql`
-      DELETE FROM booking_participants bp
-      WHERE NOT EXISTS (SELECT 1 FROM booking_sessions bs WHERE bs.id = bp.session_id)
-      RETURNING id
-    `);
-    orphanedParticipants = participantResult.rows.length;
-
     const holdResult = await db.execute(sql`
       DELETE FROM guest_pass_holds gph
-      WHERE (NOT EXISTS (SELECT 1 FROM booking_requests br WHERE br.id = gph.booking_id))
-        OR (gph.expires_at < NOW())
+      WHERE gph.expires_at < NOW()
       RETURNING id
     `);
     expiredHolds = holdResult.rows.length;
 
-    logger.info(`[DataCleanup] Removed ${orphanedNotifications} orphaned notifications, marked ${orphanedBookings} orphaned bookings, normalized ${normalizedEmails} emails, removed ${orphanedFeeSnapshots} orphaned fee snapshots, removed ${orphanedEnrollments} orphaned wellness enrollments, removed ${orphanedParticipants} orphaned booking participants, removed ${expiredHolds} expired guest pass holds`);
+    logger.info(`[DataCleanup] Removed ${orphanedNotifications} orphaned notifications, marked ${orphanedBookings} orphaned bookings, normalized ${normalizedEmails} emails, removed ${expiredHolds} expired guest pass holds`);
   } catch (error: unknown) {
     logger.error('[DataCleanup] Error during cleanup:', { extra: { detail: getErrorMessage(error) } });
     throw error;
   }
 
-  return { orphanedNotifications, orphanedBookings, normalizedEmails, orphanedFeeSnapshots, orphanedEnrollments, orphanedParticipants, expiredHolds };
+  return { orphanedNotifications, orphanedBookings, normalizedEmails, expiredHolds };
 }
 
 export async function autoFixMissingTiers(): Promise<{

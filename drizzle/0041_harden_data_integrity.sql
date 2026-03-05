@@ -86,3 +86,27 @@ UPDATE users SET stripe_customer_id = NULL
 DROP INDEX IF EXISTS users_stripe_customer_id_unique;
 CREATE UNIQUE INDEX users_stripe_customer_id_unique
   ON users (stripe_customer_id) WHERE stripe_customer_id IS NOT NULL;
+
+-- 7. guest_pass_holds: CASCADE on booking deletion
+--    Pre-clean: remove holds referencing deleted bookings.
+DELETE FROM guest_pass_holds
+  WHERE booking_id IS NOT NULL
+    AND NOT EXISTS (SELECT 1 FROM booking_requests WHERE id = guest_pass_holds.booking_id);
+
+ALTER TABLE guest_pass_holds
+  DROP CONSTRAINT IF EXISTS guest_pass_holds_booking_id_fkey;
+ALTER TABLE guest_pass_holds
+  ADD CONSTRAINT guest_pass_holds_booking_id_fkey
+  FOREIGN KEY (booking_id) REFERENCES booking_requests(id) ON DELETE CASCADE;
+
+-- 8. conference_prepayments: CASCADE on booking deletion
+--    Pre-clean: remove prepayments referencing deleted bookings.
+DELETE FROM conference_prepayments
+  WHERE booking_id IS NOT NULL
+    AND NOT EXISTS (SELECT 1 FROM booking_requests WHERE id = conference_prepayments.booking_id);
+
+ALTER TABLE conference_prepayments
+  DROP CONSTRAINT IF EXISTS conference_prepayments_booking_id_fkey;
+ALTER TABLE conference_prepayments
+  ADD CONSTRAINT conference_prepayments_booking_id_fkey
+  FOREIGN KEY (booking_id) REFERENCES booking_requests(id) ON DELETE CASCADE;

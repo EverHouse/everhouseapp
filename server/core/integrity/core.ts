@@ -45,16 +45,6 @@ export interface UnmatchedBookingRow {
   notes: string;
 }
 
-export interface BookingResourceRow {
-  id: string | number;
-  resource_id: number;
-  user_email: string;
-  user_name: string;
-  request_date: string;
-  start_time: string;
-  end_time: string;
-}
-
 export interface ParticipantUserRow {
   id: string | number;
   user_id: string;
@@ -203,14 +193,6 @@ export interface HubSpotDuplicateRow {
 
 export interface LinkedCountRow {
   linked_count: string;
-}
-
-export interface OrphanFeeSnapshotRow {
-  id: string | number;
-  booking_id: number;
-  total_cents: number;
-  status: string;
-  created_at: string;
 }
 
 export interface EmptySessionRow {
@@ -492,7 +474,6 @@ export const severityMap: Record<string, 'critical' | 'high' | 'medium' | 'low'>
   'Stuck Transitional Members': 'critical',
   'Active Bookings Without Sessions': 'critical',
   'Participant User Relationships': 'high',
-  'Booking Resource Relationships': 'high',
   'Booking Time Validity': 'high',
   'Members Without Email': 'high',
   'Deals Without Line Items': 'high',
@@ -504,7 +485,6 @@ export const severityMap: Record<string, 'critical' | 'high' | 'medium' | 'low'>
   'Stale Past Tours': 'low',
   'Unmatched Trackman Bookings': 'medium',
   'HubSpot ID Duplicates': 'high',
-  'Orphaned Fee Snapshots': 'critical',
   'Sessions Without Participants': 'low',
   'Orphaned Payment Intents': 'critical',
   'Guest Passes Without Members': 'medium',
@@ -777,14 +757,13 @@ export async function getIntegritySummary(): Promise<IntegritySummary> {
 }
 
 export async function runAllIntegrityChecks(triggeredBy: 'manual' | 'scheduled' = 'manual'): Promise<IntegrityCheckResult[]> {
-  const { checkUnmatchedTrackmanBookings, checkBookingResourceRelationships, checkParticipantUserRelationships, checkNeedsReviewItems, checkBookingTimeValidity, checkStalePastTours, checkBookingsWithoutSessions, checkOverlappingBookings, checkSessionsWithoutParticipants, checkGuestPassAccountingDrift, checkStalePendingBookings } = await import('./bookingChecks');
+  const { checkUnmatchedTrackmanBookings, checkParticipantUserRelationships, checkNeedsReviewItems, checkBookingTimeValidity, checkStalePastTours, checkBookingsWithoutSessions, checkOverlappingBookings, checkSessionsWithoutParticipants, checkGuestPassAccountingDrift, checkStalePendingBookings } = await import('./bookingChecks');
   const { checkHubSpotSyncMismatch, checkDealStageDrift, checkDealsWithoutLineItems, checkHubSpotIdDuplicates } = await import('./hubspotChecks');
-  const { checkStripeSubscriptionSync, checkDuplicateStripeCustomers, checkOrphanedFeeSnapshots, checkOrphanedPaymentIntents, checkBillingProviderHybridState, checkInvoiceBookingReconciliation } = await import('./stripeChecks');
+  const { checkStripeSubscriptionSync, checkDuplicateStripeCustomers, checkOrphanedPaymentIntents, checkBillingProviderHybridState, checkInvoiceBookingReconciliation } = await import('./stripeChecks');
   const { checkMembersWithoutEmail, checkStuckTransitionalMembers, checkTierReconciliation, checkMindBodyStaleSyncMembers, checkMindBodyStatusMismatch, checkGuestPassesForNonExistentMembers } = await import('./memberChecks');
 
   const checks = await Promise.all([
     safeCheck(checkUnmatchedTrackmanBookings, 'Unmatched Trackman Bookings'),
-    safeCheck(checkBookingResourceRelationships, 'Booking Resource Relationships'),
     safeCheck(checkParticipantUserRelationships, 'Participant User Relationships'),
     safeCheck(checkHubSpotSyncMismatch, 'HubSpot Sync Mismatch'),
     safeCheck(checkNeedsReviewItems, 'Items Needing Review'),
@@ -800,7 +779,6 @@ export async function runAllIntegrityChecks(triggeredBy: 'manual' | 'scheduled' 
     safeCheck(checkMindBodyStaleSyncMembers, 'MindBody Stale Sync'),
     safeCheck(checkMindBodyStatusMismatch, 'MindBody Data Quality'),
     safeCheck(checkHubSpotIdDuplicates, 'HubSpot ID Duplicates'),
-    safeCheck(checkOrphanedFeeSnapshots, 'Orphaned Fee Snapshots'),
     safeCheck(checkSessionsWithoutParticipants, 'Sessions Without Participants'),
     safeCheck(checkOrphanedPaymentIntents, 'Orphaned Payment Intents'),
     safeCheck(checkGuestPassesForNonExistentMembers, 'Guest Passes Without Members'),

@@ -12,7 +12,6 @@ import type {
   MemberRow,
   DuplicateStripeRow,
   SharedCustomerRow,
-  OrphanFeeSnapshotRow,
   OrphanPaymentIntentRow,
   HybridBillingRow,
   DuplicateInvoiceRow,
@@ -355,50 +354,16 @@ export async function checkDuplicateStripeCustomers(): Promise<IntegrityCheckRes
   };
 }
 
-export async function checkOrphanedFeeSnapshots(): Promise<IntegrityCheckResult> {
-  const issues: IntegrityIssue[] = [];
-
-  const orphans = await db.execute(sql`
-    SELECT bfs.id, bfs.booking_id, bfs.total_cents, bfs.status, bfs.created_at
-    FROM booking_fee_snapshots bfs
-    LEFT JOIN booking_requests br ON bfs.booking_id = br.id
-    WHERE br.id IS NULL
-    LIMIT 100
-  `);
-
-  for (const row of orphans.rows as unknown as OrphanFeeSnapshotRow[]) {
-    issues.push({
-      category: 'orphan_record',
-      severity: 'error',
-      table: 'booking_fee_snapshots',
-      recordId: row.id,
-      description: `Fee snapshot (booking_id: ${row.booking_id}) references a deleted booking — ${row.total_cents} cents, status: ${row.status}`,
-      suggestion: 'Delete orphaned fee snapshot or investigate missing booking',
-      context: {
-        status: row.status || undefined
-      }
-    });
-  }
-
-  return {
-    checkName: 'Orphaned Fee Snapshots',
-    status: issues.length === 0 ? 'pass' : 'fail',
-    issueCount: issues.length,
-    issues,
-    lastRun: new Date()
-  };
-}
-
 export async function checkOrphanedPaymentIntents(): Promise<IntegrityCheckResult> {
   const issues: IntegrityIssue[] = [];
 
   const orphans = await db.execute(sql`
     SELECT bfs.id, bfs.booking_id, bfs.stripe_payment_intent_id, bfs.total_cents, bfs.status, bfs.created_at
     FROM booking_fee_snapshots bfs
-    LEFT JOIN booking_requests br ON bfs.booking_id = br.id
+    INNER JOIN booking_requests br ON bfs.booking_id = br.id
     WHERE bfs.stripe_payment_intent_id IS NOT NULL
       AND bfs.status IN ('pending', 'requires_action')
-      AND (br.id IS NULL OR br.status IN ('cancelled', 'denied', 'expired'))
+      AND br.status IN ('cancelled', 'denied', 'expired')
     LIMIT 100
   `);
 
@@ -408,7 +373,7 @@ export async function checkOrphanedPaymentIntents(): Promise<IntegrityCheckResul
       severity: 'error',
       table: 'booking_fee_snapshots',
       recordId: row.id,
-      description: `Payment intent ${row.stripe_payment_intent_id} (${row.total_cents} cents, status: ${row.status}) references a deleted or cancelled booking (booking_id: ${row.booking_id})`,
+      description: `Payment intent ${row.stripe_payment_intent_id} (${row.total_cents} cents, status: ${row.status}) references a cancelled/denied/expired booking (booking_id: ${row.booking_id})`,
       suggestion: 'Cancel the Stripe payment intent and clean up the fee snapshot',
       context: {
         stripeCustomerId: row.stripe_payment_intent_id || undefined,

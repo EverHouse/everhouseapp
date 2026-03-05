@@ -164,13 +164,6 @@ export const integrityCheckMetadata: IntegrityCheckMetadata[] = [
     severity: 'medium'
   },
   {
-    checkName: 'Orphaned Fee Snapshots',
-    title: 'Orphaned Fee Snapshots',
-    description: 'Identifies fee snapshot records that are no longer linked to active bookings.',
-    impact: 'These records take up space but do not affect billing or operations.',
-    severity: 'low'
-  },
-  {
     checkName: 'Sessions Without Participants',
     title: 'Sessions Without Participants',
     description: 'Finds booking sessions that have no participants assigned to them.',

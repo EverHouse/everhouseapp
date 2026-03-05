@@ -258,7 +258,7 @@ router.post('/api/data-integrity/cleanup', isAdmin, async (req, res) => {
     
     res.json({ 
       success: true, 
-      message: `Cleanup complete: Removed ${result.orphanedNotifications} orphaned notifications, ${result.orphanedFeeSnapshots} orphaned fee snapshots, marked ${result.orphanedBookings} orphaned bookings, normalized ${result.normalizedEmails} emails.`,
+      message: `Cleanup complete: Removed ${result.orphanedNotifications} orphaned notifications, marked ${result.orphanedBookings} orphaned bookings, normalized ${result.normalizedEmails} emails, removed ${result.expiredHolds} expired guest pass holds.`,
       ...result
     });
   } catch (error: unknown) {

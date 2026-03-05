@@ -8,7 +8,6 @@ import type {
   IntegrityIssue,
   UnmatchedBookingRow,
   CountRow,
-  BookingResourceRow,
   ParticipantUserRow,
   ReviewItemRow,
   InvalidBookingRow,
@@ -97,43 +96,6 @@ export async function checkUnmatchedTrackmanBookings(): Promise<IntegrityCheckRe
       lastRun: new Date()
     };
   }
-}
-
-export async function checkBookingResourceRelationships(): Promise<IntegrityCheckResult> {
-  const issues: IntegrityIssue[] = [];
-
-  const invalidResources = await db.execute(sql`
-    SELECT br.id, br.resource_id, br.user_email, br.user_name, br.request_date, br.start_time, br.end_time
-    FROM booking_requests br
-    LEFT JOIN resources r ON br.resource_id = r.id
-    WHERE br.resource_id IS NOT NULL AND r.id IS NULL
-  `);
-
-  for (const row of invalidResources.rows as unknown as BookingResourceRow[]) {
-    issues.push({
-      category: 'missing_relationship',
-      severity: 'error',
-      table: 'booking_requests',
-      recordId: row.id,
-      description: `Booking by ${row.user_email} on ${row.request_date} references non-existent resource (resource_id: ${row.resource_id})`,
-      suggestion: 'Update booking to use a valid resource or delete the booking',
-      context: {
-        memberName: row.user_name || undefined,
-        memberEmail: row.user_email || undefined,
-        bookingDate: row.request_date || undefined,
-        startTime: row.start_time || undefined,
-        endTime: row.end_time || undefined
-      }
-    });
-  }
-
-  return {
-    checkName: 'Booking Resource Relationships',
-    status: issues.length === 0 ? 'pass' : 'fail',
-    issueCount: issues.length,
-    issues,
-    lastRun: new Date()
-  };
 }
 
 export async function checkParticipantUserRelationships(): Promise<IntegrityCheckResult> {

@@ -577,6 +577,28 @@ export async function ensureDatabaseConstraints() {
       logger.warn(`[DB Init] Skipping fee snapshot CASCADE: ${getErrorMessage(err)}`);
     }
 
+    try {
+      await db.execute(sql`
+        DO $$
+        BEGIN
+          ALTER TABLE guest_pass_holds
+            DROP CONSTRAINT IF EXISTS guest_pass_holds_booking_id_fkey;
+          ALTER TABLE guest_pass_holds
+            ADD CONSTRAINT guest_pass_holds_booking_id_fkey
+            FOREIGN KEY (booking_id) REFERENCES booking_requests(id) ON DELETE CASCADE;
+
+          ALTER TABLE conference_prepayments
+            DROP CONSTRAINT IF EXISTS conference_prepayments_booking_id_fkey;
+          ALTER TABLE conference_prepayments
+            ADD CONSTRAINT conference_prepayments_booking_id_fkey
+            FOREIGN KEY (booking_id) REFERENCES booking_requests(id) ON DELETE CASCADE;
+        END $$;
+      `);
+      logger.info('[DB Init] Guest pass holds & conference prepayments CASCADE constraints created/verified');
+    } catch (err: unknown) {
+      logger.warn(`[DB Init] Skipping guest pass/conference CASCADE: ${getErrorMessage(err)}`);
+    }
+
     const indexQueries = [
       { name: 'idx_booking_requests_status', query: sql`CREATE INDEX IF NOT EXISTS idx_booking_requests_status ON booking_requests(status)` },
       { name: 'idx_booking_requests_user_email', query: sql`CREATE INDEX IF NOT EXISTS idx_booking_requests_user_email ON booking_requests(user_email)` },
