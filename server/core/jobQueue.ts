@@ -147,16 +147,28 @@ async function claimJobs(): Promise<Array<{ id: number; jobType: string; payload
 }
 
 async function markJobCompleted(jobId: number): Promise<void> {
-  await db.execute(sql`UPDATE job_queue SET status = 'completed', processed_at = NOW(), locked_at = NULL, locked_by = NULL WHERE id = ${jobId}`);
+  await queryWithRetry(
+    `UPDATE job_queue SET status = 'completed', processed_at = NOW(), locked_at = NULL, locked_by = NULL WHERE id = $1`,
+    [jobId],
+    3
+  );
 }
 
 async function markJobFailed(jobId: number, error: string, retryCount: number, maxRetries: number): Promise<void> {
   if (retryCount + 1 >= maxRetries) {
-    await db.execute(sql`UPDATE job_queue SET status = 'failed', last_error = ${error}, retry_count = retry_count + 1, locked_at = NULL, locked_by = NULL WHERE id = ${jobId}`);
+    await queryWithRetry(
+      `UPDATE job_queue SET status = 'failed', last_error = $1, retry_count = retry_count + 1, locked_at = NULL, locked_by = NULL WHERE id = $2`,
+      [error, jobId],
+      3
+    );
   } else {
     const backoffMs = Math.min(1000 * Math.pow(2, retryCount), 60000);
     const nextScheduledIso = new Date(Date.now() + backoffMs).toISOString();
-    await db.execute(sql`UPDATE job_queue SET last_error = ${error}, retry_count = retry_count + 1, scheduled_for = ${nextScheduledIso}::timestamptz, locked_at = NULL, locked_by = NULL WHERE id = ${jobId}`);
+    await queryWithRetry(
+      `UPDATE job_queue SET last_error = $1, retry_count = retry_count + 1, scheduled_for = $2::timestamptz, locked_at = NULL, locked_by = NULL WHERE id = $3`,
+      [error, nextScheduledIso, jobId],
+      3
+    );
   }
 }
 
@@ -277,7 +289,11 @@ async function executeJob(job: { id: number; jobType: string; payload: Record<st
         } catch (refundError: unknown) {
           logger.error(`[JobQueue] Auto-refund failed for PI ${payload.paymentIntentId} — flagging for manual review`, { error: refundError });
           if (payload.sessionId) {
-            await db.execute(sql`UPDATE booking_sessions SET needs_review = true, review_reason = ${payload.reviewReason as string} WHERE id = ${Number(payload.sessionId)}`);
+            await queryWithRetry(
+              `UPDATE booking_sessions SET needs_review = true, review_reason = $1 WHERE id = $2`,
+              [payload.reviewReason as string, Number(payload.sessionId)],
+              3
+            );
           }
           throw refundError;
         }
@@ -349,10 +365,14 @@ export function stopJobProcessor(): void {
 }
 
 export async function cleanupOldJobs(daysToKeep: number = 7): Promise<number> {
-  const result = await db.execute(sql`DELETE FROM job_queue 
+  const result = await queryWithRetry(
+    `DELETE FROM job_queue 
      WHERE status IN ('completed', 'failed') 
-       AND processed_at < NOW() - INTERVAL '1 day' * ${daysToKeep}
-     RETURNING id`);
+       AND processed_at < NOW() - INTERVAL '1 day' * $1
+     RETURNING id`,
+    [daysToKeep],
+    3
+  );
   
   if (result.rowCount && result.rowCount > 0) {
     logger.info(`[JobQueue] Cleaned up ${result.rowCount} old jobs`);
@@ -367,7 +387,11 @@ export async function getJobQueueStats(): Promise<{
   completed: number;
   failed: number;
 }> {
-  const result = await db.execute(sql`SELECT status, COUNT(*)::int as count FROM job_queue GROUP BY status`);
+  const result = await queryWithRetry(
+    `SELECT status, COUNT(*)::int as count FROM job_queue GROUP BY status`,
+    [],
+    3
+  );
   
   const stats = { pending: 0, processing: 0, completed: 0, failed: 0 };
   for (const _row of result.rows) {

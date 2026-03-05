@@ -1,6 +1,5 @@
 import { schedulerTracker } from '../core/schedulerTracker';
-import { db } from '../db';
-import { sql } from 'drizzle-orm';
+import { queryWithRetry } from '../core/db';
 import { notifyAllStaff } from '../core/notificationService';
 import { alertOnScheduledTaskFailure } from '../core/dataAlerts';
 import { logger } from '../core/logger';
@@ -24,8 +23,8 @@ export async function checkStaleWaivers(): Promise<{
   waivers: StaleWaiver[];
 }> {
   try {
-    const result = await db.execute(sql`
-      SELECT 
+    const result = await queryWithRetry(
+      `SELECT 
         bp.id,
         bp.display_name,
         bp.session_id,
@@ -41,8 +40,10 @@ export async function checkStaleWaivers(): Promise<{
         AND bp.waiver_reviewed_at IS NULL
         AND (bp.used_guest_pass IS NULL OR bp.used_guest_pass = FALSE)
         AND bp.created_at < NOW() - INTERVAL '12 hours'
-        AND (bs.source IS NULL OR bs.source::text NOT IN ('trackman_import', 'trackman_webhook', 'auto-complete', 'manual-auto-complete'))
-    `);
+        AND (bs.source IS NULL OR bs.source::text NOT IN ('trackman_import', 'trackman_webhook', 'auto-complete', 'manual-auto-complete'))`,
+      [],
+      3
+    );
 
     const staleWaivers: StaleWaiver[] = result.rows as unknown as StaleWaiver[];
 
@@ -51,12 +52,14 @@ export async function checkStaleWaivers(): Promise<{
     let notificationSent = false;
 
     if (staleWaivers.length > 0) {
-      const recentDup = await db.execute(sql`
-        SELECT id FROM notifications
+      const recentDup = await queryWithRetry(
+        `SELECT id FROM notifications
         WHERE title = 'Waivers Need Review'
           AND created_at > NOW() - INTERVAL '6 hours'
-        LIMIT 1
-      `);
+        LIMIT 1`,
+        [],
+        3
+      );
 
       if (recentDup.rows.length === 0) {
         await notifyAllStaff(
@@ -99,7 +102,6 @@ async function scheduledCheck(): Promise<void> {
     logger.error('[Waiver Review] Scheduled check failed:', { error: error as Error });
     schedulerTracker.recordRun('Waiver Review', false, String(error));
     
-    // Notify staff about waiver review scheduler failure
     alertOnScheduledTaskFailure(
       'Waiver Review Check',
       error instanceof Error ? error : new Error(String(error)),

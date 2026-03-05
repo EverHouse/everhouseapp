@@ -2,6 +2,7 @@ import { schedulerTracker } from '../core/schedulerTracker';
 import { db } from '../db';
 import { systemSettings } from '../../shared/schema';
 import { sql } from 'drizzle-orm';
+import { queryWithRetry } from '../core/db';
 import { notifyAllStaff } from '../core/notificationService';
 import { getPacificHour, getTodayPacific } from '../utils/dateUtils';
 import { logger } from '../core/logger';
@@ -50,13 +51,17 @@ async function checkUnresolvedTrackmanBookings(): Promise<void> {
         logger.info('[Unresolved Trackman Check] Starting scheduled check...');
         
         try {
-          const result = await db.execute(sql`SELECT created_at
+          const result = await queryWithRetry(
+            `SELECT created_at
              FROM booking_requests
              WHERE (origin = 'trackman_webhook' OR origin = 'trackman_import')
                AND user_id IS NULL
                AND (status = 'pending' OR status = 'unmatched')
                AND created_at < NOW() - INTERVAL '24 hours'
-             ORDER BY created_at ASC`);
+             ORDER BY created_at ASC`,
+            [],
+            3
+          );
           
           const unresolved = result.rows;
           

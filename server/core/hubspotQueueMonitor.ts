@@ -1,5 +1,4 @@
-import { db } from '../db';
-import { sql } from 'drizzle-orm';
+import { queryWithRetry } from './db';
 
 interface HubSpotQueueStats {
   pending: number;
@@ -37,15 +36,17 @@ interface HubSpotQueueMonitorData {
 }
 
 export async function getHubSpotQueueMonitorData(): Promise<HubSpotQueueMonitorData> {
-  const statsResult = await db.execute(sql`
-    SELECT 
+  const statsResult = await queryWithRetry(
+    `SELECT 
       COALESCE(SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END), 0)::int as pending,
       COALESCE(SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END), 0)::int as failed,
       COALESCE(SUM(CASE WHEN status = 'completed' AND completed_at > NOW() - INTERVAL '24 hours' THEN 1 ELSE 0 END), 0)::int as completed_24h,
       COALESCE(SUM(CASE WHEN status = 'superseded' AND completed_at > NOW() - INTERVAL '24 hours' THEN 1 ELSE 0 END), 0)::int as superseded_24h,
       COALESCE(SUM(CASE WHEN status = 'processing' THEN 1 ELSE 0 END), 0)::int as processing
-    FROM hubspot_sync_queue
-  `);
+    FROM hubspot_sync_queue`,
+    [],
+    3
+  );
 
   const row = statsResult.rows[0] as unknown as HubSpotQueueStats;
   const stats: HubSpotQueueStats = {
@@ -56,13 +57,15 @@ export async function getHubSpotQueueMonitorData(): Promise<HubSpotQueueMonitorD
     processing: Number(row?.processing) || 0,
   };
 
-  const failedResult = await db.execute(sql`
-    SELECT id, operation, last_error, created_at, retry_count, max_retries, next_retry_at
+  const failedResult = await queryWithRetry(
+    `SELECT id, operation, last_error, created_at, retry_count, max_retries, next_retry_at
     FROM hubspot_sync_queue
     WHERE status = 'failed'
     ORDER BY created_at DESC
-    LIMIT 20
-  `);
+    LIMIT 20`,
+    [],
+    3
+  );
 
   const recentFailed: FailedQueueItem[] = failedResult.rows.map((_r) => {
     const r = _r as unknown as FailedQueueRow;
@@ -77,16 +80,20 @@ export async function getHubSpotQueueMonitorData(): Promise<HubSpotQueueMonitorD
     };
   });
 
-  const avgResult = await db.execute(sql`
-    SELECT COALESCE(AVG(EXTRACT(EPOCH FROM (completed_at - created_at)) * 1000), 0)::int as avg_ms
+  const avgResult = await queryWithRetry(
+    `SELECT COALESCE(AVG(EXTRACT(EPOCH FROM (completed_at - created_at)) * 1000), 0)::int as avg_ms
     FROM hubspot_sync_queue
-    WHERE status = 'completed' AND completed_at > NOW() - INTERVAL '24 hours'
-  `);
+    WHERE status = 'completed' AND completed_at > NOW() - INTERVAL '24 hours'`,
+    [],
+    3
+  );
   const avgProcessingTime = Number((avgResult.rows[0] as { avg_ms?: number })?.avg_ms) || 0;
 
-  const lagResult = await db.execute(sql`
-    SELECT MIN(created_at) as oldest_pending FROM hubspot_sync_queue WHERE status = 'pending'
-  `);
+  const lagResult = await queryWithRetry(
+    `SELECT MIN(created_at) as oldest_pending FROM hubspot_sync_queue WHERE status = 'pending'`,
+    [],
+    3
+  );
   const oldestPending = (lagResult.rows[0] as { oldest_pending?: string | Date })?.oldest_pending;
   let queueLag = 'No pending items';
   if (oldestPending) {

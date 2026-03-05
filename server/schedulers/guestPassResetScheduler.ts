@@ -1,7 +1,6 @@
 import { schedulerTracker } from '../core/schedulerTracker';
 import { alertOnScheduledTaskFailure } from '../core/dataAlerts';
-import { db } from '../db';
-import { sql } from 'drizzle-orm';
+import { queryWithRetry } from '../core/db';
 import { getPacificHour, getPacificDayOfMonth, getPacificDateParts } from '../utils/dateUtils';
 import { logger } from '../core/logger';
 
@@ -9,11 +8,15 @@ const RESET_HOUR = 3;
 
 async function tryClaimResetSlot(monthKey: string): Promise<boolean> {
   try {
-    const result = await db.execute(sql`INSERT INTO system_settings (key, value, updated_at)
-       VALUES ('last_guest_pass_reset', ${monthKey}, NOW())
-       ON CONFLICT (key) DO UPDATE SET value = ${monthKey}, updated_at = NOW()
-       WHERE system_settings.value IS DISTINCT FROM ${monthKey}
-       RETURNING key`);
+    const result = await queryWithRetry(
+      `INSERT INTO system_settings (key, value, updated_at)
+       VALUES ('last_guest_pass_reset', $1, NOW())
+       ON CONFLICT (key) DO UPDATE SET value = $1, updated_at = NOW()
+       WHERE system_settings.value IS DISTINCT FROM $1
+       RETURNING key`,
+      [monthKey],
+      3
+    );
     return (result.rowCount || 0) > 0;
   } catch (err: unknown) {
     logger.error('[Guest Pass Reset] Failed to claim reset slot:', { error: err as Error });
@@ -38,7 +41,6 @@ async function resetGuestPasses(): Promise<void> {
       return;
     }
     
-    // Create a unique key for this month to prevent double runs
     const parts = getPacificDateParts();
     const monthKey = `${parts.year}-${String(parts.month).padStart(2, '0')}`;
     
@@ -51,11 +53,15 @@ async function resetGuestPasses(): Promise<void> {
     logger.info('[Guest Pass Reset] Starting monthly reset...');
     schedulerTracker.recordRun('Guest Pass Reset', true);
     
-    const result = await db.execute(sql`UPDATE guest_passes 
+    const result = await queryWithRetry(
+      `UPDATE guest_passes 
        SET passes_used = 0, 
            updated_at = NOW()
        WHERE passes_used > 0
-       RETURNING member_email, passes_total`);
+       RETURNING member_email, passes_total`,
+      [],
+      3
+    );
     
     if (result.rowCount === 0) {
       logger.info('[Guest Pass Reset] No passes needed resetting');

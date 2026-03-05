@@ -1,6 +1,7 @@
 import { db } from '../db';
 import { systemSettings } from '../../shared/schema';
 import { sql } from 'drizzle-orm';
+import { queryWithRetry } from '../core/db';
 import { runAllIntegrityChecks, autoFixMissingTiers } from '../core/dataIntegrity';
 import { sendIntegrityAlertEmail } from '../emails/integrityAlertEmail';
 import { getPacificHour, getTodayPacific } from '../utils/dateUtils';
@@ -198,12 +199,14 @@ async function runPeriodicAutoFix(): Promise<void> {
 
 async function cleanupAbandonedPendingUsers(): Promise<void> {
   try {
-    const pendingResult = await db.execute(sql`
-      SELECT id, email FROM users 
+    const pendingResult = await queryWithRetry(
+      `SELECT id, email FROM users 
       WHERE membership_status = 'pending' 
         AND created_at < NOW() - INTERVAL '24 hours'
-        AND stripe_subscription_id IS NULL
-    `);
+        AND stripe_subscription_id IS NULL`,
+      [],
+      3
+    );
     
     if (!pendingResult.rows.length) return;
     

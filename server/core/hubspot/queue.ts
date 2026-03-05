@@ -1,7 +1,5 @@
-import { db } from '../../db';
 import { queryWithRetry } from '../db';
 import { getErrorMessage } from '../../utils/errorUtils';
-import { sql } from 'drizzle-orm';
 import { logger } from '../logger';
 import type { ContactMembershipStatus } from './constants';
 
@@ -47,8 +45,12 @@ export async function enqueueHubSpotSync(
   try {
     // If idempotency key provided, check for existing pending job
     if (idempotencyKey) {
-      const existing = await db.execute(sql`SELECT id FROM hubspot_sync_queue 
-         WHERE idempotency_key = ${idempotencyKey} AND status IN ('pending', 'processing', 'failed') AND status != 'superseded'`);
+      const existing = await queryWithRetry(
+        `SELECT id FROM hubspot_sync_queue 
+         WHERE idempotency_key = $1 AND status IN ('pending', 'processing', 'failed') AND status != 'superseded'`,
+        [idempotencyKey],
+        3
+      );
       if (existing.rows.length > 0) {
         logger.info('[HubSpot Queue] Duplicate job skipped', { 
           extra: { idempotencyKey, existingId: existing.rows[0].id }
@@ -57,10 +59,14 @@ export async function enqueueHubSpotSync(
       }
     }
     
-    const result = await db.execute(sql`INSERT INTO hubspot_sync_queue (operation, payload, priority, max_retries, idempotency_key)
-       VALUES (${operation}, ${JSON.stringify(payload)}, ${priority}, ${maxRetries}, ${idempotencyKey})
+    const result = await queryWithRetry(
+      `INSERT INTO hubspot_sync_queue (operation, payload, priority, max_retries, idempotency_key)
+       VALUES ($1, $2, $3, $4, $5)
        ON CONFLICT (idempotency_key) WHERE idempotency_key IS NOT NULL AND status NOT IN ('completed', 'superseded') DO NOTHING
-       RETURNING id`);
+       RETURNING id`,
+      [operation, JSON.stringify(payload), priority, maxRetries, idempotencyKey],
+      3
+    );
     
     if (result.rows.length === 0) {
       logger.info('[HubSpot Queue] Duplicate job skipped (conflict)', { 
@@ -128,9 +134,13 @@ export async function processHubSpotQueue(batchSize: number = 10): Promise<{
       await executeHubSpotOperation(job.operation, job.payload);
       
       // Mark as completed
-      await db.execute(sql`UPDATE hubspot_sync_queue 
+      await queryWithRetry(
+        `UPDATE hubspot_sync_queue 
          SET status = 'completed', completed_at = NOW(), updated_at = NOW() 
-         WHERE id = ${job.id}`);
+         WHERE id = $1`,
+        [job.id],
+        3
+      );
       
       stats.succeeded++;
       logger.info('[HubSpot Queue] Job completed', { 
@@ -145,11 +155,15 @@ export async function processHubSpotQueue(batchSize: number = 10): Promise<{
         errorMsg.includes('401');
       
       if (isUnrecoverable) {
-        await db.execute(sql`UPDATE hubspot_sync_queue 
+        await queryWithRetry(
+          `UPDATE hubspot_sync_queue 
            SET status = 'dead', 
-               last_error = ${`Unrecoverable error - ${errorMsg}`},
+               last_error = $1,
                updated_at = NOW() 
-           WHERE id = ${job.id}`);
+           WHERE id = $2`,
+          [`Unrecoverable error - ${errorMsg}`, job.id],
+          3
+        );
         
         logger.error('[HubSpot Queue] Job dead (unrecoverable error - skipping retries)', { 
           error: error,
@@ -179,13 +193,17 @@ export async function processHubSpotQueue(batchSize: number = 10): Promise<{
       if (shouldRetry) {
         // Schedule retry with exponential backoff
         const nextRetry = getNextRetryTime(newRetryCount);
-        await db.execute(sql`UPDATE hubspot_sync_queue 
+        await queryWithRetry(
+          `UPDATE hubspot_sync_queue 
            SET status = 'failed', 
-               retry_count = ${newRetryCount}, 
-               last_error = ${getErrorMessage(error)}, 
-               next_retry_at = ${nextRetry},
+               retry_count = $1, 
+               last_error = $2, 
+               next_retry_at = $3,
                updated_at = NOW() 
-           WHERE id = ${job.id}`);
+           WHERE id = $4`,
+          [newRetryCount, getErrorMessage(error), nextRetry, job.id],
+          3
+        );
         
         logger.warn('[HubSpot Queue] Job failed, will retry', { 
           extra: { 
@@ -197,11 +215,15 @@ export async function processHubSpotQueue(batchSize: number = 10): Promise<{
         });
       } else {
         // Mark as dead (exceeded retries)
-        await db.execute(sql`UPDATE hubspot_sync_queue 
+        await queryWithRetry(
+          `UPDATE hubspot_sync_queue 
            SET status = 'dead', 
-               last_error = ${getErrorMessage(error)},
+               last_error = $1,
                updated_at = NOW() 
-           WHERE id = ${job.id}`);
+           WHERE id = $2`,
+          [getErrorMessage(error), job.id],
+          3
+        );
         
         logger.error('[HubSpot Queue] Job dead (max retries exceeded)', { 
           error: error,
@@ -306,15 +328,17 @@ export async function getQueueStats(): Promise<{
   dead: number;
   completedToday: number;
 }> {
-  const result = await db.execute(sql`
-    SELECT 
+  const result = await queryWithRetry(
+    `SELECT 
       COUNT(*) FILTER (WHERE status = 'pending') as pending,
       COUNT(*) FILTER (WHERE status = 'processing') as processing,
       COUNT(*) FILTER (WHERE status = 'failed') as failed,
       COUNT(*) FILTER (WHERE status = 'dead') as dead,
       COUNT(*) FILTER (WHERE status = 'completed' AND completed_at >= NOW() - INTERVAL '24 hours') as completed_today
-    FROM hubspot_sync_queue
-  `);
+    FROM hubspot_sync_queue`,
+    [],
+    3
+  );
   
   const statsRow = result.rows[0] as unknown as QueueStatsRow;
   return {

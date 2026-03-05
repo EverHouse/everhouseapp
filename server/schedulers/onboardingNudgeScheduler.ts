@@ -1,6 +1,5 @@
 import { schedulerTracker } from '../core/schedulerTracker';
-import { db } from '../db';
-import { sql } from 'drizzle-orm';
+import { queryWithRetry } from '../core/db';
 import { getPacificHour } from '../utils/dateUtils';
 import { sendOnboardingNudge24h, sendOnboardingNudge72h, sendOnboardingNudge7d } from '../emails/onboardingNudgeEmails';
 import { logger } from '../core/logger';
@@ -16,20 +15,23 @@ async function processOnboardingNudges(): Promise<void> {
 
     logger.info('[Onboarding Nudge] Starting onboarding nudge check...');
 
-    const membersResult = await db.execute(sql`
-      SELECT id, email, first_name, created_at, onboarding_nudge_count
+    const maxNudges = Number(await getSettingValue('scheduling.max_onboarding_nudges', '3'));
+    const membersResult = await queryWithRetry(
+      `SELECT id, email, first_name, created_at, onboarding_nudge_count
       FROM users
       WHERE membership_status IN ('active', 'trialing')
         AND billing_provider = 'stripe'
         AND first_login_at IS NULL
         AND onboarding_completed_at IS NULL
-        AND onboarding_nudge_count < ${Number(await getSettingValue('scheduling.max_onboarding_nudges', '3'))}
+        AND onboarding_nudge_count < $1
         AND (onboarding_last_nudge_at IS NULL OR onboarding_last_nudge_at < NOW() - INTERVAL '20 hours')
         AND created_at < NOW() - INTERVAL '20 hours'
         AND archived_at IS NULL
       ORDER BY created_at ASC
-      LIMIT 20
-    `);
+      LIMIT 20`,
+      [maxNudges],
+      3
+    );
 
     if (membersResult.rows.length === 0) {
       logger.info('[Onboarding Nudge] No stalled members found');
@@ -56,7 +58,11 @@ async function processOnboardingNudges(): Promise<void> {
       }
 
       if (sendResult.success) {
-        await db.execute(sql`UPDATE users SET onboarding_nudge_count = onboarding_nudge_count + 1, onboarding_last_nudge_at = NOW(), updated_at = NOW() WHERE id = ${member.id}`);
+        await queryWithRetry(
+          `UPDATE users SET onboarding_nudge_count = onboarding_nudge_count + 1, onboarding_last_nudge_at = NOW(), updated_at = NOW() WHERE id = $1`,
+          [member.id],
+          3
+        );
         logger.info(`[Onboarding Nudge] Sent nudge #${currentNudgeCount + 1} to ${member.email}`);
       } else {
         logger.warn(`[Onboarding Nudge] Failed to send to ${member.email}: ${sendResult.error}`);
