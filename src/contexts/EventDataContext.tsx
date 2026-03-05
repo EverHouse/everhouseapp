@@ -92,6 +92,11 @@ export const EventDataProvider: React.FC<{children: ReactNode}> = ({ children })
 
   const refreshEvents = useCallback(async () => {
     try {
+      if (actualUserRef.current?.role === 'admin' || actualUserRef.current?.role === 'staff') {
+        try {
+          await fetch('/api/events/sync/google', { method: 'POST', credentials: 'include' });
+        } catch {}
+      }
       const res = await fetch('/api/events');
       if (res.ok) {
         const data = await res.json();
