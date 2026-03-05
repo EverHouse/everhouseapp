@@ -147,15 +147,21 @@ export async function handleBookingModification(
   const timeChanged = incoming.parsedStartTime !== existingStartTime ||
     (incoming.parsedEndTime && incoming.parsedEndTime !== existingEndTime);
   const dateChanged = incoming.parsedDate !== existingDate;
-  const playerCountChanged = incoming.playerCount > 0 && existing.declaredPlayerCount != null
-    && incoming.playerCount !== existing.declaredPlayerCount;
-  if (!bayChanged && !timeChanged && !dateChanged && !playerCountChanged) {
-    logger.info('[Trackman Webhook] No modifications detected for linked booking', {
-      extra: { bookingId, trackmanBookingId: incoming.trackmanBookingId }
-    });
+  const playerCountIncreased = incoming.playerCount > 0 && existing.declaredPlayerCount != null
+    && incoming.playerCount > existing.declaredPlayerCount;
+  if (!bayChanged && !timeChanged && !dateChanged && !playerCountIncreased) {
+    if (incoming.playerCount > 0 && existing.declaredPlayerCount != null && incoming.playerCount !== existing.declaredPlayerCount) {
+      logger.info('[Trackman Webhook] Trackman player count differs but not higher than app declared count — skipping modification', {
+        extra: { bookingId, trackmanBookingId: incoming.trackmanBookingId, trackmanCount: incoming.playerCount, appDeclaredCount: existing.declaredPlayerCount }
+      });
+    } else {
+      logger.info('[Trackman Webhook] No modifications detected for linked booking', {
+        extra: { bookingId, trackmanBookingId: incoming.trackmanBookingId }
+      });
+    }
     return { modified: false, changes: [] };
   }
-  if (playerCountChanged) {
+  if (playerCountIncreased) {
     changes.push(`Player count changed: ${existing.declaredPlayerCount || 1} → ${incoming.playerCount}`);
   }
 
