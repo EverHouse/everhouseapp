@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useAutoAnimate } from '@formkit/auto-animate/react';
 import ModalShell from '../../../components/ModalShell';
 import EmptyState from '../../../components/EmptyState';
+import { useToast } from '../../../components/Toast';
+import { haptic } from '../../../utils/haptics';
 
 interface StripeCoupon {
   id: string;
@@ -46,6 +48,7 @@ const DiscountsSubTab: React.FC<DiscountsSubTabProps> = ({ onCreateClick }) => {
   const [isSaving, setIsSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [discountsRef] = useAutoAnimate();
+  const { showToast } = useToast();
 
   const fetchCoupons = async () => {
     setIsLoading(true);
@@ -114,7 +117,10 @@ const DiscountsSubTab: React.FC<DiscountsSubTabProps> = ({ onCreateClick }) => {
         duration: 'forever',
         durationInMonths: 3,
       });
+      haptic.success();
+      showToast('Coupon created', 'success');
     } catch (err: unknown) {
+      haptic.error();
       setFormError((err instanceof Error ? err.message : String(err)) || 'Failed to create coupon');
     } finally {
       setIsSaving(false);
@@ -146,7 +152,10 @@ const DiscountsSubTab: React.FC<DiscountsSubTabProps> = ({ onCreateClick }) => {
       
       await fetchCoupons();
       setEditingCoupon(null);
+      haptic.success();
+      showToast('Coupon updated', 'success');
     } catch (err: unknown) {
+      haptic.error();
       setFormError((err instanceof Error ? err.message : String(err)) || 'Failed to update coupon');
     } finally {
       setIsUpdating(false);
@@ -168,7 +177,10 @@ const DiscountsSubTab: React.FC<DiscountsSubTabProps> = ({ onCreateClick }) => {
       
       await fetchCoupons();
       setDeleteConfirmId(null);
+      haptic.success();
+      showToast('Coupon deleted', 'success');
     } catch (err: unknown) {
+      haptic.error();
       setError((err instanceof Error ? err.message : String(err)) || 'Failed to delete coupon');
     } finally {
       setIsDeleting(null);

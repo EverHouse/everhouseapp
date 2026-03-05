@@ -4,6 +4,8 @@ import { usePageReady } from '../../contexts/PageReadyContext';
 import ModalShell from '../../components/ModalShell';
 import { formatRelativeTime } from '../../utils/dateUtils';
 import { ApplicationPipelineSkeleton } from '../../components/skeletons';
+import { useToast } from '../../components/Toast';
+import { haptic } from '../../utils/haptics';
 
 interface MembershipTier {
   id: number;
@@ -81,13 +83,12 @@ const ApplicationPipeline: React.FC = () => {
   const [tiers, setTiers] = useState<MembershipTier[]>([]);
   const [selectedTierId, setSelectedTierId] = useState<number | null>(null);
   const [isSendingInvite, setIsSendingInvite] = useState(false);
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [applicationsRef] = useAutoAnimate();
   const [isSyncing, setIsSyncing] = useState(false);
+  const { showToast } = useToast();
 
   const handleSyncFromHubSpot = async () => {
     setIsSyncing(true);
-    setToast(null);
     try {
       const res = await fetch('/api/admin/hubspot/sync-form-submissions', {
         method: 'POST',
@@ -96,16 +97,19 @@ const ApplicationPipeline: React.FC = () => {
       if (res.ok) {
         const data = await res.json();
         const inserted = data.newInserted ?? 0;
-        setToast({
-          message: inserted > 0 ? `Synced ${inserted} new submission${inserted !== 1 ? 's' : ''}` : 'All applications are up to date',
-          type: 'success',
-        });
+        haptic.success();
+        showToast(
+          inserted > 0 ? `Synced ${inserted} new submission${inserted !== 1 ? 's' : ''}` : 'All applications are up to date',
+          'success',
+        );
         fetchApplications();
       } else {
-        setToast({ message: 'Sync failed — please try again', type: 'error' });
+        haptic.error();
+        showToast('Sync failed — please try again', 'error');
       }
     } catch {
-      setToast({ message: 'Sync failed — please try again', type: 'error' });
+      haptic.error();
+      showToast('Sync failed — please try again', 'error');
     } finally {
       setIsSyncing(false);
     }
@@ -117,12 +121,6 @@ const ApplicationPipeline: React.FC = () => {
     }
   }, [isLoading, setPageReady]);
 
-  useEffect(() => {
-    if (toast) {
-      const timer = setTimeout(() => setToast(null), 4000);
-      return () => clearTimeout(timer);
-    }
-  }, [toast]);
 
   const fetchApplications = async () => {
     try {
@@ -175,8 +173,9 @@ const ApplicationPipeline: React.FC = () => {
         });
         setApplications(prev => prev.map(a => a.id === app.id ? { ...a, status: 'read' } : a));
         setSelectedApp(prev => prev ? { ...prev, status: 'read' } : null);
-      } catch (err: unknown) {
-        console.error('Failed to mark as read:', err);
+      } catch {
+        haptic.error();
+        showToast('Failed to mark as read', 'error');
       }
     }
   };
@@ -194,11 +193,15 @@ const ApplicationPipeline: React.FC = () => {
       if (res.ok) {
         setApplications(prev => prev.map(a => a.id === selectedApp.id ? { ...a, status } : a));
         setSelectedApp(prev => prev ? { ...prev, status } : null);
-        setToast({ message: `Status updated to ${status}`, type: 'success' });
+        haptic.success();
+        showToast(`Status updated to ${status}`, 'success');
+      } else {
+        haptic.error();
+        showToast('Failed to update status', 'error');
       }
     } catch (err: unknown) {
-      console.error('Failed to update status:', err);
-      setToast({ message: 'Failed to update status', type: 'error' });
+      haptic.error();
+      showToast('Failed to update status', 'error');
     } finally {
       setIsSaving(false);
     }
@@ -217,11 +220,15 @@ const ApplicationPipeline: React.FC = () => {
       if (res.ok) {
         setApplications(prev => prev.map(a => a.id === selectedApp.id ? { ...a, notes } : a));
         setSelectedApp(prev => prev ? { ...prev, notes } : null);
-        setToast({ message: 'Notes saved', type: 'success' });
+        haptic.success();
+        showToast('Notes saved', 'success');
+      } else {
+        haptic.error();
+        showToast('Failed to save notes', 'error');
       }
     } catch (err: unknown) {
-      console.error('Failed to save notes:', err);
-      setToast({ message: 'Failed to save notes', type: 'error' });
+      haptic.error();
+      showToast('Failed to save notes', 'error');
     } finally {
       setIsSaving(false);
     }
@@ -240,14 +247,16 @@ const ApplicationPipeline: React.FC = () => {
       if (res.ok) {
         setApplications(prev => prev.map(a => a.id === selectedApp.id ? { ...a, status: 'invited' } : a));
         setSelectedApp(prev => prev ? { ...prev, status: 'invited' } : null);
-        setToast({ message: 'Checkout invite sent successfully!', type: 'success' });
+        haptic.success();
+        showToast('Checkout invite sent successfully!', 'success');
       } else {
         const data = await res.json();
-        setToast({ message: data.error || 'Failed to send invite', type: 'error' });
+        haptic.error();
+        showToast(data.error || 'Failed to send invite', 'error');
       }
     } catch (err: unknown) {
-      console.error('Failed to send invite:', err);
-      setToast({ message: 'Failed to send invite', type: 'error' });
+      haptic.error();
+      showToast('Failed to send invite', 'error');
     } finally {
       setIsSendingInvite(false);
     }
@@ -260,19 +269,6 @@ const ApplicationPipeline: React.FC = () => {
 
   return (
     <div className="animate-page-enter">
-      {toast && (
-        <div className={`mb-3 px-4 py-3 rounded-xl text-sm font-semibold flex items-center gap-2 animate-content-enter ${
-          toast.type === 'success'
-            ? 'bg-green-500/10 text-green-700 dark:text-green-400'
-            : 'bg-amber-500/10 text-amber-700 dark:text-amber-400'
-        }`}>
-          <span className="material-symbols-outlined text-lg" aria-hidden="true">
-            {toast.type === 'success' ? 'check_circle' : 'info'}
-          </span>
-          {toast.message}
-        </div>
-      )}
-
       <div className="flex items-center justify-end mb-3 animate-content-enter-delay-1">
         <button
           onClick={handleSyncFromHubSpot}

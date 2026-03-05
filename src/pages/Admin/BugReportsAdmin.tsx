@@ -7,6 +7,8 @@ import ModalShell from '../../components/ModalShell';
 import { getBugReportStatusColor, formatStatusLabel, getRoleColor } from '../../utils/statusColors';
 import { formatRelativeTime, formatCardTimestamp } from '../../utils/dateUtils';
 import { useConfirmDialog } from '../../components/ConfirmDialog';
+import { useToast } from '../../components/Toast';
+import { haptic } from '../../utils/haptics';
 
 interface BugReport {
     id: number;
@@ -44,6 +46,7 @@ const BugReportsAdmin: React.FC = () => {
     const [staffNotes, setStaffNotes] = useState('');
     const [isSaving, setIsSaving] = useState(false);
     const { confirm, ConfirmDialogComponent } = useConfirmDialog();
+    const { showToast } = useToast();
     const [reportsRef] = useAutoAnimate();
 
     useEffect(() => {
@@ -98,9 +101,15 @@ const BugReportsAdmin: React.FC = () => {
                 const updated = await res.json();
                 setReports(prev => prev.map(r => r.id === selectedReport.id ? updated : r));
                 setSelectedReport(updated);
+                haptic.success();
+                showToast(`Status updated to ${formatStatusLabel(status)}`, 'success');
+            } else {
+                haptic.error();
+                showToast('Failed to update status', 'error');
             }
         } catch (err: unknown) {
-            console.error('Failed to update status:', err);
+            haptic.error();
+            showToast('Failed to update status', 'error');
         } finally {
             setIsSaving(false);
         }
@@ -120,9 +129,15 @@ const BugReportsAdmin: React.FC = () => {
                 const updated = await res.json();
                 setReports(prev => prev.map(r => r.id === selectedReport.id ? updated : r));
                 setSelectedReport(updated);
+                haptic.success();
+                showToast('Notes saved', 'success');
+            } else {
+                haptic.error();
+                showToast('Failed to save notes', 'error');
             }
         } catch (err: unknown) {
-            console.error('Failed to save notes:', err);
+            haptic.error();
+            showToast('Failed to save notes', 'error');
         } finally {
             setIsSaving(false);
         }
@@ -148,9 +163,15 @@ const BugReportsAdmin: React.FC = () => {
                 setReports(prev => prev.filter(r => r.id !== selectedReport.id));
                 setIsDetailOpen(false);
                 setSelectedReport(null);
+                haptic.success();
+                showToast('Bug report deleted', 'success');
+            } else {
+                haptic.error();
+                showToast('Failed to delete report', 'error');
             }
         } catch (err: unknown) {
-            console.error('Failed to delete:', err);
+            haptic.error();
+            showToast('Failed to delete report', 'error');
         } finally {
             setIsSaving(false);
         }
