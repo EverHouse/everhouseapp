@@ -690,12 +690,23 @@ export const TrackmanWebhookEventsSection: React.FC<TrackmanWebhookEventsSection
                                 <p className="text-xs font-medium text-primary dark:text-white capitalize">{bookingData.status}</p>
                               </div>
                             )}
-                            {bookingData?.type && (
-                              <div className="p-2 bg-gray-50 dark:bg-white/5 rounded-lg">
-                                <p className="text-[10px] uppercase tracking-wider text-primary/50 dark:text-white/40">Type</p>
-                                <p className="text-xs font-medium text-primary dark:text-white">{bookingData.type}</p>
-                              </div>
-                            )}
+                            {(() => {
+                              const rawOpts = bookingData?.playerOptions as Record<string, { quantity?: number; name?: string }> | Array<{ quantity?: number; name?: string }> | undefined;
+                              const optsArr = Array.isArray(rawOpts) ? rawOpts : rawOpts ? Object.values(rawOpts) : [];
+                              const memberQty = optsArr.reduce((sum: number, opt) => sum + (Number(opt?.quantity) || 0), 0);
+                              const firstName = optsArr[0]?.name;
+                              return memberQty > 0 ? (
+                                <div className="p-2 bg-gray-50 dark:bg-white/5 rounded-lg">
+                                  <p className="text-[10px] uppercase tracking-wider text-primary/50 dark:text-white/40">Players</p>
+                                  <p className="text-xs font-medium text-primary dark:text-white">{memberQty} {firstName ? `x ${firstName}` : ''}</p>
+                                </div>
+                              ) : bookingData?.type ? (
+                                <div className="p-2 bg-gray-50 dark:bg-white/5 rounded-lg">
+                                  <p className="text-[10px] uppercase tracking-wider text-primary/50 dark:text-white/40">Type</p>
+                                  <p className="text-xs font-medium text-primary dark:text-white">{bookingData.type}</p>
+                                </div>
+                              ) : null;
+                            })()}
                             {bookingData?.bayOption?.name && (
                               <div className="p-2 bg-gray-50 dark:bg-white/5 rounded-lg">
                                 <p className="text-[10px] uppercase tracking-wider text-primary/50 dark:text-white/40">Bay Option</p>
