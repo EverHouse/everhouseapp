@@ -136,9 +136,33 @@ export async function syncDayPassPurchaseToHubSpot(
 
       if (searchResponse.results && searchResponse.results.length > 0) {
         contactId = searchResponse.results[0].id;
-        if (!isProduction) {
-          logger.info(`[DayPassHubSpot] Found existing contact ${contactId} for ${normalizedEmail}`);
+        const currentLifecycle = searchResponse.results[0].properties?.lifecyclestage?.toLowerCase() || '';
+        
+        if (currentLifecycle !== 'customer' && currentLifecycle !== 'lead') {
+          try {
+            await retryableHubSpotRequest(() =>
+              hubspot.crm.contacts.basicApi.update(contactId!, { properties: { lifecyclestage: '' } })
+            );
+            const updateProps: Record<string, string> = {
+              lifecyclestage: 'lead',
+              hs_lead_status: 'NEW'
+            };
+            if (firstName && !searchResponse.results[0].properties?.firstname) {
+              updateProps.firstname = firstName;
+            }
+            if (lastName && !searchResponse.results[0].properties?.lastname) {
+              updateProps.lastname = lastName;
+            }
+            await retryableHubSpotRequest(() =>
+              hubspot.crm.contacts.basicApi.update(contactId!, { properties: updateProps })
+            );
+            logger.info(`[DayPassHubSpot] Updated existing contact ${contactId} lifecycle to 'lead' for ${normalizedEmail}`);
+          } catch (updateErr: unknown) {
+            logger.warn(`[DayPassHubSpot] Failed to update lifecycle for existing contact ${contactId}:`, { error: updateErr });
+          }
         }
+        
+        logger.info(`[DayPassHubSpot] Found existing contact ${contactId} for ${normalizedEmail}`);
       }
     } catch (error: unknown) {
       const statusCode = getErrorStatusCode(error);

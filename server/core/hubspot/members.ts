@@ -104,13 +104,73 @@ export async function findOrCreateHubSpotContact(
             value: email.toLowerCase()
           }]
         }],
-        properties: ['email', 'firstname', 'lastname'],
+        properties: ['email', 'firstname', 'lastname', 'phone', 'lifecyclestage', 'membership_status'],
         limit: 1
       })
     );
     
     if (searchResponse.results && searchResponse.results.length > 0) {
-      return { contactId: searchResponse.results[0].id, isNew: false };
+      const existingContact = searchResponse.results[0];
+      const contactId = existingContact.id;
+      const currentLifecycle = existingContact.properties?.lifecyclestage?.toLowerCase() || '';
+      const isVisitor = options?.role === 'visitor' || options?.role === 'day-pass';
+      
+      const targetLifecycle = isVisitor ? 'lead' : 'customer';
+      const targetStatus = isVisitor ? 'Non-Member' : 'Active';
+      
+      const shouldUpdateLifecycle = isVisitor
+        ? currentLifecycle !== 'customer' && currentLifecycle !== 'lead'
+        : currentLifecycle !== 'customer';
+      
+      const currentStatus = existingContact.properties?.membership_status || '';
+      const shouldUpdateStatus = currentStatus !== targetStatus;
+      
+      const updateProps: Record<string, string> = {};
+      
+      if (shouldUpdateLifecycle) {
+        updateProps.lifecyclestage = targetLifecycle;
+      }
+      if (shouldUpdateLifecycle || shouldUpdateStatus) {
+        updateProps.membership_status = targetStatus;
+      }
+      
+      if (firstName && !existingContact.properties?.firstname) {
+        updateProps.firstname = firstName;
+      }
+      if (lastName && !existingContact.properties?.lastname) {
+        updateProps.lastname = lastName;
+      }
+      if (phone && !existingContact.properties?.phone) {
+        updateProps.phone = phone;
+      }
+      
+      if (Object.keys(updateProps).length > 0) {
+        try {
+          if (updateProps.lifecyclestage) {
+            await retryableHubSpotRequest(() =>
+              hubspot.crm.contacts.basicApi.update(contactId, { properties: { lifecyclestage: '' } })
+            );
+          }
+          await retryableHubSpotRequest(() =>
+            hubspot.crm.contacts.basicApi.update(contactId, { properties: updateProps })
+          );
+          logger.info(`[HubSpot] Updated existing contact ${contactId} for ${email.toLowerCase()}: ${JSON.stringify(updateProps)}`);
+        } catch (updateErr: unknown) {
+          if (updateProps.lifecyclestage) {
+            try {
+              await retryableHubSpotRequest(() =>
+                hubspot.crm.contacts.basicApi.update(contactId, { properties: { lifecyclestage: currentLifecycle || 'lead' } })
+              );
+              logger.warn(`[HubSpot] Restored lifecycle to '${currentLifecycle || 'lead'}' for contact ${contactId} after update failure`);
+            } catch (restoreErr: unknown) {
+              logger.error(`[HubSpot] CRITICAL: Contact ${contactId} may have blank lifecycle after failed update + failed restore`, { error: restoreErr });
+            }
+          }
+          logger.warn(`[HubSpot] Failed to update existing contact ${contactId} for ${email.toLowerCase()}:`, { error: updateErr });
+        }
+      }
+      
+      return { contactId, isNew: false };
     }
   } catch (error: unknown) {
     const statusCode = getErrorStatusCode(error);

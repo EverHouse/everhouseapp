@@ -190,7 +190,20 @@ export async function syncMemberToHubSpot(
       // Create the contact if it doesn't exist
       logger.info(`[HubSpot Sync] Contact not found for ${email}, creating...`);
       const { findOrCreateHubSpotContact } = await import('./members');
-      const result = await findOrCreateHubSpotContact(email, '', '');
+      let contactFirstName = '';
+      let contactLastName = '';
+      try {
+        const { users } = await import('../../../shared/schema');
+        const nameResult = await db.select({ firstName: users.firstName, lastName: users.lastName })
+          .from(users)
+          .where(eq(users.email, email.toLowerCase()))
+          .limit(1);
+        contactFirstName = nameResult[0]?.firstName || '';
+        contactLastName = nameResult[0]?.lastName || '';
+      } catch (e: unknown) {
+        logger.warn('[HubSpot Sync] Failed to fetch name for contact creation:', { error: e });
+      }
+      const result = await findOrCreateHubSpotContact(email, contactFirstName, contactLastName);
       if (!result.contactId) {
         logger.error(`[HubSpot Sync] Failed to create contact for ${email}`);
         return { success: false, error: 'Failed to create contact', updated: {} };
