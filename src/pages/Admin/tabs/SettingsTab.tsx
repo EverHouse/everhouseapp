@@ -416,7 +416,7 @@ const SettingsTab: React.FC = () => {
             ].map(({ label, field }) => {
               const parsed = parseHoursString(settings[field]);
               return (
-                <div key={field} className="flex items-center gap-3">
+                <div key={field} className="flex flex-wrap items-center gap-x-3 gap-y-2">
                   <div className="w-24 flex-shrink-0">
                     <span className="text-sm font-medium text-primary/70 dark:text-white/70">{label}</span>
                   </div>
@@ -430,23 +430,23 @@ const SettingsTab: React.FC = () => {
                     <span className="text-xs text-gray-500 dark:text-gray-400">Closed</span>
                   </label>
                   {!parsed.closed && (
-                    <>
+                    <div className="flex items-center gap-2 w-full sm:w-auto sm:flex-1 min-w-0">
                       <select
                         value={parsed.open}
                         onChange={(e) => updateField(field, formatHoursString(false, e.target.value, parsed.close))}
-                        className={inputSmClass + ' !w-36'}
+                        className={inputSmClass + ' !w-auto !flex-1 min-w-0'}
                       >
                         {TIME_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                       </select>
-                      <span className="text-gray-400 text-sm">–</span>
+                      <span className="text-gray-400 text-sm flex-shrink-0">–</span>
                       <select
                         value={parsed.close}
                         onChange={(e) => updateField(field, formatHoursString(false, parsed.open, e.target.value))}
-                        className={inputSmClass + ' !w-36'}
+                        className={inputSmClass + ' !w-auto !flex-1 min-w-0'}
                       >
                         {TIME_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                       </select>
-                    </>
+                    </div>
                   )}
                 </div>
               );
