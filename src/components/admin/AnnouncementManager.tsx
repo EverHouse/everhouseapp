@@ -22,6 +22,7 @@ const AnnouncementManager: React.FC<AnnouncementManagerProps> = ({ triggerCreate
     const [editId, setEditId] = useState<string | null>(null);
     const [newItem, setNewItem] = useState<Partial<Announcement>>({ type: 'announcement' });
 
+    const [saving, setSaving] = useState(false);
     const [sheetStatus, setSheetStatus] = useState<SheetStatus>({ connected: false, sheetId: null, sheetUrl: null });
     const [sheetLoading, setSheetLoading] = useState(false);
     const [syncingFrom, setSyncingFrom] = useState(false);
@@ -66,7 +67,7 @@ const AnnouncementManager: React.FC<AnnouncementManagerProps> = ({ triggerCreate
     };
 
     const handleSave = async () => {
-        if(!newItem.title) return;
+        if(!newItem.title || saving) return;
         const ann = {
             id: editId || undefined,
             title: newItem.title,
@@ -81,6 +82,8 @@ const AnnouncementManager: React.FC<AnnouncementManagerProps> = ({ triggerCreate
             showAsBanner: newItem.showAsBanner
         };
 
+        setSaving(true);
+        setIsEditing(false);
         try {
             if (editId) {
                 await updateAnnouncement(ann);
@@ -89,10 +92,11 @@ const AnnouncementManager: React.FC<AnnouncementManagerProps> = ({ triggerCreate
                 await addAnnouncement(ann);
                 showToast('Announcement created', 'success');
             }
-            setIsEditing(false);
         } catch (err: unknown) {
             console.error('Failed to save announcement:', err);
             showToast('Failed to save announcement', 'error');
+        } finally {
+            setSaving(false);
         }
     };
 
@@ -226,9 +230,10 @@ const AnnouncementManager: React.FC<AnnouncementManagerProps> = ({ triggerCreate
                         </button>
                         <button 
                             onClick={handleSave} 
-                            className="flex-1 py-3 rounded-xl bg-primary text-white font-medium shadow-md hover:bg-primary/90 transition-colors tactile-btn"
+                            disabled={saving || !newItem.title}
+                            className="flex-1 py-3 rounded-xl bg-primary text-white font-medium shadow-md hover:bg-primary/90 transition-colors tactile-btn disabled:opacity-50"
                         >
-                            Post
+                            {saving ? 'Posting...' : 'Post'}
                         </button>
                     </div>
                 }
