@@ -1005,14 +1005,6 @@ export async function handlePaymentIntentSucceeded(client: PoolClient, paymentIn
         ? `${userResult.rows[0].first_name || ''} ${userResult.rows[0].last_name || ''}`.trim() || email
         : email;
 
-      await queueJobInTransaction(client, 'sync_to_hubspot', {
-        email,
-        amountCents: localAmount,
-        purpose: metadata.purpose,
-        description: desc,
-        paymentIntentId: localId
-      }, { webhookEventId: localId, priority: 1 });
-
       await queueJobInTransaction(client, 'send_payment_receipt', {
         to: email,
         memberName,
