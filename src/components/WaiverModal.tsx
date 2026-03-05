@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import SlideUpDrawer from './SlideUpDrawer';
 import { useTheme } from '../contexts/ThemeContext';
 import { useToast } from './Toast';
@@ -12,6 +13,7 @@ interface WaiverModalProps {
 export function WaiverModal({ isOpen, onComplete, currentVersion }: WaiverModalProps) {
   const { effectiveTheme } = useTheme();
   const { showToast } = useToast();
+  const queryClient = useQueryClient();
   const isDark = effectiveTheme === 'dark';
   const [agreed, setAgreed] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -82,6 +84,7 @@ export function WaiverModal({ isOpen, onComplete, currentVersion }: WaiverModalP
         throw new Error('Failed to sign waiver');
       }
       
+      queryClient.invalidateQueries({ queryKey: ['waiverStatus'] });
       showToast('Waiver signed successfully', 'success');
       onComplete();
     } catch (error: unknown) {

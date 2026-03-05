@@ -150,7 +150,6 @@ const Profile: React.FC = () => {
   useEffect(() => {
     if (waiverStatus?.needsWaiverUpdate) {
       setCurrentWaiverVersion(waiverStatus.currentVersion || '1.0');
-      setShowWaiverModal(true);
     }
   }, [waiverStatus]);
 
