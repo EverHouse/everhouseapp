@@ -352,7 +352,7 @@ router.post('/api/day-passes/staff-checkout', isStaffOrAdmin, async (req: Reques
         purchaser_last_name: lastName,
         purchaser_phone: phone || '',
         purchaser_dob: dob || '',
-        notes: notes || '',
+        notes: notes ? notes.substring(0, 495) + (notes.length > 495 ? '...' : '') : '',
         purchaser_street_address: streetAddress || '',
         purchaser_city: city || '',
         purchaser_state: state || '',
