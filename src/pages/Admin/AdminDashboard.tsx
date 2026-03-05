@@ -21,7 +21,13 @@ import CheckInConfirmationModal from '../../components/staff-command-center/moda
 import { useToast } from '../../components/Toast';
 import { haptic } from '../../utils/haptics';
 
-import { TabType, StaffBottomNav, StaffSidebar, StaffNavigationRail, usePendingCounts, useUnreadNotifications, useCommandCenter, getTabFromPathname, tabToPath } from './layout';
+import { TabType, getTabFromPathname, tabToPath } from './layout/types';
+import { StaffBottomNav } from './layout/StaffBottomNav';
+import { StaffSidebar } from './layout/StaffSidebar';
+import { StaffNavigationRail } from './layout/StaffNavigationRail';
+import { usePendingCounts } from './layout/hooks/usePendingCounts';
+import { useUnreadNotifications } from './layout/hooks/useUnreadNotifications';
+import { useCommandCenter } from './layout/hooks/useCommandCenter';
 
 // Loading fallback for lazy-loaded tabs - matches app aesthetic
 const TabLoadingFallback = () => (
