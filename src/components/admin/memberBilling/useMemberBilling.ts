@@ -36,6 +36,9 @@ export function useMemberBilling(
   const [showDiscountModal, setShowDiscountModal] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [showPauseModal, setShowPauseModal] = useState(false);
+  const [showResumeModal, setShowResumeModal] = useState(false);
+  const [showBillingSourceModal, setShowBillingSourceModal] = useState(false);
+  const [pendingBillingSource, setPendingBillingSource] = useState('');
   const [showTierChangeModal, setShowTierChangeModal] = useState(false);
   const [showCreateSubscriptionModal, setShowCreateSubscriptionModal] = useState(false);
   const [isCreatingSubscription, setIsCreatingSubscription] = useState(false);
@@ -224,7 +227,12 @@ export function useMemberBilling(
     }
   };
 
-  const handleUpdateBillingSource = async (newSource: string) => {
+  const requestBillingSourceChange = (newSource: string) => {
+    setPendingBillingSource(newSource);
+    setShowBillingSourceModal(true);
+  };
+
+  const handleConfirmBillingSource = async () => {
     setIsUpdatingSource(true);
     showError(null);
     try {
@@ -232,11 +240,13 @@ export function useMemberBilling(
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ billingProvider: newSource || null }),
+        body: JSON.stringify({ billingProvider: pendingBillingSource || null }),
       });
       if (res.ok) {
         await fetchBillingInfo();
         onMemberUpdated?.();
+        setShowBillingSourceModal(false);
+        setPendingBillingSource('');
         showSuccess('Billing source updated');
         setTimeout(() => onDrawerClose?.(), 600);
       } else {
@@ -288,6 +298,7 @@ export function useMemberBilling(
       if (res.ok) {
         await fetchBillingInfo();
         onMemberUpdated?.();
+        setShowResumeModal(false);
         showSuccess('Subscription resumed');
         setTimeout(() => onDrawerClose?.(), 600);
       } else {
@@ -742,7 +753,14 @@ export function useMemberBilling(
     handleManualTierSave,
 
     isUpdatingSource,
-    handleUpdateBillingSource,
+    requestBillingSourceChange,
+    handleConfirmBillingSource,
+    showBillingSourceModal,
+    setShowBillingSourceModal,
+    pendingBillingSource,
+
+    showResumeModal,
+    setShowResumeModal,
 
     isPausing,
     isResuming,

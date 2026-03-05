@@ -1,4 +1,6 @@
 import { enqueueHubSpotSync } from './queue';
+import { db } from '../../db';
+import { sql } from 'drizzle-orm';
 import type { SyncPaymentParams, SyncDayPassParams } from '../stripe/hubspotSync';
 import type { AddMemberInput } from './members';
 
@@ -35,11 +37,18 @@ export interface TierSyncParams {
 }
 
 export async function queueTierSync(params: TierSyncParams): Promise<void> {
-  const oldTierKey = (params.oldTier || 'none').replace(/\s+/g, '_');
   const newTierKey = (params.newTier || 'none').replace(/\s+/g, '_');
+  const emailKey = params.email.toLowerCase();
+
+  await db.execute(sql`UPDATE hubspot_sync_queue 
+    SET status = 'completed', completed_at = NOW() 
+    WHERE operation = 'sync_tier' 
+      AND status = 'pending' 
+      AND LOWER(payload->>'email') = ${emailKey}`);
+
   await enqueueHubSpotSync('sync_tier', params, {
     priority: 2,
-    idempotencyKey: `tier_sync_${params.email}_${oldTierKey}_to_${newTierKey}`,
+    idempotencyKey: `tier_sync_${emailKey}_to_${newTierKey}_${Date.now()}`,
     maxRetries: 5
   });
 }

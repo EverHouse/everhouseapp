@@ -215,6 +215,114 @@ export function ConfirmCancelModal({
   );
 }
 
+export function ConfirmResumeModal({
+  isOpen,
+  onClose,
+  onConfirm,
+  isLoading,
+  isDark,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  isLoading: boolean;
+  isDark: boolean;
+}) {
+  return (
+    <ModalShell isOpen={isOpen} onClose={onClose} title="Resume Subscription" size="sm">
+      <div className="p-4 space-y-4">
+        <div className={`p-4 rounded-lg ${isDark ? 'bg-green-500/10 border border-green-500/30' : 'bg-green-50 border border-green-200'}`}>
+          <div className="flex items-start gap-3">
+            <span className="material-symbols-outlined text-green-500 text-xl">play_circle</span>
+            <div>
+              <p className={`text-sm font-medium ${isDark ? 'text-green-400' : 'text-green-700'}`}>
+                Resume this member's subscription?
+              </p>
+              <p className={`text-xs mt-1 ${isDark ? 'text-green-400/80' : 'text-green-600'}`}>
+                Billing will restart immediately and the member will be charged on their next billing date.
+              </p>
+            </div>
+          </div>
+        </div>
+        <div className="flex gap-2 pt-2">
+          <button
+            onClick={onClose}
+            className={`flex-1 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors tactile-btn ${
+              isDark ? 'bg-white/10 text-white hover:bg-white/20' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={isLoading}
+            className="flex-1 px-4 py-2.5 bg-green-500 text-white rounded-lg text-sm font-medium hover:bg-green-600 disabled:opacity-50 transition-colors tactile-btn"
+          >
+            {isLoading ? 'Resuming...' : 'Resume Subscription'}
+          </button>
+        </div>
+      </div>
+    </ModalShell>
+  );
+}
+
+export function ConfirmBillingSourceModal({
+  isOpen,
+  onClose,
+  onConfirm,
+  isLoading,
+  isDark,
+  currentSource,
+  newSource,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  isLoading: boolean;
+  isDark: boolean;
+  currentSource: string;
+  newSource: string;
+}) {
+  return (
+    <ModalShell isOpen={isOpen} onClose={onClose} title="Change Billing Source" size="sm">
+      <div className="p-4 space-y-4">
+        <div className={`p-4 rounded-lg ${isDark ? 'bg-amber-500/10 border border-amber-500/30' : 'bg-amber-50 border border-amber-200'}`}>
+          <div className="flex items-start gap-3">
+            <span className="material-symbols-outlined text-amber-500 text-xl">swap_horiz</span>
+            <div>
+              <p className={`text-sm font-medium ${isDark ? 'text-amber-400' : 'text-amber-700'}`}>
+                Change billing source from <strong>{currentSource || 'None'}</strong> to <strong>{newSource || 'None'}</strong>?
+              </p>
+              <p className={`text-xs mt-1 ${isDark ? 'text-amber-400/80' : 'text-amber-600'}`}>
+                This changes how the member's subscription is managed and may affect their billing status and sync behavior.
+              </p>
+            </div>
+          </div>
+        </div>
+        <div className="flex gap-2 pt-2">
+          <button
+            onClick={onClose}
+            className={`flex-1 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors tactile-btn ${
+              isDark ? 'bg-white/10 text-white hover:bg-white/20' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={isLoading}
+            className={`flex-1 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 tactile-btn ${
+              isDark ? 'bg-amber-500 text-black hover:bg-amber-400' : 'bg-amber-500 text-white hover:bg-amber-600'
+            }`}
+          >
+            {isLoading ? 'Updating...' : 'Confirm Change'}
+          </button>
+        </div>
+      </div>
+    </ModalShell>
+  );
+}
+
 export function PauseDurationModal({
   isOpen,
   onClose,

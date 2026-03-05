@@ -10,7 +10,7 @@ import GroupBillingManager from './GroupBillingManager';
 import type { MemberBillingTabProps } from './memberBilling/types';
 import { BILLING_PROVIDERS } from './memberBilling/types';
 import { useMemberBilling } from './memberBilling/useMemberBilling';
-import { ApplyCreditModal, ApplyDiscountModal, ConfirmCancelModal, PauseDurationModal } from './memberBilling/BillingModals';
+import { ApplyCreditModal, ApplyDiscountModal, ConfirmCancelModal, ConfirmResumeModal, ConfirmBillingSourceModal, PauseDurationModal } from './memberBilling/BillingModals';
 import { CreateSubscriptionModal } from './memberBilling/CreateSubscriptionModal';
 import { CollectPaymentModal } from './memberBilling/CollectPaymentModal';
 import { UpdateCardTerminalModal } from './memberBilling/UpdateCardTerminalModal';
@@ -94,7 +94,7 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({
           isResuming={billing.isResuming}
           isGettingPaymentLink={billing.isGettingPaymentLink}
           onPause={billing.billingInfo.billingProvider === 'stripe' ? () => billing.setShowPauseModal(true) : undefined}
-          onResume={billing.billingInfo.billingProvider === 'stripe' ? billing.handleResumeSubscription : undefined}
+          onResume={billing.billingInfo.billingProvider === 'stripe' ? () => billing.setShowResumeModal(true) : undefined}
           onShowCancelModal={billing.billingInfo.billingProvider === 'stripe' ? () => billing.setShowCancelModal(true) : undefined}
           onShowCreditModal={() => billing.setShowCreditModal(true)}
           onShowDiscountModal={billing.billingInfo.billingProvider === 'stripe' ? () => billing.setShowDiscountModal(true) : undefined}
@@ -108,7 +108,7 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({
           isSyncingStripeData={billing.isSyncingStripeData}
           billingProvider={billing.billingInfo.billingProvider}
           billingProviders={BILLING_PROVIDERS}
-          onUpdateBillingSource={billing.handleUpdateBillingSource}
+          onUpdateBillingSource={billing.requestBillingSourceChange}
           isUpdatingSource={billing.isUpdatingSource}
           hasStripeCustomer={!!billing.billingInfo.stripeCustomerId}
           onCreateSubscription={billing.handleOpenCreateSubscription}
@@ -265,6 +265,26 @@ const MemberBillingTab: React.FC<MemberBillingTabProps> = ({
         onConfirm={billing.handleCancelSubscription}
         isLoading={billing.isCanceling}
         isDark={isDark}
+      />
+
+      <ConfirmResumeModal
+        isOpen={billing.showResumeModal}
+        onClose={() => billing.setShowResumeModal(false)}
+        onConfirm={billing.handleResumeSubscription}
+        isLoading={billing.isResuming}
+        isDark={isDark}
+      />
+
+      <ConfirmBillingSourceModal
+        isOpen={billing.showBillingSourceModal}
+        onClose={() => {
+          billing.setShowBillingSourceModal(false);
+        }}
+        onConfirm={billing.handleConfirmBillingSource}
+        isLoading={billing.isUpdatingSource}
+        isDark={isDark}
+        currentSource={billing.billingInfo?.billingProvider || ''}
+        newSource={billing.pendingBillingSource}
       />
 
       <PauseDurationModal

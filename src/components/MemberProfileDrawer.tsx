@@ -247,7 +247,27 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
     return () => window.removeEventListener('member-stats-updated', handleStatsUpdate as EventListener);
   }, [isOpen, member?.email, fetchMemberData]);
 
-  useScrollLock(isOpen, onClose);
+  const hasUnsavedContent = 
+    newNoteContent.trim().length > 0 ||
+    editingNoteId !== null ||
+    (showAddComm && (newCommSubject.trim().length > 0 || newCommBody.trim().length > 0));
+
+  const handleDrawerClose = useCallback(() => {
+    if (hasUnsavedContent) {
+      if (!window.confirm('You have unsaved changes. Discard and close?')) {
+        return;
+      }
+    }
+    setNewNoteContent('');
+    setEditingNoteId(null);
+    setEditingNoteContent('');
+    setShowAddComm(false);
+    setNewCommSubject('');
+    setNewCommBody('');
+    onClose();
+  }, [hasUnsavedContent, onClose]);
+
+  useScrollLock(isOpen, handleDrawerClose);
 
   const handleIdScanComplete = useCallback(async (data: {
     firstName: string;
@@ -609,7 +629,7 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
             displayedTier={displayedTier}
             onTierUpdate={(newTier) => setDisplayedTier(newTier)}
             onMemberUpdated={onMemberUpdated}
-            onDrawerClose={onClose}
+            onDrawerClose={handleDrawerClose}
             guestPassInfo={history?.guestPassInfo}
             guestHistory={guestHistory}
             guestCheckInsHistory={history?.guestCheckInsHistory || []}
@@ -639,7 +659,7 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
       <div 
         className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity duration-normal"
         style={{ height: '100dvh' }}
-        onClick={onClose}
+        onClick={handleDrawerClose}
         aria-hidden="true"
       />
       
@@ -671,7 +691,7 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
               </div>
             </div>
             <button
-              onClick={onClose}
+              onClick={handleDrawerClose}
               aria-label="Close drawer"
               className={`w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full hover:rotate-90 transition-transform duration-normal active:scale-90 tactile-btn ${isDark ? 'hover:bg-white/10 text-gray-300' : 'hover:bg-gray-100 text-gray-600'}`}
             >
