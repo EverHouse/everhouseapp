@@ -8,6 +8,17 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.76.0",
+    date: "2026-03-05",
+    title: "Concurrency & Data Integrity Fixes",
+    changes: [
+      "Fix: Waitlist promotions now use proper database locking — two simultaneous cancellations can no longer promote the same waitlisted member, skipping the next person in line",
+      "Fix: Trackman attendance reconciliation charges and status updates are now atomic — if either fails, both roll back, preventing double-charges when staff retries",
+      "Fix: Recurring wellness class updates now correctly identify the day of the week regardless of server timezone — previously a Friday class edit could accidentally apply to all Thursday classes",
+      "Fix: Staff manually adding a member to a wellness class now sends the member a notification, push alert, and updates the roster in real-time — previously the member received zero communication",
+    ]
+  },
+  {
     version: "8.75.0",
     date: "2026-03-05",
     title: "Security & Reliability Audit Fixes",

@@ -316,8 +316,6 @@ router.post('/api/wellness-classes/:id/mark-reviewed', isStaffOrAdmin, async (re
              AND is_active = true
            RETURNING id`);
       } else if (originalTitle && originalTime && originalDate) {
-        const dayOfWeek = new Date(originalDate as string).getDay();
-        
         bulkResult = await db.execute(sql`UPDATE wellness_classes 
            SET needs_review = false, 
                reviewed_by = ${reviewedBy}, 
@@ -334,7 +332,7 @@ router.post('/api/wellness-classes/:id/mark-reviewed', isStaffOrAdmin, async (re
                app_last_modified_at = NOW()
            WHERE title = ${originalTitle as string}
              AND time = ${originalTime as string}
-             AND EXTRACT(DOW FROM date) = ${dayOfWeek}
+             AND EXTRACT(DOW FROM date) = EXTRACT(DOW FROM ${originalDate as string}::date)
              AND id != ${id} 
              AND date >= ${updatedClass.date}
              AND is_active = true
@@ -672,7 +670,6 @@ router.put('/api/wellness-classes/:id', isStaffOrAdmin, async (req, res) => {
                AND is_active = true
              RETURNING id, date, time, duration, title`);
         } else if (existingRow?.title) {
-          const dayOfWeek = new Date(existingRow.date as string).getDay();
           const originalTime = existingRow.time;
           
           recurringResult = await db.execute(sql`UPDATE wellness_classes 
@@ -696,7 +693,7 @@ router.put('/api/wellness-classes/:id', isStaffOrAdmin, async (req, res) => {
                  app_last_modified_at = NOW()
              WHERE title = ${existingRow.title} 
                AND time = ${originalTime}
-               AND EXTRACT(DOW FROM date) = ${dayOfWeek}
+               AND EXTRACT(DOW FROM date) = EXTRACT(DOW FROM ${existingRow.date as string}::date)
                AND id != ${id} 
                AND date > ${updated.date}
                AND is_active = true
@@ -1178,25 +1175,28 @@ router.delete('/api/wellness-enrollments/:class_id/:user_email', isAuthenticated
     // If a regular enrollment was cancelled and there are waitlisted users, promote the first one
     if (wasNotWaitlisted && parseInt(cls.waitlist_count as string) > 0) {
       try {
-        // Get the first person on waitlist (oldest entry) with row locking to prevent race conditions
-        // FOR UPDATE SKIP LOCKED ensures concurrent processes pick different users
-        const waitlistedResult = await db.execute(sql`SELECT * FROM wellness_enrollments 
-           WHERE class_id = ${parseInt(class_id)} 
-             AND status = 'confirmed' 
-             AND is_waitlisted = true
-           ORDER BY created_at ASC
-           LIMIT 1
-           FOR UPDATE SKIP LOCKED`);
+        const promotedUserRow = await db.transaction(async (tx) => {
+          const waitlistedResult = await tx.execute(sql`SELECT * FROM wellness_enrollments 
+             WHERE class_id = ${parseInt(class_id)} 
+               AND status = 'confirmed' 
+               AND is_waitlisted = true
+             ORDER BY created_at ASC
+             LIMIT 1
+             FOR UPDATE SKIP LOCKED`);
+          
+          if (waitlistedResult.rows.length === 0) return null;
+          
+          const row = waitlistedResult.rows[0] as unknown as WaitlistedUserRow;
+          await tx.update(wellnessEnrollments)
+            .set({ isWaitlisted: false })
+            .where(eq(wellnessEnrollments.id, row.id as number));
+          
+          return row;
+        });
         
-        if (waitlistedResult.rows.length > 0) {
-          const promotedUserRow = waitlistedResult.rows[0] as unknown as WaitlistedUserRow;
+        if (promotedUserRow) {
           const promotedEmail = promotedUserRow.user_email;
           const promotedName = await getMemberDisplayName(promotedEmail as string);
-          
-          // Promote from waitlist
-          await db.update(wellnessEnrollments)
-            .set({ isWaitlisted: false })
-            .where(eq(wellnessEnrollments.id, promotedUserRow.id as number));
           
           const promotedMessage = `A spot opened up! You've been moved from the waitlist and are now enrolled in ${cls.title} with ${cls.instructor} on ${formattedDate} at ${cls.time}.`;
           
@@ -1366,9 +1366,11 @@ router.post('/api/wellness-classes/:id/enrollments/manual', isStaffOrAdmin, asyn
       return res.status(400).json({ error: 'This email is already enrolled in this class' });
     }
 
-    // Get the class details for audit logging
-    const classQuery = await db.execute(sql`SELECT id, title, instructor FROM wellness_classes WHERE id = ${parseInt(id as string)}`);
-    const classDetails = classQuery.rows[0] as unknown as WellnessClassDetailRow;
+    const classQuery = await db.execute(sql`SELECT id, title, instructor, date, time FROM wellness_classes WHERE id = ${parseInt(id as string)}`);
+    if (classQuery.rows.length === 0) {
+      return res.status(404).json({ error: 'Wellness class not found' });
+    }
+    const classDetails = classQuery.rows[0] as unknown as WellnessClassDetailRow & { date: string | Date; time: string };
 
     await db.insert(wellnessEnrollments).values({
       classId: parseInt(id as string),
@@ -1376,7 +1378,48 @@ router.post('/api/wellness-classes/:id/enrollments/manual', isStaffOrAdmin, asyn
       status: 'confirmed',
     });
     
-    logFromRequest(req, 'manual_enrollment', 'wellness', String(id), (classDetails?.title || 'Wellness Class') as string, {
+    const dateStr = classDetails.date instanceof Date 
+      ? classDetails.date.toISOString().split('T')[0] 
+      : (typeof classDetails.date === 'string' ? classDetails.date.split('T')[0] : String(classDetails.date));
+    const formattedDate = formatDateDisplayWithDay(dateStr);
+    const classTitle = (classDetails?.title || 'Wellness Class') as string;
+    const memberMessage = `You've been enrolled in ${classTitle} with ${classDetails.instructor || 'instructor'} on ${formattedDate} at ${classDetails.time} by staff.`;
+    
+    try {
+      await notifyMember({
+        userEmail: email,
+        title: 'Wellness Class Confirmed',
+        message: memberMessage,
+        type: 'wellness_booking',
+        relatedId: parseInt(id as string),
+        relatedType: 'wellness_class',
+        url: '/wellness'
+      });
+      
+      sendPushNotification(email, {
+        title: 'Wellness Class Confirmed',
+        body: memberMessage,
+        url: '/wellness'
+      }).catch(err => logger.error('Push notification failed for manual enrollment', { extra: { error: err } }));
+      
+      sendNotificationToUser(email, {
+        type: 'notification',
+        title: 'Wellness Class Confirmed',
+        message: memberMessage,
+        data: { classId: parseInt(id as string), eventType: 'wellness_enrolled' }
+      }, { action: 'wellness_enrolled', classId: parseInt(id as string), triggerSource: 'wellness.ts' });
+      
+      broadcastToStaff({
+        type: 'wellness_event',
+        action: 'enrollment_created',
+        classId: parseInt(id as string),
+        memberEmail: email
+      });
+    } catch (notifyErr: unknown) {
+      logger.warn('Non-critical: Failed to send notifications for manual enrollment', { extra: { error: notifyErr, classId: id, email } });
+    }
+    
+    logFromRequest(req, 'manual_enrollment', 'wellness', String(id), classTitle, {
       instructor: classDetails?.instructor,
       memberEnrolled: email
     });

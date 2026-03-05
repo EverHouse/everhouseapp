@@ -351,22 +351,54 @@ export async function adjustLedgerForReconciliation(
     const overageRate = await getTierOverageRate(booking.tier ?? null);
     const feeAdjustment = calculatePotentialFeeAdjustment(durationMinutes, declaredCount, actualCount, overageRate);
     
-    if (booking.session_id && feeAdjustment > 0) {
-      await recordUsage(
-        booking.session_id,
-        {
-          memberId: booking.user_email,
-          minutesCharged: 0,
-          overageFee: feeAdjustment,
-          guestFee: 0,
-          tierAtBooking: booking.tier || 'unknown',
-          paymentMethod: 'unpaid',
-        },
-        'staff_manual'
-      );
-    }
+    const previousStatus = await db.transaction(async (tx) => {
+      const currentResult = await tx.execute(sql`SELECT reconciliation_status FROM booking_requests WHERE id = ${bookingId}`);
+      const prevStatus = (currentResult.rows[0] as { reconciliation_status: string | null })?.reconciliation_status || 'pending';
+      
+      if (booking.session_id && feeAdjustment > 0) {
+        await recordUsage(
+          booking.session_id,
+          {
+            memberId: booking.user_email,
+            minutesCharged: 0,
+            overageFee: feeAdjustment,
+            guestFee: 0,
+            tierAtBooking: booking.tier || 'unknown',
+            paymentMethod: 'unpaid',
+          },
+          'staff_manual',
+          tx
+        );
+      }
+      
+      await tx.execute(sql`UPDATE booking_requests 
+         SET reconciliation_status = 'adjusted',
+             reconciled_by = ${staffEmail},
+             reconciled_at = NOW(),
+             reconciliation_notes = ${notes || null},
+             updated_at = NOW()
+         WHERE id = ${bookingId}`);
+      
+      return prevStatus;
+    });
     
-    await markAsReconciled(bookingId, staffEmail, 'adjusted', notes);
+    await logPaymentAudit({
+      bookingId,
+      sessionId: booking.session_id as number,
+      action: 'reconciliation_adjusted',
+      staffEmail,
+      reason: notes || `Attendance reconciliation: declared ${declaredCount}, actual ${actualCount}`,
+      amountAffected: feeAdjustment.toString(),
+      previousStatus,
+      newStatus: 'adjusted',
+      metadata: {
+        declaredCount,
+        actualCount,
+        discrepancy: actualCount > declaredCount ? 'under_declared' : 'over_declared',
+        durationMinutes,
+        feeAdjustment
+      },
+    });
     
     logger.info('[adjustLedgerForReconciliation] Ledger adjusted', {
       extra: {
