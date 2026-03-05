@@ -401,14 +401,10 @@ export async function checkBillingProviderHybridState(): Promise<IntegrityCheckR
     WHERE role = 'member'
       AND archived_at IS NULL
       AND (
-        -- Mindbody member with active Stripe subscription (needs migration)
         (billing_provider = 'mindbody' AND stripe_subscription_id IS NOT NULL AND stripe_subscription_id != '')
         OR
-        -- No billing provider but active member (needs classification)
         (billing_provider IS NULL AND membership_status = 'active')
-        OR
-        -- Stripe billing provider but no subscription ID (data gap)
-        (billing_provider = 'stripe' AND (stripe_subscription_id IS NULL OR stripe_subscription_id = '') AND membership_status = 'active')
+        ${isProduction ? sql`OR (billing_provider = 'stripe' AND (stripe_subscription_id IS NULL OR stripe_subscription_id = '') AND membership_status = 'active')` : sql``}
       )
     ORDER BY membership_status, email
     LIMIT 50

@@ -259,16 +259,45 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
       'hs_merged_object_ids'
     ];
     
+    const meaningfulStatuses = ['active', 'Active', 'trialing', 'past_due', 'past due', 'pastdue', 'pending', 'Pending', 'suspended', 'Suspended', 'declined', 'Declined', 'frozen', 'froze', 'Froze'];
+    
+    const filterGroups: Array<{ filters: Array<{ propertyName: string; operator: string; values?: string[]; value?: string }> }> = [
+      {
+        filters: [
+          {
+            propertyName: 'membership_status',
+            operator: 'IN',
+            values: meaningfulStatuses
+          }
+        ]
+      },
+      {
+        filters: [
+          {
+            propertyName: 'mindbody_client_id',
+            operator: 'HAS_PROPERTY'
+          }
+        ]
+      }
+    ];
+    
     let allContacts: HubSpotContact[] = [];
     let after: string | undefined = undefined;
     
     do {
-      const response = await hubspot.crm.contacts.basicApi.getPage(100, after, properties);
+      const searchRequest: Record<string, unknown> = {
+        filterGroups,
+        properties,
+        limit: 100,
+        ...(after ? { after } : {})
+      };
+      
+      const response = await hubspot.crm.contacts.searchApi.doSearch(searchRequest);
       allContacts = allContacts.concat(response.results as unknown as HubSpotContact[]);
       after = response.paging?.next?.after;
     } while (after);
     
-    if (!isProduction) logger.info(`[MemberSync] Fetched ${allContacts.length} contacts from HubSpot`);
+    logger.info(`[MemberSync] Fetched ${allContacts.length} contacts from HubSpot (filtered to meaningful statuses + Mindbody)`);
     
     const exclusionResult = await db.execute(sql`SELECT email FROM sync_exclusions`);
     const excludedEmails = new Set((exclusionResult.rows as unknown as SyncExclusionRow[]).map(r => r.email?.toLowerCase()));
@@ -284,21 +313,21 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
     let statusChanges = 0;
     let hubspotIdCollisions = 0;
     let skippedNonTransacting = 0;
+    let skippedArchived = 0;
     let stripeProtectedCount = 0;
     
-    // Parse opt-in values from HubSpot (they come as strings like "true"/"false" or "Yes"/"No")
+    const skipStatuses = ['non-member', 'archived', 'cancelled', 'expired', 'terminated'];
+    
     const parseOptIn = (val?: string): boolean | null => {
       if (!val) return null;
       const lower = val.toLowerCase();
       return lower === 'true' || lower === 'yes' || lower === '1';
     };
     
-    // Extract first/last name from hs_calculated_full_name when individual fields are empty
     const getNameFromContact = (contact: HubSpotContact): { firstName: string | null; lastName: string | null } => {
       let firstName = contact.properties.firstname || null;
       let lastName = contact.properties.lastname || null;
       
-      // If firstname or lastname is missing, try to extract from hs_calculated_full_name
       if ((!firstName || !lastName) && contact.properties.hs_calculated_full_name) {
         const fullName = contact.properties.hs_calculated_full_name.trim();
         const parts = fullName.split(' ');
@@ -313,9 +342,8 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
       return { firstName, lastName };
     };
     
-    // Process contacts in parallel batches for better performance
     const SYNC_BATCH_SIZE = 25;
-    const syncLimit = pLimit(10); // 10 concurrent DB operations
+    const syncLimit = pLimit(10);
     
     for (let i = 0; i < allContacts.length; i += SYNC_BATCH_SIZE) {
       const batch = allContacts.slice(i, i + SYNC_BATCH_SIZE);
@@ -377,7 +405,6 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
           const smsTransactionalOptIn = parseOptIn(contact.properties.hs_sms_customer_updates);
           const smsRemindersOptIn = parseOptIn(contact.properties.hs_sms_reminders);
           
-          // Stripe delinquent status (comes as "true"/"false" string)
           const stripeDelinquent = parseOptIn(contact.properties.stripe_delinquent);
           
           const { resolveUserByEmail } = await import('./stripe/customers');
@@ -393,7 +420,8 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
             lastHubspotNotesHash: users.lastHubspotNotesHash,
             role: users.role,
             tier: users.tier,
-            migrationStatus: users.migrationStatus
+            migrationStatus: users.migrationStatus,
+            archivedAt: users.archivedAt
           })
             .from(users)
             .where(eq(users.email, email))
@@ -401,7 +429,12 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
           const oldStatus = existingUser[0]?.membershipStatus || null;
           const oldNotesHash = existingUser[0]?.lastHubspotNotesHash || null;
           
-          if (!existingUser[0] && status === 'non-member' && !contact.properties.mindbody_client_id) {
+          if (existingUser[0]?.archivedAt) {
+            skippedArchived++;
+            return null;
+          }
+          
+          if (!existingUser[0] && skipStatuses.includes(status) && !contact.properties.mindbody_client_id) {
             skippedNonTransacting++;
             return null;
           }
@@ -620,7 +653,7 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
       }
     }
     
-    if (!isProduction) logger.info(`[MemberSync] Complete - Synced: ${synced}, Errors: ${errors}, Status Changes: ${statusChanges}, HubSpot ID Collisions: ${hubspotIdCollisions}, ${skippedNonTransacting} non-transacting skipped, ${stripeProtectedCount} Stripe-protected`);
+    logger.info(`[MemberSync] Complete - Synced: ${synced}, Errors: ${errors}, Status Changes: ${statusChanges}, HubSpot ID Collisions: ${hubspotIdCollisions}, ${skippedNonTransacting} non-transacting skipped, ${skippedArchived} archived skipped, ${stripeProtectedCount} Stripe-protected`);
     
     // Process merged contact IDs to extract linked emails
     // hs_merged_object_ids contains semicolon-separated HubSpot contact IDs that were merged into this contact
@@ -829,7 +862,7 @@ export async function syncRelevantMembersFromHubSpot(): Promise<{ synced: number
       'hs_merged_object_ids'
     ];
     
-    const relevantStatuses = ['active', 'Active', 'past_due', 'past due', 'pastdue', 'frozen', 'froze', 'Froze', 'suspended', 'Suspended', 'declined', 'Declined', 'expired', 'Expired', 'terminated', 'Terminated', 'cancelled', 'trialing', 'Pending', 'pending', 'Non-Member', 'non-member'];
+    const relevantStatuses = ['active', 'Active', 'trialing', 'past_due', 'past due', 'pastdue', 'frozen', 'froze', 'Froze', 'suspended', 'Suspended', 'declined', 'Declined', 'Pending', 'pending'];
     
     const filterGroups: Array<{ filters: Array<{ propertyName: string; operator: string; values?: string[]; value?: string }> }> = [
       {
@@ -840,20 +873,27 @@ export async function syncRelevantMembersFromHubSpot(): Promise<{ synced: number
             values: relevantStatuses
           }
         ]
+      },
+      {
+        filters: [
+          {
+            propertyName: 'mindbody_client_id',
+            operator: 'HAS_PROPERTY'
+          }
+        ]
       }
     ];
     
     const previousSyncTime = getLastMemberSyncTime();
     if (previousSyncTime > 0) {
-      filterGroups.push({
-        filters: [
-          {
-            propertyName: 'lastmodifieddate',
-            operator: 'GTE',
-            value: new Date(previousSyncTime).toISOString()
-          }
-        ]
-      });
+      const timeFilter = {
+        propertyName: 'lastmodifieddate',
+        operator: 'GTE',
+        value: new Date(previousSyncTime).toISOString()
+      };
+      for (const group of filterGroups) {
+        group.filters.push(timeFilter);
+      }
     }
     
     let allContacts: HubSpotContact[] = [];
@@ -888,7 +928,10 @@ export async function syncRelevantMembersFromHubSpot(): Promise<{ synced: number
     let statusChanges = 0;
     let hubspotIdCollisions = 0;
     let skippedNonTransacting = 0;
+    let skippedArchived = 0;
     let stripeProtectedCount = 0;
+    
+    const skipStatuses = ['non-member', 'archived', 'cancelled', 'expired', 'terminated'];
     
     const parseOptIn = (val?: string): boolean | null => {
       if (!val) return null;
@@ -985,7 +1028,8 @@ export async function syncRelevantMembersFromHubSpot(): Promise<{ synced: number
             lastHubspotNotesHash: users.lastHubspotNotesHash,
             role: users.role,
             tier: users.tier,
-            migrationStatus: users.migrationStatus
+            migrationStatus: users.migrationStatus,
+            archivedAt: users.archivedAt
           })
             .from(users)
             .where(eq(users.email, email))
@@ -993,7 +1037,12 @@ export async function syncRelevantMembersFromHubSpot(): Promise<{ synced: number
           const oldStatus = existingUser[0]?.membershipStatus || null;
           const oldNotesHash = existingUser[0]?.lastHubspotNotesHash || null;
           
-          if (!existingUser[0] && status === 'non-member' && !contact.properties.mindbody_client_id) {
+          if (existingUser[0]?.archivedAt) {
+            skippedArchived++;
+            return null;
+          }
+          
+          if (!existingUser[0] && skipStatuses.includes(status) && !contact.properties.mindbody_client_id) {
             skippedNonTransacting++;
             return null;
           }
@@ -1206,7 +1255,7 @@ export async function syncRelevantMembersFromHubSpot(): Promise<{ synced: number
       }
     }
     
-    if (!isProduction) logger.info(`[MemberSync] Focused sync complete - Synced: ${synced}, Errors: ${errors}, Status Changes: ${statusChanges}, HubSpot ID Collisions: ${hubspotIdCollisions}, ${skippedNonTransacting} non-transacting skipped, ${stripeProtectedCount} Stripe-protected`);
+    logger.info(`[MemberSync] Focused sync complete - Synced: ${synced}, Errors: ${errors}, Status Changes: ${statusChanges}, HubSpot ID Collisions: ${hubspotIdCollisions}, ${skippedNonTransacting} non-transacting skipped, ${skippedArchived} archived skipped, ${stripeProtectedCount} Stripe-protected`);
     
     const contactsWithMergedIds = allContacts.filter(c => c.properties.hs_merged_object_ids);
     if (contactsWithMergedIds.length > 0) {
