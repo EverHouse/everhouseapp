@@ -41,14 +41,14 @@ export function initSchedulers(): void {
   schedulerTracker.registerScheduler('Morning Closure', 30 * 60 * 1000);
   schedulerTracker.registerScheduler('Weekly Cleanup', 60 * 60 * 1000);
   schedulerTracker.registerScheduler('Integrity Check', 30 * 60 * 1000);
-  schedulerTracker.registerScheduler('Auto-Fix Tiers', 4 * 60 * 60 * 1000);
+  schedulerTracker.registerScheduler('Auto-Fix Tiers', 24 * 60 * 60 * 1000);
   schedulerTracker.registerScheduler('Abandoned Pending Cleanup', 6 * 60 * 60 * 1000);
   schedulerTracker.registerScheduler('Waiver Review', 4 * 60 * 60 * 1000);
   schedulerTracker.registerScheduler('Stripe Reconciliation', 60 * 60 * 1000);
   schedulerTracker.registerScheduler('Fee Snapshot Reconciliation', 15 * 60 * 1000);
   schedulerTracker.registerScheduler('Grace Period', 60 * 60 * 1000);
   schedulerTracker.registerScheduler('Booking Expiry', 60 * 60 * 1000);
-  schedulerTracker.registerScheduler('Booking Auto-Complete', 2 * 60 * 60 * 1000);
+  schedulerTracker.registerScheduler('Booking Auto-Complete', 60 * 60 * 1000);
   schedulerTracker.registerScheduler('Communication Logs Sync', 30 * 60 * 1000);
   schedulerTracker.registerScheduler('Webhook Log Cleanup', 60 * 60 * 1000);
   schedulerTracker.registerScheduler('Session Cleanup', 60 * 60 * 1000);
@@ -56,7 +56,7 @@ export function initSchedulers(): void {
   schedulerTracker.registerScheduler('HubSpot Queue', 2 * 60 * 1000);
   schedulerTracker.registerScheduler('HubSpot Form Sync', 30 * 60 * 1000);
   schedulerTracker.registerScheduler('Member Sync', 24 * 60 * 60 * 1000);
-  schedulerTracker.registerScheduler('Duplicate Cleanup', 60 * 60 * 1000);
+  schedulerTracker.registerScheduler('Duplicate Cleanup', 24 * 60 * 60 * 1000);
   schedulerTracker.registerScheduler('Guest Pass Reset', 60 * 60 * 1000);
   schedulerTracker.registerScheduler('Stuck Cancellation', 2 * 60 * 60 * 1000);
   schedulerTracker.registerScheduler('Pending User Cleanup', 6 * 60 * 60 * 1000);

@@ -127,6 +127,7 @@ export async function autoFixMissingTiers(): Promise<{
       logger.info(`[AutoFix] Normalized membership_status case for ${normalizedStatusCase} members: ${details}`);
     }
 
+    // Safety net — primary enforcement via trg_auto_billing_provider trigger
     const stripeProviderResult = await db.execute(sql`
       UPDATE users SET billing_provider = 'stripe', updated_at = NOW()
       WHERE membership_status = 'active'
@@ -162,6 +163,7 @@ export async function autoFixMissingTiers(): Promise<{
       logger.info(`[AutoFix] Set billing_provider='mindbody' for ${billingProviderResult.rows.length} members with MindBody IDs: ${emails}`);
     }
 
+    // Safety net — primary enforcement via trg_copy_tier_on_link trigger
     const fixResult = await db.execute(sql`
       WITH tier_fixes AS (
         SELECT DISTINCT ON (u1.id)
@@ -244,6 +246,7 @@ export async function autoFixMissingTiers(): Promise<{
       logger.info(`[AutoFix] ${remainingWithoutTier} active members still without tier (cannot auto-determine): ${emails}`);
     }
 
+    // Safety net — primary enforcement via trg_sync_staff_role trigger
     const staffSyncResult = await db.execute(sql`
       UPDATE users u
       SET role = su.role,
@@ -262,6 +265,7 @@ export async function autoFixMissingTiers(): Promise<{
       logger.info(`[AutoFix] Synced staff role for ${syncedStaffRoles} users: ${details}`);
     }
 
+    // Safety net — primary enforcement via trg_link_participant_user_id trigger
     const ownerUserIdFix = await db.execute(sql`
       UPDATE booking_participants bp
       SET user_id = u.id

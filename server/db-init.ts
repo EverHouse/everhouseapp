@@ -706,3 +706,139 @@ export async function seedTierFeatures(): Promise<void> {
     logger.error('[DB Init] Failed to seed tier features:', { extra: { errorMessage: getErrorMessage(error) } });
   }
 }
+
+export async function setupInstantDataTriggers(): Promise<void> {
+  try {
+    await db.execute(sql`
+      CREATE OR REPLACE FUNCTION auto_set_billing_provider()
+      RETURNS TRIGGER
+      LANGUAGE plpgsql
+      SET search_path = ''
+      AS $$
+      BEGIN
+        IF NEW.billing_provider IS NULL OR NEW.billing_provider = '' THEN
+          IF NEW.stripe_subscription_id IS NOT NULL AND NEW.stripe_subscription_id != '' THEN
+            NEW.billing_provider := 'stripe';
+          ELSIF NEW.mindbody_client_id IS NOT NULL AND NEW.mindbody_client_id != '' THEN
+            NEW.billing_provider := 'mindbody';
+          END IF;
+        END IF;
+        RETURN NEW;
+      END;
+      $$;
+
+      DROP TRIGGER IF EXISTS trg_auto_billing_provider ON users;
+      CREATE TRIGGER trg_auto_billing_provider
+      BEFORE INSERT OR UPDATE OF stripe_subscription_id, mindbody_client_id, billing_provider ON users
+      FOR EACH ROW
+      EXECUTE FUNCTION auto_set_billing_provider();
+    `);
+    logger.info('[DB Init] Trigger: auto_set_billing_provider created');
+  } catch (err: unknown) {
+    logger.warn(`[DB Init] Skipping auto_set_billing_provider trigger: ${getErrorMessage(err)}`);
+  }
+
+  try {
+    await db.execute(sql`
+      CREATE OR REPLACE FUNCTION auto_copy_tier_on_link()
+      RETURNS TRIGGER
+      LANGUAGE plpgsql
+      SET search_path = ''
+      AS $$
+      DECLARE
+        primary_tier TEXT;
+      BEGIN
+        SELECT tier INTO primary_tier
+        FROM public.users
+        WHERE LOWER(email) = LOWER(NEW.primary_email) AND tier IS NOT NULL
+        LIMIT 1;
+
+        IF primary_tier IS NOT NULL THEN
+          UPDATE public.users
+          SET tier = primary_tier, updated_at = NOW()
+          WHERE LOWER(email) = LOWER(NEW.linked_email) AND tier IS NULL;
+        END IF;
+
+        RETURN NEW;
+      END;
+      $$;
+
+      DROP TRIGGER IF EXISTS trg_copy_tier_on_link ON user_linked_emails;
+      CREATE TRIGGER trg_copy_tier_on_link
+      AFTER INSERT ON user_linked_emails
+      FOR EACH ROW
+      EXECUTE FUNCTION auto_copy_tier_on_link();
+    `);
+    logger.info('[DB Init] Trigger: auto_copy_tier_on_link created');
+  } catch (err: unknown) {
+    logger.warn(`[DB Init] Skipping auto_copy_tier_on_link trigger: ${getErrorMessage(err)}`);
+  }
+
+  try {
+    await db.execute(sql`
+      CREATE OR REPLACE FUNCTION auto_sync_staff_role()
+      RETURNS TRIGGER
+      LANGUAGE plpgsql
+      SET search_path = ''
+      AS $$
+      BEGIN
+        IF NEW.is_active = true THEN
+          UPDATE public.users
+          SET role = NEW.role, tier = 'VIP', membership_status = 'active', updated_at = NOW()
+          WHERE LOWER(email) = LOWER(NEW.email)
+            AND role NOT IN ('admin', 'staff', 'golf_instructor');
+        END IF;
+        RETURN NEW;
+      END;
+      $$;
+
+      DROP TRIGGER IF EXISTS trg_sync_staff_role ON staff_users;
+      CREATE TRIGGER trg_sync_staff_role
+      AFTER INSERT OR UPDATE OF is_active, role ON staff_users
+      FOR EACH ROW
+      EXECUTE FUNCTION auto_sync_staff_role();
+    `);
+    logger.info('[DB Init] Trigger: auto_sync_staff_role created');
+  } catch (err: unknown) {
+    logger.warn(`[DB Init] Skipping auto_sync_staff_role trigger: ${getErrorMessage(err)}`);
+  }
+
+  try {
+    await db.execute(sql`
+      CREATE OR REPLACE FUNCTION auto_link_participant_user_id()
+      RETURNS TRIGGER
+      LANGUAGE plpgsql
+      SET search_path = ''
+      AS $$
+      DECLARE
+        found_user_id TEXT;
+      BEGIN
+        IF NEW.user_id IS NULL AND NEW.participant_type = 'owner' AND NEW.session_id IS NOT NULL THEN
+          SELECT u.id INTO found_user_id
+          FROM public.booking_requests br
+          JOIN public.users u ON LOWER(u.email) = LOWER(br.user_email)
+          WHERE br.session_id = NEW.session_id
+          ORDER BY br.created_at DESC
+          LIMIT 1;
+
+          IF found_user_id IS NOT NULL THEN
+            NEW.user_id := found_user_id;
+          END IF;
+        END IF;
+        RETURN NEW;
+      END;
+      $$;
+
+      DROP TRIGGER IF EXISTS trg_link_participant_user_id ON booking_participants;
+      CREATE TRIGGER trg_link_participant_user_id
+      BEFORE INSERT ON booking_participants
+      FOR EACH ROW
+      EXECUTE FUNCTION auto_link_participant_user_id();
+    `);
+    logger.info('[DB Init] Trigger: auto_link_participant_user_id created');
+  } catch (err: unknown) {
+    logger.warn(`[DB Init] Skipping auto_link_participant_user_id trigger: ${getErrorMessage(err)}`);
+  }
+
+  logger.info('[DB Init] Instant data triggers created');
+}

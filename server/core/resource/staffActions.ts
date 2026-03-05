@@ -177,6 +177,11 @@ export async function assignWithPlayers(
           const displayName = memberRow
             ? `${memberRow.first_name || ''} ${memberRow.last_name || ''}`.trim() || player.name || player.email
             : player.name || player.email;
+          if (!memberRow) {
+            logger.warn('[assign-with-players] Member not found in system, participant created without user_id', {
+              extra: { email: player.email, sessionId }
+            });
+          }
           await db.execute(sql`INSERT INTO booking_participants (session_id, user_id, participant_type, display_name, slot_duration, payment_status, created_at)
              VALUES (${sessionId}, ${memberRow?.id || null}, 'member', ${displayName}, ${slotDuration}, 'pending', NOW())`);
         }

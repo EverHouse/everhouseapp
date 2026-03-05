@@ -81,7 +81,7 @@ async function checkAndRunCleanup(): Promise<void> {
 }
 
 export function startDuplicateCleanupScheduler(): NodeJS.Timeout {
-  logger.info('[Startup] Duplicate cleanup scheduler enabled (runs at 4am Pacific and on startup with 30s delay)');
+  logger.info('[Startup] Duplicate cleanup scheduler enabled (startup-only — unique constraint prevents new duplicates)');
   
   setTimeout(async () => {
     try {
@@ -92,6 +92,7 @@ export function startDuplicateCleanupScheduler(): NodeJS.Timeout {
         schedulerTracker.recordRun('Duplicate Cleanup', true);
       } else {
         logger.info('[Duplicate Cleanup] No duplicates found');
+        schedulerTracker.recordRun('Duplicate Cleanup', true);
       }
     } catch (error: unknown) {
       logger.error('[Duplicate Cleanup] Startup cleanup error:', { error: error as Error });
@@ -99,7 +100,7 @@ export function startDuplicateCleanupScheduler(): NodeJS.Timeout {
     }
   }, 30000);
   
-  return setInterval(checkAndRunCleanup, 60 * 60 * 1000);
+  return setInterval(() => {}, 24 * 60 * 60 * 1000);
 }
 
 export { cleanupDuplicateTrackmanBookings };

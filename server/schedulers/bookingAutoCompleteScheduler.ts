@@ -214,13 +214,13 @@ export function startBookingAutoCompleteScheduler(): void {
     return;
   }
 
-  logger.info('[Startup] Booking auto-complete scheduler enabled (runs every 30 minutes)');
+  logger.info('[Startup] Booking auto-complete scheduler enabled (runs every 60 minutes)');
 
   intervalId = setInterval(() => {
     guardedAutoComplete().catch((err: unknown) => {
       logger.error('[Booking Auto-Complete] Uncaught error:', { error: err as Error });
     });
-  }, 30 * 60 * 1000);
+  }, 60 * 60 * 1000);
 
   initialTimeoutId = setTimeout(() => {
     initialTimeoutId = null;
