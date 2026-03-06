@@ -144,7 +144,8 @@ router.get('/api/analytics/extended-stats', isStaffOrAdmin, async (_req: Request
         WITH participant_rev AS (
           SELECT
             TO_CHAR(DATE_TRUNC('month', bs.session_date::date), 'YYYY-MM') AS month,
-            COALESCE(SUM(bp.cached_fee_cents) FILTER (WHERE bp.payment_status = 'paid'), 0)::int AS participant_revenue_cents
+            COALESCE(SUM(bp.cached_fee_cents) FILTER (WHERE bp.payment_status = 'paid' AND bp.participant_type != 'guest'), 0)::int AS booking_revenue_cents,
+            COALESCE(SUM(bp.cached_fee_cents) FILTER (WHERE bp.payment_status = 'paid' AND bp.participant_type = 'guest'), 0)::int AS guest_revenue_cents
           FROM booking_sessions bs
           INNER JOIN booking_participants bp ON bp.session_id = bs.id
           WHERE bs.session_date >= CURRENT_DATE - INTERVAL '6 months'
@@ -153,8 +154,7 @@ router.get('/api/analytics/extended-stats', isStaffOrAdmin, async (_req: Request
         ledger_rev AS (
           SELECT
             TO_CHAR(DATE_TRUNC('month', bs.session_date::date), 'YYYY-MM') AS month,
-            COALESCE(SUM(ul.overage_fee::numeric * 100), 0)::int AS overage_revenue_cents,
-            COALESCE(SUM(ul.guest_fee::numeric * 100), 0)::int AS guest_revenue_cents
+            COALESCE(SUM(ul.overage_fee::numeric * 100), 0)::int AS overage_revenue_cents
           FROM booking_sessions bs
           INNER JOIN usage_ledger ul ON ul.session_id = bs.id
           WHERE bs.session_date >= CURRENT_DATE - INTERVAL '6 months'
@@ -162,9 +162,9 @@ router.get('/api/analytics/extended-stats', isStaffOrAdmin, async (_req: Request
         )
         SELECT
           COALESCE(p.month, l.month) AS month,
-          COALESCE(p.participant_revenue_cents, 0)::int AS participant_revenue_cents,
-          COALESCE(l.overage_revenue_cents, 0)::int AS overage_revenue_cents,
-          COALESCE(l.guest_revenue_cents, 0)::int AS guest_revenue_cents
+          COALESCE(p.booking_revenue_cents, 0)::int AS participant_revenue_cents,
+          COALESCE(p.guest_revenue_cents, 0)::int AS guest_revenue_cents,
+          COALESCE(l.overage_revenue_cents, 0)::int AS overage_revenue_cents
         FROM participant_rev p
         FULL OUTER JOIN ledger_rev l ON p.month = l.month
         ORDER BY month
