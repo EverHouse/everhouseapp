@@ -202,3 +202,25 @@ All notable changes to the Ever Club Members App are documented here.
 - **Archived User Protection**: Both sync functions skip any local user where `archived_at IS NOT NULL`. Only manual staff action can un-archive a user — HubSpot sync cannot resurrect archived records.
 - **Non-Transacting Safety Net**: New contacts with dead statuses and no Mindbody ID are not imported into the users table (secondary guard behind API-level filter).
 - **Dev Stripe Check Suppression**: In non-production environments, the "Billing Provider Hybrid State" integrity check skips the `billing_provider='stripe' AND stripe_subscription_id IS NULL` condition — Stripe env validation clears production subscription IDs in test mode, making this check produce false positives.
+
+## [8.69.0] - 2026-02-16
+
+### Codebase Modularization
+- **Backend Modular Splits**: Large monolithic files split into sub-module directories with barrel re-exports (all external import paths unchanged):
+  - `server/core/stripe/webhooks/` — Webhook dispatcher + 8 handler files (was `webhooks.ts`, 6,149 lines)
+  - `server/core/trackman/` — CSV import pipeline in 7 files (was `trackmanImport.ts`, 4,213 lines)
+  - `server/routes/trackman/admin.ts` — Split into `admin-resolution.ts`, `admin-roster.ts`, `admin-maintenance.ts` (was 4,040 lines)
+  - `server/core/integrity/` — Data integrity checks in 8 files (was `dataIntegrity.ts`, 3,891 lines)
+  - `server/routes/stripe/payments.ts` — Split into `booking-fees.ts`, `quick-charge.ts`, `payment-admin.ts`, `financial-reports.ts` (was 3,160 lines)
+  - `server/core/resource/` — Resource service in 6 files (was `resourceService.ts`, 2,566 lines)
+  - `server/routes/dataTools/` — 5 sub-routers: `member-sync.ts`, `booking-tools.ts`, `audit.ts`, `stripe-tools.ts`, `maintenance.ts` (was `dataTools.ts`, 2,683 lines)
+- **Frontend Modular Splits**:
+  - `src/pages/Admin/tabs/dataIntegrity/` — 6 sub-components + hooks (was `DataIntegrityTab.tsx`, 2,314 lines)
+  - `src/pages/Admin/tabs/directory/` — 9 sub-components + hooks (was `DirectoryTab.tsx`, 2,233 lines)
+  - `src/components/admin/memberBilling/` — 11 sub-components + hooks (was `MemberBillingTab.tsx`, 2,130 lines)
+
+### WebSocket & Safety Fixes
+- **WebSocket Zombie Prevention**: Client-side `useWebSocket` hook uses `intentionalCloseRef` + stale-socket guard (`wsRef.current === ws`) to prevent zombie reconnection loops on unmount or rapid email changes.
+- **Rate Limiter Crash Fix**: Rate limiter key generators use `String()` coercion before `.toLowerCase()` to prevent TypeError crashes from non-string input.
+- **Event Loop Cleanup**: In-memory lock cleanup interval uses `.unref()` to avoid pinning the event loop on server shutdown.
+- **Advisory Lock Safety**: `ensureSessionForBooking` uses `pg_advisory_xact_lock` when an external client (in-transaction) is passed to prevent lock leaks in aborted transactions; session-level `pg_advisory_lock` with explicit unlock when managing its own client.

@@ -134,7 +134,7 @@ export const changelog: ChangelogEntry[] = [
   },
   {
     version: "8.76.0",
-    date: "2026-03-05",
+    date: "2026-03-01",
     title: "Concurrency & Data Integrity Fixes",
     changes: [
       "Fix: Waitlist promotions now use proper database locking — two simultaneous cancellations can no longer promote the same waitlisted member, skipping the next person in line",
@@ -145,7 +145,7 @@ export const changelog: ChangelogEntry[] = [
   },
   {
     version: "8.75.0",
-    date: "2026-03-05",
+    date: "2026-02-28",
     title: "Security & Reliability Audit Fixes",
     changes: [
       "Fix: Rate limiting corrected — logged-in users now get the higher request allowance, anonymous users get the lower limit (was accidentally reversed)",
@@ -163,7 +163,7 @@ export const changelog: ChangelogEntry[] = [
   },
   {
     version: "8.74.0",
-    date: "2026-03-05",
+    date: "2026-02-26",
     title: "Admin Settings Expansion",
     changes: [
       "Feature: Contact info, social media links, and display hours are now editable from Admin Settings — no more code changes needed to update phone, email, address, or operating hours",
@@ -175,11 +175,62 @@ export const changelog: ChangelogEntry[] = [
   },
   {
     version: "8.73.0",
-    date: "2026-03-05",
+    date: "2026-02-24",
     title: "Booking Ownership & Revert Fixes",
     changes: [
       "Fix: Booking header now shows the correct owner name when a member is linked to an empty owner slot — previously the header retained the original Trackman import name while the roster showed the new owner",
       "Fix: Reverting a booking from attended/checked-in back to approved no longer fails with an error — resolved a database type issue that blocked the status change",
+    ]
+  },
+  {
+    version: "8.72.0",
+    date: "2026-02-22",
+    title: "Staff Admin UX Robustness",
+    changes: [
+      "Improvement: Resume subscription button now opens a confirmation dialog instead of firing immediately — prevents accidental resumption of paused subscriptions",
+      "Improvement: Billing source changes now show a confirmation dialog with current and new source before executing — prevents accidental billing source switches",
+      "Fix: Rapid tier changes now sync only the final tier to HubSpot — changing A to B to C results in one sync instead of three, eliminating stale overwrites",
+      "Improvement: Member profile drawer warns staff when closing with unsaved notes or communication drafts",
+      "Fix: All billing action buttons are properly disabled while processing — prevents double-click issues",
+      "Improvement: Bug reports, discounts, and application pipeline now use consistent success/error feedback across all staff actions",
+    ]
+  },
+  {
+    version: "8.71.0",
+    date: "2026-02-20",
+    title: "HubSpot Webhook-First Sync",
+    isMajor: true,
+    changes: [
+      "Feature: HubSpot contact changes now sync to the app in real-time via webhooks — no more 5-minute delays waiting for a polling cycle",
+      "Improvement: Profile fields from HubSpot (name, phone, address, date of birth, preferences) fill in automatically without overwriting existing data",
+      "Improvement: Full member reconciliation moved from daily to weekly — webhooks handle real-time updates, the weekly sync is a safety net",
+      "Cleanup: Removed the 5-minute incremental polling system — webhooks are faster and more reliable",
+    ]
+  },
+  {
+    version: "8.70.0",
+    date: "2026-02-18",
+    title: "HubSpot Sync Improvements",
+    changes: [
+      "Fix: Adding or updating contacts in HubSpot now correctly sets lifecycle stages without accidentally downgrading customers to leads",
+      "Fix: Day pass purchasers are properly promoted in HubSpot — dead lifecycle stages are refreshed without downgrading active members",
+      "Fix: Member name is now looked up from the database before syncing to HubSpot — prevents blank names in CRM records",
+      "Improvement: HubSpot sync now filters out archived and terminated contacts at the API level — reduces unnecessary data processing",
+      "Fix: Archived users are protected from being accidentally reactivated by HubSpot sync",
+    ]
+  },
+  {
+    version: "8.69.0",
+    date: "2026-02-16",
+    title: "Codebase Modularization & WebSocket Safety",
+    isMajor: true,
+    changes: [
+      "Improvement: Large server files split into organized sub-modules for better maintainability — Stripe webhooks, Trackman import, data integrity, payments, resource service, and data tools are now in dedicated directories",
+      "Improvement: Large frontend files split into focused sub-components — data integrity, member directory, and member billing tabs are now easier to navigate and maintain",
+      "Fix: WebSocket connections no longer create phantom reconnection loops when switching between accounts or closing the app quickly",
+      "Fix: Rate limiter no longer crashes on unexpected input types — handles non-string values gracefully",
+      "Fix: Background cleanup timers no longer prevent the server from shutting down cleanly",
+      "Fix: Database advisory locks now use the correct lock type based on context — prevents lock leaks in aborted transactions",
     ]
   },
   {
