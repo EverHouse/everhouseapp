@@ -55,6 +55,8 @@ export interface BookingRequest {
   staff_notes: string | null;
   suggested_time: string | null;
   created_at: string;
+  is_linked_member?: boolean;
+  primary_booker_name?: string | null;
 }
 
 export interface Closure {

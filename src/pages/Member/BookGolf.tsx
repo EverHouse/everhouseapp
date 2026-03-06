@@ -605,7 +605,8 @@ const BookGolf: React.FC = () => {
     const existingBayBooking = myRequests.find(r => 
       r.request_date === selectedDateObj.date &&
       (r.status === 'approved' || r.status === 'pending') &&
-      !r.notes?.includes('Conference room booking')
+      !r.notes?.includes('Conference room booking') &&
+      !r.is_linked_member
     );
     
     setExistingDayBooking(existingBayBooking || null);
@@ -616,7 +617,8 @@ const BookGolf: React.FC = () => {
     return myRequests.find(r => 
       r.request_date === selectedDateObj.date &&
       (r.status === 'approved' || r.status === 'pending') &&
-      !r.notes?.includes('Conference room booking')
+      !r.notes?.includes('Conference room booking') &&
+      !r.is_linked_member
     ) || null;
   }, [selectedDateObj, myRequests]);
 
