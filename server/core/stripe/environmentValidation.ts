@@ -1,9 +1,63 @@
+import Stripe from 'stripe';
 import { getStripeClient, getStripeEnvironmentInfo } from './client';
+import { upsertTransactionCache } from './webhooks';
 import { db } from '../../db';
 import { sql } from 'drizzle-orm';
 import { getErrorMessage, getErrorCode } from '../../utils/errorUtils';
 
 import { logger } from '../logger';
+
+async function backfillTransactionCacheInBackground(stripe: Stripe): Promise<void> {
+  const daysBack = 180;
+  const startDate = Math.floor((Date.now() - (daysBack * 24 * 60 * 60 * 1000)) / 1000);
+  let processed = 0;
+
+  logger.info(`[Stripe Env] Auto-backfilling transaction cache (${daysBack} days)...`);
+
+  let hasMore = true;
+  let startingAfter: string | undefined;
+
+  while (hasMore) {
+    const params: Stripe.PaymentIntentListParams = {
+      limit: 100,
+      created: { gte: startDate },
+      expand: ['data.customer'],
+    };
+    if (startingAfter) params.starting_after = startingAfter;
+
+    const page = await stripe.paymentIntents.list(params);
+
+    for (const pi of page.data) {
+      if (pi.status !== 'succeeded' && pi.status !== 'requires_capture') continue;
+      const customer = pi.customer as Stripe.Customer | null;
+      await upsertTransactionCache({
+        stripeId: pi.id,
+        objectType: 'payment_intent',
+        amountCents: pi.amount,
+        currency: pi.currency || 'usd',
+        status: pi.status,
+        createdAt: new Date(pi.created * 1000),
+        customerId: typeof pi.customer === 'string' ? pi.customer : customer?.id,
+        customerEmail: customer?.email || pi.receipt_email || pi.metadata?.email,
+        customerName: customer?.name || pi.metadata?.memberName,
+        description: pi.description || pi.metadata?.productName || 'Stripe payment',
+        metadata: pi.metadata,
+        source: 'backfill',
+        paymentIntentId: pi.id,
+      });
+      processed++;
+    }
+
+    hasMore = page.has_more;
+    if (page.data.length > 0) {
+      startingAfter = page.data[page.data.length - 1].id;
+    }
+    if (hasMore) await new Promise(resolve => setTimeout(resolve, 100));
+  }
+
+  logger.info(`[Stripe Env] Auto-backfill complete: ${processed} payment intents cached`);
+}
+
 export async function validateStripeEnvironmentIds(): Promise<void> {
   try {
     const stripe = await getStripeClient();
@@ -133,6 +187,9 @@ export async function validateStripeEnvironmentIds(): Promise<void> {
         await db.execute(sql`TRUNCATE TABLE stripe_transaction_cache`);
         transactionCacheCleared = true;
         logger.info(`[Stripe Env] Cleared transaction cache (environment change detected)`);
+        backfillTransactionCacheInBackground(stripe).catch((err: unknown) => {
+          logger.error('[Stripe Env] Background cache backfill failed', { extra: { detail: getErrorMessage(err) } });
+        });
       } catch (truncateErr: unknown) {
         logger.warn(`[Stripe Env] Could not clear transaction cache:`, { extra: { detail: getErrorMessage(truncateErr) } });
       }
@@ -142,7 +199,7 @@ export async function validateStripeEnvironmentIds(): Promise<void> {
     logger.info(`[Stripe Env] Environment validation complete (${mode} mode):
   - Tiers: ${tiersChecked} checked, ${tiersCleared} stale IDs cleared
   - Cafe items: ${cafeChecked} checked, ${cafeCleared} stale IDs cleared
-  - User subscriptions: ${subsChecked} checked, ${subsCleared} stale IDs cleared${transactionCacheCleared ? '\n  - Transaction cache: cleared' : ''}`);
+  - User subscriptions: ${subsChecked} checked, ${subsCleared} stale IDs cleared${transactionCacheCleared ? '\n  - Transaction cache: cleared (backfill started)' : ''}`);
 
     if (clearedSubscriptionTierCount > 0) {
       logger.warn(`[STARTUP WARNING] ⚠️ ${clearedSubscriptionTierCount} subscription tiers lost their Stripe product links due to environment change. Run "Sync to Stripe" from Products & Pricing before member signups will work.`);
