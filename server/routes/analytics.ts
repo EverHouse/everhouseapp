@@ -154,12 +154,15 @@ router.get('/api/analytics/extended-stats', isStaffOrAdmin, async (_req: Request
             TO_CHAR(DATE_TRUNC('month', created_at), 'YYYY-MM') AS month,
             CASE
               WHEN metadata->>'purpose' = 'overage_fee' THEN 'overage'
-              WHEN metadata->>'purpose' = 'booking_fee' THEN 'booking'
-              WHEN metadata->>'purpose' = 'one_time_purchase' THEN 'pos_sale'
+              WHEN metadata->>'purpose' = 'booking_fee'
+                OR metadata->>'paymentType' = 'booking_fee' THEN 'booking'
+              WHEN metadata->>'purpose' = 'one_time_purchase'
+                OR metadata->>'source' = 'pos' THEN 'pos_sale'
               WHEN metadata->>'paymentType' = 'subscription_terminal'
                 OR metadata->>'source' = 'membership_inline_payment'
-                OR description ILIKE '%subscription%' THEN 'subscription'
-              WHEN description ILIKE '%payment for invoice%' THEN 'subscription'
+                OR description ILIKE '%subscription%'
+                OR description ILIKE '%payment for invoice%' THEN 'subscription'
+              WHEN description ILIKE '%overage%' THEN 'overage'
               ELSE 'other'
             END AS category,
             amount_cents
