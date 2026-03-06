@@ -50,6 +50,7 @@ export function TerminalPayment({
   const [setupIntentId, setSetupIntentId] = useState<string | null>(null);
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const successTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const paymentIntentIdRef = useRef<string | null>(null);
   const selectedReaderRef = useRef<string>('');
   const processingRef = useRef(false);
@@ -123,6 +124,10 @@ export function TerminalPayment({
     return () => {
       clearPollingRef();
       clearTimeoutRef();
+      if (successTimeoutRef.current) {
+        clearTimeout(successTimeoutRef.current);
+        successTimeoutRef.current = null;
+      }
       if (processingRef.current && selectedReaderRef.current) {
         const readerId = selectedReaderRef.current;
         const piId = paymentIntentIdRef.current;
@@ -170,7 +175,8 @@ export function TerminalPayment({
         processingRef.current = false;
         setStatus('success');
         setStatusMessage('Payment successful!');
-        setTimeout(() => {
+        if (successTimeoutRef.current) clearTimeout(successTimeoutRef.current);
+        successTimeoutRef.current = setTimeout(() => {
           onSuccess(piId);
         }, 1500);
       } else if (data.status === 'canceled') {
@@ -236,7 +242,8 @@ export function TerminalPayment({
         }
         setStatus('success');
         setStatusMessage('Card saved successfully!');
-        setTimeout(() => {
+        if (successTimeoutRef.current) clearTimeout(successTimeoutRef.current);
+        successTimeoutRef.current = setTimeout(() => {
           onSuccess(siId);
         }, 1500);
       } else if (data.status === 'canceled') {
@@ -331,7 +338,8 @@ export function TerminalPayment({
       if (data.freeActivation) {
         setStatus('success');
         setStatusMessage('No payment needed — $0 subscription activated!');
-        setTimeout(() => {
+        if (successTimeoutRef.current) clearTimeout(successTimeoutRef.current);
+        successTimeoutRef.current = setTimeout(() => {
           onSuccess(data.paymentIntentId || 'free');
         }, 1500);
         return;
@@ -367,6 +375,10 @@ export function TerminalPayment({
     setCanceling(true);
     clearPollingRef();
     clearTimeoutRef();
+    if (successTimeoutRef.current) {
+      clearTimeout(successTimeoutRef.current);
+      successTimeoutRef.current = null;
+    }
 
     if (selectedReader && processing) {
       try {
@@ -382,7 +394,8 @@ export function TerminalPayment({
           setStatus('success');
           setStatusMessage('Payment already processed successfully!');
           setCanceling(false);
-          setTimeout(() => {
+          if (successTimeoutRef.current) clearTimeout(successTimeoutRef.current);
+          successTimeoutRef.current = setTimeout(() => {
             onSuccess(paymentIntentId!);
           }, 1500);
           return;

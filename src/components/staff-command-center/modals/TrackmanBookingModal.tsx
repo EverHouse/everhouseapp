@@ -101,6 +101,8 @@ export function TrackmanBookingModal({
   const [autoConfirmedId, setAutoConfirmedId] = useState<string | null>(null);
   const [showSuccessOverlay, setShowSuccessOverlay] = useState(false);
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const overlayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
 
@@ -115,6 +117,14 @@ export function TrackmanBookingModal({
       if (closeTimerRef.current) {
         clearTimeout(closeTimerRef.current);
         closeTimerRef.current = null;
+      }
+      if (overlayTimerRef.current) {
+        clearTimeout(overlayTimerRef.current);
+        overlayTimerRef.current = null;
+      }
+      if (copyTimerRef.current) {
+        clearTimeout(copyTimerRef.current);
+        copyTimerRef.current = null;
       }
       return;
     }
@@ -143,7 +153,7 @@ export function TrackmanBookingModal({
           setAutoConfirmedId(String(trackmanId));
         }
         setAutoApproved(true);
-        setTimeout(() => setShowSuccessOverlay(true), 50);
+        overlayTimerRef.current = setTimeout(() => setShowSuccessOverlay(true), 50);
         closeTimerRef.current = setTimeout(() => {
           onCloseRef.current();
         }, 3500);
@@ -153,6 +163,14 @@ export function TrackmanBookingModal({
     window.addEventListener('booking-auto-confirmed', handleAutoConfirmed as EventListener);
     return () => {
       window.removeEventListener('booking-auto-confirmed', handleAutoConfirmed as EventListener);
+      if (closeTimerRef.current) {
+        clearTimeout(closeTimerRef.current);
+        closeTimerRef.current = null;
+      }
+      if (overlayTimerRef.current) {
+        clearTimeout(overlayTimerRef.current);
+        overlayTimerRef.current = null;
+      }
     };
   }, [isOpen, booking]);
 
@@ -211,7 +229,8 @@ export function TrackmanBookingModal({
     try {
       await navigator.clipboard.writeText(notesText);
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+      copyTimerRef.current = setTimeout(() => setCopied(false), 2000);
     } catch (err: unknown) {
       console.error('Failed to copy:', err);
     }
@@ -263,7 +282,7 @@ export function TrackmanBookingModal({
       await onDevConfirm(booking.id);
       setAutoConfirmedId(`DEV-${booking.id}`);
       setAutoApproved(true);
-      setTimeout(() => setShowSuccessOverlay(true), 50);
+      overlayTimerRef.current = setTimeout(() => setShowSuccessOverlay(true), 50);
       closeTimerRef.current = setTimeout(() => {
         onCloseRef.current();
       }, 3500);
@@ -282,6 +301,14 @@ export function TrackmanBookingModal({
     if (closeTimerRef.current) {
       clearTimeout(closeTimerRef.current);
       closeTimerRef.current = null;
+    }
+    if (overlayTimerRef.current) {
+      clearTimeout(overlayTimerRef.current);
+      overlayTimerRef.current = null;
+    }
+    if (copyTimerRef.current) {
+      clearTimeout(copyTimerRef.current);
+      copyTimerRef.current = null;
     }
     onClose();
   }, [onClose]);
