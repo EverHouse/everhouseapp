@@ -6,6 +6,7 @@ import { logger } from '../core/logger';
 const SYNC_HOUR = 3;
 const SYNC_DAY = 0; // Sunday
 let currentTimeoutId: NodeJS.Timeout | null = null;
+let isRunning = false;
 
 function getMillisecondsUntilNextSunday3amPacific(): number {
   const parts = getPacificDateParts();
@@ -29,6 +30,13 @@ function getMillisecondsUntilNextSunday3amPacific(): number {
 }
 
 async function runWeeklyMemberSync(): Promise<void> {
+  if (isRunning) {
+    logger.info('[MemberSync] Skipping run — previous sync still in progress');
+    const nextRun = getMillisecondsUntilNextSunday3amPacific();
+    currentTimeoutId = setTimeout(runWeeklyMemberSync, nextRun);
+    return;
+  }
+  isRunning = true;
   logger.info('[MemberSync] Starting weekly reconciliation sync...');
   try {
     const result = await syncAllMembersFromHubSpot();
@@ -38,6 +46,8 @@ async function runWeeklyMemberSync(): Promise<void> {
   } catch (err: unknown) {
     logger.error('[MemberSync] Weekly reconciliation failed:', { error: err as Error });
     schedulerTracker.recordRun('Member Sync', false, String(err));
+  } finally {
+    isRunning = false;
   }
   
   const nextRun = getMillisecondsUntilNextSunday3amPacific();
@@ -47,6 +57,10 @@ async function runWeeklyMemberSync(): Promise<void> {
 }
 
 export function startMemberSyncScheduler(): void {
+  if (currentTimeoutId) {
+    logger.info('[MemberSync] Scheduler already running');
+    return;
+  }
   const msUntilSync = getMillisecondsUntilNextSunday3amPacific();
   const days = Math.round(msUntilSync / 1000 / 60 / 60 / 24);
   

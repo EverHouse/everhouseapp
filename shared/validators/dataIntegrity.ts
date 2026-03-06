@@ -18,7 +18,7 @@ export const syncPushPullSchema = z.preprocess(
       return {
         issue_key: obj.issue_key || obj.issueKey,
         target: obj.target,
-        user_id: rawUserId != null ? String(rawUserId) : undefined,
+        user_id: rawUserId != null ? Number(rawUserId) : undefined,
         hubspot_contact_id: obj.hubspot_contact_id || obj.hubspotContactId,
         stripe_customer_id: obj.stripe_customer_id || obj.stripeCustomerId,
       };
@@ -27,8 +27,8 @@ export const syncPushPullSchema = z.preprocess(
   },
   z.object({
     issue_key: z.string().min(1, 'issue_key is required'),
-    target: z.enum(['hubspot', 'calendar', 'stripe'], { message: 'Valid target (hubspot, calendar, or stripe) is required' }),
-    user_id: z.string().optional(),
+    target: z.enum(['hubspot', 'stripe'], { message: 'Valid target (hubspot or stripe) is required' }),
+    user_id: z.number().optional(),
     hubspot_contact_id: z.string().optional(),
     stripe_customer_id: z.string().optional(),
   })

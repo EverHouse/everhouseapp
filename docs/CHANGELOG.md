@@ -11,7 +11,8 @@ All notable changes to the Ever Club Members App are documented here.
 - **Scheduler Startup Safety**: `staggerStart()` in `schedulers/index.ts` now wraps each scheduler start in try/catch so a single scheduler failure doesn't prevent the rest from starting.
 - **Background Sync Tracking**: `backgroundSyncScheduler.ts` now calls `schedulerTracker.recordRun()` on success for accurate health dashboard reporting.
 - **Supabase Realtime Gap Fixes (6 issues)**: Corrected React Query cache invalidation keys (`['bookings']`, `['command-center']`, `['trackman']`, `['simulator']`, `['announcements']`), added reconnection-triggered cache invalidation, recovery timer cleanup on disconnect, and initial heartbeat timer tracking in `supabaseHeartbeatScheduler`.
-- **Data Integrity Sync Fixes**: Fixed Zod schema validation for data integrity sync targets (`'hubspot'`, `'calendar'`, `'stripe'`), corrected `user_id` type mismatch, and fixed Stripe handler push/pull sync implementation.
+- **Data Integrity Sync Fixes**: Fixed Zod schema validation — `user_id` type corrected from `string` to `number` to match DB column type, removed unsupported `'calendar'` sync target from validator (backend only supports `'hubspot'` and `'stripe'`), and fixed Stripe handler push/pull sync implementation.
+- **Member Sync Overlap Guard**: Added `isRunning` flag and double-start protection to `memberSyncScheduler.ts` — the last scheduler without overlap protection. Now all 25 schedulers are fully guarded.
 
 ## [8.77.5] - 2026-03-05
 

@@ -84,7 +84,7 @@ export async function getAuditLog(limit: number = 10): Promise<Array<{
 
 export interface SyncPushParams {
   issueKey: string;
-  target: 'hubspot' | 'calendar' | 'stripe';
+  target: 'hubspot' | 'stripe';
   userId?: number;
   hubspotContactId?: string;
   stripeCustomerId?: string;
@@ -92,7 +92,7 @@ export interface SyncPushParams {
 
 export interface SyncPullParams {
   issueKey: string;
-  target: 'hubspot' | 'calendar' | 'stripe';
+  target: 'hubspot' | 'stripe';
   userId?: number;
   hubspotContactId?: string;
   stripeCustomerId?: string;
