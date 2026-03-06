@@ -110,6 +110,10 @@ router.get('/api/analytics/extended-stats', isStaffOrAdmin, async (_req: Request
           COUNT(DISTINCT br.user_email) FILTER (WHERE br.request_date >= CURRENT_DATE - INTERVAL '60 days')::int AS active_60,
           COUNT(DISTINCT br.user_email) FILTER (WHERE br.request_date >= CURRENT_DATE - INTERVAL '90 days')::int AS active_90
         FROM booking_requests br
+        INNER JOIN users u ON u.email = br.user_email
+          AND u.role = 'member'
+          AND u.membership_status IN ('active', 'trialing', 'past_due')
+          AND u.archived_at IS NULL
         WHERE br.status NOT IN ('cancelled', 'declined')
       `),
 
@@ -253,8 +257,14 @@ router.get('/api/analytics/extended-stats', isStaffOrAdmin, async (_req: Request
         overageRevenue: Math.round(r.overage_revenue_cents) / 100,
         guestRevenue: Math.round(r.guest_revenue_cents) / 100,
       })),
-      bookingsOverTime: bookingsOverTimeResult.rows as { week_start: string; booking_count: number }[],
-      dayOfWeekBreakdown: (dayOfWeekResult.rows as { day_of_week: number; booking_count: number }[]),
+      bookingsOverTime: (bookingsOverTimeResult.rows as { week_start: string; booking_count: number }[]).map(r => ({
+        weekStart: r.week_start,
+        bookingCount: r.booking_count,
+      })),
+      dayOfWeekBreakdown: (dayOfWeekResult.rows as { day_of_week: number; booking_count: number }[]).map(r => ({
+        dayOfWeek: r.day_of_week,
+        bookingCount: r.booking_count,
+      })),
       utilizationByHour: (utilizationResult.rows as { hour_slot: number; booked_count: number; utilization_pct: number }[]).map(r => ({
         hourSlot: r.hour_slot,
         bookedCount: r.booked_count,

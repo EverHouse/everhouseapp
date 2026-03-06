@@ -65,13 +65,13 @@ interface RevenueEntry {
 }
 
 interface BookingsOverTimeEntry {
-  week_start: string;
-  booking_count: number;
+  weekStart: string;
+  bookingCount: number;
 }
 
 interface DayOfWeekEntry {
-  day_of_week: number;
-  booking_count: number;
+  dayOfWeek: number;
+  bookingCount: number;
 }
 
 interface UtilizationEntry {
@@ -444,8 +444,8 @@ const BookingsOverTimeChart: React.FC<{ data: BookingsOverTimeEntry[] }> = ({ da
   }
 
   const chartData = data.map(d => ({
-    week: new Date(d.week_start).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-    count: d.booking_count,
+    week: new Date(d.weekStart).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+    count: d.bookingCount,
   }));
 
   return (
@@ -478,8 +478,8 @@ const DayOfWeekChart: React.FC<{ data: DayOfWeekEntry[] }> = ({ data }) => {
   }
 
   const allDays = DAY_LABELS.map((label, idx) => {
-    const entry = data.find(d => Number(d.day_of_week) === idx);
-    return { day: label, count: entry ? entry.booking_count : 0 };
+    const entry = data.find(d => Number(d.dayOfWeek) === idx);
+    return { day: label, count: entry ? entry.bookingCount : 0 };
   });
 
   const maxCount = Math.max(...allDays.map(d => d.count), 1);
