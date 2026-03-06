@@ -543,7 +543,7 @@ router.post('/api/booking-requests', isAuthenticated, bookingRateLimiter, valida
         });
       }
       
-      // Check for time slot overlap
+      // Check for time slot overlap on the same resource
       if (resource_id) {
         const overlapCheck = await client.query(
           `SELECT id, start_time, end_time FROM booking_requests 
@@ -566,6 +566,39 @@ router.post('/api/booking-requests', isAuthenticated, bookingRateLimiter, valida
             : 'This time slot is already booked';
           
           return res.status(409).json({ error: errorMsg });
+        }
+      }
+      
+      // Check if member already has a personal time conflict (owned or participant booking at overlapping time)
+      if (!isStaffRequest || isViewAsMode) {
+        const memberOverlapCheck = await client.query(
+          `SELECT br.id, br.start_time, br.end_time, r.name AS resource_name
+           FROM booking_requests br
+           LEFT JOIN resources r ON r.id = br.resource_id
+           WHERE br.request_date = $1
+           AND br.status IN ('pending', 'pending_approval', 'approved', 'confirmed', 'attended')
+           AND br.start_time < $3 AND br.end_time > $2
+           AND (
+             LOWER(br.user_email) = LOWER($4)
+             OR br.session_id IN (
+               SELECT bp.session_id FROM booking_participants bp
+               JOIN users u ON bp.user_id = u.id
+               WHERE LOWER(u.email) = LOWER($4)
+             )
+           )`,
+          [request_date, start_time, end_time, requestEmail]
+        );
+        
+        if (memberOverlapCheck.rows.length > 0) {
+          const conflict = memberOverlapCheck.rows[0];
+          const conflictStart = conflict.start_time?.substring(0, 5);
+          const conflictEnd = conflict.end_time?.substring(0, 5);
+          const conflictResource = conflict.resource_name || 'another booking';
+          await client.query('ROLLBACK');
+          
+          return res.status(409).json({
+            error: `You already have a booking at ${conflictResource} from ${formatTime12Hour(conflictStart)} to ${formatTime12Hour(conflictEnd)}. You cannot book overlapping time slots.`
+          });
         }
       }
       
