@@ -363,8 +363,10 @@ export async function computeFeeBreakdown(params: FeeComputeParams): Promise<Fee
   
   const resolvedHostEmail = await resolveToEmail(hostEmail);
   const hostTier = await getMemberTierByEmail(resolvedHostEmail);
-  const hostTierLimits = hostTier ? await getTierLimits(hostTier) : null;
-  const guestPassInfo = await getGuestPassInfo(resolvedHostEmail, hostTier || undefined);
+  const [hostTierLimits, guestPassInfo] = await Promise.all([
+    hostTier ? getTierLimits(hostTier) : Promise.resolve(null),
+    getGuestPassInfo(resolvedHostEmail, hostTier || undefined),
+  ]);
   
   let guestPassesRemaining = guestPassInfo.remaining;
   const guestPassesAvailable = guestPassInfo.remaining;

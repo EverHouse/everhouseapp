@@ -119,7 +119,9 @@ router.post('/api/stripe/staff/quick-charge', isStaffOrAdmin, validateBody(quick
            VALUES (${'guest-pos-' + Date.now()}, ${paymentIntent.id}, ${null}, ${Math.round(numericAmount)}, 'one_time_purchase', ${finalDescription}, 'pending', ${productId || null}, ${finalProductName || null})
            ON CONFLICT (stripe_payment_intent_id) DO NOTHING`);
       } catch (dbErr: unknown) {
-        logger.warn('[GuestCheckout] Non-blocking: Could not save local payment record', { extra: { dbErr: getErrorMessage(dbErr) } });
+        logger.error('[GuestCheckout] CRITICAL: Payment record insert failed — Stripe charge exists without local record', {
+          extra: { paymentIntentId: paymentIntent.id, amountCents: numericAmount, description: finalDescription, dbErr: getErrorMessage(dbErr) }
+        });
       }
 
       logFromRequest(req, 'initiate_charge', 'payment', paymentIntent.id, 'guest-checkout', {
@@ -272,7 +274,9 @@ router.post('/api/stripe/staff/quick-charge', isStaffOrAdmin, validateBody(quick
              VALUES (${dbUserId}, ${invoiceResult.paymentIntentId}, ${stripeCustomerId}, ${Math.round(numericAmount)}, 'one_time_purchase', ${finalDescription}, 'pending', ${productId || null}, ${finalProductName || null})
              ON CONFLICT (stripe_payment_intent_id) DO NOTHING`);
         } catch (dbErr: unknown) {
-          logger.warn('[QuickCharge] Non-blocking: Could not save local payment record', { extra: { dbErr: getErrorMessage(dbErr) } });
+          logger.error('[QuickCharge] CRITICAL: Payment record insert failed — Stripe charge exists without local record', {
+            extra: { paymentIntentId: invoiceResult.paymentIntentId, userId: dbUserId, amountCents: numericAmount, description: finalDescription, dbErr: getErrorMessage(dbErr) }
+          });
         }
 
         logFromRequest(req, 'initiate_charge', 'payment', invoiceResult.paymentIntentId, customerEmail, {

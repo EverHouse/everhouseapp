@@ -376,7 +376,9 @@ router.post('/api/stripe/terminal/process-payment', isStaffOrAdmin, async (req: 
            VALUES (${userId}, ${paymentIntent.id}, ${customerId || null}, ${Math.round(amount)}, ${isBookingFee ? 'booking_fee' : 'one_time_purchase'}, ${finalDescription}, 'pending', ${null}, ${metadata?.items || null}, ${bookingIdVal}, ${sessionIdVal})
            ON CONFLICT (stripe_payment_intent_id) DO NOTHING`);
       } catch (dbErr: unknown) {
-        logger.warn('[Terminal] Non-blocking: Could not save local payment record', { extra: { dbErr: getErrorMessage(dbErr) } });
+        logger.error('[Terminal] CRITICAL: Payment record insert failed — Stripe charge exists without local record', {
+          extra: { paymentIntentId: paymentIntent.id, amount, description: finalDescription, dbErr: getErrorMessage(dbErr) }
+        });
       }
     }
 

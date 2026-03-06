@@ -137,6 +137,8 @@ The following large files have been split into sub-modules with barrel re-export
 
 ### Performance Optimization (v8.77.3)
 - **Booking List N+1 Elimination**: Consolidated 5 sequential `booking_participants` queries in `GET /api/booking-requests` into a single batch query with in-memory partitioning. Reduces database round-trips from ~6 to ~2 per booking list request, significantly improving response time for member and staff booking views.
+- **Fee Calculation Parallelization**: `computeFeeBreakdown` in `unifiedFeeService.ts` now runs `getTierLimits` and `getGuestPassInfo` concurrently via `Promise.all` instead of sequentially, shaving ~1 DB round-trip from every fee preview and check-in.
+- **Payment Record Error Escalation**: Silent `logger.warn` on payment record DB insert failures in `quick-charge.ts` (guest checkout + quick charge) and `terminal.ts` escalated to `logger.error` with `CRITICAL` tag and full payment context. These failures mean Stripe charged the customer but the local record is missing — now visible in error monitoring instead of buried in warnings.
 
 ### Bug & Stability Fixes (v8.77.2)
 - **TabTransition Timer Leak**: `TabTransition` component's `enterTimer` was created inside a `setTimeout` callback but never tracked for cleanup on unmount. Both exit and enter timers now stored in refs with proper cleanup in the `useEffect` return — prevents state updates on unmounted components during rapid tab switches.
