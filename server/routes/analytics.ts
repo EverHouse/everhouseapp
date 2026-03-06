@@ -330,6 +330,7 @@ router.get('/api/analytics/membership-insights', isStaffOrAdmin, async (_req: Re
           FROM users
           WHERE role = 'member'
             AND archived_at IS NULL
+            AND membership_status IN ('active', 'trialing', 'past_due')
             AND created_at >= DATE_TRUNC('month', CURRENT_DATE - INTERVAL '5 months')
           GROUP BY DATE_TRUNC('month', created_at)
         )
