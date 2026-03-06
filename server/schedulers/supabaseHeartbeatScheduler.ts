@@ -1,10 +1,10 @@
 import { schedulerTracker } from '../core/schedulerTracker';
 import { logger } from '../core/logger';
-import { isSupabaseConfigured, getSupabaseAdmin } from '../core/supabase/client';
+import { isSupabaseConfigured, getSupabaseAdmin, isRealtimeEnabled, resetSupabaseAvailability, enableRealtimeWithRetry } from '../core/supabase/client';
 
 let intervalId: NodeJS.Timeout | null = null;
 
-const HEARTBEAT_INTERVAL = 6 * 60 * 60 * 1000; // Every 6 hours
+const HEARTBEAT_INTERVAL = 6 * 60 * 60 * 1000;
 
 const HEARTBEAT_TIMEOUT = 10000;
 
@@ -31,6 +31,17 @@ async function runHeartbeat(): Promise<void> {
   }
 
   logger.info(`[Supabase Heartbeat] Ping successful - ${count ?? 0} users in Supabase`);
+
+  if (!isRealtimeEnabled()) {
+    logger.info('[Supabase Heartbeat] Realtime not enabled — attempting recovery...');
+    resetSupabaseAvailability();
+    const { successCount, total } = await enableRealtimeWithRetry();
+    if (successCount > 0) {
+      logger.info(`[Supabase Heartbeat] Realtime recovery succeeded (${successCount}/${total} tables)`);
+    } else {
+      logger.warn('[Supabase Heartbeat] Realtime recovery failed — will retry next heartbeat');
+    }
+  }
 }
 
 export function startSupabaseHeartbeatScheduler(): void {

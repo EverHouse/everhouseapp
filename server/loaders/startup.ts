@@ -4,7 +4,7 @@ import { getStripeSync } from '../core/stripe';
 import { getStripeEnvironmentInfo, getStripeClient } from '../core/stripe/client';
 import { runMigrations } from 'stripe-replit-sync';
 import type Stripe from 'stripe';
-import { enableRealtimeForTable } from '../core/supabase/client';
+import { enableRealtimeWithRetry } from '../core/supabase/client';
 import { initMemberSyncSettings } from '../core/memberSync';
 import { getErrorMessage } from '../utils/errorUtils';
 import { logger } from '../core/logger';
@@ -293,24 +293,15 @@ export async function runStartupTasks(): Promise<void> {
 
   try {
     logger.info('[Supabase] Enabling realtime for tables...');
-    const realtimeResults = await Promise.all([
-      enableRealtimeForTable('notifications'),
-      enableRealtimeForTable('booking_sessions'),
-      enableRealtimeForTable('announcements'),
-      enableRealtimeForTable('trackman_unmatched_bookings')
-    ]);
-    const successCount = realtimeResults.filter(Boolean).length;
-    if (successCount === realtimeResults.length) {
-      logger.info('[Supabase] Realtime enabled for notifications, booking_sessions, announcements, trackman_unmatched_bookings');
+    const { successCount, total } = await enableRealtimeWithRetry();
+    if (successCount === total) {
       startupHealth.realtime = 'ok';
     } else if (successCount > 0) {
-      logger.warn(`[Supabase] Realtime partially enabled (${successCount}/${realtimeResults.length} tables)`, { extra: { successCount, total: realtimeResults.length } });
       startupHealth.realtime = 'ok';
-      startupHealth.warnings.push(`Supabase realtime: only ${successCount}/${realtimeResults.length} tables enabled`);
+      startupHealth.warnings.push(`Supabase realtime: only ${successCount}/${total} tables enabled`);
     } else {
-      logger.warn('[Supabase] Realtime not enabled for any tables - check Supabase configuration');
       startupHealth.realtime = 'failed';
-      startupHealth.warnings.push('Supabase realtime: no tables enabled - check configuration');
+      startupHealth.warnings.push('Supabase realtime: no tables enabled - recovery scheduled');
     }
   } catch (err: unknown) {
     logger.error('[Supabase] Realtime setup failed', { error: err instanceof Error ? err : new Error(String(err)) });
