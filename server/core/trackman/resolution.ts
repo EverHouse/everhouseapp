@@ -195,7 +195,7 @@ async function insertBookingIfNotExists(
         message: `Your golf simulator booking for ${formattedDate} at ${formatTime(booking.startTime || '')} has been confirmed via Trackman.`,
         type: 'booking_approved'
       }
-    }).catch(err => process.stderr.write(`[Trackman] Booking event publish failed: ${err}\n`));
+    }).catch(err => logger.error(`[Trackman] Booking event publish failed`, { error: err instanceof Error ? err : new Error(String(err)) }));
   }
 
   return { inserted: true, finalStatus, bookingId };
@@ -311,7 +311,7 @@ export async function resolveUnmatchedBooking(
         message: `Your golf simulator booking has been confirmed.`,
         type: 'booking_approved'
       }
-    }).catch(err => process.stderr.write(`[Trackman Resolve] Booking event publish failed: ${err}\n`));
+    }).catch(err => logger.error(`[Trackman Resolve] Booking event publish failed`, { error: err instanceof Error ? err : new Error(String(err)) }));
   }
 
   let autoResolved = 0;
@@ -389,7 +389,7 @@ export async function resolveUnmatchedBooking(
             message: `Your golf simulator booking has been confirmed.`,
             type: 'booking_approved'
           }
-        }).catch(err => process.stderr.write(`[Trackman Resolve] Auto-resolved booking notification failed: ${err}\n`));
+        }).catch(err => logger.error(`[Trackman Resolve] Auto-resolved booking notification failed`, { error: err instanceof Error ? err : new Error(String(err)) }));
       }
 
       await db.update(trackmanUnmatchedBookings)

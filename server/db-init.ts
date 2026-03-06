@@ -396,56 +396,48 @@ export async function ensureDatabaseConstraints() {
       await db.execute(sql`
         DO $$
         BEGIN
-          IF NOT EXISTS (
-            SELECT 1 FROM pg_constraint WHERE conname = 'users_billing_provider_check'
-          ) THEN
-            ALTER TABLE users ADD CONSTRAINT users_billing_provider_check
-              CHECK (billing_provider IS NULL OR billing_provider IN ('stripe', 'mindbody', 'manual', 'comped', 'family_addon'));
-          END IF;
+          ALTER TABLE users DROP CONSTRAINT IF EXISTS users_billing_provider_check;
+          ALTER TABLE users ADD CONSTRAINT users_billing_provider_check
+            CHECK (billing_provider IS NULL OR billing_provider IN ('stripe', 'mindbody', 'manual', 'comped', 'family_addon', 'hubspot'));
         END $$;
       `);
       logger.info('[DB Init] Billing provider CHECK constraint created/verified');
-
-      const bookingSourceValues = ['auto-complete', 'manual-auto-complete', 'system'] as const;
-      for (const val of bookingSourceValues) {
-        try {
-          await db.execute(sql`ALTER TYPE booking_source ADD VALUE IF NOT EXISTS ${val}`);
-        } catch {
-          logger.debug(`[DB Init] booking_source enum value '${val}' already exists or cannot be added`);
-        }
-      }
-      logger.info('[DB Init] booking_source enum values synced');
-
-      const paymentStatusValues = ['refund_pending'] as const;
-      for (const val of paymentStatusValues) {
-        try {
-          await db.execute(sql`ALTER TYPE participant_payment_status ADD VALUE IF NOT EXISTS ${val}`);
-        } catch {
-          logger.debug(`[DB Init] participant_payment_status enum value '${val}' already exists or cannot be added`);
-        }
-      }
-      logger.info('[DB Init] participant_payment_status enum values synced');
-
-      await db.execute(sql`ALTER TABLE users ALTER COLUMN billing_provider SET DEFAULT 'stripe'`);
-      logger.info('[DB Init] billing_provider column default set to stripe');
-
-      try { await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS migration_billing_start_date TIMESTAMP`); } catch { logger.debug('[DB Init] migration_billing_start_date column already exists or failed'); }
-      try { await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS migration_requested_by TEXT`); } catch { logger.debug('[DB Init] migration_requested_by column already exists or failed'); }
-      try { await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS migration_tier_snapshot TEXT`); } catch { logger.debug('[DB Init] migration_tier_snapshot column already exists or failed'); }
-      try { await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS migration_status TEXT`); } catch { logger.debug('[DB Init] migration_status column already exists or failed'); }
-      logger.info('[DB Init] Billing migration columns verified');
-      
-      const hubspotFix = await db.execute(sql`
-        UPDATE users SET billing_provider = 'manual', updated_at = NOW()
-        WHERE billing_provider = 'hubspot'
-        RETURNING email
-      `);
-      if ((hubspotFix as unknown as { rows?: unknown[] }).rows?.length && (hubspotFix as unknown as { rows?: unknown[] }).rows!.length > 0) {
-        logger.info(`[DB Init] Migrated ${(hubspotFix as unknown as { rows?: unknown[] }).rows!.length} users from billing_provider='hubspot' to 'manual'`);
-      }
     } catch (err: unknown) {
       logger.warn(`[DB Init] Skipping billing provider CHECK constraint: ${getErrorMessage(err)}`);
     }
+
+    const bookingSourceValues = ['auto-complete', 'manual-auto-complete', 'system'] as const;
+    for (const val of bookingSourceValues) {
+      try {
+        await db.execute(sql`ALTER TYPE booking_source ADD VALUE IF NOT EXISTS ${val}`);
+      } catch {
+        logger.debug(`[DB Init] booking_source enum value '${val}' already exists or cannot be added`);
+      }
+    }
+    logger.info('[DB Init] booking_source enum values synced');
+
+    const paymentStatusValues = ['refund_pending'] as const;
+    for (const val of paymentStatusValues) {
+      try {
+        await db.execute(sql`ALTER TYPE participant_payment_status ADD VALUE IF NOT EXISTS ${val}`);
+      } catch {
+        logger.debug(`[DB Init] participant_payment_status enum value '${val}' already exists or cannot be added`);
+      }
+    }
+    logger.info('[DB Init] participant_payment_status enum values synced');
+
+    try {
+      await db.execute(sql`ALTER TABLE users ALTER COLUMN billing_provider SET DEFAULT 'stripe'`);
+      logger.info('[DB Init] billing_provider column default set to stripe');
+    } catch (err: unknown) {
+      logger.warn(`[DB Init] Failed to set billing_provider default: ${getErrorMessage(err)}`);
+    }
+
+    try { await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS migration_billing_start_date TIMESTAMP`); } catch { logger.debug('[DB Init] migration_billing_start_date column already exists or failed'); }
+    try { await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS migration_requested_by TEXT`); } catch { logger.debug('[DB Init] migration_requested_by column already exists or failed'); }
+    try { await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS migration_tier_snapshot TEXT`); } catch { logger.debug('[DB Init] migration_tier_snapshot column already exists or failed'); }
+    try { await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS migration_status TEXT`); } catch { logger.debug('[DB Init] migration_status column already exists or failed'); }
+    logger.info('[DB Init] Billing migration columns verified');
 
     try {
       await db.execute(sql`
