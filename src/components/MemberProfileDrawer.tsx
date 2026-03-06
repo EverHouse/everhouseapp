@@ -172,7 +172,7 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
         fetch(`/api/members/${encodeURIComponent(member.email)}/notes`, { credentials: 'include' }),
         fetch(`/api/members/${encodeURIComponent(member.email)}/communications`, { credentials: 'include' }),
         fetch(`/api/members/${encodeURIComponent(member.email)}/guests`, { credentials: 'include' }),
-        fetch(`/api/members/${encodeURIComponent(member.email)}/unified-purchases`, { credentials: 'include' }),
+        fetch(`/api/stripe/payments/${encodeURIComponent(member.email)}`, { credentials: 'include' }),
         fetch(`/api/my-billing/account-balance?user_email=${encodeURIComponent(member.email)}`, { credentials: 'include' }),
       ]);
 
@@ -194,7 +194,8 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
       }
       if (purchasesRes.ok) {
         const purchasesData = await purchasesRes.json();
-        setPurchases(purchasesData);
+        const paymentsArray = purchasesData.payments || purchasesData;
+        setPurchases(Array.isArray(paymentsArray) ? paymentsArray : []);
       }
       if (balanceRes.ok) {
         const balanceData = await balanceRes.json();

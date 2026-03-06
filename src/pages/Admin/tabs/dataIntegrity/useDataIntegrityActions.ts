@@ -621,38 +621,6 @@ export function useDataIntegrityActions(state: DataIntegrityState) {
     },
   });
 
-  const csvUploadMutation = useMutation({
-    mutationFn: async (formData: FormData) => {
-      const response = await fetch('/api/legacy-purchases/admin/upload-csv', {
-        method: 'POST',
-        credentials: 'include',
-        body: formData,
-      });
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || 'Import failed');
-      }
-      return response.json();
-    },
-    onSuccess: (data) => {
-      const importedCount = data.results?.sales?.imported || 0;
-      const linkedCount = data.results?.firstVisit?.linked || 0;
-      state.setCsvUploadResult({
-        success: true,
-        message: `Import complete! ${importedCount} sales imported, ${linkedCount} clients linked.`,
-        firstVisit: data.results?.firstVisit,
-        sales: data.results?.sales,
-      });
-      showToast(`Successfully imported ${importedCount} sales records`, 'success');
-      state.setFirstVisitFile(null);
-      state.setSalesFile(null);
-    },
-    onError: (err: Error) => {
-      state.setCsvUploadResult({ success: false, message: (err instanceof Error ? err.message : String(err)) || 'Import failed' });
-      showToast((err instanceof Error ? err.message : String(err)) || 'Failed to upload CSV files', 'error');
-    },
-  });
-
   const backfillStripeCacheMutation = useMutation({
     mutationFn: () => 
       postWithCredentials<{ stats?: StripeCacheStats }>('/api/financials/backfill-stripe-cache', {}),
@@ -1354,20 +1322,6 @@ export function useDataIntegrityActions(state: DataIntegrityState) {
     mindbodyReimportMutation.mutate({ startDate: state.mindbodyStartDate, endDate: state.mindbodyEndDate });
   };
 
-  const handleCSVUpload = () => {
-    if (!state.salesFile) {
-      showToast('Please select a Sales Report CSV file', 'error');
-      return;
-    }
-    state.setCsvUploadResult(null);
-    const formData = new FormData();
-    if (state.firstVisitFile) {
-      formData.append('firstVisitFile', state.firstVisitFile);
-    }
-    formData.append('salesFile', state.salesFile);
-    csvUploadMutation.mutate(formData);
-  };
-
   const handleBackfillStripeCache = () => {
     state.setStripeCacheResult(null);
     backfillStripeCacheMutation.mutate();
@@ -1488,7 +1442,7 @@ export function useDataIntegrityActions(state: DataIntegrityState) {
   const isLinkingFee = linkGuestFeeMutation.isPending;
   const isSearchingAttendance = searchAttendanceMutation.isPending;
   const isRunningMindbodyImport = mindbodyReimportMutation.isPending;
-  const isUploadingCSV = csvUploadMutation.isPending;
+  const isUploadingCSV = false;
   const isBackfillingStripeCache = backfillStripeCacheMutation.isPending;
   const isSyncingToHubspot = syncMembersToHubspotMutation.isPending;
   const isCleaningMindbodyIds = cleanupMindbodyIdsMutation.isPending;
@@ -1538,7 +1492,6 @@ export function useDataIntegrityActions(state: DataIntegrityState) {
     handleSearchAttendance,
     handleUpdateAttendance,
     handleMindbodyReimport,
-    handleCSVUpload,
     handleBackfillStripeCache,
     handleSyncMembersToHubspot,
     handleCleanupMindbodyIds,

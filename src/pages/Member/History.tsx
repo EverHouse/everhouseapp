@@ -29,7 +29,7 @@ interface UnifiedVisit {
 
 interface UnifiedPurchase {
   id: string;
-  type: 'legacy' | 'stripe';
+  type: 'stripe';
   itemName: string;
   itemCategory: string | null;
   amountCents: number;
@@ -69,7 +69,7 @@ const History: React.FC = () => {
   const { data: purchases = [], isLoading: purchasesLoading, refetch: refetchPurchases } = useQuery({
     queryKey: ['my-purchases', user?.email],
     queryFn: () => fetchWithCredentials<UnifiedPurchase[]>(
-      `/api/my-unified-purchases?user_email=${encodeURIComponent(user?.email || '')}`
+      `/api/my-billing/payment-history`
     ),
     enabled: !!user?.email,
   });

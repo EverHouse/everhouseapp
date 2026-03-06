@@ -928,4 +928,80 @@ router.get('/api/my-billing/receipt/:paymentIntentId', requireAuth, async (req, 
   }
 });
 
+router.get('/api/my-billing/payment-history', requireAuth, async (req, res) => {
+  try {
+    const userEmail = (req as any).session?.passport?.user?.email?.toLowerCase();
+    if (!userEmail) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    const result = await db.execute(sql`SELECT 
+        spi.id,
+        spi.stripe_payment_intent_id,
+        spi.amount_cents,
+        spi.purpose,
+        spi.booking_id,
+        spi.description,
+        spi.status,
+        spi.product_id,
+        spi.product_name,
+        spi.created_at
+       FROM stripe_payment_intents spi
+       JOIN users u ON u.id = spi.user_id
+       WHERE LOWER(u.email) = ${userEmail}
+       ORDER BY spi.created_at DESC
+       LIMIT 200`);
+
+    const purchases = (result.rows as Array<Record<string, unknown>>).map((row) => ({
+      id: `stripe-${row.id}`,
+      type: 'stripe' as const,
+      itemName: (row.description as string) || (row.product_name as string) || (row.purpose as string) || 'Payment',
+      itemCategory: (row.purpose as string) || 'payment',
+      amountCents: row.amount_cents as number,
+      date: row.created_at as string,
+      status: row.status as string,
+      source: 'Stripe',
+      stripePaymentIntentId: row.stripe_payment_intent_id as string,
+    }));
+
+    const stripe = await getStripeClient();
+    const userResult = await db.execute(sql`SELECT stripe_customer_id FROM users WHERE LOWER(email) = ${userEmail} AND stripe_customer_id IS NOT NULL LIMIT 1`);
+    const stripeCustomerId = (userResult.rows as Array<Record<string, unknown>>)[0]?.stripe_customer_id as string | undefined;
+
+    if (stripeCustomerId) {
+      try {
+        const invoices = await stripe.invoices.list({
+          customer: stripeCustomerId,
+          limit: 100,
+          status: 'open',
+        });
+
+        for (const inv of invoices.data) {
+          if (inv.amount_due > 0) {
+            purchases.push({
+              id: `inv-${inv.id}`,
+              type: 'stripe',
+              itemName: inv.description || `Invoice ${inv.number || inv.id}`,
+              itemCategory: 'invoice',
+              amountCents: inv.amount_due,
+              date: new Date(inv.created * 1000).toISOString(),
+              status: 'open',
+              source: 'Stripe',
+              stripePaymentIntentId: null,
+            });
+          }
+        }
+      } catch (invoiceErr: unknown) {
+        logger.warn('[MyBilling] Failed to fetch open invoices for payment history', { error: invoiceErr });
+      }
+    }
+
+    purchases.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    res.json(purchases);
+  } catch (error: unknown) {
+    logger.error('[MyBilling] Payment history error', { error: error instanceof Error ? error : new Error(String(error)) });
+    res.status(500).json({ error: 'Failed to fetch payment history' });
+  }
+});
+
 export default router;
