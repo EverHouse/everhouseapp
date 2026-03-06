@@ -343,7 +343,7 @@ router.get('/api/booking-requests', async (req, res) => {
       if (trackmanPlayerCount && trackmanPlayerCount > 0) {
         totalPlayerCount = trackmanPlayerCount;
       } else if (memberCounts.total > 0) {
-        totalPlayerCount = memberCounts.total + actualGuestCount;
+        totalPlayerCount = memberCounts.total;
       } else {
         totalPlayerCount = Math.max((legacyGuestCount as number) + 1, 1);
       }
@@ -669,7 +669,7 @@ router.post('/api/booking-requests', isAuthenticated, bookingRateLimiter, valida
       
       // Conference rooms auto-confirm (no staff approval needed), simulators stay pending
       const isConferenceRoom = resourceType === 'conference_room';
-      let initialStatus: 'pending' | 'confirmed' = isConferenceRoom ? 'confirmed' : 'pending';
+      const initialStatus: 'pending' | 'confirmed' = isConferenceRoom ? 'confirmed' : 'pending';
       
       const insertResult = await client.query(
         `INSERT INTO booking_requests (
@@ -1588,7 +1588,7 @@ async function calculateFeeEstimate(params: {
   } catch (error: unknown) {
     // Do NOT use fallback - this could show incorrect prices
     logger.error('[FeeEstimate] Unified service error', { error: error instanceof Error ? error : new Error(String(error)) });
-    throw new Error('Unable to calculate fee estimate. Please try again.');
+    throw new Error('Unable to calculate fee estimate. Please try again.', { cause: error });
   }
 }
 
@@ -1682,7 +1682,7 @@ router.get('/api/fee-estimate', async (req, res) => {
     const resourceType = (req.query.resourceType as string) || 'simulator';
     const guestsWithInfo = parseInt(req.query.guestsWithInfo as string) || 0;
     const memberEmailsParam = req.query.memberEmails as string | undefined;
-    let memberEmails = memberEmailsParam ? memberEmailsParam.split(',').map(e => e.trim().toLowerCase()).filter(Boolean) : [];
+    const memberEmails = memberEmailsParam ? memberEmailsParam.split(',').map(e => e.trim().toLowerCase()).filter(Boolean) : [];
     
     const memberUserIdsParam = req.query.memberUserIds as string | undefined;
     const memberUserIds = memberUserIdsParam ? memberUserIdsParam.split(',').map(id => id.trim()).filter(Boolean) : [];
