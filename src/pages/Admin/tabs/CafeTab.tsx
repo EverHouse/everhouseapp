@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAutoAnimate } from '@formkit/auto-animate/react';
 import { usePageReady } from '../../../contexts/PageReadyContext';
 import { useToast } from '../../../components/Toast';
@@ -14,6 +14,7 @@ const CafeTab: React.FC = () => {
     const [cafeRef] = useAutoAnimate();
 
     // Queries and mutations
+    const queryClient = useQueryClient();
     const { data: cafeMenu = [] } = useCafeMenu();
     const uploadImageMutation = useUploadCafeImage();
     const seedMenuMutation = useSeedCafeMenu();
@@ -29,6 +30,7 @@ const CafeTab: React.FC = () => {
             return response.json();
         },
         onSuccess: (data: { cafe?: { synced?: number; created?: number; deactivated?: number } }) => {
+            queryClient.invalidateQueries({ queryKey: ['cafe'] });
             let message = `Pulled from Stripe:\n• ${data.cafe?.synced || 0} cafe items synced`;
             if ((data.cafe?.created ?? 0) > 0) message += `\n• ${data.cafe?.created} new items created`;
             if ((data.cafe?.deactivated ?? 0) > 0) message += `\n• ${data.cafe?.deactivated} items deactivated`;

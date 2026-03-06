@@ -401,7 +401,7 @@ const TiersTab: React.FC = () => {
             if (allErrors.length > 0) message += `\n\nWarnings:\n${allErrors.join('\n')}`;
             showToast(message, allErrors.length > 0 ? 'warning' : 'success');
             queryClient.invalidateQueries({ queryKey: ['membership-tiers'] });
-            queryClient.invalidateQueries({ queryKey: ['cafe-menu'] });
+            queryClient.invalidateQueries({ queryKey: ['cafe'] });
         },
         onError: (err: Error) => {
             showToast('Pull from Stripe failed: ' + ((err instanceof Error ? err.message : String(err)) || 'Unknown error'), 'error');
