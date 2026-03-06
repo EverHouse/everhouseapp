@@ -30,6 +30,7 @@ const MAIN_NAV_ITEMS: NavItem[] = [
   { id: 'updates', icon: 'campaign', label: 'Updates' },
   { id: 'directory', icon: 'group', label: 'Directory' },
   { id: 'training', icon: 'school', label: 'Training Guide' },
+  { id: 'analytics', icon: 'analytics', label: 'Analytics' },
 ];
 
 const ADMIN_ITEMS: NavItem[] = [
