@@ -1751,6 +1751,30 @@ export async function pullCafeItemsFromStripe(): Promise<{
       }
     }
 
+    const allKnownStripeIds = new Set([
+      ...activeStripeProducts.map(p => p.id),
+      ...inactiveStripeProductIds,
+    ]);
+    try {
+      const orphanedResult = await db.execute(sql`
+        SELECT id, name, stripe_product_id
+        FROM cafe_items
+        WHERE is_active = true
+          AND stripe_product_id IS NOT NULL
+      `);
+      const orphanedRows = (orphanedResult.rows as Array<{ id: number; name: string; stripe_product_id: string }>)
+        .filter(row => !allKnownStripeIds.has(row.stripe_product_id));
+      for (const row of orphanedRows) {
+        await db.execute(sql`UPDATE cafe_items SET is_active = false WHERE id = ${row.id}`);
+        deactivated++;
+        logger.info(`[Reverse Sync] Deactivated cafe item "${row.name}" (Stripe product deleted)`);
+      }
+    } catch (err: unknown) {
+      const msg = `Error deactivating orphaned cafe items: ${getErrorMessage(err)}`;
+      logger.error(`[Reverse Sync] ${msg}`);
+      errors.push(msg);
+    }
+
     logger.info(`[Reverse Sync] Cafe items pull complete: ${synced} synced, ${created} created, ${deactivated} deactivated, ${errors.length} errors`);
     return { success: errors.length === 0, synced, created, deactivated, errors };
   } catch (error: unknown) {
