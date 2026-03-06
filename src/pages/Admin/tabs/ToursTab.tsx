@@ -52,7 +52,7 @@ const TourCard: React.FC<TourCardProps> = ({ tour, isToday = false, isPast = fal
   const isMenuOpen = statusMenuTourId === tour.id;
   
   return (
-    <div className={`p-4 rounded-xl border tactile-card ${tour.status === 'checked_in' 
+    <div className={`p-4 rounded-xl border tactile-card ${isMenuOpen ? 'relative z-30' : ''} ${tour.status === 'checked_in' 
       ? 'bg-green-500/10 border-green-500/30' 
       : tour.status === 'no-show'
         ? 'bg-red-500/5 border-red-500/20'
