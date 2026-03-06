@@ -9,6 +9,7 @@ import {
 } from '../../../shared/schema';
 import { getHubSpotClient } from '../integrations';
 import { syncCustomerMetadataToStripe } from '../stripe/customers';
+import { getStripeClient } from '../stripe/client';
 import { logIntegrityAudit } from '../auditLog';
 import { denormalizeTierForHubSpotAsync } from '../../utils/tierUtils';
 import { retryableHubSpotRequest } from '../hubspot/request';
@@ -83,16 +84,18 @@ export async function getAuditLog(limit: number = 10): Promise<Array<{
 
 export interface SyncPushParams {
   issueKey: string;
-  target: 'hubspot' | 'calendar';
+  target: 'hubspot' | 'calendar' | 'stripe';
   userId?: number;
   hubspotContactId?: string;
+  stripeCustomerId?: string;
 }
 
 export interface SyncPullParams {
   issueKey: string;
-  target: 'hubspot' | 'calendar';
+  target: 'hubspot' | 'calendar' | 'stripe';
   userId?: number;
   hubspotContactId?: string;
+  stripeCustomerId?: string;
 }
 
 export async function syncPush(params: SyncPushParams): Promise<{ success: boolean; message: string }> {
@@ -130,6 +133,32 @@ export async function syncPush(params: SyncPushParams): Promise<{ success: boole
     return {
       success: true,
       message: `Pushed app data to HubSpot contact ${hubspotContactId}`
+    };
+  }
+
+  if (target === 'stripe') {
+    if (!userId) {
+      throw new Error('userId is required for Stripe push');
+    }
+
+    const userResult = await db.execute(sql`
+      SELECT email FROM users WHERE id = ${userId}
+    `);
+
+    if (userResult.rows.length === 0) {
+      throw new Error(`User with id ${userId} not found`);
+    }
+
+    const user = userResult.rows[0] as unknown as { email: string };
+    const result = await syncCustomerMetadataToStripe(user.email);
+
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to sync to Stripe');
+    }
+
+    return {
+      success: true,
+      message: `Pushed app data to Stripe customer for ${user.email}`
     };
   }
 
@@ -359,6 +388,70 @@ export async function syncPull(params: SyncPullParams): Promise<{ success: boole
       message: recentlyFixed
         ? `Pulled HubSpot profile data (name/phone) to app user ${userId} — tier protected by recent manual fix`
         : `Pulled HubSpot data to app user ${userId}`
+    };
+  }
+
+  if (target === 'stripe') {
+    if (!userId) {
+      throw new Error('userId is required for Stripe pull');
+    }
+
+    const userResult = await db.execute(sql`
+      SELECT email, stripe_customer_id, tier, membership_status FROM users WHERE id = ${userId}
+    `);
+
+    if (userResult.rows.length === 0) {
+      throw new Error(`User with id ${userId} not found`);
+    }
+
+    const user = userResult.rows[0] as unknown as { email: string; stripe_customer_id: string | null; tier: string | null; membership_status: string | null };
+
+    if (!user.stripe_customer_id) {
+      throw new Error(`User ${userId} has no linked Stripe customer`);
+    }
+
+    const stripe = await getStripeClient();
+    const subscriptions = await stripe.subscriptions.list({
+      customer: user.stripe_customer_id,
+      status: 'all',
+      limit: 1,
+      expand: ['data.items.data.price.product'],
+    });
+
+    const activeSub = subscriptions.data.find(s => ['active', 'trialing', 'past_due'].includes(s.status));
+
+    if (!activeSub) {
+      return {
+        success: true,
+        message: `No active Stripe subscription found for user ${userId}. No changes made — review membership status manually.`
+      };
+    }
+
+    const item = activeSub.items?.data?.[0];
+    const productRef = item?.price?.product;
+    const productName = (productRef && typeof productRef === 'object' && 'name' in productRef)
+      ? (productRef as { name: string }).name
+      : null;
+
+    const updates: string[] = [];
+
+    if (productName) {
+      const stripeTier = productName.toLowerCase();
+      const currentTier = (user.tier || '').toLowerCase();
+      if (stripeTier !== currentTier) {
+        await db.execute(sql`
+          UPDATE users SET tier = ${productName.toLowerCase()}, membership_tier = ${productName.toLowerCase()}, updated_at = NOW()
+          WHERE id = ${userId}
+        `);
+        updates.push(`tier: "${user.tier}" → "${productName.toLowerCase()}"`);
+      }
+    }
+
+    return {
+      success: true,
+      message: updates.length > 0
+        ? `Pulled Stripe data to app user ${userId}: ${updates.join(', ')}`
+        : `Stripe data matches app for user ${userId} — no changes needed`
     };
   }
 

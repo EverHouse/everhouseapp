@@ -119,13 +119,14 @@ router.get('/api/data-integrity/audit-log', isAdmin, async (req, res) => {
 
 router.post('/api/data-integrity/sync-push', isAdmin, validateBody(syncPushPullSchema), async (req: Request, res) => {
   try {
-    const { issue_key, target, user_id, hubspot_contact_id } = req.body;
+    const { issue_key, target, user_id, hubspot_contact_id, stripe_customer_id } = req.body;
     
     const result = await syncPush({
       issueKey: issue_key,
       target,
       userId: user_id,
-      hubspotContactId: hubspot_contact_id
+      hubspotContactId: hubspot_contact_id,
+      stripeCustomerId: stripe_customer_id
     });
     
     // Broadcast update so other staff dashboards refresh
@@ -140,13 +141,14 @@ router.post('/api/data-integrity/sync-push', isAdmin, validateBody(syncPushPullS
 
 router.post('/api/data-integrity/sync-pull', isAdmin, validateBody(syncPushPullSchema), async (req: Request, res) => {
   try {
-    const { issue_key, target, user_id, hubspot_contact_id } = req.body;
+    const { issue_key, target, user_id, hubspot_contact_id, stripe_customer_id } = req.body;
     
     const result = await syncPull({
       issueKey: issue_key,
       target,
       userId: user_id,
-      hubspotContactId: hubspot_contact_id
+      hubspotContactId: hubspot_contact_id,
+      stripeCustomerId: stripe_customer_id
     });
     
     // Broadcast update so other staff dashboards refresh

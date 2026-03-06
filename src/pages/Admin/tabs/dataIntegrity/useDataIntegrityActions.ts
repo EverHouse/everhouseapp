@@ -378,7 +378,7 @@ export function useDataIntegrityActions(state: DataIntegrityState) {
   });
 
   const syncPushMutation = useMutation({
-    mutationFn: (params: { issueKey: string; target: string; userId?: number; hubspotContactId?: string }) => 
+    mutationFn: (params: { issueKey: string; target: string; userId?: number; hubspotContactId?: string; stripeCustomerId?: string }) => 
       postWithCredentials<{ message: string }>('/api/data-integrity/sync-push', params),
     onSuccess: (data, variables) => {
       state.setSyncingIssues(prev => {
@@ -417,7 +417,7 @@ export function useDataIntegrityActions(state: DataIntegrityState) {
   });
 
   const syncPullMutation = useMutation({
-    mutationFn: (params: { issueKey: string; target: string; userId?: number; hubspotContactId?: string }) => 
+    mutationFn: (params: { issueKey: string; target: string; userId?: number; hubspotContactId?: string; stripeCustomerId?: string }) => 
       postWithCredentials<{ message: string }>('/api/data-integrity/sync-pull', params),
     onSuccess: (data, variables) => {
       state.setSyncingIssues(prev => {
@@ -1191,7 +1191,8 @@ export function useDataIntegrityActions(state: DataIntegrityState) {
       issueKey,
       target: issue.context.syncType,
       userId: issue.context.userId,
-      hubspotContactId: issue.context.hubspotContactId
+      hubspotContactId: issue.context.hubspotContactId,
+      stripeCustomerId: issue.context.stripeCustomerId
     });
   };
 
@@ -1203,7 +1204,8 @@ export function useDataIntegrityActions(state: DataIntegrityState) {
       issueKey,
       target: issue.context.syncType,
       userId: issue.context.userId,
-      hubspotContactId: issue.context.hubspotContactId
+      hubspotContactId: issue.context.hubspotContactId,
+      stripeCustomerId: issue.context.stripeCustomerId
     });
   };
 
