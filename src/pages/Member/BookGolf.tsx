@@ -617,8 +617,7 @@ const BookGolf: React.FC = () => {
     return myRequests.find(r => 
       r.request_date === selectedDateObj.date &&
       (r.status === 'approved' || r.status === 'pending') &&
-      !r.notes?.includes('Conference room booking') &&
-      !r.is_linked_member
+      !r.notes?.includes('Conference room booking')
     ) || null;
   }, [selectedDateObj, myRequests]);
 
