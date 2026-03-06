@@ -8,6 +8,106 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.78.0",
+    date: "2026-03-06",
+    title: "Scheduler & Realtime Hardening",
+    isMajor: true,
+    changes: [
+      "Stability: All 25 background tasks now have overlap protection — if a task runs longer than expected, it won't start a duplicate, preventing issues like duplicate reminder emails or double billing reconciliation",
+      "Stability: If one background task fails to start during server startup, the rest still start normally — previously a single failure could block all automated tasks",
+      "Fix: Background sync health dashboard now accurately reports run status — previously some tasks ran successfully but weren't tracked, making the health dashboard look unhealthy",
+      "Fix: Real-time updates (bookings, command center, simulator, announcements) now properly refresh after a brief connection loss — previously staff could see stale data until a manual page reload",
+      "Fix: Data integrity sync push/pull actions now correctly validate user IDs — resolved a type mismatch that could cause sync operations to fail silently",
+      "Fix: Removed unsupported 'calendar' option from data integrity sync — only HubSpot and Stripe sync are available, preventing a confusing error when staff selected calendar",
+    ]
+  },
+  {
+    version: "8.77.5",
+    date: "2026-03-05",
+    title: "Error Visibility & Security Audit",
+    changes: [
+      "Stability: The app now gracefully restarts after an unexpected server error instead of continuing in a potentially broken state",
+      "Fix: Errors across 23 screens are now logged instead of silently ignored — if a payment form, staff tool, or settings page fails to load data, the error is captured for debugging instead of showing empty content with no explanation",
+      "Fix: Data prefetching errors (member history, notes, booking details) are now logged — previously these failures were invisible, causing slow-feeling page loads with no way to diagnose why",
+      "Security: Two booking API endpoints now enforce login verification at the middleware level — previously relied on in-handler checks only",
+      "Improvement: 30 intentionally public pages (login, availability, tours, etc.) are now clearly documented for security audit clarity",
+    ]
+  },
+  {
+    version: "8.77.4",
+    date: "2026-03-05",
+    title: "Timer Leak & Staff Form Fixes",
+    changes: [
+      "Fix: Trackman booking modal no longer causes background errors after being closed quickly — animation and copy-feedback timers are now properly cancelled on close",
+      "Fix: Terminal payment screen no longer triggers phantom callbacks after navigating away — success transition timers are now cleaned up when leaving the screen",
+      "Fix: Notice form (closures, announcements) now shows an error message if dropdown options fail to load — previously staff would see empty dropdowns with no explanation and be unable to submit",
+    ]
+  },
+  {
+    version: "8.77.3",
+    date: "2026-03-05",
+    title: "Performance Optimization",
+    changes: [
+      "Performance: Booking list loads significantly faster — reduced database queries from ~6 to ~2 per request by batching participant lookups",
+      "Performance: Fee calculation previews and check-in are faster — guest pass and tier limit lookups now run simultaneously instead of one after the other",
+      "Fix: If a Stripe charge succeeds but the local payment record fails to save, this is now flagged as a critical error in monitoring — previously it was buried as a minor warning, making it hard to catch missing payment records",
+    ]
+  },
+  {
+    version: "8.77.2",
+    date: "2026-03-04",
+    title: "Tab Stability & Scheduler Safety",
+    changes: [
+      "Fix: Rapidly switching between staff tabs no longer causes background errors — animation timers are now properly cleaned up when switching away",
+      "Fix: Staff Command Center no longer triggers repeated page reloads during development — resolved a circular dependency in navigation code",
+      "Stability: Six more background schedulers now have overlap and double-start protection — session cleanup, communication logs sync, webhook cleanup, pending user cleanup, stuck cancellation resolver, and webhook event cleanup",
+      "Fix: Trackman webhook auto-match result notification no longer persists after navigating away from the page",
+      "Fix: Trackman booking error handling now logs details instead of silently ignoring failures during legacy entry resolution",
+    ]
+  },
+  {
+    version: "8.77.1",
+    date: "2026-03-04",
+    title: "Code Quality & Crash Prevention",
+    changes: [
+      "Fix: Server errors now return clean JSON responses instead of raw HTML error pages — API consumers and the frontend get consistent error formatting",
+      "Fix: Cafe menu category dropdown no longer flickers when adding a new item — resolved an input control warning",
+      "Fix: Admin Dashboard no longer triggers unnecessary page reloads when navigating between tabs",
+      "Fix: Training section modal inputs no longer flicker when editing step titles and content",
+      "Fix: Today's Schedule section no longer crashes when there are no upcoming events — resolved a null reference error",
+      "Fix: Alerts card no longer crashes when notification data hasn't loaded yet — added proper empty-state handling",
+    ]
+  },
+  {
+    version: "8.77.0",
+    date: "2026-03-03",
+    title: "Major Bug Audit",
+    isMajor: true,
+    changes: [
+      "Fix: Triple-clicking buttons no longer freezes the UI — superseded actions are properly resolved instead of hanging forever",
+      "Fix: Duplicate day pass purchases from Stripe webhook retries are now handled gracefully — no more error storms in monitoring",
+      "Fix: Rapid tier changes (A to B to C) now sync only the final tier to HubSpot — previously all three changes would queue separately, and a stale failed job could overwrite the correct tier",
+      "Fix: HubSpot sync queue processes jobs 4x faster (every 30 seconds instead of 2 minutes, 50 per batch instead of 20) — eliminates multi-hour backlogs after bulk operations",
+      "Fix: All 7 Stripe payment operations now use time-bucketed idempotency keys — prevents duplicate charges, subscriptions, and customer records on network retries",
+      "Fix: Member Directory no longer shows an empty list after a server restart — the first staff member to open it now waits for the initial data load",
+      "Fix: The last admin account can no longer be accidentally deleted — deletion is blocked with a clear error message",
+      "Fix: Late cancellation fees are now properly collected — previously the system cancelled the Stripe payment even on late cancellations, making the forfeited fee uncollectible",
+      "Fix: Cancelling a booking before check-in no longer double-refunds guest passes — previously this could drive the pass balance negative, effectively granting unlimited guest passes",
+      "Fix: Staff and Trackman bookings can no longer double-book over pending member requests — the availability check now includes pending bookings",
+      "Fix: Trackman import no longer accidentally reverses a member's cancellation — bookings in 'cancellation pending' status are now skipped during sync",
+      "Fix: Merging a Trackman placeholder booking that already has a session no longer creates a duplicate orphaned session",
+      "Fix: Stripe financial reconciliation now runs every 5 minutes instead of once per hour — a server restart no longer risks skipping an entire day's reconciliation",
+      "Fix: Server hot-reloads no longer spawn duplicate background sync loops that doubled API requests",
+      "Fix: Corporate billing groups now enforce the pre-paid seat limit — previously admins could add unlimited members beyond the seat count at no charge",
+      "Fix: Guest pass balance now reads from the official ledger instead of dynamically counting bookings — the old calculation missed manual deductions, POS usage, and tier changes",
+      "Fix: Deactivated billing groups with cancelled subscriptions can now be deleted — previously they were permanently undeletable",
+      "Fix: Cancelling a booking that was paid alongside cafe items now refunds only the booking fee, not the entire payment",
+      "Fix: New Stripe subscriptions no longer accidentally demote staff and admin accounts to regular member role",
+      "Fix: Double-booking prevention locks now use matching algorithms across all code paths — previously two different lock calculations allowed concurrent bookings on the same resource",
+      "Fix: Double-tap NFC check-in no longer counts two visits or sends duplicate welcome alerts — the check-in now uses row-level locking to prevent the race condition",
+    ]
+  },
+  {
     version: "8.76.0",
     date: "2026-03-05",
     title: "Concurrency & Data Integrity Fixes",
