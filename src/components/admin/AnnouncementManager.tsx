@@ -40,7 +40,7 @@ const AnnouncementManager: React.FC<AnnouncementManagerProps> = ({ triggerCreate
                 const data = await res.json();
                 setSheetStatus(data);
             }
-        } catch {
+        } catch (_fetchErr) {
         }
     }, []);
 

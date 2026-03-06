@@ -113,7 +113,7 @@ export function NewUserDrawer({
           setEmailCheckResult(data);
         }
       }
-    } catch {
+    } catch (_checkErr) {
     }
   }, []);
 

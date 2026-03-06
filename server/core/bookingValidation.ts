@@ -13,7 +13,7 @@ const closureCache = new Map<string, ClosureCacheEntry>();
 const CLOSURE_CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutes
 const CLOSURE_CACHE_PRUNE_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
 
-setInterval(() => {
+const pruneInterval = setInterval(() => {
   const now = Date.now();
   let pruned = 0;
   for (const [key, entry] of closureCache) {
@@ -26,6 +26,7 @@ setInterval(() => {
     logger.info(`[Cache] Pruned ${pruned} expired closure cache entries (${closureCache.size} remaining)`);
   }
 }, CLOSURE_CACHE_PRUNE_INTERVAL_MS);
+pruneInterval.unref();
 
 export function clearClosureCache(): void {
   closureCache.clear();

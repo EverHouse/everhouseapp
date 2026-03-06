@@ -81,7 +81,7 @@ export function useSupabaseRealtime(options: UseSupabaseRealtimeOptions = {}) {
     if (existingChannel) {
       try {
         supabase.removeChannel(existingChannel);
-      } catch {
+      } catch (_removeErr) {
       }
       channelsRef.current.delete(table);
     }
@@ -134,7 +134,7 @@ export function useSupabaseRealtime(options: UseSupabaseRealtimeOptions = {}) {
       channelsRef.current.forEach((channel) => {
         try {
           supabase.removeChannel(channel);
-        } catch {
+        } catch (_cleanupErr) {
         }
       });
       channelsRef.current.clear();

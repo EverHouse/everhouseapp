@@ -107,7 +107,7 @@ export function MemberFlow({
             setStripeLoading(false);
             return;
           }
-        } catch {
+        } catch (_resuseErr) {
         }
       }
 

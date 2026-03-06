@@ -84,11 +84,12 @@ function ConfirmDialogComponent({
     setDialogZIndex(newZIndex);
     document.body.setAttribute('data-modal-count', String(currentCount + 1));
 
-    setTimeout(() => {
+    const focusTimer = setTimeout(() => {
       confirmButtonRef.current?.focus();
     }, 50);
 
     return () => {
+      clearTimeout(focusTimer);
       const currentCount = parseInt(document.body.getAttribute('data-modal-count') || '0', 10);
       if (currentCount <= 1) {
         document.body.removeAttribute('data-modal-count');
@@ -141,10 +142,20 @@ function ConfirmDialogComponent({
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, isLoading]);
 
+  const confirmTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cancelTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (confirmTimerRef.current) clearTimeout(confirmTimerRef.current);
+      if (cancelTimerRef.current) clearTimeout(cancelTimerRef.current);
+    };
+  }, []);
+
   const handleConfirm = useCallback(() => {
     if (isLoading) return;
     setIsClosing(true);
-    setTimeout(() => {
+    confirmTimerRef.current = setTimeout(() => {
       onConfirm();
     }, 200);
   }, [isLoading, onConfirm]);
@@ -152,7 +163,7 @@ function ConfirmDialogComponent({
   const handleCancel = useCallback(() => {
     if (isLoading) return;
     setIsClosing(true);
-    setTimeout(() => {
+    cancelTimerRef.current = setTimeout(() => {
       onCancel();
     }, 200);
   }, [isLoading, onCancel]);

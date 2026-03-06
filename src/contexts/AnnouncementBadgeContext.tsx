@@ -104,7 +104,7 @@ export const AnnouncementBadgeProvider: React.FC<{ children: React.ReactNode }> 
         credentials: 'include',
         body: JSON.stringify({ noticeType, noticeId })
       });
-    } catch {
+    } catch (_dismissErr) {
     }
   }, []);
 

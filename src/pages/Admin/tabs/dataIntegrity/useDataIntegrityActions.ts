@@ -834,7 +834,8 @@ export function useDataIntegrityActions(state: DataIntegrityState) {
           state.setStripeCleanupProgress(null);
           state.setStripeCleanupResult({ success: false, message: 'Job was lost (server may have restarted). Please try again.' });
         }
-      } catch {
+      } catch (pollErr) {
+        console.warn('[DataIntegrity] Stripe cleanup poll failed:', pollErr);
       }
     }, 5000);
     return () => clearInterval(interval);
@@ -909,7 +910,8 @@ export function useDataIntegrityActions(state: DataIntegrityState) {
           state.setVisitorArchiveProgress(null);
           state.setVisitorArchiveResult({ success: false, message: 'Job was lost (server may have restarted). Please try again.' });
         }
-      } catch {
+      } catch (pollErr) {
+        console.warn('[DataIntegrity] Visitor archive poll failed:', pollErr);
       }
     }, 5000);
     return () => clearInterval(interval);

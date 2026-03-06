@@ -45,6 +45,9 @@ export function useTierPermissions(tierName: string | undefined): {
       .then(data => {
         setPermissions(data);
       })
+      .catch((_err) => {
+        setPermissions(DEFAULT_PERMISSIONS);
+      })
       .finally(() => {
         setLoading(false);
       });
