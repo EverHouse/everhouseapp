@@ -700,6 +700,38 @@ router.post('/api/booking-requests', isAuthenticated, bookingRateLimiter, valida
         return true;
       });
       
+      for (const participant of sanitizedParticipants) {
+        if (participant.type === 'member' && participant.email) {
+          const pOverlap = await client.query(
+            `SELECT br.id, COALESCE(r.name, 'Unknown') AS resource_name, br.start_time, br.end_time
+             FROM booking_requests br
+             LEFT JOIN resources r ON r.id = br.resource_id
+             WHERE br.request_date = $1
+             AND br.status IN ('pending', 'pending_approval', 'approved', 'confirmed', 'attended')
+             AND br.start_time < $3 AND br.end_time > $2
+             AND (
+               LOWER(br.user_email) = LOWER($4)
+               OR br.session_id IN (
+                 SELECT bp.session_id FROM booking_participants bp
+                 JOIN users u ON bp.user_id = u.id
+                 WHERE LOWER(u.email) = LOWER($4)
+               )
+             )
+             LIMIT 1`,
+            [request_date, start_time, end_time, participant.email]
+          );
+          if (pOverlap.rows.length > 0) {
+            const conflict = pOverlap.rows[0];
+            const cStart = conflict.start_time?.substring(0, 5);
+            const cEnd = conflict.end_time?.substring(0, 5);
+            await client.query('ROLLBACK');
+            return res.status(409).json({
+              error: `${participant.name || participant.email} already has a booking at ${conflict.resource_name} from ${formatTime12Hour(cStart)} to ${formatTime12Hour(cEnd)}. They cannot be added to an overlapping time slot.`
+            });
+          }
+        }
+      }
+      
       // Conference rooms auto-confirm (no staff approval needed), simulators stay pending
       const isConferenceRoom = resourceType === 'conference_room';
       const initialStatus: 'pending' | 'confirmed' = isConferenceRoom ? 'confirmed' : 'pending';

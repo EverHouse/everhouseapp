@@ -485,6 +485,38 @@ export async function approveBooking(params: ApproveBookingParams) {
             }
 
             if (isMember && resolvedUserId) {
+              if (rpEmailNormalized && req_data.requestDate && req_data.startTime && req_data.endTime) {
+                const participantConflicts = await tx.execute(sql`
+                  SELECT br2.id, COALESCE(r2.name, 'Unknown') as resource_name, br2.start_time, br2.end_time
+                  FROM booking_requests br2
+                  LEFT JOIN resources r2 ON r2.id = br2.resource_id
+                  WHERE br2.request_date = ${req_data.requestDate}
+                  AND br2.status IN ('approved', 'confirmed', 'attended')
+                  AND br2.start_time < ${req_data.endTime} AND br2.end_time > ${req_data.startTime}
+                  AND br2.id != ${bookingId}
+                  AND (
+                    LOWER(br2.user_email) = ${rpEmailNormalized}
+                    OR br2.session_id IN (
+                      SELECT bp2.session_id FROM booking_participants bp2
+                      WHERE bp2.user_id = (SELECT id FROM users WHERE LOWER(email) = ${rpEmailNormalized} LIMIT 1)
+                    )
+                  )
+                  LIMIT 1
+                `);
+                if (participantConflicts.rows.length > 0) {
+                  const conflict = participantConflicts.rows[0] as { resource_name: string; start_time: string; end_time: string };
+                  logger.warn('[Booking Approval] Skipping participant with time conflict', {
+                    extra: {
+                      participantEmail: rpEmailNormalized,
+                      conflictResource: conflict.resource_name,
+                      conflictTime: `${conflict.start_time}-${conflict.end_time}`,
+                      bookingId
+                    }
+                  });
+                  continue;
+                }
+              }
+
               sessionParticipants.push({
                 userId: resolvedUserId,
                 participantType: 'member',
