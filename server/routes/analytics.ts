@@ -7,6 +7,8 @@ import { getErrorMessage } from '../utils/errorUtils';
 
 const router = Router();
 
+const STAFF_EMAILS_SUBQUERY = sql`(SELECT email FROM users WHERE role IN ('staff', 'admin'))`;
+
 router.get('/api/analytics/booking-stats', isStaffOrAdmin, async (_req: Request, res: Response) => {
   try {
     const peakHoursResult = await db.execute(sql`
@@ -18,6 +20,7 @@ router.get('/api/analytics/booking-stats', isStaffOrAdmin, async (_req: Request,
       WHERE status NOT IN ('cancelled', 'declined')
         AND request_date IS NOT NULL
         AND start_time IS NOT NULL
+        AND user_email NOT IN ${STAFF_EMAILS_SUBQUERY}
       GROUP BY day_of_week, hour_of_day
       ORDER BY day_of_week, hour_of_day
     `);
@@ -29,6 +32,7 @@ router.get('/api/analytics/booking-stats', isStaffOrAdmin, async (_req: Request,
       FROM resources r
       LEFT JOIN booking_requests br ON br.resource_id = r.id
         AND br.status NOT IN ('cancelled', 'declined')
+        AND br.user_email NOT IN ${STAFF_EMAILS_SUBQUERY}
       GROUP BY r.id, r.name
       ORDER BY total_minutes DESC
     `);
@@ -41,6 +45,7 @@ router.get('/api/analytics/booking-stats', isStaffOrAdmin, async (_req: Request,
       FROM booking_requests br
       WHERE br.status NOT IN ('cancelled', 'declined')
         AND br.user_email IS NOT NULL
+        AND br.user_email NOT IN ${STAFF_EMAILS_SUBQUERY}
       GROUP BY br.user_name, br.user_email
       ORDER BY total_minutes DESC
       LIMIT 5
@@ -52,6 +57,7 @@ router.get('/api/analytics/booking-stats', isStaffOrAdmin, async (_req: Request,
         COUNT(*) FILTER (WHERE status = 'cancelled')::int AS cancelled
       FROM booking_requests
       WHERE status != 'declined'
+        AND user_email NOT IN ${STAFF_EMAILS_SUBQUERY}
     `);
 
     const avgSessionResult = await db.execute(sql`
@@ -61,6 +67,7 @@ router.get('/api/analytics/booking-stats', isStaffOrAdmin, async (_req: Request,
       WHERE status NOT IN ('cancelled', 'declined')
         AND duration_minutes IS NOT NULL
         AND duration_minutes > 0
+        AND user_email NOT IN ${STAFF_EMAILS_SUBQUERY}
     `);
 
     const cancRow = cancellationResult.rows[0] as { total: number; cancelled: number };
@@ -124,6 +131,7 @@ router.get('/api/analytics/extended-stats', isStaffOrAdmin, async (_req: Request
           WHERE status NOT IN ('cancelled', 'declined')
             AND request_date >= CURRENT_DATE - INTERVAL '90 days'
             AND user_email IS NOT NULL
+            AND user_email NOT IN ${STAFF_EMAILS_SUBQUERY}
           GROUP BY user_email
         )
         SELECT
@@ -193,6 +201,7 @@ router.get('/api/analytics/extended-stats', isStaffOrAdmin, async (_req: Request
         WHERE status NOT IN ('cancelled', 'declined')
           AND request_date >= CURRENT_DATE - INTERVAL '6 months'
           AND request_date IS NOT NULL
+          AND user_email NOT IN ${STAFF_EMAILS_SUBQUERY}
         GROUP BY DATE_TRUNC('week', request_date::date)
         ORDER BY week_start
       `),
@@ -204,6 +213,7 @@ router.get('/api/analytics/extended-stats', isStaffOrAdmin, async (_req: Request
         FROM booking_requests
         WHERE status NOT IN ('cancelled', 'declined')
           AND request_date IS NOT NULL
+          AND user_email NOT IN ${STAFF_EMAILS_SUBQUERY}
         GROUP BY day_of_week
         ORDER BY day_of_week
       `),
@@ -220,6 +230,7 @@ router.get('/api/analytics/extended-stats', isStaffOrAdmin, async (_req: Request
             AND start_time IS NOT NULL
             AND end_time IS NOT NULL
             AND resource_id IN (SELECT id FROM resources WHERE type = 'simulator')
+            AND user_email NOT IN ${STAFF_EMAILS_SUBQUERY}
         ),
         hourly_bookings AS (
           SELECT hour_slot::int, COUNT(*)::int AS booked_count
@@ -231,6 +242,7 @@ router.get('/api/analytics/extended-stats', isStaffOrAdmin, async (_req: Request
           FROM booking_requests
           WHERE status NOT IN ('cancelled', 'declined')
             AND request_date IS NOT NULL
+            AND user_email NOT IN ${STAFF_EMAILS_SUBQUERY}
         ),
         sim_count AS (
           SELECT COUNT(*)::int AS num_sims FROM resources WHERE type = 'simulator'
