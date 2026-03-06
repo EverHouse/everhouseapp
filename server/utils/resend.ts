@@ -36,7 +36,7 @@ async function getCredentials() {
     throw new Error('X_REPLIT_TOKEN not found for repl/depl');
   }
 
-  connectionSettings = await fetch(
+  const connectorResponse = await fetch(
     'https://' + hostname + '/api/v2/connection?include_secrets=true&connector_names=resend',
     {
       headers: {
@@ -44,7 +44,14 @@ async function getCredentials() {
         'X_REPLIT_TOKEN': xReplitToken
       }
     }
-  ).then(res => res.json()).then((data: Record<string, unknown>) => (data.items as Record<string, unknown>[] | undefined)?.[0] ?? null);
+  );
+
+  if (!connectorResponse.ok) {
+    const errorText = await connectorResponse.text().catch(() => 'unknown');
+    throw new Error(`Resend connector API error (HTTP ${connectorResponse.status}): ${errorText.substring(0, 200)}`);
+  }
+
+  connectionSettings = await connectorResponse.json().then((data: Record<string, unknown>) => (data.items as Record<string, unknown>[] | undefined)?.[0] ?? null);
 
   const settings = connectionSettings?.settings as ResendConnectionSettings | undefined;
   if (!settings?.api_key) {

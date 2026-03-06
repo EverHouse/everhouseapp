@@ -55,7 +55,7 @@ async function getAccessToken() {
     throw new Error('X_REPLIT_TOKEN not found for repl/depl');
   }
 
-  connectionSettings = await fetch(
+  const connectorResponse = await fetch(
     'https://' + hostname + '/api/v2/connection?include_secrets=true&connector_names=google-sheet',
     {
       headers: {
@@ -63,7 +63,14 @@ async function getAccessToken() {
         'X_REPLIT_TOKEN': xReplitToken
       }
     }
-  ).then(res => res.json()).then(data => data.items?.[0]);
+  );
+
+  if (!connectorResponse.ok) {
+    const errorText = await connectorResponse.text().catch(() => 'unknown');
+    throw new Error(`Google Sheet connector API error (HTTP ${connectorResponse.status}): ${errorText.substring(0, 200)}`);
+  }
+
+  connectionSettings = await connectorResponse.json().then((data: { items?: Array<Record<string, unknown>> }) => data.items?.[0]);
 
   const accessToken = connectionSettings?.settings?.access_token || connectionSettings?.settings?.oauth?.credentials?.access_token;
 

@@ -82,6 +82,12 @@ async function fetchHubSpotToken(): Promise<string> {
       }
     }
   );
+
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => 'unknown');
+    logger.error('[HubSpot] Connector API returned non-OK status', { extra: { status: response.status, body: errorText.substring(0, 200) } });
+    throw new Error(`HubSpot connector API error (HTTP ${response.status})`);
+  }
   
   const data: ConnectorApiResponse = await response.json();
   
