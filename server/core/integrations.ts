@@ -163,7 +163,7 @@ async function fetchGoogleCalendarToken(): Promise<string> {
     throw new Error('Google Calendar connector not available - deployment token missing. Please ensure the Google Calendar integration is enabled for this deployment.');
   }
 
-  googleCalendarConnectionSettings = await fetch(
+  const connectorResponse = await fetch(
     'https://' + hostname + '/api/v2/connection?include_secrets=true&connector_names=google-calendar',
     {
       headers: {
@@ -171,7 +171,15 @@ async function fetchGoogleCalendarToken(): Promise<string> {
         'X_REPLIT_TOKEN': xReplitToken
       }
     }
-  ).then(res => res.json()).then((data: ConnectorApiResponse) => data.items?.[0] ?? null);
+  );
+
+  if (!connectorResponse.ok) {
+    const errorText = await connectorResponse.text().catch(() => 'unknown');
+    logger.error('[Google Calendar] Connector API returned non-OK status', { extra: { status: connectorResponse.status, body: errorText.substring(0, 200) } });
+    throw new Error(`Google Calendar connector API error (HTTP ${connectorResponse.status})`);
+  }
+
+  googleCalendarConnectionSettings = await connectorResponse.json().then((data: ConnectorApiResponse) => data.items?.[0] ?? null);
 
   const gcSettings2 = googleCalendarConnectionSettings?.settings;
   const gcOauth2 = gcSettings2?.oauth?.credentials;
