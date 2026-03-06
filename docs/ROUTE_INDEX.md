@@ -545,7 +545,6 @@ Total routes: **655**
 | POST | `/api/hubspot/webhooks` | server/routes/hubspot.ts | 1417 | None |
 | POST | `/api/hubspot/push-db-tiers` | server/routes/hubspot.ts | 1562 | Staff |
 | POST | `/api/hubspot/sync-billing-providers` | server/routes/hubspot.ts | 1666 | Staff |
-| GET | `/api/hubspot/products` | server/routes/hubspot.ts | 1768 | Staff |
 | POST | `/api/admin/hubspot/sync-form-submissions` | server/routes/hubspot.ts | 1809 | Staff |
 | GET | `/api/admin/hubspot/form-sync-status` | server/routes/hubspot.ts | 1820 | Admin |
 | POST | `/api/admin/hubspot/form-sync-reset` | server/routes/hubspot.ts | 1830 | Admin |
@@ -553,23 +552,9 @@ Total routes: **655**
 | GET | `/api/admin/hubspot/set-forms-token-page` | server/routes/hubspot.ts | 1863 | Admin |
 | GET | `/api/admin/hubspot/marketing-contacts-audit` | server/routes/hubspot.ts | 1949 | Admin |
 | POST | `/api/admin/hubspot/remove-marketing-contacts` | server/routes/hubspot.ts | 2235 | Admin |
-| GET | `/api/hubspot/deals/member/:email` | server/routes/hubspotDeals.ts | 28 | Staff |
-| GET | `/api/hubspot/products` | server/routes/hubspotDeals.ts | 45 | Staff |
-| PUT | `/api/hubspot/products/:id` | server/routes/hubspotDeals.ts | 55 | Staff |
-| GET | `/api/hubspot/discount-rules` | server/routes/hubspotDeals.ts | 76 | Staff |
-| PUT | `/api/hubspot/discount-rules/:tag` | server/routes/hubspotDeals.ts | 86 | Staff |
-| POST | `/api/hubspot/deals/:dealId/line-items` | server/routes/hubspotDeals.ts | 107 | Staff |
-| DELETE | `/api/hubspot/line-items/:lineItemId` | server/routes/hubspotDeals.ts | 140 | Staff |
-| GET | `/api/hubspot/billing-audit/:email` | server/routes/hubspotDeals.ts | 160 | Staff |
-| GET | `/api/hubspot/member-discount/:email` | server/routes/hubspotDeals.ts | 174 | Staff |
-| POST | `/api/hubspot/sync-deal-stage` | server/routes/hubspotDeals.ts | 193 | Staff |
-| GET | `/api/hubspot/sync-status` | server/routes/hubspotDeals.ts | 220 | Staff |
-| POST | `/api/hubspot/sync-all-members` | server/routes/hubspotDeals.ts | 234 | Staff |
-| POST | `/api/hubspot/sync-communication-logs` | server/routes/hubspotDeals.ts | 248 | Staff |
-| POST | `/api/hubspot/push-members-to-hubspot` | server/routes/hubspotDeals.ts | 261 | Staff |
-| POST | `/api/hubspot/remediate-deal-stages` | server/routes/hubspotDeals.ts | 323 | Staff |
-| GET | `/api/hubspot/deal-stage-summary` | server/routes/hubspotDeals.ts | 440 | Staff |
-| POST | `/api/admin/hubspot/deals/batch-delete` | server/routes/hubspotDeals.ts | 474 | Staff |
+| GET | `/api/hubspot/sync-status` | server/routes/hubspot.ts | 2191 | Staff |
+| POST | `/api/hubspot/sync-all-members` | server/routes/hubspot.ts | 2201 | Staff |
+| POST | `/api/hubspot/push-members-to-hubspot` | server/routes/hubspot.ts | 2213 | Staff |
 
 ## Notifications
 
@@ -709,18 +694,6 @@ Total routes: **655**
 | POST | `/api/data-tools/archive-stale-visitors` | server/routes/dataTools.ts | 2420 | Admin |
 | GET | `/api/data-tools/archive-stale-visitors/status` | server/routes/dataTools.ts | 2457 | Admin |
 | POST | `/api/data-tools/cleanup-ghost-fees` | server/routes/dataTools.ts | 2611 | Admin |
-| GET | `/api/legacy-purchases/member/:email` | server/routes/legacyPurchases.ts | 61 | Staff |
-| GET | `/api/legacy-purchases/my-purchases` | server/routes/legacyPurchases.ts | 90 | None |
-| GET | `/api/members/:email/unified-purchases` | server/routes/legacyPurchases.ts | 401 | Staff |
-| GET | `/api/my-unified-purchases` | server/routes/legacyPurchases.ts | 416 | None |
-| GET | `/api/legacy-purchases/member/:email/stats` | server/routes/legacyPurchases.ts | 446 | Staff |
-| POST | `/api/legacy-purchases/admin/import` | server/routes/legacyPurchases.ts | 472 | Admin |
-| GET | `/api/legacy-purchases/admin/import-jobs` | server/routes/legacyPurchases.ts | 507 | Admin |
-| POST | `/api/legacy-purchases/admin/upload-csv` | server/routes/legacyPurchases.ts | 524 | None |
-| GET | `/api/legacy-purchases/admin/unmatched` | server/routes/legacyPurchases.ts | 627 | Admin |
-| POST | `/api/legacy-purchases/admin/link-guest-fees` | server/routes/legacyPurchases.ts | 643 | Admin |
-| POST | `/api/legacy-purchases/admin/sync-hubspot` | server/routes/legacyPurchases.ts | 834 | Admin |
-| POST | `/api/legacy-purchases/admin/sync-hubspot/:email` | server/routes/legacyPurchases.ts | 1030 | Admin |
 | GET | `/api/admin/mindbody/unmatched` | server/routes/mindbody.ts | 12 | Staff |
 | POST | `/api/admin/mindbody/link` | server/routes/mindbody.ts | 72 | Staff |
 | GET | `/api/admin/mindbody/link-history` | server/routes/mindbody.ts | 158 | Staff |

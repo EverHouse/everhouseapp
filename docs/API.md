@@ -64,8 +64,7 @@
 49. [Data Integrity](#data-integrity)
 50. [Data Tools](#data-tools)
 51. [Data Export](#data-export)
-52. [Legacy Purchases](#legacy-purchases)
-53. [Image Upload](#image-upload)
+52. [Image Upload](#image-upload)
 54. [ID Scanner](#id-scanner)
 55. [Monitoring](#monitoring)
 56. [Email Templates](#email-templates)
@@ -773,7 +772,6 @@
 | POST | `/api/hubspot/webhooks` | 🔑 | HubSpot webhook handler |
 | POST | `/api/hubspot/push-db-tiers` | 🛡️ | Push DB tiers to HubSpot |
 | POST | `/api/hubspot/sync-billing-providers` | 🛡️ | Sync billing providers |
-| GET | `/api/hubspot/products` | 🛡️ | List HubSpot products |
 | POST | `/api/admin/hubspot/sync-form-submissions` | 🛡️ | Sync form submissions |
 | GET | `/api/admin/hubspot/form-sync-status` | 🛡️ | Form sync status |
 | POST | `/api/admin/hubspot/form-sync-reset` | 🛡️ | Reset form sync |
@@ -784,26 +782,13 @@
 
 ---
 
-## HubSpot Deals & Products
+## HubSpot Sync
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| GET | `/api/hubspot/deals/member/:email` | 🛡️ | Get member deals |
-| PUT | `/api/hubspot/products/:id` | 🛡️ | Update HubSpot product |
-| GET | `/api/hubspot/discount-rules` | 🛡️ | List discount rules |
-| PUT | `/api/hubspot/discount-rules/:tag` | 🛡️ | Update discount rule |
-| POST | `/api/hubspot/deals/:dealId/line-items` | 🛡️ | Add deal line items |
-| DELETE | `/api/hubspot/line-items/:lineItemId` | 🛡️ | Delete line item |
-| GET | `/api/hubspot/billing-audit/:email` | 🛡️ | Billing audit for member |
-| GET | `/api/hubspot/member-discount/:email` | 🛡️ | Get member discount |
-| POST | `/api/hubspot/sync-deal-stage` | 🛡️ | Sync deal stages |
 | GET | `/api/hubspot/sync-status` | 🛡️ | HubSpot sync status |
-| POST | `/api/hubspot/sync-all-members` | 🛡️ | Sync all members |
-| POST | `/api/hubspot/sync-communication-logs` | 🛡️ | Sync communication logs |
+| POST | `/api/hubspot/sync-all-members` | 🛡️ | Sync all members to HubSpot |
 | POST | `/api/hubspot/push-members-to-hubspot` | 🛡️ | Push members to HubSpot |
-| POST | `/api/hubspot/remediate-deal-stages` | 🛡️ | Remediate deal stages |
-| GET | `/api/hubspot/deal-stage-summary` | 🛡️ | Deal stage summary |
-| POST | `/api/admin/hubspot/deals/batch-delete` | 🛡️ | Batch delete deals |
 
 ---
 
@@ -1069,25 +1054,6 @@
 | GET | `/api/account/my-data` | 👤 | Download own data (GDPR) |
 | GET | `/api/account/my-data/preview` | 👤 | Preview data export |
 | GET | `/api/account/export-history` | 👤 | Export request history |
-
----
-
-## Legacy Purchases
-
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| GET | `/api/legacy-purchases/member/:email` | 🛡️ | Get member legacy purchases |
-| GET | `/api/legacy-purchases/my-purchases` | 👤 | Get own legacy purchases |
-| GET | `/api/members/:email/unified-purchases` | 🛡️ | Unified purchase history |
-| GET | `/api/my-unified-purchases` | 👤 | Own unified purchases |
-| GET | `/api/legacy-purchases/member/:email/stats` | 🛡️ | Legacy purchase stats |
-| POST | `/api/legacy-purchases/admin/import` | 🛡️ | Import legacy data |
-| GET | `/api/legacy-purchases/admin/import-jobs` | 🛡️ | List import jobs |
-| POST | `/api/legacy-purchases/admin/upload-csv` | 🛡️ | Upload CSV import |
-| GET | `/api/legacy-purchases/admin/unmatched` | 🛡️ | Unmatched legacy records |
-| POST | `/api/legacy-purchases/admin/link-guest-fees` | 🛡️ | Link guest fees |
-| POST | `/api/legacy-purchases/admin/sync-hubspot` | 🛡️ | Sync to HubSpot |
-| POST | `/api/legacy-purchases/admin/sync-hubspot/:email` | 🛡️ | Sync member to HubSpot |
 
 ---
 
