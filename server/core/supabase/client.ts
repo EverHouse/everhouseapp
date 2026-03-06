@@ -296,4 +296,11 @@ async function attemptRecovery(): Promise<void> {
   }, delayMs);
 }
 
+export function stopRealtimeRecovery(): void {
+  if (recoveryTimer) {
+    clearTimeout(recoveryTimer);
+    recoveryTimer = null;
+  }
+}
+
 export { SupabaseClient };

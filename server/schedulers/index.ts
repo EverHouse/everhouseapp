@@ -23,6 +23,7 @@ import { startPendingUserCleanupScheduler, stopPendingUserCleanupScheduler } fro
 import { startWebhookEventCleanupScheduler, stopWebhookEventCleanupScheduler } from './webhookEventCleanupScheduler';
 import { startOnboardingNudgeScheduler, stopOnboardingNudgeScheduler } from './onboardingNudgeScheduler';
 import { startSupabaseHeartbeatScheduler, stopSupabaseHeartbeatScheduler } from './supabaseHeartbeatScheduler';
+import { stopRealtimeRecovery } from '../core/supabase/client';
 import { startJobProcessor, stopJobProcessor } from '../core/jobQueue';
 import { schedulerTracker } from '../core/schedulerTracker';
 import { isProduction } from '../core/db';
@@ -206,5 +207,6 @@ export function stopSchedulers(): void {
   stopMemberSyncScheduler();
   stopBackgroundSyncScheduler();
   stopSupabaseHeartbeatScheduler();
+  stopRealtimeRecovery();
   stopJobProcessor();
 }

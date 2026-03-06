@@ -22,6 +22,7 @@ export function useRealtimeHealth(staffWsConnected?: boolean) {
   });
 
   const prevWsConnectedRef = useRef(staffWsConnected ?? true);
+  const prevSupabaseConnectedRef = useRef(true);
   const prevOnlineRef = useRef(navigator.onLine);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const supabaseCheckRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -64,8 +65,15 @@ export function useRealtimeHealth(staffWsConnected?: boolean) {
         (ch) => ch.state === 'errored' || ch.state === 'closed'
       );
 
+      const newConnected = channels.length === 0 ? true : hasSubscribed && !hasError;
+      const wasDisconnected = !prevSupabaseConnectedRef.current;
+      prevSupabaseConnectedRef.current = newConnected;
+
+      if (wasDisconnected && newConnected && navigator.onLine) {
+        invalidateRealtimeQueries();
+      }
+
       setState(prev => {
-        const newConnected = channels.length === 0 ? true : hasSubscribed && !hasError;
         return { ...prev, supabaseConnected: newConnected };
       });
     };
@@ -76,7 +84,7 @@ export function useRealtimeHealth(staffWsConnected?: boolean) {
     return () => {
       if (supabaseCheckRef.current) clearInterval(supabaseCheckRef.current);
     };
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- invalidateRealtimeQueries is stable (useCallback with [])
 
   useEffect(() => {
     const handleOnline = () => {

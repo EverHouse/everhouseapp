@@ -3,6 +3,7 @@ import { logger } from '../core/logger';
 import { isSupabaseConfigured, getSupabaseAdmin, isRealtimeEnabled, resetSupabaseAvailability, enableRealtimeWithRetry } from '../core/supabase/client';
 
 let intervalId: NodeJS.Timeout | null = null;
+let initialTimerId: NodeJS.Timeout | null = null;
 
 const HEARTBEAT_INTERVAL = 6 * 60 * 60 * 1000;
 
@@ -48,7 +49,8 @@ export function startSupabaseHeartbeatScheduler(): void {
   stopSupabaseHeartbeatScheduler();
   logger.info('[Startup] Supabase heartbeat scheduler enabled (runs every 6 hours)');
 
-  setTimeout(async () => {
+  initialTimerId = setTimeout(async () => {
+    initialTimerId = null;
     try {
       await runHeartbeat();
       schedulerTracker.recordRun('Supabase Heartbeat', true);
@@ -70,6 +72,10 @@ export function startSupabaseHeartbeatScheduler(): void {
 }
 
 export function stopSupabaseHeartbeatScheduler(): void {
+  if (initialTimerId) {
+    clearTimeout(initialTimerId);
+    initialTimerId = null;
+  }
   if (intervalId) {
     clearInterval(intervalId);
     intervalId = null;
