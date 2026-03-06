@@ -159,6 +159,20 @@ async function processGracePeriodMembers(): Promise<void> {
 }
 
 let intervalId: NodeJS.Timeout | null = null;
+let isRunning = false;
+
+async function guardedProcessGracePeriodMembers(): Promise<void> {
+  if (isRunning) {
+    logger.info('[Grace Period] Skipping run — previous run still in progress');
+    return;
+  }
+  isRunning = true;
+  try {
+    await processGracePeriodMembers();
+  } finally {
+    isRunning = false;
+  }
+}
 
 export function startGracePeriodScheduler(): void {
   if (intervalId) {
@@ -169,7 +183,7 @@ export function startGracePeriodScheduler(): void {
   logger.info(`[Startup] Grace period scheduler enabled (runs at 10am Pacific)`);
   
   intervalId = setInterval(() => {
-    processGracePeriodMembers().catch((err: unknown) => {
+    guardedProcessGracePeriodMembers().catch((err: unknown) => {
       logger.error('[Grace Period] Uncaught error:', { error: err as Error });
       schedulerTracker.recordRun('Grace Period', false, String(err));
     });

@@ -114,6 +114,7 @@ async function scheduledCheck(): Promise<void> {
 }
 
 let intervalId: NodeJS.Timeout | null = null;
+let isRunning = false;
 
 export function startWaiverReviewScheduler(): void {
   if (intervalId) {
@@ -122,7 +123,19 @@ export function startWaiverReviewScheduler(): void {
   }
 
   const CHECK_INTERVAL_MS = 4 * 60 * 60 * 1000;
-  intervalId = setInterval(scheduledCheck, CHECK_INTERVAL_MS);
+  intervalId = setInterval(() => {
+    if (isRunning) {
+      logger.info('[Waiver Review] Skipping run — previous run still in progress');
+      return;
+    }
+    isRunning = true;
+    scheduledCheck()
+      .catch((err: unknown) => {
+        logger.error('[Waiver Review] Uncaught error:', { error: err as Error });
+        schedulerTracker.recordRun('Waiver Review', false, String(err));
+      })
+      .finally(() => { isRunning = false; });
+  }, CHECK_INTERVAL_MS);
   logger.info('[Startup] Waiver review scheduler enabled (checks every 4 hours for stale waivers)');
 }
 

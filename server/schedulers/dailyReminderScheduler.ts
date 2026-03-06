@@ -68,6 +68,20 @@ async function checkAndSendReminders(): Promise<void> {
 }
 
 let intervalId: NodeJS.Timeout | null = null;
+let isRunning = false;
+
+async function guardedCheckAndSendReminders(): Promise<void> {
+  if (isRunning) {
+    logger.info('[Daily Reminders] Skipping run — previous run still in progress');
+    return;
+  }
+  isRunning = true;
+  try {
+    await checkAndSendReminders();
+  } finally {
+    isRunning = false;
+  }
+}
 
 export function startDailyReminderScheduler(): void {
   if (intervalId) {
@@ -75,7 +89,12 @@ export function startDailyReminderScheduler(): void {
     return;
   }
 
-  intervalId = setInterval(checkAndSendReminders, 30 * 60 * 1000);
+  intervalId = setInterval(() => {
+    guardedCheckAndSendReminders().catch((err: unknown) => {
+      logger.error('[Daily Reminders] Uncaught error:', { error: err as Error });
+      schedulerTracker.recordRun('Daily Reminder', false, String(err));
+    });
+  }, 30 * 60 * 1000);
   logger.info('[Startup] Daily reminder scheduler enabled (runs at 6pm)');
 }
 

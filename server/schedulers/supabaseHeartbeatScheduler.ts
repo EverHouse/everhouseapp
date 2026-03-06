@@ -60,14 +60,17 @@ export function startSupabaseHeartbeatScheduler(): void {
     }
   }, 30 * 1000);
 
-  intervalId = setInterval(async () => {
-    try {
-      await runHeartbeat();
-      schedulerTracker.recordRun('Supabase Heartbeat', true);
-    } catch (err: unknown) {
-      logger.error('[Supabase Heartbeat] Scheduler error:', { error: err as Error });
-      schedulerTracker.recordRun('Supabase Heartbeat', false, String(err));
-    }
+  let heartbeatRunning = false;
+  intervalId = setInterval(() => {
+    if (heartbeatRunning) return;
+    heartbeatRunning = true;
+    runHeartbeat()
+      .then(() => schedulerTracker.recordRun('Supabase Heartbeat', true))
+      .catch((err: unknown) => {
+        logger.error('[Supabase Heartbeat] Scheduler error:', { error: err as Error });
+        schedulerTracker.recordRun('Supabase Heartbeat', false, String(err));
+      })
+      .finally(() => { heartbeatRunning = false; });
   }, HEARTBEAT_INTERVAL);
 }
 

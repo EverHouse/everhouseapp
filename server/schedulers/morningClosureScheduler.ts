@@ -68,6 +68,20 @@ async function checkAndSendMorningNotifications(): Promise<void> {
 }
 
 let intervalId: NodeJS.Timeout | null = null;
+let isRunning = false;
+
+async function guardedCheckAndSendMorningNotifications(): Promise<void> {
+  if (isRunning) {
+    logger.info('[Morning Closures] Skipping run — previous run still in progress');
+    return;
+  }
+  isRunning = true;
+  try {
+    await checkAndSendMorningNotifications();
+  } finally {
+    isRunning = false;
+  }
+}
 
 export function startMorningClosureScheduler(): void {
   if (intervalId) {
@@ -75,7 +89,12 @@ export function startMorningClosureScheduler(): void {
     return;
   }
 
-  intervalId = setInterval(checkAndSendMorningNotifications, 30 * 60 * 1000);
+  intervalId = setInterval(() => {
+    guardedCheckAndSendMorningNotifications().catch((err: unknown) => {
+      logger.error('[Morning Closures] Uncaught error:', { error: err as Error });
+      schedulerTracker.recordRun('Morning Closure', false, String(err));
+    });
+  }, 30 * 60 * 1000);
   logger.info('[Startup] Morning closure notification scheduler enabled (runs at 8am)');
 }
 

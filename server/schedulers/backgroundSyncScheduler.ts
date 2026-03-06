@@ -75,6 +75,7 @@ const runBackgroundSync = async () => {
     const closuresMsg = closuresResult.error ? closuresResult.error : `${(closuresResult as { synced: number; error?: string }).synced} synced`;
     const confRoomMsg = confRoomResult.error ? confRoomResult.error : (confRoomResult.warning ? 'not configured' : `${confRoomResult.synced} synced`);
     logger.info(`[Auto-sync] Events: ${eventsMsg}, Wellness: ${wellnessMsg}, Closures: ${closuresMsg}, ConfRoom: ${confRoomMsg}`);
+    schedulerTracker.recordRun('Background Sync', true);
   } catch (err: unknown) {
     logger.error('[Auto-sync] Calendar sync failed:', { error: err as Error });
     schedulerTracker.recordRun('Background Sync', false, String(err));

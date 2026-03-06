@@ -36,8 +36,12 @@ const STAGGER_INTERVAL_MS = 10_000;
 
 function staggerStart(delayMs: number, name: string, fn: () => void): void {
   const timeout = setTimeout(() => {
-    logger.info(`[Schedulers] Starting ${name} (staggered +${Math.round(delayMs / 1000)}s)`);
-    fn();
+    try {
+      logger.info(`[Schedulers] Starting ${name} (staggered +${Math.round(delayMs / 1000)}s)`);
+      fn();
+    } catch (err) {
+      logger.error(`[Schedulers] Failed to start ${name}:`, { error: err as Error });
+    }
   }, delayMs);
   staggerTimeouts.push(timeout);
 }

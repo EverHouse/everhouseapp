@@ -83,6 +83,20 @@ async function checkAndRunReconciliation(): Promise<void> {
 }
 
 let intervalId: NodeJS.Timeout | null = null;
+let isRunning = false;
+
+async function guardedCheckAndRunReconciliation(): Promise<void> {
+  if (isRunning) {
+    logger.info('[Stripe Reconciliation] Skipping run — previous run still in progress');
+    return;
+  }
+  isRunning = true;
+  try {
+    await checkAndRunReconciliation();
+  } finally {
+    isRunning = false;
+  }
+}
 
 export function startStripeReconciliationScheduler(): void {
   if (intervalId) {
@@ -94,13 +108,13 @@ export function startStripeReconciliationScheduler(): void {
   logger.info(`[Startup] Stripe reconciliation scheduler enabled (runs at 5am Pacific)`);
   schedulerTracker.recordRun('Stripe Reconciliation', true);
   
-  checkAndRunReconciliation().catch((err: unknown) => {
+  guardedCheckAndRunReconciliation().catch((err: unknown) => {
     logger.error('[Stripe Reconciliation] Initial check error:', { error: err as Error });
     schedulerTracker.recordRun('Stripe Reconciliation', false, String(err));
   });
   
   intervalId = setInterval(() => {
-    checkAndRunReconciliation().catch((err: unknown) => {
+    guardedCheckAndRunReconciliation().catch((err: unknown) => {
       logger.error('[Stripe Reconciliation] Uncaught error:', { error: err as Error });
       schedulerTracker.recordRun('Stripe Reconciliation', false, String(err));
     });

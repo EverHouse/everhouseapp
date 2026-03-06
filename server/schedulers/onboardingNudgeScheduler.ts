@@ -74,6 +74,7 @@ async function processOnboardingNudges(): Promise<void> {
 }
 
 let intervalId: NodeJS.Timeout | null = null;
+let isRunning = false;
 
 export function startOnboardingNudgeScheduler(): void {
   if (intervalId) {
@@ -83,9 +84,19 @@ export function startOnboardingNudgeScheduler(): void {
 
   const interval = 60 * 60 * 1000;
   logger.info('[Scheduler] Onboarding Nudge scheduler started (runs at 10 AM Pacific)');
-  intervalId = setInterval(async () => {
-    schedulerTracker.recordRun('Onboarding Nudge', true);
-    await processOnboardingNudges();
+  intervalId = setInterval(() => {
+    if (isRunning) {
+      logger.info('[Onboarding Nudge] Skipping run — previous run still in progress');
+      return;
+    }
+    isRunning = true;
+    processOnboardingNudges()
+      .then(() => schedulerTracker.recordRun('Onboarding Nudge', true))
+      .catch((err: unknown) => {
+        logger.error('[Onboarding Nudge] Uncaught error:', { error: err as Error });
+        schedulerTracker.recordRun('Onboarding Nudge', false, String(err));
+      })
+      .finally(() => { isRunning = false; });
   }, interval);
 }
 

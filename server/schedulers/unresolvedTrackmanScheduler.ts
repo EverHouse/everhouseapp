@@ -99,6 +99,20 @@ async function checkUnresolvedTrackmanBookings(): Promise<void> {
 }
 
 let intervalId: NodeJS.Timeout | null = null;
+let isRunning = false;
+
+async function guardedCheckUnresolvedTrackmanBookings(): Promise<void> {
+  if (isRunning) {
+    logger.info('[Unresolved Trackman] Skipping run — previous run still in progress');
+    return;
+  }
+  isRunning = true;
+  try {
+    await checkUnresolvedTrackmanBookings();
+  } finally {
+    isRunning = false;
+  }
+}
 
 export function startUnresolvedTrackmanScheduler(): void {
   if (intervalId) {
@@ -106,7 +120,12 @@ export function startUnresolvedTrackmanScheduler(): void {
     return;
   }
 
-  intervalId = setInterval(checkUnresolvedTrackmanBookings, 15 * 60 * 1000);
+  intervalId = setInterval(() => {
+    guardedCheckUnresolvedTrackmanBookings().catch((err: unknown) => {
+      logger.error('[Unresolved Trackman] Uncaught error:', { error: err as Error });
+      schedulerTracker.recordRun('Unresolved Trackman', false, String(err));
+    });
+  }, 15 * 60 * 1000);
   logger.info('[Startup] Unresolved Trackman check scheduler enabled (runs at 9am Pacific)');
 }
 

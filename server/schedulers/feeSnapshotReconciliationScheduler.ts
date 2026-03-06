@@ -381,6 +381,7 @@ async function reconcileStalePaymentIntents(): Promise<{ reconciled: number; err
 }
 
 let intervalId: NodeJS.Timeout | null = null;
+let isRunning = false;
 
 export function startFeeSnapshotReconciliationScheduler(): void {
   if (intervalId) {
@@ -432,41 +433,44 @@ export function startFeeSnapshotReconciliationScheduler(): void {
   }, 2 * 60 * 1000);
   
   intervalId = setInterval(() => {
-    reconcilePendingSnapshots()
-      .then(result => {
-        if (result.synced > 0 || result.errors > 0) {
-          logger.info(`[Fee Snapshot Reconciliation] Run complete: synced=${result.synced}, errors=${result.errors}`);
-          schedulerTracker.recordRun('Fee Snapshot Reconciliation', true);
-        }
-      })
-      .catch((err: unknown) => {
-        logger.error('[Fee Snapshot Reconciliation] Uncaught error:', { error: err as Error });
-        schedulerTracker.recordRun('Fee Snapshot Reconciliation', false, String(err));
-      });
+    if (isRunning) {
+      logger.info('[Fee Snapshot Reconciliation] Skipping run — previous run still in progress');
+      return;
+    }
+    isRunning = true;
 
-    reconcileStalePaymentIntents()
-      .then(result => {
-        if (result.reconciled > 0 || result.errors > 0) {
-          logger.info(`[Payment Intent Reconciliation] Run complete: reconciled=${result.reconciled}, errors=${result.errors}`);
+    Promise.allSettled([
+      reconcilePendingSnapshots()
+        .then(result => {
+          if (result.synced > 0 || result.errors > 0) {
+            logger.info(`[Fee Snapshot Reconciliation] Run complete: synced=${result.synced}, errors=${result.errors}`);
+          }
+        }),
+      reconcileStalePaymentIntents()
+        .then(result => {
+          if (result.reconciled > 0 || result.errors > 0) {
+            logger.info(`[Payment Intent Reconciliation] Run complete: reconciled=${result.reconciled}, errors=${result.errors}`);
+          }
+        }),
+      cancelAbandonedPaymentIntents()
+        .then(result => {
+          if (result.cancelled > 0 || result.errors > 0) {
+            logger.info(`[Abandoned PI Cleanup] Run complete: cancelled=${result.cancelled}, errors=${result.errors}`);
+          }
+        }),
+    ])
+      .then(results => {
+        const failed = results.filter(r => r.status === 'rejected');
+        if (failed.length > 0) {
+          for (const f of failed) {
+            logger.error('[Fee Snapshot Reconciliation] Task failed:', { error: (f as PromiseRejectedResult).reason as Error });
+          }
+          schedulerTracker.recordRun('Fee Snapshot Reconciliation', false, `${failed.length} task(s) failed`);
+        } else {
           schedulerTracker.recordRun('Fee Snapshot Reconciliation', true);
         }
       })
-      .catch((err: unknown) => {
-        logger.error('[Payment Intent Reconciliation] Uncaught error:', { error: err as Error });
-        schedulerTracker.recordRun('Fee Snapshot Reconciliation', false, String(err));
-      });
-
-    cancelAbandonedPaymentIntents()
-      .then(result => {
-        if (result.cancelled > 0 || result.errors > 0) {
-          logger.info(`[Abandoned PI Cleanup] Run complete: cancelled=${result.cancelled}, errors=${result.errors}`);
-          schedulerTracker.recordRun('Fee Snapshot Reconciliation', true);
-        }
-      })
-      .catch((err: unknown) => {
-        logger.error('[Abandoned PI Cleanup] Uncaught error:', { error: err as Error });
-        schedulerTracker.recordRun('Fee Snapshot Reconciliation', false, String(err));
-      });
+      .finally(() => { isRunning = false; });
   }, RECONCILIATION_INTERVAL_MS);
 }
 
