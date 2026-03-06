@@ -277,4 +277,88 @@ router.get('/api/analytics/extended-stats', isStaffOrAdmin, async (_req: Request
   }
 });
 
+router.get('/api/analytics/membership-insights', isStaffOrAdmin, async (_req: Request, res: Response) => {
+  try {
+    const [tierResult, atRiskResult, growthResult] = await Promise.all([
+      db.execute(sql`
+        SELECT
+          COALESCE(membership_tier, 'Unknown') AS tier,
+          COUNT(*)::int AS member_count
+        FROM users
+        WHERE role = 'member'
+          AND membership_status IN ('active', 'trialing', 'past_due')
+          AND archived_at IS NULL
+        GROUP BY membership_tier
+        ORDER BY member_count DESC
+      `),
+
+      db.execute(sql`
+        SELECT
+          u.id,
+          COALESCE(NULLIF(TRIM(CONCAT(u.first_name, ' ', u.last_name)), ''), u.email) AS name,
+          u.email,
+          u.membership_tier AS tier,
+          MAX(br.request_date) AS last_booking_date
+        FROM users u
+        LEFT JOIN booking_requests br ON br.user_email = u.email
+          AND br.status NOT IN ('cancelled', 'declined')
+        WHERE u.role = 'member'
+          AND u.membership_status IN ('active', 'trialing', 'past_due')
+          AND u.archived_at IS NULL
+        GROUP BY u.id, u.first_name, u.last_name, u.email, u.membership_tier
+        HAVING MAX(br.request_date) IS NULL
+           OR MAX(br.request_date) < CURRENT_DATE - INTERVAL '45 days'
+        ORDER BY MAX(br.request_date) ASC NULLS FIRST
+        LIMIT 15
+      `),
+
+      db.execute(sql`
+        WITH months AS (
+          SELECT TO_CHAR(d, 'YYYY-MM') AS month
+          FROM generate_series(
+            DATE_TRUNC('month', CURRENT_DATE - INTERVAL '5 months'),
+            DATE_TRUNC('month', CURRENT_DATE),
+            '1 month'::interval
+          ) d
+        ),
+        signups AS (
+          SELECT
+            TO_CHAR(DATE_TRUNC('month', created_at), 'YYYY-MM') AS month,
+            COUNT(*)::int AS new_members
+          FROM users
+          WHERE role = 'member'
+            AND archived_at IS NULL
+            AND created_at >= DATE_TRUNC('month', CURRENT_DATE - INTERVAL '5 months')
+          GROUP BY DATE_TRUNC('month', created_at)
+        )
+        SELECT m.month, COALESCE(s.new_members, 0)::int AS new_members
+        FROM months m
+        LEFT JOIN signups s ON s.month = m.month
+        ORDER BY m.month
+      `),
+    ]);
+
+    res.json({
+      tierDistribution: (tierResult.rows as { tier: string; member_count: number }[]).map(r => ({
+        tier: r.tier,
+        memberCount: r.member_count,
+      })),
+      atRiskMembers: (atRiskResult.rows as { id: number; name: string; email: string; tier: string | null; last_booking_date: string | null }[]).map(r => ({
+        id: r.id,
+        name: r.name,
+        email: r.email,
+        tier: r.tier || 'Unknown',
+        lastBookingDate: r.last_booking_date,
+      })),
+      newMemberGrowth: (growthResult.rows as { month: string; new_members: number }[]).map(r => ({
+        month: r.month,
+        newMembers: r.new_members,
+      })),
+    });
+  } catch (error) {
+    logger.error('Failed to fetch membership insights', { error: getErrorMessage(error) });
+    res.status(500).json({ error: 'Failed to fetch membership insights' });
+  }
+});
+
 export default router;

@@ -16,6 +16,8 @@ import {
   Line,
   AreaChart,
   Area,
+  PieChart,
+  Pie,
 } from 'recharts';
 
 interface PeakHourEntry {
@@ -87,6 +89,30 @@ interface ExtendedStats {
   bookingsOverTime: BookingsOverTimeEntry[];
   dayOfWeekBreakdown: DayOfWeekEntry[];
   utilizationByHour: UtilizationEntry[];
+}
+
+interface TierDistributionEntry {
+  tier: string;
+  memberCount: number;
+}
+
+interface AtRiskMember {
+  id: number;
+  name: string;
+  email: string;
+  tier: string;
+  lastBookingDate: string | null;
+}
+
+interface NewMemberGrowthEntry {
+  month: string;
+  newMembers: number;
+}
+
+interface MembershipInsights {
+  tierDistribution: TierDistributionEntry[];
+  atRiskMembers: AtRiskMember[];
+  newMemberGrowth: NewMemberGrowthEntry[];
 }
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -549,6 +575,101 @@ const UtilizationChart: React.FC<{ data: UtilizationEntry[] }> = ({ data }) => {
   );
 };
 
+const TIER_COLORS = ['#6366f1', '#8b5cf6', '#a78bfa', '#22c55e', '#f59e0b', '#ef4444', '#ec4899', '#14b8a6', '#f97316', '#64748b'];
+
+const TierDistributionChart: React.FC<{ data: TierDistributionEntry[] }> = ({ data }) => {
+  if (!data.length) return <p className="text-primary/40 dark:text-white/40 text-sm text-center py-8">No membership data available.</p>;
+  const total = data.reduce((sum, d) => sum + d.memberCount, 0);
+  return (
+    <div className="flex flex-col sm:flex-row items-center gap-4">
+      <div className="w-full sm:w-1/2 h-[220px]">
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart>
+            <Pie
+              data={data}
+              dataKey="memberCount"
+              nameKey="tier"
+              cx="50%"
+              cy="50%"
+              innerRadius={50}
+              outerRadius={85}
+              paddingAngle={2}
+              strokeWidth={0}
+            >
+              {data.map((_, i) => (
+                <Cell key={i} fill={TIER_COLORS[i % TIER_COLORS.length]} />
+              ))}
+            </Pie>
+            <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(value: number, name: string) => [`${value} (${((value / total) * 100).toFixed(1)}%)`, name]} />
+          </PieChart>
+        </ResponsiveContainer>
+      </div>
+      <div className="w-full sm:w-1/2 space-y-2">
+        {data.map((entry, i) => (
+          <div key={entry.tier} className="flex items-center justify-between text-sm">
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: TIER_COLORS[i % TIER_COLORS.length] }} />
+              <span className="text-primary dark:text-white truncate">{entry.tier}</span>
+            </div>
+            <span className="text-primary/60 dark:text-white/60 font-medium tabular-nums">{entry.memberCount}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+const AtRiskMembersList: React.FC<{ data: AtRiskMember[] }> = ({ data }) => {
+  if (!data.length) return <p className="text-primary/40 dark:text-white/40 text-sm text-center py-8">No at-risk members found.</p>;
+  return (
+    <div className="space-y-1 max-h-[300px] overflow-y-auto">
+      {data.map((member) => {
+        const daysSince = member.lastBookingDate
+          ? Math.floor((Date.now() - new Date(member.lastBookingDate).getTime()) / (1000 * 60 * 60 * 24))
+          : null;
+        return (
+          <div key={member.id} className="flex items-center justify-between px-3 py-2 rounded-lg hover:bg-primary/5 dark:hover:bg-white/5 transition-colors">
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-primary dark:text-white truncate">{member.name}</p>
+              <p className="text-xs text-primary/50 dark:text-white/50 truncate">{member.tier}</p>
+            </div>
+            <div className="text-right flex-shrink-0 ml-3">
+              {daysSince !== null ? (
+                <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${daysSince > 90 ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'}`}>
+                  {daysSince}d ago
+                </span>
+              ) : (
+                <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">
+                  Never booked
+                </span>
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+const NewMemberGrowthChart: React.FC<{ data: NewMemberGrowthEntry[] }> = ({ data }) => {
+  if (!data.length) return <p className="text-primary/40 dark:text-white/40 text-sm text-center py-8">No signup data available.</p>;
+  const formatted = data.map(d => ({
+    ...d,
+    label: new Date(d.month + '-01').toLocaleDateString('en-US', { month: 'short', year: '2-digit' }),
+  }));
+  return (
+    <ResponsiveContainer width="100%" height={220}>
+      <LineChart data={formatted} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" />
+        <XAxis dataKey="label" tick={{ fontSize: 12 }} stroke="#94a3b8" />
+        <YAxis tick={{ fontSize: 12 }} stroke="#94a3b8" allowDecimals={false} />
+        <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(value: number) => [value, 'New Members']} />
+        <Line type="monotone" dataKey="newMembers" stroke="#22c55e" strokeWidth={2.5} dot={{ fill: '#22c55e', r: 4 }} activeDot={{ r: 6 }} />
+      </LineChart>
+    </ResponsiveContainer>
+  );
+};
+
 const AnalyticsTab: React.FC = () => {
   const { data, isLoading, error } = useQuery<BookingStats>({
     queryKey: ['booking-analytics'],
@@ -559,6 +680,12 @@ const AnalyticsTab: React.FC = () => {
   const { data: extData, isLoading: extLoading } = useQuery<ExtendedStats>({
     queryKey: ['extended-analytics'],
     queryFn: () => fetchWithCredentials<ExtendedStats>('/api/analytics/extended-stats'),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const { data: memberData, isLoading: memberLoading } = useQuery<MembershipInsights>({
+    queryKey: ['membership-insights'],
+    queryFn: () => fetchWithCredentials<MembershipInsights>('/api/analytics/membership-insights'),
     staleTime: 5 * 60 * 1000,
   });
 
@@ -658,7 +785,27 @@ const AnalyticsTab: React.FC = () => {
           </SectionCard>
         </div>
 
-        {extLoading && (
+        {memberData && (
+          <>
+            <div>
+              <h2 className="text-lg sm:text-xl font-semibold text-primary dark:text-white mt-2" style={{ fontFamily: 'var(--font-heading)' }}>Membership Insights</h2>
+              <p className="text-sm text-primary/50 dark:text-white/50 mt-1">Member composition, engagement, and growth</p>
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+              <SectionCard icon="pie_chart" title="Tier Distribution" subtitle="Active members by membership tier">
+                <TierDistributionChart data={memberData.tierDistribution} />
+              </SectionCard>
+              <SectionCard icon="person_alert" title="At-Risk Members" subtitle="No bookings in the last 45 days">
+                <AtRiskMembersList data={memberData.atRiskMembers} />
+              </SectionCard>
+            </div>
+            <SectionCard icon="trending_up" title="New Member Growth" subtitle="New signups over the last 6 months">
+              <NewMemberGrowthChart data={memberData.newMemberGrowth} />
+            </SectionCard>
+          </>
+        )}
+
+        {(extLoading || memberLoading) && (
           <div className="flex items-center justify-center py-8">
             <WalkingGolferSpinner />
           </div>

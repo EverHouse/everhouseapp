@@ -116,7 +116,7 @@ The following large files have been split into sub-modules with barrel re-export
 - **API Documentation**: Comprehensive endpoint reference at `docs/API.md`.
 
 ### Booking Analytics
-- **Analytics Page**: Staff-only analytics dashboard at `/admin/analytics` with 11 visualizations across two endpoints:
+- **Analytics Page**: Staff-only analytics dashboard at `/admin/analytics` with 14 visualizations across three endpoints:
   - **Core Stats** (`GET /api/analytics/booking-stats`):
     1. Total Bookings / Cancellation Rate / Avg Session Length stat cards
     2. Weekly Peak Hours Heatmap (day × hour grid with color intensity)
@@ -129,7 +129,11 @@ The following large files have been split into sub-modules with barrel re-export
     8. Utilization by Hour bar chart (average simulator utilization % per time slot, color-coded by threshold)
     9. Active vs Inactive Members ring charts (unique bookers in 30/60/90 day windows vs total active members)
     10. Booking Frequency histogram (member count by booking frequency bucket over 90 days)
-- **Tech**: Recharts library (BarChart, LineChart, AreaChart, SVG ring charts), TanStack Query for data fetching, two parallel queries
+  - **Membership Insights** (`GET /api/analytics/membership-insights`):
+    11. Tier Distribution donut pie chart (active members by membership tier with legend)
+    12. At-Risk Members list (no booking in 45+ days, with days-ago badges, max 15)
+    13. New Member Growth line chart (monthly signups over last 6 months)
+- **Tech**: Recharts library (BarChart, LineChart, AreaChart, PieChart, SVG ring charts), TanStack Query for data fetching, three parallel queries
 - **Files**: `server/routes/analytics.ts`, `src/pages/Admin/tabs/AnalyticsTab.tsx`
 
 ### Recent Changes
