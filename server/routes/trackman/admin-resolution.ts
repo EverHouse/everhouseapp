@@ -1426,30 +1426,6 @@ router.post('/api/admin/trackman/unmatch-member', isStaffOrAdmin, async (req, re
   }
 });
 
-function calculateMatchScore(searchName: string, firstName: string | null, lastName: string | null): number {
-  const search = searchName.toLowerCase().trim();
-  const first = (firstName || '').toLowerCase().trim();
-  const last = (lastName || '').toLowerCase().trim();
-  const full = `${first} ${last}`.trim();
-  
-  if (search === full) return 100;
-  
-  let score = 0;
-  const searchParts = search.split(/\s+/);
-  
-  for (const part of searchParts) {
-    if (first === part) score += 40;
-    else if (first.startsWith(part)) score += 30;
-    else if (first.includes(part)) score += 20;
-    
-    if (last === part) score += 40;
-    else if (last.startsWith(part)) score += 30;
-    else if (last.includes(part)) score += 20;
-  }
-  
-  return Math.min(score, 99);
-}
-
 router.get('/api/admin/trackman/potential-matches', isStaffOrAdmin, async (req, res) => {
   try {
     const limit = parseInt(req.query.limit as string) || 50;
@@ -1516,81 +1492,6 @@ router.get('/api/admin/trackman/potential-matches', isStaffOrAdmin, async (req, 
   } catch (error: unknown) {
     logger.error('Fetch potential-matches error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to fetch potential matches' });
-  }
-});
-
-router.get('/api/admin/trackman/fuzzy-matches/:id', isStaffOrAdmin, async (req, res) => {
-  try {
-    const { id } = req.params;
-    
-    const unmatchedResult = await db.execute(sql`SELECT id, user_name, original_email, notes, match_attempt_reason
-       FROM trackman_unmatched_bookings
-       WHERE id = ${id}`);
-    
-    if (unmatchedResult.rowCount === 0) {
-      return res.status(404).json({ error: 'Unmatched booking not found' });
-    }
-    
-    const unmatched = unmatchedResult.rows[0] as DbRow;
-    const userName = String((unmatched.user_name || '')).toLowerCase().trim();
-    
-    if (!userName) {
-      return res.json({ suggestions: [], message: 'No name to match against' });
-    }
-    
-    const nameParts = userName.split(/\s+/).filter(Boolean);
-    const firstName = nameParts[0] || '';
-    const lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1] : '';
-    
-    let suggestions: DbRow[] = [];
-    
-    if (firstName && lastName) {
-      const result = await db.execute(sql`SELECT id, email, first_name, last_name, membership_status, trackman_email
-         FROM users
-         WHERE (
-           (LOWER(first_name) LIKE ${`%${firstName}%`} AND LOWER(last_name) LIKE ${`%${lastName}%`})
-           OR (LOWER(first_name) LIKE ${`%${lastName}%`} AND LOWER(last_name) LIKE ${`%${firstName}%`})
-           OR LOWER(first_name || ' ' || last_name) LIKE ${`%${userName}%`}
-           OR LOWER(last_name || ' ' || first_name) LIKE ${`%${userName}%`}
-         )
-         AND membership_status IS NOT NULL
-         ORDER BY 
-           CASE WHEN membership_status = 'active' THEN 0 ELSE 1 END,
-           first_name, last_name
-         LIMIT 10`);
-      suggestions = result.rows;
-    } else if (firstName) {
-      const result = await db.execute(sql`SELECT id, email, first_name, last_name, membership_status, trackman_email
-         FROM users
-         WHERE (LOWER(first_name) LIKE ${`%${firstName}%`} OR LOWER(last_name) LIKE ${`%${firstName}%`})
-         AND membership_status IS NOT NULL
-         ORDER BY 
-           CASE WHEN membership_status = 'active' THEN 0 ELSE 1 END,
-           first_name, last_name
-         LIMIT 10`);
-      suggestions = result.rows;
-    }
-    
-    const formattedSuggestions = suggestions.map(s => ({
-      id: s.id,
-      email: s.email,
-      firstName: s.first_name,
-      lastName: s.last_name,
-      fullName: [s.first_name, s.last_name].filter(Boolean).join(' '),
-      membershipStatus: s.membership_status,
-      trackmanEmail: s.trackman_email,
-      matchScore: calculateMatchScore(userName, s.first_name as string, s.last_name as string)
-    })).sort((a, b) => b.matchScore - a.matchScore);
-    
-    res.json({ 
-      unmatchedName: unmatched.user_name,
-      unmatchedEmail: unmatched.original_email,
-      matches: formattedSuggestions,
-      requiresReview: String((unmatched.match_attempt_reason || '')).includes('REQUIRES_REVIEW')
-    });
-  } catch (error: unknown) {
-    logger.error('Fuzzy match error', { error: error instanceof Error ? error : new Error(String(error)) });
-    res.status(500).json({ error: 'Failed to find fuzzy matches' });
   }
 });
 

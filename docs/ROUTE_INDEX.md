@@ -374,7 +374,6 @@ Total routes: **655**
 | PUT | `/api/admin/booking/:bookingId/members/:slotId/unlink` | server/routes/trackman/admin.ts | 3102 | Staff |
 | GET | `/api/admin/trackman/potential-matches` | server/routes/trackman/admin.ts | 3183 | Staff |
 | DELETE | `/api/admin/trackman/reset-data` | server/routes/trackman/admin.ts | 3252 | Staff |
-| GET | `/api/admin/trackman/fuzzy-matches/:id` | server/routes/trackman/admin.ts | 3330 | Staff |
 | GET | `/api/admin/trackman/requires-review` | server/routes/trackman/admin.ts | 3405 | Staff |
 | GET | `/api/admin/backfill-sessions/preview` | server/routes/trackman/admin.ts | 3456 | Staff |
 | POST | `/api/admin/backfill-sessions` | server/routes/trackman/admin.ts | 3518 | Staff |

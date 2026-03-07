@@ -603,7 +603,6 @@
 | PUT | `/api/admin/trackman/matched/:id/reassign` | 🛡️ | Reassign matched booking |
 | POST | `/api/admin/trackman/unmatch-member` | 🛡️ | Unmatch a member |
 | GET | `/api/admin/trackman/potential-matches` | 🛡️ | Find potential matches |
-| GET | `/api/admin/trackman/fuzzy-matches/:id` | 🛡️ | Get fuzzy matches for booking |
 | GET | `/api/admin/trackman/requires-review` | 🛡️ | Items requiring review |
 | POST | `/api/admin/trackman/auto-match-visitors` | 🛡️ | Auto-match visitors |
 | POST | `/api/trackman/admin/cleanup-lessons` | 🛡️ | Clean up lesson records |

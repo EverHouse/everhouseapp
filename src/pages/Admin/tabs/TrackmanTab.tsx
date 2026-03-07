@@ -111,13 +111,6 @@ interface TrackmanMember {
   name?: string;
 }
 
-interface FuzzyMatch {
-  email: string;
-  firstName?: string;
-  lastName?: string;
-  score: number;
-}
-
 interface ImportRun {
   id: number;
   filename: string;
@@ -153,10 +146,6 @@ interface NeedsPlayersResponse {
   totalCount: number;
 }
 
-interface FuzzyMatchesResponse {
-  matches: FuzzyMatch[];
-}
-
 const TrackmanTab: React.FC = () => {
   const queryClient = useQueryClient();
   const pageReadyContext = usePageReady();
@@ -170,7 +159,7 @@ const TrackmanTab: React.FC = () => {
   const [unmatchedPage, setUnmatchedPage] = useState(1);
   const [needsPlayersPage, setNeedsPlayersPage] = useState(1);
   const [needsPlayersSearchQuery, setNeedsPlayersSearchQuery] = useState('');
-  const [fuzzyMatchModal, setFuzzyMatchModal] = useState<{ booking: TrackmanBooking; matches: FuzzyMatch[]; isLoading: boolean; selectedEmail: string; rememberEmail: boolean } | null>(null);
+  const [fuzzyMatchModal, setFuzzyMatchModal] = useState<{ booking: TrackmanBooking; selectedEmail: string; rememberEmail: boolean } | null>(null);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [assignPlayersModal, setAssignPlayersModal] = useState<{ booking: TrackmanBooking; isOpen: boolean } | null>(null);
   const [bookingSheet, setBookingSheet] = useState<{ 
@@ -244,25 +233,6 @@ const TrackmanTab: React.FC = () => {
     },
     enabled: searchQuery.length >= 2,
   });
-
-  const { data: fuzzyMatchesData, isLoading: fuzzyMatchesLoading, isError: fuzzyMatchesError } = useQuery<FuzzyMatchesResponse>({
-    queryKey: ['trackman', 'fuzzy-matches', fuzzyMatchModal?.booking?.id],
-    queryFn: () => fetchWithCredentials(`/api/admin/trackman/fuzzy-matches/${fuzzyMatchModal?.booking?.id}`),
-    enabled: !!fuzzyMatchModal?.booking?.id,
-  });
-
-  React.useEffect(() => {
-    if (fuzzyMatchesError && fuzzyMatchModal) {
-      setFuzzyMatchModal(prev => prev ? { ...prev, isLoading: false } : null);
-      showToast('Failed to fetch fuzzy matches', 'error');
-    }
-  }, [fuzzyMatchesError, fuzzyMatchModal, showToast]);
-
-  React.useEffect(() => {
-    if (fuzzyMatchesData && fuzzyMatchModal) {
-      setFuzzyMatchModal(prev => prev ? { ...prev, matches: fuzzyMatchesData.matches || [], isLoading: false } : null);
-    }
-  }, [fuzzyMatchesData, fuzzyMatchModal]);
 
   useEffect(() => {
     return () => {
@@ -417,7 +387,7 @@ const TrackmanTab: React.FC = () => {
   }, [needsPlayersSearchQuery]);
 
   const handleOpenFuzzyMatchModal = (booking: TrackmanBooking) => {
-    setFuzzyMatchModal({ booking, matches: [], isLoading: true, selectedEmail: '', rememberEmail: true });
+    setFuzzyMatchModal({ booking, selectedEmail: '', rememberEmail: true });
   };
 
   const handleResolveFuzzyMatch = () => {
@@ -1053,125 +1023,76 @@ const TrackmanTab: React.FC = () => {
             </p>
           </div>
           
-          {fuzzyMatchesLoading ? (
-            <div className="flex flex-col items-center justify-center py-8 gap-3">
-              <WalkingGolferSpinner size="md" variant="auto" />
-              <p className="text-sm text-primary/70 dark:text-white/70">Finding matches...</p>
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-primary dark:text-white mb-2">
+              Search for a member:
+            </label>
+            <div className="relative">
+              <span aria-hidden="true" className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-primary/40 dark:text-white/40 text-lg">search</span>
+              <input
+                type="text"
+                value={fuzzySearchQuery}
+                onChange={e => setFuzzySearchQuery(e.target.value)}
+                placeholder="Type member name or email..."
+                className="w-full pl-10 pr-4 py-3 rounded-xl bg-white/70 dark:bg-white/5 border border-primary/10 dark:border-white/25 text-primary dark:text-white placeholder:text-primary/40 dark:placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+              />
             </div>
-          ) : (
-            <>
-              {fuzzyMatchesData?.matches && fuzzyMatchesData.matches.length > 0 && (
-                <div className="mb-4">
-                  <label className="block text-sm font-medium text-primary dark:text-white mb-2">
-                    Suggested Matches:
-                  </label>
-                  <div className="max-h-40 overflow-y-auto space-y-2 -mx-2 px-2">
-                    {fuzzyMatchesData.matches.map((match: FuzzyMatch, idx: number) => (
-                      <button
-                        key={match.email || idx}
-                        onClick={() => setFuzzyMatchModal(prev => prev ? { ...prev, selectedEmail: match.email } : null)}
-                        className={`w-full p-3 text-left rounded-xl transition-all duration-fast ${
-                          fuzzyMatchModal?.selectedEmail === match.email
-                            ? 'bg-amber-100 dark:bg-amber-500/20 border-2 border-amber-500 shadow-md'
-                            : 'bg-white/70 dark:bg-white/5 border border-primary/10 dark:border-white/25 hover:bg-white dark:hover:bg-white/10 hover:border-primary/20 dark:hover:border-white/20'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="font-semibold text-primary dark:text-white text-sm">
-                              {match.firstName || ''} {match.lastName || ''}
-                            </p>
-                            <p className="text-xs text-primary/80 dark:text-white/80">{match.email}</p>
-                          </div>
-                          <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
-                            match.score >= 80 
-                              ? 'bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-300'
-                              : match.score >= 60
-                                ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300'
-                                : 'bg-gray-100 text-gray-700 dark:bg-gray-500/20 dark:text-gray-300'
-                          }`}>
-                            {match.score}%
-                          </span>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-              
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-primary dark:text-white mb-2">
-                  {fuzzyMatchesData?.matches && fuzzyMatchesData.matches.length > 0 ? 'Or search for a member:' : 'Search for a member:'}
-                </label>
-                <div className="relative">
-                  <span aria-hidden="true" className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-primary/40 dark:text-white/40 text-lg">search</span>
-                  <input
-                    type="text"
-                    value={fuzzySearchQuery}
-                    onChange={e => setFuzzySearchQuery(e.target.value)}
-                    placeholder="Type member name or email..."
-                    className="w-full pl-10 pr-4 py-3 rounded-xl bg-white/70 dark:bg-white/5 border border-primary/10 dark:border-white/25 text-primary dark:text-white placeholder:text-primary/40 dark:placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-amber-500/50"
-                  />
-                </div>
-              </div>
-              
-              {fuzzySearchQuery.trim() && (
-                <div className="max-h-48 overflow-y-auto space-y-2 -mx-2 px-2 mb-4">
-                  {fuzzyFilteredMembers.slice(0, 15).map((member: TrackmanMember, idx: number) => (
-                    <button
-                      key={member.email || `member-${idx}`}
-                      onClick={() => setFuzzyMatchModal(prev => prev ? { ...prev, selectedEmail: member.email } : null)}
-                      className={`w-full p-3 text-left rounded-xl transition-all duration-fast ${
-                        fuzzyMatchModal?.selectedEmail === member.email
-                          ? 'bg-amber-100 dark:bg-amber-500/20 border-2 border-amber-500 shadow-md'
-                          : 'bg-white/70 dark:bg-white/5 border border-primary/10 dark:border-white/25 hover:bg-white dark:hover:bg-white/10 hover:border-primary/20 dark:hover:border-white/20'
-                      }`}
-                    >
-                      <p className="font-semibold text-primary dark:text-white text-sm">
-                        {member.firstName || member.firstname || ''} {member.lastName || member.lastname || ''}
-                      </p>
-                      <p className="text-xs text-primary/80 dark:text-white/80">{member.email}</p>
-                    </button>
-                  ))}
-                  {fuzzyFilteredMembers.length === 0 && (
-                    <EmptyState
-                      icon="group"
-                      title={`No members found for "${fuzzySearchQuery}"`}
-                      variant="compact"
-                    />
-                  )}
-                </div>
-              )}
-              
-              {!fuzzyMatchesData?.matches?.length && !fuzzySearchQuery.trim() && (
+          </div>
+          
+          {fuzzySearchQuery.trim() && (
+            <div className="max-h-48 overflow-y-auto space-y-2 -mx-2 px-2 mb-4">
+              {fuzzyFilteredMembers.slice(0, 15).map((member: TrackmanMember, idx: number) => (
+                <button
+                  key={member.email || `member-${idx}`}
+                  onClick={() => setFuzzyMatchModal(prev => prev ? { ...prev, selectedEmail: member.email } : null)}
+                  className={`w-full p-3 text-left rounded-xl transition-all duration-fast ${
+                    fuzzyMatchModal?.selectedEmail === member.email
+                      ? 'bg-amber-100 dark:bg-amber-500/20 border-2 border-amber-500 shadow-md'
+                      : 'bg-white/70 dark:bg-white/5 border border-primary/10 dark:border-white/25 hover:bg-white dark:hover:bg-white/10 hover:border-primary/20 dark:hover:border-white/20'
+                  }`}
+                >
+                  <p className="font-semibold text-primary dark:text-white text-sm">
+                    {member.firstName || member.firstname || ''} {member.lastName || member.lastname || ''}
+                  </p>
+                  <p className="text-xs text-primary/80 dark:text-white/80">{member.email}</p>
+                </button>
+              ))}
+              {fuzzyFilteredMembers.length === 0 && (
                 <EmptyState
-                  icon="person_add"
-                  title="No auto-suggestions available"
-                  description="Use the search above to find a member"
+                  icon="group"
+                  title={`No members found for "${fuzzySearchQuery}"`}
                   variant="compact"
                 />
               )}
-              
-              {fuzzyMatchModal?.selectedEmail && (fuzzyMatchModal.booking?.originalEmail || fuzzyMatchModal.booking?.original_email) && 
-                (fuzzyMatchModal.booking?.originalEmail || fuzzyMatchModal.booking?.original_email).toLowerCase() !== fuzzyMatchModal.selectedEmail.toLowerCase() && (
-                <div className="p-3 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-500/30 mb-4">
-                  <label className="flex items-start gap-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={fuzzyMatchModal.rememberEmail}
-                      onChange={(e) => setFuzzyMatchModal({ ...fuzzyMatchModal, rememberEmail: e.target.checked })}
-                      className="mt-0.5 w-4 h-4 rounded border-amber-400 text-amber-500 focus:ring-amber-500/50 focus:ring-offset-0"
-                    />
-                    <div>
-                      <p className="text-sm font-medium text-primary dark:text-white">Remember this email for future bookings</p>
-                      <p className="text-xs text-primary/70 dark:text-white/70 mt-0.5">
-                        Link "{fuzzyMatchModal.booking?.originalEmail || fuzzyMatchModal.booking?.original_email}" to this member's account
-                      </p>
-                    </div>
-                  </label>
+            </div>
+          )}
+          
+          {!fuzzySearchQuery.trim() && (
+            <EmptyState
+              icon="search"
+              title="Search by name or email to find a member"
+              variant="compact"
+            />
+          )}
+          
+          {fuzzyMatchModal?.selectedEmail && (fuzzyMatchModal.booking?.originalEmail || fuzzyMatchModal.booking?.original_email) && 
+            (fuzzyMatchModal.booking?.originalEmail || fuzzyMatchModal.booking?.original_email).toLowerCase() !== fuzzyMatchModal.selectedEmail.toLowerCase() && (
+            <div className="p-3 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-500/30 mb-4">
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={fuzzyMatchModal.rememberEmail}
+                  onChange={(e) => setFuzzyMatchModal({ ...fuzzyMatchModal, rememberEmail: e.target.checked })}
+                  className="mt-0.5 w-4 h-4 rounded border-amber-400 text-amber-500 focus:ring-amber-500/50 focus:ring-offset-0"
+                />
+                <div>
+                  <p className="text-sm font-medium text-primary dark:text-white">Remember this email for future bookings</p>
+                  <p className="text-xs text-primary/70 dark:text-white/70 mt-0.5">
+                    Link "{fuzzyMatchModal.booking?.originalEmail || fuzzyMatchModal.booking?.original_email}" to this member's account
+                  </p>
                 </div>
-              )}
-            </>
+              </label>
+            </div>
           )}
           
           <div className="flex justify-end gap-3 pt-4 border-t border-primary/10 dark:border-white/25">

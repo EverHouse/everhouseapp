@@ -41,7 +41,6 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
 
   const hubSpotMembers = await getAllHubSpotMembers();
   
-  const membersByName = new Map<string, string[]>();
   const membersByEmail = new Map<string, string>();
   
   if (hubSpotMembers.length === 0) {
@@ -63,34 +62,14 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
   for (const member of hubSpotMembers) {
     if (member.email) {
       membersByEmail.set(member.email.toLowerCase(), member.email);
-      const fullName = `${member.firstName || ''} ${member.lastName || ''}`.toLowerCase().trim();
-      if (fullName) {
-        const existing = membersByName.get(fullName) || [];
-        existing.push(member.email);
-        membersByName.set(fullName, existing);
-      }
     }
   }
   
-  let ambiguousNameCount = 0;
-  for (const [name, emails] of membersByName.entries()) {
-    if (emails.length > 1) {
-      ambiguousNameCount++;
-      if (ambiguousNameCount <= 5) {
-        process.stderr.write(`[Trackman Import] Ambiguous name "${name}" matches ${emails.length} members: ${emails.join(', ')}\n`);
-      }
-    }
-  }
-  if (ambiguousNameCount > 0) {
-    process.stderr.write(`[Trackman Import] Total ambiguous names: ${ambiguousNameCount} (name matching will be skipped for these)\n`);
-  }
   process.stderr.write(`[Trackman Import] Using ${membersByEmail.size} HubSpot members for matching (includes former members)\n`);
 
   try {
     const localUsers = await db.select({
       email: users.email,
-      firstName: users.firstName,
-      lastName: users.lastName
     }).from(users).where(sql`email IS NOT NULL AND email != '' AND COALESCE(membership_status, '') != 'merged'`);
     
     let addedFromDb = 0;
@@ -100,12 +79,6 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
         if (!membersByEmail.has(lowerEmail)) {
           membersByEmail.set(lowerEmail, user.email);
           addedFromDb++;
-          const fullName = `${user.firstName || ''} ${user.lastName || ''}`.toLowerCase().trim();
-          if (fullName) {
-            const existing = membersByName.get(fullName) || [];
-            existing.push(user.email);
-            membersByName.set(fullName, existing);
-          }
         }
       }
     }
@@ -1926,18 +1899,11 @@ export async function rescanUnmatchedBookings(performedBy: string = 'system'): P
     };
   }
   
-  const membersByName = new Map<string, string[]>();
   const membersByEmail = new Map<string, string>();
   
   for (const member of hubSpotMembers) {
     if (member.email) {
       membersByEmail.set(member.email.toLowerCase(), member.email);
-      const fullName = `${member.firstName || ''} ${member.lastName || ''}`.toLowerCase().trim();
-      if (fullName) {
-        const existing = membersByName.get(fullName) || [];
-        existing.push(member.email);
-        membersByName.set(fullName, existing);
-      }
     }
   }
   
@@ -2057,35 +2023,6 @@ export async function rescanUnmatchedBookings(performedBy: string = 'system'): P
           if (existingMember) {
             matchedEmail = existingMember;
             matchReason = 'Matched by trackman_email';
-          }
-        }
-      }
-      
-      if (!matchedEmail && userName) {
-        const normalizedName = userName.toLowerCase().trim();
-        const byNameEmails = membersByName.get(normalizedName);
-        if (byNameEmails && byNameEmails.length === 1) {
-          matchedEmail = byNameEmails[0];
-          matchReason = 'Matched by name';
-        } else if (!byNameEmails || byNameEmails.length === 0) {
-          const nameParts = normalizedName.split(' ');
-          if (nameParts.length >= 2) {
-            const firstName = nameParts[0];
-            const lastName = nameParts[nameParts.length - 1];
-            
-            let partialMatches: string[] = [];
-            let matchedName = '';
-            for (const [name, emails] of membersByName.entries()) {
-              if (name.includes(firstName) && name.includes(lastName)) {
-                partialMatches = partialMatches.concat(emails);
-                matchedName = name;
-              }
-            }
-            
-            if (partialMatches.length === 1) {
-              matchedEmail = partialMatches[0];
-              matchReason = `Matched by partial name: ${matchedName}`;
-            }
           }
         }
       }
