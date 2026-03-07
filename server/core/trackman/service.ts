@@ -17,7 +17,7 @@ import { logger } from '../logger';
 import type { TrackmanRow, PaidCheckRow } from './constants';
 import { isPlaceholderEmail, normalizeStatus, isFutureBooking, isTimeWithinTolerance } from './constants';
 import { parseCSVWithMultilineSupport, extractTime, extractDate, parseNotesForPlayers } from './parser';
-import { getGolfInstructorEmails, getAllHubSpotMembers, loadEmailMapping, resolveEmail, isConvertedToPrivateEventBlock, autoLinkEmailToOwner, isEmailLinkedToUser } from './matching';
+import { getGolfInstructorEmails, getAllHubSpotMembers, loadEmailMapping, resolveEmail, isConvertedToPrivateEventBlock, isEmailLinkedToUser } from './matching';
 import { createTrackmanSessionAndParticipants, transferRequestParticipantsToSession } from './sessionMapper';
 
 export async function importTrackmanBookings(csvPath: string, importedBy?: string): Promise<{
@@ -1331,7 +1331,6 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
             
             for (const memberPlayer of memberPlayers) {
               const memberEmail = memberPlayer.email!.toLowerCase();
-              const memberName = memberPlayer.name || '';
               
               const memberResolvedEmail = resolveEmail(memberEmail, membersByEmail, trackmanEmailMapping);
               
@@ -1345,7 +1344,9 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
                 continue;
               }
               
-              const memberExists = membersByEmail.get(memberEmail) || trackmanEmailMapping.get(memberEmail);
+              const mappedMemberEmail = emailMapping.get(memberEmail);
+              const memberExists = membersByEmail.get(memberEmail) || trackmanEmailMapping.get(memberEmail) || 
+                (mappedMemberEmail ? membersByEmail.get(mappedMemberEmail.toLowerCase()) || mappedMemberEmail : undefined);
               
               let resolvedMemberEmail = memberExists;
               
