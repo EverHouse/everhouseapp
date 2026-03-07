@@ -274,7 +274,7 @@ const Landing: React.FC = () => {
             <p className="text-base text-primary/70 dark:text-white/70 leading-relaxed" style={{ fontFamily: 'var(--font-body)' }}>Select the plan that fits your lifestyle.</p>
          </div>
          
-         <div className="flex flex-col gap-4">
+         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 max-w-6xl mx-auto">
             {socialTier && (
             <div className="backdrop-blur-xl bg-white/50 dark:bg-white/5 p-6 rounded-xl border border-white/60 dark:border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.08),inset_0_1px_1px_rgba(255,255,255,0.6)] hover:scale-[1.02] hover:-translate-y-1 transition-all duration-[400ms]">
                 <div className="flex justify-between items-center mb-2">
@@ -326,11 +326,12 @@ const Landing: React.FC = () => {
             </div>
             )}
 
-            <Link to="/membership/compare" className="tactile-btn w-full mt-2 flex items-center justify-center gap-1 text-xs font-bold uppercase tracking-widest text-primary/60 dark:text-white/60 hover:text-primary dark:hover:text-white transition-colors py-2">
+         </div>
+
+            <Link to="/membership/compare" className="tactile-btn w-full mt-4 flex items-center justify-center gap-1 text-xs font-bold uppercase tracking-widest text-primary/60 dark:text-white/60 hover:text-primary dark:hover:text-white transition-colors py-2 max-w-6xl mx-auto">
               Compare all tiers
               <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
             </Link>
-         </div>
       </section>
 
       <section className="px-6 py-10 bg-bone dark:bg-[#141414] animate-content-enter-delay-4">

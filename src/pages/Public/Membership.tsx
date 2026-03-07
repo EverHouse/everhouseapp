@@ -131,7 +131,7 @@ const MembershipOverview: React.FC = () => {
         url="/membership"
         image="/images/hero-lounge-optimized.webp"
       />
-    <div className="px-4 pt-4 pb-0 flex flex-col gap-8 bg-bone dark:bg-[#141414] min-h-screen overflow-x-hidden">
+    <div className="px-4 pt-4 pb-0 flex flex-col gap-8 bg-bone dark:bg-[#141414] min-h-screen overflow-x-hidden max-w-6xl mx-auto lg:px-8">
       <div className="text-center px-2 animate-content-enter">
         <p className="text-primary/40 dark:text-white/40 text-[10px] font-bold uppercase tracking-[0.3em] mb-2">Est. 2025</p>
         <h1 className="text-3xl sm:text-4xl md:text-5xl text-primary dark:text-white mb-3 leading-none" style={{ fontFamily: 'var(--font-display)' }}>Your Office. Your Course. Your Club.</h1>
@@ -151,7 +151,7 @@ const MembershipOverview: React.FC = () => {
         </p>
       </div>
 
-      <div className="flex flex-col gap-5 animate-content-enter-delay-2">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 animate-content-enter-delay-2">
         {tiers.map((tier) => {
           const isCorporate = tier.slug === 'corporate';
           const suffix = isCorporate ? '/mo per employee' : extractSuffix(tier.price_string);

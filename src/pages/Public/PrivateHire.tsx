@@ -141,12 +141,13 @@ const PrivateHire: React.FC = () => {
          </div>
        </section>
 
-       <div className="px-4 pb-8 space-y-6">
-          <div className="flex items-center justify-between px-2 pb-2 animate-content-enter">
+       <div className="px-4 pb-8 max-w-7xl mx-auto">
+          <div className="flex items-center justify-between px-2 pb-6 animate-content-enter">
              <h3 className="text-lg font-bold text-primary dark:text-white">Available Spaces</h3>
              <span className="text-xs font-bold text-primary/50 dark:text-white/50 bg-[#E8E8E0] dark:bg-white/5 px-2 py-1 rounded uppercase tracking-widest">Select One</span>
           </div>
           
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <SpaceCard
             title="The Main Hall"
             cap="600 Max"
@@ -171,6 +172,7 @@ const PrivateHire: React.FC = () => {
             desc="Enjoy the California breeze in our lush outdoor setting, perfect for cocktail hours."
             index={2}
           />
+          </div>
        </div>
 
        </div>
