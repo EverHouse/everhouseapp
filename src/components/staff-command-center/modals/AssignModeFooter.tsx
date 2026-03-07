@@ -189,6 +189,7 @@ export function AssignModeSecondaryActions({
                   type="text"
                   value={customEventTitle}
                   onChange={e => setCustomEventTitle(e.target.value)}
+                  maxLength={200}
                   placeholder="e.g. Corporate Event, Birthday Party..."
                   className="w-full px-3 py-2 rounded-lg border border-purple-200 dark:border-purple-500/30 bg-white dark:bg-white/5 text-sm text-primary dark:text-white placeholder:text-primary/40 dark:placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
                   autoFocus

@@ -825,7 +825,7 @@ router.get('/api/admin/linked-emails/:email', isStaffOrAdmin, async (req: Reques
   }
 });
 
-router.get('/api/availability/trackman-cache', async (req: Request, res: Response) => {
+router.get('/api/availability/trackman-cache', isStaffOrAdmin, async (req: Request, res: Response) => {
   try {
     const { start_date, end_date, resource_id } = req.query;
     

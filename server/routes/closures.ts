@@ -166,21 +166,44 @@ function getDatesBetween(startDate: string, endDate: string): string[] {
   return dates;
 }
 
-async function formatAffectedAreasForDisplay(affectedAreas: string | null | undefined): Promise<string> {
-  if (!affectedAreas) return 'No booking restrictions';
-  if (affectedAreas === 'entire_facility') return 'Entire Facility';
-  if (affectedAreas === 'all_bays') return 'All Simulator Bays';
-  if (affectedAreas === 'conference_room') return 'Conference Room';
-  
-  if (affectedAreas.startsWith('bay_')) {
-    const bayId = parseInt(affectedAreas.replace('bay_', ''));
+async function formatSingleAreaFromDb(area: string): Promise<string> {
+  const trimmed = area.trim();
+  if (trimmed === 'entire_facility') return 'Entire Facility';
+  if (trimmed === 'all_bays') return 'All Simulator Bays';
+  if (trimmed === 'conference_room' || trimmed === 'Conference Room') return 'Conference Room';
+  if (trimmed === 'none') return '';
+
+  if (trimmed.startsWith('bay_')) {
+    const bayId = parseInt(trimmed.replace('bay_', ''));
     if (!isNaN(bayId)) {
       const [resource] = await db.select({ name: resources.name }).from(resources).where(eq(resources.id, bayId));
-      return resource ? resource.name : affectedAreas;
+      return resource ? resource.name : `Simulator Bay ${bayId}`;
     }
   }
-  
-  return affectedAreas;
+
+  return trimmed;
+}
+
+async function formatAffectedAreasForDisplay(affectedAreas: string | null | undefined): Promise<string> {
+  if (!affectedAreas) return 'No booking restrictions';
+  const trimmed = affectedAreas.trim();
+  if (trimmed === 'none') return 'No booking restrictions';
+
+  if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) {
+        const formatted = await Promise.all(parsed.map((a: string) => formatSingleAreaFromDb(String(a))));
+        const filtered = formatted.filter(a => a);
+        if (filtered.length > 0) return filtered.join(', ');
+      }
+    } catch { /* fall through to comma-separated parsing */ }
+  }
+
+  const parts = trimmed.includes(',') ? trimmed.split(',') : [trimmed];
+  const formatted = await Promise.all(parts.map(formatSingleAreaFromDb));
+  const filtered = formatted.filter(a => a);
+  return filtered.length > 0 ? filtered.join(', ') : affectedAreas;
 }
 
 async function createAvailabilityBlocksForClosure(
