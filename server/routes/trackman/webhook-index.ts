@@ -327,9 +327,11 @@ router.post('/api/webhooks/trackman', async (req: Request, res: Response) => {
   
   const payload: TrackmanWebhookPayload = req.body;
   
-  // Detect non-booking event types early (user_update, purchase) — skip booking dedup for these
+  const rawPl = payload as Record<string, unknown>;
   const incomingEventType = payload.event_type || payload.eventType || '';
-  const isNonBookingEvent = incomingEventType.includes('user') || incomingEventType.includes('purchase');
+  const isNonBookingEvent = incomingEventType.includes('user') || incomingEventType.includes('purchase') ||
+    (rawPl.user && typeof rawPl.user === 'object' && !rawPl.booking && !rawPl.data) ||
+    (rawPl.purchase && typeof rawPl.purchase === 'object' && !rawPl.booking);
   
   // Check for duplicate webhook using idempotency guard BEFORE processing
   // Include status + content signature in dedup key so modifications with changed bay/time get through
@@ -536,7 +538,12 @@ router.post('/api/webhooks/trackman', async (req: Request, res: Response) => {
         matchedBookingId = result.matchedBookingId;
       }
     } else {
-      eventType = payload.event_type || payload.eventType || 'booking_update';
+      const rawPayload = payload as Record<string, unknown>;
+      const hasUserKey = rawPayload.user && typeof rawPayload.user === 'object' && !rawPayload.booking && !rawPayload.data;
+      const hasPurchaseKey = rawPayload.purchase && typeof rawPayload.purchase === 'object' && !rawPayload.booking;
+      
+      eventType = payload.event_type || payload.eventType || 
+        (hasUserKey ? 'user_update' : hasPurchaseKey ? 'purchase_update' : 'booking_update');
       
       const isUserUpdateEvent = eventType.includes('user_update') || eventType.includes('user.');
       const isPurchaseEvent = eventType.includes('purchase');
