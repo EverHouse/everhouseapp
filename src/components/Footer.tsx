@@ -74,7 +74,7 @@ export const Footer: React.FC<FooterProps> = ({ hideCta = false }) => {
      
      {!hideCta && (
        <a 
-         href="/membership" 
+         href="/membership/apply" 
          className="w-full max-w-sm mx-auto mb-10 py-4 px-6 rounded-[4px] bg-[#F2F2EC] text-[#293515] font-bold text-sm flex items-center justify-center gap-2 hover:opacity-90 transition-opacity border border-[#F2F2EC]/80 shadow-[0_4px_16px_rgba(0,0,0,0.1)] tactile-btn"
        >
          Apply for Membership
