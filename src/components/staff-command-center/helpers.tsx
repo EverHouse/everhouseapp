@@ -3,9 +3,10 @@ import { getPacificDateParts } from '../../utils/dateUtils';
 
 export const DateBlock: React.FC<{ dateStr: string; today: string }> = ({ dateStr, today }) => {
   const isToday = dateStr === today;
-  const date = new Date(dateStr + 'T12:00:00');
-  const month = date.toLocaleDateString('en-US', { month: 'short', timeZone: 'America/Los_Angeles' }).toUpperCase();
-  const day = date.getDate();
+  const date = dateStr ? new Date(dateStr + 'T12:00:00') : new Date(NaN);
+  const isValid = !isNaN(date.getTime());
+  const month = isValid ? date.toLocaleDateString('en-US', { month: 'short', timeZone: 'America/Los_Angeles' }).toUpperCase() : '';
+  const day = isValid ? date.getDate() : '';
   
   return (
     <div className={`flex flex-col items-center justify-center min-w-[44px] h-[44px] rounded-lg ${
@@ -69,9 +70,16 @@ export const getEventIcon = (category: string): string => {
 export const formatTimeLeft = (targetDate: string | Date, targetTime: string): string => {
   if (!targetDate || !targetTime) return 'No upcoming';
   
-  const dateStr = typeof targetDate === 'string' 
-    ? targetDate.split('T')[0]
-    : targetDate.toISOString().split('T')[0];
+  let dateStr: string;
+  if (typeof targetDate === 'string') {
+    dateStr = targetDate.split('T')[0];
+  } else {
+    try {
+      dateStr = targetDate.toISOString().split('T')[0];
+    } catch {
+      return 'No upcoming';
+    }
+  }
   
   if (!dateStr || dateStr === 'Invalid Date' || !dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
     return 'No upcoming';

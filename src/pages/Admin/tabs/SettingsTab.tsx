@@ -334,39 +334,39 @@ const SettingsTab: React.FC = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <FieldLabel>Club Phone</FieldLabel>
-              <input type="tel" value={settings.contactPhone} onChange={(e) => updateField('contactPhone', e.target.value)} className={inputClass} placeholder="(555) 555-5555" />
+              <input type="tel" value={settings.contactPhone ?? ''} onChange={(e) => updateField('contactPhone', e.target.value)} className={inputClass} placeholder="(555) 555-5555" />
             </div>
             <div>
               <FieldLabel>Contact Email</FieldLabel>
-              <input type="email" value={settings.contactEmail} onChange={(e) => updateField('contactEmail', e.target.value)} className={inputClass} placeholder="info@example.com" />
+              <input type="email" value={settings.contactEmail ?? ''} onChange={(e) => updateField('contactEmail', e.target.value)} className={inputClass} placeholder="info@example.com" />
             </div>
           </div>
           <div>
             <FieldLabel>Address Line 1</FieldLabel>
-            <input type="text" value={settings.addressLine1} onChange={(e) => updateField('addressLine1', e.target.value)} className={inputClass} placeholder="123 Main St" />
+            <input type="text" value={settings.addressLine1 ?? ''} onChange={(e) => updateField('addressLine1', e.target.value)} className={inputClass} placeholder="123 Main St" />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <FieldLabel>Address Line 2 / Suite</FieldLabel>
-              <input type="text" value={settings.addressLine2} onChange={(e) => updateField('addressLine2', e.target.value)} className={inputClass} placeholder="Suite 100" />
+              <input type="text" value={settings.addressLine2 ?? ''} onChange={(e) => updateField('addressLine2', e.target.value)} className={inputClass} placeholder="Suite 100" />
             </div>
             <div>
               <FieldLabel>City, State, Zip</FieldLabel>
-              <input type="text" value={settings.cityStateZip} onChange={(e) => updateField('cityStateZip', e.target.value)} className={inputClass} placeholder="City, ST 00000" />
+              <input type="text" value={settings.cityStateZip ?? ''} onChange={(e) => updateField('cityStateZip', e.target.value)} className={inputClass} placeholder="City, ST 00000" />
             </div>
           </div>
           <div>
             <FieldLabel>Formerly Known As</FieldLabel>
-            <input type="text" value={settings.formerlyKnownAs} onChange={(e) => updateField('formerlyKnownAs', e.target.value)} className={inputClass} placeholder="Leave empty to hide" />
+            <input type="text" value={settings.formerlyKnownAs ?? ''} onChange={(e) => updateField('formerlyKnownAs', e.target.value)} className={inputClass} placeholder="Leave empty to hide" />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <FieldLabel>Google Maps URL</FieldLabel>
-              <input type="url" value={settings.googleMapsUrl} onChange={(e) => updateField('googleMapsUrl', e.target.value)} className={inputClass} placeholder="https://maps.app.goo.gl/..." />
+              <input type="url" value={settings.googleMapsUrl ?? ''} onChange={(e) => updateField('googleMapsUrl', e.target.value)} className={inputClass} placeholder="https://maps.app.goo.gl/..." />
             </div>
             <div>
               <FieldLabel>Apple Maps Query</FieldLabel>
-              <input type="text" value={settings.appleMapsQuery} onChange={(e) => updateField('appleMapsQuery', e.target.value)} className={inputClass} placeholder="Business+Name+City+ST" />
+              <input type="text" value={settings.appleMapsQuery ?? ''} onChange={(e) => updateField('appleMapsQuery', e.target.value)} className={inputClass} placeholder="Business+Name+City+ST" />
             </div>
           </div>
 
@@ -374,15 +374,15 @@ const SettingsTab: React.FC = () => {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <FieldLabel>Instagram URL</FieldLabel>
-              <input type="url" value={settings.instagramUrl} onChange={(e) => updateField('instagramUrl', e.target.value)} className={inputClass} placeholder="https://instagram.com/..." />
+              <input type="url" value={settings.instagramUrl ?? ''} onChange={(e) => updateField('instagramUrl', e.target.value)} className={inputClass} placeholder="https://instagram.com/..." />
             </div>
             <div>
               <FieldLabel>TikTok URL</FieldLabel>
-              <input type="url" value={settings.tiktokUrl} onChange={(e) => updateField('tiktokUrl', e.target.value)} className={inputClass} placeholder="https://tiktok.com/@..." />
+              <input type="url" value={settings.tiktokUrl ?? ''} onChange={(e) => updateField('tiktokUrl', e.target.value)} className={inputClass} placeholder="https://tiktok.com/@..." />
             </div>
             <div>
               <FieldLabel>LinkedIn URL</FieldLabel>
-              <input type="url" value={settings.linkedinUrl} onChange={(e) => updateField('linkedinUrl', e.target.value)} className={inputClass} placeholder="https://linkedin.com/company/..." />
+              <input type="url" value={settings.linkedinUrl ?? ''} onChange={(e) => updateField('linkedinUrl', e.target.value)} className={inputClass} placeholder="https://linkedin.com/company/..." />
             </div>
           </div>
 
@@ -401,7 +401,7 @@ const SettingsTab: React.FC = () => {
           {settings.appleMessagesEnabled && (
             <div>
               <FieldLabel>Apple Business ID</FieldLabel>
-              <input type="text" value={settings.appleMessagesBusinessId} onChange={(e) => updateField('appleMessagesBusinessId', e.target.value)} className={inputClass} placeholder="Enter your Apple Business Messages ID" />
+              <input type="text" value={settings.appleMessagesBusinessId ?? ''} onChange={(e) => updateField('appleMessagesBusinessId', e.target.value)} className={inputClass} placeholder="Enter your Apple Business Messages ID" />
             </div>
           )}
 
@@ -467,7 +467,7 @@ const SettingsTab: React.FC = () => {
             ].map(({ label, field }) => (
               <div key={field}>
                 <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">{label}</label>
-                <input type="number" min="15" max="120" step="15" value={settings[field]} onChange={(e) => updateField(field, e.target.value)} className={inputSmClass} />
+                <input type="number" min="15" max="120" step="15" value={settings[field] ?? ''} onChange={(e) => updateField(field, e.target.value)} className={inputSmClass} />
               </div>
             ))}
           </div>
@@ -547,14 +547,14 @@ const SettingsTab: React.FC = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <FieldLabel>Daily Reminder Hour</FieldLabel>
-              <select value={settings.dailyReminderHour} onChange={(e) => updateField('dailyReminderHour', e.target.value)} className={inputClass}>
+              <select value={settings.dailyReminderHour ?? ''} onChange={(e) => updateField('dailyReminderHour', e.target.value)} className={inputClass}>
                 {HOUR_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
               </select>
               <p className="text-xs text-gray-400 mt-1">When to send tomorrow's booking/event reminders</p>
             </div>
             <div>
               <FieldLabel>Morning Closure Alert Hour</FieldLabel>
-              <select value={settings.morningClosureHour} onChange={(e) => updateField('morningClosureHour', e.target.value)} className={inputClass}>
+              <select value={settings.morningClosureHour ?? ''} onChange={(e) => updateField('morningClosureHour', e.target.value)} className={inputClass}>
                 {HOUR_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
               </select>
               <p className="text-xs text-gray-400 mt-1">When to notify members about today's closures</p>
@@ -563,14 +563,14 @@ const SettingsTab: React.FC = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <FieldLabel>Onboarding Nudge Hour</FieldLabel>
-              <select value={settings.onboardingNudgeHour} onChange={(e) => updateField('onboardingNudgeHour', e.target.value)} className={inputClass}>
+              <select value={settings.onboardingNudgeHour ?? ''} onChange={(e) => updateField('onboardingNudgeHour', e.target.value)} className={inputClass}>
                 {HOUR_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
               </select>
               <p className="text-xs text-gray-400 mt-1">When to send nudge emails to new members</p>
             </div>
             <div>
               <FieldLabel>Grace Period Check Hour</FieldLabel>
-              <select value={settings.gracePeriodHour} onChange={(e) => updateField('gracePeriodHour', e.target.value)} className={inputClass}>
+              <select value={settings.gracePeriodHour ?? ''} onChange={(e) => updateField('gracePeriodHour', e.target.value)} className={inputClass}>
                 {HOUR_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
               </select>
               <p className="text-xs text-gray-400 mt-1">When to check and send payment grace period reminders</p>
@@ -579,17 +579,17 @@ const SettingsTab: React.FC = () => {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <FieldLabel>Max Onboarding Nudges</FieldLabel>
-              <input type="number" min="1" max="10" value={settings.maxOnboardingNudges} onChange={(e) => updateField('maxOnboardingNudges', e.target.value)} className={inputClass} />
+              <input type="number" min="1" max="10" value={settings.maxOnboardingNudges ?? ''} onChange={(e) => updateField('maxOnboardingNudges', e.target.value)} className={inputClass} />
               <p className="text-xs text-gray-400 mt-1">Maximum nudge emails per new member</p>
             </div>
             <div>
               <FieldLabel>Grace Period Days</FieldLabel>
-              <input type="number" min="1" max="14" value={settings.gracePeriodDays} onChange={(e) => updateField('gracePeriodDays', e.target.value)} className={inputClass} />
+              <input type="number" min="1" max="14" value={settings.gracePeriodDays ?? ''} onChange={(e) => updateField('gracePeriodDays', e.target.value)} className={inputClass} />
               <p className="text-xs text-gray-400 mt-1">Days before terminating for failed payment</p>
             </div>
             <div>
               <FieldLabel>Trial Coupon Code</FieldLabel>
-              <input type="text" value={settings.trialCouponCode} onChange={(e) => updateField('trialCouponCode', e.target.value)} className={inputClass} placeholder="COUPONCODE" />
+              <input type="text" value={settings.trialCouponCode ?? ''} onChange={(e) => updateField('trialCouponCode', e.target.value)} className={inputClass} placeholder="COUPONCODE" />
               <p className="text-xs text-gray-400 mt-1">Promo code included in trial welcome email</p>
             </div>
           </div>

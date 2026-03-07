@@ -253,7 +253,7 @@ export function useCommandCenterData(userEmail?: string) {
       if (c.endDate < today) return false;
       if (c.startDate > tomorrow) return false;
       if (c.endDate === today && c.endTime) {
-        const normalizedEndTime = c.endTime.slice(0, 5);
+        const normalizedEndTime = typeof c.endTime === 'string' ? c.endTime.slice(0, 5) : '00:00';
         if (normalizedEndTime <= nowTime) return false;
       }
       return true;

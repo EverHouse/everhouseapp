@@ -21,8 +21,10 @@ const NextTourWidget: React.FC<NextTourWidgetProps> = ({ nextTour, isDesktop, on
   };
 
   const getDateDisplay = () => {
-    if (nextTour) {
-      const dateStr = new Date(nextTour.tourDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'America/Los_Angeles' });
+    if (nextTour && nextTour.tourDate) {
+      const d = new Date(nextTour.tourDate + 'T12:00:00');
+      if (isNaN(d.getTime())) return '';
+      const dateStr = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'America/Los_Angeles' });
       return nextTour.startTime ? `${dateStr} at ${formatTime12Hour(nextTour.startTime)}` : dateStr;
     }
     return '';
@@ -71,7 +73,11 @@ const NextEventWidget: React.FC<NextEventWidgetProps> = ({ nextActivityItem, nex
   const normalizeDateStr = (d: string | Date | undefined): string => {
     if (!d) return '';
     if (typeof d === 'string') return d.split('T')[0];
-    return new Date(d).toISOString().split('T')[0];
+    try {
+      return d.toISOString().split('T')[0];
+    } catch {
+      return '';
+    }
   };
 
   const getTitle = () => {
@@ -88,27 +94,20 @@ const NextEventWidget: React.FC<NextEventWidgetProps> = ({ nextActivityItem, nex
     return 'No upcoming';
   };
 
+  const safeDateDisplay = (dateVal: string | Date | undefined, timeVal?: string | null): string => {
+    const normalized = normalizeDateStr(dateVal);
+    if (!normalized) return '';
+    const d = new Date(normalized + 'T12:00:00');
+    if (isNaN(d.getTime())) return '';
+    const dateStr = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'America/Los_Angeles' });
+    return timeVal ? `${dateStr} at ${formatTime12Hour(timeVal)}` : dateStr;
+  };
+
   const getDateDisplay = () => {
-    if (isEvent && event) {
-      const normalized = normalizeDateStr(event.event_date);
-      const dateStr = new Date(normalized + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'America/Los_Angeles' });
-      return event.start_time ? `${dateStr} at ${formatTime12Hour(event.start_time)}` : dateStr;
-    }
-    if (isWellness && wellness) {
-      const normalized = normalizeDateStr(wellness.date);
-      const dateStr = new Date(normalized + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'America/Los_Angeles' });
-      return wellness.time ? `${dateStr} at ${formatTime12Hour(wellness.time)}` : dateStr;
-    }
-    if (useFallbackEvent && fallbackEvent) {
-      const normalized = normalizeDateStr(fallbackEvent.event_date);
-      const dateStr = new Date(normalized + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'America/Los_Angeles' });
-      return fallbackEvent.start_time ? `${dateStr} at ${formatTime12Hour(fallbackEvent.start_time)}` : dateStr;
-    }
-    if (useFallbackWellness && fallbackWellness) {
-      const normalized = normalizeDateStr(fallbackWellness.date);
-      const dateStr = new Date(normalized + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'America/Los_Angeles' });
-      return fallbackWellness.time ? `${dateStr} at ${formatTime12Hour(fallbackWellness.time)}` : dateStr;
-    }
+    if (isEvent && event) return safeDateDisplay(event.event_date, event.start_time);
+    if (isWellness && wellness) return safeDateDisplay(wellness.date, wellness.time);
+    if (useFallbackEvent && fallbackEvent) return safeDateDisplay(fallbackEvent.event_date, fallbackEvent.start_time);
+    if (useFallbackWellness && fallbackWellness) return safeDateDisplay(fallbackWellness.date, fallbackWellness.time);
     return '';
   };
 
@@ -161,7 +160,7 @@ const WellnessCard: React.FC<WellnessCardProps> = ({ isDesktopGrid, isDesktop, u
     ) : (
       <div className={`${isDesktop ? 'flex-1 overflow-y-auto pb-6' : ''}`}>
         {upcomingWellness.slice(0, isDesktop ? 5 : 3).map((wellness, index) => {
-          const dateStr = typeof wellness.date === 'string' ? wellness.date.split('T')[0] : new Date(wellness.date).toISOString().split('T')[0];
+          const dateStr = wellness.date ? (typeof wellness.date === 'string' ? wellness.date.split('T')[0] : new Date(wellness.date).toISOString().split('T')[0]) : '';
           return (
             <GlassListRow key={wellness.id} onClick={onNavigateToWellness} className="animate-slide-up-stagger tactile-row" style={{ '--stagger-index': index } as React.CSSProperties}>
               <DateBlock dateStr={dateStr} today={today} />
