@@ -562,7 +562,7 @@ router.post('/api/webhooks/trackman', async (req: Request, res: Response) => {
           if (member) {
             matchedUserId = member.email;
             logger.info('[Trackman Webhook] user_update matched to member', {
-              extra: { trackmanUserId, memberEmail: member.email, memberName: member.name }
+              extra: { trackmanUserId, memberEmail: member.email, memberName: [member.firstName, member.lastName].filter(Boolean).join(' ') || undefined }
             });
           }
         }
