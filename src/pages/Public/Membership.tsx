@@ -228,7 +228,7 @@ const MembershipOverview: React.FC = () => {
         </div>
         
         <div className="flex flex-col md:flex-row items-center md:items-start justify-center gap-4 md:gap-2 relative">
-          <div className="hidden md:block absolute top-8 left-[20%] right-[20%] h-[2px] border-t-2 border-dashed border-primary/20 dark:border-white/20"></div>
+          <div className="hidden md:block absolute top-7 left-[16.67%] right-[16.67%] h-[2px] border-t-2 border-dashed border-primary/20 dark:border-white/20"></div>
           
           <div className="flex flex-col items-center text-center relative z-10 flex-1 max-w-[200px]">
             <div className="w-14 h-14 rounded-full bg-primary flex items-center justify-center text-white text-lg font-bold mb-3 shadow-lg dark:shadow-black/20">
