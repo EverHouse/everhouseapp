@@ -519,7 +519,6 @@ router.post('/api/webhooks/trackman', async (req: Request, res: Response) => {
         logger.info('[Trackman Webhook] V2: No direct match, falling through to standard processing', {
           extra: { 
             trackmanBookingId: v2Result.normalized.trackmanBookingId,
-            customerEmail: v2Result.normalized.customerEmail,
             date: v2Result.normalized.parsedDate,
             time: v2Result.normalized.parsedStartTime
           }
