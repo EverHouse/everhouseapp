@@ -15,7 +15,7 @@ interface GroupedTemplates {
   [category: string]: EmailTemplate[];
 }
 
-const CATEGORY_ORDER = ['Authentication', 'Welcome', 'Booking', 'Passes', 'Payments', 'Membership', 'System'];
+const CATEGORY_ORDER = ['Authentication', 'Welcome', 'Booking', 'Passes', 'Payments', 'Membership', 'Onboarding', 'System'];
 
 const CATEGORY_ICONS: Record<string, string> = {
   Authentication: 'lock',
@@ -24,6 +24,7 @@ const CATEGORY_ICONS: Record<string, string> = {
   Passes: 'confirmation_number',
   Payments: 'payments',
   Membership: 'card_membership',
+  Onboarding: 'school',
   System: 'settings',
 };
 
@@ -38,12 +39,12 @@ interface EmailCategory {
 }
 
 const EMAIL_CATEGORIES: EmailCategory[] = [
-  { key: 'email.auth.enabled', label: 'Authentication', icon: 'lock', description: 'Login codes (OTP) for passwordless sign-in', alwaysOn: true },
+  { key: 'email.auth.enabled', label: 'Authentication', icon: 'lock', description: 'Login codes (OTP) and account deletion confirmations', alwaysOn: true },
   { key: 'email.welcome.enabled', label: 'Welcome', icon: 'waving_hand', description: 'Welcome, trial welcome, and first visit emails' },
   { key: 'email.booking.enabled', label: 'Booking', icon: 'event_note', description: 'Booking confirmations, tour confirmations, and reschedule notifications' },
   { key: 'email.passes.enabled', label: 'Passes', icon: 'confirmation_number', description: 'Day pass and guest pass emails with QR codes' },
   { key: 'email.payments.enabled', label: 'Payments', icon: 'payments', description: 'Payment receipts, failed payments, outstanding balances', defaultOff: true, stripeNote: true },
-  { key: 'email.membership.enabled', label: 'Membership', icon: 'card_membership', description: 'Renewal, failed payment, card expiring, grace period emails', defaultOff: true, stripeNote: true },
+  { key: 'email.membership.enabled', label: 'Membership', icon: 'card_membership', description: 'Renewal, failed payment, card expiring, invitations, and win-back emails', defaultOff: true, stripeNote: true },
   { key: 'email.onboarding.enabled', label: 'Onboarding', icon: 'school', description: 'Automated onboarding nudge emails for stalled members' },
   { key: 'email.system.enabled', label: 'System', icon: 'settings', description: 'Data integrity alerts sent to staff' },
 ];

@@ -55,7 +55,7 @@ function getEmailWrapper(content: string): string {
 </html>`;
 }
 
-function getNudge24hHtml(firstName?: string): string {
+export function getNudge24hHtml(firstName?: string): string {
   const greeting = firstName ? `Hi ${firstName},` : 'Hi there,';
 
   const content = `
@@ -95,7 +95,7 @@ function getNudge24hHtml(firstName?: string): string {
   return getEmailWrapper(content);
 }
 
-function getNudge72hHtml(firstName?: string): string {
+export function getNudge72hHtml(firstName?: string): string {
   const greeting = firstName ? `Hi ${firstName},` : 'Hi there,';
 
   const content = `
@@ -201,7 +201,7 @@ function getNudge72hHtml(firstName?: string): string {
   return getEmailWrapper(content);
 }
 
-function getNudge7dHtml(firstName?: string): string {
+export function getNudge7dHtml(firstName?: string): string {
   const greeting = firstName ? `Hi ${firstName},` : 'Hi there,';
 
   const content = `

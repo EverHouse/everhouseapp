@@ -8,6 +8,8 @@ import { getMembershipRenewalHtml, getMembershipFailedHtml, getCardExpiringHtml,
 import { getIntegrityAlertEmailHtml } from '../emails/integrityAlertEmail';
 import { getTourConfirmationHtml } from '../emails/tourEmails';
 import { getOtpEmailHtml } from '../emails/otpEmail';
+import { getNudge24hHtml, getNudge72hHtml, getNudge7dHtml } from '../emails/onboardingNudgeEmails';
+import { getMembershipInviteHtml, getWinBackHtml, getAccountDeletionHtml } from '../emails/memberInviteEmail';
 import type { IntegrityCheckResult } from './dataIntegrity';
 
 export interface EmailTemplateInfo {
@@ -19,6 +21,7 @@ export interface EmailTemplateInfo {
 
 const TEMPLATE_REGISTRY: EmailTemplateInfo[] = [
   { id: 'otp-login', name: 'Login Code (OTP)', description: 'One-time passcode sent for passwordless login', category: 'Authentication' },
+  { id: 'account-deletion', name: 'Account Deletion', description: 'Confirmation when a member requests account deletion', category: 'Authentication' },
   { id: 'welcome', name: 'Welcome Email', description: 'Sent when a new member joins', category: 'Welcome' },
   { id: 'trial-welcome', name: 'Trial Welcome', description: 'Sent when a trial membership begins', category: 'Welcome' },
   { id: 'first-visit', name: 'First Visit', description: 'Sent after a member\'s first visit', category: 'Welcome' },
@@ -36,6 +39,11 @@ const TEMPLATE_REGISTRY: EmailTemplateInfo[] = [
   { id: 'card-expiring', name: 'Card Expiring', description: 'Warning that card on file is expiring', category: 'Membership' },
   { id: 'grace-period-reminder', name: 'Grace Period Reminder', description: 'Reminder during grace period', category: 'Membership' },
   { id: 'membership-activation', name: 'Membership Activation', description: 'Membership activation checkout link', category: 'Membership' },
+  { id: 'membership-invite', name: 'Membership Invitation', description: 'Sent when staff invites someone to join as a member', category: 'Membership' },
+  { id: 'win-back', name: 'Win-Back / Reactivation', description: 'Sent to former members to encourage rejoining', category: 'Membership' },
+  { id: 'onboarding-day1', name: 'Onboarding - Day 1', description: 'First nudge sent 24 hours after signup', category: 'Onboarding' },
+  { id: 'onboarding-day3', name: 'Onboarding - Day 3', description: 'Second nudge with tips sent 72 hours after signup', category: 'Onboarding' },
+  { id: 'onboarding-day7', name: 'Onboarding - Day 7', description: 'Final nudge offering help after one week', category: 'Onboarding' },
   { id: 'integrity-alert', name: 'Integrity Alert', description: 'System data integrity check results', category: 'System' },
 ];
 
@@ -51,6 +59,9 @@ export async function renderTemplatePreview(templateId: string): Promise<string 
         code: '847291',
         logoUrl: 'https://everclub.app/images/everclub-logo-dark.png',
       });
+
+    case 'account-deletion':
+      return getAccountDeletionHtml({ firstName: 'Alex' });
 
     case 'tour-confirmation':
       return getTourConfirmationHtml({
@@ -186,6 +197,29 @@ export async function renderTemplatePreview(templateId: string): Promise<string 
         checkoutUrl: 'https://everclub.app/checkout/sample',
         expiresAt: new Date(Date.now() + 48 * 60 * 60 * 1000),
       });
+
+    case 'membership-invite':
+      return getMembershipInviteHtml({
+        firstName: 'Jordan',
+        tierName: 'Premium',
+        priceFormatted: '$299/month',
+        checkoutUrl: 'https://everclub.app/checkout/sample',
+      });
+
+    case 'win-back':
+      return getWinBackHtml({
+        firstName: 'Jordan',
+        reactivationLink: 'https://everclub.app/rejoin/sample',
+      });
+
+    case 'onboarding-day1':
+      return getNudge24hHtml('Alex');
+
+    case 'onboarding-day3':
+      return getNudge72hHtml('Alex');
+
+    case 'onboarding-day7':
+      return getNudge7dHtml('Alex');
 
     case 'integrity-alert':
       return getIntegrityAlertEmailHtml(
