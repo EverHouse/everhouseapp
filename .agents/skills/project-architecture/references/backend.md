@@ -200,7 +200,7 @@ Only if all 3 fail does it INSERT a new session. When called inside a transactio
 | `resource/index.ts` | Re-exports all resource service functions |
 | `resource/service.ts` | Core CRUD: `fetchAllResources`, `fetchBookings`, `fetchPendingBookings` |
 | `resource/cancellation.ts` | `handleCancellationCascade`, `memberCancelBooking`, refund logic |
-| `resource/trackman.ts` | `linkTrackmanToMember`, `markBookingAsEvent`, unmatched booking handling |
+| `resource/trackman.ts` | `linkTrackmanToMember`, `markBookingAsEvent` (accepts optional `eventTitle`, stores `affected_areas` as comma-separated), unmatched booking handling |
 | `resource/availability.ts` | `fetchOverlappingNotices`, availability blocks, facility closures |
 | `resource/staffActions.ts` | `createManualBooking`, `assignWithPlayers`, `assignMemberToBooking` |
 | `queryCache.ts` | Query result caching |

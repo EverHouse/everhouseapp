@@ -262,7 +262,7 @@ Sub-dirs: `drawers/`, `hooks/`, `modals/`, `sections/`.
 
 ## Utils (`src/utils/`)
 
-- `closureUtils.ts` — Closure date helpers
+- `closureUtils.ts` — Closure date helpers, `formatTitleForDisplay` (notice type label formatting), `formatSingleArea` ("Simulator Bay X" badge labels), `getAffectedAreasList`
 - `dateUtils.ts` — Date formatting (Pacific timezone priority)
 - `errorHandling.ts` — Error parsing and display
 - `formatting.ts` — Number, currency, text formatting

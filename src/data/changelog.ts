@@ -8,6 +8,17 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.80.0",
+    date: "2026-03-07",
+    title: "Private Event & Notice Display Improvements",
+    changes: [
+      "Improvement: Staff can now enter a custom title when marking a Trackman booking as a private event — no more generic 'Unknown' labels on private event notices",
+      "Fix: Notice type labels like 'private_event' now display properly as 'Private Event' across all staff and member views — previously showed as raw database values",
+      "Fix: Bay labels in notices now consistently show 'Simulator Bay 1' instead of just 'Bay 1' for clearer identification",
+      "Fix: Affected area badges on private event notices now display correctly instead of showing raw data format",
+    ]
+  },
+  {
     version: "8.79.0",
     date: "2026-03-06",
     title: "Staff Analytics Dashboard & Tracking",

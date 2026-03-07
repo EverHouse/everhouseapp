@@ -2,6 +2,18 @@
 
 All notable changes to the Ever Club Members App are documented here.
 
+## [8.80.0] - 2026-03-07
+
+### Mark as Private Event Workflow
+- **Custom Event Title**: Staff can now enter a custom title when marking a Trackman booking as a private event — previously the notice was titled "Unknown (Trackman)" from the placeholder booking name.
+- **Title Input UI**: "Mark as Private Event" flow now shows a title input field (pre-filled "Private Event") when creating a new notice. Staff can also link to an existing overlapping notice instead.
+- **Affected Areas Format**: Private event notices now store affected areas as comma-separated strings (`bay_1,bay_2`) instead of JSON arrays — both formats are parsed correctly for backwards compatibility.
+
+### Notice Display Consistency
+- **Notice Type Labels**: Raw `notice_type` values like `private_event` now display as "Private Event" across all views: staff Notices tab (active and past), overlapping notices list in the booking modal, and member booking page closure alerts.
+- **Bay Badge Labels**: All bay badges now consistently display "Simulator Bay 1" instead of "Bay 1" via the `formatSingleArea` utility.
+- **Files**: `src/utils/closureUtils.ts` (`formatTitleForDisplay` exported), `src/pages/Admin/tabs/BlocksTab.tsx`, `src/components/staff-command-center/modals/AssignModeFooter.tsx`, `src/pages/Member/BookGolf.tsx`
+
 ## [8.79.0] - 2026-03-06
 
 ### Staff Analytics Dashboard

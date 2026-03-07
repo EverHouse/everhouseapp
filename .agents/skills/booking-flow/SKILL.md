@@ -268,6 +268,29 @@ Resource type?
 
 Each event can trigger member notifications (push, WebSocket, email) and staff notifications independently via `PublishOptions`.
 
+## Mark as Private Event Flow (v8.80.0)
+
+Staff can convert unknown/unmatched Trackman bookings into private event blocks via the "Mark as Private Event" button in the Unified Booking Sheet (`AssignModeFooter.tsx`).
+
+**Backend** (`markBookingAsEvent` in `server/core/resource/trackman.ts`):
+- Accepts optional `eventTitle` param (defaults to "Private Event") and optional `existingClosureId` to link to an existing notice
+- Creates `facility_closures` record with `notice_type = 'private_event'` and the custom title
+- Creates `availability_blocks` per resource to block the bays
+- Stores `affected_areas` as comma-separated strings (`bay_1,bay_2`) — NOT JSON arrays
+- Archives the original unmatched booking (`status = 'archived_event'`)
+
+**Frontend** (`AssignModeFooter.tsx` + `useUnifiedBookingLogic.ts`):
+- Shows overlapping notices for the same day — staff can pick an existing notice
+- "Create New Notice Instead" reveals a title input field (pre-filled "Private Event")
+- `executeMarkAsEvent` passes custom `eventTitle` to the API endpoint
+
+**Display formatting** (`closureUtils.ts`):
+- `formatTitleForDisplay` converts raw `notice_type` values like `private_event` → "Private Event" for display across BlocksTab, AssignModeFooter, and BookGolf
+- `formatSingleArea` converts `bay_1` → "Simulator Bay 1" for consistent badge labels
+- Both JSON arrays (old data) and comma-separated strings (new data) are parsed correctly by `getAffectedAreasList`
+
+**Validator**: `markAsEventSchema` in `shared/validators/resources.ts` includes optional `eventTitle` (string, 1-200 chars).
+
 ## Reconciliation
 
 After a booking is completed, `findAttendanceDiscrepancies()` compares `declared_player_count` (from member's request) against `trackman_player_count` (from Trackman data). If they differ:

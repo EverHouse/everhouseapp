@@ -245,6 +245,8 @@ The 1-hour constraint prevents accidentally flipping legacy pending bookings fro
 
 Before creating an unmatched booking during CSV import, check if the time slot has been converted to a private event block via `isConvertedToPrivateEventBlock()`. This prevents creating duplicate unmatched bookings when re-importing CSV data after a booking was marked as a private event. The check looks for `availability_blocks` linked to `facility_closures` with `notice_type = 'private_event'` that overlap the booking's time range.
 
+**Mark-as-event flow (v8.80.0):** `markBookingAsEvent` in `server/core/resource/trackman.ts` accepts an optional `eventTitle` parameter (defaults to "Private Event") that becomes the notice title. Affected areas are stored as comma-separated strings (`bay_1,bay_2`) — NOT JSON arrays. The `markAsEventSchema` in `shared/validators/resources.ts` validates the optional `eventTitle` field. Staff can either link to an existing notice or create a new one with a custom title via the `AssignModeFooter.tsx` UI.
+
 ### Rule 14b — Trackman webhook SQL null safety
 
 All Trackman webhook handlers that use Drizzle `sql` template literals with optional parameters MUST coalesce `undefined` to `null` using `?? null`. This prevents Drizzle from producing empty SQL placeholders.
