@@ -203,51 +203,87 @@ export async function ensureSessionForBooking(params: {
     }
 
     const existingOwner = await lockClient.query(
-      `SELECT id FROM booking_participants
-       WHERE session_id = $1 AND participant_type = 'owner'
+      `SELECT bp.id, bp.user_id, bp.display_name, u.email as owner_email
+       FROM booking_participants bp
+       LEFT JOIN users u ON bp.user_id = u.id
+       WHERE bp.session_id = $1 AND bp.participant_type = 'owner'
        LIMIT 1`,
       [sessionId]
     );
 
-    if (existingOwner.rows.length === 0) {
-      let ownerDisplayName = params.ownerName;
-      let resolvedUserId: string | null = params.ownerUserId || null;
+    let ownerDisplayName = params.ownerName;
+    let resolvedUserId: string | null = params.ownerUserId || null;
 
-      if (!resolvedUserId || !ownerDisplayName || ownerDisplayName.includes('@')) {
-        const nameResult = await lockClient.query(
-          `SELECT id, first_name, last_name FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1`,
-          [params.ownerEmail]
-        );
-        if (nameResult.rows.length > 0) {
-          const { id, first_name, last_name } = nameResult.rows[0];
-          if (!resolvedUserId) {
-            resolvedUserId = id || null;
-          }
-          if (!ownerDisplayName || ownerDisplayName.includes('@')) {
-            const fullName = [first_name, last_name].filter(Boolean).join(' ');
-            if (fullName) {
-              ownerDisplayName = fullName;
-            }
+    if (!resolvedUserId || !ownerDisplayName || ownerDisplayName.includes('@')) {
+      const nameResult = await lockClient.query(
+        `SELECT id, first_name, last_name FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1`,
+        [params.ownerEmail]
+      );
+      if (nameResult.rows.length > 0) {
+        const { id, first_name, last_name } = nameResult.rows[0];
+        if (!resolvedUserId) {
+          resolvedUserId = id || null;
+        }
+        if (!ownerDisplayName || ownerDisplayName.includes('@')) {
+          const fullName = [first_name, last_name].filter(Boolean).join(' ');
+          if (fullName) {
+            ownerDisplayName = fullName;
           }
         }
       }
+    }
 
-      let slotDuration = 60;
-      try {
-        const [startH, startM] = params.startTime.split(':').map(Number);
-        const [endH, endM] = params.endTime.split(':').map(Number);
-        let endMinutes = endH * 60 + endM;
-        const startMinutes = startH * 60 + startM;
-        if (endMinutes <= startMinutes) endMinutes += 1440;
-        slotDuration = endMinutes - startMinutes;
-        if (slotDuration <= 0) slotDuration = 60;
-      } catch (err) { logger.warn('[Booking] Non-critical slot duration calculation failed:', err); }
+    let slotDuration = 60;
+    try {
+      const [startH, startM] = params.startTime.split(':').map(Number);
+      const [endH, endM] = params.endTime.split(':').map(Number);
+      let endMinutes = endH * 60 + endM;
+      const startMinutes = startH * 60 + startM;
+      if (endMinutes <= startMinutes) endMinutes += 1440;
+      slotDuration = endMinutes - startMinutes;
+      if (slotDuration <= 0) slotDuration = 60;
+    } catch (err) { logger.warn('[Booking] Non-critical slot duration calculation failed:', err); }
 
+    if (existingOwner.rows.length === 0) {
       await lockClient.query(
         `INSERT INTO booking_participants (session_id, user_id, participant_type, display_name, slot_duration, invited_at)
          VALUES ($1, $2, 'owner', $3, $4, NOW())`,
         [sessionId, resolvedUserId, ownerDisplayName || params.ownerEmail, slotDuration]
       );
+    } else if (!created && params.ownerEmail) {
+      const existingEmail = existingOwner.rows[0].owner_email?.toLowerCase();
+      const existingUserId = existingOwner.rows[0].user_id;
+      const newEmail = params.ownerEmail.toLowerCase();
+      const ownerChanged = existingEmail ? existingEmail !== newEmail : (resolvedUserId ? existingUserId !== resolvedUserId : true);
+      if (ownerChanged) {
+        const hasActiveBookingForOldOwner = await lockClient.query(
+          `SELECT id FROM booking_requests
+           WHERE session_id = $1 AND status NOT IN ('cancelled', 'deleted')
+           AND (
+             ($2::text IS NOT NULL AND LOWER(user_email) = LOWER($2::text))
+             OR ($2::text IS NULL AND user_id = $3::text)
+           )
+           AND id != $4
+           LIMIT 1`,
+          [sessionId, existingEmail || null, existingUserId || null, params.bookingId]
+        );
+        if (hasActiveBookingForOldOwner.rows.length === 0) {
+          await lockClient.query(
+            `UPDATE booking_participants
+             SET user_id = $1, display_name = $2, slot_duration = $3
+             WHERE id = $4`,
+            [resolvedUserId, ownerDisplayName || params.ownerEmail, slotDuration, existingOwner.rows[0].id]
+          );
+          logger.info('[SessionManager] Updated session owner — previous owner has no active booking on this session', {
+            extra: {
+              sessionId,
+              previousOwner: existingEmail || existingUserId,
+              newOwner: newEmail,
+              bookingId: params.bookingId
+            }
+          });
+        }
+      }
     }
 
     await lockClient.query(
