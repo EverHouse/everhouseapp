@@ -223,7 +223,7 @@ router.get('/api/my-visits', isAuthenticated, async (req, res) => {
         LEFT JOIN resources r ON br.resource_id = r.id
         WHERE LOWER(br.user_email) = ${targetEmail}
           AND br.request_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
-          AND br.status NOT IN ('cancelled', 'declined', 'cancellation_pending')
+          AND br.status NOT IN ('cancelled', 'declined', 'cancellation_pending', 'deleted')
         
         UNION ALL
         
@@ -251,7 +251,7 @@ router.get('/api/my-visits', isAuthenticated, async (req, res) => {
           AND bp.participant_type != 'owner'
           AND LOWER(br.user_email) != ${targetEmail}
           AND br.request_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
-          AND br.status NOT IN ('cancelled', 'declined', 'cancellation_pending')
+          AND br.status NOT IN ('cancelled', 'declined', 'cancellation_pending', 'deleted')
         
         UNION ALL
         

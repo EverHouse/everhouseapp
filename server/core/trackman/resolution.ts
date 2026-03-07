@@ -71,7 +71,7 @@ async function insertBookingIfNotExists(
         AND request_date = ${booking.bookingDate}
         AND start_time = ${booking.startTime}
         AND resource_id = ${resourceId}
-        AND status NOT IN ('cancelled', 'declined', 'cancellation_pending')
+        AND status NOT IN ('cancelled', 'declined', 'cancellation_pending', 'deleted')
       `)
       .limit(1);
 

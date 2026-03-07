@@ -65,7 +65,7 @@ router.get('/api/admin/trackman/matched', isStaffOrAdmin, async (req, res) => {
     
     const matchedConditions: ReturnType<typeof sql>[] = [
       sql`(br.trackman_booking_id IS NOT NULL OR br.notes LIKE '%[Trackman Import ID:%')`,
-      sql`br.status NOT IN ('cancelled', 'declined', 'cancellation_pending')`,
+      sql`br.status NOT IN ('cancelled', 'declined', 'cancellation_pending', 'deleted')`,
       sql`(
         COALESCE(br.trackman_player_count, 1) = 1
         OR (

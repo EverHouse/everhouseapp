@@ -443,7 +443,7 @@ async function enrichContactsWithDbData(contacts: HubSpotContact[]): Promise<Hub
   const lastActivityResult = await db.execute(sql`SELECT email, MAX(activity_date) as last_activity FROM (
       SELECT LOWER(user_email) as email, request_date as activity_date
       FROM booking_requests 
-      WHERE LOWER(user_email) IN (${sql.join(emails.map(e => sql`${e}`), sql`, `)}) AND request_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date AND status NOT IN ('cancelled', 'declined', 'cancellation_pending')
+      WHERE LOWER(user_email) IN (${sql.join(emails.map(e => sql`${e}`), sql`, `)}) AND request_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date AND status NOT IN ('cancelled', 'declined', 'cancellation_pending', 'deleted')
       UNION ALL
       SELECT LOWER(er.user_email) as email, e.event_date as activity_date
       FROM event_rsvps er
@@ -469,7 +469,7 @@ async function enrichContactsWithDbData(contacts: HubSpotContact[]): Promise<Hub
      FROM booking_requests
      WHERE LOWER(user_email) IN (${sql.join(emails.map(e => sql`${e}`), sql`, `)})
        AND request_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
-       AND status NOT IN ('cancelled', 'declined', 'cancellation_pending')
+       AND status NOT IN ('cancelled', 'declined', 'cancellation_pending', 'deleted')
      GROUP BY LOWER(user_email)`);
   for (const row of pastBookingsResult.rows) {
     const r = row as unknown as EmailCountRow;
@@ -1866,7 +1866,7 @@ router.get('/api/admin/hubspot/marketing-contacts-audit', isAdmin, async (_req: 
                 SELECT LOWER(user_email) as email, request_date as activity_date
                 FROM booking_requests
                 WHERE LOWER(user_email) IN (${sql.join(batch.map(e => sql`${e}`), sql`, `)})
-                  AND status NOT IN ('cancelled', 'declined', 'cancellation_pending')
+                  AND status NOT IN ('cancelled', 'declined', 'cancellation_pending', 'deleted')
               ) combined GROUP BY email`
         );
         for (const row of activityResult.rows) {

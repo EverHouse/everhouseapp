@@ -776,7 +776,7 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
                 OR LOWER(user_name) LIKE '%unknown%' 
                 OR LOWER(user_name) LIKE '%unassigned%'
                 OR (user_email = '' AND user_name IS NOT NULL))
-           AND status NOT IN ('cancelled', 'declined', 'cancellation_pending')
+           AND status NOT IN ('cancelled', 'declined', 'cancellation_pending', 'deleted')
            ORDER BY ABS(EXTRACT(EPOCH FROM (start_time::time - ${startTime}::time))), created_at DESC`);
         
         if (placeholderBooking.rows.length > 1) {
@@ -919,7 +919,7 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
                 AND request_date = ${bookingDate}
                 AND start_time = ${startTime}
                 AND resource_id = ${parsedBayId}
-                AND status NOT IN ('cancelled', 'declined', 'cancellation_pending')
+                AND status NOT IN ('cancelled', 'declined', 'cancellation_pending', 'deleted')
               `)
               .limit(1);
 
@@ -1060,7 +1060,7 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
                 LOWER(user_email) = LOWER(${matchedEmail})
                 AND request_date = ${bookingDate}
                 AND resource_id = ${parsedBayId}
-                AND status NOT IN ('cancelled', 'declined', 'cancellation_pending')
+                AND status NOT IN ('cancelled', 'declined', 'cancellation_pending', 'deleted')
                 AND trackman_booking_id IS NULL
               `);
             

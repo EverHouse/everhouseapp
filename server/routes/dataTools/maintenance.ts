@@ -315,14 +315,14 @@ router.post('/api/data-tools/sync-visit-counts', isAdmin, async (req: Request, r
               SELECT id as booking_id FROM booking_requests
               WHERE LOWER(user_email) = ${normalizedEmail}
                 AND request_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
-                AND status NOT IN ('cancelled', 'declined', 'cancellation_pending')
+                AND status NOT IN ('cancelled', 'declined', 'cancellation_pending', 'deleted')
               UNION
               SELECT br.id as booking_id FROM booking_requests br
               JOIN booking_participants bp ON bp.session_id = br.session_id
               JOIN users u ON bp.user_id = u.id
               WHERE LOWER(u.email) = ${normalizedEmail}
                 AND br.request_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
-                AND br.status NOT IN ('cancelled', 'declined', 'cancellation_pending')
+                AND br.status NOT IN ('cancelled', 'declined', 'cancellation_pending', 'deleted')
             ) all_bookings
           `);
           
@@ -610,7 +610,7 @@ router.post('/api/data-tools/fix-trackman-ghost-bookings', isAdmin, async (req: 
        LEFT JOIN users u ON LOWER(br.user_email) = LOWER(u.email)
        WHERE br.trackman_booking_id IS NOT NULL
          AND br.session_id IS NULL
-         AND br.status NOT IN ('cancelled', 'declined', 'cancellation_pending')
+         AND br.status NOT IN ('cancelled', 'declined', 'cancellation_pending', 'deleted')
     `;
     
     if (startDate) {

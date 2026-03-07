@@ -273,7 +273,7 @@ router.get('/api/admin/financials/summary', isStaffOrAdmin, async (req, res) => 
         WHERE br.session_id IS NOT NULL
           AND br.request_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
           AND br.request_date >= (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date - INTERVAL '30 days'
-          AND br.status NOT IN ('cancelled', 'declined', 'cancellation_pending')
+          AND br.status NOT IN ('cancelled', 'declined', 'cancellation_pending', 'deleted')
           AND NOT EXISTS (
             SELECT 1 FROM booking_fee_snapshots bfs
             WHERE bfs.session_id = br.session_id AND bfs.status IN ('completed', 'paid')

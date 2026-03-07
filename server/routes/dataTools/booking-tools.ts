@@ -88,7 +88,7 @@ router.get('/api/data-tools/available-sessions', isAdmin, async (req: Request, r
       FROM booking_requests br
       LEFT JOIN resources r ON br.resource_id = r.id
       WHERE br.request_date = ${date}
-      AND br.status NOT IN ('cancelled', 'declined', 'cancellation_pending')
+      AND br.status NOT IN ('cancelled', 'declined', 'cancellation_pending', 'deleted')
     `;
     
     if (memberEmail) {

@@ -117,14 +117,14 @@ router.get('/api/members/:email/details', isAuthenticated, memberLookupRateLimit
           SELECT id as booking_id FROM booking_requests
           WHERE LOWER(user_email) = ${normalizedEmail}
             AND request_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
-            AND status NOT IN ('cancelled', 'declined', 'cancellation_pending')
+            AND status NOT IN ('cancelled', 'declined', 'cancellation_pending', 'deleted')
           UNION
           SELECT br.id as booking_id FROM booking_requests br
           JOIN booking_participants bp ON bp.session_id = br.session_id
           JOIN users u ON bp.user_id = u.id
           WHERE LOWER(u.email) = ${normalizedEmail}
             AND br.request_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
-            AND br.status NOT IN ('cancelled', 'declined', 'cancellation_pending')
+            AND br.status NOT IN ('cancelled', 'declined', 'cancellation_pending', 'deleted')
         ) all_bookings
       `),
       db.select({ count: sql<number>`COUNT(*)` })
@@ -150,7 +150,7 @@ router.get('/api/members/:email/details', isAuthenticated, memberLookupRateLimit
         SELECT MAX(last_date) as last_date FROM (
           SELECT MAX(request_date) as last_date FROM booking_requests
           WHERE LOWER(user_email) = ${normalizedEmail} 
-            AND status NOT IN ('cancelled', 'declined', 'cancellation_pending')
+            AND status NOT IN ('cancelled', 'declined', 'cancellation_pending', 'deleted')
             AND request_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
           UNION ALL
           SELECT MAX(br.request_date) as last_date FROM booking_participants bp
@@ -158,7 +158,7 @@ router.get('/api/members/:email/details', isAuthenticated, memberLookupRateLimit
           JOIN booking_requests br ON bp.session_id = br.session_id
           WHERE LOWER(u.email) = ${normalizedEmail}
             AND bp.participant_type = 'guest'
-            AND br.status NOT IN ('cancelled', 'declined', 'cancellation_pending')
+            AND br.status NOT IN ('cancelled', 'declined', 'cancellation_pending', 'deleted')
             AND br.request_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
           UNION ALL
           SELECT MAX(br.request_date) as last_date FROM booking_participants bp
@@ -167,7 +167,7 @@ router.get('/api/members/:email/details', isAuthenticated, memberLookupRateLimit
           WHERE LOWER(u.email) = ${normalizedEmail} 
             AND bp.participant_type != 'owner'
             AND bp.participant_type != 'guest'
-            AND br.status NOT IN ('cancelled', 'declined', 'cancellation_pending')
+            AND br.status NOT IN ('cancelled', 'declined', 'cancellation_pending', 'deleted')
             AND br.request_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
           UNION ALL
           SELECT MAX(e.event_date) as last_date FROM event_rsvps er

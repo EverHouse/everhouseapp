@@ -433,7 +433,7 @@ router.get('/api/member/dashboard-data', isAuthenticated, async (req, res) => {
             FROM booking_requests br
             WHERE LOWER(br.user_email) = ${userEmail}
               AND br.request_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
-              AND br.status NOT IN ('cancelled', 'declined', 'cancellation_pending')
+              AND br.status NOT IN ('cancelled', 'declined', 'cancellation_pending', 'deleted')
 
             UNION ALL
 
@@ -447,7 +447,7 @@ router.get('/api/member/dashboard-data', isAuthenticated, async (req, res) => {
               AND bp.participant_type != 'owner'
               AND LOWER(br.user_email) != ${userEmail}
               AND br.request_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
-              AND br.status NOT IN ('cancelled', 'declined', 'cancellation_pending')
+              AND br.status NOT IN ('cancelled', 'declined', 'cancellation_pending', 'deleted')
 
             UNION ALL
 

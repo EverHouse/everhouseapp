@@ -258,7 +258,7 @@ router.get('/api/members/directory', isStaffOrAdmin, async (req, res) => {
             SELECT LOWER(user_email) as email, id as booking_id, request_date as last_date
             FROM booking_requests
             WHERE LOWER(user_email) IN (${sql.join(memberEmails.map(e => sql`${e}`), sql`, `)})
-              AND status NOT IN ('cancelled', 'declined', 'cancellation_pending')
+              AND status NOT IN ('cancelled', 'declined', 'cancellation_pending', 'deleted')
               AND request_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
             UNION ALL
             SELECT LOWER(u_bp.email) as email, br.id as booking_id, br.request_date as last_date
@@ -268,7 +268,7 @@ router.get('/api/members/directory', isStaffOrAdmin, async (req, res) => {
             LEFT JOIN users u_bp ON bp.user_id = u_bp.id
             WHERE bp.participant_type = 'guest'
               AND LOWER(COALESCE(u_bp.email, '')) IN (${sql.join(memberEmails.map(e => sql`${e}`), sql`, `)})
-              AND br.status NOT IN ('cancelled', 'declined', 'cancellation_pending')
+              AND br.status NOT IN ('cancelled', 'declined', 'cancellation_pending', 'deleted')
               AND br.request_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
             UNION ALL
             SELECT LOWER(u_bp2.email) as email, br.id as booking_id, br.request_date as last_date
@@ -279,7 +279,7 @@ router.get('/api/members/directory', isStaffOrAdmin, async (req, res) => {
             WHERE bp2.participant_type = 'member'
               AND LOWER(u_bp2.email) IN (${sql.join(memberEmails.map(e => sql`${e}`), sql`, `)})
               AND LOWER(u_bp2.email) != LOWER(br.user_email)
-              AND br.status NOT IN ('cancelled', 'declined', 'cancellation_pending')
+              AND br.status NOT IN ('cancelled', 'declined', 'cancellation_pending', 'deleted')
               AND br.request_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
             UNION ALL
             SELECT LOWER(er.user_email) as email, NULL::int as booking_id, e.event_date as last_date
