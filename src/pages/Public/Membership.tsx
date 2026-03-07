@@ -210,6 +210,7 @@ const MembershipOverview: React.FC = () => {
                 features={tier.highlighted_features}
                 onClick={handleClick}
                 btnText={btnText}
+                className={isCorporate ? 'lg:col-span-3' : ''}
               />
             );
           }
@@ -335,8 +336,8 @@ const MembershipOverview: React.FC = () => {
   );
 };
 
-const MembershipCard: React.FC<{ title: string; price: string; suffix?: string; desc: string; features: string[]; onClick: () => void; btnText?: string }> = ({ title, price, suffix="/mo", desc, features, onClick, btnText="Apply" }) => (
-  <div className="relative flex flex-col p-6 bg-white/50 dark:bg-white/5 backdrop-blur-xl rounded-xl border border-white/60 dark:border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.08),inset_0_1px_1px_rgba(255,255,255,0.6)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.3)] hover:scale-[1.02] hover:-translate-y-1 transition-all duration-[400ms]">
+const MembershipCard: React.FC<{ title: string; price: string; suffix?: string; desc: string; features: string[]; onClick: () => void; btnText?: string; className?: string }> = ({ title, price, suffix="/mo", desc, features, onClick, btnText="Apply", className="" }) => (
+  <div className={`relative flex flex-col p-6 bg-white/50 dark:bg-white/5 backdrop-blur-xl rounded-xl border border-white/60 dark:border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.08),inset_0_1px_1px_rgba(255,255,255,0.6)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.3)] hover:scale-[1.02] hover:-translate-y-1 transition-all duration-[400ms] ${className}`}>
     <div className="mb-4">
       <h2 className="text-xl font-semibold text-primary dark:text-white mb-2">{title}</h2>
       <p className="text-sm text-primary/70 dark:text-white/70 leading-relaxed font-light">{desc}</p>
