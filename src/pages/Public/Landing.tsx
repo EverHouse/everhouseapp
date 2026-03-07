@@ -334,30 +334,6 @@ const Landing: React.FC = () => {
             </Link>
       </section>
 
-      <section className="px-6 py-10 bg-bone dark:bg-[#141414] animate-content-enter-delay-4">
-        <h3 className="text-center text-2xl text-primary dark:text-white mb-6 leading-tight" style={{ fontFamily: 'var(--font-headline)' }}>Join 200+ Members</h3>
-        <div className="flex justify-center items-center gap-0 overflow-x-auto">
-          <div className="flex-1 min-w-0 text-center px-3">
-            <p className="text-xl sm:text-2xl font-bold text-primary dark:text-white">4</p>
-            <p className="text-[10px] sm:text-xs text-primary/70 dark:text-white/70 uppercase tracking-wider font-medium">TrackMan Bays</p>
-          </div>
-          <div className="w-px h-8 bg-primary/20 dark:bg-white/20 shrink-0"></div>
-          <div className="flex-1 min-w-0 text-center px-3">
-            <p className="text-xl sm:text-2xl font-bold text-primary dark:text-white">200+</p>
-            <p className="text-[10px] sm:text-xs text-primary/70 dark:text-white/70 uppercase tracking-wider font-medium">Active Members</p>
-          </div>
-          <div className="w-px h-8 bg-primary/20 dark:bg-white/20 shrink-0"></div>
-          <div className="flex-1 min-w-0 text-center px-3">
-            <p className="text-xl sm:text-2xl font-bold text-primary dark:text-white">5-Star</p>
-            <p className="text-[10px] sm:text-xs text-primary/70 dark:text-white/70 uppercase tracking-wider font-medium">Rated</p>
-          </div>
-          <div className="w-px h-8 bg-primary/20 dark:bg-white/20 shrink-0"></div>
-          <div className="flex-1 min-w-0 text-center px-3">
-            <p className="text-xl sm:text-2xl font-bold text-primary dark:text-white">Est. 2025</p>
-            <p className="text-[10px] sm:text-xs text-primary/70 dark:text-white/70 uppercase tracking-wider font-medium">Founded</p>
-          </div>
-        </div>
-      </section>
 
       <section className="px-6 py-12 bg-bone dark:bg-[#141414] animate-content-enter-delay-5">
         <div className="max-w-2xl mx-auto text-center">

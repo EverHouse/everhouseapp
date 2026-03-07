@@ -146,11 +146,6 @@ const MembershipOverview: React.FC = () => {
         <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
       </Link>
 
-      <div className="text-center py-4 animate-content-enter-delay-1">
-        <p className="text-sm text-primary/70 dark:text-white/70 font-light">
-          Join <span className="font-semibold text-primary dark:text-white">200+ professionals</span> who chose Ever Club over country clubs, home simulators, and co-working spaces.
-        </p>
-      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 animate-content-enter-delay-2">
         {tiers.map((tier) => {
