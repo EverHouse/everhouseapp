@@ -86,9 +86,10 @@ export const TRAINING_SEED_DATA = [
       { title: 'Smart Booking Detection', content: 'When you scan a member\'s QR code, the system automatically checks for today\'s scheduled bookings. If a booking is found, it routes to the booking check-in flow (with billing) instead of walk-in. The confirmation shows booking details including bay, time, and resource type.', pageIcon: 'auto_awesome' },
       { title: 'Walk-In QR Check-In', content: 'If no booking is found for today, a walk-in check-in is recorded. A confirmation popup shows the member\'s name, tier, status, and any pinned staff notes. The visit is automatically recorded in the system.', pageIcon: 'login' },
       { title: 'Where Members Find Their QR Code', content: 'Members tap their membership card on the dashboard to show their QR code. They can present it at the front desk for quick check-in.', pageIcon: 'credit_card' },
-      { title: 'Confirmation Popup', content: 'After scanning, a confirmation modal shows the member\'s name, tier, booking details (if applicable), and any pinned staff notes. It auto-dismisses after a few seconds. Status warnings appear in amber for cancelled, suspended, or inactive members.', pageIcon: 'check_circle' },
+      { title: 'Confirmation Popup', content: 'After scanning, a confirmation modal shows the member\'s name, tier, booking details (if applicable), and any pinned staff notes. For active members, the modal is green with a success sound. For members with expired, cancelled, suspended, past_due, or paused status, the modal turns red with a warning sound and tells you to verify membership before granting access.', pageIcon: 'check_circle' },
       { title: 'Duplicate Scan Protection', content: 'If the same member is scanned twice within 2 minutes, you will see a friendly "already checked in" message instead of an error. This prevents accidental duplicate check-ins.', pageIcon: 'shield' },
       { title: 'Visit Tracking', content: 'Walk-in check-ins automatically count toward the member\'s lifetime visits. Visit counts are displayed on the membership card, in the staff profile drawer, and in the member directory. Visits also sync to HubSpot.', pageIcon: 'trending_up' },
+      { title: 'First Visit Alert', content: 'If a trialing member checks in for the very first time (lifetime visits = 1), the system automatically sends them a first visit confirmation email. This helps new members feel welcomed.', pageIcon: 'celebration' },
     ]
   },
   {
@@ -136,8 +137,9 @@ export const TRAINING_SEED_DATA = [
       { title: 'Creating New Visitors', content: 'If the person isn\'t in the system yet, you can create a new visitor directly from the roster. Enter their name, email, and visitor type, and they\'ll be added to the booking and the directory simultaneously.' },
       { title: 'Guest Pass Status', content: `Green badge = Member has guest passes available, no fee charged. Blue badge = No passes remaining, $${PRICING.GUEST_FEE_DOLLARS} guest fee applies. Guest passes are applied automatically when available.` },
       { title: 'Removing Players', content: 'Tap the X button on any non-owner player to remove them from the booking. If a guest pass was used, it is automatically refunded when the guest is removed.' },
-      { title: 'Time Split', content: 'Simulator time is divided equally among all participants. For example, a 60-minute booking with 3 players gives each person 20 minutes of allocated time. Fees are calculated based on each person\'s share.' },
-      { title: 'Check-In Requirement', content: 'Check-in is disabled until all player slots are filled. If the roster is incomplete, you\'ll see a prompt to add the remaining players before proceeding. After the booking\'s invoice has been paid, the roster is locked and cannot be changed unless an admin overrides it with a reason.' },
+      { title: 'Member Match Warning', content: 'If you enter an email for a new guest that matches an existing club member, the system displays a warning. You can choose to add them as a member (linking their account) or add them as a guest anyway.', pageIcon: 'warning' },
+      { title: 'Check-In Requirement', content: 'Check-in is disabled until all player slots are filled. If the roster is incomplete, you\'ll see a prompt to add the remaining players before proceeding.' },
+      { title: 'Roster Lock After Payment', content: 'After the booking\'s invoice has been paid, the roster is locked — a green lock icon appears in the header. You cannot add or remove players while locked. The player count dropdown is also disabled.' },
     ]
   },
   {
@@ -170,8 +172,9 @@ export const TRAINING_SEED_DATA = [
     steps: [
       { title: 'Auto-Confirmed', content: 'Unlike simulator bookings which go through a "request and hold" approval process, conference room bookings are confirmed instantly. No staff approval is needed.', pageIcon: 'meeting_room' },
       { title: 'Daily Allowance', content: 'Each membership tier includes a daily conference room allowance (in minutes). If a booking stays within the allowance, there is no charge.', pageIcon: 'schedule' },
-      { title: 'Overage Prepayment', content: 'If a booking exceeds the daily allowance, the member must pay for the overage minutes before the booking is confirmed. The payment screen appears automatically.', pageIcon: 'payment' },
-      { title: 'Member Booking Flow', content: 'Members book conference rooms from the "Book Golf" page by switching to the Conference tab. They pick the date, time, and duration. If overage applies, they pay upfront.', pageIcon: 'calendar_month' },
+      { title: 'Invoice-Based Billing', content: 'If a booking exceeds the daily allowance, the system automatically creates an invoice for the overage fees. If the member has a Stripe credit balance, it is applied automatically. If payment fails, the booking reverts to pending for staff review.', pageIcon: 'payment' },
+      { title: 'Member Booking Flow', content: 'Members book conference rooms from the "Book Golf" page by switching to the Conference tab. They pick the date, time, and duration. An estimate shows any overage fees before submission.', pageIcon: 'calendar_month' },
+      { title: 'Staff Manual Booking', content: 'Staff can manually book conference rooms for members from the Staff Command Center. This is useful for walk-in requests or phone reservations.', pageIcon: 'support_agent' },
       { title: 'No Trackman Linking', content: 'Conference room bookings do not link to Trackman. They are managed entirely within the app.', pageIcon: 'link_off' },
     ]
   },
@@ -184,9 +187,10 @@ export const TRAINING_SEED_DATA = [
     isAdminOnly: false,
     steps: [
       { title: 'What Are Waivers?', content: 'Every member must sign a liability waiver to use the facility. The system tracks whether each member has signed the current version of the waiver.', pageIcon: 'assignment' },
-      { title: 'When Members See Waivers', content: 'Members are prompted to sign the waiver when they log in if they haven\'t signed the latest version. A waiver modal appears that they must accept before continuing.', pageIcon: 'edit' },
-      { title: 'Waiver Versions', content: 'When the waiver text is updated, a new version is created. All members will need to re-sign the new version the next time they log in.', pageIcon: 'history' },
-      { title: 'Stale Waiver Review', content: 'The system automatically checks for members with unsigned or outdated waivers every 4 hours. Staff are notified when waivers need attention.', pageIcon: 'timer' },
+      { title: 'When Members See Waivers', content: 'Members are prompted to sign the waiver when they log in if they haven\'t signed the latest version. A non-dismissible waiver modal appears that they must scroll to the bottom of before the "Sign Waiver" button becomes active. Staff and admins are exempt from waiver requirements.', pageIcon: 'edit' },
+      { title: 'Waiver Versions', content: 'When the waiver text is updated (by an admin), a new version is created. The system shows how many active members will need to re-sign. All affected members see the waiver modal the next time they log in.', pageIcon: 'history' },
+      { title: 'Stale Waiver Review', content: 'The system automatically checks every 4 hours for participants whose fees were waived but whose waiver hasn\'t been reviewed by staff. If stale waivers are found (over 12 hours old), all staff are notified. Alerts are de-duplicated to avoid repeats within 6 hours.', pageIcon: 'timer' },
+      { title: 'Guardian Consent', content: 'For members under 18, the booking flow captures guardian name, relationship, and phone number. This consent is stored on the booking record and visible to staff during check-in.', pageIcon: 'family_restroom' },
       { title: 'Waiver Status in Profile', content: 'You can see a member\'s waiver status in their profile drawer under the Overview tab. It shows whether their waiver is current, expired, or not yet signed.', pageIcon: 'verified' },
     ]
   },
@@ -264,9 +268,11 @@ export const TRAINING_SEED_DATA = [
     isAdminOnly: false,
     steps: [
       { title: 'What Are Day Passes?', content: 'Day passes are one-time access passes for non-members. There are two types: Golf Sim day passes and Coworking day passes. They allow visitors to use the facility for a single day without a membership.', pageIcon: 'confirmation_number' },
-      { title: 'Selling a Day Pass (Staff)', content: 'From the New User drawer (via the floating action button), select "Visitor" mode. Choose the day pass product (Golf Sim or Coworking), fill in the visitor\'s info (or scan their ID to auto-fill), and complete the payment. You can also sell day passes directly from the POS Register under the Passes category tab.', pageIcon: 'sell' },
-      { title: 'QR Code Delivery', content: 'After purchase, the visitor receives a QR code via email that can be redeemed at the front desk. The email includes the pass details and instructions for redemption.', pageIcon: 'qr_code' },
-      { title: 'Redeeming at POS', content: 'Go to Financials > POS > Redeem Pass. Scan the visitor\'s QR code or enter the pass ID manually. The system validates the pass and marks it as redeemed.', pageIcon: 'redeem' },
+      { title: 'Public Purchase', content: 'Visitors can buy day passes directly on the club website at the /day-pass page. They select the pass type, enter their info, and pay with a credit card via Stripe Checkout. No login required.', pageIcon: 'public' },
+      { title: 'Selling a Day Pass (Staff)', content: 'From the New User drawer (via the floating action button), select "Visitor" mode. Choose the day pass product (Golf Sim or Coworking), fill in the visitor\'s info (or scan their ID to auto-fill), and complete the payment. You can also sell day passes directly from the POS Register under the Passes category tab. Staff can use the card reader, online card, or card on file.', pageIcon: 'sell' },
+      { title: 'QR Code Delivery', content: 'After purchase, the visitor receives a QR code via email that can be redeemed at the front desk. The email includes the pass details, pass ID, and instructions for redemption.', pageIcon: 'qr_code' },
+      { title: 'Redeeming at POS', content: 'Go to Financials > POS > Redeem Pass. Scan the visitor\'s QR code or enter the pass ID manually. The system validates the pass and marks it as redeemed. A confirmation email is sent to the visitor with WiFi details and club information.', pageIcon: 'redeem' },
+      { title: 'Refunds', content: 'Staff can process refunds for day passes through Stripe. The pass status is automatically updated to "refunded" in the system.', pageIcon: 'undo' },
       { title: 'Pricing', content: 'Day pass prices are managed in Stripe and update automatically in the app. If prices change in Stripe, the new prices are reflected everywhere without any manual updates needed.', pageIcon: 'attach_money' },
     ]
   },
@@ -279,14 +285,15 @@ export const TRAINING_SEED_DATA = [
     isAdminOnly: false,
     steps: [
       { title: 'What is a Billing Provider?', content: 'Each member has a billing provider that determines how their subscription and payments are managed. This is shown in the member\'s Billing tab.', pageIcon: 'account_balance' },
-      { title: 'Stripe (Primary)', content: 'Stripe is our primary billing system. Members with Stripe billing have their subscriptions, payments, and invoices fully managed in the app. You can pause, cancel, or change their tier directly.' },
-      { title: 'MindBody (Legacy)', content: 'Some legacy members have billing managed externally through MindBody. The app only handles one-off charges like guest fees. Subscription changes must be made in MindBody.' },
-      { title: 'Family Add-on', content: 'Members who are part of a family or corporate group are billed under the primary payer\'s subscription. Their individual billing tab shows who the primary payer is.' },
-      { title: 'Comped', content: 'Complimentary members have full access but are not billed. This is used for staff, VIP guests, or promotional memberships.' },
+      { title: 'Stripe (Primary)', content: 'Stripe is our primary billing system. Members with Stripe billing have their subscriptions, payments, and invoices fully managed in the app. You can pause/resume, cancel, change tier, apply discounts, apply credits, collect payments via terminal or card on file, and manage their card.', pageIcon: 'credit_card' },
+      { title: 'MindBody (Legacy)', content: 'Some legacy members have billing managed externally through MindBody. The app shows a "Stripe Wallet" for one-off charges (overage fees, guest passes). Staff can initiate migration to Stripe if the member has a card on file.', pageIcon: 'swap_horiz' },
+      { title: 'Family Add-on', content: 'Members who are part of a family group are billed under the primary payer\'s subscription at a discounted add-on rate. Their billing tab shows who the primary payer is and the specific add-on price. Billing changes must be made on the primary member\'s profile.', pageIcon: 'family_restroom' },
+      { title: 'Comped', content: 'Complimentary members have full access but are not billed. This is used for staff, VIP guests, or promotional memberships. The billing tab shows instructions for converting to a paid Stripe plan if needed.' },
+      { title: 'No Billing Source', content: 'If a member has no billing provider assigned, the system prompts you to select one. This can happen with newly imported members or data inconsistencies.' },
       { title: 'Viewing Billing Provider', content: 'Open a member\'s profile from the Directory, then go to the Billing tab. The billing provider is shown at the top with a badge.' },
       { title: 'Changing Billing Provider', content: 'Admins can change a member\'s billing provider from the Billing tab. Be careful: switching providers doesn\'t automatically migrate subscription data.' },
-      { title: 'Stripe Member Controls', content: 'For Stripe members, you can: view subscription details, pause billing, apply discounts, change membership tier, cancel subscription, and apply account credits.' },
-      { title: 'MindBody Member View', content: 'For MindBody members, billing information is read-only. You\'ll see a note indicating billing is managed externally.' },
+      { title: 'Stripe Member Controls', content: 'For Stripe members, you can: view subscription details, pause/resume billing, apply discounts, change membership tier, cancel subscription, apply account credits, collect payments via terminal or manual card entry, send activation emails, open the Stripe billing portal, and sync data from Stripe.' },
+      { title: 'MindBody Migration', content: 'For MindBody members, use "Initiate Migration" to move them to Stripe billing. The system checks if they have a card on file and a matching Stripe price. You can cancel or retry the migration if needed.', pageIcon: 'swap_horiz' },
     ]
   },
   {
@@ -299,7 +306,7 @@ export const TRAINING_SEED_DATA = [
     steps: [
       { title: 'Two Group Types', content: 'There are two types of group memberships: Family groups (a primary member adds family members at a discounted rate) and Corporate groups (a company purchases multiple seats with volume pricing).', pageIcon: 'family_restroom' },
       { title: 'Family Groups', content: 'The primary family member pays for everyone. Sub-members (spouse, kids) are added at a discounted rate pulled from Stripe. Each sub-member gets their own login and booking access.', pageIcon: 'group' },
-      { title: 'Corporate Groups', content: 'Companies purchase a set number of seats with volume pricing (the more seats, the lower the per-seat cost). The corporate admin manages who fills each seat.', pageIcon: 'business' },
+      { title: 'Corporate Groups', content: 'Companies purchase a set number of seats with volume pricing. Pricing tiers are: 1-4 seats at base price, 5-9 at a discount, 10-19 lower, 20-49 lower still, and 50+ at the lowest per-seat rate. Corporate members default to the Corporate tier.', pageIcon: 'business' },
       { title: 'Adding Group Members', content: 'From the member profile drawer, go to the Billing tab. For family groups, use "Add Family Member." For corporate groups, use "Add Seat." Fill in the sub-member\'s details (or scan their ID to auto-fill).', pageIcon: 'person_add' },
       { title: 'Removing Group Members', content: 'Remove a sub-member from the Billing tab. Their access is deactivated immediately and the billing adjusts on the next cycle.', pageIcon: 'person_remove' },
       { title: 'Individual Tracking', content: 'Even though billing is unified under the primary payer, each group member\'s bookings, visits, and usage are tracked individually.', pageIcon: 'bar_chart' },
@@ -314,10 +321,11 @@ export const TRAINING_SEED_DATA = [
     isAdminOnly: false,
     steps: [
       { title: 'Access Tours', content: 'Go to the Tours tab from the sidebar or hamburger menu to view all scheduled facility tours.', pageIcon: 'directions_walk' },
-      { title: 'Native Tour Scheduling', content: 'Visitors can book tours directly on the club website at the /tour page. No login is required. The booking flow has two steps: enter visitor info (name, email, phone), then pick an available date and time from the calendar.' },
-      { title: 'Available Time Slots', content: 'Tour slots are available during configurable business hours (10am–5pm) in 30-minute intervals. The system checks Google Calendar for conflicts and only shows open slots.' },
-      { title: 'Google Calendar Integration', content: 'Scheduled tours are automatically added to the club\'s Google Calendar. The system also checks the calendar for conflicts to prevent double-booking tour slots.' },
-      { title: 'Confirmation Emails', content: 'After a visitor books a tour, they receive a confirmation email with the date, time, and club details. Staff are also notified of the new tour.' },
+      { title: 'Native Tour Scheduling', content: 'Visitors can book tours directly on the club website at the /tour page. No login is required. The booking flow has two steps: enter visitor info (name, email, phone), then pick an available date and time from the next 14 days.' },
+      { title: 'Available Time Slots', content: 'Tour slots are available during configurable business hours in 30-minute intervals. The system checks both Google Calendar and existing database entries for conflicts and only shows open slots.' },
+      { title: 'Google Calendar Integration', content: 'Scheduled tours are automatically added to the "Tours Scheduled" Google Calendar. The system also checks the calendar for conflicts to prevent double-booking tour slots.' },
+      { title: 'HubSpot Meeting Sync', content: 'Tours can also be synced from HubSpot meetings. Use the "Sync" button on the Tours page to pull in meetings with "tour" in the title or location. Unlinked HubSpot meetings appear in a "Needs Review" section.', pageIcon: 'sync' },
+      { title: 'Confirmation Emails', content: 'After a visitor books a tour, they receive a confirmation email with the date, time, and club details. Staff receive both in-app notifications and push notifications.' },
       { title: 'Today\'s Tours', content: 'The top section of the Tours page shows tours scheduled for today with the guest name, scheduled time, and current status.' },
       { title: 'Upcoming Tours', content: 'Below today\'s tours, you can see all upcoming scheduled tours organized by date.' },
       { title: 'Tour Status', content: 'Update the tour status as needed: Scheduled (upcoming), Pending, Checked In, Completed (attended), Cancelled, or No Show.' },
@@ -431,11 +439,13 @@ export const TRAINING_SEED_DATA = [
     isAdminOnly: true,
     steps: [
       { title: 'Access Inquiries', content: 'Go to Inquiries from the Admin section of the sidebar or hamburger menu.', pageIcon: 'mail' },
-      { title: 'Filter by Type', content: 'Use the filter buttons to view specific form types: Contact, Tour Request, Membership Inquiry, Private Hire, or Guest Check-in.' },
-      { title: 'Filter by Status', content: 'Filter by status: New (unread), Read, Replied, or Archived.' },
-      { title: 'View Submission Details', content: 'Tap an inquiry to expand and see the full submission details including contact info and message.' },
-      { title: 'Add Staff Notes', content: 'Add internal notes to track follow-up actions or important details about the inquiry.' },
+      { title: 'Filter by Type', content: 'Use the filter chips to view specific form types: Contact, Tour Request, Private Hire, Guest Check-in, or Event Inquiry.' },
+      { title: 'Filter by Status', content: 'Filter by status tabs at the top: All, New (unread, highlighted with a blue border), Read, Replied, or Archived. Each tab shows a count.' },
+      { title: 'Auto-Read', content: 'Opening a "New" inquiry automatically marks it as "Read" so you can tell which submissions have been seen by staff.' },
+      { title: 'View Submission Details', content: 'Tap an inquiry to open its detail modal with the full submission including contact info, message, and structured metadata.' },
+      { title: 'Add Staff Notes', content: 'Add internal notes to track follow-up actions or important details about the inquiry. Notes are visible to all staff.' },
       { title: 'Update Status', content: 'Mark inquiries as Read, Replied, or Archived to keep track of which ones need attention.' },
+      { title: 'HubSpot Sync', content: 'Use the "Sync from HubSpot" button to pull recent form submissions from HubSpot into the inquiries list. Staff are notified via push and in-app alerts when new inquiries arrive.', pageIcon: 'sync' },
     ]
   },
   {
@@ -505,15 +515,14 @@ export const TRAINING_SEED_DATA = [
     sortOrder: 26,
     isAdminOnly: true,
     steps: [
-      { title: 'Access Products & Pricing', content: 'Go to Products & Pricing from the Admin section of the sidebar or hamburger menu. This controls membership tier settings and Stripe integration.', pageIcon: 'loyalty' },
-      { title: 'Edit Tier Settings', content: 'Click on a tier to edit its name, description, price, and marketing copy. Changes take effect immediately for all members on that tier.' },
-      { title: 'Booking Limits', content: 'Set daily simulator minutes, conference room minutes, and advance booking window for each tier. Members cannot exceed these limits.' },
-      { title: 'Guest Passes', content: 'Configure how many guest passes members receive per month for each tier. Passes reset on the 1st of each month.' },
-      { title: 'Access Permissions', content: 'Toggle which features each tier can access: simulator booking, conference room, extended sessions, events, and more. Denied access hides those options from members.' },
-      { title: 'Highlighted Features', content: 'Edit the bullet points that appear on the membership comparison page. These are shown to prospective members during signup.' },
+      { title: 'Sub-Tabs', content: 'The Products & Pricing page has five sub-tabs: Memberships (recurring subscription tiers), Products (one-time purchase items), Fees & Passes (day passes and guest passes), Discounts (coupon management), and Cafe Menu (food and drink items synced from Stripe).', pageIcon: 'loyalty' },
+      { title: 'Edit Tier Settings', content: 'Click on a tier to edit its name, description, price, button text, and marketing copy. Set display options like "is_popular" (adds a Popular badge) and sort order.' },
+      { title: 'Booking Limits', content: 'Set daily simulator minutes, conference room minutes, guest passes per month, and advance booking window (in days) for each tier. Members cannot exceed these limits.' },
+      { title: 'Access Permissions', content: 'Toggle which features each tier can access: simulator booking, conference room, wellness booking, group lessons, extended sessions, private lessons, guest passes, discounted merch, and unlimited access. Denied access hides those options from members.' },
+      { title: 'Compare Table Features', content: 'Manage custom feature rows that appear on the membership comparison page. Each feature can be a boolean (checkmark), number, or text value per tier. Use the arrows to reorder features.' },
       { title: 'Show on Membership Page', content: 'Use the "Show on Membership Page" toggle to control whether a tier appears on the public membership comparison page. Hidden tiers are still available for existing members but won\'t be shown to new signups.', pageIcon: 'visibility' },
-      { title: 'Managed by Stripe Labels', content: 'Some fields like booking limits and access permissions show a "Managed by Stripe" label. These values are synced from Stripe and cannot be edited directly in the app. Make changes in the Stripe Dashboard instead.', pageIcon: 'lock' },
-      { title: 'Sync to Stripe', content: 'Use the "Sync to Stripe" button to push tier data, permissions, and features to Stripe. Use "Pull from Stripe" to refresh tier data from the Stripe Product Catalog.', pageIcon: 'sync' },
+      { title: 'Managed by Stripe Labels', content: 'When a tier is linked to a Stripe product, a purple "Managed by Stripe" label appears. Booking limits, access permissions, pricing, and features become read-only in the app and must be edited in the Stripe Dashboard. You can "Unlink from Stripe" to regain local editing control.', pageIcon: 'lock' },
+      { title: 'Sync to Stripe', content: 'Use the "Sync to Stripe" button to push tier data to Stripe, or "Pull from Stripe" to refresh from the Stripe Product Catalog. A status indicator shows whether you\'re using Stripe Live or Stripe Test mode.', pageIcon: 'sync' },
       { title: 'Test with View As', content: 'After changing tier settings, use View As Member in the Directory to verify the member experience. This confirms booking limits and access permissions work as expected.' },
     ]
   },
@@ -557,8 +566,10 @@ export const TRAINING_SEED_DATA = [
     steps: [
       { title: 'Access Bug Reports', content: 'Go to Bug Reports from the Admin section of the sidebar or hamburger menu.', pageIcon: 'bug_report' },
       { title: 'View Reports', content: 'See all bug reports submitted by members and staff, including screenshots if attached.' },
-      { title: 'Report Details', content: 'Each report shows the description, reporter, date submitted, and current status (Open, In Progress, Resolved).' },
-      { title: 'Update Status', content: 'Change the status as you work on issues. Mark as "In Progress" when investigating, and "Resolved" when fixed.' },
+      { title: 'Report Details', content: 'Each report shows the description, reporter, date submitted, current status (Open, In Progress, Resolved), screenshots if attached, the page URL where the bug occurred, and the user\'s browser/device info.' },
+      { title: 'Update Status', content: 'Change the status as you work on issues. Mark as "In Progress" when investigating, and "Resolved" when fixed. The system records who resolved it and when.' },
+      { title: 'Staff Notes', content: 'Add internal-only staff notes to bug reports for team coordination. Notes are not visible to the member who reported the bug.' },
+      { title: 'Delete Reports', content: 'Admins can permanently delete a bug report after a confirmation prompt. Use this for spam or duplicate reports.' },
       { title: 'Member Visibility', content: 'Members can see the status of their own reports from their Profile page, so keep statuses updated.' },
     ]
   },
@@ -571,10 +582,10 @@ export const TRAINING_SEED_DATA = [
     isAdminOnly: true,
     steps: [
       { title: 'Access Changelog', content: 'Go to the Changelog from the sidebar/hamburger menu under Admin settings to view all app updates.', pageIcon: 'history' },
-      { title: 'View Updates', content: 'See a chronological list of all app updates, newest first. Major releases are highlighted.' },
-      { title: 'What\'s Included', content: 'Each version shows the date, a title summarizing the update, and a list of changes in plain language.' },
-      { title: 'Staff Activity Feed', content: 'Below the changelog, you can see a live feed of staff activity including booking actions, payment processing, and member updates.' },
-      { title: 'Share with Staff', content: 'Use this to stay informed about new features and share updates with your team during meetings.' },
+      { title: 'Two Tabs', content: 'The Changelog page has two tabs: Updates (product changelog entries) and Activity (staff activity audit log).' },
+      { title: 'Updates Tab', content: 'See a chronological list of all app updates, newest first. Each version shows the date, a title summarizing the update, and a list of changes in plain language.' },
+      { title: 'Activity Tab', content: 'The Activity tab is a comprehensive audit log of all staff actions. It tracks bookings, billing, member changes, tours, events, and admin actions. Each entry includes the actor, IP address, timestamp, and specific details of what changed.' },
+      { title: 'Activity Filters', content: 'Filter the activity log by category (Bookings, Billing, Members, Tours, Events, Admin), by specific staff member email, or by actor type (Staff, Member, System). Use "Load More" to paginate through results.', pageIcon: 'filter_list' },
     ]
   },
   {
@@ -688,8 +699,9 @@ export const TRAINING_SEED_DATA = [
       { title: 'Access Email Templates', content: 'Go to Email Templates from the Admin section of the sidebar or hamburger menu. This page lets you preview every automated email the system sends to members.', pageIcon: 'forward_to_inbox' },
       { title: 'Template Categories', content: 'Templates are organized into six categories: Welcome (onboarding emails), Booking (confirmations, reminders, cancellations), Passes (day pass delivery), Payments (receipts, failed payment alerts), Membership (tier changes, renewals), and System (verification codes, alerts).' },
       { title: 'Browsing Templates', content: 'On desktop, use the sidebar to browse templates by category. On mobile, use the dropdown menu to select a template. The list shows each template\'s name and a brief description.' },
-      { title: 'Preview Mode', content: 'Select any template to see a full rendered HTML preview of exactly what members receive. The preview shows realistic sample data so you can verify the layout, branding, and content.' },
-      { title: 'Read-Only Reference', content: 'Email templates are managed in the codebase and cannot be edited from this page. This tool is for reference — use it to verify what emails look like before they go out, or to answer member questions about emails they received.' },
+      { title: 'Preview Mode', content: 'Select any template to see a full rendered HTML preview in an iframe of exactly what members receive. The preview shows realistic sample data so you can verify the layout, branding, and content.' },
+      { title: 'Email Category Toggles', content: 'Admins can globally enable or disable specific email categories (e.g., turn off automated onboarding nudges). This acts as a master kill-switch for entire groups of automated emails.', pageIcon: 'toggle_on' },
+      { title: 'Read-Only Reference', content: 'Email template content is managed in the codebase and cannot be edited from this page. This tool is for reference — use it to verify what emails look like before they go out, or to answer member questions about emails they received.' },
     ]
   },
   {
