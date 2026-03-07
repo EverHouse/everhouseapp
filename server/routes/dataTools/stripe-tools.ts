@@ -4,7 +4,7 @@ import { db } from '../../db';
 import { isProduction } from '../../core/db';
 import { sql } from 'drizzle-orm';
 import { isAdmin } from '../../core/middleware';
-import { getHubSpotClient } from '../../core/integrations';
+import { getHubSpotClientWithFallback } from '../../core/integrations';
 import { retryableHubSpotRequest } from '../../core/hubspot/request';
 import { logFromRequest, logBillingAudit } from '../../core/auditLog';
 import { getSessionUser } from '../../types/session';
@@ -503,7 +503,7 @@ router.post('/api/data-tools/sync-payment-status', isAdmin, async (req: Request,
     logger.info('[DataTools] Starting payment status sync to HubSpot (dryRun: ) by', { extra: { dryRun, staffEmail } });
     
     const { getStripeClient } = await import('../../core/stripe/client');
-    const hubspot = await getHubSpotClient();
+    const { client: hubspot } = await getHubSpotClientWithFallback();
     const stripe = await getStripeClient();
     
     const membersWithBoth = await db.execute(sql`SELECT id, email, first_name, last_name, tier, stripe_customer_id, hubspot_id

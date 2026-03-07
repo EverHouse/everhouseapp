@@ -5,7 +5,7 @@ import { isProduction } from '../../core/db';
 import { users } from '@shared/schema';
 import { sql, inArray } from 'drizzle-orm';
 import { isAdmin } from '../../core/middleware';
-import { getHubSpotClient } from '../../core/integrations';
+import { getHubSpotClientWithFallback } from '../../core/integrations';
 import { retryableHubSpotRequest } from '../../core/hubspot/request';
 import { logFromRequest, logBillingAudit } from '../../core/auditLog';
 import { getSessionUser } from '../../types/session';
@@ -160,7 +160,7 @@ router.post('/api/data-tools/cleanup-mindbody-ids', isAdmin, async (req: Request
       });
     }
     
-    const hubspot = await getHubSpotClient();
+    const { client: hubspot } = await getHubSpotClientWithFallback();
     const toClean: Array<{ email: string; mindbodyClientId: string; hubspotId: string | null }> = [];
     const validated: Array<{ email: string; mindbodyClientId: string }> = [];
     const errors: string[] = [];
@@ -268,7 +268,7 @@ router.post('/api/data-tools/sync-visit-counts', isAdmin, async (req: Request, r
     
     logger.info('[DataTools] Starting visit count sync to HubSpot (dryRun: ) by', { extra: { dryRun, staffEmail } });
     
-    const hubspot = await getHubSpotClient();
+    const { client: hubspot } = await getHubSpotClientWithFallback();
     
     const membersWithHubspot = await db.execute(sql`SELECT id, email, first_name, last_name, hubspot_id
        FROM users 
@@ -493,7 +493,7 @@ router.post('/api/data-tools/detect-duplicates', isAdmin, async (req: Request, r
       }))
     }));
     
-    const hubspot = await getHubSpotClient();
+    const { client: hubspot } = await getHubSpotClientWithFallback();
     const hubspotDuplicates: Array<{
       email: string;
       contacts: Array<{ contactId: string; firstname: string; lastname: string; createdate: string }>;

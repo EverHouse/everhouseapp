@@ -3,7 +3,7 @@ import { sql } from 'drizzle-orm';
 import { Client } from '@hubspot/api-client';
 import { getErrorMessage, getErrorStatusCode } from '../../utils/errorUtils';
 import { logger } from '../logger';
-import { getHubSpotClient } from '../integrations';
+import { getHubSpotClientWithFallback } from '../integrations';
 import { isProduction } from '../db';
 import { denormalizeTierForHubSpotAsync } from '../../utils/tierUtils';
 import type {
@@ -21,7 +21,8 @@ export async function checkHubSpotSyncMismatch(): Promise<IntegrityCheckResult> 
 
   let hubspot: Client;
   try {
-    hubspot = await getHubSpotClient();
+    const result = await getHubSpotClientWithFallback();
+    hubspot = result.client;
   } catch (err: unknown) {
     if (!isProduction) logger.error('[DataIntegrity] HubSpot API error:', { error: err });
     issues.push({

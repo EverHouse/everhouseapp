@@ -4,7 +4,7 @@ import { db } from '../../db';
 import { isProduction } from '../../core/db';
 import { sql } from 'drizzle-orm';
 import { isAdmin } from '../../core/middleware';
-import { getHubSpotClient } from '../../core/integrations';
+import { getHubSpotClientWithFallback } from '../../core/integrations';
 import { retryableHubSpotRequest } from '../../core/hubspot/request';
 import { logFromRequest, logBillingAudit } from '../../core/auditLog';
 import { getSessionUser } from '../../types/session';
@@ -51,7 +51,7 @@ router.post('/api/data-tools/resync-member', isAdmin, async (req: Request, res: 
     const user = existingUser.rows[0] as unknown as DbUserRow;
     let hubspotContactId = user.hubspot_id;
     
-    const hubspot = await getHubSpotClient();
+    const { client: hubspot } = await getHubSpotClientWithFallback();
     
     if (!hubspotContactId) {
       const searchResponse = await retryableHubSpotRequest(() =>

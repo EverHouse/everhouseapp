@@ -4,7 +4,7 @@ import Stripe from 'stripe';
 import { Client } from '@hubspot/api-client';
 import { getErrorMessage } from '../../utils/errorUtils';
 import { logger } from '../logger';
-import { getHubSpotClient } from '../integrations';
+import { getHubSpotClientWithFallback } from '../integrations';
 import { isProduction } from '../db';
 import { getStripeClient } from '../stripe/client';
 import { retryableHubSpotRequest } from '../hubspot/request';
@@ -170,7 +170,8 @@ export async function checkTierReconciliation(): Promise<IntegrityCheckResult> {
 
   let hubspot: Client | undefined;
   try {
-    hubspot = await getHubSpotClient();
+    const hsResult = await getHubSpotClientWithFallback();
+    hubspot = hsResult.client;
   } catch (err: unknown) {
     if (!isProduction) logger.error('[DataIntegrity] HubSpot API error for tier reconciliation:', { error: err });
   }
