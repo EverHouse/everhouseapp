@@ -373,6 +373,7 @@ const Login: React.FC = () => {
                     ref={(el) => { otpRefs.current[idx] = el; }}
                     type="text"
                     inputMode="numeric"
+                    autoComplete={idx === 0 ? 'one-time-code' : 'off'}
                     maxLength={1}
                     value={digit}
                     onChange={(e) => handleOtpChange(idx, e.target.value)}
@@ -453,6 +454,7 @@ const Login: React.FC = () => {
                     <input
                       id="login-email"
                       type="email"
+                      autoComplete="email"
                       placeholder="Membership Email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
