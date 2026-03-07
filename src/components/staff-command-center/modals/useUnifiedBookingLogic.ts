@@ -1275,7 +1275,7 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
             owner: {
               email: staff.email,
               name: staffName,
-              member_id: staff.user_id || null
+              ...(staff.user_id ? { member_id: staff.user_id } : {})
             },
             additional_players: [],
             rememberEmail: false
@@ -1296,7 +1296,7 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
             owner: {
               email: staff.email,
               name: staffName,
-              member_id: staff.user_id || null
+              ...(staff.user_id ? { member_id: staff.user_id } : {})
             },
             additional_players: [],
             rememberEmail: false
