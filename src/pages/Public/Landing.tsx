@@ -349,15 +349,6 @@ const Landing: React.FC = () => {
       </section>
 
 
-      <section className="px-6 py-12 bg-bone dark:bg-[#141414] animate-content-enter-delay-5">
-        <div className="max-w-2xl mx-auto text-center">
-          <span className="text-6xl text-primary/20 dark:text-white/20 leading-none block mb-2" style={{ fontFamily: 'var(--font-display)' }}>"</span>
-          <blockquote className="text-lg sm:text-xl italic text-primary/90 dark:text-white/90 mb-4 leading-relaxed -mt-8">
-            Ever Club has become my second office. The golf is incredible, but the community is what keeps me coming back.
-          </blockquote>
-          <p className="text-sm text-primary/60 dark:text-white/60 font-medium">— Michael R., Core Member</p>
-        </div>
-      </section>
 
       <section className="px-6 py-16 bg-bone dark:bg-[#141414]">
         <div className="max-w-md mx-auto text-center">
