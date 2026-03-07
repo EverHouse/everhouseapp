@@ -40,46 +40,36 @@ export const StaffBottomNav: React.FC<StaffBottomNavProps> = ({
   
   const displayActiveTab = optimisticTab || activeTab;
   const visibleItems = NAV_ITEMS.filter(item => !item.adminOnly || isAdmin);
-  const activeIndex = visibleItems.findIndex(item => item.id === displayActiveTab);
-  const itemCount = visibleItems.length;
-  
-  const blobWidth = 100 / itemCount;
   
   const navContent = (
     <nav 
       ref={navRef}
-      className="staff-bottom-nav relative mb-8 mx-auto w-[calc(100%-3rem)] max-w-md bg-black/60 backdrop-blur-xl border border-white/15 p-1.5 shadow-[0_8px_32px_rgba(0,0,0,0.4),0_2px_8px_rgba(0,0,0,0.2)] rounded-full pointer-events-auto"
+      className="staff-bottom-nav relative mb-8 mx-auto w-[calc(100%-3rem)] max-w-md bg-black/60 backdrop-blur-xl border border-white/10 p-2 rounded-full pointer-events-auto"
+      role="navigation"
+      aria-label="Staff navigation"
     >
       <div className="relative flex items-center w-full">
-        {activeIndex >= 0 && (
-        <div 
-          className="absolute top-0 bottom-0 left-0 rounded-full pointer-events-none bg-gradient-to-b from-white/20 to-white/10 shadow-[0_0_20px_rgba(41,53,21,0.5),inset_0_1px_1px_rgba(255,255,255,0.2)] transition-transform duration-emphasis ease-spring-bounce"
-          style={{ 
-            width: `${blobWidth}%`, 
-            transform: `translateX(${activeIndex * 100}%)`,
-          }}
-        />
-        )}
-        
         {visibleItems.map((item) => {
           const isActive = displayActiveTab === item.id;
+          const shouldFill = isActive;
           return (
           <button
             type="button"
             key={item.id}
             onClick={() => navigateToTab(item.id)}
             onMouseEnter={() => prefetchStaffRoute(tabToPath[item.id])}
-            style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+            style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent', fontFamily: 'var(--font-label)' }}
             aria-label={item.label}
             aria-current={isActive ? 'page' : undefined}
             className={`
-              tactile-btn flex-1 flex flex-col items-center gap-1 py-2 px-1 min-h-[48px] relative z-10 cursor-pointer
-              transition-colors duration-normal ease-out active:scale-95
-              ${isActive ? 'text-white' : 'text-white/60 hover:text-white'}
+              tactile-btn flex-1 flex flex-col items-center gap-1 py-3.5 px-1 min-h-[48px] relative z-10 cursor-pointer
+              select-none transition-all duration-normal ease-out active:scale-95
+              focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:ring-inset focus-visible:outline-none
+              ${isActive ? 'text-white' : 'text-white/50 hover:text-white/70'}
             `}
           >
             <div className="relative">
-              <span className={`material-symbols-outlined text-xl transition-transform duration-normal ${isActive ? 'filled scale-110' : ''}`} aria-hidden="true">
+              <span className={`material-symbols-outlined text-[20px] transition-all duration-normal pointer-events-none ${shouldFill ? 'filled' : ''}`} aria-hidden="true">
                 {item.icon}
               </span>
               {item.id === 'simulator' && pendingRequestsCount > 0 && (
@@ -88,9 +78,10 @@ export const StaffBottomNav: React.FC<StaffBottomNavProps> = ({
                 </span>
               )}
             </div>
-            <span className={`text-[10px] uppercase tracking-[0.12em] transition-colors duration-normal ${isActive ? 'font-semibold' : 'font-normal'}`} style={{ fontFamily: 'var(--font-label)' }}>
+            <span className={`text-[9px] uppercase tracking-[0.2em] transition-colors duration-normal pointer-events-none translate-y-[1px] ${isActive ? 'font-semibold text-white' : 'font-medium'}`}>
               {item.label}
             </span>
+            <div className={`absolute bottom-1.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-white transition-all duration-normal ${isActive ? 'opacity-100 scale-100' : 'opacity-0 scale-0'}`} />
           </button>
           );
         })}
