@@ -1132,7 +1132,7 @@ const BookGolf: React.FC = () => {
                       <span className={`material-symbols-outlined text-2xl ${isDark ? 'text-amber-400' : 'text-amber-600'}`}>notifications</span>
                       <div className="flex-1">
                         <h4 className={`font-bold ${isDark ? 'text-amber-300' : 'text-amber-800'}`}>
-                          {closure.noticeType || 'Notice'}
+                          {closure.noticeType ? (closure.noticeType.includes('_') ? closure.noticeType.split('_').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ') : closure.noticeType) : 'Notice'}
                         </h4>
                         {hasTimeRange && (
                           <p className={`text-sm mt-1 ${isDark ? 'text-amber-300/80' : 'text-amber-700'}`}>

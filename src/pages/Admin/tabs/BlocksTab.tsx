@@ -10,7 +10,7 @@ import { AnimatedPage } from '../../../components/motion';
 import { TabTransition } from '../../../components/motion/TabTransition';
 import { useConfirmDialog } from '../../../components/ConfirmDialog';
 import { fetchWithCredentials, postWithCredentials, deleteWithCredentials, putWithCredentials } from '../../../hooks/queries/useFetch';
-import { isBlockingClosure } from '../../../utils/closureUtils';
+import { isBlockingClosure, formatTitleForDisplay } from '../../../utils/closureUtils';
 import WalkingGolferSpinner from '../../../components/WalkingGolferSpinner';
 
 interface BlocksClosure {
@@ -1015,8 +1015,8 @@ const BlocksTab: React.FC = () => {
                                                         : 'bg-amber-200 dark:bg-amber-500/30 text-amber-700 dark:text-amber-300'
                                                 }`}>
                                                     {blocking 
-                                                        ? (closure.noticeType || 'Closure')
-                                                        : (closure.noticeType && closure.noticeType.toLowerCase() !== 'closure' ? closure.noticeType : 'Notice')
+                                                        ? formatTitleForDisplay(closure.noticeType || 'Closure')
+                                                        : (closure.noticeType && closure.noticeType.toLowerCase() !== 'closure' ? formatTitleForDisplay(closure.noticeType) : 'Notice')
                                                     }
                                                 </span>
                                                 {closure.reason && closure.reason.trim() && (
@@ -1193,8 +1193,8 @@ const BlocksTab: React.FC = () => {
                                                                 : 'bg-amber-200/60 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400'
                                                         }`}>
                                                             {blocking 
-                                                                ? (closure.noticeType || 'Closure')
-                                                                : (closure.noticeType && closure.noticeType.toLowerCase() !== 'closure' ? closure.noticeType : 'Notice')
+                                                                ? formatTitleForDisplay(closure.noticeType || 'Closure')
+                                                                : (closure.noticeType && closure.noticeType.toLowerCase() !== 'closure' ? formatTitleForDisplay(closure.noticeType) : 'Notice')
                                                             }
                                                         </span>
                                                     </div>

@@ -9,7 +9,7 @@ export function isBlockingClosure(affectedAreas: string | null | undefined): boo
   return affectedAreas !== 'none' && affectedAreas !== '' && affectedAreas !== null && affectedAreas !== undefined;
 }
 
-function formatTitleForDisplay(title: string): string {
+export function formatTitleForDisplay(title: string): string {
   if (!title) return 'Notice';
   const trimmed = title.trim();
 

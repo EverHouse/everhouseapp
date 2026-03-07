@@ -169,7 +169,7 @@ export function AssignModeSecondaryActions({
                     ? `${notice.start_time.slice(0, 5)} - ${notice.end_time.slice(0, 5)}` 
                     : 'All day'
                   }
-                  {notice.notice_type && ` • ${notice.notice_type}`}
+                  {notice.notice_type && ` • ${notice.notice_type.includes('_') ? notice.notice_type.split('_').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ') : notice.notice_type}`}
                 </p>
               </button>
             ))}
