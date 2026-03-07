@@ -226,7 +226,7 @@ const BookTour: React.FC = () => {
                 </div>
                 <div className="flex items-center gap-3">
                   <span className="material-symbols-outlined text-primary/60 dark:text-white/60">location_on</span>
-                  <span className="text-primary dark:text-white font-medium">3625 W MacArthur Blvd, Santa Ana, CA 92704</span>
+                  <span className="text-primary dark:text-white font-medium">15771 Red Hill Ave, Ste 500, Tustin, CA 92780</span>
                 </div>
               </div>
 

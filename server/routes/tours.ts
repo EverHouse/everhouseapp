@@ -944,7 +944,7 @@ function getTourConfirmationHtml(data: { guestName: string; date: string; time: 
                         <td>
                           <p style="margin: 0; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: ${CLUB_COLORS.textMuted};">Location</p>
                           <p style="margin: 4px 0 0 0; font-size: 18px; font-weight: 600; color: ${CLUB_COLORS.textDark};">Ever Club</p>
-                          <p style="margin: 4px 0 0 0; font-size: 14px; color: ${CLUB_COLORS.textMuted};">3625 W MacArthur Blvd, Santa Ana, CA 92704</p>
+                          <p style="margin: 4px 0 0 0; font-size: 14px; color: ${CLUB_COLORS.textMuted};">15771 Red Hill Ave, Ste 500, Tustin, CA 92780</p>
                         </td>
                       </tr>
                     </table>
@@ -963,7 +963,7 @@ function getTourConfirmationHtml(data: { guestName: string; date: string; time: 
           <tr>
             <td style="text-align: center; border-top: 1px solid ${CLUB_COLORS.borderLight}; padding-top: 24px;">
               <p style="margin: 0; font-size: 12px; color: ${CLUB_COLORS.textMuted};">
-                Ever Club &bull; 3625 W MacArthur Blvd &bull; Santa Ana, CA 92704
+                Ever Club &bull; 15771 Red Hill Ave, Ste 500 &bull; Tustin, CA 92780
               </p>
             </td>
           </tr>
