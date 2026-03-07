@@ -296,7 +296,8 @@ router.post('/api/webhooks/trackman', async (req: Request, res: Response) => {
       bodyKeys: Object.keys(req.body || {}),
       hasVenue: !!req.body?.venue,
       hasBookingStart: !!req.body?.booking?.start,
-      isV2Format: isTrackmanV2Payload(req.body)
+      isV2Format: isTrackmanV2Payload(req.body),
+      eventType: req.body?.event_type || req.body?.eventType || 'unknown'
     }
   });
   
@@ -530,7 +531,46 @@ router.post('/api/webhooks/trackman', async (req: Request, res: Response) => {
     } else {
       eventType = payload.event_type || payload.eventType || 'booking_update';
       
-      if (eventType.includes('booking') || eventType.includes('created') || eventType.includes('updated') || eventType.includes('cancel')) {
+      const isUserUpdateEvent = eventType.includes('user_update') || eventType.includes('user.');
+      const isPurchaseEvent = eventType.includes('purchase');
+      
+      if (isUserUpdateEvent) {
+        const userData = (payload as Record<string, unknown>).user || (payload as Record<string, unknown>).data || payload;
+        const uData = userData as Record<string, unknown>;
+        trackmanUserId = String(uData.id || uData.userId || '');
+        const userName = [uData.firstName || uData.first_name, uData.lastName || uData.last_name].filter(Boolean).join(' ');
+        const userEmail = (uData.email as string) || '';
+        
+        logger.info('[Trackman Webhook] Processing user_update event', {
+          extra: { 
+            trackmanUserId,
+            userName: userName || undefined,
+            userEmail: userEmail || undefined,
+            eventType
+          }
+        });
+
+        if (userEmail) {
+          const member = await findMemberByEmail(userEmail);
+          if (member) {
+            matchedUserId = member.email;
+            logger.info('[Trackman Webhook] user_update matched to member', {
+              extra: { trackmanUserId, memberEmail: member.email, memberName: member.name }
+            });
+          }
+        }
+      } else if (isPurchaseEvent) {
+        const purchaseData = (payload as Record<string, unknown>).purchase || (payload as Record<string, unknown>).data || payload;
+        const pData = purchaseData as Record<string, unknown>;
+        
+        logger.info('[Trackman Webhook] Processing purchase event', {
+          extra: { 
+            purchaseId: pData.id,
+            status: pData.status,
+            eventType
+          }
+        });
+      } else if (eventType.includes('booking') || eventType.includes('created') || eventType.includes('updated') || eventType.includes('cancel')) {
         const result = await handleBookingUpdate(payload);
         matchedBookingId = result.matchedBookingId;
         

@@ -309,6 +309,8 @@ export const TrackmanWebhookEventsSection: React.FC<TrackmanWebhookEventsSection
   };
 
   const getEventBadgeColor = (type: string) => {
+    if (type.includes('user_update') || type.includes('user.')) return 'bg-indigo-100 text-indigo-800 dark:bg-indigo-500/20 dark:text-indigo-400';
+    if (type.includes('purchase')) return 'bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-400';
     if (type.includes('modified')) return 'bg-purple-100 text-purple-800 dark:bg-purple-500/20 dark:text-purple-400';
     if (type.includes('created') || type.includes('create')) return 'bg-green-100 text-green-800 dark:bg-green-500/20 dark:text-green-400';
     if (type.includes('updated') || type.includes('update')) return 'bg-blue-100 text-blue-800 dark:bg-blue-500/20 dark:text-blue-400';
@@ -453,7 +455,11 @@ export const TrackmanWebhookEventsSection: React.FC<TrackmanWebhookEventsSection
                   
                   const payload = typeof event.payload === 'string' ? JSON.parse(event.payload) : event.payload;
                   const eventType = getEventTypeFromPayload(payload, event.event_type);
-                  const bookingData = (payload?.data || payload?.booking || {}) as TrackmanPayloadBooking;
+                  const isUserUpdate = eventType === 'user_update' || eventType === 'user.updated' || eventType === 'user.created';
+                  const isPurchaseUpdate = eventType === 'purchase_update' || eventType === 'purchase_paid' || eventType.includes('purchase');
+                  const userData = isUserUpdate ? (payload?.user || payload?.data || payload) as Record<string, unknown> : null;
+                  const purchaseData = isPurchaseUpdate ? (payload?.purchase || payload?.data || payload) as Record<string, unknown> : null;
+                  const bookingData = (!isUserUpdate && !isPurchaseUpdate) ? (payload?.data || payload?.booking || {}) as TrackmanPayloadBooking : {} as TrackmanPayloadBooking;
                   const venueData = (payload?.venue || bookingData?.venue) as TrackmanPayloadBooking['venue'];
                   const bayName = bookingData?.bay_name || bookingData?.bayName || (bookingData?.bay?.ref ? `Bay ${bookingData.bay.ref}` : undefined);
                   
@@ -464,6 +470,11 @@ export const TrackmanWebhookEventsSection: React.FC<TrackmanWebhookEventsSection
                   const duration = calculateDuration(bookingStart, bookingEnd);
                   const playerCount = getPlayerCount(bookingData);
 
+                  const userDisplayName = userData ? [userData.firstName || userData.first_name, userData.lastName || userData.last_name].filter(Boolean).join(' ') as string : '';
+                  const userEmail = (userData?.email as string) || '';
+                  const userPhone = (userData?.phone || userData?.phoneNumber || userData?.mobile) as string || '';
+                  const trackmanUserId = (userData?.id || userData?.userId) as string || '';
+
                   return (
                     <div key={event.id} className="p-3 md:p-4 bg-white/50 dark:bg-white/5 rounded-xl tactile-row">
                       <div className="flex items-start justify-between gap-2 md:gap-3">
@@ -472,7 +483,19 @@ export const TrackmanWebhookEventsSection: React.FC<TrackmanWebhookEventsSection
                             <span className={`px-1.5 md:px-2 py-0.5 rounded-[4px] text-xs font-medium ${getEventBadgeColor(eventType)}`}>
                               {eventType}
                             </span>
-                            {bayName && (
+                            {isUserUpdate && (
+                              <span className="flex items-center gap-1 text-xs font-medium text-primary/80 dark:text-white/80">
+                                <span className="material-symbols-outlined text-sm">person</span>
+                                {userDisplayName || userEmail || 'User'}
+                              </span>
+                            )}
+                            {isPurchaseUpdate && (
+                              <span className="flex items-center gap-1 text-xs font-medium text-primary/80 dark:text-white/80">
+                                <span className="material-symbols-outlined text-sm">receipt_long</span>
+                                Purchase
+                              </span>
+                            )}
+                            {!isUserUpdate && !isPurchaseUpdate && bayName && (
                               <span className="flex items-center gap-1 text-xs font-medium text-primary/80 dark:text-white/80">
                                 <span className="material-symbols-outlined text-sm">sports_golf</span>
                                 {bayName}
@@ -496,7 +519,24 @@ export const TrackmanWebhookEventsSection: React.FC<TrackmanWebhookEventsSection
                             )}
                           </div>
                           
-                          {(bookingDate || timeSlot) && (
+                          {isUserUpdate && (userEmail || userPhone) && (
+                            <div className="mt-2 flex items-center gap-2 md:gap-3 flex-wrap">
+                              {userEmail && (
+                                <span className="flex items-center gap-1 text-sm font-semibold text-primary dark:text-white">
+                                  <span className="material-symbols-outlined text-base">mail</span>
+                                  {userEmail}
+                                </span>
+                              )}
+                              {userPhone && (
+                                <span className="flex items-center gap-1 text-sm font-semibold text-primary dark:text-white">
+                                  <span className="material-symbols-outlined text-base">phone</span>
+                                  {userPhone}
+                                </span>
+                              )}
+                            </div>
+                          )}
+
+                          {!isUserUpdate && !isPurchaseUpdate && (bookingDate || timeSlot) && (
                             <div className="mt-2 flex items-center gap-2 md:gap-3 flex-wrap">
                               {bookingDate && (
                                 <span className="flex items-center gap-1 text-sm font-semibold text-primary dark:text-white">
@@ -514,13 +554,13 @@ export const TrackmanWebhookEventsSection: React.FC<TrackmanWebhookEventsSection
                           )}
                           
                           <div className="mt-1.5 flex items-center gap-2 md:gap-3 text-xs text-primary/60 dark:text-white/60 flex-wrap">
-                            {duration && (
+                            {!isUserUpdate && !isPurchaseUpdate && duration && (
                               <span className="flex items-center gap-0.5">
                                 <span className="material-symbols-outlined text-sm">timer</span>
                                 {duration}
                               </span>
                             )}
-                            {playerCount !== null && (
+                            {!isUserUpdate && !isPurchaseUpdate && playerCount !== null && (
                               <span className="flex items-center gap-0.5">
                                 <span className="material-symbols-outlined text-sm">group</span>
                                 {playerCount} player{playerCount !== 1 ? 's' : ''}
@@ -530,7 +570,12 @@ export const TrackmanWebhookEventsSection: React.FC<TrackmanWebhookEventsSection
                               <span className="material-symbols-outlined text-sm">sync</span>
                               {event.created_at ? formatDateTimePacific(event.created_at) : 'Unknown'}
                             </span>
-                            {event.trackman_booking_id && (
+                            {isUserUpdate && trackmanUserId && (
+                              <span className="text-primary/40 dark:text-white/40">
+                                User #{trackmanUserId}
+                              </span>
+                            )}
+                            {!isUserUpdate && event.trackman_booking_id && (
                               <span className="text-primary/40 dark:text-white/40">
                                 #{event.trackman_booking_id}
                               </span>
@@ -668,6 +713,85 @@ export const TrackmanWebhookEventsSection: React.FC<TrackmanWebhookEventsSection
                       
                       {isExpanded && (
                         <div className="mt-3 space-y-2">
+                          {isUserUpdate && userData ? (
+                          <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                            {trackmanUserId && (
+                              <div className="p-2 bg-indigo-50 dark:bg-indigo-500/10 rounded-lg">
+                                <p className="text-[10px] uppercase tracking-wider text-indigo-600/60 dark:text-indigo-400/60">Trackman User ID</p>
+                                <p className="text-xs font-medium text-indigo-800 dark:text-indigo-300">{trackmanUserId}</p>
+                              </div>
+                            )}
+                            {userDisplayName && (
+                              <div className="p-2 bg-indigo-50 dark:bg-indigo-500/10 rounded-lg">
+                                <p className="text-[10px] uppercase tracking-wider text-indigo-600/60 dark:text-indigo-400/60">Name</p>
+                                <p className="text-xs font-medium text-indigo-800 dark:text-indigo-300">{userDisplayName}</p>
+                              </div>
+                            )}
+                            {userEmail && (
+                              <div className="p-2 bg-indigo-50 dark:bg-indigo-500/10 rounded-lg">
+                                <p className="text-[10px] uppercase tracking-wider text-indigo-600/60 dark:text-indigo-400/60">Email</p>
+                                <p className="text-xs font-medium text-indigo-800 dark:text-indigo-300 break-all">{userEmail}</p>
+                              </div>
+                            )}
+                            {userPhone && (
+                              <div className="p-2 bg-indigo-50 dark:bg-indigo-500/10 rounded-lg">
+                                <p className="text-[10px] uppercase tracking-wider text-indigo-600/60 dark:text-indigo-400/60">Phone</p>
+                                <p className="text-xs font-medium text-indigo-800 dark:text-indigo-300">{userPhone}</p>
+                              </div>
+                            )}
+                            {venueData?.name && (
+                              <div className="p-2 bg-gray-50 dark:bg-white/5 rounded-lg">
+                                <p className="text-[10px] uppercase tracking-wider text-primary/50 dark:text-white/40">Venue</p>
+                                <p className="text-xs font-medium text-primary dark:text-white">{venueData.name}</p>
+                              </div>
+                            )}
+                            {Object.entries(userData).filter(([k]) => !['id', 'userId', 'email', 'phone', 'phoneNumber', 'mobile', 'firstName', 'first_name', 'lastName', 'last_name'].includes(k) && typeof userData[k] !== 'object').map(([key, value]) => (
+                              <div key={key} className="p-2 bg-gray-50 dark:bg-white/5 rounded-lg">
+                                <p className="text-[10px] uppercase tracking-wider text-primary/50 dark:text-white/40">{key.replace(/([A-Z])/g, ' $1').replace(/_/g, ' ').trim()}</p>
+                                <p className="text-xs font-medium text-primary dark:text-white break-all">{String(value)}</p>
+                              </div>
+                            ))}
+                          </div>
+                          ) : isPurchaseUpdate && purchaseData ? (
+                          <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                            {purchaseData.id && (
+                              <div className="p-2 bg-amber-50 dark:bg-amber-500/10 rounded-lg">
+                                <p className="text-[10px] uppercase tracking-wider text-amber-600/60 dark:text-amber-400/60">Purchase ID</p>
+                                <p className="text-xs font-medium text-amber-800 dark:text-amber-300">{String(purchaseData.id)}</p>
+                              </div>
+                            )}
+                            {purchaseData.status && (
+                              <div className="p-2 bg-amber-50 dark:bg-amber-500/10 rounded-lg">
+                                <p className="text-[10px] uppercase tracking-wider text-amber-600/60 dark:text-amber-400/60">Status</p>
+                                <p className="text-xs font-medium text-amber-800 dark:text-amber-300 capitalize">{String(purchaseData.status)}</p>
+                              </div>
+                            )}
+                            {purchaseData.total !== undefined && (
+                              <div className="p-2 bg-amber-50 dark:bg-amber-500/10 rounded-lg">
+                                <p className="text-[10px] uppercase tracking-wider text-amber-600/60 dark:text-amber-400/60">Total</p>
+                                <p className="text-xs font-medium text-amber-800 dark:text-amber-300">{String(purchaseData.total)}</p>
+                              </div>
+                            )}
+                            {venueData?.name && (
+                              <div className="p-2 bg-gray-50 dark:bg-white/5 rounded-lg">
+                                <p className="text-[10px] uppercase tracking-wider text-primary/50 dark:text-white/40">Venue</p>
+                                <p className="text-xs font-medium text-primary dark:text-white">{venueData.name}</p>
+                              </div>
+                            )}
+                            {Array.isArray(purchaseData.lineItems || purchaseData.line_items) && (
+                              <div className="p-2 bg-gray-50 dark:bg-white/5 rounded-lg col-span-2 md:col-span-3">
+                                <p className="text-[10px] uppercase tracking-wider text-primary/50 dark:text-white/40 mb-1">Line Items</p>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {((purchaseData.lineItems || purchaseData.line_items) as Array<Record<string, unknown>>).map((item, idx) => (
+                                    <span key={idx} className="px-2 py-0.5 bg-white dark:bg-white/10 rounded text-xs text-primary dark:text-white">
+                                      {String(item.name || item.type || `Item ${idx + 1}`)}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                          ) : (
                           <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                             {bookingData?.id && (
                               <div className="p-2 bg-gray-50 dark:bg-white/5 rounded-lg">
@@ -740,6 +864,7 @@ export const TrackmanWebhookEventsSection: React.FC<TrackmanWebhookEventsSection
                               </div>
                             )}
                           </div>
+                          )}
                           {bookingData?.playerOptions && bookingData.playerOptions.length > 0 && (
                             <div className="p-2 bg-gray-50 dark:bg-white/5 rounded-lg">
                               <p className="text-[10px] uppercase tracking-wider text-primary/50 dark:text-white/40 mb-1">Player Options</p>
