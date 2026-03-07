@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 
 interface AssignModeFooterProps {
   hasOwner: boolean;
@@ -22,7 +22,7 @@ export interface AssignModeSecondaryActionsProps {
   isLoadingStaff: boolean;
   assigningToStaff: boolean;
   handleMarkAsEvent: () => Promise<void>;
-  executeMarkAsEvent: (existingClosureId?: number) => Promise<void>;
+  executeMarkAsEvent: (existingClosureId?: number, eventTitle?: string) => Promise<void>;
   handleAssignToStaff: (staff: { id: string | number; name: string; email: string }) => Promise<void>;
   getRoleBadge: (role: string) => React.ReactNode;
   onDeleteBooking?: () => Promise<void>;
@@ -114,6 +114,9 @@ export function AssignModeSecondaryActions({
   onDeleteBooking,
   deleting,
 }: AssignModeSecondaryActionsProps) {
+  const [customEventTitle, setCustomEventTitle] = useState('');
+  const [showTitleInput, setShowTitleInput] = useState(false);
+
   return (
     <div className="space-y-2 pt-2 border-t border-primary/10 dark:border-white/10">
       <button
@@ -170,17 +173,51 @@ export function AssignModeSecondaryActions({
                 </p>
               </button>
             ))}
-            <button
-              onClick={() => executeMarkAsEvent()}
-              disabled={markingAsEvent}
-              className="tactile-btn w-full p-2 text-center rounded-lg border-2 border-dashed border-purple-300 dark:border-purple-600 text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-500/10 transition-colors text-sm font-medium"
-            >
-              <span className="material-symbols-outlined text-sm mr-1">add</span>
-              Create New Notice Instead
-            </button>
+            {!showTitleInput ? (
+              <button
+                onClick={() => setShowTitleInput(true)}
+                disabled={markingAsEvent}
+                className="tactile-btn w-full p-2 text-center rounded-lg border-2 border-dashed border-purple-300 dark:border-purple-600 text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-500/10 transition-colors text-sm font-medium"
+              >
+                <span className="material-symbols-outlined text-sm mr-1">add</span>
+                Create New Notice Instead
+              </button>
+            ) : (
+              <div className="space-y-2 p-2 rounded-lg bg-white dark:bg-white/5 border border-purple-200 dark:border-purple-500/20">
+                <label className="text-xs font-medium text-purple-700 dark:text-purple-400">Event Title</label>
+                <input
+                  type="text"
+                  value={customEventTitle}
+                  onChange={e => setCustomEventTitle(e.target.value)}
+                  placeholder="e.g. Corporate Event, Birthday Party..."
+                  className="w-full px-3 py-2 rounded-lg border border-purple-200 dark:border-purple-500/30 bg-white dark:bg-white/5 text-sm text-primary dark:text-white placeholder:text-primary/40 dark:placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                  autoFocus
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' && customEventTitle.trim()) {
+                      executeMarkAsEvent(undefined, customEventTitle);
+                    }
+                  }}
+                />
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => executeMarkAsEvent(undefined, customEventTitle || undefined)}
+                    disabled={markingAsEvent || !customEventTitle.trim()}
+                    className="tactile-btn flex-1 py-2 px-3 rounded-lg bg-purple-600 text-white text-sm font-medium hover:bg-purple-700 transition-colors disabled:opacity-50"
+                  >
+                    {markingAsEvent ? 'Creating...' : 'Create Notice'}
+                  </button>
+                  <button
+                    onClick={() => { setShowTitleInput(false); setCustomEventTitle(''); }}
+                    className="tactile-btn py-2 px-3 rounded-lg border border-purple-200 dark:border-purple-500/30 text-purple-600 dark:text-purple-400 text-sm hover:bg-purple-50 dark:hover:bg-purple-500/10 transition-colors"
+                  >
+                    Back
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
           <button
-            onClick={() => setShowNoticeSelection(false)}
+            onClick={() => { setShowNoticeSelection(false); setShowTitleInput(false); setCustomEventTitle(''); }}
             className="tactile-btn w-full text-center text-xs text-primary/50 dark:text-white/50 hover:text-primary dark:hover:text-white pt-1"
           >
             Cancel

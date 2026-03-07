@@ -494,6 +494,7 @@ export async function markBookingAsEvent(params: {
   trackmanBookingId?: string;
   existingClosureId?: number;
   staffEmail: string;
+  eventTitle?: string;
 }) {
   let primaryBooking: typeof bookingRequests.$inferSelect | undefined;
   let isFromUnmatched = false;
@@ -616,7 +617,7 @@ export async function markBookingAsEvent(params: {
   const resourceIds = [...new Set(relatedBookings.map(b => b.resourceId).filter(Boolean))] as number[];
   const bookingIds = relatedBookings.map(b => b.id);
   
-  const eventTitle = primaryBooking.userName || 'Private Event';
+  const eventTitle = params.eventTitle || 'Private Event';
   
   const result = await db.transaction(async (tx) => {
     let closure: typeof facilityClosures.$inferSelect | null = null;
@@ -672,7 +673,7 @@ export async function markBookingAsEvent(params: {
         startTime: startTime,
         endDate: bookingDate,
         endTime: endTime,
-        affectedAreas: JSON.stringify(resourceIds.map(id => `bay_${id}`)),
+        affectedAreas: resourceIds.map(id => `bay_${id}`).join(','),
         visibility: 'Private',
         isActive: true,
         createdBy: params.staffEmail

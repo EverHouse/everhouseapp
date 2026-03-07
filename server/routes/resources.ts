@@ -364,7 +364,7 @@ router.get('/api/resources/overlapping-notices', isStaffOrAdmin, async (req, res
 
 router.post('/api/bookings/mark-as-event', isStaffOrAdmin, validateBody(markAsEventSchema), async (req, res) => {
   try {
-    const { booking_id, trackman_booking_id, existingClosureId } = req.body;
+    const { booking_id, trackman_booking_id, existingClosureId, eventTitle } = req.body;
     
     const staffEmail = req.session?.user?.email || 'staff';
     
@@ -373,6 +373,7 @@ router.post('/api/bookings/mark-as-event', isStaffOrAdmin, validateBody(markAsEv
       trackmanBookingId: trackman_booking_id,
       existingClosureId,
       staffEmail,
+      eventTitle,
     });
     
     logFromRequest(req, 'update_booking', 'booking', result.primaryBooking.id.toString(), `Private Event: ${result.eventTitle}`, {

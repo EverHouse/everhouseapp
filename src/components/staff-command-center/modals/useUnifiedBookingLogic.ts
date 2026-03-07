@@ -1221,7 +1221,7 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
     await fetchOverlappingNotices();
   };
 
-  const executeMarkAsEvent = async (existingClosureId?: number) => {
+  const executeMarkAsEvent = async (existingClosureId?: number, eventTitle?: string) => {
     if (markingAsEvent) return;
     
     setMarkingAsEvent(true);
@@ -1231,15 +1231,20 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
         throw new Error('No booking to mark as event');
       }
 
+      const body: Record<string, unknown> = {
+        booking_id: bkId,
+        trackman_booking_id: trackmanBookingId,
+        existingClosureId,
+      };
+      if (eventTitle?.trim()) {
+        body.eventTitle = eventTitle.trim();
+      }
+
       const res = await fetch('/api/bookings/mark-as-event', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({
-          booking_id: bkId,
-          trackman_booking_id: trackmanBookingId,
-          existingClosureId
-        })
+        body: JSON.stringify(body)
       });
       
       if (!res.ok) {

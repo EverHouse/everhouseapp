@@ -27,6 +27,7 @@ export const markAsEventSchema = z.object({
   booking_id: z.number().int().positive().optional(),
   trackman_booking_id: z.string().optional(),
   existingClosureId: z.number().optional(),
+  eventTitle: z.string().min(1).max(200).optional(),
 }).refine(
   (data) => data.booking_id !== undefined || data.trackman_booking_id !== undefined,
   { message: 'At least one of booking_id or trackman_booking_id is required' }

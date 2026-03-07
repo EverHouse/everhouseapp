@@ -88,7 +88,7 @@ const formatSingleArea = (area: string): string => {
   if (trimmed === 'none') return '';
   if (trimmed.startsWith('bay_')) {
     const bayNum = trimmed.replace('bay_', '');
-    return `Bay ${bayNum}`;
+    return `Simulator Bay ${bayNum}`;
   }
   return trimmed;
 };
