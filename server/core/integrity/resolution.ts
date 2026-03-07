@@ -7,7 +7,7 @@ import {
   integrityIssuesTracking,
   integrityIgnores
 } from '../../../shared/schema';
-import { getHubSpotClient } from '../integrations';
+import { getHubSpotClientWithFallback } from '../integrations';
 import { syncCustomerMetadataToStripe } from '../stripe/customers';
 import { getStripeClient } from '../stripe/client';
 import { logIntegrityAudit } from '../auditLog';
@@ -117,7 +117,7 @@ export async function syncPush(params: SyncPushParams): Promise<{ success: boole
 
     const user = userResult.rows[0] as unknown as SyncPushUserRow;
 
-    const hubspot = await getHubSpotClient();
+    const { client: hubspot } = await getHubSpotClientWithFallback();
 
     const isChurned = ['terminated', 'cancelled', 'non-member', 'deleted', 'former_member', 'expired'].includes(String(user.membership_status || '').toLowerCase());
     const mappedTier = isChurned ? '' : (await denormalizeTierForHubSpotAsync(String(user.tier)) || '');
@@ -178,7 +178,7 @@ export async function bulkPushToHubSpot(dryRun: boolean = true): Promise<{
   let totalMismatched = 0;
   let totalSynced = 0;
 
-  const hubspot = await getHubSpotClient();
+  const { client: hubspot } = await getHubSpotClientWithFallback();
 
   const allMembersResult = await db.execute(sql`
     SELECT id, email, first_name, last_name, membership_tier, hubspot_id, tier, membership_status
@@ -340,7 +340,7 @@ export async function syncPull(params: SyncPullParams): Promise<{ success: boole
       throw new Error('userId and hubspotContactId are required for HubSpot pull');
     }
 
-    const hubspot = await getHubSpotClient();
+    const { client: hubspot } = await getHubSpotClientWithFallback();
 
     const contact = await hubspot.crm.contacts.basicApi.getById(
       hubspotContactId,
