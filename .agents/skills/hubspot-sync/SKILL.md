@@ -118,9 +118,9 @@ The `POST /api/hubspot/webhooks` endpoint handles `contact.propertyChange` event
 - **Protection rules**: Skip if in `sync_exclusions`, skip if `archived_at IS NOT NULL`, STRIPE WINS for status/tier, skip visitors for status changes, skip unknown users (no upsert).
 - **Cache invalidation**: Every handled property change invalidates the contact cache and broadcasts a directory update via WebSocket.
 
-### Weekly Reconciliation Sync (Safety Net — Sunday 3 AM Pacific)
+### Daily Reconciliation Sync (Safety Net — Daily 3 AM Pacific)
 
-`syncAllMembersFromHubSpot` in `server/core/memberSync.ts` runs weekly as a safety net:
+`syncAllMembersFromHubSpot` in `server/core/memberSync.ts` runs daily as a safety net:
 
 1. Fetch all contacts from HubSpot (paginated, 100 per page).
 2. Skip contacts in the `sync_exclusions` table (permanently deleted members).
@@ -211,7 +211,7 @@ Contacts are enriched with: lifetime visits (bookings + events + wellness + walk
 | `server/core/hubspotQueueMonitor.ts` | Queue stats for admin dashboard |
 | `server/core/stripe/hubspotSync.ts` | Payment and day-pass line item sync |
 | `server/schedulers/hubspotQueueScheduler.ts` | Queue processor (every 2 min) |
-| `server/schedulers/memberSyncScheduler.ts` | Weekly member sync (Sunday 3 AM Pacific) |
+| `server/schedulers/memberSyncScheduler.ts` | Daily member sync (3 AM Pacific) |
 | `server/schedulers/hubspotFormSyncScheduler.ts` | Form sync (every 30 min) |
 | `server/routes/hubspot.ts` | API routes, contact cache, webhook validation |
 
