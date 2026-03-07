@@ -160,7 +160,14 @@ const WellnessCard: React.FC<WellnessCardProps> = ({ isDesktopGrid, isDesktop, u
     ) : (
       <div className={`${isDesktop ? 'flex-1 overflow-y-auto pb-6' : ''}`}>
         {upcomingWellness.slice(0, isDesktop ? 5 : 3).map((wellness, index) => {
-          const dateStr = wellness.date ? (typeof wellness.date === 'string' ? wellness.date.split('T')[0] : new Date(wellness.date).toISOString().split('T')[0]) : '';
+          let dateStr = '';
+          if (wellness.date) {
+            if (typeof wellness.date === 'string') {
+              dateStr = wellness.date.split('T')[0];
+            } else {
+              try { dateStr = new Date(wellness.date).toISOString().split('T')[0]; } catch { dateStr = ''; }
+            }
+          }
           return (
             <GlassListRow key={wellness.id} onClick={onNavigateToWellness} className="animate-slide-up-stagger tactile-row" style={{ '--stagger-index': index } as React.CSSProperties}>
               <DateBlock dateStr={dateStr} today={today} />
