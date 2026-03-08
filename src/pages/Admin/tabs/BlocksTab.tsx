@@ -10,7 +10,7 @@ import { AnimatedPage } from '../../../components/motion';
 import { TabTransition } from '../../../components/motion/TabTransition';
 import { useConfirmDialog } from '../../../components/ConfirmDialog';
 import { fetchWithCredentials, postWithCredentials, deleteWithCredentials, putWithCredentials } from '../../../hooks/queries/useFetch';
-import { isBlockingClosure, formatTitleForDisplay, formatAffectedAreas as formatAreasShared } from '../../../utils/closureUtils';
+import { isBlockingClosure, formatTitleForDisplay, formatAffectedAreas as formatAreasShared, getAffectedAreasList as getAreasListShared } from '../../../utils/closureUtils';
 import WalkingGolferSpinner from '../../../components/WalkingGolferSpinner';
 
 interface BlocksClosure {
@@ -542,20 +542,7 @@ const BlocksTab: React.FC = () => {
         if (areas === 'all_bays') {
             return bays.map(b => b.name);
         }
-        if (areas === 'conference_room') return ['Conference Room'];
-        
-        const areaList = areas.split(',').map(a => a.trim());
-        return areaList.map(area => {
-            if (area === 'entire_facility') return 'Entire Facility';
-            if (area === 'all_bays') return 'All Bays';
-            if (area === 'conference_room' || area === 'Conference Room') return 'Conference Room';
-            if (area.startsWith('bay_')) {
-                const areaId = parseInt(area.replace('bay_', ''));
-                const bay = bays.find(b => b.id === areaId);
-                return bay ? bay.name : `Bay ${areaId}`;
-            }
-            return area;
-        });
+        return getAreasListShared(areas);
     };
 
     const filteredClosures = useMemo(() => {

@@ -14,6 +14,7 @@ const DEFAULT_SETTINGS: Record<string, { value: string; category: string }> = {
   'notifications.data_integrity_alerts': { value: 'true', category: 'notifications' },
   'notifications.sync_failure_alerts': { value: 'true', category: 'notifications' },
 
+  'email.auth.enabled': { value: 'true', category: 'email' },
   'email.welcome.enabled': { value: 'true', category: 'email' },
   'email.booking.enabled': { value: 'true', category: 'email' },
   'email.passes.enabled': { value: 'true', category: 'email' },

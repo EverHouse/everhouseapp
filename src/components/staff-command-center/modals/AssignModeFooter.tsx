@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { formatTitleForDisplay } from '../../../utils/closureUtils';
 
 interface AssignModeFooterProps {
   hasOwner: boolean;
@@ -159,7 +160,7 @@ export function AssignModeSecondaryActions({
                 className="tactile-btn w-full p-2 text-left rounded-lg bg-white dark:bg-white/5 hover:bg-purple-100 dark:hover:bg-purple-900/20 transition-colors border border-purple-200 dark:border-purple-500/20"
               >
                 <div className="flex items-center justify-between">
-                  <p className="text-sm font-medium text-primary dark:text-white">{notice.title || notice.reason || 'Untitled Notice'}</p>
+                  <p className="text-sm font-medium text-primary dark:text-white">{notice.title ? formatTitleForDisplay(notice.title) : notice.reason || 'Untitled Notice'}</p>
                   <span className="px-1.5 py-0.5 text-[10px] font-medium bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300 rounded">
                     {notice.source}
                   </span>
@@ -169,7 +170,7 @@ export function AssignModeSecondaryActions({
                     ? `${notice.start_time.slice(0, 5)} - ${notice.end_time.slice(0, 5)}` 
                     : 'All day'
                   }
-                  {notice.notice_type && ` • ${notice.notice_type.includes('_') ? notice.notice_type.split('_').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ') : notice.notice_type}`}
+                  {notice.notice_type && ` • ${formatTitleForDisplay(notice.notice_type)}`}
                 </p>
               </button>
             ))}
