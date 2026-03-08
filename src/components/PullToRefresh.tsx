@@ -18,7 +18,7 @@ const isTouchDevice = () => {
   return 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 };
 
-const PullToRefresh: React.FC<PullToRefreshProps> = ({ children, disabled = false, className = '' }) => {
+const PullToRefresh: React.FC<PullToRefreshProps> = ({ children, onRefresh, disabled = false, className = '' }) => {
   const [pullDistance, setPullDistance] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isFillingScreen, setIsFillingScreen] = useState(false);
@@ -100,9 +100,14 @@ const PullToRefresh: React.FC<PullToRefreshProps> = ({ children, disabled = fals
     setIsFillingScreen(false);
     setIsRefreshing(true);
     
-    sessionStorage.setItem('ptr-reload', '1');
-    window.location.reload();
-  }, [isRefreshing, isFillingScreen]);
+    try {
+      await onRefresh?.();
+    } catch (err) {
+      console.error('[PullToRefresh] Refresh failed:', err);
+    }
+    
+    setIsRefreshing(false);
+  }, [isRefreshing, isFillingScreen, onRefresh]);
 
   useEffect(() => {
     if (!isTouchCapable) return;
@@ -192,6 +197,7 @@ const PullToRefresh: React.FC<PullToRefreshProps> = ({ children, disabled = fals
   const isFillingScreenRef = useRef(isFillingScreen);
   const pullDistanceRef = useRef(pullDistance);
   const animateSpringBackRef = useRef(animateSpringBack);
+  const onRefreshRef = useRef(onRefresh);
 
   useEffect(() => { disabledRef.current = disabled; }, [disabled]);
   useEffect(() => { isModalOpenRef.current = isModalOpen; }, [isModalOpen]);
@@ -200,6 +206,7 @@ const PullToRefresh: React.FC<PullToRefreshProps> = ({ children, disabled = fals
   useEffect(() => { isFillingScreenRef.current = isFillingScreen; }, [isFillingScreen]);
   useEffect(() => { pullDistanceRef.current = pullDistance; }, [pullDistance]);
   useEffect(() => { animateSpringBackRef.current = animateSpringBack; }, [animateSpringBack]);
+  useEffect(() => { onRefreshRef.current = onRefresh; }, [onRefresh]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -262,8 +269,13 @@ const PullToRefresh: React.FC<PullToRefreshProps> = ({ children, disabled = fals
         setIsFillingScreen(false);
         setIsRefreshing(true);
 
-        sessionStorage.setItem('ptr-reload', '1');
-        window.location.reload();
+        try {
+          await onRefreshRef.current?.();
+        } catch (err) {
+          console.error('[PullToRefresh] Refresh failed:', err);
+        }
+
+        setIsRefreshing(false);
       } else {
         if (currentPullDistance > 5) {
           animateSpringBackRef.current(currentPullDistance);
@@ -432,7 +444,25 @@ const PullToRefresh: React.FC<PullToRefreshProps> = ({ children, disabled = fals
           inset: 0,
           zIndex: 99999,
           backgroundColor: '#293515',
-        }} />,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexDirection: 'column',
+          gap: '12px',
+        }}>
+          <img
+            src="/assets/logos/walking-mascot-white.gif"
+            alt=""
+            style={{ width: 64, height: 64, objectFit: 'contain' }}
+          />
+          <span style={{
+            fontFamily: "'Instrument Sans', sans-serif",
+            fontSize: 13,
+            fontWeight: 500,
+            color: 'rgba(255,255,255,0.8)',
+            letterSpacing: '0.5px',
+          }}>Refreshing...</span>
+        </div>,
         document.body
       )}
 
