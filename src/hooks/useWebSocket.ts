@@ -39,15 +39,19 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
   const fetchNotificationsForEmail = useCallback(async () => {
     if (!emailToUse) return;
     
-    if (isViewAsMode) {
-      const { ok, data } = await apiRequest<Array<Record<string, unknown>>>(
-        `/api/notifications?user_email=${encodeURIComponent(emailToUse)}&unread_only=true`
-      );
-      if (ok && data) {
-        useNotificationStore.getState().setUnreadCount(data.length);
+    try {
+      if (isViewAsMode) {
+        const { ok, data } = await apiRequest<Array<Record<string, unknown>>>(
+          `/api/notifications?user_email=${encodeURIComponent(emailToUse)}&unread_only=true`
+        );
+        if (ok && data) {
+          useNotificationStore.getState().setUnreadCount(data.length);
+        }
+      } else {
+        fetchNotifications();
       }
-    } else {
-      fetchNotifications();
+    } catch (err: unknown) {
+      console.warn('[WebSocket] Failed to fetch notifications:', err);
     }
   }, [emailToUse, isViewAsMode, fetchNotifications]);
 

@@ -27,7 +27,9 @@ const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({
       if ((window as unknown as { google?: { accounts?: { id?: { initialize: (opts: unknown) => void; renderButton: (el: HTMLElement, opts: unknown) => void } } } }).google?.accounts?.id) {
         setLoaded(true);
       } else {
-        existingScript.addEventListener('load', () => setLoaded(true));
+        const onLoad = () => setLoaded(true);
+        existingScript.addEventListener('load', onLoad);
+        return () => existingScript.removeEventListener('load', onLoad);
       }
       return;
     }

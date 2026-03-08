@@ -283,6 +283,21 @@ export class BookingStateService {
         DELETE FROM guest_pass_holds WHERE booking_id = ${bookingId}
       `);
 
+      if (booking.sessionId) {
+        await tx.execute(sql`
+          DELETE FROM usage_ledger
+          WHERE session_id = ${booking.sessionId}
+          AND LOWER(member_id) = LOWER(${booking.userEmail})
+          AND NOT EXISTS (
+            SELECT 1 FROM booking_requests br
+            WHERE br.session_id = ${booking.sessionId}
+            AND br.id != ${bookingId}
+            AND LOWER(br.user_email) = LOWER(${booking.userEmail})
+            AND br.status NOT IN ('cancelled', 'declined', 'deleted')
+          )
+        `);
+      }
+
       let updatedStaffNotes = staffNotes || '';
       if (source === 'trackman_webhook') {
         updatedStaffNotes = (booking.staffNotes || '') + ' [Cancelled via Trackman webhook]';
@@ -556,6 +571,21 @@ export class BookingStateService {
       await tx.execute(sql`
         DELETE FROM guest_pass_holds WHERE booking_id = ${bookingId}
       `);
+
+      if (existing.sessionId) {
+        await tx.execute(sql`
+          DELETE FROM usage_ledger
+          WHERE session_id = ${existing.sessionId}
+          AND LOWER(member_id) = LOWER(${existing.userEmail})
+          AND NOT EXISTS (
+            SELECT 1 FROM booking_requests br
+            WHERE br.session_id = ${existing.sessionId}
+            AND br.id != ${bookingId}
+            AND LOWER(br.user_email) = LOWER(${existing.userEmail})
+            AND br.status NOT IN ('cancelled', 'declined', 'deleted')
+          )
+        `);
+      }
 
       const noteAppend = source === 'trackman_webhook'
         ? '\n[Cancellation completed via Trackman webhook]'
