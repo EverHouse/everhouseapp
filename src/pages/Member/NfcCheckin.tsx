@@ -3,30 +3,26 @@ import { useNavigate } from 'react-router-dom';
 import { useData } from '../../contexts/DataContext';
 import PwaSmartBanner from '../../components/PwaSmartBanner';
 
-type CheckinState = 'loading' | 'checking_in' | 'not_logged_in' | 'error';
+type CheckinResult = 'checking_in' | 'error';
 
 const AUTO_REDIRECT_DELAY = 3500;
 
 const NfcCheckin: React.FC = () => {
   const { user, sessionChecked } = useData();
   const navigate = useNavigate();
-  const [state, setState] = useState<CheckinState>('loading');
+  const [result, setResult] = useState<CheckinResult | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
   const [errorRedirect, setErrorRedirect] = useState<'dashboard' | 'login'>('dashboard');
   const checkinAttemptedRef = useRef(false);
 
+  const displayState = !sessionChecked ? 'loading' : !user ? 'not_logged_in' : result ?? 'checking_in';
   useEffect(() => {
-    if (!sessionChecked) return;
-
-    if (!user) {
-      setState('not_logged_in');
+    if (!sessionChecked || !user) {
       return;
     }
 
     if (checkinAttemptedRef.current) return;
     checkinAttemptedRef.current = true;
-
-    setState('checking_in');
 
     fetch('/api/member/nfc-checkin', {
       method: 'POST',
@@ -46,22 +42,22 @@ const NfcCheckin: React.FC = () => {
           if (res.status === 403 || res.status === 404) {
             setErrorRedirect('login');
           }
-          setState('error');
+          setResult('error');
         }
       })
       .catch(() => {
         setErrorMessage('Unable to connect. Please try again.');
-        setState('error');
+        setResult('error');
       });
   }, [sessionChecked, user, navigate]);
 
   useEffect(() => {
-    if (state !== 'error') return;
+    if (displayState !== 'error') return;
     const timer = setTimeout(() => {
       navigate(errorRedirect === 'login' ? '/login' : '/dashboard', { replace: true });
     }, AUTO_REDIRECT_DELAY);
     return () => clearTimeout(timer);
-  }, [state, errorRedirect, navigate]);
+  }, [displayState, errorRedirect, navigate]);
 
   const handleLoginRedirect = () => {
     const currentPath = window.location.pathname + window.location.search;
@@ -73,7 +69,7 @@ const NfcCheckin: React.FC = () => {
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center p-4">
       <PwaSmartBanner />
       <div className="w-full max-w-sm">
-        {state === 'loading' && (
+        {displayState === 'loading' && (
           <div className="text-center">
             <div className="w-16 h-16 rounded-full bg-white/10 flex items-center justify-center mx-auto mb-4 animate-pulse">
               <span className="material-symbols-outlined text-4xl text-white/60">nfc</span>
@@ -82,7 +78,7 @@ const NfcCheckin: React.FC = () => {
           </div>
         )}
 
-        {state === 'checking_in' && (
+        {displayState === 'checking_in' && (
           <div className="text-center">
             <div className="w-16 h-16 rounded-full bg-white/10 flex items-center justify-center mx-auto mb-4 animate-pulse">
               <span className="material-symbols-outlined text-4xl text-white/60">nfc</span>
@@ -92,7 +88,7 @@ const NfcCheckin: React.FC = () => {
           </div>
         )}
 
-        {state === 'not_logged_in' && (
+        {displayState === 'not_logged_in' && (
           <div className="rounded-xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-300">
             <div className="bg-gradient-to-br from-gray-700 via-gray-600 to-gray-800 p-8 text-center">
               <div className="w-16 h-16 rounded-full bg-white/20 flex items-center justify-center mx-auto mb-4">
@@ -112,7 +108,7 @@ const NfcCheckin: React.FC = () => {
           </div>
         )}
 
-        {state === 'error' && (
+        {displayState === 'error' && (
           <div className="rounded-xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-300">
             <div className="bg-gradient-to-br from-red-700 via-red-600 to-red-800 p-8 text-center">
               <div className="w-16 h-16 rounded-full bg-white/20 flex items-center justify-center mx-auto mb-4">

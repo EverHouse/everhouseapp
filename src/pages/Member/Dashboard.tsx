@@ -203,8 +203,26 @@ const Dashboard: React.FC = () => {
   const [optimisticCancellingIds, setOptimisticCancellingIds] = useState<Set<number>>(new Set());
   const [optimisticCancelledIds, setOptimisticCancelledIds] = useState<Set<number>>(new Set());
   const [scheduleRef] = useAutoAnimate();
-  const [showFirstLoginModal, setShowFirstLoginModal] = useState(false);
-  const [nfcCheckinData, setNfcCheckinData] = useState<{ type: 'success' | 'already_checked_in', memberName: string, tier?: string | null } | null>(null);
+  const [showFirstLoginModal, setShowFirstLoginModal] = useState(() => {
+    if (user?.email) {
+      const key = `eh_first_login_shown_${user.email}`;
+      if (!localStorage.getItem(key)) {
+        localStorage.setItem(key, 'true');
+        return true;
+      }
+    }
+    return false;
+  });
+  const [nfcCheckinData, setNfcCheckinData] = useState<{ type: 'success' | 'already_checked_in', memberName: string, tier?: string | null } | null>(() => {
+    const stored = sessionStorage.getItem('nfc_checkin_result');
+    if (stored) {
+      sessionStorage.removeItem('nfc_checkin_result');
+      try {
+        return JSON.parse(stored);
+      } catch (e) { console.warn('[Dashboard] Failed to parse NFC checkin data:', e); }
+    }
+    return null;
+  });
 
   const isStaffOrAdminProfile = user?.role === 'admin' || user?.role === 'staff';
   const { permissions: tierPermissions } = useTierPermissions(user?.tier);
@@ -265,36 +283,16 @@ const Dashboard: React.FC = () => {
     return () => window.removeEventListener('member-stats-updated', handleMemberStatsUpdated as EventListener);
   }, [user?.email, queryClient]);
 
-  useEffect(() => {
+  const isBannerInitiallyDismissed = useMemo(() => {
     if (user?.email && bannerAnnouncement) {
       const dismissedKey = `eh_banner_dismissed_${user.email}`;
       const dismissedId = localStorage.getItem(dismissedKey);
-      if (bannerAnnouncement.id === dismissedId) {
-        setBannerDismissed(true);
-      }
+      return bannerAnnouncement.id === dismissedId;
     }
+    return false;
   }, [user?.email, bannerAnnouncement]);
 
-  useEffect(() => {
-    if (user?.email) {
-      const key = `eh_first_login_shown_${user.email}`;
-      if (!localStorage.getItem(key)) {
-        setShowFirstLoginModal(true);
-        localStorage.setItem(key, 'true');
-      }
-    }
-  }, [user?.email]);
 
-  useEffect(() => {
-    const stored = sessionStorage.getItem('nfc_checkin_result');
-    if (stored) {
-      sessionStorage.removeItem('nfc_checkin_result');
-      try {
-        const data = JSON.parse(stored);
-        setNfcCheckinData(data);
-      } catch (e) { console.warn('[Dashboard] Failed to parse NFC checkin data:', e); }
-    }
-  }, []);
 
   useEffect(() => {
     const handleCheckinNotification = (e: Event) => {
@@ -314,9 +312,10 @@ const Dashboard: React.FC = () => {
     return () => window.removeEventListener('member-notification', handleCheckinNotification);
   }, [user?.name, user?.tier]);
 
+  const userEmail = user?.email;
   const allItems = useMemo(() => [
     ...dbBookings.map(b => {
-      const isLinkedMember = user?.email ? b.user_email?.toLowerCase() !== user.email.toLowerCase() : false;
+      const isLinkedMember = userEmail ? b.user_email?.toLowerCase() !== userEmail.toLowerCase() : false;
       const primaryBookerName = isLinkedMember && b.user_email 
         ? b.user_email.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
         : null;
@@ -424,7 +423,7 @@ const Dashboard: React.FC = () => {
         raw: c,
         source: 'calendar'
       }))
-  ].sort((a, b) => a.sortKey.localeCompare(b.sortKey)), [dbBookings, dbBookingRequests, dbRSVPs, dbWellnessEnrollments, dbConferenceRoomBookings, user?.email]);
+  ].sort((a, b) => a.sortKey.localeCompare(b.sortKey)), [dbBookings, dbBookingRequests, dbRSVPs, dbWellnessEnrollments, dbConferenceRoomBookings, userEmail]);
 
   const todayStr = getTodayString();
   const nowTime = getNowTimePacific();
@@ -773,8 +772,8 @@ const Dashboard: React.FC = () => {
         <ClosureAlert />
         <AnnouncementAlert />
         
-        <SmoothReveal isLoaded={!!bannerAnnouncement && !bannerDismissed} delay={50}>
-        {bannerAnnouncement && !bannerDismissed && (
+        <SmoothReveal isLoaded={!!bannerAnnouncement && !bannerDismissed && !isBannerInitiallyDismissed} delay={50}>
+        {bannerAnnouncement && !bannerDismissed && !isBannerInitiallyDismissed && (
           <div className={`mb-4 py-3 px-4 rounded-xl flex items-start justify-between gap-3 animate-pop-in ${isDark ? 'bg-lavender/20 border border-lavender/30' : 'bg-lavender/30 border border-lavender/40'}`}>
             <div className="flex items-start gap-3 min-w-0 flex-1">
               <span className={`material-symbols-outlined text-xl flex-shrink-0 mt-0.5 ${isDark ? 'text-lavender' : 'text-primary'}`}>campaign</span>

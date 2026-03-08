@@ -224,7 +224,9 @@ const ClassesView: React.FC<{onBook: (cls: WellnessClass) => void; isDark?: bool
   const categories = ['All', 'Classes', 'MedSpa', 'Recovery', 'Therapy', 'Nutrition', 'Personal Training', 'Mindfulness', 'Outdoors', 'General'];
   
   const onRefreshCompleteRef = useRef(onRefreshComplete);
-  onRefreshCompleteRef.current = onRefreshComplete;
+  useEffect(() => {
+    onRefreshCompleteRef.current = onRefreshComplete;
+  });
   const prevRefreshKeyRef = useRef(refreshKey);
 
   const { data: classes = [], isLoading: classesLoading, refetch: refetchClasses, error: classesError } = useQuery({
@@ -280,12 +282,14 @@ const ClassesView: React.FC<{onBook: (cls: WellnessClass) => void; isDark?: bool
 
   useEffect(() => {
     if (refreshKey > prevRefreshKeyRef.current) {
-      setDisplayCount(INITIAL_DISPLAY_COUNT);
+      prevRefreshKeyRef.current = refreshKey;
       Promise.all([refetchClasses(), refetchEnrollments()]).then(() => {
+        setDisplayCount(INITIAL_DISPLAY_COUNT);
         onRefreshCompleteRef.current?.();
       });
+    } else {
+      prevRefreshKeyRef.current = refreshKey;
     }
-    prevRefreshKeyRef.current = refreshKey;
   }, [refreshKey, refetchClasses, refetchEnrollments]);
 
   useEffect(() => {
