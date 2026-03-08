@@ -21,6 +21,7 @@ const isTouchDevice = () => {
 const PullToRefresh: React.FC<PullToRefreshProps> = ({ children, onRefresh, disabled = false, className = '' }) => {
   const [pullDistance, setPullDistance] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isDismissing, setIsDismissing] = useState(false);
   const [isFillingScreen, setIsFillingScreen] = useState(false);
   const [isSpringBack, setIsSpringBack] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
