@@ -16,7 +16,7 @@ import { getSessionUser } from '../types/session';
 import type { Request } from 'express';
 import { getErrorMessage, safeErrorDetail } from '../utils/errorUtils';
 import { validateBody } from '../middleware/validate';
-import { resolveIssueSchema, syncPushPullSchema, ignoreIssueSchema, bulkIgnoreSchema, placeholderDeleteSchema, recordIdSchema, userIdSchema, unlinkHubspotSchema, mergeHubspotSchema, mergeStripeSchema, changeBillingProviderSchema, acceptTierSchema, reviewItemSchema, assignSessionOwnerSchema, cancelOrphanedPiSchema, dryRunSchema } from '../../shared/validators/dataIntegrity';
+import { resolveIssueSchema, syncPushPullSchema, ignoreIssueSchema, bulkIgnoreSchema, placeholderDeleteSchema, recordIdSchema, userIdSchema, unlinkHubspotSchema, mergeHubspotSchema, mergeStripeSchema, changeBillingProviderSchema, acceptTierSchema, reviewItemSchema, assignSessionOwnerSchema, cancelOrphanedPiSchema, dryRunSchema, updateTourStatusSchema, clearStripeIdSchema } from '../../shared/validators/dataIntegrity';
 import { queueIntegrityFixSync } from '../core/hubspot/queueHelpers';
 
 const router = Router();
@@ -1539,6 +1539,71 @@ router.post('/api/data-integrity/fix/accept-tier', isAdmin, validateBody(acceptT
   } catch (error: unknown) {
     await client.query('ROLLBACK').catch((rollbackErr: unknown) => { logger.warn('[DataIntegrity] Rollback failed', { error: rollbackErr instanceof Error ? rollbackErr : new Error(String(rollbackErr)) }); });
     logger.error('[DataIntegrity] Accept tier error', { extra: { error: getErrorMessage(error) } });
+    res.status(500).json({ success: false, message: 'Operation failed', details: safeErrorDetail(error) });
+  } finally {
+    safeRelease(client);
+  }
+});
+
+router.post('/api/data-integrity/fix/update-tour-status', isAdmin, validateBody(updateTourStatusSchema), async (req: Request, res) => {
+  try {
+    const { recordId, newStatus } = req.body;
+    const staffEmail = getSessionUser(req)?.email || 'unknown';
+
+    const result = await db.execute(sql`
+      UPDATE tours 
+      SET status = ${newStatus}, updated_at = NOW()
+      WHERE id = ${Number(recordId)}
+      RETURNING id, title, guest_name
+    `);
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ success: false, message: 'Tour not found' });
+    }
+
+    const tour = result.rows[0] as { id: number; title: string; guest_name: string };
+    logFromRequest(req, 'update_tour_status', 'tour', String(recordId), `Updated tour #${recordId} "${tour.title}" to "${newStatus}" via data integrity`, { recordId, newStatus });
+
+    res.json({ success: true, message: `Tour "${tour.title}" marked as ${newStatus.replace('_', ' ')}` });
+  } catch (error: unknown) {
+    logger.error('[DataIntegrity] Update tour status error', { extra: { error: getErrorMessage(error) } });
+    res.status(500).json({ success: false, message: 'Operation failed', details: safeErrorDetail(error) });
+  }
+});
+
+router.post('/api/data-integrity/fix/clear-stripe-customer-id', isAdmin, validateBody(clearStripeIdSchema), async (req: Request, res) => {
+  const client = await pool.connect();
+  try {
+    const { userId } = req.body;
+    const staffEmail = getSessionUser(req)?.email || 'unknown';
+
+    await client.query('BEGIN');
+    await client.query(`SELECT pg_advisory_xact_lock($1)`, [userId]);
+
+    const result = await client.query(
+      `UPDATE users 
+       SET stripe_customer_id = NULL, updated_at = NOW(),
+           last_manual_fix_at = NOW(), last_manual_fix_by = $2
+       WHERE id = $1
+       RETURNING email, first_name, last_name`,
+      [userId, staffEmail]
+    );
+
+    if (result.rowCount === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    await client.query('COMMIT');
+
+    const user = result.rows[0];
+    const memberName = [user.first_name, user.last_name].filter(Boolean).join(' ') || user.email;
+    logFromRequest(req, 'clear_stripe_customer_id', 'user', String(userId), `Cleared orphaned Stripe customer ID for "${memberName}" via data integrity`, { userId });
+
+    res.json({ success: true, message: `Cleared Stripe customer ID for "${memberName}"` });
+  } catch (error: unknown) {
+    await client.query('ROLLBACK').catch((rollbackErr: unknown) => { logger.warn('[DataIntegrity] Rollback failed', { error: rollbackErr instanceof Error ? rollbackErr : new Error(String(rollbackErr)) }); });
+    logger.error('[DataIntegrity] Clear Stripe customer ID error', { extra: { error: getErrorMessage(error) } });
     res.status(500).json({ success: false, message: 'Operation failed', details: safeErrorDetail(error) });
   } finally {
     safeRelease(client);

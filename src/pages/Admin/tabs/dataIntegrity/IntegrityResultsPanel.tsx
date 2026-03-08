@@ -1350,7 +1350,7 @@ const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
                                       </button>
                                     </>
                                   )}
-                                  {!issue.ignored && issue.context?.userId && (issue.context as IssueContext & { mindbodyClientId?: string })?.mindbodyClientId === 'none' && (
+                                  {!issue.ignored && issue.context?.userId && issue.context?.mindbodyClientId === 'none' && issue.context?.billingProvider !== 'none' && !(issue.context?.billingProvider === 'mindbody' && issue.context?.stripeSubscriptionId && issue.context.stripeSubscriptionId !== 'none') && (
                                     <>
                                       <button
                                         onClick={() => handleViewProfile(issue.context!.memberEmail!)}
@@ -1363,7 +1363,7 @@ const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
                                       <button
                                         onClick={() => {
                                           if (confirm(`Switch "${issue.context?.memberName}" billing to manual? This removes MindBody as their billing provider.`)) {
-                                            fixIssueMutation.mutate({ endpoint: '/api/data-integrity/fix/change-billing-provider', body: { userId: issue.context?.userId, newProvider: 'manual' } });
+                                            fixIssueMutation.mutate({ endpoint: '/api/data-integrity/fix/change-billing-provider', body: { userId: String(issue.context?.userId), newProvider: 'manual' } });
                                           }
                                         }}
                                         disabled={fixingIssues.has(String(issue.context?.userId))}
@@ -1440,12 +1440,12 @@ const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
                                       )}
                                     </>
                                   )}
-                                  {!issue.ignored && issue.table === 'booking_requests' && issue.category === 'billing_issue' && (
+                                  {!issue.ignored && issue.table === 'booking_requests' && issue.category === 'billing_issue' && typeof issue.recordId === 'number' && (
                                     <button
                                       type="button"
                                       onClick={() => setBookingSheet({
                                         isOpen: true,
-                                        bookingId: typeof issue.recordId === 'number' ? issue.recordId : parseInt(String(issue.recordId)),
+                                        bookingId: issue.recordId as number,
                                         memberEmail: issue.context?.memberEmail || issue.context?.userEmail,
                                         bookingDate: issue.context?.bookingDate,
                                         timeSlot: issue.context?.startTime,
@@ -1454,6 +1454,17 @@ const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
                                       title="Open booking to review and create invoice"
                                     >
                                       <span className="material-symbols-outlined text-[16px]">open_in_new</span>
+                                    </button>
+                                  )}
+                                  {!issue.ignored && issue.table === 'booking_requests' && issue.category === 'billing_issue' && typeof issue.recordId === 'string' && issue.context?.memberEmail && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleViewProfile(issue.context!.memberEmail!)}
+                                      disabled={loadingMemberEmail === issue.context?.memberEmail}
+                                      className="p-1.5 text-blue-600 hover:bg-blue-100 dark:text-blue-400 dark:hover:bg-blue-900/30 rounded transition-colors disabled:opacity-50"
+                                      title="View member profile to review billing"
+                                    >
+                                      <span className="material-symbols-outlined text-[16px]">person</span>
                                     </button>
                                   )}
                                   {!issue.ignored && issue.table === 'users' && issue.category === 'sync_mismatch' && issue.context?.memberStatus && ['pending', 'non-member'].includes(issue.context.memberStatus) && (
@@ -1596,9 +1607,61 @@ const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
                                       >
                                         <span className="material-symbols-outlined text-[16px]">person</span>
                                       </button>
+                                      {issue.context?.syncComparison?.find(c => c.field === 'Membership Tier')?.externalValue && (
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            const stripeTier = String(issue.context?.syncComparison?.find(c => c.field === 'Membership Tier')?.externalValue || '');
+                                            if (confirm(`Accept Stripe tier "${stripeTier}" for "${issue.context?.memberName}"? This will update their database tier to match Stripe.`)) {
+                                              fixIssueMutation.mutate({ endpoint: '/api/data-integrity/fix/accept-tier', body: { userId: String(issue.context?.userId), acceptedTier: stripeTier, source: 'stripe' } });
+                                            }
+                                          }}
+                                          disabled={fixingIssues.has(String(issue.context?.userId))}
+                                          className="p-1.5 text-green-600 hover:bg-green-100 dark:text-green-400 dark:hover:bg-green-900/30 rounded transition-colors disabled:opacity-50"
+                                          title="Accept tier from Stripe"
+                                        >
+                                          {fixingIssues.has(String(issue.context?.userId)) ? (
+                                            <span className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>
+                                          ) : (
+                                            <span className="material-symbols-outlined text-[16px]">sync</span>
+                                          )}
+                                        </button>
+                                      )}
                                     </>
                                   )}
-                                  {!issue.ignored && issue.table === 'users' && issue.category === 'data_quality' && issue.description?.toLowerCase().includes('stripe') && issue.context?.memberEmail && (
+                                  {!issue.ignored && issue.table === 'users' && issue.category === 'data_quality' && issue.context?.errorType === 'orphaned_stripe_customer' && issue.context?.userId && (
+                                    <>
+                                      {issue.context?.memberEmail && (
+                                        <button
+                                          type="button"
+                                          onClick={() => handleViewProfile(issue.context!.memberEmail!)}
+                                          disabled={loadingMemberEmail === issue.context?.memberEmail}
+                                          className="p-1.5 text-blue-600 hover:bg-blue-100 dark:text-blue-400 dark:hover:bg-blue-900/30 rounded transition-colors disabled:opacity-50"
+                                          title="View member profile"
+                                        >
+                                          <span className="material-symbols-outlined text-[16px]">person</span>
+                                        </button>
+                                      )}
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          if (confirm(`Clear the orphaned Stripe customer ID for "${issue.context?.memberName || 'this member'}"? The Stripe customer no longer exists.`)) {
+                                            fixIssueMutation.mutate({ endpoint: '/api/data-integrity/fix/clear-stripe-customer-id', body: { userId: String(issue.context?.userId) } });
+                                          }
+                                        }}
+                                        disabled={fixingIssues.has(String(issue.context?.userId))}
+                                        className="p-1.5 text-red-600 hover:bg-red-100 dark:text-red-400 dark:hover:bg-red-900/30 rounded transition-colors disabled:opacity-50"
+                                        title="Clear orphaned Stripe customer ID"
+                                      >
+                                        {fixingIssues.has(String(issue.context?.userId)) ? (
+                                          <span className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>
+                                        ) : (
+                                          <span className="material-symbols-outlined text-[16px]">link_off</span>
+                                        )}
+                                      </button>
+                                    </>
+                                  )}
+                                  {!issue.ignored && issue.table === 'users' && issue.category === 'data_quality' && issue.context?.errorType !== 'orphaned_stripe_customer' && issue.description?.toLowerCase().includes('stripe') && issue.context?.memberEmail && (
                                     <button
                                       type="button"
                                       onClick={() => handleViewProfile(issue.context!.memberEmail!)}
@@ -1608,6 +1671,161 @@ const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
                                     >
                                       <span className="material-symbols-outlined text-[16px]">person</span>
                                     </button>
+                                  )}
+                                  {!issue.ignored && issue.table === 'tours' && issue.category === 'data_quality' && (
+                                    <>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          if (confirm(`Mark tour for "${issue.context?.guestName || 'guest'}" as completed?`)) {
+                                            fixIssueMutation.mutate({ endpoint: '/api/data-integrity/fix/update-tour-status', body: { recordId: issue.recordId, newStatus: 'completed' } });
+                                          }
+                                        }}
+                                        disabled={fixingIssues.has(String(issue.recordId))}
+                                        className="p-1.5 text-green-600 hover:bg-green-100 dark:text-green-400 dark:hover:bg-green-900/30 rounded transition-colors disabled:opacity-50"
+                                        title="Mark tour as completed"
+                                      >
+                                        {fixingIssues.has(String(issue.recordId)) ? (
+                                          <span className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>
+                                        ) : (
+                                          <span className="material-symbols-outlined text-[16px]">check_circle</span>
+                                        )}
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          if (confirm(`Mark tour for "${issue.context?.guestName || 'guest'}" as no-show?`)) {
+                                            fixIssueMutation.mutate({ endpoint: '/api/data-integrity/fix/update-tour-status', body: { recordId: issue.recordId, newStatus: 'no_show' } });
+                                          }
+                                        }}
+                                        disabled={fixingIssues.has(String(issue.recordId))}
+                                        className="p-1.5 text-orange-600 hover:bg-orange-100 dark:text-orange-400 dark:hover:bg-orange-900/30 rounded transition-colors disabled:opacity-50"
+                                        title="Mark tour as no-show"
+                                      >
+                                        {fixingIssues.has(String(issue.recordId)) ? (
+                                          <span className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>
+                                        ) : (
+                                          <span className="material-symbols-outlined text-[16px]">person_off</span>
+                                        )}
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          if (confirm(`Cancel tour for "${issue.context?.guestName || 'guest'}"?`)) {
+                                            fixIssueMutation.mutate({ endpoint: '/api/data-integrity/fix/update-tour-status', body: { recordId: issue.recordId, newStatus: 'cancelled' } });
+                                          }
+                                        }}
+                                        disabled={fixingIssues.has(String(issue.recordId))}
+                                        className="p-1.5 text-red-600 hover:bg-red-100 dark:text-red-400 dark:hover:bg-red-900/30 rounded transition-colors disabled:opacity-50"
+                                        title="Cancel tour"
+                                      >
+                                        {fixingIssues.has(String(issue.recordId)) ? (
+                                          <span className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>
+                                        ) : (
+                                          <span className="material-symbols-outlined text-[16px]">cancel</span>
+                                        )}
+                                      </button>
+                                    </>
+                                  )}
+                                  {!issue.ignored && issue.table === 'booking_sessions' && issue.category === 'data_quality' && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        if (confirm(`Delete session #${issue.recordId} with invalid times? This cannot be undone.`)) {
+                                          fixIssueMutation.mutate({ endpoint: '/api/data-integrity/fix/delete-empty-session', body: { recordId: issue.recordId } });
+                                        }
+                                      }}
+                                      disabled={fixingIssues.has(String(issue.recordId))}
+                                      className="p-1.5 text-red-600 hover:bg-red-100 dark:text-red-400 dark:hover:bg-red-900/30 rounded transition-colors disabled:opacity-50"
+                                      title="Delete invalid session"
+                                    >
+                                      {fixingIssues.has(String(issue.recordId)) ? (
+                                        <span className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>
+                                      ) : (
+                                        <span className="material-symbols-outlined text-[16px]">delete</span>
+                                      )}
+                                    </button>
+                                  )}
+                                  {!issue.ignored && issue.table === 'users' && issue.category === 'sync_mismatch' && issue.context?.billingProvider === 'mindbody' && issue.context?.stripeSubscriptionId && issue.context.stripeSubscriptionId !== 'none' && (
+                                    <>
+                                      {issue.context?.memberEmail && (
+                                        <button
+                                          type="button"
+                                          onClick={() => handleViewProfile(issue.context!.memberEmail!)}
+                                          disabled={loadingMemberEmail === issue.context?.memberEmail}
+                                          className="p-1.5 text-blue-600 hover:bg-blue-100 dark:text-blue-400 dark:hover:bg-blue-900/30 rounded transition-colors disabled:opacity-50"
+                                          title="View member profile"
+                                        >
+                                          <span className="material-symbols-outlined text-[16px]">person</span>
+                                        </button>
+                                      )}
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          if (confirm(`Switch "${issue.context?.memberName}" billing to Stripe? This member has a Stripe subscription but is marked as MindBody-billed.`)) {
+                                            fixIssueMutation.mutate({ endpoint: '/api/data-integrity/fix/change-billing-provider', body: { userId: String(issue.context?.userId), newProvider: 'stripe' } });
+                                          }
+                                        }}
+                                        disabled={fixingIssues.has(String(issue.context?.userId))}
+                                        className="p-1.5 text-green-600 hover:bg-green-100 dark:text-green-400 dark:hover:bg-green-900/30 rounded transition-colors disabled:opacity-50"
+                                        title="Switch billing to Stripe"
+                                      >
+                                        {fixingIssues.has(String(issue.context?.userId)) ? (
+                                          <span className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>
+                                        ) : (
+                                          <span className="material-symbols-outlined text-[16px]">swap_horiz</span>
+                                        )}
+                                      </button>
+                                    </>
+                                  )}
+                                  {!issue.ignored && issue.table === 'users' && issue.category === 'sync_mismatch' && issue.context?.billingProvider === 'none' && issue.context?.userId && (
+                                    <>
+                                      {issue.context?.memberEmail && (
+                                        <button
+                                          type="button"
+                                          onClick={() => handleViewProfile(issue.context!.memberEmail!)}
+                                          disabled={loadingMemberEmail === issue.context?.memberEmail}
+                                          className="p-1.5 text-blue-600 hover:bg-blue-100 dark:text-blue-400 dark:hover:bg-blue-900/30 rounded transition-colors disabled:opacity-50"
+                                          title="View member profile"
+                                        >
+                                          <span className="material-symbols-outlined text-[16px]">person</span>
+                                        </button>
+                                      )}
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          if (confirm(`Set "${issue.context?.memberName}" billing provider to Stripe?`)) {
+                                            fixIssueMutation.mutate({ endpoint: '/api/data-integrity/fix/change-billing-provider', body: { userId: String(issue.context?.userId), newProvider: 'stripe' } });
+                                          }
+                                        }}
+                                        disabled={fixingIssues.has(String(issue.context?.userId))}
+                                        className="p-1.5 text-green-600 hover:bg-green-100 dark:text-green-400 dark:hover:bg-green-900/30 rounded transition-colors disabled:opacity-50"
+                                        title="Set billing to Stripe"
+                                      >
+                                        {fixingIssues.has(String(issue.context?.userId)) ? (
+                                          <span className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>
+                                        ) : (
+                                          <span className="material-symbols-outlined text-[16px]">credit_card</span>
+                                        )}
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          if (confirm(`Set "${issue.context?.memberName}" billing provider to manual?`)) {
+                                            fixIssueMutation.mutate({ endpoint: '/api/data-integrity/fix/change-billing-provider', body: { userId: String(issue.context?.userId), newProvider: 'manual' } });
+                                          }
+                                        }}
+                                        disabled={fixingIssues.has(String(issue.context?.userId))}
+                                        className="p-1.5 text-purple-600 hover:bg-purple-100 dark:text-purple-400 dark:hover:bg-purple-900/30 rounded transition-colors disabled:opacity-50"
+                                        title="Set billing to manual"
+                                      >
+                                        {fixingIssues.has(String(issue.context?.userId)) ? (
+                                          <span className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>
+                                        ) : (
+                                          <span className="material-symbols-outlined text-[16px]">edit_note</span>
+                                        )}
+                                      </button>
+                                    </>
                                   )}
                                   {!issue.ignored && (
                                     <button

@@ -113,6 +113,15 @@ export const dryRunSchema = z.object({
   dryRun: z.boolean().default(true),
 });
 
+export const updateTourStatusSchema = z.object({
+  recordId: z.union([z.string(), z.number()]).transform(String),
+  newStatus: z.enum(['completed', 'no_show', 'cancelled'], { message: 'newStatus must be completed, no_show, or cancelled' }),
+});
+
+export const clearStripeIdSchema = z.object({
+  userId: z.string().min(1, 'userId is required'),
+});
+
 export type ResolveIssueInput = z.infer<typeof resolveIssueSchema>;
 export type SyncPushPullInput = z.infer<typeof syncPushPullSchema>;
 export type IgnoreIssueInput = z.infer<typeof ignoreIssueSchema>;
@@ -129,3 +138,5 @@ export type ReviewItemInput = z.infer<typeof reviewItemSchema>;
 export type AssignSessionOwnerInput = z.infer<typeof assignSessionOwnerSchema>;
 export type CancelOrphanedPiInput = z.infer<typeof cancelOrphanedPiSchema>;
 export type DryRunInput = z.infer<typeof dryRunSchema>;
+export type UpdateTourStatusInput = z.infer<typeof updateTourStatusSchema>;
+export type ClearStripeIdInput = z.infer<typeof clearStripeIdSchema>;
