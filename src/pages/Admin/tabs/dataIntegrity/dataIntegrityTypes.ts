@@ -73,6 +73,7 @@ export interface IssueContext {
   member2Name?: string;
   issueKey?: string;
   linkedBookingId?: number;
+  bookingIds?: number[];
 }
 
 export interface IgnoreInfo {

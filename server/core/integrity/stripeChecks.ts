@@ -465,7 +465,7 @@ export async function checkInvoiceBookingReconciliation(): Promise<IntegrityChec
 
   try {
     const duplicateInvoicesResult = await db.execute(sql`
-      SELECT stripe_invoice_id, COUNT(*) as booking_count, array_agg(id) as booking_ids
+      SELECT stripe_invoice_id, COUNT(*) as booking_count, array_agg(id) as booking_ids, array_remove(array_agg(DISTINCT user_email), NULL) as user_emails
       FROM booking_requests
       WHERE stripe_invoice_id IS NOT NULL
         AND status NOT IN ('cancelled', 'declined', 'deleted')
@@ -474,6 +474,7 @@ export async function checkInvoiceBookingReconciliation(): Promise<IntegrityChec
     `);
 
     for (const row of duplicateInvoicesResult.rows as unknown as DuplicateInvoiceRow[]) {
+      const userEmails = (row as unknown as { user_emails: string[] }).user_emails || [];
       issues.push({
         category: 'billing_issue',
         severity: 'error',
@@ -482,7 +483,9 @@ export async function checkInvoiceBookingReconciliation(): Promise<IntegrityChec
         description: `Stripe invoice ${row.stripe_invoice_id} is shared by ${row.booking_count} bookings (IDs: ${row.booking_ids.join(', ')}). Potential double-billing.`,
         suggestion: 'Multiple bookings share the same Stripe invoice. Review for double-billing risk.',
         context: {
-          stripeCustomerId: row.stripe_invoice_id
+          stripeCustomerId: row.stripe_invoice_id,
+          memberEmail: userEmails[0] || undefined,
+          bookingIds: row.booking_ids
         }
       });
     }

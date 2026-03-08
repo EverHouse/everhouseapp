@@ -1451,14 +1451,23 @@ router.post('/api/data-integrity/fix/cancel-orphaned-pi', isAdmin, validateBody(
       const msg = getErrorMessage(stripeError);
       if (msg.includes('already been canceled') || msg.includes('already_canceled') || msg.includes('cannot be canceled')) {
         logFromRequest(req, 'cancel_orphaned_pi', 'payment_intent', paymentIntentId, `Payment intent ${paymentIntentId} was already cancelled`, { paymentIntentId, alreadyCancelled: true });
-        return res.json({ success: true, message: `Payment intent ${paymentIntentId} was already cancelled` });
+      } else {
+        throw stripeError;
       }
-      throw stripeError;
     }
 
-    logFromRequest(req, 'cancel_orphaned_pi', 'payment_intent', paymentIntentId, `Cancelled orphaned payment intent ${paymentIntentId} via data integrity`, { paymentIntentId });
+    const snapshotResult = await db.execute(sql`
+      UPDATE booking_fee_snapshots 
+      SET status = 'cancelled', updated_at = NOW()
+      WHERE stripe_payment_intent_id = ${paymentIntentId}
+        AND status IN ('pending', 'requires_action')
+      RETURNING id
+    `);
+    const updatedCount = snapshotResult.rows.length;
 
-    res.json({ success: true, message: `Cancelled orphaned payment intent ${paymentIntentId}` });
+    logFromRequest(req, 'cancel_orphaned_pi', 'payment_intent', paymentIntentId, `Cancelled orphaned payment intent ${paymentIntentId} and updated ${updatedCount} fee snapshot(s)`, { paymentIntentId, updatedSnapshots: updatedCount });
+
+    res.json({ success: true, message: `Cancelled payment intent ${paymentIntentId} and updated ${updatedCount} fee snapshot(s)` });
   } catch (error: unknown) {
     logger.error('[DataIntegrity] Cancel orphaned PI error', { extra: { error: getErrorMessage(error) } });
     res.status(500).json({ success: false, message: 'Operation failed', details: safeErrorDetail(error) });

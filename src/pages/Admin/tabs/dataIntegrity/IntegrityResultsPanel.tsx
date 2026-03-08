@@ -1191,6 +1191,24 @@ const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
                                       )}
                                     </button>
                                   )}
+                                  {!issue.ignored && issue.table === 'booking_fee_snapshots' && issue.context?.stripePaymentIntentId && (
+                                    <button
+                                      onClick={() => {
+                                        if (confirm(`Cancel payment intent ${issue.context!.stripePaymentIntentId} in Stripe and mark the fee snapshot as cancelled?`)) {
+                                          fixIssueMutation.mutate({ endpoint: '/api/data-integrity/fix/cancel-orphaned-pi', body: { paymentIntentId: issue.context!.stripePaymentIntentId } });
+                                        }
+                                      }}
+                                      disabled={fixingIssues.has(String(issue.context?.stripePaymentIntentId))}
+                                      className="p-1.5 text-red-600 hover:bg-red-100 dark:text-red-400 dark:hover:bg-red-900/30 rounded transition-colors disabled:opacity-50"
+                                      title="Cancel payment intent in Stripe"
+                                    >
+                                      {fixingIssues.has(String(issue.context?.stripePaymentIntentId)) ? (
+                                        <span className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>
+                                      ) : (
+                                        <span className="material-symbols-outlined text-[16px]">money_off</span>
+                                      )}
+                                    </button>
+                                  )}
                                   {!issue.ignored && (issue.table === 'guest_passes' || issue.table === 'booking_fee_snapshots' || issue.table === 'booking_participants') && (
                                     <button
                                       onClick={() => {
@@ -1456,16 +1474,34 @@ const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
                                       <span className="material-symbols-outlined text-[16px]">open_in_new</span>
                                     </button>
                                   )}
-                                  {!issue.ignored && issue.table === 'booking_requests' && issue.category === 'billing_issue' && typeof issue.recordId === 'string' && issue.context?.memberEmail && (
-                                    <button
-                                      type="button"
-                                      onClick={() => handleViewProfile(issue.context!.memberEmail!)}
-                                      disabled={loadingMemberEmail === issue.context?.memberEmail}
-                                      className="p-1.5 text-blue-600 hover:bg-blue-100 dark:text-blue-400 dark:hover:bg-blue-900/30 rounded transition-colors disabled:opacity-50"
-                                      title="View member profile to review billing"
-                                    >
-                                      <span className="material-symbols-outlined text-[16px]">person</span>
-                                    </button>
+                                  {!issue.ignored && issue.table === 'booking_requests' && issue.category === 'billing_issue' && typeof issue.recordId === 'string' && (
+                                    <>
+                                      {issue.context?.memberEmail && (
+                                        <button
+                                          type="button"
+                                          onClick={() => handleViewProfile(issue.context!.memberEmail!)}
+                                          disabled={loadingMemberEmail === issue.context?.memberEmail}
+                                          className="p-1.5 text-blue-600 hover:bg-blue-100 dark:text-blue-400 dark:hover:bg-blue-900/30 rounded transition-colors disabled:opacity-50"
+                                          title="View member profile to review billing"
+                                        >
+                                          <span className="material-symbols-outlined text-[16px]">person</span>
+                                        </button>
+                                      )}
+                                      {issue.context?.bookingIds && issue.context.bookingIds.length > 0 && (
+                                        <button
+                                          type="button"
+                                          onClick={() => setBookingSheet({
+                                            isOpen: true,
+                                            bookingId: issue.context!.bookingIds![0],
+                                            memberEmail: issue.context?.memberEmail,
+                                          })}
+                                          className="p-1.5 text-blue-600 hover:bg-blue-100 dark:text-blue-400 dark:hover:bg-blue-900/30 rounded transition-colors"
+                                          title={`Open first booking (#${issue.context.bookingIds[0]}) sharing this invoice`}
+                                        >
+                                          <span className="material-symbols-outlined text-[16px]">open_in_new</span>
+                                        </button>
+                                      )}
+                                    </>
                                   )}
                                   {!issue.ignored && issue.table === 'users' && issue.category === 'sync_mismatch' && issue.context?.memberStatus && ['pending', 'non-member'].includes(issue.context.memberStatus) && (
                                     <>
@@ -1607,26 +1643,29 @@ const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
                                       >
                                         <span className="material-symbols-outlined text-[16px]">person</span>
                                       </button>
-                                      {issue.context?.syncComparison?.find(c => c.field === 'Membership Tier')?.externalValue && (
-                                        <button
-                                          type="button"
-                                          onClick={() => {
-                                            const stripeTier = String(issue.context?.syncComparison?.find(c => c.field === 'Membership Tier')?.externalValue || '');
-                                            if (confirm(`Accept Stripe tier "${stripeTier}" for "${issue.context?.memberName}"? This will update their database tier to match Stripe.`)) {
-                                              fixIssueMutation.mutate({ endpoint: '/api/data-integrity/fix/accept-tier', body: { userId: String(issue.context?.userId), acceptedTier: stripeTier, source: 'stripe' } });
-                                            }
-                                          }}
-                                          disabled={fixingIssues.has(String(issue.context?.userId))}
-                                          className="p-1.5 text-green-600 hover:bg-green-100 dark:text-green-400 dark:hover:bg-green-900/30 rounded transition-colors disabled:opacity-50"
-                                          title="Accept tier from Stripe"
-                                        >
-                                          {fixingIssues.has(String(issue.context?.userId)) ? (
-                                            <span className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>
-                                          ) : (
-                                            <span className="material-symbols-outlined text-[16px]">sync</span>
-                                          )}
-                                        </button>
-                                      )}
+                                      {(() => {
+                                        const tierComparison = issue.context?.syncComparison?.find(c => c.field === 'Membership Tier' || c.field === 'App Tier vs Stripe Product');
+                                        return tierComparison?.externalValue ? (
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              const stripeTier = String(tierComparison.externalValue || '');
+                                              if (confirm(`Accept Stripe tier "${stripeTier}" for "${issue.context?.memberName}"? This will update their database tier to match Stripe.`)) {
+                                                fixIssueMutation.mutate({ endpoint: '/api/data-integrity/fix/accept-tier', body: { userId: String(issue.context?.userId), acceptedTier: stripeTier, source: 'stripe' } });
+                                              }
+                                            }}
+                                            disabled={fixingIssues.has(String(issue.context?.userId))}
+                                            className="p-1.5 text-green-600 hover:bg-green-100 dark:text-green-400 dark:hover:bg-green-900/30 rounded transition-colors disabled:opacity-50"
+                                            title="Accept tier from Stripe"
+                                          >
+                                            {fixingIssues.has(String(issue.context?.userId)) ? (
+                                              <span className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>
+                                            ) : (
+                                              <span className="material-symbols-outlined text-[16px]">sync</span>
+                                            )}
+                                          </button>
+                                        ) : null;
+                                      })()}
                                     </>
                                   )}
                                   {!issue.ignored && issue.table === 'users' && issue.category === 'data_quality' && issue.context?.errorType === 'orphaned_stripe_customer' && issue.context?.userId && (
