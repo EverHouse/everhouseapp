@@ -126,6 +126,22 @@ export const logger = {
   },
 };
 
+const NOISE_PATHS = new Set([
+  '/api/v1/workflows',
+  '/api/v1/executions',
+  '/api/v1/credentials',
+  '/api/login',
+  '/callback',
+  '/index.html.gz',
+]);
+
+function isNoisyRequest(method: string, path: string, statusCode: number): boolean {
+  if (statusCode === 404 && NOISE_PATHS.has(path)) return true;
+  if (statusCode === 404 && method === 'POST' && path.endsWith('.gz')) return true;
+  if (statusCode === 401 && path === '/api/auth/session') return true;
+  return false;
+}
+
 export function logRequest(req: Request, res: Response, next: NextFunction) {
   const start = Date.now();
   
@@ -141,7 +157,9 @@ export function logRequest(req: Request, res: Response, next: NextFunction) {
     };
     const message = `${req.method} ${req.path}`;
     
-    if (res.statusCode >= 400) {
+    if (isNoisyRequest(req.method, req.path, res.statusCode)) {
+      logger.debug(message, context);
+    } else if (res.statusCode >= 400) {
       logger.warn(message, context);
     } else {
       logger.info(message, context);
