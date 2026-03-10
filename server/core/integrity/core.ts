@@ -366,6 +366,9 @@ export interface IssueContext {
   stripeCustomerId?: string;
   stripePaymentIntentId?: string;
   userId?: number;
+  issueType?: string;
+  sourceTable?: string;
+  count?: number;
   duplicateUsers?: Array<{ userId: number; email: string; status: string; tier: string }>;
   trackmanBookingId?: string;
   userName?: string;

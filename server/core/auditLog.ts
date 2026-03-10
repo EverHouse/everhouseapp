@@ -300,7 +300,11 @@ export type AuditAction =
   | 'revert_to_approved'
   | 'bulk_attend_stale_bookings'
   | 'create_block'
-  | 'get_invoice_link';
+  | 'get_invoice_link'
+  | 'delete_orphan_records'
+  | 'mark_waiver_signed'
+  | 'update_tour_status'
+  | 'clear_stripe_customer_id';
 
 export type ActorType = 'staff' | 'member' | 'system';
 

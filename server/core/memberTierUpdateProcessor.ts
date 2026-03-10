@@ -88,7 +88,7 @@ export async function processMemberTierUpdate(payload: MemberTierUpdatePayload):
 
         if (tierResult.length > 0 && tierResult[0].stripePriceId) {
           const { changeSubscriptionTier } = await import('./stripe/subscriptions');
-          await changeSubscriptionTier(user.stripeSubscriptionId, tierResult[0].stripePriceId, newTier);
+          await changeSubscriptionTier(user.stripeSubscriptionId, tierResult[0].stripePriceId);
           logger.info(`[MemberTierUpdateProcessor] Synced Stripe subscription tier for ${normalizedEmail}: ${oldTier || 'None'} → ${newTier}`);
         } else {
           logger.warn(`[MemberTierUpdateProcessor] No Stripe price found for tier ${newTier} — Stripe subscription not updated for ${normalizedEmail}`);

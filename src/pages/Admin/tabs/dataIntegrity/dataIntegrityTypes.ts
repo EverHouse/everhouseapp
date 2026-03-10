@@ -74,6 +74,9 @@ export interface IssueContext {
   issueKey?: string;
   linkedBookingId?: number;
   bookingIds?: number[];
+  issueType?: string;
+  sourceTable?: string;
+  count?: number;
 }
 
 export interface IgnoreInfo {
