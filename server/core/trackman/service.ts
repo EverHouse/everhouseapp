@@ -327,7 +327,7 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
         }
       }
 
-      if (!matchedEmail && !isPlaceholderEmail(row.userEmail) && row.userEmail.includes('@')) {
+      if (!matchedEmail && row.userEmail.includes('@')) {
         const existingMember = membersByEmail.get(row.userEmail.toLowerCase());
         if (existingMember) {
           matchedEmail = existingMember;
