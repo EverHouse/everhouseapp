@@ -245,6 +245,7 @@ export async function createBookingForMember(
       }
       
       const sessionCheck = await db.execute(sql`SELECT session_id FROM booking_requests WHERE id = ${pendingBookingId}`);
+      let newSessionId: number | null = null;
       
       if ((sessionCheck.rows as Array<Record<string, unknown>>)[0]?.session_id) {
         if (wasTimeTolerance) {
@@ -256,7 +257,6 @@ export async function createBookingForMember(
           }
         }
       } else {
-        var newSessionId: number | null = null;
         try {
           const sessionResult = await ensureSessionForBooking({
             bookingId: pendingBookingId,
