@@ -290,12 +290,11 @@ html {
   min-height: 100%;
   overflow-x: hidden;
   overflow-y: auto;
+  overscroll-behavior-y: contain;
 }
 
 body {
   min-height: 100%;
-  overflow-x: hidden;
-  overflow-y: auto;
 }
 
 #root {
@@ -325,10 +324,6 @@ html, body {
   font-family: 'Instrument Sans', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-}
-
-body {
-  overscroll-behavior-y: contain;
 }
 
 html.dark, html.dark body {
