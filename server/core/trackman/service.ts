@@ -384,10 +384,6 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
         }
       }
 
-      if (!matchedEmail && row.userName && !isPlaceholderEmail(row.userEmail)) {
-        process.stderr.write(`[Trackman Import] No email match for "${row.userName}" (email: ${row.userEmail}) - name matching disabled for accuracy\n`);
-      }
-
       const bookingDate = extractDate(row.startDate);
       const startTime = extractTime(row.startDate);
       const endTime = extractTime(row.endDate);
@@ -1983,7 +1979,7 @@ export async function rescanUnmatchedBookings(performedBy: string = 'system'): P
           }
         }
       }
-      
+
       if (matchedEmail) {
         await db.update(trackmanUnmatchedBookings)
           .set({
