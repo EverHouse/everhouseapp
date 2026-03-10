@@ -50,6 +50,7 @@ interface IntegrityResultsPanelProps {
     isUnmatched?: boolean;
   }) => void;
   fixIssueMutation: UseMutationResult<{ success: boolean; message: string }, unknown, { endpoint: string; body: Record<string, unknown> }, unknown>;
+  bulkMarkWaiversMutation: UseMutationResult<{ success: boolean; message: string; count: number }, Error, void, unknown>;
   fixingIssues: Set<string>;
   isRefreshing: boolean;
   openIgnoreModal: (issue: IntegrityIssue, checkName: string) => void;
@@ -138,6 +139,7 @@ const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
   handleViewProfile,
   setBookingSheet,
   fixIssueMutation,
+  bulkMarkWaiversMutation,
   fixingIssues,
   isRefreshing,
   openIgnoreModal,
@@ -916,7 +918,25 @@ const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
                     )}
                     
                     {Array.isArray(result.issues) && result.issues.filter(i => !i.ignored).length > 3 && (
-                      <div className="flex justify-end">
+                      <div className="flex justify-end gap-3">
+                        {result.checkName === 'Active Members Without Waivers' && (
+                          <button
+                            onClick={() => {
+                              if (window.confirm(`Mark all ${result.issues.filter(i => !i.ignored).length} members as waiver signed? This cannot be undone.`)) {
+                                bulkMarkWaiversMutation.mutate();
+                              }
+                            }}
+                            disabled={bulkMarkWaiversMutation.isPending}
+                            className="text-xs text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-200 flex items-center gap-1"
+                          >
+                            {bulkMarkWaiversMutation.isPending ? (
+                              <span className="material-symbols-outlined animate-spin text-[14px]">progress_activity</span>
+                            ) : (
+                              <span className="material-symbols-outlined text-[14px]">verified</span>
+                            )}
+                            Mark All as Signed ({result.issues.filter(i => !i.ignored).length})
+                          </button>
+                        )}
                         <button
                           onClick={() => openBulkIgnoreModal(result.checkName, result.issues)}
                           className="text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 flex items-center gap-1"

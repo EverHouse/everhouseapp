@@ -731,6 +731,30 @@ export function useDataIntegrityActions(state: DataIntegrityState) {
     }
   });
 
+  const bulkMarkWaiversMutation = useMutation({
+    mutationFn: () =>
+      postWithCredentials<{ success: boolean; message: string; count: number }>('/api/data-integrity/fix/mark-all-waivers-signed', {}),
+    onSuccess: (data) => {
+      showToast(data.message || 'All waivers marked as signed', 'success');
+      queryClient.setQueryData(['data-integrity', 'cached'], (old: CachedResultsResponse | undefined) => {
+        if (!old?.hasCached) return old;
+        return {
+          ...old,
+          results: old.results.map((check) => {
+            if (check.checkName !== 'Active Members Without Waivers') return check;
+            return { ...check, issues: [], issueCount: 0 };
+          }).filter((check) => check.issueCount > 0),
+        };
+      });
+      setTimeout(() => {
+        runIntegrityMutation.mutate();
+      }, 1500);
+    },
+    onError: (err: Error) => {
+      showToast((err instanceof Error ? err.message : String(err)) || 'Failed to mark waivers as signed', 'error');
+    },
+  });
+
   useEffect(() => {
     const handleProgress = (event: CustomEvent) => {
       const { data, result, error } = event.detail || {};
@@ -1500,6 +1524,7 @@ export function useDataIntegrityActions(state: DataIntegrityState) {
     runIntegrityMutation,
     cancelBookingMutation,
     fixIssueMutation,
+    bulkMarkWaiversMutation,
 
     handleCheckHealth,
     handleResyncMember,

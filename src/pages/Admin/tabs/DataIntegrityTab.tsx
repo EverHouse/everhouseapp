@@ -118,6 +118,7 @@ const DataIntegrityTab: React.FC = () => {
         handleViewProfile={actions.handleViewProfile}
         setBookingSheet={state.setBookingSheet}
         fixIssueMutation={actions.fixIssueMutation}
+        bulkMarkWaiversMutation={actions.bulkMarkWaiversMutation}
         fixingIssues={state.fixingIssues}
         isRefreshing={actions.runIntegrityMutation.isPending}
         openIgnoreModal={actions.openIgnoreModal}

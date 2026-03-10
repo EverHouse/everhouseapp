@@ -1559,6 +1559,22 @@ router.post('/api/data-integrity/fix/mark-waiver-signed', isAdmin, validateBody(
   }
 });
 
+router.post('/api/data-integrity/fix/mark-all-waivers-signed', isAdmin, async (req: Request, res) => {
+  try {
+    const result = await db.execute(
+      sql`UPDATE users SET waiver_signed_at = NOW(), waiver_version = 'staff_marked', updated_at = NOW() WHERE membership_status = 'active' AND role = 'member' AND (waiver_signed_at IS NULL AND waiver_version IS NULL) AND created_at < NOW() - INTERVAL '7 days'`
+    );
+
+    const count = result.rowCount || 0;
+    logFromRequest(req, 'mark_all_waivers_signed', 'user', 'bulk', `Marked ${count} active members as waiver signed via data integrity bulk action`, { count });
+
+    res.json({ success: true, message: `Marked ${count} member${count === 1 ? '' : 's'} as waiver signed`, count });
+  } catch (error: unknown) {
+    logger.error('[DataIntegrity] Mark all waivers signed error', { extra: { error: getErrorMessage(error) } });
+    res.status(500).json({ success: false, message: 'Operation failed', details: safeErrorDetail(error) });
+  }
+});
+
 router.post('/api/data-integrity/fix/accept-tier', isAdmin, validateBody(acceptTierSchema), async (req: Request, res) => {
   const client = await pool.connect();
   try {
