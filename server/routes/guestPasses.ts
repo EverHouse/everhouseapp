@@ -7,6 +7,7 @@ import { getTierLimits } from '../core/tierService';
 import { sendPushNotification } from './push';
 import { sendNotificationToUser, broadcastMemberStatsUpdated } from '../core/websocket';
 import { logAndRespond, logger } from '../core/logger';
+import { isSyntheticEmail } from '../core/notificationService';
 import { withRetry } from '../core/retry';
 import { getSessionUser } from '../types/session';
 import { logFromRequest } from '../core/auditLog';
@@ -187,13 +188,15 @@ router.post('/api/guest-passes/:email/use', isAuthenticated, async (req, res) =>
       ? `Guest pass used for ${guest_name}. You have ${remaining} pass${remaining !== 1 ? 'es' : ''} remaining this month.`
       : `Guest pass used. You have ${remaining} pass${remaining !== 1 ? 'es' : ''} remaining this month.`;
     
-    await db.insert(notifications).values({
-      userEmail: normalizedEmail,
-      title: 'Guest Pass Used',
-      message: message,
-      type: 'guest_pass',
-      relatedType: 'guest_pass'
-    });
+    if (!isSyntheticEmail(normalizedEmail)) {
+      await db.insert(notifications).values({
+        userEmail: normalizedEmail,
+        title: 'Guest Pass Used',
+        message: message,
+        type: 'guest_pass',
+        relatedType: 'guest_pass'
+      });
+    }
     
     sendPushNotification(normalizedEmail, {
       title: 'Guest Pass Used',

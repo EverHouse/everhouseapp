@@ -3,7 +3,7 @@ import { db } from '../../db';
 import { resources, notifications, bookingRequests } from '../../../shared/schema';
 import { logger } from '../logger';
 import { createPacificDate, formatDateDisplayWithDay, formatTime12Hour } from '../../utils/dateUtils';
-import { notifyMember, notifyAllStaff } from '../notificationService';
+import { notifyMember, notifyAllStaff, isSyntheticEmail } from '../notificationService';
 import { refundGuestPass } from '../../routes/guestPasses';
 import { cancelPaymentIntent, getStripeClient } from '../stripe';
 import { broadcastAvailabilityUpdate } from '../websocket';
@@ -545,14 +545,16 @@ export async function memberCancelBooking(bookingId: number, userEmail: string, 
       }
     ).catch(err => logger.error('Staff cancellation notification failed', { extra: { error: err } }));
     
-    await db.insert(notifications).values({
-      userEmail: existing.userEmail || '',
-      title: 'Cancellation Request Submitted',
-      message: `Your cancellation request for ${bookingDate} at ${bookingTime} has been submitted. You'll be notified once it's fully processed.`,
-      type: 'cancellation_pending',
-      relatedId: bookingId,
-      relatedType: 'booking_request'
-    });
+    if (existing.userEmail && !isSyntheticEmail(existing.userEmail)) {
+      await db.insert(notifications).values({
+        userEmail: existing.userEmail,
+        title: 'Cancellation Request Submitted',
+        message: `Your cancellation request for ${bookingDate} at ${bookingTime} has been submitted. You'll be notified once it's fully processed.`,
+        type: 'cancellation_pending',
+        relatedId: bookingId,
+        relatedType: 'booking_request'
+      });
+    }
     
     return { 
       success: true, 

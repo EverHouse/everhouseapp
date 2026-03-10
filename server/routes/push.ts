@@ -9,6 +9,7 @@ import { formatTime12Hour, getTodayPacific, getTomorrowPacific } from '../utils/
 import { sendNotificationToUser } from '../core/websocket';
 import { isAuthenticated, isStaffOrAdmin } from '../core/middleware';
 import { getErrorMessage, getErrorStatusCode } from '../utils/errorUtils';
+import { isSyntheticEmail } from '../core/notificationService';
 
 const router = Router();
 
@@ -333,17 +334,19 @@ export async function sendDailyReminders() {
     ));
     
     if (bookingReminders.length > 0) {
-      const bookingNotifications = bookingReminders.map(booking => ({
-        userEmail: booking.userEmail,
-        title: 'Booking Tomorrow',
-        message: `Reminder: Your simulator booking is tomorrow at ${formatTime12Hour(booking.startTime)}${booking.resourceId ? ` on Bay ${booking.resourceId}` : ''}.`,
-        type: 'booking_reminder' as const,
-        relatedId: booking.id,
-        relatedType: 'booking_request' as const
-      }));
+      const bookingNotifications = bookingReminders
+        .filter(booking => booking.userEmail && !isSyntheticEmail(booking.userEmail))
+        .map(booking => ({
+          userEmail: booking.userEmail,
+          title: 'Booking Tomorrow',
+          message: `Reminder: Your simulator booking is tomorrow at ${formatTime12Hour(booking.startTime)}${booking.resourceId ? ` on Bay ${booking.resourceId}` : ''}.`,
+          type: 'booking_reminder' as const,
+          relatedId: booking.id,
+          relatedType: 'booking_request' as const
+        }));
       
       try {
-        await db.insert(notifications).values(bookingNotifications);
+        if (bookingNotifications.length > 0) await db.insert(notifications).values(bookingNotifications);
         results.bookings = bookingNotifications.length;
       } catch (err: unknown) {
         results.errors.push(`Booking batch insert: ${getErrorMessage(err)}`);

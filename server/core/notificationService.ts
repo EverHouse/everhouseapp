@@ -340,6 +340,26 @@ async function deliverViaEmail(to: string, subject: string, html: string): Promi
   }
 }
 
+const SYNTHETIC_EMAIL_PATTERNS = [
+  '@trackman.local',
+  '@trackman.import',
+  '@visitors.evenhouse.club',
+  'private-event@',
+  'unmatched-',
+  'unmatched@',
+  'unknown@mindbody',
+  'staff@evenhouse.app',
+  'golfnow-',
+  'classpass-',
+  'anonymous-',
+  'anongolfnow@',
+];
+
+export function isSyntheticEmail(email: string): boolean {
+  const lower = email.toLowerCase().trim();
+  return SYNTHETIC_EMAIL_PATTERNS.some(pattern => lower.includes(pattern));
+}
+
 export async function notifyMember(
   payload: NotificationPayload,
   options: { sendPush?: boolean; sendWebSocket?: boolean; sendEmail?: boolean; emailSubject?: string; emailHtml?: string } = {}
@@ -361,6 +381,14 @@ export async function notifyMember(
     };
   }
   
+  if (isSyntheticEmail(payload.userEmail)) {
+    return {
+      notificationId: undefined,
+      deliveryResults: [{ channel: 'database', success: true, error: 'Skipped — synthetic/placeholder email' }],
+      allSucceeded: true
+    };
+  }
+
   const { sendPush = true, sendWebSocket = true, sendEmail = false, emailSubject, emailHtml } = options;
   const deliveryResults: DeliveryResult[] = [];
   

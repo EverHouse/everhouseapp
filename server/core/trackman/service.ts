@@ -13,6 +13,7 @@ import { useGuestPass } from '../../routes/guestPasses';
 import { cancelPendingPaymentIntentsForBooking } from '../billing/paymentIntentCleanup';
 import { alertOnTrackmanImportIssues } from '../dataAlerts';
 import { logger } from '../logger';
+import { isSyntheticEmail } from '../notificationService';
 
 import type { TrackmanRow, PaidCheckRow } from './constants';
 import { isPlaceholderEmail, normalizeStatus, isFutureBooking, isTimeWithinTolerance } from './constants';
@@ -1351,7 +1352,7 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
               let resolvedMemberEmail = memberExists;
               
               if (memberSlot <= row.playerCount) {
-                if (resolvedMemberEmail && normalizedStatus === 'approved' && isUpcoming) {
+                if (resolvedMemberEmail && normalizedStatus === 'approved' && isUpcoming && !isSyntheticEmail(resolvedMemberEmail)) {
                   const linkedMessage = `You've been added to a simulator booking on ${formatNotificationDateTime(bookingDate, startTime)}.`;
                   await db.insert(notifications).values({
                     userEmail: resolvedMemberEmail,
@@ -1441,7 +1442,7 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
             `);
           }
 
-          if (normalizedStatus === 'approved' && isUpcoming && insertResult[0]) {
+          if (normalizedStatus === 'approved' && isUpcoming && insertResult[0] && !isSyntheticEmail(matchedEmail)) {
             const approvalMessage = `Your simulator booking for ${formatNotificationDateTime(bookingDate, startTime)} has been approved.`;
             
             await db.insert(notifications).values({
@@ -1655,7 +1656,7 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
         cancelledBookings++;
         process.stderr.write(`[Trackman Import] Cancelled booking ${booking.trackmanBookingId} (${booking.userName}) for ${bookingDateStr} - no longer in Trackman\n`);
         
-        if (booking.userEmail) {
+        if (booking.userEmail && !isSyntheticEmail(booking.userEmail)) {
           const cancelMessage = `Your simulator booking for ${formatNotificationDateTime(bookingDateStr, booking.startTime || '')} has been cancelled as it was removed from the booking system.`;
           
           await db.insert(notifications).values({

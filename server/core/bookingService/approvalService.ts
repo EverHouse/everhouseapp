@@ -5,7 +5,7 @@ import { eq, and, or, gt, lt, lte, gte, ne, sql, isNull, isNotNull } from 'drizz
 import { sendPushNotification } from '../../routes/push';
 import { formatNotificationDateTime, formatDateDisplayWithDay, formatTime12Hour } from '../../utils/dateUtils';
 import { logger } from '../logger';
-import { notifyAllStaff, notifyMember } from '../notificationService';
+import { notifyAllStaff, notifyMember, isSyntheticEmail } from '../notificationService';
 import { checkClosureConflict, checkAvailabilityBlockConflict } from '../bookingValidation';
 import { bookingEvents } from '../bookingEvents';
 import { sendNotificationToUser, broadcastAvailabilityUpdate, broadcastMemberStatsUpdated, broadcastBillingUpdate } from '../websocket';
@@ -771,7 +771,7 @@ async function notifyLinkedMembers(bookingId: number, updated: BookingUpdateResu
       ));
 
     for (const member of linkedMembers) {
-      if (member.userEmail && member.userEmail.toLowerCase() !== updated.userEmail.toLowerCase()) {
+      if (member.userEmail && member.userEmail.toLowerCase() !== updated.userEmail.toLowerCase() && !isSyntheticEmail(member.userEmail)) {
         const linkedMessage = `A booking you're part of has been confirmed for ${formatNotificationDateTime(updated.requestDate, updated.startTime)}.`;
 
         await db.insert(notifications).values({
@@ -843,6 +843,7 @@ async function notifyApprovalParticipants(bookingId: number, updated: BookingUpd
       if (!participantEmail) continue;
       if (participantEmail === ownerEmailLower) continue;
       if (processedEmails.has(participantEmail)) continue;
+      if (isSyntheticEmail(participantEmail)) continue;
       processedEmails.add(participantEmail);
 
       const notificationMsg = `${ownerName} has added you to their simulator booking on ${formattedDate} at ${formattedTime}.`;
@@ -1414,16 +1415,16 @@ export async function handlePendingCancellation(bookingId: number, bookingData: 
     }
   ).catch(err => logger.error('Staff cancellation notification failed:', { extra: { err } }));
 
-  await db.insert(notifications).values({
-    userEmail: bookingData.userEmail || '',
-    title: 'Booking Cancellation in Progress',
-    message: `Your booking for ${bookingDate} at ${bookingTime} is being cancelled. You'll be notified once it's fully processed.`,
-    type: 'cancellation_pending',
-    relatedId: bookingId,
-    relatedType: 'booking_request'
-  });
+  if (bookingData.userEmail && !isSyntheticEmail(bookingData.userEmail)) {
+    await db.insert(notifications).values({
+      userEmail: bookingData.userEmail,
+      title: 'Booking Cancellation in Progress',
+      message: `Your booking for ${bookingDate} at ${bookingTime} is being cancelled. You'll be notified once it's fully processed.`,
+      type: 'cancellation_pending',
+      relatedId: bookingId,
+      relatedType: 'booking_request'
+    });
 
-  if (bookingData.userEmail) {
     sendPushNotification(bookingData.userEmail, {
       title: 'Booking Cancellation in Progress',
       body: `Your booking for ${bookingDate} at ${bookingTime} is being cancelled. You'll be notified once it's fully processed.`,
@@ -1970,7 +1971,7 @@ export async function checkinBooking(params: CheckinBookingParams) {
     });
   }
 
-  if (newStatus === 'no_show' && booking.userEmail) {
+  if (newStatus === 'no_show' && booking.userEmail && !isSyntheticEmail(booking.userEmail)) {
     const noShowDateStr = String(booking.requestDate).split('T')[0];
     const formattedDate = formatDateDisplayWithDay(noShowDateStr);
     const formattedTime = formatTime12Hour(booking.startTime);

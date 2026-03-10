@@ -1,7 +1,7 @@
 import { eq, sql } from 'drizzle-orm';
 import { db } from '../db';
 import { notifications, staffUsers, users } from '../../shared/schema';
-
+import { isSyntheticEmail } from './notificationService';
 import { logger } from './logger';
 export async function getStaffAndAdminEmails(): Promise<string[]> {
   const staffEmails = await db.select({ email: staffUsers.email })
@@ -58,6 +58,9 @@ export async function notifyMemberRequired(
   relatedId?: number,
   relatedType?: string
 ): Promise<void> {
+  if (isSyntheticEmail(userEmail)) {
+    return;
+  }
   await db.insert(notifications).values({
     userEmail,
     title,

@@ -5,7 +5,7 @@ import { bookingRequests, resources, users, bookingParticipants, notifications }
 import { eq, and, or, ne, desc, sql, SQL, inArray } from 'drizzle-orm';
 import { sendPushNotification } from '../push';
 import { checkDailyBookingLimit, getMemberTierByEmail, getTierLimits, getDailyBookedMinutes } from '../../core/tierService';
-import { notifyAllStaff } from '../../core/notificationService';
+import { notifyAllStaff, isSyntheticEmail } from '../../core/notificationService';
 import { formatNotificationDateTime, formatDateDisplayWithDay, formatTime12Hour, createPacificDate, getTodayPacific } from '../../utils/dateUtils';
 import {logAndRespond, logger } from '../../core/logger';
 import { bookingEvents } from '../../core/bookingEvents';
@@ -1215,14 +1215,16 @@ router.put('/api/booking-requests/:id/member-cancel', isAuthenticated, async (re
         }
       ).catch((err: unknown) => logger.error('Staff cancellation notification failed:', { error: err instanceof Error ? err : new Error(getErrorMessage(err)) }));
       
-      await db.insert(notifications).values({
-        userEmail: existing.userEmail || '',
-        title: 'Cancellation Request Submitted',
-        message: `Your cancellation request for ${bookingDate} at ${bookingTime} has been submitted. You'll be notified once it's fully processed.`,
-        type: 'cancellation_pending',
-        relatedId: bookingId,
-        relatedType: 'booking_request'
-      });
+      if (existing.userEmail && !isSyntheticEmail(existing.userEmail)) {
+        await db.insert(notifications).values({
+          userEmail: existing.userEmail,
+          title: 'Cancellation Request Submitted',
+          message: `Your cancellation request for ${bookingDate} at ${bookingTime} has been submitted. You'll be notified once it's fully processed.`,
+          type: 'cancellation_pending',
+          relatedId: bookingId,
+          relatedType: 'booking_request'
+        });
+      }
       
       await logMemberAction({
         memberEmail: existing.userEmail || '',

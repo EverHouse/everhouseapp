@@ -2,6 +2,7 @@ import { eq, and, or, sql } from 'drizzle-orm';
 import { db } from '../../db';
 import { resources, users, notifications, bookingRequests } from '../../../shared/schema';
 import { logger } from '../logger';
+import { isSyntheticEmail } from '../notificationService';
 import { sendPushNotification } from '../../routes/push';
 import { sendNotificationToUser } from '../websocket';
 import { checkAllConflicts } from '../bookingValidation';
@@ -554,14 +555,16 @@ export async function createManualBooking(params: {
     const notifTitle = 'Booking Confirmed';
     const notifMessage = `Your ${resource.type === 'simulator' ? 'golf simulator' : 'conference room'} booking for ${formattedDate} at ${formatTime(params.startTime)} has been confirmed.`;
     
-    await db.insert(notifications).values({
-      userEmail: params.memberEmail,
-      title: notifTitle,
-      message: notifMessage,
-      type: 'booking_approved',
-      relatedId: newBooking.id,
-      relatedType: 'booking'
-    });
+    if (!isSyntheticEmail(params.memberEmail)) {
+      await db.insert(notifications).values({
+        userEmail: params.memberEmail,
+        title: notifTitle,
+        message: notifMessage,
+        type: 'booking_approved',
+        relatedId: newBooking.id,
+        relatedType: 'booking'
+      });
+    }
     
     await sendPushNotification(params.memberEmail, {
       title: notifTitle,

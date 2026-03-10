@@ -6,6 +6,7 @@ import { sendPushNotification, sendPushNotificationToStaff } from '../routes/pus
 import { formatTime12Hour, formatDateDisplayWithDay } from '../utils/dateUtils';
 
 import { logger } from './logger';
+import { isSyntheticEmail } from './notificationService';
 interface RequestParticipant {
   email: string;
   type: 'member' | 'guest';
@@ -153,7 +154,7 @@ export async function publish(
       });
     }
 
-    if (notifyMember && memberNotification) {
+    if (notifyMember && memberNotification && !isSyntheticEmail(data.memberEmail)) {
       try {
         await db.insert(notifications).values({
           userEmail: data.memberEmail,
@@ -371,7 +372,7 @@ export async function linkAndNotifyParticipants(
         
         try {
           const notificationMsg = `You have been added to a simulator booking on ${bookingDateStr} at ${startTimeStr} (${bayName}).`;
-          await db.insert(notifications).values({
+          if (!isSyntheticEmail(email)) await db.insert(notifications).values({
             userEmail: email,
             title: 'Added to Booking',
             message: notificationMsg,
