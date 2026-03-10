@@ -309,6 +309,7 @@ export class BookingStateService {
       await tx.update(bookingRequests)
         .set({
           status: 'cancelled',
+          isUnmatched: false,
           staffNotes: updatedStaffNotes || undefined,
           updatedAt: new Date(),
         })
@@ -594,6 +595,7 @@ export class BookingStateService {
       await tx.update(bookingRequests)
         .set({
           status: 'cancelled',
+          isUnmatched: false,
           staffNotes: sql`COALESCE(staff_notes, '') || ${noteAppend}`,
           updatedAt: new Date(),
         })

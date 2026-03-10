@@ -69,6 +69,7 @@ async function expireStaleBookingRequests(): Promise<void> {
     const expiredBookings = await queryWithRetry<ExpiredBookingResult>(
       `UPDATE booking_requests 
        SET status = 'expired',
+           is_unmatched = false,
            staff_notes = COALESCE(staff_notes || E'\n', '') || '[Auto-expired: booking time passed without confirmation]',
            updated_at = NOW(),
            reviewed_at = NOW(),
@@ -206,6 +207,7 @@ export async function runManualBookingExpiry(): Promise<{ expiredCount: number }
   const result = await queryWithRetry(
     `UPDATE booking_requests 
      SET status = 'expired',
+         is_unmatched = false,
          staff_notes = COALESCE(staff_notes || E'\n', '') || '[Auto-expired: booking time passed without confirmation]',
          updated_at = NOW(),
          reviewed_at = NOW(),

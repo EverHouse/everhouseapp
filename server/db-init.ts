@@ -952,5 +952,31 @@ export async function setupInstantDataTriggers(): Promise<void> {
     logger.warn(`[DB Init] Skipping auto_link_participant_user_id trigger: ${getErrorMessage(err)}`);
   }
 
+  try {
+    await db.execute(sql`
+      CREATE OR REPLACE FUNCTION auto_clear_unmatched_on_terminal()
+      RETURNS TRIGGER
+      LANGUAGE plpgsql
+      SET search_path = ''
+      AS $$
+      BEGIN
+        IF NEW.is_unmatched = true AND NEW.status IN ('cancelled', 'declined', 'deleted', 'attended', 'no_show', 'expired') THEN
+          NEW.is_unmatched := false;
+        END IF;
+        RETURN NEW;
+      END;
+      $$;
+
+      DROP TRIGGER IF EXISTS trg_clear_unmatched_on_terminal ON booking_requests;
+      CREATE TRIGGER trg_clear_unmatched_on_terminal
+        BEFORE INSERT OR UPDATE ON booking_requests
+        FOR EACH ROW
+        EXECUTE FUNCTION auto_clear_unmatched_on_terminal();
+    `);
+    logger.info('[DB Init] Trigger: auto_clear_unmatched_on_terminal created');
+  } catch (err: unknown) {
+    logger.warn(`[DB Init] Skipping auto_clear_unmatched_on_terminal trigger: ${getErrorMessage(err)}`);
+  }
+
   logger.info('[DB Init] Instant data triggers created');
 }

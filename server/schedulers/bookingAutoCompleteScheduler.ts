@@ -72,6 +72,7 @@ async function autoCompletePastBookings(): Promise<void> {
     const markedBookings = await queryWithRetry<AutoCompletedBookingResult>(
       `UPDATE booking_requests 
        SET status = 'attended',
+           is_unmatched = false,
            staff_notes = COALESCE(staff_notes || E'\n', '') || '[Auto checked-in: booking time passed]',
            updated_at = NOW(),
            reviewed_at = NOW(),
@@ -251,6 +252,7 @@ export async function runManualBookingAutoComplete(): Promise<{ markedCount: num
   const result = await queryWithRetry<AutoCompletedBookingResult>(
     `UPDATE booking_requests 
      SET status = 'attended',
+         is_unmatched = false,
          staff_notes = COALESCE(staff_notes || E'\n', '') || '[Auto checked-in: booking time passed]',
          updated_at = NOW(),
          reviewed_at = NOW(),

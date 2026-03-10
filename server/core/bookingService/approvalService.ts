@@ -158,6 +158,7 @@ export async function validateTrackmanId(trackmanBookingId: string, bookingId: n
           .set({
             trackmanBookingId: null,
             status: 'declined',
+            isUnmatched: false,
             staffNotes: sql`COALESCE(staff_notes, '') || ' [Auto-declined: Trackman ID re-linked to booking #' || ${bookingId}::text || ' for the same member]'`,
             reviewedBy: 'system_relink',
             reviewedAt: sql`NOW()`,
@@ -904,6 +905,7 @@ export async function declineBooking(params: DeclineBookingParams) {
     const [updatedRow] = await tx.update(bookingRequests)
       .set({
         status: 'declined',
+        isUnmatched: false,
         staffNotes: staff_notes,
         suggestedTime: suggested_time,
         reviewedBy: reviewed_by,

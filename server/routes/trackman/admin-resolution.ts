@@ -34,7 +34,7 @@ router.get('/api/admin/trackman/unmatched', isStaffOrAdmin, async (req, res) => 
     
     const sqlConditions: ReturnType<typeof sql>[] = [
       sql`br.is_unmatched = true`,
-      sql`br.status NOT IN ('cancelled', 'declined', 'deleted')`
+      sql`br.status NOT IN ('cancelled', 'declined', 'deleted', 'attended', 'no_show', 'expired')`
     ];
     
     if (resolved === 'false') {

@@ -1233,7 +1233,7 @@ router.post('/api/data-integrity/fix/complete-booking', isAdmin, validateBody(re
 
     const result = await db.execute(sql`
       UPDATE booking_requests 
-      SET status = 'attended', updated_at = NOW() 
+      SET status = 'attended', is_unmatched = false, updated_at = NOW() 
       WHERE id = ${recordId} AND status IN ('pending', 'approved', 'confirmed')
     `);
 
@@ -1333,7 +1333,7 @@ router.post('/api/data-integrity/fix/bulk-attend-stale-bookings', isAdmin, async
   try {
     const result = await db.execute(sql`
       UPDATE booking_requests
-      SET status = 'attended', updated_at = NOW()
+      SET status = 'attended', is_unmatched = false, updated_at = NOW()
       WHERE status IN ('pending', 'approved')
         AND (request_date + start_time::time) < ((NOW() AT TIME ZONE 'America/Los_Angeles') - INTERVAL '24 hours')
         AND request_date >= CURRENT_DATE - INTERVAL '7 days'
