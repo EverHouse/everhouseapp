@@ -10,7 +10,6 @@ import type {
   IntegrityRunResponse,
   CalendarStatusResponse,
   HistoryData,
-  AuditLogEntry,
   IgnoredIssueEntry,
   ActiveIssue,
   SystemHealth,
@@ -198,14 +197,6 @@ export function useDataIntegrityActions(state: DataIntegrityState) {
   } = useQuery({
     queryKey: ['data-integrity', 'history'],
     queryFn: () => fetchWithCredentials<HistoryData>('/api/data-integrity/history'),
-  });
-
-  const { 
-    data: auditLog = [], 
-    isLoading: isLoadingAuditLog 
-  } = useQuery({
-    queryKey: ['data-integrity', 'audit-log'],
-    queryFn: () => fetchWithCredentials<AuditLogEntry[]>('/api/data-integrity/audit-log?limit=10'),
   });
 
   const { 
@@ -1515,8 +1506,6 @@ export function useDataIntegrityActions(state: DataIntegrityState) {
     isLoadingCalendars,
     historyData,
     isLoadingHistory,
-    auditLog,
-    isLoadingAuditLog,
     ignoredIssues,
     isLoadingIgnored,
 

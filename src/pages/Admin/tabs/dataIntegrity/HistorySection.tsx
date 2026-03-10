@@ -1,17 +1,13 @@
 import React from 'react';
 import EmptyState from '../../../../components/EmptyState';
 import { getTrendIcon, getTrendColor } from './dataIntegrityUtils';
-import type { HistoryData, AuditLogEntry } from './dataIntegrityTypes';
+import type { HistoryData } from './dataIntegrityTypes';
 
 interface HistorySectionProps {
   showHistory: boolean;
   onToggleHistory: () => void;
   isLoadingHistory: boolean;
   historyData: HistoryData | undefined;
-  showActivityLog: boolean;
-  onToggleActivityLog: () => void;
-  isLoadingAuditLog: boolean;
-  auditLog: AuditLogEntry[];
 }
 
 const HistorySection: React.FC<HistorySectionProps> = ({
@@ -19,10 +15,6 @@ const HistorySection: React.FC<HistorySectionProps> = ({
   onToggleHistory,
   isLoadingHistory,
   historyData,
-  showActivityLog,
-  onToggleActivityLog,
-  isLoadingAuditLog,
-  auditLog,
 }) => {
   return (
     <>
@@ -107,59 +99,6 @@ const HistorySection: React.FC<HistorySectionProps> = ({
               </>
             ) : (
               <p className="text-sm text-gray-500 dark:text-gray-400">Failed to load history</p>
-            )}
-          </div>
-        )}
-      </div>
-
-      <div className="mb-6 bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-xl p-4">
-        <button
-          onClick={onToggleActivityLog}
-          className="tactile-row flex items-center justify-between w-full text-left"
-        >
-          <div className="flex items-center gap-2">
-            <span aria-hidden="true" className="material-symbols-outlined text-primary dark:text-white">assignment</span>
-            <span className="font-bold text-primary dark:text-white">Activity Log</span>
-          </div>
-          <span aria-hidden="true" className={`material-symbols-outlined text-gray-500 dark:text-gray-400 transition-transform ${showActivityLog ? 'rotate-180' : ''}`}>
-            expand_more
-          </span>
-        </button>
-        
-        {showActivityLog && (
-          <div className="mt-4">
-            {isLoadingAuditLog ? (
-              <div className="flex items-center justify-center py-4">
-                <span aria-hidden="true" className="material-symbols-outlined animate-spin text-gray-500">progress_activity</span>
-              </div>
-            ) : auditLog.length > 0 ? (
-              <div className="space-y-2 max-h-64 overflow-y-auto">
-                {auditLog.map((entry) => (
-                  <div key={entry.id} className="p-3 bg-gray-50 dark:bg-white/5 rounded-lg">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className={`text-xs font-bold uppercase tracking-wider px-2 py-0.5 rounded ${
-                        entry.action === 'resolved' 
-                          ? 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400'
-                          : entry.action === 'ignored'
-                          ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600 dark:text-yellow-400'
-                          : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'
-                      }`}>
-                        {entry.action}
-                      </span>
-                      <span className="text-[10px] text-gray-500 dark:text-gray-500">
-                        {new Date(entry.actionAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'America/Los_Angeles' })}
-                      </span>
-                    </div>
-                    <p className="text-xs text-gray-700 dark:text-gray-300 font-mono truncate">{entry.issueKey}</p>
-                    <p className="text-[10px] text-gray-500 dark:text-gray-500">by {entry.actionBy}</p>
-                    {entry.notes && (
-                      <p className="text-xs text-gray-600 dark:text-gray-400 mt-1 italic">{entry.notes}</p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-gray-500 dark:text-gray-400">No activity logged yet</p>
             )}
           </div>
         )}

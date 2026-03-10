@@ -99,10 +99,6 @@ const DataIntegrityTab: React.FC = () => {
         onToggleHistory={() => state.setShowHistory(!state.showHistory)}
         isLoadingHistory={actions.isLoadingHistory}
         historyData={actions.historyData}
-        showActivityLog={state.showActivityLog}
-        onToggleActivityLog={() => state.setShowActivityLog(!state.showActivityLog)}
-        isLoadingAuditLog={actions.isLoadingAuditLog}
-        auditLog={actions.auditLog}
       />
 
       <IntegrityResultsPanel

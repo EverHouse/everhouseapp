@@ -108,8 +108,6 @@ export function useDataIntegrityState() {
 
   const [showCalendars, setShowCalendars] = useState(true);
   const [showHistory, setShowHistory] = useState(true);
-  const [showActivityLog, setShowActivityLog] = useState(true);
-
   const [syncingIssues, setSyncingIssues] = useState<Set<string>>(new Set());
   const [cancellingBookings, setCancellingBookings] = useState<Set<number>>(new Set());
   const [fixingIssues, setFixingIssues] = useState<Set<string>>(new Set());
@@ -288,7 +286,6 @@ export function useDataIntegrityState() {
     selectedCheck, setSelectedCheck,
     showCalendars, setShowCalendars,
     showHistory, setShowHistory,
-    showActivityLog, setShowActivityLog,
     syncingIssues, setSyncingIssues,
     cancellingBookings, setCancellingBookings,
     fixingIssues, setFixingIssues,
