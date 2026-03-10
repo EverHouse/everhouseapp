@@ -299,6 +299,7 @@ export interface SyncPushUserRow {
   membership_tier: string;
   tier: string;
   membership_status: string;
+  hubspot_id?: string;
 }
 
 export interface TotalRow {

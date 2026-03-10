@@ -102,12 +102,12 @@ export async function syncPush(params: SyncPushParams): Promise<{ success: boole
   const { target, userId, hubspotContactId } = params;
 
   if (target === 'hubspot') {
-    if (!userId || !hubspotContactId) {
-      throw new Error('userId and hubspotContactId are required for HubSpot push');
+    if (!userId) {
+      throw new Error('userId is required for HubSpot push');
     }
 
     const userResult = await db.execute(sql`
-      SELECT first_name, last_name, email, membership_tier, tier, membership_status
+      SELECT first_name, last_name, email, membership_tier, tier, membership_status, hubspot_id
       FROM users WHERE id = ${userId}
     `);
 
@@ -117,12 +117,17 @@ export async function syncPush(params: SyncPushParams): Promise<{ success: boole
 
     const user = userResult.rows[0] as unknown as SyncPushUserRow;
 
+    const resolvedHubspotId = hubspotContactId || user.hubspot_id;
+    if (!resolvedHubspotId) {
+      throw new Error('Member is missing a HubSpot contact link — cannot push');
+    }
+
     const { client: hubspot } = await getHubSpotClientWithFallback();
 
     const isChurned = ['terminated', 'cancelled', 'non-member', 'deleted', 'former_member', 'expired'].includes(String(user.membership_status || '').toLowerCase());
     const mappedTier = isChurned ? '' : (await denormalizeTierForHubSpotAsync(String(user.tier)) || '');
 
-    await hubspot.crm.contacts.basicApi.update(hubspotContactId, {
+    await hubspot.crm.contacts.basicApi.update(resolvedHubspotId, {
       properties: {
         firstname: user.first_name || '',
         lastname: user.last_name || '',
@@ -132,7 +137,7 @@ export async function syncPush(params: SyncPushParams): Promise<{ success: boole
 
     return {
       success: true,
-      message: `Pushed app data to HubSpot contact ${hubspotContactId}`
+      message: `Pushed app data to HubSpot contact ${resolvedHubspotId}`
     };
   }
 
@@ -336,24 +341,28 @@ export async function syncPull(params: SyncPullParams): Promise<{ success: boole
   const { target, userId, hubspotContactId } = params;
 
   if (target === 'hubspot') {
-    if (!userId || !hubspotContactId) {
-      throw new Error('userId and hubspotContactId are required for HubSpot pull');
+    if (!userId) {
+      throw new Error('userId is required for HubSpot pull');
+    }
+
+    const userResult = await db.execute(sql`
+      SELECT email, billing_provider, last_manual_fix_at, hubspot_id FROM users WHERE id = ${userId}
+    `);
+    const resolvedHubspotId = hubspotContactId || (userResult.rows[0] as { hubspot_id?: string } | undefined)?.hubspot_id;
+    if (!resolvedHubspotId) {
+      throw new Error('Member is missing a HubSpot contact link — cannot pull');
     }
 
     const { client: hubspot } = await getHubSpotClientWithFallback();
 
     const contact = await hubspot.crm.contacts.basicApi.getById(
-      hubspotContactId,
+      resolvedHubspotId,
       ['firstname', 'lastname', 'email', 'phone', 'membership_tier']
     );
 
     const props = contact.properties || {};
     const hsTierValue = props.membership_tier || null;
     const appTier = hubspotTierToAppTier(hsTierValue);
-
-    const userResult = await db.execute(sql`
-      SELECT email, billing_provider, last_manual_fix_at FROM users WHERE id = ${userId}
-    `);
     const user = userResult.rows[0] as { email: string; billing_provider: string | null; last_manual_fix_at: Date | null } | undefined;
     const userEmail = user?.email;
 

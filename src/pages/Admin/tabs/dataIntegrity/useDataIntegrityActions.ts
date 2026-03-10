@@ -1200,8 +1200,8 @@ export function useDataIntegrityActions(state: DataIntegrityState) {
 
   const handleSyncPush = (issue: IntegrityIssue) => {
     if (!issue.context?.syncType) return;
-    if (issue.context.syncType === 'hubspot' && (!issue.context.userId || !issue.context.hubspotContactId)) {
-      showToast('Cannot push to HubSpot: member is missing a HubSpot contact link', 'error');
+    if (issue.context.syncType === 'hubspot' && !issue.context.userId) {
+      showToast('Cannot push to HubSpot: member user ID is missing', 'error');
       return;
     }
     if (issue.context.syncType === 'stripe' && !issue.context.stripeCustomerId) {
@@ -1221,8 +1221,8 @@ export function useDataIntegrityActions(state: DataIntegrityState) {
 
   const handleSyncPull = (issue: IntegrityIssue) => {
     if (!issue.context?.syncType) return;
-    if (issue.context.syncType === 'hubspot' && !issue.context.hubspotContactId) {
-      showToast('Cannot pull from HubSpot: member is missing a HubSpot contact link', 'error');
+    if (issue.context.syncType === 'hubspot' && !issue.context.userId) {
+      showToast('Cannot pull from HubSpot: member user ID is missing', 'error');
       return;
     }
     if (issue.context.syncType === 'stripe' && !issue.context.stripeCustomerId) {
