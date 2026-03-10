@@ -248,10 +248,6 @@ const PullToRefresh: React.FC<PullToRefreshProps> = ({ children, onRefresh, disa
         const resistance = 0.33;
         const distance = Math.min(diff * resistance, MAX_PULL);
         setPullDistance(distance);
-
-        if (distance > 10) {
-          e.preventDefault();
-        }
       } else {
         setPullDistance(0);
       }
@@ -293,7 +289,7 @@ const PullToRefresh: React.FC<PullToRefreshProps> = ({ children, onRefresh, disa
     };
 
     container.addEventListener('touchstart', onTouchStart, { passive: true });
-    container.addEventListener('touchmove', onTouchMove, { passive: false });
+    container.addEventListener('touchmove', onTouchMove, { passive: true });
     container.addEventListener('touchend', onTouchEnd);
     container.addEventListener('touchcancel', onTouchEnd);
 
@@ -347,7 +343,6 @@ const PullToRefresh: React.FC<PullToRefreshProps> = ({ children, onRefresh, disa
     <div
       ref={containerRef}
       className={`min-h-full ${className}`}
-      style={isTouchCapable ? { touchAction: pullDistance > 0 ? 'none' : 'pan-y' } : undefined}
     >
       {showPullBar && createPortal(
         <div 
