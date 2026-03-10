@@ -365,6 +365,11 @@ body::after {
   z-index: -1;
 }
 
+/* Scrollable content inside overlays — prevent Android 12+ stretch from bleeding through */
+[data-scroll-lock-allow] {
+  overscroll-behavior: contain;
+}
+
 /* Native scrolling container for main content - restores iOS rubber-band physics */
 .native-scroller {
   overflow-y: auto;
@@ -1927,33 +1932,37 @@ html.dark .border-accessible {
 .animate-content-enter {
   opacity: 0;
   animation: pageContentEnter 0.5s var(--m3-emphasized-decel) forwards;
+  will-change: transform, opacity;
 }
 
 .animate-content-enter-delay-1 {
   opacity: 0;
   animation: pageContentEnter 0.5s var(--m3-emphasized-decel) 80ms forwards;
+  will-change: transform, opacity;
 }
 
 .animate-content-enter-delay-2 {
   opacity: 0;
   animation: pageContentEnter 0.5s var(--m3-emphasized-decel) 160ms forwards;
+  will-change: transform, opacity;
 }
 
 .animate-content-enter-delay-3 {
   opacity: 0;
   animation: pageContentEnter 0.5s var(--m3-emphasized-decel) 240ms forwards;
+  will-change: transform, opacity;
 }
 
 /* Extended stagger delays for lists (4-12) — 80ms intervals */
-.animate-content-enter-delay-4 { opacity: 0; animation: pageContentEnter 0.5s var(--m3-emphasized-decel) 320ms forwards; }
-.animate-content-enter-delay-5 { opacity: 0; animation: pageContentEnter 0.5s var(--m3-emphasized-decel) 400ms forwards; }
-.animate-content-enter-delay-6 { opacity: 0; animation: pageContentEnter 0.5s var(--m3-emphasized-decel) 480ms forwards; }
-.animate-content-enter-delay-7 { opacity: 0; animation: pageContentEnter 0.5s var(--m3-emphasized-decel) 560ms forwards; }
-.animate-content-enter-delay-8 { opacity: 0; animation: pageContentEnter 0.5s var(--m3-emphasized-decel) 640ms forwards; }
-.animate-content-enter-delay-9 { opacity: 0; animation: pageContentEnter 0.5s var(--m3-emphasized-decel) 720ms forwards; }
-.animate-content-enter-delay-10 { opacity: 0; animation: pageContentEnter 0.5s var(--m3-emphasized-decel) 800ms forwards; }
-.animate-content-enter-delay-11 { opacity: 0; animation: pageContentEnter 0.5s var(--m3-emphasized-decel) 880ms forwards; }
-.animate-content-enter-delay-12 { opacity: 0; animation: pageContentEnter 0.5s var(--m3-emphasized-decel) 960ms forwards; }
+.animate-content-enter-delay-4 { opacity: 0; animation: pageContentEnter 0.5s var(--m3-emphasized-decel) 320ms forwards; will-change: transform, opacity; }
+.animate-content-enter-delay-5 { opacity: 0; animation: pageContentEnter 0.5s var(--m3-emphasized-decel) 400ms forwards; will-change: transform, opacity; }
+.animate-content-enter-delay-6 { opacity: 0; animation: pageContentEnter 0.5s var(--m3-emphasized-decel) 480ms forwards; will-change: transform, opacity; }
+.animate-content-enter-delay-7 { opacity: 0; animation: pageContentEnter 0.5s var(--m3-emphasized-decel) 560ms forwards; will-change: transform, opacity; }
+.animate-content-enter-delay-8 { opacity: 0; animation: pageContentEnter 0.5s var(--m3-emphasized-decel) 640ms forwards; will-change: transform, opacity; }
+.animate-content-enter-delay-9 { opacity: 0; animation: pageContentEnter 0.5s var(--m3-emphasized-decel) 720ms forwards; will-change: transform, opacity; }
+.animate-content-enter-delay-10 { opacity: 0; animation: pageContentEnter 0.5s var(--m3-emphasized-decel) 800ms forwards; will-change: transform, opacity; }
+.animate-content-enter-delay-11 { opacity: 0; animation: pageContentEnter 0.5s var(--m3-emphasized-decel) 880ms forwards; will-change: transform, opacity; }
+.animate-content-enter-delay-12 { opacity: 0; animation: pageContentEnter 0.5s var(--m3-emphasized-decel) 960ms forwards; will-change: transform, opacity; }
 
 /* List item stagger with slide - for lists/cards that need vertical motion */
 @keyframes listItemEnter {
@@ -1970,18 +1979,19 @@ html.dark .border-accessible {
 .animate-list-item {
   opacity: 0;
   animation: listItemEnter 0.45s var(--m3-emphasized-decel) forwards;
+  will-change: transform, opacity;
 }
 
-.animate-list-item-delay-1 { opacity: 0; animation: listItemEnter 0.45s var(--m3-emphasized-decel) 60ms forwards; }
-.animate-list-item-delay-2 { opacity: 0; animation: listItemEnter 0.45s var(--m3-emphasized-decel) 120ms forwards; }
-.animate-list-item-delay-3 { opacity: 0; animation: listItemEnter 0.45s var(--m3-emphasized-decel) 180ms forwards; }
-.animate-list-item-delay-4 { opacity: 0; animation: listItemEnter 0.45s var(--m3-emphasized-decel) 240ms forwards; }
-.animate-list-item-delay-5 { opacity: 0; animation: listItemEnter 0.45s var(--m3-emphasized-decel) 300ms forwards; }
-.animate-list-item-delay-6 { opacity: 0; animation: listItemEnter 0.45s var(--m3-emphasized-decel) 360ms forwards; }
-.animate-list-item-delay-7 { opacity: 0; animation: listItemEnter 0.45s var(--m3-emphasized-decel) 420ms forwards; }
-.animate-list-item-delay-8 { opacity: 0; animation: listItemEnter 0.45s var(--m3-emphasized-decel) 480ms forwards; }
-.animate-list-item-delay-9 { opacity: 0; animation: listItemEnter 0.45s var(--m3-emphasized-decel) 540ms forwards; }
-.animate-list-item-delay-10 { opacity: 0; animation: listItemEnter 0.45s var(--m3-emphasized-decel) 600ms forwards; }
+.animate-list-item-delay-1 { opacity: 0; animation: listItemEnter 0.45s var(--m3-emphasized-decel) 60ms forwards; will-change: transform, opacity; }
+.animate-list-item-delay-2 { opacity: 0; animation: listItemEnter 0.45s var(--m3-emphasized-decel) 120ms forwards; will-change: transform, opacity; }
+.animate-list-item-delay-3 { opacity: 0; animation: listItemEnter 0.45s var(--m3-emphasized-decel) 180ms forwards; will-change: transform, opacity; }
+.animate-list-item-delay-4 { opacity: 0; animation: listItemEnter 0.45s var(--m3-emphasized-decel) 240ms forwards; will-change: transform, opacity; }
+.animate-list-item-delay-5 { opacity: 0; animation: listItemEnter 0.45s var(--m3-emphasized-decel) 300ms forwards; will-change: transform, opacity; }
+.animate-list-item-delay-6 { opacity: 0; animation: listItemEnter 0.45s var(--m3-emphasized-decel) 360ms forwards; will-change: transform, opacity; }
+.animate-list-item-delay-7 { opacity: 0; animation: listItemEnter 0.45s var(--m3-emphasized-decel) 420ms forwards; will-change: transform, opacity; }
+.animate-list-item-delay-8 { opacity: 0; animation: listItemEnter 0.45s var(--m3-emphasized-decel) 480ms forwards; will-change: transform, opacity; }
+.animate-list-item-delay-9 { opacity: 0; animation: listItemEnter 0.45s var(--m3-emphasized-decel) 540ms forwards; will-change: transform, opacity; }
+.animate-list-item-delay-10 { opacity: 0; animation: listItemEnter 0.45s var(--m3-emphasized-decel) 600ms forwards; will-change: transform, opacity; }
 
 /* FAB expanding menu item animations */
 @keyframes fabItemEnter {
@@ -2790,6 +2800,8 @@ html.dark .border-accessible {
 .tactile-card,
 .tactile-row,
 .tactile-btn {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
   transition: transform var(--duration-fast) var(--spring-smooth),
               box-shadow var(--duration-fast) ease-out,
               background-color var(--duration-fast) ease-out;

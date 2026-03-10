@@ -44,8 +44,11 @@ export function useEdgeSwipe(config: EdgeSwipeConfig = {}) {
     (window.matchMedia('(display-mode: standalone)').matches || 
      (window.navigator as unknown as { standalone?: boolean }).standalone === true);
 
+  const isAndroidGestureNav = typeof window !== 'undefined' && 
+    /Android/i.test(navigator.userAgent) && !isStandalonePWA;
+
   const handleStart = useCallback((clientX: number, clientY: number) => {
-    if (!enabled || !isTouchDevice || isStandalonePWA) return;
+    if (!enabled || !isTouchDevice || isStandalonePWA || isAndroidGestureNav) return;
     if (clientX <= edgeWidth) {
       setState({
         isActive: true,
@@ -57,7 +60,7 @@ export function useEdgeSwipe(config: EdgeSwipeConfig = {}) {
       startTimeRef.current = Date.now();
       isHorizontalRef.current = null;
     }
-  }, [enabled, edgeWidth, isTouchDevice, isStandalonePWA]);
+  }, [enabled, edgeWidth, isTouchDevice, isStandalonePWA, isAndroidGestureNav]);
 
   const handleMove = useCallback((clientX: number, clientY: number) => {
     if (!state.isActive) return;
@@ -113,7 +116,7 @@ export function useEdgeSwipe(config: EdgeSwipeConfig = {}) {
   }, [state.isActive, state.currentX, state.startX, threshold, velocityThreshold, navigate, onBack]);
 
   useEffect(() => {
-    if (!enabled || !isTouchDevice || isStandalonePWA) return;
+    if (!enabled || !isTouchDevice || isStandalonePWA || isAndroidGestureNav) return;
 
     const handleTouchStart = (e: TouchEvent) => {
       const touch = e.touches[0];
