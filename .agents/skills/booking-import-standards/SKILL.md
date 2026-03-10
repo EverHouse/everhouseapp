@@ -373,6 +373,41 @@ After a booking is approved (or auto-linked via Trackman), create a prepayment i
 
 ---
 
+## Section 8: Terminal Status Invariants
+
+### Rule 21 — Terminal status MUST clear is_unmatched
+
+When a booking reaches any terminal status (`cancelled`, `declined`, `deleted`, `attended`, `no_show`, `expired`), `is_unmatched` MUST be set to `false`. This prevents stale unmatched bookings from cluttering the admin resolution UI.
+
+**Defense layers (all three required):**
+
+1. **DB trigger (catch-all):** `trg_clear_unmatched_on_terminal` — a `BEFORE INSERT OR UPDATE` trigger on `booking_requests` that automatically sets `is_unmatched = false` when status is terminal. Created in `setupInstantDataTriggers()` in `server/db-init.ts`. This catches every code path, including future ones.
+2. **Application code (explicit):** Every code path that transitions a booking to a terminal status should explicitly set `isUnmatched: false` in its UPDATE statement. This makes the intent visible and debuggable.
+3. **Query filter (UI safety net):** Admin queries that list unmatched bookings must exclude all terminal statuses from results, so even if a stale flag exists, it won't appear.
+
+**Code paths that transition to terminal statuses (must all set isUnmatched: false):**
+- `BookingStateService.cancelBooking()` and `completePendingCancellation()` — cancellation flow
+- `cancelBookingByTrackmanId()` — webhook cancellation handler
+- `approvalService.declineBooking()` — staff decline and auto-decline
+- `bookingAutoCompleteScheduler` — marks bookings as `attended`
+- Booking expiry scheduler — marks bookings as `expired`
+- CSV import stale cleanup — bulk-cancels stale bookings
+- Data integrity bulk operations — any fix that sets terminal status
+- `admin-resolution.ts` — staff-initiated status changes on unmatched bookings
+
+**Why this happened:** The `is_unmatched` flag was introduced to track Trackman bookings that couldn't be linked to a member, but the "clear on terminal" rule was never codified. Every code path that changed a booking's status was written independently, and none knew about the flag. This caused 400+ stale unmatched bookings to accumulate in production.
+
+### Rule 22 — Boolean flags require lifecycle rules
+
+When adding any new boolean flag to `booking_requests` (or similar state tables), you MUST define:
+1. **When it becomes true** — what sets the flag
+2. **When it becomes false** — what clears the flag (especially on terminal transitions)
+3. **Where the enforcement lives** — DB trigger, application code, or both
+
+Document the lifecycle in this skill file. Undocumented flags accumulate stale data silently.
+
+---
+
 ## Quick Checklist for New Booking Features
 
 When adding any new booking-related code, verify:
@@ -394,3 +429,5 @@ When adding any new booking-related code, verify:
 - [ ] For roster changes: Does it check roster lock via `enforceRosterLock()`? (Rule 15c)
 - [ ] Does the invoice sync after fee recalculation? (Rule 15b)
 - [ ] Does the availability endpoint account for pending booking requests on specific bays? (Rule 6, soft lock)
+- [ ] Does any terminal status transition clear `is_unmatched`? (Rule 21)
+- [ ] If adding a new boolean flag, is its full lifecycle (set/clear/enforcement) documented? (Rule 22)

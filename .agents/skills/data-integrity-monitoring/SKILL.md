@@ -53,6 +53,8 @@ Each of the 33 integrity checks has an assigned severity in `severityMap`:
 - **Critical** — Require immediate attention. Trigger staff notifications on every run if status is `fail`. Examples: Stripe Subscription Sync, Billing Provider Hybrid State, Orphaned Payment Intents, Deal Stage Drift, Stuck Transitional Members, Invoice-Booking Reconciliation, Overlapping Bookings, Active Bookings Without Sessions.
 - **High** — Trigger notifications when issue count exceeds a threshold (default 10). Examples: Tier Reconciliation, Duplicate Stripe Customers, Members Without Email, HubSpot ID Duplicates, Guest Pass Accounting Drift, Stale Pending Bookings, Archived Member Lingering Data.
 - **Medium** — Logged and visible in dashboard but do not trigger proactive alerts. Examples: Orphan Booking Participants, MindBody Stale Sync, Unmatched Trackman Bookings, Active Members Without Waivers, Email Cascade Orphans.
+
+> **Lesson learned (March 2026):** The "Unmatched Trackman Bookings" check only counted unmatched bookings — it did not detect stale ones (terminal-status bookings still flagged as unmatched). A DB trigger `trg_clear_unmatched_on_terminal` now automatically clears `is_unmatched` on terminal transitions. When adding new integrity checks, verify they detect **stale/invalid state**, not just count records. See booking-import-standards Rule 21.
 - **Low** — Informational. Examples: Sessions Without Participants, Items Needing Review.
 
 ### Error Alert Severities (Email)
