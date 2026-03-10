@@ -4,6 +4,7 @@ import { isProduction } from '../db';
 import { getHubSpotClient } from '../integrations';
 import { sql } from 'drizzle-orm';
 import { retryableHubSpotRequest } from './request';
+import { DB_STATUS_TO_HUBSPOT_STATUS, DB_BILLING_PROVIDER_TO_HUBSPOT } from './constants';
 import { isPlaceholderEmail } from '../stripe/customers';
 import { getTodayPacific } from '../../utils/dateUtils';
 
@@ -301,16 +302,11 @@ export async function syncTierToHubSpot(params: {
   const billingProvider = userRows[0].billing_provider as string;
   const membershipStatus = userRows[0].membership_status as string;
   
-  const DB_BILLING_PROVIDER_TO_HUBSPOT: Record<string, string> = {
-    'stripe': 'Stripe',
-    'mindbody': 'MindBody',
-    'hubspot': 'Manual',
-    'manual': 'Manual',
-    'comped': 'Comped'
-  };
-  const hubspotBillingProvider = billingProvider ? (DB_BILLING_PROVIDER_TO_HUBSPOT[(billingProvider as string).toLowerCase()] || 'Manual') : undefined;
+  const hubspotBillingProvider = billingProvider ? (DB_BILLING_PROVIDER_TO_HUBSPOT[(billingProvider as string).toLowerCase()] || 'manual') : undefined;
   
-  const isActive = membershipStatus && ['active', 'trialing', 'past_due'].includes((membershipStatus as string).toLowerCase());
+  const normalizedStatus = (membershipStatus || '').toLowerCase();
+  const hubspotStatus = DB_STATUS_TO_HUBSPOT_STATUS[normalizedStatus] || 'Suspended';
+  const isActive = ['active', 'trialing', 'past_due'].includes(normalizedStatus);
   const lifecyclestage = isActive ? 'customer' : 'other';
   
   try {
@@ -318,7 +314,7 @@ export async function syncTierToHubSpot(params: {
     
     const properties: Record<string, string> = {
       membership_tier: hubspotTier || '',
-      membership_status: membershipStatus || '',
+      membership_status: hubspotStatus,
       lifecyclestage: lifecyclestage
     };
     
@@ -338,7 +334,7 @@ export async function syncTierToHubSpot(params: {
       hubspot.crm.contacts.basicApi.update(hubspotContactId, { properties })
     );
     
-    logger.info(`[HubSpot TierSync] Updated contact ${normalizedEmail}: tier="${hubspotTier}", status="${membershipStatus}", lifecycle="${lifecyclestage}", billing="${hubspotBillingProvider || 'not set'}"`);
+    logger.info(`[HubSpot TierSync] Updated contact ${normalizedEmail}: tier="${hubspotTier}", status="${hubspotStatus}", lifecycle="${lifecyclestage}", billing="${hubspotBillingProvider || 'not set'}"`);
   } catch (error: unknown) {
     logger.error(`[HubSpot TierSync] Failed to sync tier for ${normalizedEmail}:`, { error: error });
     throw error;
