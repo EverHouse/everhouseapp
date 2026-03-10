@@ -2875,7 +2875,7 @@ img[loading="lazy"] {
   /* Hide navigation, headers, floating elements, and interactive elements */
   header,
   nav,
-  .print\\:hidden,
+  [class~="print:hidden"],
   [class*="fixed"][class*="bottom"],
   [class*="fixed"][class*="top"]:not([class*="print"]) {
     display: none !important;
@@ -2896,19 +2896,19 @@ img[loading="lazy"] {
   }
   
   /* Hide the expand arrow icons in print */
-  .material-symbols-outlined.text-primary\\/40[class*="rotate"],
-  .material-symbols-outlined.dark\\:text-white\\/40[class*="transition-transform"] {
+  .material-symbols-outlined[class~="text-primary/40"][class*="rotate"],
+  .material-symbols-outlined[class~="dark:text-white/40"][class*="transition-transform"] {
     display: none !important;
   }
   
   /* Show print-only elements */
-  .print\\:block {
+  [class~="print:block"] {
     display: block !important;
   }
   
   /* Reset glass effects for print */
-  .bg-white\\/60,
-  .dark\\:bg-white\\/5 {
+  [class~="bg-white/60"],
+  [class~="dark:bg-white/5"] {
     background: white !important;
     backdrop-filter: none !important;
   }
@@ -2919,32 +2919,32 @@ img[loading="lazy"] {
   }
   
   /* Page breaks */
-  .print\\:break-inside-avoid {
+  [class~="print:break-inside-avoid"] {
     break-inside: avoid !important;
   }
   
   /* Better text contrast for print */
   .text-primary,
-  .text-primary\\/80,
-  .text-primary\\/70,
-  .text-primary\\/60,
-  .dark\\:text-white,
-  .dark\\:text-white\\/80,
-  .dark\\:text-white\\/70,
-  .dark\\:text-white\\/60 {
+  [class~="text-primary/80"],
+  [class~="text-primary/70"],
+  [class~="text-primary/60"],
+  [class~="dark:text-white"],
+  [class~="dark:text-white/80"],
+  [class~="dark:text-white/70"],
+  [class~="dark:text-white/60"] {
     color: #333 !important;
   }
   
-  .text-primary\\/50,
-  .text-primary\\/40,
-  .dark\\:text-white\\/50,
-  .dark\\:text-white\\/40 {
+  [class~="text-primary/50"],
+  [class~="text-primary/40"],
+  [class~="dark:text-white/50"],
+  [class~="dark:text-white/40"] {
     color: #666 !important;
   }
   
   /* Reset border colors */
-  .border-primary\\/10,
-  .dark\\:border-white\\/10 {
+  [class~="border-primary/10"],
+  [class~="dark:border-white/10"] {
     border-color: #ddd !important;
   }
   
