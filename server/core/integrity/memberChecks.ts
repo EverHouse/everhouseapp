@@ -675,6 +675,7 @@ export async function checkEmailOrphans(): Promise<IntegrityCheckResult> {
       LEFT JOIN users u ON LOWER(er.user_email) = LOWER(u.email)
       WHERE u.id IS NULL
         AND er.user_email IS NOT NULL AND er.user_email != ''
+        AND COALESCE(er.source, 'local') = 'local'
       GROUP BY er.user_email
 
       UNION ALL
