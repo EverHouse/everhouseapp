@@ -141,7 +141,7 @@ Issues are categorized as: `orphan_record`, `sync_mismatch`, `data_quality`, `bo
 - **Action**: Request waiver signature from the member at their next visit.
 
 ### Email Cascade Orphans
-- **Detects**: Records in notifications, booking_participants (owner type), event_rsvps, and push_subscriptions where the email does not match any user in the users table. These are typically caused by email changes that didn't cascade to all tables, or by user deletions.
+- **Detects**: Records in notifications, booking_participants, event_rsvps, push_subscriptions, wellness_enrollments, and user_dismissed_notices where the email does not match any user in the users table. These are typically caused by email changes that didn't cascade to all tables, or by user deletions.
 - **Action**: Link records to the correct user email or clean up orphaned records.
 
 ---

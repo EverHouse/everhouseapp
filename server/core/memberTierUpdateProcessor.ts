@@ -77,6 +77,28 @@ export async function processMemberTierUpdate(payload: MemberTierUpdatePayload):
       })
       .where(sql`LOWER(${users.email}) = ${normalizedEmail}`);
 
+    if (user.billingProvider === 'stripe' && user.stripeSubscriptionId && newTier) {
+      try {
+        const { membershipTiers } = await import('../../shared/schema');
+        const { eq } = await import('drizzle-orm');
+        const tierResult = await db.select({ stripePriceId: membershipTiers.stripePriceId })
+          .from(membershipTiers)
+          .where(eq(membershipTiers.name, newTier))
+          .limit(1);
+
+        if (tierResult.length > 0 && tierResult[0].stripePriceId) {
+          const { changeSubscriptionTier } = await import('./stripe/subscriptions');
+          await changeSubscriptionTier(user.stripeSubscriptionId, tierResult[0].stripePriceId, newTier);
+          logger.info(`[MemberTierUpdateProcessor] Synced Stripe subscription tier for ${normalizedEmail}: ${oldTier || 'None'} → ${newTier}`);
+        } else {
+          logger.warn(`[MemberTierUpdateProcessor] No Stripe price found for tier ${newTier} — Stripe subscription not updated for ${normalizedEmail}`);
+        }
+      } catch (stripeErr: unknown) {
+        const { getErrorMessage } = await import('../utils/errorUtils');
+        logger.error(`[MemberTierUpdateProcessor] Stripe tier sync failed for ${normalizedEmail} — manual adjustment may be needed`, { error: stripeErr instanceof Error ? stripeErr : new Error(getErrorMessage(stripeErr)) });
+      }
+    }
+
     if (syncToHubspot && newTier) {
       await queueTierSync({
         email: normalizedEmail,

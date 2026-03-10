@@ -227,6 +227,13 @@ router.post('/api/stripe/subscriptions/create-for-member', isStaffOrAdmin, subsc
       }
     }
     
+    const exclusionCheck = await db.execute(
+      sql`SELECT email FROM sync_exclusions WHERE LOWER(email) = ${memberEmail.toLowerCase()} LIMIT 1`
+    );
+    if (exclusionCheck.rows.length > 0) {
+      return res.status(400).json({ error: 'This email belongs to a previously removed member and cannot be re-used for a new subscription.' });
+    }
+
     const tierResult = await db.select()
       .from(membershipTiers)
       .where(eq(membershipTiers.name, tierName))

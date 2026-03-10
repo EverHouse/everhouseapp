@@ -671,13 +671,12 @@ export async function checkEmailOrphans(): Promise<IntegrityCheckResult> {
 
       UNION ALL
 
-      SELECT 'booking_participants' AS source_table, bp.user_email AS email_value, COUNT(*)::text AS record_count
+      SELECT 'booking_participants' AS source_table, bp.email AS email_value, COUNT(*)::text AS record_count
       FROM booking_participants bp
-      LEFT JOIN users u ON LOWER(bp.user_email) = LOWER(u.email)
+      LEFT JOIN users u ON LOWER(bp.email) = LOWER(u.email)
       WHERE u.id IS NULL
-        AND bp.user_email IS NOT NULL AND bp.user_email != ''
-        AND bp.participant_type = 'owner'
-      GROUP BY bp.user_email
+        AND bp.email IS NOT NULL AND bp.email != ''
+      GROUP BY bp.email
 
       UNION ALL
 
@@ -696,6 +695,24 @@ export async function checkEmailOrphans(): Promise<IntegrityCheckResult> {
       WHERE u.id IS NULL
         AND ps.user_email IS NOT NULL AND ps.user_email != ''
       GROUP BY ps.user_email
+
+      UNION ALL
+
+      SELECT 'wellness_enrollments' AS source_table, we.user_email AS email_value, COUNT(*)::text AS record_count
+      FROM wellness_enrollments we
+      LEFT JOIN users u ON LOWER(we.user_email) = LOWER(u.email)
+      WHERE u.id IS NULL
+        AND we.user_email IS NOT NULL AND we.user_email != ''
+      GROUP BY we.user_email
+
+      UNION ALL
+
+      SELECT 'user_dismissed_notices' AS source_table, udn.user_email AS email_value, COUNT(*)::text AS record_count
+      FROM user_dismissed_notices udn
+      LEFT JOIN users u ON LOWER(udn.user_email) = LOWER(u.email)
+      WHERE u.id IS NULL
+        AND udn.user_email IS NOT NULL AND udn.user_email != ''
+      GROUP BY udn.user_email
     ) orphan_summary
     ORDER BY record_count::int DESC
     LIMIT 100

@@ -103,6 +103,29 @@ export async function cascadeEmailChange(
       rowCount = await updateTable('usage_ledger', 'member_id');
       if (rowCount > 0) tablesUpdated.push({ tableName: 'usage_ledger', rowsAffected: rowCount });
 
+      rowCount = await updateTable('notifications', 'user_email');
+      if (rowCount > 0) tablesUpdated.push({ tableName: 'notifications', rowsAffected: rowCount });
+
+      rowCount = await updateTable('push_subscriptions', 'user_email');
+      if (rowCount > 0) tablesUpdated.push({ tableName: 'push_subscriptions', rowsAffected: rowCount });
+
+      rowCount = await updateTable('event_rsvps', 'user_email');
+      if (rowCount > 0) tablesUpdated.push({ tableName: 'event_rsvps', rowsAffected: rowCount });
+
+      rowCount = await updateTable('wellness_enrollments', 'user_email');
+      if (rowCount > 0) tablesUpdated.push({ tableName: 'wellness_enrollments', rowsAffected: rowCount });
+
+      rowCount = await updateTable('user_linked_emails', 'primary_email');
+      if (rowCount > 0) tablesUpdated.push({ tableName: 'user_linked_emails', rowsAffected: rowCount });
+
+      rowCount = await updateTable('user_dismissed_notices', 'user_email');
+      if (rowCount > 0) tablesUpdated.push({ tableName: 'user_dismissed_notices', rowsAffected: rowCount });
+
+      const bpResult = await tx.execute(
+        sql`UPDATE booking_participants SET email = ${normalizedNewEmail} WHERE LOWER(email) = LOWER(${normalizedOldEmail})`
+      );
+      if ((bpResult.rowCount || 0) > 0) tablesUpdated.push({ tableName: 'booking_participants', rowsAffected: bpResult.rowCount || 0 });
+
       await logBillingAudit({
         memberEmail: normalizedNewEmail,
         actionType: 'email_changed',
@@ -184,10 +207,16 @@ export async function previewEmailChangeImpact(
     { table: 'billing_groups', column: 'primary_email' },
     { table: 'group_members', column: 'member_email' },
     { table: 'booking_requests', column: 'user_email' },
-    { table: 'booking_participants', column: 'user_id' },
+    { table: 'booking_participants', column: 'email' },
     { table: 'admin_audit_log', column: 'resource_id' },
     { table: 'legacy_purchases', column: 'member_email' },
     { table: 'usage_ledger', column: 'member_id' },
+    { table: 'notifications', column: 'user_email' },
+    { table: 'push_subscriptions', column: 'user_email' },
+    { table: 'event_rsvps', column: 'user_email' },
+    { table: 'wellness_enrollments', column: 'user_email' },
+    { table: 'user_linked_emails', column: 'primary_email' },
+    { table: 'user_dismissed_notices', column: 'user_email' },
   ];
 
   for (const { table, column } of tablesToCheck) {
