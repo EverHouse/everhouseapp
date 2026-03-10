@@ -678,11 +678,17 @@ export async function cancelBookingByTrackmanId(
       requestDate: bookingRequests.requestDate,
       startTime: bookingRequests.startTime,
       resourceId: bookingRequests.resourceId,
-      trackmanBookingId: bookingRequests.trackmanBookingId
+      trackmanBookingId: bookingRequests.trackmanBookingId,
+      isUnmatched: bookingRequests.isUnmatched
     }).from(bookingRequests).where(eq(bookingRequests.trackmanBookingId, trackmanBookingId));
 
     if (!booking) return { cancelled: false };
-    if (booking.status === 'cancelled') return { cancelled: true, bookingId: booking.id };
+    if (booking.status === 'cancelled') {
+      if (booking.isUnmatched) {
+        await db.update(bookingRequests).set({ isUnmatched: false }).where(eq(bookingRequests.id, booking.id));
+      }
+      return { cancelled: true, bookingId: booking.id };
+    }
 
     const wasPendingCancellation = booking.status === 'cancellation_pending';
 
@@ -707,6 +713,8 @@ export async function cancelBookingByTrackmanId(
       });
       return { cancelled: false, bookingId: booking.id };
     }
+
+    await db.update(bookingRequests).set({ isUnmatched: false }).where(eq(bookingRequests.id, booking.id));
 
     return { cancelled: true, bookingId: booking.id, wasPendingCancellation };
   } catch (e: unknown) {

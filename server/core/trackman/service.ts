@@ -1647,6 +1647,7 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
         await db.update(bookingRequests)
           .set({ 
             status: 'cancelled',
+            isUnmatched: false,
             notes: sql`COALESCE(notes, '') || ' [Auto-cancelled: Removed from Trackman]'`
           })
           .where(eq(bookingRequests.id, booking.id));
@@ -1683,6 +1684,35 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
           });
         }
       }
+    }
+  }
+
+  if (csvMinDate && csvMaxDate) {
+    const importIdArray = Array.from(importBookingIds);
+    const staleUnmatched = await db.execute(sql`
+      UPDATE booking_requests 
+      SET is_unmatched = false, 
+          status = CASE 
+            WHEN status IN ('cancelled', 'declined', 'deleted', 'attended', 'no_show', 'cancellation_pending') THEN status 
+            ELSE 'cancelled' 
+          END,
+          notes = CASE 
+            WHEN status NOT IN ('cancelled', 'declined', 'deleted', 'attended', 'no_show', 'cancellation_pending') 
+            THEN COALESCE(notes, '') || ' [Auto-cancelled: Removed from Trackman]'
+            ELSE notes 
+          END,
+          updated_at = NOW()
+      WHERE is_unmatched = true 
+        AND trackman_booking_id IS NOT NULL
+        AND request_date >= ${csvMinDate}::date 
+        AND request_date <= ${csvMaxDate}::date
+        AND trackman_booking_id <> ALL(${importIdArray}::text[])
+      RETURNING id, trackman_booking_id
+    `);
+    const staleCount = staleUnmatched.rowCount || 0;
+    if (staleCount > 0) {
+      removedFromUnmatched += staleCount;
+      process.stderr.write(`[Trackman Import] Cleared ${staleCount} stale unmatched bookings no longer in Trackman CSV\n`);
     }
   }
 

@@ -32,7 +32,10 @@ router.get('/api/admin/trackman/unmatched', isStaffOrAdmin, async (req, res) => 
     const offsetNum = parseInt(offset as string) || 0;
     const categoryFilter = (category as string).toLowerCase();
     
-    const sqlConditions: ReturnType<typeof sql>[] = [sql`br.is_unmatched = true`];
+    const sqlConditions: ReturnType<typeof sql>[] = [
+      sql`br.is_unmatched = true`,
+      sql`br.status NOT IN ('cancelled', 'declined', 'deleted')`
+    ];
     
     if (resolved === 'false') {
       sqlConditions.push(sql`(br.user_email IS NULL OR br.user_email = '' OR br.user_email LIKE 'unmatched-%@%' OR br.user_email LIKE '%@trackman.local')`);
