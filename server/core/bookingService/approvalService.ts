@@ -711,6 +711,12 @@ export async function approveBooking(params: ApproveBookingParams) {
       }
     }
 
+    sendPushNotification(updated.userEmail, {
+      title: 'Booking Approved!',
+      body: approvalMessage,
+      url: '/sims'
+    }).catch(err => logger.error('Push notification failed:', { extra: { err } }));
+
     notifyLinkedMembers(bookingId, updated as unknown as BookingUpdateResult);
 
     bookingEvents.publish('booking_approved', {
@@ -732,6 +738,13 @@ export async function approveBooking(params: ApproveBookingParams) {
       date: updated.requestDate,
       action: 'booked'
     });
+
+    sendNotificationToUser(updated.userEmail, {
+      type: 'notification',
+      title: 'Booking Approved',
+      message: approvalMessage,
+      data: { bookingId, eventType: 'booking_approved' }
+    }, { action: 'booking_approved', bookingId, triggerSource: 'approval.ts' });
 
     notifyApprovalParticipants(bookingId, updated as unknown as BookingUpdateResult);
   }
@@ -937,6 +950,12 @@ export async function declineBooking(params: DeclineBookingParams) {
     logger.warn('[Decline] Non-blocking: failed to void draft invoice', { extra: { bookingId, error: getErrorMessage(err) } });
   });
 
+  sendPushNotification(updated.userEmail, {
+    title: 'Booking Request Update',
+    body: declineMessage,
+    url: '/sims'
+  }).catch(err => logger.error('Push notification failed:', { extra: { err } }));
+
   bookingEvents.publish('booking_declined', {
     bookingId,
     memberEmail: updated.userEmail,
@@ -946,6 +965,13 @@ export async function declineBooking(params: DeclineBookingParams) {
     status: 'declined',
     actionBy: 'staff'
   }, { notifyMember: true, notifyStaff: true, cleanupNotifications: true }).catch(err => logger.error('Booking event publish failed:', { extra: { err } }));
+
+  sendNotificationToUser(updated.userEmail, {
+    type: 'notification',
+    title: 'Booking Declined',
+    message: declineMessage,
+    data: { bookingId, eventType: 'booking_declined' }
+  }, { action: 'booking_declined', bookingId, triggerSource: 'approval.ts' });
 
   return { updated };
 }
