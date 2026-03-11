@@ -1038,7 +1038,7 @@ router.get('/api/my-billing/payment-history', requireAuth, async (req, res) => {
 
         for (const inv of invoices.data) {
           if (inv.amount_due > 0) {
-            const bookingId = inv.metadata?.booking_id;
+            const bookingId = inv.metadata?.bookingId;
             if (bookingId) {
               invoiceBookingIds.add(bookingId);
             }
