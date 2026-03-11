@@ -4,10 +4,11 @@ import { logger } from '../logger';
 import { getErrorMessage } from '../../utils/errorUtils';
 import { notifyAllStaff } from '../notificationService';
 import { broadcastBookingInvoiceUpdate } from '../websocket';
-import { bookingRequests } from '../../../shared/schema';
+import { bookingRequests, membershipTiers } from '../../../shared/schema';
 import { eq, sql } from 'drizzle-orm';
 import type Stripe from 'stripe';
 import type { BookingFeeLineItem } from '../stripe/invoices';
+import { PRICING } from './pricingConfig';
 
 interface InvoiceWithPaymentIntent extends Stripe.Invoice {
   payment_intent: string | Stripe.PaymentIntent | null;
@@ -141,12 +142,27 @@ function buildInvoiceMetadata(
   return meta;
 }
 
+async function getFeePriceIds(): Promise<{ overagePriceId: string | null; guestPriceId: string | null }> {
+  const rows = await db.select({ slug: membershipTiers.slug, stripePriceId: membershipTiers.stripePriceId })
+    .from(membershipTiers)
+    .where(sql`${membershipTiers.slug} IN ('simulator-overage-30min', 'guest-pass')`);
+  let overagePriceId: string | null = null;
+  let guestPriceId: string | null = null;
+  for (const r of rows) {
+    if (r.slug === 'simulator-overage-30min') overagePriceId = r.stripePriceId;
+    if (r.slug === 'guest-pass') guestPriceId = r.stripePriceId;
+  }
+  return { overagePriceId, guestPriceId };
+}
+
 async function addLineItemsToInvoice(
   stripe: Stripe,
   invoiceId: string,
   customerId: string,
   feeLineItems: BookingFeeLineItem[]
 ): Promise<void> {
+  const { overagePriceId, guestPriceId } = await getFeePriceIds();
+
   for (const li of feeLineItems) {
     if (li.totalCents <= 0) continue;
 
@@ -154,37 +170,77 @@ async function addLineItemsToInvoice(
       const overageDesc = li.participantType === 'owner'
         ? `Overage fee — ${li.displayName}`
         : `Overage fee — ${li.displayName} (${li.participantType})`;
-      await stripe.invoiceItems.create({
-        customer: customerId,
-        invoice: invoiceId,
-        amount: li.overageCents,
-        currency: 'usd',
-        description: overageDesc,
-        metadata: {
-          participantId: li.participantId?.toString() || '',
-          feeType: 'overage',
-          participantType: li.participantType,
-        },
-      }, {
-        idempotencyKey: `invitem_overage_${invoiceId}_${li.participantId || 'unknown'}_${li.overageCents}`
-      });
+
+      const overageRateCents = PRICING.OVERAGE_RATE_CENTS;
+      const quantity = overageRateCents > 0 ? Math.round(li.overageCents / overageRateCents) : 1;
+
+      if (overagePriceId && quantity > 0) {
+        await stripe.invoiceItems.create({
+          customer: customerId,
+          invoice: invoiceId,
+          price: overagePriceId,
+          quantity,
+          description: overageDesc,
+          metadata: {
+            participantId: li.participantId?.toString() || '',
+            feeType: 'overage',
+            participantType: li.participantType,
+          },
+        }, {
+          idempotencyKey: `invitem_overage_${invoiceId}_${li.participantId || 'unknown'}_${li.overageCents}`
+        });
+      } else {
+        await stripe.invoiceItems.create({
+          customer: customerId,
+          invoice: invoiceId,
+          amount: li.overageCents,
+          currency: 'usd',
+          description: overageDesc,
+          metadata: {
+            participantId: li.participantId?.toString() || '',
+            feeType: 'overage',
+            participantType: li.participantType,
+          },
+        }, {
+          idempotencyKey: `invitem_overage_${invoiceId}_${li.participantId || 'unknown'}_${li.overageCents}`
+        });
+      }
     }
 
     if (li.guestCents > 0) {
-      await stripe.invoiceItems.create({
-        customer: customerId,
-        invoice: invoiceId,
-        amount: li.guestCents,
-        currency: 'usd',
-        description: `Guest fee — ${li.displayName}`,
-        metadata: {
-          participantId: li.participantId?.toString() || '',
-          feeType: 'guest',
-          participantType: li.participantType,
-        },
-      }, {
-        idempotencyKey: `invitem_guest_${invoiceId}_${li.participantId || 'unknown'}_${li.guestCents}`
-      });
+      if (guestPriceId) {
+        const guestRateCents = PRICING.GUEST_FEE_CENTS;
+        const guestQty = guestRateCents > 0 ? Math.round(li.guestCents / guestRateCents) : 1;
+        await stripe.invoiceItems.create({
+          customer: customerId,
+          invoice: invoiceId,
+          price: guestPriceId,
+          quantity: guestQty > 0 ? guestQty : 1,
+          description: `Guest fee — ${li.displayName}`,
+          metadata: {
+            participantId: li.participantId?.toString() || '',
+            feeType: 'guest',
+            participantType: li.participantType,
+          },
+        }, {
+          idempotencyKey: `invitem_guest_${invoiceId}_${li.participantId || 'unknown'}_${li.guestCents}`
+        });
+      } else {
+        await stripe.invoiceItems.create({
+          customer: customerId,
+          invoice: invoiceId,
+          amount: li.guestCents,
+          currency: 'usd',
+          description: `Guest fee — ${li.displayName}`,
+          metadata: {
+            participantId: li.participantId?.toString() || '',
+            feeType: 'guest',
+            participantType: li.participantType,
+          },
+        }, {
+          idempotencyKey: `invitem_guest_${invoiceId}_${li.participantId || 'unknown'}_${li.guestCents}`
+        });
+      }
     }
   }
 }
