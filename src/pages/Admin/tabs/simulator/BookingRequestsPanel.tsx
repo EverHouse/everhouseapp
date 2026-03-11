@@ -108,7 +108,7 @@ const BookingRequestsPanel: React.FC<BookingRequestsPanelProps> = ({
         >
             <div className="hidden lg:block absolute top-0 left-0 right-0 h-10 bg-gradient-to-b from-white dark:from-[#1e1e1e] to-transparent z-10 pointer-events-none rounded-t-xl" />
             <div className="hidden lg:block absolute bottom-0 left-0 right-0 h-10 bg-gradient-to-t from-white dark:from-[#1e1e1e] to-transparent z-10 pointer-events-none rounded-b-xl" />
-            <div className="space-y-6 p-5 animate-content-enter h-full overflow-y-auto pb-10">
+            <div className="space-y-6 p-5 animate-content-enter h-full overflow-y-auto overflow-x-hidden pb-10">
                 <div className="animate-content-enter-delay-1">
                     <div className="flex flex-col gap-2 mb-4">
                         <div className="flex items-center justify-between">
@@ -388,10 +388,32 @@ const BookingRequestsPanel: React.FC<BookingRequestsPanelProps> = ({
                                             const actionState = actionInProgress[actionKey];
                                             const isActionPending = !!actionState;
                                             const isOptimisticNew = String(booking.id).startsWith('creating-');
+                                            const isAlreadyCheckedIn = booking.status === 'attended' || booking.status === 'no_show';
+                                            const hasFeesDue = booking.has_unpaid_fees && (booking.total_owed || 0) > 0 && !booking.fee_snapshot_paid;
+                                            const canSwipeCheckIn = isToday && !isOptimisticNew && !isActionPending && !isUnmatched && booking.status !== 'cancellation_pending';
+                                            const swipeLeftActions = canSwipeCheckIn ? (
+                                                isAlreadyCheckedIn ? [] :
+                                                hasFeesDue ? [{
+                                                    id: 'charge',
+                                                    icon: 'payments',
+                                                    label: `$${Math.round(booking.total_owed || 0)} Due`,
+                                                    color: 'orange' as const,
+                                                    onClick: () => {
+                                                        const bookingId = typeof booking.id === 'string' ? parseInt(String(booking.id).replace('cal_', '')) : booking.id;
+                                                        setBookingSheet({ isOpen: true, trackmanBookingId: null, bookingId, mode: 'manage' as const });
+                                                    }
+                                                }] : [{
+                                                    id: 'checkin',
+                                                    icon: 'login',
+                                                    label: 'Check In',
+                                                    color: 'green' as const,
+                                                    onClick: () => updateBookingStatusOptimistic(booking, 'attended')
+                                                }]
+                                            ) : [];
                                             return (
                                                 <SwipeableListItem
                                                     key={`upcoming-${booking.id}`}
-                                                    leftActions={[]}
+                                                    leftActions={swipeLeftActions}
                                                     rightActions={isOptimisticNew || isActionPending || booking.status === 'cancellation_pending' ? [] : [
                                                         {
                                                             id: 'cancel',
