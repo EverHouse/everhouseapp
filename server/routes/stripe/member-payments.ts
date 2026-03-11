@@ -28,7 +28,7 @@ import { sendNotificationToUser, broadcastBillingUpdate, broadcastBookingInvoice
 import { alertOnExternalServiceError } from '../../core/errorAlerts';
 import { getErrorCode, getErrorMessage } from '../../utils/errorUtils';
 import { toIntArrayLiteral } from '../../utils/sqlArrayLiteral';
-import { getBookingInvoiceId, createDraftInvoiceForBooking } from '../../core/billing/bookingInvoiceService';
+import { getBookingInvoiceId, createDraftInvoiceForBooking, buildInvoiceDescription } from '../../core/billing/bookingInvoiceService';
 
 interface BookingRow {
   id: number;
@@ -251,12 +251,14 @@ async function handleExistingInvoicePayment(params: {
        VALUES (${bookingId}, ${sessionId}, ${JSON.stringify(serverFees)}, ${serverTotal}, 'pending', ${invoicePiId})
     `);
 
+    const piDescription = await buildInvoiceDescription(bookingId, trackmanId);
+
     await db.execute(sql`
       INSERT INTO stripe_payment_intents 
        (user_id, stripe_payment_intent_id, stripe_customer_id, amount_cents, purpose, booking_id, session_id, description, status)
        VALUES (${resolvedUserId || bookingEmail}, ${invoicePiId}, ${stripeCustomerId},
        ${serverTotal}, ${'booking_fee'}, ${bookingId}, ${sessionId},
-       ${existingInvoiceId}, 'pending')
+       ${piDescription}, 'pending')
        ON CONFLICT (stripe_payment_intent_id) DO NOTHING
     `);
 
@@ -523,12 +525,14 @@ router.post('/api/member/bookings/:id/pay-fees', isAuthenticated, paymentRateLim
     await db.execute(sql`
       UPDATE booking_fee_snapshots SET stripe_payment_intent_id = ${invoicePiId}, status = 'pending' WHERE id = ${snapshotId}
     `);
+    const newPiDescription = await buildInvoiceDescription(bookingId, trackmanId);
+
     await db.execute(sql`
       INSERT INTO stripe_payment_intents 
        (user_id, stripe_payment_intent_id, stripe_customer_id, amount_cents, purpose, booking_id, session_id, description, status)
        VALUES (${resolvedUserId || booking.user_email}, ${invoicePiId}, ${stripeCustomerId},
        ${serverTotal}, ${'booking_fee'}, ${bookingId}, ${booking.session_id},
-       ${draftResult.invoiceId}, 'pending')
+       ${newPiDescription}, 'pending')
        ON CONFLICT (stripe_payment_intent_id) DO NOTHING
     `);
 

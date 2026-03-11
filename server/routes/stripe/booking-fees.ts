@@ -25,7 +25,7 @@ import { broadcastBillingUpdate, broadcastBookingInvoiceUpdate } from '../../cor
 import { alertOnExternalServiceError } from '../../core/errorAlerts';
 import { getErrorMessage, getErrorCode, safeErrorDetail } from '../../utils/errorUtils';
 import { toIntArrayLiteral } from '../../utils/sqlArrayLiteral';
-import { getBookingInvoiceId, finalizeAndPayInvoice, createDraftInvoiceForBooking, finalizeInvoicePaidOutOfBand, recreateDraftInvoiceFromBooking } from '../../core/billing/bookingInvoiceService';
+import { getBookingInvoiceId, finalizeAndPayInvoice, createDraftInvoiceForBooking, finalizeInvoicePaidOutOfBand, recreateDraftInvoiceFromBooking, buildInvoiceDescription } from '../../core/billing/bookingInvoiceService';
 import { validateBody } from '../../middleware/validate';
 import { createPaymentIntentSchema, markBookingPaidSchema, confirmPaymentSchema, cancelPaymentIntentSchema, createCustomerSchema, chargeSavedCardSchema } from '../../../shared/validators/payments';
 
@@ -120,10 +120,7 @@ router.post('/api/stripe/create-payment-intent', isStaffOrAdmin, validateBody(cr
     if (bookingId) {
       const trackmanLookup = await db.execute(sql`SELECT trackman_booking_id FROM booking_requests WHERE id = ${bookingId}`);
       trackmanId = (trackmanLookup.rows[0] as { trackman_booking_id?: string })?.trackman_booking_id;
-      const bookingRef = trackmanId ? `TM-${trackmanId}` : `#${bookingId}`;
-      if (!description.startsWith('#') && !description.startsWith('TM-')) {
-        finalDescription = `${bookingRef} - ${description}`;
-      }
+      finalDescription = await buildInvoiceDescription(bookingId, (trackmanId as string) || null);
     }
     
     let resolvedUserId = userId || '';
@@ -775,6 +772,8 @@ router.post('/api/stripe/staff/charge-saved-card', isStaffOrAdmin, validateBody(
     let successMessage: string;
 
     if (invoiceResult.status === 'succeeded') {
+      const chargeDescription = await buildInvoiceDescription(Number(resolvedBookingId), trackmanBookingId);
+
       await db.transaction(async (tx) => {
         const safeParticipantIds = (participantIds || []).filter((id: unknown) => typeof id === 'number' && Number.isFinite(id) && id > 0).map((id: number) => Math.floor(id));
         if (safeParticipantIds.length > 0) {
@@ -788,7 +787,7 @@ router.post('/api/stripe/staff/charge-saved-card', isStaffOrAdmin, validateBody(
 
         await tx.execute(sql`INSERT INTO stripe_payment_intents 
             (user_id, stripe_payment_intent_id, stripe_customer_id, amount_cents, status, purpose, description, booking_id, session_id)
-           VALUES (${member.id}, ${invoiceResult.paymentIntentId}, ${member.stripe_customer_id}, ${authoritativeAmountCents}, 'succeeded', 'booking_fee', 'Staff charged via invoice', ${resolvedBookingId}, ${resolvedSessionId})
+           VALUES (${member.id}, ${invoiceResult.paymentIntentId}, ${member.stripe_customer_id}, ${authoritativeAmountCents}, 'succeeded', 'booking_fee', ${chargeDescription}, ${resolvedBookingId}, ${resolvedSessionId})
            ON CONFLICT (stripe_payment_intent_id) DO UPDATE SET status = 'succeeded', updated_at = NOW()`);
 
       });

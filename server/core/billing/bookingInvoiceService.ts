@@ -84,7 +84,7 @@ export interface FinalizeAndPayResult {
   amountCharged: number;
 }
 
-async function buildInvoiceDescription(
+export async function buildInvoiceDescription(
   bookingId: number,
   trackmanBookingId: string | null | undefined,
 ): Promise<string> {
