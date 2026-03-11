@@ -216,7 +216,14 @@ export async function ensureSessionForBooking(params: {
           sessionId = insertResult.rows[0].id;
           created = true;
         } finally {
-          await lockClient.query(`RESET app.bypass_overlap_check`).catch(() => {});
+          try {
+            await lockClient.query(`RESET app.bypass_overlap_check`);
+          } catch (resetErr) {
+            logger.warn('[SessionManager] Failed to reset bypass_overlap_check, destroying connection to prevent leak', { error: resetErr });
+            if (manageLockClient) {
+              try { lockClient.release(true); } catch (_) {}
+            }
+          }
         }
       } catch (insertErr: unknown) {
         const errCode = getErrorCode(insertErr);
