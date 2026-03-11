@@ -173,6 +173,17 @@ export async function cleanupOrphanedRecords(): Promise<{ notifications: number;
     `);
     oldBookingsArchived = bookingResult.rowCount || 0;
     logger.info(`[DB Init] Marked ${oldBookingsArchived} orphaned old booking records`);
+
+    const lessonClosureResult = await db.execute(sql`
+      UPDATE facility_closures
+      SET is_active = false
+      WHERE is_active = true
+        AND (LOWER(title) LIKE 'lesson%' OR LOWER(title) LIKE 'private lesson%' OR LOWER(title) LIKE 'kids lesson%' OR LOWER(title) LIKE 'group lesson%')
+    `);
+    const lessonClosuresDeactivated = lessonClosureResult.rowCount || 0;
+    if (lessonClosuresDeactivated > 0) {
+      logger.info(`[DB Init] Deactivated ${lessonClosuresDeactivated} lesson closures (lessons should only create availability blocks, not notices)`);
+    }
   } catch (error: unknown) {
     logger.error('[DB Init] Failed to cleanup orphaned records:', { extra: { errorMessage: getErrorMessage(error) } });
   }

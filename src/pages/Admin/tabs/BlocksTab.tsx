@@ -103,6 +103,7 @@ const BlocksTab: React.FC = () => {
     const [closuresFilterResource, setClosuresFilterResource] = useState<string>('all');
     const [closuresFilterDate, setClosuresFilterDate] = useState<string>('');
     const [showPastAccordion, setShowPastAccordion] = useState(false);
+    const [pastNoticesLimit, setPastNoticesLimit] = useState(50);
     const [closureForm, setClosureForm] = useState<BlocksClosureForm>({
         start_date: '',
         start_time: '',
@@ -1134,7 +1135,7 @@ const BlocksTab: React.FC = () => {
                     <div className={`accordion-content ${showPastAccordion ? 'is-open' : ''}`}>
                       <div className="accordion-inner">
                         <div className="p-4 space-y-3 bg-gray-50/50 dark:bg-white/5 border-t border-gray-200/50 dark:border-white/10">
-                            {pastClosures.map((closure, index) => {
+                            {pastClosures.slice(0, pastNoticesLimit).map((closure, index) => {
                                 const blocking = isBlocking(closure.affectedAreas);
                                 const isExpanded = expandedNotices.has(closure.id);
                                 
@@ -1224,6 +1225,14 @@ const BlocksTab: React.FC = () => {
                                     </div>
                                 );
                             })}
+                            {pastClosures.length > pastNoticesLimit && (
+                                <button
+                                    onClick={() => setPastNoticesLimit(prev => prev + 50)}
+                                    className="w-full py-3 text-sm font-medium text-gray-500 dark:text-white/60 hover:text-gray-700 dark:hover:text-white/80 bg-white/40 dark:bg-white/5 rounded-xl hover:bg-white/60 dark:hover:bg-white/10 transition-colors"
+                                >
+                                    Show more ({pastClosures.length - pastNoticesLimit} remaining)
+                                </button>
+                            )}
                         </div>
                       </div>
                     </div>
