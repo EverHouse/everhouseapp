@@ -28,7 +28,7 @@ export const syncPushPullSchema = z.preprocess(
   z.object({
     issue_key: z.string().min(1, 'issue_key is required'),
     target: z.enum(['hubspot', 'stripe'], { message: 'Valid target (hubspot or stripe) is required' }),
-    user_id: z.number().optional(),
+    user_id: z.number().int().positive().optional(),
     hubspot_contact_id: z.string().optional(),
     stripe_customer_id: z.string().optional(),
   }).refine(

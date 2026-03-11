@@ -57,18 +57,30 @@ export function StaffManualBookingModal({
   }, [isOpen, defaultDate, defaultStartTime]);
 
   useEffect(() => {
-    if (!isOpen) return;
-    if (!confHostMember || !confDate) {
+    if (!isOpen || !confHostMember || !confDate) {
       setConfFeeEstimate(null);
+      setConfLoadingFee(false);
       return;
     }
 
+    const controller = new AbortController();
     setConfLoadingFee(true);
-    fetch(`/api/staff/conference-room/fee-estimate?email=${encodeURIComponent(confHostMember.email)}&date=${confDate}&duration=${confDuration}`, { credentials: 'include' })
+    fetch(`/api/staff/conference-room/fee-estimate?email=${encodeURIComponent(confHostMember.email)}&date=${confDate}&duration=${confDuration}`, { credentials: 'include', signal: controller.signal })
       .then(res => res.json())
-      .then(data => setConfFeeEstimate(data))
-      .catch(err => console.error('Failed to load fee estimate:', err))
-      .finally(() => setConfLoadingFee(false));
+      .then(data => {
+        if (!controller.signal.aborted) setConfFeeEstimate(data);
+      })
+      .catch(err => {
+        if (!controller.signal.aborted) console.error('Failed to load fee estimate:', err);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setConfLoadingFee(false);
+      });
+
+    return () => {
+      controller.abort();
+      setConfLoadingFee(false);
+    };
   }, [isOpen, confHostMember, confDate, confDuration]);
 
   const handleConferenceSubmit = useCallback(async () => {

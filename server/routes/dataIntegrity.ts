@@ -120,6 +120,10 @@ router.get('/api/data-integrity/audit-log', isAdmin, async (req, res) => {
 router.post('/api/data-integrity/sync-push', isAdmin, validateBody(syncPushPullSchema), async (req: Request, res) => {
   try {
     const { issue_key, target, user_id, hubspot_contact_id, stripe_customer_id } = req.body;
+
+    if (!user_id) {
+      return res.status(400).json({ error: 'userId is required for sync push operations' });
+    }
     
     const result = await syncPush({
       issueKey: issue_key,
@@ -142,6 +146,10 @@ router.post('/api/data-integrity/sync-push', isAdmin, validateBody(syncPushPullS
 router.post('/api/data-integrity/sync-pull', isAdmin, validateBody(syncPushPullSchema), async (req: Request, res) => {
   try {
     const { issue_key, target, user_id, hubspot_contact_id, stripe_customer_id } = req.body;
+
+    if (!user_id) {
+      return res.status(400).json({ error: 'userId is required for sync pull operations' });
+    }
     
     const result = await syncPull({
       issueKey: issue_key,
@@ -1531,19 +1539,19 @@ router.post('/api/data-integrity/fix/delete-orphan-records-by-email', isAdmin, v
   try {
     const { table, email } = req.body;
 
-    const columnMap: Record<string, string> = {
-      notifications: 'user_email',
-      push_subscriptions: 'user_email',
-      user_dismissed_notices: 'user_email',
+    const deleteQueries: Record<string, ReturnType<typeof sql>> = {
+      notifications: sql`DELETE FROM notifications WHERE LOWER(user_email) = LOWER(${email}) AND NOT EXISTS (SELECT 1 FROM users u WHERE LOWER(u.email) = LOWER(${email}))`,
+      push_subscriptions: sql`DELETE FROM push_subscriptions WHERE LOWER(user_email) = LOWER(${email}) AND NOT EXISTS (SELECT 1 FROM users u WHERE LOWER(u.email) = LOWER(${email}))`,
+      user_dismissed_notices: sql`DELETE FROM user_dismissed_notices WHERE LOWER(user_email) = LOWER(${email}) AND NOT EXISTS (SELECT 1 FROM users u WHERE LOWER(u.email) = LOWER(${email}))`,
     };
-    const emailColumn = columnMap[table];
 
-    const result = await pool.query(
-      `DELETE FROM ${table} WHERE LOWER(${emailColumn}) = LOWER($1) AND NOT EXISTS (SELECT 1 FROM users u WHERE LOWER(u.email) = LOWER($1))`,
-      [email]
-    );
+    const query = deleteQueries[table];
+    if (!query) {
+      return res.status(400).json({ success: false, message: `Unsupported table: ${table}` });
+    }
 
-    const deleted = result.rowCount || 0;
+    const result = await db.execute(query);
+    const deleted = (result as { rowCount?: number }).rowCount || 0;
     logFromRequest(req, 'delete_orphan_records', table, email, `Deleted ${deleted} orphaned ${table} records for email ${email} via data integrity`, { email, table, deleted });
 
     res.json({ success: true, message: `Deleted ${deleted} orphaned record(s) from ${table}` });
