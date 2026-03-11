@@ -404,10 +404,10 @@ const History: React.FC = () => {
                                     </p>
                                   </div>
                                   <div className="text-right flex-shrink-0">
-                                    <p className={`text-lg font-bold ${purchase.status === 'open' ? (isDark ? 'text-amber-400' : 'text-amber-600') : (isDark ? 'text-accent' : 'text-brand-green')}`}>
+                                    <p className={`text-lg font-bold ${(purchase.status === 'open' || purchase.status === 'draft') ? (isDark ? 'text-amber-400' : 'text-amber-600') : (isDark ? 'text-accent' : 'text-brand-green')}`}>
                                       {formatCurrency(purchase.amountCents)}
                                     </p>
-                                    {purchase.itemCategory === 'invoice' && purchase.status === 'open' && (
+                                    {purchase.itemCategory === 'invoice' && (purchase.status === 'open' || purchase.status === 'draft') && (
                                       <button
                                         onClick={() => setPayingInvoice(purchase)}
                                         className="tactile-btn bg-primary text-white text-sm font-medium px-4 py-2 rounded-xl hover:bg-primary/90 transition-colors flex items-center gap-1.5 mt-2 ml-auto"

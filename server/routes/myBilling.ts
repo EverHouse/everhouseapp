@@ -1030,11 +1030,11 @@ router.get('/api/my-billing/payment-history', requireAuth, async (req, res) => {
 
     if (stripeCustomerId) {
       try {
-        const invoices = await stripe.invoices.list({
-          customer: stripeCustomerId,
-          limit: 100,
-          status: 'open',
-        });
+        const [openInvoices, draftInvoices] = await Promise.all([
+          stripe.invoices.list({ customer: stripeCustomerId, limit: 100, status: 'open' }),
+          stripe.invoices.list({ customer: stripeCustomerId, limit: 100, status: 'draft' }),
+        ]);
+        const invoices = { data: [...openInvoices.data, ...draftInvoices.data] };
 
         for (const inv of invoices.data) {
           if (inv.amount_due > 0) {

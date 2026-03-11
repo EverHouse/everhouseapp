@@ -92,7 +92,11 @@ function buildInvoiceDescription(
   const totalOverageCents = feeLineItems.reduce((sum, li) => sum + li.overageCents, 0);
   const totalGuestCents = feeLineItems.reduce((sum, li) => sum + li.guestCents, 0);
   const bookingRef = trackmanBookingId ? `TM-${trackmanBookingId}` : `#${bookingId}`;
-  return `Booking ${bookingRef} fees - Overage: $${(totalOverageCents / 100).toFixed(2)}, Guest fees: $${(totalGuestCents / 100).toFixed(2)}`;
+  const parts: string[] = [];
+  if (totalOverageCents > 0) parts.push(`Overage: $${(totalOverageCents / 100).toFixed(2)}`);
+  if (totalGuestCents > 0) parts.push(`Guest fees: $${(totalGuestCents / 100).toFixed(2)}`);
+  const feeSummary = parts.length > 0 ? ` | ${parts.join(', ')}` : '';
+  return `Booking ${bookingRef} fees${feeSummary}`;
 }
 
 function buildInvoiceMetadata(

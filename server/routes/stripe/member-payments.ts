@@ -806,7 +806,10 @@ router.post('/api/member/invoices/:invoiceId/pay', isAuthenticated, async (req: 
       return res.status(403).json({ error: 'You do not have permission to pay this invoice' });
     }
 
-    if (invoice.status !== 'open') {
+    if (invoice.status === 'draft') {
+      await stripe.invoices.finalizeInvoice(invoiceId as string);
+      logger.info('[Stripe] Finalized draft invoice for member payment', { extra: { invoiceId } });
+    } else if (invoice.status !== 'open') {
       if (invoice.status === 'paid') {
         return res.status(400).json({ error: 'This invoice has already been paid' });
       }
