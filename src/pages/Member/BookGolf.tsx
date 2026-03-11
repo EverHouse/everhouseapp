@@ -490,7 +490,7 @@ const BookGolf: React.FC = () => {
     }
   }, [isLoading, setPageReady]);
 
-  // Listen for real-time booking updates
+  // Listen for real-time booking updates (Supabase Realtime + WebSocket)
   useEffect(() => {
     const handleBookingUpdate = () => {
       queryClient.invalidateQueries({ queryKey: bookGolfKeys.myRequests(effectiveUser?.email || '') });
@@ -499,9 +499,17 @@ const BookGolf: React.FC = () => {
         queryClient.invalidateQueries({ queryKey: bookGolfKeys.existingBookings(selectedDateObj.date, activeTab) });
       }
     };
+
+    const handleAvailabilityUpdate = () => {
+      queryClient.invalidateQueries({ queryKey: ['bookGolf', 'availability'] });
+    };
     
     window.addEventListener('booking-update', handleBookingUpdate);
-    return () => window.removeEventListener('booking-update', handleBookingUpdate);
+    window.addEventListener('availability-update', handleAvailabilityUpdate);
+    return () => {
+      window.removeEventListener('booking-update', handleBookingUpdate);
+      window.removeEventListener('availability-update', handleAvailabilityUpdate);
+    };
   }, [queryClient, effectiveUser?.email, selectedDateObj?.date, activeTab]);
 
 

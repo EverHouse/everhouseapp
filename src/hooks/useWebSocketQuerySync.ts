@@ -5,6 +5,7 @@ import { financialsKeys } from './queries/useFinancialsQueries';
 import { cafeKeys } from './queries/useCafeQueries';
 import { toursKeys } from './queries/useToursQueries';
 import { commandCenterKeys } from './queries/useCommandCenterQueries';
+import { bookGolfKeys } from '../pages/Member/bookGolf/bookGolfTypes';
 
 const directoryKeys = {
   all: ['directory'] as const,
@@ -108,7 +109,7 @@ export function useWebSocketQuerySync() {
       if (import.meta.env.DEV) console.log('[WebSocketQuerySync] Invalidating member/profile queries for stats update');
       queryClient.invalidateQueries({ queryKey: ['member'] });
       queryClient.invalidateQueries({ queryKey: ['members'] });
-      queryClient.invalidateQueries({ queryKey: ['book-golf'] });
+      queryClient.invalidateQueries({ queryKey: bookGolfKeys.all });
     };
 
     const handleMemberDataUpdated = (event: CustomEvent) => {
@@ -125,7 +126,7 @@ export function useWebSocketQuerySync() {
 
     const handleDayPassUpdate = (event: CustomEvent) => {
       if (import.meta.env.DEV) console.log('[WebSocketQuerySync] Invalidating day-pass/visitor queries');
-      queryClient.invalidateQueries({ queryKey: ['book-golf'] });
+      queryClient.invalidateQueries({ queryKey: bookGolfKeys.all });
       queryClient.invalidateQueries({ queryKey: directoryKeys.all });
     };
 
@@ -133,7 +134,7 @@ export function useWebSocketQuerySync() {
       if (import.meta.env.DEV) console.log('[WebSocketQuerySync] Invalidating closure/availability queries');
       queryClient.invalidateQueries({ queryKey: ['closures'] });
       queryClient.invalidateQueries({ queryKey: bookingsKeys.all });
-      queryClient.invalidateQueries({ queryKey: ['book-golf'] });
+      queryClient.invalidateQueries({ queryKey: bookGolfKeys.all });
       queryClient.invalidateQueries({ queryKey: commandCenterKeys.facility() });
     };
 
@@ -142,7 +143,7 @@ export function useWebSocketQuerySync() {
       queryClient.invalidateQueries({ queryKey: bookingsKeys.all });
       queryClient.invalidateQueries({ queryKey: simulatorKeys.all });
       queryClient.invalidateQueries({ queryKey: financialsKeys.all });
-      queryClient.invalidateQueries({ queryKey: ['book-golf'] });
+      queryClient.invalidateQueries({ queryKey: bookGolfKeys.all });
       invalidateCommandCenterBookings();
     };
 
@@ -157,7 +158,7 @@ export function useWebSocketQuerySync() {
       if (import.meta.env.DEV) console.log('[WebSocketQuerySync] Invalidating queries for waitlist-update');
       queryClient.invalidateQueries({ queryKey: bookingsKeys.all });
       queryClient.invalidateQueries({ queryKey: simulatorKeys.all });
-      queryClient.invalidateQueries({ queryKey: ['book-golf'] });
+      queryClient.invalidateQueries({ queryKey: bookGolfKeys.all });
       queryClient.invalidateQueries({ queryKey: wellnessKeys.all });
     };
 
@@ -186,7 +187,7 @@ export function useWebSocketQuerySync() {
       if (import.meta.env.DEV) console.log('[WebSocketQuerySync] Invalidating queries for availability-update');
       queryClient.invalidateQueries({ queryKey: bookingsKeys.all });
       queryClient.invalidateQueries({ queryKey: simulatorKeys.all });
-      queryClient.invalidateQueries({ queryKey: ['book-golf'] });
+      queryClient.invalidateQueries({ queryKey: bookGolfKeys.all });
       queryClient.invalidateQueries({ queryKey: commandCenterKeys.facility() });
     };
 
