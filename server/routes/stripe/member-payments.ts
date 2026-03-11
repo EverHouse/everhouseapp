@@ -91,7 +91,7 @@ async function finalizeInvoiceWithPi(
   if (finalized.payment_intent) {
     if (typeof finalized.payment_intent === 'string') {
       const fullPi = await stripe.paymentIntents.retrieve(finalized.payment_intent);
-      if (fullPi.client_secret) {
+      if (fullPi.status !== 'canceled' && fullPi.client_secret) {
         return { piId: fullPi.id, clientSecret: fullPi.client_secret };
       }
     } else {
