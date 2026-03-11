@@ -68,9 +68,36 @@ export async function createBookingForMember(
       const oldResourceId = (existingBooking.rows as Array<Record<string, unknown>>)[0].resource_id;
       const bayChanged = resourceId && oldResourceId && resourceId !== oldResourceId;
 
+      const cancelOverlappingBookings = async (targetResourceId: number, targetDate: string, targetStart: string, targetEnd: string, excludeBookingId: number) => {
+        const conflicting = await db.execute(sql`
+          SELECT id, trackman_booking_id, user_email
+          FROM booking_requests
+          WHERE resource_id = ${targetResourceId}
+            AND request_date = ${targetDate}
+            AND status IN ('pending', 'approved', 'confirmed')
+            AND start_time < ${targetEnd}
+            AND end_time > ${targetStart}
+            AND id != ${excludeBookingId}
+            AND (trackman_booking_id IS NULL OR trackman_booking_id != ${trackmanBookingId})`);
+        const rows = conflicting.rows as { id: number; trackman_booking_id: string | null; user_email: string }[];
+        if (rows.length > 0) {
+          const ids = rows.map(r => r.id);
+          await db.execute(sql`
+            UPDATE booking_requests 
+            SET status = 'cancelled', updated_at = NOW(),
+                staff_notes = COALESCE(staff_notes, '') || ${`\n[Auto-cancelled: superseded by Trackman booking ${trackmanBookingId}]`}
+            WHERE id = ANY(${ids})`);
+          logger.info('[Trackman Webhook] createBookingForMember cancelled overlapping bookings before update', {
+            extra: { trackmanBookingId, cancelledBookingIds: ids }
+          });
+        }
+      };
+
       if (oldDuration !== newDuration) {
         const bookingId = (existingBooking.rows as Array<Record<string, unknown>>)[0].id as number;
         const sessionId = (existingBooking.rows as Array<Record<string, unknown>>)[0].session_id as number | null;
+        
+        await cancelOverlappingBookings(bayChanged ? resourceId : (oldResourceId as number), slotDate, startTime, endTime, bookingId);
         
         if (bayChanged) {
           await db.execute(sql`UPDATE booking_requests 
@@ -122,6 +149,8 @@ export async function createBookingForMember(
       if (bayChanged) {
         const bookingId = (existingBooking.rows as Array<Record<string, unknown>>)[0].id as number;
         const sessionId = (existingBooking.rows as Array<Record<string, unknown>>)[0].session_id as number | null;
+        
+        await cancelOverlappingBookings(resourceId, slotDate, startTime, endTime, bookingId);
         
         await db.execute(sql`UPDATE booking_requests SET resource_id = ${resourceId}, updated_at = NOW() WHERE id = ${bookingId}`);
         
@@ -411,18 +440,67 @@ export async function createBookingForMember(
       [member.firstName, member.lastName].filter(Boolean).join(' ') || 
       member.email;
     
-    const result = await db.execute(sql`INSERT INTO booking_requests 
-       (user_id, user_email, user_name, resource_id, request_date, start_time, end_time, 
-        duration_minutes, status, trackman_booking_id, trackman_player_count, 
-        reviewed_by, reviewed_at, staff_notes, was_auto_linked, 
-        origin, last_sync_source, last_trackman_sync_at, created_at, updated_at)
-       VALUES (${member.id}, ${member.email}, ${memberName}, ${resourceId}, ${slotDate}, ${startTime}, ${endTime}, ${durationMinutes}, 'approved', ${trackmanBookingId}, ${playerCount}, 'trackman_webhook', NOW(), 
-               '[Auto-created via Trackman webhook - staff booking]', true,
-               'trackman_webhook', 'trackman_webhook', NOW(), NOW(), NOW())
-       ON CONFLICT (trackman_booking_id) WHERE trackman_booking_id IS NOT NULL DO UPDATE SET
-         last_trackman_sync_at = NOW(),
-         updated_at = NOW()
-       RETURNING id, (xmax = 0) AS was_inserted`);
+    let result;
+    try {
+      result = await db.execute(sql`INSERT INTO booking_requests 
+         (user_id, user_email, user_name, resource_id, request_date, start_time, end_time, 
+          duration_minutes, status, trackman_booking_id, trackman_player_count, 
+          reviewed_by, reviewed_at, staff_notes, was_auto_linked, 
+          origin, last_sync_source, last_trackman_sync_at, created_at, updated_at)
+         VALUES (${member.id}, ${member.email}, ${memberName}, ${resourceId}, ${slotDate}, ${startTime}, ${endTime}, ${durationMinutes}, 'approved', ${trackmanBookingId}, ${playerCount}, 'trackman_webhook', NOW(), 
+                 '[Auto-created via Trackman webhook - staff booking]', true,
+                 'trackman_webhook', 'trackman_webhook', NOW(), NOW(), NOW())
+         ON CONFLICT (trackman_booking_id) WHERE trackman_booking_id IS NOT NULL DO UPDATE SET
+           last_trackman_sync_at = NOW(),
+           updated_at = NOW()
+         RETURNING id, (xmax = 0) AS was_inserted`);
+    } catch (insertError: unknown) {
+      const errMsg = insertError instanceof Error ? insertError.message : String(insertError);
+      const cause = (insertError as { cause?: { code?: string } })?.cause;
+      if (cause?.code === '23P01' || errMsg.includes('booking_requests_no_overlap') || errMsg.includes('23P01')) {
+        logger.info('[Trackman Webhook] createBookingForMember overlap constraint — cancelling conflicting bookings (Trackman is authoritative)', {
+          extra: { trackmanBookingId, date: slotDate, time: startTime, endTime, resourceId, memberEmail: member.email }
+        });
+
+        const conflicting = await db.execute(sql`
+          SELECT id, trackman_booking_id, user_email
+          FROM booking_requests
+          WHERE resource_id = ${resourceId}
+            AND request_date = ${slotDate}
+            AND status IN ('pending', 'approved', 'confirmed')
+            AND start_time < ${endTime}
+            AND end_time > ${startTime}
+            AND (trackman_booking_id IS NULL OR trackman_booking_id != ${trackmanBookingId})`);
+
+        const conflictingRows = conflicting.rows as { id: number; trackman_booking_id: string | null; user_email: string }[];
+        if (conflictingRows.length > 0) {
+          const conflictIds = conflictingRows.map(r => r.id);
+          await db.execute(sql`
+            UPDATE booking_requests 
+            SET status = 'cancelled', updated_at = NOW(),
+                staff_notes = COALESCE(staff_notes, '') || ${`\n[Auto-cancelled: superseded by Trackman booking ${trackmanBookingId}]`}
+            WHERE id = ANY(${conflictIds})`);
+          logger.info('[Trackman Webhook] Cancelled conflicting bookings for member booking', {
+            extra: { trackmanBookingId, cancelledBookingIds: conflictIds }
+          });
+        }
+
+        result = await db.execute(sql`INSERT INTO booking_requests 
+           (user_id, user_email, user_name, resource_id, request_date, start_time, end_time, 
+            duration_minutes, status, trackman_booking_id, trackman_player_count, 
+            reviewed_by, reviewed_at, staff_notes, was_auto_linked, 
+            origin, last_sync_source, last_trackman_sync_at, created_at, updated_at)
+           VALUES (${member.id}, ${member.email}, ${memberName}, ${resourceId}, ${slotDate}, ${startTime}, ${endTime}, ${durationMinutes}, 'approved', ${trackmanBookingId}, ${playerCount}, 'trackman_webhook', NOW(), 
+                   '[Auto-created via Trackman webhook - staff booking, previous conflicting booking cancelled]', true,
+                   'trackman_webhook', 'trackman_webhook', NOW(), NOW(), NOW())
+           ON CONFLICT (trackman_booking_id) WHERE trackman_booking_id IS NOT NULL DO UPDATE SET
+             last_trackman_sync_at = NOW(),
+             updated_at = NOW()
+           RETURNING id, (xmax = 0) AS was_inserted`);
+      } else {
+        throw insertError;
+      }
+    }
     
     if ((result.rows as Array<Record<string, unknown>>).length > 0) {
       const bookingId = (result.rows as Array<Record<string, unknown>>)[0].id as number;
