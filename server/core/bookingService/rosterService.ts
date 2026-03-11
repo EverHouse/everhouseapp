@@ -1139,7 +1139,7 @@ export async function addParticipant(params: AddParticipantParams): Promise<AddP
       }
     }
 
-    const [newParticipant] = await linkParticipants(sessionId, [participantInput]);
+    const [newParticipant] = await linkParticipants(sessionId, [participantInput], tx);
 
     let guestPassesRemaining: number | undefined;
     if (type === 'guest' && newParticipant) {
@@ -1898,7 +1898,7 @@ export async function applyRosterBatch(params: BatchRosterUpdateParams): Promise
             }
 
             const displayName = [memberInfo.firstName, memberInfo.lastName].filter(Boolean).join(' ') || memberInfo.email;
-            await linkParticipants(sessionId!, [{ userId: memberInfo.id, participantType: 'member', displayName }]);
+            await linkParticipants(sessionId!, [{ userId: memberInfo.id, participantType: 'member', displayName }], tx);
 
             logger.info('[rosterService:batch] Member added', {
               extra: { bookingId, memberEmail: memberInfo.email }
@@ -1950,7 +1950,7 @@ export async function applyRosterBatch(params: BatchRosterUpdateParams): Promise
               guestId,
               participantType: 'guest',
               displayName: op.guest.name,
-            }]);
+            }], tx);
 
             if (newGuestParticipant) {
               await tx.update(bookingParticipants)
