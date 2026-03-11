@@ -110,6 +110,7 @@ export const users = pgTable("users", {
   index("users_visitor_type_idx").on(table.visitorType),
   index("users_hubspot_id_idx").on(table.hubspotId),
   index("users_tier_id_idx").on(table.tierId),
+  uniqueIndex("users_hubspot_id_unique").on(table.hubspotId).where(sql`hubspot_id IS NOT NULL AND hubspot_id != ''`),
 ]);
 
 // Staff users table - emails that get staff or admin access

@@ -18,7 +18,7 @@ The Ever Club Members App is a private members club application designed for gol
 - **Timezone**: All date/time operations explicitly use Pacific Time (`America/Los_Angeles`).
 - **Audit Logging**: All staff actions are logged.
 - **API/Frontend Consistency**: API response field names align with frontend TypeScript interfaces.
-- **Database & Data Integrity**: PostgreSQL, Supabase Realtime, and Drizzle ORM with CASCADE constraints.
+- **Database & Data Integrity**: PostgreSQL, Supabase Realtime, and Drizzle ORM with CASCADE constraints. DB-level enforcement includes unique indexes on `stripe_customer_id` and `hubspot_id` (partial, non-null), CHECK constraint preventing `billing_provider='mindbody'` with an active `stripe_subscription_id`, guest pass arithmetic checks, booking time validity checks, and an exclusion constraint preventing overlapping bookings.
 - **Real-time Updates**: WebSocket broadcasting for booking and invoice changes via Supabase Realtime. React Query with WebSocket-driven cache invalidation is used for the Staff Command Center.
 - **Member Dashboard**: Features a chronological card layout for bookings, events, and wellness sessions with "Add to Calendar" functionality.
 

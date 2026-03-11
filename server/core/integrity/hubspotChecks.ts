@@ -166,6 +166,10 @@ export async function checkHubSpotSyncMismatch(): Promise<IntegrityCheckResult> 
 
 
 export async function checkHubSpotIdDuplicates(): Promise<IntegrityCheckResult> {
+  // NOTE: As of migration 0047, a partial unique index (users_hubspot_id_unique)
+  // prevents new duplicate hubspot_ids from being inserted at the DB level.
+  // This check still runs to catch edge cases like empty-string hubspot_ids
+  // or duplicates introduced via direct DB operations that bypass the index.
   const issues: IntegrityIssue[] = [];
 
   try {
@@ -179,6 +183,7 @@ export async function checkHubSpotIdDuplicates(): Promise<IntegrityCheckResult> 
         COUNT(*) as user_count
       FROM users u
       WHERE u.hubspot_id IS NOT NULL
+        AND u.hubspot_id != ''
         AND u.archived_at IS NULL
         AND u.membership_status != 'merged'
       GROUP BY u.hubspot_id

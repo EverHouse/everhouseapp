@@ -392,6 +392,10 @@ export async function checkOrphanedPaymentIntents(): Promise<IntegrityCheckResul
 }
 
 export async function checkBillingProviderHybridState(): Promise<IntegrityCheckResult> {
+  // NOTE: As of migration 0047, a CHECK constraint (users_billing_provider_no_hybrid)
+  // prevents the critical case of billing_provider='mindbody' with a stripe_subscription_id.
+  // This check still catches softer issues: NULL billing_provider on active members,
+  // and stripe provider without a subscription ID (prod only).
   const issues: IntegrityIssue[] = [];
 
   const hybridResult = await db.execute(sql`
