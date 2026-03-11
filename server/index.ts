@@ -38,17 +38,11 @@ process.on('uncaughtException', (error) => {
   setTimeout(() => process.exit(1), 3000);
 });
 
-let unhandledRejectionExitScheduled = false;
+let unhandledRejectionCount = 0;
 process.on('unhandledRejection', (reason, promise) => {
+  unhandledRejectionCount++;
   const errorMessage = reason instanceof Error ? reason.message : String(reason);
-  logger.error('[Process] Unhandled Rejection - scheduling shutdown:', { extra: { errorMessage } });
-  if (!unhandledRejectionExitScheduled) {
-    unhandledRejectionExitScheduled = true;
-    setTimeout(() => {
-      logger.error('[Process] Exiting after unhandled rejection grace period');
-      process.exit(1);
-    }, 5000).unref();
-  }
+  logger.error('[Process] Unhandled Rejection (non-fatal):', { extra: { errorMessage, totalCount: unhandledRejectionCount } });
 });
 
 process.on('beforeExit', (code) => {
@@ -95,9 +89,18 @@ async function gracefulShutdown(signal: string) {
     }
 
     if (httpServer) {
+      if (typeof httpServer.closeIdleConnections === 'function') {
+        httpServer.closeIdleConnections();
+      }
       await new Promise<void>((resolve) => {
-        httpServer!.close(() => resolve());
-        setTimeout(resolve, 5000);
+        httpServer!.close(() => {
+          logger.info('[Shutdown] HTTP server closed gracefully');
+          resolve();
+        });
+        setTimeout(() => {
+          logger.warn('[Shutdown] HTTP server close timed out after 10s, continuing shutdown');
+          resolve();
+        }, 10000);
       });
     }
 
@@ -175,6 +178,9 @@ httpServer = http.createServer((req, res) => {
   res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache, no-store, must-revalidate' });
   res.end(MAINTENANCE_HTML);
 });
+
+httpServer.keepAliveTimeout = 65000;
+httpServer.headersTimeout = 66000;
 
 httpServer.listen(PORT, '0.0.0.0', () => {
   logger.info(`[Startup] HTTP server listening on port ${PORT} - health check ready`);

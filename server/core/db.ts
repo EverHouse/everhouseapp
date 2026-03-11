@@ -53,8 +53,12 @@ pool.on('error', (err) => {
   logger.error('[Database] Pool error:', { extra: { detail: err.message } });
 });
 
+let poolConnectCount = 0;
 pool.on('connect', () => {
-  logger.info(`[Database] New client connected via ${usingPooler ? 'session pooler' : 'direct connection'}`);
+  poolConnectCount++;
+  if (poolConnectCount <= 5 || poolConnectCount % 100 === 0) {
+    logger.info(`[Database] New client connected via ${usingPooler ? 'session pooler' : 'direct connection'} (total: ${poolConnectCount})`);
+  }
 });
 
 if (usingPooler && directPool !== pool) {

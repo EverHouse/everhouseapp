@@ -161,6 +161,7 @@ The following large files have been split into sub-modules with barrel re-export
 - **Pull-to-Refresh Fix**: Now correctly invokes `onRefresh` callback instead of always doing a full page reload. Android touch handling made passive with direction locking.
 - **Pixel Optimizations**: `touch-action: manipulation` on tactile elements, GPU promotion for staggered animations, `overscroll-behavior: contain` on scroll-lock elements.
 - **Chunk Error Auto-Recovery**: Error boundaries clear service worker caches before reloading on chunk load errors.
+- **Server Stability Improvements (v8.83.0)**: Unhandled promise rejections are now non-fatal (previously crashed the server). HTTP `keepAliveTimeout` (65s) and `headersTimeout` (66s) configured to prevent proxy/load-balancer connection drops. Graceful shutdown improved with `closeIdleConnections()` and extended 10s HTTP drain timeout. Database pool connect logging throttled to reduce log noise. HubSpot queue status no longer spams logs for static dead items.
 - **Trackman User Update/Purchase Webhooks**: Backend handles `user_update` and `purchase` event types with proper extraction, member matching, and logging.
 
 See [`docs/CHANGELOG.md`](docs/CHANGELOG.md) for the full changelog (v8.70.0+).

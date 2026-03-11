@@ -41,7 +41,7 @@ async function processQueue(): Promise<void> {
     }
     
     const queueStats = await getQueueStats();
-    if (queueStats.pending > 0 || queueStats.failed > 0 || queueStats.dead > 0) {
+    if (queueStats.pending > 0 || queueStats.failed > 0 || queueStats.processing > 0) {
       logger.info('[HubSpot Queue] Queue status', {
         extra: queueStats
       });
