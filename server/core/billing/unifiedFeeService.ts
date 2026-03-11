@@ -571,6 +571,11 @@ export async function computeFeeBreakdown(params: FeeComputeParams): Promise<Fee
              WHERE LOWER(ul.member_id) = ANY(${identifiersLiteral}::text[])
                AND bs.session_date = ${sessionDate}
                AND r.type = ${resourceTypeFilter}
+               AND EXISTS (
+                 SELECT 1 FROM booking_requests br_check
+                 WHERE br_check.session_id = ul.session_id
+                   AND br_check.status NOT IN ('cancelled', 'declined', 'cancellation_pending', 'deleted')
+               )
                ${excludeClauseLedgerFrag}
                ${timeFilterLedgerFrag}
              GROUP BY LOWER(ul.member_id)

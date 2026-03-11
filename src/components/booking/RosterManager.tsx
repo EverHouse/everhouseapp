@@ -123,6 +123,7 @@ export interface RosterManagerProps {
   isOwner: boolean;
   isStaff: boolean;
   onUpdate?: () => void;
+  resourceType?: 'simulator' | 'conference_room';
 }
 
 const RosterManager: React.FC<RosterManagerProps> = ({
@@ -130,7 +131,8 @@ const RosterManager: React.FC<RosterManagerProps> = ({
   declaredPlayerCount,
   isOwner,
   isStaff,
-  onUpdate
+  onUpdate,
+  resourceType = 'simulator'
 }) => {
   const { effectiveTheme } = useTheme();
   const isDark = effectiveTheme === 'dark';
@@ -370,16 +372,18 @@ const RosterManager: React.FC<RosterManagerProps> = ({
         <div className={`px-5 py-4 border-b ${isDark ? 'border-white/10' : 'border-black/5'}`}>
           <div className="flex items-center justify-between">
             <h3 className={`text-2xl ${isDark ? 'text-white' : 'text-[#293515]'} leading-tight`} style={{ fontFamily: 'var(--font-headline)' }}>
-              {canManage ? 'Manage Players' : 'Players'}
+              {resourceType === 'conference_room' ? 'Booking Fees' : (canManage ? 'Manage Players' : 'Players')}
             </h3>
-            <span className={`text-sm font-medium ${isDark ? 'text-white/60' : 'text-[#293515]/60'}`}>
-              {apiCurrentParticipantCount}/{apiDeclaredPlayerCount}
-            </span>
+            {resourceType !== 'conference_room' && (
+              <span className={`text-sm font-medium ${isDark ? 'text-white/60' : 'text-[#293515]/60'}`}>
+                {apiCurrentParticipantCount}/{apiDeclaredPlayerCount}
+              </span>
+            )}
           </div>
         </div>
 
         <div ref={rosterListRef} className="p-5 space-y-3">
-          {ownerParticipant && (
+          {resourceType !== 'conference_room' && ownerParticipant && (
             <div className={`flex items-center gap-3 px-6 py-3 rounded-xl ${isDark ? 'bg-white/5' : 'bg-black/[0.02]'}`}>
               <Avatar name={ownerParticipant.displayName} size="md" />
               <div className="flex-1 min-w-0">
@@ -391,7 +395,7 @@ const RosterManager: React.FC<RosterManagerProps> = ({
             </div>
           )}
 
-          {otherParticipants.map(participant => (
+          {resourceType !== 'conference_room' && otherParticipants.map(participant => (
             <div 
               key={participant.id}
               className={`flex items-center gap-3 px-6 py-3 rounded-xl ${isDark ? 'bg-white/5' : 'bg-black/[0.02]'}`}
@@ -424,7 +428,7 @@ const RosterManager: React.FC<RosterManagerProps> = ({
             </div>
           ))}
 
-          {remainingSlots > 0 && canManage && !rosterLocked && (
+          {resourceType !== 'conference_room' && remainingSlots > 0 && canManage && !rosterLocked && (
             <div className={`flex flex-col gap-2 p-3 rounded-xl border-2 border-dashed ${
               isDark ? 'border-white/20' : 'border-black/10'
             }`}>
@@ -456,7 +460,7 @@ const RosterManager: React.FC<RosterManagerProps> = ({
             </div>
           )}
 
-          {remainingSlots > 0 && !canManage && (
+          {resourceType !== 'conference_room' && remainingSlots > 0 && !canManage && (
             <div className={`p-3 rounded-xl border-2 border-dashed text-center ${
               isDark ? 'border-white/20' : 'border-black/10'
             }`}>

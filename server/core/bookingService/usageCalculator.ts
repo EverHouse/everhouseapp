@@ -160,6 +160,11 @@ export async function getDailyUsageFromLedger(
        JOIN booking_sessions bs ON ul.session_id = bs.id
        WHERE LOWER(ul.member_id) = LOWER(${memberEmail})
          AND bs.session_date = ${date}
+         AND EXISTS (
+           SELECT 1 FROM booking_requests br_check
+           WHERE br_check.session_id = ul.session_id
+             AND br_check.status NOT IN ('cancelled', 'declined', 'cancellation_pending', 'deleted')
+         )
          ${excludeClause}
          ${resourceTypeClause}`);
     

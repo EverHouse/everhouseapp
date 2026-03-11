@@ -1089,7 +1089,7 @@ const Dashboard: React.FC = () => {
                 const isApprovedOrConfirmed = ['approved', 'confirmed'].includes((item as DashboardBookingItem).status);
                 const isOwnerOfBooking = !((item as DashboardBookingItem).isLinkedMember);
                 const showRosterManager = (item.type === 'booking' || item.type === 'booking_request') && 
-                  isSimulatorBooking && 
+                  (isSimulatorBooking || item.resourceType === 'conference_room') && 
                   isApprovedOrConfirmed && 
                   isOwnerOfBooking;
                 const rawBookingData = item.raw as DBBookingRequest;
@@ -1170,6 +1170,7 @@ const Dashboard: React.FC = () => {
                           isOwner={isOwnerOfBooking}
                           isStaff={isStaffOrAdminProfile}
                           onUpdate={() => refetchAllData()}
+                          resourceType={item.resourceType === 'conference_room' ? 'conference_room' : 'simulator'}
                         />
                       </div>
                     )}
