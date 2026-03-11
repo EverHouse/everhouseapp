@@ -246,50 +246,77 @@ export async function runStartupTasks(): Promise<void> {
         .then(() => logger.info('[Stripe] FAMILY20 coupon ready'))
         .catch((err: unknown) => logger.error('[Stripe] FAMILY20 coupon setup failed', { error: err instanceof Error ? err : new Error(String(err)) }));
       
-      import('../core/stripe/products.js')
-        .then(({ ensureSimulatorOverageProduct }) => retryWithBackoff(async () => {
-          const r = await ensureSimulatorOverageProduct();
-          if (r.action === 'error') throw new Error('Simulator Overage product initialization failed');
-          return r;
-        }, 'Simulator Overage product'))
-        .then((result) => logger.info(`[Stripe] Simulator Overage product ${result.action}`, { extra: { action: result.action } }))
-        .catch((err: unknown) => logger.error('[Stripe] Simulator Overage setup failed', { error: err instanceof Error ? err : new Error(String(err)) }));
-      
-      import('../core/stripe/products.js')
-        .then(({ ensureGuestPassProduct }) => retryWithBackoff(async () => {
-          const r = await ensureGuestPassProduct();
-          if (r.action === 'error') throw new Error('Guest Pass product initialization failed');
-          return r;
-        }, 'Guest Pass product'))
-        .then((result) => logger.info(`[Stripe] Guest Pass product ${result.action}`, { extra: { action: result.action } }))
-        .catch((err: unknown) => logger.error('[Stripe] Guest Pass setup failed', { error: err instanceof Error ? err : new Error(String(err)) }));
-      
-      import('../core/stripe/products.js')
-        .then(({ ensureDayPassCoworkingProduct }) => retryWithBackoff(async () => {
-          const r = await ensureDayPassCoworkingProduct();
-          if (r.action === 'error') throw new Error('Day Pass Coworking product initialization failed');
-          return r;
-        }, 'Day Pass Coworking product'))
-        .then((result) => logger.info(`[Stripe] Day Pass Coworking product ${result.action}`, { extra: { action: result.action } }))
-        .catch((err: unknown) => logger.error('[Stripe] Day Pass Coworking setup failed', { error: err instanceof Error ? err : new Error(String(err)) }));
-      
-      import('../core/stripe/products.js')
-        .then(({ ensureDayPassGolfSimProduct }) => retryWithBackoff(async () => {
-          const r = await ensureDayPassGolfSimProduct();
-          if (r.action === 'error') throw new Error('Day Pass Golf Sim product initialization failed');
-          return r;
-        }, 'Day Pass Golf Sim product'))
-        .then((result) => logger.info(`[Stripe] Day Pass Golf Sim product ${result.action}`, { extra: { action: result.action } }))
-        .catch((err: unknown) => logger.error('[Stripe] Day Pass Golf Sim setup failed', { error: err instanceof Error ? err : new Error(String(err)) }));
-      
-      import('../core/stripe/products.js')
-        .then(({ ensureCorporateVolumePricingProduct }) => retryWithBackoff(async () => {
-          const r = await ensureCorporateVolumePricingProduct();
-          if (r.action === 'error') throw new Error('Corporate Volume Pricing product initialization failed');
-          return r;
-        }, 'Corporate Volume Pricing product'))
-        .then((result) => logger.info(`[Stripe] Corporate Volume Pricing product ${result.action}`, { extra: { action: result.action } }))
-        .catch((err: unknown) => logger.error('[Stripe] Corporate Volume Pricing setup failed', { error: err instanceof Error ? err : new Error(String(err)) }));
+      const productInitPromises: Promise<void>[] = [];
+
+      productInitPromises.push(
+        import('../core/stripe/products.js')
+          .then(({ ensureSimulatorOverageProduct }) => retryWithBackoff(async () => {
+            const r = await ensureSimulatorOverageProduct();
+            if (r.action === 'error') throw new Error(`Simulator Overage product initialization failed (${r.action})`);
+            return r;
+          }, 'Simulator Overage product'))
+          .then((result) => { logger.info(`[Stripe] Simulator Overage product ${result.action}`, { extra: { action: result.action } }); })
+          .catch((err: unknown) => {
+            logger.error('[Stripe] Simulator Overage setup failed', { error: err instanceof Error ? err : new Error(String(err)) });
+            startupHealth.warnings.push(`Stripe product init: Simulator Overage - ${getErrorMessage(err)}`);
+          })
+      );
+
+      productInitPromises.push(
+        import('../core/stripe/products.js')
+          .then(({ ensureGuestPassProduct }) => retryWithBackoff(async () => {
+            const r = await ensureGuestPassProduct();
+            if (r.action === 'error') throw new Error(`Guest Pass product initialization failed (${r.action})`);
+            return r;
+          }, 'Guest Pass product'))
+          .then((result) => { logger.info(`[Stripe] Guest Pass product ${result.action}`, { extra: { action: result.action } }); })
+          .catch((err: unknown) => {
+            logger.error('[Stripe] Guest Pass setup failed', { error: err instanceof Error ? err : new Error(String(err)) });
+            startupHealth.warnings.push(`Stripe product init: Guest Pass - ${getErrorMessage(err)}`);
+          })
+      );
+
+      productInitPromises.push(
+        import('../core/stripe/products.js')
+          .then(({ ensureDayPassCoworkingProduct }) => retryWithBackoff(async () => {
+            const r = await ensureDayPassCoworkingProduct();
+            if (r.action === 'error') throw new Error(`Day Pass Coworking product initialization failed (${r.action})`);
+            return r;
+          }, 'Day Pass Coworking product'))
+          .then((result) => { logger.info(`[Stripe] Day Pass Coworking product ${result.action}`, { extra: { action: result.action } }); })
+          .catch((err: unknown) => {
+            logger.error('[Stripe] Day Pass Coworking setup failed', { error: err instanceof Error ? err : new Error(String(err)) });
+            startupHealth.warnings.push(`Stripe product init: Day Pass Coworking - ${getErrorMessage(err)}`);
+          })
+      );
+
+      productInitPromises.push(
+        import('../core/stripe/products.js')
+          .then(({ ensureDayPassGolfSimProduct }) => retryWithBackoff(async () => {
+            const r = await ensureDayPassGolfSimProduct();
+            if (r.action === 'error') throw new Error(`Day Pass Golf Sim product initialization failed (${r.action})`);
+            return r;
+          }, 'Day Pass Golf Sim product'))
+          .then((result) => { logger.info(`[Stripe] Day Pass Golf Sim product ${result.action}`, { extra: { action: result.action } }); })
+          .catch((err: unknown) => {
+            logger.error('[Stripe] Day Pass Golf Sim setup failed', { error: err instanceof Error ? err : new Error(String(err)) });
+            startupHealth.warnings.push(`Stripe product init: Day Pass Golf Sim - ${getErrorMessage(err)}`);
+          })
+      );
+
+      productInitPromises.push(
+        import('../core/stripe/products.js')
+          .then(({ ensureCorporateVolumePricingProduct }) => retryWithBackoff(async () => {
+            const r = await ensureCorporateVolumePricingProduct();
+            if (r.action === 'error') throw new Error(`Corporate Volume Pricing product initialization failed (${r.action})`);
+            return r;
+          }, 'Corporate Volume Pricing product'))
+          .then((result) => { logger.info(`[Stripe] Corporate Volume Pricing product ${result.action}`, { extra: { action: result.action } }); })
+          .catch((err: unknown) => {
+            logger.error('[Stripe] Corporate Volume Pricing setup failed', { error: err instanceof Error ? err : new Error(String(err)) });
+            startupHealth.warnings.push(`Stripe product init: Corporate Volume Pricing - ${getErrorMessage(err)}`);
+          })
+      );
       
       import('../core/stripe/products.js')
         .then(({ pullCorporateVolumePricingFromStripe }) => retryWithBackoff(() => pullCorporateVolumePricingFromStripe(), 'Corporate pricing pull'))
