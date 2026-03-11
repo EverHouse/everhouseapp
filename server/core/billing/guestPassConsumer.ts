@@ -4,6 +4,7 @@ import { getErrorMessage } from '../../utils/errorUtils';
 import { syncBookingInvoice } from './bookingInvoiceService';
 
 import { logger } from '../logger';
+import { isPlaceholderGuestName } from './pricingConfig';
 
 interface GuestPassCheckRow { id: number; used_guest_pass: boolean; guest_id: number | null }
 interface OwnerIdRow { id: number }
@@ -30,8 +31,7 @@ export async function consumeGuestPassForParticipant(
   sessionDate: Date,
   staffEmail?: string
 ): Promise<GuestPassConsumptionResult> {
-  const isPlaceholderGuest = /^Guest \d+$/i.test(guestName || '');
-  if (isPlaceholderGuest) {
+  if (isPlaceholderGuestName(guestName)) {
     return {
       success: false,
       error: `Cannot use guest pass for placeholder slot "${guestName}". Please assign a real guest first.`

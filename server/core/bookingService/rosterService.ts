@@ -28,7 +28,7 @@ import {
   invalidateCachedFees,
   recalculateSessionFees,
 } from '../billing/unifiedFeeService';
-import { PRICING } from '../billing/pricingConfig';
+import { PRICING, isPlaceholderGuestName } from '../billing/pricingConfig';
 import { createPrepaymentIntent } from '../billing/prepaymentService';
 import { findConflictingBookings } from './conflictDetection';
 import { notifyMember } from '../notificationService';
@@ -1002,13 +1002,6 @@ export async function addParticipant(params: AddParticipantParams): Promise<AddP
       const normalize = (name: string) => name.replace(/\s+/g, ' ').trim().toLowerCase();
       const normalizedMember = normalize(memberFullName);
 
-      const isPlaceholderGuest = (name: string | null): boolean => {
-        if (!name) return false;
-        const normalized = name.trim().toLowerCase();
-        return /^guest\s+\d+$/.test(normalized) ||
-               /^guest\s*\(.*pending.*\)$/i.test(normalized);
-      };
-
       let matchingGuest = existingParticipants.find(p => {
         if (p.participantType !== 'guest') return false;
         const normalizedGuest = normalize(p.displayName || '');
@@ -1018,7 +1011,7 @@ export async function addParticipant(params: AddParticipantParams): Promise<AddP
       if (!matchingGuest) {
         matchingGuest = existingParticipants.find(p => {
           if (p.participantType !== 'guest') return false;
-          return isPlaceholderGuest(p.displayName);
+          return isPlaceholderGuestName(p.displayName);
         });
 
         if (matchingGuest) {
@@ -1081,7 +1074,7 @@ export async function addParticipant(params: AddParticipantParams): Promise<AddP
     const ownerTier = booking.owner_tier || await getMemberTierByEmail(booking.owner_email);
 
     if (type === 'guest' && ownerTier) {
-      const guestDisplayName = guest?.name || `Guest ${existingParticipants.filter(p => p.participantType === 'guest').length + 1}`;
+      const guestDisplayName = guest?.name || 'Guest (info pending)';
       const participantsForValidation: ParticipantForValidation[] = [
         ...existingParticipants.map(p => ({
           type: p.participantType as 'owner' | 'member' | 'guest',
@@ -1111,11 +1104,9 @@ export async function addParticipant(params: AddParticipantParams): Promise<AddP
         displayName,
       };
     } else if (type === 'guest' && params.useGuestPass === false && !guest) {
-      const guestNumber = existingParticipants.filter(p => p.participantType === 'guest').length + 1;
-      const placeholderName = `Guest ${guestNumber}`;
       participantInput = {
         participantType: 'guest',
-        displayName: placeholderName,
+        displayName: 'Guest (info pending)',
       };
     } else {
       const guestId = await createOrFindGuest(
@@ -1879,13 +1870,6 @@ export async function applyRosterBatch(params: BatchRosterUpdateParams): Promise
             const normalize = (name: string) => name.replace(/\s+/g, ' ').trim().toLowerCase();
             const normalizedMember = normalize(memberFullName);
 
-            const isPlaceholderGuest = (name: string | null): boolean => {
-              if (!name) return false;
-              const normalized = name.trim().toLowerCase();
-              return /^guest\s+\d+$/.test(normalized) ||
-                     /^guest\s*\(.*pending.*\)$/i.test(normalized);
-            };
-
             let matchingGuest = existingParticipants.find(p => {
               if (p.participantType !== 'guest') return false;
               const normalizedGuest = normalize(p.displayName || '');
@@ -1895,7 +1879,7 @@ export async function applyRosterBatch(params: BatchRosterUpdateParams): Promise
             if (!matchingGuest) {
               matchingGuest = existingParticipants.find(p => {
                 if (p.participantType !== 'guest') return false;
-                return isPlaceholderGuest(p.displayName);
+                return isPlaceholderGuestName(p.displayName);
               });
             }
 

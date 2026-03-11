@@ -8,6 +8,7 @@ import { sendPushNotification } from './push';
 import { sendNotificationToUser, broadcastMemberStatsUpdated } from '../core/websocket';
 import { logAndRespond, logger } from '../core/logger';
 import { isSyntheticEmail } from '../core/notificationService';
+import { isPlaceholderGuestName } from '../core/billing/pricingConfig';
 import { withRetry } from '../core/retry';
 import { getSessionUser } from '../types/session';
 import { logFromRequest } from '../core/auditLog';
@@ -163,7 +164,7 @@ router.post('/api/guest-passes/:email/use', isAuthenticated, async (req, res) =>
     
     const { guest_name } = req.body;
     
-    if (guest_name && /^Guest \d+$/i.test(guest_name)) {
+    if (isPlaceholderGuestName(guest_name)) {
       return res.status(400).json({ error: `Cannot use guest pass for placeholder "${guest_name}". Assign a real guest first.` });
     }
     
@@ -263,7 +264,7 @@ export async function useGuestPass(
   guestName?: string,
   sendNotification: boolean = true
 ): Promise<{ success: boolean; error?: string; remaining?: number }> {
-  if (guestName && /^Guest \d+$/i.test(guestName)) {
+  if (isPlaceholderGuestName(guestName)) {
     return { success: false, error: `Cannot use guest pass for placeholder "${guestName}". Assign a real guest first.` };
   }
   

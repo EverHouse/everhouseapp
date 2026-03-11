@@ -3,7 +3,7 @@ import { getTierLimits, getMemberTierByEmail } from '../tierService';
 import { db } from '../../db';
 import { sql } from 'drizzle-orm';
 import { MemberService, isUUID, isEmail, normalizeEmail } from '../memberService';
-import { PRICING } from '../billing/pricingConfig';
+import { PRICING, isPlaceholderGuestName } from '../billing/pricingConfig';
 import { toTextArrayLiteral, toIntArrayLiteral, toNumericArrayLiteral } from '../../utils/sqlArrayLiteral';
 
 async function resolveToEmail(identifier: string | undefined): Promise<string> {
@@ -263,8 +263,7 @@ export async function calculateSessionBilling(
       let guestFee = PRICING.GUEST_FEE_DOLLARS;
       let guestPassUsed = false;
       
-      const isPlaceholderGuest = /^Guest \d+$/i.test(participant.displayName || '');
-      const isRealNamedGuest = participant.guestId || !isPlaceholderGuest;
+      const isRealNamedGuest = participant.guestId || !isPlaceholderGuestName(participant.displayName);
       if (isRealNamedGuest && guestPassInfo.hasGuestPassBenefit && guestPassesRemaining > 0) {
         guestPassUsed = true;
         guestPassesRemaining--;
@@ -430,8 +429,7 @@ export async function calculateFullSessionBilling(
       let guestFee = PRICING.GUEST_FEE_DOLLARS;
       let guestPassUsed = false;
       
-      const isPlaceholderGuest = /^Guest \d+$/i.test(participant.displayName || '');
-      const isRealNamedGuest = participant.guestId || !isPlaceholderGuest;
+      const isRealNamedGuest = participant.guestId || !isPlaceholderGuestName(participant.displayName);
       if (isRealNamedGuest && guestPassInfo.hasGuestPassBenefit && guestPassesRemaining > 0) {
         guestPassUsed = true;
         guestPassesRemaining--;

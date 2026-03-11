@@ -10,7 +10,7 @@ import { computeFeeBreakdown, recalculateSessionFees } from '../../core/billing/
 import { logFromRequest } from '../../core/auditLog';
 
 import { ensureSessionForBooking } from '../../core/bookingService/sessionManager';
-import { PRICING } from '../../core/billing/pricingConfig';
+import { PRICING, isPlaceholderGuestName } from '../../core/billing/pricingConfig';
 import { refundGuestPassForParticipant } from '../../core/billing/guestPassConsumer';
 import { getErrorMessage } from '../../utils/errorUtils';
 import { createPacificDate } from '../../utils/dateUtils';
@@ -1220,7 +1220,7 @@ router.post('/api/admin/booking/:id/guests', isStaffOrAdmin, async (req, res) =>
       const declaredPlayerCount = booking.declared_player_count || 1;
       const slotDuration = Math.floor(Number(durationMinutes)/ Math.max(declaredPlayerCount as number, 1));
       const trimmedName = guestName.trim();
-      const isPlaceholder = /^Guest \d+$/i.test(trimmedName) || /^Guest\s*\(.*pending.*\)$/i.test(trimmedName);
+      const isPlaceholder = isPlaceholderGuestName(trimmedName);
 
       let passUsed = false;
       if (!isPlaceholder && ownerEmail) {

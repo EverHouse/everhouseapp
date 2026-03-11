@@ -121,7 +121,7 @@ export function GuestPaymentChoiceModal({
         }
       );
       if (ok) {
-        onSuccess('Guest');
+        onSuccess('Guest (info pending)');
       } else {
         setError(apiError || "Something went wrong adding your guest. Please try again.");
       }

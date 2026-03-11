@@ -82,7 +82,7 @@ Charged per non-member participant at `PRICING.GUEST_FEE_CENTS` (flat rate, defa
 4. Real named guest with an available guest pass and `hasGuestPassBenefit` → fee waived, `guestPassUsed = true`, decrement `guestPassesRemaining`.
 5. All other guests → charged `PRICING.GUEST_FEE_CENTS`.
 
-**Placeholder guests** matching `/^Guest \d+$/i` (e.g., "Guest 1", "Guest 2") are not considered "real named guests" and cannot consume guest passes, but still incur the flat guest fee.
+**Placeholder guests** are detected by `isPlaceholderGuestName()` from `pricingConfig.ts`, matching both `/^Guest \d+$/i` (e.g., "Guest 1", "Guest 2") and `/^Guest\s*\(.*pending.*\)$/i` (e.g., "Guest (info pending)"). They are not considered "real named guests" and cannot consume guest passes, but still incur the flat guest fee. All placeholder detection across the codebase uses this single shared helper.
 
 **Empty slot handling (v8.85.0):** when `effectivePlayerCount > actualParticipantCount`, empty slots are treated identically to guests. Each empty slot's minutes are absorbed into the owner's allocated minutes (increasing potential overage), AND each empty slot incurs `GUEST_FEE_CENTS` as a flat guest fee. Empty slot line items appear in the breakdown with `guestCents = GUEST_FEE_CENTS` and `totalCents = GUEST_FEE_CENTS`. This ensures there is no cost difference between leaving a slot empty and inviting a guest.
 
@@ -229,7 +229,7 @@ Members receive a monthly allocation of guest passes (`guest_passes_per_month` f
 3. **Release** — if a booking is cancelled, `releaseGuestPassHold()` deletes the hold rows, freeing the passes.
 4. **Refund** — `refundGuestPassForParticipant()` decrements `passes_used`, restores the guest fee on the participant, and deletes the `legacy_purchases` record.
 
-Placeholder guests (`/^Guest \d+$/i`) cannot consume guest passes; only named guests or guests with a `guest_id` can.
+Placeholder guests (detected by `isPlaceholderGuestName()` from `pricingConfig.ts`) cannot consume guest passes; only named guests or guests with a `guest_id` can.
 
 ## Supporting Services
 

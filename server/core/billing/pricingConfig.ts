@@ -90,3 +90,10 @@ export function updateFamilyDiscountPercent(percent: number): void {
   _familyDiscountPercent = percent;
   logger.info('[PricingConfig] Family discount updated from Stripe:', { extra: { detail: { percent } } });
 }
+
+export function isPlaceholderGuestName(name: string | null | undefined): boolean {
+  if (!name) return false;
+  const normalized = name.trim().toLowerCase();
+  return /^guest\s+\d+$/.test(normalized) ||
+         /^guest\s*\(.*pending.*\)$/i.test(normalized);
+}

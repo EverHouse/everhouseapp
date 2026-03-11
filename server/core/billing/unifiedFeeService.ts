@@ -5,7 +5,7 @@ import { getDailyUsageFromLedger, getGuestPassInfo, calculateOverageFee } from '
 import { MemberService, isEmail, normalizeEmail, isUUID } from '../memberService';
 import { FeeBreakdown, FeeComputeParams, FeeLineItem } from '../../../shared/models/billing';
 import { logger } from '../logger';
-import { PRICING } from './pricingConfig';
+import { PRICING, isPlaceholderGuestName } from './pricingConfig';
 import { toIntArrayLiteral, toTextArrayLiteral, toBoolArrayLiteral } from '../../utils/sqlArrayLiteral';
 
 type SqlQueryParam = string | number | boolean | null | Date | string[];
@@ -683,7 +683,7 @@ export async function computeFeeBreakdown(params: FeeComputeParams): Promise<Fee
       // This matches the logic in feeCalculator.ts for consistency
       const isActualGuest = !participant.userId;
       const hasRealGuestId = !!participant.guestId;
-      const isPlaceholderGuest = /^Guest \d+$/i.test(participant.displayName || '');
+      const isPlaceholderGuest = isPlaceholderGuestName(participant.displayName);
       const isRealNamedGuest = isActualGuest && (hasRealGuestId || !isPlaceholderGuest);
       
       if (!isActualGuest) {
