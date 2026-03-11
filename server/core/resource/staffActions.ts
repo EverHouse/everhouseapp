@@ -417,35 +417,6 @@ export async function createManualBooking(params: {
     throw { statusCode: 404, error: 'Resource not found' };
   }
 
-  {
-    const existingBookings = await db.select({
-      id: bookingRequests.id,
-      resourceType: resources.type
-    })
-      .from(bookingRequests)
-      .innerJoin(resources, eq(bookingRequests.resourceId, resources.id))
-      .where(and(
-        eq(bookingRequests.userEmail, params.memberEmail.toLowerCase()),
-        sql`${bookingRequests.requestDate} = ${params.bookingDate}`,
-        eq(resources.type, resource.type),
-        or(
-          eq(bookingRequests.status, 'confirmed'),
-          eq(bookingRequests.status, 'pending'),
-          eq(bookingRequests.status, 'pending_approval'),
-          eq(bookingRequests.status, 'approved')
-        )
-      ));
-    
-    if (existingBookings.length > 0) {
-      const resourceTypeLabel = resource.type === 'conference_room' ? 'conference room' : 'bay';
-      throw { 
-        statusCode: 409,
-        error: 'Member already has a booking',
-        message: `This member already has a ${resourceTypeLabel} booking on ${params.bookingDate}. Only one ${resourceTypeLabel} booking per day is allowed.`
-      };
-    }
-  }
-
   const startParts = params.startTime.split(':').map(Number);
   const startMinutes = startParts[0] * 60 + (startParts[1] || 0);
   const endMinutes = startMinutes + params.durationMinutes;

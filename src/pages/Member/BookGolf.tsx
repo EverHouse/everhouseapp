@@ -29,7 +29,7 @@ import {
   type BookingRequest,
   type Closure,
   type GuestPassInfo,
-  type ExistingBookingCheck,
+
   type FeeEstimateResponse,
   type PlayerSlot,
   bookGolfKeys,
@@ -81,7 +81,7 @@ const BookGolf: React.FC = () => {
   const [hasUserSelectedDuration, setHasUserSelectedDuration] = useState(false);
   const [playerSlots, setPlayerSlots] = useState<PlayerSlot[]>([]);
   
-  const [existingDayBooking, setExistingDayBooking] = useState<BookingRequest | null>(null);
+  const [cancelTargetBooking, setCancelTargetBooking] = useState<BookingRequest | null>(null);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [showGuardianConsent, setShowGuardianConsent] = useState(false);
   const [guardianConsentData, setGuardianConsentData] = useState<GuardianConsentData | null>(null);
@@ -254,15 +254,6 @@ const BookGolf: React.FC = () => {
     queryKey: bookGolfKeys.closures(),
     queryFn: () => fetchWithCredentials<Closure[]>('/api/closures'),
     staleTime: 1000 * 60 * 5,
-  });
-
-  // Existing Bookings Check Query
-  const { data: existingBookingCheck } = useQuery({
-    queryKey: bookGolfKeys.existingBookings(selectedDateObj?.date || '', activeTab),
-    queryFn: () => fetchWithCredentials<ExistingBookingCheck>(
-      `/api/bookings/check-existing?date=${selectedDateObj!.date}&resource_type=${activeTab}`
-    ),
-    enabled: !!selectedDateObj?.date && activeTab === 'simulator',
   });
 
   // Fee Estimate Query (debounced via staleTime)
@@ -597,26 +588,16 @@ const BookGolf: React.FC = () => {
   }, [selectedSlot, selectedResource]);
 
   useEffect(() => {
-    if (!selectedDateObj?.date || !myRequests.length || activeTab !== 'simulator') {
-      setExistingDayBooking(null);
-      return;
+    if (cancelTargetBooking && !myRequests.find(r => r.id === cancelTargetBooking.id && (r.status === 'approved' || r.status === 'pending'))) {
+      setCancelTargetBooking(null);
     }
-    
-    const existingBayBooking = myRequests.find(r => 
-      r.request_date === selectedDateObj.date &&
-      (r.status === 'approved' || r.status === 'pending') &&
-      !r.notes?.includes('Conference room booking') &&
-      !r.is_linked_member
-    );
-    
-    setExistingDayBooking(existingBayBooking || null);
-  }, [selectedDateObj, myRequests, activeTab]);
+  }, [myRequests, cancelTargetBooking]);
 
   const memberBayBookingsForDay = useMemo(() => {
     if (!selectedDateObj?.date || !myRequests.length) return [];
     return myRequests.filter(r => 
       r.request_date === selectedDateObj.date &&
-      (r.status === 'approved' || r.status === 'pending') &&
+      (r.status === 'approved' || r.status === 'pending' || r.status === 'cancellation_pending') &&
       !r.notes?.includes('Conference room booking')
     );
   }, [selectedDateObj, myRequests]);
@@ -1152,81 +1133,69 @@ const BookGolf: React.FC = () => {
             </div>
           )}
 
-          {activeTab === 'simulator' && existingBookingCheck?.hasExisting && (
-            <div className={`p-4 rounded-xl mb-4 border ${isDark ? 'bg-amber-900/20 border-amber-800' : 'bg-amber-50 border-amber-200'}`}>
-              <p className={`font-medium ${isDark ? 'text-amber-200' : 'text-amber-800'}`}>
-                {existingBookingCheck.bookings[0]?.status === 'pending'
-                  ? 'You have a pending request on this day'
-                  : 'You already have a booking on this day'}
-              </p>
-              <p className={`text-sm mt-1 ${isDark ? 'text-amber-400' : 'text-amber-600'}`}>
-                {existingBookingCheck.bookings[0]?.resourceName} - {formatTime12Hour(existingBookingCheck.bookings[0]?.startTime)} - {formatTime12Hour(existingBookingCheck.bookings[0]?.endTime)}
-                {existingBookingCheck.staffCreated && ' (Booked by staff)'}
-              </p>
-              <p className={`text-xs mt-2 ${isDark ? 'text-amber-500' : 'text-amber-500'}`}>
-                Only one simulator booking per day is allowed. You can cancel your existing {existingBookingCheck.bookings[0]?.status === 'pending' ? 'request' : 'booking'} from the Dashboard.
-              </p>
-            </div>
-          )}
-
-          {activeTab === 'simulator' && existingDayBooking && !existingBookingCheck?.hasExisting && (
-            <section className={`rounded-xl p-4 border ${
-              existingDayBooking.status === 'cancellation_pending'
-                ? (isDark ? 'bg-orange-500/10 border-orange-500/30' : 'bg-orange-50 border-orange-200')
-                : (isDark ? 'bg-accent/10 border-accent/30' : 'bg-accent/5 border-accent/30')
-            }`}>
-              <div className="flex items-start gap-3">
-                <span className={`material-symbols-outlined text-2xl ${
-                  existingDayBooking.status === 'cancellation_pending' ? (isDark ? 'text-orange-400' : 'text-orange-600') : (isDark ? 'text-accent' : 'text-accent-dark')
+          {activeTab === 'simulator' && memberBayBookingsForDay.length > 0 && (
+            <div className="space-y-3">
+              {memberBayBookingsForDay.map((booking) => (
+                <section key={booking.id} className={`rounded-xl p-4 border ${
+                  booking.status === 'cancellation_pending'
+                    ? (isDark ? 'bg-orange-500/10 border-orange-500/30' : 'bg-orange-50 border-orange-200')
+                    : (isDark ? 'bg-accent/10 border-accent/30' : 'bg-accent/5 border-accent/30')
                 }`}>
-                  {existingDayBooking.status === 'cancellation_pending' ? 'hourglass_top' : existingDayBooking.status === 'pending' ? 'schedule' : 'event_available'}
-                </span>
-                <div className="flex-1">
-                  <h4 className={`font-bold ${isDark ? 'text-white' : 'text-primary'}`}>
-                    {existingDayBooking.status === 'cancellation_pending'
-                      ? 'Cancellation in Progress'
-                      : existingDayBooking.status === 'pending'
-                        ? `You have a pending request for ${formatDateShort(existingDayBooking.request_date)}`
-                        : `You already have a booking for ${formatDateShort(existingDayBooking.request_date)}`
-                    }
-                  </h4>
-                  <p className={`text-sm mt-1 ${isDark ? 'text-white/80' : 'text-primary/80'}`}>
-                    {existingDayBooking.bay_name} - {formatTime12Hour(existingDayBooking.start_time)} - {formatTime12Hour(existingDayBooking.end_time)}
-                  </p>
-                  {existingDayBooking.status === 'cancellation_pending' && (
-                    <p className={`text-xs mt-2 ${isDark ? 'text-orange-400' : 'text-orange-600'}`}>
-                      Your cancellation is being processed
-                    </p>
+                  <div className="flex items-start gap-3">
+                    <span className={`material-symbols-outlined text-2xl ${
+                      booking.status === 'cancellation_pending' ? (isDark ? 'text-orange-400' : 'text-orange-600') : (isDark ? 'text-accent' : 'text-accent-dark')
+                    }`}>
+                      {booking.status === 'cancellation_pending' ? 'hourglass_top' : booking.status === 'pending' ? 'schedule' : 'event_available'}
+                    </span>
+                    <div className="flex-1">
+                      <h4 className={`font-bold ${isDark ? 'text-white' : 'text-primary'}`}>
+                        {booking.status === 'cancellation_pending'
+                          ? 'Cancellation in Progress'
+                          : booking.status === 'pending'
+                            ? `You have a pending request for ${formatDateShort(booking.request_date)}`
+                            : `You already have a booking for ${formatDateShort(booking.request_date)}`
+                        }
+                      </h4>
+                      <p className={`text-sm mt-1 ${isDark ? 'text-white/80' : 'text-primary/80'}`}>
+                        {booking.bay_name} - {formatTime12Hour(booking.start_time)} - {formatTime12Hour(booking.end_time)}
+                      </p>
+                      {booking.status === 'cancellation_pending' && (
+                        <p className={`text-xs mt-2 ${isDark ? 'text-orange-400' : 'text-orange-600'}`}>
+                          Your cancellation is being processed
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  {booking.status !== 'cancellation_pending' && (
+                    <div className="mt-4">
+                      <button
+                        onClick={() => {
+                          haptic.light();
+                          setCancelTargetBooking(booking);
+                          setShowCancelConfirm(true);
+                        }}
+                        className={`tactile-btn w-full py-3 rounded-xl font-bold text-sm border transition-colors flex items-center justify-center gap-2 ${
+                          isDark 
+                            ? 'border-red-500/50 text-red-400 hover:bg-red-500/10' 
+                            : 'border-red-300 text-red-600 hover:bg-red-50'
+                        }`}
+                      >
+                        <span className="material-symbols-outlined text-lg">event_busy</span>
+                        {booking.status === 'pending' ? 'Cancel Request' : 'Cancel Booking'}
+                      </button>
+                    </div>
                   )}
-                </div>
-              </div>
-              {existingDayBooking.status !== 'cancellation_pending' && (
-                <div className="mt-4">
-                  <button
-                    onClick={() => {
-                      haptic.light();
-                      setShowCancelConfirm(true);
-                    }}
-                    className={`tactile-btn w-full py-3 rounded-xl font-bold text-sm border transition-colors flex items-center justify-center gap-2 ${
-                      isDark 
-                        ? 'border-red-500/50 text-red-400 hover:bg-red-500/10' 
-                        : 'border-red-300 text-red-600 hover:bg-red-50'
-                    }`}
-                  >
-                    <span className="material-symbols-outlined text-lg">event_busy</span>
-                    {existingDayBooking?.status === 'pending' ? 'Cancel Request' : 'Cancel Booking'}
-                  </button>
-                </div>
-              )}
-            </section>
+                </section>
+              ))}
+            </div>
           )}
           
           <ModalShell isOpen={showCancelConfirm} onClose={() => setShowCancelConfirm(false)} showCloseButton={false}>
             <div className="p-6 text-center">
               {(() => {
-                const hasTrackman = existingDayBooking && (
-                  !!(existingDayBooking.trackman_booking_id) || 
-                  (existingDayBooking.notes && existingDayBooking.notes.includes('[Trackman Import ID:'))
+                const hasTrackman = cancelTargetBooking && (
+                  !!(cancelTargetBooking.trackman_booking_id) || 
+                  (cancelTargetBooking.notes && cancelTargetBooking.notes.includes('[Trackman Import ID:'))
                 );
                 return (
                   <>
@@ -1235,9 +1204,9 @@ const BookGolf: React.FC = () => {
                         {hasTrackman ? 'warning' : 'event_busy'}
                       </span>
                     </div>
-                    <h3 className={`text-xl font-bold mb-2 ${isDark ? 'text-white' : 'text-primary'}`}>{existingDayBooking?.status === 'pending' ? 'Cancel Request?' : 'Cancel Booking?'}</h3>
+                    <h3 className={`text-xl font-bold mb-2 ${isDark ? 'text-white' : 'text-primary'}`}>{cancelTargetBooking?.status === 'pending' ? 'Cancel Request?' : 'Cancel Booking?'}</h3>
                     <p className={`text-sm mb-4 ${isDark ? 'text-white/70' : 'text-primary/70'}`}>
-                      Are you sure you want to cancel your {existingDayBooking?.status === 'pending' ? 'request' : 'booking'} for {existingDayBooking ? formatDateShort(existingDayBooking.request_date) : ''} at {existingDayBooking ? `${formatTime12Hour(existingDayBooking.start_time)} - ${formatTime12Hour(existingDayBooking.end_time)}` : ''}?
+                      Are you sure you want to cancel your {cancelTargetBooking?.status === 'pending' ? 'request' : 'booking'} for {cancelTargetBooking ? formatDateShort(cancelTargetBooking.request_date) : ''} at {cancelTargetBooking ? `${formatTime12Hour(cancelTargetBooking.start_time)} - ${formatTime12Hour(cancelTargetBooking.end_time)}` : ''}?
                     </p>
                     
                     {hasTrackman && (
@@ -1266,14 +1235,15 @@ const BookGolf: React.FC = () => {
                             : 'border-primary/20 text-primary hover:bg-primary/5'
                         }`}
                       >
-                        {existingDayBooking?.status === 'pending' ? 'Keep Request' : 'Keep Booking'}
+                        {cancelTargetBooking?.status === 'pending' ? 'Keep Request' : 'Keep Booking'}
                       </button>
                       <button
                         onClick={async () => {
-                          if (!existingDayBooking) return;
-                          setExistingDayBooking(null);
+                          if (!cancelTargetBooking) return;
+                          const bookingId = cancelTargetBooking.id;
+                          setCancelTargetBooking(null);
                           setShowCancelConfirm(false);
-                          await handleCancelRequest(existingDayBooking.id);
+                          await handleCancelRequest(bookingId);
                         }}
                         disabled={cancelBookingMutation.isPending}
                         className={`flex-1 py-3 rounded-xl font-bold text-sm transition-colors flex items-center justify-center gap-2 ${
@@ -1305,7 +1275,7 @@ const BookGolf: React.FC = () => {
             </div>
           )}
 
-          {(!existingDayBooking || activeTab !== 'simulator') && !existingBookingCheck?.hasExisting && (activeTab !== 'simulator' || !isAtDailyLimit) && (
+          {(activeTab !== 'simulator' || !isAtDailyLimit) && (
           <>
           <section ref={timeSlotsRef} className="min-h-[120px]">
             <h3 className={`text-[11px] font-bold uppercase tracking-[0.2em] mb-3 ${isDark ? 'text-white/80' : 'text-primary/80'}`} style={{ fontFamily: 'var(--font-label)' }}>Available Times</h3>

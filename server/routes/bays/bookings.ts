@@ -490,7 +490,6 @@ router.post('/api/booking-requests', isAuthenticated, bookingRateLimiter, valida
           `SELECT pg_advisory_xact_lock(hashtext($1))`,
           [requestEmail]
         );
-        // Skip pending check for conference rooms since they auto-confirm
         if (resourceType !== 'conference_room') {
           const pendingCheck = await client.query(
             `SELECT COUNT(*)::int AS cnt FROM booking_requests
@@ -504,43 +503,6 @@ router.post('/api/booking-requests', isAuthenticated, bookingRateLimiter, valida
             });
           }
         }
-      }
-      
-      await client.query(
-        `SELECT id FROM booking_requests 
-         WHERE LOWER(user_email) = LOWER($1) 
-         AND request_date = $2 
-         AND status IN ('pending', 'approved', 'confirmed')
-         FOR UPDATE`,
-        [user_email, request_date]
-      );
-      
-      const linkedEmailCheck = await client.query(
-        `SELECT br.id, br.user_email FROM booking_requests br
-         WHERE br.request_date = $1
-         AND br.status IN ('pending', 'approved', 'confirmed')
-         AND LOWER(br.user_email) != LOWER($2)
-         AND EXISTS (
-           SELECT 1 FROM resources r2 WHERE r2.id = br.resource_id AND r2.type = $3
-         )
-         AND EXISTS (
-           SELECT 1 FROM users u 
-           WHERE LOWER(u.email) = LOWER($2)
-           AND (
-             LOWER(u.trackman_email) = LOWER(br.user_email)
-             OR COALESCE(u.linked_emails, '[]'::jsonb) @> to_jsonb(LOWER(br.user_email)::text)
-             OR COALESCE(u.manually_linked_emails, '[]'::jsonb) @> to_jsonb(LOWER(br.user_email)::text)
-           )
-         )
-         LIMIT 1`,
-        [request_date, user_email, resourceType]
-      );
-
-      if (linkedEmailCheck.rows.length > 0) {
-        await client.query('ROLLBACK');
-        return res.status(409).json({
-          error: 'You already have a booking on this date under a linked account. Please cancel it first or choose a different date.'
-        });
       }
       
       // Check for time slot overlap on the same resource
