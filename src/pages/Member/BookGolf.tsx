@@ -164,11 +164,11 @@ const BookGolf: React.FC = () => {
     staleTime: 1000 * 60 * 5,
   });
 
-  // Availability Query — short staleTime to prevent stale slot bookings
+  // Availability Query — realtime updates via Supabase booking_sessions channel
   const resourceIds = resources.map(r => r.dbId);
   const { data: availableSlots = [], isLoading: availabilityLoading } = useQuery({
     queryKey: bookGolfKeys.availability(resourceIds, selectedDateObj?.date || '', duration, undefined, effectiveUser?.email),
-    staleTime: 1000 * 15,
+    staleTime: 1000 * 60 * 2,
     queryFn: async () => {
       if (!selectedDateObj?.date || resourceIds.length === 0) return [];
       
@@ -494,6 +494,7 @@ const BookGolf: React.FC = () => {
   useEffect(() => {
     const handleBookingUpdate = () => {
       queryClient.invalidateQueries({ queryKey: bookGolfKeys.myRequests(effectiveUser?.email || '') });
+      queryClient.invalidateQueries({ queryKey: ['bookGolf', 'availability'] });
       if (selectedDateObj?.date && activeTab === 'simulator') {
         queryClient.invalidateQueries({ queryKey: bookGolfKeys.existingBookings(selectedDateObj.date, activeTab) });
       }
