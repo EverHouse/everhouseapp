@@ -62,11 +62,26 @@ export async function createSession(
   source: BookingSource = 'member_request',
   tx?: TransactionContext
 ): Promise<{ session: BookingSession; participants: BookingParticipant[] }> {
-  const dbCtx = tx || db;
-  try {
-    const lockKey = `${request.resourceId}::${request.sessionDate}`;
-    await dbCtx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`);
+  const lockKey = `${request.resourceId}::${request.sessionDate}`;
 
+  if (tx) {
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`);
+    return createSessionInner(request, participants, source, tx);
+  }
+
+  return db.transaction(async (innerTx) => {
+    await innerTx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`);
+    return createSessionInner(request, participants, source, innerTx);
+  });
+}
+
+async function createSessionInner(
+  request: CreateSessionRequest,
+  participants: ParticipantInput[],
+  source: BookingSource,
+  tx: TransactionContext
+): Promise<{ session: BookingSession; participants: BookingParticipant[] }> {
+  try {
     const sessionData: InsertBookingSession = {
       resourceId: request.resourceId,
       sessionDate: request.sessionDate,
@@ -77,8 +92,8 @@ export async function createSession(
       createdBy: request.createdBy
     };
     
-    await dbCtx.execute(sql`SET LOCAL app.bypass_overlap_check = 'true'`);
-    const [session] = await dbCtx
+    await tx.execute(sql`SET LOCAL app.bypass_overlap_check = 'true'`);
+    const [session] = await tx
       .insert(bookingSessions)
       .values(sessionData)
       .returning();

@@ -268,8 +268,8 @@ const router = Router();
 let allContactsCache: { data: HubSpotContact[] | null; timestamp: number; lastModifiedCheck: number } = { data: null, timestamp: 0, lastModifiedCheck: 0 };
 const ALL_CONTACTS_CACHE_TTL = 30 * 60 * 1000; // 30 minutes for full refresh
 
-// Track if a background refresh is in progress
 let backgroundRefreshInProgress = false;
+let backgroundRefreshPromise: Promise<void> | null = null;
 
 /**
  * Check if an error is a HubSpot rate limit error (429)
@@ -645,12 +645,13 @@ router.get('/api/hubspot/contacts', isStaffOrAdmin, async (req, res) => {
     
     if (!backgroundRefreshInProgress) {
       backgroundRefreshInProgress = true;
-      fetchAllHubSpotContacts(forceRefresh)
+      backgroundRefreshPromise = fetchAllHubSpotContacts(forceRefresh)
         .catch(err => {
           if (!isProduction) logger.warn('[HubSpot] Background full sync failed', { extra: { err } });
         })
         .finally(() => {
           backgroundRefreshInProgress = false;
+          backgroundRefreshPromise = null;
         });
     }
     
@@ -659,20 +660,26 @@ router.get('/api/hubspot/contacts', isStaffOrAdmin, async (req, res) => {
   
   if (!backgroundRefreshInProgress) {
     backgroundRefreshInProgress = true;
-    try {
-      await fetchAllHubSpotContacts(true);
-      backgroundRefreshInProgress = false;
-      if (allContactsCache.data) {
-        const filteredContacts = filterContacts(allContactsCache.data);
-        return res.json(buildResponse(filteredContacts, false, false));
-      }
-    } catch (err) {
-      logger.warn('[HubSpot] Initial sync failed, returning empty', { extra: { err: err instanceof Error ? err.message : String(err) } });
-      backgroundRefreshInProgress = false;
-    }
+    backgroundRefreshPromise = fetchAllHubSpotContacts(true)
+      .catch(err => {
+        logger.warn('[HubSpot] Initial sync failed', { extra: { err: err instanceof Error ? err.message : String(err) } });
+      })
+      .finally(() => {
+        backgroundRefreshInProgress = false;
+        backgroundRefreshPromise = null;
+      });
+  }
+
+  if (backgroundRefreshPromise) {
+    await backgroundRefreshPromise;
   }
   
-  return res.json(buildResponse([], true, backgroundRefreshInProgress));
+  if (allContactsCache.data) {
+    const filteredContacts = filterContacts(allContactsCache.data);
+    return res.json(buildResponse(filteredContacts, false, false));
+  }
+  
+  return res.json(buildResponse([], true, false));
   } catch (error: unknown) {
     logger.error('Failed to fetch contacts', { error: error instanceof Error ? error : new Error(String(error)) });
     return res.status(500).json({ error: 'Failed to fetch contacts' });
@@ -766,6 +773,7 @@ router.post('/api/hubspot/forms/:formType', async (req, res) => {
       return res.status(400).json({ error: 'Context must be an object if provided' });
     }
     
+    let guestCheckinMemberEmail: string | null = null;
     if (formType === 'guest-checkin') {
       const sessionUser = getSessionUser(req);
       if (!sessionUser || !sessionUser.isStaff) {
@@ -777,20 +785,16 @@ router.post('/api/hubspot/forms/:formType', async (req, res) => {
         return res.status(400).json({ error: 'Member email is required for guest check-in' });
       }
       
-      const memberEmail = memberEmailField.value;
+      guestCheckinMemberEmail = memberEmailField.value;
       
-      const updateResult = await db.execute(sql`UPDATE guest_passes 
-         SET passes_used = passes_used + 1 
-         WHERE member_email = ${memberEmail} AND passes_used < passes_total
-         RETURNING passes_used, passes_total`);
+      const passCheck = await db.execute(sql`SELECT passes_used, passes_total FROM guest_passes WHERE member_email = ${guestCheckinMemberEmail}`);
       
-      if (updateResult.rows.length === 0) {
-        const passCheck = await db.execute(sql`SELECT passes_used, passes_total FROM guest_passes WHERE member_email = ${memberEmail}`);
-        
-        if (passCheck.rows.length === 0) {
-          return res.status(400).json({ error: 'Guest pass record not found. Please contact staff.' });
-        }
-        
+      if (passCheck.rows.length === 0) {
+        return res.status(400).json({ error: 'Guest pass record not found. Please contact staff.' });
+      }
+      
+      const passRow = passCheck.rows[0] as { passes_used: number; passes_total: number };
+      if (passRow.passes_used >= passRow.passes_total) {
         return res.status(400).json({ error: 'No guest passes remaining. Please contact staff for assistance.' });
       }
     }
@@ -848,6 +852,19 @@ router.post('/api/hubspot/forms/:formType', async (req, res) => {
       const errorData = await response.json();
       if (!isProduction) logger.error('HubSpot form error', { extra: { errorData } });
       return res.status(response.status).json({ error: 'Form submission failed' });
+    }
+
+    if (guestCheckinMemberEmail) {
+      const updateResult = await db.execute(sql`UPDATE guest_passes 
+         SET passes_used = passes_used + 1 
+         WHERE member_email = ${guestCheckinMemberEmail} AND passes_used < passes_total
+         RETURNING passes_used, passes_total`);
+      
+      if (updateResult.rows.length === 0) {
+        logger.warn('[Guest Check-in] HubSpot form submitted but guest pass deduction failed (pass may have been used concurrently)', {
+          extra: { memberEmail: guestCheckinMemberEmail }
+        });
+      }
     }
     
     const result: Record<string, unknown> = await response.json();
