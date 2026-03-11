@@ -93,6 +93,8 @@ interface FeePreviewResponse {
       displayName: string;
       type: string;
       minutes: number;
+      feeCents?: number;
+      guestPassUsed?: boolean;
     }>;
   };
   ownerFees: {
@@ -137,7 +139,7 @@ const RosterManager: React.FC<RosterManagerProps> = ({
   const { effectiveTheme } = useTheme();
   const isDark = effectiveTheme === 'dark';
   const { showToast } = useToast();
-  const { guestFeeDollars } = usePricing();
+  const { guestFeeDollars, overageRatePerBlockDollars } = usePricing();
   const [rosterListRef] = useAutoAnimate();
 
   const [loading, setLoading] = useState(true);
@@ -395,9 +397,9 @@ const RosterManager: React.FC<RosterManagerProps> = ({
             </div>
           )}
 
-          {resourceType !== 'conference_room' && otherParticipants.map(participant => (
+          {resourceType !== 'conference_room' && otherParticipants.map((participant, idx) => (
             <div 
-              key={participant.id}
+              key={`${participant.id}-${idx}`}
               className={`flex items-center gap-3 px-6 py-3 rounded-xl ${isDark ? 'bg-white/5' : 'bg-black/[0.02]'}`}
             >
               <Avatar name={participant.displayName} size="md" />
@@ -478,16 +480,40 @@ const RosterManager: React.FC<RosterManagerProps> = ({
             </h4>
             
             <div className="space-y-2">
-              {feePreview.timeAllocation.allocations.map((alloc, idx) => (
-                <div key={idx} className="flex items-center justify-between">
-                  <span className={`text-sm ${isDark ? 'text-white/60' : 'text-[#293515]/60'}`}>
-                    {alloc.displayName}
-                  </span>
-                  <span className={`text-sm font-medium ${isDark ? 'text-white' : 'text-[#293515]'}`}>
-                    {alloc.minutes} min
-                  </span>
-                </div>
-              ))}
+              {feePreview.timeAllocation.allocations.map((alloc, idx) => {
+                const isEmptySlot = alloc.displayName === 'Empty Slot';
+                const isGuestWithPass = alloc.type === 'guest' && !isEmptySlot && alloc.guestPassUsed;
+                const isGuestWithFee = alloc.type === 'guest' && !isEmptySlot && !alloc.guestPassUsed && (alloc.feeCents ?? 0) > 0;
+
+                return (
+                  <div key={idx} className="flex items-center justify-between">
+                    <span className={`text-sm flex items-center gap-1.5 ${isDark ? 'text-white/60' : 'text-[#293515]/60'}`}>
+                      {isGuestWithPass && (
+                        <span className={`material-symbols-outlined text-sm ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`}>confirmation_number</span>
+                      )}
+                      {alloc.displayName}
+                      {isEmptySlot && (
+                        <span className={`text-xs ${isDark ? 'text-amber-400/70' : 'text-amber-600/70'}`}>
+                          (${guestFeeDollars.toFixed(0)} overage)
+                        </span>
+                      )}
+                      {isGuestWithPass && (
+                        <span className={`text-xs ${isDark ? 'text-emerald-400/70' : 'text-emerald-600/70'}`}>
+                          (pass)
+                        </span>
+                      )}
+                      {isGuestWithFee && (
+                        <span className={`text-xs ${isDark ? 'text-amber-400/70' : 'text-amber-600/70'}`}>
+                          (${guestFeeDollars.toFixed(0)} fee)
+                        </span>
+                      )}
+                    </span>
+                    <span className={`text-sm font-medium ${isDark ? 'text-white' : 'text-[#293515]'}`}>
+                      {alloc.minutes} min
+                    </span>
+                  </div>
+                );
+              })}
               
               {/* Open Slots - show unfilled slots so math balances */}
               {(() => {
@@ -536,6 +562,11 @@ const RosterManager: React.FC<RosterManagerProps> = ({
                     <div className="flex items-center justify-between">
                       <span className={`text-sm ${isDark ? 'text-amber-400' : 'text-amber-600'}`}>
                         Overage
+                        {overageRatePerBlockDollars > 0 && (
+                          <span className="text-xs opacity-70 ml-1">
+                            ({Math.ceil(feePreview.ownerFees.overageMinutes / 30)} × ${overageRatePerBlockDollars.toFixed(0)})
+                          </span>
+                        )}
                       </span>
                       <span className={`text-sm font-medium ${isDark ? 'text-amber-400' : 'text-amber-600'}`}>
                         {feePreview.ownerFees.overageMinutes} min

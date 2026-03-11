@@ -3,7 +3,8 @@ import { ZodSchema, ZodError } from 'zod';
 
 export function validateBody<T>(schema: ZodSchema<T>) {
   return (req: Request, res: Response, next: NextFunction) => {
-    const result = schema.safeParse(req.body);
+    const body = req.body === undefined || req.body === null ? {} : req.body;
+    const result = schema.safeParse(body);
     if (!result.success) {
       const formatted = formatZodError(result.error);
       return res.status(400).json({ error: formatted });

@@ -664,6 +664,7 @@ export async function previewRosterFees(
         type: p.participantType,
         minutes: p.minutesAllocated,
         feeCents: p.totalCents,
+        guestPassUsed: p.guestPassUsed ?? false,
       })),
     },
     ownerFees: {
@@ -1070,12 +1071,13 @@ export async function addParticipant(params: AddParticipantParams): Promise<AddP
     const ownerTier = booking.owner_tier || await getMemberTierByEmail(booking.owner_email);
 
     if (type === 'guest' && ownerTier) {
+      const guestDisplayName = guest?.name || `Guest ${existingParticipants.filter(p => p.participantType === 'guest').length + 1}`;
       const participantsForValidation: ParticipantForValidation[] = [
         ...existingParticipants.map(p => ({
           type: p.participantType as 'owner' | 'member' | 'guest',
           displayName: p.displayName
         })),
-        { type: 'guest', displayName: guest!.name }
+        { type: 'guest', displayName: guestDisplayName }
       ];
 
       const socialCheck = await enforceSocialTierRules(ownerTier, participantsForValidation);
@@ -1097,6 +1099,13 @@ export async function addParticipant(params: AddParticipantParams): Promise<AddP
         userId: memberInfo.id,
         participantType: 'member',
         displayName,
+      };
+    } else if (type === 'guest' && params.useGuestPass === false && !guest) {
+      const guestNumber = existingParticipants.filter(p => p.participantType === 'guest').length + 1;
+      const placeholderName = `Guest ${guestNumber}`;
+      participantInput = {
+        participantType: 'guest',
+        displayName: placeholderName,
       };
     } else {
       const guestId = await createOrFindGuest(

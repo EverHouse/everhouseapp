@@ -198,16 +198,28 @@ export const MemberSearchInput: React.FC<MemberSearchInputProps> = ({
   const syncDropdownPosition = useCallback(() => {
     if (!containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
-    const scrollY = window.scrollY || document.documentElement.scrollTop;
-    const scrollX = window.scrollX || document.documentElement.scrollLeft;
+
+    const vv = window.visualViewport;
+    const viewportHeight = vv ? vv.height : window.innerHeight;
+    const viewportOffsetTop = vv ? vv.offsetTop : 0;
+
+    const rectTopInVV = rect.top - viewportOffsetTop;
+    const rectBottomInVV = rect.bottom - viewportOffsetTop;
+    const spaceBelow = viewportHeight - rectBottomInVV;
+    const spaceAbove = rectTopInVV;
+    const maxDropdownHeight = 256;
+    const placeAbove = spaceBelow < Math.min(maxDropdownHeight, 120) && spaceAbove > spaceBelow;
+    const clampedHeight = Math.min(maxDropdownHeight, Math.max(placeAbove ? spaceAbove - 8 : spaceBelow - 8, 80));
 
     setDropdownStyle({
-      position: 'absolute',
-      top: rect.bottom + scrollY + 4,
-      left: rect.left + scrollX,
+      position: 'fixed',
+      top: placeAbove ? undefined : rect.bottom + 4,
+      bottom: placeAbove ? (window.innerHeight - rect.top + 4) : undefined,
+      left: rect.left,
       width: rect.width,
+      maxHeight: clampedHeight,
       zIndex: 99999,
-    });
+    } as React.CSSProperties);
   }, []);
 
   useEffect(() => {
@@ -296,7 +308,7 @@ export const MemberSearchInput: React.FC<MemberSearchInputProps> = ({
       id={listboxId}
       role="listbox"
       style={dropdownStyle}
-      className="bg-white dark:bg-gray-900 border border-primary/10 dark:border-white/10 rounded-xl shadow-xl overflow-hidden max-h-64 overflow-y-auto"
+      className="bg-white dark:bg-gray-900 border border-primary/10 dark:border-white/10 rounded-xl shadow-xl overflow-hidden overflow-y-auto"
     >
       {filteredMembers.length > 0 ? (
         filteredMembers.map((member, index) => {
@@ -376,7 +388,10 @@ export const MemberSearchInput: React.FC<MemberSearchInputProps> = ({
           value={query}
           onChange={handleInputChange}
           onKeyDown={handleKeyDown}
-          onFocus={() => query.trim() && setIsOpen(true)}
+          enterKeyHint="search"
+          onFocus={() => {
+            if (query.trim()) setIsOpen(true);
+          }}
           placeholder={placeholder}
           disabled={disabled}
           autoFocus={autoFocus}

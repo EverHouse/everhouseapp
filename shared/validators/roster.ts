@@ -11,8 +11,8 @@ export const addParticipantSchema = z.object({
   useGuestPass: z.boolean().optional(),
   deferFeeRecalc: z.boolean().optional(),
 }).refine(
-  (data) => data.type !== 'guest' || (data.guest && data.guest.name && data.guest.email),
-  { message: 'Guest name and email are required for guest participants', path: ['guest'] }
+  (data) => data.type !== 'guest' || data.useGuestPass === false || (data.guest && data.guest.name && data.guest.email),
+  { message: 'Guest name and email are required when using a guest pass', path: ['guest'] }
 );
 
 const batchOperationSchema = z.object({
