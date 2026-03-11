@@ -339,7 +339,7 @@ const checkOtpVerifyAttempts = async (email: string, ip?: string): Promise<{ all
       }
       
       if (locked_until && new Date(locked_until) <= now) {
-        await db.delete(rateLimits).where(eq(rateLimits.key, perIpKey));
+        db.delete(rateLimits).where(eq(rateLimits.key, perIpKey)).catch((err) => logger.warn('[RateLimit] Non-critical expired lock cleanup failed', { key: perIpKey, error: err }));
       }
     }
 
@@ -356,7 +356,7 @@ const checkOtpVerifyAttempts = async (email: string, ip?: string): Promise<{ all
         return { allowed: false, retryAfter: Math.max(0, retryAfter) };
       }
       if (ipLocked && new Date(ipLocked) <= now) {
-        await db.delete(rateLimits).where(eq(rateLimits.key, ipKey));
+        db.delete(rateLimits).where(eq(rateLimits.key, ipKey)).catch((err) => logger.warn('[RateLimit] Non-critical expired lock cleanup failed', { key: ipKey, error: err }));
       }
     }
 
@@ -373,7 +373,7 @@ const checkOtpVerifyAttempts = async (email: string, ip?: string): Promise<{ all
         return { allowed: false, retryAfter: Math.max(0, retryAfter) };
       }
       if (emailLocked && new Date(emailLocked) <= now) {
-        await db.delete(rateLimits).where(eq(rateLimits.key, emailKey));
+        db.delete(rateLimits).where(eq(rateLimits.key, emailKey)).catch((err) => logger.warn('[RateLimit] Non-critical expired lock cleanup failed', { key: emailKey, error: err }));
       }
     }
     
@@ -397,10 +397,18 @@ const recordOtpVerifyFailure = async (email: string, ip?: string): Promise<void>
     await db.execute(sql`INSERT INTO rate_limits (key, limit_type, count, reset_at, updated_at)
        VALUES (${perIpKey}, 'otp_verify', 1, ${resetAt}, NOW())
        ON CONFLICT (key) DO UPDATE SET
-         count = rate_limits.count + 1,
-         locked_until = CASE 
-           WHEN rate_limits.count + 1 >= ${OTP_VERIFY_MAX_ATTEMPTS} THEN ${lockedUntil}
+         count = CASE
+           WHEN rate_limits.locked_until IS NOT NULL AND rate_limits.locked_until <= NOW() THEN 1
+           ELSE rate_limits.count + 1
+         END,
+         locked_until = CASE
+           WHEN rate_limits.locked_until IS NOT NULL AND rate_limits.locked_until <= NOW() THEN NULL
+           WHEN CASE WHEN rate_limits.locked_until IS NOT NULL AND rate_limits.locked_until <= NOW() THEN 1 ELSE rate_limits.count + 1 END >= ${OTP_VERIFY_MAX_ATTEMPTS} THEN ${lockedUntil}
            ELSE rate_limits.locked_until
+         END,
+         reset_at = CASE
+           WHEN rate_limits.locked_until IS NOT NULL AND rate_limits.locked_until <= NOW() THEN ${resetAt}
+           ELSE rate_limits.reset_at
          END,
          updated_at = NOW()
        RETURNING count`);
@@ -409,10 +417,18 @@ const recordOtpVerifyFailure = async (email: string, ip?: string): Promise<void>
     await db.execute(sql`INSERT INTO rate_limits (key, limit_type, count, reset_at, updated_at)
        VALUES (${ipKey}, 'otp_verify_ip', 1, ${resetAt}, NOW())
        ON CONFLICT (key) DO UPDATE SET
-         count = rate_limits.count + 1,
-         locked_until = CASE 
-           WHEN rate_limits.count + 1 >= ${OTP_VERIFY_IP_MAX_ATTEMPTS} THEN ${lockedUntil}
+         count = CASE
+           WHEN rate_limits.locked_until IS NOT NULL AND rate_limits.locked_until <= NOW() THEN 1
+           ELSE rate_limits.count + 1
+         END,
+         locked_until = CASE
+           WHEN rate_limits.locked_until IS NOT NULL AND rate_limits.locked_until <= NOW() THEN NULL
+           WHEN CASE WHEN rate_limits.locked_until IS NOT NULL AND rate_limits.locked_until <= NOW() THEN 1 ELSE rate_limits.count + 1 END >= ${OTP_VERIFY_IP_MAX_ATTEMPTS} THEN ${lockedUntil}
            ELSE rate_limits.locked_until
+         END,
+         reset_at = CASE
+           WHEN rate_limits.locked_until IS NOT NULL AND rate_limits.locked_until <= NOW() THEN ${resetAt}
+           ELSE rate_limits.reset_at
          END,
          updated_at = NOW()
        RETURNING count`);
@@ -421,10 +437,18 @@ const recordOtpVerifyFailure = async (email: string, ip?: string): Promise<void>
     await db.execute(sql`INSERT INTO rate_limits (key, limit_type, count, reset_at, updated_at)
        VALUES (${emailKey}, 'otp_verify_email', 1, ${resetAt}, NOW())
        ON CONFLICT (key) DO UPDATE SET
-         count = rate_limits.count + 1,
-         locked_until = CASE 
-           WHEN rate_limits.count + 1 >= ${OTP_VERIFY_EMAIL_MAX_ATTEMPTS} THEN ${lockedUntil}
+         count = CASE
+           WHEN rate_limits.locked_until IS NOT NULL AND rate_limits.locked_until <= NOW() THEN 1
+           ELSE rate_limits.count + 1
+         END,
+         locked_until = CASE
+           WHEN rate_limits.locked_until IS NOT NULL AND rate_limits.locked_until <= NOW() THEN NULL
+           WHEN CASE WHEN rate_limits.locked_until IS NOT NULL AND rate_limits.locked_until <= NOW() THEN 1 ELSE rate_limits.count + 1 END >= ${OTP_VERIFY_EMAIL_MAX_ATTEMPTS} THEN ${lockedUntil}
            ELSE rate_limits.locked_until
+         END,
+         reset_at = CASE
+           WHEN rate_limits.locked_until IS NOT NULL AND rate_limits.locked_until <= NOW() THEN ${resetAt}
+           ELSE rate_limits.reset_at
          END,
          updated_at = NOW()
        RETURNING count`);
@@ -804,7 +828,7 @@ router.post('/api/auth/verify-otp', async (req, res) => {
     
     let normalizedEmail = normalizeEmail(email);
     const normalizedCode = code.toString().trim();
-    const clientIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket.remoteAddress || '';
+    const clientIp = req.ip || req.socket.remoteAddress || 'unknown';
     
     const attemptCheck = await checkOtpVerifyAttempts(normalizedEmail, clientIp);
     if (!attemptCheck.allowed) {
@@ -1017,20 +1041,26 @@ router.post('/api/auth/verify-otp', async (req, res) => {
     // Track first login for onboarding (async, non-blocking)
     db.execute(sql`UPDATE users SET first_login_at = NOW(), updated_at = NOW() WHERE LOWER(email) = LOWER(${member.email}) AND first_login_at IS NULL`).catch((err) => logger.warn('[Auth] Non-critical first_login_at update failed:', err));
 
-    // Send welcome email on first login (async, non-blocking)
+    // Send welcome email on first login (async, non-blocking, atomic claim)
     (async () => {
       try {
-        const [user] = await db.select({ welcomeEmailSent: users.welcomeEmailSent })
-          .from(users)
-          .where(sql`LOWER(${users.email}) = LOWER(${member.email})`)
-          .limit(1);
-        
-        if (user && !user.welcomeEmailSent && member.role === 'member') {
-          const result = await sendWelcomeEmail(member.email, member.firstName);
-          if (result.success) {
-            await db.update(users)
-              .set({ welcomeEmailSent: true, welcomeEmailSentAt: new Date() })
-              .where(sql`LOWER(${users.email}) = LOWER(${member.email})`);
+        if (member.role === 'member') {
+          const claimed = await db.execute(sql`
+            UPDATE users
+            SET welcome_email_sent = true, welcome_email_sent_at = NOW(), updated_at = NOW()
+            WHERE LOWER(email) = LOWER(${member.email})
+              AND (welcome_email_sent IS NULL OR welcome_email_sent = false)
+            RETURNING id
+          `);
+          if (claimed.rows.length > 0) {
+            const result = await sendWelcomeEmail(member.email, member.firstName);
+            if (!result.success) {
+              await db.execute(sql`
+                UPDATE users SET welcome_email_sent = false, welcome_email_sent_at = NULL, updated_at = NOW()
+                WHERE LOWER(email) = LOWER(${member.email})
+              `);
+              logger.warn('[Welcome Email] Send failed, reset flag for retry', { email: member.email });
+            }
           }
         }
       } catch (error: unknown) {
