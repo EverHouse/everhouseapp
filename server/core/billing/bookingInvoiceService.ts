@@ -246,7 +246,7 @@ export async function createDraftInvoiceForBooking(
     metadata: invoiceMetadata,
     pending_invoice_items_behavior: 'exclude',
   }, {
-    idempotencyKey: `invoice_booking_draft_${bookingId}_${sessionId}_${Math.floor(Date.now() / 300000)}`
+    idempotencyKey: `invoice_booking_draft_${bookingId}_${sessionId}_${Date.now()}`
   });
 
   try {

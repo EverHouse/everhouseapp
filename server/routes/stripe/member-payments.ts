@@ -33,40 +33,47 @@ import { getBookingInvoiceId, createDraftInvoiceForBooking, buildInvoiceDescript
 async function retrieveInvoicePaymentIntent(
   stripe: Stripe,
   invoiceId: string,
-  maxAttempts = 4,
 ): Promise<{ piId: string; clientSecret: string }> {
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    const inv = await stripe.invoices.retrieve(invoiceId, { expand: ['payment_intent'] });
-    const rawPi = (inv as unknown as { payment_intent: string | Stripe.PaymentIntent | null }).payment_intent;
+  const inv = await stripe.invoices.retrieve(invoiceId, { expand: ['payment_intent'] });
+  const rawPi = (inv as unknown as { payment_intent: string | Stripe.PaymentIntent | null }).payment_intent;
 
-    let piId: string | null = null;
-    let clientSecret: string | null = null;
-
-    if (typeof rawPi === 'object' && rawPi !== null) {
-      const piObj = rawPi as Stripe.PaymentIntent;
-      if (piObj.status !== 'canceled') {
-        piId = piObj.id;
-        clientSecret = piObj.client_secret;
-      }
-    } else if (typeof rawPi === 'string') {
-      const pi = await stripe.paymentIntents.retrieve(rawPi);
-      if (pi.status !== 'canceled') {
-        piId = pi.id;
-        clientSecret = pi.client_secret;
-      }
+  if (typeof rawPi === 'object' && rawPi !== null) {
+    const piObj = rawPi as Stripe.PaymentIntent;
+    if (piObj.status !== 'canceled' && piObj.client_secret) {
+      return { piId: piObj.id, clientSecret: piObj.client_secret };
     }
-
-    if (piId && clientSecret) {
-      return { piId, clientSecret };
-    }
-
-    if (attempt < maxAttempts) {
-      logger.info('[Stripe] Invoice PI not ready yet, retrying...', { extra: { invoiceId, attempt, maxAttempts } });
-      await new Promise(resolve => setTimeout(resolve, 500 * attempt));
+  } else if (typeof rawPi === 'string') {
+    const pi = await stripe.paymentIntents.retrieve(rawPi);
+    if (pi.status !== 'canceled' && pi.client_secret) {
+      return { piId: pi.id, clientSecret: pi.client_secret };
     }
   }
 
-  throw new Error(`Invoice ${invoiceId} has no PaymentIntent after ${maxAttempts} attempts`);
+  logger.info('[Stripe] No PI on invoice via retrieve, forcing creation via pay()', { extra: { invoiceId, invoiceStatus: inv.status } });
+
+  const paidInvoice = await stripe.invoices.pay(invoiceId, {
+    payment_behavior: 'default_incomplete',
+  } as Stripe.InvoicePayParams);
+
+  const afterPi = (paidInvoice as unknown as { payment_intent: string | Stripe.PaymentIntent | null }).payment_intent;
+
+  if (typeof afterPi === 'object' && afterPi !== null) {
+    const piObj = afterPi as Stripe.PaymentIntent;
+    if (piObj.client_secret) {
+      return { piId: piObj.id, clientSecret: piObj.client_secret };
+    }
+    const fullPi = await stripe.paymentIntents.retrieve(piObj.id);
+    if (fullPi.client_secret) {
+      return { piId: fullPi.id, clientSecret: fullPi.client_secret };
+    }
+  } else if (typeof afterPi === 'string') {
+    const pi = await stripe.paymentIntents.retrieve(afterPi);
+    if (pi.client_secret) {
+      return { piId: pi.id, clientSecret: pi.client_secret };
+    }
+  }
+
+  throw new Error(`Invoice ${invoiceId} has no PaymentIntent after pay() attempt`);
 }
 
 interface BookingRow {
@@ -253,14 +260,10 @@ async function handleExistingInvoicePayment(params: {
 
     if (existingInvoice.status === 'draft') {
       await stripe.invoices.update(existingInvoiceId, {
-        collection_method: 'send_invoice',
-        days_until_due: 30,
+        collection_method: 'charge_automatically',
       });
-    }
-
-    if (existingInvoice.status === 'draft') {
       await stripe.invoices.finalizeInvoice(existingInvoiceId, { auto_advance: false });
-      logger.info('[Stripe] Finalized draft invoice as send_invoice for interactive member payment', { extra: { bookingId, invoiceId: existingInvoiceId } });
+      logger.info('[Stripe] Finalized draft invoice as charge_automatically for interactive member payment', { extra: { bookingId, invoiceId: existingInvoiceId } });
     }
 
     const { piId: invoicePiId, clientSecret: invoicePiSecret } = await retrieveInvoicePaymentIntent(stripe, existingInvoiceId);
@@ -516,12 +519,11 @@ router.post('/api/member/bookings/:id/pay-fees', isAuthenticated, paymentRateLim
     const stripe = await getStripeClient();
 
     await stripe.invoices.update(draftResult.invoiceId, {
-      collection_method: 'send_invoice',
-      days_until_due: 30,
+      collection_method: 'charge_automatically',
     });
 
     await stripe.invoices.finalizeInvoice(draftResult.invoiceId, { auto_advance: false });
-    logger.info('[Stripe] Finalized new invoice as send_invoice for interactive member payment', { extra: { bookingId, invoiceId: draftResult.invoiceId } });
+    logger.info('[Stripe] Finalized new invoice as charge_automatically for interactive member payment', { extra: { bookingId, invoiceId: draftResult.invoiceId } });
 
     const { piId: invoicePiId, clientSecret: invoicePiSecret } = await retrieveInvoicePaymentIntent(stripe, draftResult.invoiceId);
 
@@ -778,20 +780,18 @@ router.post('/api/member/invoices/:invoiceId/pay', isAuthenticated, async (req: 
 
     if (stripeInvoice.status === 'draft') {
       await stripe.invoices.update(invoiceId as string, {
-        collection_method: 'send_invoice',
-        days_until_due: 30,
+        collection_method: 'charge_automatically',
       });
       await stripe.invoices.finalizeInvoice(invoiceId as string, { auto_advance: false });
-      logger.info('[Stripe] Finalized draft invoice as send_invoice for interactive member payment', { extra: { invoiceId } });
+      logger.info('[Stripe] Finalized draft invoice as charge_automatically for interactive member payment', { extra: { invoiceId } });
     } else if (stripeInvoice.status === 'open') {
-      if (stripeInvoice.collection_method === 'charge_automatically') {
+      if (stripeInvoice.collection_method === 'send_invoice') {
         await stripe.invoices.update(invoiceId as string, {
-          collection_method: 'send_invoice',
-          days_until_due: 30,
+          collection_method: 'charge_automatically',
         });
-        logger.info('[Stripe] Switched open invoice from charge_automatically to send_invoice', { extra: { invoiceId } });
+        logger.info('[Stripe] Switched open invoice from send_invoice to charge_automatically', { extra: { invoiceId } });
       } else {
-        logger.info('[Stripe] Invoice already open with send_invoice — using existing PI', { extra: { invoiceId } });
+        logger.info('[Stripe] Invoice already open with charge_automatically — using existing PI', { extra: { invoiceId } });
       }
     }
 
