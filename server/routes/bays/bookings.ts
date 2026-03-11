@@ -1264,13 +1264,17 @@ router.put('/api/booking-requests/:id/member-cancel', isAuthenticated, async (re
         .where(eq(bookingRequests.id, bookingId));
     });
     
-    for (const guest of guestPassRecipientsToRefund) {
-      try {
-        await refundGuestPass(existing.userEmail, guest.displayName || undefined, false);
-        logger.info('[Member Cancel] Refunded guest pass for participant', { extra: { bookingId, guestName: guest.displayName, ownerEmail: existing.userEmail } });
-      } catch (refundErr: unknown) {
-        logger.error('[Member Cancel] Failed to refund guest pass (non-blocking)', { extra: { bookingId, guestName: guest.displayName, error: getErrorMessage(refundErr) } });
+    if (!shouldSkipRefund) {
+      for (const guest of guestPassRecipientsToRefund) {
+        try {
+          await refundGuestPass(existing.userEmail, guest.displayName || undefined, false);
+          logger.info('[Member Cancel] Refunded guest pass for participant', { extra: { bookingId, guestName: guest.displayName, ownerEmail: existing.userEmail } });
+        } catch (refundErr: unknown) {
+          logger.error('[Member Cancel] Failed to refund guest pass (non-blocking)', { extra: { bookingId, guestName: guest.displayName, error: getErrorMessage(refundErr) } });
+        }
       }
+    } else {
+      logger.info('[Member Cancel] Late cancellation — skipping guest pass refund', { extra: { bookingId, hoursUntilStart } });
     }
     
     if (!shouldSkipRefund) {

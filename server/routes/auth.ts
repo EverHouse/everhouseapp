@@ -863,7 +863,7 @@ router.post('/api/auth/verify-otp', async (req, res) => {
     const otpRecord = atomicResult.rows[0];
     
     const role = await getUserRole(normalizedEmail);
-    const sessionTtl = 7 * 24 * 60 * 60 * 1000;
+    const sessionTtl = 30 * 24 * 60 * 60 * 1000;
     
     let member: SessionUser | undefined;
     let shouldSetupPassword = false;
@@ -1257,7 +1257,7 @@ router.post('/api/auth/password-login', async (req, res) => {
       if (!isProduction) logger.error('HubSpot lookup failed', { error: hubspotError instanceof Error ? hubspotError : new Error(getErrorMessage(hubspotError)) });
     }
     
-    const sessionTtl = 7 * 24 * 60 * 60 * 1000;
+    const sessionTtl = 30 * 24 * 60 * 60 * 1000;
     const member = {
       id: memberData?.id || userRecord.id.toString(),
       firstName: memberData?.firstName || userRecord.name?.split(' ')[0] || '',
@@ -1380,7 +1380,7 @@ router.post('/api/auth/dev-login', async (req, res) => {
     
     const user = existingUser[0];
     
-    const sessionTtl = 7 * 24 * 60 * 60 * 1000;
+    const sessionTtl = 30 * 24 * 60 * 60 * 1000;
     const member = {
       id: user.id,
       firstName: user.firstName || '',

@@ -63,7 +63,7 @@ export async function handleCancellationCascade(
   const bookingStartTime = createPacificDate(requestDate, startTime);
   const now = new Date();
   const hoursUntilStart = (bookingStartTime.getTime() - now.getTime()) / (1000 * 60 * 60);
-  const shouldRefundGuestPasses = hoursUntilStart > 24;
+  const shouldRefundGuestPasses = hoursUntilStart >= 1;
 
   logger.info('[cancellation-cascade] Starting cascade', {
     extra: {
@@ -290,7 +290,7 @@ export async function handleCancellationCascade(
         await notifyMember({
           userEmail: ownerEmail,
           title: 'Guest Passes Refunded',
-          message: `${result.guestPassesRefunded} guest pass${result.guestPassesRefunded > 1 ? 'es have' : ' has'} been refunded due to your booking cancellation (cancelled more than 24 hours in advance).`,
+          message: `${result.guestPassesRefunded} guest pass${result.guestPassesRefunded > 1 ? 'es have' : ' has'} been refunded due to your booking cancellation (cancelled more than 1 hour in advance).`,
           type: 'guest_pass',
           relatedId: bookingId,
           relatedType: 'booking_request'

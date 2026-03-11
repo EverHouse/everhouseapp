@@ -98,7 +98,7 @@ router.post('/api/auth/google/verify', async (req, res) => {
       return res.status(403).json({ error: 'Your membership is not active. Please contact us for assistance.' });
     }
 
-    const sessionTtl = 7 * 24 * 60 * 60 * 1000;
+    const sessionTtl = 30 * 24 * 60 * 60 * 1000;
     const member = {
       id: user.id,
       firstName: user.firstName || '',
@@ -217,7 +217,7 @@ router.post('/api/auth/google/callback', async (req, res) => {
       return res.redirect('/login?error=inactive_membership');
     }
 
-    const sessionTtl = 7 * 24 * 60 * 60 * 1000;
+    const sessionTtl = 30 * 24 * 60 * 60 * 1000;
     const member = {
       id: user.id,
       firstName: user.firstName || '',
