@@ -1632,18 +1632,57 @@ router.post('/api/admin/trackman-webhooks/backfill', isAdmin, async (req, res) =
             member: existingBooking.user_email || existingBooking.user_name
           });
         } else {
-          // Use ON CONFLICT to handle race conditions with concurrent reprocess requests
-          const newBooking = await db.execute(sql`INSERT INTO booking_requests 
-            (request_date, start_time, end_time, duration_minutes, resource_id,
-             user_email, user_name, status, trackman_booking_id, trackman_external_id,
-             trackman_player_count, is_unmatched, 
-             origin, last_sync_source, last_trackman_sync_at, created_at, updated_at)
-            VALUES (${requestDate}, ${startTime}, ${endTime}, ${durationMinutes}, ${resourceId}, ${customerEmail || ''}, ${customerName}, 'approved', ${event.trackman_booking_id}, ${externalBookingId || null}, ${playerCount}, true,
-                    'trackman_webhook', 'trackman_webhook', NOW(), NOW(), NOW())
-            ON CONFLICT (trackman_booking_id) WHERE trackman_booking_id IS NOT NULL DO UPDATE SET
-              last_trackman_sync_at = NOW(),
-              updated_at = NOW()
-            RETURNING id, (xmax = 0) AS was_inserted`);
+          let newBooking;
+          try {
+            newBooking = await db.execute(sql`INSERT INTO booking_requests 
+              (request_date, start_time, end_time, duration_minutes, resource_id,
+               user_email, user_name, status, trackman_booking_id, trackman_external_id,
+               trackman_player_count, is_unmatched, 
+               origin, last_sync_source, last_trackman_sync_at, created_at, updated_at)
+              VALUES (${requestDate}, ${startTime}, ${endTime}, ${durationMinutes}, ${resourceId}, ${customerEmail || ''}, ${customerName}, 'approved', ${event.trackman_booking_id}, ${externalBookingId || null}, ${playerCount}, true,
+                      'trackman_webhook', 'trackman_webhook', NOW(), NOW(), NOW())
+              ON CONFLICT (trackman_booking_id) WHERE trackman_booking_id IS NOT NULL DO UPDATE SET
+                last_trackman_sync_at = NOW(),
+                updated_at = NOW()
+              RETURNING id, (xmax = 0) AS was_inserted`);
+          } catch (insertErr: unknown) {
+            const errMsg = insertErr instanceof Error ? insertErr.message : String(insertErr);
+            const cause = (insertErr as { cause?: { code?: string } })?.cause;
+            if (cause?.code === '23P01' || errMsg.includes('booking_requests_no_overlap') || errMsg.includes('23P01')) {
+              newBooking = await db.transaction(async (tx) => {
+                const conflicting = await tx.execute(sql`
+                  SELECT id FROM booking_requests
+                  WHERE resource_id = ${resourceId}
+                    AND request_date = ${requestDate}
+                    AND status IN ('pending', 'approved', 'confirmed')
+                    AND start_time < ${endTime}
+                    AND end_time > ${startTime}
+                    AND (trackman_booking_id IS NULL OR trackman_booking_id != ${event.trackman_booking_id})
+                  FOR UPDATE`);
+                const conflictIds = (conflicting.rows as { id: number }[]).map(r => r.id);
+                if (conflictIds.length > 0) {
+                  await tx.execute(sql`
+                    UPDATE booking_requests SET status = 'cancelled', updated_at = NOW(),
+                      staff_notes = COALESCE(staff_notes, '') || ${`\n[Auto-cancelled: superseded by Trackman reprocess ${event.trackman_booking_id}]`}
+                    WHERE id = ANY(${conflictIds})`);
+                  logger.info('[Trackman Reprocess] Cancelled overlapping bookings', { extra: { trackmanBookingId: event.trackman_booking_id, cancelledIds: conflictIds } });
+                }
+                return await tx.execute(sql`INSERT INTO booking_requests 
+                  (request_date, start_time, end_time, duration_minutes, resource_id,
+                   user_email, user_name, status, trackman_booking_id, trackman_external_id,
+                   trackman_player_count, is_unmatched, 
+                   origin, last_sync_source, last_trackman_sync_at, created_at, updated_at)
+                  VALUES (${requestDate}, ${startTime}, ${endTime}, ${durationMinutes}, ${resourceId}, ${customerEmail || ''}, ${customerName}, 'approved', ${event.trackman_booking_id}, ${externalBookingId || null}, ${playerCount}, true,
+                          'trackman_webhook', 'trackman_webhook', NOW(), NOW(), NOW())
+                  ON CONFLICT (trackman_booking_id) WHERE trackman_booking_id IS NOT NULL DO UPDATE SET
+                    last_trackman_sync_at = NOW(),
+                    updated_at = NOW()
+                  RETURNING id, (xmax = 0) AS was_inserted`);
+              });
+            } else {
+              throw insertErr;
+            }
+          }
           
           if (newBooking.rows.length > 0) {
             const bookingId = (newBooking.rows[0] as unknown as NewBookingRow).id;

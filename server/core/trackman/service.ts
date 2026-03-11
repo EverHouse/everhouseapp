@@ -2082,8 +2082,37 @@ export async function rescanUnmatchedBookings(performedBy: string = 'system'): P
                   ON CONFLICT (trackman_booking_id) WHERE trackman_booking_id IS NOT NULL DO NOTHING`);
                 process.stderr.write(`[Trackman Rescan] Created booking for ${matchedEmail} (Trackman ID: ${booking.trackmanBookingId})\n`);
               } catch (insertErr: unknown) {
-                if (getErrorMessage(insertErr)?.includes('duplicate key') || getErrorCode(insertErr) === '23505') {
+                const errCode = getErrorCode(insertErr);
+                const errMessage = getErrorMessage(insertErr) || '';
+                const causeCode = (insertErr as { cause?: { code?: string } })?.cause?.code;
+                if (errMessage.includes('duplicate key') || errCode === '23505' || causeCode === '23505') {
                   process.stderr.write(`[Trackman Rescan] Booking ${booking.trackmanBookingId} already exists - skipping\n`);
+                } else if (errCode === '23P01' || causeCode === '23P01' || errMessage.includes('booking_requests_no_overlap') || errMessage.includes('23P01')) {
+                  await db.transaction(async (tx) => {
+                    const conflicting = await tx.execute(sql`
+                      SELECT id FROM booking_requests
+                      WHERE resource_id = ${bayId}
+                        AND request_date = ${bookingDate}
+                        AND status IN ('pending', 'approved', 'confirmed')
+                        AND start_time < ${endTime}
+                        AND end_time > ${startTime}
+                        AND (trackman_booking_id IS NULL OR trackman_booking_id != ${booking.trackmanBookingId})
+                      FOR UPDATE`);
+                    const conflictIds = (conflicting.rows as { id: number }[]).map(r => r.id);
+                    if (conflictIds.length > 0) {
+                      await tx.execute(sql`
+                        UPDATE booking_requests SET status = 'cancelled', updated_at = NOW(),
+                          staff_notes = COALESCE(staff_notes, '') || ${`\n[Auto-cancelled: superseded by Trackman rescan import ${booking.trackmanBookingId}]`}
+                        WHERE id = ANY(${conflictIds})`);
+                    }
+                    await tx.execute(sql`INSERT INTO booking_requests (
+                        user_email, user_name, request_date, start_time, end_time,
+                        duration_minutes, resource_id, status, trackman_booking_id,
+                        notes, trackman_player_count, created_at, updated_at
+                      ) VALUES (${matchedEmail}, ${booking.userName || ''}, ${bookingDate}, ${startTime}, ${endTime}, ${booking.durationMinutes || 60}, ${bayId}, 'approved', ${booking.trackmanBookingId}, ${`[Trackman Import ID:${booking.trackmanBookingId}] ${booking.notes || ''}`.trim()}, ${booking.playerCount || 1}, NOW(), NOW())
+                      ON CONFLICT (trackman_booking_id) WHERE trackman_booking_id IS NOT NULL DO NOTHING`);
+                  });
+                  process.stderr.write(`[Trackman Rescan] Created booking for ${matchedEmail} after clearing overlap (Trackman ID: ${booking.trackmanBookingId})\n`);
                 } else {
                   throw insertErr;
                 }

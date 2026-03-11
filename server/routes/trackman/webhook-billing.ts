@@ -59,16 +59,7 @@ export async function createBookingForMember(
   customerName?: string
 ): Promise<{ success: boolean; bookingId?: number; updated?: boolean }> {
   try {
-    const existingBooking = await db.execute(sql`SELECT id, duration_minutes, session_id, resource_id FROM booking_requests WHERE trackman_booking_id = ${trackmanBookingId}`);
-    
-    if ((existingBooking.rows as Array<Record<string, unknown>>).length > 0) {
-      const oldDuration = (existingBooking.rows as Array<Record<string, unknown>>)[0].duration_minutes;
-      const newDuration = calculateDurationMinutes(startTime, endTime);
-      
-      const oldResourceId = (existingBooking.rows as Array<Record<string, unknown>>)[0].resource_id;
-      const bayChanged = resourceId && oldResourceId && resourceId !== oldResourceId;
-
-      const cancelOverlappingBookings = async (targetResourceId: number, targetDate: string, targetStart: string, targetEnd: string, excludeBookingId: number) => {
+    const cancelOverlappingBookings = async (targetResourceId: number, targetDate: string, targetStart: string, targetEnd: string, excludeBookingId: number) => {
         const conflicting = await db.execute(sql`
           SELECT id, trackman_booking_id, user_email
           FROM booking_requests
@@ -92,6 +83,15 @@ export async function createBookingForMember(
           });
         }
       };
+
+    const existingBooking = await db.execute(sql`SELECT id, duration_minutes, session_id, resource_id FROM booking_requests WHERE trackman_booking_id = ${trackmanBookingId}`);
+    
+    if ((existingBooking.rows as Array<Record<string, unknown>>).length > 0) {
+      const oldDuration = (existingBooking.rows as Array<Record<string, unknown>>)[0].duration_minutes;
+      const newDuration = calculateDurationMinutes(startTime, endTime);
+      
+      const oldResourceId = (existingBooking.rows as Array<Record<string, unknown>>)[0].resource_id;
+      const bayChanged = resourceId && oldResourceId && resourceId !== oldResourceId;
 
       if (oldDuration !== newDuration) {
         const bookingId = (existingBooking.rows as Array<Record<string, unknown>>)[0].id as number;
@@ -249,6 +249,10 @@ export async function createBookingForMember(
       const endMinutesCalc = endParts[0] * 60 + endParts[1];
       const newDurationMinutes = endMinutesCalc > startMinutesCalc ? endMinutesCalc - startMinutesCalc : 60;
       
+      if (wasTimeTolerance && resourceId) {
+        await cancelOverlappingBookings(resourceId, slotDate, startTime, endTime, pendingBookingId);
+      }
+
       const pendingUpdateResult = await db.execute(sql`UPDATE booking_requests 
          SET trackman_booking_id = ${trackmanBookingId}, 
              trackman_player_count = ${playerCount},
