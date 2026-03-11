@@ -241,7 +241,8 @@ export async function executePendingMigration(userId: string, email: string): Pr
       logger.error(`${prefix} Stripe subscription creation failed for ${email}:`, { error: stripeError });
 
       await db.execute(sql`
-        UPDATE users SET billing_provider = 'mindbody', migration_status = 'failed', updated_at = NOW()
+        UPDATE users SET billing_provider = 'mindbody', migration_status = 'failed',
+          stripe_subscription_id = NULL, updated_at = NOW()
         WHERE id = ${userId}
       `);
 
