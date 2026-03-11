@@ -119,6 +119,18 @@ async function expireStaleBookingRequests(): Promise<void> {
       }
     }
 
+    const allExpiredIds = [...trackmanLinked.rows, ...expiredBookings.rows].map(b => b.id);
+    if (allExpiredIds.length > 0) {
+      try {
+        await queryWithRetry(
+          `UPDATE booking_fee_snapshots SET status = 'cancelled', updated_at = NOW() WHERE booking_id = ANY($1::int[]) AND status IN ('pending', 'requires_action')`,
+          [allExpiredIds]
+        );
+      } catch (snapshotErr) {
+        logger.warn('[Booking Expiry] Non-blocking: failed to cancel fee snapshots for expired bookings', { error: snapshotErr as Error });
+      }
+    }
+
     logger.info(`[Booking Expiry] Processed ${totalCount} stale booking(s): ${expiredCount} expired, ${trackmanCount} → cancellation_pending`);
     schedulerTracker.recordRun('Booking Expiry', true);
 
@@ -234,6 +246,19 @@ export async function runManualBookingExpiry(): Promise<{ expiredCount: number }
   );
   
   const expiredCount = result.rows.length;
+  
+  if (expiredCount > 0) {
+    const expiredIds = (result.rows as Array<{ id: number }>).map(r => r.id);
+    try {
+      await queryWithRetry(
+        `UPDATE booking_fee_snapshots SET status = 'cancelled', updated_at = NOW() WHERE booking_id = ANY($1::int[]) AND status IN ('pending', 'requires_action')`,
+        [expiredIds]
+      );
+    } catch (snapshotErr) {
+      logger.warn('[Booking Expiry] Non-blocking: failed to cancel fee snapshots for manually expired bookings', { error: snapshotErr as Error });
+    }
+  }
+
   logger.info(`[Booking Expiry] Manual run expired ${expiredCount} booking(s)`);
   
   return { expiredCount };

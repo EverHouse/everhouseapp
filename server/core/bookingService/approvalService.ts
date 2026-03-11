@@ -235,6 +235,7 @@ export async function validateTrackmanId(trackmanBookingId: string, bookingId: n
               });
             }
           }
+          await db.execute(sql`UPDATE booking_fee_snapshots SET status = 'cancelled', updated_at = NOW() WHERE booking_id = ${duplicateId} AND status IN ('pending', 'requires_action')`);
         } catch (invoiceErr: unknown) {
           logger.warn('[ValidateTrackmanId] Stripe cleanup failed for orphaned booking (non-blocking)', {
             extra: { declinedBookingId: duplicateId, error: invoiceErr instanceof Error ? invoiceErr.message : String(invoiceErr) }
@@ -952,6 +953,27 @@ export async function declineBooking(params: DeclineBookingParams) {
     logger.warn('[Decline] Non-blocking: failed to void draft invoice', { extra: { bookingId, error: getErrorMessage(err) } });
   });
 
+  (async () => {
+    try {
+      const snapshots = await db.execute(sql`
+        SELECT stripe_payment_intent_id FROM booking_fee_snapshots 
+        WHERE booking_id = ${bookingId} AND stripe_payment_intent_id IS NOT NULL AND status IN ('pending', 'requires_action')
+      `);
+      for (const row of snapshots.rows) {
+        const piId = String(row.stripe_payment_intent_id);
+        try {
+          await cancelPaymentIntent(piId);
+          await PaymentStatusService.markPaymentCancelled({ paymentIntentId: piId });
+        } catch (err: unknown) {
+          logger.warn('[Decline] Non-blocking: failed to cancel PI', { extra: { piId, error: getErrorMessage(err) } });
+        }
+      }
+      await db.execute(sql`UPDATE booking_fee_snapshots SET status = 'cancelled', updated_at = NOW() WHERE booking_id = ${bookingId} AND status IN ('pending', 'requires_action')`);
+    } catch (err: unknown) {
+      logger.warn('[Decline] Non-blocking: failed to clean up fee snapshots', { extra: { bookingId, error: getErrorMessage(err) } });
+    }
+  })();
+
   sendPushNotification(updated.userEmail, {
     title: 'Booking Request Update',
     body: declineMessage,
@@ -1322,7 +1344,7 @@ export async function cancelBooking(params: CancelBookingParams) {
                   amountCents: pi.amount
                 });
               } else if (['requires_payment_method', 'requires_confirmation', 'requires_action', 'requires_capture', 'processing'].includes(pi.status)) {
-                await stripe.paymentIntents.cancel(snapshot.stripePaymentIntentId);
+                await cancelPaymentIntent(snapshot.stripePaymentIntentId);
                 logger.info('[Staff Cancel] Cancelled payment intent for booking', { extra: { snapshotStripe_payment_intent_id: snapshot.stripePaymentIntentId, bookingId } });
 
                 await PaymentStatusService.markPaymentCancelled({
@@ -1333,6 +1355,7 @@ export async function cancelBooking(params: CancelBookingParams) {
                   paymentIntentId: snapshot.stripePaymentIntentId
                 });
               }
+              await db.execute(sql`UPDATE booking_fee_snapshots SET status = 'cancelled', updated_at = NOW() WHERE booking_id = ${bookingId} AND stripe_payment_intent_id = ${snapshot.stripePaymentIntentId} AND status IN ('pending', 'requires_action')`);
             } catch (piErr: unknown) {
               logger.error('[Staff Cancel] Failed to handle payment', { extra: { stripe_payment_intent_id: snapshot.stripePaymentIntentId, error: getErrorMessage(piErr) } });
             }
@@ -1396,6 +1419,10 @@ export async function cancelBooking(params: CancelBookingParams) {
       logger.error('[Staff Cancel] Failed to void/refund booking invoice (non-blocking)', {
         extra: { bookingId, error: getErrorMessage(err) }
       });
+    });
+
+    db.execute(sql`UPDATE booking_fee_snapshots SET status = 'cancelled', updated_at = NOW() WHERE booking_id = ${bookingId} AND status IN ('pending', 'requires_action')`).catch((err: unknown) => {
+      logger.warn('[Staff Cancel] Non-blocking: failed to mark remaining fee snapshots as cancelled', { extra: { bookingId, error: getErrorMessage(err) } });
     });
   }
 

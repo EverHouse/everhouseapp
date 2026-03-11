@@ -363,7 +363,7 @@ export async function checkOrphanedPaymentIntents(): Promise<IntegrityCheckResul
     INNER JOIN booking_requests br ON bfs.booking_id = br.id
     WHERE bfs.stripe_payment_intent_id IS NOT NULL
       AND bfs.status IN ('pending', 'requires_action')
-      AND br.status IN ('cancelled', 'denied', 'expired')
+      AND br.status IN ('cancelled', 'declined', 'denied', 'expired')
     LIMIT 100
   `);
 
