@@ -322,12 +322,20 @@ export function useCommandCenterData(userEmail?: string) {
     };
 
     const getAffectedBays = (closure: Closure): string[] => {
-      const areas = closure.affectedAreas?.toLowerCase() || '';
+      const raw = closure.affectedAreas;
+      if (!raw) return [];
+      const areas = raw.toLowerCase().trim();
+      if (areas === '' || areas === 'none') return [];
       if (areas === 'entire_facility' || areas === 'all_bays') return ['all'];
       try {
-        const parsed = JSON.parse(closure.affectedAreas);
-        if (Array.isArray(parsed)) return parsed.map((a: string) => a.toLowerCase());
-      } catch (e) { console.warn('[CommandCenter] Failed to parse affectedAreas:', e); }
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) return parsed.map((a: string) => String(a).toLowerCase());
+      } catch (_e) {
+        // Expected for non-JSON values (comma-separated or plain strings)
+      }
+      if (raw.includes(',')) {
+        return raw.split(',').map(s => s.trim().toLowerCase());
+      }
       return [areas];
     };
 
