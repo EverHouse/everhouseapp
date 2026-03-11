@@ -33,6 +33,7 @@ interface PayFeesResponse {
   balanceApplied?: number;
   remainingAmount?: number;
   participantFees: ParticipantFee[];
+  description?: string;
   error?: string;
 }
 
@@ -284,7 +285,7 @@ export function MemberPaymentModal({
               <StripePaymentWithSecret
                 clientSecret={paymentData.clientSecret}
                 amount={paymentData.remainingAmount || paymentData.totalAmount}
-                description={`Booking fees for #${bookingId}`}
+                description={paymentData.description || `Booking fees for #${bookingId}`}
                 onSuccess={handlePaymentSuccess}
                 onCancel={onClose}
               />

@@ -734,7 +734,7 @@ async function buildFallbackPreview(params: FallbackPreviewParams): Promise<Prev
   const guestMinutes = allocations
     .filter(a => a.participantType === 'guest')
     .reduce((sum, a) => sum + a.minutesAllocated, 0);
-  const totalOwnerResponsibleMinutes = ownerMinutes;
+  const totalOwnerResponsibleMinutes = ownerMinutes + guestMinutes;
 
   let overageFee = 0;
   let overageMinutes = 0;

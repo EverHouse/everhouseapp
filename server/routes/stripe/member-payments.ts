@@ -415,6 +415,7 @@ async function handleExistingInvoicePayment(params: {
       balanceApplied: 0,
       remainingAmount: serverTotal / 100,
       participantFees: participantFeesList,
+      description: piDescription,
     };
   } catch (invoiceErr: unknown) {
     logger.warn('[Stripe] Failed to use existing draft invoice, falling back to new invoice', {
@@ -680,6 +681,7 @@ router.post('/api/member/bookings/:id/pay-fees', isAuthenticated, paymentRateLim
       balanceApplied: 0,
       remainingAmount: serverTotal / 100,
       participantFees: participantFeesList,
+      description: newPiDescription,
     });
   } catch (error: unknown) {
     const errMsg = error instanceof Error ? error.message : String(error);
