@@ -950,6 +950,7 @@ router.get('/api/my-billing/payment-history', requireAuth, async (req, res) => {
        FROM stripe_payment_intents spi
        JOIN users u ON u.id = spi.user_id
        WHERE LOWER(u.email) = ${userEmail}
+         AND spi.status IN ('succeeded', 'refunded')
        ORDER BY spi.created_at DESC
        LIMIT 200`),
       db.execute(sql`SELECT 
