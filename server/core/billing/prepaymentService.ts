@@ -1,6 +1,7 @@
 import { getOrCreateStripeCustomer } from '../stripe/customers';
 import { type BookingFeeLineItem } from '../stripe/invoices';
 import { createDraftInvoiceForBooking } from './bookingInvoiceService';
+import { PRICING } from './pricingConfig';
 import { db } from '../../db';
 import { sql } from 'drizzle-orm';
 import { logger } from '../logger';
@@ -136,7 +137,7 @@ export async function createPrepaymentIntent(
 
     const { customerId } = await getOrCreateStripeCustomer(userId || userEmail, userEmail, userName);
 
-    const feeLineItems = await buildParticipantLineItems(sessionId, feeBreakdown);
+    const feeLineItems = await buildParticipantLineItems(sessionId, feeBreakdown, bookingId, resourceType);
 
     const result = await createDraftInvoiceForBooking({
       customerId,
@@ -174,7 +175,9 @@ export async function createPrepaymentIntent(
 
 async function buildParticipantLineItems(
   sessionId: number,
-  aggregateFees: { overageCents: number; guestCents: number }
+  aggregateFees: { overageCents: number; guestCents: number },
+  bookingId: number,
+  resourceType: string
 ): Promise<BookingFeeLineItem[]> {
   try {
     const participantsResult = await db.execute(
@@ -202,6 +205,24 @@ async function buildParticipantLineItems(
         guestCents: isGuest ? feeCents : 0,
         totalCents: feeCents,
       });
+    }
+
+    if (lineItems.length > 0 && resourceType !== 'conference_room') {
+      const allParticipantResult = await db.execute(sql`SELECT COUNT(*) as cnt FROM booking_participants WHERE session_id = ${sessionId}`);
+      const actualCount = parseInt((allParticipantResult.rows[0] as { cnt: string }).cnt) || 0;
+      const declaredResult = await db.execute(sql`SELECT declared_player_count FROM booking_requests WHERE id = ${bookingId} LIMIT 1`);
+      const declaredCount = (declaredResult.rows[0] as { declared_player_count: number | null })?.declared_player_count || actualCount;
+      const emptySlots = Math.max(0, declaredCount - actualCount);
+      if (emptySlots > 0) {
+        const emptySlotFeeCents = emptySlots * PRICING.GUEST_FEE_CENTS;
+        lineItems.push({
+          displayName: `Empty Slot${emptySlots > 1 ? 's' : ''}`,
+          participantType: 'guest',
+          overageCents: 0,
+          guestCents: emptySlotFeeCents,
+          totalCents: emptySlotFeeCents,
+        });
+      }
     }
 
     return lineItems.length > 0 ? lineItems : buildFallbackLineItems(aggregateFees);

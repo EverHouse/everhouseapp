@@ -52,6 +52,7 @@ interface InvoiceSyncRow {
   status: string;
   resource_id: number | null;
   resource_type: string;
+  declared_player_count: number | null;
 }
 
 interface TrackmanBookingIdRow {
@@ -1070,7 +1071,8 @@ export async function recreateDraftInvoiceFromBooking(bookingId: number): Promis
 export async function syncBookingInvoice(bookingId: number, sessionId: number): Promise<void> {
   try {
     const invoiceResult = await db.execute(sql`SELECT br.stripe_invoice_id, br.user_email, br.trackman_booking_id, br.status, br.resource_id,
-              COALESCE(r.type, 'simulator') as resource_type
+              COALESCE(r.type, 'simulator') as resource_type,
+              br.declared_player_count
        FROM booking_requests br
        LEFT JOIN resources r ON br.resource_id = r.id
        WHERE br.id = ${bookingId} LIMIT 1`);
@@ -1086,15 +1088,6 @@ export async function syncBookingInvoice(bookingId: number, sessionId: number): 
          WHERE session_id = ${sessionId} AND cached_fee_cents > 0`);
 
       const typedParticipants = participantResult.rows as unknown as ParticipantFeeRow[];
-      const totalFees = typedParticipants.reduce((sum, r) => sum + r.cached_fee_cents, 0);
-      if (totalFees <= 0) return;
-
-      const userResult = await db.execute(sql`SELECT stripe_customer_id FROM users WHERE LOWER(email) = LOWER(${booking.user_email}) LIMIT 1`);
-      const stripeCustomerId = (userResult.rows as unknown as StripeCustomerIdRow[])[0]?.stripe_customer_id;
-      if (!stripeCustomerId) {
-        logger.warn('[BookingInvoice] syncBookingInvoice: no stripe_customer_id for user, cannot create draft invoice', { extra: { bookingId, email: booking.user_email } });
-        return;
-      }
 
       const feeLineItems: BookingFeeLineItem[] = typedParticipants.map((row) => {
         const totalCents = row.cached_fee_cents;
@@ -1108,6 +1101,33 @@ export async function syncBookingInvoice(bookingId: number, sessionId: number): 
           totalCents,
         };
       });
+
+      if (booking.resource_type !== 'conference_room') {
+        const allParticipantResult = await db.execute(sql`SELECT COUNT(*) as cnt FROM booking_participants WHERE session_id = ${sessionId}`);
+        const actualCount = parseInt((allParticipantResult.rows[0] as { cnt: string }).cnt) || 0;
+        const declaredCount = booking.declared_player_count || actualCount;
+        const emptySlots = Math.max(0, declaredCount - actualCount);
+        if (emptySlots > 0) {
+          const emptySlotFeeCents = emptySlots * PRICING.GUEST_FEE_CENTS;
+          feeLineItems.push({
+            displayName: `Empty Slot${emptySlots > 1 ? 's' : ''}`,
+            participantType: 'guest',
+            overageCents: 0,
+            guestCents: emptySlotFeeCents,
+            totalCents: emptySlotFeeCents,
+          });
+        }
+      }
+
+      const totalFees = feeLineItems.reduce((sum, li) => sum + li.totalCents, 0);
+      if (totalFees <= 0) return;
+
+      const userResult = await db.execute(sql`SELECT stripe_customer_id FROM users WHERE LOWER(email) = LOWER(${booking.user_email}) LIMIT 1`);
+      const stripeCustomerId = (userResult.rows as unknown as StripeCustomerIdRow[])[0]?.stripe_customer_id;
+      if (!stripeCustomerId) {
+        logger.warn('[BookingInvoice] syncBookingInvoice: no stripe_customer_id for user, cannot create draft invoice', { extra: { bookingId, email: booking.user_email } });
+        return;
+      }
 
       const draftResult = await createDraftInvoiceForBooking({
         customerId: stripeCustomerId as string,
@@ -1173,6 +1193,23 @@ export async function syncBookingInvoice(bookingId: number, sessionId: number): 
         totalCents,
       };
     });
+
+    if (booking.resource_type !== 'conference_room') {
+      const allParticipantResult = await db.execute(sql`SELECT COUNT(*) as cnt FROM booking_participants WHERE session_id = ${sessionId}`);
+      const actualCount = parseInt((allParticipantResult.rows[0] as { cnt: string }).cnt) || 0;
+      const declaredCount = booking.declared_player_count || actualCount;
+      const emptySlots = Math.max(0, declaredCount - actualCount);
+      if (emptySlots > 0) {
+        const emptySlotFeeCents = emptySlots * PRICING.GUEST_FEE_CENTS;
+        feeLineItems.push({
+          displayName: `Empty Slot${emptySlots > 1 ? 's' : ''}`,
+          participantType: 'guest',
+          overageCents: 0,
+          guestCents: emptySlotFeeCents,
+          totalCents: emptySlotFeeCents,
+        });
+      }
+    }
 
     const totalFees = feeLineItems.reduce((sum, li) => sum + li.totalCents, 0);
 

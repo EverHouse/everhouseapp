@@ -594,6 +594,7 @@ export async function previewRosterFees(
       participantsForFeeCalc,
       guestCount,
       memberCount,
+      isConferenceRoom,
     });
   }
 
@@ -707,6 +708,7 @@ interface FallbackPreviewParams {
   participantsForFeeCalc: FeeParticipantInput[];
   guestCount: number;
   memberCount: number;
+  isConferenceRoom: boolean;
 }
 
 async function buildFallbackPreview(params: FallbackPreviewParams): Promise<PreviewFeesResult> {
@@ -714,7 +716,7 @@ async function buildFallbackPreview(params: FallbackPreviewParams): Promise<Prev
     booking, durationMinutes, declaredPlayerCount, totalSlots, minutesPerPlayer,
     actualParticipantCount, effectivePlayerCount, dailyAllowance,
     remainingMinutesToday, guestPassesPerMonth, ownerTier, allParticipants,
-    participantsForFeeCalc, guestCount, memberCount,
+    participantsForFeeCalc, guestCount, memberCount, isConferenceRoom,
   } = params;
 
   const allocations = computeUsageAllocation(durationMinutes, participantsForFeeCalc.map(p => ({
@@ -753,6 +755,12 @@ async function buildFallbackPreview(params: FallbackPreviewParams): Promise<Prev
     ? await getGuestPassesRemaining(booking.owner_email)
     : 0;
 
+  const guestsWithoutPass = Math.max(0, guestCount - Math.min(guestCount, guestPassesRemaining));
+  const emptySlotGuestFees = !isConferenceRoom ? unfilledSlots * PRICING.GUEST_FEE_DOLLARS : 0;
+  const realGuestFees = !isConferenceRoom ? guestsWithoutPass * PRICING.GUEST_FEE_DOLLARS : 0;
+  const estimatedGuestFees = realGuestFees + emptySlotGuestFees;
+  const estimatedTotalFees = overageFee + estimatedGuestFees;
+
   return {
     booking: {
       id: booking.booking_id,
@@ -789,6 +797,8 @@ async function buildFallbackPreview(params: FallbackPreviewParams): Promise<Prev
       minutesWithinAllowance,
       overageMinutes,
       estimatedOverageFee: overageFee,
+      estimatedGuestFees,
+      estimatedTotalFees,
     },
     guestPasses: {
       monthlyAllowance: guestPassesPerMonth,

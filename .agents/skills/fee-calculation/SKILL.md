@@ -36,7 +36,7 @@ Accept a `FeeComputeParams` object (defined in `shared/models/billing.ts`) conta
 6. **Batch-fetch participant tiers, roles, and daily usage** — single queries for all participants to avoid N+1.
 7. **Build line items** — iterate participants and apply rules per type (see reference: `references/fee-breakdown.md`).
 8. **Owner absorbs non-member time** — empty slots and guest slot minutes are added to the owner's allocated minutes, then overage is recalculated.
-9. **Empty slot absorption (v8.11.0)** — each unfilled declared slot's minutes are absorbed into the owner's allocated minutes (increasing potential overage), but no `GUEST_FEE_CENTS` is charged on the empty slot itself.
+9. **Empty slot = guest treatment (v8.85.0)** — each unfilled declared slot is treated identically to a guest: its minutes are absorbed into the owner's allocated minutes (increasing potential overage), AND `GUEST_FEE_CENTS` is charged as a flat guest fee per empty slot. This ensures there is no cost advantage to leaving a slot empty vs. inviting a guest.
 10. **Return `FeeBreakdown`** — totals, participant line items, and metadata.
 
 ### Output
@@ -84,7 +84,7 @@ Charged per non-member participant at `PRICING.GUEST_FEE_CENTS` (flat rate, defa
 
 **Placeholder guests** matching `/^Guest \d+$/i` (e.g., "Guest 1", "Guest 2") are not considered "real named guests" and cannot consume guest passes, but still incur the flat guest fee.
 
-**Empty slot handling (v8.11.0):** when `effectivePlayerCount > actualParticipantCount`, empty slots do NOT charge `GUEST_FEE_CENTS` directly. Instead, the empty slot minutes are absorbed into the owner's allocated minutes (increasing potential overage). This prevents ghost fees on unfilled slots while still ensuring the owner bears the usage cost. Empty slot line items appear in the breakdown with `$0` guest fee and `overageCents` reflecting any incremental overage from the absorbed time.
+**Empty slot handling (v8.85.0):** when `effectivePlayerCount > actualParticipantCount`, empty slots are treated identically to guests. Each empty slot's minutes are absorbed into the owner's allocated minutes (increasing potential overage), AND each empty slot incurs `GUEST_FEE_CENTS` as a flat guest fee. Empty slot line items appear in the breakdown with `guestCents = GUEST_FEE_CENTS` and `totalCents = GUEST_FEE_CENTS`. This ensures there is no cost difference between leaving a slot empty and inviting a guest.
 
 ### Prepayment
 
