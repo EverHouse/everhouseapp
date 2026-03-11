@@ -37,6 +37,7 @@ export function useEdgeSwipe(config: EdgeSwipeConfig = {}) {
 
   const startTimeRef = useRef(0);
   const isHorizontalRef = useRef<boolean | null>(null);
+  const isActiveRef = useRef(false);
 
   const isTouchDevice = typeof window !== 'undefined' && 'ontouchstart' in window;
   
@@ -44,12 +45,10 @@ export function useEdgeSwipe(config: EdgeSwipeConfig = {}) {
     (window.matchMedia('(display-mode: standalone)').matches || 
      (window.navigator as unknown as { standalone?: boolean }).standalone === true);
 
-  const isAndroidGestureNav = typeof window !== 'undefined' && 
-    /Android/i.test(navigator.userAgent) && !isStandalonePWA;
-
   const handleStart = useCallback((clientX: number, clientY: number) => {
-    if (!enabled || !isTouchDevice || isStandalonePWA || isAndroidGestureNav) return;
+    if (!enabled || !isTouchDevice || isStandalonePWA) return;
     if (clientX <= edgeWidth) {
+      isActiveRef.current = true;
       setState({
         isActive: true,
         progress: 0,
@@ -60,7 +59,7 @@ export function useEdgeSwipe(config: EdgeSwipeConfig = {}) {
       startTimeRef.current = Date.now();
       isHorizontalRef.current = null;
     }
-  }, [enabled, edgeWidth, isTouchDevice, isStandalonePWA, isAndroidGestureNav]);
+  }, [enabled, edgeWidth, isTouchDevice, isStandalonePWA]);
 
   const handleMove = useCallback((clientX: number, clientY: number) => {
     if (!state.isActive) return;
@@ -72,6 +71,7 @@ export function useEdgeSwipe(config: EdgeSwipeConfig = {}) {
       if (Math.abs(deltaX) > 10 || Math.abs(deltaY) > 10) {
         isHorizontalRef.current = Math.abs(deltaX) > Math.abs(deltaY);
         if (!isHorizontalRef.current) {
+          isActiveRef.current = false;
           setState(prev => ({ ...prev, isActive: false, progress: 0 }));
           return;
         }
@@ -104,6 +104,7 @@ export function useEdgeSwipe(config: EdgeSwipeConfig = {}) {
       }
     }
 
+    isActiveRef.current = false;
     setState({
       isActive: false,
       progress: 0,
@@ -115,7 +116,7 @@ export function useEdgeSwipe(config: EdgeSwipeConfig = {}) {
   }, [state.isActive, state.currentX, state.startX, threshold, velocityThreshold, onSwipe, onBack]);
 
   useEffect(() => {
-    if (!enabled || !isTouchDevice || isStandalonePWA || isAndroidGestureNav) return;
+    if (!enabled || !isTouchDevice || isStandalonePWA) return;
 
     const handleTouchStart = (e: TouchEvent) => {
       const touch = e.touches[0];
@@ -123,6 +124,9 @@ export function useEdgeSwipe(config: EdgeSwipeConfig = {}) {
     };
 
     const handleTouchMove = (e: TouchEvent) => {
+      if (isActiveRef.current && isHorizontalRef.current) {
+        e.preventDefault();
+      }
       const touch = e.touches[0];
       handleMove(touch.clientX, touch.clientY);
     };
@@ -130,7 +134,7 @@ export function useEdgeSwipe(config: EdgeSwipeConfig = {}) {
     const handleTouchEnd = () => handleEnd();
 
     document.addEventListener('touchstart', handleTouchStart, { passive: true });
-    document.addEventListener('touchmove', handleTouchMove, { passive: true });
+    document.addEventListener('touchmove', handleTouchMove, { passive: false });
     document.addEventListener('touchend', handleTouchEnd);
 
     return () => {
