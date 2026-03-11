@@ -875,133 +875,82 @@ export async function voidBookingInvoice(bookingId: number): Promise<{
   error?: string;
 }> {
   const stripe = await getStripeClient();
-  const invoiceId = await getBookingInvoiceId(bookingId);
 
-  if (!invoiceId) {
-    return { success: true };
+  const invoiceIds: string[] = [];
+  const primaryInvoiceId = await getBookingInvoiceId(bookingId);
+  if (primaryInvoiceId) {
+    invoiceIds.push(primaryInvoiceId);
   }
 
   try {
-    const invoice = await stripe.invoices.retrieve(invoiceId);
-
-    if (invoice.status === 'draft') {
-      await stripe.invoices.del(invoiceId);
-      logger.info('[BookingInvoice] Deleted draft invoice for cancelled booking', {
-        extra: { bookingId, invoiceId }
-      });
-    } else if (invoice.status === 'open') {
-      await stripe.invoices.voidInvoice(invoiceId);
-      logger.info('[BookingInvoice] Voided open invoice for cancelled booking', {
-        extra: { bookingId, invoiceId }
-      });
-    } else if (invoice.status === 'void' || invoice.status === 'uncollectible') {
-      logger.info('[BookingInvoice] Invoice already voided or uncollectible, clearing reference', {
-        extra: { bookingId, invoiceId, status: invoice.status }
-      });
-    } else if (invoice.status === 'paid') {
-      const invoiceExpanded = invoice as unknown as InvoiceWithPaymentIntent;
-      const paymentIntentId = typeof invoiceExpanded.payment_intent === 'string'
-        ? invoiceExpanded.payment_intent
-        : invoiceExpanded.payment_intent?.id
-        || (invoice.metadata as Record<string, string>)?.terminalPaymentIntentId;
-      if (paymentIntentId) {
-        try {
-          const refund = await stripe.refunds.create({
-            payment_intent: paymentIntentId,
-            reason: 'requested_by_customer'
-          }, {
-            idempotencyKey: `refund_void_invoice_${bookingId}_${invoiceId}`
-          });
-          logger.info('[BookingInvoice] Refunded paid invoice for cancelled booking', {
-            extra: { bookingId, invoiceId, refundId: refund.id, amountCents: refund.amount }
-          });
-        } catch (refundErr: unknown) {
-          logger.error('[BookingInvoice] Failed to refund paid invoice', {
-            extra: { bookingId, invoiceId, error: getErrorMessage(refundErr) }
-          });
-          notifyAllStaff(
-            'Invoice Refund Failed',
-            `Failed to automatically refund paid invoice ${invoiceId} for booking #${bookingId}. Please refund manually in Stripe.`,
-            'warning',
-            { relatedId: bookingId, relatedType: 'booking' }
-          ).catch((err: unknown) => { logger.warn('[BookingInvoice] Failed to notify staff about refund failure', { extra: { bookingId, error: getErrorMessage(err) } }); });
-          return { success: false, error: 'Failed to refund paid invoice' };
-        }
-      } else {
-        const amountPaid = invoice.amount_paid || 0;
-        const customerId = typeof invoice.customer === 'string' ? invoice.customer : invoice.customer?.id;
-
-        const alreadyRefunded = await db.execute(sql`
-          SELECT COUNT(*) as cnt FROM stripe_payment_intents
-          WHERE booking_id = ${bookingId}
-            AND stripe_payment_intent_id LIKE 'balance-%'
-            AND status = 'refunded'
-        `);
-        const alreadyHandled = Number((alreadyRefunded.rows as unknown as RefundCountRow[])[0]?.cnt || 0) > 0;
-
-        if (alreadyHandled) {
-          logger.info('[BookingInvoice] Balance refund already processed for this booking, skipping', {
-            extra: { bookingId, invoiceId }
-          });
-        } else if (amountPaid > 0 && customerId) {
-          try {
-            const balanceTxn = await stripe.customers.createBalanceTransaction(
-              customerId,
-              {
-                amount: -amountPaid,
-                currency: invoice.currency || 'usd',
-                description: `Refund for cancelled booking #${bookingId} (invoice ${invoiceId})`,
-              }
-            );
-            logger.info('[BookingInvoice] Restored customer credit balance for cancelled booking', {
-              extra: { bookingId, invoiceId, amountCents: amountPaid, balanceTransactionId: balanceTxn.id, customerId }
-            });
-
-            await db.execute(sql`
-              UPDATE stripe_payment_intents 
-              SET status = 'refunded', updated_at = NOW(),
-                  description = COALESCE(description, '') || ${` [Refund: ${balanceTxn.id}]`}
-              WHERE stripe_payment_intent_id LIKE 'balance-%' 
-                AND booking_id = ${bookingId} 
-                AND status = 'succeeded'
-            `);
-          } catch (balanceErr: unknown) {
-            logger.error('[BookingInvoice] Failed to restore customer credit balance', {
-              extra: { bookingId, invoiceId, error: getErrorMessage(balanceErr) }
-            });
-            notifyAllStaff(
-              'Paid Invoice — Manual Refund Needed',
-              `Cancelled booking #${bookingId} has a paid invoice (${invoiceId}) with no payment intent attached. Please refund manually in Stripe.`,
-              'warning',
-              { relatedId: bookingId, relatedType: 'booking' }
-            ).catch((err: unknown) => { logger.warn('[BookingInvoice] Failed to notify staff about manual refund', { extra: { bookingId, error: getErrorMessage(err) } }); });
-            return { success: false, error: 'Failed to restore credit balance' };
-          }
-        } else {
-          logger.info('[BookingInvoice] Paid invoice with no payment intent and zero amount, skipping refund', {
-            extra: { bookingId, invoiceId, amountPaid }
-          });
-        }
+    const searchResult = await stripe.invoices.search({
+      query: `metadata["bookingId"]:"${bookingId}"`,
+      limit: 20,
+    });
+    for (const inv of searchResult.data) {
+      if (!invoiceIds.includes(inv.id)) {
+        invoiceIds.push(inv.id);
       }
     }
+  } catch (searchErr: unknown) {
+    logger.warn('[BookingInvoice] Failed to search Stripe for booking invoices, falling back to primary only', {
+      extra: { bookingId, error: getErrorMessage(searchErr) }
+    });
+  }
 
-    await db.update(bookingRequests).set({ stripeInvoiceId: null, updatedAt: new Date() }).where(eq(bookingRequests.id, bookingId));
+  if (invoiceIds.length === 0) {
+    return { success: true };
+  }
 
+  const errors: string[] = [];
+
+  for (const invoiceId of invoiceIds) {
     try {
-      broadcastBookingInvoiceUpdate({ bookingId, action: 'invoice_voided', invoiceId });
-    } catch (err: unknown) {
-      logger.warn('[BookingInvoice] Failed to broadcast invoice voided', {
-        extra: { bookingId, invoiceId, error: getErrorMessage(err) }
+      const invoice = await stripe.invoices.retrieve(invoiceId);
+
+      if (invoice.status === 'draft') {
+        await stripe.invoices.del(invoiceId);
+        logger.info('[BookingInvoice] Deleted draft invoice for cancelled booking', {
+          extra: { bookingId, invoiceId }
+        });
+      } else if (invoice.status === 'open') {
+        await stripe.invoices.voidInvoice(invoiceId);
+        logger.info('[BookingInvoice] Voided open invoice for cancelled booking', {
+          extra: { bookingId, invoiceId }
+        });
+      } else if (invoice.status === 'void' || invoice.status === 'uncollectible') {
+        logger.info('[BookingInvoice] Invoice already voided or uncollectible, skipping', {
+          extra: { bookingId, invoiceId, status: invoice.status }
+        });
+      } else if (invoice.status === 'paid') {
+        logger.info('[BookingInvoice] Paid invoice found — refund handled by cancellation cascade via stripe_payment_intents', {
+          extra: { bookingId, invoiceId, amountPaid: invoice.amount_paid }
+        });
+      }
+    } catch (error: unknown) {
+      const msg = `Failed to void/handle invoice ${invoiceId}: ${getErrorMessage(error)}`;
+      errors.push(msg);
+      logger.error('[BookingInvoice] Error processing invoice during cancellation', {
+        extra: { bookingId, invoiceId, error: getErrorMessage(error) }
       });
     }
-
-    return { success: true };
-  } catch (error: unknown) {
-    logger.error('[BookingInvoice] Error voiding invoice', {
-      extra: { bookingId, invoiceId, error: getErrorMessage(error) }
-    });
-    return { success: false, error: getErrorMessage(error) };
   }
+
+  await db.update(bookingRequests).set({ stripeInvoiceId: null, updatedAt: new Date() }).where(eq(bookingRequests.id, bookingId));
+
+  try {
+    broadcastBookingInvoiceUpdate({ bookingId, action: 'invoice_voided', invoiceId: invoiceIds[0] });
+  } catch (err: unknown) {
+    logger.warn('[BookingInvoice] Failed to broadcast invoice voided', {
+      extra: { bookingId, error: getErrorMessage(err) }
+    });
+  }
+
+  if (errors.length > 0) {
+    return { success: false, error: errors.join('; ') };
+  }
+
+  return { success: true };
 }
 
 export async function recreateDraftInvoiceFromBooking(bookingId: number): Promise<{ success: boolean; invoiceId?: string }> {

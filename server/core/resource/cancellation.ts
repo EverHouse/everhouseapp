@@ -135,7 +135,7 @@ export async function handleCancellationCascade(
 
   const succeededIntents = await db.execute(sql`SELECT spi.stripe_payment_intent_id, spi.amount_cents, spi.stripe_customer_id, spi.user_id
        FROM stripe_payment_intents spi
-       WHERE spi.booking_id = ${bookingId} AND spi.purpose = 'prepayment' AND spi.status = 'succeeded'`);
+       WHERE spi.booking_id = ${bookingId} AND spi.status = 'succeeded'`);
 
   await Promise.allSettled((succeededIntents.rows as unknown as PaymentIntentIdRow[]).map(async (row) => {
     try {
@@ -145,7 +145,7 @@ export async function handleCancellationCascade(
            RETURNING stripe_payment_intent_id`);
         
       if ((claimResult as unknown as { rowCount: number }).rowCount === 0) {
-          logger.info('[cancellation-cascade] Prepayment already claimed or refunded, skipping', {
+          logger.info('[cancellation-cascade] Payment already claimed or refunded, skipping', {
             extra: { bookingId, paymentIntentId: row.stripe_payment_intent_id }
           });
           return;
@@ -163,7 +163,7 @@ export async function handleCancellationCascade(
             }, { maxRetries: 5 });
             
             result.prepaymentRefunds++;
-            logger.info('[cancellation-cascade] Queued balance refund for cancelled prepayment', {
+            logger.info('[cancellation-cascade] Queued balance refund for cancelled payment', {
               extra: { 
                 bookingId, 
                 paymentIntentId: row.stripe_payment_intent_id,
@@ -189,7 +189,7 @@ export async function handleCancellationCascade(
           }, { maxRetries: 5 });
           
           result.prepaymentRefunds++;
-          logger.info('[cancellation-cascade] Queued prepayment refund', {
+          logger.info('[cancellation-cascade] Queued payment refund', {
             extra: { 
               bookingId, 
               paymentIntentId: row.stripe_payment_intent_id,
@@ -328,15 +328,13 @@ export async function deleteBooking(bookingId: number, archivedBy: string, hardD
   let cascadeResult: CancellationCascadeResult | undefined;
   
   if (hardDelete) {
-    if (booking.stripeInvoiceId) {
-      try {
-        const { voidBookingInvoice } = await import('../billing/bookingInvoiceService');
-        await voidBookingInvoice(bookingId);
-      } catch (voidErr: unknown) {
-        logger.warn('[DELETE /api/bookings] Failed to void invoice before hard delete', {
-          extra: { bookingId, stripeInvoiceId: booking.stripeInvoiceId, error: getErrorMessage(voidErr) }
-        });
-      }
+    try {
+      const { voidBookingInvoice } = await import('../billing/bookingInvoiceService');
+      await voidBookingInvoice(bookingId);
+    } catch (voidErr: unknown) {
+      logger.warn('[DELETE /api/bookings] Failed to void invoice before hard delete', {
+        extra: { bookingId, stripeInvoiceId: booking.stripeInvoiceId, error: getErrorMessage(voidErr) }
+      });
     }
 
     await db.transaction(async (tx) => {
