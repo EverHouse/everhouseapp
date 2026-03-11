@@ -1204,8 +1204,8 @@ export function useDataIntegrityActions(state: DataIntegrityState) {
       showToast('Cannot push to HubSpot: member user ID is missing', 'error');
       return;
     }
-    if (issue.context.syncType === 'stripe' && !issue.context.stripeCustomerId) {
-      showToast('Cannot push to Stripe: member is missing a Stripe customer link', 'error');
+    if (issue.context.syncType === 'stripe' && !issue.context.userId) {
+      showToast('Cannot push to Stripe: member user ID is missing', 'error');
       return;
     }
     const issueKey = `${issue.table}_${issue.recordId}`;
@@ -1225,8 +1225,8 @@ export function useDataIntegrityActions(state: DataIntegrityState) {
       showToast('Cannot pull from HubSpot: member user ID is missing', 'error');
       return;
     }
-    if (issue.context.syncType === 'stripe' && !issue.context.stripeCustomerId) {
-      showToast('Cannot pull from Stripe: member is missing a Stripe customer link', 'error');
+    if (issue.context.syncType === 'stripe' && !issue.context.userId) {
+      showToast('Cannot pull from Stripe: member user ID is missing', 'error');
       return;
     }
     const issueKey = `${issue.table}_${issue.recordId}`;

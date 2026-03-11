@@ -31,7 +31,10 @@ export const syncPushPullSchema = z.preprocess(
     user_id: z.number().optional(),
     hubspot_contact_id: z.string().optional(),
     stripe_customer_id: z.string().optional(),
-  })
+  }).refine(
+    (data) => data.user_id != null,
+    { message: 'user_id is required for sync operations', path: ['user_id'] }
+  )
 );
 
 export const ignoreIssueSchema = z.object({
