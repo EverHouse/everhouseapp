@@ -494,7 +494,7 @@ const RosterManager: React.FC<RosterManagerProps> = ({
                       {alloc.displayName}
                       {isEmptySlot && (
                         <span className={`text-xs ${isDark ? 'text-amber-400/70' : 'text-amber-600/70'}`}>
-                          (${guestFeeDollars.toFixed(0)} overage)
+                          (${guestFeeDollars.toFixed(0)} fee)
                         </span>
                       )}
                       {isGuestWithPass && (

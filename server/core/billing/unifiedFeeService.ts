@@ -878,8 +878,9 @@ export async function computeFeeBreakdown(params: FeeComputeParams): Promise<Fee
   const ownerCount = participants.filter(p => p.participantType === 'owner').length;
   const emptySlots = Math.max(0, effectivePlayerCount - ownerCount - actualMemberCount - actualGuestCount);
 
+  const emptySlotMinutes = emptySlots > 0 ? emptySlots * minutesPerParticipant : 0;
   const guestSlotMinutes = actualGuestCount > 0 ? actualGuestCount * minutesPerParticipant : 0;
-  const nonMemberMinutes = guestSlotMinutes;
+  const nonMemberMinutes = emptySlotMinutes + guestSlotMinutes;
 
   if (nonMemberMinutes > 0 && !isConferenceRoom) {
     const ownerLineItem = lineItems.find(li => li.participantType === 'owner') ||
@@ -906,9 +907,10 @@ export async function computeFeeBreakdown(params: FeeComputeParams): Promise<Fee
         ownerLineItem.totalCents = ownerLineItem.overageCents;
         totalOverageCents += ownerLineItem.overageCents;
 
-        logger.info('[FeeBreakdown] Owner overage recalculated with guest slot time', {
+        logger.info('[FeeBreakdown] Owner overage recalculated with empty slot and guest slot time', {
           extra: {
             emptySlots,
+            emptySlotMinutes,
             guestCount: actualGuestCount,
             guestSlotMinutes,
             totalNonMemberMinutes: nonMemberMinutes,
@@ -923,6 +925,7 @@ export async function computeFeeBreakdown(params: FeeComputeParams): Promise<Fee
 
   if (emptySlots > 0 && !isConferenceRoom) {
     for (let i = 0; i < emptySlots; i++) {
+      const emptyGuestFee = PRICING.GUEST_FEE_CENTS;
       const emptyLineItem: FeeLineItem = {
         participantId: undefined,
         userId: undefined,
@@ -930,11 +933,12 @@ export async function computeFeeBreakdown(params: FeeComputeParams): Promise<Fee
         participantType: 'guest',
         minutesAllocated: minutesPerParticipant,
         overageCents: 0,
-        guestCents: 0,
-        totalCents: 0,
+        guestCents: emptyGuestFee,
+        totalCents: emptyGuestFee,
         guestPassUsed: false
       };
 
+      totalGuestCents += emptyGuestFee;
       lineItems.push(emptyLineItem);
     }
   }
