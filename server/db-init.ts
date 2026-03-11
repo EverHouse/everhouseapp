@@ -178,7 +178,16 @@ export async function cleanupOrphanedRecords(): Promise<{ notifications: number;
       UPDATE facility_closures
       SET is_active = false
       WHERE is_active = true
-        AND (LOWER(title) LIKE 'lesson%' OR LOWER(title) LIKE 'private lesson%' OR LOWER(title) LIKE 'kids lesson%' OR LOWER(title) LIKE 'group lesson%')
+        AND (
+          LOWER(title) LIKE 'lesson%'
+          OR LOWER(title) LIKE 'private lesson%'
+          OR LOWER(title) LIKE 'kids lesson%'
+          OR LOWER(title) LIKE 'group lesson%'
+          OR LOWER(title) ~ '\][\s:|\-]*lesson'
+          OR LOWER(title) ~ '\][\s:|\-]*private lesson'
+          OR LOWER(title) ~ '\][\s:|\-]*kids lesson'
+          OR LOWER(title) ~ '\][\s:|\-]*group lesson'
+        )
     `);
     const lessonClosuresDeactivated = lessonClosureResult.rowCount || 0;
     if (lessonClosuresDeactivated > 0) {

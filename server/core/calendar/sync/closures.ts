@@ -7,6 +7,15 @@ import { getPacificMidnightUTC } from '../../../utils/dateUtils';
 
 import { toIntArrayLiteral } from '../../../utils/sqlArrayLiteral';
 import { logger } from '../../logger';
+
+const LESSON_PREFIXES = ['lesson', 'private lesson', 'kids lesson', 'group lesson'];
+function isLessonTitle(title: string): boolean {
+  return LESSON_PREFIXES.some(prefix => title.startsWith(prefix));
+}
+function stripBracketPrefixes(title: string): string {
+  return title.replace(/^\[[^\]]*\]\s*[-:|]?\s*/g, '').trim();
+}
+
 function stripHtmlTags(html: string): string {
   if (!html) return '';
   return html
@@ -293,8 +302,9 @@ export async function syncInternalCalendarToClosures(): Promise<{ synced: number
         continue;
       }
       
-      const titleLower = event.summary.toLowerCase().trim();
-      if (titleLower.startsWith('lesson') || titleLower.startsWith('private lesson') || titleLower.startsWith('kids lesson') || titleLower.startsWith('group lesson')) {
+      const rawTitleLower = event.summary.toLowerCase().trim();
+      const strippedTitle = stripBracketPrefixes(rawTitleLower);
+      if (isLessonTitle(rawTitleLower) || isLessonTitle(strippedTitle)) {
         continue;
       }
       
