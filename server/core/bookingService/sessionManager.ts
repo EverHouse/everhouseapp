@@ -141,6 +141,8 @@ export async function ensureSessionForBooking(params: {
       }
       try {
 
+    let reusedStaleSession = false;
+
     if (params.trackmanBookingId) {
       const trackmanMatch = await lockClient.query(
         `SELECT bs.id FROM booking_sessions bs
@@ -150,6 +152,14 @@ export async function ensureSessionForBooking(params: {
       );
       if (trackmanMatch.rows.length > 0) {
         sessionId = trackmanMatch.rows[0].id;
+        const activeCheck = await lockClient.query(
+          `SELECT COUNT(*) as cnt FROM booking_requests
+           WHERE session_id = $1 AND status NOT IN ('cancelled', 'deleted', 'declined')`,
+          [sessionId]
+        );
+        if (parseInt(activeCheck.rows[0].cnt) === 0) {
+          reusedStaleSession = true;
+        }
       }
     }
 
@@ -162,11 +172,22 @@ export async function ensureSessionForBooking(params: {
              VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
              ON CONFLICT (trackman_booking_id) WHERE trackman_booking_id IS NOT NULL
              DO UPDATE SET updated_at = NOW()
-             RETURNING id`,
+             RETURNING id, (xmax = 0) AS was_inserted`,
             [params.resourceId, params.sessionDate, params.startTime, params.endTime, params.trackmanBookingId || null, params.source, params.createdBy]
           );
           sessionId = insertResult.rows[0].id;
-          created = true;
+          const wasInserted = insertResult.rows[0].was_inserted;
+          created = wasInserted;
+          if (!wasInserted) {
+            const activeCheck = await lockClient.query(
+              `SELECT COUNT(*) as cnt FROM booking_requests
+               WHERE session_id = $1 AND status NOT IN ('cancelled', 'deleted', 'declined')`,
+              [sessionId]
+            );
+            if (parseInt(activeCheck.rows[0].cnt) === 0) {
+              reusedStaleSession = true;
+            }
+          }
         } finally {
           try {
             await lockClient.query(`RESET app.bypass_overlap_check`);
@@ -184,6 +205,16 @@ export async function ensureSessionForBooking(params: {
         }
         throw insertErr;
       }
+    }
+
+    if (reusedStaleSession) {
+      await lockClient.query(
+        `DELETE FROM booking_participants WHERE session_id = $1`,
+        [sessionId]
+      );
+      logger.info('[SessionManager] Cleared stale participants from reused session (all prior bookings cancelled)', {
+        extra: { sessionId, newOwnerEmail: params.ownerEmail }
+      });
     }
 
     const existingOwner = await lockClient.query(

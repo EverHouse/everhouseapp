@@ -384,19 +384,19 @@ export async function runStartupTasks(): Promise<void> {
       JOIN booking_participants bp
         ON bp.session_id = active_br.session_id
         AND bp.participant_type = 'owner'
-      WHERE active_br.status IN ('approved', 'pending')
+      WHERE active_br.status NOT IN ('cancelled', 'deleted', 'declined')
         AND bp.user_id IS DISTINCT FROM active_br.user_id
         AND active_br.user_id IS NOT NULL
         AND EXISTS (
           SELECT 1 FROM booking_requests cancelled_br
           WHERE cancelled_br.session_id = active_br.session_id
-            AND cancelled_br.status IN ('cancelled', 'deleted')
+            AND cancelled_br.status IN ('cancelled', 'deleted', 'declined')
             AND cancelled_br.id != active_br.id
         )
         AND NOT EXISTS (
           SELECT 1 FROM booking_requests other_active
           WHERE other_active.session_id = active_br.session_id
-            AND other_active.status IN ('approved', 'pending')
+            AND other_active.status NOT IN ('cancelled', 'deleted', 'declined')
             AND other_active.id != active_br.id
         )
     `);
