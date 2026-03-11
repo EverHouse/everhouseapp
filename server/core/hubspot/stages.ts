@@ -182,7 +182,7 @@ export async function syncMemberToHubSpot(
     
     if (billingProvider) {
       const normalizedProvider = billingProvider.toLowerCase();
-      const hubspotProvider = DB_BILLING_PROVIDER_TO_HUBSPOT[normalizedProvider] || 'Manual';
+      const hubspotProvider = DB_BILLING_PROVIDER_TO_HUBSPOT[normalizedProvider] || 'manual';
       properties.billing_provider = hubspotProvider;
       updated.billingProvider = true;
     }

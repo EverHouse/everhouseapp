@@ -214,8 +214,9 @@ export async function ensureSessionForBooking(params: {
         sessionId = insertResult.rows[0].id;
         created = true;
       } catch (insertErr: unknown) {
-        const errMsg = getErrorMessage(insertErr);
-        if (errMsg.includes('booking_sessions_resource_datetime_unique')) {
+        const errCode = getErrorCode(insertErr);
+        const errConstraint = (insertErr && typeof insertErr === 'object' && 'constraint' in insertErr) ? String((insertErr as Record<string, unknown>).constraint) : '';
+        if (errCode === '23505' && errConstraint === 'booking_sessions_resource_datetime_unique') {
           const fallback = await lockClient.query(
             `SELECT id FROM booking_sessions
              WHERE resource_id = $1 AND session_date = $2 AND start_time = $3 AND end_time = $4
