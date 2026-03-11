@@ -84,12 +84,38 @@ export interface FinalizeAndPayResult {
   amountCharged: number;
 }
 
-function buildInvoiceDescription(
+async function buildInvoiceDescription(
   bookingId: number,
   trackmanBookingId: string | null | undefined,
-  _feeLineItems: BookingFeeLineItem[]
-): string {
+): Promise<string> {
   const bookingRef = trackmanBookingId ? `TM-${trackmanBookingId}` : `#${bookingId}`;
+  try {
+    const result = await db.execute(sql`
+      SELECT br.request_date, br.start_time, br.end_time, r.name AS resource_name
+      FROM booking_requests br
+      LEFT JOIN resources r ON r.id = br.resource_id
+      WHERE br.id = ${bookingId}
+      LIMIT 1
+    `);
+    const row = result.rows[0] as { request_date: string; start_time: string; end_time: string; resource_name: string | null } | undefined;
+    if (row) {
+      const date = new Date(row.request_date);
+      const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'America/Los_Angeles' });
+      const formatTime = (t: string) => {
+        const [h, m] = t.split(':').map(Number);
+        const ampm = h >= 12 ? 'PM' : 'AM';
+        const h12 = h % 12 || 12;
+        return m === 0 ? `${h12}${ampm}` : `${h12}:${String(m).padStart(2, '0')}${ampm}`;
+      };
+      const timeRange = `${formatTime(row.start_time)}–${formatTime(row.end_time)}`;
+      const resource = row.resource_name || 'Unassigned';
+      return `Booking ${bookingRef} — ${resource}, ${dateStr}, ${timeRange}`;
+    }
+  } catch (err: unknown) {
+    logger.warn('[BookingInvoice] Could not fetch booking details for invoice description', {
+      extra: { bookingId, error: getErrorMessage(err) }
+    });
+  }
   return `Booking ${bookingRef} fees`;
 }
 
@@ -209,7 +235,7 @@ export async function createDraftInvoiceForBooking(
     }
   }
 
-  const description = buildInvoiceDescription(bookingId, trackmanBookingId, feeLineItems);
+  const description = await buildInvoiceDescription(bookingId, trackmanBookingId);
   const invoiceMetadata = buildInvoiceMetadata(params, feeLineItems);
 
   const invoice = await stripe.invoices.create({
@@ -312,7 +338,7 @@ export async function updateDraftInvoiceLineItems(params: {
   const trackmanBookingId = (trackmanResult.rows as unknown as TrackmanBookingIdRow[])[0]?.trackman_booking_id || null;
 
   await stripe.invoices.update(invoiceId, {
-    description: buildInvoiceDescription(bookingId, trackmanBookingId, feeLineItems),
+    description: await buildInvoiceDescription(bookingId, trackmanBookingId),
     metadata: {
       ...(invoice.metadata || {}),
       overageCents: totalOverageCents.toString(),
