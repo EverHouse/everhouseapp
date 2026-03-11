@@ -231,31 +231,25 @@ async function handleExistingInvoicePayment(params: {
       };
     }
 
-    let clientSecret = invoiceResult.clientSecret;
-    let paymentIntentId = invoiceResult.paymentIntentId;
+    const clientSecret = invoiceResult.clientSecret;
+    const paymentIntentId = invoiceResult.paymentIntentId;
 
     if (!clientSecret || !paymentIntentId) {
-      const standalonePi = await stripe.paymentIntents.create({
-        amount: serverTotal,
-        currency: 'usd',
-        customer: stripeCustomerId,
-        metadata: {
-          invoice_id: invoiceResult.invoiceId,
-          booking_id: bookingId.toString(),
-          purpose: 'booking_fee',
-          member_email: bookingEmail,
-          source: 'ever_house_member_portal',
-        },
-        description: `Booking fees for ${trackmanId ? `TM-${trackmanId}` : `#${bookingId}`}`,
-        automatic_payment_methods: { enabled: true },
-      }, {
-        idempotencyKey: `pay_fees_existing_standalone_${bookingId}_${sessionId}_${Math.floor(Date.now() / 300000)}`
+      logger.warn('[Stripe] Invoice finalized but no PI client secret available — returning hosted invoice URL as fallback', {
+        extra: { bookingId, invoiceId: invoiceResult.invoiceId, hostedUrl: invoiceResult.hostedInvoiceUrl }
       });
-      clientSecret = standalonePi.client_secret || '';
-      paymentIntentId = standalonePi.id;
-      logger.info('[Stripe] Created standalone PI for existing invoice payment (no invoice PI)', {
-        extra: { bookingId, invoiceId: invoiceResult.invoiceId, paymentIntentId: standalonePi.id }
-      });
+      return {
+        paidInFull: false,
+        clientSecret: '',
+        paymentIntentId: '',
+        invoiceId: invoiceResult.invoiceId,
+        totalAmount: serverTotal / 100,
+        balanceApplied: 0,
+        remainingAmount: serverTotal / 100,
+        hostedInvoiceUrl: invoiceResult.hostedInvoiceUrl || null,
+        invoicePdf: invoiceResult.invoicePdf || null,
+        participantFees: participantFeesList,
+      };
     }
 
     await db.execute(sql`
@@ -553,32 +547,24 @@ router.post('/api/member/bookings/:id/pay-fees', isAuthenticated, paymentRateLim
       });
     }
 
-    let clientSecret = invoiceResult.clientSecret;
-    let paymentIntentId = invoiceResult.paymentIntentId;
+    const clientSecret = invoiceResult.clientSecret;
+    const paymentIntentId = invoiceResult.paymentIntentId;
 
     if (!clientSecret || !paymentIntentId) {
-      const { getStripeClient } = await import('../../core/stripe/client');
-      const stripe = await getStripeClient();
-      const standalonePi = await stripe.paymentIntents.create({
-        amount: serverTotal,
-        currency: 'usd',
-        customer: stripeCustomerId,
-        metadata: {
-          invoice_id: invoiceResult.invoiceId,
-          booking_id: bookingId.toString(),
-          purpose: 'booking_fee',
-          member_email: booking.user_email,
-          source: 'ever_house_member_portal',
-        },
-        description: `Booking fees for ${trackmanId ? `TM-${trackmanId}` : `#${bookingId}`}`,
-        automatic_payment_methods: { enabled: true },
-      }, {
-        idempotencyKey: `pay_fees_standalone_${bookingId}_${booking.session_id}_${Math.floor(Date.now() / 300000)}`
+      logger.warn('[Stripe] Invoice finalized but no PI client secret available — returning hosted invoice URL', {
+        extra: { bookingId, invoiceId: invoiceResult.invoiceId, hostedUrl: invoiceResult.hostedInvoiceUrl }
       });
-      clientSecret = standalonePi.client_secret || '';
-      paymentIntentId = standalonePi.id;
-      logger.info('[Stripe] Created standalone PI for member payment (no invoice PI)', {
-        extra: { bookingId, invoiceId: invoiceResult.invoiceId, paymentIntentId: standalonePi.id }
+      return res.json({
+        paidInFull: false,
+        clientSecret: '',
+        paymentIntentId: '',
+        invoiceId: invoiceResult.invoiceId,
+        totalAmount: serverTotal / 100,
+        balanceApplied: 0,
+        remainingAmount: serverTotal / 100,
+        hostedInvoiceUrl: invoiceResult.hostedInvoiceUrl || null,
+        invoicePdf: invoiceResult.invoicePdf || null,
+        participantFees: participantFeesList,
       });
     }
 
@@ -590,7 +576,7 @@ router.post('/api/member/bookings/:id/pay-fees', isAuthenticated, paymentRateLim
        (user_id, stripe_payment_intent_id, stripe_customer_id, amount_cents, purpose, booking_id, session_id, description, status)
        VALUES (${resolvedUserId || booking.user_email}, ${paymentIntentId}, ${stripeCustomerId},
        ${serverTotal}, ${'booking_fee'}, ${bookingId}, ${booking.session_id},
-       ${`Member payment invoice for booking ${trackmanId ? `TM-${trackmanId}` : `#${bookingId}`}`},
+       ${invoiceResult.invoiceId},
        'pending')
        ON CONFLICT (stripe_payment_intent_id) DO NOTHING
     `);
@@ -731,17 +717,14 @@ router.post('/api/member/bookings/:id/confirm-payment', isAuthenticated, async (
           const { getStripeClient } = await import('../../core/stripe/client');
           const stripe = await getStripeClient();
           const inv = await stripe.invoices.retrieve(invoiceId);
-          if (inv.status === 'draft') {
-            await stripe.invoices.finalizeInvoice(invoiceId);
-            logger.info('[Stripe] Finalized draft invoice before OOB settlement', { extra: { bookingId, invoiceId } });
-          }
-          if (inv.status === 'open' || inv.status === 'draft') {
-            await stripe.invoices.pay(invoiceId, { paid_out_of_band: true });
-            logger.info('[Stripe] Marked invoice as paid OOB after standalone PI payment', { extra: { bookingId, invoiceId, paymentIntentId } });
+          if (inv.status === 'paid') {
+            logger.info('[Stripe] Invoice already marked paid by Stripe (invoice PI succeeded)', { extra: { bookingId, invoiceId } });
+          } else if (inv.status === 'open') {
+            logger.info('[Stripe] Invoice still open after confirm-payment — Stripe webhook will settle it', { extra: { bookingId, invoiceId } });
           }
         }
-      } catch (invoiceSettleErr: unknown) {
-        logger.warn('[Stripe] Non-blocking: Failed to settle invoice after confirm-payment', { extra: { bookingId, error: getErrorMessage(invoiceSettleErr) } });
+      } catch (invoiceCheckErr: unknown) {
+        logger.warn('[Stripe] Non-blocking: Failed to check invoice status after confirm-payment', { extra: { bookingId, error: getErrorMessage(invoiceCheckErr) } });
       }
 
       sendNotificationToUser(sessionEmail, {
@@ -822,13 +805,11 @@ router.post('/api/member/invoices/:invoiceId/pay', isAuthenticated, async (req: 
       return res.status(403).json({ error: 'You do not have permission to pay this invoice' });
     }
 
-    if (invoice.status === 'draft') {
-      await stripe.invoices.finalizeInvoice(invoiceId as string);
-      logger.info('[Stripe] Finalized draft invoice for member payment', { extra: { invoiceId } });
-    } else if (invoice.status !== 'open') {
-      if (invoice.status === 'paid') {
-        return res.status(400).json({ error: 'This invoice has already been paid' });
-      }
+    if (invoice.status === 'paid') {
+      return res.status(400).json({ error: 'This invoice has already been paid' });
+    }
+
+    if (invoice.status !== 'draft' && invoice.status !== 'open') {
       return res.status(400).json({ error: `Cannot pay invoice with status: ${invoice.status}` });
     }
 
@@ -837,35 +818,47 @@ router.post('/api/member/invoices/:invoiceId/pay', isAuthenticated, async (req: 
       return res.status(400).json({ error: 'Invoice amount is too small to process' });
     }
 
-    const primaryLine = invoice.lines?.[0];
-    const description = primaryLine?.description || invoice.description || `Invoice ${invoiceId}`;
+    if (stripeInvoice.status === 'draft') {
+      await stripe.invoices.finalizeInvoice(invoiceId as string);
+      logger.info('[Stripe] Finalized draft invoice for member payment', { extra: { invoiceId } });
+    }
 
-    const paymentIntent = await stripe.paymentIntents.create({
-      amount: amountDue,
-      currency: invoice.currency || 'usd',
-      customer: stripeCustomerId,
-      metadata: {
-        invoice_id: invoiceId as string,
-        purpose: 'invoice_payment',
-        member_email: sessionEmail,
-        source: 'ever_house_member_portal'
-      },
-      description: `Payment for: ${description}`,
-      automatic_payment_methods: {
-        enabled: true,
-      },
-    }, {
-      idempotencyKey: `invoice_payment_${invoiceId}_${stripeCustomerId}`
-    });
+    const finalizedInvoice = await stripe.invoices.retrieve(invoiceId as string, { expand: ['payment_intent'] });
+    const rawPi = (finalizedInvoice as unknown as { payment_intent: string | Stripe.PaymentIntent | null }).payment_intent;
+    let invoicePiId: string | null = null;
+    let invoicePiSecret: string | null = null;
 
-    logger.info('[Stripe] Member invoice payment intent created for : $', { extra: { invoiceId, amountDue_100_ToFixed_2: (amountDue / 100).toFixed(2) } });
+    if (typeof rawPi === 'object' && rawPi !== null) {
+      invoicePiId = (rawPi as Stripe.PaymentIntent).id;
+      invoicePiSecret = (rawPi as Stripe.PaymentIntent).client_secret;
+    } else if (typeof rawPi === 'string') {
+      invoicePiId = rawPi;
+      const pi = await stripe.paymentIntents.retrieve(rawPi);
+      invoicePiSecret = pi.client_secret;
+    }
+
+    if (!invoicePiId || !invoicePiSecret) {
+      logger.warn('[Stripe] Invoice has no PaymentIntent after finalization, returning hosted URL', {
+        extra: { invoiceId, hostedUrl: finalizedInvoice.hosted_invoice_url }
+      });
+      return res.json({
+        clientSecret: '',
+        paymentIntentId: '',
+        invoiceId: invoiceId,
+        amount: amountDue / 100,
+        hostedInvoiceUrl: finalizedInvoice.hosted_invoice_url,
+        currency: invoice.currency || 'usd'
+      });
+    }
+
+    logger.info('[Stripe] Returning invoice PI for member payment', { extra: { invoiceId, paymentIntentId: invoicePiId, amount: amountDue } });
 
     res.json({
-      clientSecret: paymentIntent.client_secret,
-      paymentIntentId: paymentIntent.id,
+      clientSecret: invoicePiSecret,
+      paymentIntentId: invoicePiId,
       invoiceId: invoiceId,
       amount: amountDue / 100,
-      description: description,
+      description: invoice.description || `Invoice ${invoiceId}`,
       currency: invoice.currency || 'usd'
     });
   } catch (error: unknown) {
@@ -912,82 +905,52 @@ router.post('/api/member/invoices/:invoiceId/confirm', isAuthenticated, async (r
       return res.status(400).json({ error: 'Payment has not succeeded' });
     }
 
-    if (paymentIntent.metadata?.invoice_id !== invoiceId) {
+    const invId = invoiceId as string;
+    const invoice = await stripe.invoices.retrieve(invId, { expand: ['payment_intent'] });
+
+    if (invoice.customer !== stripeCustomerId) {
+      return res.status(403).json({ error: 'You do not have permission to confirm this invoice' });
+    }
+
+    const rawPi = (invoice as unknown as { payment_intent: string | Stripe.PaymentIntent | null }).payment_intent;
+    const invoicePiId = typeof rawPi === 'string'
+      ? rawPi
+      : (typeof rawPi === 'object' && rawPi !== null) ? (rawPi as Stripe.PaymentIntent).id : null;
+
+    if (invoicePiId !== paymentIntentId) {
       return res.status(400).json({ error: 'Payment does not match invoice' });
     }
 
-    try {
-      let invoice = await stripe.invoices.retrieve(invoiceId);
-
-      if (invoice.customer !== stripeCustomerId) {
-        return res.status(403).json({ error: 'You do not have permission to confirm this invoice' });
-      }
-
-      if (invoice.status === 'draft') {
-        invoice = await stripe.invoices.finalizeInvoice(invoiceId);
-        logger.info('[Stripe] Finalized draft invoice before OOB reconciliation', { extra: { invoiceId } });
-      }
-
-      const rawPi = (invoice as unknown as StripeInvoiceExpanded).payment_intent;
-      const invoicePiId = typeof rawPi === 'string'
-        ? rawPi
-        : (typeof rawPi === 'object' && rawPi !== null) ? (rawPi as Stripe.PaymentIntent).id : null;
-      if (invoicePiId && invoicePiId !== paymentIntentId) {
-        try {
-          await stripe.paymentIntents.cancel(invoicePiId);
-          logger.info('[Stripe] Cancelled invoice-generated PI before OOB reconciliation', { extra: { invoicePiId, invoiceId } });
-        } catch (cancelErr: unknown) {
-          logger.warn('[Stripe] Could not cancel invoice PI', { extra: { invoicePiId, error: getErrorMessage(cancelErr) } });
-        }
-      }
-
-      await stripe.invoices.pay(invoiceId, {
-        paid_out_of_band: true,
-      });
-
-      try {
-        await stripe.invoices.update(invoiceId, {
-          metadata: {
-            ...((invoice as unknown as StripeInvoiceExpanded).metadata || {}),
-            reconciled_by_pi: paymentIntentId,
-            reconciliation_source: 'member_payment',
-          }
-        });
-      } catch (_metaErr: unknown) { /* non-blocking */ }
-
-      logger.info('[Stripe] Invoice reconciled with member PI', { extra: { invoiceId, paymentIntentId } });
-      
-      sendNotificationToUser(sessionEmail, {
-        type: 'billing_update',
-        title: 'Invoice Paid',
-        message: 'Your invoice has been paid successfully.',
-        data: { invoiceId, status: 'paid' }
-      });
-      
-      broadcastBillingUpdate({
-        memberEmail: sessionEmail,
-        action: 'invoice_paid',
-        status: 'paid'
-      });
-
-      try {
-        const invoiceMeta = (invoice as unknown as StripeInvoiceExpanded).metadata;
-        const invoiceBookingId = invoiceMeta?.bookingId ? parseInt(invoiceMeta.bookingId) : null;
-        if (invoiceBookingId) {
-          broadcastBookingInvoiceUpdate({
-            bookingId: invoiceBookingId,
-            action: 'invoice_paid',
-            invoiceId,
-          });
-        }
-      } catch (_broadcastErr: unknown) { /* non-blocking */ }
-    } catch (payErr: unknown) {
-      if (getErrorCode(payErr) === 'invoice_already_paid') {
-        logger.info('[Stripe] Invoice was already marked as paid', { extra: { invoiceId } });
-      } else {
-        logger.error('[Stripe] Error marking invoice as paid', { extra: { payErr } });
-      }
+    if (invoice.status === 'paid') {
+      logger.info('[Stripe] Invoice already paid (Stripe settled it automatically)', { extra: { invoiceId: invId, paymentIntentId } });
+    } else {
+      logger.info('[Stripe] Invoice not yet marked paid — Stripe webhook will settle it', { extra: { invoiceId: invId, paymentIntentId, invoiceStatus: invoice.status } });
     }
+
+    sendNotificationToUser(sessionEmail, {
+      type: 'billing_update',
+      title: 'Invoice Paid',
+      message: 'Your invoice has been paid successfully.',
+      data: { invoiceId: invId, status: 'paid' }
+    });
+    
+    broadcastBillingUpdate({
+      memberEmail: sessionEmail,
+      action: 'invoice_paid',
+      status: 'paid'
+    });
+
+    try {
+      const invoiceMeta = (invoice as unknown as StripeInvoiceExpanded).metadata;
+      const invoiceBookingId = invoiceMeta?.bookingId ? parseInt(invoiceMeta.bookingId) : null;
+      if (invoiceBookingId) {
+        broadcastBookingInvoiceUpdate({
+          bookingId: invoiceBookingId,
+          action: 'invoice_paid',
+          invoiceId: invId,
+        });
+      }
+    } catch (_broadcastErr: unknown) { /* non-blocking */ }
 
     res.json({ success: true });
   } catch (error: unknown) {

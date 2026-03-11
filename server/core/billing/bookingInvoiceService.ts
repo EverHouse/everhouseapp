@@ -87,16 +87,10 @@ export interface FinalizeAndPayResult {
 function buildInvoiceDescription(
   bookingId: number,
   trackmanBookingId: string | null | undefined,
-  feeLineItems: BookingFeeLineItem[]
+  _feeLineItems: BookingFeeLineItem[]
 ): string {
-  const totalOverageCents = feeLineItems.reduce((sum, li) => sum + li.overageCents, 0);
-  const totalGuestCents = feeLineItems.reduce((sum, li) => sum + li.guestCents, 0);
   const bookingRef = trackmanBookingId ? `TM-${trackmanBookingId}` : `#${bookingId}`;
-  const parts: string[] = [];
-  if (totalOverageCents > 0) parts.push(`Overage: $${(totalOverageCents / 100).toFixed(2)}`);
-  if (totalGuestCents > 0) parts.push(`Guest fees: $${(totalGuestCents / 100).toFixed(2)}`);
-  const feeSummary = parts.length > 0 ? ` | ${parts.join(', ')}` : '';
-  return `Booking ${bookingRef} fees${feeSummary}`;
+  return `Booking ${bookingRef} fees`;
 }
 
 function buildInvoiceMetadata(
@@ -550,7 +544,18 @@ export async function finalizeAndPayInvoice(params: {
   }
 
   if (!invoicePiId) {
-    logger.info('[BookingInvoice] No PaymentIntent after finalization (member likely has no default payment method)', {
+    const expandedInvoice = await stripe.invoices.retrieve(invoiceId, { expand: ['payment_intent'] });
+    const expandedRawPi = (expandedInvoice as unknown as { payment_intent: string | Stripe.PaymentIntent | null }).payment_intent;
+    if (typeof expandedRawPi === 'object' && expandedRawPi !== null) {
+      invoicePiId = expandedRawPi.id;
+      logger.info('[BookingInvoice] Retrieved invoice PI via expand', {
+        extra: { bookingId, invoiceId, paymentIntentId: invoicePiId, piStatus: expandedRawPi.status }
+      });
+    }
+  }
+
+  if (!invoicePiId) {
+    logger.warn('[BookingInvoice] No PaymentIntent after finalization even with expand — returning hosted URL as fallback', {
       extra: { bookingId, invoiceId, invoiceStatus: finalizedInvoice.status }
     });
     return {
