@@ -164,16 +164,38 @@ export async function autoFixMissingTiers(): Promise<{
       logger.info(`[AutoFix] Set billing_provider='mindbody' for ${billingProviderResult.rows.length} members with MindBody IDs: ${emails}`);
     }
 
+    await db.execute(sql`
+      DELETE FROM user_linked_emails
+      WHERE LOWER(primary_email) = LOWER(linked_email)
+    `);
+
+    await db.execute(sql`
+      DELETE FROM user_linked_emails ule
+      WHERE NOT EXISTS (
+        SELECT 1 FROM users u
+        WHERE LOWER(u.email) = LOWER(ule.primary_email)
+          AND u.archived_at IS NULL
+          AND u.membership_status != 'merged'
+      )
+    `);
+
     const clearedLinkedTiers = await db.execute(sql`
       UPDATE users u
       SET tier = NULL, membership_status = 'inactive', updated_at = NOW()
       FROM user_linked_emails ule
       WHERE LOWER(ule.linked_email) = LOWER(u.email)
+        AND LOWER(ule.primary_email) != LOWER(ule.linked_email)
         AND u.role = 'member'
         AND (u.tier IS NOT NULL OR u.membership_status = 'active')
         AND u.email NOT LIKE '%test%'
         AND u.email NOT LIKE '%example.com'
         AND (u.last_manual_fix_at IS NULL OR u.last_manual_fix_at < NOW() - INTERVAL '1 hour')
+        AND EXISTS (
+          SELECT 1 FROM users p
+          WHERE LOWER(p.email) = LOWER(ule.primary_email)
+            AND p.archived_at IS NULL
+            AND p.membership_status != 'merged'
+        )
       RETURNING u.email, u.tier
     `);
 

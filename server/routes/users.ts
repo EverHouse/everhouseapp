@@ -254,6 +254,13 @@ router.delete('/api/staff-users/:id', isAdmin, async (req, res) => {
         );
         logger.info(`[Staff] Reset role for ${deletedEmail} based on membership status after staff removal`);
       }
+
+      await db.execute(
+        sql`DELETE FROM user_linked_emails
+            WHERE LOWER(primary_email) = ${deletedEmail.toLowerCase()}
+               OR LOWER(linked_email) = ${deletedEmail.toLowerCase()}`
+      );
+      logger.info(`[Staff] Cleaned up user_linked_emails for ${deletedEmail} after staff removal`);
     }
     
     logFromRequest(req, 'delete_staff_user', 'staff_user', req.params.id as string, '', {});

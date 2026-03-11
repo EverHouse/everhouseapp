@@ -439,6 +439,8 @@ export async function executeMerge(
     
     // Update user_linked_emails (uses primary_email column, not user_id)
     await tx.execute(sql`UPDATE user_linked_emails SET primary_email = ${primaryEmail} WHERE LOWER(primary_email) = ${secondaryEmail}`);
+
+    await tx.execute(sql`DELETE FROM user_linked_emails WHERE LOWER(primary_email) = LOWER(linked_email)`);
     
     // Add secondary email as a linked email for the primary user
     if (secondaryEmail && secondaryEmail !== primaryEmail) {
