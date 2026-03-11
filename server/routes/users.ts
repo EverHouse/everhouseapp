@@ -184,6 +184,13 @@ router.put('/api/staff-users/:id', isAdmin, async (req, res) => {
                 AND role = 'staff'`
         );
         logger.info(`[Staff] Reset role for ${staffEmail} based on membership status after staff deactivation`);
+
+        await db.execute(
+          sql`DELETE FROM user_linked_emails
+              WHERE LOWER(primary_email) = ${staffEmail}
+                 OR LOWER(linked_email) = ${staffEmail}`
+        );
+        logger.info(`[Staff] Cleaned up user_linked_emails for ${staffEmail} after staff deactivation`);
       }
     }
 
@@ -383,6 +390,38 @@ router.put('/api/admin-users/:id', isAdmin, async (req, res) => {
     if (result.length === 0) {
       return res.status(404).json({ error: 'Admin user not found' });
     }
+
+    if (is_active === false && result[0].email) {
+      const adminEmail = result[0].email.toLowerCase();
+      const otherActiveStaff = await db.select({ id: staffUsers.id })
+        .from(staffUsers)
+        .where(and(
+          eq(sql`LOWER(${staffUsers.email})`, adminEmail),
+          eq(staffUsers.isActive, true),
+          sql`${staffUsers.id} != ${parseInt(id as string)}`
+        ))
+        .limit(1);
+
+      if (otherActiveStaff.length === 0) {
+        await db.execute(
+          sql`UPDATE users SET role = CASE
+                WHEN membership_status IN ('active', 'trialing', 'past_due', 'pending') THEN 'member'
+                WHEN membership_status IN ('visitor', 'non-member') THEN 'visitor'
+                ELSE role
+              END,
+              updated_at = NOW()
+              WHERE LOWER(email) = ${adminEmail}
+                AND role = 'staff'`
+        );
+
+        await db.execute(
+          sql`DELETE FROM user_linked_emails
+              WHERE LOWER(primary_email) = ${adminEmail}
+                 OR LOWER(linked_email) = ${adminEmail}`
+        );
+        logger.info(`[Staff] Reset role and cleaned up user_linked_emails for ${adminEmail} after admin deactivation`);
+      }
+    }
     
     logFromRequest(req, 'update_admin_user', 'staff_user', req.params.id as string, '', { changes: req.body });
     res.json({
@@ -432,6 +471,34 @@ router.delete('/api/admin-users/:id', isAdmin, async (req, res) => {
     
     if (result.length === 0) {
       return res.status(404).json({ error: 'Admin user not found' });
+    }
+
+    const deletedAdminEmail = result[0].email;
+    if (deletedAdminEmail) {
+      const stillStaff = await db.select({ id: staffUsers.id })
+        .from(staffUsers)
+        .where(eq(sql`LOWER(${staffUsers.email})`, deletedAdminEmail.toLowerCase()))
+        .limit(1);
+
+      if (stillStaff.length === 0) {
+        await db.execute(
+          sql`UPDATE users SET role = CASE
+                WHEN membership_status IN ('active', 'trialing', 'past_due', 'pending') THEN 'member'
+                WHEN membership_status IN ('visitor', 'non-member') THEN 'visitor'
+                ELSE role
+              END,
+              updated_at = NOW()
+              WHERE LOWER(email) = ${deletedAdminEmail.toLowerCase()}
+                AND role = 'staff'`
+        );
+      }
+
+      await db.execute(
+        sql`DELETE FROM user_linked_emails
+            WHERE LOWER(primary_email) = ${deletedAdminEmail.toLowerCase()}
+               OR LOWER(linked_email) = ${deletedAdminEmail.toLowerCase()}`
+      );
+      logger.info(`[Staff] Cleaned up user_linked_emails for ${deletedAdminEmail} after admin removal`);
     }
     
     logFromRequest(req, 'delete_admin_user', 'staff_user', req.params.id as string, '', {});

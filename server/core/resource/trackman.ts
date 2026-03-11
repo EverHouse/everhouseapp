@@ -471,7 +471,7 @@ export async function linkEmailToMember(ownerEmail: string, originalEmail: strin
   try {
     const existingLink = await db.execute(sql`SELECT id FROM user_linked_emails WHERE LOWER(linked_email) = LOWER(${originalEmail})`);
     
-    if ((existingLink.rows as unknown as LinkedEmailIdRow[]).length === 0) {
+    if ((existingLink.rows as unknown as LinkedEmailIdRow[]).length === 0 && ownerEmail.toLowerCase() !== originalEmail.toLowerCase()) {
       const [member] = await db.select().from(users).where(eq(users.email, ownerEmail.toLowerCase())).limit(1);
       if (member) {
         await db.execute(sql`INSERT INTO user_linked_emails (primary_email, linked_email, source, created_at) 
