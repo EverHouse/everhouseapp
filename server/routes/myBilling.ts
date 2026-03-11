@@ -1031,12 +1031,31 @@ router.get('/api/my-billing/payment-history', requireAuth, async (req, res) => {
 
     if (stripeCustomerId) {
       try {
-        const [openInvoices, draftInvoices] = await Promise.all([
+        const [openInvoices, draftInvoices, paidInvoices] = await Promise.all([
           stripe.invoices.list({ customer: stripeCustomerId, limit: 100, status: 'open' }),
           stripe.invoices.list({ customer: stripeCustomerId, limit: 100, status: 'draft' }),
+          stripe.invoices.list({ customer: stripeCustomerId, limit: 100, status: 'paid' }),
         ]);
-        const invoices = { data: [...openInvoices.data, ...draftInvoices.data] };
 
+        const paidInvoiceUrlByBookingId = new Map<string, string>();
+        for (const inv of paidInvoices.data) {
+          const bookingId = inv.metadata?.bookingId || inv.metadata?.booking_id;
+          if (bookingId && inv.hosted_invoice_url) {
+            paidInvoiceUrlByBookingId.set(bookingId, inv.hosted_invoice_url);
+            invoiceBookingIds.add(bookingId);
+          }
+        }
+
+        for (const p of purchases) {
+          if (p.id.startsWith('stripe-') && p.bookingId && !p.hostedInvoiceUrl) {
+            const url = paidInvoiceUrlByBookingId.get(String(p.bookingId));
+            if (url) {
+              p.hostedInvoiceUrl = url;
+            }
+          }
+        }
+
+        const invoices = { data: [...openInvoices.data, ...draftInvoices.data] };
         const seenInvoiceBookingIds = new Set<string>();
         const sortedInvoices = [...invoices.data].sort((a, b) => b.created - a.created);
         for (const inv of sortedInvoices) {
@@ -1065,13 +1084,14 @@ router.get('/api/my-billing/payment-history', requireAuth, async (req, res) => {
           }
         }
       } catch (invoiceErr: unknown) {
-        logger.warn('[MyBilling] Failed to fetch open invoices for payment history', { error: invoiceErr });
+        logger.warn('[MyBilling] Failed to fetch invoices for payment history', { error: invoiceErr });
       }
     }
 
     const deduped = purchases.filter(p => {
       if (p.itemCategory === 'invoice') return true;
       if (!p.id.startsWith('stripe-')) return true;
+      if (p.bookingId && invoiceBookingIds.has(String(p.bookingId)) && p.hostedInvoiceUrl) return true;
       if (p.bookingId && invoiceBookingIds.has(String(p.bookingId))) return false;
       return true;
     });
