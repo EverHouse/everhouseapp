@@ -1277,6 +1277,12 @@ router.post('/api/data-integrity/fix/cancel-stale-booking', isAdmin, validateBod
       }
     }
 
+    try {
+      await db.execute(sql`UPDATE booking_fee_snapshots SET status = 'cancelled', updated_at = NOW() WHERE booking_id = ${recordId} AND status IN ('pending', 'requires_action')`);
+    } catch (snapshotErr: unknown) {
+      logger.warn('[DataIntegrity] Non-blocking: failed to cancel fee snapshots for stale booking', { extra: { bookingId: recordId, error: getErrorMessage(snapshotErr) } });
+    }
+
     logFromRequest(req, 'cancel_stale_booking', 'booking_request', String(recordId), `Cancelled stale booking #${recordId} via data integrity`, { bookingId: recordId });
 
     res.json({ success: true, message: `Stale booking #${recordId} cancelled` });
@@ -1303,6 +1309,15 @@ router.post('/api/data-integrity/fix/bulk-cancel-stale-bookings', isAdmin, async
     const invoiceRows = (result.rows as { id: number; stripe_invoice_id: string | null }[]).filter(r => r.stripe_invoice_id);
 
     logFromRequest(req, 'bulk_cancel_stale_bookings', 'booking_request', undefined, `Bulk cancelled ${count} stale bookings via data integrity`, { cancelledCount: count, invoicesToVoid: invoiceRows.length });
+
+    const cancelledIds = (result.rows as { id: number }[]).map(r => r.id);
+    if (cancelledIds.length > 0) {
+      try {
+        await db.execute(sql`UPDATE booking_fee_snapshots SET status = 'cancelled', updated_at = NOW() WHERE booking_id = ANY(${cancelledIds}::int[]) AND status IN ('pending', 'requires_action')`);
+      } catch (snapshotErr: unknown) {
+        logger.warn('[DataIntegrity] Non-blocking: failed to cancel fee snapshots for bulk stale cancel', { extra: { error: getErrorMessage(snapshotErr) } });
+      }
+    }
 
     res.json({ success: true, message: `Cancelled ${count} stale bookings (${invoiceRows.length} invoices voiding in background)`, cancelledCount: count });
 

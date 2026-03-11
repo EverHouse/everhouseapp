@@ -600,6 +600,10 @@ export async function memberCancelBooking(bookingId: number, userEmail: string, 
     });
   }
   
+  db.execute(sql`UPDATE booking_fee_snapshots SET status = 'cancelled', updated_at = NOW() WHERE booking_id = ${bookingId} AND status IN ('pending', 'requires_action')`).catch((err: unknown) => {
+    logger.warn('[Member Cancel] Non-blocking: failed to cancel fee snapshots', { extra: { bookingId, error: getErrorMessage(err) } });
+  });
+  
   logger.info('[PUT /api/bookings/member-cancel] Cancellation cascade complete', {
     extra: {
       bookingId,
