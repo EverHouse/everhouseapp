@@ -546,6 +546,13 @@ export async function markBookingAsEvent(params: {
     throw new AppError(404, 'Booking not found');
   }
   
+  const lessonPrefixes = ['lesson', 'private lesson', 'kids lesson', 'group lesson', 'beginner group lesson'];
+  const bookingNameLower = (primaryBooking.userName || '').toLowerCase().trim();
+  const titleLower = (params.eventTitle || '').toLowerCase().trim();
+  if (lessonPrefixes.some(prefix => bookingNameLower.startsWith(prefix)) || lessonPrefixes.some(prefix => titleLower.startsWith(prefix))) {
+    throw new AppError(400, 'Lesson bookings should not be marked as private events. Use "Assign to Staff" to convert to an instructor availability block instead.');
+  }
+  
   const userName = primaryBooking.userName?.toLowerCase()?.trim();
   const bookingDate = primaryBooking.requestDate;
   const startTime = primaryBooking.startTime;

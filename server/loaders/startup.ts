@@ -478,6 +478,16 @@ export async function runStartupTasks(): Promise<void> {
     logger.warn('[Startup] Session owner mismatch fix failed (non-critical)', { error: err instanceof Error ? err : new Error(String(err)) });
   }
 
+  try {
+    const { cleanupOldFacilityClosures } = await import('../core/databaseCleanup');
+    const deactivated = await cleanupOldFacilityClosures(30);
+    if (deactivated > 0) {
+      logger.info(`[Startup] Deactivated ${deactivated} old facility closures (>30 days past)`);
+    }
+  } catch (err: unknown) {
+    logger.warn('[Startup] Old facility closures cleanup failed (non-critical)', { error: err instanceof Error ? err : new Error(String(err)) });
+  }
+
   startupHealth.completedAt = new Date().toISOString();
   
   if (startupHealth.criticalFailures.length > 0) {
