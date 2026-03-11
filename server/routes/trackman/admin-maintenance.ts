@@ -247,7 +247,8 @@ router.get('/api/admin/backfill-sessions/preview', isStaffOrAdmin, async (req, r
 });
 
 router.post('/api/admin/backfill-sessions', isStaffOrAdmin, async (req, res) => {
-  const client = await pool.connect();
+  let client = await pool.connect();
+  let clientReleased = false;
   
   try {
     await client.query('BEGIN');
@@ -292,6 +293,7 @@ router.post('/api/admin/backfill-sessions', isStaffOrAdmin, async (req, res) => 
     let sessionsCreated = 0;
     let sessionsLinked = 0;
     const errors: Array<{ bookingId: number; error: string }> = [];
+    const createdSessionIds: number[] = [];
     let savepointCounter = 0;
     
     for (const booking of bookings) {
@@ -348,16 +350,8 @@ router.post('/api/admin/backfill-sessions', isStaffOrAdmin, async (req, res) => 
         
         await client.query(`RELEASE SAVEPOINT ${savepointName}`);
         
-        const newSessionId = sessionResult.sessionId;
-        if (newSessionId && newSessionId > 0) {
-          const todayPacific = getTodayPacific();
-          const isPastBooking = booking.request_date < todayPacific;
-          if (isPastBooking) {
-            await client.query(
-              `UPDATE booking_participants SET payment_status = 'paid', paid_at = NOW() WHERE session_id = $1 AND payment_status = 'pending'`,
-              [newSessionId]
-            );
-          }
+        if (sessionResult.sessionId > 0) {
+          createdSessionIds.push(sessionResult.sessionId);
         }
         
         if (sessionResult.created) {
@@ -382,22 +376,44 @@ router.post('/api/admin/backfill-sessions', isStaffOrAdmin, async (req, res) => 
     }
     
     await client.query('COMMIT');
+    safeRelease(client);
+    clientReleased = true;
+    
+    let feesComputed = 0;
+    let feeErrors = 0;
+    for (const sessionId of createdSessionIds) {
+      try {
+        await recalculateSessionFees(sessionId, 'staff_action', { skipCascade: true });
+        feesComputed++;
+      } catch (feeErr: unknown) {
+        feeErrors++;
+        logger.warn('[Backfill] Fee calculation failed for session', { extra: { sessionId, error: getErrorMessage(feeErr) } });
+      }
+    }
+    
+    if (createdSessionIds.length > 0) {
+      logger.info('[Backfill] Fee computation complete', { extra: { feesComputed, feeErrors, totalSessions: createdSessionIds.length } });
+    }
     
     logFromRequest(req, 'bulk_action', 'booking', undefined, 'Session Backfill', {
       action: 'backfill_sessions',
       sessionsCreated,
       sessionsLinked,
       totalProcessed: bookings.length,
+      feesComputed,
+      feeErrors,
       errorsCount: errors.length,
       errors: errors.slice(0, 10)
     });
     
     const totalResolved = sessionsCreated + sessionsLinked;
-    logger.info('[Backfill] Completed: new sessions, linked to existing for bookings by', { extra: { sessionsCreated, sessionsLinked, bookingsLength: bookings.length, staffEmail } });
+    logger.info('[Backfill] Completed', { extra: { sessionsCreated, sessionsLinked, feesComputed, feeErrors, bookingsLength: bookings.length, staffEmail } });
     
     const messageParts = [];
     if (sessionsCreated > 0) messageParts.push(`${sessionsCreated} new sessions created`);
     if (sessionsLinked > 0) messageParts.push(`${sessionsLinked} linked to existing sessions`);
+    if (feesComputed > 0) messageParts.push(`${feesComputed} sessions had fees computed`);
+    if (feeErrors > 0) messageParts.push(`${feeErrors} fee calculation errors`);
     const message = messageParts.length > 0 
       ? `Successfully resolved ${totalResolved} bookings: ${messageParts.join(', ')}`
       : 'No bookings could be resolved';
@@ -406,13 +422,17 @@ router.post('/api/admin/backfill-sessions', isStaffOrAdmin, async (req, res) => 
       success: true,
       sessionsCreated,
       sessionsLinked,
+      feesComputed,
+      feeErrors,
       totalProcessed: bookings.length,
       errorsCount: errors.length,
       errors: errors.length > 0 ? errors.slice(0, 20) : undefined,
       message
     });
   } catch (error: unknown) {
-    await client.query('ROLLBACK');
+    if (!clientReleased) {
+      try { await client.query('ROLLBACK'); } catch (_) {}
+    }
     logger.error('[Backfill Sessions] Error', { error: error instanceof Error ? error : new Error(String(error)) });
     
     logFromRequest(req, 'bulk_action', 'booking', undefined, 'Session Backfill Failed', {
@@ -422,7 +442,9 @@ router.post('/api/admin/backfill-sessions', isStaffOrAdmin, async (req, res) => 
     
     res.status(500).json({ error: 'Failed to backfill sessions', details: safeErrorDetail(error) });
   } finally {
-    safeRelease(client);
+    if (!clientReleased) {
+      safeRelease(client);
+    }
   }
 });
 
