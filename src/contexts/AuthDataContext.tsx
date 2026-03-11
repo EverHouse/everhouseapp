@@ -12,7 +12,6 @@ interface AuthDataContextType {
   isLoading: boolean;
   sessionChecked: boolean;
   sessionVersion: number;
-  login: (email: string) => Promise<void>;
   loginWithMember: (member: MemberProfile) => void;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
@@ -67,8 +66,8 @@ export const AuthDataProvider: React.FC<{children: ReactNode}> = ({ children }) 
     sessionCheckDone.current = true;
 
     const initializeUser = async () => {
-      const isDevPreview = window.location.pathname.includes('/dev-preview/') ||
-                           window.location.hash.includes('/dev-preview/');
+      const isDevPreview = import.meta.env.DEV && (window.location.pathname.includes('/dev-preview/') ||
+                           window.location.hash.includes('/dev-preview/'));
       const isScreenshotMode = isDevPreview;
 
       if (isScreenshotMode) {
@@ -242,44 +241,6 @@ export const AuthDataProvider: React.FC<{children: ReactNode}> = ({ children }) 
     });
   }, []);
 
-  const login = useCallback(async (email: string) => {
-    const res = await fetch('/api/auth/verify-member', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email })
-    });
-
-    if (!res.ok) {
-      const data = await res.json();
-      throw new Error(data.error || 'Failed to verify membership');
-    }
-
-    const { member } = await res.json();
-
-    const memberProfile: MemberProfile = {
-      id: member.id,
-      name: [member.firstName, member.lastName].filter(Boolean).join(' ') || member.email || 'Member',
-      tier: member.tier || 'Core',
-      tags: member.tags || [],
-      status: 'Active',
-      email: member.email,
-      phone: member.phone || '',
-      jobTitle: member.jobTitle || '',
-      role: member.role || 'member',
-      mindbodyClientId: member.mindbodyClientId || '',
-      lifetimeVisits: member.lifetimeVisits || 0,
-      lastBookingDate: member.lastBookingDate || undefined
-    };
-
-    if (!sessionChecked) {
-      loginInProgressRef.current = true;
-    }
-    localStorage.setItem('eh_member', JSON.stringify(memberProfile));
-    setActualUser(memberProfile);
-    useUserStore.getState().setUser(memberProfile);
-    setSessionVersion(v => v + 1);
-  }, [sessionChecked]);
-
   const loginWithMember = useCallback((member: MemberProfile) => {
     const memberProfile: MemberProfile = {
       id: member.id,
@@ -443,12 +404,12 @@ export const AuthDataProvider: React.FC<{children: ReactNode}> = ({ children }) 
   const contextValue = React.useMemo(() => ({
     user, actualUser, viewAsUser, isViewingAs,
     isLoading, sessionChecked, sessionVersion,
-    login, loginWithMember, logout, refreshUser,
+    loginWithMember, logout, refreshUser,
     setViewAsUser, clearViewAsUser
   }), [
     user, actualUser, viewAsUser, isViewingAs,
     isLoading, sessionChecked, sessionVersion,
-    login, loginWithMember, logout, refreshUser,
+    loginWithMember, logout, refreshUser,
     setViewAsUser, clearViewAsUser
   ]);
 

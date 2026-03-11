@@ -71,13 +71,7 @@ class ErrorBoundary extends Component<Props, State> {
     this.props.onError?.(error, errorInfo);
 
     if (isChunkLoadError(error)) {
-      const alreadyReloaded = sessionStorage.getItem(CHUNK_RELOAD_KEY);
-      if (!alreadyReloaded) {
-        sessionStorage.setItem(CHUNK_RELOAD_KEY, '1');
-        this.clearCachesAndReload();
-        return;
-      }
-      sessionStorage.removeItem(CHUNK_RELOAD_KEY);
+      console.warn('[ErrorBoundary] Chunk load error detected — showing fallback UI');
     }
   }
 
@@ -142,15 +136,18 @@ class ErrorBoundary extends Component<Props, State> {
       if (this.props.fallback) return this.props.fallback;
 
       const hitReloadLimit = this.state.reloadAttempts >= MAX_GLOBAL_RELOADS;
+      const isChunk = this.state.error ? isChunkLoadError(this.state.error) : false;
 
       return (
         <ErrorFallback
           variant="page"
-          title="Something went wrong"
+          title={isChunk ? "Update available" : "Something went wrong"}
           description={
             hitReloadLimit
               ? "We're having trouble loading the app. Try clearing the cache or contact support if this continues."
-              : 'The app encountered an unexpected error. Please try again.'
+              : isChunk
+                ? 'A new version of the app is available. Please reload to get the latest update.'
+                : 'The app encountered an unexpected error. Please try again.'
           }
           onRetry={this.handleReload}
           retryLabel="Reload App"

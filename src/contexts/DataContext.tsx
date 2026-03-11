@@ -31,7 +31,6 @@ interface DataContextType {
   membersPagination: { total: number; page: number; totalPages: number; hasMore: boolean } | null;
   isFetchingMembers: boolean;
 
-  login: (email: string) => Promise<void>;
   loginWithMember: (member: MemberProfile) => void;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
@@ -98,7 +97,6 @@ export const useData = (): DataContextType => {
     isDataReady,
     sessionChecked: auth.sessionChecked,
     sessionVersion: auth.sessionVersion,
-    login: auth.login,
     loginWithMember: auth.loginWithMember,
     logout: auth.logout,
     refreshUser: auth.refreshUser,
