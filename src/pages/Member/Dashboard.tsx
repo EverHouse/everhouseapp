@@ -972,6 +972,10 @@ const Dashboard: React.FC = () => {
                   const primaryBookerName = (item as DashboardBookingItem).primaryBookerName;
                   
                   const isCancellationPending = (item as DashboardBookingItem).status === 'cancellation_pending';
+
+                  const bookingHasStarted = item.rawDate && startTime24
+                    ? new Date(`${item.rawDate}T${startTime24}`) <= new Date()
+                    : false;
                   
                   // When cancelling or cancellation_pending, show no actions (disabled state)
                   if (isCancelling || isCancellationPending) {
@@ -990,10 +994,10 @@ const Dashboard: React.FC = () => {
                           endTime: endTime24
                         }, `EverClub_${item.rawDate}_${item.title.replace(/[^a-zA-Z0-9]/g, '_')}.ics`)
                       }] : []),
-                      ...(!isLinkedMember ? [
+                      ...(!isLinkedMember && !bookingHasStarted ? [
                         { icon: 'close', label: 'Cancel', onClick: () => handleCancelBooking(Number(item.dbId), item.type) }
                       ] : []),
-                      ...(isLinkedMember && isConfirmed ? [{
+                      ...(isLinkedMember && isConfirmed && !bookingHasStarted ? [{
                         icon: 'logout',
                         label: 'Leave',
                         onClick: () => handleLeaveBooking(Number(item.dbId), primaryBookerName)

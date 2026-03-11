@@ -488,6 +488,13 @@ export async function memberCancelBooking(bookingId: number, userEmail: string, 
   if (existing.status === 'cancellation_pending') {
     throw { statusCode: 400, error: 'Cancellation is already in progress' };
   }
+
+  if (!isAdminViewingAs && existing.requestDate && existing.startTime) {
+    const bookingStart = new Date(`${existing.requestDate}T${existing.startTime}`);
+    if (bookingStart <= new Date()) {
+      throw { statusCode: 400, error: 'This booking has already started and cannot be cancelled' };
+    }
+  }
   
   const wasApproved = existing.status === 'approved';
   const isTrackmanLinked = !!existing.trackmanBookingId;

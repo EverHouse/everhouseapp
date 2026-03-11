@@ -1137,6 +1137,13 @@ router.put('/api/booking-requests/:id/member-cancel', isAuthenticated, async (re
     if (existing.status === 'cancellation_pending') {
       return res.status(400).json({ error: 'Cancellation is already in progress' });
     }
+
+    if (!isAdminViewingAs && existing.requestDate && existing.startTime) {
+      const bookingStart = new Date(`${existing.requestDate}T${existing.startTime}`);
+      if (bookingStart <= new Date()) {
+        return res.status(400).json({ error: 'This booking has already started and cannot be cancelled' });
+      }
+    }
     
     const wasApproved = existing.status === 'approved';
     const isTrackmanLinked = !!existing.trackmanBookingId;
