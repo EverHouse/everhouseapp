@@ -8,6 +8,7 @@ import { normalizeEmail } from '../core/utils/emailNormalization';
 import { logMemberAction } from '../core/auditLog';
 import { getErrorMessage } from '../utils/errorUtils';
 import { logger } from '../core/logger';
+import { authRateLimiterByIp } from '../middleware/rateLimiting';
 
 const router = Router();
 
@@ -32,7 +33,7 @@ async function verifyGoogleToken(credential: string) {
   };
 }
 
-router.post('/api/auth/google/verify', async (req, res) => {
+router.post('/api/auth/google/verify', authRateLimiterByIp, async (req, res) => {
   try {
     const { credential } = req.body;
     if (!credential) {

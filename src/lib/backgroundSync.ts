@@ -143,7 +143,7 @@ const syncAll = async () => {
 };
 
 let intervalId: number | null = null;
-let visibilityListenerAdded = false;
+let visibilityHandler: (() => void) | null = null;
 
 export const startBackgroundSync = () => {
   if (intervalId) return;
@@ -151,11 +151,11 @@ export const startBackgroundSync = () => {
   syncAll();
   intervalId = window.setInterval(syncAll, SYNC_INTERVAL);
 
-  if (!visibilityListenerAdded) {
-    visibilityListenerAdded = true;
-    document.addEventListener('visibilitychange', () => {
+  if (!visibilityHandler) {
+    visibilityHandler = () => {
       if (isVisible()) syncAll();
-    });
+    };
+    document.addEventListener('visibilitychange', visibilityHandler);
   }
 };
 
@@ -163,5 +163,9 @@ export const stopBackgroundSync = () => {
   if (intervalId) {
     clearInterval(intervalId);
     intervalId = null;
+  }
+  if (visibilityHandler) {
+    document.removeEventListener('visibilitychange', visibilityHandler);
+    visibilityHandler = null;
   }
 };

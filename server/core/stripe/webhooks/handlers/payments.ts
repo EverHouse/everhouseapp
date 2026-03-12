@@ -620,7 +620,7 @@ export async function handlePaymentIntentSucceeded(client: PoolClient, paymentIn
     const snapshotResult = await client.query(
       `SELECT bfs.*
        FROM booking_fee_snapshots bfs
-       WHERE bfs.id = $1 AND bfs.stripe_payment_intent_id = $2 AND bfs.status = 'pending'
+       WHERE bfs.id = $1 AND bfs.stripe_payment_intent_id = $2 AND bfs.status IN ('pending', 'failed')
        FOR UPDATE OF bfs`,
       [feeSnapshotId, id]
     );

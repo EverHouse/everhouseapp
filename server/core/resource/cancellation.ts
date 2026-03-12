@@ -22,6 +22,7 @@ interface BookingParticipantRow {
   guest_id: number | null;
   participant_type: string;
   display_name: string | null;
+  used_guest_pass: boolean | null;
 }
 
 interface UserEmailRow {
@@ -84,7 +85,7 @@ export async function handleCancellationCascade(
 
   const txResult = await db.transaction(async (tx) => {
     if (sessionId) {
-      const participantsResult = await tx.execute(sql`SELECT id, user_id, guest_id, participant_type, display_name 
+      const participantsResult = await tx.execute(sql`SELECT id, user_id, guest_id, participant_type, display_name, used_guest_pass 
          FROM booking_participants WHERE session_id = ${sessionId}`);
       const participants = participantsResult.rows as unknown as BookingParticipantRow[];
 
@@ -112,7 +113,7 @@ export async function handleCancellationCascade(
           }
         }
 
-        if (participant.participant_type === 'guest' && shouldRefundGuestPasses) {
+        if (participant.participant_type === 'guest' && shouldRefundGuestPasses && participant.used_guest_pass) {
           guestsToRefund.push({
             displayName: participant.display_name || 'Guest',
             participantId: participant.id

@@ -1453,9 +1453,14 @@ router.put('/api/booking-requests/:id/member-cancel', isAuthenticated, async (re
         }
       }
       
+      let cancelResourceType: string = 'simulator';
+      if (existing.resourceId) {
+        const [resForType] = await db.select({ type: resources.type }).from(resources).where(eq(resources.id, existing.resourceId));
+        if (resForType?.type) cancelResourceType = resForType.type;
+      }
       broadcastAvailabilityUpdate({
         resourceId: existing.resourceId || undefined,
-        resourceType: 'simulator',
+        resourceType: cancelResourceType as 'simulator' | 'conference_room',
         date: existing.requestDate,
         action: 'cancelled'
       });

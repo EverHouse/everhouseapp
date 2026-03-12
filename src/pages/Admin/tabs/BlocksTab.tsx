@@ -426,15 +426,6 @@ const BlocksTab: React.FC = () => {
         }
     });
 
-    useEffect(() => {
-        const handleOpenNewClosure = () => {
-            resetClosureForm();
-            setIsClosureModalOpen(true);
-        };
-        window.addEventListener('open-new-closure', handleOpenNewClosure);
-        return () => window.removeEventListener('open-new-closure', handleOpenNewClosure);
-    }, []);
-
     const resetClosureForm = () => {
         setClosureForm({
             start_date: '',
@@ -453,6 +444,15 @@ const BlocksTab: React.FC = () => {
         setEditingClosureId(null);
         setTouchedFields(new Set());
     };
+
+    useEffect(() => {
+        const handleOpenNewClosure = () => {
+            resetClosureForm();
+            setIsClosureModalOpen(true);
+        };
+        window.addEventListener('open-new-closure', handleOpenNewClosure);
+        return () => window.removeEventListener('open-new-closure', handleOpenNewClosure);
+    }, []);
 
     const handleSaveClosure = () => {
         if (!closureForm.start_date || !closureForm.affected_areas || !closureForm.visibility?.trim()) return;

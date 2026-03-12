@@ -18,6 +18,7 @@ import { normalizeEmail } from '../core/utils/emailNormalization';
 import { FilterOperatorEnum } from '@hubspot/api-client/lib/codegen/crm/contacts';
 import { getErrorMessage } from '../utils/errorUtils';
 import { getOtpEmailHtml } from '../emails/otpEmail';
+import { authRateLimiter, authRateLimiterByIp } from '../middleware/rateLimiting';
 
 interface StaffUserData {
   id: number;
@@ -1141,7 +1142,7 @@ router.get('/api/auth/session', async (req, res) => {
   });
 });
 
-router.get('/api/auth/check-staff-admin', async (req, res) => {
+router.get('/api/auth/check-staff-admin', authRateLimiterByIp, async (req, res) => {
   try {
     const { email } = req.query;
     
@@ -1178,7 +1179,7 @@ router.get('/api/auth/check-staff-admin', async (req, res) => {
   }
 });
 
-router.post('/api/auth/password-login', async (req, res) => {
+router.post('/api/auth/password-login', ...authRateLimiter, async (req, res) => {
   try {
     const { email, password } = req.body;
     

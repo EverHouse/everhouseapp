@@ -1657,7 +1657,32 @@ export async function revertToApproved(params: { bookingId: number; staffEmail: 
   return { success: true, previousStatus, bookingId };
 }
 
+const ALLOWED_STATUS_TRANSITIONS: Record<string, string[]> = {
+  pending: ['approved', 'declined', 'cancelled', 'cancellation_pending'],
+  approved: ['attended', 'no_show', 'cancelled', 'cancellation_pending', 'confirmed'],
+  confirmed: ['attended', 'no_show', 'cancelled', 'cancellation_pending'],
+  cancellation_pending: ['cancelled', 'approved'],
+  declined: ['pending'],
+  attended: [],
+  cancelled: [],
+  no_show: [],
+};
+
 export async function updateGenericStatus(bookingId: number, status: string, staff_notes?: string) {
+  const [current] = await db.select({ status: bookingRequests.status })
+    .from(bookingRequests)
+    .where(eq(bookingRequests.id, bookingId));
+
+  if (!current) {
+    throw new Error(`Booking ${bookingId} not found`);
+  }
+
+  const currentStatus = current.status || 'pending';
+  const allowed = ALLOWED_STATUS_TRANSITIONS[currentStatus];
+  if (allowed && !allowed.includes(status)) {
+    throw new Error(`Invalid status transition from '${currentStatus}' to '${status}'`);
+  }
+
   const result = await db.update(bookingRequests)
     .set({
       status: status,

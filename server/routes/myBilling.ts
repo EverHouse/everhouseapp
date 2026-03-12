@@ -17,6 +17,7 @@ import { notifyAllStaff } from '../core/notificationService';
 import { getErrorMessage } from '../utils/errorUtils';
 import { getAppBaseUrl } from '../utils/urlUtils';
 import { formatDatePacific } from '../utils/dateUtils';
+import { isStaffOrAdmin } from '../replit_integrations/auth';
 
 const router = Router();
 
@@ -27,20 +28,17 @@ function requireAuth(req: Request, res: Response, next: NextFunction) {
   next();
 }
 
-function requireStaffAuth(req: Request, res: Response, next: NextFunction) {
-  if (!req.session?.user?.email) {
-    return res.status(401).json({ error: 'Not authenticated' });
-  }
-  if (req.session.user.role !== 'admin' && req.session.user.role !== 'staff') {
-    return res.status(403).json({ error: 'Staff access required' });
-  }
-  next();
+const requireStaffAuth = [requireAuth, isStaffOrAdmin];
+
+async function isDbVerifiedStaff(email: string): Promise<boolean> {
+  const result = await db.execute(sql`SELECT id FROM staff_users WHERE LOWER(email) = ${email.toLowerCase()} AND is_active = true`);
+  return (result.rows as Array<Record<string, unknown>>).length > 0;
 }
 
 router.get('/api/my/billing', requireAuth, async (req, res) => {
   try {
     const sessionUser = req.session.user;
-    const isStaff = sessionUser.role === 'admin' || sessionUser.role === 'staff';
+    const isStaff = await isDbVerifiedStaff(sessionUser.email);
     const targetEmail = (req.query.email && isStaff) ? String(req.query.email).trim().toLowerCase() : sessionUser.email;
     const email = targetEmail;
     
@@ -151,7 +149,7 @@ router.get('/api/my/billing', requireAuth, async (req, res) => {
 router.get('/api/my/billing/invoices', requireAuth, async (req, res) => {
   try {
     const sessionUser = req.session.user;
-    const isStaff = sessionUser.role === 'admin' || sessionUser.role === 'staff';
+    const isStaff = await isDbVerifiedStaff(sessionUser.email);
     const email = (req.query.email && isStaff) ? String(req.query.email).trim().toLowerCase() : sessionUser.email;
     
     const result = await db.execute(sql`SELECT stripe_customer_id, billing_provider FROM users WHERE LOWER(email) = ${email.toLowerCase()}`);
@@ -228,7 +226,7 @@ router.post('/api/my/billing/update-payment-method', requireAuth, async (req, re
 router.post('/api/my/billing/portal', requireAuth, async (req, res) => {
   try {
     const sessionUser = req.session.user;
-    const isStaff = sessionUser.role === 'admin' || sessionUser.role === 'staff';
+    const isStaff = await isDbVerifiedStaff(sessionUser.email);
     const targetEmail = (req.body.email && isStaff) ? String(req.body.email).trim().toLowerCase() : sessionUser.email;
     
     const result = await db.execute(sql`SELECT id, stripe_customer_id, billing_provider, email, role, first_name, last_name, tier, migration_status FROM users WHERE LOWER(email) = ${targetEmail.toLowerCase()}`);
@@ -240,7 +238,7 @@ router.post('/api/my/billing/portal', requireAuth, async (req, res) => {
     
     // Don't create Stripe customers for staff/admin accessing their own portal
     // (Staff can still view member billing portals when passing a member email)
-    const targetIsStaff = member.role === 'staff' || member.role === 'admin';
+    const targetIsStaff = await isDbVerifiedStaff(targetEmail);
     if (targetIsStaff) {
       return res.status(400).json({ error: 'Staff accounts do not have billing portals' });
     }
@@ -289,8 +287,7 @@ router.post('/api/my/billing/add-payment-method-for-extras', requireAuth, async 
   try {
     const email = req.session.user.email;
     
-    const sessionRole = req.session.user.role;
-    if (sessionRole === 'staff' || sessionRole === 'admin') {
+    if (await isDbVerifiedStaff(email)) {
       return res.status(400).json({ error: 'Staff accounts do not use billing' });
     }
     
@@ -334,9 +331,7 @@ router.post('/api/my/billing/migrate-to-stripe', requireAuth, async (req, res) =
   try {
     const email = req.session.user.email;
     
-    // Staff/admin don't need billing migration
-    const sessionRole = req.session.user.role;
-    if (sessionRole === 'staff' || sessionRole === 'admin') {
+    if (await isDbVerifiedStaff(email)) {
       return res.status(400).json({ error: 'Staff accounts do not use billing' });
     }
     
@@ -403,12 +398,12 @@ router.get('/api/my/balance', requireAuth, async (req, res) => {
   try {
     const email = req.session.user.email;
     
-    const result = await db.execute(sql`SELECT stripe_customer_id, role FROM users WHERE LOWER(email) = ${email.toLowerCase()}`);
-    
-    // Staff/admin don't have account balances
-    if ((result.rows as Array<Record<string, unknown>>)[0]?.role === 'staff' || (result.rows as Array<Record<string, unknown>>)[0]?.role === 'admin') {
+    if (await isDbVerifiedStaff(email)) {
       return res.json({ balanceCents: 0, balanceDollars: 0, isStaff: true });
     }
+    
+    const result = await db.execute(sql`SELECT stripe_customer_id FROM users WHERE LOWER(email) = ${email.toLowerCase()}`);
+    
     
     if (!(result.rows as Array<Record<string, unknown>>)[0]?.stripe_customer_id) {
       return res.json({ balanceCents: 0, balanceDollars: 0 });
@@ -442,16 +437,15 @@ router.post('/api/my/add-funds', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Amount must be between $5 and $500' });
     }
     
-    const result = await db.execute(sql`SELECT id, stripe_customer_id, first_name, last_name, role, tier FROM users WHERE LOWER(email) = ${email.toLowerCase()}`);
+    if (await isDbVerifiedStaff(email)) {
+      return res.status(400).json({ error: 'Staff accounts do not use account balance' });
+    }
+    
+    const result = await db.execute(sql`SELECT id, stripe_customer_id, first_name, last_name, tier FROM users WHERE LOWER(email) = ${email.toLowerCase()}`);
     
     const member = (result.rows as Array<Record<string, unknown>>)[0];
     if (!member) {
       return res.status(404).json({ error: 'Member not found' });
-    }
-    
-    // Staff/admin don't need account balance functionality - don't create Stripe customers for them
-    if (member.role === 'staff' || member.role === 'admin') {
-      return res.status(400).json({ error: 'Staff accounts do not use account balance' });
     }
     
     const stripe = await getStripeClient();
@@ -500,24 +494,23 @@ router.post('/api/my/add-funds', requireAuth, async (req, res) => {
 router.get('/api/my-billing/account-balance', requireAuth, async (req, res) => {
   try {
     const sessionEmail = req.session.user.email;
-    const sessionRole = req.session.user.role;
+    const isStaffUser = await isDbVerifiedStaff(sessionEmail);
     
-    // Support "View As" feature: staff can pass user_email param to view as another member
     const requestedEmail = (req.query.user_email as string | undefined)?.trim()?.toLowerCase();
     let targetEmail = sessionEmail;
     
     if (requestedEmail && requestedEmail !== sessionEmail.toLowerCase()) {
-      if (sessionRole === 'admin' || sessionRole === 'staff') {
+      if (isStaffUser) {
         targetEmail = requestedEmail;
       }
     }
     
-    const result = await db.execute(sql`SELECT stripe_customer_id, role FROM users WHERE LOWER(email) = ${targetEmail.toLowerCase()}`);
-    
-    // Staff/admin don't have account balances
-    if ((result.rows as Array<Record<string, unknown>>)[0]?.role === 'staff' || (result.rows as Array<Record<string, unknown>>)[0]?.role === 'admin') {
+    if (await isDbVerifiedStaff(targetEmail)) {
       return res.json({ balanceCents: 0, balanceDollars: 0, isStaff: true });
     }
+    
+    const result = await db.execute(sql`SELECT stripe_customer_id FROM users WHERE LOWER(email) = ${targetEmail.toLowerCase()}`);
+    
     
     if (!(result.rows as Array<Record<string, unknown>>)[0]?.stripe_customer_id) {
       return res.json({ balanceCents: 0, balanceDollars: 0 });

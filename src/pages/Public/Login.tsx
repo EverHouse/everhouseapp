@@ -95,12 +95,12 @@ const Login: React.FC = () => {
     }
   };
 
-  const checkStaffAdmin = useCallback(async (emailToCheck: string) => {
+  const checkStaffAdmin = useCallback(async (emailToCheck: string, signal?: AbortSignal) => {
     if (!emailToCheck || !emailToCheck.includes('@')) return;
     
     setCheckingEmail(true);
     try {
-      const res = await fetch(`/api/auth/check-staff-admin?email=${encodeURIComponent(emailToCheck)}`);
+      const res = await fetch(`/api/auth/check-staff-admin?email=${encodeURIComponent(emailToCheck)}`, { signal });
       if (res.ok) {
         const data = await res.json();
         setIsStaffOrAdmin(data.isStaffOrAdmin);
@@ -110,6 +110,7 @@ const Login: React.FC = () => {
         }
       }
     } catch (err: unknown) {
+      if (err instanceof DOMException && err.name === 'AbortError') return;
       console.error('Failed to check staff/admin status');
     } finally {
       setCheckingEmail(false);
@@ -117,9 +118,10 @@ const Login: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    const abortController = new AbortController();
     const debounceTimer = setTimeout(() => {
       if (email.includes('@')) {
-        checkStaffAdmin(email);
+        checkStaffAdmin(email, abortController.signal);
       } else {
         setIsStaffOrAdmin(false);
         setHasPassword(false);
@@ -127,7 +129,10 @@ const Login: React.FC = () => {
       }
     }, 500);
     
-    return () => clearTimeout(debounceTimer);
+    return () => {
+      clearTimeout(debounceTimer);
+      abortController.abort();
+    };
   }, [email, checkStaffAdmin]);
 
   const handleDevLogin = async (email?: string) => {

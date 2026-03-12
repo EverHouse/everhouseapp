@@ -250,7 +250,37 @@ export async function previewMerge(primaryUserId: string, secondaryUserId: strin
   };
 }
 
+function mergeAdvisoryLockId(id1: string, id2: string): number {
+  const sorted = [id1, id2].sort();
+  const combined = `merge:${sorted[0]}:${sorted[1]}`;
+  let hash = 0;
+  for (let i = 0; i < combined.length; i++) {
+    hash = ((hash << 5) - hash + combined.charCodeAt(i)) | 0;
+  }
+  return hash;
+}
+
 export async function executeMerge(
+  primaryUserId: string, 
+  secondaryUserId: string, 
+  performedBy: string
+): Promise<MergeResult> {
+  const lockId = mergeAdvisoryLockId(primaryUserId, secondaryUserId);
+
+  const lockResult = await db.execute(sql`SELECT pg_try_advisory_lock(${lockId}) as acquired`);
+  const acquired = (lockResult.rows as Array<Record<string, unknown>>)[0]?.acquired;
+  if (!acquired) {
+    throw new Error('A merge involving one of these users is already in progress. Please try again.');
+  }
+
+  try {
+    return await executeMergeInternal(primaryUserId, secondaryUserId, performedBy);
+  } finally {
+    await db.execute(sql`SELECT pg_advisory_unlock(${lockId})`);
+  }
+}
+
+async function executeMergeInternal(
   primaryUserId: string, 
   secondaryUserId: string, 
   performedBy: string

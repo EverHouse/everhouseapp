@@ -305,6 +305,14 @@ export async function createBookingForMember(
           });
           
           newSessionId = sessionResult.sessionId || null;
+
+          if (!newSessionId || sessionResult.error) {
+            logger.error('[Trackman Webhook] Session creation failed after approval — reverting to pending', {
+              extra: { bookingId: pendingBookingId, trackmanBookingId, error: sessionResult.error }
+            });
+            await db.execute(sql`UPDATE booking_requests SET status = 'pending', updated_at = NOW() WHERE id = ${pendingBookingId}`);
+            return { success: false };
+          }
           
           if (newSessionId && !sessionResult.error) {
             await db.execute(sql`UPDATE booking_participants SET payment_status = 'waived' WHERE session_id = ${newSessionId} AND (payment_status = 'pending' OR payment_status IS NULL)`);
@@ -364,7 +372,8 @@ export async function createBookingForMember(
             }
           }
         } catch (sessionErr: unknown) {
-          logger.error('[Trackman Webhook] Failed to ensure session for linked booking', { extra: { bookingId: pendingBookingId, trackmanBookingId, error: sessionErr } });
+          logger.error('[Trackman Webhook] Failed to ensure session for linked booking — reverting to pending', { extra: { bookingId: pendingBookingId, trackmanBookingId, error: sessionErr } });
+          await db.execute(sql`UPDATE booking_requests SET status = 'pending', updated_at = NOW() WHERE id = ${pendingBookingId}`);
         }
       }
       
@@ -787,6 +796,14 @@ export async function tryMatchByBayDateTime(
         createdBy: 'trackman_auto_match'
       });
 
+      if (!sessionResult.sessionId || sessionResult.error) {
+        logger.error('[Trackman Webhook] Session creation failed after bay/date/time match approval — reverting to pending', {
+          extra: { bookingId, trackmanBookingId, error: sessionResult.error }
+        });
+        await db.execute(sql`UPDATE booking_requests SET status = 'pending', updated_at = NOW() WHERE id = ${bookingId}`);
+        return { matched: false };
+      }
+
       if (sessionResult.sessionId && !sessionResult.error) {
         await db.execute(sql`UPDATE booking_participants SET payment_status = 'waived' WHERE session_id = ${sessionResult.sessionId} AND (payment_status = 'pending' OR payment_status IS NULL)`);
         let transferredCount = 0;
@@ -843,7 +860,7 @@ export async function refundGuestPassesForCancelledBooking(bookingId: number, me
     const sessionId = (sessionResult.rows as Array<Record<string, unknown>>)[0].session_id;
     
     const guestParticipants = await db.execute(sql`SELECT id, display_name FROM booking_participants 
-       WHERE session_id = ${sessionId} AND participant_type = 'guest'`);
+       WHERE session_id = ${sessionId} AND participant_type = 'guest' AND used_guest_pass = true`);
     
     let refundedCount = 0;
     for (const guest of (guestParticipants.rows as Array<Record<string, unknown>>)) {

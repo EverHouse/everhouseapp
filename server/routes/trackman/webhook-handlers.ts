@@ -598,39 +598,47 @@ export async function tryAutoApproveBooking(
     let createdSessionId: number | undefined;
     
     if (!pendingBooking.session_id && resourceId) {
-      const sessionResult = await ensureSessionForBooking({
-        bookingId,
-        resourceId,
-        sessionDate: slotDate,
-        startTime: String(pendingBooking.start_time),
-        endTime: String(pendingBooking.end_time),
-        ownerEmail: String(pendingBooking.user_email),
-        ownerName: pendingBooking.user_name ? String(pendingBooking.user_name) : undefined,
-        ownerUserId: pendingBooking.user_id ? String(pendingBooking.user_id) : undefined,
-        trackmanBookingId,
-        source: 'trackman_webhook',
-        createdBy: 'trackman_webhook'
-      });
-
-      if (sessionResult.sessionId) {
-        createdSessionId = sessionResult.sessionId;
-        await db.execute(sql`UPDATE booking_participants SET payment_status = 'waived' WHERE session_id = ${createdSessionId} AND (payment_status = 'pending' OR payment_status IS NULL)`);
-        
-        try {
-          const rpResult = await db.execute(sql`SELECT request_participants FROM booking_requests WHERE id = ${bookingId}`);
-          const rpData = (rpResult.rows[0] as { request_participants: unknown })?.request_participants;
-          await transferRequestParticipantsToSession(
-            createdSessionId, rpData, String(pendingBooking.user_email), `webhook auto-approve booking #${bookingId}`
-          );
-        } catch (rpErr: unknown) {
-          logger.warn('[Trackman Webhook] Non-blocking: Failed to transfer request_participants to session', {
-            extra: { bookingId, sessionId: createdSessionId, error: (rpErr as Error).message }
-          });
-        }
-      } else {
-        logger.warn('[Trackman Webhook] Session creation failed for auto-approved booking — approval preserved, session will be created later', {
-          extra: { bookingId, trackmanBookingId, error: sessionResult.error }
+      try {
+        const sessionResult = await ensureSessionForBooking({
+          bookingId,
+          resourceId,
+          sessionDate: slotDate,
+          startTime: String(pendingBooking.start_time),
+          endTime: String(pendingBooking.end_time),
+          ownerEmail: String(pendingBooking.user_email),
+          ownerName: pendingBooking.user_name ? String(pendingBooking.user_name) : undefined,
+          ownerUserId: pendingBooking.user_id ? String(pendingBooking.user_id) : undefined,
+          trackmanBookingId,
+          source: 'trackman_webhook',
+          createdBy: 'trackman_webhook'
         });
+
+        if (sessionResult.sessionId) {
+          createdSessionId = sessionResult.sessionId;
+          await db.execute(sql`UPDATE booking_participants SET payment_status = 'waived' WHERE session_id = ${createdSessionId} AND (payment_status = 'pending' OR payment_status IS NULL)`);
+          
+          try {
+            const rpResult = await db.execute(sql`SELECT request_participants FROM booking_requests WHERE id = ${bookingId}`);
+            const rpData = (rpResult.rows[0] as { request_participants: unknown })?.request_participants;
+            await transferRequestParticipantsToSession(
+              createdSessionId, rpData, String(pendingBooking.user_email), `webhook auto-approve booking #${bookingId}`
+            );
+          } catch (rpErr: unknown) {
+            logger.warn('[Trackman Webhook] Non-blocking: Failed to transfer request_participants to session', {
+              extra: { bookingId, sessionId: createdSessionId, error: (rpErr as Error).message }
+            });
+          }
+        } else {
+          logger.error('[Trackman Webhook] Session creation failed for auto-approved booking — reverting to pending', {
+            extra: { bookingId, trackmanBookingId, error: sessionResult.error }
+          });
+          await db.execute(sql`UPDATE booking_requests SET status = 'pending', updated_at = NOW() WHERE id = ${bookingId}`);
+        }
+      } catch (sessionErr: unknown) {
+        logger.error('[Trackman Webhook] ensureSessionForBooking threw for auto-approved booking — reverting to pending', {
+          extra: { bookingId, trackmanBookingId, error: (sessionErr as Error).message }
+        });
+        await db.execute(sql`UPDATE booking_requests SET status = 'pending', updated_at = NOW() WHERE id = ${bookingId}`);
       }
     }
     

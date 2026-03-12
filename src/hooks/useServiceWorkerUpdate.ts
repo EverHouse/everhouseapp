@@ -120,6 +120,7 @@ export function useServiceWorkerUpdate(): ServiceWorkerUpdateState {
     const onControllerChange = () => {
       if (refreshing) return;
       refreshing = true;
+      navigator.serviceWorker.removeEventListener('controllerchange', onControllerChange);
       window.location.reload();
     };
     navigator.serviceWorker.addEventListener('controllerchange', onControllerChange);
@@ -128,6 +129,7 @@ export function useServiceWorkerUpdate(): ServiceWorkerUpdateState {
 
     setTimeout(() => {
       if (!refreshing) {
+        navigator.serviceWorker.removeEventListener('controllerchange', onControllerChange);
         console.log('[App] Controller change timeout, forcing reload');
         window.location.reload();
       }
