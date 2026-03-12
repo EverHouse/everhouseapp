@@ -1,0 +1,173 @@
+import { Router } from 'express';
+import { logger } from '../core/logger';
+import { isAuthenticated } from '../core/middleware';
+import { db } from '../db';
+import { users, membershipTiers, guestPasses } from '../../shared/schema';
+import { sql } from 'drizzle-orm';
+import { normalizeTierName } from '../../shared/constants/tiers';
+import { generatePkPass, type PassData, type WalletConfig } from '../walletPass/passGenerator';
+import { getSessionUser } from '../types/session';
+import { getSettingValue, getSettingBoolean } from '../core/settingsHelper';
+
+const router = Router();
+
+router.get('/api/member/wallet-pass/status', isAuthenticated, async (req, res) => {
+  try {
+    const isEnabled = await getSettingBoolean('apple_wallet.enabled', false);
+    if (!isEnabled) {
+      return res.json({ available: false });
+    }
+    const [passTypeId, teamId] = await Promise.all([
+      getSettingValue('apple_wallet.pass_type_id', ''),
+      getSettingValue('apple_wallet.team_id', ''),
+    ]);
+    const certPem = process.env.APPLE_WALLET_CERT_PEM || '';
+    const keyPem = process.env.APPLE_WALLET_KEY_PEM || '';
+
+    if (!passTypeId || !teamId || !certPem || !keyPem) {
+      return res.json({ available: false });
+    }
+
+    const sessionUser = getSessionUser(req);
+    if (!sessionUser?.email) {
+      return res.json({ available: false });
+    }
+
+    const userResult = await db.select({
+      role: users.role,
+      membershipStatus: users.membershipStatus,
+    })
+      .from(users)
+      .where(sql`LOWER(${users.email}) = LOWER(${sessionUser.email})`)
+      .limit(1);
+
+    if (userResult.length === 0) {
+      return res.json({ available: false });
+    }
+
+    const user = userResult[0];
+    if (user.role === 'admin' || user.role === 'staff') {
+      return res.json({ available: false });
+    }
+    if (user.membershipStatus === 'expired' || user.membershipStatus === 'cancelled') {
+      return res.json({ available: false });
+    }
+
+    return res.json({ available: true });
+  } catch {
+    return res.json({ available: false });
+  }
+});
+
+router.get('/api/member/wallet-pass', isAuthenticated, async (req, res) => {
+  try {
+    const isEnabled = await getSettingBoolean('apple_wallet.enabled', false);
+    if (!isEnabled) {
+      return res.status(404).json({ error: 'Apple Wallet passes are not enabled' });
+    }
+
+    const [passTypeId, teamId] = await Promise.all([
+      getSettingValue('apple_wallet.pass_type_id', ''),
+      getSettingValue('apple_wallet.team_id', ''),
+    ]);
+
+    const certPem = process.env.APPLE_WALLET_CERT_PEM || '';
+    const keyPem = process.env.APPLE_WALLET_KEY_PEM || '';
+
+    if (!passTypeId || !teamId || !certPem || !keyPem) {
+      return res.status(503).json({ error: 'Apple Wallet is not fully configured yet. Pass Type ID and Team ID must be set in Settings, and certificates must be added as environment secrets.' });
+    }
+
+    const walletConfig: WalletConfig = { passTypeId, teamId, certPem, keyPem };
+
+    const sessionUser = getSessionUser(req);
+    if (!sessionUser?.email) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    const userResult = await db.select({
+      id: users.id,
+      firstName: users.firstName,
+      lastName: users.lastName,
+      email: users.email,
+      tier: users.tier,
+      membershipStatus: users.membershipStatus,
+      joinDate: users.joinDate,
+      role: users.role,
+    })
+      .from(users)
+      .where(sql`LOWER(${users.email}) = LOWER(${sessionUser.email})`)
+      .limit(1);
+
+    if (userResult.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const user = userResult[0];
+
+    if (user.role === 'admin' || user.role === 'staff') {
+      return res.status(403).json({ error: 'Wallet pass is only available for members' });
+    }
+
+    if (user.membershipStatus === 'expired' || user.membershipStatus === 'cancelled') {
+      return res.status(403).json({ error: 'Your membership is not active' });
+    }
+
+    const tier = normalizeTierName(user.tier);
+
+    const [tierResult, guestPassResult] = await Promise.all([
+      db.select({
+        dailySimMinutes: membershipTiers.dailySimMinutes,
+        dailyConfRoomMinutes: membershipTiers.dailyConfRoomMinutes,
+        guestPassesPerMonth: membershipTiers.guestPassesPerMonth,
+      })
+        .from(membershipTiers)
+        .where(sql`LOWER(${membershipTiers.name}) = LOWER(${tier})`)
+        .limit(1),
+      db.select({
+        passesUsed: guestPasses.passesUsed,
+        passesTotal: guestPasses.passesTotal,
+      })
+        .from(guestPasses)
+        .where(sql`LOWER(${guestPasses.memberEmail}) = LOWER(${user.email})`)
+        .limit(1),
+    ]);
+
+    const tierData = tierResult.length > 0 ? tierResult[0] : null;
+    const guestPassData = guestPassResult.length > 0 ? guestPassResult[0] : null;
+
+    const memberName = [user.firstName, user.lastName].filter(Boolean).join(' ') || sessionUser.name || 'Member';
+
+    let memberSince = '';
+    if (user.joinDate) {
+      const date = new Date(user.joinDate);
+      memberSince = date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    }
+
+    const passData: PassData = {
+      memberId: user.id,
+      memberName,
+      tier,
+      memberSince,
+      dailySimulatorMinutes: tierData?.dailySimMinutes ?? null,
+      dailyConfRoomMinutes: tierData?.dailyConfRoomMinutes ?? null,
+      guestPassesRemaining: guestPassData ? (guestPassData.passesTotal - guestPassData.passesUsed) : null,
+      guestPassesTotal: guestPassData?.passesTotal ?? null,
+    };
+
+    const pkpassBuffer = await generatePkPass(passData, walletConfig);
+
+    res.set({
+      'Content-Type': 'application/vnd.apple.pkpass',
+      'Content-Disposition': `attachment; filename="EverClub-${tier}-Pass.pkpass"`,
+      'Content-Length': pkpassBuffer.length.toString(),
+    });
+
+    res.send(pkpassBuffer);
+  } catch (error) {
+    logger.error('[WalletPass] Failed to generate wallet pass', { error: error instanceof Error ? error : new Error(String(error)) });
+    res.status(500).json({ error: 'Failed to generate wallet pass' });
+  }
+});
+
+export default router;

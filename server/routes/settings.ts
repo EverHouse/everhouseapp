@@ -73,6 +73,10 @@ const DEFAULT_SETTINGS: Record<string, { value: string; category: string }> = {
   'apple_messages.enabled': { value: 'false', category: 'apple_messages' },
   'apple_messages.business_id': { value: '', category: 'apple_messages' },
 
+  'apple_wallet.enabled': { value: 'false', category: 'apple_wallet' },
+  'apple_wallet.pass_type_id': { value: '', category: 'apple_wallet' },
+  'apple_wallet.team_id': { value: '', category: 'apple_wallet' },
+
   'hours.monday': { value: 'Closed', category: 'hours_display' },
   'hours.tuesday_thursday': { value: '8:30 AM – 8:00 PM', category: 'hours_display' },
   'hours.friday_saturday': { value: '8:30 AM – 10:00 PM', category: 'hours_display' },

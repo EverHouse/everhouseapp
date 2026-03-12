@@ -20,6 +20,9 @@ interface SettingsState {
   linkedinUrl: string;
   appleMessagesEnabled: boolean;
   appleMessagesBusinessId: string;
+  appleWalletEnabled: boolean;
+  appleWalletPassTypeId: string;
+  appleWalletTeamId: string;
   hoursMonday: string;
   hoursTuesdayThursday: string;
   hoursFridaySaturday: string;
@@ -138,6 +141,9 @@ const SettingsTab: React.FC = () => {
     linkedinUrl: 'https://www.linkedin.com/company/ever-club',
     appleMessagesEnabled: false,
     appleMessagesBusinessId: '',
+    appleWalletEnabled: false,
+    appleWalletPassTypeId: '',
+    appleWalletTeamId: '',
     hoursMonday: 'Closed',
     hoursTuesdayThursday: '8:30 AM – 8:00 PM',
     hoursFridaySaturday: '8:30 AM – 10:00 PM',
@@ -198,6 +204,9 @@ const SettingsTab: React.FC = () => {
         linkedinUrl: data['social.linkedin_url']?.value || defaultSettings.linkedinUrl,
         appleMessagesEnabled: data['apple_messages.enabled']?.value === 'true',
         appleMessagesBusinessId: data['apple_messages.business_id']?.value || '',
+        appleWalletEnabled: data['apple_wallet.enabled']?.value === 'true',
+        appleWalletPassTypeId: data['apple_wallet.pass_type_id']?.value || '',
+        appleWalletTeamId: data['apple_wallet.team_id']?.value || '',
         hoursMonday: data['hours.monday']?.value || defaultSettings.hoursMonday,
         hoursTuesdayThursday: data['hours.tuesday_thursday']?.value || defaultSettings.hoursTuesdayThursday,
         hoursFridaySaturday: data['hours.friday_saturday']?.value || defaultSettings.hoursFridaySaturday,
@@ -243,6 +252,9 @@ const SettingsTab: React.FC = () => {
         'social.linkedin_url': settingsToSave.linkedinUrl,
         'apple_messages.enabled': String(settingsToSave.appleMessagesEnabled),
         'apple_messages.business_id': settingsToSave.appleMessagesBusinessId,
+        'apple_wallet.enabled': String(settingsToSave.appleWalletEnabled),
+        'apple_wallet.pass_type_id': settingsToSave.appleWalletPassTypeId,
+        'apple_wallet.team_id': settingsToSave.appleWalletTeamId,
         'hours.monday': settingsToSave.hoursMonday,
         'hours.tuesday_thursday': settingsToSave.hoursTuesdayThursday,
         'hours.friday_saturday': settingsToSave.hoursFridaySaturday,
@@ -402,6 +414,48 @@ const SettingsTab: React.FC = () => {
             <div>
               <FieldLabel>Apple Business ID</FieldLabel>
               <input type="text" value={settings.appleMessagesBusinessId ?? ''} onChange={(e) => updateField('appleMessagesBusinessId', e.target.value)} className={inputClass} placeholder="Enter your Apple Business Messages ID" />
+            </div>
+          )}
+
+          <SubSectionLabel>Apple Wallet Pass</SubSectionLabel>
+          <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-black/20 rounded-xl">
+            <div>
+              <p className="font-medium text-primary dark:text-white">Enable Apple Wallet Pass</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">Allow members to add their membership card to Apple Wallet</p>
+            </div>
+            <Toggle
+              checked={settings.appleWalletEnabled}
+              onChange={(checked) => updateField('appleWalletEnabled', checked)}
+              size="md"
+            />
+          </div>
+          {settings.appleWalletEnabled && (
+            <div className="space-y-4">
+              <div>
+                <FieldLabel>Pass Type ID</FieldLabel>
+                <input type="text" value={settings.appleWalletPassTypeId ?? ''} onChange={(e) => updateField('appleWalletPassTypeId', e.target.value)} className={inputClass} placeholder="pass.com.everclub.membership" />
+                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Create this in Apple Developer &rarr; Certificates, Identifiers &amp; Profiles &rarr; Identifiers &rarr; Pass Type IDs</p>
+              </div>
+              <div>
+                <FieldLabel>Team ID</FieldLabel>
+                <input type="text" value={settings.appleWalletTeamId ?? ''} onChange={(e) => updateField('appleWalletTeamId', e.target.value)} className={inputClass} placeholder="e.g. ABC1234DEF" />
+                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Found in Apple Developer &rarr; Membership &rarr; Team ID</p>
+              </div>
+              <div className="p-4 bg-gray-50 dark:bg-black/20 rounded-xl space-y-2">
+                <p className="text-sm font-medium text-primary dark:text-white">Certificates (Secrets)</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  For security, the Pass Certificate and Private Key are stored as environment secrets rather than in the database. Add these two secrets in your hosting environment:
+                </p>
+                <div className="space-y-1 pl-1">
+                  <p className="text-xs font-mono text-gray-600 dark:text-gray-300"><span className="font-semibold">APPLE_WALLET_CERT_PEM</span> — Pass Type ID certificate in PEM format</p>
+                  <p className="text-xs font-mono text-gray-600 dark:text-gray-300"><span className="font-semibold">APPLE_WALLET_KEY_PEM</span> — Private key in PEM format</p>
+                </div>
+              </div>
+              <div className="p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-700/30">
+                <p className="text-xs text-amber-700 dark:text-amber-300">
+                  <strong>Setup guide:</strong> In Apple Developer, create a Pass Type ID, then create a certificate for it. Export the certificate and private key from Keychain Access in PEM format. Add them as the environment secrets listed above. The WWDR intermediate certificate is included automatically.
+                </p>
+              </div>
             </div>
           )}
 
