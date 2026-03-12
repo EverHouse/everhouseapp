@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 
 interface AppleSignInButtonProps {
   onSuccess: (data: { identityToken: string; user?: { name?: { firstName?: string; lastName?: string }; email?: string } }) => void;
@@ -29,43 +29,59 @@ declare global {
 
 const APPLE_CLIENT_ID = import.meta.env.VITE_APPLE_CLIENT_ID;
 
+function loadAppleSDK(): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (window.AppleID) {
+      resolve();
+      return;
+    }
+
+    const existingScript = document.querySelector('script[src*="appleid.auth.js"]');
+    if (existingScript) {
+      if (window.AppleID) {
+        resolve();
+        return;
+      }
+      const onLoad = () => {
+        existingScript.removeEventListener('load', onLoad);
+        resolve();
+      };
+      existingScript.addEventListener('load', onLoad);
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.src = 'https://appleid.cdn-apple.com/appleauth/static/jsapi/appleid/1/en_US/appleid.auth.js';
+    script.async = true;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error('Failed to load Apple Sign-In SDK'));
+    document.head.appendChild(script);
+  });
+}
+
 const AppleSignInButton: React.FC<AppleSignInButtonProps> = ({
   onSuccess,
   onError,
   disabled = false,
   compact = false
 }) => {
-  const loadAppleSDK = useCallback((): Promise<void> => {
-    return new Promise((resolve, reject) => {
-      if (window.AppleID) {
-        resolve();
-        return;
-      }
+  const sdkReady = useRef(false);
 
-      const existingScript = document.querySelector('script[src*="appleid.auth.js"]');
-      if (existingScript) {
-        const onLoad = () => {
-          existingScript.removeEventListener('load', onLoad);
-          resolve();
-        };
-        existingScript.addEventListener('load', onLoad);
-        return;
-      }
-
-      const script = document.createElement('script');
-      script.src = 'https://appleid.cdn-apple.com/appleauth/static/jsapi/appleid/1/en_US/appleid.auth.js';
-      script.async = true;
-      script.onload = () => resolve();
-      script.onerror = () => reject(new Error('Failed to load Apple Sign-In SDK'));
-      document.head.appendChild(script);
-    });
+  useEffect(() => {
+    if (!APPLE_CLIENT_ID) return;
+    loadAppleSDK().then(() => {
+      sdkReady.current = true;
+    }).catch(() => {});
   }, []);
 
   const handleClick = useCallback(async () => {
     if (disabled || !APPLE_CLIENT_ID) return;
 
     try {
-      await loadAppleSDK();
+      if (!sdkReady.current) {
+        await loadAppleSDK();
+        sdkReady.current = true;
+      }
 
       if (!window.AppleID) {
         onError?.('Apple Sign-In is not available');
@@ -96,7 +112,7 @@ const AppleSignInButton: React.FC<AppleSignInButtonProps> = ({
       }
       onError?.('Apple sign-in failed. Please try again.');
     }
-  }, [disabled, loadAppleSDK, onSuccess, onError]);
+  }, [disabled, onSuccess, onError]);
 
   if (!APPLE_CLIENT_ID) return null;
 
