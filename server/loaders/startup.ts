@@ -535,6 +535,41 @@ export async function runStartupTasks(): Promise<void> {
     logger.warn('[Startup] Lesson closures cleanup failed (non-critical)', { error: err instanceof Error ? err : new Error(String(err)) });
   }
 
+  try {
+    const deadItems = await db.execute(sql`
+      SELECT id, payload FROM hubspot_sync_queue
+      WHERE status = 'dead' AND operation = 'sync_tier'
+        AND last_error LIKE '%was not one of the allowed options%'
+        AND id IN (14, 15)
+    `);
+    const rows = (deadItems as { rows: Array<{ id: number; payload: string }> }).rows;
+    if (rows.length > 0) {
+      const { enqueueHubSpotSync } = await import('../core/hubspot/queue');
+      for (const row of rows) {
+        try {
+          const payload = typeof row.payload === 'string' ? JSON.parse(row.payload) : row.payload;
+          const emailKey = (payload.email as string).toLowerCase();
+          const newJobId = await enqueueHubSpotSync('sync_tier', payload, {
+            priority: 2,
+            idempotencyKey: `requeue_dead_tier_sync_${emailKey}_${row.id}`,
+            maxRetries: 5
+          });
+          if (newJobId !== null) {
+            await db.execute(sql`UPDATE hubspot_sync_queue SET status = 'superseded', completed_at = NOW() WHERE id = ${row.id}`);
+            logger.info(`[Startup] Re-queued dead HubSpot sync_tier job #${row.id} as #${newJobId} for ${emailKey}`);
+          } else {
+            logger.info(`[Startup] Dead HubSpot sync_tier job #${row.id} already re-queued, marking superseded`);
+            await db.execute(sql`UPDATE hubspot_sync_queue SET status = 'superseded', completed_at = NOW() WHERE id = ${row.id}`);
+          }
+        } catch (rowErr: unknown) {
+          logger.warn(`[Startup] Failed to re-queue dead HubSpot job #${row.id}, leaving as dead for manual review`, { error: rowErr instanceof Error ? rowErr : new Error(String(rowErr)) });
+        }
+      }
+    }
+  } catch (err: unknown) {
+    logger.warn('[Startup] HubSpot dead queue re-queue failed (non-critical)', { error: err instanceof Error ? err : new Error(String(err)) });
+  }
+
   startupHealth.completedAt = new Date().toISOString();
   
   if (startupHealth.criticalFailures.length > 0) {
