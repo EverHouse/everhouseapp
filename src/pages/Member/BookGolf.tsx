@@ -520,7 +520,7 @@ const BookGolf: React.FC = () => {
       if (prev.length === slotsNeeded) return prev;
       const newSlots: PlayerSlot[] = [];
       for (let i = 0; i < slotsNeeded; i++) {
-        newSlots.push(prev[i] || { email: '', name: '', firstName: '', lastName: '', type: 'guest', searchQuery: '' });
+        newSlots.push(prev[i] || { id: crypto.randomUUID(), email: '', name: '', firstName: '', lastName: '', type: 'guest', searchQuery: '' });
       }
       return newSlots;
     });

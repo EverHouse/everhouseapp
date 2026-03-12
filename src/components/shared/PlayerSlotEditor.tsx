@@ -1,7 +1,9 @@
 import React, { useCallback } from 'react';
+import { useAutoAnimate } from '@formkit/auto-animate/react';
 import { MemberSearchInput, SelectedMember } from './MemberSearchInput';
 
 export interface PlayerSlot {
+  id: string;
   email: string;
   name: string;
   firstName: string;
@@ -35,6 +37,7 @@ const PlayerSlotEditor: React.FC<PlayerSlotEditorProps> = ({
   maxPlayers = 4,
   showPlayerCountSelector = true,
 }) => {
+  const [slotListRef] = useAutoAnimate();
   const playerCounts = Array.from({ length: maxPlayers }, (_, i) => i + 1);
   const labels: Record<number, string> = { 1: 'Solo', 2: 'Duo', 3: 'Trio', 4: 'Four' };
 
@@ -110,14 +113,14 @@ const PlayerSlotEditor: React.FC<PlayerSlotEditorProps> = ({
             Provide guest first name, last name, and email to use your guest passes. Unfilled slots are charged the full guest fee.
           </div>
 
-          <div className="space-y-4">
+          <div ref={slotListRef} className="space-y-4">
             {slots.map((slot, index) => {
               const isGuestComplete = slot.type === 'guest' && slot.firstName.trim() !== '' && slot.lastName.trim() !== '' && slot.email.includes('@');
               const isGuestIncomplete = slot.type === 'guest' && !slot.selectedId && (!slot.firstName.trim() || !slot.lastName.trim() || !slot.email.includes('@'));
               const showIndicator = slot.type === 'guest' && !slot.selectedId && (slot.firstName.trim() !== '' || slot.lastName.trim() !== '' || slot.email.trim() !== '');
 
               return (
-                <div key={index} className="space-y-2">
+                <div key={slot.id} className="space-y-2">
                   <div className="flex items-center justify-between">
                     <label className={`text-sm font-medium ${isDark ? 'text-white/70' : 'text-primary/70'}`}>
                       Player {index + 2}
