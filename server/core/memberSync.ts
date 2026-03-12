@@ -342,9 +342,34 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
     };
     
     const SYNC_BATCH_SIZE = 25;
-    const syncLimit = pLimit(10);
+    const syncLimit = pLimit(5);
+    
+    const isTransientDbError = (err: unknown): boolean => {
+      const msg = err instanceof Error ? err.message : String(err);
+      return /connection terminat|connection timeout|pool|too many clients|ECONNRESET|ECONNREFUSED|idle_in_transaction_session_timeout/i.test(msg);
+    };
+    
+    const retryDbOperation = async <T>(fn: () => Promise<T>, label: string, maxRetries = 3): Promise<T> => {
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          return await fn();
+        } catch (err) {
+          if (attempt < maxRetries && isTransientDbError(err)) {
+            const delay = attempt * 250;
+            logger.warn(`[MemberSync] Transient DB error for ${label}, retrying (${attempt}/${maxRetries}) in ${delay}ms`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+          } else {
+            throw err;
+          }
+        }
+      }
+      throw new Error(`retryDbOperation: unreachable`);
+    };
     
     for (let i = 0; i < allContacts.length; i += SYNC_BATCH_SIZE) {
+      if (i > 0) {
+        await new Promise(resolve => setTimeout(resolve, 300));
+      }
       const batch = allContacts.slice(i, i + SYNC_BATCH_SIZE);
       
       const results = await Promise.allSettled(
@@ -413,7 +438,7 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
             email = resolvedSync.primaryEmail.toLowerCase();
           }
 
-          const existingUser = await db.select({ 
+          const existingUser = await retryDbOperation(() => db.select({ 
             membershipStatus: users.membershipStatus,
             billingProvider: users.billingProvider,
             lastHubspotNotesHash: users.lastHubspotNotesHash,
@@ -425,7 +450,7 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
           })
             .from(users)
             .where(eq(users.email, email))
-            .limit(1);
+            .limit(1), email);
           const oldStatus = existingUser[0]?.membershipStatus || null;
           const oldNotesHash = existingUser[0]?.lastHubspotNotesHash || null;
           
@@ -479,7 +504,7 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
             }
           }
           
-          await db.insert(users)
+          await retryDbOperation(() => db.insert(users)
             .values({
               id: sql`gen_random_uuid()`,
               email,
@@ -540,7 +565,7 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
                 lastSyncedAt: new Date(),
                 updatedAt: new Date()
               }
-            });
+            }), email);
 
           if (isMindBodyDeactivation) {
             logger.info(`[MemberSync] MINDBODY DEACTIVATION CASCADE: ${email} — tier removed, billing_provider set to stripe. Must reactivate via Stripe.`);
@@ -599,7 +624,6 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
           const combinedNotesContent = [hubspotNotes || '', hubspotMessage || ''].join('||');
           const currentNotesHash = combinedNotesContent ? simpleHash(combinedNotesContent) : null;
           
-          // Only create new notes if the content has changed
           if (currentNotesHash && currentNotesHash !== oldNotesHash) {
             const today = new Date().toLocaleDateString('en-US', { 
               year: 'numeric', 
@@ -608,41 +632,39 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
               timeZone: 'America/Los_Angeles'
             });
             
-            // Create note for membership_notes if present
             if (hubspotNotes) {
               const noteContent = `[Mindbody Notes - ${today}]:\n${sanitizeNoteContent(hubspotNotes)}`;
-              await db.insert(memberNotes).values({
+              await retryDbOperation(() => db.insert(memberNotes).values({
                 memberEmail: email,
                 content: noteContent,
                 createdBy: 'system',
                 createdByName: 'HubSpot Sync (Mindbody)',
                 isPinned: false
-              });
+              }), email);
             }
             
-            // Create note for message if present
             if (hubspotMessage) {
               const msgContent = `[Mindbody Message - ${today}]:\n${sanitizeNoteContent(hubspotMessage)}`;
-              await db.insert(memberNotes).values({
+              await retryDbOperation(() => db.insert(memberNotes).values({
                 memberEmail: email,
                 content: msgContent,
                 createdBy: 'system',
                 createdByName: 'HubSpot Sync (Mindbody)',
                 isPinned: false
-              });
+              }), email);
             }
             
-            // Update the hash to track this version
-            await db.update(users)
+            await retryDbOperation(() => db.update(users)
               .set({ lastHubspotNotesHash: currentNotesHash })
-              .where(eq(users.email, email));
+              .where(eq(users.email, email)), email);
           }
           
           return { email, statusChanged: oldStatus !== null && oldStatus !== status };
         }))
       );
       
-      for (const result of results) {
+      for (let j = 0; j < results.length; j++) {
+        const result = results[j];
         if (result.status === 'fulfilled' && result.value) {
           synced++;
           if (result.value.statusChanged) {
@@ -650,7 +672,9 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
           }
         } else if (result.status === 'rejected') {
           errors++;
-          if (!isProduction) logger.error(`[MemberSync] Error syncing contact:`, { extra: { detail: result.reason } });
+          const failedEmail = batch[j]?.properties?.email || 'unknown';
+          const errMsg = result.reason instanceof Error ? result.reason.message : String(result.reason);
+          logger.error(`[MemberSync] Failed to sync contact ${failedEmail}: ${errMsg}`);
         }
       }
     }
@@ -916,9 +940,34 @@ export async function syncRelevantMembersFromHubSpot(): Promise<{ synced: number
     };
     
     const SYNC_BATCH_SIZE = 25;
-    const syncLimit = pLimit(10);
+    const syncLimit = pLimit(5);
+    
+    const isTransientDbError = (err: unknown): boolean => {
+      const msg = err instanceof Error ? err.message : String(err);
+      return /connection terminat|connection timeout|pool|too many clients|ECONNRESET|ECONNREFUSED|idle_in_transaction_session_timeout/i.test(msg);
+    };
+    
+    const retryDbOperation = async <T>(fn: () => Promise<T>, label: string, maxRetries = 3): Promise<T> => {
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          return await fn();
+        } catch (err) {
+          if (attempt < maxRetries && isTransientDbError(err)) {
+            const delay = attempt * 250;
+            logger.warn(`[MemberSync] Transient DB error for ${label}, retrying (${attempt}/${maxRetries}) in ${delay}ms`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+          } else {
+            throw err;
+          }
+        }
+      }
+      throw new Error(`retryDbOperation: unreachable`);
+    };
     
     for (let i = 0; i < allContacts.length; i += SYNC_BATCH_SIZE) {
+      if (i > 0) {
+        await new Promise(resolve => setTimeout(resolve, 300));
+      }
       const batch = allContacts.slice(i, i + SYNC_BATCH_SIZE);
       
       const results = await Promise.allSettled(
@@ -980,7 +1029,7 @@ export async function syncRelevantMembersFromHubSpot(): Promise<{ synced: number
             email = resolvedSync.primaryEmail.toLowerCase();
           }
 
-          const existingUser = await db.select({ 
+          const existingUser = await retryDbOperation(() => db.select({ 
             membershipStatus: users.membershipStatus,
             billingProvider: users.billingProvider,
             lastHubspotNotesHash: users.lastHubspotNotesHash,
@@ -992,7 +1041,7 @@ export async function syncRelevantMembersFromHubSpot(): Promise<{ synced: number
           })
             .from(users)
             .where(eq(users.email, email))
-            .limit(1);
+            .limit(1), email);
           const oldStatus = existingUser[0]?.membershipStatus || null;
           const oldNotesHash = existingUser[0]?.lastHubspotNotesHash || null;
           
@@ -1046,7 +1095,7 @@ export async function syncRelevantMembersFromHubSpot(): Promise<{ synced: number
             }
           }
           
-          await db.insert(users)
+          await retryDbOperation(() => db.insert(users)
             .values({
               id: sql`gen_random_uuid()`,
               email,
@@ -1107,7 +1156,7 @@ export async function syncRelevantMembersFromHubSpot(): Promise<{ synced: number
                 lastSyncedAt: new Date(),
                 updatedAt: new Date()
               }
-            });
+            }), email);
 
           if (isMindBodyDeactivation) {
             logger.info(`[MemberSync] MINDBODY DEACTIVATION CASCADE: ${email} — tier removed, billing_provider set to stripe. Must reactivate via Stripe.`);
@@ -1203,7 +1252,8 @@ export async function syncRelevantMembersFromHubSpot(): Promise<{ synced: number
         }))
       );
       
-      for (const result of results) {
+      for (let j = 0; j < results.length; j++) {
+        const result = results[j];
         if (result.status === 'fulfilled' && result.value) {
           synced++;
           if (result.value.statusChanged) {
@@ -1211,7 +1261,9 @@ export async function syncRelevantMembersFromHubSpot(): Promise<{ synced: number
           }
         } else if (result.status === 'rejected') {
           errors++;
-          if (!isProduction) logger.error(`[MemberSync] Error syncing contact:`, { extra: { detail: result.reason } });
+          const failedEmail = batch[j]?.properties?.email || 'unknown';
+          const errMsg = result.reason instanceof Error ? result.reason.message : String(result.reason);
+          logger.error(`[MemberSync] Failed to sync contact ${failedEmail}: ${errMsg}`);
         }
       }
     }
