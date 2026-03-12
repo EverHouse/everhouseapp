@@ -1223,29 +1223,29 @@ export async function syncRelevantMembersFromHubSpot(): Promise<{ synced: number
             
             if (hubspotNotes) {
               const noteContent = `[Mindbody Notes - ${today}]:\n${sanitizeNoteContent(hubspotNotes)}`;
-              await db.insert(memberNotes).values({
+              await retryDbOperation(() => db.insert(memberNotes).values({
                 memberEmail: email,
                 content: noteContent,
                 createdBy: 'system',
                 createdByName: 'HubSpot Sync (Mindbody)',
                 isPinned: false
-              });
+              }), email);
             }
             
             if (hubspotMessage) {
               const msgContent = `[Mindbody Message - ${today}]:\n${sanitizeNoteContent(hubspotMessage)}`;
-              await db.insert(memberNotes).values({
+              await retryDbOperation(() => db.insert(memberNotes).values({
                 memberEmail: email,
                 content: msgContent,
                 createdBy: 'system',
                 createdByName: 'HubSpot Sync (Mindbody)',
                 isPinned: false
-              });
+              }), email);
             }
             
-            await db.update(users)
+            await retryDbOperation(() => db.update(users)
               .set({ lastHubspotNotesHash: currentNotesHash })
-              .where(eq(users.email, email));
+              .where(eq(users.email, email)), email);
           }
           
           return { email, statusChanged: oldStatus !== null && oldStatus !== status };

@@ -105,6 +105,7 @@ const ClosureAlert: React.FC = () => {
     e.stopPropagation();
     const closure = activeClosures[0];
     if (!closure) return;
+    if (exitTimer.current) clearTimeout(exitTimer.current);
     setIsExiting(true);
     exitTimer.current = setTimeout(() => {
       const newDismissed = new Set(dismissedIds);

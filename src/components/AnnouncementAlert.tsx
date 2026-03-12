@@ -23,6 +23,7 @@ const AnnouncementAlert: React.FC = () => {
 
   const handleDismiss = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
+    if (exitTimer.current) clearTimeout(exitTimer.current);
     haptic.light();
     setIsExiting(true);
     exitTimer.current = setTimeout(() => {
@@ -33,9 +34,9 @@ const AnnouncementAlert: React.FC = () => {
   }, [markSingleAsSeen, unseenHighPriority]);
 
   if (unseenHighPriority.length === 0 && !isExiting) return null;
-  if (unseenHighPriority.length === 0) return null;
 
   const latestAnnouncement = unseenHighPriority[0];
+  if (!latestAnnouncement) return null;
   const hasMultiple = unseenHighPriority.length > 1;
   const isUpdate = latestAnnouncement.type === 'update';
 
