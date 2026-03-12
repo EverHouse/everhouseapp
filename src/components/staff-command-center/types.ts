@@ -14,6 +14,7 @@ export interface BookingRequest {
   member_notes?: string | null;
   notes?: string | null;
   has_unpaid_fees?: boolean;
+  /** Total amount owed in dollars (converted from cents at the API layer) */
   total_owed?: number;
   created_at?: string;
   has_conflict?: boolean;

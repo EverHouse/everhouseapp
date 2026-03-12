@@ -271,11 +271,13 @@ router.get('/api/wellness-classes/needs-review', isStaffOrAdmin, async (req, res
 router.post('/api/wellness-classes/:id/mark-reviewed', isStaffOrAdmin, async (req, res) => {
   try {
     const { id } = req.params;
+    const numId = parseInt(id as string);
+    if (isNaN(numId)) return res.status(400).json({ error: 'Invalid wellness class ID' });
     const { applyToAll } = req.body;
     const sessionUser = getSessionUser(req);
     const reviewedBy = sessionUser?.email || 'staff';
     
-    const existing = await db.execute(sql`SELECT title, time, date FROM wellness_classes WHERE id = ${id}`);
+    const existing = await db.execute(sql`SELECT title, time, date FROM wellness_classes WHERE id = ${numId}`);
     const originalTitle = existing.rows[0]?.title;
     const originalTime = existing.rows[0]?.time;
     const originalDate = existing.rows[0]?.date;
@@ -283,7 +285,7 @@ router.post('/api/wellness-classes/:id/mark-reviewed', isStaffOrAdmin, async (re
     const result = await db.execute(sql`UPDATE wellness_classes 
        SET needs_review = false, reviewed_by = ${reviewedBy}, reviewed_at = NOW(), updated_at = NOW(), review_dismissed = true, conflict_detected = false,
            locally_edited = true, app_last_modified_at = NOW()
-       WHERE id = ${id} RETURNING *`);
+       WHERE id = ${numId} RETURNING *`);
     
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Wellness class not found' });
@@ -311,7 +313,7 @@ router.post('/api/wellness-classes/:id/mark-reviewed', isStaffOrAdmin, async (re
                locally_edited = true,
                app_last_modified_at = NOW()
            WHERE recurring_event_id = ${updatedClass.recurring_event_id} 
-             AND id != ${id} 
+             AND id != ${numId} 
              AND date >= ${updatedClass.date}
              AND is_active = true
            RETURNING id`);
@@ -333,7 +335,7 @@ router.post('/api/wellness-classes/:id/mark-reviewed', isStaffOrAdmin, async (re
            WHERE title = ${originalTitle as string}
              AND time = ${originalTime as string}
              AND EXTRACT(DOW FROM date) = EXTRACT(DOW FROM ${originalDate as string}::date)
-             AND id != ${id} 
+             AND id != ${numId} 
              AND date >= ${updatedClass.date}
              AND is_active = true
            RETURNING id`);
@@ -536,7 +538,10 @@ router.put('/api/wellness-classes/:id', isStaffOrAdmin, async (req, res) => {
     const finalSpots = spots || (capacity ? `${capacity} spots` : null);
     const finalCapacity = capacity || (spots ? parseInt(spots.toString().replace(/[^0-9]/g, '')) || null : null);
     
-    const existing = await db.execute(sql`SELECT google_calendar_id, title, time, instructor, duration, category, date, block_bookings, block_simulators, block_conference_room, recurring_event_id FROM wellness_classes WHERE id = ${id}`);
+    const wellnessId = parseInt(id as string);
+    if (isNaN(wellnessId)) return res.status(400).json({ error: 'Invalid wellness class ID' });
+    
+    const existing = await db.execute(sql`SELECT google_calendar_id, title, time, instructor, duration, category, date, block_bookings, block_simulators, block_conference_room, recurring_event_id FROM wellness_classes WHERE id = ${wellnessId}`);
     
     const previousBlockBookings = existing.rows[0]?.block_bookings || false;
     const previousBlockSimulators = existing.rows[0]?.block_simulators || false;
@@ -575,7 +580,7 @@ router.put('/api/wellness-classes/:id', isStaffOrAdmin, async (req, res) => {
         review_dismissed = true,
         reviewed_by = ${reviewedBy},
         reviewed_at = NOW()
-       WHERE id = ${id} RETURNING *`);
+       WHERE id = ${wellnessId} RETURNING *`);
     
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Wellness class not found' });
@@ -666,7 +671,7 @@ router.put('/api/wellness-classes/:id', isStaffOrAdmin, async (req, res) => {
                  locally_edited = true,
                  app_last_modified_at = NOW()
              WHERE recurring_event_id = ${existingRow.recurring_event_id} 
-               AND id != ${id} 
+               AND id != ${wellnessId} 
                AND date > ${updated.date}
                AND is_active = true
              RETURNING id, date, time, duration, title`);
@@ -695,7 +700,7 @@ router.put('/api/wellness-classes/:id', isStaffOrAdmin, async (req, res) => {
              WHERE title = ${existingRow.title} 
                AND time = ${originalTime}
                AND EXTRACT(DOW FROM date) = EXTRACT(DOW FROM ${existingRow.date as string}::date)
-               AND id != ${id} 
+               AND id != ${wellnessId} 
                AND date > ${updated.date}
                AND is_active = true
              RETURNING id, date, time, duration, title`);
@@ -847,7 +852,7 @@ router.put('/api/wellness-classes/:id', isStaffOrAdmin, async (req, res) => {
       
       if (hasValidInstructor && hasValidCategory && hasValidSpots) {
         try {
-          const reviewedResult = await db.execute(sql`UPDATE wellness_classes SET needs_review = false, reviewed_by = ${userEmail}, reviewed_at = NOW(), updated_at = NOW(), review_dismissed = true WHERE id = ${id} RETURNING *`);
+          const reviewedResult = await db.execute(sql`UPDATE wellness_classes SET needs_review = false, reviewed_by = ${userEmail}, reviewed_at = NOW(), updated_at = NOW(), review_dismissed = true WHERE id = ${wellnessId} RETURNING *`);
           if (reviewedResult.rows.length > 0) {
             Object.assign(updated, reviewedResult.rows[0]);
           }
@@ -946,11 +951,15 @@ router.get('/api/wellness-enrollments', async (req, res) => {
 
 router.post('/api/wellness-enrollments', isAuthenticated, async (req, res) => {
   try {
-    const { class_id, user_email: raw_user_email } = req.body;
+    const { class_id: rawClassId, user_email: raw_user_email } = req.body;
     const user_email = raw_user_email?.trim()?.toLowerCase();
     
-    if (!class_id || !user_email) {
+    if (!rawClassId || !user_email) {
       return res.status(400).json({ error: 'Missing class_id or user_email' });
+    }
+    const class_id = parseInt(String(rawClassId));
+    if (isNaN(class_id)) {
+      return res.status(400).json({ error: 'Invalid class_id' });
     }
     
     const sessionUser = getSessionUser(req);
@@ -1017,7 +1026,7 @@ router.post('/api/wellness-enrollments', isAuthenticated, async (req, res) => {
         
         const enrollmentResult = await tx.insert(wellnessEnrollments)
           .values({
-            classId: parseInt(class_id as string),
+            classId: class_id,
             userEmail: user_email as string,
             status: 'confirmed',
             isWaitlisted: isWaitlisted as boolean
@@ -1029,7 +1038,7 @@ router.post('/api/wellness-enrollments', isAuthenticated, async (req, res) => {
           title: isWaitlisted ? 'Added to Waitlist' : 'Wellness Class Confirmed',
           message: memberMessage,
           type: 'wellness_booking',
-          relatedId: parseInt(class_id as string),
+          relatedId: class_id,
           relatedType: 'wellness_class'
         });
         
@@ -1091,7 +1100,10 @@ router.post('/api/wellness-enrollments', isAuthenticated, async (req, res) => {
 router.delete('/api/wellness-enrollments/:class_id/:user_email', isAuthenticated, async (req, res) => {
   try {
     const { class_id: rawClassId, user_email: rawUserEmail } = req.params;
-    const class_id = rawClassId as string;
+    const class_id = parseInt(rawClassId as string);
+    if (isNaN(class_id)) {
+      return res.status(400).json({ error: 'Invalid class_id' });
+    }
     const user_email = decodeURIComponent(rawUserEmail as string).trim().toLowerCase();
     const enrollmentEmail = user_email;
     
@@ -1118,7 +1130,7 @@ router.delete('/api/wellness-enrollments/:class_id/:user_email', isAuthenticated
     const currentEnrollment = await db.select()
       .from(wellnessEnrollments)
       .where(and(
-        eq(wellnessEnrollments.classId, parseInt(class_id)),
+        eq(wellnessEnrollments.classId, class_id),
         eq(wellnessEnrollments.userEmail, user_email),
         eq(wellnessEnrollments.status, 'confirmed')
       ))
@@ -1146,7 +1158,7 @@ router.delete('/api/wellness-enrollments/:class_id/:user_email', isAuthenticated
       await tx.update(wellnessEnrollments)
         .set({ status: 'cancelled' })
         .where(and(
-          eq(wellnessEnrollments.classId, parseInt(class_id)),
+          eq(wellnessEnrollments.classId, class_id),
           eq(wellnessEnrollments.userEmail, user_email)
         ));
     });
@@ -1155,14 +1167,14 @@ router.delete('/api/wellness-enrollments/:class_id/:user_email', isAuthenticated
       'Wellness Enrollment Cancelled',
       staffMessage,
       'wellness_cancellation',
-      { relatedId: parseInt(class_id), relatedType: 'wellness_class', url: '/admin/calendar' }
+      { relatedId: class_id, relatedType: 'wellness_class', url: '/admin/calendar' }
     ).catch(err => logger.warn('Failed to notify staff of wellness cancellation', { extra: { error: err } }));
     
     // Delete the original "Wellness Class Confirmed" notification to avoid confusion
     try {
       await db.execute(sql`DELETE FROM notifications 
          WHERE LOWER(user_email) = LOWER(${user_email}) 
-         AND related_id = ${parseInt(class_id)} 
+         AND related_id = ${class_id} 
          AND related_type = 'wellness_class' 
          AND type = 'wellness_booking'`);
     } catch (cleanupErr: unknown) {
@@ -1175,7 +1187,7 @@ router.delete('/api/wellness-enrollments/:class_id/:user_email', isAuthenticated
       title: 'Wellness Enrollment Cancelled',
       message: `Your enrollment in "${cls.title}" on ${formattedDate} has been cancelled`,
       type: 'wellness',
-      relatedId: parseInt(class_id),
+      relatedId: class_id,
       relatedType: 'wellness',
       url: '/wellness'
     });
@@ -1185,7 +1197,7 @@ router.delete('/api/wellness-enrollments/:class_id/:user_email', isAuthenticated
       try {
         const promotedUserRow = await db.transaction(async (tx) => {
           const waitlistedResult = await tx.execute(sql`SELECT * FROM wellness_enrollments 
-             WHERE class_id = ${parseInt(class_id)} 
+             WHERE class_id = ${class_id} 
                AND status = 'confirmed' 
                AND is_waitlisted = true
              ORDER BY created_at ASC
@@ -1204,7 +1216,7 @@ router.delete('/api/wellness-enrollments/:class_id/:user_email', isAuthenticated
             title: 'Spot Available - You\'re In!',
             message: `A spot opened up! You've been moved from the waitlist and are now enrolled in ${cls.title} with ${cls.instructor} on ${formattedDate} at ${cls.time}.`,
             type: 'wellness_booking',
-            relatedId: parseInt(class_id as string),
+            relatedId: class_id,
             relatedType: 'wellness_class'
           });
           
@@ -1229,15 +1241,15 @@ router.delete('/api/wellness-enrollments/:class_id/:user_email', isAuthenticated
             type: 'notification',
             title: 'Spot Available - You\'re In!',
             message: promotedMessage,
-            data: { classId: parseInt(class_id), eventType: 'wellness_promoted' }
-          }, { action: 'wellness_promoted', classId: parseInt(class_id), triggerSource: 'wellness.ts' });
+            data: { classId: class_id, eventType: 'wellness_promoted' }
+          }, { action: 'wellness_promoted', classId: class_id, triggerSource: 'wellness.ts' });
           
           // Notify staff
           await notifyAllStaff(
             'Waitlist Promotion',
             `${promotedName} was automatically promoted from waitlist for ${cls.title} on ${formattedDate}`,
             'wellness_enrollment',
-            { relatedId: parseInt(class_id), relatedType: 'wellness_class', url: '/admin/calendar' }
+            { relatedId: class_id, relatedType: 'wellness_class', url: '/admin/calendar' }
           );
         }
       } catch (promoteError: unknown) {
@@ -1249,7 +1261,7 @@ router.delete('/api/wellness-enrollments/:class_id/:user_email', isAuthenticated
     broadcastToStaff({
       type: 'wellness_event',
       action: 'enrollment_cancelled',
-      classId: parseInt(class_id),
+      classId: class_id,
       memberEmail: user_email
     });
     
@@ -1261,9 +1273,9 @@ router.delete('/api/wellness-enrollments/:class_id/:user_email', isAuthenticated
         END as spots_available
        FROM wellness_classes WHERE id = ${class_id}`);
     const spotsAvailable = (spotsQuery.rows[0] as unknown as WellnessClassRow)?.spots_available;
-    broadcastWaitlistUpdate({ classId: parseInt(class_id as string), action: 'spot_opened', spotsAvailable: (spotsAvailable as number) ?? undefined });
+    broadcastWaitlistUpdate({ classId: class_id, action: 'spot_opened', spotsAvailable: (spotsAvailable as number) ?? undefined });
     
-    logFromRequest(req, 'delete_wellness_class', 'wellness', class_id as string, undefined, {
+    logFromRequest(req, 'delete_wellness_class', 'wellness', String(class_id), undefined, {
       member_email: user_email,
       class_title: cls.title,
       class_date: dateStr
@@ -1280,8 +1292,9 @@ router.delete('/api/wellness-classes/:id', isStaffOrAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const wellnessClassId = parseInt(id as string);
+    if (isNaN(wellnessClassId)) return res.status(400).json({ error: 'Invalid wellness class ID' });
     
-    const existing = await db.execute(sql`SELECT google_calendar_id FROM wellness_classes WHERE id = ${id}`);
+    const existing = await db.execute(sql`SELECT google_calendar_id FROM wellness_classes WHERE id = ${wellnessClassId}`);
     if (existing.rows.length > 0 && (existing.rows[0] as unknown as WellnessClassRow).google_calendar_id) {
       try {
         const calendarId = await getCalendarIdByName(CALENDAR_CONFIG.wellness.name);
@@ -1299,7 +1312,7 @@ router.delete('/api/wellness-classes/:id', isStaffOrAdmin, async (req, res) => {
       logger.error('Failed to remove availability blocks for wellness class', { extra: { error: blockError } });
     }
     
-    const result = await db.execute(sql`DELETE FROM wellness_classes WHERE id = ${id} RETURNING *`);
+    const result = await db.execute(sql`DELETE FROM wellness_classes WHERE id = ${wellnessClassId} RETURNING *`);
     
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Wellness class not found' });
@@ -1325,6 +1338,8 @@ router.delete('/api/wellness-classes/:id', isStaffOrAdmin, async (req, res) => {
 router.get('/api/wellness-classes/:id/enrollments', isStaffOrAdmin, async (req, res) => {
   try {
     const { id } = req.params;
+    const classId = parseInt(id as string);
+    if (isNaN(classId)) return res.status(400).json({ error: 'Invalid wellness class ID' });
     
     const result = await db.select({
       id: wellnessEnrollments.id,
@@ -1338,7 +1353,7 @@ router.get('/api/wellness-classes/:id/enrollments', isStaffOrAdmin, async (req, 
     .from(wellnessEnrollments)
     .leftJoin(users, eq(wellnessEnrollments.userEmail, users.email))
     .where(and(
-      eq(wellnessEnrollments.classId, parseInt(id as string)),
+      eq(wellnessEnrollments.classId, classId),
       eq(wellnessEnrollments.status, 'confirmed')
     ))
     .orderBy(desc(wellnessEnrollments.createdAt));
@@ -1353,6 +1368,8 @@ router.get('/api/wellness-classes/:id/enrollments', isStaffOrAdmin, async (req, 
 router.post('/api/wellness-classes/:id/enrollments/manual', isStaffOrAdmin, async (req, res) => {
   try {
     const { id } = req.params;
+    const classId = parseInt(id as string);
+    if (isNaN(classId)) return res.status(400).json({ error: 'Invalid wellness class ID' });
     const { email: rawEmail } = req.body;
     const email = rawEmail?.trim()?.toLowerCase();
     
@@ -1363,7 +1380,7 @@ router.post('/api/wellness-classes/:id/enrollments/manual', isStaffOrAdmin, asyn
     const existingEnrollment = await db.select()
       .from(wellnessEnrollments)
       .where(and(
-        eq(wellnessEnrollments.classId, parseInt(id as string)),
+        eq(wellnessEnrollments.classId, classId),
         eq(wellnessEnrollments.userEmail, email),
         eq(wellnessEnrollments.status, 'confirmed')
       ))
@@ -1373,14 +1390,14 @@ router.post('/api/wellness-classes/:id/enrollments/manual', isStaffOrAdmin, asyn
       return res.status(400).json({ error: 'This email is already enrolled in this class' });
     }
 
-    const classQuery = await db.execute(sql`SELECT id, title, instructor, date, time FROM wellness_classes WHERE id = ${parseInt(id as string)}`);
+    const classQuery = await db.execute(sql`SELECT id, title, instructor, date, time FROM wellness_classes WHERE id = ${classId}`);
     if (classQuery.rows.length === 0) {
       return res.status(404).json({ error: 'Wellness class not found' });
     }
     const classDetails = classQuery.rows[0] as unknown as WellnessClassDetailRow & { date: string | Date; time: string };
 
     await db.insert(wellnessEnrollments).values({
-      classId: parseInt(id as string),
+      classId,
       userEmail: email,
       status: 'confirmed',
     });
@@ -1398,7 +1415,7 @@ router.post('/api/wellness-classes/:id/enrollments/manual', isStaffOrAdmin, asyn
         title: 'Wellness Class Confirmed',
         message: memberMessage,
         type: 'wellness_booking',
-        relatedId: parseInt(id as string),
+        relatedId: classId,
         relatedType: 'wellness_class',
         url: '/wellness'
       });
@@ -1413,13 +1430,13 @@ router.post('/api/wellness-classes/:id/enrollments/manual', isStaffOrAdmin, asyn
         type: 'notification',
         title: 'Wellness Class Confirmed',
         message: memberMessage,
-        data: { classId: parseInt(id as string), eventType: 'wellness_enrolled' }
-      }, { action: 'wellness_enrolled', classId: parseInt(id as string), triggerSource: 'wellness.ts' });
+        data: { classId, eventType: 'wellness_enrolled' }
+      }, { action: 'wellness_enrolled', classId, triggerSource: 'wellness.ts' });
       
       broadcastToStaff({
         type: 'wellness_event',
         action: 'enrollment_created',
-        classId: parseInt(id as string),
+        classId,
         memberEmail: email
       });
     } catch (notifyErr: unknown) {

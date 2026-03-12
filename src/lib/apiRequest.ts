@@ -1,3 +1,9 @@
+/**
+ * Imperative API client with automatic retry, structured errors (ApiResult<T>),
+ * and timeout support. Use this for mutations and one-off calls outside React Query.
+ * For React Query queryFn callbacks, prefer the simpler fetchWithCredentials()
+ * helpers in src/hooks/queries/useFetch.ts.
+ */
 const isDev = import.meta.env.DEV;
 
 // CSRF protection removed - SameSite cookies + CORS provide sufficient protection for SPA

@@ -188,6 +188,7 @@ router.get('/api/approved-bookings', isStaffOrAdmin, async (req, res) => {
           END as all_participants_paid
         FROM booking_requests br
         LEFT JOIN LATERAL (
+          /* Convert cached_fee_cents to dollars for frontend display */
           SELECT SUM(COALESCE(bp.cached_fee_cents, 0)) / 100.0 as total_owed
           FROM booking_participants bp
           WHERE bp.session_id = br.session_id

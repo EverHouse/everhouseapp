@@ -285,6 +285,8 @@ router.post('/api/announcements', isStaffOrAdmin, async (req, res) => {
 router.put('/api/announcements/:id', isStaffOrAdmin, async (req, res) => {
   try {
     const { id } = req.params;
+    const announcementId = parseInt(id as string);
+    if (isNaN(announcementId)) return res.status(400).json({ error: 'Invalid announcement ID' });
     const { title, description, startDate, endDate, linkType, linkTarget, notifyMembers, showAsBanner } = req.body;
     
     if (!title) {
@@ -293,7 +295,7 @@ router.put('/api/announcements/:id', isStaffOrAdmin, async (req, res) => {
     
     const results = await db.transaction(async (tx) => {
       if (showAsBanner) {
-        await tx.execute(sql`UPDATE announcements SET show_as_banner = false WHERE show_as_banner = true AND id != ${parseInt(id as string)}`);
+        await tx.execute(sql`UPDATE announcements SET show_as_banner = false WHERE show_as_banner = true AND id != ${announcementId}`);
       }
       
       return await tx.execute(sql`
@@ -305,7 +307,7 @@ router.put('/api/announcements/:id', isStaffOrAdmin, async (req, res) => {
             link_type = ${linkType || null},
             link_target = ${linkTarget || null},
             show_as_banner = ${showAsBanner || false}
-        WHERE id = ${parseInt(id as string)}
+        WHERE id = ${announcementId}
         RETURNING *
       `);
     });
@@ -377,9 +379,11 @@ router.put('/api/announcements/:id', isStaffOrAdmin, async (req, res) => {
 router.delete('/api/announcements/:id', isStaffOrAdmin, async (req, res) => {
   try {
     const { id } = req.params;
+    const announcementId = parseInt(id as string);
+    if (isNaN(announcementId)) return res.status(400).json({ error: 'Invalid announcement ID' });
     
     const [deleted] = await db.delete(announcements)
-      .where(eq(announcements.id, parseInt(id as string)))
+      .where(eq(announcements.id, announcementId))
       .returning();
     
     if (!deleted) {

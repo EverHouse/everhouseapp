@@ -10,9 +10,10 @@ export interface BookingMember {
   tier: string | null;
   membershipStatus?: string | null;
   isStaff?: boolean;
+  /** Fee amount in cents */
   fee: number;
   feeNote: string;
-  guestInfo?: { guestId: number; guestName: string; guestEmail: string; fee: number; feeNote: string; usedGuestPass: boolean } | null;
+  guestInfo?: { guestId: number; guestName: string; guestEmail: string; /** Fee amount in cents */ fee: number; feeNote: string; usedGuestPass: boolean } | null;
 }
 
 export interface BookingGuest {
@@ -21,6 +22,7 @@ export interface BookingGuest {
   guestName: string | null;
   guestEmail: string | null;
   slotNumber: number;
+  /** Fee amount in cents */
   fee: number;
   feeNote: string;
 }
@@ -40,7 +42,7 @@ export interface FinancialSummary {
   totalOwnerOwes: number;
   totalPlayersOwe: number;
   grandTotal: number;
-  playerBreakdown: Array<{ name: string; tier: string | null; fee: number; feeNote: string; membershipStatus?: string | null }>;
+  playerBreakdown: Array<{ name: string; tier: string | null; /** Fee amount in cents */ fee: number; feeNote: string; membershipStatus?: string | null }>;
   allPaid?: boolean;
 }
 
@@ -152,6 +154,12 @@ export interface VisitorSearchResult {
 
 export interface SlotState {
   type: 'empty' | 'member' | 'guest_placeholder' | 'visitor';
+  /**
+   * member.id source depends on context:
+   * - In manage mode (existing booking): String(BookingMember.id) — the booking_participants row ID
+   * - In assign mode (new booking): users.id — the user's string UUID
+   * - For visitors: visitors.id — the visitor record UUID
+   */
   member?: { id: string; email: string; name: string; tier?: string | null };
   guestName?: string;
 }

@@ -247,6 +247,8 @@ router.get('/api/events/needs-review', isStaffOrAdmin, async (req, res) => {
 router.post('/api/events/:id/mark-reviewed', isStaffOrAdmin, async (req, res) => {
   try {
     const { id } = req.params;
+    const eventId = parseInt(id as string);
+    if (isNaN(eventId)) return res.status(400).json({ error: 'Invalid event ID' });
     const sessionUser = getSessionUser(req);
     const reviewedBy = sessionUser?.email || 'unknown';
     
@@ -256,7 +258,7 @@ router.post('/api/events/:id/mark-reviewed', isStaffOrAdmin, async (req, res) =>
       reviewedAt: new Date(),
       reviewDismissed: true,
       conflictDetected: false,
-    }).where(eq(events.id, parseInt(id as string))).returning();
+    }).where(eq(events.id, eventId)).returning();
     
     if (result.length === 0) {
       return res.status(404).json({ error: 'Event not found' });
@@ -483,13 +485,16 @@ router.put('/api/events/:id', isStaffOrAdmin, async (req, res) => {
       return res.status(400).json({ error: 'Invalid date/time combination' });
     }
     
+    const eventId = parseInt(id as string);
+    if (isNaN(eventId)) return res.status(400).json({ error: 'Invalid event ID' });
+    
     const existing = await db.select({ 
       googleCalendarId: events.googleCalendarId,
       blockBookings: events.blockBookings,
       blockSimulators: events.blockSimulators,
       blockConferenceRoom: events.blockConferenceRoom,
       needsReview: events.needsReview
-    }).from(events).where(eq(events.id, parseInt(id as string)));
+    }).from(events).where(eq(events.id, eventId));
     
     const previousBlockBookings = existing[0]?.blockBookings || false;
     const previousBlockSimulators = existing[0]?.blockSimulators || false;
@@ -539,7 +544,7 @@ router.put('/api/events/:id', isStaffOrAdmin, async (req, res) => {
     // Always clear conflict_detected when saving an event (user is acknowledging changes)
     updateData.conflictDetected = false;
     
-    const result = await db.update(events).set(updateData).where(eq(events.id, parseInt(id as string))).returning();
+    const result = await db.update(events).set(updateData).where(eq(events.id, eventId)).returning();
     
     if (result.length === 0) {
       return res.status(404).json({ error: 'Event not found' });
@@ -578,7 +583,7 @@ router.put('/api/events/:id', isStaffOrAdmin, async (req, res) => {
               locallyEdited: false,
               appLastModifiedAt: null,
               lastSyncedAt: new Date(),
-            }).where(eq(events.id, parseInt(id as string)));
+            }).where(eq(events.id, eventId));
           }
         }
       } catch (calError: unknown) {
@@ -586,7 +591,6 @@ router.put('/api/events/:id', isStaffOrAdmin, async (req, res) => {
       }
     }
     
-    const eventId = parseInt(id as string);
     const userEmail = getSessionUser(req)?.email || 'system';
     
     // Determine if blocking has changed
@@ -1136,6 +1140,8 @@ router.delete('/api/rsvps/:event_id/:user_email', isAuthenticated, async (req, r
 router.get('/api/events/:id/rsvps', isStaffOrAdmin, async (req, res) => {
   try {
     const { id } = req.params;
+    const eventId = parseInt(id as string);
+    if (isNaN(eventId)) return res.status(400).json({ error: 'Invalid event ID' });
     
     const result = await db.select({
       id: eventRsvps.id,
@@ -1159,7 +1165,7 @@ router.get('/api/events/:id/rsvps', isStaffOrAdmin, async (req, res) => {
       eq(eventRsvps.matchedUserId, users.id)
     ))
     .where(and(
-      eq(eventRsvps.eventId, parseInt(id as string)),
+      eq(eventRsvps.eventId, eventId),
       eq(eventRsvps.status, 'confirmed')
     ))
     .orderBy(desc(eventRsvps.createdAt));

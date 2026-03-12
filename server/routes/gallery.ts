@@ -15,9 +15,9 @@ router.get('/api/gallery', async (req, res) => {
     
     let images;
     if (include_inactive === 'true') {
-      images = await db.select().from(galleryImages).orderBy(asc(galleryImages.sortOrder));
+      images = await db.select().from(galleryImages).orderBy(asc(galleryImages.sortOrder)).limit(500);
     } else {
-      images = await db.select().from(galleryImages).where(eq(galleryImages.isActive, true)).orderBy(asc(galleryImages.sortOrder));
+      images = await db.select().from(galleryImages).where(eq(galleryImages.isActive, true)).orderBy(asc(galleryImages.sortOrder)).limit(500);
     }
     
     const formatted = images.map(img => ({
@@ -62,6 +62,8 @@ router.post('/api/admin/gallery', isStaffOrAdmin, async (req, res) => {
 router.put('/api/admin/gallery/:id', isStaffOrAdmin, async (req, res) => {
   try {
     const { id } = req.params;
+    const imageId = parseInt(id as string);
+    if (isNaN(imageId)) return res.status(400).json({ error: 'Invalid gallery image ID' });
     const { title, imageUrl, category, sortOrder, isActive } = req.body;
     
     const [updated] = await db.update(galleryImages)
@@ -72,7 +74,7 @@ router.put('/api/admin/gallery/:id', isStaffOrAdmin, async (req, res) => {
         sortOrder: sortOrder !== undefined ? sortOrder : undefined,
         isActive: isActive !== undefined ? isActive : undefined
       })
-      .where(eq(galleryImages.id, parseInt(id as string)))
+      .where(eq(galleryImages.id, imageId))
       .returning();
     
     if (!updated) {
@@ -89,10 +91,12 @@ router.put('/api/admin/gallery/:id', isStaffOrAdmin, async (req, res) => {
 router.delete('/api/admin/gallery/:id', isStaffOrAdmin, async (req, res) => {
   try {
     const { id } = req.params;
+    const imageId = parseInt(id as string);
+    if (isNaN(imageId)) return res.status(400).json({ error: 'Invalid gallery image ID' });
     
     const [updated] = await db.update(galleryImages)
       .set({ isActive: false })
-      .where(eq(galleryImages.id, parseInt(id as string)))
+      .where(eq(galleryImages.id, imageId))
       .returning();
     
     if (!updated) {

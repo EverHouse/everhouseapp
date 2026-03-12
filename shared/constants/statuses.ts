@@ -5,6 +5,7 @@ export const BOOKING_STATUSES = [
   'confirmed',
   'declined',
   'cancelled',
+  'cancellation_pending',
   'attended',
   'no_show',
   'checked_in'
@@ -14,7 +15,7 @@ export type BookingStatus = typeof BOOKING_STATUSES[number];
 
 export const ACTIVE_BOOKING_STATUSES: BookingStatus[] = ['pending', 'pending_approval', 'approved', 'confirmed'];
 export const COMPLETED_BOOKING_STATUSES: BookingStatus[] = ['attended', 'checked_in'];
-export const CANCELLED_BOOKING_STATUSES: BookingStatus[] = ['declined', 'cancelled', 'no_show'];
+export const CANCELLED_BOOKING_STATUSES: BookingStatus[] = ['declined', 'cancelled', 'cancellation_pending', 'no_show'];
 
 export const NOTIFICATION_TYPES = [
   'booking',

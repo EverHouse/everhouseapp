@@ -1,3 +1,9 @@
+/**
+ * Low-level fetch helpers for use inside React Query queryFn callbacks.
+ * For imperative API calls (mutations, actions outside React Query), use
+ * apiRequest() from src/lib/apiRequest.ts which adds retry logic and
+ * structured error handling via ApiResult<T>.
+ */
 export async function fetchWithCredentials<T>(url: string, options?: RequestInit): Promise<T> {
   const response = await fetch(url, {
     credentials: 'include',

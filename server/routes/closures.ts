@@ -197,7 +197,7 @@ async function formatAffectedAreasForDisplay(affectedAreas: string | null | unde
         const filtered = formatted.filter(a => a);
         if (filtered.length > 0) return filtered.join(', ');
       }
-    } catch { /* fall through to comma-separated parsing */ }
+    } catch { /* intentionally swallowed: fall through to comma-separated parsing */ }
   }
 
   const parts = trimmed.includes(',') ? trimmed.split(',') : [trimmed];
@@ -427,12 +427,14 @@ router.post('/api/notice-types', isStaffOrAdmin, async (req, res) => {
 router.put('/api/notice-types/:id', isStaffOrAdmin, async (req, res) => {
   try {
     const { id } = req.params;
+    const noticeTypeId = parseInt(id as string);
+    if (isNaN(noticeTypeId)) return res.status(400).json({ error: 'Invalid notice type ID' });
     const { name, sort_order } = req.body;
     
     const [existing] = await db
       .select()
       .from(noticeTypes)
-      .where(eq(noticeTypes.id, parseInt(id as string)));
+      .where(eq(noticeTypes.id, noticeTypeId));
     
     if (!existing) {
       return res.status(404).json({ error: 'Notice type not found' });
@@ -453,7 +455,7 @@ router.put('/api/notice-types/:id', isStaffOrAdmin, async (req, res) => {
     const [result] = await db
       .update(noticeTypes)
       .set(updateData)
-      .where(eq(noticeTypes.id, parseInt(id as string)))
+      .where(eq(noticeTypes.id, noticeTypeId))
       .returning();
     
     logFromRequest(req, 'update_notice_type', 'notice_type', String(id), undefined, {});
@@ -470,11 +472,13 @@ router.put('/api/notice-types/:id', isStaffOrAdmin, async (req, res) => {
 router.delete('/api/notice-types/:id', isStaffOrAdmin, async (req, res) => {
   try {
     const { id } = req.params;
+    const noticeTypeId = parseInt(id as string);
+    if (isNaN(noticeTypeId)) return res.status(400).json({ error: 'Invalid notice type ID' });
     
     const [existing] = await db
       .select()
       .from(noticeTypes)
-      .where(eq(noticeTypes.id, parseInt(id as string)));
+      .where(eq(noticeTypes.id, noticeTypeId));
     
     if (!existing) {
       return res.status(404).json({ error: 'Notice type not found' });
@@ -486,7 +490,7 @@ router.delete('/api/notice-types/:id', isStaffOrAdmin, async (req, res) => {
     
     await db
       .delete(noticeTypes)
-      .where(eq(noticeTypes.id, parseInt(id as string)));
+      .where(eq(noticeTypes.id, noticeTypeId));
     
     logFromRequest(req, 'delete_notice_type', 'notice_type', String(id), undefined, {});
     res.json({ success: true, message: 'Notice type deleted' });
@@ -550,6 +554,8 @@ router.post('/api/closure-reasons', isStaffOrAdmin, async (req, res) => {
 router.put('/api/closure-reasons/:id', isStaffOrAdmin, async (req, res) => {
   try {
     const { id } = req.params;
+    const reasonId = parseInt(id as string);
+    if (isNaN(reasonId)) return res.status(400).json({ error: 'Invalid closure reason ID' });
     const { label, sort_order, is_active } = req.body;
     
     const updateData: Record<string, unknown> = {};
@@ -564,7 +570,7 @@ router.put('/api/closure-reasons/:id', isStaffOrAdmin, async (req, res) => {
     const [result] = await db
       .update(closureReasons)
       .set(updateData)
-      .where(eq(closureReasons.id, parseInt(id as string)))
+      .where(eq(closureReasons.id, reasonId))
       .returning();
     
     if (!result) {
@@ -585,11 +591,13 @@ router.put('/api/closure-reasons/:id', isStaffOrAdmin, async (req, res) => {
 router.delete('/api/closure-reasons/:id', isStaffOrAdmin, async (req, res) => {
   try {
     const { id } = req.params;
+    const reasonId = parseInt(id as string);
+    if (isNaN(reasonId)) return res.status(400).json({ error: 'Invalid closure reason ID' });
     
     const [result] = await db
       .update(closureReasons)
       .set({ isActive: false })
-      .where(eq(closureReasons.id, parseInt(id as string)))
+      .where(eq(closureReasons.id, reasonId))
       .returning();
     
     if (!result) {
@@ -836,6 +844,7 @@ router.delete('/api/closures/:id', isStaffOrAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const closureId = parseInt(id as string);
+    if (isNaN(closureId)) return res.status(400).json({ error: 'Invalid closure ID' });
     
     const [closure] = await db
       .select()
@@ -907,6 +916,7 @@ router.put('/api/closures/:id', isStaffOrAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const closureId = parseInt(id as string);
+    if (isNaN(closureId)) return res.status(400).json({ error: 'Invalid closure ID' });
     const { 
       title, 
       reason,

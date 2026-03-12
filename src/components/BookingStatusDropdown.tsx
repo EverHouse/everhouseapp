@@ -4,7 +4,7 @@ import { createPortal } from 'react-dom';
 type StatusValue = 'attended' | 'no_show' | 'approved';
 
 interface BookingStatusDropdownProps {
-  currentStatus: 'check_in' | 'attended' | 'no_show';
+  currentStatus: 'check_in' | 'checked_in' | 'attended' | 'no_show' | 'cancellation_pending';
   onStatusChange: (status: StatusValue) => void;
   disabled?: boolean;
   loading?: boolean;
@@ -126,6 +126,8 @@ export function BookingStatusDropdown({
 
       const loadingColorClass = currentStatus === 'check_in'
         ? (isSm ? 'bg-glass-surface-primary dark:bg-glass-surface-primary-dark text-glass-surface-primary-text dark:text-accent opacity-50' : 'bg-green-600 text-white opacity-75')
+        : currentStatus === 'checked_in'
+        ? (isSm ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400' : 'bg-green-100 dark:bg-green-900/30 border border-green-400 dark:border-green-600 text-green-700 dark:text-green-300')
         : currentStatus === 'attended'
           ? (isSm ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400' : 'bg-green-100 dark:bg-green-900/30 border border-green-400 dark:border-green-600 text-green-700 dark:text-green-300')
           : (isSm ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400' : 'bg-red-100 dark:bg-red-900/30 border border-red-400 dark:border-red-600 text-red-700 dark:text-red-300');
@@ -134,6 +136,32 @@ export function BookingStatusDropdown({
         <button type="button" disabled className={`${loadingClass} ${loadingColorClass}`} {...ariaProps}>
           <span className={`material-symbols-outlined ${isSm ? 'text-sm' : 'text-sm'} animate-spin`}>progress_activity</span>
           Updating...
+        </button>
+      );
+    }
+
+    if (currentStatus === 'cancellation_pending') {
+      const btnClass = isSm
+        ? 'text-xs px-2 py-1 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 rounded-lg font-medium flex items-center gap-1'
+        : 'tactile-btn w-full py-2 px-3 rounded-lg text-sm font-medium flex items-center justify-center gap-1.5 transition-colors bg-orange-100 dark:bg-orange-900/30 border border-orange-400 dark:border-orange-600 text-orange-700 dark:text-orange-300';
+      return (
+        <button type="button" disabled className={btnClass} {...ariaProps}>
+          <span className={`material-symbols-outlined ${isSm ? 'text-sm' : 'text-sm'}`}>event_busy</span>
+          Cancellation Pending
+        </button>
+      );
+    }
+
+    if (currentStatus === 'checked_in') {
+      const btnClass = isSm
+        ? 'text-xs px-2 py-1 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 rounded-lg font-medium flex items-center gap-1 hover:ring-2 hover:ring-emerald-300 dark:hover:ring-emerald-600 transition-all cursor-pointer'
+        : 'tactile-btn w-full py-2 px-3 rounded-lg text-sm font-medium flex items-center justify-center gap-1.5 transition-colors bg-green-100 dark:bg-green-900/30 border border-green-400 dark:border-green-600 text-green-700 dark:text-green-300 hover:ring-2 hover:ring-green-300 dark:hover:ring-green-600 cursor-pointer';
+
+      return (
+        <button type="button" onClick={handleButtonClick} onKeyDown={handleKeyDown} disabled={disabled} className={btnClass} {...ariaProps}>
+          <span className={`material-symbols-outlined ${isSm ? 'text-sm' : 'text-sm'}`}>check_circle</span>
+          Checked In
+          <span className={`material-symbols-outlined ${isSm ? 'text-xs' : 'text-sm'} ml-0.5`}>expand_more</span>
         </button>
       );
     }

@@ -73,6 +73,8 @@ router.get('/api/tours/today', isStaffOrAdmin, async (req, res) => {
 router.post('/api/tours/:id/checkin', isStaffOrAdmin, async (req, res) => {
   try {
     const { id } = req.params;
+    const tourId = parseInt(id as string);
+    if (isNaN(tourId)) return res.status(400).json({ error: 'Invalid tour ID' });
     const staffEmail = getSessionUser(req)?.email || req.body.staffEmail;
     
     const [updated] = await db.update(tours)
@@ -82,7 +84,7 @@ router.post('/api/tours/:id/checkin', isStaffOrAdmin, async (req, res) => {
         checkedInBy: staffEmail,
         updatedAt: new Date(),
       })
-      .where(eq(tours.id, parseInt(id as string)))
+      .where(eq(tours.id, tourId))
       .returning();
     
     if (!updated) {
@@ -124,7 +126,10 @@ router.patch('/api/tours/:id/status', isStaffOrAdmin, async (req, res) => {
       return res.status(400).json({ error: `Invalid status. Must be one of: ${validStatuses.join(', ')}` });
     }
     
-    const [existingTour] = await db.select().from(tours).where(eq(tours.id, parseInt(id as string)));
+    const tourId = parseInt(id as string);
+    if (isNaN(tourId)) return res.status(400).json({ error: 'Invalid tour ID' });
+    
+    const [existingTour] = await db.select().from(tours).where(eq(tours.id, tourId));
     const previousStatus = existingTour?.status || 'unknown';
     
     const updateData: Record<string, unknown> = {
@@ -142,7 +147,7 @@ router.patch('/api/tours/:id/status', isStaffOrAdmin, async (req, res) => {
     
     const [updated] = await db.update(tours)
       .set(updateData)
-      .where(eq(tours.id, parseInt(id as string)))
+      .where(eq(tours.id, tourId))
       .returning();
     
     if (!updated) {

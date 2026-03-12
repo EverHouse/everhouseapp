@@ -42,6 +42,13 @@ export interface Announcement {
   showAsBanner?: boolean;
 }
 
+/**
+ * Frontend display-oriented member profile.
+ * Distinct from shared/models/users.ts User (DB schema type) and
+ * shared/models/auth-session.ts User (Drizzle inferred type).
+ * This type includes computed/display fields (name, tier, avatar, lifetimeVisits)
+ * that are assembled by the API layer, not stored directly in the users table.
+ */
 export interface MemberProfile {
   id: string;
   name: string;
@@ -57,7 +64,7 @@ export interface MemberProfile {
   jobTitle?: string;
   joinDate?: string;
   avatar?: string;
-  role?: 'member' | 'staff' | 'admin';
+  role?: 'member' | 'staff' | 'admin' | 'visitor' | string;
   mindbodyClientId?: string;
   stripeCustomerId?: string;
   hubspotId?: string;
@@ -78,6 +85,13 @@ export interface MemberProfile {
   firstLoginAt?: string | null;
   waiverVersion?: string | null;
   waiverSignedAt?: string | null;
+  mindbodyId?: string | null;
+  accountBalance?: number;
+  lastVisit?: string | null;
+  legacySource?: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
+  userId?: string;
 }
 
 export interface Booking {
