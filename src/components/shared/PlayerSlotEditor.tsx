@@ -37,6 +37,7 @@ const PlayerSlotEditor: React.FC<PlayerSlotEditorProps> = ({
   maxPlayers = 4,
   showPlayerCountSelector = true,
 }) => {
+  const [wrapperRef] = useAutoAnimate();
   const [slotListRef] = useAutoAnimate();
   const playerCounts = Array.from({ length: maxPlayers }, (_, i) => i + 1);
   const labels: Record<number, string> = { 1: 'Solo', 2: 'Duo', 3: 'Trio', 4: 'Four' };
@@ -73,7 +74,7 @@ const PlayerSlotEditor: React.FC<PlayerSlotEditorProps> = ({
   }, [slots, onSlotsChange]);
 
   return (
-    <>
+    <div ref={wrapperRef} className="space-y-6">
       {showPlayerCountSelector && (
         <section className={`rounded-xl p-4 border glass-card ${isDark ? 'border-white/25' : 'border-black/10'}`}>
           <div className="flex items-center justify-between mb-3">
@@ -101,17 +102,20 @@ const PlayerSlotEditor: React.FC<PlayerSlotEditorProps> = ({
         </section>
       )}
 
-      {slots.length > 0 && (
-        <section className={`rounded-xl p-4 border glass-card relative z-10 ${isDark ? 'border-white/25' : 'border-black/10'}`}>
-          <div className="flex items-center gap-2 mb-3">
-            <span className={`text-[11px] font-bold uppercase tracking-[0.2em] ${isDark ? 'text-white/80' : 'text-primary/80'}`} style={{ fontFamily: 'var(--font-label)' }}>Additional Players</span>
-            <span className={`text-xs ${isDark ? 'text-white/50' : 'text-primary/50'}`}>(Optional)</span>
-          </div>
+      <section className={`rounded-xl border glass-card relative z-10 overflow-hidden transition-all duration-300 ${slots.length > 0 ? 'p-4' : 'p-0 border-transparent'} ${isDark ? 'border-white/25' : 'border-black/10'}`} style={slots.length === 0 ? { maxHeight: 0 } : { maxHeight: '2000px' }}>
+        {slots.length > 0 && (
+          <>
+            <div className="flex items-center gap-2 mb-3">
+              <span className={`text-[11px] font-bold uppercase tracking-[0.2em] ${isDark ? 'text-white/80' : 'text-primary/80'}`} style={{ fontFamily: 'var(--font-label)' }}>Additional Players</span>
+              <span className={`text-xs ${isDark ? 'text-white/50' : 'text-primary/50'}`}>(Optional)</span>
+            </div>
 
-          <div className={`mb-3 p-3 rounded-lg text-sm ${isDark ? 'bg-blue-500/10 border border-blue-500/30 text-blue-300' : 'bg-blue-50 border border-blue-200 text-blue-700'}`}>
-            <span className="material-symbols-outlined text-sm mr-1 align-middle">info</span>
-            Provide guest first name, last name, and email to use your guest passes. Unfilled slots are charged the full guest fee.
-          </div>
+            <div className={`mb-3 p-3 rounded-lg text-sm ${isDark ? 'bg-blue-500/10 border border-blue-500/30 text-blue-300' : 'bg-blue-50 border border-blue-200 text-blue-700'}`}>
+              <span className="material-symbols-outlined text-sm mr-1 align-middle">info</span>
+              Provide guest first name, last name, and email to use your guest passes. Unfilled slots are charged the full guest fee.
+            </div>
+          </>
+        )}
 
           <div ref={slotListRef} className="space-y-4">
             {slots.map((slot, index) => {
@@ -245,15 +249,14 @@ const PlayerSlotEditor: React.FC<PlayerSlotEditorProps> = ({
             })}
           </div>
 
-          {guestPassesRemaining !== undefined && (
+          {guestPassesRemaining !== undefined && slots.length > 0 && (
             <div className={`mt-3 pt-3 border-t flex items-center justify-between ${isDark ? 'border-white/10' : 'border-black/5'}`}>
               <span className={`text-xs ${isDark ? 'text-white/50' : 'text-primary/50'}`}>Guest passes remaining</span>
               <span className={`text-xs font-semibold ${isDark ? 'text-white/70' : 'text-primary/70'}`}>{guestPassesRemaining}</span>
             </div>
           )}
         </section>
-      )}
-    </>
+    </div>
   );
 };
 
