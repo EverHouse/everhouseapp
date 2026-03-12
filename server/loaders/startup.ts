@@ -540,7 +540,6 @@ export async function runStartupTasks(): Promise<void> {
       SELECT id, payload FROM hubspot_sync_queue
       WHERE status = 'dead' AND operation = 'sync_tier'
         AND last_error LIKE '%was not one of the allowed options%'
-        AND id IN (14, 15)
     `);
     const rows = (deadItems as { rows: Array<{ id: number; payload: string }> }).rows;
     if (rows.length > 0) {
@@ -548,6 +547,10 @@ export async function runStartupTasks(): Promise<void> {
       for (const row of rows) {
         try {
           const payload = typeof row.payload === 'string' ? JSON.parse(row.payload) : row.payload;
+          if (!payload?.email || typeof payload.email !== 'string') {
+            logger.warn(`[Startup] Dead HubSpot job #${row.id} has no valid email in payload, skipping`);
+            continue;
+          }
           const emailKey = (payload.email as string).toLowerCase();
           const newJobId = await enqueueHubSpotSync('sync_tier', payload, {
             priority: 2,

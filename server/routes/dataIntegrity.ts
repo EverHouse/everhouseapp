@@ -1111,7 +1111,7 @@ router.post('/api/data-integrity/fix/deactivate-stale-member', isAdmin, validate
     const staffEmail = getSessionUser(req)?.email || 'unknown';
 
     await client.query('BEGIN');
-    await client.query(`SELECT pg_advisory_xact_lock($1)`, [userId]);
+    await client.query(`SELECT pg_advisory_xact_lock(hashtext($1::text))`, [userId]);
 
     const result = await client.query(
       `UPDATE users 
@@ -1153,7 +1153,7 @@ router.post('/api/data-integrity/fix/change-billing-provider', isAdmin, validate
     const staffEmail = getSessionUser(req)?.email || 'unknown';
 
     await client.query('BEGIN');
-    await client.query(`SELECT pg_advisory_xact_lock($1)`, [userId]);
+    await client.query(`SELECT pg_advisory_xact_lock(hashtext($1::text))`, [userId]);
 
     const result = await client.query(
       `UPDATE users 
@@ -1382,7 +1382,7 @@ router.post('/api/data-integrity/fix/activate-stuck-member', isAdmin, validateBo
     const staffEmail = getSessionUser(req)?.email || 'unknown';
 
     await client.query('BEGIN');
-    await client.query(`SELECT pg_advisory_xact_lock($1)`, [userId]);
+    await client.query(`SELECT pg_advisory_xact_lock(hashtext($1::text))`, [userId]);
 
     const result = await client.query(
       `UPDATE users 
@@ -1590,7 +1590,7 @@ router.post('/api/data-integrity/fix/accept-tier', isAdmin, validateBody(acceptT
     const staffEmail = getSessionUser(req)?.email || 'unknown';
 
     await client.query('BEGIN');
-    await client.query(`SELECT pg_advisory_xact_lock($1)`, [userId]);
+    await client.query(`SELECT pg_advisory_xact_lock(hashtext($1::text))`, [userId]);
 
     const result = await client.query(
       `UPDATE users 
@@ -1658,7 +1658,7 @@ router.post('/api/data-integrity/fix/clear-stripe-customer-id', isAdmin, validat
     const staffEmail = getSessionUser(req)?.email || 'unknown';
 
     await client.query('BEGIN');
-    await client.query(`SELECT pg_advisory_xact_lock($1)`, [userId]);
+    await client.query(`SELECT pg_advisory_xact_lock(hashtext($1::text))`, [userId]);
 
     const result = await client.query(
       `UPDATE users 

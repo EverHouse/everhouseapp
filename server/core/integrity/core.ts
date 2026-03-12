@@ -25,7 +25,7 @@ export interface MemberRow {
   billing_provider?: string;
   mindbody_client_id?: string;
   role?: string;
-  id?: number;
+  id?: string | number;
   [key: string]: unknown;
 }
 
@@ -167,7 +167,7 @@ export interface MindBodyMismatchRow {
 export interface HubSpotDuplicateRow {
   hubspot_id: string;
   emails: string[];
-  user_ids: number[];
+  user_ids: (string | number)[];
   statuses: string[];
   tiers: string[];
   user_count: number;
