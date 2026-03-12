@@ -13,7 +13,7 @@ const PrivacyPolicy: React.FC = () => {
         <div className="space-y-8 leading-relaxed text-base" style={{ fontFamily: 'var(--font-body)' }}>
           <section>
             <p>
-              This Privacy Policy describes how everclub.app and related Ever Members Club services (the "Site," "we," "us," or "our") collect, use, and disclose your personal information when you visit our website, contact us, use our services, or make a purchase.
+              This Privacy Policy describes how everclub.app and related Ever Members Club services, operated by Tempo CC Inc. (the "Site," "we," "us," or "our") collect, use, and disclose your personal information when you visit our website, contact us, use our services, or make a purchase.
             </p>
           </section>
 

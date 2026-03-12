@@ -14,7 +14,7 @@ const TermsOfService: React.FC = () => {
           <section>
             <h2 className="text-2xl mb-4 leading-tight" style={{ fontFamily: 'var(--font-headline)' }}>1. Agreement Overview</h2>
             <p>
-              This Membership Agreement ("Agreement") outlines the terms and conditions of membership at Ever Members Club, doing business as Ever Club (the "Club"). By becoming an Ever Club member (or guest of a member), you agree to abide by this Agreement and all Club rules. This Agreement is intended to protect our members, guests, and the Club.
+              This Membership Agreement ("Agreement") outlines the terms and conditions of membership at Ever Members Club, a property of Tempo CC Inc., doing business as Ever Club (the "Club"). By becoming an Ever Club member (or guest of a member), you agree to abide by this Agreement and all Club rules. This Agreement is intended to protect our members, guests, and the Club.
             </p>
           </section>
 
