@@ -4,7 +4,7 @@ export { tabToPath, pathToTab, getTabFromPathname } from '../../../lib/nav-const
 export const NAV_ITEMS: import('../../../lib/nav-constants').NavItemData[] = [
   { id: 'home', icon: 'home', label: 'Home' },
   { id: 'simulator', icon: 'event_note', label: 'Bookings' },
-  { id: 'financials', icon: 'point_of_sale', label: 'Financials' },
+  { id: 'financials', icon: 'point_of_sale', label: 'POS' },
   { id: 'events', icon: 'calendar_month', label: 'Calendar' },
   { id: 'directory', icon: 'groups', label: 'Directory' },
 ];
