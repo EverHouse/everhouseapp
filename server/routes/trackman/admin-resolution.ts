@@ -840,7 +840,7 @@ router.put('/api/admin/trackman/unmatched/:id/resolve', isStaffOrAdmin, async (r
     });
   } catch (error: unknown) {
     logger.error('Error resolving unmatched booking', { error: error instanceof Error ? error : new Error(String(error)) });
-    const errorMessage = (error as Error)?.message || 'Unknown error';
+    const errorMessage = getErrorMessage(error);
     if (errorMessage.includes('Stripe') || errorMessage.includes('stripe')) {
       return res.status(500).json({ error: `Billing error: ${errorMessage}` });
     }

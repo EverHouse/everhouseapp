@@ -2264,7 +2264,7 @@ router.post('/api/hubspot/push-members-to-hubspot', isStaffOrAdmin, async (_req:
         synced++;
       } catch (err: unknown) {
         errors++;
-        logger.warn('[HubSpot Push] Failed to push member', { extra: { email: member.email, error: getErrorMessage(err as Error) } });
+        logger.warn('[HubSpot Push] Failed to push member', { extra: { email: member.email, error: getErrorMessage(err) } });
       }
     }
 

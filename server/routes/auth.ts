@@ -802,16 +802,17 @@ router.post('/api/auth/request-otp', async (req, res) => {
       
       return res.json({ success: true, message: 'Login code sent to your email' });
     } catch (emailError: unknown) {
-      logger.error('[OTP Email] Error sending email', { extra: { emailError_as_Error_message_emailError: (emailError as Error)?.message || emailError } });
+      logger.error('[OTP Email] Error sending email', { extra: { error: getErrorMessage(emailError) } });
       return res.status(500).json({ error: 'Failed to send login code. Please try again.' });
     }
   } catch (error: unknown) {
-    if (!isProduction) logger.error('OTP request error', { extra: { error_as_Error_message_error: (error as Error)?.message || error } });
+    const errorMsg = getErrorMessage(error);
+    if (!isProduction) logger.error('OTP request error', { extra: { error: errorMsg } });
     
-    if ((error as Error)?.message?.includes('HubSpot') || (error as Error)?.message?.includes('hubspot')) {
+    if (errorMsg.includes('HubSpot') || errorMsg.includes('hubspot')) {
       return res.status(500).json({ error: 'Unable to verify membership. Please try again later.' });
     }
-    if ((error as Error)?.message?.includes('Resend') || (error as Error)?.message?.includes('email')) {
+    if (errorMsg.includes('Resend') || errorMsg.includes('email')) {
       return res.status(500).json({ error: 'Unable to send email. Please try again later.' });
     }
     

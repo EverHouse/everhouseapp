@@ -932,7 +932,7 @@ router.delete('/api/members/:email/permanent', isAdmin, async (req, res) => {
       message: `Member ${memberName || normalizedEmail} permanently deleted`
     });
   } catch (error: unknown) {
-    logger.error('Member permanent delete error', { extra: { error_as_Error_message_error: (error as Error)?.message || error } });
+    logger.error('Member permanent delete error', { extra: { error: getErrorMessage(error) } });
     res.status(500).json({ error: 'Failed to permanently delete member' });
   }
 });

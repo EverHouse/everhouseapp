@@ -435,7 +435,7 @@ const BookGolf: React.FC = () => {
 
   // Derived loading state
   const isLoading = resourcesLoading || availabilityLoading;
-  const error = resourcesError ? (resourcesError as Error).message : null;
+  const error = resourcesError ? (resourcesError instanceof Error ? resourcesError.message : String(resourcesError)) : null;
 
   // ============ END REACT QUERY HOOKS ============
 
@@ -724,7 +724,7 @@ const BookGolf: React.FC = () => {
     } catch (err: unknown) {
       console.error('[BookGolf] Failed to cancel request:', err);
       haptic.error();
-      showToast((err as Error).message || 'Failed to cancel booking', 'error');
+      showToast(err instanceof Error ? err.message : 'Failed to cancel booking', 'error');
     }
   };
 

@@ -1220,7 +1220,7 @@ router.post('/api/data-integrity/fix/delete-member-no-email', isAdmin, validateB
 
     for (const query of cleanups) {
       try { await db.execute(query); } catch (e) {
-        logger.warn('[DataIntegrity] Non-critical cleanup step failed during member delete', { extra: { recordId, error: getErrorMessage(e as Error) } });
+        logger.warn('[DataIntegrity] Non-critical cleanup step failed during member delete', { extra: { recordId, error: getErrorMessage(e) } });
       }
     }
 

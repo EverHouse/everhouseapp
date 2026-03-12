@@ -263,7 +263,7 @@ router.post('/api/my/billing/portal', requireAuth, async (req, res) => {
         const { syncMemberToHubSpot } = await import('../core/hubspot/stages');
         await syncMemberToHubSpot({ email: member.email as string, billingProvider: preservedProvider });
       } catch (e: unknown) {
-        logger.warn('[MyBilling] Failed to sync billing provider to HubSpot for', { extra: { email: member.email as string, e_as_any_e: (e as Error)?.message || e } });
+        logger.warn('[MyBilling] Failed to sync billing provider to HubSpot for', { extra: { email: member.email as string, error: getErrorMessage(e) } });
       }
     }
     
