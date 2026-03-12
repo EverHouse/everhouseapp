@@ -2,6 +2,19 @@
 
 All notable changes to the Ever Club Members App are documented here.
 
+## [8.84.0] - 2026-03-12
+
+### Linked Email Booking Fix (Comprehensive)
+- **Booking Creation — Email Resolution**: All booking creation paths now resolve linked/secondary emails to the primary account before saving. Ensures `user_id` is always set alongside `user_email`. Affected paths: member booking (POST `/api/bays/bookings`), staff manual booking, staff conference room booking, `createBookingRequest`, `createManualBooking` (resource service), Trackman resolution inserts, and Trackman rescan inserts.
+- **Member Dashboard — Linked Email Queries**: Member-facing booking queries now include bookings created under any linked email. Fixes bookings "disappearing" from the member's dashboard when they were made under a secondary email. Affected queries: dashboard GET, past booking count, last activity date, outstanding balance summary, detailed outstanding items, unfilled slots.
+- **Tier Limit Enforcement**: Daily booked minutes (`getDailyBookedMinutes`, `getTotalDailyUsageMinutes`) now aggregate across all linked emails, preventing members from bypassing tier limits by booking under secondary emails.
+- **Staff Check-In**: QR scan booking lookup now finds bookings across linked emails.
+- **Staff Existing Booking Check**: `checkExistingBookingsForStaff` includes linked email bookings for conflict detection.
+- **Calendar Sync**: `findMemberByCalendarEvent` now checks the `user_linked_emails` table when matching calendar event attendees to members, with new `'linked_email'` match method.
+- **Auto-Repair on Startup**: Server startup repairs orphaned bookings (those with a linked email but missing `user_id`) automatically.
+- **Admin Repair Endpoint**: `POST /api/admin/repair-linked-email-bookings` available for on-demand repair.
+- **Files**: `server/routes/bays/bookings.ts`, `server/routes/members/dashboard.ts`, `server/core/resource/service.ts`, `server/core/resource/staffActions.ts`, `server/routes/staff/manualBooking.ts`, `server/routes/staff-conference-booking.ts`, `server/core/trackman/resolution.ts`, `server/core/trackman/service.ts`, `server/core/calendar/sync/conference-room.ts`, `server/core/calendar/config.ts`, `server/replit_integrations/auth/routes.ts`, `server/routes/memberBilling.ts`, `server/core/tierService.ts`, `server/routes/staffCheckin.ts`, `server/loaders/startup.ts`, `server/routes/trackman/admin-maintenance.ts`
+
 ## [8.82.0] - 2026-03-11
 
 ### Session & Auth Fixes

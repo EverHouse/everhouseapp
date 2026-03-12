@@ -12,6 +12,7 @@ import { createPrepaymentIntent } from '../billing/prepaymentService';
 import { ensureSessionForBooking } from '../bookingService/sessionManager';
 import { createCalendarEventOnCalendar, getCalendarIdByName, CALENDAR_CONFIG } from '../calendar/index';
 import { AppError } from '../errors';
+import { resolveUserByEmail } from '../stripe/customers';
 
 interface MemberLookupRow {
   id: string;
@@ -402,9 +403,20 @@ export async function createManualBooking(params: {
     throw new AppError(400, 'Invalid duration. Must be between 30 and 360 minutes in 30-minute increments.');
   }
 
+  let resolvedMemberEmail = params.memberEmail.toLowerCase();
+  let resolvedUserId: string | null = null;
+  const resolved = await resolveUserByEmail(resolvedMemberEmail);
+  if (resolved) {
+    if (resolved.matchType !== 'direct') {
+      logger.info('[StaffActions] Resolved linked email to primary', { extra: { originalEmail: resolvedMemberEmail, resolvedEmail: resolved.primaryEmail, matchType: resolved.matchType } });
+      resolvedMemberEmail = resolved.primaryEmail.toLowerCase();
+    }
+    resolvedUserId = resolved.userId;
+  }
+
   const [member] = await db.select()
     .from(users)
-    .where(eq(users.email, params.memberEmail));
+    .where(eq(users.email, resolvedMemberEmail));
 
   if (!member) {
     throw new AppError(404, 'Member not found with that email');
@@ -450,12 +462,12 @@ export async function createManualBooking(params: {
       if (calendarId) {
         const memberName = member.firstName && member.lastName 
           ? `${member.firstName} ${member.lastName}` 
-          : params.memberEmail;
+          : resolvedMemberEmail;
         
         const summary = `Booking: ${memberName}`;
         const descriptionLines = [
           `Area: ${resource.name}`,
-          `Member: ${params.memberEmail}`,
+          `Member: ${resolvedMemberEmail}`,
           `Guests: ${params.guestCount}`,
           `Source: ${params.bookingSource}`,
           `Created by: ${params.staffEmail}`
@@ -481,7 +493,7 @@ export async function createManualBooking(params: {
 
   const memberName = member.firstName && member.lastName 
     ? `${member.firstName} ${member.lastName}` 
-    : params.memberEmail;
+    : resolvedMemberEmail;
   
   const bookingNotes = params.notes 
     ? `${params.notes}\n[Source: ${params.bookingSource}]` 
@@ -490,7 +502,8 @@ export async function createManualBooking(params: {
   const [newBooking] = await db.insert(bookingRequests)
     .values({
       resourceId: params.resourceId,
-      userEmail: params.memberEmail,
+      userEmail: resolvedMemberEmail,
+      userId: resolvedUserId,
       userName: memberName,
       resourcePreference: resource.name,
       requestDate: params.bookingDate,
@@ -521,9 +534,9 @@ export async function createManualBooking(params: {
     const notifTitle = 'Booking Confirmed';
     const notifMessage = `Your ${resource.type === 'simulator' ? 'golf simulator' : 'conference room'} booking for ${formattedDate} at ${formatTime(params.startTime)} has been confirmed.`;
     
-    if (!isSyntheticEmail(params.memberEmail)) {
+    if (!isSyntheticEmail(resolvedMemberEmail)) {
       await db.insert(notifications).values({
-        userEmail: params.memberEmail,
+        userEmail: resolvedMemberEmail,
         title: notifTitle,
         message: notifMessage,
         type: 'booking_approved',
@@ -532,13 +545,13 @@ export async function createManualBooking(params: {
       });
     }
     
-    await sendPushNotification(params.memberEmail, {
+    await sendPushNotification(resolvedMemberEmail, {
       title: notifTitle,
       body: notifMessage,
       url: '/dashboard'
     });
     
-    sendNotificationToUser(params.memberEmail, {
+    sendNotificationToUser(resolvedMemberEmail, {
       type: 'notification',
       title: notifTitle,
       message: notifMessage,
@@ -550,7 +563,7 @@ export async function createManualBooking(params: {
 
   bookingEvents.publish('booking_approved', {
     bookingId: newBooking.id,
-    memberEmail: params.memberEmail,
+    memberEmail: resolvedMemberEmail,
     memberName: memberName,
     resourceId: params.resourceId,
     resourceName: resource.name,

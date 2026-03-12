@@ -560,6 +560,8 @@ router.post('/api/booking-requests', isAuthenticated, bookingRateLimiter, valida
            AND br.start_time < $3 AND br.end_time > $2
            AND (
              LOWER(br.user_email) = LOWER($4)
+             OR LOWER(br.user_email) IN (SELECT LOWER(ule.linked_email) FROM user_linked_emails ule WHERE LOWER(ule.primary_email) = LOWER($4))
+             OR LOWER(br.user_email) IN (SELECT LOWER(ule.primary_email) FROM user_linked_emails ule WHERE LOWER(ule.linked_email) = LOWER($4))
              OR br.session_id IN (
                SELECT bp.session_id FROM booking_participants bp
                JOIN users u ON bp.user_id = u.id
@@ -691,6 +693,8 @@ router.post('/api/booking-requests', isAuthenticated, bookingRateLimiter, valida
              AND br.start_time < $3 AND br.end_time > $2
              AND (
                LOWER(br.user_email) = LOWER($4)
+               OR LOWER(br.user_email) IN (SELECT LOWER(ule.linked_email) FROM user_linked_emails ule WHERE LOWER(ule.primary_email) = LOWER($4))
+               OR LOWER(br.user_email) IN (SELECT LOWER(ule.primary_email) FROM user_linked_emails ule WHERE LOWER(ule.linked_email) = LOWER($4))
                OR br.session_id IN (
                  SELECT bp.session_id FROM booking_participants bp
                  JOIN users u ON bp.user_id = u.id

@@ -82,6 +82,8 @@ router.get('/api/member/dashboard-data', isAuthenticated, async (req, res) => {
           ),
           or(
             eq(bookingRequests.userEmail, userEmail),
+            sql`LOWER(${bookingRequests.userEmail}) IN (SELECT LOWER(ule.linked_email) FROM user_linked_emails ule WHERE LOWER(ule.primary_email) = ${userEmail})`,
+            sql`LOWER(${bookingRequests.userEmail}) IN (SELECT LOWER(ule.primary_email) FROM user_linked_emails ule WHERE LOWER(ule.linked_email) = ${userEmail})`,
             sql`${bookingRequests.sessionId} IN (SELECT bp.session_id FROM booking_participants bp JOIN users u ON bp.user_id = u.id WHERE LOWER(u.email) = ${userEmail})`,
             sql`${bookingRequests.id} IN (
               SELECT br2.id FROM booking_requests br2
@@ -202,6 +204,8 @@ router.get('/api/member/dashboard-data', isAuthenticated, async (req, res) => {
         const conditions = [
           or(
             sql`LOWER(${bookingRequests.userEmail}) = ${userEmail}`,
+            sql`LOWER(${bookingRequests.userEmail}) IN (SELECT LOWER(ule.linked_email) FROM user_linked_emails ule WHERE LOWER(ule.primary_email) = ${userEmail})`,
+            sql`LOWER(${bookingRequests.userEmail}) IN (SELECT LOWER(ule.primary_email) FROM user_linked_emails ule WHERE LOWER(ule.linked_email) = ${userEmail})`,
             sql`${bookingRequests.sessionId} IN (SELECT bp.session_id FROM booking_participants bp JOIN users u ON bp.user_id = u.id WHERE LOWER(u.email) = ${userEmail})`
           )
         ];

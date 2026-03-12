@@ -148,7 +148,9 @@ export async function getDailyBookedMinutes(email: string, date: string, resourc
     const result = await db.execute(sql`
       SELECT COALESCE(SUM(br.duration_minutes), 0) as total_minutes
       FROM booking_requests br
-      WHERE LOWER(br.user_email) = LOWER(${email})
+      WHERE (LOWER(br.user_email) = LOWER(${email})
+             OR LOWER(br.user_email) IN (SELECT LOWER(ule.linked_email) FROM user_linked_emails ule WHERE LOWER(ule.primary_email) = LOWER(${email}))
+             OR LOWER(br.user_email) IN (SELECT LOWER(ule.primary_email) FROM user_linked_emails ule WHERE LOWER(ule.linked_email) = LOWER(${email})))
         AND br.request_date = ${normalizedDate}
         AND br.status IN ('pending', 'approved', 'attended', 'confirmed')
         ${resourceFilter}`);
@@ -219,7 +221,9 @@ export async function getTotalDailyUsageMinutes(
            )
          ), 0) as total_minutes
          FROM booking_requests br
-         WHERE LOWER(user_email) = LOWER(${email})
+         WHERE (LOWER(user_email) = LOWER(${email})
+                OR LOWER(user_email) IN (SELECT LOWER(ule.linked_email) FROM user_linked_emails ule WHERE LOWER(ule.primary_email) = LOWER(${email}))
+                OR LOWER(user_email) IN (SELECT LOWER(ule.primary_email) FROM user_linked_emails ule WHERE LOWER(ule.linked_email) = LOWER(${email})))
            AND request_date = ${date}
            AND status IN ('pending', 'approved')
            ${ownerExcludeClause}

@@ -11,6 +11,7 @@ import { DEFAULT_TIER } from '../../../shared/constants/tiers';
 import { ensureSessionForBooking } from '../bookingService/sessionManager';
 import { getCached, setCache } from '../queryCache';
 import { AppError } from '../errors';
+import { resolveUserByEmail } from '../stripe/customers';
 
 interface ResourceTypeRow {
   type: string;
@@ -50,6 +51,8 @@ export async function checkExistingBookings(userEmail: string, date: string, res
     .where(and(
       or(
         eq(bookingRequests.userEmail, userEmail),
+        sql`LOWER(${bookingRequests.userEmail}) IN (SELECT LOWER(ule.linked_email) FROM user_linked_emails ule WHERE LOWER(ule.primary_email) = ${userEmail.toLowerCase()})`,
+        sql`LOWER(${bookingRequests.userEmail}) IN (SELECT LOWER(ule.primary_email) FROM user_linked_emails ule WHERE LOWER(ule.linked_email) = ${userEmail.toLowerCase()})`,
         sql`${bookingRequests.sessionId} IN (
           SELECT bp.session_id FROM booking_participants bp
           JOIN users u ON bp.user_id = u.id
@@ -96,6 +99,8 @@ export async function checkExistingBookingsForStaff(memberEmail: string, date: s
     .where(and(
       or(
         eq(bookingRequests.userEmail, memberEmail.toLowerCase()),
+        sql`LOWER(${bookingRequests.userEmail}) IN (SELECT LOWER(ule.linked_email) FROM user_linked_emails ule WHERE LOWER(ule.primary_email) = ${memberEmail.toLowerCase()})`,
+        sql`LOWER(${bookingRequests.userEmail}) IN (SELECT LOWER(ule.primary_email) FROM user_linked_emails ule WHERE LOWER(ule.linked_email) = ${memberEmail.toLowerCase()})`,
         sql`${bookingRequests.sessionId} IN (
           SELECT bp.session_id FROM booking_participants bp
           JOIN users u ON bp.user_id = u.id
@@ -149,6 +154,8 @@ export async function fetchBookings(params: {
     const userEmail = params.userEmail.toLowerCase();
     conditions.push(or(
       eq(bookingRequests.userEmail, userEmail),
+      sql`LOWER(${bookingRequests.userEmail}) IN (SELECT LOWER(ule.linked_email) FROM user_linked_emails ule WHERE LOWER(ule.primary_email) = ${userEmail})`,
+      sql`LOWER(${bookingRequests.userEmail}) IN (SELECT LOWER(ule.primary_email) FROM user_linked_emails ule WHERE LOWER(ule.linked_email) = ${userEmail})`,
       sql`${bookingRequests.id} IN (SELECT br2.id FROM booking_requests br2 INNER JOIN booking_participants bp ON bp.session_id = br2.session_id INNER JOIN users u ON u.id = bp.user_id WHERE LOWER(u.email) = ${userEmail})`
     ));
   }
@@ -364,6 +371,17 @@ export async function createBookingRequest(params: {
   endTime: string;
   notes?: string;
 }) {
+  let resolvedEmail = params.userEmail.toLowerCase();
+  let resolvedUserId: string | null = null;
+  const resolved = await resolveUserByEmail(resolvedEmail);
+  if (resolved) {
+    if (resolved.matchType !== 'direct') {
+      logger.info('[ResourceBooking] Resolved linked email to primary', { extra: { originalEmail: resolvedEmail, resolvedEmail: resolved.primaryEmail, matchType: resolved.matchType } });
+      resolvedEmail = resolved.primaryEmail.toLowerCase();
+    }
+    resolvedUserId = resolved.userId;
+  }
+
   const userResult = await db.select({
     id: users.id,
     tier: users.tier,
@@ -372,7 +390,7 @@ export async function createBookingRequest(params: {
     lastName: users.lastName
   })
     .from(users)
-    .where(eq(users.email, params.userEmail));
+    .where(eq(users.email, resolvedEmail));
   
   const user = userResult[0];
   const userTier = user?.tier || DEFAULT_TIER;
@@ -396,7 +414,7 @@ export async function createBookingRequest(params: {
     resourceType = (resourceResult.rows as unknown as ResourceTypeRow[])[0]?.type || 'simulator';
   }
   
-  const limitCheck = await checkDailyBookingLimit(params.userEmail, params.bookingDate, durationMinutes, userTier, resourceType);
+  const limitCheck = await checkDailyBookingLimit(resolvedEmail, params.bookingDate, durationMinutes, userTier, resourceType);
   if (!limitCheck.allowed) {
     throw new AppError(403, limitCheck.reason, {
       remainingMinutes: limitCheck.remainingMinutes
@@ -452,12 +470,13 @@ export async function createBookingRequest(params: {
   
   const userName = user?.firstName && user?.lastName 
     ? `${user.firstName} ${user.lastName}` 
-    : params.userEmail;
+    : resolvedEmail;
   
   const result = await db.insert(bookingRequests)
     .values({
       resourceId: params.resourceId,
-      userEmail: params.userEmail.toLowerCase(),
+      userEmail: resolvedEmail,
+      userId: resolvedUserId,
       userName: userName,
       requestDate: params.bookingDate,
       startTime: params.startTime,

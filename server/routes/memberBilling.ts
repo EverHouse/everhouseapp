@@ -263,7 +263,9 @@ router.get('/api/member-billing/:email', isStaffOrAdmin, async (req, res) => {
         JOIN booking_requests br ON br.session_id = bs.id
         LEFT JOIN users u ON bp.user_id = u.id
         WHERE (LOWER(u.email) = LOWER(${email}) 
-               OR (bp.participant_type = 'owner' AND LOWER(br.user_email) = LOWER(${email})))
+               OR (bp.participant_type = 'owner' AND LOWER(br.user_email) = LOWER(${email}))
+               OR (bp.participant_type = 'owner' AND LOWER(br.user_email) IN (SELECT LOWER(ule.linked_email) FROM user_linked_emails ule WHERE LOWER(ule.primary_email) = LOWER(${email})))
+               OR (bp.participant_type = 'owner' AND LOWER(br.user_email) IN (SELECT LOWER(ule.primary_email) FROM user_linked_emails ule WHERE LOWER(ule.linked_email) = LOWER(${email}))))
           AND bp.payment_status = 'pending'
           AND COALESCE(bp.cached_fee_cents, 0) > 0
       `);
@@ -307,7 +309,9 @@ router.get('/api/member-billing/:email/outstanding', isStaffOrAdmin, async (req,
       LEFT JOIN resources r ON br.resource_id = r.id
       LEFT JOIN users u ON bp.user_id = u.id
       WHERE (LOWER(u.email) = LOWER(${email}) 
-             OR (bp.participant_type = 'owner' AND LOWER(br.user_email) = LOWER(${email})))
+             OR (bp.participant_type = 'owner' AND LOWER(br.user_email) = LOWER(${email}))
+             OR (bp.participant_type = 'owner' AND LOWER(br.user_email) IN (SELECT LOWER(ule.linked_email) FROM user_linked_emails ule WHERE LOWER(ule.primary_email) = LOWER(${email})))
+             OR (bp.participant_type = 'owner' AND LOWER(br.user_email) IN (SELECT LOWER(ule.primary_email) FROM user_linked_emails ule WHERE LOWER(ule.linked_email) = LOWER(${email}))))
         AND bp.payment_status IN ('pending')
         AND COALESCE(bp.cached_fee_cents, 0) > 0
       ORDER BY br.request_date DESC, br.start_time ASC
@@ -348,7 +352,9 @@ router.get('/api/member-billing/:email/outstanding', isStaffOrAdmin, async (req,
       FROM booking_requests br
       LEFT JOIN resources r ON br.resource_id = r.id
       LEFT JOIN booking_participants bp ON bp.session_id = br.session_id
-      WHERE LOWER(br.user_email) = LOWER(${email})
+      WHERE (LOWER(br.user_email) = LOWER(${email})
+             OR LOWER(br.user_email) IN (SELECT LOWER(ule.linked_email) FROM user_linked_emails ule WHERE LOWER(ule.primary_email) = LOWER(${email}))
+             OR LOWER(br.user_email) IN (SELECT LOWER(ule.primary_email) FROM user_linked_emails ule WHERE LOWER(ule.linked_email) = LOWER(${email})))
         AND br.request_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
         AND br.request_date >= (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date - INTERVAL '30 days'
         AND br.session_id IS NOT NULL

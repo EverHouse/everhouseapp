@@ -44,7 +44,9 @@ export function registerAuthRoutes(app: Express): void {
         SELECT COUNT(*) as count FROM (
            -- As host
            SELECT br.id FROM booking_requests br
-           WHERE LOWER(br.user_email) = LOWER(${user.email})
+           WHERE (LOWER(br.user_email) = LOWER(${user.email})
+                  OR LOWER(br.user_email) IN (SELECT LOWER(ule.linked_email) FROM user_linked_emails ule WHERE LOWER(ule.primary_email) = LOWER(${user.email}))
+                  OR LOWER(br.user_email) IN (SELECT LOWER(ule.primary_email) FROM user_linked_emails ule WHERE LOWER(ule.linked_email) = LOWER(${user.email})))
              AND br.request_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
              AND br.status NOT IN ('cancelled', 'declined', 'cancellation_pending', 'deleted')
            UNION
@@ -88,7 +90,10 @@ export function registerAuthRoutes(app: Express): void {
         SELECT MAX(last_date) as last_date FROM (
            -- Bookings as host
            SELECT MAX(request_date) as last_date FROM booking_requests
-           WHERE LOWER(user_email) = LOWER(${user.email}) AND request_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date AND status NOT IN ('cancelled', 'declined', 'cancellation_pending', 'deleted')
+           WHERE (LOWER(user_email) = LOWER(${user.email})
+                  OR LOWER(user_email) IN (SELECT LOWER(ule.linked_email) FROM user_linked_emails ule WHERE LOWER(ule.primary_email) = LOWER(${user.email}))
+                  OR LOWER(user_email) IN (SELECT LOWER(ule.primary_email) FROM user_linked_emails ule WHERE LOWER(ule.linked_email) = LOWER(${user.email})))
+             AND request_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date AND status NOT IN ('cancelled', 'declined', 'cancellation_pending', 'deleted')
            UNION ALL
            -- Bookings as player or guest (via booking_participants)
            SELECT MAX(br.request_date) as last_date FROM booking_requests br

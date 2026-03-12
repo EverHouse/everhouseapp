@@ -111,11 +111,18 @@ async function insertBookingIfNotExists(
   const parsedPlayers = parseNotesForPlayers(booking.notes || '');
   const actualGuestCount = parsedPlayers.filter(p => p.type === 'guest').length;
 
+  let memberUserId: string | null = null;
+  const userIdLookup = await db.execute(sql`SELECT id FROM users WHERE LOWER(email) = LOWER(${memberEmail}) AND archived_at IS NULL LIMIT 1`);
+  if (userIdLookup.rows.length > 0) {
+    memberUserId = (userIdLookup.rows[0] as { id: string }).id;
+  }
+
   let insertResult;
   try {
     insertResult = await db.insert(bookingRequests).values({
       userEmail: memberEmail,
       userName: booking.userName,
+      userId: memberUserId,
       resourceId: resourceId,
       requestDate: booking.bookingDate,
       startTime: booking.startTime,

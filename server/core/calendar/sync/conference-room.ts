@@ -206,6 +206,20 @@ export async function findMemberByCalendarEvent(eventData: CalendarEventData): P
   }
 
   for (const email of collectedEmails) {
+    const linkedEmailResult = await db.execute(
+      sql`SELECT u.email, u.first_name, u.last_name FROM user_linked_emails ule
+          JOIN users u ON LOWER(u.email) = LOWER(ule.primary_email) AND u.archived_at IS NULL
+          WHERE LOWER(ule.linked_email) = ${email}
+          LIMIT 1`
+    );
+    if (linkedEmailResult.rows.length > 0) {
+      const row = linkedEmailResult.rows[0] as { email: string; first_name: string | null; last_name: string | null };
+      const userName = row.first_name && row.last_name
+        ? `${row.first_name} ${row.last_name}`
+        : (row.first_name || row.last_name || null);
+      return { userEmail: row.email, userName, matchMethod: 'linked_email' };
+    }
+
     const userWithLinkedEmail = await db
       .select()
       .from(users)

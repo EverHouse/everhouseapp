@@ -122,7 +122,7 @@ export interface ConferenceRoomBooking {
 export interface MemberMatchResult {
   userEmail: string | null;
   userName: string | null;
-  matchMethod: 'attendee' | 'description' | 'name' | 'manual_link' | null;
+  matchMethod: 'attendee' | 'description' | 'name' | 'linked_email' | 'manual_link' | null;
 }
 
 export interface CalendarEventData {

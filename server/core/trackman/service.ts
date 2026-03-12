@@ -2042,6 +2042,12 @@ export async function rescanUnmatchedBookings(performedBy: string = 'system'): P
       }
 
       if (matchedEmail) {
+        let matchedUserId: string | null = null;
+        const uidResult = await db.execute(sql`SELECT id FROM users WHERE LOWER(email) = LOWER(${matchedEmail}) AND archived_at IS NULL LIMIT 1`);
+        if (uidResult.rows.length > 0) {
+          matchedUserId = (uidResult.rows[0] as { id: string }).id;
+        }
+
         await db.update(trackmanUnmatchedBookings)
           .set({
             resolvedEmail: matchedEmail,
@@ -2075,10 +2081,10 @@ export async function rescanUnmatchedBookings(performedBy: string = 'system'): P
             if (existingBooking.length === 0) {
               try {
                 await db.execute(sql`INSERT INTO booking_requests (
-                    user_email, user_name, request_date, start_time, end_time,
+                    user_id, user_email, user_name, request_date, start_time, end_time,
                     duration_minutes, resource_id, status, trackman_booking_id,
                     notes, trackman_player_count, created_at, updated_at
-                  ) VALUES (${matchedEmail}, ${booking.userName || ''}, ${bookingDate}, ${startTime}, ${endTime}, ${booking.durationMinutes || 60}, ${bayId}, 'approved', ${booking.trackmanBookingId}, ${`[Trackman Import ID:${booking.trackmanBookingId}] ${booking.notes || ''}`.trim()}, ${booking.playerCount || 1}, NOW(), NOW())
+                  ) VALUES (${matchedUserId}, ${matchedEmail}, ${booking.userName || ''}, ${bookingDate}, ${startTime}, ${endTime}, ${booking.durationMinutes || 60}, ${bayId}, 'approved', ${booking.trackmanBookingId}, ${`[Trackman Import ID:${booking.trackmanBookingId}] ${booking.notes || ''}`.trim()}, ${booking.playerCount || 1}, NOW(), NOW())
                   ON CONFLICT (trackman_booking_id) WHERE trackman_booking_id IS NOT NULL DO NOTHING`);
                 process.stderr.write(`[Trackman Rescan] Created booking for ${matchedEmail} (Trackman ID: ${booking.trackmanBookingId})\n`);
               } catch (insertErr: unknown) {
@@ -2106,10 +2112,10 @@ export async function rescanUnmatchedBookings(performedBy: string = 'system'): P
                         WHERE id = ANY(${conflictIds})`);
                     }
                     await tx.execute(sql`INSERT INTO booking_requests (
-                        user_email, user_name, request_date, start_time, end_time,
+                        user_id, user_email, user_name, request_date, start_time, end_time,
                         duration_minutes, resource_id, status, trackman_booking_id,
                         notes, trackman_player_count, created_at, updated_at
-                      ) VALUES (${matchedEmail}, ${booking.userName || ''}, ${bookingDate}, ${startTime}, ${endTime}, ${booking.durationMinutes || 60}, ${bayId}, 'approved', ${booking.trackmanBookingId}, ${`[Trackman Import ID:${booking.trackmanBookingId}] ${booking.notes || ''}`.trim()}, ${booking.playerCount || 1}, NOW(), NOW())
+                      ) VALUES (${matchedUserId}, ${matchedEmail}, ${booking.userName || ''}, ${bookingDate}, ${startTime}, ${endTime}, ${booking.durationMinutes || 60}, ${bayId}, 'approved', ${booking.trackmanBookingId}, ${`[Trackman Import ID:${booking.trackmanBookingId}] ${booking.notes || ''}`.trim()}, ${booking.playerCount || 1}, NOW(), NOW())
                       ON CONFLICT (trackman_booking_id) WHERE trackman_booking_id IS NOT NULL DO NOTHING`);
                   });
                   process.stderr.write(`[Trackman Rescan] Created booking for ${matchedEmail} after clearing overlap (Trackman ID: ${booking.trackmanBookingId})\n`);

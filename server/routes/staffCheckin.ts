@@ -1831,7 +1831,9 @@ router.post('/api/staff/qr-checkin', isStaffOrAdmin, async (req: Request, res: R
           SELECT br.id, br.start_time, br.end_time, r.name as bay_name, r.type as resource_type
           FROM booking_requests br
           LEFT JOIN resources r ON br.resource_id = r.id
-          WHERE LOWER(br.user_email) = LOWER(${result.memberEmail})
+          WHERE (LOWER(br.user_email) = LOWER(${result.memberEmail})
+                 OR LOWER(br.user_email) IN (SELECT LOWER(ule.linked_email) FROM user_linked_emails ule WHERE LOWER(ule.primary_email) = LOWER(${result.memberEmail}))
+                 OR LOWER(br.user_email) IN (SELECT LOWER(ule.primary_email) FROM user_linked_emails ule WHERE LOWER(ule.linked_email) = LOWER(${result.memberEmail})))
             AND br.request_date = (CURRENT_DATE AT TIME ZONE 'America/Chicago')::date
             AND br.status IN ('approved', 'confirmed')
           ORDER BY ABS(EXTRACT(EPOCH FROM (br.start_time::time - (CURRENT_TIME AT TIME ZONE 'America/Chicago')::time))) ASC
