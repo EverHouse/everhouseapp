@@ -10,15 +10,49 @@
 -- ============================================================================
 -- 1. UNIQUE INDEX ON hubspot_id (where not null)
 -- ============================================================================
--- Pre-clean: NULL out duplicate hubspot_ids, keeping the most recently updated.
-WITH ranked AS (
-  SELECT id, hubspot_id,
-    ROW_NUMBER() OVER (PARTITION BY hubspot_id ORDER BY updated_at DESC NULLS LAST, created_at DESC NULLS LAST) as rn
-  FROM users
-  WHERE hubspot_id IS NOT NULL AND hubspot_id != ''
-)
+
+-- Step 1a: Normalize whitespace-only hubspot_ids to NULL
 UPDATE users SET hubspot_id = NULL
-  WHERE id IN (SELECT id FROM ranked WHERE rn > 1);
+  WHERE hubspot_id IS NOT NULL AND TRIM(hubspot_id) = '';
+
+-- Step 1b: Trim whitespace from hubspot_ids
+UPDATE users SET hubspot_id = TRIM(hubspot_id)
+  WHERE hubspot_id IS NOT NULL AND hubspot_id != TRIM(hubspot_id);
+
+-- Step 1c: NULL out duplicate hubspot_ids, keeping the most recently updated.
+DO $$
+DECLARE
+  dup_count INTEGER;
+BEGIN
+  WITH ranked AS (
+    SELECT id, hubspot_id,
+      ROW_NUMBER() OVER (
+        PARTITION BY hubspot_id
+        ORDER BY updated_at DESC NULLS LAST, created_at DESC NULLS LAST, id DESC
+      ) as rn
+    FROM users
+    WHERE hubspot_id IS NOT NULL AND hubspot_id != ''
+  )
+  UPDATE users SET hubspot_id = NULL
+    WHERE id IN (SELECT id FROM ranked WHERE rn > 1);
+
+  GET DIAGNOSTICS dup_count = ROW_COUNT;
+  IF dup_count > 0 THEN
+    RAISE NOTICE 'Cleared % duplicate hubspot_id values', dup_count;
+  END IF;
+
+  -- Verify no duplicates remain before creating index
+  SELECT COUNT(*) INTO dup_count
+    FROM (
+      SELECT hubspot_id FROM users
+      WHERE hubspot_id IS NOT NULL AND hubspot_id != ''
+      GROUP BY hubspot_id HAVING COUNT(*) > 1
+    ) dupes;
+
+  IF dup_count > 0 THEN
+    RAISE NOTICE 'WARNING: % duplicate hubspot_id groups still remain after cleanup', dup_count;
+  END IF;
+END $$;
 
 DROP INDEX IF EXISTS users_hubspot_id_unique;
 CREATE UNIQUE INDEX users_hubspot_id_unique
