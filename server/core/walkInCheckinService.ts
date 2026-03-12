@@ -93,7 +93,7 @@ export async function processWalkInCheckin(params: WalkInCheckinParams): Promise
         .catch(err => logger.error(`[WalkInCheckin] Failed to sync visit count to HubSpot:`, { extra: { err } }));
     }
 
-    try { broadcastMemberStatsUpdated(member.email, { lifetimeVisits: newVisitCount }); } catch (err: unknown) {logger.error('[Broadcast] Stats update error:', err); }
+    try { broadcastMemberStatsUpdated(member.email, { lifetimeVisits: newVisitCount }); } catch (err: unknown) {logger.error('[Broadcast] Stats update error:', { error: err instanceof Error ? err : new Error(getErrorMessage(err)) }); }
 
     notifyMember({
       userEmail: member.email,

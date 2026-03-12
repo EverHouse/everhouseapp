@@ -119,7 +119,8 @@ router.post('/api/auth/apple/verify', authRateLimiterByIp, async (req, res) => {
     const user = dbUser[0];
 
     const dbMemberStatus = (user.membershipStatus || '').toLowerCase();
-    const role = (user.role || 'member') as 'admin' | 'staff' | 'member';
+    const rawRole = (user.role || 'member').toLowerCase();
+    const role: 'admin' | 'staff' | 'member' = rawRole === 'admin' || rawRole === 'staff' ? rawRole : 'member';
     const activeStatuses = ['active', 'trialing', 'past_due'];
 
     if (role === 'member' && !activeStatuses.includes(dbMemberStatus)) {

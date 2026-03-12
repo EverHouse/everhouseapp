@@ -279,7 +279,7 @@ function signManifest(manifestJson: string, config: WalletConfig): Buffer {
       },
       {
         type: forge.pki.oids.signingTime,
-        value: new Date() as unknown as string,
+        value: new Date() as unknown as Date & string,
       },
     ],
   });
@@ -314,7 +314,7 @@ export async function generatePkPass(data: PassData, config: WalletConfig): Prom
   files['signature'] = signature;
 
   return new Promise((resolve, reject) => {
-    const archive = archiver('zip', { store: true });
+    const archive = archiver('zip', { zlib: { level: 0 } });
     const chunks: Buffer[] = [];
 
     archive.on('data', (chunk: Buffer) => chunks.push(chunk));

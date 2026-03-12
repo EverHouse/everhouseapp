@@ -3,6 +3,7 @@ import { pullTierFeaturesFromStripe } from '../../products';
 import { clearTierCache } from '../../../tierService';
 import { updateOverageRate, updateGuestFee } from '../../../billing/pricingConfig';
 import { logger } from '../../../logger';
+import { getErrorMessage } from '../../../../utils/errorUtils';
 import type { PoolClient } from 'pg';
 import type { DeferredAction, StripeProductWithMarketingFeatures } from '../types';
 
@@ -68,7 +69,7 @@ export async function handleProductUpdated(client: PoolClient, product: StripePr
       logger.info(`[Stripe Webhook] Updated cafe item from product ${product.id}`);
     }
   } catch (error: unknown) {
-    logger.error('[Stripe Webhook] Error handling product.updated:', { error: error });
+    logger.error('[Stripe Webhook] Error handling product.updated:', { error: error instanceof Error ? error : new Error(getErrorMessage(error)) });
   }
 
   return deferredActions;
@@ -99,7 +100,7 @@ export async function handleProductCreated(client: PoolClient, product: Stripe.P
       logger.info(`[Stripe Webhook] New product ${product.id} created in Stripe. Use "Pull from Stripe" button to import if needed.`);
     }
   } catch (error: unknown) {
-    logger.error('[Stripe Webhook] Error handling product.created:', { error: error });
+    logger.error('[Stripe Webhook] Error handling product.created:', { error: error instanceof Error ? error : new Error(getErrorMessage(error)) });
   }
 
   return deferredActions;
@@ -138,7 +139,7 @@ export async function handleProductDeleted(client: PoolClient, product: Stripe.P
       }
     }
   } catch (error: unknown) {
-    logger.error('[Stripe Webhook] Error handling product.deleted:', { error: error });
+    logger.error('[Stripe Webhook] Error handling product.deleted:', { error: error instanceof Error ? error : new Error(getErrorMessage(error)) });
   }
 
   return deferredActions;
@@ -193,7 +194,7 @@ export async function handlePriceChange(client: PoolClient, price: Stripe.Price)
       }
     }
   } catch (error: unknown) {
-    logger.error('[Stripe Webhook] Error handling price change:', { error: error });
+    logger.error('[Stripe Webhook] Error handling price change:', { error: error instanceof Error ? error : new Error(getErrorMessage(error)) });
   }
 
   return deferredActions;
