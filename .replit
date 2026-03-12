@@ -40,6 +40,8 @@ SUPABASE_URL = "https://lenzghtdaoxwhnyzprxc.supabase.co"
 ENABLE_CORPORATE_BILLING = "true"
 SUPABASE_DB_SCHEMA = "public"
 ENABLE_PGBOUNCER = "false"
+APPLE_SERVICE_ID = "members.everclub.signin"
+VITE_APPLE_CLIENT_ID = "members.everclub.signin"
 
 [userenv.development]
 DEV_LOGIN_ENABLED = "true"
