@@ -10,6 +10,7 @@ export type AuditAction =
   | 'view_member_profile'
   | 'view_member_billing'
   | 'update_member'
+  | 'profile_details_updated'
   | 'delete_member'
   | 'delete_visitor'
   | 'archive_member'

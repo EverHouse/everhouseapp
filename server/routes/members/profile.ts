@@ -15,7 +15,7 @@ import {
 } from '../../../shared/schema';
 import { isProduction } from '../../core/db';
 import { isStaffOrAdmin, isAuthenticated, isAdmin } from '../../core/middleware';
-import { syncSmsPreferencesToHubSpot } from '../../core/hubspot/contacts';
+import { syncSmsPreferencesToHubSpot, syncProfileDetailsToHubSpot } from '../../core/hubspot/contacts';
 import { getSessionUser } from '../../types/session';
 import { logSystemAction, logFromRequest } from '../../core/auditLog';
 import { logger } from '../../core/logger';
@@ -301,6 +301,103 @@ router.put('/api/members/:email/sms-preferences', isAuthenticated, async (req, r
   } catch (error: unknown) {
     logger.error('SMS preferences update error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to update SMS preferences' });
+  }
+});
+
+const profileDetailsSchema = z.object({
+  dateOfBirth: z.string().nullable().optional(),
+  streetAddress: z.string().max(500).nullable().optional(),
+  city: z.string().max(200).nullable().optional(),
+  state: z.string().max(100).nullable().optional(),
+  zipCode: z.string().max(20).nullable().optional(),
+});
+
+router.put('/api/members/:email/profile-details', isStaffOrAdmin, async (req, res) => {
+  try {
+    const emailParseResult = emailParamSchema.safeParse(req.params.email);
+    if (!emailParseResult.success) {
+      return res.status(400).json({ error: 'Invalid email format' });
+    }
+    const normalizedEmail = emailParseResult.data;
+
+    const bodyParseResult = profileDetailsSchema.safeParse(req.body);
+    if (!bodyParseResult.success) {
+      return res.status(400).json({ error: 'Invalid profile details format' });
+    }
+
+    const { dateOfBirth, streetAddress, city, state, zipCode } = bodyParseResult.data;
+
+    if (dateOfBirth !== undefined && dateOfBirth !== null && dateOfBirth !== '') {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(dateOfBirth)) {
+        return res.status(400).json({ error: 'Date of birth must be in YYYY-MM-DD format' });
+      }
+      const parsed = new Date(dateOfBirth + 'T00:00:00');
+      if (isNaN(parsed.getTime())) {
+        return res.status(400).json({ error: 'Invalid date of birth' });
+      }
+    }
+
+    const updateData: Record<string, unknown> = { updatedAt: new Date() };
+    if (dateOfBirth !== undefined) updateData.dateOfBirth = dateOfBirth || null;
+    if (streetAddress !== undefined) updateData.streetAddress = streetAddress || null;
+    if (city !== undefined) updateData.city = city || null;
+    if (state !== undefined) updateData.state = state || null;
+    if (zipCode !== undefined) updateData.zipCode = zipCode || null;
+
+    if (Object.keys(updateData).length === 1) {
+      return res.status(400).json({ error: 'No valid updates provided' });
+    }
+
+    const result = await db.update(users)
+      .set(updateData)
+      .where(sql`LOWER(${users.email}) = ${normalizedEmail}`)
+      .returning({
+        email: users.email,
+        dateOfBirth: users.dateOfBirth,
+        streetAddress: users.streetAddress,
+        city: users.city,
+        state: users.state,
+        zipCode: users.zipCode,
+      });
+
+    if (result.length === 0) {
+      return res.status(404).json({ error: 'Member not found' });
+    }
+
+    const sessionUser = getSessionUser(req);
+    await logFromRequest(req, {
+      action: 'profile_details_updated',
+      resourceType: 'member',
+      resourceId: normalizedEmail,
+      details: {
+        updatedFields: Object.keys(updateData).filter(k => k !== 'updatedAt'),
+        updatedBy: sessionUser?.email || 'unknown',
+      },
+    });
+
+    invalidateCache(`member-details:${normalizedEmail}`);
+
+    syncProfileDetailsToHubSpot(normalizedEmail, {
+      dateOfBirth: result[0].dateOfBirth || null,
+      streetAddress: result[0].streetAddress || null,
+      city: result[0].city || null,
+      state: result[0].state || null,
+      zipCode: result[0].zipCode || null,
+    }).catch(err => {
+      logger.error('[Profile] Failed to sync profile details to HubSpot', { extra: { email: normalizedEmail, error: err } });
+    });
+
+    res.json({
+      success: true,
+      dateOfBirth: result[0].dateOfBirth,
+      streetAddress: result[0].streetAddress,
+      city: result[0].city,
+      state: result[0].state,
+      zipCode: result[0].zipCode,
+    });
+  } catch (error: unknown) {
+    logger.error('Profile details update error', { error: error instanceof Error ? error : new Error(String(error)) });
+    res.status(500).json({ error: 'Failed to update profile details' });
   }
 });
 

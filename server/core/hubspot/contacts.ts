@@ -143,6 +143,87 @@ export async function syncSmsPreferencesToHubSpot(
   }
 }
 
+export interface ProfileDetails {
+  dateOfBirth: string | null;
+  streetAddress: string | null;
+  city: string | null;
+  state: string | null;
+  zipCode: string | null;
+}
+
+export async function syncProfileDetailsToHubSpot(
+  email: string,
+  details: ProfileDetails
+): Promise<{ success: boolean; error?: string }> {
+  const normalizedEmail = email.toLowerCase().trim();
+
+  try {
+    const hubspot = await getHubSpotClient();
+
+    const searchResponse = await retryableHubSpotRequest(() =>
+      hubspot.crm.contacts.searchApi.doSearch({
+        filterGroups: [{
+          filters: [{
+            propertyName: 'email',
+            operator: FilterOperatorEnum.Eq,
+            value: normalizedEmail
+          }]
+        }],
+        properties: ['email'],
+        limit: 1
+      })
+    );
+
+    if (!searchResponse.results || searchResponse.results.length === 0) {
+      if (!isProduction) {
+        logger.info(`[HubSpot Profile Sync] Contact not found for ${normalizedEmail}`);
+      }
+      return { success: false, error: 'Contact not found in HubSpot' };
+    }
+
+    const contactId = searchResponse.results[0].id;
+
+    const properties: Record<string, string> = {};
+    if (details.dateOfBirth !== undefined) {
+      properties.date_of_birth = details.dateOfBirth || '';
+    }
+    if (details.streetAddress !== undefined) {
+      properties.address = details.streetAddress || '';
+    }
+    if (details.city !== undefined) {
+      properties.city = details.city || '';
+    }
+    if (details.state !== undefined) {
+      properties.state = details.state || '';
+    }
+    if (details.zipCode !== undefined) {
+      properties.zip = details.zipCode || '';
+    }
+
+    if (Object.keys(properties).length === 0) {
+      return { success: true };
+    }
+
+    await retryableHubSpotRequest(() =>
+      hubspot.crm.contacts.basicApi.update(contactId, { properties })
+    );
+
+    if (!isProduction) {
+      logger.info(`[HubSpot Profile Sync] Updated profile details for contact ${contactId}`);
+    }
+
+    return { success: true };
+
+  } catch (error: unknown) {
+    const errorMsg = getErrorMessage(error);
+    logger.error('[HubSpot Profile Sync] Error syncing profile details:', { error: error });
+    return {
+      success: false,
+      error: errorMsg || 'Failed to sync profile details to HubSpot'
+    };
+  }
+}
+
 export interface SyncDayPassPurchaseInput {
   email: string;
   firstName?: string;

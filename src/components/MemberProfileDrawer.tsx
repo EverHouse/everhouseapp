@@ -63,7 +63,37 @@ const TABS: { id: TabType; label: string; icon: string }[] = [
   { id: 'communications', label: 'Comms', icon: 'chat' },
 ];
 
-const VISITOR_TABS: TabType[] = ['billing', 'activity', 'communications', 'notes'];
+const VISITOR_TABS: TabType[] = ['overview', 'billing', 'activity', 'communications', 'notes'];
+
+const CopyButton: React.FC<{ value: string; isDark: boolean; size?: 'sm' | 'xs' }> = ({ value, isDark, size = 'sm' }) => {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch { /* noop */ }
+  };
+  const iconSize = size === 'xs' ? 'text-[12px]' : 'text-[14px]';
+  const btnSize = size === 'xs' ? 'w-5 h-5 min-w-[20px]' : 'w-6 h-6 min-w-[24px]';
+  return (
+    <button
+      onClick={handleCopy}
+      title={copied ? 'Copied!' : 'Copy'}
+      className={`${btnSize} flex items-center justify-center rounded transition-all tactile-btn ${
+        copied
+          ? 'text-green-500'
+          : isDark ? 'text-gray-500 hover:text-gray-300 hover:bg-white/10' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
+      }`}
+    >
+      <span className={`material-symbols-outlined ${iconSize}`}>
+        {copied ? 'check' : 'content_copy'}
+      </span>
+    </button>
+  );
+};
 
 const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, member, isAdmin, onClose, onViewAs, onMemberDeleted, onMemberUpdated, visitorMode = false }) => {
   const { effectiveTheme } = useTheme();
@@ -76,11 +106,11 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
   }, [isOpen, setDrawerOpen]);
   
   
-  const [activeTab, setActiveTab] = useState<TabType>(visitorMode ? 'billing' : 'overview');
+  const [activeTab, setActiveTab] = useState<TabType>('overview');
   
   useEffect(() => {
     if (isOpen) {
-      setActiveTab(visitorMode ? 'billing' : 'overview');
+      setActiveTab('overview');
       setShowEmailChange(false);
       setNewEmailValue('');
       setEmailChangeError('');
@@ -90,6 +120,24 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
   const visibleTabs = visitorMode 
     ? TABS.filter(tab => VISITOR_TABS.includes(tab.id))
     : TABS;
+  const [enrichedMember, setEnrichedMember] = useState<MemberProfile | null>(member);
+  useEffect(() => {
+    if (member) setEnrichedMember(member);
+  }, [member]);
+
+  useEffect(() => {
+    if (!isOpen || !member?.email) return;
+    let cancelled = false;
+    fetch(`/api/members/${encodeURIComponent(member.email)}/details`, { credentials: 'include' })
+      .then(res => res.ok ? res.json() : null)
+      .then(details => {
+        if (cancelled || !details) return;
+        setEnrichedMember(prev => ({ ...prev, ...details }));
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [isOpen, member?.email]);
+
   const [isLoading, setIsLoading] = useState(false);
   const [history, setHistory] = useState<MemberHistory | null>(null);
   const [notes, setNotes] = useState<MemberNote[]>([]);
@@ -167,7 +215,8 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
     if (!member?.email) return;
     setIsLoading(true);
     try {
-      const [historyRes, notesRes, commsRes, guestsRes, purchasesRes, balanceRes] = await Promise.all([
+      const [detailsRes, historyRes, notesRes, commsRes, guestsRes, purchasesRes, balanceRes] = await Promise.all([
+        fetch(`/api/members/${encodeURIComponent(member.email)}/details`, { credentials: 'include' }),
         fetch(`/api/members/${encodeURIComponent(member.email)}/history`, { credentials: 'include' }),
         fetch(`/api/members/${encodeURIComponent(member.email)}/notes`, { credentials: 'include' }),
         fetch(`/api/members/${encodeURIComponent(member.email)}/communications`, { credentials: 'include' }),
@@ -175,6 +224,11 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
         fetch(`/api/stripe/payments/${encodeURIComponent(member.email)}`, { credentials: 'include' }),
         fetch(`/api/my-billing/account-balance?user_email=${encodeURIComponent(member.email)}`, { credentials: 'include' }),
       ]);
+
+      if (detailsRes.ok) {
+        const detailsData = await detailsRes.json();
+        setEnrichedMember(prev => ({ ...prev, ...detailsData }));
+      }
 
       if (historyRes.ok) {
         const historyData = await historyRes.json();
@@ -528,7 +582,7 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
     }
   };
 
-  if (!isOpen || !member) return null;
+  if (!isOpen || !member || !enrichedMember) return null;
 
   const filteredBookingHistory = (history?.bookingHistory || []).filter((b: BookingHistoryItem) => b.status !== 'cancelled' && b.status !== 'declined' && b.status !== 'deleted');
   const filteredBookingRequestsHistory = (history?.bookingRequestsHistory || []).filter((b: BookingHistoryItem) => b.status !== 'cancelled' && b.status !== 'declined' && b.status !== 'deleted');
@@ -550,7 +604,7 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
       case 'overview':
         return (
           <OverviewTab
-            member={member}
+            member={enrichedMember}
             isDark={isDark}
             isAdmin={isAdmin}
             visitorMode={visitorMode}
@@ -578,6 +632,7 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
             linkedEmails={linkedEmails}
             removingEmail={removingEmail}
             handleRemoveLinkedEmail={handleRemoveLinkedEmail}
+            onMemberUpdated={() => { fetchMemberData(); onMemberUpdated?.(); }}
           />
         );
 
@@ -679,14 +734,14 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
         >
           <div className="flex items-start justify-between">
             <div className="flex-1 min-w-0">
-              <h2 className={`text-xl sm:text-2xl font-bold truncate ${isDark ? 'text-white' : 'text-gray-900'}`}>{member.name}</h2>
+              <h2 className={`text-xl sm:text-2xl font-bold truncate ${isDark ? 'text-white' : 'text-gray-900'}`}>{enrichedMember.name}</h2>
               <div className="flex items-center gap-2 mt-1 flex-wrap">
-                <TierBadge tier={displayedTier || member.rawTier || member.tier} size="md" showNoTier={true} lastTier={member.lastTier} membershipStatus={member.membershipStatus} />
-                {member.status && typeof member.status === 'string' && member.status.toLowerCase() !== 'active' && (
+                <TierBadge tier={displayedTier || enrichedMember.rawTier || enrichedMember.tier} size="md" showNoTier={true} lastTier={enrichedMember.lastTier} membershipStatus={enrichedMember.membershipStatus} />
+                {enrichedMember.status && typeof enrichedMember.status === 'string' && enrichedMember.status.toLowerCase() !== 'active' && (
                   <span className={`w-fit px-2 py-0.5 rounded-[4px] text-[10px] font-bold uppercase tracking-widest ${
-                    getMemberStatusColor(member.status, isDark)
+                    getMemberStatusColor(enrichedMember.status, isDark)
                   }`}>
-                    {getMemberStatusLabel(member.status)}
+                    {getMemberStatusLabel(enrichedMember.status)}
                   </span>
                 )}
               </div>
@@ -700,7 +755,7 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
             </button>
           </div>
 
-          <div className="mt-4 space-y-2">
+          <div className="mt-4 space-y-1">
             <div className="flex items-center gap-1">
               <a 
                 href={`mailto:${member.email}`}
@@ -709,6 +764,7 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
                 <span className="material-symbols-outlined text-lg">mail</span>
                 {member.email}
               </a>
+              <CopyButton value={member.email} isDark={isDark} />
               {isAdmin && !visitorMode && (
                 <button
                   onClick={() => {
@@ -789,40 +845,25 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
                 )}
               </div>
             )}
-            {member.phone && (
-              <a 
-                href={`tel:${member.phone}`}
-                className={`flex items-center gap-2 text-sm hover:underline ${isDark ? 'text-gray-300' : 'text-gray-700'}`}
-              >
-                <span className="material-symbols-outlined text-lg">phone</span>
-                {formatPhoneNumber(member.phone)}
-              </a>
+            {enrichedMember.phone && (
+              <div className="flex items-center gap-1">
+                <a 
+                  href={`tel:${enrichedMember.phone}`}
+                  className={`flex items-center gap-2 text-sm hover:underline ${isDark ? 'text-gray-300' : 'text-gray-700'}`}
+                >
+                  <span className="material-symbols-outlined text-lg">phone</span>
+                  {formatPhoneNumber(enrichedMember.phone)}
+                </a>
+                <CopyButton value={enrichedMember.phone} isDark={isDark} />
+              </div>
             )}
             <div className="flex items-center gap-4 flex-wrap text-xs">
               <span className={isDark ? 'text-gray-400' : 'text-gray-500'}>
                 {visitsCount} lifetime visits
               </span>
-              {member.joinDate && (
+              {enrichedMember.joinDate && (
                 <span className={isDark ? 'text-gray-400' : 'text-gray-500'}>
-                  Joined {formatDatePacific(member.joinDate)}
-                </span>
-              )}
-            </div>
-            {/* System IDs section - only show mindbody ID if validated from HubSpot */}
-            <div className="flex items-center gap-3 flex-wrap text-xs mt-1">
-              {member.mindbodyClientId && member.hubspotId && (
-                <span className={isDark ? 'text-gray-500' : 'text-gray-400'}>
-                  MB: {member.mindbodyClientId}
-                </span>
-              )}
-              {member.stripeCustomerId && (
-                <span className={isDark ? 'text-gray-500' : 'text-gray-400'}>
-                  Stripe: {member.stripeCustomerId.substring(0, 14)}...
-                </span>
-              )}
-              {member.hubspotId && (
-                <span className={isDark ? 'text-gray-500' : 'text-gray-400'}>
-                  HS: {member.hubspotId}
+                  Joined {formatDatePacific(enrichedMember.joinDate)}
                 </span>
               )}
             </div>
@@ -835,9 +876,9 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
                 className="flex-1 py-2.5 px-4 rounded-[4px] bg-brand-green text-white font-medium flex items-center justify-center gap-2 hover:opacity-90 transition-opacity tactile-btn"
               >
                 <span className="material-symbols-outlined text-lg">visibility</span>
-                View As This Member
+                View As
               </button>
-              {member.membershipStatus !== 'merged' && (
+              {enrichedMember.membershipStatus !== 'merged' && (
                 <button
                   onClick={() => {
                     setShowMergeModal(true);
@@ -860,12 +901,12 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
             </div>
           )}
 
-          {isAdmin && !visitorMode && !displayedTier && member.membershipStatus === 'active' && (
+          {isAdmin && !visitorMode && !displayedTier && enrichedMember.membershipStatus === 'active' && (
             <div className={`mt-4 p-3 rounded-xl border ${isDark ? 'bg-yellow-900/20 border-yellow-500/30' : 'bg-yellow-50 border-yellow-200'}`}>
               <div className="flex items-center gap-2 mb-2">
                 <span className="material-symbols-outlined text-yellow-500">warning</span>
                 <span className={`text-sm font-medium ${isDark ? 'text-yellow-300' : 'text-yellow-700'}`}>
-                  No tier assigned {member.billingProvider === 'mindbody' && '(MindBody member)'}
+                  No tier assigned {enrichedMember.billingProvider === 'mindbody' && '(MindBody member)'}
                 </span>
               </div>
               <div className="flex gap-2">
@@ -947,8 +988,8 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
                           credentials: 'include',
                           body: JSON.stringify({ 
                             email: member.email,
-                            firstName: member.name?.split(' ')[0] || '',
-                            lastName: member.name?.split(' ').slice(1).join(' ') || '',
+                            firstName: enrichedMember.name?.split(' ')[0] || '',
+                            lastName: enrichedMember.name?.split(' ').slice(1).join(' ') || '',
                             tierId: selectedTierId
                           })
                         });
@@ -1000,7 +1041,7 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
             </div>
           )}
 
-          {isAdmin && !visitorMode && member.membershipStatus && ['terminated', 'cancelled', 'canceled', 'frozen', 'inactive', 'suspended', 'expired', 'former_member'].includes(member.membershipStatus.toLowerCase()) && (
+          {isAdmin && !visitorMode && enrichedMember.membershipStatus && ['terminated', 'cancelled', 'canceled', 'frozen', 'inactive', 'suspended', 'expired', 'former_member'].includes(enrichedMember.membershipStatus.toLowerCase()) && (
             <div className="mt-3">
               <button
                 onClick={async () => {
@@ -1045,7 +1086,7 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
               </div>
               
               <p className={`mb-4 ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
-                This will permanently delete <strong>{member.name}</strong> ({member.email}) and all their data from the app.
+                This will permanently delete <strong>{enrichedMember.name}</strong> ({member.email}) and all their data from the app.
               </p>
               
               <div className="space-y-3 mb-6">
@@ -1124,7 +1165,7 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
                     <span className="material-symbols-outlined text-red-500 text-sm">person_remove</span>
                   </div>
                   <div>
-                    <p className={`font-medium ${isDark ? 'text-white' : 'text-gray-900'}`}>{member.name}</p>
+                    <p className={`font-medium ${isDark ? 'text-white' : 'text-gray-900'}`}>{enrichedMember.name}</p>
                     <p className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>{member.email}</p>
                   </div>
                 </div>
