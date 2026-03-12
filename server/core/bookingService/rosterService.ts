@@ -529,9 +529,20 @@ export async function previewRosterFees(
   const participantsForFeeCalc: FeeParticipantInput[] = [];
 
   if (!ownerInParticipants) {
+    let ownerName = booking.owner_name;
+    if (!ownerName || ownerName.includes('@')) {
+      const ownerNameResult = await db.select({ firstName: users.firstName, lastName: users.lastName })
+        .from(users)
+        .where(sql`LOWER(${users.email}) = LOWER(${booking.owner_email})`)
+        .limit(1);
+      if (ownerNameResult.length > 0) {
+        const dbName = [ownerNameResult[0].firstName, ownerNameResult[0].lastName].filter(Boolean).join(' ').trim();
+        if (dbName) ownerName = dbName;
+      }
+    }
     participantsForFeeCalc.push({
       email: booking.owner_email,
-      displayName: booking.owner_name || booking.owner_email,
+      displayName: ownerName || booking.owner_email,
       participantType: 'owner'
     });
   }

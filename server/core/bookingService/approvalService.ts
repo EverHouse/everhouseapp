@@ -394,16 +394,31 @@ export async function approveBooking(params: ApproveBookingParams) {
     if (!updatedRow.sessionId) {
       try {
         let ownerUserId = updatedRow.userId;
+        let ownerDisplayName = updatedRow.userName;
         if (!ownerUserId && updatedRow.userEmail) {
-          const userResult = await tx.select({ id: users.id })
+          const userResult = await tx.select({ id: users.id, firstName: users.firstName, lastName: users.lastName })
             .from(users)
-            .where(eq(users.email, updatedRow.userEmail.toLowerCase()))
+            .where(sql`LOWER(${users.email}) = LOWER(${updatedRow.userEmail})`)
             .limit(1);
           if (userResult.length > 0) {
             ownerUserId = userResult[0].id;
+            const dbName = [userResult[0].firstName, userResult[0].lastName].filter(Boolean).join(' ').trim();
+            if (dbName) ownerDisplayName = dbName;
             await tx.update(bookingRequests)
               .set({ userId: ownerUserId })
               .where(eq(bookingRequests.id, bookingId));
+          }
+        }
+        if (!ownerDisplayName || ownerDisplayName.includes('@')) {
+          if (ownerUserId) {
+            const nameResult = await tx.select({ firstName: users.firstName, lastName: users.lastName })
+              .from(users)
+              .where(eq(users.id, ownerUserId))
+              .limit(1);
+            if (nameResult.length > 0) {
+              const dbName = [nameResult[0].firstName, nameResult[0].lastName].filter(Boolean).join(' ').trim();
+              if (dbName) ownerDisplayName = dbName;
+            }
           }
         }
 
@@ -415,7 +430,7 @@ export async function approveBooking(params: ApproveBookingParams) {
         }> = [{
           userId: ownerUserId || undefined,
           participantType: 'owner',
-          displayName: updatedRow.userName || updatedRow.userEmail
+          displayName: ownerDisplayName || updatedRow.userEmail
         }];
 
         const requestParticipants = updatedRow.requestParticipants as Array<{
@@ -1690,9 +1705,14 @@ export async function checkinBooking(params: CheckinBookingParams) {
     start_time: bookingRequests.startTime,
     end_time: bookingRequests.endTime,
     declared_player_count: bookingRequests.declaredPlayerCount,
-    user_name: bookingRequests.userName
+    user_name: sql`COALESCE(
+      NULLIF(TRIM(CONCAT_WS(' ', ${users.firstName}, ${users.lastName})), ''),
+      NULLIF(${bookingRequests.userName}, ''),
+      ${bookingRequests.userEmail}
+    )`.as('user_name')
   })
     .from(bookingRequests)
+    .leftJoin(users, eq(bookingRequests.userId, users.id))
     .where(eq(bookingRequests.id, bookingId));
 
   if (existingResult.length === 0) {

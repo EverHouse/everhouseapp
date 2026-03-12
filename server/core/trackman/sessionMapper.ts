@@ -80,12 +80,25 @@ export async function transferRequestParticipantsToSession(
 
 export async function createTrackmanSessionAndParticipants(input: SessionCreationInput): Promise<void> {
   try {
+    let resolvedOwnerName = input.ownerName;
     try {
     const participantInputs: ParticipantInput[] = [];
     const memberData: { userId: string; tier: string; email?: string }[] = [];
     
     const ownerUserId = await getUserIdByEmail(input.ownerEmail);
     const ownerTier = await getMemberTierByEmail(input.ownerEmail) || 'social';
+    
+    resolvedOwnerName = input.ownerName;
+    if ((!resolvedOwnerName || resolvedOwnerName.includes('@')) && ownerUserId) {
+      const ownerNameResult = await db.select({ firstName: users.firstName, lastName: users.lastName })
+        .from(users)
+        .where(eq(users.id, ownerUserId))
+        .limit(1);
+      if (ownerNameResult.length > 0) {
+        const dbName = [ownerNameResult[0].firstName, ownerNameResult[0].lastName].filter(Boolean).join(' ').trim();
+        if (dbName) resolvedOwnerName = dbName;
+      }
+    }
     
     const ownerEmailNormalized = resolveEmail(input.ownerEmail, input.membersByEmail, input.trackmanEmailMapping);
     
@@ -103,7 +116,7 @@ export async function createTrackmanSessionAndParticipants(input: SessionCreatio
     participantInputs.push({
       userId: ownerUserId || undefined,
       participantType: 'owner',
-      displayName: input.ownerName || input.ownerEmail,
+      displayName: resolvedOwnerName || input.ownerEmail,
       slotDuration: perParticipantMinutes
     });
     
@@ -166,10 +179,21 @@ export async function createTrackmanSessionAndParticipants(input: SessionCreatio
         
         const memberTier = await getMemberTierByEmail(normalizedMemberEmail) || 'social';
         
+        let memberDisplayName = member.name;
+        if ((!memberDisplayName || memberDisplayName.includes('@')) && memberUserId) {
+          const mNameResult = await db.select({ firstName: users.firstName, lastName: users.lastName })
+            .from(users)
+            .where(eq(users.id, memberUserId))
+            .limit(1);
+          if (mNameResult.length > 0) {
+            const dbName = [mNameResult[0].firstName, mNameResult[0].lastName].filter(Boolean).join(' ').trim();
+            if (dbName) memberDisplayName = dbName;
+          }
+        }
         participantInputs.push({
           userId: memberUserId,
           participantType: 'member',
-          displayName: member.name || normalizedMemberEmail,
+          displayName: memberDisplayName || normalizedMemberEmail,
           slotDuration: perParticipantMinutes
         });
         
@@ -199,10 +223,21 @@ export async function createTrackmanSessionAndParticipants(input: SessionCreatio
           }
           
           const memberTier = await getMemberTierByEmail(guest.email) || 'social';
+          let guestAsMemberName = guest.name;
+          if ((!guestAsMemberName || guestAsMemberName.includes('@')) && memberByEmail) {
+            const gmNameResult = await db.select({ firstName: users.firstName, lastName: users.lastName })
+              .from(users)
+              .where(eq(users.id, memberByEmail))
+              .limit(1);
+            if (gmNameResult.length > 0) {
+              const dbName = [gmNameResult[0].firstName, gmNameResult[0].lastName].filter(Boolean).join(' ').trim();
+              if (dbName) guestAsMemberName = dbName;
+            }
+          }
           participantInputs.push({
             userId: memberByEmail,
             participantType: 'member',
-            displayName: guest.name || guest.email,
+            displayName: guestAsMemberName || guest.email,
             slotDuration: perParticipantMinutes
           });
           memberData.push({ userId: memberByEmail, tier: memberTier, email: guest.email });
@@ -435,7 +470,7 @@ export async function createTrackmanSessionAndParticipants(input: SessionCreatio
           [{
             userId: fallbackOwnerUserId || undefined,
             participantType: 'owner',
-            displayName: input.ownerName || input.ownerEmail,
+            displayName: resolvedOwnerName || input.ownerEmail,
             slotDuration: input.durationMinutes
           }],
           'trackman_import'

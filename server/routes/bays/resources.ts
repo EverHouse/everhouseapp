@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { db } from '../../db';
-import { resources, availabilityBlocks, bookingRequests } from '../../../shared/schema';
+import { resources, availabilityBlocks, bookingRequests, users } from '../../../shared/schema';
 import { eq, and, or, asc, sql } from 'drizzle-orm';
 import { isProduction } from '../../core/db';
 import { getGoogleCalendarClient } from '../../core/integrations';
@@ -38,9 +38,14 @@ router.get('/api/bays/:bayId/availability', async (req, res) => {
     const bookingsResult = await db.select({
       start_time: bookingRequests.startTime,
       end_time: bookingRequests.endTime,
-      user_name: bookingRequests.userName
+      user_name: sql`COALESCE(
+        NULLIF(TRIM(CONCAT_WS(' ', ${users.firstName}, ${users.lastName})), ''),
+        NULLIF(${bookingRequests.userName}, ''),
+        ${bookingRequests.userEmail}
+      )`.as('user_name')
     })
     .from(bookingRequests)
+    .leftJoin(users, eq(bookingRequests.userId, users.id))
     .where(and(
       eq(bookingRequests.resourceId, parseInt(bayId)),
       eq(bookingRequests.requestDate, date as string),
