@@ -266,6 +266,56 @@ Monitoring service that runs periodically to detect payment cards expiring withi
 - `references/fee-breakdown.md` — detailed `computeFeeBreakdown` flow, input parameters, line item rules, guest pass hold/consume logic, usage calculator specifics.
 - `references/pricing-sources.md` — dynamic pricing from Stripe products, pricing config cache, rate determination, product catalog sync.
 
+## Outstanding Balance Endpoints
+
+Two separate endpoints serve outstanding fee data to different UI tabs:
+
+### `/api/member/balance` (Overview Tab)
+
+**File:** `server/routes/stripe/member-payments.ts` (~line 1252)
+**UI:** `src/components/memberProfile/OverviewTab.tsx` — Outstanding Fees card
+
+Computes a member's total unpaid fees by scanning `booking_participants` for pending owner/member fees, guest fees charged to the owner, and unfilled slot fees. Uses four sub-queries:
+
+1. **Owner/member overage fees** — participants with `participant_type IN ('owner', 'member')` and `payment_status = 'pending' OR NULL`
+2. **Guest fees** — guest participants with `cached_fee_cents > 0` whose session owner matches the member
+3. **Uncached sessions** — sessions with no cached fees that need on-the-fly `computeFeeBreakdown()` calculation
+4. **Unfilled slot fees** — future bookings where `declared_player_count > actual participants`, generating synthetic guest fee line items
+
+**Mandatory filters (v8.86.0):**
+
+Sub-queries 1–3 (historical fees) include all three filters:
+```sql
+AND bs.session_date >= CURRENT_DATE - INTERVAL '90 days'
+AND NOT EXISTS (
+  SELECT 1 FROM booking_requests br2
+  WHERE br2.session_id = bs.id
+    AND br2.status IN ('cancelled', 'declined', 'cancellation_pending')
+)
+AND NOT EXISTS (
+  SELECT 1 FROM booking_fee_snapshots bfs
+  WHERE bfs.session_id = bp.session_id
+    AND bfs.status IN ('completed', 'paid')
+)
+```
+
+Sub-query 4 (unfilled slots) only applies to future bookings and includes the cancelled booking filter via `br.status NOT IN (...)` (it joins `booking_requests` directly).
+
+- **90-day lookback** — prevents ancient sessions from inflating the balance
+- **Cancelled/declined booking filter** — sessions linked to cancelled bookings must not generate fees
+- **Completed/paid snapshot filter** — sessions with completed fee snapshots are already settled
+
+**Bug history:** Before v8.86.0, this endpoint was missing the booking status and snapshot filters on sub-queries 1–3, causing cancelled bookings and already-paid sessions to appear as outstanding fees on the Overview tab.
+
+### `/api/member-billing/:email/outstanding` (Billing Tab)
+
+**File:** `server/routes/memberBilling.ts`
+**UI:** `src/components/admin/memberBilling/OutstandingFeesSection.tsx`
+
+This endpoint serves the Billing tab's outstanding fees. Its main query filters by `br.status NOT IN ('cancelled', 'declined', 'cancellation_pending')` but does not include snapshot exclusion or a lookback limit. Its secondary "uncached sessions" query does include snapshot exclusion. When modifying this endpoint, consider adding the full set of filters for consistency.
+
+**When modifying either endpoint, ensure cancelled booking exclusion and paid snapshot exclusion are present on every sub-query that fetches historical fees.**
+
 ## Key Source Files
 
 | File | Purpose |
@@ -282,3 +332,5 @@ Monitoring service that runs periodically to detect payment cards expiring withi
 | `server/core/stripe/products.ts` | `ensureSimulatorOverageProduct()`, `ensureGuestPassProduct()`, tier sync |
 | `shared/models/billing.ts` | `FeeBreakdown`, `FeeComputeParams`, `FeeLineItem` type definitions |
 | `server/core/billing/bookingInvoiceService.ts` | `createDraftInvoiceForBooking()`, `syncBookingInvoice()`, `finalizeAndPayInvoice()`, `voidBookingInvoice()`, `isBookingInvoicePaid()` |
+| `server/routes/stripe/member-payments.ts` | `/api/member/balance` — Overview tab outstanding fees endpoint |
+| `server/routes/memberBilling.ts` | `/api/member-billing/:email/outstanding` — Billing tab outstanding fees endpoint |

@@ -304,6 +304,20 @@ Empty booking slots (declared player count minus actual participants) generate s
 
 This is why Rule 10 (parsing guest tags) is critical: filling guest slots with actual names prevents false guest fees.
 
+### Rule 17a — Outstanding balance queries must filter cancelled bookings and paid snapshots
+
+Any query that computes a member's outstanding (unpaid) fees MUST include these three filters on every sub-query:
+
+1. **90-day lookback**: `session_date >= CURRENT_DATE - INTERVAL '90 days'`
+2. **Exclude cancelled/declined bookings**: `NOT EXISTS (SELECT 1 FROM booking_requests WHERE session_id = bs.id AND status IN ('cancelled', 'declined', 'cancellation_pending'))`
+3. **Exclude already-settled sessions**: `NOT EXISTS (SELECT 1 FROM booking_fee_snapshots WHERE session_id = bp.session_id AND status IN ('completed', 'paid'))`
+
+Without these filters, `cached_fee_cents` from cancelled bookings and already-paid sessions appear as phantom outstanding fees. This was a production bug (v8.86.0) where the Overview tab's `/api/member/balance` endpoint showed 14 items ($850) for a member who had no real outstanding fees.
+
+Two endpoints serve outstanding fees:
+- `/api/member/balance` (Overview tab) — `server/routes/stripe/member-payments.ts`
+- `/api/member-billing/:email/outstanding` (Billing tab) — `server/routes/memberBilling.ts`
+
 ---
 
 ## Section 4a: Invoice Lifecycle

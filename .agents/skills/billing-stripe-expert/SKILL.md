@@ -156,6 +156,23 @@ Status → Staff → Active Membership → Tier → Unlimited → Social → Usa
 
 ---
 
+## Outstanding Balance Queries
+
+There are two endpoints that compute a member's outstanding fees:
+
+1. **`/api/member/balance`** (`server/routes/stripe/member-payments.ts`) — used by the Overview tab's Outstanding Fees card
+2. **`/api/member-billing/:email/outstanding`** (`server/routes/memberBilling.ts`) — used by the Billing tab's Outstanding Fees section
+
+Both endpoints query `booking_participants` for unpaid fees. **All balance queries MUST include these three filters:**
+
+1. **90-day lookback:** `bs.session_date >= CURRENT_DATE - INTERVAL '90 days'`
+2. **Exclude cancelled bookings:** `NOT EXISTS (SELECT 1 FROM booking_requests br2 WHERE br2.session_id = bs.id AND br2.status IN ('cancelled', 'declined', 'cancellation_pending'))`
+3. **Exclude settled sessions:** `NOT EXISTS (SELECT 1 FROM booking_fee_snapshots bfs WHERE bfs.session_id = bp.session_id AND bfs.status IN ('completed', 'paid'))`
+
+Missing any of these filters causes phantom fees to appear (cancelled bookings or already-paid sessions showing as outstanding). This was a production bug fixed in v8.86.0.
+
+---
+
 ## Anti-Patterns — NEVER Do These
 
 1. **Never hardcode `$25`, `2500`, or any dollar amount** — always use `PRICING.*` from `pricingConfig.ts`
@@ -170,3 +187,4 @@ Status → Staff → Active Membership → Tier → Unlimited → Social → Usa
 10. **Never skip idempotency checks in webhook handlers** — always call `tryClaimEvent()`
 11. **Never parse webhook body as JSON before signature verification** — it must be a raw `Buffer`
 12. **Never create a PaymentIntent without checking for an existing open intent** — query `stripe_payment_intents` first (Commandment 5)
+13. **Never query outstanding fees without filtering cancelled bookings and paid snapshots** — always include `NOT EXISTS` checks for cancelled/declined booking statuses AND completed/paid fee snapshots. See Outstanding Balance Queries section above.

@@ -1499,6 +1499,7 @@ router.get('/api/member/balance', isAuthenticated, async (req: Request, res: Res
          AND COALESCE(br.declared_player_count, 1) > 1
          AND (bs.session_date AT TIME ZONE 'America/Los_Angeles')::date >= (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
          AND (bs.source IS NULL OR bs.source::text NOT IN ('trackman_import', 'trackman_webhook'))
+         AND br.status NOT IN ('cancelled', 'declined', 'cancellation_pending')
        GROUP BY bs.id, bs.session_date, bs.start_time, bs.end_time, r.name, br.declared_player_count, bp.user_id
     `);
 
