@@ -4,8 +4,9 @@ import { eq, sql, inArray } from 'drizzle-orm';
 import { getErrorMessage } from '../../utils/errorUtils';
 import { getTodayPacific } from '../../utils/dateUtils';
 import { getMemberTierByEmail } from '../tierService';
-import { ensureSessionForBooking, createSession, recordUsage, ParticipantInput } from '../bookingService/sessionManager';
+import { ensureSessionForBooking, createSession, recordUsage, ParticipantInput, createOrFindGuest } from '../bookingService/sessionManager';
 import { calculateFullSessionBilling, Participant } from '../bookingService/usageCalculator';
+import { upsertVisitor } from '../visitors/matchingService';
 import { logger } from '../logger';
 import type { SessionCreationInput } from './constants';
 import { resolveEmail, getUserIdByEmail, isEmailLinkedToUser } from './matching';
@@ -36,9 +37,25 @@ export async function transferRequestParticipantsToSession(
     if (rp.type === 'guest') {
       const guestName = rp.name || 'Guest';
       if (!existingGuestNames.has(guestName.toLowerCase())) {
+        let guestId: number | null = null;
+        if (rp.email) {
+          try {
+            guestId = await createOrFindGuest(guestName, rp.email, undefined, ownerEmail);
+          } catch (guestErr) {
+            logger.error('[Participant Transfer] Non-blocking guest record creation failed', {
+              extra: { email: rp.email, error: getErrorMessage(guestErr) }
+            });
+          }
+          const nameParts = guestName.trim().split(/\s+/);
+          const firstName = nameParts[0] || undefined;
+          const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : undefined;
+          upsertVisitor({ email: rp.email.toLowerCase().trim(), firstName, lastName }, false)
+            .then(v => logger.info('[Participant Transfer] Visitor record ensured for guest', { extra: { email: rp.email, visitorUserId: v.id, sessionId } }))
+            .catch(err => logger.error('[Participant Transfer] Non-blocking visitor upsert failed', { extra: { email: rp.email, error: getErrorMessage(err) } }));
+        }
         await db.execute(sql`INSERT INTO booking_participants 
-           (session_id, display_name, participant_type, payment_status, created_at)
-           VALUES (${sessionId}, ${guestName}, 'guest', 'waived', NOW())`);
+           (session_id, guest_id, display_name, participant_type, payment_status, created_at)
+           VALUES (${sessionId}, ${guestId}, ${guestName}, 'guest', 'waived', NOW())`);
         existingGuestNames.add(guestName.toLowerCase());
         participantsAdded++;
       }

@@ -35,6 +35,7 @@ import { notifyMember } from '../notificationService';
 import { getOrCreateStripeCustomer } from '../stripe/customers';
 import { createBalanceAwarePayment } from '../stripe/payments';
 import { useGuestPass, refundGuestPass, ensureGuestPassRecord } from '../../routes/guestPasses';
+import { upsertVisitor } from '../visitors/matchingService';
 import { getErrorMessage } from '../../utils/errorUtils';
 import type { FeeBreakdown } from '../../../shared/models/billing';
 import type { BookingParticipant } from '../../../shared/models/scheduling';
@@ -1130,6 +1131,25 @@ export async function addParticipant(params: AddParticipantParams): Promise<AddP
         undefined,
         sessionUserId || userEmail
       );
+
+      if (guest!.email) {
+        const nameParts = guest!.name.trim().split(/\s+/);
+        const firstName = nameParts[0] || undefined;
+        const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : undefined;
+        upsertVisitor({
+          email: guest!.email,
+          firstName,
+          lastName,
+        }, false).then(visitorUser => {
+          logger.info('[rosterService] Visitor record ensured for guest', {
+            extra: { guestEmail: guest!.email, visitorUserId: visitorUser.id }
+          });
+        }).catch(err => {
+          logger.error('[rosterService] Non-blocking visitor upsert failed', {
+            extra: { guestEmail: guest!.email, error: getErrorMessage(err) }
+          });
+        });
+      }
 
       if (params.useGuestPass !== false) {
         await ensureGuestPassRecord(booking.owner_email, ownerTier || undefined);

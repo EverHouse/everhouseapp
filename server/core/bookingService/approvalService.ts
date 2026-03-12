@@ -11,7 +11,7 @@ import { bookingEvents } from '../bookingEvents';
 import { sendNotificationToUser, broadcastAvailabilityUpdate, broadcastMemberStatsUpdated, broadcastBillingUpdate } from '../websocket';
 import { refundGuestPass } from '../../routes/guestPasses';
 import { updateHubSpotContactVisitCount } from '../memberSync';
-import { createSessionWithUsageTracking, ensureSessionForBooking } from './sessionManager';
+import { createSessionWithUsageTracking, ensureSessionForBooking, createOrFindGuest } from './sessionManager';
 import { recalculateSessionFees } from '../billing/unifiedFeeService';
 import { PaymentStatusService } from '../billing/PaymentStatusService';
 import { cancelPaymentIntent, getStripeClient } from '../stripe';
@@ -23,6 +23,7 @@ import { releaseGuestPassHold } from '../billing/guestPassHoldService';
 import { createPrepaymentIntent } from '../billing/prepaymentService';
 import { voidBookingInvoice, finalizeAndPayInvoice } from '../billing/bookingInvoiceService';
 import { getErrorMessage, getErrorStatusCode } from '../../utils/errorUtils';
+import { upsertVisitor } from '../visitors/matchingService';
 import { AppError } from '../errors';
 import { logPaymentAudit } from '../auditLog';
 
@@ -539,10 +540,21 @@ export async function approveBooking(params: ApproveBookingParams) {
               addedUserIds.add(resolvedUserId);
               if (rpEmailNormalized) addedEmails.add(rpEmailNormalized);
             } else {
-              sessionParticipants.push({
+              const guestParticipant: { participantType: 'guest'; displayName: string; guestId?: number } = {
                 participantType: 'guest',
                 displayName: resolvedName || rp.name || rpEmailNormalized || 'Guest'
-              });
+              };
+              if (rpEmailNormalized && rp.name) {
+                try {
+                  const guestId = await createOrFindGuest(rp.name, rpEmailNormalized, undefined, updatedRow.userEmail);
+                  guestParticipant.guestId = guestId;
+                } catch (guestErr) {
+                  logger.error('[Booking Approval] Non-blocking guest record creation failed', {
+                    extra: { rpEmailNormalized, error: getErrorMessage(guestErr) }
+                  });
+                }
+              }
+              sessionParticipants.push(guestParticipant);
               if (rpEmailNormalized) addedEmails.add(rpEmailNormalized);
             }
           }
@@ -762,6 +774,22 @@ export async function approveBooking(params: ApproveBookingParams) {
     }, { action: 'booking_approved', bookingId, triggerSource: 'approval.ts' });
 
     notifyApprovalParticipants(bookingId, updated as unknown as BookingUpdateResult);
+  }
+
+  const requestParticipantsForVisitors = (updated as Record<string, unknown>).requestParticipants as Array<{
+    email?: string; type: 'member' | 'guest'; name?: string;
+  }> | null;
+  if (requestParticipantsForVisitors && Array.isArray(requestParticipantsForVisitors)) {
+    for (const rp of requestParticipantsForVisitors) {
+      if (rp?.type === 'guest' && rp.email) {
+        const nameParts = (rp.name || '').trim().split(/\s+/);
+        const firstName = nameParts[0] || undefined;
+        const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : undefined;
+        upsertVisitor({ email: rp.email.toLowerCase().trim(), firstName, lastName }, false)
+          .then(v => logger.info('[Booking Approval] Visitor record ensured for guest', { extra: { email: rp.email, visitorUserId: v.id, bookingId } }))
+          .catch(err => logger.error('[Booking Approval] Non-blocking visitor upsert failed', { extra: { email: rp.email, error: getErrorMessage(err) } }));
+      }
+    }
   }
 
   return { updated, isConferenceRoom };
@@ -2154,6 +2182,22 @@ export async function devConfirmBooking(params: DevConfirmParams) {
             }
           }
 
+          let resolvedGuestId: number | null = null;
+          if (participantType === 'guest' && rp.email) {
+            try {
+              resolvedGuestId = await createOrFindGuest(
+                rp.name || resolvedName || 'Guest',
+                rp.email,
+                undefined,
+                (booking.user_email || '') as string
+              );
+            } catch (guestErr) {
+              logger.error('[Dev Confirm] Non-blocking guest record creation failed', {
+                extra: { email: rp.email, error: getErrorMessage(guestErr) }
+              });
+            }
+          }
+
           if (!resolvedName) {
             resolvedName = rp.name || rp.email || (participantType === 'guest' ? 'Guest' : 'Member');
           }
@@ -2166,9 +2210,10 @@ export async function devConfirmBooking(params: DevConfirmParams) {
           }
 
           try {
+            const insertUserId = participantType === 'guest' ? null : resolvedUserId;
             await tx.execute(sql`
-              INSERT INTO booking_participants (session_id, user_id, participant_type, display_name, created_at)
-               VALUES (${sessionId}, ${resolvedUserId}, ${participantType}, ${resolvedName}, NOW())
+              INSERT INTO booking_participants (session_id, user_id, guest_id, participant_type, display_name, created_at)
+               VALUES (${sessionId}, ${insertUserId}, ${resolvedGuestId}, ${participantType}, ${resolvedName}, NOW())
             `);
             participantsCreated++;
             if (resolvedUserId) existingUserIds.add(String(resolvedUserId));
@@ -2282,6 +2327,22 @@ export async function devConfirmBooking(params: DevConfirmParams) {
     message: `Your simulator booking for ${dateStr} at ${timeStr} has been confirmed.`,
     data: { bookingId: bookingId.toString(), eventType: 'booking_confirmed' }
   }, { action: 'booking_confirmed', bookingId, triggerSource: 'approval.ts' });
+
+  const devConfirmRequestParticipants = booking.request_participants as Array<{
+    email?: string; type: 'member' | 'guest'; name?: string;
+  }> | null;
+  if (devConfirmRequestParticipants && Array.isArray(devConfirmRequestParticipants)) {
+    for (const rp of devConfirmRequestParticipants) {
+      if (rp?.type === 'guest' && rp.email) {
+        const nameParts = (rp.name || '').trim().split(/\s+/);
+        const firstName = nameParts[0] || undefined;
+        const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : undefined;
+        upsertVisitor({ email: rp.email.toLowerCase().trim(), firstName, lastName }, false)
+          .then(v => logger.info('[Dev Confirm] Visitor record ensured for guest', { extra: { email: rp.email, visitorUserId: v.id, bookingId } }))
+          .catch(err => logger.error('[Dev Confirm] Non-blocking visitor upsert failed', { extra: { email: rp.email, error: getErrorMessage(err) } }));
+      }
+    }
+  }
 
   return { success: true, bookingId, sessionId, totalFeeCents: resolvedTotalFeeCents, booking, dateStr, timeStr };
 }
