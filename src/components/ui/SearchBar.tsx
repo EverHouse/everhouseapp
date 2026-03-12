@@ -38,6 +38,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   const inputRef = useRef<HTMLInputElement>(null);
   const mobileInputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mobileCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isMd = useBreakpoint('md');
   const isMobile = !isMd;
 
@@ -79,13 +80,21 @@ export const SearchBar: React.FC<SearchBarProps> = ({
     mobileInputRef.current?.focus();
   }, [onChange, onClear]);
 
+  useEffect(() => {
+    return () => {
+      if (mobileCloseTimerRef.current) clearTimeout(mobileCloseTimerRef.current);
+    };
+  }, []);
+
   const handleMobileClose = useCallback(() => {
     haptic.light();
     setIsMobileClosing(true);
-    setTimeout(() => {
+    if (mobileCloseTimerRef.current) clearTimeout(mobileCloseTimerRef.current);
+    mobileCloseTimerRef.current = setTimeout(() => {
       setIsMobileExpanded(false);
       setIsMobileVisible(false);
       setIsMobileClosing(false);
+      mobileCloseTimerRef.current = null;
     }, 200);
   }, []);
 

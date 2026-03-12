@@ -265,6 +265,8 @@ export function TerminalPayment({
       return;
     }
 
+    if (processingRef.current) return;
+
     if (isSaveCard && !paymentMetadata?.customerId) {
       onError('Customer ID is required to save a card');
       return;
@@ -346,6 +348,8 @@ export function TerminalPayment({
       }
 
       startTimeout();
+
+      clearPollingRef();
 
       if (isSaveCard) {
         setSetupIntentId(data.setupIntentId);
