@@ -1306,11 +1306,7 @@ const BookGolf: React.FC = () => {
                   const hasSelectedSlot = hourGroup.slots.some(s => selectedSlot?.id === s.id);
                   
                   return (
-                    <div 
-                      key={hourGroup.hour24}
-                      className="animate-slide-up-stagger"
-                      style={{ '--stagger-index': groupIndex, animationFillMode: 'both' } as React.CSSProperties}
-                    >
+                    <div key={hourGroup.hour24}>
                       <button
                         onClick={() => {
                           haptic.light();
@@ -1408,7 +1404,7 @@ const BookGolf: React.FC = () => {
               </h3>
               <div ref={resourcesRef} className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3">
                 {getAvailableResourcesForSlot(selectedSlot).map((resource, index) => (
-                  <div key={resource.id} className="animate-slide-up-stagger" style={{ '--stagger-index': index, animationFillMode: 'both' } as React.CSSProperties}>
+                  <div key={resource.id}>
                     <ResourceCard
                       resource={resource}
                       selected={selectedResource?.id === resource.id}
@@ -1420,7 +1416,7 @@ const BookGolf: React.FC = () => {
                 {resources
                   .filter(r => selectedSlot.requestedResourceDbIds.includes(r.dbId) && !selectedSlot.availableResourceDbIds.includes(r.dbId))
                   .map((resource, index) => (
-                  <div key={`requested-${resource.id}`} className={index < 10 ? `animate-list-item-delay-${index}` : 'animate-list-item'}>
+                  <div key={`requested-${resource.id}`}>
                     <ResourceCard
                       resource={resource}
                       selected={false}

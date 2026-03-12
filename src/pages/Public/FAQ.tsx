@@ -149,7 +149,7 @@ const FAQ: React.FC = () => {
           />
         ) : (
           filteredFaqs.map((faq, index) => (
-            <div key={faq.id} className={`animate-list-item-delay-${Math.min(index, 10)}`}>
+            <div key={faq.id}>
               <AccordionItem question={faq.question} answer={faq.answer} />
             </div>
           ))

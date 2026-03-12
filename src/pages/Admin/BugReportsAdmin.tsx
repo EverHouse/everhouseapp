@@ -231,7 +231,7 @@ const BugReportsAdmin: React.FC = () => {
                             <button
                                 key={report.id}
                                 onClick={() => openDetail(report)}
-                                className={`w-full text-left p-4 rounded-xl transition-colors tactile-card ${idx < 10 ? `animate-list-item-delay-${idx}` : 'animate-list-item'} ${isDark ? 'glass-card hover:bg-white/5' : 'bg-white border border-black/5 hover:shadow-md'}`}
+                                className={`w-full text-left p-4 rounded-xl transition-colors tactile-card ${isDark ? 'glass-card hover:bg-white/5' : 'bg-white border border-black/5 hover:shadow-md'}`}
                             >
                                 <div className="flex items-start justify-between gap-3">
                                     <div className="flex-1 min-w-0">

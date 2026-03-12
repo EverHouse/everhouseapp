@@ -471,7 +471,7 @@ const ApplicationPipeline: React.FC = () => {
             <button
               key={app.id}
               onClick={() => openDetail(app)}
-              className={`w-full text-left bg-white dark:bg-surface-dark p-4 rounded-xl shadow-sm border cursor-pointer hover:border-primary/30 transition-colors tactile-card ${index < 10 ? `animate-list-item-delay-${index}` : 'animate-list-item'} ${
+              className={`w-full text-left bg-white dark:bg-surface-dark p-4 rounded-xl shadow-sm border cursor-pointer hover:border-primary/30 transition-colors tactile-card ${
                 app.status === 'new'
                   ? 'border-blue-200 dark:border-blue-800/30'
                   : app.status === 'archived'

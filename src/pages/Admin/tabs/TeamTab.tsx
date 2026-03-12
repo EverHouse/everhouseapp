@@ -393,7 +393,7 @@ const TeamTab: React.FC = () => {
               <div 
                 key={member.id}
                 onClick={() => openDetailsModal(member)}
-                className={`flex items-center justify-between p-4 rounded-xl border transition-colors tactile-row animate-list-item-delay-${Math.min(index, 10)} cursor-pointer hover:border-primary/50 ${
+                className={`flex items-center justify-between p-4 rounded-xl border transition-colors tactile-row cursor-pointer hover:border-primary/50 ${
                   member.is_active 
                     ? 'bg-white dark:bg-surface-dark border-gray-200 dark:border-white/25 hover:bg-gray-50 dark:hover:bg-surface-dark' 
                     : 'bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-white/20 opacity-60'

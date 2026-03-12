@@ -5,6 +5,8 @@ import { useData } from '../contexts/DataContext';
 import { getTodayPacific } from '../utils/dateUtils';
 import { isBlockingClosure, getAffectedAreasList, getNoticeLabel as getNoticeLabelUtil } from '../utils/closureUtils';
 
+const EXIT_DURATION = 250;
+
 interface Closure {
   id: number;
   title: string;
@@ -111,7 +113,7 @@ const ClosureAlert: React.FC = () => {
       localStorage.setItem(getStorageKey(), JSON.stringify([...newDismissed]));
       setIsExiting(false);
       exitTimer.current = null;
-    }, 250);
+    }, EXIT_DURATION);
   }, [activeClosures, dismissedIds]);
 
   const handleViewDetails = () => {

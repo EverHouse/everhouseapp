@@ -539,7 +539,7 @@ const TiersTab: React.FC = () => {
                                             tabIndex={0}
                                             onClick={() => openEdit(pass)}
                                             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openEdit(pass); } }}
-                                            className={`bg-white dark:bg-surface-dark p-4 rounded-xl shadow-sm border border-gray-200 dark:border-white/20 cursor-pointer hover:border-primary/30 transition-all duration-fast ${index < 10 ? `animate-list-item-delay-${index}` : 'animate-list-item'}`}
+                                            className="bg-white dark:bg-surface-dark p-4 rounded-xl shadow-sm border border-gray-200 dark:border-white/20 cursor-pointer hover:border-primary/30 transition-all duration-fast"
                                         >
                                             <div className="flex items-start justify-between">
                                                 <div>
@@ -1210,7 +1210,7 @@ const TiersTab: React.FC = () => {
                                 <div 
                                     key={tier.id} 
                                     onClick={() => openEdit(tier)}
-                                    className={`bg-white dark:bg-surface-dark p-4 rounded-xl shadow-sm border border-gray-200 dark:border-white/20 cursor-pointer hover:border-primary/30 transition-colors tactile-card ${index < 10 ? `animate-list-item-delay-${index}` : 'animate-list-item'}`}
+                                    className="bg-white dark:bg-surface-dark p-4 rounded-xl shadow-sm border border-gray-200 dark:border-white/20 cursor-pointer hover:border-primary/30 transition-colors tactile-card"
                                 >
                                     <div className="flex items-start justify-between mb-3">
                                         <div>

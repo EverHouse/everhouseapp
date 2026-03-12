@@ -55,7 +55,7 @@ const ProductsSubTab: React.FC<ProductsSubTabProps> = ({ activeSubTab }) => {
 
   const renderProduct = (product: StripeProduct, index: number) => {
     return (
-      <div key={product.id} className={`p-4 rounded-xl bg-gray-50 dark:bg-black/20 border border-gray-200 dark:border-white/10 tactile-row ${index < 10 ? `animate-list-item-delay-${index}` : 'animate-list-item'}`}>
+      <div key={product.id} className="p-4 rounded-xl bg-gray-50 dark:bg-black/20 border border-gray-200 dark:border-white/10 tactile-row">
         <div className="flex items-start justify-between">
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-1">

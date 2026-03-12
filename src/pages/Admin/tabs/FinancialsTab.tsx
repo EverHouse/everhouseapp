@@ -781,7 +781,7 @@ const InvoicesSubTab: React.FC = () => {
                 </thead>
                 <tbody ref={invTbodyParent} className="divide-y divide-primary/5 dark:divide-white/5">
                   {filteredInvoices.map((invoice, index) => (
-                    <tr key={invoice.id} className={`hover:bg-primary/5 dark:hover:bg-white/5 transition-colors tactile-row animate-list-item-delay-${Math.min(index + 1, 10)}`}>
+                    <tr key={invoice.id} className="hover:bg-primary/5 dark:hover:bg-white/5 transition-colors tactile-row">
                       <td className="px-4 py-3">
                         <p className="font-medium text-primary dark:text-white font-mono text-sm">
                           {invoice.number || '-'}
