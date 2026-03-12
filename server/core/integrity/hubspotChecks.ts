@@ -120,7 +120,7 @@ export async function checkHubSpotSyncMismatch(): Promise<IntegrityCheckResult> 
             syncType: 'hubspot',
             syncComparison: comparisons,
             hubspotContactId: member.hubspot_id,
-            userId: Number(member.id)
+            userId: String(member.id)
           }
         });
       }
@@ -138,7 +138,7 @@ export async function checkHubSpotSyncMismatch(): Promise<IntegrityCheckResult> 
             memberEmail: member.email || undefined,
             syncType: 'hubspot',
             hubspotContactId: member.hubspot_id,
-            userId: Number(member.id)
+            userId: String(member.id)
           }
         });
       }

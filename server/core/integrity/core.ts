@@ -366,11 +366,11 @@ export interface IssueContext {
   hubspotContactId?: string;
   stripeCustomerId?: string;
   stripePaymentIntentId?: string;
-  userId?: number;
+  userId?: string | number;
   issueType?: string;
   sourceTable?: string;
   count?: number;
-  duplicateUsers?: Array<{ userId: number; email: string; status: string; tier: string }>;
+  duplicateUsers?: Array<{ userId: string | number; email: string; status: string; tier: string }>;
   trackmanBookingId?: string;
   userName?: string;
   userEmail?: string;

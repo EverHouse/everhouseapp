@@ -48,8 +48,8 @@ export interface IssueContext {
   syncType?: 'hubspot' | 'calendar' | 'stripe';
   syncComparison?: SyncComparisonData[];
   hubspotContactId?: string;
-  userId?: number;
-  duplicateUsers?: Array<{ userId: number; email: string; status: string; tier: string }>;
+  userId?: string | number;
+  duplicateUsers?: Array<{ userId: string | number; email: string; status: string; tier: string }>;
   errorType?: string;
   email?: string;
   memberEmails?: string;

@@ -109,7 +109,7 @@ export async function checkStripeSubscriptionSync(): Promise<IntegrityCheckResul
               memberTier: member.tier || undefined,
               syncType: 'stripe',
               stripeCustomerId: customerId,
-              userId: Number(member.id),
+              userId: String(member.id),
               syncComparison: [
                 { field: 'Subscription', appValue: dbStatus, externalValue: 'no subscription' }
               ]
@@ -154,7 +154,7 @@ export async function checkStripeSubscriptionSync(): Promise<IntegrityCheckResul
               memberTier: member.tier || undefined,
               syncType: 'stripe',
               stripeCustomerId: customerId,
-              userId: Number(member.id),
+              userId: String(member.id),
               syncComparison: comparisons
             }
           });
@@ -197,7 +197,7 @@ export async function checkStripeSubscriptionSync(): Promise<IntegrityCheckResul
               memberTier: member.tier || undefined,
               syncType: 'stripe',
               stripeCustomerId: customerId,
-              userId: Number(member.id),
+              userId: String(member.id),
               syncComparison: comparisons
             }
           });
@@ -219,7 +219,7 @@ export async function checkStripeSubscriptionSync(): Promise<IntegrityCheckResul
             memberName,
             memberEmail: member.email || undefined,
             stripeCustomerId: customerId,
-            userId: Number(member.id),
+            userId: String(member.id),
             errorType: 'orphaned_stripe_customer'
           }
         });
@@ -450,7 +450,7 @@ export async function checkBillingProviderHybridState(): Promise<IntegrityCheckR
         stripeSubscriptionId: member.stripe_subscription_id || 'none',
         stripeCustomerId: member.stripe_customer_id || 'none',
         mindbodyClientId: member.mindbody_client_id || 'none',
-        userId: Number(member.id)
+        userId: String(member.id)
       }
     });
   }

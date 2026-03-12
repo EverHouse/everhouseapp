@@ -369,7 +369,7 @@ export function useDataIntegrityActions(state: DataIntegrityState) {
   });
 
   const syncPushMutation = useMutation({
-    mutationFn: (params: { issueKey: string; target: string; userId?: number; hubspotContactId?: string; stripeCustomerId?: string }) => 
+    mutationFn: (params: { issueKey: string; target: string; userId?: string | number; hubspotContactId?: string; stripeCustomerId?: string }) => 
       postWithCredentials<{ message: string }>('/api/data-integrity/sync-push', params),
     onSuccess: (data, variables) => {
       state.setSyncingIssues(prev => {
@@ -408,7 +408,7 @@ export function useDataIntegrityActions(state: DataIntegrityState) {
   });
 
   const syncPullMutation = useMutation({
-    mutationFn: (params: { issueKey: string; target: string; userId?: number; hubspotContactId?: string; stripeCustomerId?: string }) => 
+    mutationFn: (params: { issueKey: string; target: string; userId?: string | number; hubspotContactId?: string; stripeCustomerId?: string }) => 
       postWithCredentials<{ message: string }>('/api/data-integrity/sync-pull', params),
     onSuccess: (data, variables) => {
       state.setSyncingIssues(prev => {
@@ -689,7 +689,7 @@ export function useDataIntegrityActions(state: DataIntegrityState) {
       queryClient.setQueryData(['data-integrity', 'cached'], (old: CachedResultsResponse | undefined) => {
         if (!old?.hasCached || !recordId) return old;
         const rid = String(recordId);
-        const matchesIssue = (issue: { recordId?: string | number; id?: string | number; context?: { userId?: number } }) => {
+        const matchesIssue = (issue: { recordId?: string | number; id?: string | number; context?: { userId?: string | number } }) => {
           const id = issue.recordId ?? issue.id;
           if (id != null && String(id) === rid) return true;
           if (issue.context?.userId && String(issue.context.userId) === rid) return true;

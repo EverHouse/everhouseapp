@@ -134,7 +134,7 @@ export async function checkStuckTransitionalMembers(): Promise<IntegrityCheckRes
             memberEmail: member.email,
             memberTier: member.tier,
             stripeCustomerId: member.stripe_subscription_id,
-            userId: Number(member.id)
+            userId: String(member.id)
           }
         }
       };
@@ -330,7 +330,7 @@ export async function checkTierReconciliation(): Promise<IntegrityCheckResult> {
             syncType: 'stripe',
             stripeCustomerId: customerId,
             hubspotContactId: member.hubspot_id || undefined,
-            userId: Number(member.id),
+            userId: String(member.id),
             syncComparison: tierMismatches
           }
         });
@@ -392,7 +392,7 @@ export async function checkMindBodyStaleSyncMembers(): Promise<IntegrityCheckRes
         memberTier: member.tier,
         lastUpdate: member.updated_at || undefined,
         mindbodyClientId: member.mindbody_client_id || undefined,
-        userId: Number(member.id)
+        userId: String(member.id)
       }
     });
   }
@@ -455,7 +455,7 @@ export async function checkMindBodyStatusMismatch(): Promise<IntegrityCheckResul
         memberTier: member.tier || 'none',
         memberStatus: member.membership_status,
         mindbodyClientId: member.mindbody_client_id || 'none',
-        userId: Number(member.id)
+        userId: String(member.id)
       }
     });
   }
