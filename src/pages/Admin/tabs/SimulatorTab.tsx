@@ -578,7 +578,7 @@ const SimulatorTab: React.FC = () => {
         );
         
         try {
-            const res = await fetch(`/api/bookings/${booking.id}`, {
+            const res = await fetch(`/api/booking-requests/${booking.id}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
