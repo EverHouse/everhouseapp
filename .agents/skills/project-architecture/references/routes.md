@@ -95,7 +95,8 @@ All mutating routes (POST/PUT/PATCH/DELETE) must be protected. Two equivalent pa
 ## Standalone Route Files
 
 - `auth.ts` — Login, logout, session management
-- `auth-google.ts` — Google Sign-In flow
+- `auth-google.ts` — Google Sign-In (login, link/unlink, status)
+- `auth-apple.ts` — Apple Sign-In (login via JWKS token verification, link/unlink, status)
 - `account.ts` — Account settings, deletion
 - `roster.ts` — Roster/participant management (uses `roster_version` locking)
 - `resources.ts` — Resource/bay CRUD
@@ -140,6 +141,7 @@ All mutating routes (POST/PUT/PATCH/DELETE) must be protected. Two equivalent pa
 - `idScanner.ts` — ID/license scanning (OpenAI Vision)
 - `resendWebhooks.ts` — Resend email webhooks
 - `mindbody.ts` — MindBody import endpoints
+- `walletPass.ts` — Apple Wallet pass generation and download (uses `server/walletPass/passGenerator.ts`)
 - `testAuth.ts` — Dev-only test auth
 - `emailTemplates.ts` — Email template preview endpoints
 - `monitoring.ts` — System monitoring endpoints
