@@ -1830,8 +1830,7 @@ export async function checkinBooking(params: CheckinBookingParams) {
       const declaredCount = roster.declared_player_count || roster.trackman_player_count || 1;
       const participantCount = parseInt(roster.participant_count) || 0;
 
-      if (roster.session_id && participantCount >= declaredCount) {
-      } else {
+      if (!(roster.session_id && participantCount >= declaredCount)) {
         const emptySlots = parseInt(roster.empty_slots) || 0;
         const totalSlots = parseInt(roster.total_slots) || 0;
 

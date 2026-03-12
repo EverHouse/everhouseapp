@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import EmptyState from '../../../../components/EmptyState';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { usePageReady } from '../../../../contexts/PageReadyContext';
@@ -331,11 +331,38 @@ export const EventsAdminContent: React.FC = () => {
         setIsEditing(true);
     };
 
+    const allEvents = [...events, ...optimisticEvents];
+    const filteredEvents = activeCategory === 'all' 
+        ? allEvents 
+        : allEvents.filter(e => e.category === activeCategory);
+
+    const today = getTodayPacific();
+    const upcomingEvents = filteredEvents
+        .filter(e => e.event_date >= today && !deletingEventIds.has(e.id))
+        .sort((a, b) => a.event_date.localeCompare(b.event_date));
+    const pastEvents = filteredEvents
+        .filter(e => e.event_date < today && !deletingEventIds.has(e.id))
+        .sort((a, b) => b.event_date.localeCompare(a.event_date));
+
+    const openCreate = useCallback(() => {
+        setNewItem({ category: activeCategory === 'all' ? 'Social' : activeCategory });
+        setEditId(null);
+        setTouchedFields(new Set());
+        setIsEditing(true);
+    }, [activeCategory]);
+
+    const openEdit = (event: DBEvent) => {
+        setNewItem(event);
+        setEditId(event.id);
+        setTouchedFields(new Set());
+        setIsEditing(true);
+    };
+
     useEffect(() => {
         const handleOpenCreate = () => openCreate();
         window.addEventListener('openEventCreate', handleOpenCreate);
         return () => window.removeEventListener('openEventCreate', handleOpenCreate);
-    }, []);
+    }, [openCreate]);
 
     useEffect(() => {
         const handleRefresh = () => {
@@ -359,33 +386,6 @@ export const EventsAdminContent: React.FC = () => {
             document.body.style.overflow = '';
         };
     }, [isEditing]);
-
-    const allEvents = [...events, ...optimisticEvents];
-    const filteredEvents = activeCategory === 'all' 
-        ? allEvents 
-        : allEvents.filter(e => e.category === activeCategory);
-
-    const today = getTodayPacific();
-    const upcomingEvents = filteredEvents
-        .filter(e => e.event_date >= today && !deletingEventIds.has(e.id))
-        .sort((a, b) => a.event_date.localeCompare(b.event_date));
-    const pastEvents = filteredEvents
-        .filter(e => e.event_date < today && !deletingEventIds.has(e.id))
-        .sort((a, b) => b.event_date.localeCompare(a.event_date));
-
-    const openEdit = (event: DBEvent) => {
-        setNewItem(event);
-        setEditId(event.id);
-        setTouchedFields(new Set());
-        setIsEditing(true);
-    };
-
-    const openCreate = () => {
-        setNewItem({ category: activeCategory === 'all' ? 'Social' : activeCategory });
-        setEditId(null);
-        setTouchedFields(new Set());
-        setIsEditing(true);
-    };
 
     const handleSave = () => {
         setError(null);

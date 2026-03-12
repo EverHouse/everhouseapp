@@ -95,8 +95,7 @@ export async function checkHubSpotSyncMismatch(): Promise<IntegrityCheckResult> 
       const hsTierRaw = props.membership_tier || null;
       const expectedNorm = (expectedHubSpotTier || '').trim().toLowerCase();
       const hsNorm = (hsTierRaw || '').trim().toLowerCase();
-      if (!expectedNorm && !hsNorm) {
-      } else if (expectedNorm !== hsNorm) {
+      if ((expectedNorm || hsNorm) && expectedNorm !== hsNorm) {
         comparisons.push({
           field: 'Membership Tier',
           appValue: expectedHubSpotTier || null,

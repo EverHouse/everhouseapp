@@ -183,7 +183,7 @@ async function discoverFormsViaSDK(client: Client): Promise<HubSpotForm[]> {
         `[HubSpot FormSync] API error discovering forms: ${errMsg}. ` +
         `The Private App token needs the 'forms' scope enabled.`
       );
-      throw new Error(`HUBSPOT_API_ERROR: ${errMsg}`);
+      throw new Error(`HUBSPOT_API_ERROR: ${errMsg}`, { cause: err });
     }
     logger.warn(`[HubSpot FormSync] Could not discover forms via typed SDK: ${errMsg}`);
     return [];

@@ -340,7 +340,7 @@ export async function getOrCreateStripeCustomer(
       if (isRateLimitOrNetwork) {
         logger.error(`[Stripe] Critical error searching for customer ${searchEmail}, aborting to prevent duplicates:`, { error: error });
         await alertOnExternalServiceError('Stripe', error as Error, `search for customer by email ${searchEmail}`);
-        throw new Error(`Stripe unavailable while searching for existing customers - cannot safely create new customer: ${getErrorMessage(error)}`);
+        throw new Error(`Stripe unavailable while searching for existing customers - cannot safely create new customer: ${getErrorMessage(error)}`, { cause: error });
       }
       
       logger.warn(`[Stripe] Non-critical error searching for customer by email ${searchEmail}:`, { extra: { detail: getErrorMessage(error) } });

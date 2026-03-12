@@ -1504,7 +1504,6 @@ export async function removeParticipant(params: RemoveParticipantParams): Promis
       });
     }
 
-    let guestPassesRemaining: number | undefined;
     if (participant.participantType === 'guest' && participant.usedGuestPass === true) {
       deferredRemoveRefund = { ownerEmail: booking.owner_email, guestName: participant.displayName || undefined };
     }
@@ -1531,8 +1530,8 @@ export async function removeParticipant(params: RemoveParticipantParams): Promis
     return {
       sessionId: booking.session_id,
       deferFeeRecalc: !!params.deferFeeRecalc,
-      guestPassesRemaining,
-      newRosterVersion
+      newRosterVersion,
+      guestPassesRemaining: undefined as number | undefined
     };
   });
 
