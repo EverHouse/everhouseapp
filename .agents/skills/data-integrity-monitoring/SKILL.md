@@ -11,7 +11,7 @@ Layered defense against data corruption, sync drift, and operational failures ac
 
 | Task | Primary File(s) | When to touch |
 |---|---|---|
-| Integrity checks (33) | `server/core/dataIntegrity.ts` | Check logic, issue tracking, ignore rules, audit log |
+| Integrity checks (26) | `server/core/dataIntegrity.ts` | Check logic, issue tracking, ignore rules, audit log |
 | Data alerts (in-app) | `server/core/dataAlerts.ts` | Staff notifications for failures |
 | Error alerts (email) | `server/core/errorAlerts.ts` | Email alerts with plain-language translation |
 | Monitoring core | `server/core/monitoring.ts` | `system_alerts` table + in-memory buffer |
@@ -97,7 +97,7 @@ What type of alert?
 
 ## Detailed Reference
 
-- **[references/integrity-checks.md](references/integrity-checks.md)** — Complete list of all 33 integrity checks with detection logic, severity, and recommended actions. Webhook, job queue, and HubSpot queue monitors.
+- **[references/integrity-checks.md](references/integrity-checks.md)** — Complete list of all 26 integrity checks with detection logic, severity, and recommended actions. Webhook, job queue, and HubSpot queue monitors.
 - **[references/scheduler-map.md](references/scheduler-map.md)** — All 27 scheduled tasks with frequencies, execution windows, multi-instance safety.
 
 ---

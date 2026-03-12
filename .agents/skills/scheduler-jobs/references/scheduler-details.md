@@ -158,7 +158,7 @@ Each sync uses `syncWithRetry()`: attempt once, if failed retry after 5 seconds.
 **Interval:** 2 min | **Time Gate:** None
 
 1. Recover any jobs stuck in `processing` state (server crash recovery) via `recoverStuckProcessingJobs()`
-2. Process up to 20 queued HubSpot operations per batch via `processHubSpotQueue(20)`
+2. Process up to 50 queued HubSpot operations per batch via `processHubSpotQueue(50)`
 3. Log queue stats (pending, failed, dead counts)
 4. On startup, ensure HubSpot properties exist via `ensureHubSpotPropertiesExist()`
 5. Mutex guard: skip if already processing (`isProcessing` flag)

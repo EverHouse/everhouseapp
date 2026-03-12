@@ -37,7 +37,7 @@ All schedulers registered in `server/schedulers/index.ts` via `initSchedulers()`
 | Webhook Log Cleanup | webhookLogCleanupScheduler.ts | 1 hr | 4 AM Pacific | Delete 30-day-old webhook logs |
 | Session Cleanup | sessionCleanupScheduler.ts | 1 hr | 2 AM Pacific | Expired HTTP sessions |
 | Unresolved Trackman | unresolvedTrackmanScheduler.ts | 15 min | 9 AM Pacific | Unmatched Trackman >24h alert |
-| HubSpot Queue | hubspotQueueScheduler.ts | 2 min | None | Process HubSpot sync ops (batch 20) |
+| HubSpot Queue | hubspotQueueScheduler.ts | 2 min | None | Process HubSpot sync ops (batch 50) |
 | HubSpot Form Sync | hubspotFormSyncScheduler.ts | 30 min | None | Ingest HubSpot forms |
 | Member Sync | memberSyncScheduler.ts | 24 hr | 3 AM Pacific | Full HubSpot member sync |
 | Duplicate Cleanup | duplicateCleanupScheduler.ts | 24 hr | 4 AM Pacific | Remove duplicate Trackman bookings |

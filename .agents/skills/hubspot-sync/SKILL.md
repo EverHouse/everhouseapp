@@ -117,7 +117,7 @@ MindBody-billed active member's HubSpot status changes to non-active
 | `sync_member` | 3 | Full member sync (currently disabled) |
 | `create_deal` | 5 | Create membership deal (currently disabled) |
 
-Queue scheduler: every 2 min, claim up to 20 jobs, exponential backoff on failure.
+Queue scheduler: every 2 min, claim up to 50 jobs, exponential backoff on failure.
 
 ## Contact Properties Written (App → HubSpot)
 
