@@ -14,7 +14,7 @@ interface SettingsState {
   cityStateZip: string;
   formerlyKnownAs: string;
   googleMapsUrl: string;
-  appleMapsQuery: string;
+  appleMapsUrl: string;
   instagramUrl: string;
   tiktokUrl: string;
   linkedinUrl: string;
@@ -135,7 +135,7 @@ const SettingsTab: React.FC = () => {
     cityStateZip: 'Tustin, CA 92780',
     formerlyKnownAs: 'Formerly Even House (evenhouse.club)',
     googleMapsUrl: 'https://maps.app.goo.gl/Zp93EMzyp9EA3vqA6',
-    appleMapsQuery: 'Even+House+Tustin+CA',
+    appleMapsUrl: 'https://maps.apple.com/place?place-id=I2671995E78948F1F&address=15771+Red+Hill+Ave%2C+Ste+500%2C+Tustin%2C+CA++92780%2C+United+States&coordinate=33.713744%2C-117.836476&name=Even+House&_provider=9902',
     instagramUrl: 'https://www.instagram.com/everclub/',
     tiktokUrl: 'https://www.tiktok.com/@everclub',
     linkedinUrl: 'https://www.linkedin.com/company/ever-club',
@@ -198,7 +198,7 @@ const SettingsTab: React.FC = () => {
         cityStateZip: data['contact.city_state_zip']?.value || defaultSettings.cityStateZip,
         formerlyKnownAs: data['contact.formerly_known_as']?.value || defaultSettings.formerlyKnownAs,
         googleMapsUrl: data['contact.google_maps_url']?.value || defaultSettings.googleMapsUrl,
-        appleMapsQuery: data['contact.apple_maps_query']?.value || defaultSettings.appleMapsQuery,
+        appleMapsUrl: data['contact.apple_maps_url']?.value || data['contact.apple_maps_query']?.value || defaultSettings.appleMapsUrl,
         instagramUrl: data['social.instagram_url']?.value || defaultSettings.instagramUrl,
         tiktokUrl: data['social.tiktok_url']?.value || defaultSettings.tiktokUrl,
         linkedinUrl: data['social.linkedin_url']?.value || defaultSettings.linkedinUrl,
@@ -246,7 +246,7 @@ const SettingsTab: React.FC = () => {
         'contact.city_state_zip': settingsToSave.cityStateZip,
         'contact.formerly_known_as': settingsToSave.formerlyKnownAs,
         'contact.google_maps_url': settingsToSave.googleMapsUrl,
-        'contact.apple_maps_query': settingsToSave.appleMapsQuery,
+        'contact.apple_maps_url': settingsToSave.appleMapsUrl,
         'social.instagram_url': settingsToSave.instagramUrl,
         'social.tiktok_url': settingsToSave.tiktokUrl,
         'social.linkedin_url': settingsToSave.linkedinUrl,
@@ -377,8 +377,8 @@ const SettingsTab: React.FC = () => {
               <input type="url" value={settings.googleMapsUrl ?? ''} onChange={(e) => updateField('googleMapsUrl', e.target.value)} className={inputClass} placeholder="https://maps.app.goo.gl/..." />
             </div>
             <div>
-              <FieldLabel>Apple Maps Query</FieldLabel>
-              <input type="text" value={settings.appleMapsQuery ?? ''} onChange={(e) => updateField('appleMapsQuery', e.target.value)} className={inputClass} placeholder="Business+Name+City+ST" />
+              <FieldLabel>Apple Maps URL</FieldLabel>
+              <input type="url" value={settings.appleMapsUrl ?? ''} onChange={(e) => updateField('appleMapsUrl', e.target.value)} className={inputClass} placeholder="https://maps.apple.com/place?..." />
             </div>
           </div>
 

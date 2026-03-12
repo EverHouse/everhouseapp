@@ -41,7 +41,7 @@ declare global {
   }
 }
 
-const CLUB_COORDS = { lat: 33.7175, lng: -117.8531 };
+const CLUB_COORDS = { lat: 33.713744, lng: -117.836476 };
 
 function useMapKitToken() {
   const [token, setToken] = useState<string | null>(null);
@@ -179,7 +179,7 @@ const FALLBACK = {
   'contact.city_state_zip': 'Tustin, CA 92780',
   'contact.formerly_known_as': 'Formerly Even House (evenhouse.club)',
   'contact.google_maps_url': 'https://maps.app.goo.gl/Zp93EMzyp9EA3vqA6',
-  'contact.apple_maps_query': 'Even+House+Tustin+CA',
+  'contact.apple_maps_url': 'https://maps.apple.com/place?place-id=I2671995E78948F1F&address=15771+Red+Hill+Ave%2C+Ste+500%2C+Tustin%2C+CA++92780%2C+United+States&coordinate=33.713744%2C-117.836476&name=Even+House&_provider=9902',
   'apple_messages.enabled': 'false',
   'apple_messages.business_id': '',
   'hours.monday': 'Closed',
@@ -439,7 +439,7 @@ const Contact: React.FC = () => {
                     Open in Google Maps
                  </a>
                  <a 
-                   href="https://maps.apple.com/place?auid=17062891045498801688" 
+                   href={s['contact.apple_maps_url']} 
                    target="_blank" 
                    rel="noreferrer" 
                    className="bg-zinc-700 text-white px-4 py-2 rounded-lg shadow-md dark:shadow-black/20 font-bold text-xs flex items-center gap-2 hover:shadow-lg transition-shadow"

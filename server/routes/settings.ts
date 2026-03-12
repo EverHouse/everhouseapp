@@ -64,7 +64,7 @@ const DEFAULT_SETTINGS: Record<string, { value: string; category: string }> = {
   'contact.city_state_zip': { value: 'Tustin, CA 92780', category: 'contact' },
   'contact.formerly_known_as': { value: 'Formerly Even House (evenhouse.club)', category: 'contact' },
   'contact.google_maps_url': { value: 'https://maps.app.goo.gl/Zp93EMzyp9EA3vqA6', category: 'contact' },
-  'contact.apple_maps_query': { value: 'Even+House+Tustin+CA', category: 'contact' },
+  'contact.apple_maps_url': { value: 'https://maps.apple.com/place?place-id=I2671995E78948F1F&address=15771+Red+Hill+Ave%2C+Ste+500%2C+Tustin%2C+CA++92780%2C+United+States&coordinate=33.713744%2C-117.836476&name=Even+House&_provider=9902', category: 'contact' },
 
   'social.instagram_url': { value: 'https://www.instagram.com/everclub/', category: 'social' },
   'social.tiktok_url': { value: 'https://www.tiktok.com/@everclub', category: 'social' },
