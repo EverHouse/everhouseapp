@@ -74,20 +74,21 @@ export async function syncSmsPreferencesToHubSpot(
       if (errMsg.includes('PROPERTY_DOESNT_EXIST')) {
         const missingProps = new Set<string>();
         try {
-          const body = (updateError as { body?: string })?.body;
-          if (body) {
-            const parsed = JSON.parse(body);
-            const errors = parsed?.errors as { context?: { propertyName?: string[] } }[] | undefined;
-            if (Array.isArray(errors)) {
-              for (const err of errors) {
-                const names = err?.context?.propertyName;
-                if (Array.isArray(names)) {
-                  for (const n of names) missingProps.add(n);
-                }
+          const rawBody = (updateError as { body?: string | Record<string, unknown> })?.body;
+          const parsed = typeof rawBody === 'string' ? JSON.parse(rawBody) : rawBody;
+          const errors = parsed?.errors as { context?: { propertyName?: string[] } }[] | undefined;
+          if (Array.isArray(errors)) {
+            for (const err of errors) {
+              const names = err?.context?.propertyName;
+              if (Array.isArray(names)) {
+                for (const n of names) missingProps.add(n);
               }
             }
           }
         } catch {
+          // noop
+        }
+        if (missingProps.size === 0) {
           for (const entry of Object.values(smsPropertyMap)) {
             if (errMsg.includes(entry.hubspotProp)) {
               missingProps.add(entry.hubspotProp);
@@ -103,9 +104,20 @@ export async function syncSmsPreferencesToHubSpot(
         }
 
         if (Object.keys(existingProps).length > 0) {
-          await retryableHubSpotRequest(() =>
-            hubspot.crm.contacts.basicApi.update(contactId, { properties: existingProps })
-          );
+          try {
+            await retryableHubSpotRequest(() =>
+              hubspot.crm.contacts.basicApi.update(contactId, { properties: existingProps })
+            );
+          } catch (retryError: unknown) {
+            const retryMsg = getErrorMessage(retryError);
+            if (retryMsg.includes('PROPERTY_DOESNT_EXIST')) {
+              logger.warn('[HubSpot SMS Sync] Retry also failed — none of the SMS properties exist in HubSpot', {
+                extra: { contactId, missingProps: Array.from(missingProps), remainingProps: Object.keys(existingProps) }
+              });
+            } else {
+              throw retryError;
+            }
+          }
         }
         logger.warn('[HubSpot SMS Sync] Some SMS properties do not exist in HubSpot — skipped missing properties', {
           extra: { contactId, missingProps: Array.from(missingProps) }
