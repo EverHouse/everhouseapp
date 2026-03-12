@@ -1,65 +1,16 @@
 -- ============================================================================
--- INTEGRITY HARDENING: HubSpot ID Uniqueness + Billing Provider State Check
+-- INTEGRITY HARDENING: Billing Provider State Check
 -- ============================================================================
--- 1. Adds a partial unique index on hubspot_id to prevent duplicate HubSpot IDs
---    (mirrors the pattern from 0041 for stripe_customer_id).
--- 2. Adds a CHECK constraint to prevent invalid billing provider hybrid states
---    where billing_provider contradicts the presence of billing system IDs.
--- ============================================================================
-
--- ============================================================================
--- 1. UNIQUE INDEX ON hubspot_id (where not null)
+-- Adds a CHECK constraint to prevent invalid billing provider hybrid states
+-- where billing_provider contradicts the presence of billing system IDs.
+--
+-- NOTE: The hubspot_id unique index is created at app startup in db-init.ts
+-- (same pattern as stripe_customer_id) because it requires data cleanup first
+-- and the migration validator cannot run cleanup before testing constraints.
 -- ============================================================================
 
--- Step 1a: Normalize whitespace-only hubspot_ids to NULL
-UPDATE users SET hubspot_id = NULL
-  WHERE hubspot_id IS NOT NULL AND TRIM(hubspot_id) = '';
-
--- Step 1b: Trim whitespace from hubspot_ids
-UPDATE users SET hubspot_id = TRIM(hubspot_id)
-  WHERE hubspot_id IS NOT NULL AND hubspot_id != TRIM(hubspot_id);
-
--- Step 1c: NULL out duplicate hubspot_ids, keeping the most recently updated.
-DO $$
-DECLARE
-  dup_count INTEGER;
-BEGIN
-  WITH ranked AS (
-    SELECT id, hubspot_id,
-      ROW_NUMBER() OVER (
-        PARTITION BY hubspot_id
-        ORDER BY updated_at DESC NULLS LAST, created_at DESC NULLS LAST, id DESC
-      ) as rn
-    FROM users
-    WHERE hubspot_id IS NOT NULL AND hubspot_id != ''
-  )
-  UPDATE users SET hubspot_id = NULL
-    WHERE id IN (SELECT id FROM ranked WHERE rn > 1);
-
-  GET DIAGNOSTICS dup_count = ROW_COUNT;
-  IF dup_count > 0 THEN
-    RAISE NOTICE 'Cleared % duplicate hubspot_id values', dup_count;
-  END IF;
-
-  -- Verify no duplicates remain before creating index
-  SELECT COUNT(*) INTO dup_count
-    FROM (
-      SELECT hubspot_id FROM users
-      WHERE hubspot_id IS NOT NULL AND hubspot_id != ''
-      GROUP BY hubspot_id HAVING COUNT(*) > 1
-    ) dupes;
-
-  IF dup_count > 0 THEN
-    RAISE NOTICE 'WARNING: % duplicate hubspot_id groups still remain after cleanup', dup_count;
-  END IF;
-END $$;
-
-DROP INDEX IF EXISTS users_hubspot_id_unique;
-CREATE UNIQUE INDEX users_hubspot_id_unique
-  ON users (hubspot_id) WHERE hubspot_id IS NOT NULL AND hubspot_id != '';
-
 -- ============================================================================
--- 2. BILLING PROVIDER HYBRID STATE CHECK
+-- BILLING PROVIDER HYBRID STATE CHECK
 -- ============================================================================
 -- Prevents the specific invalid state where billing_provider='mindbody' but
 -- a Stripe subscription exists. This is the main "hybrid state" the integrity

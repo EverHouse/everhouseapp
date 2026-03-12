@@ -166,7 +166,7 @@ export async function checkHubSpotSyncMismatch(): Promise<IntegrityCheckResult> 
 
 
 export async function checkHubSpotIdDuplicates(): Promise<IntegrityCheckResult> {
-  // NOTE: As of migration 0047, a partial unique index (users_hubspot_id_unique)
+  // NOTE: A partial unique index (users_hubspot_id_unique) is created at startup in db-init.ts
   // prevents new duplicate hubspot_ids from being inserted at the DB level.
   // This check still runs to catch edge cases like empty-string hubspot_ids
   // or duplicates introduced via direct DB operations that bypass the index.

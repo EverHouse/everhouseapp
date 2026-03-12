@@ -617,6 +617,29 @@ export async function ensureDatabaseConstraints() {
       } catch (err: unknown) {
         logger.warn(`[DB Init] Skipping Stripe customer unique index: ${getErrorMessage(err)}`);
       }
+
+      try {
+        await db.execute(sql`UPDATE users SET hubspot_id = NULL WHERE hubspot_id IS NOT NULL AND TRIM(hubspot_id) = ''`);
+        await db.execute(sql`UPDATE users SET hubspot_id = TRIM(hubspot_id) WHERE hubspot_id IS NOT NULL AND hubspot_id != TRIM(hubspot_id)`);
+        await db.execute(sql`
+          UPDATE users SET hubspot_id = NULL
+          WHERE id IN (
+            SELECT id FROM (
+              SELECT id, ROW_NUMBER() OVER (PARTITION BY hubspot_id ORDER BY updated_at DESC NULLS LAST, created_at DESC NULLS LAST, id DESC) AS rn
+              FROM users
+              WHERE hubspot_id IS NOT NULL AND hubspot_id != ''
+            ) dupes
+            WHERE rn > 1
+          )
+        `);
+        await db.execute(sql`
+          CREATE UNIQUE INDEX IF NOT EXISTS users_hubspot_id_unique
+            ON users (hubspot_id) WHERE hubspot_id IS NOT NULL AND hubspot_id != ''
+        `);
+        logger.info('[DB Init] HubSpot ID unique index created/verified');
+      } catch (err: unknown) {
+        logger.warn(`[DB Init] Skipping HubSpot ID unique index: ${getErrorMessage(err)}`);
+      }
     }
 
     try {
