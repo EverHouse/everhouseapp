@@ -233,7 +233,7 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
               System IDs
             </h4>
             <div className="flex items-center gap-3 flex-wrap text-xs">
-              {member.mindbodyClientId && member.hubspotId && (
+              {member.mindbodyClientId && (
                 <span className={`flex items-center gap-0.5 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
                   MB: {member.mindbodyClientId}
                   <CopyButton value={member.mindbodyClientId} isDark={isDark} />
