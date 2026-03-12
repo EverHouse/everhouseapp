@@ -102,7 +102,7 @@ const PlayerSlotEditor: React.FC<PlayerSlotEditorProps> = ({
       )}
 
       {slots.length > 0 && (
-        <section className={`rounded-xl p-4 border glass-card relative z-10 overflow-hidden ${isDark ? 'border-white/25' : 'border-black/10'}`}>
+        <section className={`rounded-xl p-4 border glass-card relative z-10 ${isDark ? 'border-white/25' : 'border-black/10'}`}>
           <div className="flex items-center gap-2 mb-3">
             <span className={`text-[11px] font-bold uppercase tracking-[0.2em] ${isDark ? 'text-white/80' : 'text-primary/80'}`} style={{ fontFamily: 'var(--font-label)' }}>Additional Players</span>
             <span className={`text-xs ${isDark ? 'text-white/50' : 'text-primary/50'}`}>(Optional)</span>
