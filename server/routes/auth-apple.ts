@@ -14,11 +14,12 @@ const router = Router();
 
 const APPLE_CLIENT_ID = process.env.APPLE_SERVICE_ID;
 
-let applePublicKeys: jose.JWKSetLike | null = null;
+type JWKSFunction = ReturnType<typeof jose.createRemoteJWKSet>;
+let applePublicKeys: JWKSFunction | null = null;
 let appleKeysLastFetched = 0;
 const APPLE_KEYS_TTL = 60 * 60 * 1000;
 
-async function getApplePublicKeys(): Promise<jose.JWKSetLike> {
+async function getApplePublicKeys(): Promise<JWKSFunction> {
   const now = Date.now();
   if (applePublicKeys && now - appleKeysLastFetched < APPLE_KEYS_TTL) {
     return applePublicKeys;
