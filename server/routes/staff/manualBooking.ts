@@ -11,6 +11,7 @@ import { resources, dayPassPurchases, passRedemptionLogs, bookingRequests } from
 import { eq, sql } from 'drizzle-orm';
 import { getSessionUser } from '../../types/session';
 import { ensureSessionForBooking } from '../../core/bookingService/sessionManager';
+import { resolveUserByEmail } from '../../core/stripe/customers';
 
 const router = Router();
 
@@ -38,6 +39,19 @@ router.post('/api/staff/manual-booking', isStaffOrAdmin, async (req, res) => {
       });
     }
 
+    let resolvedEmail = (user_email || '').toLowerCase();
+    let resolvedUserId: string | null = null;
+    if (user_email) {
+      const resolved = await resolveUserByEmail(resolvedEmail);
+      if (resolved) {
+        if (resolved.matchType !== 'direct') {
+          logger.info('[StaffManualBooking] Resolved linked email to primary', { extra: { originalEmail: resolvedEmail, resolvedEmail: resolved.primaryEmail, matchType: resolved.matchType } });
+          resolvedEmail = resolved.primaryEmail.toLowerCase();
+        }
+        resolvedUserId = resolved.userId;
+      }
+    }
+
     if (trackman_id) {
       const [duplicate] = await db.select({ id: bookingRequests.id, status: bookingRequests.status, userEmail: bookingRequests.userEmail })
         .from(bookingRequests)
@@ -47,7 +61,7 @@ router.post('/api/staff/manual-booking', isStaffOrAdmin, async (req, res) => {
       if (duplicate) {
         const terminalStatuses = ['cancelled', 'cancellation_pending', 'declined', 'no_show'];
         const sameEmail = user_email && duplicate.userEmail &&
-          user_email.toLowerCase() === duplicate.userEmail.toLowerCase();
+          resolvedEmail === duplicate.userEmail?.toLowerCase();
 
         if (terminalStatuses.includes(duplicate.status || '')) {
           await db.update(bookingRequests)
@@ -162,7 +176,7 @@ router.post('/api/staff/manual-booking', isStaffOrAdmin, async (req, res) => {
         
         const dayPass = dayPassResult.rows[0];
         
-        if (dayPass.purchaser_email.toLowerCase() !== user_email.toLowerCase()) {
+        if (dayPass.purchaser_email.toLowerCase() !== resolvedEmail) {
           await client.query('ROLLBACK');
           return res.status(403).json({ error: 'Day pass belongs to a different user' });
         }
@@ -184,7 +198,7 @@ router.post('/api/staff/manual-booking', isStaffOrAdmin, async (req, res) => {
          AND request_date = $2 
          AND status IN ('pending', 'approved', 'confirmed')
          FOR UPDATE`,
-        [user_email, request_date]
+        [resolvedEmail, request_date]
       );
       
       if (resource_id) {
@@ -217,16 +231,17 @@ router.post('/api/staff/manual-booking', isStaffOrAdmin, async (req, res) => {
       
       const insertResult = await client.query(
         `INSERT INTO booking_requests (
-          user_email, user_name, resource_id, 
+          user_email, user_name, user_id, resource_id, 
           request_date, start_time, duration_minutes, end_time,
           declared_player_count, request_participants,
           trackman_booking_id, trackman_external_id, origin,
           status, created_at, updated_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW(), NOW())
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW(), NOW())
         RETURNING *`,
         [
-          user_email.toLowerCase(),
+          resolvedEmail,
           user_name || null,
+          resolvedUserId || null,
           resource_id || null,
           request_date,
           start_time,
@@ -295,7 +310,7 @@ router.post('/api/staff/manual-booking', isStaffOrAdmin, async (req, res) => {
             sessionDate: request_date,
             startTime: start_time,
             endTime: (row.endTime as string) || end_time,
-            ownerEmail: user_email.toLowerCase(),
+            ownerEmail: resolvedEmail,
             ownerName: user_name || row.userName || undefined,
             source: 'staff_manual',
             createdBy: 'staff_manual_day_pass'

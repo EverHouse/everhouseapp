@@ -17,6 +17,7 @@ import { getSettingValue } from '../../core/settingsHelper';
 import { ensureSessionForBooking } from '../../core/bookingService/sessionManager';
 import { recalculateSessionFees } from '../../core/billing/unifiedFeeService';
 import { syncBookingInvoice, finalizeAndPayInvoice } from '../../core/billing/bookingInvoiceService';
+import { resolveUserByEmail } from '../../core/stripe/customers';
 
 const router = Router();
 
@@ -211,7 +212,16 @@ router.post('/api/staff/conference-room/booking', isStaffOrAdmin, async (req: Re
       return res.status(400).json({ error: 'Invalid duration. Must be between 30 and 240 minutes.' });
     }
 
-    const normalizedEmail = normalizeEmail(hostEmail);
+    let normalizedEmail = normalizeEmail(hostEmail);
+    let resolvedUserId: string | null = null;
+    const resolved = await resolveUserByEmail(normalizedEmail);
+    if (resolved) {
+      if (resolved.matchType !== 'direct') {
+        logger.info('[StaffConfRoom] Resolved linked email to primary', { extra: { originalEmail: normalizedEmail, resolvedEmail: resolved.primaryEmail, matchType: resolved.matchType } });
+        normalizedEmail = resolved.primaryEmail.toLowerCase();
+      }
+      resolvedUserId = resolved.userId;
+    }
 
     const resourceResult = await db.execute(sql`SELECT id, name FROM resources WHERE type = 'conference_room' LIMIT 1`);
 
@@ -272,15 +282,16 @@ router.post('/api/staff/conference-room/booking', isStaffOrAdmin, async (req: Re
 
       const insertResult = await client.query(
         `INSERT INTO booking_requests (
-          user_email, user_name, resource_id,
+          user_email, user_name, user_id, resource_id,
           request_date, start_time, duration_minutes, end_time,
           status, origin,
           created_at, updated_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), NOW())
         RETURNING id`,
         [
           normalizedEmail,
           hostName || null,
+          resolvedUserId || null,
           resourceId,
           date,
           startTimeWithSeconds,
