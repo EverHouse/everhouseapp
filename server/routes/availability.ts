@@ -170,9 +170,9 @@ router.post('/api/availability/batch', async (req, res) => {
       db.execute(sql`SELECT id, type FROM resources WHERE id = ANY(${resourceIdsLiteral}::int[])`),
       ignoreId
         ? db.execute(sql`SELECT resource_id, start_time, end_time FROM booking_requests 
-             WHERE resource_id = ANY(${resourceIdsLiteral}::int[]) AND request_date = ${date} AND status IN ('approved', 'confirmed', 'cancellation_pending') AND id != ${ignoreId}`)
+             WHERE resource_id = ANY(${resourceIdsLiteral}::int[]) AND request_date = ${date} AND status IN ('approved', 'confirmed', 'cancellation_pending', 'attended') AND id != ${ignoreId}`)
         : db.execute(sql`SELECT resource_id, start_time, end_time FROM booking_requests 
-             WHERE resource_id = ANY(${resourceIdsLiteral}::int[]) AND request_date = ${date} AND status IN ('approved', 'confirmed', 'cancellation_pending')`),
+             WHERE resource_id = ANY(${resourceIdsLiteral}::int[]) AND request_date = ${date} AND status IN ('approved', 'confirmed', 'cancellation_pending', 'attended')`),
       db.execute(sql`SELECT resource_id, start_time, end_time FROM availability_blocks 
          WHERE resource_id = ANY(${resourceIdsLiteral}::int[]) AND block_date = ${date}`),
       db.execute(sql`SELECT tub.bay_number, tub.start_time, tub.end_time FROM trackman_unmatched_bookings tub
@@ -322,9 +322,9 @@ router.get('/api/availability', async (req, res) => {
     // Include both 'approved' and 'confirmed' statuses as active bookings that block availability
     const bookedSlots = ignoreId
       ? await db.execute(sql`SELECT start_time, end_time FROM booking_requests 
-           WHERE resource_id = ${resource_id} AND request_date = ${date} AND status IN ('approved', 'confirmed', 'cancellation_pending') AND id != ${ignoreId}`)
+           WHERE resource_id = ${resource_id} AND request_date = ${date} AND status IN ('approved', 'confirmed', 'cancellation_pending', 'attended') AND id != ${ignoreId}`)
       : await db.execute(sql`SELECT start_time, end_time FROM booking_requests 
-           WHERE resource_id = ${resource_id} AND request_date = ${date} AND status IN ('approved', 'confirmed', 'cancellation_pending')`);
+           WHERE resource_id = ${resource_id} AND request_date = ${date} AND status IN ('approved', 'confirmed', 'cancellation_pending', 'attended')`);
     
     const blockedSlots = await db.execute(sql`SELECT start_time, end_time FROM availability_blocks 
        WHERE resource_id = ${resource_id} AND block_date = ${date}`);
