@@ -13,7 +13,7 @@ export interface UserProfile {
   phone: string;
   joinDate?: string;
   avatar?: string;
-  role?: 'member' | 'staff' | 'admin';
+  role?: 'member' | 'staff' | 'admin' | 'visitor' | string;
   mindbodyClientId?: string;
   lifetimeVisits?: number;
   lastBookingDate?: string;

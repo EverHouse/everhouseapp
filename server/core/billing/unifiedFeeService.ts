@@ -884,7 +884,7 @@ export async function computeFeeBreakdown(params: FeeComputeParams): Promise<Fee
             guestSlotMinutes,
             totalNonMemberMinutes: nonMemberMinutes,
             newMinutesAllocated: ownerLineItem.minutesAllocated,
-            totalAfterSession,
+            totalAfterSession: usedMinutesToday + ownerLineItem.minutesAllocated,
             newOverageCents: ownerLineItem.overageCents
           }
         });

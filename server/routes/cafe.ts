@@ -132,7 +132,7 @@ router.delete('/api/cafe-menu/:id', isStaffOrAdmin, async (req, res) => {
       try {
         const { getStripeClient } = await import('../core/stripe/client');
         const stripe = await getStripeClient();
-        const product = await stripe.products.retrieve(existing[0].stripeProductId);
+        const product = await stripe.products.retrieve(existing[0].stripeProductId) as unknown as { deleted?: boolean };
         if (product && !product.deleted) {
           return res.status(400).json({ error: 'This item is linked to an active Stripe product. Archive it in the Stripe Dashboard instead.' });
         }

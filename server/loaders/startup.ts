@@ -541,7 +541,7 @@ export async function runStartupTasks(): Promise<void> {
       WHERE status = 'dead' AND operation = 'sync_tier'
         AND last_error LIKE '%was not one of the allowed options%'
     `);
-    const rows = (deadItems as { rows: Array<{ id: number; payload: string }> }).rows;
+    const rows = (deadItems as unknown as { rows: Array<{ id: number; payload: string }> }).rows;
     if (rows.length > 0) {
       const { enqueueHubSpotSync } = await import('../core/hubspot/queue');
       for (const row of rows) {
