@@ -23,6 +23,7 @@ import { PRICING } from '../../core/billing/pricingConfig';
 import { createGuestPassHold } from '../../core/billing/guestPassHoldService';
 import { ensureSessionForBooking, createSessionWithUsageTracking } from '../../core/bookingService/sessionManager';
 import { getErrorMessage } from '../../utils/errorUtils';
+import { resolveUserByEmail } from '../../core/stripe/customers';
 import { cancelPendingPaymentIntentsForBooking } from '../../core/billing/paymentIntentCleanup';
 import { normalizeToISODate } from '../../utils/dateNormalize';
 import { bookingRateLimiter } from '../../middleware/rateLimiting';
@@ -118,6 +119,8 @@ router.get('/api/booking-requests', isAuthenticated, async (req, res) => {
       conditions.push(
         or(
           sql`LOWER(${bookingRequests.userEmail}) = ${userEmailLower}`,
+          sql`LOWER(${bookingRequests.userEmail}) IN (SELECT LOWER(ule.linked_email) FROM user_linked_emails ule WHERE LOWER(ule.primary_email) = ${userEmailLower})`,
+          sql`LOWER(${bookingRequests.userEmail}) IN (SELECT LOWER(ule.primary_email) FROM user_linked_emails ule WHERE LOWER(ule.linked_email) = ${userEmailLower})`,
           sql`${bookingRequests.sessionId} IN (SELECT bp.session_id FROM booking_participants bp JOIN users u ON bp.user_id = u.id WHERE LOWER(u.email) = ${userEmailLower})`
         )
       );
@@ -434,12 +437,27 @@ router.post('/api/booking-requests', isAuthenticated, bookingRateLimiter, valida
     }
     
     const sessionEmail = sessionUser.email?.toLowerCase() || '';
-    const requestEmail = user_email.toLowerCase();
+    let requestEmail = user_email.toLowerCase();
+    let resolvedUserId: string | null = null;
+    
+    const resolved = await resolveUserByEmail(requestEmail);
+    if (resolved) {
+      if (resolved.matchType !== 'direct') {
+        logger.info('[Booking] Resolved linked email to primary for booking creation', { extra: { originalEmail: requestEmail, resolvedEmail: resolved.primaryEmail, matchType: resolved.matchType } });
+        requestEmail = resolved.primaryEmail.toLowerCase();
+      }
+      resolvedUserId = resolved.userId;
+    }
     
     if (sessionEmail !== requestEmail) {
-      const hasStaffAccess = await isStaffOrAdminCheck(sessionEmail);
-      if (!hasStaffAccess) {
-        return res.status(403).json({ error: 'You can only create booking requests for yourself' });
+      const sessionResolved = await resolveUserByEmail(sessionEmail);
+      const sessionPrimary = sessionResolved?.primaryEmail?.toLowerCase() || sessionEmail;
+      
+      if (sessionPrimary !== requestEmail) {
+        const hasStaffAccess = await isStaffOrAdminCheck(sessionEmail);
+        if (!hasStaffAccess) {
+          return res.status(403).json({ error: 'You can only create booking requests for yourself' });
+        }
       }
     }
     
@@ -564,7 +582,7 @@ router.post('/api/booking-requests', isAuthenticated, bookingRateLimiter, valida
         }
       }
       
-      const limitCheck = await checkDailyBookingLimit(user_email, request_date, duration_minutes, user_tier, resourceType);
+      const limitCheck = await checkDailyBookingLimit(requestEmail, request_date, duration_minutes, user_tier, resourceType);
       if (!limitCheck.allowed) {
         await client.query('ROLLBACK');
         return res.status(403).json({ 
@@ -653,7 +671,7 @@ router.post('/api/booking-requests', isAuthenticated, bookingRateLimiter, valida
       
       const seenEmails = new Set<string>();
       const seenUserIds = new Set<string>();
-      seenEmails.add(user_email.toLowerCase());
+      seenEmails.add(requestEmail);
       sanitizedParticipants = sanitizedParticipants.filter((p: SanitizedParticipant) => {
         if (p.userId && seenUserIds.has(p.userId)) return false;
         if (p.email && seenEmails.has(p.email.toLowerCase())) return false;
@@ -700,16 +718,17 @@ router.post('/api/booking-requests', isAuthenticated, bookingRateLimiter, valida
       
       const insertResult = await client.query(
         `INSERT INTO booking_requests (
-          user_email, user_name, resource_id, resource_preference, 
+          user_email, user_name, user_id, resource_id, resource_preference, 
           request_date, start_time, duration_minutes, end_time, notes,
           declared_player_count, member_notes,
           guardian_name, guardian_relationship, guardian_phone, guardian_consent_at,
           request_participants, status, created_at, updated_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, NOW(), NOW())
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, NOW(), NOW())
         RETURNING *`,
         [
-          user_email.toLowerCase(),
+          requestEmail,
           user_name,
+          resolvedUserId || null,
           resource_id || null,
           resource_preference || null,
           request_date,
@@ -732,7 +751,7 @@ router.post('/api/booking-requests', isAuthenticated, bookingRateLimiter, valida
       if (guestCount > 0) {
         const bookingId = insertResult.rows[0].id;
         const holdResult = await createGuestPassHold(
-          user_email.toLowerCase(),
+          requestEmail,
           bookingId,
           guestCount,
           client
@@ -785,8 +804,8 @@ router.post('/api/booking-requests', isAuthenticated, bookingRateLimiter, valida
 
         const participants = [{
           participantType: 'owner' as const,
-          displayName: user_name || user_email,
-          userId: sessionUser?.id || undefined,
+          displayName: user_name || requestEmail,
+          userId: resolvedUserId || sessionUser?.id || undefined,
           guestId: undefined
         }];
 
@@ -796,7 +815,7 @@ router.post('/api/booking-requests', isAuthenticated, bookingRateLimiter, valida
           sessionDate: request_date,
           startTime: start_time,
           endTime: confEndTime,
-          ownerEmail: user_email.toLowerCase(),
+          ownerEmail: requestEmail,
           durationMinutes: confDurationMinutes > 0 ? confDurationMinutes : duration_minutes,
           declaredPlayerCount: 1,
           participants
@@ -812,7 +831,7 @@ router.post('/api/booking-requests', isAuthenticated, bookingRateLimiter, valida
             sessionDate: request_date,
             startTime: start_time,
             endTime: row.endTime || end_time,
-            ownerEmail: user_email.toLowerCase(),
+            ownerEmail: requestEmail,
             ownerName: user_name || undefined,
             source: 'member_request',
             createdBy: 'conference_room_auto_confirm'
@@ -828,7 +847,7 @@ router.post('/api/booking-requests', isAuthenticated, bookingRateLimiter, valida
           sessionDate: request_date,
           startTime: start_time,
           endTime: row.endTime || end_time,
-          ownerEmail: user_email.toLowerCase(),
+          ownerEmail: requestEmail,
           ownerName: user_name || undefined,
           source: 'member_request',
           createdBy: 'conference_room_auto_confirm'

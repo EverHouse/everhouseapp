@@ -556,4 +556,56 @@ router.post('/api/admin/trackman/cleanup-duplicates', isStaffOrAdmin, async (req
   }
 });
 
+router.post('/api/admin/repair-linked-email-bookings', isStaffOrAdmin, async (req, res) => {
+  try {
+    const result = await db.execute(sql`
+      UPDATE booking_requests br
+      SET 
+        user_email = u.email,
+        user_id = u.id,
+        updated_at = NOW()
+      FROM user_linked_emails ule
+      JOIN users u ON LOWER(u.email) = LOWER(ule.primary_email) AND u.archived_at IS NULL
+      WHERE LOWER(br.user_email) = LOWER(ule.linked_email)
+        AND LOWER(br.user_email) != LOWER(u.email)
+      RETURNING br.id, br.user_email AS new_email, ule.linked_email AS old_email
+    `);
+    
+    const manualResult = await db.execute(sql`
+      UPDATE booking_requests br
+      SET
+        user_email = u.email,
+        user_id = u.id,
+        updated_at = NOW()
+      FROM users u
+      WHERE u.archived_at IS NULL
+        AND u.manually_linked_emails IS NOT NULL
+        AND u.manually_linked_emails @> to_jsonb(LOWER(br.user_email))
+        AND LOWER(br.user_email) != LOWER(u.email)
+      RETURNING br.id, br.user_email AS new_email
+    `);
+
+    const totalFixed = (result.rows?.length || 0) + (manualResult.rows?.length || 0);
+    
+    logFromRequest(req, {
+      action: 'update_booking',
+      resourceType: 'booking_request',
+      details: { operation: 'repair_linked_email_bookings', totalFixed, linkedFixed: result.rows?.length || 0, manualFixed: manualResult.rows?.length || 0 }
+    });
+
+    logger.info('[Admin] Repaired linked email bookings', { extra: { linkedFixed: result.rows?.length || 0, manualFixed: manualResult.rows?.length || 0 } });
+    
+    res.json({ 
+      success: true, 
+      linkedFixed: result.rows?.length || 0,
+      manualFixed: manualResult.rows?.length || 0,
+      totalFixed,
+      details: result.rows || []
+    });
+  } catch (error: unknown) {
+    logger.error('[Admin] Failed to repair linked email bookings', { error: error instanceof Error ? error : new Error(String(error)) });
+    res.status(500).json({ error: 'Failed to repair linked email bookings', details: safeErrorDetail(error) });
+  }
+});
+
 export default router;
