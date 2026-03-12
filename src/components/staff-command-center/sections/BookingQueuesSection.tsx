@@ -62,7 +62,7 @@ const PendingRequestsCard = memo<PendingRequestsCardProps>(({
           )}
         </div>
       </div>
-      <div ref={listRef}>
+      <div ref={listRef} className="relative">
         {pendingRequests.length === 0 ? (
           <div className="flex-1 flex flex-col items-center justify-center py-8">
             <EmptyState icon="check_circle" title="All caught up!" description="No pending requests" variant="compact" />
@@ -74,8 +74,7 @@ const PendingRequestsCard = memo<PendingRequestsCardProps>(({
             return (
               <GlassListRow 
                 key={`${request.source || 'request'}-${request.id}`} 
-                className="flex-col !items-stretch !gap-2 animate-slide-up-stagger"
-                style={{ '--stagger-index': index } as React.CSSProperties}
+                className="flex-col !items-stretch !gap-2"
               >
                 {request.status === 'cancellation_pending' ? (
                   <>
@@ -241,7 +240,7 @@ const UpcomingBookingsCard = memo<UpcomingBookingsCardProps>(({
           <button onClick={() => navigateToTab('simulator')} className="tactile-btn text-xs text-primary/80 dark:text-white/80 hover:underline">View all</button>
         )}
       </div>
-      <div ref={listRef}>
+      <div ref={listRef} className="relative">
         {mergedUpcomingBookings.length === 0 ? (
           <div className="flex-1 flex flex-col items-center justify-center py-8">
             <EmptyState icon="calendar_today" title="No bookings today" variant="compact" />
@@ -257,8 +256,7 @@ const UpcomingBookingsCard = memo<UpcomingBookingsCardProps>(({
               <GlassListRow 
                 key={`${isUnmatched ? 'unmatched-' : ''}${booking.id}`}
                 onClick={() => navigateToTab('simulator')}
-                className={`flex-col !items-stretch !gap-2 animate-slide-up-stagger ${cardClass}`}
-                style={{ '--stagger-index': index } as React.CSSProperties}
+                className={`flex-col !items-stretch !gap-2 ${cardClass}`}
               >
                 <div className="flex items-start gap-3">
                   <DateBlock dateStr={booking.request_date || booking.slot_date || ''} today={today} />
