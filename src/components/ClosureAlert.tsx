@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../contexts/ThemeContext';
 import { useData } from '../contexts/DataContext';
@@ -32,6 +32,8 @@ const ClosureAlert: React.FC = () => {
   const [closures, setClosures] = useState<Closure[]>([]);
   const [dismissedIds, setDismissedIds] = useState<Set<number>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
+  const [isExiting, setIsExiting] = useState(false);
+  const exitTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const getStorageKey = () => `eh_dismissed_notices_${user?.email || 'guest'}`;
 
@@ -91,15 +93,26 @@ const ClosureAlert: React.FC = () => {
     });
   }, [closures, dismissedIds, isStaffOrAdmin, isViewingAsMember]);
 
-  const handleDismiss = (e: React.MouseEvent) => {
+  useEffect(() => {
+    return () => {
+      if (exitTimer.current) clearTimeout(exitTimer.current);
+    };
+  }, []);
+
+  const handleDismiss = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
     const closure = activeClosures[0];
     if (!closure) return;
-    const newDismissed = new Set(dismissedIds);
-    newDismissed.add(closure.id);
-    setDismissedIds(newDismissed);
-    localStorage.setItem(getStorageKey(), JSON.stringify([...newDismissed]));
-  };
+    setIsExiting(true);
+    exitTimer.current = setTimeout(() => {
+      const newDismissed = new Set(dismissedIds);
+      newDismissed.add(closure.id);
+      setDismissedIds(newDismissed);
+      localStorage.setItem(getStorageKey(), JSON.stringify([...newDismissed]));
+      setIsExiting(false);
+      exitTimer.current = null;
+    }, 250);
+  }, [activeClosures, dismissedIds]);
 
   const handleViewDetails = () => {
     navigate('/updates?tab=notices');
@@ -146,7 +159,9 @@ const ClosureAlert: React.FC = () => {
 
   return (
     <div 
-      className={`mb-4 py-2 px-4 rounded-xl flex items-center justify-between gap-3 cursor-pointer transition-all duration-fast ${
+      className={`mb-4 py-2 px-4 rounded-xl flex items-center justify-between gap-3 cursor-pointer transition-all duration-normal ease-spring-smooth ${
+        isExiting ? 'opacity-0 scale-95 max-h-0 mb-0 py-0 overflow-hidden' : 'animate-content-enter max-h-[200px]'
+      } ${
         blocking
           ? (isDark ? 'bg-red-500/20 hover:bg-red-500/30' : 'bg-red-100 hover:bg-red-200')
           : (isDark ? 'bg-amber-500/20 hover:bg-amber-500/30' : 'bg-amber-100 hover:bg-amber-200')

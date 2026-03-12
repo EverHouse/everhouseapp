@@ -199,6 +199,9 @@ const Dashboard: React.FC = () => {
   const [showGuestCheckin, setShowGuestCheckin] = useState(false);
   const [isCardOpen, setIsCardOpen] = useState(false);
   const [bannerDismissed, setBannerDismissed] = useState(false);
+  const [bannerExiting, setBannerExiting] = useState(false);
+  const bannerExitTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (bannerExitTimer.current) clearTimeout(bannerExitTimer.current); }, []);
   // Optimistic UI state
   const [optimisticCancelledIds, setOptimisticCancelledIds] = useState<Set<number>>(new Set());
   const [scheduleRef] = useAutoAnimate();
@@ -767,7 +770,7 @@ const Dashboard: React.FC = () => {
         
         <SmoothReveal isLoaded={!!bannerAnnouncement && !bannerDismissed && !isBannerInitiallyDismissed} delay={50}>
         {bannerAnnouncement && !bannerDismissed && !isBannerInitiallyDismissed && (
-          <div className={`mb-4 py-3 px-4 rounded-xl flex items-start justify-between gap-3 animate-pop-in ${isDark ? 'bg-lavender/20 border border-lavender/30' : 'bg-lavender/30 border border-lavender/40'}`}>
+          <div className={`mb-4 py-3 px-4 rounded-xl flex items-start justify-between gap-3 transition-all duration-normal ease-spring-smooth ${bannerExiting ? 'opacity-0 scale-95 max-h-0 mb-0 py-0 overflow-hidden' : 'animate-pop-in max-h-[200px]'} ${isDark ? 'bg-lavender/20 border border-lavender/30' : 'bg-lavender/30 border border-lavender/40'}`}>
             <div className="flex items-start gap-3 min-w-0 flex-1">
               <span className={`material-symbols-outlined text-xl flex-shrink-0 mt-0.5 ${isDark ? 'text-lavender' : 'text-primary'}`}>campaign</span>
               <div className="min-w-0 flex-1">
@@ -801,7 +804,11 @@ const Dashboard: React.FC = () => {
                 if (user?.email && bannerAnnouncement.id) {
                   localStorage.setItem(`eh_banner_dismissed_${user.email}`, bannerAnnouncement.id);
                 }
-                setBannerDismissed(true);
+                setBannerExiting(true);
+                bannerExitTimer.current = setTimeout(() => {
+                  setBannerDismissed(true);
+                  bannerExitTimer.current = null;
+                }, 250);
               }}
               className={`p-1.5 min-w-[32px] min-h-[32px] flex items-center justify-center rounded-full transition-colors flex-shrink-0 ${isDark ? 'hover:bg-white/10 text-white/60 hover:text-white' : 'hover:bg-black/10 text-primary/60 hover:text-primary'}`}
               aria-label="Dismiss banner"

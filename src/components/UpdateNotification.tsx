@@ -1,14 +1,57 @@
-import React from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { useServiceWorkerUpdate } from '../hooks/useServiceWorkerUpdate';
+
+const EXIT_DURATION = 250;
 
 export const UpdateNotification: React.FC = () => {
   const { updateAvailable, isUpdating, applyUpdate, dismissUpdate } = useServiceWorkerUpdate();
+  const [isExiting, setIsExiting] = useState(false);
+  const [rendered, setRendered] = useState(false);
+  const exitTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  if (!updateAvailable) return null;
+  useEffect(() => {
+    if (exitTimer.current) {
+      clearTimeout(exitTimer.current);
+      exitTimer.current = null;
+    }
+    setIsExiting(false);
+
+    if (updateAvailable && !rendered) {
+      setRendered(true);
+    } else if (!updateAvailable && rendered) {
+      setIsExiting(true);
+      exitTimer.current = setTimeout(() => {
+        setIsExiting(false);
+        setRendered(false);
+        exitTimer.current = null;
+      }, EXIT_DURATION);
+    }
+
+    return () => {
+      if (exitTimer.current) {
+        clearTimeout(exitTimer.current);
+        exitTimer.current = null;
+      }
+    };
+  }, [updateAvailable]);
+
+  const handleDismiss = useCallback(() => {
+    setIsExiting(true);
+    exitTimer.current = setTimeout(() => {
+      dismissUpdate();
+      setIsExiting(false);
+      setRendered(false);
+      exitTimer.current = null;
+    }, EXIT_DURATION);
+  }, [dismissUpdate]);
+
+  if (!rendered) return null;
 
   return (
     <div 
-      className="fixed left-4 right-4 md:left-auto md:right-6 md:max-w-sm animate-pop-in"
+      className={`fixed left-4 right-4 md:left-auto md:right-6 md:max-w-sm transition-all duration-normal ease-spring-smooth ${
+        isExiting ? 'opacity-0 scale-95 translate-y-[-8px]' : 'animate-pop-in'
+      }`}
       style={{ 
         top: 'max(120px, calc(env(safe-area-inset-top) + 100px))',
         zIndex: 'var(--z-toast, 10500)'
@@ -35,7 +78,7 @@ export const UpdateNotification: React.FC = () => {
                 {isUpdating ? 'Updating...' : 'Refresh Now'}
               </button>
               <button
-                onClick={dismissUpdate}
+                onClick={handleDismiss}
                 disabled={isUpdating}
                 className="px-4 py-2 text-xs font-medium text-muted hover:text-foreground transition-colors tactile-btn"
               >
@@ -44,7 +87,7 @@ export const UpdateNotification: React.FC = () => {
             </div>
           </div>
           <button
-            onClick={dismissUpdate}
+            onClick={handleDismiss}
             className="p-1.5 hover:bg-black/5 dark:hover:bg-white/5 rounded-full transition-colors tactile-btn"
             aria-label="Dismiss"
           >

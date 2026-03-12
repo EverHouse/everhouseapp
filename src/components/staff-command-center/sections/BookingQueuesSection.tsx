@@ -1,5 +1,6 @@
 import React, { useMemo, useCallback, useState, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAutoAnimate } from '@formkit/auto-animate/react';
 import EmptyState from '../../EmptyState';
 import { formatTime12Hour, getNowTimePacific, getTodayPacific, formatRelativeTime } from '../../../utils/dateUtils';
 import { DateBlock, GlassListRow } from '../helpers';
@@ -31,6 +32,7 @@ const PendingRequestsCard = memo<PendingRequestsCardProps>(({
 }) => {
   const hasCancellations = pendingRequests.some(r => r.status === 'cancellation_pending');
   const cancellationCount = pendingRequests.filter(r => r.status === 'cancellation_pending').length;
+  const [listRef] = useAutoAnimate();
 
   return (
     <div 
@@ -60,7 +62,7 @@ const PendingRequestsCard = memo<PendingRequestsCardProps>(({
           )}
         </div>
       </div>
-      <div>
+      <div ref={listRef}>
         {pendingRequests.length === 0 ? (
           <div className="flex-1 flex flex-col items-center justify-center py-8">
             <EmptyState icon="check_circle" title="All caught up!" description="No pending requests" variant="compact" />
@@ -216,6 +218,7 @@ const UpcomingBookingsCard = memo<UpcomingBookingsCardProps>(({
 }) => {
   const unmatchedCount = mergedUpcomingBookings.filter(b => b.is_unmatched).length;
   const hasUnmatchedBookings = unmatchedCount > 0;
+  const [listRef] = useAutoAnimate();
   
   return (
     <div 
@@ -238,7 +241,7 @@ const UpcomingBookingsCard = memo<UpcomingBookingsCardProps>(({
           <button onClick={() => navigateToTab('simulator')} className="tactile-btn text-xs text-primary/80 dark:text-white/80 hover:underline">View all</button>
         )}
       </div>
-      <div>
+      <div ref={listRef}>
         {mergedUpcomingBookings.length === 0 ? (
           <div className="flex-1 flex flex-col items-center justify-center py-8">
             <EmptyState icon="calendar_today" title="No bookings today" variant="compact" />

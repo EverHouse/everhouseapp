@@ -1,27 +1,43 @@
-import React from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAnnouncementBadge } from '../contexts/AnnouncementBadgeContext';
 import { Announcement } from '../contexts/DataContext';
 import { haptic } from '../utils/haptics';
 
+const EXIT_DURATION = 250;
+
 const AnnouncementAlert: React.FC = () => {
   const navigate = useNavigate();
   const { effectiveTheme } = useTheme();
   const isDark = effectiveTheme === 'dark';
   const { unseenHighPriority, markSingleAsSeen, markAllAsSeen } = useAnnouncementBadge();
+  const [isExiting, setIsExiting] = useState(false);
+  const exitTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  useEffect(() => {
+    return () => {
+      if (exitTimer.current) clearTimeout(exitTimer.current);
+    };
+  }, []);
+
+  const handleDismiss = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    haptic.light();
+    setIsExiting(true);
+    exitTimer.current = setTimeout(() => {
+      markSingleAsSeen(unseenHighPriority[0]?.id);
+      setIsExiting(false);
+      exitTimer.current = null;
+    }, EXIT_DURATION);
+  }, [markSingleAsSeen, unseenHighPriority]);
+
+  if (unseenHighPriority.length === 0 && !isExiting) return null;
   if (unseenHighPriority.length === 0) return null;
 
   const latestAnnouncement = unseenHighPriority[0];
   const hasMultiple = unseenHighPriority.length > 1;
   const isUpdate = latestAnnouncement.type === 'update';
-
-  const handleDismiss = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    haptic.light();
-    markSingleAsSeen(latestAnnouncement.id);
-  };
 
   const handleAnnouncementClick = (item: Announcement) => {
     haptic.selection();
@@ -90,7 +106,9 @@ const AnnouncementAlert: React.FC = () => {
 
   return (
     <article 
-      className={`mb-6 p-4 rounded-xl border cursor-pointer transition-all duration-fast ${cardColors} focus-visible:ring-2 focus-visible:ring-[#CCB8E4] focus-visible:outline-none`}
+      className={`mb-6 p-4 rounded-xl border cursor-pointer transition-all duration-normal ease-spring-smooth ${cardColors} focus-visible:ring-2 focus-visible:ring-[#CCB8E4] focus-visible:outline-none ${
+        isExiting ? 'opacity-0 scale-95 max-h-0 mb-0 py-0 overflow-hidden' : 'animate-content-enter max-h-[200px]'
+      }`}
       onClick={handleViewAll}
       onKeyDown={handleKeyDown}
       onKeyUp={handleKeyUp}

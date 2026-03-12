@@ -1666,6 +1666,21 @@ html.dark .border-accessible {
   animation: popIn 0.25s var(--m3-standard-decel) both;
 }
 
+@keyframes bannerSlideDown {
+  0% {
+    opacity: 0;
+    transform: translateY(-100%);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-banner-slide-down {
+  animation: bannerSlideDown 0.3s var(--m3-emphasized-decel) both;
+}
+
 @keyframes fabEnter {
   0% {
     opacity: 0;
@@ -2558,6 +2573,7 @@ html.dark .border-accessible {
   .animate-icon-morph,
   .animate-slide-up-stagger,
   .animate-pop-in,
+  .animate-banner-slide-down,
   .animate-page-enter,
   .animate-content-enter,
   .animate-content-enter-delay-1,

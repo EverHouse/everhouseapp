@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useNavigationLoading } from '../contexts/NavigationLoadingContext';
@@ -16,6 +16,8 @@ interface StaffMobileSidebarProps {
   isAdmin?: boolean;
 }
 
+const EXIT_DURATION = 250;
+
 export const StaffMobileSidebar: React.FC<StaffMobileSidebarProps> = ({
   isOpen,
   onClose,
@@ -27,6 +29,35 @@ export const StaffMobileSidebar: React.FC<StaffMobileSidebarProps> = ({
   const { startNavigation } = useNavigationLoading();
   const [showBugReport, setShowBugReport] = useState(false);
   const [optimisticTab, setOptimisticTab] = useState<TabType | null>(null);
+  const [isClosing, setIsClosing] = useState(false);
+  const [rendered, setRendered] = useState(false);
+  const closingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (closingTimer.current) {
+      clearTimeout(closingTimer.current);
+      closingTimer.current = null;
+    }
+
+    if (isOpen) {
+      setRendered(true);
+      setIsClosing(false);
+    } else if (rendered) {
+      setIsClosing(true);
+      closingTimer.current = setTimeout(() => {
+        setRendered(false);
+        setIsClosing(false);
+        closingTimer.current = null;
+      }, EXIT_DURATION);
+    }
+
+    return () => {
+      if (closingTimer.current) {
+        clearTimeout(closingTimer.current);
+        closingTimer.current = null;
+      }
+    };
+  }, [isOpen]);
 
   useEffect(() => {
     prefetchAdjacentStaffRoutes(location.pathname);
@@ -51,15 +82,19 @@ export const StaffMobileSidebar: React.FC<StaffMobileSidebarProps> = ({
 
   useScrollLockManager(isOpen);
 
+  const handleClose = useCallback(() => {
+    onClose();
+  }, [onClose]);
+
   const handleNavClick = (tab: TabType) => {
     navigateToTab(tab);
-    onClose();
+    handleClose();
   };
 
   const handleHomeClick = () => {
     startNavigation();
     navigate('/');
-    onClose();
+    handleClose();
   };
 
   const NavButton: React.FC<{ item: typeof MAIN_NAV_ITEMS[number] }> = ({ item }) => {
@@ -85,17 +120,21 @@ export const StaffMobileSidebar: React.FC<StaffMobileSidebarProps> = ({
     );
   };
 
-  if (!isOpen) return null;
+  if (!rendered) return null;
 
   const sidebarContent = (
     <div className="fixed inset-0" style={{ zIndex: 'var(--z-modal, 100)' }}>
       <div 
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-        onClick={onClose}
+        className={`absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity duration-normal ${
+          isClosing ? 'opacity-0' : 'opacity-100 animate-backdrop-fade-in'
+        }`}
+        onClick={handleClose}
       />
       
       <aside 
-        className="absolute left-0 top-0 bottom-0 w-72 bg-[#293515] shadow-2xl flex flex-col animate-slide-in-left"
+        className={`absolute left-0 top-0 bottom-0 w-72 bg-[#293515] shadow-2xl flex flex-col ${
+          isClosing ? 'animate-slide-out-left' : 'animate-slide-in-left'
+        }`}
         style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
       >
         <button 
