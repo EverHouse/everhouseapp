@@ -218,8 +218,6 @@ interface BalanceParticipantRow {
   end_time: string;
   resource_name: string | null;
   ledger_fee: string;
-  pending_snapshot_count: string;
-  total_snapshot_count: string;
   owner_email?: string;
 }
 
@@ -235,8 +233,6 @@ interface GuestBalanceRow {
   end_time: string;
   resource_name: string | null;
   owner_email: string;
-  pending_snapshot_count: string;
-  total_snapshot_count: string;
 }
 
 interface UncachedSessionRow {
@@ -1270,6 +1266,7 @@ router.get('/api/member/balance', isAuthenticated, async (req: Request, res: Res
 
     // Only show fees where there's a pending fee snapshot OR no snapshot at all (legacy)
     // Exclude sessions where all snapshots are cancelled/paid (orphaned cached_fee_cents)
+    // Also exclude cancelled/declined bookings and sessions older than 90 days
     const result = await db.execute(sql`
       SELECT 
         bp.id as participant_id,
@@ -1282,9 +1279,7 @@ router.get('/api/member/balance', isAuthenticated, async (req: Request, res: Res
         bs.start_time,
         bs.end_time,
         r.name as resource_name,
-        COALESCE(ul.overage_fee, 0) + COALESCE(ul.guest_fee, 0) as ledger_fee,
-        (SELECT COUNT(*) FROM booking_fee_snapshots bfs WHERE bfs.session_id = bp.session_id AND bfs.status = 'pending') as pending_snapshot_count,
-        (SELECT COUNT(*) FROM booking_fee_snapshots bfs WHERE bfs.session_id = bp.session_id) as total_snapshot_count
+        COALESCE(ul.overage_fee, 0) + COALESCE(ul.guest_fee, 0) as ledger_fee
        FROM booking_participants bp
        JOIN booking_sessions bs ON bs.id = bp.session_id
        JOIN users pu ON pu.id = bp.user_id
@@ -1295,6 +1290,17 @@ router.get('/api/member/balance', isAuthenticated, async (req: Request, res: Res
          AND (bp.payment_status = 'pending' OR bp.payment_status IS NULL)
          AND bp.participant_type IN ('owner', 'member')
          AND (bs.source IS NULL OR bs.source::text NOT IN ('trackman_import', 'trackman_webhook'))
+         AND bs.session_date >= CURRENT_DATE - INTERVAL '90 days'
+         AND NOT EXISTS (
+           SELECT 1 FROM booking_requests br2
+           WHERE br2.session_id = bs.id
+             AND br2.status IN ('cancelled', 'declined', 'cancellation_pending')
+         )
+         AND NOT EXISTS (
+           SELECT 1 FROM booking_fee_snapshots bfs
+           WHERE bfs.session_id = bp.session_id
+             AND bfs.status IN ('completed', 'paid')
+         )
        ORDER BY bs.session_date DESC, bs.start_time DESC
     `);
 
@@ -1310,9 +1316,7 @@ router.get('/api/member/balance', isAuthenticated, async (req: Request, res: Res
         bs.start_time,
         bs.end_time,
         r.name as resource_name,
-        owner_u.email as owner_email,
-        (SELECT COUNT(*) FROM booking_fee_snapshots bfs WHERE bfs.session_id = bp.session_id AND bfs.status = 'pending') as pending_snapshot_count,
-        (SELECT COUNT(*) FROM booking_fee_snapshots bfs WHERE bfs.session_id = bp.session_id) as total_snapshot_count
+        owner_u.email as owner_email
        FROM booking_participants bp
        JOIN booking_sessions bs ON bs.id = bp.session_id
        LEFT JOIN resources r ON r.id = bs.resource_id
@@ -1324,6 +1328,17 @@ router.get('/api/member/balance', isAuthenticated, async (req: Request, res: Res
          AND LOWER(owner_u.email) = ${memberEmail}
          AND bp.cached_fee_cents > 0
          AND (bs.source IS NULL OR bs.source::text NOT IN ('trackman_import', 'trackman_webhook'))
+         AND bs.session_date >= CURRENT_DATE - INTERVAL '90 days'
+         AND NOT EXISTS (
+           SELECT 1 FROM booking_requests br2
+           WHERE br2.session_id = bs.id
+             AND br2.status IN ('cancelled', 'declined', 'cancellation_pending')
+         )
+         AND NOT EXISTS (
+           SELECT 1 FROM booking_fee_snapshots bfs
+           WHERE bfs.session_id = bp.session_id
+             AND bfs.status IN ('completed', 'paid')
+         )
        ORDER BY bs.session_date DESC, bs.start_time DESC
     `);
 
@@ -1384,6 +1399,16 @@ router.get('/api/member/balance', isAuthenticated, async (req: Request, res: Res
            AND COALESCE(bp.cached_fee_cents, 0) = 0
            AND bs.session_date >= CURRENT_DATE - INTERVAL '90 days'
            AND (bs.source IS NULL OR bs.source::text NOT IN ('trackman_import', 'trackman_webhook'))
+           AND NOT EXISTS (
+             SELECT 1 FROM booking_requests br2
+             WHERE br2.session_id = bs.id
+               AND br2.status IN ('cancelled', 'declined', 'cancellation_pending')
+           )
+           AND NOT EXISTS (
+             SELECT 1 FROM booking_fee_snapshots bfs
+             WHERE bfs.session_id = bs.id
+               AND bfs.status IN ('completed', 'paid')
+           )
          LIMIT 20
       `);
 
