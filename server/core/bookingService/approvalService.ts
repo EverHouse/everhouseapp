@@ -2158,26 +2158,26 @@ export async function devConfirmBooking(params: DevConfirmParams) {
 
           if (resolvedUserId && !resolvedName) {
             const userResult = await tx.execute(sql`
-              SELECT name, first_name, last_name, email FROM users WHERE id = ${resolvedUserId}
+              SELECT first_name, last_name, email FROM users WHERE id = ${resolvedUserId}
             `);
             if (userResult.rows.length > 0) {
-              interface UserNameRow { id: string; name: string | null; first_name: string | null; last_name: string | null; email: string }
+              interface UserNameRow { first_name: string | null; last_name: string | null; email: string }
               const u = userResult.rows[0] as unknown as UserNameRow;
-              resolvedName = u.name || `${u.first_name || ''} ${u.last_name || ''}`.trim() || u.email || 'Member';
+              resolvedName = `${u.first_name || ''} ${u.last_name || ''}`.trim() || u.email || 'Member';
             }
           }
 
           if (!resolvedUserId && rp.email) {
             const userResult = await tx.execute(sql`
-              SELECT id, name, first_name, last_name FROM users WHERE LOWER(email) = LOWER(${rp.email})
+              SELECT id, first_name, last_name FROM users WHERE LOWER(email) = LOWER(${rp.email})
             `);
             if (userResult.rows.length > 0) {
-              interface UserNameLookupRow { id: string; name: string | null; first_name: string | null; last_name: string | null }
+              interface UserNameLookupRow { id: string; first_name: string | null; last_name: string | null }
               resolvedUserId = (userResult.rows[0] as unknown as UserNameLookupRow).id;
               participantType = 'member';
               if (!resolvedName) {
                 const u = userResult.rows[0] as unknown as UserNameLookupRow;
-                resolvedName = u.name || `${u.first_name || ''} ${u.last_name || ''}`.trim();
+                resolvedName = `${u.first_name || ''} ${u.last_name || ''}`.trim();
               }
             }
           }

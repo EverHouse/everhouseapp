@@ -155,7 +155,7 @@ interface TierRow {
 
 interface MemberMatchRow {
   id: string;
-  name: string;
+  display_name: string;
   email: string;
 }
 
@@ -173,7 +173,8 @@ interface OwnerRow {
 interface MemberDetailRow {
   id: string;
   email: string;
-  name: string;
+  first_name: string | null;
+  last_name: string | null;
   tier_name: string;
   can_book_simulators: boolean;
 }
@@ -1253,10 +1254,10 @@ router.post('/api/bookings/:id/staff-direct-add', isStaffOrAdmin, async (req: Re
       }
 
       // Check if guest email matches an existing member
-      let matchedMember: { id: string; name: string; email: string } | null = null;
+      let matchedMember: { id: string; display_name: string; email: string } | null = null;
       if (guestEmail) {
         const memberCheck = await db.execute(sql`
-          SELECT id, COALESCE(name, email) as name, email 
+          SELECT id, COALESCE(NULLIF(TRIM(CONCAT(first_name, ' ', last_name)), ''), email) as display_name, email 
           FROM users 
           WHERE LOWER(email) = LOWER(${guestEmail}) AND archived_at IS NULL
         `);
@@ -1275,14 +1276,14 @@ router.post('/api/bookings/:id/staff-direct-add', isStaffOrAdmin, async (req: Re
         
         if (existingCheck.rows.length > 0) {
           return res.status(400).json({ 
-            error: `${matchedMember.name} is already in this booking's roster` 
+            error: `${matchedMember.display_name} is already in this booking's roster` 
           });
         }
 
         await db.execute(sql`
           INSERT INTO booking_participants 
             (session_id, user_id, participant_type, display_name, payment_status, slot_duration)
-          VALUES (${sessionId}, ${matchedMember.id}, 'member', ${matchedMember.name}, 'pending', ${slotDuration})
+          VALUES (${sessionId}, ${matchedMember.id}, 'member', ${matchedMember.display_name}, 'pending', ${slotDuration})
         `);
 
         await logPaymentAudit({
@@ -1292,7 +1293,7 @@ router.post('/api/bookings/:id/staff-direct-add', isStaffOrAdmin, async (req: Re
           staffEmail,
           staffName,
           reason: overrideReason || 'Staff direct add - matched to member',
-          metadata: { participantType: 'member', guestEmail, matchedUserId: matchedMember.id, matchedName: matchedMember.name },
+          metadata: { participantType: 'member', guestEmail, matchedUserId: matchedMember.id, matchedName: matchedMember.display_name },
         });
 
         try {
@@ -1345,7 +1346,7 @@ router.post('/api/bookings/:id/staff-direct-add', isStaffOrAdmin, async (req: Re
           participantType: 'member',
           originalGuestEmail: guestEmail,
           matchedUserId: matchedMember.id,
-          matchedName: matchedMember.name,
+          matchedName: matchedMember.display_name,
           sessionId,
           reason: overrideReason || 'Staff direct add - matched to member'
         });
@@ -1359,10 +1360,10 @@ router.post('/api/bookings/:id/staff-direct-add', isStaffOrAdmin, async (req: Re
 
         return res.json({ 
           success: true, 
-          message: `Found existing member "${matchedMember.name}" - added as member (not guest)`,
+          message: `Found existing member "${matchedMember.display_name}" - added as member (not guest)`,
           sessionId,
           matchedAsMember: true,
-          memberName: matchedMember.name
+          memberName: matchedMember.display_name
         });
       }
 
@@ -1457,7 +1458,7 @@ router.post('/api/bookings/:id/staff-direct-add', isStaffOrAdmin, async (req: Re
       }
 
       const memberResult = await db.execute(sql`
-        SELECT u.id, u.email, u.name, mt.name as tier_name, mt.can_book_simulators
+        SELECT u.id, u.email, u.first_name, u.last_name, mt.name as tier_name, mt.can_book_simulators
         FROM users u
         LEFT JOIN membership_tiers mt ON u.tier_id = mt.id
         WHERE LOWER(u.email) = LOWER(${memberEmail})
@@ -1492,10 +1493,11 @@ router.post('/api/bookings/:id/staff-direct-add', isStaffOrAdmin, async (req: Re
          LEFT JOIN guests g ON bp.guest_id = g.id
          WHERE bp.session_id = ${sessionId} 
            AND bp.participant_type = 'guest'
-           AND (LOWER(bp.display_name) = LOWER(${member.name || ''}) OR LOWER(g.email) = LOWER(${member.email}))`);
+           AND (LOWER(bp.display_name) = LOWER(${`${member.first_name || ''} ${member.last_name || ''}`.trim() || ''}) OR LOWER(g.email) = LOWER(${member.email}))`);
       
+      const memberDisplayName = `${member.first_name || ''} ${member.last_name || ''}`.trim() || member.email;
+
       if (matchingGuest.rowCount && matchingGuest.rowCount > 0) {
-        // Remove the guest entry since this person is actually a member
         const guestIds = (matchingGuest.rows as unknown as MatchingGuestRow[]).map(r => r.id);
         await db.execute(sql`DELETE FROM booking_participants WHERE id = ANY(${toIntArrayLiteral(guestIds)}::int[])`);
         logger.info('[Staff Add Member] Removed duplicate guest entries for member in session', { extra: { guestIdsLength: guestIds.length, memberEmail: member.email, sessionId } });
@@ -1504,7 +1506,7 @@ router.post('/api/bookings/:id/staff-direct-add', isStaffOrAdmin, async (req: Re
       await db.execute(sql`
         INSERT INTO booking_participants 
           (session_id, user_id, participant_type, display_name, payment_status, slot_duration)
-        VALUES (${sessionId}, ${member.id}, 'member', ${member.name || member.email}, 'pending', ${slotDuration})
+        VALUES (${sessionId}, ${member.id}, 'member', ${memberDisplayName}, 'pending', ${slotDuration})
       `);
 
       await logPaymentAudit({
@@ -1517,7 +1519,7 @@ router.post('/api/bookings/:id/staff-direct-add', isStaffOrAdmin, async (req: Re
         metadata: { 
           participantType: 'member', 
           memberEmail: member.email,
-          memberName: member.name,
+          memberName: memberDisplayName,
           tierName: member.tier_name,
           tierOverrideApplied
         },
@@ -1532,7 +1534,7 @@ router.post('/api/bookings/:id/staff-direct-add', isStaffOrAdmin, async (req: Re
 
       logFromRequest(req, 'direct_add_participant', 'booking', bookingId.toString(), booking.resource_name || `Booking #${bookingId}`, {
         participantType: 'member',
-        memberName: member.name,
+        memberName: memberDisplayName,
         memberEmail: member.email,
         tierName: member.tier_name,
         tierOverrideApplied,
@@ -1549,7 +1551,7 @@ router.post('/api/bookings/:id/staff-direct-add', isStaffOrAdmin, async (req: Re
 
       return res.json({ 
         success: true, 
-        message: `Member "${member.name || member.email}" added directly by staff${tierOverrideApplied ? ' (tier override applied)' : ''}`,
+        message: `Member "${memberDisplayName}" added directly by staff${tierOverrideApplied ? ' (tier override applied)' : ''}`,
         sessionId,
         tierOverrideApplied
       });
