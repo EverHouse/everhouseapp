@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { postWithCredentials } from '../../../../hooks/queries/useFetch';
-import { useToast } from '../../../../components/Toast';
+import { postWithCredentials, fetchWithCredentials } from '../../../../hooks/queries/useFetch';
 import type { CalendarStatusResponse } from './dataIntegrityTypes';
 
 interface MigrationResults {
@@ -24,7 +23,12 @@ const CalendarStatusSection: React.FC<CalendarStatusSectionProps> = ({
 }) => {
   const [isMigrating, setIsMigrating] = useState(false);
   const [migrationResult, setMigrationResult] = useState<{ success: boolean; results?: MigrationResults; error?: string } | null>(null);
-  const { showToast } = useToast();
+
+  useEffect(() => {
+    fetchWithCredentials<{ running: boolean }>('/api/admin/calendar/cleanup-status')
+      .then(data => { if (data.running) setIsMigrating(true); })
+      .catch(() => {});
+  }, []);
 
   const handleCleanupComplete = useCallback((e: Event) => {
     const detail = (e as CustomEvent).detail;
@@ -34,20 +38,11 @@ const CalendarStatusSection: React.FC<CalendarStatusSectionProps> = ({
     setIsMigrating(false);
 
     if (data.success && data.results) {
-      const r = data.results as MigrationResults;
-      const totalErrors = r.wellness.errors + r.events.errors + r.closures.errors;
-      const totalCleaned = r.wellness.cleaned + r.events.cleaned + r.closures.cleaned;
-      setMigrationResult({ success: true, results: r });
-      if (totalErrors > 0) {
-        showToast(`Calendar cleanup done: ${totalCleaned} cleaned, ${totalErrors} errors (rate limit). Try again for remaining items.`, 'warning');
-      } else {
-        showToast(`Calendar cleanup complete: ${totalCleaned} items cleaned successfully`, 'success');
-      }
+      setMigrationResult({ success: true, results: data.results as MigrationResults });
     } else {
       setMigrationResult({ success: false, error: data.error || 'Cleanup failed' });
-      showToast(data.error || 'Calendar cleanup failed', 'error');
     }
-  }, [showToast]);
+  }, []);
 
   useEffect(() => {
     window.addEventListener('calendar-cleanup-complete', handleCleanupComplete);
@@ -59,7 +54,11 @@ const CalendarStatusSection: React.FC<CalendarStatusSectionProps> = ({
     setIsMigrating(true);
     setMigrationResult(null);
     try {
-      await postWithCredentials<{ success: boolean; message?: string }>('/api/admin/calendar/migrate-clean-descriptions', {});
+      const data = await postWithCredentials<{ success: boolean; message?: string; error?: string }>('/api/admin/calendar/migrate-clean-descriptions', {});
+      if (!data.success) {
+        setIsMigrating(false);
+        setMigrationResult({ success: false, error: data.error || 'Failed to start cleanup' });
+      }
     } catch (err: unknown) {
       setIsMigrating(false);
       setMigrationResult({ success: false, error: err instanceof Error ? err.message : 'Failed to start cleanup' });
@@ -138,7 +137,7 @@ const CalendarStatusSection: React.FC<CalendarStatusSectionProps> = ({
                         <p>Closures: {migrationResult.results.closures.cleaned}/{migrationResult.results.closures.total} cleaned{migrationResult.results.closures.errors > 0 ? `, ${migrationResult.results.closures.errors} errors` : ''}</p>
                       </div>
                     ) : migrationResult.success ? (
-                      <p className="font-medium">Cleanup started in the background. Check server logs for progress.</p>
+                      <p className="font-medium">Cleanup running in the background. You&apos;ll get a notification when it finishes.</p>
                     ) : (
                       <p>{migrationResult.error || 'Migration failed'}</p>
                     )}

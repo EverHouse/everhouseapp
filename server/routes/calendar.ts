@@ -237,11 +237,22 @@ router.post('/api/admin/bookings/sync-calendar', isStaffOrAdmin, async (req, res
   }
 });
 
+let calendarCleanupRunning = false;
+
+router.get('/api/admin/calendar/cleanup-status', isStaffOrAdmin, (_req, res) => {
+  res.json({ running: calendarCleanupRunning });
+});
+
 router.post('/api/admin/calendar/migrate-clean-descriptions', isAdmin, async (req, res) => {
+  if (calendarCleanupRunning) {
+    return res.status(409).json({ success: false, error: 'Calendar cleanup is already running. Please wait for it to finish.' });
+  }
+
   const THROTTLE_MS = 150;
   const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-  res.json({ success: true, message: 'Calendar description cleanup started in background. Check server logs for progress.' });
+  calendarCleanupRunning = true;
+  res.json({ success: true, message: 'Calendar description cleanup started in background.' });
 
   try {
     const calendar = await getGoogleCalendarClient();
@@ -377,12 +388,14 @@ router.post('/api/admin/calendar/migrate-clean-descriptions', isAdmin, async (re
     }
 
     logger.info('[Migration] Calendar description cleanup complete', { extra: results });
+    calendarCleanupRunning = false;
     broadcastToStaff({
       type: 'calendar_cleanup_complete',
       data: { success: true, results }
     });
   } catch (error: unknown) {
     logger.error('[Migration] Calendar cleanup failed', { error: error instanceof Error ? error : new Error(String(error)) });
+    calendarCleanupRunning = false;
     broadcastToStaff({
       type: 'calendar_cleanup_complete',
       data: { success: false, error: getErrorMessage(error) }
