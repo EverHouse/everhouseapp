@@ -127,6 +127,14 @@ function buildPassJson(data: PassData, config: WalletConfig, colors: TierColors)
     value: data.tier,
   });
 
+  const portalUrl = process.env.APP_URL || 'https://everclub.app';
+  backFields.push({
+    key: 'memberPortal',
+    label: 'Member Portal',
+    value: portalUrl,
+    attributedValue: `<a href="${portalUrl}">Open Member Portal</a>`,
+  } as any);
+
   const headerFields: Array<{ key: string; label: string; value: string; textAlignment?: string }> = [];
   if (data.memberSince) {
     headerFields.push({
