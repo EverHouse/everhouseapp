@@ -259,9 +259,11 @@ async function compositeLogoWithMascot(
     sharp(logoSource).resize(logoWidth, totalHeight, { fit: 'contain', background: transparentBg }).png().toBuffer(),
   ]);
 
-  const mascotLeft = 0;
+  const logoLeft = 0;
+  const logoMeta = await sharp(logoBuf).metadata();
+  const actualLogoWidth = logoMeta.width || logoWidth;
+  const mascotLeft = actualLogoWidth + gap;
   const mascotTop = Math.round((totalHeight - mascotSize) / 2);
-  const logoLeft = mascotSize + gap;
 
   return sharp({
     create: {
@@ -272,8 +274,8 @@ async function compositeLogoWithMascot(
     },
   })
     .composite([
-      { input: mascotBuf, left: mascotLeft, top: mascotTop },
       { input: logoBuf, left: logoLeft, top: 0 },
+      { input: mascotBuf, left: mascotLeft, top: mascotTop },
     ])
     .png()
     .toBuffer();
