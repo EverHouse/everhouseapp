@@ -157,7 +157,6 @@ function buildPassJson(data: PassData, config: WalletConfig, colors: TierColors)
     teamIdentifier: config.teamId,
     organizationName: 'Ever Club',
     description: `Ever Club ${data.tier} Membership`,
-    logoText: 'Ever Club',
     foregroundColor: hexToRgb(colors.foreground),
     backgroundColor: hexToRgb(colors.bg),
     labelColor: hexToRgb(colors.label),
@@ -226,28 +225,63 @@ interface PassImages {
   'logo.png': Buffer;
   'logo@2x.png': Buffer;
   'logo@3x.png': Buffer;
+  'thumbnail.png'?: Buffer;
+  'thumbnail@2x.png'?: Buffer;
+  'thumbnail@3x.png'?: Buffer;
+}
+
+function selectThumbnailSource(colors: TierColors): string | null {
+  const useDarkMascot = isLightBackground(colors.bg);
+  const darkPath = path.join(process.cwd(), 'public', 'assets', 'logos', 'mascot-dark.webp');
+  const whitePath = path.join(process.cwd(), 'public', 'assets', 'logos', 'mascot-white.webp');
+
+  if (useDarkMascot && fs.existsSync(darkPath)) return darkPath;
+  if (!useDarkMascot && fs.existsSync(whitePath)) return whitePath;
+  if (fs.existsSync(darkPath)) return darkPath;
+  if (fs.existsSync(whitePath)) return whitePath;
+  return null;
 }
 
 async function generatePassImages(colors: TierColors): Promise<PassImages> {
   const logoSource = selectLogoSource(colors);
+  const thumbnailSource = selectThumbnailSource(colors);
+  const transparentBg = { r: 0, g: 0, b: 0, alpha: 0 };
 
-  const [icon, icon2x, icon3x, logo, logo2x, logo3x] = await Promise.all([
-    sharp(logoSource).resize(29, 29, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } }).png().toBuffer(),
-    sharp(logoSource).resize(58, 58, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } }).png().toBuffer(),
-    sharp(logoSource).resize(87, 87, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } }).png().toBuffer(),
-    sharp(logoSource).resize(220, 70, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } }).png().toBuffer(),
-    sharp(logoSource).resize(440, 140, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } }).png().toBuffer(),
-    sharp(logoSource).resize(660, 210, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } }).png().toBuffer(),
-  ]);
+  const imagePromises: Promise<Buffer>[] = [
+    sharp(logoSource).resize(29, 29, { fit: 'contain', background: transparentBg }).png().toBuffer(),
+    sharp(logoSource).resize(58, 58, { fit: 'contain', background: transparentBg }).png().toBuffer(),
+    sharp(logoSource).resize(87, 87, { fit: 'contain', background: transparentBg }).png().toBuffer(),
+    sharp(logoSource).resize(220, 70, { fit: 'contain', background: transparentBg }).png().toBuffer(),
+    sharp(logoSource).resize(440, 140, { fit: 'contain', background: transparentBg }).png().toBuffer(),
+    sharp(logoSource).resize(660, 210, { fit: 'contain', background: transparentBg }).png().toBuffer(),
+  ];
 
-  return {
-    'icon.png': icon,
-    'icon@2x.png': icon2x,
-    'icon@3x.png': icon3x,
-    'logo.png': logo,
-    'logo@2x.png': logo2x,
-    'logo@3x.png': logo3x,
+  if (thumbnailSource) {
+    imagePromises.push(
+      sharp(thumbnailSource).resize(90, 90, { fit: 'contain', background: transparentBg }).png().toBuffer(),
+      sharp(thumbnailSource).resize(180, 180, { fit: 'contain', background: transparentBg }).png().toBuffer(),
+      sharp(thumbnailSource).resize(270, 270, { fit: 'contain', background: transparentBg }).png().toBuffer(),
+    );
+  }
+
+  const results = await Promise.all(imagePromises);
+
+  const images: PassImages = {
+    'icon.png': results[0],
+    'icon@2x.png': results[1],
+    'icon@3x.png': results[2],
+    'logo.png': results[3],
+    'logo@2x.png': results[4],
+    'logo@3x.png': results[5],
   };
+
+  if (thumbnailSource) {
+    images['thumbnail.png'] = results[6];
+    images['thumbnail@2x.png'] = results[7];
+    images['thumbnail@3x.png'] = results[8];
+  }
+
+  return images;
 }
 
 function computeSha1(data: Buffer | string): string {
