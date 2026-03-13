@@ -552,10 +552,36 @@ router.post('/api/auth/verify-member', async (req, res) => {
         'trialing': 'Trialing',
         'past_due': 'Past Due'
       };
+      let memberFirstName = dbUser[0].firstName || '';
+      let memberLastName = dbUser[0].lastName || '';
+
+      if (!memberFirstName) {
+        try {
+          const hubspotClient = await getHubSpotClient();
+          const hsSearch = await hubspotClient.crm.contacts.searchApi.doSearch({
+            filterGroups: [{ filters: [{ propertyName: 'email', operator: FilterOperatorEnum.Eq, value: normalizedEmail }] }],
+            properties: ['firstname', 'lastname'],
+            limit: 1
+          });
+          const hsContact = hsSearch.results[0];
+          if (hsContact?.properties.firstname) {
+            memberFirstName = hsContact.properties.firstname;
+            memberLastName = memberLastName || hsContact.properties.lastname || '';
+            await db.update(users).set({
+              firstName: memberFirstName,
+              lastName: memberLastName || undefined,
+              updatedAt: new Date()
+            }).where(eq(users.id, dbUser[0].id));
+          }
+        } catch (hsErr: unknown) {
+          logger.warn('[Auth] HubSpot name backfill failed during verify-member', { error: hsErr instanceof Error ? hsErr : new Error(String(hsErr)) });
+        }
+      }
+
       const member = {
         id: dbUser[0].id,
-        firstName: dbUser[0].firstName || '',
-        lastName: dbUser[0].lastName || '',
+        firstName: memberFirstName,
+        lastName: memberLastName,
         email: dbUser[0].email || normalizedEmail,
         phone: dbUser[0].phone || '',
         jobTitle: '',
@@ -622,6 +648,18 @@ router.post('/api/auth/verify-member', async (req, res) => {
     let lastName = dbUser[0]?.lastName || contact?.properties.lastname || '';
     let phone = dbUser[0]?.phone || contact?.properties.phone || '';
     let jobTitle = '';
+
+    if (hasDbUser && !dbUser[0]?.firstName && firstName) {
+      try {
+        await db.update(users).set({
+          firstName: firstName,
+          lastName: lastName || undefined,
+          updatedAt: new Date()
+        }).where(eq(users.id, dbUser[0].id));
+      } catch (backfillErr: unknown) {
+        logger.warn('[Auth] Name backfill from HubSpot failed during verify-member', { error: backfillErr instanceof Error ? backfillErr : new Error(String(backfillErr)) });
+      }
+    }
 
     // Use staff user data if available (overrides other data for staff/admin)
     if (isStaffOrAdmin && staffUserData) {
