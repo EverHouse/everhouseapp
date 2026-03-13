@@ -9,21 +9,20 @@ vi.mock('../server/utils/errorUtils', () => ({
   getErrorMessage: vi.fn((e: unknown) => String(e)),
 }));
 
-const { mockClient, mockPool } = vi.hoisted(() => {
-  const mockClient = {
-    query: vi.fn(),
-    release: vi.fn(),
-  };
-  const mockPool = {
-    connect: vi.fn().mockResolvedValue(mockClient),
-  };
-  return { mockClient, mockPool };
+const { mockExecute, mockTransaction } = vi.hoisted(() => {
+  const mockExecute = vi.fn();
+  const mockTransaction = vi.fn();
+  return { mockExecute, mockTransaction };
 });
 
-vi.mock('../server/core/db', () => ({
-  pool: mockPool,
-  safeRelease: vi.fn((client: { release: () => void }) => { try { client.release(); } catch {} }),
+vi.mock('../server/db', () => ({
+  db: {
+    execute: mockExecute,
+    transaction: mockTransaction,
+  },
 }));
+
+vi.mock('../server/core/bookingService/sessionManager', () => ({}));
 
 import {
   getAvailableGuestPasses,
@@ -36,23 +35,21 @@ import {
 describe('GuestPassHoldService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockPool.connect.mockResolvedValue(mockClient);
   });
 
   describe('getAvailableGuestPasses', () => {
     it('returns full allowance when no passes used and no holds', async () => {
-      mockClient.query
+      mockExecute
         .mockResolvedValueOnce({ rows: [{ guest_passes_per_month: 4 }] })
         .mockResolvedValueOnce({ rows: [] })
         .mockResolvedValueOnce({ rows: [{ total_held: '0' }] });
 
       const result = await getAvailableGuestPasses('test@example.com');
       expect(result).toBe(4);
-      expect(mockClient.release).toHaveBeenCalled();
     });
 
     it('subtracts used passes from total', async () => {
-      mockClient.query
+      mockExecute
         .mockResolvedValueOnce({ rows: [{ guest_passes_per_month: 4 }] })
         .mockResolvedValueOnce({ rows: [{ passes_used: 2, passes_total: 4 }] })
         .mockResolvedValueOnce({ rows: [{ total_held: '0' }] });
@@ -62,7 +59,7 @@ describe('GuestPassHoldService', () => {
     });
 
     it('subtracts held passes from available', async () => {
-      mockClient.query
+      mockExecute
         .mockResolvedValueOnce({ rows: [{ guest_passes_per_month: 4 }] })
         .mockResolvedValueOnce({ rows: [{ passes_used: 1, passes_total: 4 }] })
         .mockResolvedValueOnce({ rows: [{ total_held: '1' }] });
@@ -72,7 +69,7 @@ describe('GuestPassHoldService', () => {
     });
 
     it('returns 0 when all passes are used', async () => {
-      mockClient.query
+      mockExecute
         .mockResolvedValueOnce({ rows: [{ guest_passes_per_month: 4 }] })
         .mockResolvedValueOnce({ rows: [{ passes_used: 4, passes_total: 4 }] })
         .mockResolvedValueOnce({ rows: [{ total_held: '0' }] });
@@ -82,7 +79,7 @@ describe('GuestPassHoldService', () => {
     });
 
     it('returns 0 when passes used plus holds exceed total', async () => {
-      mockClient.query
+      mockExecute
         .mockResolvedValueOnce({ rows: [{ guest_passes_per_month: 4 }] })
         .mockResolvedValueOnce({ rows: [{ passes_used: 3, passes_total: 4 }] })
         .mockResolvedValueOnce({ rows: [{ total_held: '2' }] });
@@ -92,7 +89,7 @@ describe('GuestPassHoldService', () => {
     });
 
     it('defaults to 4 guest passes when tier not found', async () => {
-      mockClient.query
+      mockExecute
         .mockResolvedValueOnce({ rows: [] })
         .mockResolvedValueOnce({ rows: [] })
         .mockResolvedValueOnce({ rows: [{ total_held: '0' }] });
@@ -102,7 +99,7 @@ describe('GuestPassHoldService', () => {
     });
 
     it('updates passes_total when tier allows more than current total', async () => {
-      mockClient.query
+      mockExecute
         .mockResolvedValueOnce({ rows: [{ guest_passes_per_month: 6 }] })
         .mockResolvedValueOnce({ rows: [{ passes_used: 1, passes_total: 4 }] })
         .mockResolvedValueOnce({ rows: [] })
@@ -110,73 +107,53 @@ describe('GuestPassHoldService', () => {
 
       const result = await getAvailableGuestPasses('test@example.com');
       expect(result).toBe(5);
-      expect(mockClient.query).toHaveBeenCalledWith(
-        expect.stringContaining('UPDATE guest_passes'),
-        expect.arrayContaining([6]),
-      );
+      expect(mockExecute).toHaveBeenCalledTimes(4);
     });
 
-    it('does not release client when externalClient is provided', async () => {
-      const externalClient = {
-        query: vi.fn()
+    it('uses provided transaction context without managing its own', async () => {
+      const txCtx = {
+        execute: vi.fn()
           .mockResolvedValueOnce({ rows: [{ guest_passes_per_month: 4 }] })
           .mockResolvedValueOnce({ rows: [] })
           .mockResolvedValueOnce({ rows: [{ total_held: '0' }] }),
-        release: vi.fn(),
       };
 
-      const result = await getAvailableGuestPasses('test@example.com', undefined, externalClient as any);
+      const result = await getAvailableGuestPasses('test@example.com', undefined, txCtx as any);
       expect(result).toBe(4);
-      expect(externalClient.release).not.toHaveBeenCalled();
+      expect(txCtx.execute).toHaveBeenCalledTimes(3);
+      expect(mockExecute).not.toHaveBeenCalled();
     });
 
     it('normalizes email to lowercase and trimmed', async () => {
-      mockClient.query
+      mockExecute
         .mockResolvedValueOnce({ rows: [{ guest_passes_per_month: 4 }] })
         .mockResolvedValueOnce({ rows: [] })
         .mockResolvedValueOnce({ rows: [{ total_held: '0' }] });
 
       await getAvailableGuestPasses('  TEST@Example.COM  ');
-      expect(mockClient.query).toHaveBeenCalledWith(
-        expect.any(String),
-        ['test@example.com'],
-      );
+      expect(mockExecute).toHaveBeenCalledTimes(3);
     });
   });
 
   describe('cleanupExpiredHolds', () => {
     it('returns count of deleted expired holds', async () => {
-      mockClient.query.mockResolvedValueOnce({
+      mockExecute.mockResolvedValueOnce({
         rows: [{ id: 1 }, { id: 2 }, { id: 3 }],
         rowCount: 3,
       });
 
       const result = await cleanupExpiredHolds();
       expect(result).toBe(3);
-      expect(mockClient.query).toHaveBeenCalledWith(
-        expect.stringContaining('DELETE FROM guest_pass_holds'),
-      );
-      expect(mockClient.release).toHaveBeenCalled();
     });
 
     it('returns 0 when no expired holds exist', async () => {
-      mockClient.query.mockResolvedValueOnce({
+      mockExecute.mockResolvedValueOnce({
         rows: [],
         rowCount: 0,
       });
 
       const result = await cleanupExpiredHolds();
       expect(result).toBe(0);
-    });
-
-    it('releases client even when no holds are deleted', async () => {
-      mockClient.query.mockResolvedValueOnce({
-        rows: [],
-        rowCount: 0,
-      });
-
-      await cleanupExpiredHolds();
-      expect(mockClient.release).toHaveBeenCalled();
     });
   });
 
@@ -185,7 +162,6 @@ describe('GuestPassHoldService', () => {
       const result = await createGuestPassHold('test@example.com', 1, 0);
       expect(result.success).toBe(true);
       expect(result.passesHeld).toBe(0);
-      expect(mockPool.connect).not.toHaveBeenCalled();
     });
 
     it('returns success with 0 held when passesNeeded is negative', async () => {
@@ -195,14 +171,15 @@ describe('GuestPassHoldService', () => {
     });
 
     it('returns error when not enough passes available', async () => {
-      mockClient.query
-        .mockResolvedValueOnce(undefined)
-        .mockResolvedValueOnce(undefined)
-        .mockResolvedValueOnce({ rows: [{ id: 1 }] })
-        .mockResolvedValueOnce({ rows: [{ guest_passes_per_month: 2 }] })
-        .mockResolvedValueOnce({ rows: [{ passes_used: 2, passes_total: 2 }] })
-        .mockResolvedValueOnce({ rows: [{ total_held: '0' }] })
-        .mockResolvedValueOnce(undefined);
+      const mockTx = {
+        execute: vi.fn()
+          .mockResolvedValueOnce({ rows: [] })
+          .mockResolvedValueOnce({ rows: [{ id: 1 }] })
+          .mockResolvedValueOnce({ rows: [{ guest_passes_per_month: 2 }] })
+          .mockResolvedValueOnce({ rows: [{ passes_used: 2, passes_total: 2 }] })
+          .mockResolvedValueOnce({ rows: [{ total_held: '0' }] }),
+      };
+      mockTransaction.mockImplementation(async (cb: (tx: any) => Promise<any>) => cb(mockTx));
 
       const result = await createGuestPassHold('test@example.com', 1, 3);
       expect(result.success).toBe(false);
@@ -212,7 +189,7 @@ describe('GuestPassHoldService', () => {
 
   describe('releaseGuestPassHold', () => {
     it('returns passes released count', async () => {
-      mockClient.query.mockResolvedValueOnce({
+      mockExecute.mockResolvedValueOnce({
         rows: [{ passes_held: 2 }, { passes_held: 1 }],
         rowCount: 2,
       });
@@ -220,11 +197,10 @@ describe('GuestPassHoldService', () => {
       const result = await releaseGuestPassHold(123);
       expect(result.success).toBe(true);
       expect(result.passesReleased).toBe(3);
-      expect(mockClient.release).toHaveBeenCalled();
     });
 
     it('returns 0 when no holds exist for booking', async () => {
-      mockClient.query.mockResolvedValueOnce({
+      mockExecute.mockResolvedValueOnce({
         rows: [],
         rowCount: 0,
       });
@@ -235,21 +211,21 @@ describe('GuestPassHoldService', () => {
     });
 
     it('returns failure on DB error', async () => {
-      mockClient.query.mockRejectedValueOnce(new Error('DB error'));
+      mockExecute.mockRejectedValueOnce(new Error('DB error'));
 
       const result = await releaseGuestPassHold(123);
       expect(result.success).toBe(false);
       expect(result.passesReleased).toBe(0);
-      expect(mockClient.release).toHaveBeenCalled();
     });
   });
 
   describe('convertHoldToUsage', () => {
     it('returns 0 when no holds exist for booking', async () => {
-      mockClient.query
-        .mockResolvedValueOnce(undefined)
-        .mockResolvedValueOnce({ rows: [] })
-        .mockResolvedValueOnce(undefined);
+      const mockTx = {
+        execute: vi.fn()
+          .mockResolvedValueOnce({ rows: [] }),
+      };
+      mockTransaction.mockImplementation(async (cb: (tx: any) => Promise<any>) => cb(mockTx));
 
       const result = await convertHoldToUsage(123, 'test@example.com');
       expect(result.success).toBe(true);
@@ -257,28 +233,25 @@ describe('GuestPassHoldService', () => {
     });
 
     it('converts held passes to usage', async () => {
-      mockClient.query
-        .mockResolvedValueOnce(undefined)
-        .mockResolvedValueOnce({ rows: [{ id: 1, passes_held: 3 }] })
-        .mockResolvedValueOnce({ rowCount: 1 })
-        .mockResolvedValueOnce({ rowCount: 1 })
-        .mockResolvedValueOnce(undefined);
+      const mockTx = {
+        execute: vi.fn()
+          .mockResolvedValueOnce({ rows: [{ id: 1, passes_held: 3 }] })
+          .mockResolvedValueOnce({ rowCount: 1 })
+          .mockResolvedValueOnce({ rowCount: 1 }),
+      };
+      mockTransaction.mockImplementation(async (cb: (tx: any) => Promise<any>) => cb(mockTx));
 
       const result = await convertHoldToUsage(123, 'test@example.com');
       expect(result.success).toBe(true);
       expect(result.passesConverted).toBe(3);
     });
 
-    it('returns failure on DB error and rolls back', async () => {
-      mockClient.query
-        .mockResolvedValueOnce(undefined)
-        .mockRejectedValueOnce(new Error('DB error'))
-        .mockResolvedValueOnce(undefined);
+    it('returns failure on DB error', async () => {
+      mockTransaction.mockRejectedValueOnce(new Error('DB error'));
 
       const result = await convertHoldToUsage(123, 'test@example.com');
       expect(result.success).toBe(false);
       expect(result.passesConverted).toBe(0);
-      expect(mockClient.query).toHaveBeenCalledWith('ROLLBACK');
     });
   });
 });

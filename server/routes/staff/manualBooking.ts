@@ -1,5 +1,4 @@
 import { Router } from 'express';
-import { pool, safeRelease } from '../../core/db';
 import { isStaffOrAdmin } from '../../core/middleware';
 import { notifyAllStaff } from '../../core/notificationService';
 import { broadcastAvailabilityUpdate } from '../../core/websocket';
@@ -13,6 +12,13 @@ import { getSessionUser } from '../../types/session';
 import { ensureSessionForBooking } from '../../core/bookingService/sessionManager';
 import { resolveUserByEmail } from '../../core/stripe/customers';
 import { checkClosureConflict, checkAvailabilityBlockConflict } from '../../core/bookingValidation';
+
+class ManualBookingValidationError extends Error {
+  constructor(public statusCode: number, public errorBody: Record<string, unknown>) {
+    super(typeof errorBody.error === 'string' ? errorBody.error : 'Booking validation error');
+    this.name = 'ManualBookingValidationError';
+  }
+}
 
 const router = Router();
 
@@ -160,167 +166,159 @@ router.post('/api/staff/manual-booking', isStaffOrAdmin, async (req, res) => {
     const sessionUser = getSessionUser(req);
     const staffEmail = sessionUser?.email || 'staff';
     
-    const client = await pool.connect();
     let row: Record<string, unknown> | undefined;
     let dayPassRedeemed = false;
     
     try {
-      await client.query('BEGIN');
-      
-      if (isDayPassPayment) {
-        const dayPassResult = await client.query(
-          `SELECT id, purchaser_email, redeemed_at, status, remaining_uses, booking_id
-           FROM day_pass_purchases 
-           WHERE id = $1
-           FOR UPDATE`,
-          [dayPassPurchaseId]
-        );
-        
-        if (dayPassResult.rows.length === 0) {
-          await client.query('ROLLBACK');
-          return res.status(404).json({ error: 'Day pass not found' });
+      const txResult = await db.transaction(async (tx) => {
+        if (isDayPassPayment) {
+          const dayPassResult = await tx.execute(sql`
+            SELECT id, purchaser_email, redeemed_at, status, remaining_uses, booking_id
+            FROM day_pass_purchases 
+            WHERE id = ${dayPassPurchaseId}
+            FOR UPDATE
+          `);
+          
+          if (dayPassResult.rows.length === 0) {
+            throw new ManualBookingValidationError(404, { error: 'Day pass not found' });
+          }
+          
+          const dayPass = dayPassResult.rows[0] as Record<string, unknown>;
+          
+          if ((dayPass.purchaser_email as string).toLowerCase() !== resolvedEmail) {
+            throw new ManualBookingValidationError(403, { error: 'Day pass belongs to a different user' });
+          }
+          
+          if (dayPass.redeemed_at !== null || dayPass.booking_id !== null) {
+            throw new ManualBookingValidationError(400, { error: 'Day pass has already been redeemed' });
+          }
+          
+          if (dayPass.status === 'redeemed' || (dayPass.remaining_uses !== null && (dayPass.remaining_uses as number) <= 0)) {
+            throw new ManualBookingValidationError(400, { error: 'Day pass has already been used' });
+          }
         }
         
-        const dayPass = dayPassResult.rows[0];
+        await tx.execute(sql`
+          SELECT id FROM booking_requests 
+          WHERE LOWER(user_email) = LOWER(${resolvedEmail}) 
+          AND request_date = ${request_date} 
+          AND status IN ('pending', 'approved', 'confirmed')
+          FOR UPDATE
+        `);
         
-        if (dayPass.purchaser_email.toLowerCase() !== resolvedEmail) {
-          await client.query('ROLLBACK');
-          return res.status(403).json({ error: 'Day pass belongs to a different user' });
-        }
-        
-        if (dayPass.redeemed_at !== null || dayPass.booking_id !== null) {
-          await client.query('ROLLBACK');
-          return res.status(400).json({ error: 'Day pass has already been redeemed' });
-        }
-        
-        if (dayPass.status === 'redeemed' || (dayPass.remaining_uses !== null && dayPass.remaining_uses <= 0)) {
-          await client.query('ROLLBACK');
-          return res.status(400).json({ error: 'Day pass has already been used' });
-        }
-      }
-      
-      await client.query(
-        `SELECT id FROM booking_requests 
-         WHERE LOWER(user_email) = LOWER($1) 
-         AND request_date = $2 
-         AND status IN ('pending', 'approved', 'confirmed')
-         FOR UPDATE`,
-        [resolvedEmail, request_date]
-      );
-      
-      if (resource_id) {
-        const overlapCheck = await client.query(
-          `SELECT id, start_time, end_time FROM booking_requests 
-           WHERE resource_id = $1 
-           AND request_date = $2 
-           AND status IN ('pending', 'pending_approval', 'approved', 'confirmed', 'attended', 'cancellation_pending')
-           AND (
-             (start_time < $4 AND end_time > $3) OR
-             (end_time < start_time AND (start_time < $4 OR end_time > $3))
-           )
-           FOR UPDATE`,
-          [resource_id, request_date, start_time, end_time]
-        );
-        
-        if (overlapCheck.rows.length > 0) {
-          const conflict = overlapCheck.rows[0];
-          const conflictStart = conflict.start_time?.substring(0, 5);
-          const conflictEnd = conflict.end_time?.substring(0, 5);
-          await client.query('ROLLBACK');
-          const errorMsg = conflictStart && conflictEnd
-            ? `This time slot conflicts with an existing booking from ${formatTime12Hour(conflictStart)} to ${formatTime12Hour(conflictEnd)}. Please adjust your time or duration.`
-            : 'This time slot is already booked';
-          return res.status(409).json({ error: errorMsg });
-        }
+        if (resource_id) {
+          const overlapCheck = await tx.execute(sql`
+            SELECT id, start_time, end_time FROM booking_requests 
+            WHERE resource_id = ${resource_id} 
+            AND request_date = ${request_date} 
+            AND status IN ('pending', 'pending_approval', 'approved', 'confirmed', 'attended', 'cancellation_pending')
+            AND (
+              (start_time < ${end_time} AND end_time > ${start_time}) OR
+              (end_time < start_time AND (start_time < ${end_time} OR end_time > ${start_time}))
+            )
+            FOR UPDATE
+          `);
+          
+          if (overlapCheck.rows.length > 0) {
+            const conflict = overlapCheck.rows[0] as Record<string, unknown>;
+            const conflictStart = (conflict.start_time as string)?.substring(0, 5);
+            const conflictEnd = (conflict.end_time as string)?.substring(0, 5);
+            const errorMsg = conflictStart && conflictEnd
+              ? `This time slot conflicts with an existing booking from ${formatTime12Hour(conflictStart)} to ${formatTime12Hour(conflictEnd)}. Please adjust your time or duration.`
+              : 'This time slot is already booked';
+            throw new ManualBookingValidationError(409, { error: errorMsg });
+          }
 
-        const closureCheck = await checkClosureConflict(resource_id, request_date, start_time, end_time);
-        if (closureCheck.hasConflict) {
-          await client.query('ROLLBACK');
-          return res.status(409).json({ error: `This time slot conflicts with a facility closure: ${closureCheck.closureTitle || 'Facility Closure'}` });
-        }
+          const closureCheck = await checkClosureConflict(resource_id, request_date, start_time, end_time);
+          if (closureCheck.hasConflict) {
+            throw new ManualBookingValidationError(409, { error: `This time slot conflicts with a facility closure: ${closureCheck.closureTitle || 'Facility Closure'}` });
+          }
 
-        const blockCheck = await checkAvailabilityBlockConflict(resource_id, request_date, start_time, end_time);
-        if (blockCheck.hasConflict) {
-          await client.query('ROLLBACK');
-          return res.status(409).json({ error: `This time slot is blocked: ${blockCheck.blockNotes || blockCheck.blockType || 'Event Block'}` });
+          const blockCheck = await checkAvailabilityBlockConflict(resource_id, request_date, start_time, end_time);
+          if (blockCheck.hasConflict) {
+            throw new ManualBookingValidationError(409, { error: `This time slot is blocked: ${blockCheck.blockNotes || blockCheck.blockType || 'Event Block'}` });
+          }
         }
-      }
-      
-      const bookingStatus = isDayPassPayment ? 'approved' : 'pending';
-      
-      const insertResult = await client.query(
-        `INSERT INTO booking_requests (
-          user_email, user_name, user_id, resource_id, 
-          request_date, start_time, duration_minutes, end_time,
-          declared_player_count, request_participants,
-          trackman_booking_id, trackman_external_id, origin,
-          status, created_at, updated_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW(), NOW())
-        RETURNING *`,
-        [
-          resolvedEmail,
-          user_name || null,
-          resolvedUserId || null,
-          resource_id || null,
-          request_date,
-          start_time,
-          duration_minutes,
-          end_time,
-          declared_player_count && declared_player_count >= 1 && declared_player_count <= 4 ? declared_player_count : null,
-          sanitizedParticipants.length > 0 ? JSON.stringify(sanitizedParticipants) : '[]',
-          trackman_booking_id_val || trackman_external_id_val,
-          trackman_external_id_val || null,
-          'staff_manual',
-          bookingStatus
-        ]
-      );
-      
-      const dbRow = insertResult.rows[0];
-      const bookingId = dbRow.id;
-      
-      if (isDayPassPayment) {
-        await client.query(
-          `UPDATE day_pass_purchases 
-           SET redeemed_at = NOW(),
-               booking_id = $1,
-               status = 'redeemed',
-               remaining_uses = 0,
-               updated_at = NOW()
-           WHERE id = $2`,
-          [bookingId, dayPassPurchaseId]
-        );
         
-        await client.query(
-          `INSERT INTO pass_redemption_logs (purchase_id, redeemed_by, location, notes)
-           VALUES ($1, $2, 'staff_manual_booking', $3)`,
-          [dayPassPurchaseId, staffEmail, `Redeemed via manual booking #${bookingId}`]
-        );
+        const bookingStatus = isDayPassPayment ? 'approved' : 'pending';
         
-        dayPassRedeemed = true;
-        logger.info('[StaffManualBooking] Day pass redeemed for booking', { extra: { dayPassPurchaseId, bookingId } });
-      }
+        const trackmanBookingIdVal = trackman_booking_id_val || trackman_external_id_val;
+        const insertResult = await tx.execute(sql`
+          INSERT INTO booking_requests (
+            user_email, user_name, user_id, resource_id, 
+            request_date, start_time, duration_minutes, end_time,
+            declared_player_count, request_participants,
+            trackman_booking_id, trackman_external_id, origin,
+            status, created_at, updated_at
+          ) VALUES (
+            ${resolvedEmail},
+            ${user_name || null},
+            ${resolvedUserId || null},
+            ${resource_id || null},
+            ${request_date},
+            ${start_time},
+            ${duration_minutes},
+            ${end_time},
+            ${declared_player_count && declared_player_count >= 1 && declared_player_count <= 4 ? declared_player_count : null},
+            ${sanitizedParticipants.length > 0 ? JSON.stringify(sanitizedParticipants) : '[]'},
+            ${trackmanBookingIdVal},
+            ${trackman_external_id_val || null},
+            ${'staff_manual'},
+            ${bookingStatus},
+            NOW(), NOW()
+          )
+          RETURNING *
+        `);
+        
+        const dbRow = insertResult.rows[0] as Record<string, unknown>;
+        const bookingId = dbRow.id as number;
+        
+        let txDayPassRedeemed = false;
+        if (isDayPassPayment) {
+          await tx.execute(sql`
+            UPDATE day_pass_purchases 
+            SET redeemed_at = NOW(),
+                booking_id = ${bookingId},
+                status = 'redeemed',
+                remaining_uses = 0,
+                updated_at = NOW()
+            WHERE id = ${dayPassPurchaseId}
+          `);
+          
+          await tx.execute(sql`
+            INSERT INTO pass_redemption_logs (purchase_id, redeemed_by, location, notes)
+            VALUES (${dayPassPurchaseId}, ${staffEmail}, ${'staff_manual_booking'}, ${'Redeemed via manual booking #' + bookingId})
+          `);
+          
+          txDayPassRedeemed = true;
+          logger.info('[StaffManualBooking] Day pass redeemed for booking', { extra: { dayPassPurchaseId, bookingId } });
+        }
+        
+        return {
+          row: {
+            id: dbRow.id as number,
+            userEmail: dbRow.user_email as string,
+            userName: dbRow.user_name as string,
+            resourceId: dbRow.resource_id as number,
+            requestDate: dbRow.request_date as string,
+            startTime: dbRow.start_time as string,
+            durationMinutes: dbRow.duration_minutes as number,
+            endTime: dbRow.end_time as string,
+            status: dbRow.status as string,
+            declaredPlayerCount: dbRow.declared_player_count as number,
+            requestParticipants: (dbRow.request_participants as unknown as unknown[]) || [],
+            trackmanExternalId: dbRow.trackman_external_id as string,
+            origin: dbRow.origin as string,
+            createdAt: dbRow.created_at,
+            updatedAt: dbRow.updated_at
+          },
+          dayPassRedeemed: txDayPassRedeemed
+        };
+      });
       
-      await client.query('COMMIT');
-      
-      row = {
-        id: dbRow.id as number,
-        userEmail: dbRow.user_email as string,
-        userName: dbRow.user_name as string,
-        resourceId: dbRow.resource_id as number,
-        requestDate: dbRow.request_date as string,
-        startTime: dbRow.start_time as string,
-        durationMinutes: dbRow.duration_minutes as number,
-        endTime: dbRow.end_time as string,
-        status: dbRow.status as string,
-        declaredPlayerCount: dbRow.declared_player_count as number,
-        requestParticipants: (dbRow.request_participants as unknown as unknown[]) || [],
-        trackmanExternalId: dbRow.trackman_external_id as string,
-        origin: dbRow.origin as string,
-        createdAt: dbRow.created_at,
-        updatedAt: dbRow.updated_at
-      };
+      row = txResult.row;
+      dayPassRedeemed = txResult.dayPassRedeemed;
 
-      // Ensure session exists for approved day pass bookings
       if (isDayPassPayment && row.resourceId) {
         try {
           await ensureSessionForBooking({
@@ -339,10 +337,10 @@ router.post('/api/staff/manual-booking', isStaffOrAdmin, async (req, res) => {
         }
       }
     } catch (error: unknown) {
-      await client.query('ROLLBACK');
+      if (error instanceof ManualBookingValidationError) {
+        return res.status(error.statusCode).json(error.errorBody);
+      }
       throw error;
-    } finally {
-      safeRelease(client);
     }
     
     let resourceName = 'Bay';

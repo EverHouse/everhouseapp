@@ -1,8 +1,14 @@
 import { Router } from 'express';
 import { db } from '../../db';
-import { pool, safeRelease } from '../../core/db';
 import { bookingRequests, resources, users, bookingParticipants, notifications } from '../../../shared/schema';
 import { eq, and, or, ne, desc, sql, SQL, inArray } from 'drizzle-orm';
+
+class BookingValidationError extends Error {
+  constructor(public statusCode: number, public errorBody: Record<string, unknown>) {
+    super(typeof errorBody.error === 'string' ? errorBody.error : 'Booking validation error');
+    this.name = 'BookingValidationError';
+  }
+}
 import { sendPushNotification } from '../push';
 import { checkDailyBookingLimit, getMemberTierByEmail, getTierLimits, getDailyBookedMinutes } from '../../core/tierService';
 import { notifyAllStaff, isSyntheticEmail } from '../../core/notificationService';
@@ -515,345 +521,314 @@ router.post('/api/booking-requests', isAuthenticated, bookingRateLimiter, valida
       return res.status(400).json({ error: 'Booking cannot extend past midnight. Please choose an earlier start time or shorter duration.' });
     }
     
-    const client = await pool.connect();
     let row: BookingInsertRow;
-    // Declare resourceType outside try block so it's available for notifications after transaction
     let resourceType = 'simulator';
     try {
-      await client.query('BEGIN');
-      
-      // Look up resource type FIRST so pending check and linked email check can use it
-      if (resource_id) {
-        const resourceResult = await client.query(
-          `SELECT type FROM resources WHERE id = $1`,
-          [resource_id]
-        );
-        resourceType = resourceResult.rows[0]?.type || 'simulator';
-      }
-      
-      if (resource_id) {
-        await client.query(
-          `SELECT pg_advisory_xact_lock(hashtext($1 || '::' || $2))`,
-          [String(resource_id), request_date]
-        );
-      }
+      const txResult = await db.transaction(async (tx) => {
+        if (resource_id) {
+          const resourceResult = await tx.execute(sql`SELECT type FROM resources WHERE id = ${resource_id}`);
+          resourceType = (resourceResult.rows[0] as Record<string, unknown>)?.type as string || 'simulator';
+        }
+        
+        if (resource_id) {
+          await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${String(resource_id)} || '::' || ${request_date}))`);
+        }
 
-      if (!isStaffRequest || isViewAsMode) {
-        await client.query(
-          `SELECT pg_advisory_xact_lock(hashtext($1))`,
-          [requestEmail]
-        );
-        if (resourceType !== 'conference_room') {
-          const pendingCheck = await client.query(
-            `SELECT COUNT(*)::int AS cnt FROM booking_requests
-             WHERE LOWER(user_email) = LOWER($1) AND status = 'pending'`,
-            [requestEmail]
-          );
-          if (pendingCheck.rows[0].cnt > 0) {
-            await client.query('ROLLBACK');
-            return res.status(409).json({
-              error: 'You already have a pending request. Please wait for it to be approved or denied before requesting another slot.'
+        if (!isStaffRequest || isViewAsMode) {
+          await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${requestEmail}))`);
+          if (resourceType !== 'conference_room') {
+            const pendingCheck = await tx.execute(sql`
+              SELECT COUNT(*)::int AS cnt FROM booking_requests
+              WHERE LOWER(user_email) = LOWER(${requestEmail}) AND status = 'pending'
+            `);
+            if ((pendingCheck.rows[0] as Record<string, unknown>).cnt as number > 0) {
+              throw new BookingValidationError(409, {
+                error: 'You already have a pending request. Please wait for it to be approved or denied before requesting another slot.'
+              });
+            }
+          }
+        }
+        
+        if (resource_id) {
+          const overlapCheck = await tx.execute(sql`
+            SELECT id, start_time, end_time FROM booking_requests 
+            WHERE resource_id = ${resource_id} 
+            AND request_date = ${request_date} 
+            AND status IN ('pending', 'pending_approval', 'approved', 'confirmed', 'attended', 'cancellation_pending')
+            AND start_time < ${end_time} AND end_time > ${start_time}
+            FOR UPDATE
+          `);
+          
+          if (overlapCheck.rows.length > 0) {
+            const conflict = overlapCheck.rows[0] as Record<string, unknown>;
+            const conflictStart = (conflict.start_time as string)?.substring(0, 5);
+            const conflictEnd = (conflict.end_time as string)?.substring(0, 5);
+            
+            const errorMsg = conflictStart && conflictEnd
+              ? `This time slot conflicts with an existing booking from ${formatTime12Hour(conflictStart)} to ${formatTime12Hour(conflictEnd)}. Please adjust your time or duration.`
+              : 'This time slot is already booked';
+            
+            throw new BookingValidationError(409, { error: errorMsg });
+          }
+        }
+        
+        if (resource_id) {
+          const closureCheck = await checkClosureConflict(resource_id, request_date, start_time, end_time);
+          if (closureCheck.hasConflict) {
+            throw new BookingValidationError(409, {
+              error: `This time slot conflicts with a facility closure: ${closureCheck.closureTitle || 'Facility Closure'}. Please choose a different time.`
+            });
+          }
+
+          const blockCheck = await checkAvailabilityBlockConflict(resource_id, request_date, start_time, end_time);
+          if (blockCheck.hasConflict) {
+            throw new BookingValidationError(409, {
+              error: `This time slot is blocked for: ${blockCheck.blockType || 'Event Block'}. Please choose a different time.`
             });
           }
         }
-      }
-      
-      // Check for time slot overlap on the same resource
-      if (resource_id) {
-        const overlapCheck = await client.query(
-          `SELECT id, start_time, end_time FROM booking_requests 
-           WHERE resource_id = $1 
-           AND request_date = $2 
-           AND status IN ('pending', 'pending_approval', 'approved', 'confirmed', 'attended', 'cancellation_pending')
-           AND start_time < $4 AND end_time > $3
-           FOR UPDATE`,
-          [resource_id, request_date, start_time, end_time]
-        );
-        
-        if (overlapCheck.rows.length > 0) {
-          const conflict = overlapCheck.rows[0];
-          const conflictStart = conflict.start_time?.substring(0, 5);
-          const conflictEnd = conflict.end_time?.substring(0, 5);
-          await client.query('ROLLBACK');
-          
-          const errorMsg = conflictStart && conflictEnd
-            ? `This time slot conflicts with an existing booking from ${formatTime12Hour(conflictStart)} to ${formatTime12Hour(conflictEnd)}. Please adjust your time or duration.`
-            : 'This time slot is already booked';
-          
-          return res.status(409).json({ error: errorMsg });
-        }
-      }
-      
-      if (resource_id) {
-        const closureCheck = await checkClosureConflict(resource_id, request_date, start_time, end_time);
-        if (closureCheck.hasConflict) {
-          await client.query('ROLLBACK');
-          return res.status(409).json({
-            error: `This time slot conflicts with a facility closure: ${closureCheck.closureTitle || 'Facility Closure'}. Please choose a different time.`
-          });
-        }
 
-        const blockCheck = await checkAvailabilityBlockConflict(resource_id, request_date, start_time, end_time);
-        if (blockCheck.hasConflict) {
-          await client.query('ROLLBACK');
-          return res.status(409).json({
-            error: `This time slot is blocked for: ${blockCheck.blockType || 'Event Block'}. Please choose a different time.`
-          });
-        }
-      }
-
-      // Check if member already has a personal time conflict (owned or participant booking at overlapping time)
-      if (!isStaffRequest || isViewAsMode) {
-        const memberOverlapCheck = await client.query(
-          `SELECT br.id, br.start_time, br.end_time, r.name AS resource_name
-           FROM booking_requests br
-           LEFT JOIN resources r ON r.id = br.resource_id
-           WHERE br.request_date = $1
-           AND br.status IN ('pending', 'pending_approval', 'approved', 'confirmed', 'attended')
-           AND br.start_time < $3 AND br.end_time > $2
-           AND (
-             LOWER(br.user_email) = LOWER($4)
-             OR LOWER(br.user_email) IN (SELECT LOWER(ule.linked_email) FROM user_linked_emails ule WHERE LOWER(ule.primary_email) = LOWER($4))
-             OR LOWER(br.user_email) IN (SELECT LOWER(ule.primary_email) FROM user_linked_emails ule WHERE LOWER(ule.linked_email) = LOWER($4))
-             OR br.session_id IN (
-               SELECT bp.session_id FROM booking_participants bp
-               JOIN users u ON bp.user_id = u.id
-               WHERE LOWER(u.email) = LOWER($4)
-             )
-           )`,
-          [request_date, start_time, end_time, requestEmail]
-        );
-        
-        if (memberOverlapCheck.rows.length > 0) {
-          const conflict = memberOverlapCheck.rows[0];
-          const conflictStart = conflict.start_time?.substring(0, 5);
-          const conflictEnd = conflict.end_time?.substring(0, 5);
-          const conflictResource = conflict.resource_name || 'another booking';
-          await client.query('ROLLBACK');
+        if (!isStaffRequest || isViewAsMode) {
+          const memberOverlapCheck = await tx.execute(sql`
+            SELECT br.id, br.start_time, br.end_time, r.name AS resource_name
+            FROM booking_requests br
+            LEFT JOIN resources r ON r.id = br.resource_id
+            WHERE br.request_date = ${request_date}
+            AND br.status IN ('pending', 'pending_approval', 'approved', 'confirmed', 'attended')
+            AND br.start_time < ${end_time} AND br.end_time > ${start_time}
+            AND (
+              LOWER(br.user_email) = LOWER(${requestEmail})
+              OR LOWER(br.user_email) IN (SELECT LOWER(ule.linked_email) FROM user_linked_emails ule WHERE LOWER(ule.primary_email) = LOWER(${requestEmail}))
+              OR LOWER(br.user_email) IN (SELECT LOWER(ule.primary_email) FROM user_linked_emails ule WHERE LOWER(ule.linked_email) = LOWER(${requestEmail}))
+              OR br.session_id IN (
+                SELECT bp.session_id FROM booking_participants bp
+                JOIN users u ON bp.user_id = u.id
+                WHERE LOWER(u.email) = LOWER(${requestEmail})
+              )
+            )
+          `);
           
-          return res.status(409).json({
-            error: `You already have a booking at ${conflictResource} from ${formatTime12Hour(conflictStart)} to ${formatTime12Hour(conflictEnd)}. You cannot book overlapping time slots.`
-          });
-        }
-      }
-      
-      const limitCheck = await checkDailyBookingLimit(requestEmail, request_date, duration_minutes, user_tier, resourceType);
-      if (!limitCheck.allowed) {
-        await client.query('ROLLBACK');
-        return res.status(403).json({ 
-          error: limitCheck.reason,
-          remainingMinutes: limitCheck.remainingMinutes
-        });
-      }
-      
-      let sanitizedParticipants: SanitizedParticipant[] = [];
-      if (request_participants && Array.isArray(request_participants)) {
-        if (request_participants.length > 3) {
-          await client.query('ROLLBACK');
-          return res.status(400).json({ error: 'Maximum of 3 guests allowed per booking' });
-        }
-        sanitizedParticipants = request_participants
-          .map((p: { email?: string; type?: string; userId?: string; name?: string }) => ({
-            email: typeof p.email === 'string' ? p.email.toLowerCase().trim() : '',
-            type: (p.type === 'member' ? 'member' : 'guest') as 'member' | 'guest',
-            userId: typeof p.userId === 'string' ? p.userId : undefined,
-            name: typeof p.name === 'string' ? p.name.trim() : undefined
-          }))
-          .filter((p: SanitizedParticipant) => p.email || p.userId);
-      }
-      
-      for (const participant of sanitizedParticipants) {
-        if (participant.email && !participant.userId) {
-          try {
-            const [existingUser] = await db.select({ 
-              id: users.id,
-              firstName: users.firstName,
-              lastName: users.lastName 
-            }).from(users)
-              .where(eq(sql`LOWER(${users.email})`, participant.email.toLowerCase()))
-              .limit(1);
-            if (existingUser) {
-              participant.userId = existingUser.id;
-              if (!participant.name || participant.name.includes('@')) {
-                const fullName = [existingUser.firstName, existingUser.lastName].filter(Boolean).join(' ').trim();
-                if (fullName) participant.name = fullName;
-              }
-            }
-          } catch (err: unknown) {
-            logger.error('[Booking] Failed to lookup user for email', { error: err instanceof Error ? err : new Error(getErrorMessage(err)), extra: { email: participant.email } });
+          if (memberOverlapCheck.rows.length > 0) {
+            const conflict = memberOverlapCheck.rows[0] as Record<string, unknown>;
+            const conflictStart = (conflict.start_time as string)?.substring(0, 5);
+            const conflictEnd = (conflict.end_time as string)?.substring(0, 5);
+            const conflictResource = (conflict.resource_name as string) || 'another booking';
+            
+            throw new BookingValidationError(409, {
+              error: `You already have a booking at ${conflictResource} from ${formatTime12Hour(conflictStart)} to ${formatTime12Hour(conflictEnd)}. You cannot book overlapping time slots.`
+            });
           }
         }
         
-        // FIX: Also resolve email and name when userId is provided but email is missing
-        // This happens when members are selected from the directory (userId set, email undefined)
-        if (participant.userId && !participant.email) {
-          try {
-            const [existingUser] = await db.select({ 
-              email: users.email, 
-              firstName: users.firstName,
-              lastName: users.lastName,
+        const limitCheck = await checkDailyBookingLimit(requestEmail, request_date, duration_minutes, user_tier, resourceType);
+        if (!limitCheck.allowed) {
+          throw new BookingValidationError(403, { 
+            error: limitCheck.reason,
+            remainingMinutes: limitCheck.remainingMinutes
+          });
+        }
+        
+        let sanitizedParticipants: SanitizedParticipant[] = [];
+        if (request_participants && Array.isArray(request_participants)) {
+          if (request_participants.length > 3) {
+            throw new BookingValidationError(400, { error: 'Maximum of 3 guests allowed per booking' });
+          }
+          sanitizedParticipants = request_participants
+            .map((p: { email?: string; type?: string; userId?: string; name?: string }) => ({
+              email: typeof p.email === 'string' ? p.email.toLowerCase().trim() : '',
+              type: (p.type === 'member' ? 'member' : 'guest') as 'member' | 'guest',
+              userId: typeof p.userId === 'string' ? p.userId : undefined,
+              name: typeof p.name === 'string' ? p.name.trim() : undefined
+            }))
+            .filter((p: SanitizedParticipant) => p.email || p.userId);
+        }
+        
+        for (const participant of sanitizedParticipants) {
+          if (participant.email && !participant.userId) {
+            try {
+              const [existingUser] = await db.select({ 
+                id: users.id,
+                firstName: users.firstName,
+                lastName: users.lastName 
+              }).from(users)
+                .where(eq(sql`LOWER(${users.email})`, participant.email.toLowerCase()))
+                .limit(1);
+              if (existingUser) {
+                participant.userId = existingUser.id;
+                if (!participant.name || participant.name.includes('@')) {
+                  const fullName = [existingUser.firstName, existingUser.lastName].filter(Boolean).join(' ').trim();
+                  if (fullName) participant.name = fullName;
+                }
+              }
+            } catch (err: unknown) {
+              logger.error('[Booking] Failed to lookup user for email', { error: err instanceof Error ? err : new Error(getErrorMessage(err)), extra: { email: participant.email } });
+            }
+          }
+          
+          if (participant.userId && !participant.email) {
+            try {
+              const [existingUser] = await db.select({ 
+                email: users.email, 
+                firstName: users.firstName,
+                lastName: users.lastName,
+                name: sql<string>`COALESCE(TRIM(CONCAT(${users.firstName}, ' ', ${users.lastName})), '')`.as('name')
+              }).from(users)
+                .where(eq(users.id, participant.userId))
+                .limit(1);
+              if (existingUser) {
+                participant.email = existingUser.email?.toLowerCase() || '';
+                if (!participant.name) {
+                  participant.name = existingUser.name || 
+                    `${existingUser.firstName || ''} ${existingUser.lastName || ''}`.trim() || 
+                    existingUser.email || undefined;
+                }
+                logger.info('[Booking] Resolved email for directory-selected participant', { extra: { participantEmail: participant.email } });
+              }
+            } catch (err: unknown) {
+              logger.error('[Booking] Failed to lookup email for userId', { error: err instanceof Error ? err : new Error(getErrorMessage(err)), extra: { userId: participant.userId } });
+            }
+          }
+        }
+        
+        for (const participant of sanitizedParticipants) {
+          if (participant.userId) {
+            const statusCheck = await db.select({ 
+              membershipStatus: users.membershipStatus,
+              email: users.email,
               name: sql<string>`COALESCE(TRIM(CONCAT(${users.firstName}, ' ', ${users.lastName})), '')`.as('name')
             }).from(users)
               .where(eq(users.id, participant.userId))
               .limit(1);
-            if (existingUser) {
-              participant.email = existingUser.email?.toLowerCase() || '';
-              // Also set name if not already set
-              if (!participant.name) {
-                participant.name = existingUser.name || 
-                  `${existingUser.firstName || ''} ${existingUser.lastName || ''}`.trim() || 
-                  existingUser.email || undefined;
-              }
-              logger.info('[Booking] Resolved email for directory-selected participant', { extra: { participantEmail: participant.email } });
+            if (statusCheck.length > 0 && (statusCheck[0].membershipStatus === 'inactive' || statusCheck[0].membershipStatus === 'cancelled')) {
+              throw new BookingValidationError(400, { 
+                error: `${statusCheck[0].name || statusCheck[0].email || 'A participant'} has an inactive membership and cannot be added to bookings.`
+              });
             }
-          } catch (err: unknown) {
-            logger.error('[Booking] Failed to lookup email for userId', { error: err instanceof Error ? err : new Error(getErrorMessage(err)), extra: { userId: participant.userId } });
           }
         }
-      }
-      
-      for (const participant of sanitizedParticipants) {
-        if (participant.userId) {
-          const statusCheck = await db.select({ 
-            membershipStatus: users.membershipStatus,
-            email: users.email,
-            name: sql<string>`COALESCE(TRIM(CONCAT(${users.firstName}, ' ', ${users.lastName})), '')`.as('name')
-          }).from(users)
-            .where(eq(users.id, participant.userId))
-            .limit(1);
-          if (statusCheck.length > 0 && (statusCheck[0].membershipStatus === 'inactive' || statusCheck[0].membershipStatus === 'cancelled')) {
-            await client.query('ROLLBACK');
-            return res.status(400).json({ 
-              error: `${statusCheck[0].name || statusCheck[0].email || 'A participant'} has an inactive membership and cannot be added to bookings.`
-            });
+        
+        const seenEmails = new Set<string>();
+        const seenUserIds = new Set<string>();
+        seenEmails.add(requestEmail);
+        sanitizedParticipants = sanitizedParticipants.filter((p: SanitizedParticipant) => {
+          if (p.userId && seenUserIds.has(p.userId)) return false;
+          if (p.email && seenEmails.has(p.email.toLowerCase())) return false;
+          if (p.userId) seenUserIds.add(p.userId);
+          if (p.email) seenEmails.add(p.email.toLowerCase());
+          return true;
+        });
+        
+        for (const participant of sanitizedParticipants) {
+          if (participant.type === 'member' && participant.email) {
+            const pOverlap = await tx.execute(sql`
+              SELECT br.id, COALESCE(r.name, 'Unknown') AS resource_name, br.start_time, br.end_time
+              FROM booking_requests br
+              LEFT JOIN resources r ON r.id = br.resource_id
+              WHERE br.request_date = ${request_date}
+              AND br.status IN ('pending', 'pending_approval', 'approved', 'confirmed', 'attended')
+              AND br.start_time < ${end_time} AND br.end_time > ${start_time}
+              AND (
+                LOWER(br.user_email) = LOWER(${participant.email})
+                OR LOWER(br.user_email) IN (SELECT LOWER(ule.linked_email) FROM user_linked_emails ule WHERE LOWER(ule.primary_email) = LOWER(${participant.email}))
+                OR LOWER(br.user_email) IN (SELECT LOWER(ule.primary_email) FROM user_linked_emails ule WHERE LOWER(ule.linked_email) = LOWER(${participant.email}))
+                OR br.session_id IN (
+                  SELECT bp.session_id FROM booking_participants bp
+                  JOIN users u ON bp.user_id = u.id
+                  WHERE LOWER(u.email) = LOWER(${participant.email})
+                )
+              )
+              LIMIT 1
+            `);
+            if (pOverlap.rows.length > 0) {
+              const conflict = pOverlap.rows[0] as Record<string, unknown>;
+              const cStart = (conflict.start_time as string)?.substring(0, 5);
+              const cEnd = (conflict.end_time as string)?.substring(0, 5);
+              throw new BookingValidationError(409, {
+                error: `${participant.name || participant.email} already has a booking at ${conflict.resource_name} from ${formatTime12Hour(cStart)} to ${formatTime12Hour(cEnd)}. They cannot be added to an overlapping time slot.`
+              });
+            }
           }
         }
-      }
-      
-      const seenEmails = new Set<string>();
-      const seenUserIds = new Set<string>();
-      seenEmails.add(requestEmail);
-      sanitizedParticipants = sanitizedParticipants.filter((p: SanitizedParticipant) => {
-        if (p.userId && seenUserIds.has(p.userId)) return false;
-        if (p.email && seenEmails.has(p.email.toLowerCase())) return false;
-        if (p.userId) seenUserIds.add(p.userId);
-        if (p.email) seenEmails.add(p.email.toLowerCase());
-        return true;
-      });
-      
-      for (const participant of sanitizedParticipants) {
-        if (participant.type === 'member' && participant.email) {
-          const pOverlap = await client.query(
-            `SELECT br.id, COALESCE(r.name, 'Unknown') AS resource_name, br.start_time, br.end_time
-             FROM booking_requests br
-             LEFT JOIN resources r ON r.id = br.resource_id
-             WHERE br.request_date = $1
-             AND br.status IN ('pending', 'pending_approval', 'approved', 'confirmed', 'attended')
-             AND br.start_time < $3 AND br.end_time > $2
-             AND (
-               LOWER(br.user_email) = LOWER($4)
-               OR LOWER(br.user_email) IN (SELECT LOWER(ule.linked_email) FROM user_linked_emails ule WHERE LOWER(ule.primary_email) = LOWER($4))
-               OR LOWER(br.user_email) IN (SELECT LOWER(ule.primary_email) FROM user_linked_emails ule WHERE LOWER(ule.linked_email) = LOWER($4))
-               OR br.session_id IN (
-                 SELECT bp.session_id FROM booking_participants bp
-                 JOIN users u ON bp.user_id = u.id
-                 WHERE LOWER(u.email) = LOWER($4)
-               )
-             )
-             LIMIT 1`,
-            [request_date, start_time, end_time, participant.email]
+        
+        const isConferenceRoom = resourceType === 'conference_room';
+        const initialStatus: 'pending' | 'confirmed' = isConferenceRoom ? 'confirmed' : 'pending';
+        
+        const guardianConsentAt = guardian_consent ? new Date() : null;
+        const insertResult = await tx.execute(sql`
+          INSERT INTO booking_requests (
+            user_email, user_name, user_id, resource_id, resource_preference, 
+            request_date, start_time, duration_minutes, end_time, notes,
+            declared_player_count, member_notes,
+            guardian_name, guardian_relationship, guardian_phone, guardian_consent_at,
+            request_participants, status, created_at, updated_at
+          ) VALUES (
+            ${requestEmail},
+            ${resolvedUserName},
+            ${resolvedUserId || null},
+            ${resource_id || null},
+            ${resource_preference || null},
+            ${request_date},
+            ${start_time},
+            ${duration_minutes},
+            ${end_time},
+            ${notes || null},
+            ${declared_player_count && declared_player_count >= 1 && declared_player_count <= 4 ? declared_player_count : null},
+            ${member_notes ? String(member_notes).slice(0, 280) : null},
+            ${guardian_consent && guardian_name ? guardian_name : null},
+            ${guardian_consent && guardian_relationship ? guardian_relationship : null},
+            ${guardian_consent && guardian_phone ? guardian_phone : null},
+            ${guardianConsentAt},
+            ${sanitizedParticipants.length > 0 ? JSON.stringify(sanitizedParticipants) : '[]'},
+            ${initialStatus},
+            NOW(), NOW()
+          )
+          RETURNING *
+        `);
+        
+        const guestCount = sanitizedParticipants.filter((p: SanitizedParticipant) => p.type === 'guest').length;
+        if (guestCount > 0) {
+          const bookingId = (insertResult.rows[0] as Record<string, unknown>).id as number;
+          const holdResult = await createGuestPassHold(
+            requestEmail,
+            bookingId,
+            guestCount,
+            tx
           );
-          if (pOverlap.rows.length > 0) {
-            const conflict = pOverlap.rows[0];
-            const cStart = conflict.start_time?.substring(0, 5);
-            const cEnd = conflict.end_time?.substring(0, 5);
-            await client.query('ROLLBACK');
-            return res.status(409).json({
-              error: `${participant.name || participant.email} already has a booking at ${conflict.resource_name} from ${formatTime12Hour(cStart)} to ${formatTime12Hour(cEnd)}. They cannot be added to an overlapping time slot.`
-            });
+          if (!holdResult.success) {
+            throw new Error(`Guest pass hold failed: ${holdResult.error || 'Insufficient guest passes available'}`);
           }
         }
-      }
-      
-      // Conference rooms auto-confirm (no staff approval needed), simulators stay pending
-      const isConferenceRoom = resourceType === 'conference_room';
-      const initialStatus: 'pending' | 'confirmed' = isConferenceRoom ? 'confirmed' : 'pending';
-      
-      const insertResult = await client.query(
-        `INSERT INTO booking_requests (
-          user_email, user_name, user_id, resource_id, resource_preference, 
-          request_date, start_time, duration_minutes, end_time, notes,
-          declared_player_count, member_notes,
-          guardian_name, guardian_relationship, guardian_phone, guardian_consent_at,
-          request_participants, status, created_at, updated_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, NOW(), NOW())
-        RETURNING *`,
-        [
-          requestEmail,
-          resolvedUserName,
-          resolvedUserId || null,
-          resource_id || null,
-          resource_preference || null,
-          request_date,
-          start_time,
-          duration_minutes,
-          end_time,
-          notes || null,
-          declared_player_count && declared_player_count >= 1 && declared_player_count <= 4 ? declared_player_count : null,
-          member_notes ? String(member_notes).slice(0, 280) : null,
-          guardian_consent && guardian_name ? guardian_name : null,
-          guardian_consent && guardian_relationship ? guardian_relationship : null,
-          guardian_consent && guardian_phone ? guardian_phone : null,
-          guardian_consent ? new Date() : null,
-          sanitizedParticipants.length > 0 ? JSON.stringify(sanitizedParticipants) : '[]',
-          initialStatus
-        ]
-      );
-      
-      const guestCount = sanitizedParticipants.filter((p: SanitizedParticipant) => p.type === 'guest').length;
-      if (guestCount > 0) {
-        const bookingId = insertResult.rows[0].id;
-        const holdResult = await createGuestPassHold(
-          requestEmail,
-          bookingId,
-          guestCount,
-          client
-        );
-        if (!holdResult.success) {
-          throw new Error(`Guest pass hold failed: ${holdResult.error || 'Insufficient guest passes available'}`);
-        }
-      }
-      
-      await client.query('COMMIT');
-      
-      const dbRow = insertResult.rows[0];
-      row = {
-        id: dbRow.id,
-        userEmail: dbRow.user_email,
-        userName: dbRow.user_name,
-        resourceId: dbRow.resource_id,
-        resourcePreference: dbRow.resource_preference,
-        requestDate: dbRow.request_date,
-        startTime: dbRow.start_time,
-        durationMinutes: dbRow.duration_minutes,
-        endTime: dbRow.end_time,
-        notes: dbRow.notes,
-        status: dbRow.status,
-        declaredPlayerCount: dbRow.declared_player_count,
-        memberNotes: dbRow.member_notes,
-        guardianName: dbRow.guardian_name,
-        guardianRelationship: dbRow.guardian_relationship,
-        guardianPhone: dbRow.guardian_phone,
-        guardianConsentAt: dbRow.guardian_consent_at,
-        requestParticipants: dbRow.request_participants || [],
-        createdAt: dbRow.created_at,
-        updatedAt: dbRow.updated_at
-      };
+        
+        const dbRow = insertResult.rows[0] as Record<string, unknown>;
+        return {
+          id: dbRow.id,
+          userEmail: dbRow.user_email,
+          userName: dbRow.user_name,
+          resourceId: dbRow.resource_id,
+          resourcePreference: dbRow.resource_preference,
+          requestDate: dbRow.request_date,
+          startTime: dbRow.start_time,
+          durationMinutes: dbRow.duration_minutes,
+          endTime: dbRow.end_time,
+          notes: dbRow.notes,
+          status: dbRow.status,
+          declaredPlayerCount: dbRow.declared_player_count,
+          memberNotes: dbRow.member_notes,
+          guardianName: dbRow.guardian_name,
+          guardianRelationship: dbRow.guardian_relationship,
+          guardianPhone: dbRow.guardian_phone,
+          guardianConsentAt: dbRow.guardian_consent_at,
+          requestParticipants: dbRow.request_participants || [],
+          createdAt: dbRow.created_at,
+          updatedAt: dbRow.updated_at
+        } as BookingInsertRow;
+      });
+      row = txResult;
     } catch (error: unknown) {
-      await client.query('ROLLBACK');
+      if (error instanceof BookingValidationError) {
+        return res.status(error.statusCode).json(error.errorBody);
+      }
       throw error;
-    } finally {
-      safeRelease(client);
     }
     
     // Ensure session exists for auto-confirmed conference room bookings
