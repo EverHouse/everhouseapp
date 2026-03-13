@@ -231,81 +231,18 @@ interface PassImages {
   'logo@3x.png': Buffer;
 }
 
-function selectMascotSource(colors: TierColors): string | null {
-  const useDarkMascot = isLightBackground(colors.bg);
-  const darkPath = path.join(process.cwd(), 'public', 'assets', 'logos', 'mascot-dark.webp');
-  const whitePath = path.join(process.cwd(), 'public', 'assets', 'logos', 'mascot-white.webp');
-
-  if (useDarkMascot && fs.existsSync(darkPath)) return darkPath;
-  if (!useDarkMascot && fs.existsSync(whitePath)) return whitePath;
-  if (fs.existsSync(darkPath)) return darkPath;
-  if (fs.existsSync(whitePath)) return whitePath;
-  return null;
-}
-
-async function compositeLogoWithMascot(
-  logoSource: string,
-  mascotSource: string,
-  totalWidth: number,
-  totalHeight: number,
-): Promise<Buffer> {
-  const transparentBg = { r: 0, g: 0, b: 0, alpha: 0 };
-  const mascotSize = Math.round(totalHeight * 0.85);
-  const logoWidth = Math.round(totalWidth * 0.7);
-  const gap = Math.round(totalWidth * 0.02);
-
-  const [mascotBuf, logoBuf] = await Promise.all([
-    sharp(mascotSource).resize(mascotSize, mascotSize, { fit: 'contain', background: transparentBg }).png().toBuffer(),
-    sharp(logoSource).resize(logoWidth, totalHeight, { fit: 'contain', background: transparentBg }).png().toBuffer(),
-  ]);
-
-  const logoLeft = 0;
-  const logoMeta = await sharp(logoBuf).metadata();
-  const actualLogoWidth = logoMeta.width || logoWidth;
-  const mascotLeft = actualLogoWidth + gap;
-  const mascotTop = Math.round((totalHeight - mascotSize) / 2);
-
-  return sharp({
-    create: {
-      width: totalWidth,
-      height: totalHeight,
-      channels: 4,
-      background: transparentBg,
-    },
-  })
-    .composite([
-      { input: logoBuf, left: logoLeft, top: 0 },
-      { input: mascotBuf, left: mascotLeft, top: mascotTop },
-    ])
-    .png()
-    .toBuffer();
-}
-
 async function generatePassImages(colors: TierColors): Promise<PassImages> {
   const logoSource = selectLogoSource(colors);
-  const mascotSource = selectMascotSource(colors);
   const transparentBg = { r: 0, g: 0, b: 0, alpha: 0 };
 
-  const [icon, icon2x, icon3x] = await Promise.all([
+  const [icon, icon2x, icon3x, logo, logo2x, logo3x] = await Promise.all([
     sharp(logoSource).resize(29, 29, { fit: 'contain', background: transparentBg }).png().toBuffer(),
     sharp(logoSource).resize(58, 58, { fit: 'contain', background: transparentBg }).png().toBuffer(),
     sharp(logoSource).resize(87, 87, { fit: 'contain', background: transparentBg }).png().toBuffer(),
+    sharp(logoSource).resize(220, 70, { fit: 'contain', background: transparentBg }).png().toBuffer(),
+    sharp(logoSource).resize(440, 140, { fit: 'contain', background: transparentBg }).png().toBuffer(),
+    sharp(logoSource).resize(660, 210, { fit: 'contain', background: transparentBg }).png().toBuffer(),
   ]);
-
-  let logo: Buffer, logo2x: Buffer, logo3x: Buffer;
-  if (mascotSource) {
-    [logo, logo2x, logo3x] = await Promise.all([
-      compositeLogoWithMascot(logoSource, mascotSource, 260, 70),
-      compositeLogoWithMascot(logoSource, mascotSource, 520, 140),
-      compositeLogoWithMascot(logoSource, mascotSource, 780, 210),
-    ]);
-  } else {
-    [logo, logo2x, logo3x] = await Promise.all([
-      sharp(logoSource).resize(220, 70, { fit: 'contain', background: transparentBg }).png().toBuffer(),
-      sharp(logoSource).resize(440, 140, { fit: 'contain', background: transparentBg }).png().toBuffer(),
-      sharp(logoSource).resize(660, 210, { fit: 'contain', background: transparentBg }).png().toBuffer(),
-    ]);
-  }
 
   return {
     'icon.png': icon,
