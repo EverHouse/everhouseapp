@@ -1105,7 +1105,7 @@ const Profile: React.FC = () => {
                <span className={`material-symbols-outlined text-xl ${isDark ? 'text-accent' : 'text-amber-600'}`}>visibility</span>
                <div className="flex-1">
                  <p className={`font-semibold text-sm ${isDark ? 'text-accent' : 'text-amber-800'}`}>
-                   Viewing as {user.name}
+                   Viewing as {(user.name || '').includes('@') ? user.email?.split('@')[0] : user.name}
                  </p>
                  <p className={`text-xs mt-0.5 ${isDark ? 'text-white/70' : 'text-amber-700'}`}>
                    You are viewing this profile as an administrator

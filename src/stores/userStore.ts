@@ -6,6 +6,8 @@ import { useNotificationStore } from './notificationStore';
 export interface UserProfile {
   id: string;
   name: string;
+  firstName?: string | null;
+  lastName?: string | null;
   tier: string;
   tags?: string[];
   status: 'Active' | 'Pending' | 'Expired' | 'Inactive' | 'Terminated' | 'former_member' | string;
