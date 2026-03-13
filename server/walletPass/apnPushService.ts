@@ -147,6 +147,43 @@ export async function sendPassUpdateForMemberByEmail(email: string): Promise<voi
   }
 }
 
+export async function sendPassUpdateToAllRegistrations(): Promise<{ sent: number; failed: number }> {
+  const result = { sent: 0, failed: 0 };
+
+  try {
+    const registrations = await db.select({
+      pushToken: walletPassDeviceRegistrations.pushToken,
+      passTypeId: walletPassDeviceRegistrations.passTypeId,
+      serialNumber: walletPassDeviceRegistrations.serialNumber,
+    })
+      .from(walletPassDeviceRegistrations);
+
+    if (registrations.length === 0) {
+      logger.info('[WalletPass APN] No device registrations found for bulk push');
+      return result;
+    }
+
+    logger.info(`[WalletPass APN] Sending bulk push to ${registrations.length} device(s)`);
+
+    for (const reg of registrations) {
+      const success = await sendApnPush(reg.pushToken, reg.passTypeId);
+      if (success) {
+        result.sent++;
+      } else {
+        result.failed++;
+      }
+    }
+
+    logger.info(`[WalletPass APN] Bulk push complete: sent=${result.sent}, failed=${result.failed}`);
+  } catch (err) {
+    logger.error('[WalletPass APN] Error sending bulk pass update push', {
+      error: err instanceof Error ? err : new Error(String(err)),
+    });
+  }
+
+  return result;
+}
+
 export async function getOrCreateAuthToken(serialNumber: string, memberId: string): Promise<string> {
   const existing = await db.select({ authToken: walletPassAuthTokens.authToken })
     .from(walletPassAuthTokens)

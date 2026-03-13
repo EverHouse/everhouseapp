@@ -95,6 +95,11 @@ export async function generatePassForMember(memberId: string): Promise<Buffer | 
     const authToken = await getOrCreateAuthToken(serialNumber, user.id);
     const webServiceURL = await getWebServiceURL();
 
+    const [clubLat, clubLng] = await Promise.all([
+      getSettingValue('club.latitude', '33.713744'),
+      getSettingValue('club.longitude', '-117.836476'),
+    ]);
+
     const passData: PassData = {
       memberId: user.id,
       firstName: user.firstName || 'Member',
@@ -108,6 +113,8 @@ export async function generatePassForMember(memberId: string): Promise<Buffer | 
       guestPassesTotal: guestPassData?.passesTotal ?? null,
       authenticationToken: authToken,
       webServiceURL: webServiceURL || undefined,
+      clubLatitude: clubLat && !isNaN(parseFloat(clubLat)) ? parseFloat(clubLat) : undefined,
+      clubLongitude: clubLng && !isNaN(parseFloat(clubLng)) ? parseFloat(clubLng) : undefined,
     };
 
     let dbColors: TierColors | null = null;

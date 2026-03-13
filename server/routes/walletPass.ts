@@ -6,10 +6,11 @@ import { users, membershipTiers, guestPasses } from '../../shared/schema';
 import { sql } from 'drizzle-orm';
 import { normalizeTierName } from '../../shared/constants/tiers';
 import { generatePkPass, type PassData, type WalletConfig, type TierColors } from '../walletPass/passGenerator';
-import { getOrCreateAuthToken } from '../walletPass/apnPushService';
+import { getOrCreateAuthToken, sendPassUpdateToAllRegistrations } from '../walletPass/apnPushService';
 import { getWebServiceURL } from '../walletPass/passService';
 import { getSessionUser } from '../types/session';
 import { getSettingValue, getSettingBoolean } from '../core/settingsHelper';
+import { isStaffOrAdmin } from '../core/middleware';
 
 const router = Router();
 
@@ -161,6 +162,11 @@ router.get('/api/member/wallet-pass', isAuthenticated, async (req, res) => {
     const authToken = await getOrCreateAuthToken(serialNumber, user.id);
     const webServiceURL = await getWebServiceURL();
 
+    const [clubLat, clubLng] = await Promise.all([
+      getSettingValue('club.latitude', '33.713744'),
+      getSettingValue('club.longitude', '-117.836476'),
+    ]);
+
     const passData: PassData = {
       memberId: user.id,
       firstName: user.firstName || sessionUser.name || 'Member',
@@ -174,6 +180,8 @@ router.get('/api/member/wallet-pass', isAuthenticated, async (req, res) => {
       guestPassesTotal: guestPassData?.passesTotal ?? null,
       authenticationToken: authToken,
       webServiceURL: webServiceURL || undefined,
+      clubLatitude: clubLat && !isNaN(parseFloat(clubLat)) ? parseFloat(clubLat) : undefined,
+      clubLongitude: clubLng && !isNaN(parseFloat(clubLng)) ? parseFloat(clubLng) : undefined,
     };
 
     const pkpassBuffer = await generatePkPass(passData, walletConfig, dbColors);
@@ -188,6 +196,19 @@ router.get('/api/member/wallet-pass', isAuthenticated, async (req, res) => {
   } catch (error) {
     logger.error('[WalletPass] Failed to generate wallet pass', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to generate wallet pass' });
+  }
+});
+
+router.post('/api/admin/wallet-pass/push-update-all', isStaffOrAdmin, async (req, res) => {
+  try {
+    const result = await sendPassUpdateToAllRegistrations();
+    logger.info('[WalletPass] Bulk push update triggered by admin', {
+      extra: { sent: result.sent, failed: result.failed }
+    });
+    res.json({ success: true, sent: result.sent, failed: result.failed });
+  } catch (error) {
+    logger.error('[WalletPass] Bulk push update failed', { error: error instanceof Error ? error : new Error(String(error)) });
+    res.status(500).json({ error: 'Failed to send bulk push update' });
   }
 });
 

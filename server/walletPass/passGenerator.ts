@@ -19,6 +19,8 @@ interface PassData {
   guestPassesTotal: number | null;
   authenticationToken?: string;
   webServiceURL?: string;
+  clubLatitude?: number;
+  clubLongitude?: number;
 }
 
 interface TierColors {
@@ -205,6 +207,21 @@ function buildPassJson(data: PassData, config: WalletConfig, colors: TierColors)
       messageEncoding: 'iso-8859-1',
     },
   ];
+
+  if (
+    data.clubLatitude != null && data.clubLongitude != null &&
+    isFinite(data.clubLatitude) && isFinite(data.clubLongitude) &&
+    data.clubLatitude >= -90 && data.clubLatitude <= 90 &&
+    data.clubLongitude >= -180 && data.clubLongitude <= 180
+  ) {
+    passJson.locations = [
+      {
+        latitude: data.clubLatitude,
+        longitude: data.clubLongitude,
+        relevantText: 'Welcome to Ever Club',
+      },
+    ];
+  }
 
   return passJson;
 }

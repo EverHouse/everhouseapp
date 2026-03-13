@@ -23,6 +23,8 @@ interface SettingsState {
   appleWalletEnabled: boolean;
   appleWalletPassTypeId: string;
   appleWalletTeamId: string;
+  clubLatitude: string;
+  clubLongitude: string;
   hoursMonday: string;
   hoursTuesdayThursday: string;
   hoursFridaySaturday: string;
@@ -144,6 +146,8 @@ const SettingsTab: React.FC = () => {
     appleWalletEnabled: false,
     appleWalletPassTypeId: '',
     appleWalletTeamId: '',
+    clubLatitude: '33.713744',
+    clubLongitude: '-117.836476',
     hoursMonday: 'Closed',
     hoursTuesdayThursday: '8:30 AM – 8:00 PM',
     hoursFridaySaturday: '8:30 AM – 10:00 PM',
@@ -207,6 +211,8 @@ const SettingsTab: React.FC = () => {
         appleWalletEnabled: data['apple_wallet.enabled']?.value === 'true',
         appleWalletPassTypeId: data['apple_wallet.pass_type_id']?.value || '',
         appleWalletTeamId: data['apple_wallet.team_id']?.value || '',
+        clubLatitude: data['club.latitude']?.value || defaultSettings.clubLatitude,
+        clubLongitude: data['club.longitude']?.value || defaultSettings.clubLongitude,
         hoursMonday: data['hours.monday']?.value || defaultSettings.hoursMonday,
         hoursTuesdayThursday: data['hours.tuesday_thursday']?.value || defaultSettings.hoursTuesdayThursday,
         hoursFridaySaturday: data['hours.friday_saturday']?.value || defaultSettings.hoursFridaySaturday,
@@ -255,6 +261,8 @@ const SettingsTab: React.FC = () => {
         'apple_wallet.enabled': String(settingsToSave.appleWalletEnabled),
         'apple_wallet.pass_type_id': settingsToSave.appleWalletPassTypeId,
         'apple_wallet.team_id': settingsToSave.appleWalletTeamId,
+        'club.latitude': settingsToSave.clubLatitude,
+        'club.longitude': settingsToSave.clubLongitude,
         'hours.monday': settingsToSave.hoursMonday,
         'hours.tuesday_thursday': settingsToSave.hoursTuesdayThursday,
         'hours.friday_saturday': settingsToSave.hoursFridaySaturday,
@@ -382,6 +390,25 @@ const SettingsTab: React.FC = () => {
             </div>
           </div>
 
+          <SubSectionLabel>Club GPS Coordinates</SubSectionLabel>
+          <p className="text-xs text-gray-500 dark:text-gray-400 -mt-2">Used for the contact page map and Apple Wallet lock screen location trigger</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <FieldLabel>Latitude</FieldLabel>
+              <input type="text" inputMode="decimal" value={settings.clubLatitude ?? ''} onChange={(e) => updateField('clubLatitude', e.target.value)} className={inputClass} placeholder="33.713744" />
+              {settings.clubLatitude && (isNaN(parseFloat(settings.clubLatitude)) || parseFloat(settings.clubLatitude) < -90 || parseFloat(settings.clubLatitude) > 90) && (
+                <p className="text-xs text-red-500 mt-1">Must be a number between -90 and 90</p>
+              )}
+            </div>
+            <div>
+              <FieldLabel>Longitude</FieldLabel>
+              <input type="text" inputMode="decimal" value={settings.clubLongitude ?? ''} onChange={(e) => updateField('clubLongitude', e.target.value)} className={inputClass} placeholder="-117.836476" />
+              {settings.clubLongitude && (isNaN(parseFloat(settings.clubLongitude)) || parseFloat(settings.clubLongitude) < -180 || parseFloat(settings.clubLongitude) > 180) && (
+                <p className="text-xs text-red-500 mt-1">Must be a number between -180 and 180</p>
+              )}
+            </div>
+          </div>
+
           <SubSectionLabel>Social Media Links</SubSectionLabel>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
@@ -455,6 +482,28 @@ const SettingsTab: React.FC = () => {
                 <p className="text-xs text-amber-700 dark:text-amber-300">
                   <strong>Setup guide:</strong> In Apple Developer, create a Pass Type ID, then create a certificate for it. Export the certificate and private key from Keychain Access in PEM format. Add them as the environment secrets listed above. The WWDR intermediate certificate is included automatically.
                 </p>
+              </div>
+              <div className="p-4 bg-gray-50 dark:bg-black/20 rounded-xl space-y-2">
+                <p className="text-sm font-medium text-primary dark:text-white">Push Update to All Passes</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Notify all registered devices to re-download their pass. Use this after changing pass settings like coordinates or pass design.
+                </p>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      const res = await postWithCredentials('/api/admin/wallet-pass/push-update-all', {});
+                      const data = res as { sent?: number; failed?: number };
+                      setSuccess(`Push sent to ${data.sent ?? 0} device(s)${data.failed ? `, ${data.failed} failed` : ''}`);
+                      setTimeout(() => setSuccess(null), 4000);
+                    } catch {
+                      setSuccess(null);
+                    }
+                  }}
+                  className="px-4 py-2 text-sm font-medium text-white bg-primary hover:bg-primary/90 rounded-lg transition-colors"
+                >
+                  Send Push Update
+                </button>
               </div>
             </div>
           )}

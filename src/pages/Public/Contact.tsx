@@ -41,7 +41,7 @@ declare global {
   }
 }
 
-const CLUB_COORDS = { lat: 33.713744, lng: -117.836476 };
+const DEFAULT_CLUB_COORDS = { lat: 33.713744, lng: -117.836476 };
 
 function useMapKitToken() {
   const [token, setToken] = useState<string | null>(null);
@@ -73,7 +73,7 @@ function useIsDarkMode() {
   return isDark;
 }
 
-function AppleMapView() {
+function AppleMapView({ coords }: { coords: { lat: number; lng: number } }) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<mapkit.Map | null>(null);
   const { token, tokenError } = useMapKitToken();
@@ -94,7 +94,7 @@ function AppleMapView() {
         authorizationCallback: (done) => done(mapkitToken),
       });
 
-      const center = new window.mapkit.Coordinate(CLUB_COORDS.lat, CLUB_COORDS.lng);
+      const center = new window.mapkit.Coordinate(coords.lat, coords.lng);
       const span = new window.mapkit.CoordinateSpan(0.005, 0.005);
       const region = new window.mapkit.CoordinateRegion(center, span);
 
@@ -118,7 +118,7 @@ function AppleMapView() {
     } catch {
       setMapError(true);
     }
-  }, []);
+  }, [coords]);
 
   useEffect(() => {
     if (!token) return;
@@ -180,6 +180,8 @@ const FALLBACK = {
   'contact.formerly_known_as': 'Formerly Even House (evenhouse.club)',
   'contact.google_maps_url': 'https://maps.app.goo.gl/Zp93EMzyp9EA3vqA6',
   'contact.apple_maps_url': 'https://maps.apple.com/place?place-id=I2671995E78948F1F&address=15771+Red+Hill+Ave%2C+Ste+500%2C+Tustin%2C+CA++92780%2C+United+States&coordinate=33.713744%2C-117.836476&name=Even+House&_provider=9902',
+  'club.latitude': '33.713744',
+  'club.longitude': '-117.836476',
   'apple_messages.enabled': 'false',
   'apple_messages.business_id': '',
   'hours.monday': 'Closed',
@@ -427,7 +429,10 @@ const Contact: React.FC = () => {
 
       <section className="px-4 mb-12 max-w-2xl mx-auto w-full">
         <div className="w-full h-64 rounded-xl overflow-hidden relative border border-black/5 dark:border-white/10">
-            <AppleMapView />
+            <AppleMapView coords={{
+              lat: parseFloat(s['club.latitude']) || DEFAULT_CLUB_COORDS.lat,
+              lng: parseFloat(s['club.longitude']) || DEFAULT_CLUB_COORDS.lng,
+            }} />
             <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-2 z-10">
                  <a 
                    href={s['contact.google_maps_url']} 
