@@ -131,9 +131,28 @@ router.get('/api/booking-requests', isAuthenticated, async (req, res) => {
       conditions.push(eq(bookingRequests.status, status as string));
     }
     
-    const limit = limitParam ? Math.min(parseInt(limitParam as string), 500) : undefined;
-    const page = pageParam ? Math.max(1, parseInt(pageParam as string)) : undefined;
-    const offset = page && limit ? (page - 1) * limit : (offsetParam ? parseInt(offsetParam as string) : undefined);
+    let limit: number | undefined;
+    if (limitParam) {
+      limit = parseInt(limitParam as string, 10);
+      if (isNaN(limit)) return res.status(400).json({ error: 'Invalid limit parameter' });
+      limit = Math.min(limit, 500);
+    }
+    
+    let page: number | undefined;
+    if (pageParam) {
+      page = parseInt(pageParam as string, 10);
+      if (isNaN(page)) return res.status(400).json({ error: 'Invalid page parameter' });
+      page = Math.max(1, page);
+    }
+    
+    let offset: number | undefined;
+    if (offsetParam) {
+      offset = parseInt(offsetParam as string, 10);
+      if (isNaN(offset)) return res.status(400).json({ error: 'Invalid offset parameter' });
+    }
+    if (page && limit) {
+      offset = (page - 1) * limit;
+    }
     
     const isPaginated = !!page;
     
@@ -1742,7 +1761,13 @@ router.get('/api/fee-estimate', isAuthenticated, async (req, res) => {
     const isStaff = await isStaffOrAdminCheck(sessionEmail);
     
     // If bookingId is provided, look up the booking (staff only)
-    const bookingId = req.query.bookingId ? parseInt(req.query.bookingId as string) : null;
+    let bookingId: number | null = null;
+    if (req.query.bookingId) {
+      bookingId = parseInt(req.query.bookingId as string, 10);
+      if (isNaN(bookingId)) {
+        return res.status(400).json({ error: 'Invalid bookingId parameter' });
+      }
+    }
     
     if (bookingId) {
       if (!isStaff) {

@@ -8,7 +8,7 @@ import {logAndRespond, logger } from '../../core/logger';
 import { formatDateDisplayWithDay, formatTime12Hour } from '../../utils/dateUtils';
 import { db } from '../../db';
 import { resources, dayPassPurchases, passRedemptionLogs, bookingRequests } from '../../../shared/schema';
-import { eq, sql } from 'drizzle-orm';
+import { eq, and, sql } from 'drizzle-orm';
 import { getSessionUser } from '../../types/session';
 import { ensureSessionForBooking } from '../../core/bookingService/sessionManager';
 import { resolveUserByEmail } from '../../core/stripe/customers';
@@ -70,7 +70,7 @@ router.post('/api/staff/manual-booking', isStaffOrAdmin, async (req, res) => {
             .where(eq(bookingRequests.id, duplicate.id));
         } else if (sameEmail) {
           const duplicateId = duplicate.id as number;
-          await db.update(bookingRequests)
+          const updateResult = await db.update(bookingRequests)
             .set({
               trackmanBookingId: null,
               status: 'declined',
@@ -79,20 +79,26 @@ router.post('/api/staff/manual-booking', isStaffOrAdmin, async (req, res) => {
               reviewedAt: sql`NOW()`,
               updatedAt: sql`NOW()`
             })
-            .where(eq(bookingRequests.id, duplicateId));
+            .where(and(
+              eq(bookingRequests.id, duplicateId),
+              sql`${bookingRequests.status} NOT IN ('cancelled', 'cancellation_pending', 'declined', 'no_show')`
+            ))
+            .returning({ id: bookingRequests.id });
 
-          const orphanedSession = await db.execute(sql`
-            SELECT id FROM booking_sessions WHERE id = (
-              SELECT session_id FROM booking_requests WHERE id = ${duplicateId}
-            )
-          `).then(r => (r.rows as Array<Record<string, unknown>>)[0]);
+          if (updateResult.length > 0) {
+            const orphanedSession = await db.execute(sql`
+              SELECT id FROM booking_sessions WHERE id = (
+                SELECT session_id FROM booking_requests WHERE id = ${duplicateId}
+              )
+            `).then(r => (r.rows as Array<Record<string, unknown>>)[0]);
 
-          if (orphanedSession?.id) {
-            await db.execute(sql`DELETE FROM booking_sessions WHERE id = ${orphanedSession.id}`);
+            if (orphanedSession?.id) {
+              await db.execute(sql`DELETE FROM booking_sessions WHERE id = ${orphanedSession.id}`);
+            }
           }
 
           logger.info('[ManualBooking] Declined orphaned same-member booking during Trackman re-link', {
-            extra: { declinedBookingId: duplicateId, trackmanId: trackman_id }
+            extra: { declinedBookingId: duplicateId, trackmanId: trackman_id, updated: updateResult.length > 0 }
           });
         } else {
           return res.status(409).json({ 
