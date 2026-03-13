@@ -225,9 +225,12 @@ interface PassImages {
   'logo.png': Buffer;
   'logo@2x.png': Buffer;
   'logo@3x.png': Buffer;
+  'thumbnail.png'?: Buffer;
+  'thumbnail@2x.png'?: Buffer;
+  'thumbnail@3x.png'?: Buffer;
 }
 
-function selectMascotSource(colors: TierColors): string | null {
+function selectThumbnailSource(colors: TierColors): string | null {
   const useDarkMascot = isLightBackground(colors.bg);
   const darkPath = path.join(process.cwd(), 'public', 'assets', 'logos', 'mascot-dark.webp');
   const whitePath = path.join(process.cwd(), 'public', 'assets', 'logos', 'mascot-white.webp');
@@ -239,75 +242,46 @@ function selectMascotSource(colors: TierColors): string | null {
   return null;
 }
 
-async function compositeLogoWithMascot(
-  logoSource: string,
-  mascotSource: string | null,
-  width: number,
-  height: number,
-): Promise<Buffer> {
-  const transparentBg = { r: 0, g: 0, b: 0, alpha: 0 };
-
-  if (!mascotSource) {
-    return sharp(logoSource)
-      .resize(width, height, { fit: 'contain', background: transparentBg })
-      .png()
-      .toBuffer();
-  }
-
-  const logoWidth = Math.floor(width * 0.65);
-  const mascotSize = Math.floor(height * 0.6);
-  const mascotTop = Math.floor((height - mascotSize) / 2);
-  const mascotLeft = width - mascotSize;
-
-  const [logoBuf, mascotBuf] = await Promise.all([
-    sharp(logoSource)
-      .resize(logoWidth, height, { fit: 'contain', background: transparentBg })
-      .png()
-      .toBuffer(),
-    sharp(mascotSource)
-      .resize(mascotSize, mascotSize, { fit: 'contain', background: transparentBg })
-      .png()
-      .toBuffer(),
-  ]);
-
-  return sharp({
-    create: {
-      width,
-      height,
-      channels: 4,
-      background: transparentBg,
-    },
-  })
-    .composite([
-      { input: logoBuf, left: 0, top: 0 },
-      { input: mascotBuf, left: mascotLeft, top: mascotTop },
-    ])
-    .png()
-    .toBuffer();
-}
-
 async function generatePassImages(colors: TierColors): Promise<PassImages> {
   const logoSource = selectLogoSource(colors);
-  const mascotSource = selectMascotSource(colors);
+  const thumbnailSource = selectThumbnailSource(colors);
   const transparentBg = { r: 0, g: 0, b: 0, alpha: 0 };
 
-  const [icon, icon2x, icon3x, logo, logo2x, logo3x] = await Promise.all([
+  const imagePromises: Promise<Buffer>[] = [
     sharp(logoSource).resize(29, 29, { fit: 'contain', background: transparentBg }).png().toBuffer(),
     sharp(logoSource).resize(58, 58, { fit: 'contain', background: transparentBg }).png().toBuffer(),
     sharp(logoSource).resize(87, 87, { fit: 'contain', background: transparentBg }).png().toBuffer(),
-    compositeLogoWithMascot(logoSource, mascotSource, 320, 70),
-    compositeLogoWithMascot(logoSource, mascotSource, 640, 140),
-    compositeLogoWithMascot(logoSource, mascotSource, 960, 210),
-  ]);
+    sharp(logoSource).resize(220, 70, { fit: 'contain', background: transparentBg }).png().toBuffer(),
+    sharp(logoSource).resize(440, 140, { fit: 'contain', background: transparentBg }).png().toBuffer(),
+    sharp(logoSource).resize(660, 210, { fit: 'contain', background: transparentBg }).png().toBuffer(),
+  ];
 
-  return {
-    'icon.png': icon,
-    'icon@2x.png': icon2x,
-    'icon@3x.png': icon3x,
-    'logo.png': logo,
-    'logo@2x.png': logo2x,
-    'logo@3x.png': logo3x,
+  if (thumbnailSource) {
+    imagePromises.push(
+      sharp(thumbnailSource).resize(90, 90, { fit: 'contain', background: transparentBg }).png().toBuffer(),
+      sharp(thumbnailSource).resize(180, 180, { fit: 'contain', background: transparentBg }).png().toBuffer(),
+      sharp(thumbnailSource).resize(270, 270, { fit: 'contain', background: transparentBg }).png().toBuffer(),
+    );
+  }
+
+  const results = await Promise.all(imagePromises);
+
+  const images: PassImages = {
+    'icon.png': results[0],
+    'icon@2x.png': results[1],
+    'icon@3x.png': results[2],
+    'logo.png': results[3],
+    'logo@2x.png': results[4],
+    'logo@3x.png': results[5],
   };
+
+  if (thumbnailSource) {
+    images['thumbnail.png'] = results[6];
+    images['thumbnail@2x.png'] = results[7];
+    images['thumbnail@3x.png'] = results[8];
+  }
+
+  return images;
 }
 
 function computeSha1(data: Buffer | string): string {
