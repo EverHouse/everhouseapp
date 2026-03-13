@@ -29,6 +29,7 @@ import { normalizeToISODate } from '../../utils/dateNormalize';
 import { bookingRateLimiter } from '../../middleware/rateLimiting';
 import { validateBody } from '../../middleware/validate';
 import { createBookingRequestSchema } from '../../../shared/validators/booking';
+import { checkClosureConflict, checkAvailabilityBlockConflict } from '../../core/bookingValidation';
 
 interface SanitizedParticipant {
   email: string;
@@ -564,6 +565,24 @@ router.post('/api/booking-requests', isAuthenticated, bookingRateLimiter, valida
         }
       }
       
+      if (resource_id) {
+        const closureCheck = await checkClosureConflict(resource_id, request_date, start_time, end_time);
+        if (closureCheck.hasConflict) {
+          await client.query('ROLLBACK');
+          return res.status(409).json({
+            error: `This time slot conflicts with a facility closure: ${closureCheck.closureTitle || 'Facility Closure'}. Please choose a different time.`
+          });
+        }
+
+        const blockCheck = await checkAvailabilityBlockConflict(resource_id, request_date, start_time, end_time);
+        if (blockCheck.hasConflict) {
+          await client.query('ROLLBACK');
+          return res.status(409).json({
+            error: `This time slot is blocked for: ${blockCheck.blockType || 'Event Block'}. Please choose a different time.`
+          });
+        }
+      }
+
       // Check if member already has a personal time conflict (owned or participant booking at overlapping time)
       if (!isStaffRequest || isViewAsMode) {
         const memberOverlapCheck = await client.query(
