@@ -62,10 +62,11 @@ router.get('/api/staff-users', isStaffOrAdmin, async (req, res) => {
       .from(staffUsers);
     
     const result = includeAll 
-      ? await baseQuery.orderBy(desc(staffUsers.createdAt))
+      ? await baseQuery.orderBy(desc(staffUsers.createdAt)).limit(500)
       : await baseQuery
           .where(sql`${staffUsers.role} = 'staff' OR ${staffUsers.role} IS NULL`)
-          .orderBy(desc(staffUsers.createdAt));
+          .orderBy(desc(staffUsers.createdAt))
+          .limit(500);
     res.json(result);
   } catch (error: unknown) {
     logger.error('API error fetching staff users', { error: error instanceof Error ? error : new Error(String(error)) });
@@ -308,7 +309,8 @@ router.get('/api/admin-users', isAdmin, async (req, res) => {
     })
       .from(staffUsers)
       .where(eq(staffUsers.role, 'admin'))
-      .orderBy(desc(staffUsers.createdAt));
+      .orderBy(desc(staffUsers.createdAt))
+      .limit(500);
     res.json(result);
   } catch (error: unknown) {
     logger.error('API error fetching admin users', { error: error instanceof Error ? error : new Error(String(error)) });

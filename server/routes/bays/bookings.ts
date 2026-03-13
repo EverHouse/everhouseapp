@@ -1206,8 +1206,8 @@ router.put('/api/booking-requests/:id/member-cancel', isAuthenticated, async (re
     }
 
     if (!isAdminViewingAs && existing.requestDate && existing.startTime) {
-      const bookingStart = new Date(`${existing.requestDate}T${existing.startTime}`);
-      if (bookingStart <= new Date()) {
+      const bookingStart = createPacificDate(existing.requestDate, existing.startTime.substring(0, 5));
+      if (bookingStart.getTime() <= new Date().getTime()) {
         return res.status(400).json({ error: 'This booking has already started and cannot be cancelled' });
       }
     }
@@ -1217,7 +1217,7 @@ router.put('/api/booking-requests/:id/member-cancel', isAuthenticated, async (re
     const needsPendingCancel = wasApproved && isTrackmanLinked;
     
     if (needsPendingCancel) {
-      await db.update(bookingRequests)
+      const pendingResult = await db.update(bookingRequests)
         .set({
           status: 'cancellation_pending',
           cancellationPendingAt: new Date(),
@@ -1226,7 +1226,15 @@ router.put('/api/booking-requests/:id/member-cancel', isAuthenticated, async (re
             : '[Member requested cancellation - awaiting Trackman cancellation]',
           updatedAt: new Date()
         })
-        .where(eq(bookingRequests.id, bookingId));
+        .where(and(
+          eq(bookingRequests.id, bookingId),
+          inArray(bookingRequests.status, ['pending', 'pending_approval', 'approved', 'confirmed'])
+        ))
+        .returning({ id: bookingRequests.id });
+      
+      if (pendingResult.length === 0) {
+        return res.status(409).json({ error: 'Booking could not be cancelled. Its status was changed concurrently.' });
+      }
       
       logFromRequest(req, 'cancellation_requested', 'booking', idStr, undefined, {
         member_email: existing.userEmail,
@@ -1322,13 +1330,21 @@ router.put('/api/booking-requests/:id/member-cancel', isAuthenticated, async (re
         }
       }
       
-      await tx.update(bookingRequests)
+      const cancelResult = await tx.update(bookingRequests)
         .set({
           status: 'cancelled',
           staffNotes: staffNotes || undefined,
           updatedAt: new Date()
         })
-        .where(eq(bookingRequests.id, bookingId));
+        .where(and(
+          eq(bookingRequests.id, bookingId),
+          inArray(bookingRequests.status, ['pending', 'pending_approval', 'approved', 'confirmed'])
+        ))
+        .returning({ id: bookingRequests.id });
+      
+      if (cancelResult.length === 0) {
+        throw new Error('Booking could not be cancelled. Its status was changed concurrently by a staff member.');
+      }
     });
     
     if (!shouldSkipRefund) {
