@@ -467,6 +467,20 @@ export async function ensureDatabaseConstraints() {
       logger.warn(`[DB Init] Skipping billing provider CHECK constraint: ${getErrorMessage(err)}`);
     }
 
+    try {
+      await db.execute(sql`
+        DO $$
+        BEGIN
+          ALTER TABLE availability_blocks DROP CONSTRAINT IF EXISTS availability_blocks_block_type_check;
+          ALTER TABLE availability_blocks ADD CONSTRAINT availability_blocks_block_type_check
+            CHECK (block_type IN ('available', 'blocked', 'maintenance', 'wellness', 'event', 'lesson', 'closure'));
+        END $$;
+      `);
+      logger.info('[DB Init] Availability blocks block_type CHECK constraint synced');
+    } catch (err: unknown) {
+      logger.warn(`[DB Init] Skipping availability_blocks block_type CHECK constraint: ${getErrorMessage(err)}`);
+    }
+
     const bookingSourceValues = ['auto-complete', 'manual-auto-complete', 'system'] as const;
     for (const val of bookingSourceValues) {
       try {
