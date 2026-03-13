@@ -85,9 +85,20 @@ self.addEventListener('fetch', function(event) {
     event.respondWith(
       fetch(request, { cache: 'no-store' })
         .then(function(response) {
-          if (response.ok) {
+          if (response.ok && response.status !== 503) {
             var clone = response.clone();
             caches.open(CACHE_NAME).then(function(cache) { cache.put(request, clone); });
+          }
+          if (response.status === 503) {
+            return caches.match(request).then(function(cachedResponse) {
+              if (cachedResponse) {
+                console.log('[SW] Server returning 503, serving cached version');
+                return cachedResponse;
+              }
+              return caches.match('/').then(function(fallback) {
+                return fallback || response;
+              });
+            });
           }
           return response;
         })

@@ -61,79 +61,95 @@ export async function runStartupTasks(): Promise<void> {
     startupHealth.criticalFailures.push(`Database constraints: ${getErrorMessage(err)}`);
   }
 
-  try {
-    await setupEmailNormalization();
-    const { updated } = await normalizeExistingEmails();
-    if (updated > 0) {
-      logger.info(`[Startup] Normalized ${updated} existing email records`, { extra: { updated } });
-    }
-  } catch (err: unknown) {
-    logger.error('[Startup] Email normalization failed', { error: err instanceof Error ? err : new Error(String(err)) });
-    startupHealth.warnings.push(`Email normalization: ${getErrorMessage(err)}`);
-  }
+  const parallelDbTasks = [
+    (async () => {
+      try {
+        await setupEmailNormalization();
+        const { updated } = await normalizeExistingEmails();
+        if (updated > 0) {
+          logger.info(`[Startup] Normalized ${updated} existing email records`, { extra: { updated } });
+        }
+      } catch (err: unknown) {
+        logger.error('[Startup] Email normalization failed', { error: err instanceof Error ? err : new Error(String(err)) });
+        startupHealth.warnings.push(`Email normalization: ${getErrorMessage(err)}`);
+      }
+    })(),
+    (async () => {
+      try {
+        await setupInstantDataTriggers();
+      } catch (err: unknown) {
+        logger.error('[Startup] Instant data triggers failed', { error: err instanceof Error ? err : new Error(String(err)) });
+        startupHealth.warnings.push(`Instant data triggers: ${getErrorMessage(err)}`);
+      }
+    })(),
+    (async () => {
+      try {
+        await fixFunctionSearchPaths();
+      } catch (err: unknown) {
+        logger.warn(`[Startup] Function search_path fix failed (non-critical): ${getErrorMessage(err)}`);
+      }
+    })(),
+    (async () => {
+      try {
+        await seedDefaultNoticeTypes();
+      } catch (err: unknown) {
+        logger.error('[Startup] Seeding notice types failed', { error: err instanceof Error ? err : new Error(String(err)) });
+        startupHealth.warnings.push(`Notice types: ${getErrorMessage(err)}`);
+      }
+    })(),
+    (async () => {
+      try {
+        await seedTierFeatures();
+      } catch (err: unknown) {
+        logger.error('[Startup] Seeding tier features failed', { error: err instanceof Error ? err : new Error(String(err)) });
+        startupHealth.warnings.push(`Tier features: ${getErrorMessage(err)}`);
+      }
+    })(),
+    (async () => {
+      try {
+        await validateTierHierarchy();
+      } catch (err: unknown) {
+        logger.error('[Startup] Tier hierarchy validation failed', { error: err instanceof Error ? err : new Error(String(err)) });
+        startupHealth.warnings.push(`Tier validation: ${getErrorMessage(err)}`);
+      }
+    })(),
+    (async () => {
+      try {
+        await initMemberSyncSettings();
+      } catch (err: unknown) {
+        logger.error('[Startup] Member sync settings init failed', { error: err instanceof Error ? err : new Error(String(err)) });
+        startupHealth.warnings.push(`Member sync settings: ${getErrorMessage(err)}`);
+      }
+    })(),
+    (async () => {
+      try {
+        await seedTrainingSections();
+        logger.info('[Startup] Training sections synced');
+      } catch (err: unknown) {
+        logger.error('[Startup] Seeding training sections failed', { error: err instanceof Error ? err : new Error(String(err)) });
+        startupHealth.warnings.push(`Training sections: ${getErrorMessage(err)}`);
+      }
+    })(),
+    (async () => {
+      try {
+        await createSyncExclusionsTable();
+      } catch (err: unknown) {
+        logger.error('[Startup] Creating sync exclusions table failed', { error: err instanceof Error ? err : new Error(String(err)) });
+        startupHealth.warnings.push(`Sync exclusions table: ${getErrorMessage(err)}`);
+      }
+    })(),
+    (async () => {
+      try {
+        await createStripeTransactionCache();
+      } catch (err: unknown) {
+        logger.error('[Startup] Creating stripe transaction cache failed', { error: err instanceof Error ? err : new Error(String(err)) });
+        startupHealth.warnings.push(`Stripe transaction cache: ${getErrorMessage(err)}`);
+      }
+    })(),
+  ];
 
-  try {
-    await setupInstantDataTriggers();
-  } catch (err: unknown) {
-    logger.error('[Startup] Instant data triggers failed', { error: err instanceof Error ? err : new Error(String(err)) });
-    startupHealth.warnings.push(`Instant data triggers: ${getErrorMessage(err)}`);
-  }
-
-  try {
-    await fixFunctionSearchPaths();
-  } catch (err: unknown) {
-    logger.warn(`[Startup] Function search_path fix failed (non-critical): ${getErrorMessage(err)}`);
-  }
-  
-  try {
-    await seedDefaultNoticeTypes();
-  } catch (err: unknown) {
-    logger.error('[Startup] Seeding notice types failed', { error: err instanceof Error ? err : new Error(String(err)) });
-    startupHealth.warnings.push(`Notice types: ${getErrorMessage(err)}`);
-  }
-
-  try {
-    await seedTierFeatures();
-  } catch (err: unknown) {
-    logger.error('[Startup] Seeding tier features failed', { error: err instanceof Error ? err : new Error(String(err)) });
-    startupHealth.warnings.push(`Tier features: ${getErrorMessage(err)}`);
-  }
-
-  try {
-    await validateTierHierarchy();
-  } catch (err: unknown) {
-    logger.error('[Startup] Tier hierarchy validation failed', { error: err instanceof Error ? err : new Error(String(err)) });
-    startupHealth.warnings.push(`Tier validation: ${getErrorMessage(err)}`);
-  }
-
-  try {
-    await initMemberSyncSettings();
-  } catch (err: unknown) {
-    logger.error('[Startup] Member sync settings init failed', { error: err instanceof Error ? err : new Error(String(err)) });
-    startupHealth.warnings.push(`Member sync settings: ${getErrorMessage(err)}`);
-  }
-
-  try {
-    await seedTrainingSections();
-    logger.info('[Startup] Training sections synced');
-  } catch (err: unknown) {
-    logger.error('[Startup] Seeding training sections failed', { error: err instanceof Error ? err : new Error(String(err)) });
-    startupHealth.warnings.push(`Training sections: ${getErrorMessage(err)}`);
-  }
-
-  try {
-    await createSyncExclusionsTable();
-  } catch (err: unknown) {
-    logger.error('[Startup] Creating sync exclusions table failed', { error: err instanceof Error ? err : new Error(String(err)) });
-    startupHealth.warnings.push(`Sync exclusions table: ${getErrorMessage(err)}`);
-  }
-
-  try {
-    await createStripeTransactionCache();
-  } catch (err: unknown) {
-    logger.error('[Startup] Creating stripe transaction cache failed', { error: err instanceof Error ? err : new Error(String(err)) });
-    startupHealth.warnings.push(`Stripe transaction cache: ${getErrorMessage(err)}`);
-  }
+  await Promise.allSettled(parallelDbTasks);
+  logger.info('[Startup] Parallel DB initialization tasks complete');
 
   try {
     const databaseUrl = process.env.DATABASE_URL;

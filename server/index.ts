@@ -164,7 +164,7 @@ httpServer = http.createServer((req, res) => {
   }
 
   if (req.url === '/' && req.method === 'GET' && !isReady) {
-    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache, no-store, must-revalidate' });
+    res.writeHead(503, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache, no-store, must-revalidate', 'Retry-After': '5' });
     res.end(MAINTENANCE_HTML);
     return;
   }
@@ -180,7 +180,7 @@ httpServer = http.createServer((req, res) => {
     return;
   }
 
-  res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache, no-store, must-revalidate' });
+  res.writeHead(503, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache, no-store, must-revalidate', 'Retry-After': '5' });
   res.end(MAINTENANCE_HTML);
 });
 
@@ -1067,7 +1067,6 @@ async function initializeApp() {
   });
 
   expressApp = app;
-  logger.info('[Startup] Express app initialized, waiting for background services...');
 
   if (isProduction) {
     try {
@@ -1080,18 +1079,18 @@ async function initializeApp() {
     }
   }
 
-  const heavyTaskDelay = isProduction ? 10000 : 500;
-  logger.info(`[Startup] Scheduling heavy background tasks in ${heavyTaskDelay / 1000}s...`);
+  try {
+    initWebSocketServer(httpServer!);
+    websocketInitialized = true;
+  } catch (err: unknown) {
+    logger.error('[Startup] WebSocket initialization failed:', { error: err as Error });
+  }
 
-  setTimeout(() => {
-    logger.info('[Startup] Starting heavy background tasks...');
+  isReady = true;
+  logger.info('[Startup] Express app initialized — app is ready to serve requests');
 
-    try {
-      initWebSocketServer(httpServer!);
-      websocketInitialized = true;
-    } catch (err: unknown) {
-      logger.error('[Startup] WebSocket initialization failed:', { error: err as Error });
-    }
+  setImmediate(() => {
+    logger.info('[Startup] Starting background initialization tasks...');
 
     (async () => {
       const maxRetries = 3;
@@ -1176,9 +1175,8 @@ async function initializeApp() {
       logger.error('[Startup] Scheduler initialization failed:', { error: err as Error });
     }
 
-    isReady = true;
-    logger.info('[Startup] All background services initialized — app is fully ready');
-  }, heavyTaskDelay);
+    logger.info('[Startup] All background services launched');
+  });
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- dynamic Drizzle types not worth replicating for one-time seed function
