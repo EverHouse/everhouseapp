@@ -223,7 +223,7 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
                 blockType: 'blocked',
                 notes: `Lesson - ${row.userName}`,
                 createdBy: 'trackman_import'
-              });
+              }).onConflictDoNothing();
               
               process.stderr.write(`[Trackman Import] Converted staff lesson to block: ${row.userEmail} -> "${row.userName}" on ${bookingDate}\n`);
             } catch (blockErr: unknown) {
@@ -1984,6 +1984,7 @@ export async function rescanUnmatchedBookings(performedBy: string = 'system'): P
               INSERT INTO availability_blocks 
                 (resource_id, block_date, start_time, end_time, block_type, notes, created_by)
               VALUES (${resourceId}, ${bookingDate}, ${startTime}, ${endTime}, 'blocked', ${`Lesson - ${userName || 'Unknown'}`}, ${performedBy})
+              ON CONFLICT DO NOTHING
             `);
             
             process.stderr.write(`[Trackman Rescan] Created availability block for lesson: ${userName} on ${bookingDate} ${startTime}-${endTime}\n`);

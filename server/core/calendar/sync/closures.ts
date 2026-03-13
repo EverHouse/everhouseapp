@@ -233,19 +233,11 @@ async function createAvailabilityBlocks(
     }
   }
   if (valueParts.length > 0) {
-    try {
-      await db.execute(
-        sql`INSERT INTO availability_blocks (resource_id, block_date, start_time, end_time, block_type, notes, created_by, closure_id)
-         VALUES ${sql.join(valueParts, sql`, `)}`
-      );
-    } catch (insertErr: any) {
-      const pgCode = insertErr?.code || insertErr?.cause?.code;
-      if (pgCode === '23505') {
-        logger.debug(`[Closures Sync] Skipped duplicate blocks for closure #${closureId}`);
-      } else {
-        throw insertErr;
-      }
-    }
+    await db.execute(
+      sql`INSERT INTO availability_blocks (resource_id, block_date, start_time, end_time, block_type, notes, created_by, closure_id)
+       VALUES ${sql.join(valueParts, sql`, `)}
+       ON CONFLICT DO NOTHING`
+    );
   }
   return blocksCreated;
 }

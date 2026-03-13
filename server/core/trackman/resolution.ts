@@ -535,6 +535,7 @@ export async function cleanupHistoricalLessons(dryRun = false): Promise<{
           INSERT INTO availability_blocks 
             (resource_id, block_date, start_time, end_time, block_type, notes, created_by)
           VALUES (${booking.resource_id}, ${bookingDate}, ${booking.start_time}, ${endTime}, 'blocked', ${`Lesson - ${booking.user_name || 'Unknown'}`}, 'system_cleanup')
+          ON CONFLICT DO NOTHING
         `);
       }
 
@@ -634,6 +635,7 @@ export async function cleanupHistoricalLessons(dryRun = false): Promise<{
           INSERT INTO availability_blocks 
             (resource_id, block_date, start_time, end_time, block_type, notes, created_by)
           VALUES (${resourceId}, ${bookingDate}, ${item.startTime}, ${item.endTime || item.startTime}, 'blocked', ${`Lesson - ${item.userName || 'Unknown'}`}, 'system_cleanup')
+          ON CONFLICT DO NOTHING
         `);
       }
 

@@ -235,7 +235,7 @@ async function createAvailabilityBlocksForClosure(
   }
   
   if (insertValues.length > 0) {
-    await db.insert(availabilityBlocks).values(insertValues);
+    await db.insert(availabilityBlocks).values(insertValues).onConflictDoNothing();
     logger.info('[Closures] Created availability blocks for closure #', { extra: { insertValuesLength: insertValues.length, closureId } });
   }
 }
@@ -1287,7 +1287,7 @@ router.post('/api/closures/backfill-blocks', isStaffOrAdmin, async (req, res) =>
         }
         
         if (insertValues.length > 0) {
-          await db.insert(availabilityBlocks).values(insertValues);
+          await db.insert(availabilityBlocks).values(insertValues).onConflictDoNothing();
           totalBlocksCreated += insertValues.length;
           results.push({ closureId: closure.id, title: closure.title, blocksCreated: insertValues.length });
           logger.info('[Backfill] Created blocks for closure #', { extra: { insertValuesLength: insertValues.length, closureId: closure.id, closureTitle: closure.title } });

@@ -481,13 +481,14 @@ router.post('/api/availability-blocks', isStaffOrAdmin, async (req, res) => {
     }
     
     const result = await db.execute(sql`INSERT INTO availability_blocks (resource_id, block_date, start_time, end_time, block_type, notes, created_by)
-       VALUES (${resource_id}, ${block_date}, ${start_time}, ${end_time}, ${block_type}, ${notes}, ${created_by}) RETURNING *`);
+       VALUES (${resource_id}, ${block_date}, ${start_time}, ${end_time}, ${block_type}, ${notes}, ${created_by})
+       ON CONFLICT DO NOTHING RETURNING *`);
     
     if (result.rows[0]) {
       logFromRequest(req, 'create_availability_block', 'availability', String(result.rows[0].id), undefined, { resource_id, block_date, start_time, end_time });
       res.status(201).json(result.rows[0]);
     } else {
-      res.status(500).json({ error: 'Failed to create availability block' });
+      res.status(409).json({ error: 'An availability block already exists for this time slot' });
     }
   } catch (error: unknown) {
     logger.error('Availability block creation error', { error: error instanceof Error ? error : new Error(String(error)) });

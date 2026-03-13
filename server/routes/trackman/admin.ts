@@ -632,7 +632,8 @@ router.post('/api/trackman/admin/cleanup-lessons', isStaffOrAdmin, async (req, r
         if (!blockAlreadyExists) {
           await db.execute(sql`INSERT INTO availability_blocks 
               (resource_id, block_date, start_time, end_time, block_type, notes, created_by)
-            VALUES (${booking.resource_id}, ${bookingDate}, ${booking.start_time}, ${endTime}, 'blocked', ${`Lesson - ${booking.user_name}`}, 'system_cleanup')`);
+            VALUES (${booking.resource_id}, ${bookingDate}, ${booking.start_time}, ${endTime}, 'blocked', ${`Lesson - ${booking.user_name}`}, 'system_cleanup')
+            ON CONFLICT DO NOTHING`);
         }
 
         await db.execute(sql`UPDATE booking_requests 
@@ -698,7 +699,8 @@ router.post('/api/trackman/admin/cleanup-lessons', isStaffOrAdmin, async (req, r
           if (existingBlock.rows.length === 0) {
             await db.execute(sql`INSERT INTO availability_blocks 
                 (resource_id, block_date, start_time, end_time, block_type, notes, created_by)
-              VALUES (${resourceId}, ${bookingDate}, ${item.start_time}, ${item.end_time || item.start_time}, 'blocked', ${`Lesson - ${item.user_name}`}, 'system_cleanup')`);
+              VALUES (${resourceId}, ${bookingDate}, ${item.start_time}, ${item.end_time || item.start_time}, 'blocked', ${`Lesson - ${item.user_name}`}, 'system_cleanup')
+              ON CONFLICT DO NOTHING`);
           }
 
           await db.execute(sql`UPDATE trackman_unmatched_bookings

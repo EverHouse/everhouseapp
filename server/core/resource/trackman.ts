@@ -194,25 +194,21 @@ export async function convertToInstructorBlock(
   existingBooking: { id: number } | null,
   staffEmail: string
 ) {
-  let block;
-  try {
-    [block] = await db.insert(availabilityBlocks).values({
-      resourceId: bookingData.resourceId,
-      blockDate: bookingData.requestDate,
-      startTime: bookingData.startTime,
-      endTime: bookingData.endTime || bookingData.startTime,
-      blockType: 'blocked',
-      notes: `Lesson - ${ownerName}`,
-      createdBy: staffEmail
-    }).returning();
-  } catch (insertErr: any) {
-    const pgCode = insertErr?.code || insertErr?.cause?.code;
-    if (pgCode === '23505') {
-      logger.debug(`[Trackman] Skipped duplicate instructor block for ${ownerName} on ${bookingData.requestDate}`);
-      return;
-    }
-    throw insertErr;
+  const result = await db.insert(availabilityBlocks).values({
+    resourceId: bookingData.resourceId,
+    blockDate: bookingData.requestDate,
+    startTime: bookingData.startTime,
+    endTime: bookingData.endTime || bookingData.startTime,
+    blockType: 'blocked',
+    notes: `Lesson - ${ownerName}`,
+    createdBy: staffEmail
+  }).onConflictDoNothing().returning();
+  
+  if (result.length === 0) {
+    logger.debug(`[Trackman] Skipped duplicate instructor block for ${ownerName} on ${bookingData.requestDate}`);
+    return;
   }
+  const block = result[0];
   
   if (existingBooking) {
     await db.delete(bookingRequests).where(eq(bookingRequests.id, existingBooking.id));
@@ -711,16 +707,7 @@ export async function markBookingAsEvent(params: {
         createdBy: params.staffEmail
       }));
       
-      try {
-        await tx.insert(availabilityBlocks).values(blockValues);
-      } catch (insertErr: any) {
-        const pgCode = insertErr?.code || insertErr?.cause?.code;
-        if (pgCode === '23505') {
-          logger.debug(`[Trackman] Skipped duplicate closure blocks for event: ${eventTitle}`);
-        } else {
-          throw insertErr;
-        }
-      }
+      await tx.insert(availabilityBlocks).values(blockValues).onConflictDoNothing();
     }
     
     const unmatchedInBookingRequests = bookingIds.filter(id => {
