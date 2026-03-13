@@ -236,14 +236,16 @@ export async function reconcileSubscriptions() {
             const { findOrCreateHubSpotContact } = await import('../hubspot/members');
             await findOrCreateHubSpotContact(customerEmail, firstName, lastName);
             const { syncMemberToHubSpot } = await import('../hubspot/stages');
+            const existingUserResult = await db.execute(sql`SELECT join_date FROM users WHERE LOWER(email) = LOWER(${customerEmail}) LIMIT 1`);
+            const existingJoinDate = (existingUserResult.rows[0] as { join_date: string | null } | undefined)?.join_date;
             await syncMemberToHubSpot({
               email: customerEmail,
               status: 'active',
               billingProvider: 'stripe',
               tier: tierName || undefined,
-              memberSince: new Date()
+              ...(existingJoinDate ? {} : { memberSince: new Date() })
             });
-            logger.info(`[Reconcile] Synced ${customerEmail} to HubSpot: status=active, tier=${tierName}, billing=stripe`);
+            logger.info(`[Reconcile] Synced ${customerEmail} to HubSpot: status=active, tier=${tierName}, billing=stripe, preservedExistingJoinDate=${!!existingJoinDate}`);
           } catch (hubspotError: unknown) {
             logger.error(`[Reconcile] HubSpot sync failed for ${customerEmail}:`, { error: hubspotError });
           }

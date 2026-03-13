@@ -106,7 +106,7 @@ export async function syncMemberToHubSpot(
             value: email.toLowerCase()
           }]
         }],
-        properties: ['email', 'membership_status', 'billing_provider', 'membership_tier', 'membership_billing_type'],
+        properties: ['email', 'membership_status', 'billing_provider', 'membership_tier', 'membership_billing_type', 'membership_start_date'],
         limit: 1
       })
     );
@@ -197,10 +197,15 @@ export async function syncMemberToHubSpot(
     }
     
     if (memberSince) {
-      const date = memberSince instanceof Date ? memberSince : new Date(memberSince);
-      const midnightUtc = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
-      properties.membership_start_date = midnightUtc.getTime().toString();
-      updated.memberSince = true;
+      const existingStartDate = searchResponse.results?.[0]?.properties?.membership_start_date;
+      if (existingStartDate) {
+        logger.info(`[HubSpot Sync] Preserving existing membership_start_date for ${email} (existing: ${existingStartDate})`);
+      } else {
+        const date = memberSince instanceof Date ? memberSince : new Date(memberSince);
+        const midnightUtc = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+        properties.membership_start_date = midnightUtc.getTime().toString();
+        updated.memberSince = true;
+      }
     }
 
     const isLiveStripe = await isLiveStripeEnvironment();

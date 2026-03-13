@@ -236,17 +236,22 @@ export async function handleSubscriptionCreated(client: PoolClient, subscription
           );
           
           if (contactResult?.contactId) {
+            const existingUserResult = await pool.query(
+              'SELECT join_date FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1',
+              [deferredCustomerEmail]
+            );
+            const existingJoinDate = existingUserResult.rows[0]?.join_date;
             await syncMemberToHubSpot({
               email: deferredCustomerEmail,
               status: deferredActualStatus,
               billingProvider: 'stripe',
               tier: deferredTierName || undefined,
-              memberSince: new Date(),
+              ...(existingJoinDate ? {} : { memberSince: new Date() }),
               stripeCustomerId: deferredCustomerId,
               stripePricingInterval: deferredPricingInterval,
               billingGroupRole: 'Primary',
             });
-            logger.info(`[Stripe Webhook] Synced ${deferredCustomerEmail} to HubSpot contact: status=${deferredActualStatus}, tier=${deferredTierName}, billing=stripe`);
+            logger.info(`[Stripe Webhook] Synced ${deferredCustomerEmail} to HubSpot contact: status=${deferredActualStatus}, tier=${deferredTierName}, billing=stripe, preservedExistingJoinDate=${!!existingJoinDate}`);
             
             if (deferredTierName) {
               await queueTierSync({
@@ -471,17 +476,22 @@ export async function handleSubscriptionCreated(client: PoolClient, subscription
             deferredActions.push(async () => {
               try {
                 const { syncMemberToHubSpot } = await import('../../../hubspot/stages');
+                const existingUserResult = await pool.query(
+                  'SELECT join_date FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1',
+                  [deferredActivationEmail]
+                );
+                const existingJoinDate = existingUserResult.rows[0]?.join_date;
                 await syncMemberToHubSpot({
                   email: deferredActivationEmail,
                   status: deferredActivationStatus,
                   billingProvider: 'stripe',
                   tier: deferredActivationTierName,
-                  memberSince: new Date(),
+                  ...(existingJoinDate ? {} : { memberSince: new Date() }),
                   stripeCustomerId: deferredActivationCustomerId,
                   stripePricingInterval: deferredActivationInterval,
                   billingGroupRole: 'Primary',
                 });
-                logger.info(`[Stripe Webhook] Synced existing user ${deferredActivationEmail} to HubSpot: tier=${deferredActivationTierName}, status=${deferredActivationStatus}, billing=stripe, memberSince=now`);
+                logger.info(`[Stripe Webhook] Synced existing user ${deferredActivationEmail} to HubSpot: tier=${deferredActivationTierName}, status=${deferredActivationStatus}, billing=stripe, preservedExistingJoinDate=${!!existingJoinDate}`);
               } catch (hubspotError: unknown) {
                 logger.error('[Stripe Webhook] HubSpot sync failed for existing user subscription:', { error: getErrorMessage(hubspotError) });
               }
@@ -575,15 +585,20 @@ export async function handleSubscriptionCreated(client: PoolClient, subscription
                       try {
                         const { syncMemberToHubSpot } = await import('../../../hubspot/stages');
                         const mappedHubSpotStatus = (deferredSubscriptionStatus === 'active' || deferredSubscriptionStatus === 'trialing') ? 'active' : 'pending';
+                        const existingUserResult = await pool.query(
+                          'SELECT join_date FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1',
+                          [deferredEmail]
+                        );
+                        const existingJoinDate = existingUserResult.rows[0]?.join_date;
                         await syncMemberToHubSpot({
                           email: deferredEmail,
                           status: mappedHubSpotStatus,
                           billingProvider: 'stripe',
                           tier: tierName,
-                          memberSince: new Date(),
+                          ...(existingJoinDate ? {} : { memberSince: new Date() }),
                           billingGroupRole: 'Primary',
                         });
-                        logger.info(`[Stripe Webhook] Synced ${deferredEmail} to HubSpot: tier=${tierName}, status=${mappedHubSpotStatus}, billing=stripe, memberSince=now`);
+                        logger.info(`[Stripe Webhook] Synced ${deferredEmail} to HubSpot: tier=${tierName}, status=${mappedHubSpotStatus}, billing=stripe, preservedExistingJoinDate=${!!existingJoinDate}`);
                       } catch (hubspotError: unknown) {
                         logger.error('[Stripe Webhook] HubSpot sync failed for product name match:', { error: getErrorMessage(hubspotError) });
                       }
