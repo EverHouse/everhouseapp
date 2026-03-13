@@ -480,6 +480,21 @@ router.post('/api/availability-blocks', isStaffOrAdmin, async (req, res) => {
       return res.status(400).json({ error: 'Missing required fields' });
     }
     
+    const { findCoveringBlock } = await import('../core/availabilityBlockService');
+    const existingCovering = await findCoveringBlock(resource_id, block_date, start_time, end_time);
+    
+    if (existingCovering) {
+      const sourceLabel = existingCovering.event_id ? 'event' 
+        : existingCovering.wellness_class_id ? 'wellness class' 
+        : existingCovering.closure_id ? 'facility notice/closure' 
+        : existingCovering.block_type;
+      return res.status(409).json({ 
+        error: `This time slot is already blocked by a ${sourceLabel}`,
+        existingBlockId: existingCovering.id,
+        existingBlockType: existingCovering.block_type,
+      });
+    }
+    
     const result = await db.execute(sql`INSERT INTO availability_blocks (resource_id, block_date, start_time, end_time, block_type, notes, created_by)
        VALUES (${resource_id}, ${block_date}, ${start_time}, ${end_time}, ${block_type}, ${notes}, ${created_by})
        ON CONFLICT DO NOTHING RETURNING *`);

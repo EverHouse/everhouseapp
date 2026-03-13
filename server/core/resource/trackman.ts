@@ -194,11 +194,30 @@ export async function convertToInstructorBlock(
   existingBooking: { id: number } | null,
   staffEmail: string
 ) {
+  const endTime = bookingData.endTime || bookingData.startTime;
+  
+  if (bookingData.resourceId) {
+    const { findCoveringBlock } = await import('../availabilityBlockService');
+    const existingCovering = await findCoveringBlock(
+      bookingData.resourceId,
+      bookingData.requestDate,
+      bookingData.startTime,
+      endTime,
+    );
+    if (existingCovering) {
+      logger.info(`[Trackman] Instructor block for ${ownerName} absorbed by existing block #${existingCovering.id} (${existingCovering.block_type})`);
+      if (existingBooking) {
+        await db.delete(bookingRequests).where(eq(bookingRequests.id, existingBooking.id));
+      }
+      return;
+    }
+  }
+  
   const result = await db.insert(availabilityBlocks).values({
     resourceId: bookingData.resourceId,
     blockDate: bookingData.requestDate,
     startTime: bookingData.startTime,
-    endTime: bookingData.endTime || bookingData.startTime,
+    endTime,
     blockType: 'blocked',
     notes: `Lesson - ${ownerName}`,
     createdBy: staffEmail
