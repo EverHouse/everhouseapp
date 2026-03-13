@@ -560,27 +560,57 @@ router.post('/api/webhooks/trackman', async (req: Request, res: Response) => {
           const startTime = v2Result.normalized.parsedStartTime;
           const endTime = v2Result.normalized.parsedEndTime || startTime;
           
-          await db.insert(availabilityBlocks).values({
-            resourceId,
-            blockDate,
-            startTime,
-            endTime,
-            blockType: 'blocked',
-            notes: `Trackman Block - Bay ${resourceId}`,
-            createdBy: 'trackman_webhook',
-          }).onConflictDoNothing();
+          const existingBlock = await db.execute(sql`
+            SELECT id, block_type, created_by, event_id, wellness_class_id, closure_id 
+            FROM availability_blocks 
+            WHERE resource_id = ${resourceId} 
+              AND block_date = ${blockDate}
+              AND start_time <= ${startTime}
+              AND end_time >= ${endTime}
+            LIMIT 1
+          `);
           
-          eventType = 'booking.block';
-          
-          logger.info('[Trackman Webhook] V2: Created availability block from Trackman blocked bay option', {
-            extra: {
-              trackmanBookingId: v2Result.normalized.trackmanBookingId,
+          if (existingBlock.rows.length > 0) {
+            const existing = existingBlock.rows[0] as { id: number; block_type: string; created_by: string; event_id: number | null; wellness_class_id: number | null; closure_id: number | null };
+            eventType = 'booking.block';
+            logger.info('[Trackman Webhook] V2: Blocked bay option absorbed by existing availability block', {
+              extra: {
+                trackmanBookingId: v2Result.normalized.trackmanBookingId,
+                resourceId,
+                blockDate,
+                startTime,
+                endTime,
+                existingBlockId: existing.id,
+                existingBlockType: existing.block_type,
+                existingCreatedBy: existing.created_by,
+                eventId: existing.event_id,
+                wellnessClassId: existing.wellness_class_id,
+                closureId: existing.closure_id,
+              }
+            });
+          } else {
+            await db.insert(availabilityBlocks).values({
               resourceId,
               blockDate,
               startTime,
               endTime,
-            }
-          });
+              blockType: 'blocked',
+              notes: `Trackman Block - Bay ${resourceId}`,
+              createdBy: 'trackman_webhook',
+            }).onConflictDoNothing();
+            
+            eventType = 'booking.block';
+            
+            logger.info('[Trackman Webhook] V2: Created availability block from Trackman blocked bay option', {
+              extra: {
+                trackmanBookingId: v2Result.normalized.trackmanBookingId,
+                resourceId,
+                blockDate,
+                startTime,
+                endTime,
+              }
+            });
+          }
         } else {
           eventType = 'booking.block';
           processingError = `Blocked bay option could not be mapped to a resource (bay ref: ${v2Result.bayRef || 'unknown'})`;
