@@ -101,7 +101,10 @@ export async function calculateAndCacheParticipantFees(
         await tx.execute(
           sql`UPDATE booking_participants bp
            SET cached_fee_cents = updates.cents
-           FROM (SELECT UNNEST(${ids}::int[]) as id, UNNEST(${cents}::int[]) as cents) as updates
+           FROM (
+             SELECT UNNEST(${toIntArrayLiteral(ids)}::int[]) as id, 
+                    UNNEST(${toIntArrayLiteral(cents)}::int[]) as cents
+           ) as updates
            WHERE bp.id = updates.id`
         );
       }

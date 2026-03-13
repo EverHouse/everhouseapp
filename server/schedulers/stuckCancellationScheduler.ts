@@ -22,7 +22,8 @@ async function checkStuckCancellations(): Promise<void> {
        LEFT JOIN resources r ON br.resource_id = r.id
        WHERE br.status = 'cancellation_pending'
        AND br.cancellation_pending_at < NOW() - INTERVAL '4 hours'
-       ORDER BY br.cancellation_pending_at ASC`
+       ORDER BY br.cancellation_pending_at ASC
+       LIMIT 100`
     );
 
     if (stuckBookings.rows.length === 0) {
@@ -77,6 +78,7 @@ async function checkStuckCancellations(): Promise<void> {
 }
 
 let intervalId: NodeJS.Timeout | null = null;
+let timeoutId: NodeJS.Timeout | null = null;
 let isRunning = false;
 
 async function guardedCheck(): Promise<void> {
@@ -107,7 +109,8 @@ export function startStuckCancellationScheduler(): void {
     });
   }, 2 * 60 * 60 * 1000);
 
-  setTimeout(() => {
+  timeoutId = setTimeout(() => {
+    timeoutId = null;
     guardedCheck().catch((err: unknown) => {
       logger.error('[Stuck Cancellations] Initial run error:', { error: err as Error });
       schedulerTracker.recordRun('Stuck Cancellation', false, String(err));
@@ -119,6 +122,10 @@ export function stopStuckCancellationScheduler(): void {
   if (intervalId) {
     clearInterval(intervalId);
     intervalId = null;
-    logger.info('[Stuck Cancellations] Scheduler stopped');
   }
+  if (timeoutId) {
+    clearTimeout(timeoutId);
+    timeoutId = null;
+  }
+  logger.info('[Stuck Cancellations] Scheduler stopped');
 }
