@@ -9,6 +9,7 @@ import { logger } from '../core/logger';
 interface PassData {
   memberId: string;
   memberName: string;
+  memberEmail: string;
   tier: string;
   memberSince: string;
   dailySimulatorMinutes: number | null;
@@ -33,11 +34,11 @@ interface WalletConfig {
 }
 
 const DEFAULT_TIER_COLORS: Record<string, TierColors> = {
-  VIP: { bg: '#E5E4E2', foreground: '#374151', label: '#6B7280' },
-  Premium: { bg: '#D4AF37', foreground: '#1a1a1a', label: '#4a4a4a' },
-  Corporate: { bg: '#374151', foreground: '#FFFFFF', label: '#D1D5DB' },
-  Core: { bg: '#293515', foreground: '#FFFFFF', label: '#D1D5DB' },
-  Social: { bg: '#CCB8E4', foreground: '#293515', label: '#4a4a4a' },
+  VIP: { bg: '#555555', foreground: '#FFFFFF', label: '#7CB342' },
+  Premium: { bg: '#555555', foreground: '#FFFFFF', label: '#7CB342' },
+  Corporate: { bg: '#555555', foreground: '#FFFFFF', label: '#7CB342' },
+  Core: { bg: '#555555', foreground: '#FFFFFF', label: '#7CB342' },
+  Social: { bg: '#555555', foreground: '#FFFFFF', label: '#7CB342' },
 };
 
 function isLightBackground(hex: string): boolean {
