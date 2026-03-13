@@ -90,7 +90,7 @@ export async function generatePassForMember(memberId: string): Promise<Buffer | 
     let memberSince = '';
     if (user.joinDate) {
       const date = new Date(user.joinDate);
-      memberSince = date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+      memberSince = date.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
     }
 
     const serialNumber = `EVERCLUB-${user.id}`;
