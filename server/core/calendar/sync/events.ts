@@ -7,9 +7,55 @@ import { CALENDAR_CONFIG } from '../config';
 import { getCalendarIdByName } from '../cache';
 import { alertOnSyncFailure } from '../../dataAlerts';
 import { getPacificMidnightUTC } from '../../../utils/dateUtils';
+import { getAllActiveBayIds, getConferenceRoomId } from '../../affectedAreas';
+import { availabilityBlocks } from '../../../../shared/models/scheduling';
 
 import { toIntArrayLiteral } from '../../../utils/sqlArrayLiteral';
 import { logger } from '../../logger';
+
+async function resyncEventAvailabilityBlocks(
+  eventId: number,
+  eventDate: string,
+  startTime: string,
+  endTime: string,
+  blockSimulators: boolean,
+  blockConferenceRoom: boolean,
+  eventTitle?: string
+): Promise<void> {
+  try {
+    await db.delete(availabilityBlocks).where(eq(availabilityBlocks.eventId, eventId));
+
+    if (!blockSimulators && !blockConferenceRoom) return;
+
+    const resourceIds: number[] = [];
+    if (blockSimulators) {
+      const bayIds = await getAllActiveBayIds();
+      resourceIds.push(...bayIds);
+    }
+    if (blockConferenceRoom) {
+      const conferenceRoomId = await getConferenceRoomId();
+      if (conferenceRoomId && !resourceIds.includes(conferenceRoomId)) {
+        resourceIds.push(conferenceRoomId);
+      }
+    }
+
+    const blockNotes = eventTitle ? `Blocked for: ${eventTitle}` : 'Blocked for event';
+    for (const resourceId of resourceIds) {
+      await db.insert(availabilityBlocks).values({
+        resourceId,
+        blockDate: eventDate,
+        startTime,
+        endTime: endTime || startTime,
+        blockType: 'event',
+        notes: blockNotes,
+        createdBy: 'calendar_sync',
+        eventId,
+      }).onConflictDoNothing();
+    }
+  } catch (err) {
+    logger.error(`[Events Sync] Failed to resync availability blocks for event #${eventId}`, { error: err });
+  }
+}
 export async function syncGoogleCalendarEvents(options?: { suppressAlert?: boolean }): Promise<{ synced: number; created: number; updated: number; deleted: number; pushedToCalendar: number; error?: string }> {
   try {
     const calendar = await getGoogleCalendarClient();
@@ -104,7 +150,8 @@ export async function syncGoogleCalendarEvents(options?: { suppressAlert?: boole
       const existing = await db.execute(sql`SELECT id, locally_edited, app_last_modified_at, google_event_updated_at,
                 title, description, event_date, start_time, end_time, location, category,
                 image_url, external_url, max_attendees, visibility, requires_rsvp,
-                reviewed_at, last_synced_at, review_dismissed, needs_review
+                reviewed_at, last_synced_at, review_dismissed, needs_review,
+                block_simulators, block_conference_room
          FROM events WHERE google_calendar_id = ${googleEventId}`);
       
       interface EventDbRow {
@@ -127,6 +174,8 @@ export async function syncGoogleCalendarEvents(options?: { suppressAlert?: boole
         reviewed_at: string | null;
         last_synced_at: string | null;
         review_dismissed: boolean;
+        block_simulators: boolean;
+        block_conference_room: boolean;
         needs_review: boolean;
       }
 
@@ -149,6 +198,9 @@ export async function syncGoogleCalendarEvents(options?: { suppressAlert?: boole
                google_event_etag = ${googleEtag}, google_event_updated_at = ${googleUpdatedAt}, last_synced_at = NOW(),
                locally_edited = false, app_last_modified_at = NULL
                WHERE google_calendar_id = ${googleEventId}`);
+            if (dbRow.block_simulators || dbRow.block_conference_room) {
+              await resyncEventAvailabilityBlocks(dbRow.id, eventDate, startTime, endTime || startTime, dbRow.block_simulators, dbRow.block_conference_room, title);
+            }
             updated++;
           } else {
             try {
@@ -248,6 +300,9 @@ export async function syncGoogleCalendarEvents(options?: { suppressAlert?: boole
              needs_review = CASE WHEN ${reviewDismissed} THEN needs_review ELSE CASE WHEN ${isConflict} THEN true ELSE ${shouldSetNeedsReview} END END,
              conflict_detected = CASE WHEN ${isConflict} THEN true ELSE conflict_detected END
              WHERE google_calendar_id = ${googleEventId}`);
+          if (dbRow.block_simulators || dbRow.block_conference_room) {
+            await resyncEventAvailabilityBlocks(dbRow.id, eventDate, startTime, endTime || startTime, dbRow.block_simulators, dbRow.block_conference_room, title);
+          }
           updated++;
         }
       } else {

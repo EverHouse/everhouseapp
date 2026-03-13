@@ -57,6 +57,11 @@ async function createEventAvailabilityBlocks(
     }
   }
   
+  if (resourceIds.length === 0 && (blockSimulators || blockConferenceRoom)) {
+    logger.warn(`[Events] No resources found for event #${eventId} block creation (blockSimulators=${blockSimulators}, blockConferenceRoom=${blockConferenceRoom})`);
+    return;
+  }
+  
   const blockNotes = eventTitle ? `Blocked for: ${eventTitle}` : 'Blocked for event';
   const executor = tx || db;
   
@@ -72,6 +77,8 @@ async function createEventAvailabilityBlocks(
       eventId,
     }).onConflictDoNothing();
   }
+  
+  logger.info(`[Events] Created ${resourceIds.length} availability blocks for event #${eventId} on ${eventDate}`);
 }
 
 async function removeEventAvailabilityBlocks(eventId: number): Promise<void> {
