@@ -103,6 +103,9 @@ router.get('/api/member/onboarding', isAuthenticated, async (req, res) => {
       isComplete,
       isDismissed,
       onboardingCompletedAt: finalUser.onboarding_completed_at,
+      firstLoginAt: finalUser.first_login_at,
+      joinDate: finalUser.join_date,
+      createdAt: finalUser.created_at,
     });
   } catch (error: unknown) {
     logger.error('[onboarding] Failed to get onboarding status', { error: error instanceof Error ? error : new Error(String(error)) });

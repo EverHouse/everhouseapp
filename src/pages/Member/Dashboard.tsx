@@ -297,11 +297,48 @@ const Dashboard: React.FC = () => {
   useEffect(() => {
     if (!user?.email || firstLoginCheckedRef.current) return;
     firstLoginCheckedRef.current = true;
-    const key = `eh_first_login_shown_${user.email}`;
-    if (!localStorage.getItem(key)) {
-      localStorage.setItem(key, 'true');
-      queueMicrotask(() => setShowFirstLoginModal(true));
-    }
+
+    const localKey = `eh_first_login_shown_${user.email}`;
+    if (localStorage.getItem(localKey)) return;
+
+    (async () => {
+      try {
+        const res = await fetch('/api/member/onboarding', { credentials: 'include' });
+        if (!res.ok) return;
+        const data = await res.json();
+
+        if (data.firstLoginAt || data.onboardingCompletedAt || data.isDismissed) {
+          localStorage.setItem(localKey, 'true');
+          return;
+        }
+
+        const joinOrCreated = data.joinDate || data.createdAt;
+        if (joinOrCreated) {
+          const age = Date.now() - new Date(joinOrCreated).getTime();
+          if (age > 7 * 24 * 60 * 60 * 1000) {
+            localStorage.setItem(localKey, 'true');
+            return;
+          }
+        }
+
+        localStorage.setItem(localKey, 'true');
+
+        fetch('/api/member/onboarding/complete-step', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ step: 'first_login' }),
+        }).catch(() => {});
+
+        queueMicrotask(() => setShowFirstLoginModal(true));
+      } catch {
+        const key = `eh_first_login_shown_${user?.email}`;
+        if (!localStorage.getItem(key)) {
+          localStorage.setItem(key, 'true');
+          queueMicrotask(() => setShowFirstLoginModal(true));
+        }
+      }
+    })();
   }, [user?.email]);
 
   useEffect(() => {
