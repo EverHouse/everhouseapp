@@ -127,6 +127,11 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
             window.dispatchEvent(new CustomEvent('closure-update', { detail: message }));
           }
 
+          // Handle directory sync updates (background sync progress/completion)
+          if (message.type === 'directory_sync_update') {
+            window.dispatchEvent(new CustomEvent('directory-sync-update', { detail: message }));
+          }
+
           // Handle member data updates (from HubSpot sync)
           if (message.type === 'member_data_updated') {
             window.dispatchEvent(new CustomEvent('member-data-updated', { detail: message }));

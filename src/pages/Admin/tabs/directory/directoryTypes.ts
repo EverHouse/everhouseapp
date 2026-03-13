@@ -84,6 +84,20 @@ export interface VisitorsResponse {
 
 export interface SyncStatusResponse {
     lastSyncTime: string | null;
+    status: 'idle' | 'running' | 'completed' | 'failed';
+    jobId?: string;
+    startedAt?: string;
+    completedAt?: string;
+    progress?: Record<string, unknown>;
+    result?: DirectorySyncResult | null;
+    error?: string | null;
+}
+
+export interface DirectorySyncResult {
+    pullCount: number;
+    pushCount: number;
+    stripeUpdated: number;
+    errors: string[];
 }
 
 export interface SyncResponse {

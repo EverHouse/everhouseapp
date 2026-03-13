@@ -13,6 +13,7 @@ import {
     type VisitorsResponse,
     type SyncStatusResponse,
     type SyncResponse,
+    type DirectorySyncResult,
     directoryKeys,
     VISITORS_PAGE_SIZE,
     ITEMS_PER_PAGE,
@@ -81,15 +82,22 @@ export function useDirectoryData({
     const [formerLoading, setFormerLoading] = useState(false);
     const [formerError, setFormerError] = useState(false);
     const [syncMessage, setSyncMessage] = useState<{ type: 'success' | 'warning' | 'error'; text: string } | null>(null);
+    const lastAppliedJobIdRef = useRef<string | null>(null);
     const [optimisticTiers, setOptimisticTiers] = useState<Record<string, string>>({});
     const [pendingTierUpdates, setPendingTierUpdates] = useState<Set<string>>(new Set());
 
     const { data: syncStatusData } = useQuery({
         queryKey: directoryKeys.syncStatus(),
-        queryFn: () => fetchWithCredentials<SyncStatusResponse>('/api/hubspot/sync-status'),
-        staleTime: 60000,
+        queryFn: () => fetchWithCredentials<SyncStatusResponse>('/api/directory/sync-status'),
+        staleTime: 10000,
+        refetchInterval: (query) => {
+            const data = query.state.data;
+            if (data && data.status === 'running') return 5000;
+            return false;
+        },
     });
     const lastSyncTime = syncStatusData?.lastSyncTime ?? null;
+    const isSyncRunning = syncStatusData?.status === 'running';
 
     const { 
         data: visitorsData, 
@@ -144,77 +152,113 @@ export function useDirectoryData({
         staleTime: 30000,
     });
 
-    const syncMutation = useMutation({
-        mutationFn: async () => {
-            let pullCount = 0;
-            let pushCount = 0;
-            let stripeUpdated = 0;
-            let errors: string[] = [];
+    const formatSyncResult = useCallback((result: DirectorySyncResult) => {
+        const { pullCount, pushCount, stripeUpdated, errors } = result;
+        const hubspotErrors = errors.filter(e => e === 'pull' || e === 'push');
+        const stripeError = errors.includes('stripe');
 
-            const [pullResult, pushResult, stripeResult] = await Promise.allSettled([
-                postWithCredentials<SyncResponse>('/api/hubspot/sync-all-members', {}),
-                postWithCredentials<{ synced?: number }>('/api/hubspot/push-members-to-hubspot', {}),
-                postWithCredentials<{ updated?: number }>('/api/stripe/sync-member-subscriptions', {}),
-            ]);
+        const parts: string[] = [];
 
-            if (pullResult.status === 'fulfilled') pullCount = pullResult.value.synced || 0;
-            else errors.push('pull');
+        if (hubspotErrors.length === 0) {
+            const hsTotal = pullCount + pushCount;
+            if (hsTotal > 0) parts.push(`HubSpot: ${hsTotal} synced`);
+        } else if (hubspotErrors.length === 2) {
+            parts.push('HubSpot: failed');
+        } else {
+            const failedPart = hubspotErrors[0] === 'pull' ? 'pull' : 'push';
+            parts.push(`HubSpot: partial (${failedPart} failed)`);
+        }
 
-            if (pushResult.status === 'fulfilled') pushCount = pushResult.value.synced || 0;
-            else errors.push('push');
+        if (!stripeError) {
+            if (stripeUpdated > 0) parts.push(`Stripe: ${stripeUpdated} updated`);
+        } else {
+            parts.push('Stripe: failed');
+        }
 
-            if (stripeResult.status === 'fulfilled') stripeUpdated = stripeResult.value.updated || 0;
-            else errors.push('stripe');
+        const allFailed = hubspotErrors.length === 2 && stripeError;
+        const hasAnyError = errors.length > 0;
 
-            return { pullCount, pushCount, stripeUpdated, errors };
-        },
-        onSuccess: async ({ pullCount, pushCount, stripeUpdated, errors }) => {
-            await refreshMembers();
+        if (allFailed) {
+            return { type: 'error' as const, text: 'Failed to sync' };
+        }
+        return {
+            type: (hasAnyError ? 'warning' : 'success') as 'warning' | 'success',
+            text: parts.length > 0 ? parts.join('. ') : 'All up to date'
+        };
+    }, []);
 
-            const hubspotErrors = errors.filter(e => e === 'pull' || e === 'push');
-            const stripeError = errors.includes('stripe');
+    useEffect(() => {
+        const jobId = syncStatusData?.jobId;
+        if (!jobId || lastAppliedJobIdRef.current === jobId) return;
 
-            const parts: string[] = [];
-
-            if (hubspotErrors.length === 0) {
-                const hsTotal = pullCount + pushCount;
-                if (hsTotal > 0) parts.push(`HubSpot: ${hsTotal} synced`);
-            } else if (hubspotErrors.length === 2) {
-                parts.push('HubSpot: failed');
-            } else {
-                const failedPart = hubspotErrors[0] === 'pull' ? 'pull' : 'push';
-                parts.push(`HubSpot: partial (${failedPart} failed)`);
-            }
-
-            if (!stripeError) {
-                if (stripeUpdated > 0) parts.push(`Stripe: ${stripeUpdated} updated`);
-            } else {
-                parts.push('Stripe: failed');
-            }
-
-            const allFailed = hubspotErrors.length === 2 && stripeError;
-            const hasAnyError = errors.length > 0;
-
-            if (allFailed) {
-                setSyncMessage({ type: 'error', text: 'Failed to sync' });
-            } else {
-                setSyncMessage({
-                    type: hasAnyError ? 'warning' : 'success',
-                    text: parts.length > 0 ? parts.join('. ') : 'All up to date'
-                });
-            }
-
+        if (syncStatusData?.status === 'completed' && syncStatusData.result) {
+            lastAppliedJobIdRef.current = jobId;
+            refreshMembers();
             if (memberTab === 'former') {
                 setFormerLoading(true);
-                await fetchFormerMembers();
-                setFormerLoading(false);
+                fetchFormerMembers().finally(() => setFormerLoading(false));
             }
+            const msg = formatSyncResult(syncStatusData.result);
+            setSyncMessage(msg);
+            const timer = setTimeout(() => setSyncMessage(null), 5000);
+            return () => clearTimeout(timer);
+        }
+        if (syncStatusData?.status === 'failed') {
+            lastAppliedJobIdRef.current = jobId;
+            setSyncMessage({ type: 'error', text: syncStatusData.error || 'Failed to sync' });
+            const timer = setTimeout(() => setSyncMessage(null), 5000);
+            return () => clearTimeout(timer);
+        }
+    }, [syncStatusData?.status, syncStatusData?.jobId, formatSyncResult, refreshMembers, memberTab, fetchFormerMembers, setFormerLoading]);
 
+    useEffect(() => {
+        const handleDirectorySyncUpdate = (event: CustomEvent) => {
+            const { status, result, error, jobId: wsJobId } = event.detail || {};
+            
             queryClient.invalidateQueries({ queryKey: directoryKeys.syncStatus() });
-            setTimeout(() => setSyncMessage(null), 5000);
+
+            if (status === 'completed') {
+                if (wsJobId && lastAppliedJobIdRef.current === wsJobId) return;
+                if (wsJobId) lastAppliedJobIdRef.current = wsJobId;
+
+                refreshMembers();
+                if (memberTab === 'former') {
+                    setFormerLoading(true);
+                    fetchFormerMembers().finally(() => setFormerLoading(false));
+                }
+                if (result) {
+                    const msg = formatSyncResult(result as DirectorySyncResult);
+                    setSyncMessage(msg);
+                    setTimeout(() => setSyncMessage(null), 5000);
+                }
+            } else if (status === 'failed') {
+                if (wsJobId && lastAppliedJobIdRef.current === wsJobId) return;
+                if (wsJobId) lastAppliedJobIdRef.current = wsJobId;
+
+                setSyncMessage({ type: 'error', text: error || 'Failed to sync' });
+                setTimeout(() => setSyncMessage(null), 5000);
+            }
+        };
+
+        window.addEventListener('directory-sync-update', handleDirectorySyncUpdate as EventListener);
+        return () => {
+            window.removeEventListener('directory-sync-update', handleDirectorySyncUpdate as EventListener);
+        };
+    }, [queryClient, refreshMembers, memberTab, fetchFormerMembers, formatSyncResult, setFormerLoading]);
+
+    const syncMutation = useMutation({
+        mutationFn: async () => {
+            return postWithCredentials<{ started: boolean; jobId: string; message?: string }>('/api/directory/sync', {});
+        },
+        onSuccess: (data) => {
+            if (!data.started) {
+                setSyncMessage({ type: 'warning', text: data.message || 'Sync already in progress' });
+                setTimeout(() => setSyncMessage(null), 5000);
+            }
+            queryClient.invalidateQueries({ queryKey: directoryKeys.syncStatus() });
         },
         onError: () => {
-            setSyncMessage({ type: 'error', text: 'Failed to sync' });
+            setSyncMessage({ type: 'error', text: 'Failed to start sync' });
             setTimeout(() => setSyncMessage(null), 5000);
         },
     });
@@ -338,6 +382,7 @@ export function useDirectoryData({
 
     return {
         lastSyncTime,
+        isSyncRunning,
         visitors,
         visitorsTotal,
         visitorsTotalPages,

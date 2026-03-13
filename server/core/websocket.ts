@@ -832,6 +832,39 @@ export function broadcastWaitlistUpdate(data: {
   return sent;
 }
 
+export function broadcastDirectorySyncUpdate(data: {
+  status: 'running' | 'completed' | 'failed';
+  jobId?: string;
+  progress?: Record<string, unknown>;
+  result?: Record<string, unknown>;
+  error?: string;
+  lastSyncTime?: string | null;
+}) {
+  const payload = JSON.stringify({
+    type: 'directory_sync_update',
+    ...data
+  });
+
+  let sent = 0;
+  clients.forEach((connections) => {
+    connections.forEach(conn => {
+      if (conn.isStaff && conn.ws.readyState === WebSocket.OPEN) {
+        try {
+          conn.ws.send(payload);
+          sent++;
+        } catch (err: unknown) {
+          logger.warn(`[WebSocket] Error in broadcastDirectorySyncUpdate send`, { error: getErrorMessage(err) });
+        }
+      }
+    });
+  });
+
+  if (sent > 0) {
+    logger.info(`[WebSocket] Broadcast directory sync ${data.status} to ${sent} staff connections`);
+  }
+  return sent;
+}
+
 export function broadcastDirectoryUpdate(action: 'synced' | 'updated' | 'created') {
   const payload = JSON.stringify({
     type: 'directory_update',

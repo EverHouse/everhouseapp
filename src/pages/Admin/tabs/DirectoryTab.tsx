@@ -180,15 +180,15 @@ const DirectoryTab: React.FC = () => {
                 </div>
                 <button
                     onClick={handleSync}
-                    disabled={data.syncMutation.isPending}
+                    disabled={data.isSyncRunning || data.syncMutation.isPending}
                     className="tactile-btn flex items-center justify-center gap-1.5 sm:px-3 px-2 py-1.5 rounded-full text-[11px] sm:text-xs font-medium text-gray-500 dark:text-gray-400 hover:bg-black/5 dark:hover:bg-white/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer shrink-0"
-                    title={data.syncMutation.isPending ? 'Syncing...' : data.lastSyncTime ? `Last sync: ${new Date(data.lastSyncTime).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'America/Los_Angeles' })}` : 'Sync All'}
+                    title={data.isSyncRunning ? 'Syncing...' : data.lastSyncTime ? `Last sync: ${new Date(data.lastSyncTime).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'America/Los_Angeles' })}` : 'Sync All'}
                 >
-                    <span className={`material-symbols-outlined text-[16px] ${data.syncMutation.isPending ? 'animate-spin' : ''}`}>
+                    <span className={`material-symbols-outlined text-[16px] ${data.isSyncRunning ? 'animate-spin' : ''}`}>
                         sync
                     </span>
                     <span className="hidden sm:inline">
-                        {data.syncMutation.isPending ? 'Syncing...' : data.lastSyncTime ? `Sync (${new Date(data.lastSyncTime).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'America/Los_Angeles' })})` : 'Sync All'}
+                        {data.isSyncRunning ? 'Syncing...' : data.lastSyncTime ? `Sync (${new Date(data.lastSyncTime).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'America/Los_Angeles' })})` : 'Sync All'}
                     </span>
                 </button>
             </div>

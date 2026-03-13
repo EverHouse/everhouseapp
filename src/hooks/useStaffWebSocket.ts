@@ -295,6 +295,11 @@ export function useStaffWebSocket(options: UseStaffWebSocketOptions = {}) {
             window.dispatchEvent(new CustomEvent('data-integrity-update', { detail: message }));
           }
 
+          if (message.type === 'directory_sync_update') {
+            if (import.meta.env.DEV) console.log('[StaffWebSocket] Received directory_sync_update');
+            window.dispatchEvent(new CustomEvent('directory-sync-update', { detail: message }));
+          }
+
           if (message.type === 'member_data_updated') {
             if (import.meta.env.DEV) console.log('[StaffWebSocket] Received member_data_updated:', message.memberEmail);
             window.dispatchEvent(new CustomEvent('member-data-updated', { detail: message }));
