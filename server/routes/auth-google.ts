@@ -139,6 +139,11 @@ router.post('/api/auth/google/verify', authRateLimiterByIp, async (req, res) => 
           .set(updateData)
           .where(eq(users.id, user.id));
       }
+    } else if (!user.firstName && googleUser.firstName) {
+      const nameBackfill: Record<string, unknown> = { updatedAt: new Date() };
+      nameBackfill.firstName = googleUser.firstName;
+      if (!user.lastName && googleUser.lastName) nameBackfill.lastName = googleUser.lastName;
+      await db.update(users).set(nameBackfill).where(eq(users.id, user.id));
     }
 
     req.session.save((err) => {
