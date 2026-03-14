@@ -145,7 +145,7 @@ export const AuthDataProvider: React.FC<{children: ReactNode}> = ({ children }) 
               name: [sessionData.member.firstName, sessionData.member.lastName].filter(Boolean).join(' ') || sessionData.member.email || 'Member',
               firstName: sessionData.member.firstName || null,
               lastName: sessionData.member.lastName || null,
-              tier: sessionData.member.tier || 'Social',
+              tier: sessionData.member.tier || 'Core',
               tags: sessionData.member.tags || [],
               status: 'Active' as const,
               email: sessionData.member.email,
@@ -250,8 +250,9 @@ export const AuthDataProvider: React.FC<{children: ReactNode}> = ({ children }) 
     const fullName = [member.firstName, member.lastName].filter(Boolean).join(' ');
     const memberProfile: MemberProfile = {
       id: member.id,
-      name: member.name || fullName || member.email || 'Member',
+      name: fullName || member.email || 'Member',
       firstName: member.firstName || null,
+      lastName: member.lastName || null,
       tier: member.tier || 'Core',
       tags: member.tags || [],
       status: 'Active',
@@ -261,7 +262,8 @@ export const AuthDataProvider: React.FC<{children: ReactNode}> = ({ children }) 
       role: member.role || 'member',
       mindbodyClientId: member.mindbodyClientId || '',
       lifetimeVisits: member.lifetimeVisits || 0,
-      lastBookingDate: member.lastBookingDate || undefined
+      lastBookingDate: member.lastBookingDate || undefined,
+      dateOfBirth: member.dateOfBirth || null
     };
 
     if (!sessionChecked) {
@@ -319,7 +321,8 @@ export const AuthDataProvider: React.FC<{children: ReactNode}> = ({ children }) 
             role: member.role || 'member',
             mindbodyClientId: member.mindbodyClientId || '',
             lifetimeVisits: member.lifetimeVisits || 0,
-            lastBookingDate: member.lastBookingDate || undefined
+            lastBookingDate: member.lastBookingDate || undefined,
+            dateOfBirth: member.dateOfBirth || null
           };
           localStorage.setItem('eh_member', JSON.stringify(memberProfile));
           setActualUser(memberProfile);

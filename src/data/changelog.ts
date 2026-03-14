@@ -13,6 +13,7 @@ export const changelog: ChangelogEntry[] = [
     title: "Fix Welcome Header Showing Email Instead of Name",
     changes: [
       "Fix: Dashboard welcome greeting now shows your first name instead of your email address — the login flow was not building the display name from first/last name fields",
+      "Fix: Login profile was missing lastName and dateOfBirth fields — all three profile-building paths (session, login, refresh) now store identical fields",
     ]
   },
   {

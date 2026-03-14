@@ -623,7 +623,7 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
       <AnimatedPage className="pb-40">
         <div className="flex items-start justify-between mb-4 lg:mb-6 animate-content-enter-delay-1">
           <div>
-            <h1 className="text-4xl lg:text-5xl font-bold text-primary dark:text-white leading-none" style={{ fontFamily: 'var(--font-display)', fontOpticalSizing: 'auto', letterSpacing: '-0.03em' }}>Welcome, {actualUser?.name?.split(' ')[0] || 'Staff'}</h1>
+            <h1 className="text-4xl lg:text-5xl font-bold text-primary dark:text-white leading-none" style={{ fontFamily: 'var(--font-display)', fontOpticalSizing: 'auto', letterSpacing: '-0.03em' }}>Welcome, {actualUser?.firstName || (actualUser?.name && !actualUser.name.includes('@') ? actualUser.name.split(' ')[0] : 'Staff')}</h1>
             <p className="text-sm lg:text-base text-primary/60 dark:text-white/60 mt-1">{formatTodayDate()}</p>
           </div>
         </div>
