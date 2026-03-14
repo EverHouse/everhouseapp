@@ -1,6 +1,6 @@
 # Ever Club Members App
 
-**Current Version**: 8.87.5 (March 14, 2026)
+**Current Version**: 8.87.6 (March 14, 2026)
 
 ## Overview
 The Ever Club Members App is a private members club application designed for golf and wellness centers. Its primary purpose is to serve as a central digital hub for managing golf simulator bookings, wellness service appointments, and club events. The project aims to enhance member satisfaction and operational efficiency through comprehensive membership management, facility booking, and community-building tools, ultimately creating a seamless digital experience for club members and staff.
@@ -147,6 +147,7 @@ The following large files have been split into sub-modules with barrel re-export
 - **Files**: `server/routes/analytics.ts`, `src/pages/Admin/tabs/AnalyticsTab.tsx`
 
 ### Recent Changes
+- **HubSpot Field Mapping Fix (v8.87.6)**: Fixed silently dropped form fields — Private Hire (event_date, event_time, additional_details, event_services), Guest Check-in (guest_firstname, guest_lastname, guest_email, guest_phone, member_name, member_email), and Contact (topic) now all pass through the `VALID_HUBSPOT_CONTACT_FIELDS` allowlist to HubSpot.
 - **Admin-Configurable HubSpot Form IDs (v8.87.5)**: Added new "HubSpot Form IDs" section in Admin Settings for all 6 form types (membership, private-hire, event-inquiry, tour-request, guest-checkin, contact). `resolveFormId()` now uses 4-tier fallback: env var → admin setting (DB, 30s cached via `getSettingValue`) → auto-discovered → hardcoded. 6 new `hubspot.form_id.*` keys in `DEFAULT_SETTINGS`. `resolveFormId` and `logFormIdResolutionStatus` are now async. Tests updated with 3 new admin-setting-specific test cases.
 - **HubSpot Form Submission Fix (v8.87.4)**: Fixed public-facing form submissions (membership application, guest check-in, contact) that failed with "Submission Failed" when env vars weren't set. Added `resolveFormId()` 3-tier fallback (env var → auto-discovered ID → known hardcoded ID). `inferFormTypeFromName` now delegates to `inferFormTypeStrict` for consistent classification. Discovery map clears stale entries each sync and logs collisions. Non-JSON HubSpot error responses no longer crash the submission handler. Startup diagnostic logs which form types have resolved IDs.
 - **Database Connection Fix & Stability (v8.87.3)**: Fixed dev login and staff portal routing failures caused by Task #42's auto-redirect to production Supabase DB (schema mismatch). Local DB redirect is now opt-in via `FORCE_POOLER_REDIRECT=true` instead of automatic. Fixed StripeSync client to follow the same DB routing logic. All 274 tests passing, zero server errors.

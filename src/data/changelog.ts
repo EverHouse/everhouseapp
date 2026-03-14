@@ -8,6 +8,17 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.87.6",
+    date: "2026-03-14",
+    title: "HubSpot Field Mapping Fix — No More Silently Dropped Data",
+    changes: [
+      "Fix: Private Hire inquiry fields (event date, event time, services, additional details) now properly reach HubSpot instead of being silently dropped",
+      "Fix: Guest Check-in fields (guest name, email, phone, sponsoring member) now sync to HubSpot — previously all guest data was lost",
+      "Fix: Contact form 'topic' field now passes through to HubSpot",
+      "All form fields submitted by members and visitors are now included in HubSpot submissions for complete CRM records",
+    ]
+  },
+  {
     version: "8.87.5",
     date: "2026-03-14",
     title: "Admin-Configurable HubSpot Form IDs",

@@ -819,6 +819,10 @@ router.post('/api/hubspot/forms/:formType', async (req, res) => {
       'firstname', 'lastname', 'email', 'phone', 'company', 'message',
       'membership_interest', 'event_type', 'guest_count',
       'eh_email_updates_opt_in',
+      'event_date', 'event_time', 'additional_details', 'event_services',
+      'topic',
+      'guest_firstname', 'guest_lastname', 'guest_email', 'guest_phone',
+      'member_name', 'member_email',
     ]);
 
     const hubspotFields: Array<{ name: string; value: string }> = [];
