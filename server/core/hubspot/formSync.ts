@@ -34,6 +34,7 @@ import { eq, and, gte, lte } from 'drizzle-orm';
 import { notifyAllStaff } from '../notificationService';
 import { Client } from '@hubspot/api-client';
 import nodeFetch from 'node-fetch';
+import { getSettingValue } from '../settingsHelper';
 
 import { logger } from '../logger';
 
@@ -54,7 +55,7 @@ const HUBSPOT_KNOWN_FORM_IDS: Record<string, string> = {
 
 const discoveredFormIds: Map<string, string> = new Map();
 
-export function resolveFormId(formType: string): string | null {
+export async function resolveFormId(formType: string): Promise<string | null> {
   const envVarMap: Record<string, string | undefined> = {
     'tour-request': process.env.HUBSPOT_FORM_TOUR_REQUEST,
     'membership': process.env.HUBSPOT_FORM_MEMBERSHIP,
@@ -67,18 +68,21 @@ export function resolveFormId(formType: string): string | null {
   const envValue = envVarMap[formType];
   if (envValue) return envValue;
 
+  const adminValue = await getSettingValue(`hubspot.form_id.${formType}`, '');
+  if (adminValue) return adminValue;
+
   const discovered = discoveredFormIds.get(formType);
   if (discovered) return discovered;
 
   return HUBSPOT_KNOWN_FORM_IDS[formType] || null;
 }
 
-export function logFormIdResolutionStatus(): void {
+export async function logFormIdResolutionStatus(): Promise<void> {
   const allTypes = ['tour-request', 'membership', 'private-hire', 'event-inquiry', 'guest-checkin', 'contact'];
   const resolved: string[] = [];
   const missing: string[] = [];
   for (const ft of allTypes) {
-    const id = resolveFormId(ft);
+    const id = await resolveFormId(ft);
     if (id) {
       resolved.push(`${ft}=${id.substring(0, 8)}…`);
     } else {
@@ -86,7 +90,7 @@ export function logFormIdResolutionStatus(): void {
     }
   }
   if (missing.length > 0) {
-    logger.warn(`[HubSpot Forms] Form types with no resolved ID at startup: ${missing.join(', ')}. These will fail until discovery runs or env vars are set.`);
+    logger.warn(`[HubSpot Forms] Form types with no resolved ID at startup: ${missing.join(', ')}. These will fail until discovery runs, admin settings are configured, or env vars are set.`);
   }
   logger.info(`[HubSpot Forms] Resolved form IDs: ${resolved.join(', ')}`);
 }

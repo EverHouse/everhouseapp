@@ -89,6 +89,13 @@ const DEFAULT_SETTINGS: Record<string, { value: string; category: string }> = {
   'resource.tours.slot_duration': { value: '30', category: 'resource_hours' },
 
 
+  'hubspot.form_id.membership': { value: '', category: 'hubspot_forms' },
+  'hubspot.form_id.private-hire': { value: '', category: 'hubspot_forms' },
+  'hubspot.form_id.event-inquiry': { value: '', category: 'hubspot_forms' },
+  'hubspot.form_id.tour-request': { value: '', category: 'hubspot_forms' },
+  'hubspot.form_id.guest-checkin': { value: '', category: 'hubspot_forms' },
+  'hubspot.form_id.contact': { value: '', category: 'hubspot_forms' },
+
   'hubspot.tier.core': { value: 'Core Membership', category: 'hubspot_tiers' },
   'hubspot.tier.core-founding': { value: 'Core Membership Founding Members', category: 'hubspot_tiers' },
   'hubspot.tier.premium': { value: 'Premium Membership', category: 'hubspot_tiers' },

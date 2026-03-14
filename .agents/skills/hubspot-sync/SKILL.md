@@ -21,7 +21,7 @@ description: HubSpot CRM synchronization system — queue-based sync of contacts
 | Discount rules | `server/core/hubspot/discounts.ts` | Max-wins rule (not additive) |
 | Admin discount CRUD | `server/core/hubspot/admin.ts` | Discount rules, billing audit |
 | Request wrapper | `server/core/hubspot/request.ts` | Rate-limit-aware p-retry |
-| Form submissions | `server/core/hubspot/formSync.ts` | Form ingestion from HubSpot |
+| Form submissions | `server/core/hubspot/formSync.ts` | Form ingestion from HubSpot; `resolveFormId()` (async) uses 4-tier fallback: env var → admin setting → auto-discovered → hardcoded |
 | Full member sync | `server/core/memberSync.ts` | Daily inbound reconciliation |
 | Payment line items | `server/core/hubspot/queueHelpers.ts` | Stripe → HubSpot line items (via queue) |
 | Queue monitor | `server/core/hubspotQueueMonitor.ts` | Admin dashboard stats |

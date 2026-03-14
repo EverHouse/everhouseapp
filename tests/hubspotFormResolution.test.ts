@@ -46,6 +46,10 @@ vi.mock('../server/core/notificationService', () => ({
   notifyAllStaff: vi.fn(),
 }));
 
+vi.mock('../server/core/settingsHelper', () => ({
+  getSettingValue: vi.fn().mockResolvedValue(''),
+}));
+
 describe('HubSpot Form Resolution', () => {
   let resolveFormId: typeof import('../server/core/hubspot/formSync').resolveFormId;
   let logFormIdResolutionStatus: typeof import('../server/core/hubspot/formSync').logFormIdResolutionStatus;
@@ -53,58 +57,74 @@ describe('HubSpot Form Resolution', () => {
 
   beforeEach(async () => {
     vi.resetModules();
+    vi.resetAllMocks();
     delete process.env.HUBSPOT_FORM_TOUR_REQUEST;
     delete process.env.HUBSPOT_FORM_MEMBERSHIP;
     delete process.env.HUBSPOT_FORM_PRIVATE_HIRE;
     delete process.env.HUBSPOT_FORM_EVENT_INQUIRY;
     delete process.env.HUBSPOT_FORM_GUEST_CHECKIN;
     delete process.env.HUBSPOT_FORM_CONTACT;
+    const settingsHelper = await import('../server/core/settingsHelper');
+    vi.mocked(settingsHelper.getSettingValue).mockResolvedValue('');
     formSyncModule = await import('../server/core/hubspot/formSync');
     resolveFormId = formSyncModule.resolveFormId;
     logFormIdResolutionStatus = formSyncModule.logFormIdResolutionStatus;
   });
 
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
-  describe('resolveFormId — 3-tier fallback', () => {
-    it('returns hardcoded ID for membership when no env var set', () => {
-      expect(resolveFormId('membership')).toBe(KNOWN_IDS['membership']);
+  describe('resolveFormId — 4-tier fallback', () => {
+    it('returns hardcoded ID for membership when no env var set', async () => {
+      expect(await resolveFormId('membership')).toBe(KNOWN_IDS['membership']);
     });
 
-    it('returns hardcoded ID for private-hire when no env var set', () => {
-      expect(resolveFormId('private-hire')).toBe(KNOWN_IDS['private-hire']);
+    it('returns hardcoded ID for private-hire when no env var set', async () => {
+      expect(await resolveFormId('private-hire')).toBe(KNOWN_IDS['private-hire']);
     });
 
-    it('returns hardcoded ID for event-inquiry when no env var set', () => {
-      expect(resolveFormId('event-inquiry')).toBe(KNOWN_IDS['event-inquiry']);
+    it('returns hardcoded ID for event-inquiry when no env var set', async () => {
+      expect(await resolveFormId('event-inquiry')).toBe(KNOWN_IDS['event-inquiry']);
     });
 
-    it('returns null for tour-request (no hardcoded, no env, no discovery)', () => {
-      expect(resolveFormId('tour-request')).toBeNull();
+    it('returns null for tour-request (no hardcoded, no env, no admin, no discovery)', async () => {
+      expect(await resolveFormId('tour-request')).toBeNull();
     });
 
-    it('returns null for guest-checkin (no hardcoded, no env, no discovery)', () => {
-      expect(resolveFormId('guest-checkin')).toBeNull();
+    it('returns null for guest-checkin (no hardcoded, no env, no admin, no discovery)', async () => {
+      expect(await resolveFormId('guest-checkin')).toBeNull();
     });
 
-    it('returns null for contact (no hardcoded, no env, no discovery)', () => {
-      expect(resolveFormId('contact')).toBeNull();
+    it('returns null for contact (no hardcoded, no env, no admin, no discovery)', async () => {
+      expect(await resolveFormId('contact')).toBeNull();
     });
 
-    it('returns null for completely unknown form type', () => {
-      expect(resolveFormId('nonexistent-form')).toBeNull();
+    it('returns null for completely unknown form type', async () => {
+      expect(await resolveFormId('nonexistent-form')).toBeNull();
     });
 
-    it('prefers env var over hardcoded ID', () => {
+    it('prefers env var over hardcoded ID', async () => {
       process.env.HUBSPOT_FORM_MEMBERSHIP = 'env-override-id';
-      expect(resolveFormId('membership')).toBe('env-override-id');
+      expect(await resolveFormId('membership')).toBe('env-override-id');
     });
 
-    it('env var takes priority even when empty string (falsy) — returns hardcoded', () => {
+    it('env var takes priority even when empty string (falsy) — returns hardcoded', async () => {
       process.env.HUBSPOT_FORM_MEMBERSHIP = '';
-      expect(resolveFormId('membership')).toBe(KNOWN_IDS['membership']);
+      expect(await resolveFormId('membership')).toBe(KNOWN_IDS['membership']);
+    });
+
+    it('admin setting overrides hardcoded when no env var set', async () => {
+      const settingsHelper = await import('../server/core/settingsHelper');
+      vi.mocked(settingsHelper.getSettingValue).mockResolvedValueOnce('admin-form-id-123');
+      expect(await resolveFormId('membership')).toBe('admin-form-id-123');
+    });
+
+    it('env var takes priority over admin setting', async () => {
+      process.env.HUBSPOT_FORM_MEMBERSHIP = 'env-override-id';
+      expect(await resolveFormId('membership')).toBe('env-override-id');
+    });
+
+    it('admin setting provides form ID for types with no hardcoded fallback', async () => {
+      const settingsHelper = await import('../server/core/settingsHelper');
+      vi.mocked(settingsHelper.getSettingValue).mockResolvedValueOnce('admin-tour-id');
+      expect(await resolveFormId('tour-request')).toBe('admin-tour-id');
     });
   });
 
@@ -112,7 +132,7 @@ describe('HubSpot Form Resolution', () => {
     it('runs without error and reports missing types', async () => {
       const loggerModule = await import('../server/core/logger');
       const { logger } = loggerModule;
-      logFormIdResolutionStatus();
+      await logFormIdResolutionStatus();
       expect(logger.warn).toHaveBeenCalledWith(
         expect.stringContaining('tour-request')
       );
@@ -130,9 +150,9 @@ describe('HubSpot Form Resolution', () => {
       expect(VALID_FORM_TYPES.sort()).toEqual(RESOLVE_FORM_TYPES.sort());
     });
 
-    it('every VALID_FORM_TYPE calls resolveFormId without crashing', () => {
+    it('every VALID_FORM_TYPE calls resolveFormId without crashing', async () => {
       for (const ft of VALID_FORM_TYPES) {
-        expect(() => resolveFormId(ft)).not.toThrow();
+        await expect(resolveFormId(ft)).resolves.toBeDefined;
       }
     });
   });
@@ -201,22 +221,22 @@ describe('updateDiscoveredFormIds behavior', () => {
     formSyncModule = await import('../server/core/hubspot/formSync');
   });
 
-  it('resolveFormId returns null for tour-request before discovery', () => {
-    expect(formSyncModule.resolveFormId('tour-request')).toBeNull();
+  it('resolveFormId returns null for tour-request before discovery', async () => {
+    expect(await formSyncModule.resolveFormId('tour-request')).toBeNull();
   });
 
-  it('resolveFormId returns null for contact before discovery', () => {
-    expect(formSyncModule.resolveFormId('contact')).toBeNull();
+  it('resolveFormId returns null for contact before discovery', async () => {
+    expect(await formSyncModule.resolveFormId('contact')).toBeNull();
   });
 
-  it('resolveFormId returns null for guest-checkin before discovery', () => {
-    expect(formSyncModule.resolveFormId('guest-checkin')).toBeNull();
+  it('resolveFormId returns null for guest-checkin before discovery', async () => {
+    expect(await formSyncModule.resolveFormId('guest-checkin')).toBeNull();
   });
 
-  it('known form types always resolve even without discovery or env vars', () => {
-    expect(formSyncModule.resolveFormId('membership')).toBeTruthy();
-    expect(formSyncModule.resolveFormId('private-hire')).toBeTruthy();
-    expect(formSyncModule.resolveFormId('event-inquiry')).toBeTruthy();
+  it('known form types always resolve even without discovery or env vars', async () => {
+    expect(await formSyncModule.resolveFormId('membership')).toBeTruthy();
+    expect(await formSyncModule.resolveFormId('private-hire')).toBeTruthy();
+    expect(await formSyncModule.resolveFormId('event-inquiry')).toBeTruthy();
   });
 });
 

@@ -760,10 +760,10 @@ router.post('/api/hubspot/forms/:formType', async (req, res) => {
     }
 
     const { resolveFormId } = await import('../core/hubspot/formSync');
-    const formId = resolveFormId(formType);
+    const formId = await resolveFormId(formType);
 
     if (!formId) {
-      logger.error(`[HubSpot Forms] No form ID resolved for form type "${formType}". Set HUBSPOT_FORM_${formType.toUpperCase().replace(/-/g, '_')} env var or ensure form sync has discovered this form.`);
+      logger.error(`[HubSpot Forms] No form ID resolved for form type "${formType}". Configure via Admin Settings, set HUBSPOT_FORM_${formType.toUpperCase().replace(/-/g, '_')} env var, or ensure form sync has discovered this form.`);
       return res.status(400).json({ error: 'Form configuration missing. Please contact support.' });
     }
     

@@ -8,6 +8,17 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.87.5",
+    date: "2026-03-14",
+    title: "Admin-Configurable HubSpot Form IDs",
+    changes: [
+      "New: HubSpot Form IDs can now be configured directly from Admin Settings — no more environment variables needed",
+      "A new 'HubSpot Form IDs' section in Settings lets admins paste form IDs for Membership, Private Hire, Event Inquiry, Tour Request, Guest Check-in, and Contact forms",
+      "Smart 4-level fallback: Environment variable → Admin setting → Auto-discovered → Hardcoded default — so forms always work with zero config and can be overridden when needed",
+      "Settings are cached for fast performance and take effect immediately when saved",
+    ]
+  },
+  {
     version: "8.87.4",
     date: "2026-03-14",
     title: "HubSpot Form Submission Fix",

@@ -32,6 +32,7 @@ interface SettingsState {
   resourceGolfSlotDuration: string;
   resourceConferenceSlotDuration: string;
   resourceToursSlotDuration: string;
+  hubspotFormIds: Record<string, string>;
   hubspotTiers: Record<string, string>;
   hubspotStatuses: Record<string, string>;
   dailyReminderHour: string;
@@ -42,6 +43,15 @@ interface SettingsState {
   gracePeriodDays: string;
   trialCouponCode: string;
 }
+
+const HUBSPOT_FORM_ID_KEYS = [
+  { key: 'membership', label: 'Membership Application' },
+  { key: 'private-hire', label: 'Private Hire Inquiry' },
+  { key: 'event-inquiry', label: 'Event Inquiry' },
+  { key: 'tour-request', label: 'Tour Request' },
+  { key: 'guest-checkin', label: 'Guest Check-in' },
+  { key: 'contact', label: 'Contact Form' },
+] as const;
 
 const HUBSPOT_TIER_KEYS = [
   'core', 'core-founding', 'premium', 'premium-founding',
@@ -155,6 +165,10 @@ const SettingsTab: React.FC = () => {
     resourceGolfSlotDuration: '60',
     resourceConferenceSlotDuration: '30',
     resourceToursSlotDuration: '30',
+    hubspotFormIds: {
+      'membership': '', 'private-hire': '', 'event-inquiry': '',
+      'tour-request': '', 'guest-checkin': '', 'contact': '',
+    },
     hubspotTiers: {
       'core': 'Core Membership', 'core-founding': 'Core Membership Founding Members',
       'premium': 'Premium Membership', 'premium-founding': 'Premium Membership Founding Members',
@@ -181,6 +195,11 @@ const SettingsTab: React.FC = () => {
     queryKey: ['settings'],
     queryFn: async () => {
       const data = await fetchWithCredentials<Record<string, { value: string }>>('/api/settings');
+
+      const hubspotFormIds: Record<string, string> = {};
+      for (const f of HUBSPOT_FORM_ID_KEYS) {
+        hubspotFormIds[f.key] = data[`hubspot.form_id.${f.key}`]?.value || '';
+      }
 
       const hubspotTiers: Record<string, string> = {};
       for (const t of HUBSPOT_TIER_KEYS) {
@@ -220,6 +239,7 @@ const SettingsTab: React.FC = () => {
         resourceGolfSlotDuration: data['resource.golf.slot_duration']?.value || '60',
         resourceConferenceSlotDuration: data['resource.conference.slot_duration']?.value || '30',
         resourceToursSlotDuration: data['resource.tours.slot_duration']?.value || '30',
+        hubspotFormIds,
         hubspotTiers,
         hubspotStatuses,
         dailyReminderHour: data['scheduling.daily_reminder_hour']?.value || '18',
@@ -280,6 +300,9 @@ const SettingsTab: React.FC = () => {
         'scheduling.trial_coupon_code': settingsToSave.trialCouponCode,
       };
 
+      for (const [key, val] of Object.entries(settingsToSave.hubspotFormIds ?? {})) {
+        payload[`hubspot.form_id.${key}`] = val;
+      }
       for (const [key, val] of Object.entries(settingsToSave.hubspotTiers ?? {})) {
         payload[`hubspot.tier.${key}`] = val;
       }
@@ -575,6 +598,35 @@ const SettingsTab: React.FC = () => {
               </div>
             ))}
           </div>
+        </div>
+      </div>
+
+      <div className={sectionClass}>
+        <SectionHeader icon="dynamic_form" title="HubSpot Form IDs" subtitle="Override auto-discovered HubSpot form IDs. Leave blank to use auto-discovery or environment variables." />
+        <div className="space-y-3">
+          {HUBSPOT_FORM_ID_KEYS.map(({ key, label }) => (
+            <div key={key} className="flex items-center gap-4">
+              <div className="w-44 flex-shrink-0">
+                <span className="text-xs font-medium text-gray-600 dark:text-gray-300">{label}</span>
+              </div>
+              <input
+                type="text"
+                value={settings.hubspotFormIds?.[key] ?? ''}
+                onChange={(e) => {
+                  setSettings(prev => ({
+                    ...prev,
+                    hubspotFormIds: { ...(prev.hubspotFormIds ?? {}), [key]: e.target.value }
+                  }));
+                  setHasChanges(true);
+                }}
+                className={inputSmClass}
+                placeholder="Auto-discovered"
+              />
+            </div>
+          ))}
+          <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
+            Priority: Environment variable → Admin setting → Auto-discovered → Hardcoded fallback
+          </p>
         </div>
       </div>
 

@@ -33,7 +33,9 @@ export function startHubSpotFormSyncScheduler(): void {
   }
 
   logger.info('[Startup] HubSpot form sync scheduler enabled (runs every 30 minutes)');
-  logFormIdResolutionStatus();
+  logFormIdResolutionStatus().catch(err => {
+    logger.error('[HubSpot FormSync] Failed to log form ID resolution status:', { error: err as Error });
+  });
 
   setTimeout(() => {
     runSync().catch(err => {
