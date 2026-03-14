@@ -10,7 +10,12 @@ import { z } from 'zod';
 
 const router = Router();
 
-router.get('/api/data-tools/audit-log', isAdmin, async (req: Request, res: Response) => {
+const auditLogQuerySchema = z.object({
+  limit: z.string().regex(/^\d+$/).optional(),
+  actionType: z.string().optional(),
+}).passthrough();
+
+router.get('/api/data-tools/audit-log', isAdmin, validateQuery(auditLogQuerySchema), async (req: Request, res: Response) => {
   try {
     const { limit = '20', actionType } = req.query;
     

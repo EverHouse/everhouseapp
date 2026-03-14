@@ -7,6 +7,8 @@ import { notifyMember } from '../../core/notificationService';
 import { isStaffOrAdmin, isAdmin } from '../../core/middleware';
 import { linkAndNotifyParticipants } from '../../core/bookingEvents';
 import { formatDatePacific, formatTimePacific } from '../../utils/dateUtils';
+import { validateQuery } from '../../middleware/validate';
+import { z } from 'zod';
 import {
   TrackmanWebhookPayload,
   TrackmanV2WebhookPayload,
@@ -711,7 +713,12 @@ router.post('/api/webhooks/trackman', async (req: Request, res: Response) => {
   }
 });
 
-router.get('/api/admin/trackman-webhooks', isStaffOrAdmin, async (req: Request, res: Response) => {
+const webhookPaginationSchema = z.object({
+  limit: z.string().regex(/^\d+$/).optional(),
+  offset: z.string().regex(/^\d+$/).optional(),
+}).passthrough();
+
+router.get('/api/admin/trackman-webhooks', isStaffOrAdmin, validateQuery(webhookPaginationSchema), async (req: Request, res: Response) => {
   try {
     const limit = Math.min(parseInt(req.query.limit as string) || 50, 100);
     const offset = parseInt(req.query.offset as string) || 0;

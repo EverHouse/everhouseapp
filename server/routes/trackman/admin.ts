@@ -7,6 +7,8 @@ import { sql } from 'drizzle-orm';
 import { recalculateSessionFees } from '../../core/billing/unifiedFeeService';
 import { logFromRequest } from '../../core/auditLog';
 import { getStripeClient } from '../../core/stripe/client';
+import { validateQuery } from '../../middleware/validate';
+import { z } from 'zod';
 
 import { getErrorMessage } from '../../utils/errorUtils';
 
@@ -57,7 +59,13 @@ router.delete('/api/admin/trackman/linked-email', isStaffOrAdmin, async (req, re
   }
 });
 
-router.get('/api/admin/trackman/matched', isStaffOrAdmin, async (req, res) => {
+const paginatedSearchSchema = z.object({
+  limit: z.string().regex(/^\d+$/).optional(),
+  offset: z.string().regex(/^\d+$/).optional(),
+  search: z.string().optional(),
+}).passthrough();
+
+router.get('/api/admin/trackman/matched', isStaffOrAdmin, validateQuery(paginatedSearchSchema), async (req, res) => {
   try {
     const limit = parseInt(req.query.limit as string) || 100;
     const offset = parseInt(req.query.offset as string) || 0;
@@ -407,7 +415,12 @@ router.post('/api/admin/trackman/unmatch-member', isStaffOrAdmin, async (req, re
   }
 });
 
-router.get('/api/admin/trackman/potential-matches', isStaffOrAdmin, async (req, res) => {
+const paginatedSchema = z.object({
+  limit: z.string().regex(/^\d+$/).optional(),
+  offset: z.string().regex(/^\d+$/).optional(),
+}).passthrough();
+
+router.get('/api/admin/trackman/potential-matches', isStaffOrAdmin, validateQuery(paginatedSchema), async (req, res) => {
   try {
     const limit = parseInt(req.query.limit as string) || 50;
     const offset = parseInt(req.query.offset as string) || 0;
@@ -476,7 +489,7 @@ router.get('/api/admin/trackman/potential-matches', isStaffOrAdmin, async (req, 
   }
 });
 
-router.get('/api/admin/trackman/requires-review', isStaffOrAdmin, async (req, res) => {
+router.get('/api/admin/trackman/requires-review', isStaffOrAdmin, validateQuery(paginatedSchema), async (req, res) => {
   try {
     const limit = parseInt(req.query.limit as string) || 50;
     const offset = parseInt(req.query.offset as string) || 0;

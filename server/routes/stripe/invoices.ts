@@ -3,6 +3,8 @@ import { Router, Request, Response } from 'express';
 import { isStaffOrAdmin } from '../../core/middleware';
 import { db } from '../../db';
 import { sql } from 'drizzle-orm';
+import { validateQuery } from '../../middleware/validate';
+import { z } from 'zod';
 import { getSessionUser } from '../../types/session';
 import {
   createInvoice,
@@ -213,7 +215,11 @@ router.post('/api/stripe/invoices/:invoiceId/void', isStaffOrAdmin, async (req: 
   }
 });
 
-router.get('/api/my-invoices', async (req: Request, res: Response) => {
+const invoiceEmailQuerySchema = z.object({
+  user_email: z.string().email().optional(),
+}).passthrough();
+
+router.get('/api/my-invoices', validateQuery(invoiceEmailQuerySchema), async (req: Request, res: Response) => {
   try {
     const sessionUser = getSessionUser(req);
     const sessionEmail = sessionUser?.email;

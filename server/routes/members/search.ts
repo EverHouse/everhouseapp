@@ -16,7 +16,15 @@ const DIRECTORY_CACHE_TTL = 30_000;
 
 const router = Router();
 
-router.get('/api/members/search', isAuthenticated, async (req, res) => {
+const memberSearchSchema = z.object({
+  query: z.string().optional(),
+  limit: z.string().regex(/^\d+$/).optional(),
+  excludeId: z.string().optional(),
+  includeFormer: z.enum(['true', 'false']).optional(),
+  includeVisitors: z.enum(['true', 'false']).optional(),
+}).passthrough();
+
+router.get('/api/members/search', isAuthenticated, validateQuery(memberSearchSchema), async (req, res) => {
   try {
     const { query, limit = '10', excludeId, includeFormer = 'false', includeVisitors = 'false' } = req.query;
     
@@ -448,7 +456,13 @@ router.get('/api/members/directory', isStaffOrAdmin, validateQuery(directoryQuer
   }
 });
 
-router.get('/api/guests/search', isAuthenticated, async (req, res) => {
+const guestSearchSchema = z.object({
+  query: z.string().optional(),
+  limit: z.string().regex(/^\d+$/).optional(),
+  includeFullEmail: z.enum(['true', 'false']).optional(),
+}).passthrough();
+
+router.get('/api/guests/search', isAuthenticated, validateQuery(guestSearchSchema), async (req, res) => {
   try {
     const { query, limit = '10', includeFullEmail } = req.query;
     

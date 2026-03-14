@@ -10,6 +10,8 @@ import { updateHubSpotContactPreferences } from '../../core/memberSync';
 import { getResendClient } from '../../utils/resend';
 import { withResendRetry } from '../../core/retryUtils';
 import { logFromRequest } from '../../core/auditLog';
+import { validateQuery } from '../../middleware/validate';
+import { z } from 'zod';
 
 const router = Router();
 
@@ -91,7 +93,11 @@ router.delete('/api/members/:email/communications/:logId', isStaffOrAdmin, async
   }
 });
 
-router.patch('/api/members/me/preferences', isAuthenticated, async (req, res) => {
+const optionalEmailQuerySchema = z.object({
+  user_email: z.string().email().optional(),
+}).passthrough();
+
+router.patch('/api/members/me/preferences', isAuthenticated, validateQuery(optionalEmailQuerySchema), async (req, res) => {
   try {
     const sessionUser = getSessionUser(req);
     if (!sessionUser?.email) {
@@ -151,7 +157,7 @@ router.patch('/api/members/me/preferences', isAuthenticated, async (req, res) =>
   }
 });
 
-router.get('/api/members/me/preferences', isAuthenticated, async (req, res) => {
+router.get('/api/members/me/preferences', isAuthenticated, validateQuery(optionalEmailQuerySchema), async (req, res) => {
   try {
     const sessionUser = getSessionUser(req);
     if (!sessionUser?.email) {
@@ -190,7 +196,7 @@ router.get('/api/members/me/preferences', isAuthenticated, async (req, res) => {
   }
 });
 
-router.get('/api/my-visits', isAuthenticated, async (req, res) => {
+router.get('/api/my-visits', isAuthenticated, validateQuery(optionalEmailQuerySchema), async (req, res) => {
   try {
     const sessionUser = getSessionUser(req);
     if (!sessionUser?.email) {

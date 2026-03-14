@@ -4,6 +4,8 @@ import { eq, and, sql, gt } from 'drizzle-orm';
 import { walletPassDeviceRegistrations, walletPassAuthTokens } from '../../shared/schema';
 import { validateAuthToken } from '../walletPass/apnPushService';
 import { logger } from '../core/logger';
+import { validateQuery } from '../middleware/validate';
+import { z } from 'zod';
 
 const router = Router();
 
@@ -71,7 +73,11 @@ router.post('/v1/devices/:deviceLibraryId/registrations/:passTypeId/:serialNumbe
   }
 });
 
-router.get('/v1/devices/:deviceLibraryId/registrations/:passTypeId', async (req, res) => {
+const passesQuerySchema = z.object({
+  passesUpdatedSince: z.string().optional(),
+}).passthrough();
+
+router.get('/v1/devices/:deviceLibraryId/registrations/:passTypeId', validateQuery(passesQuerySchema), async (req, res) => {
   try {
     const { deviceLibraryId, passTypeId } = req.params;
     const passesUpdatedSince = req.query.passesUpdatedSince as string | undefined;

@@ -18,6 +18,8 @@ import { getErrorMessage } from '../utils/errorUtils';
 import { getAppBaseUrl } from '../utils/urlUtils';
 import { formatDatePacific } from '../utils/dateUtils';
 import { isStaffOrAdmin } from '../replit_integrations/auth';
+import { validateQuery } from '../middleware/validate';
+import { z } from 'zod';
 
 const router = Router();
 
@@ -35,7 +37,11 @@ async function isDbVerifiedStaff(email: string): Promise<boolean> {
   return (result.rows as Array<Record<string, unknown>>).length > 0;
 }
 
-router.get('/api/my/billing', requireAuth, async (req, res) => {
+const optionalEmailSchema = z.object({
+  email: z.string().email().optional(),
+}).passthrough();
+
+router.get('/api/my/billing', requireAuth, validateQuery(optionalEmailSchema), async (req, res) => {
   try {
     const sessionUser = req.session.user;
     const isStaff = await isDbVerifiedStaff(sessionUser.email);
@@ -146,7 +152,7 @@ router.get('/api/my/billing', requireAuth, async (req, res) => {
   }
 });
 
-router.get('/api/my/billing/invoices', requireAuth, async (req, res) => {
+router.get('/api/my/billing/invoices', requireAuth, validateQuery(optionalEmailSchema), async (req, res) => {
   try {
     const sessionUser = req.session.user;
     const isStaff = await isDbVerifiedStaff(sessionUser.email);
@@ -490,8 +496,11 @@ router.post('/api/my/add-funds', requireAuth, async (req, res) => {
 });
 
 // Route alias for account-balance endpoint
-// Supports ?user_email param for "View As" feature when staff views as another member
-router.get('/api/my-billing/account-balance', requireAuth, async (req, res) => {
+const billingEmailQuerySchema = z.object({
+  user_email: z.string().email().optional(),
+}).passthrough();
+
+router.get('/api/my-billing/account-balance', requireAuth, validateQuery(billingEmailQuerySchema), async (req, res) => {
   try {
     const sessionEmail = req.session.user.email;
     const isStaffUser = await isDbVerifiedStaff(sessionEmail);

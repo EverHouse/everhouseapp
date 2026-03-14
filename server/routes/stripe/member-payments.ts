@@ -13,6 +13,8 @@ import { paymentRateLimiter } from '../../middleware/rateLimiting';
 import { db } from '../../db';
 import { membershipTiers } from '../../../shared/schema';
 import { sql, ilike } from 'drizzle-orm';
+import { validateQuery } from '../../middleware/validate';
+import { z } from 'zod';
 import { getSessionUser } from '../../types/session';
 import {
   createPaymentIntent,
@@ -1249,7 +1251,11 @@ router.post('/api/member/guest-passes/confirm', isAuthenticated, async (req: Req
   }
 });
 
-router.get('/api/member/balance', isAuthenticated, async (req: Request, res: Response) => {
+const balanceQuerySchema = z.object({
+  email: z.string().email().optional(),
+}).passthrough();
+
+router.get('/api/member/balance', isAuthenticated, validateQuery(balanceQuerySchema), async (req: Request, res: Response) => {
   try {
     const sessionUser = getSessionUser(req);
     if (!sessionUser?.email) {

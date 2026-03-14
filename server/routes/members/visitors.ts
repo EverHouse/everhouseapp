@@ -9,6 +9,8 @@ import { isStaffOrAdmin, isAdmin } from '../../core/middleware';
 import { getSessionUser } from '../../types/session';
 import { logFromRequest } from '../../core/auditLog';
 import { getErrorMessage, safeErrorDetail } from '../../utils/errorUtils';
+import { validateQuery } from '../../middleware/validate';
+import { z } from 'zod';
 
 const PLACEHOLDER_EMAIL_PATTERNS = [
   '@visitors.evenhouse.club',
@@ -29,7 +31,18 @@ function isPlaceholderEmail(email: string | null | undefined): boolean {
 
 const router = Router();
 
-router.get('/api/visitors', isStaffOrAdmin, async (req, res) => {
+const visitorsQuerySchema = z.object({
+  sortBy: z.string().optional(),
+  order: z.enum(['asc', 'desc']).optional(),
+  limit: z.string().regex(/^\d+$/).optional(),
+  offset: z.string().regex(/^\d+$/).optional(),
+  typeFilter: z.string().optional(),
+  sourceFilter: z.string().optional(),
+  search: z.string().optional(),
+  archived: z.enum(['true', 'false']).optional(),
+}).passthrough();
+
+router.get('/api/visitors', isStaffOrAdmin, validateQuery(visitorsQuerySchema), async (req, res) => {
   try {
     const { sortBy = 'lastPurchase', order = 'desc', limit = '100', offset = '0', typeFilter = 'all', sourceFilter = 'all', search = '', archived = 'false' } = req.query;
     const pageLimit = Math.min(parseInt(limit as string) || 100, 500);
@@ -1064,7 +1077,11 @@ router.delete('/api/visitors/:id', isStaffOrAdmin, async (req, res) => {
   }
 });
 
-router.get('/api/visitors/check-email', isStaffOrAdmin, async (req, res) => {
+const checkEmailSchema = z.object({
+  email: z.string().email(),
+}).passthrough();
+
+router.get('/api/visitors/check-email', isStaffOrAdmin, validateQuery(checkEmailSchema), async (req, res) => {
   try {
     const email = (req.query.email as string || '').trim().toLowerCase();
     if (!email) {
