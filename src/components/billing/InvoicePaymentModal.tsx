@@ -12,6 +12,14 @@ import { SlideUpDrawer } from '../SlideUpDrawer';
 import { getStripeAppearance } from '../stripe/stripeAppearance';
 import WalkingGolferSpinner from '../WalkingGolferSpinner';
 
+interface SavedPaymentMethod {
+  id: string;
+  brand: string | undefined;
+  last4: string | undefined;
+  expMonth: number | undefined;
+  expYear: number | undefined;
+}
+
 let stripePromise: Promise<Stripe | null> | null = null;
 
 async function getStripePromise(): Promise<Stripe | null> {
@@ -159,19 +167,77 @@ export function InvoicePaymentModal({
   const [paymentData, setPaymentData] = useState<PayInvoiceResponse | null>(null);
   const [stripeInstance, setStripeInstance] = useState<Stripe | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [savedCard, setSavedCard] = useState<SavedPaymentMethod | null>(null);
+  const [savedCardLoading, setSavedCardLoading] = useState(false);
+  const [savedCardSuccess, setSavedCardSuccess] = useState(false);
+
+  const formatCardBrand = (brand: string | undefined) => {
+    if (!brand) return 'Card';
+    const brands: Record<string, string> = {
+      visa: 'Visa', mastercard: 'Mastercard', amex: 'Amex',
+      discover: 'Discover', diners: 'Diners', jcb: 'JCB', unionpay: 'UnionPay',
+    };
+    return brands[brand.toLowerCase()] || brand.charAt(0).toUpperCase() + brand.slice(1);
+  };
+
+  const handleSavedCardPayment = async () => {
+    if (!savedCard) return;
+    setSavedCardLoading(true);
+    setError(null);
+
+    try {
+      const { ok, data, error: apiError, errorData } = await apiRequest<{ success: boolean; cardBrand?: string; cardLast4?: string; amountCents?: number }>(
+        `/api/member/invoices/${invoice.id}/pay-saved-card`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ paymentMethodId: savedCard.id }),
+        }
+      );
+
+      if (ok && data?.success) {
+        setSavedCardSuccess(true);
+        setSavedCardLoading(false);
+        setTimeout(() => onSuccess(), 1500);
+      } else if (errorData?.requiresAction) {
+        setSavedCard(null);
+        setSavedCardLoading(false);
+      } else {
+        setError(apiError || 'Payment failed. Please try using the card form below.');
+        setSavedCardLoading(false);
+      }
+    } catch (err: unknown) {
+      setError((err instanceof Error ? err.message : String(err)) || 'Payment failed. Please try the card form below.');
+      setSavedCardLoading(false);
+    }
+  };
 
   const initializePayment = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
+      setSavedCard(null);
+      setSavedCardSuccess(false);
+      setSavedCardLoading(false);
 
-      const stripe = await getStripePromise();
+      const [stripe, methodsResult] = await Promise.all([
+        getStripePromise(),
+        apiRequest<{ paymentMethods: SavedPaymentMethod[] }>(
+          `/api/member/payment-methods`,
+          { method: 'GET' }
+        ),
+      ]);
+
       if (!stripe) {
         setError('Payment system not available');
         setLoading(false);
         return;
       }
       setStripeInstance(stripe);
+
+      if (methodsResult.ok && methodsResult.data?.paymentMethods?.length) {
+        setSavedCard(methodsResult.data.paymentMethods[0]);
+      }
 
       const { ok, data, error: apiError } = await apiRequest<PayInvoiceResponse>(
         `/api/member/invoices/${invoice.id}/pay`,
@@ -216,7 +282,7 @@ export function InvoicePaymentModal({
     }
   };
 
-  const stickyFooter = !loading && !error && paymentData && stripeInstance && options ? (
+  const stickyFooter = !loading && !error && !savedCardSuccess && !savedCardLoading && paymentData && stripeInstance && options ? (
     <div className="flex gap-2 p-4">
       <button
         type="button"
@@ -311,16 +377,62 @@ export function InvoicePaymentModal({
               </div>
             </div>
 
-            <Elements stripe={stripeInstance} options={options} key={isDark ? 'dark' : 'light'}>
-              <InvoiceCheckoutForm 
-                onSuccess={onSuccess} 
-                onCancel={onClose}
-                invoiceId={invoice.id}
-                paymentIntentId={paymentData.paymentIntentId}
-                isProcessing={isProcessing}
-                setIsProcessing={setIsProcessing}
-              />
-            </Elements>
+            {savedCardSuccess ? (
+              <div className={`rounded-xl p-4 text-center ${isDark ? 'bg-emerald-500/20' : 'bg-emerald-100'}`}>
+                <span className="material-symbols-outlined text-4xl text-emerald-500 mb-2">check_circle</span>
+                <p className={`text-lg font-semibold ${isDark ? 'text-emerald-400' : 'text-emerald-700'}`}>
+                  Payment Successful
+                </p>
+                <p className={`text-sm mt-1 ${isDark ? 'text-emerald-400/80' : 'text-emerald-600'}`}>
+                  Charged to {formatCardBrand(savedCard?.brand)} •••• {savedCard?.last4}
+                </p>
+              </div>
+            ) : (
+              <>
+                {savedCard && !savedCardLoading && (
+                  <div className="space-y-3">
+                    <button
+                      onClick={handleSavedCardPayment}
+                      className={`w-full flex items-center justify-center gap-3 px-4 py-3.5 rounded-xl text-sm font-semibold transition-all tactile-btn ${
+                        isDark
+                          ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-900/30'
+                          : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-200/60'
+                      }`}
+                    >
+                      <span className="material-symbols-outlined text-lg">credit_card</span>
+                      Pay {formatAmount(invoice.amountDue)} with {formatCardBrand(savedCard.brand)} •••• {savedCard.last4}
+                    </button>
+                    <div className="flex items-center gap-3">
+                      <div className={`flex-1 h-px ${isDark ? 'bg-white/10' : 'bg-primary/10'}`} />
+                      <span className={`text-xs font-medium ${isDark ? 'text-white/40' : 'text-primary/40'}`}>or pay with a different method</span>
+                      <div className={`flex-1 h-px ${isDark ? 'bg-white/10' : 'bg-primary/10'}`} />
+                    </div>
+                  </div>
+                )}
+
+                {savedCardLoading && (
+                  <div className="flex flex-col items-center justify-center py-6 gap-3">
+                    <WalkingGolferSpinner size="sm" variant="light" />
+                    <p className={`text-sm font-medium ${isDark ? 'text-white/70' : 'text-primary/70'}`}>
+                      Charging {formatCardBrand(savedCard?.brand)} •••• {savedCard?.last4}...
+                    </p>
+                  </div>
+                )}
+
+                {!savedCardLoading && (
+                  <Elements stripe={stripeInstance} options={options} key={isDark ? 'dark' : 'light'}>
+                    <InvoiceCheckoutForm 
+                      onSuccess={onSuccess} 
+                      onCancel={onClose}
+                      invoiceId={invoice.id}
+                      paymentIntentId={paymentData.paymentIntentId}
+                      isProcessing={isProcessing}
+                      setIsProcessing={setIsProcessing}
+                    />
+                  </Elements>
+                )}
+              </>
+            )}
           </div>
         )}
       </div>

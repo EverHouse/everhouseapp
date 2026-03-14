@@ -1291,6 +1291,135 @@ router.post('/api/member/invoices/:invoiceId/pay', isAuthenticated, async (req: 
   }
 });
 
+router.post('/api/member/invoices/:invoiceId/pay-saved-card', isAuthenticated, paymentRateLimiter, async (req: Request, res: Response) => {
+  try {
+    const sessionUser = getSessionUser(req);
+    const sessionEmail = sessionUser?.email;
+    if (!sessionEmail) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    const { invoiceId } = req.params;
+    if (!invoiceId || !(invoiceId as string).startsWith('in_')) {
+      return res.status(400).json({ error: 'Invalid invoice ID' });
+    }
+
+    const { paymentMethodId } = req.body;
+    if (!paymentMethodId || typeof paymentMethodId !== 'string') {
+      return res.status(400).json({ error: 'Missing paymentMethodId' });
+    }
+
+    const userResult = await db.execute(sql`
+      SELECT id, stripe_customer_id, email FROM users WHERE LOWER(email) = ${sessionEmail.toLowerCase()} AND archived_at IS NULL
+    `);
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    const user = userResult.rows[0] as { id: string; stripe_customer_id: string | null; email: string };
+
+    if (!user.stripe_customer_id) {
+      return res.status(400).json({ error: 'No payment methods on file. Please use the standard payment form.' });
+    }
+
+    const savedMethods = await listCustomerPaymentMethods(user.stripe_customer_id);
+    const selectedMethod = savedMethods.find(m => m.id === paymentMethodId);
+    if (!selectedMethod) {
+      return res.status(400).json({ error: 'Selected card is no longer available. Please use the standard payment form.' });
+    }
+
+    const { getStripeClient } = await import('../../core/stripe/client');
+    const stripe = await getStripeClient();
+    const stripeInvoice = await stripe.invoices.retrieve(invoiceId as string);
+
+    if (stripeInvoice.customer !== user.stripe_customer_id) {
+      return res.status(403).json({ error: 'You do not have permission to pay this invoice' });
+    }
+
+    if (stripeInvoice.status === 'paid') {
+      return res.status(400).json({ error: 'This invoice has already been paid' });
+    }
+
+    if (stripeInvoice.status !== 'draft' && stripeInvoice.status !== 'open') {
+      return res.status(400).json({ error: `Cannot pay invoice with status: ${stripeInvoice.status}` });
+    }
+
+    const amountDue = stripeInvoice.amount_due;
+    if (amountDue < 50) {
+      return res.status(400).json({ error: 'Invoice amount is too small to process' });
+    }
+
+    if (stripeInvoice.status === 'draft') {
+      await stripe.invoices.update(invoiceId as string, {
+        collection_method: 'charge_automatically',
+        payment_settings: {
+          payment_method_types: ['card', 'link'],
+        },
+      });
+      await stripe.invoices.finalizeInvoice(invoiceId as string);
+    } else if (stripeInvoice.collection_method === 'send_invoice') {
+      await stripe.invoices.update(invoiceId as string, {
+        collection_method: 'charge_automatically',
+        payment_settings: {
+          payment_method_types: ['card', 'link'],
+        },
+      });
+    }
+
+    const paidInvoice = await stripe.invoices.pay(invoiceId as string, {
+      payment_method: selectedMethod.id,
+    });
+
+    if (paidInvoice.status === 'paid') {
+      try {
+        await db.execute(sql`INSERT INTO billing_audit 
+          (member_email, member_id, action, amount_cents, description, invoice_id, created_at)
+          VALUES (${sessionEmail}, ${user.id}, 'member_saved_card_invoice', ${amountDue}, ${`Paid invoice ${invoiceId} with saved card •••• ${selectedMethod.last4}`}, ${invoiceId}, NOW())`);
+      } catch (auditErr: unknown) {
+        logger.warn('[MemberPayments] Failed to write invoice billing audit (non-blocking)', { extra: { error: getErrorMessage(auditErr) } });
+      }
+
+      broadcastBillingUpdate({
+        memberEmail: sessionEmail,
+        action: 'invoice_paid',
+        status: 'paid'
+      });
+
+      logger.info('[MemberPayments] Member paid invoice with saved card', {
+        extra: { invoiceId, memberEmail: sessionEmail, amountCents: amountDue, cardLast4: selectedMethod.last4 }
+      });
+
+      return res.json({
+        success: true,
+        cardBrand: selectedMethod.brand,
+        cardLast4: selectedMethod.last4,
+        amountCents: amountDue,
+      });
+    }
+
+    const piId = typeof paidInvoice.payment_intent === 'string' ? paidInvoice.payment_intent : paidInvoice.payment_intent?.id;
+    if (piId) {
+      const pi = await stripe.paymentIntents.retrieve(piId);
+      if (pi.status === 'requires_action') {
+        return res.status(402).json({
+          error: 'Your card requires additional verification. Please use the standard payment form.',
+          requiresAction: true,
+        });
+      }
+    }
+
+    return res.status(400).json({
+      error: 'Payment could not be completed with this card. Please try the standard payment form.',
+    });
+  } catch (error: unknown) {
+    logger.error('[MemberPayments] Error processing saved card invoice payment', { error: error instanceof Error ? error : new Error(String(error)) });
+    await alertOnExternalServiceError('Stripe', error instanceof Error ? error : new Error(String(error)), 'member saved card invoice payment');
+    return res.status(500).json({
+      error: 'Payment failed. Please try using the standard payment form.',
+      retryable: true
+    });
+  }
+});
+
 router.post('/api/member/invoices/:invoiceId/confirm', isAuthenticated, async (req: Request, res: Response) => {
   try {
     const sessionUser = getSessionUser(req);
