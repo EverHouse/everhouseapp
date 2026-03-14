@@ -15,6 +15,7 @@ import { refundGuestPassForParticipant } from '../../core/billing/guestPassConsu
 import { getErrorMessage } from '../../utils/errorUtils';
 import { createPacificDate } from '../../utils/dateUtils';
 import { broadcastBookingRosterUpdate } from '../../core/websocket';
+import { syncBookingInvoice } from '../../core/billing/bookingInvoiceService';
 
 interface DbRow {
   [key: string]: unknown;
@@ -1249,6 +1250,9 @@ router.post('/api/admin/booking/:id/guests', isStaffOrAdmin, async (req, res) =>
 
       if (req.body.deferFeeRecalc !== true) {
         await recalculateSessionFees(sessionId, 'roster_update');
+        syncBookingInvoice(bookingId, sessionId).catch(err => {
+          logger.warn('[AddGuest] Non-blocking: draft invoice sync failed after roster change', { extra: { error: getErrorMessage(err), bookingId, sessionId } });
+        });
       }
 
       await db.execute(sql`UPDATE booking_requests SET guest_count = COALESCE(guest_count, 0) + 1, updated_at = NOW() WHERE id = ${bookingId}`);
@@ -1345,6 +1349,9 @@ router.delete('/api/admin/booking/:id/guests/:guestId', isStaffOrAdmin, async (r
     if (req.query.deferFeeRecalc !== 'true') {
       if (sessionId) {
         await recalculateSessionFees(sessionId as number, 'roster_update');
+        syncBookingInvoice(bookingId, sessionId as number).catch(err => {
+          logger.warn('[RemoveGuest] Non-blocking: draft invoice sync failed after roster change', { extra: { error: getErrorMessage(err), bookingId, sessionId } });
+        });
       }
     }
 
@@ -1448,6 +1455,9 @@ router.put('/api/admin/booking/:bookingId/members/:slotId/link', isStaffOrAdmin,
           if (req.body.deferFeeRecalc !== true) {
             try {
               await recalculateSessionFees(sessionId as number, 'roster_update');
+              syncBookingInvoice(bookingId, sessionId as number).catch(err => {
+                logger.warn('[Link Member] Non-blocking: draft invoice sync failed after roster change', { extra: { error: getErrorMessage(err), bookingId, sessionId } });
+              });
             } catch (feeErr: unknown) {
               logger.warn('[Link Member] Failed to recalculate fees for session', { extra: { sessionId, feeErr } });
             }
@@ -1525,6 +1535,9 @@ router.put('/api/admin/booking/:bookingId/members/:slotId/link', isStaffOrAdmin,
       if (req.body.deferFeeRecalc !== true) {
         try {
           await recalculateSessionFees(sessionId as number, 'roster_update');
+          syncBookingInvoice(bookingId, sessionId as number).catch(err => {
+            logger.warn('[Link Member] Non-blocking: draft invoice sync failed after roster change', { extra: { error: getErrorMessage(err), bookingId, sessionId } });
+          });
         } catch (feeErr: unknown) {
           logger.warn('[Link Member] Failed to recalculate fees for session', { extra: { sessionId, feeErr } });
         }
@@ -1612,6 +1625,9 @@ router.put('/api/admin/booking/:bookingId/members/:slotId/unlink', isStaffOrAdmi
       try {
         const { recalculateSessionFees } = await import('../../core/billing/unifiedFeeService');
         await recalculateSessionFees(sessionId as number, 'roster_update');
+        syncBookingInvoice(bookingId, sessionId as number).catch(err => {
+          logger.warn('[unlink] Non-blocking: draft invoice sync failed after roster change', { extra: { error: getErrorMessage(err), bookingId, sessionId } });
+        });
       } catch (feeError: unknown) {
         logger.warn('[unlink] Failed to recalculate session fees (non-blocking)', { extra: { feeError } });
       }

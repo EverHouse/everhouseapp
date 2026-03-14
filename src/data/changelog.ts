@@ -19,6 +19,8 @@ export const changelog: ChangelogEntry[] = [
       "Fix: Availability slot duration now validates against zero or invalid values to prevent potential system hangs",
       "Fix: Corrected module import path for background job store",
       "Fix: Guest fee recalculation now stores tier information correctly instead of writing invalid text for guests without a tier",
+      "Fix: Stripe invoice syncing now runs after all admin roster operations (add guest, remove guest, link member, unlink member) — previously invoices could get out of sync with actual fees",
+      "Fix: Member-initiated fee recalculation now properly syncs the booking's Stripe invoice",
     ]
   },
   {

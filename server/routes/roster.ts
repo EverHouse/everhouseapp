@@ -17,6 +17,7 @@ import {
 } from '../core/bookingService/rosterService';
 import { getSessionParticipants } from '../core/bookingService/sessionManager';
 import { invalidateCachedFees, recalculateSessionFees } from '../core/billing/unifiedFeeService';
+import { syncBookingInvoice } from '../core/billing/bookingInvoiceService';
 import { validateBody } from '../middleware/validate';
 import { addParticipantSchema, batchRosterSchema, previewFeesSchema, playerCountSchema, removeParticipantSchema } from '../../shared/validators/roster';
 
@@ -318,6 +319,10 @@ router.post('/api/admin/booking/:bookingId/recalculate-fees', isStaffOrAdmin, as
 
     await invalidateCachedFees(participantIds, 'batch_recalc');
     const recalcResult = await recalculateSessionFees(booking.session_id, 'roster_update');
+
+    syncBookingInvoice(bookingId, booking.session_id).catch(err => {
+      logger.warn('[roster:recalcFees] Non-blocking: draft invoice sync failed after fee recalculation', { extra: { error: String(err), bookingId, sessionId: booking.session_id } });
+    });
 
     let prepaymentCreated = false;
     const totalCents = recalcResult.totals?.totalCents || 0;
