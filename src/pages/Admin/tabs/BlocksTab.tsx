@@ -39,7 +39,6 @@ interface BlocksClosureForm {
     end_date: string;
     end_time: string;
     affected_areas: string;
-    visibility: string;
     reason: string;
     member_notice: string;
     notes: string;
@@ -110,7 +109,6 @@ const BlocksTab: React.FC = () => {
         end_date: '',
         end_time: '',
         affected_areas: 'entire_facility',
-        visibility: '',
         reason: '',
         member_notice: '',
         notes: '',
@@ -148,11 +146,10 @@ const BlocksTab: React.FC = () => {
 
     const closureValidation = {
         notice_type: !closureForm.notice_type?.trim(),
-        affected_areas: !closureForm.affected_areas?.trim(),
-        visibility: !closureForm.visibility?.trim()
+        affected_areas: !closureForm.affected_areas?.trim()
     };
 
-    const isClosureFormValid = !closureValidation.notice_type && !closureValidation.affected_areas && !closureValidation.visibility;
+    const isClosureFormValid = !closureValidation.notice_type && !closureValidation.affected_areas;
 
     // Mutations for closure reasons
     const addClosureReasonMutation = useMutation({
@@ -434,7 +431,6 @@ const BlocksTab: React.FC = () => {
             end_date: '',
             end_time: '',
             affected_areas: 'entire_facility',
-            visibility: '',
             reason: '',
             member_notice: '',
             notes: '',
@@ -456,7 +452,7 @@ const BlocksTab: React.FC = () => {
     }, []);
 
     const handleSaveClosure = () => {
-        if (!closureForm.start_date || !closureForm.affected_areas || !closureForm.visibility?.trim()) return;
+        if (!closureForm.start_date || !closureForm.affected_areas) return;
         saveClosureMutation.mutate({ form: closureForm, isEdit: !!editingClosureId, id: editingClosureId || undefined });
     };
 
@@ -469,7 +465,6 @@ const BlocksTab: React.FC = () => {
             end_date: closure.endDate,
             end_time: closure.endTime || '',
             affected_areas: closure.affectedAreas || 'entire_facility',
-            visibility: closure.visibility || '',
             reason: closure.reason || '',
             member_notice: closure.memberNotice || '',
             notes: stripHtml(closure.notes),
@@ -618,9 +613,6 @@ const BlocksTab: React.FC = () => {
         }
         if (!closure.affectedAreas || closure.affectedAreas === 'none' || closure.affectedAreas === '') {
             missing.push('Affected areas');
-        }
-        if (!closure.visibility || closure.visibility.trim() === '') {
-            missing.push('Visibility');
         }
         return missing;
     };
@@ -1411,31 +1403,6 @@ const BlocksTab: React.FC = () => {
                                     Selected: {formatAffectedAreas(closureForm.affected_areas)}
                                 </p>
                             )}
-                        </div>
-                        <div>
-                            <label className="text-[10px] font-bold uppercase text-gray-500 dark:text-gray-400 mb-1 block">Visibility *</label>
-                            <select
-                                value={closureForm.visibility}
-                                onChange={e => setClosureForm({...closureForm, visibility: e.target.value})}
-                                onBlur={() => markTouched('visibility')}
-                                className={`w-full border bg-gray-50 dark:bg-black/30 p-2.5 rounded-xl text-sm text-primary dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all duration-fast ${
-                                    touchedFields.has('visibility') && closureValidation.visibility 
-                                        ? 'border-red-500 dark:border-red-500' 
-                                        : 'border-gray-200 dark:border-white/20'
-                                }`}
-                            >
-                                <option value="">Select visibility...</option>
-                                <option value="Public">Public</option>
-                                <option value="Staff Only">Staff Only</option>
-                                <option value="Private">Private</option>
-                                <option value="Draft">Draft</option>
-                            </select>
-                            {touchedFields.has('visibility') && closureValidation.visibility && (
-                                <p className="text-xs text-red-500 mt-1">Visibility is required</p>
-                            )}
-                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                Controls who can see this notice
-                            </p>
                         </div>
                         <div>
                             <label className="text-[10px] font-bold uppercase text-gray-500 dark:text-gray-400 mb-2 block">Member Visibility</label>

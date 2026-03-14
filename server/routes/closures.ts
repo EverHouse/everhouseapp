@@ -661,9 +661,6 @@ router.get('/api/closures/needs-review', isStaffOrAdmin, async (req, res) => {
       if (!closure.affectedAreas || closure.affectedAreas === 'none') {
         missingFields.push('Affected areas');
       }
-      if (!closure.visibility || closure.visibility.trim() === '') {
-        missingFields.push('Visibility');
-      }
       return {
         ...closure,
         missingFields
@@ -690,7 +687,6 @@ router.post('/api/closures', isStaffOrAdmin, async (req, res) => {
       end_date, 
       end_time,
       affected_areas,
-      visibility,
       notify_members,
       created_by 
     } = req.body;
@@ -712,7 +708,7 @@ router.post('/api/closures', isStaffOrAdmin, async (req, res) => {
       endDate: end_date || start_date,
       endTime: end_time || null,
       affectedAreas: affected_areas,
-      visibility: visibility || null,
+      visibility: shouldNotifyMembers ? 'Members' : 'Staff Only',
       notifyMembers: shouldNotifyMembers,
       isActive: true,
       createdBy: created_by
@@ -949,7 +945,6 @@ router.put('/api/closures/:id', isStaffOrAdmin, async (req, res) => {
       end_date, 
       end_time,
       affected_areas,
-      visibility,
       notify_members
     } = req.body;
     
@@ -986,7 +981,7 @@ router.put('/api/closures/:id', isStaffOrAdmin, async (req, res) => {
         endDate: end_date || existing.endDate,
         endTime: normalizedEndTime,
         affectedAreas: affected_areas || existing.affectedAreas,
-        visibility: visibility !== undefined ? visibility : existing.visibility,
+        visibility: shouldNotifyMembers ? 'Members' : 'Staff Only',
         notifyMembers: shouldNotifyMembers,
         needsReview: false
       })
@@ -1043,8 +1038,8 @@ router.put('/api/closures/:id', isStaffOrAdmin, async (req, res) => {
     // Only update Internal Calendar - availability blocking is handled by the availability_blocks table
     const notesChanged = notes !== undefined && notes !== existing.notes;
     const noticeTypeChanged = notice_type !== undefined && notice_type !== existing.noticeType;
-    const visibilityChanged = visibility !== undefined && visibility !== existing.visibility;
-    const shouldUpdateCalendar = datesChanged || timesChanged || title !== existing.title || reason !== existing.reason || areasChanged || notesChanged || noticeTypeChanged || visibilityChanged;
+    const notifyMembersChanged = shouldNotifyMembers !== existing.notifyMembers;
+    const shouldUpdateCalendar = datesChanged || timesChanged || title !== existing.title || reason !== existing.reason || areasChanged || notesChanged || noticeTypeChanged || notifyMembersChanged;
     if (shouldUpdateCalendar) {
       try {
         const internalCalendarId = await getCalendarIdByName(CALENDAR_CONFIG.internal.name);

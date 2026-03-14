@@ -30,7 +30,6 @@ interface NoticeFormData {
   end_date: string;
   end_time: string;
   affected_areas: string;
-  visibility: string;
   notice_type: string;
   reason: string;
   notify_members: boolean;
@@ -65,7 +64,6 @@ export const NoticeFormDrawer: React.FC<NoticeFormDrawerProps> = ({
     end_date: today,
     end_time: '',
     affected_areas: 'entire_facility',
-    visibility: '',
     notice_type: '',
     reason: '',
     notify_members: false
@@ -102,7 +100,6 @@ export const NoticeFormDrawer: React.FC<NoticeFormDrawerProps> = ({
           end_date: editItem.end_date || today,
           end_time: editItem.end_time || '',
           affected_areas: editItem.affected_areas || 'entire_facility',
-          visibility: editItem.visibility || '',
           notice_type: editItem.notice_type || '',
           reason: editItem.reason || '',
           notify_members: editItem.notify_members || false
@@ -116,7 +113,6 @@ export const NoticeFormDrawer: React.FC<NoticeFormDrawerProps> = ({
           end_date: today,
           end_time: '',
           affected_areas: 'entire_facility',
-          visibility: '',
           notice_type: '',
           reason: '',
           notify_members: false
@@ -132,11 +128,10 @@ export const NoticeFormDrawer: React.FC<NoticeFormDrawerProps> = ({
 
   const closureValidation = {
     notice_type: !formData.notice_type?.trim(),
-    affected_areas: !formData.affected_areas?.trim(),
-    visibility: !formData.visibility?.trim()
+    affected_areas: !formData.affected_areas?.trim()
   };
 
-  const isClosureFormValid = !closureValidation.notice_type && !closureValidation.affected_areas && !closureValidation.visibility;
+  const isClosureFormValid = !closureValidation.notice_type && !closureValidation.affected_areas;
 
   const bays = resources.filter(r => r.type === 'simulator');
 
@@ -186,7 +181,6 @@ export const NoticeFormDrawer: React.FC<NoticeFormDrawerProps> = ({
       end_date: today,
       end_time: '',
       affected_areas: 'entire_facility',
-      visibility: '',
       notice_type: '',
       reason: '',
       notify_members: false
@@ -380,32 +374,6 @@ export const NoticeFormDrawer: React.FC<NoticeFormDrawerProps> = ({
                 Selected: {formatAffectedAreas(formData.affected_areas)}
               </p>
             )}
-          </div>
-
-          <div>
-            <label className="text-[10px] font-bold uppercase text-gray-500 dark:text-gray-400 mb-1 block">Visibility *</label>
-            <select
-              value={formData.visibility}
-              onChange={e => setFormData({...formData, visibility: e.target.value})}
-              onBlur={() => markTouched('visibility')}
-              className={`w-full border bg-gray-50 dark:bg-black/30 p-2.5 rounded-xl text-sm text-primary dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all duration-fast ${
-                touchedFields.has('visibility') && closureValidation.visibility 
-                  ? 'border-red-500 dark:border-red-500' 
-                  : 'border-gray-200 dark:border-white/20'
-              }`}
-            >
-              <option value="">Select visibility...</option>
-              <option value="Public">Public</option>
-              <option value="Staff Only">Staff Only</option>
-              <option value="Private">Private</option>
-              <option value="Draft">Draft</option>
-            </select>
-            {touchedFields.has('visibility') && closureValidation.visibility && (
-              <p className="text-xs text-red-500 mt-1">Visibility is required</p>
-            )}
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-              Controls who can see this notice
-            </p>
           </div>
 
           <div>
