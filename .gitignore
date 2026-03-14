@@ -41,5 +41,10 @@ tsconfig.tsbuildinfo
 # Test output
 coverage/
 
+# Certificate files (use env secrets instead)
+*.pem
+*.der
+cert_b64.txt
+
 # Environment files
 .env

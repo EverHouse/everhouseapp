@@ -2,6 +2,19 @@
 
 All notable changes to the Ever Club Members App are documented here.
 
+## [8.86.2] - 2026-03-14
+
+### Project Cleanup & Dead Code Removal
+- **Disk Space**: Removed `attached_assets/` (141MB chat screenshots/pastes), `dist/` (16MB build output), and empty `uploads/` directory.
+- **Security**: Removed root-level Apple certificate files (`cert_b64.txt`, `cert.der`, `cert.pem`) — certificates are stored as env secrets. Added `*.pem`, `*.der`, `cert_b64.txt` to `.gitignore`.
+- **Dead Code**: Removed deprecated `src/lib/backgroundSync.ts` (fully replaced by React Query) and unused `src/components/staff-command-center/sections/QuickActionsGrid.tsx`.
+
+## [8.86.1] - 2026-03-14
+
+### WebSocket Reconnect Loop Fix & Error Logging
+- **WebSocket Backoff**: Member and staff WebSocket hooks now use exponential backoff (2s×2^n, max 30s) with max retry limits (15/20) and reset counter on successful connection.
+- **Error Logging**: Session store error logging uses `getErrorMessage()` instead of raw `err.message`.
+
 ## [8.86.0] - 2026-03-14
 
 ### Security Audit & Code Quality Hardening

@@ -8,6 +8,19 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.86.2",
+    date: "2026-03-14",
+    title: "Project Cleanup & Dead Code Removal",
+    changes: [
+      "Cleanup: Removed 141MB of accumulated chat screenshots and paste files from development workspace — frees up significant disk space",
+      "Cleanup: Removed stale Apple certificate files from project root — certificates are already stored securely as environment secrets",
+      "Cleanup: Removed deprecated background sync module that was fully replaced by React Query caching",
+      "Cleanup: Removed unused QuickActionsGrid staff component that was never integrated",
+      "Cleanup: Cleared build output directory (16MB) — gets rebuilt automatically on each deploy",
+      "Improvement: Updated .gitignore to prevent certificate files from being committed — keeps sensitive files out of version control",
+    ]
+  },
+  {
     version: "8.86.1",
     date: "2026-03-14",
     title: "WebSocket Reconnect Loop Fix & Error Logging",
