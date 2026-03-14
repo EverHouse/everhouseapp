@@ -8,6 +8,7 @@ All notable changes to the Ever Club Members App are documented here.
 - **Disk Space**: Removed `attached_assets/` (141MB chat screenshots/pastes), `dist/` (16MB build output), and empty `uploads/` directory.
 - **Security**: Removed root-level Apple certificate files (`cert_b64.txt`, `cert.der`, `cert.pem`) — certificates are stored as env secrets. Added `*.pem`, `*.der`, `cert_b64.txt` to `.gitignore`.
 - **Dead Code**: Removed deprecated `src/lib/backgroundSync.ts` (fully replaced by React Query) and unused `src/components/staff-command-center/sections/QuickActionsGrid.tsx`.
+- **Unused Packages**: Removed `react-window`, `react-virtualized-auto-sizer`, and their type definitions — never imported anywhere in the codebase.
 
 ## [8.86.1] - 2026-03-14
 

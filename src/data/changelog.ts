@@ -18,6 +18,7 @@ export const changelog: ChangelogEntry[] = [
       "Cleanup: Removed unused QuickActionsGrid staff component that was never integrated",
       "Cleanup: Cleared build output directory (16MB) — gets rebuilt automatically on each deploy",
       "Improvement: Updated .gitignore to prevent certificate files from being committed — keeps sensitive files out of version control",
+      "Cleanup: Removed unused react-window and react-virtualized-auto-sizer packages — reduces install size and build footprint",
     ]
   },
   {
