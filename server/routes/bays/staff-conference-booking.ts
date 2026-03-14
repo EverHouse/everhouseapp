@@ -17,7 +17,7 @@ import { getErrorMessage } from '../../utils/errorUtils';
 import { getSettingValue } from '../../core/settingsHelper';
 import { ensureSessionForBooking } from '../../core/bookingService/sessionManager';
 import { recalculateSessionFees } from '../../core/billing/unifiedFeeService';
-import { syncBookingInvoice, finalizeAndPayInvoice } from '../../core/billing/bookingInvoiceService';
+import { syncBookingInvoice, finalizeAndPayInvoice, getBookingInvoiceId } from '../../core/billing/bookingInvoiceService';
 import { resolveUserByEmail } from '../../core/stripe/customers';
 import { checkClosureConflict, checkAvailabilityBlockConflict } from '../../core/bookingValidation';
 
@@ -368,15 +368,21 @@ router.post('/api/staff/conference-room/booking', isStaffOrAdmin, async (req: Re
           await recalculateSessionFees(sessionResult.sessionId, 'staff_booking');
           await syncBookingInvoice(bookingId, sessionResult.sessionId);
           
-          // Auto-finalize and pay using Stripe credit balance
-          try {
-            const payResult = await finalizeAndPayInvoice({ bookingId });
-            logger.info('[StaffConferenceBooking] Invoice finalized and payment attempted', {
-              extra: { bookingId, sessionId: sessionResult.sessionId, paidInFull: payResult.paidInFull, status: payResult.status }
-            });
-          } catch (payErr: unknown) {
-            logger.warn('[StaffConferenceBooking] Invoice finalize/pay failed (will be collected at check-in)', {
-              extra: { bookingId, error: getErrorMessage(payErr) }
+          const invoiceId = await getBookingInvoiceId(bookingId);
+          if (invoiceId) {
+            try {
+              const payResult = await finalizeAndPayInvoice({ bookingId });
+              logger.info('[StaffConferenceBooking] Invoice finalized and payment attempted', {
+                extra: { bookingId, sessionId: sessionResult.sessionId, paidInFull: payResult.paidInFull, status: payResult.status }
+              });
+            } catch (payErr: unknown) {
+              logger.warn('[StaffConferenceBooking] Invoice finalize/pay failed (will be collected at check-in)', {
+                extra: { bookingId, error: getErrorMessage(payErr) }
+              });
+            }
+          } else {
+            logger.info('[StaffConferenceBooking] No fees due — skipping invoice finalization', {
+              extra: { bookingId, sessionId: sessionResult.sessionId }
             });
           }
           

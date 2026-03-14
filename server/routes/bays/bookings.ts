@@ -23,7 +23,7 @@ import { isAuthenticated } from '../../core/middleware';
 import { getCalendarIdByName, deleteCalendarEvent } from '../../core/calendar/index';
 import { refundGuestPass } from '../guestPasses';
 import { computeFeeBreakdown, applyFeeBreakdownToParticipants, recalculateSessionFees } from '../../core/billing/unifiedFeeService';
-import { voidBookingInvoice, syncBookingInvoice, finalizeAndPayInvoice } from '../../core/billing/bookingInvoiceService';
+import { voidBookingInvoice, syncBookingInvoice, finalizeAndPayInvoice, getBookingInvoiceId } from '../../core/billing/bookingInvoiceService';
 import { PRICING } from '../../core/billing/pricingConfig';
 import { createGuestPassHold } from '../../core/billing/guestPassHoldService';
 import { ensureSessionForBooking, createSessionWithUsageTracking } from '../../core/bookingService/sessionManager';
@@ -899,15 +899,22 @@ router.post('/api/booking-requests', isAuthenticated, bookingRateLimiter, valida
           await recalculateSessionFees(confSessionId, 'approval');
           await syncBookingInvoice(row.id, confSessionId);
           
-          try {
-            const payResult = await finalizeAndPayInvoice({ bookingId: row.id });
-            logger.info('[ConferenceRoom] Invoice finalized and payment attempted', {
-              extra: { bookingId: row.id, sessionId: confSessionId, paidInFull: payResult.paidInFull, status: payResult.status }
-            });
-            row._invoicePayResult = payResult;
-          } catch (payErr: unknown) {
-            logger.warn('[ConferenceRoom] Invoice finalize/pay did not complete instantly — member can pay via dashboard', {
-              extra: { bookingId: row.id, error: getErrorMessage(payErr) }
+          const invoiceId = await getBookingInvoiceId(row.id);
+          if (invoiceId) {
+            try {
+              const payResult = await finalizeAndPayInvoice({ bookingId: row.id });
+              logger.info('[ConferenceRoom] Invoice finalized and payment attempted', {
+                extra: { bookingId: row.id, sessionId: confSessionId, paidInFull: payResult.paidInFull, status: payResult.status }
+              });
+              row._invoicePayResult = payResult;
+            } catch (payErr: unknown) {
+              logger.warn('[ConferenceRoom] Invoice finalize/pay did not complete instantly — member can pay via dashboard', {
+                extra: { bookingId: row.id, error: getErrorMessage(payErr) }
+              });
+            }
+          } else {
+            logger.info('[ConferenceRoom] No fees due — skipping invoice finalization', {
+              extra: { bookingId: row.id, sessionId: confSessionId }
             });
           }
         } catch (invoiceErr: unknown) {

@@ -8,6 +8,15 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.87.7",
+    date: "2026-03-14",
+    title: "Conference Room Booking Fix — No More False Invoice Warnings",
+    changes: [
+      "Fix: Conference room bookings within your daily allowance (no fees due) no longer trigger false 'invoice not found' warnings",
+      "Both member and staff conference room booking paths now correctly skip the payment step when there are no charges",
+    ]
+  },
+  {
     version: "8.87.6",
     date: "2026-03-14",
     title: "HubSpot Field Mapping Fix — No More Silently Dropped Data",
