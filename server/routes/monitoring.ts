@@ -1,5 +1,7 @@
 import { Router } from 'express';
 import { isStaffOrAdmin } from '../core/middleware';
+import { validateQuery } from '../middleware/validate';
+import { z } from 'zod';
 import { schedulerTracker } from '../core/schedulerTracker';
 import { getWebhookEvents, getWebhookEventTypes } from '../core/webhookMonitor';
 import { getJobQueueMonitorData } from '../core/jobQueueMonitor';
@@ -25,7 +27,14 @@ router.get('/api/admin/monitoring/schedulers', isStaffOrAdmin, async (_req, res)
   }
 });
 
-router.get('/api/admin/monitoring/webhooks', isStaffOrAdmin, async (req, res) => {
+const webhookQuerySchema = z.object({
+  type: z.string().optional(),
+  status: z.enum(['processed', 'failed', 'pending']).optional(),
+  limit: z.string().regex(/^\d+$/).optional(),
+  offset: z.string().regex(/^\d+$/).optional(),
+}).passthrough();
+
+router.get('/api/admin/monitoring/webhooks', isStaffOrAdmin, validateQuery(webhookQuerySchema), async (req, res) => {
   try {
     const type = req.query.type as string | undefined;
     const status = req.query.status as 'processed' | 'failed' | 'pending' | undefined;
@@ -66,7 +75,13 @@ router.get('/api/admin/monitoring/hubspot-queue', isStaffOrAdmin, async (_req, r
   }
 });
 
-router.get('/api/admin/monitoring/alerts', isStaffOrAdmin, async (req, res) => {
+const alertsQuerySchema = z.object({
+  startDate: z.string().optional(),
+  endDate: z.string().optional(),
+  limit: z.string().regex(/^\d+$/).optional(),
+}).passthrough();
+
+router.get('/api/admin/monitoring/alerts', isStaffOrAdmin, validateQuery(alertsQuerySchema), async (req, res) => {
   try {
     const startDate = req.query.startDate as string | undefined;
     const endDate = req.query.endDate as string | undefined;
@@ -79,7 +94,18 @@ router.get('/api/admin/monitoring/alerts', isStaffOrAdmin, async (req, res) => {
   }
 });
 
-router.get('/api/admin/monitoring/audit-logs', isStaffOrAdmin, async (req, res) => {
+const auditLogsQuerySchema = z.object({
+  staffEmail: z.string().optional(),
+  action: z.string().optional(),
+  resourceType: z.string().optional(),
+  resourceId: z.string().optional(),
+  startDate: z.string().optional(),
+  endDate: z.string().optional(),
+  limit: z.string().regex(/^\d+$/).optional(),
+  offset: z.string().regex(/^\d+$/).optional(),
+}).passthrough();
+
+router.get('/api/admin/monitoring/audit-logs', isStaffOrAdmin, validateQuery(auditLogsQuerySchema), async (req, res) => {
   try {
     const staffEmail = req.query.staffEmail as string | undefined;
     const action = req.query.action as string | undefined;

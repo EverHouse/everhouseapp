@@ -5,6 +5,8 @@ import { adminAuditLog } from '@shared/schema';
 import { eq, and, desc, inArray } from 'drizzle-orm';
 import { isAdmin } from '../../core/middleware';
 import { safeErrorDetail } from '../../utils/errorUtils';
+import { validateQuery } from '../../middleware/validate';
+import { z } from 'zod';
 
 const router = Router();
 
@@ -33,7 +35,14 @@ router.get('/api/data-tools/audit-log', isAdmin, async (req: Request, res: Respo
   }
 });
 
-router.get('/api/data-tools/staff-activity', isAdmin, async (req: Request, res: Response) => {
+const staffActivityQuerySchema = z.object({
+  limit: z.string().regex(/^\d+$/).optional(),
+  staff_email: z.string().optional(),
+  actions: z.string().optional(),
+  actor_type: z.string().optional(),
+}).passthrough();
+
+router.get('/api/data-tools/staff-activity', isAdmin, validateQuery(staffActivityQuerySchema), async (req: Request, res: Response) => {
   try {
     const limitParam = parseInt(req.query.limit as string) || 50;
     const staffEmail = (req.query.staff_email as string)?.trim()?.toLowerCase();

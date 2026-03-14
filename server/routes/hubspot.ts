@@ -2,6 +2,8 @@ import { logger } from '../core/logger';
 import { Router, Request, Response } from 'express';
 import * as crypto from 'crypto';
 import { isProduction } from '../core/db';
+import { validateQuery } from '../middleware/validate';
+import { z } from 'zod';
 import { getHubSpotClient, getHubSpotClientWithFallback } from '../core/integrations';
 import { db } from '../db';
 import { formSubmissions, users } from '../../shared/schema';
@@ -558,7 +560,15 @@ async function enrichContactsWithDbData(contacts: HubSpotContact[]): Promise<Hub
   });
 }
 
-router.get('/api/hubspot/contacts', isStaffOrAdmin, async (req, res) => {
+const hubspotContactsQuerySchema = z.object({
+  refresh: z.string().optional(),
+  status: z.string().optional(),
+  search: z.string().optional(),
+  page: z.string().regex(/^\d+$/).optional(),
+  limit: z.string().regex(/^\d+$/).optional(),
+}).passthrough();
+
+router.get('/api/hubspot/contacts', isStaffOrAdmin, validateQuery(hubspotContactsQuerySchema), async (req, res) => {
   try {
   const forceRefresh = req.query.refresh === 'true';
   const statusFilter = (req.query.status as string)?.toLowerCase() || 'active';

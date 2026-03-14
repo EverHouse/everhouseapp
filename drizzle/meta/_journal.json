@@ -169,6 +169,13 @@
       "when": 1770671847064,
       "tag": "0023_fast_warstar",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1773705600000,
+      "tag": "0051_add_guests_email_unique",
+      "breakpoints": true
     }
   ]
 }

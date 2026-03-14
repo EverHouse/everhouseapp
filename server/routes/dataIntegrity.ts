@@ -1,6 +1,8 @@
 import { logger } from '../core/logger';
 import { Router } from 'express';
 import { isAdmin } from '../core/middleware';
+import { validateQuery } from '../middleware/validate';
+import { z } from 'zod';
 import { runAllIntegrityChecks, getIntegritySummary, getIntegrityHistory, resolveIssue, getAuditLog, syncPush, syncPull, createIgnoreRule, createBulkIgnoreRules, removeIgnoreRule, getIgnoredIssues, getCachedIntegrityResults, runDataCleanup } from '../core/dataIntegrity';
 import { pool, safeRelease } from '../core/db';
 import { db } from '../db';
@@ -74,7 +76,9 @@ router.get('/api/data-integrity/summary', isAdmin, async (req, res) => {
   }
 });
 
-router.get('/api/data-integrity/history', isAdmin, async (req, res) => {
+const historyQuerySchema = z.object({ days: z.string().regex(/^\d+$/).optional() }).passthrough();
+
+router.get('/api/data-integrity/history', isAdmin, validateQuery(historyQuerySchema), async (req, res) => {
   try {
     const days = parseInt(req.query.days as string) || 30;
     const historyData = await getIntegrityHistory(days);
@@ -106,7 +110,9 @@ router.post('/api/data-integrity/resolve', isAdmin, validateBody(resolveIssueSch
   }
 });
 
-router.get('/api/data-integrity/audit-log', isAdmin, async (req, res) => {
+const auditLogQuerySchema = z.object({ limit: z.string().regex(/^\d+$/).optional() }).passthrough();
+
+router.get('/api/data-integrity/audit-log', isAdmin, validateQuery(auditLogQuerySchema), async (req, res) => {
   try {
     const limit = parseInt(req.query.limit as string) || 10;
     const auditEntries = await getAuditLog(limit);

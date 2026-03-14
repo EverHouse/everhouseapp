@@ -6,10 +6,18 @@ import { eq, desc, sql, isNull, and, or, ilike } from "drizzle-orm";
 import { isStaffOrAdmin, isAdmin } from "../core/middleware";
 import { getSessionUser } from "../types/session";
 import { logger } from "../core/logger";
+import { validateQuery } from "../middleware/validate";
+import { z } from "zod";
 
 const router = Router();
 
-router.get("/api/admin/mindbody/unmatched", isStaffOrAdmin, async (req: Request, res: Response) => {
+const paginationQuerySchema = z.object({
+  limit: z.string().regex(/^\d+$/).optional(),
+  offset: z.string().regex(/^\d+$/).optional(),
+  search: z.string().optional(),
+}).passthrough();
+
+router.get("/api/admin/mindbody/unmatched", isStaffOrAdmin, validateQuery(paginationQuerySchema), async (req: Request, res: Response) => {
   try {
     const limit = Math.min(parseInt(req.query.limit as string) || 50, 100);
     const offset = parseInt(req.query.offset as string) || 0;
@@ -155,7 +163,9 @@ router.post("/api/admin/mindbody/link", isStaffOrAdmin, async (req: Request, res
   }
 });
 
-router.get("/api/admin/mindbody/link-history", isStaffOrAdmin, async (req: Request, res: Response) => {
+const linkHistoryQuerySchema = z.object({ limit: z.string().regex(/^\d+$/).optional() }).passthrough();
+
+router.get("/api/admin/mindbody/link-history", isStaffOrAdmin, validateQuery(linkHistoryQuerySchema), async (req: Request, res: Response) => {
   try {
     const limit = Math.min(parseInt(req.query.limit as string) || 20, 50);
 
