@@ -1336,7 +1336,7 @@ const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
                                   )}
                                   {!issue.ignored && (issue.context?.email || (issue.context?.memberEmails && issue.context.memberEmails.length > 0)) && ((issue.context as IssueContext & { stripeCustomerIds?: string[] })?.stripeCustomerIds || issue.context?.stripeCustomerId) && (
                                     <button
-                                      onClick={() => handleViewProfile(issue.context!.email || (issue.context!.memberEmails as unknown as string[] | undefined)?.[0])}
+                                      onClick={() => handleViewProfile(issue.context!.email || (issue.context!.memberEmails as unknown as string[] | undefined)?.[0] || '')}
                                       disabled={loadingMemberEmail === (issue.context!.email || (issue.context!.memberEmails as unknown as string[] | undefined)?.[0])}
                                       className="p-1.5 text-blue-600 hover:bg-blue-100 dark:text-blue-400 dark:hover:bg-blue-900/30 rounded transition-colors disabled:opacity-50"
                                       title="View member profile"

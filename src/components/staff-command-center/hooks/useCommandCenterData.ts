@@ -53,7 +53,7 @@ export function useCommandCenterData(userEmail?: string) {
     ).map((r: BookingRequest) => ({
       ...r,
       user_name: getDisplayName(r.user_email, r.user_name),
-      request_participants: r.request_participants?.map((p: any) => ({
+      request_participants: r.request_participants?.map((p: { email?: string; type: 'member' | 'guest'; userId?: string; name?: string }) => ({
         ...p,
         name: p.name && !p.name.includes('@') ? p.name : (p.email ? (memberNameByEmail[p.email.toLowerCase()] || p.name || p.email) : p.name)
       })),
@@ -61,13 +61,11 @@ export function useCommandCenterData(userEmail?: string) {
     }));
     allPending = [...allPending, ...pending];
 
-    const pendingBookings = (raw.pendingBookings || []).map((b: any) => {
-      return {
-        ...b,
-        user_name: getDisplayName(b.user_email, b.user_name, b.first_name, b.last_name),
-        source: 'booking' as const
-      };
-    });
+    const pendingBookings = (raw.pendingBookings || []).map((b: BookingRequest & { first_name?: string; last_name?: string }) => ({
+      ...b,
+      user_name: getDisplayName(b.user_email, b.user_name, b.first_name, b.last_name),
+      source: 'booking' as const
+    }));
     allPending = [...allPending, ...pendingBookings];
 
     return allPending;
@@ -306,10 +304,12 @@ export function useCommandCenterData(userEmail?: string) {
     });
 
     const resourceMap = new Map<number, { id: number; name: string; type?: string }>();
-    facilityData.bays.forEach((b: { id: number; name: string; type?: string }) =>
+    const bays = Array.isArray(facilityData.bays) ? facilityData.bays as { id: number; name: string; type?: string }[] : [];
+    const resources = Array.isArray(facilityData.resources) ? facilityData.resources as { id: number; name: string; type?: string }[] : [];
+    bays.forEach((b) =>
       resourceMap.set(b.id, { ...b, type: 'simulator' })
     );
-    facilityData.resources.forEach((r: { id: number; name: string; type?: string }) =>
+    resources.forEach((r) =>
       resourceMap.set(r.id, r)
     );
 

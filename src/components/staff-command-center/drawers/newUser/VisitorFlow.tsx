@@ -229,7 +229,7 @@ export function VisitorFlow({
   if (step === 'payment') {
     const totalPrice = selectedProduct?.priceCents || 0;
 
-    const stripeOptions: StripeElementsOptions = clientSecret ? {
+    const stripeOptions = (clientSecret ? {
       clientSecret,
       appearance: {
         theme: 'stripe',
@@ -242,7 +242,7 @@ export function VisitorFlow({
           borderRadius: '8px',
         },
       },
-    } : undefined;
+    } : undefined) as import('@stripe/stripe-js').StripeElementsOptions | undefined;
 
     return (
       <div className="space-y-4">

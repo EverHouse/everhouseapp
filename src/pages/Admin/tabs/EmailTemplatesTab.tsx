@@ -142,7 +142,7 @@ const EmailTemplatesTab: React.FC = () => {
     setPreviewHtml(null);
     try {
       const data = await fetchWithCredentials<{ html?: string; subject?: string }>(`/api/admin/email-templates/${template.id}/preview`);
-      setPreviewHtml(data.html);
+      setPreviewHtml(data.html ?? null);
     } catch (err: unknown) {
       setPreviewHtml('<html><body><p style="padding:40px;color:#666;text-align:center;">Failed to load template preview.</p></body></html>');
     } finally {

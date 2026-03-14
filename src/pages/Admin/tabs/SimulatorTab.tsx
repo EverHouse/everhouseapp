@@ -32,6 +32,7 @@ import {
 import { fetchWithCredentials } from '../../../hooks/queries/useFetch';
 
 import type { BookingRequest, Bay, Resource, CalendarClosure, AvailabilityBlock } from './simulator/simulatorTypes';
+import type { BookingRequest as CommandCenterBookingRequest } from '../../../components/staff-command-center/types';
 import { formatDateShortAdmin } from './simulator/simulatorUtils';
 import ManualBookingModal from './simulator/MemberSearchPopover';
 import CalendarGrid from './simulator/CalendarGrid';
@@ -94,7 +95,7 @@ const SimulatorTab: React.FC = () => {
     );
     
     const availabilityBlocks: AvailabilityBlock[] = useMemo(() => 
-        availabilityBlocksData.map((b: { id: number; resource_id?: number; resourceId?: number; block_date?: string; blockDate?: string; start_time?: string; startTime?: string; end_time?: string; endTime?: string; block_type?: string; blockType?: string; notes?: string; closure_title?: string; closureTitle?: string }) => ({
+        (availabilityBlocksData as Array<{ id: number; resource_id?: number; resourceId?: number; block_date?: string; blockDate?: string; start_time?: string; startTime?: string; end_time?: string; endTime?: string; block_type?: string; blockType?: string; notes?: string; closure_title?: string; closureTitle?: string }>).map((b) => ({
             id: b.id,
             resourceId: b.resource_id || b.resourceId,
             blockDate: b.block_date?.includes('T') ? b.block_date.split('T')[0] : (b.blockDate || b.block_date),
@@ -103,12 +104,12 @@ const SimulatorTab: React.FC = () => {
             blockType: b.block_type || b.blockType,
             notes: b.notes,
             closureTitle: b.closure_title || b.closureTitle
-        })),
+        } as AvailabilityBlock)),
         [availabilityBlocksData]
     );
     
     const requests: BookingRequest[] = useMemo(() => {
-        const fromRequests = bookingRequestsData.map((r: BookingRequest) => ({ ...r, source: 'booking_request' as const }));
+        const fromRequests = (bookingRequestsData as BookingRequest[]).map((r) => ({ ...r, source: 'booking_request' as const } as BookingRequest));
         const fromPending = pendingBookingsData.map((b) => ({
             id: b.id,
             user_email: b.user_email,
@@ -136,7 +137,7 @@ const SimulatorTab: React.FC = () => {
     const { memberStatusMap, memberNameMap } = useMemo(() => {
         const statusMap: Record<string, string> = {};
         const nameMap: Record<string, string> = {};
-        memberContactsData.forEach((m: { email?: string; firstName?: string; lastName?: string; status?: string; manuallyLinkedEmails?: string[] }) => {
+        (memberContactsData as { email?: string; firstName?: string; lastName?: string; status?: string; manuallyLinkedEmails?: string[] }[]).forEach((m) => {
             const fullName = [m.firstName, m.lastName].filter(Boolean).join(' ');
             if (m.email) {
                 const emailLower = m.email.toLowerCase();
@@ -544,7 +545,7 @@ const SimulatorTab: React.FC = () => {
         setCancelConfirmModal({
             isOpen: true,
             booking,
-            hasTrackman,
+            hasTrackman: !!hasTrackman,
             isCancelling: false,
             showSuccess: false
         });
@@ -1048,7 +1049,7 @@ const SimulatorTab: React.FC = () => {
                         resources={resources}
                         memberNameMap={memberNameMap}
                         actionInProgress={actionInProgress}
-                        navigateToTab={navigateToTab}
+                        navigateToTab={navigateToTab as (tab: string) => void}
                         setBookingSheet={setBookingSheet as (sheet: Record<string, unknown> | null) => void}
                         setTrackmanModal={setTrackmanModal}
                         setSelectedRequest={setSelectedRequest}
@@ -1094,7 +1095,7 @@ const SimulatorTab: React.FC = () => {
                         setLastRefresh={setLastRefresh}
                         isDark={isDark}
                         showToast={showToast}
-                        calendarColRef={calendarColRef}
+                        calendarColRef={calendarColRef as React.RefObject<HTMLDivElement>}
                         activeView={activeView}
                         guestFeeDollars={guestFeeDollars}
                         overageRatePerBlockDollars={overageRatePerBlockDollars}
@@ -1392,7 +1393,7 @@ const SimulatorTab: React.FC = () => {
             <TrackmanBookingModal
               isOpen={trackmanModal.isOpen}
               onClose={() => setTrackmanModal({ isOpen: false, booking: null })}
-              booking={trackmanModal.booking}
+              booking={trackmanModal.booking as unknown as CommandCenterBookingRequest | null}
               onConfirm={handleTrackmanConfirm}
               onDevConfirm={handleDevConfirm}
             />

@@ -332,7 +332,7 @@ const SyncToolsPanel: React.FC<SyncToolsPanelProps> = ({
                 {stripeCleanupResult.dryRun && stripeCleanupResult.customers && stripeCleanupResult.customers.length > 0 && (
                   <div className="mt-2 max-h-40 overflow-y-auto text-xs bg-white dark:bg-white/10 rounded p-2">
                     <p className="font-medium mb-1">{stripeCleanupResult.emptyCount} empty customers found:</p>
-                    {stripeCleanupResult.customers.map((c: StripeCleanupCustomer, i: number) => (
+                    {(stripeCleanupResult.customers as StripeCleanupCustomer[]).map((c, i) => (
                       <div key={i} className="py-1 border-b border-gray-100 dark:border-white/10 last:border-0">
                         {c.email || 'No email'} — {c.name || 'No name'} ({c.id})
                       </div>
@@ -342,7 +342,7 @@ const SyncToolsPanel: React.FC<SyncToolsPanelProps> = ({
                 {!stripeCleanupResult.dryRun && stripeCleanupResult.deleted && stripeCleanupResult.deleted.length > 0 && (
                   <div className="mt-2 max-h-40 overflow-y-auto text-xs bg-white dark:bg-white/10 rounded p-2">
                     <p className="font-medium mb-1">{stripeCleanupResult.deletedCount} customers deleted:</p>
-                    {stripeCleanupResult.deleted.map((c: StripeCleanupCustomer, i: number) => (
+                    {(stripeCleanupResult.deleted as StripeCleanupCustomer[]).map((c, i) => (
                       <div key={i} className="py-1 border-b border-gray-100 dark:border-white/10 last:border-0">
                         {c.email || 'No email'} ({c.id})
                       </div>

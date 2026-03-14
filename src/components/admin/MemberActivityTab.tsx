@@ -285,14 +285,14 @@ const MemberActivityTab: React.FC<MemberActivityTabProps> = ({
           <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${getStatusBadgeStyle(booking.status, isDark)}`}>
             {booking.status === 'no_show' ? 'No Show' : booking.status === 'cancellation_pending' ? 'Cancellation Pending' : booking.status}
           </span>
-          {booking.guestCount > 0 && (
+          {(booking.guestCount ?? 0) > 0 && (
             <span className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-              +{booking.guestCount} guest{booking.guestCount > 1 ? 's' : ''}
+              +{booking.guestCount} guest{(booking.guestCount ?? 0) > 1 ? 's' : ''}
             </span>
           )}
         </div>
         <p className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-          {formatDatePacific(booking.bookingDate || booking.requestDate)} · {formatTime12Hour(booking.startTime)} - {formatTime12Hour(booking.endTime)}
+          {formatDatePacific(booking.bookingDate || booking.requestDate || '')} · {formatTime12Hour(booking.startTime || '')} - {formatTime12Hour(booking.endTime || '')}
         </p>
         {booking.notes && <p className={`text-xs mt-1 ${isDark ? 'text-gray-500' : 'text-gray-500'} line-clamp-1`}>{booking.notes}</p>}
         {(canConfirm || canCancel) && (
@@ -360,7 +360,7 @@ const MemberActivityTab: React.FC<MemberActivityTabProps> = ({
   const renderVisitItem = (visit: VisitHistoryItem & { isWalkIn?: boolean; resource_name?: string; check_in_time?: string; role?: string; resourceName?: string; date?: string; bookingDate?: string; startTime?: string; endTime?: string; checkedInBy?: string; hostName?: string; instructor?: string; location?: string }) => (
     <div className="flex-1 min-w-0">
       <div className="flex items-center gap-2 mb-1">
-        <span className="material-symbols-outlined text-green-500 text-lg">{visit.isWalkIn ? 'qr_code_scanner' : getRoleIcon(visit.role)}</span>
+        <span className="material-symbols-outlined text-green-500 text-lg">{visit.isWalkIn ? 'qr_code_scanner' : getRoleIcon(visit.role || '')}</span>
         <span className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>{visit.resourceName || 'Visit'}</span>
         {visit.role && (
           <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${visit.isWalkIn ? 'bg-emerald-500 text-white' : getRoleBadgeColor(visit.role)}`}>
@@ -369,7 +369,7 @@ const MemberActivityTab: React.FC<MemberActivityTabProps> = ({
         )}
       </div>
       <p className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-        {formatDatePacific(visit.date || visit.bookingDate)}
+        {formatDatePacific(visit.date || visit.bookingDate || '')}
         {visit.startTime && <> · {formatTime12Hour(visit.startTime)}{visit.endTime && ` - ${formatTime12Hour(visit.endTime)}`}</>}
       </p>
       {visit.checkedInBy && (
@@ -422,9 +422,9 @@ const MemberActivityTab: React.FC<MemberActivityTabProps> = ({
     // Count visits: use visitHistory (attended simulator bookings) + past events + attended wellness
     // This matches the backend attendedVisitsCount calculation
     const attendedBookingsCount = visitHistory?.length || 0;
-    const pastEventsCount = (eventRsvpHistory || []).filter((e: EventRsvpItem) => {
-      const eventDate = new Date(e.eventDate);
-      return eventDate < new Date(); // Past events count as attended
+    const pastEventsCount = (eventRsvpHistory || []).filter((e) => {
+      const eventDate = new Date(e.eventDate || '');
+      return eventDate < new Date();
     }).length;
     const attendedWellnessCount = (wellnessHistory || []).filter((w: WellnessHistoryItem) => w.status === 'attended').length;
     

@@ -260,7 +260,7 @@ const ResourceUtilizationChart: React.FC<{ data: ResourceEntry[] }> = ({ data })
           tickLine={false}
           width={110}
         />
-        <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(value: number) => [`${value} hours`, 'Total Booked']} />
+        <Tooltip contentStyle={TOOLTIP_STYLE} formatter={((value: number) => [`${value} hours`, 'Total Booked']) as never} />
         <Bar dataKey="totalHours" radius={[0, 6, 6, 0]} maxBarSize={28}>
           {data.map((_, index) => (
             <Cell key={index} fill={RESOURCE_COLORS[index % RESOURCE_COLORS.length]} />
@@ -398,7 +398,7 @@ const BookingFrequencyChart: React.FC<{ data: BookingFrequencyEntry[] }> = ({ da
           tickLine={false}
           allowDecimals={false}
         />
-        <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(value: number) => [`${value} members`, 'Members']} />
+        <Tooltip contentStyle={TOOLTIP_STYLE} formatter={((value: number) => [`${value} members`, 'Members']) as never} />
         <Bar dataKey="memberCount" radius={[6, 6, 0, 0]} maxBarSize={40} fill="#8b5cf6" />
       </BarChart>
     </ResponsiveContainer>
@@ -467,7 +467,7 @@ const RevenueChart: React.FC<{ data: RevenueEntry[] }> = ({ data }) => {
           />
           <Tooltip
             contentStyle={TOOLTIP_STYLE}
-            formatter={(value: number, name: string) => [`$${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, REVENUE_LABEL_MAP[name] || name]}
+            formatter={((value: number, name: string) => [`$${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, REVENUE_LABEL_MAP[name] || name]) as never}
           />
           {activeCategories.map(c => (
             <Area key={c.key} type="monotone" dataKey={c.key} stroke={c.color} strokeWidth={2} fill={`url(#grad-${c.key})`} stackId="1" />
@@ -513,7 +513,7 @@ const BookingsOverTimeChart: React.FC<{ data: BookingsOverTimeEntry[] }> = ({ da
           tickLine={false}
           allowDecimals={false}
         />
-        <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(value: number) => [`${value} bookings`, 'Weekly Total']} />
+        <Tooltip contentStyle={TOOLTIP_STYLE} formatter={((value: number) => [`${value} bookings`, 'Weekly Total']) as never} />
         <Line type="monotone" dataKey="count" stroke="#6366f1" strokeWidth={2.5} dot={false} activeDot={{ r: 4, fill: '#6366f1' }} />
       </LineChart>
     </ResponsiveContainer>
@@ -548,7 +548,7 @@ const DayOfWeekChart: React.FC<{ data: DayOfWeekEntry[] }> = ({ data }) => {
           tickLine={false}
           allowDecimals={false}
         />
-        <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(value: number) => [`${value} bookings`, 'Total']} />
+        <Tooltip contentStyle={TOOLTIP_STYLE} formatter={((value: number) => [`${value} bookings`, 'Total']) as never} />
         <Bar dataKey="count" radius={[6, 6, 0, 0]} maxBarSize={40}>
           {allDays.map((entry, index) => (
             <Cell key={index} fill={entry.count === maxCount ? '#6366f1' : '#a78bfa'} />
@@ -586,7 +586,7 @@ const UtilizationChart: React.FC<{ data: UtilizationEntry[] }> = ({ data }) => {
           unit="%"
           domain={[0, 100]}
         />
-        <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(value: number) => [`${value}%`, 'Utilization']} />
+        <Tooltip contentStyle={TOOLTIP_STYLE} formatter={((value: number) => [`${value}%`, 'Utilization']) as never} />
         <Bar dataKey="pct" radius={[6, 6, 0, 0]} maxBarSize={32}>
           {chartData.map((entry, index) => (
             <Cell key={index} fill={entry.pct >= 75 ? '#ef4444' : entry.pct >= 50 ? '#f59e0b' : entry.pct >= 25 ? '#6366f1' : '#a78bfa'} />
@@ -622,7 +622,7 @@ const TierDistributionChart: React.FC<{ data: TierDistributionEntry[] }> = ({ da
                 <Cell key={i} fill={TIER_COLORS[i % TIER_COLORS.length]} />
               ))}
             </Pie>
-            <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(value: number, name: string) => [`${value} (${((value / total) * 100).toFixed(1)}%)`, name]} />
+            <Tooltip contentStyle={TOOLTIP_STYLE} formatter={((value: number, name: string) => [`${value} (${((value / total) * 100).toFixed(1)}%)`, name]) as never} />
           </PieChart>
         </ResponsiveContainer>
       </div>
@@ -685,7 +685,7 @@ const NewMemberGrowthChart: React.FC<{ data: NewMemberGrowthEntry[] }> = ({ data
         <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" />
         <XAxis dataKey="label" tick={{ fontSize: 12 }} stroke="#94a3b8" />
         <YAxis tick={{ fontSize: 12 }} stroke="#94a3b8" allowDecimals={false} />
-        <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(value: number) => [value, 'New Members']} />
+        <Tooltip contentStyle={TOOLTIP_STYLE} formatter={((value: number) => [value, 'New Members']) as never} />
         <Line type="monotone" dataKey="newMembers" stroke="#22c55e" strokeWidth={2.5} dot={{ fill: '#22c55e', r: 4 }} activeDot={{ r: 6 }} />
       </LineChart>
     </ResponsiveContainer>

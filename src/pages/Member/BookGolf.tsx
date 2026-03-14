@@ -409,8 +409,8 @@ const BookGolf: React.FC = () => {
   });
 
   // Cancel Booking Mutation
-  const cancelBookingMutation = useMutation({
-    mutationFn: async ({ bookingId, actingAsEmail }: { bookingId: number; actingAsEmail?: string }) => 
+  const cancelBookingMutation = useMutation<{ success: boolean; status?: string }, Error, { bookingId: number; actingAsEmail?: string }, { previousData?: [readonly unknown[], unknown][] }>({
+    mutationFn: async ({ bookingId, actingAsEmail }) => 
       putWithCredentials<{ success: boolean; status?: string }>(`/api/bookings/${bookingId}/member-cancel`, { acting_as_email: actingAsEmail }),
     onMutate: async ({ bookingId }) => {
       await queryClient.cancelQueries({ queryKey: bookGolfKeys.all });
@@ -426,7 +426,7 @@ const BookGolf: React.FC = () => {
       );
       return { previousData };
     },
-    onError: (_err: unknown, _vars: unknown, context: { previousData?: [unknown, unknown][] } | undefined) => {
+    onError: (_err, _vars, context) => {
       context?.previousData?.forEach(([key, data]) => queryClient.setQueryData(key as string[], data));
     },
     onSettled: () => {

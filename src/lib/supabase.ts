@@ -9,9 +9,9 @@ interface SupabaseRealtimeConfig {
 let supabaseClient: SupabaseClient | null = null;
 let initAttempted = false;
 
-function isValidSupabaseKey(key: string): boolean {
+function isValidSupabaseKey(key: string | undefined): boolean {
   // Supabase anon keys are JWTs that start with 'eyJ'
-  return key && key.startsWith('eyJ') && key.length > 100;
+  return !!key && key.startsWith('eyJ') && key.length > 100;
 }
 
 export function getSupabase(): SupabaseClient | null {

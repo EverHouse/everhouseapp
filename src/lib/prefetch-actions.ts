@@ -55,7 +55,7 @@ export const prefetchAllNavRoutes = () => {
 
 export const prefetchOnIdle = () => {
   if ('requestIdleCallback' in window) {
-    (window as unknown as { requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => void }).requestIdleCallback(() => prefetchAllNavRoutes(), { timeout: 2000 });
+    (window as unknown as { requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => void }).requestIdleCallback!(() => prefetchAllNavRoutes(), { timeout: 2000 });
   } else {
     setTimeout(prefetchAllNavRoutes, 100);
   }

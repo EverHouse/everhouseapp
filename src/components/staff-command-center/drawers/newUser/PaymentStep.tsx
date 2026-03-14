@@ -90,7 +90,7 @@ export function PaymentStep({
   
   const totalPrice = primaryPrice + groupMembersTotal;
 
-  const stripeOptions: StripeElementsOptions = clientSecret ? {
+  const stripeOptions = (clientSecret ? {
     clientSecret,
     appearance: {
       theme: 'stripe',
@@ -103,7 +103,7 @@ export function PaymentStep({
         borderRadius: '8px',
       },
     },
-  } : undefined;
+  } : undefined) as import('@stripe/stripe-js').StripeElementsOptions | undefined;
 
   return (
     <div className="space-y-4">

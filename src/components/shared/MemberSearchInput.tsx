@@ -319,7 +319,7 @@ export const MemberSearchInput: React.FC<MemberSearchInputProps> = ({
     >
       {filteredMembers.length > 0 ? (
         filteredMembers.map((member, index) => {
-          const isVisitor = member.membershipStatus === 'visitor' || member.membershipStatus === 'non-member';
+          const isVisitor = ('membershipStatus' in member) && (member.membershipStatus === 'visitor' || member.membershipStatus === 'non-member');
           return (
             <button
               key={member.id || member.email}
@@ -350,7 +350,7 @@ export const MemberSearchInput: React.FC<MemberSearchInputProps> = ({
                   )}
                 </p>
                 <p className="text-xs text-primary/60 dark:text-white/60 truncate">
-                  {showTier && member.tier ? `${member.tier} • ` : ''}{privacyMode ? (member.emailRedacted || redactEmail(member.email)) : member.email}
+                  {showTier && member.tier ? `${member.tier} • ` : ''}{privacyMode ? (('emailRedacted' in member ? member.emailRedacted : null) || redactEmail(member.email)) : member.email}
                 </p>
               </div>
             </button>

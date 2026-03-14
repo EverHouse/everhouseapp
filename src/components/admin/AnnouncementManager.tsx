@@ -87,10 +87,10 @@ const AnnouncementManager: React.FC<AnnouncementManagerProps> = ({ triggerCreate
         setIsEditing(false);
         try {
             if (editId) {
-                await updateAnnouncement(ann);
+                await updateAnnouncement(ann as Announcement);
                 showToast('Announcement updated', 'success');
             } else {
-                await addAnnouncement(ann);
+                await addAnnouncement(ann as Announcement);
                 showToast('Announcement created', 'success');
             }
         } catch (err: unknown) {

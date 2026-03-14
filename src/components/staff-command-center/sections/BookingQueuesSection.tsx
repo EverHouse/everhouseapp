@@ -364,7 +364,7 @@ export const BookingQueuesSection: React.FC<BookingQueuesSectionProps> = ({
 }) => {
   const navigate = useNavigate();
   const navigateToTab = useCallback((tab: TabType) => {
-    if (tabToPath[tab]) navigate(tabToPath[tab]);
+    if ((tabToPath as Record<string, string>)[tab]) navigate((tabToPath as Record<string, string>)[tab]);
   }, [navigate]);
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
 

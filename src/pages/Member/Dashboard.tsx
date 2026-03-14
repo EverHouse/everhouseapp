@@ -461,12 +461,12 @@ const Dashboard: React.FC = () => {
         type: 'conference_room_calendar' as const,
         title: 'Conference Room',
         resourceType: 'conference_room',
-        date: formatDate(c.request_date),
-        rawDate: c.request_date.split('T')[0],
-        time: formatTime12Hour(c.start_time),
-        endTime: formatTime12Hour(c.end_time),
-        details: `${formatTime12Hour(c.start_time)} - ${formatTime12Hour(c.end_time)}`,
-        sortKey: `${c.request_date}T${c.start_time}`,
+        date: formatDate(c.request_date || ''),
+        rawDate: (c.request_date || '').split('T')[0],
+        time: formatTime12Hour(c.start_time || ''),
+        endTime: formatTime12Hour(c.end_time || ''),
+        details: `${formatTime12Hour(c.start_time || '')} - ${formatTime12Hour(c.end_time || '')}`,
+        sortKey: `${c.request_date || ''}T${c.start_time || ''}`,
         raw: c,
         source: 'calendar'
       }))
@@ -503,7 +503,7 @@ const Dashboard: React.FC = () => {
       endTime = undefined;
     } else if (item.type === 'conference_room_calendar') {
       const raw = item.raw as DashboardRawBooking;
-      itemDate = raw.request_date.split('T')[0];
+      itemDate = (raw.request_date || '').split('T')[0];
       endTime = raw.end_time;
     }
     
@@ -1003,7 +1003,7 @@ const Dashboard: React.FC = () => {
             </div>
             <div ref={scheduleRef} className="space-y-3">
               {upcomingItemsFiltered.length > 0 ? upcomingItemsFiltered.slice(0, 6).map((item, idx) => {
-                let actions;
+                let actions: { icon: string; label: string; onClick: () => void }[] = [];
                 if (item.type === 'booking' || item.type === 'booking_request') {
                   const bookingStatus = (item as DashboardBookingItem).status as string;
                   const isConfirmed = bookingStatus === 'approved' || bookingStatus === 'confirmed';
@@ -1122,7 +1122,7 @@ const Dashboard: React.FC = () => {
                   return <div className="flex gap-1.5 flex-wrap">{badges}</div>;
                 };
                 const isSimulatorBooking = item.resourceType === 'simulator';
-                const isApprovedOrConfirmed = ['approved', 'confirmed'].includes((item as DashboardBookingItem).status);
+                const isApprovedOrConfirmed = ['approved', 'confirmed'].includes((item as DashboardBookingItem).status || '');
                 const isOwnerOfBooking = !((item as DashboardBookingItem).isLinkedMember);
                 const showRosterManager = (item.type === 'booking' || item.type === 'booking_request') && 
                   (isSimulatorBooking || item.resourceType === 'conference_room') && 

@@ -441,7 +441,7 @@ const DirectoryTab: React.FC = () => {
 
             <MemberProfileDrawer
                 isOpen={visitorDetailsOpen && !!selectedVisitor}
-                member={selectedVisitor ? data.visitorToMemberProfile(selectedVisitor) as MemberProfile : null}
+                member={selectedVisitor ? data.visitorToMemberProfile(selectedVisitor) as unknown as MemberProfile : null}
                 isAdmin={isAdmin}
                 onClose={() => { setVisitorDetailsOpen(false); setSelectedVisitor(null); }}
                 onViewAs={() => {}}

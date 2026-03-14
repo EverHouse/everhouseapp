@@ -51,10 +51,10 @@ export const AnnouncementFormDrawer: React.FC<AnnouncementFormDrawerProps> = ({
       };
 
       if (editItem?.id) {
-        await updateAnnouncement(ann);
+        await updateAnnouncement(ann as Announcement);
         showToast('Announcement updated', 'success');
       } else {
-        await addAnnouncement(ann);
+        await addAnnouncement(ann as Announcement);
         showToast('Announcement created', 'success');
       }
       onClose();

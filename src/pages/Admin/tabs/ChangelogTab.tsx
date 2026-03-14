@@ -461,12 +461,12 @@ const ChangelogTab: React.FC = () => {
             case 'create_event':
             case 'update_event':
             case 'delete_event':
-                if (d.event_date || d.date) parts.push(d.event_date || d.date);
+                if (d.event_date || d.date) parts.push((d.event_date || d.date)!);
                 if (d.location) parts.push(d.location);
                 break;
             case 'manual_rsvp':
             case 'remove_rsvp':
-                if (d.attendee_email || d.rsvp_email) parts.push(d.attendee_email || d.rsvp_email);
+                if (d.attendee_email || d.rsvp_email) parts.push((d.attendee_email || d.rsvp_email)!);
                 if (d.event_date) parts.push(d.event_date);
                 break;
             case 'create_wellness_class':
@@ -498,7 +498,7 @@ const ChangelogTab: React.FC = () => {
                 break;
             case 'link_member_to_booking':
             case 'unlink_member_from_booking':
-                if (d.memberEmail || d.linkedBy) parts.push(d.memberEmail || d.linkedBy);
+                if (d.memberEmail || d.linkedBy) parts.push((d.memberEmail || d.linkedBy)!);
                 break;
             case 'direct_add_participant':
                 if (d.guestName) parts.push(d.guestName);
@@ -653,8 +653,8 @@ const ChangelogTab: React.FC = () => {
             case 'day_pass_purchased':
             case 'day_pass_redeemed':
             case 'day_pass_refunded':
-                if (d.visitor_email || d.email) parts.push(d.visitor_email || d.email);
-                if (d.visitor_name || d.name) parts.push(d.visitor_name || d.name);
+                if (d.visitor_email || d.email) parts.push((d.visitor_email || d.email)!);
+                if (d.visitor_name || d.name) parts.push((d.visitor_name || d.name)!);
                 if (d.amount_cents) parts.push(`$${(d.amount_cents / 100).toFixed(2)}`);
                 break;
             case 'guest_pass_used':
@@ -700,8 +700,8 @@ const ChangelogTab: React.FC = () => {
             case 'visitor_created':
             case 'visitor_stripe_linked':
             case 'delete_visitor':
-                if (d.visitor_email || d.email) parts.push(d.visitor_email || d.email);
-                if (d.visitor_name || d.name) parts.push(d.visitor_name || d.name);
+                if (d.visitor_email || d.email) parts.push((d.visitor_email || d.email)!);
+                if (d.visitor_name || d.name) parts.push((d.visitor_name || d.name)!);
                 break;
             case 'data_migration':
                 if (d.from && d.to) parts.push(`${d.from} → ${d.to}`);
@@ -737,8 +737,8 @@ const ChangelogTab: React.FC = () => {
             case 'update_member':
             case 'delete_member':
             case 'archive_member':
-                if (d.member_email || d.email) parts.push(d.member_email || d.email);
-                if (d.member_name || d.name) parts.push(d.member_name || d.name);
+                if (d.member_email || d.email) parts.push((d.member_email || d.email)!);
+                if (d.member_name || d.name) parts.push((d.member_name || d.name)!);
                 if (d.tier) parts.push(d.tier);
                 break;
             case 'sync_events':

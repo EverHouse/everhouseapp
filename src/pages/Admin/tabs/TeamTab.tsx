@@ -98,8 +98,8 @@ const TeamTab: React.FC = () => {
   });
 
   // Mutation for removing a team member
-  const removeTeamMemberMutation = useMutation({
-    mutationFn: (memberId: number) => deleteWithCredentials(`/api/staff-users/${memberId}`),
+  const removeTeamMemberMutation = useMutation<unknown, Error, number>({
+    mutationFn: (memberId) => deleteWithCredentials(`/api/staff-users/${memberId}`),
     onMutate: async (memberId) => {
       await queryClient.cancelQueries({ queryKey: ['staff-users'] });
       const previous = queryClient.getQueryData<TeamMember[]>(['staff-users']);
@@ -108,8 +108,8 @@ const TeamTab: React.FC = () => {
       );
       return { previous };
     },
-    onError: (_err: unknown, _id: unknown, context: { previous?: TeamMember[] } | undefined) => {
-      if (context?.previous) queryClient.setQueryData(['staff-users'], context.previous);
+    onError: (_err, _id, context) => {
+      if ((context as { previous?: TeamMember[] })?.previous) queryClient.setQueryData(['staff-users'], (context as { previous?: TeamMember[] }).previous);
       setError('Failed to remove team member');
       setTimeout(() => setError(null), 3000);
     },
@@ -123,8 +123,8 @@ const TeamTab: React.FC = () => {
   });
 
   // Mutation for updating a team member
-  const updateTeamMemberMutation = useMutation({
-    mutationFn: (member: TeamMember) =>
+  const updateTeamMemberMutation = useMutation<TeamMember, Error, TeamMember, { previous?: TeamMember[] }>({
+    mutationFn: (member) =>
       fetchWithCredentials<TeamMember>(`/api/staff-users/${member.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -146,7 +146,7 @@ const TeamTab: React.FC = () => {
       );
       return { previous };
     },
-    onError: (_err: unknown, _member: unknown, context: { previous?: TeamMember[] } | undefined) => {
+    onError: (_err, _member, context) => {
       if (context?.previous) queryClient.setQueryData(['staff-users'], context.previous);
       setError('Failed to update team member');
     },

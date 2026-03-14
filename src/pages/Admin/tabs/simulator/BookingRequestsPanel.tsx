@@ -630,7 +630,7 @@ const BookingRequestsPanel: React.FC<BookingRequestsPanelProps> = ({
                                                                         />
                                                                     }
                                                                 />
-                                                            ) : !isConferenceRoom && booking.declared_player_count > 0 && booking.declared_player_count > (booking.filled_player_count || 0) ? (
+                                                            ) : !isConferenceRoom && (booking.declared_player_count ?? 0) > 0 && (booking.declared_player_count ?? 0) > (booking.filled_player_count || 0) ? (
                                                                 <button
                                                                     onClick={() => {
                                                                         const bookingId = typeof booking.id === 'string' ? parseInt(String(booking.id).replace('cal_', '')) : booking.id;

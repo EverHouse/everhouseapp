@@ -16,7 +16,7 @@ export function useParallax(options?: UseParallaxOptions): UseParallaxReturn {
   const [offset, setOffset] = useState(0);
   const [opacity, setOpacity] = useState(1);
   const [gradientShift, setGradientShift] = useState(0);
-  const ref = useRef<HTMLElement>(null);
+  const ref = useRef<HTMLElement | null>(null);
 
   const speed = options?.speed ?? 0.5;
   const maxOffset = options?.maxOffset ?? 200;
@@ -47,5 +47,5 @@ export function useParallax(options?: UseParallaxOptions): UseParallaxReturn {
     return () => window.removeEventListener('scroll', handleScroll);
   }, [speed, maxOffset]);
 
-  return { offset, opacity, gradientShift, ref };
+  return { offset, opacity, gradientShift, ref: ref as React.RefObject<HTMLElement> };
 }

@@ -229,7 +229,7 @@ export const ResourcesSection: React.FC<ResourcesSectionProps> = ({
 }) => {
   const navigate = useNavigate();
   const navigateToTab = useCallback((tab: TabType) => {
-    if (tabToPath[tab]) navigate(tabToPath[tab]);
+    if ((tabToPath as Record<string, string>)[tab]) navigate((tabToPath as Record<string, string>)[tab]);
   }, [navigate]);
 
   if (variant === 'mobile-notice-only') {
@@ -289,7 +289,7 @@ export const NoticeBoardWidget: React.FC<{
 }> = ({ closures, upcomingClosure, announcements }) => {
   const navigate = useNavigate();
   const navigateToTab = useCallback((tab: TabType) => {
-    if (tabToPath[tab]) navigate(tabToPath[tab]);
+    if ((tabToPath as Record<string, string>)[tab]) navigate((tabToPath as Record<string, string>)[tab]);
   }, [navigate]);
 
   return (

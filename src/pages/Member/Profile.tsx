@@ -251,8 +251,8 @@ const Profile: React.FC = () => {
     checkPush();
   }, []);
 
-  const updatePreferencesMutation = useMutation({
-    mutationFn: (data: { emailOptIn?: boolean; smsOptIn?: boolean; doNotSellMyInfo?: boolean }) =>
+  const updatePreferencesMutation = useMutation<{ success: boolean }, Error, { emailOptIn?: boolean; smsOptIn?: boolean; doNotSellMyInfo?: boolean }, { previous?: PreferencesData }>({
+    mutationFn: (data) =>
       patchWithCredentials<{ success: boolean }>(
         `/api/members/me/preferences?user_email=${encodeURIComponent(user!.email)}`,
         data
@@ -266,7 +266,7 @@ const Profile: React.FC = () => {
       });
       return { previous };
     },
-    onError: (_err: unknown, _data: unknown, context: { previous?: PreferencesData } | undefined) => {
+    onError: (_err, _data, context) => {
       if (context?.previous) queryClient.setQueryData(['memberPreferences', user?.email], context.previous);
       showToast('Failed to update preferences', 'error');
     },
@@ -278,8 +278,8 @@ const Profile: React.FC = () => {
     },
   });
 
-  const updateProfileMutation = useMutation({
-    mutationFn: (data: { firstName: string; lastName: string; phone: string }) =>
+  const updateProfileMutation = useMutation<{ success: boolean; firstName: string; lastName: string; phone: string }, Error, { firstName: string; lastName: string; phone: string }>({
+    mutationFn: (data) =>
       putWithCredentials<{ success: boolean; firstName: string; lastName: string; phone: string }>(
         '/api/member/profile',
         data
@@ -294,9 +294,10 @@ const Profile: React.FC = () => {
       setEditingProfile(false);
       await refreshUser();
     },
-    onError: (err: Error, _data: unknown, context: { previousDashboard?: unknown; previousName?: string; previousPhone?: string } | undefined) => {
-      if (context?.previousDashboard) {
-        queryClient.setQueryData(['member', 'dashboard-data', user?.email], context.previousDashboard);
+    onError: (err: Error, _data, context: unknown) => {
+      const ctx = context as { previousDashboard?: unknown; previousName?: string; previousPhone?: string } | undefined;
+      if (ctx?.previousDashboard) {
+        queryClient.setQueryData(['member', 'dashboard-data', user?.email], ctx.previousDashboard);
       }
       showToast((err instanceof Error ? err.message : String(err)) || 'Failed to update profile', 'error');
     },
@@ -307,6 +308,7 @@ const Profile: React.FC = () => {
   });
 
   const handleStartEdit = () => {
+    if (!user) return;
     if (user.firstName) {
       setEditFirstName(user.firstName);
       setEditLastName(user.lastName || '');
@@ -339,8 +341,8 @@ const Profile: React.FC = () => {
     updatePreferencesMutation.mutate(body);
   };
 
-  const updateSmsPreferencesMutation = useMutation({
-    mutationFn: (data: { smsPromoOptIn?: boolean; smsTransactionalOptIn?: boolean; smsRemindersOptIn?: boolean }) =>
+  const updateSmsPreferencesMutation = useMutation<{ success: boolean }, Error, { smsPromoOptIn?: boolean; smsTransactionalOptIn?: boolean; smsRemindersOptIn?: boolean }, { previous?: PreferencesData }>({
+    mutationFn: (data) =>
       putWithCredentials<{ success: boolean }>(
         `/api/members/${encodeURIComponent(user!.email)}/sms-preferences`,
         data
@@ -354,7 +356,7 @@ const Profile: React.FC = () => {
       });
       return { previous };
     },
-    onError: (_err: unknown, _data: unknown, context: { previous?: PreferencesData } | undefined) => {
+    onError: (_err, _data, context) => {
       if (context?.previous) queryClient.setQueryData(['memberPreferences', user?.email], context.previous);
       showToast('Failed to update SMS preferences', 'error');
     },

@@ -170,7 +170,7 @@ export function PaymentActionFooter({
     setLocalStatus(null);
   }, [bookingId]);
 
-  const fs = rosterData?.financialSummary;
+  const fs = rosterData?.financialSummary!;
 
   const closePaymentOptions = () => {
     setShowInlinePayment(false);

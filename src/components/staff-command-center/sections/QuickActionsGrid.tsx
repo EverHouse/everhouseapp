@@ -16,7 +16,7 @@ export const QuickActionsGrid: React.FC<QuickActionsGridProps> = ({ isAdmin, var
   const navigate = useNavigate();
   const { startNavigation } = useNavigationLoading();
   const navigateToTab = useCallback((tab: TabType) => {
-    if (tabToPath[tab]) navigate(tabToPath[tab]);
+    if ((tabToPath as Record<string, string>)[tab]) navigate((tabToPath as Record<string, string>)[tab]);
   }, [navigate]);
 
   if (variant === 'desktop') {

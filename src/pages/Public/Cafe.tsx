@@ -78,10 +78,7 @@ const PublicCafe: React.FC = () => {
   useEffect(() => {
     if (categoryScrollRef.current) {
       const buttons = categoryScrollRef.current.querySelectorAll('button');
-      let activeBtn: HTMLElement | null = null;
-      buttons.forEach(btn => {
-        if (btn.textContent === activeCategory) activeBtn = btn as HTMLElement;
-      });
+      const activeBtn = Array.from(buttons).find(btn => btn.textContent === activeCategory) as HTMLElement | undefined;
       if (activeBtn) {
         activeBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
       }

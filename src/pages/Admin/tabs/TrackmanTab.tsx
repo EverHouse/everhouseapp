@@ -524,7 +524,7 @@ const TrackmanTab: React.FC = () => {
                 <p className="font-bold text-green-700 dark:text-green-300">Import Complete</p>
                 <p className="text-sm text-green-600 dark:text-green-400">
                   Total: {importResult.totalRows} | Matched: {importResult.matchedRows} | Linked: {importResult.linkedRows || 0} | Unmatched: {importResult.unmatchedRows} | Skipped: {importResult.skippedRows}
-                  {(importResult.removedFromUnmatched > 0 || importResult.cancelledBookings > 0) && (
+                  {((importResult.removedFromUnmatched ?? 0) > 0 || (importResult.cancelledBookings ?? 0) > 0) && (
                     <span className="block mt-1">
                       Cleaned up: {importResult.removedFromUnmatched || 0} unmatched removed, {importResult.cancelledBookings || 0} bookings cancelled
                     </span>
@@ -659,7 +659,7 @@ const TrackmanTab: React.FC = () => {
                         <div>
                           <span className="text-xs text-primary/50 dark:text-white/50">Time</span>
                           <p className="text-primary dark:text-white font-medium text-sm">
-                            {formatTime12Hour(booking.startTime || booking.start_time)} - {formatTime12Hour(booking.endTime || booking.end_time)}
+                            {formatTime12Hour(booking.startTime || booking.start_time || '')} - {formatTime12Hour(booking.endTime || booking.end_time || '')}
                           </p>
                         </div>
                       </div>
@@ -721,8 +721,8 @@ const TrackmanTab: React.FC = () => {
                             </span>
                           </td>
                           <td className="py-2 px-3 text-primary dark:text-white whitespace-nowrap">
-                            <div className="text-sm font-medium">{formatDateDisplayWithDay(booking.bookingDate || booking.booking_date)}</div>
-                            <div className="text-xs text-primary/60 dark:text-white/60">{formatTime12Hour(booking.startTime || booking.start_time)} - {formatTime12Hour(booking.endTime || booking.end_time)}</div>
+                            <div className="text-sm font-medium">{formatDateDisplayWithDay(booking.bookingDate || booking.booking_date || '')}</div>
+                            <div className="text-xs text-primary/60 dark:text-white/60">{formatTime12Hour(booking.startTime || booking.start_time || '')} - {formatTime12Hour(booking.endTime || booking.end_time || '')}</div>
                           </td>
                           <td className="py-2 px-3 text-primary dark:text-white">
                             <div className="font-medium truncate max-w-[150px]">{booking.userName || booking.user_name || 'Unknown'}</div>
@@ -925,7 +925,7 @@ const TrackmanTab: React.FC = () => {
               <div className="p-3 bg-gray-50 dark:bg-white/5 rounded-lg">
                 <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Time</p>
                 <p className="font-medium text-primary dark:text-white text-sm">
-                  {formatTime12Hour(viewDetailBooking.startTime || viewDetailBooking.start_time)} - {formatTime12Hour(viewDetailBooking.endTime || viewDetailBooking.end_time)}
+                  {formatTime12Hour(viewDetailBooking.startTime || viewDetailBooking.start_time || '')} - {formatTime12Hour(viewDetailBooking.endTime || viewDetailBooking.end_time || '')}
                 </p>
               </div>
             </div>
@@ -1068,7 +1068,7 @@ const TrackmanTab: React.FC = () => {
           )}
           
           {fuzzyMatchModal?.selectedEmail && (fuzzyMatchModal.booking?.originalEmail || fuzzyMatchModal.booking?.original_email) && 
-            (fuzzyMatchModal.booking?.originalEmail || fuzzyMatchModal.booking?.original_email).toLowerCase() !== fuzzyMatchModal.selectedEmail.toLowerCase() && (
+            (fuzzyMatchModal.booking?.originalEmail || fuzzyMatchModal.booking?.original_email || '').toLowerCase() !== fuzzyMatchModal.selectedEmail.toLowerCase() && (
             <div className="p-3 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-500/30 mb-4">
               <label className="flex items-start gap-3 cursor-pointer">
                 <input
@@ -1113,7 +1113,7 @@ const TrackmanTab: React.FC = () => {
           trackmanBookingId={String(assignPlayersModal.booking.trackmanBookingId || assignPlayersModal.booking.trackman_booking_id || '')}
           bayName={`Bay ${assignPlayersModal.booking.bayNumber || assignPlayersModal.booking.bay_number}`}
           bookingDate={assignPlayersModal.booking.bookingDate || assignPlayersModal.booking.booking_date}
-          timeSlot={`${formatTime12Hour(assignPlayersModal.booking.startTime || assignPlayersModal.booking.start_time)} - ${formatTime12Hour(assignPlayersModal.booking.endTime || assignPlayersModal.booking.end_time)}`}
+          timeSlot={`${formatTime12Hour(assignPlayersModal.booking.startTime || assignPlayersModal.booking.start_time || '')} - ${formatTime12Hour(assignPlayersModal.booking.endTime || assignPlayersModal.booking.end_time || '')}`}
           matchedBookingId={undefined}
           currentMemberName={undefined}
           currentMemberEmail={undefined}

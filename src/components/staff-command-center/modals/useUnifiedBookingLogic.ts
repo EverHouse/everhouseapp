@@ -929,7 +929,7 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
       const result = await chargeCardOnFile({
         memberEmail: ownerEmail || fetchedContext?.ownerEmail || rosterData.members?.find(m => m.isPrimary)?.userEmail || '',
         bookingId,
-        sessionId: rosterData.sessionId,
+        sessionId: rosterData.sessionId!,
         participantIds: allParticipantIds,
       });
       if (result.success) {

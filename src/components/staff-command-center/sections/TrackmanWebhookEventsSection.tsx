@@ -383,9 +383,9 @@ export const TrackmanWebhookEventsSection: React.FC<TrackmanWebhookEventsSection
         <h2 className="text-2xl leading-tight font-bold text-primary dark:text-white flex items-center gap-2" style={{ fontFamily: 'var(--font-headline)' }}>
           <TrackmanIcon size={22} />
           Trackman Bookings Synced
-          {webhookStats?.webhookStats?.total_events > 0 && (
+          {(webhookStats?.webhookStats?.total_events ?? 0) > 0 && (
             <span className="text-xs md:text-sm font-normal text-primary/60 dark:text-white/60">
-              ({webhookStats.webhookStats.total_events} in last 30 days)
+              ({webhookStats?.webhookStats?.total_events} in last 30 days)
             </span>
           )}
         </h2>
@@ -456,7 +456,7 @@ export const TrackmanWebhookEventsSection: React.FC<TrackmanWebhookEventsSection
                   const isExpanded = expandedEventId === event.id;
                   
                   const payload = typeof event.payload === 'string' ? JSON.parse(event.payload) : event.payload;
-                  const eventType = getEventTypeFromPayload(payload, event.event_type);
+                  const eventType = getEventTypeFromPayload(payload, event.event_type ?? '') ?? '';
                   const isUserUpdate = eventType === 'user_update' || eventType === 'user.updated' || eventType === 'user.created';
                   const isPurchaseUpdate = eventType === 'purchase_update' || eventType === 'purchase_paid' || eventType.includes('purchase');
                   const userData = isUserUpdate ? (payload?.user || payload?.data || payload) as Record<string, unknown> : null;
@@ -467,9 +467,9 @@ export const TrackmanWebhookEventsSection: React.FC<TrackmanWebhookEventsSection
                   
                   const bookingStart = bookingData?.start;
                   const bookingEnd = bookingData?.end;
-                  const bookingDate = formatBookingDate(bookingStart);
-                  const timeSlot = formatTimeSlot(bookingStart, bookingEnd);
-                  const duration = calculateDuration(bookingStart, bookingEnd);
+                  const bookingDate = formatBookingDate(bookingStart ?? '');
+                  const timeSlot = formatTimeSlot(bookingStart ?? '', bookingEnd ?? '');
+                  const duration = calculateDuration(bookingStart ?? '', bookingEnd ?? '');
                   const playerCount = getPlayerCount(bookingData);
 
                   const userDisplayName = userData ? [userData.firstName || userData.first_name, userData.lastName || userData.last_name].filter(Boolean).join(' ') as string : '';
@@ -756,13 +756,13 @@ export const TrackmanWebhookEventsSection: React.FC<TrackmanWebhookEventsSection
                           </div>
                           ) : isPurchaseUpdate && purchaseData ? (
                           <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                            {purchaseData.id && (
+                            {!!purchaseData.id && (
                               <div className="p-2 bg-amber-50 dark:bg-amber-500/10 rounded-lg">
                                 <p className="text-[10px] uppercase tracking-wider text-amber-600/60 dark:text-amber-400/60">Purchase ID</p>
                                 <p className="text-xs font-medium text-amber-800 dark:text-amber-300">{String(purchaseData.id)}</p>
                               </div>
                             )}
-                            {purchaseData.status && (
+                            {!!purchaseData.status && (
                               <div className="p-2 bg-amber-50 dark:bg-amber-500/10 rounded-lg">
                                 <p className="text-[10px] uppercase tracking-wider text-amber-600/60 dark:text-amber-400/60">Status</p>
                                 <p className="text-xs font-medium text-amber-800 dark:text-amber-300 capitalize">{String(purchaseData.status)}</p>

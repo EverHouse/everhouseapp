@@ -37,7 +37,7 @@ export interface CalendarGridProps {
 }
 
 function CurrentTimeIndicator({ gridRef, nowMinutes, gridStartMinutes, totalColumns }: {
-    gridRef: React.RefObject<HTMLDivElement>;
+    gridRef: React.RefObject<HTMLDivElement | null>;
     nowMinutes: number;
     gridStartMinutes: number;
     totalColumns: number;

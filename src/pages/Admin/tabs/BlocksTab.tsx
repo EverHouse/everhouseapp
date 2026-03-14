@@ -195,8 +195,8 @@ const BlocksTab: React.FC = () => {
         },
     });
 
-    const deleteClosureReasonMutation = useMutation({
-        mutationFn: (id: number) => deleteWithCredentials(`/api/closure-reasons/${id}`),
+    const deleteClosureReasonMutation = useMutation<unknown, Error, number>({
+        mutationFn: (id) => deleteWithCredentials(`/api/closure-reasons/${id}`),
         onMutate: async (id) => {
             await queryClient.cancelQueries({ queryKey: ['closureReasons'] });
             const previous = queryClient.getQueryData<ClosureReason[]>(['closureReasons']);
@@ -205,8 +205,8 @@ const BlocksTab: React.FC = () => {
             );
             return { previous };
         },
-        onError: (_err: unknown, _id: unknown, context: { previous?: ClosureReason[] } | undefined) => {
-            if (context?.previous) queryClient.setQueryData(['closureReasons'], context.previous);
+        onError: (_err, _id, context) => {
+            if ((context as { previous?: ClosureReason[] })?.previous) queryClient.setQueryData(['closureReasons'], (context as { previous?: ClosureReason[] }).previous);
             showToast('Failed to delete reason', 'error');
         },
         onSettled: () => {
@@ -268,8 +268,8 @@ const BlocksTab: React.FC = () => {
         },
     });
 
-    const deleteNoticeTypeMutation = useMutation({
-        mutationFn: (id: number) => deleteWithCredentials(`/api/notice-types/${id}`),
+    const deleteNoticeTypeMutation = useMutation<unknown, Error, number>({
+        mutationFn: (id) => deleteWithCredentials(`/api/notice-types/${id}`),
         onMutate: async (id) => {
             await queryClient.cancelQueries({ queryKey: ['noticeTypes'] });
             const previous = queryClient.getQueryData<NoticeType[]>(['noticeTypes']);
@@ -278,8 +278,8 @@ const BlocksTab: React.FC = () => {
             );
             return { previous };
         },
-        onError: (_err: unknown, _id: unknown, context: { previous?: NoticeType[] } | undefined) => {
-            if (context?.previous) queryClient.setQueryData(['noticeTypes'], context.previous);
+        onError: (_err, _id, context) => {
+            if ((context as { previous?: NoticeType[] })?.previous) queryClient.setQueryData(['noticeTypes'], (context as { previous?: NoticeType[] }).previous);
             showToast('Failed to delete notice type', 'error');
         },
         onSettled: () => {
@@ -352,8 +352,8 @@ const BlocksTab: React.FC = () => {
     };
 
     // Mutations for closures
-    const saveClosureMutation = useMutation({
-        mutationFn: (data: { form: BlocksClosureForm; isEdit: boolean; id?: number }) => {
+    const saveClosureMutation = useMutation<{ blocks?: unknown[]; warnings?: string[] }, Error, { form: BlocksClosureForm; isEdit: boolean; id?: number }>({
+        mutationFn: (data) => {
             const url = data.isEdit ? `/api/closures/${data.id}` : '/api/closures';
             const payload = data.isEdit
                 ? { ...data.form }
@@ -389,8 +389,8 @@ const BlocksTab: React.FC = () => {
         },
     });
 
-    const deleteClosureMutation = useMutation({
-        mutationFn: (closureId: number) => deleteWithCredentials(`/api/closures/${closureId}`),
+    const deleteClosureMutation = useMutation<unknown, Error, number>({
+        mutationFn: (closureId) => deleteWithCredentials(`/api/closures/${closureId}`),
         onMutate: async (closureId) => {
             await queryClient.cancelQueries({ queryKey: ['closures'] });
             const previous = queryClient.getQueryData<BlocksClosure[]>(['closures']);
@@ -399,8 +399,8 @@ const BlocksTab: React.FC = () => {
             );
             return { previous };
         },
-        onError: (_err: unknown, _id: unknown, context: { previous?: BlocksClosure[] } | undefined) => {
-            if (context?.previous) queryClient.setQueryData(['closures'], context.previous);
+        onError: (_err, _id, context) => {
+            if ((context as { previous?: BlocksClosure[] })?.previous) queryClient.setQueryData(['closures'], (context as { previous?: BlocksClosure[] }).previous);
             showToast('Failed to delete notice', 'error');
         },
         onSettled: () => {

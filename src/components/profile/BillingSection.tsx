@@ -420,7 +420,7 @@ export default function BillingSection({ isDark }: Props) {
                 </span>
               </div>
               <p className={`text-sm mt-1 ${isDark ? 'text-green-300/80' : 'text-green-700'}`}>
-                Your card ending in {billingInfo.paymentMethods[0].last4} will be used for any additional charges.
+                Your card ending in {billingInfo.paymentMethods?.[0]?.last4} will be used for any additional charges.
               </p>
             </div>
           ) : (

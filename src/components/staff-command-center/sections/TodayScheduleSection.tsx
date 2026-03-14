@@ -212,9 +212,9 @@ const EventsCard: React.FC<EventsCardProps> = ({ isDesktopGrid, isDesktop, upcom
           const hasStartTime = event.start_time && event.start_time !== '00:00';
           const hasEndTime = event.end_time && event.end_time !== '00:00';
           const timeDisplay = hasStartTime && hasEndTime 
-            ? `${formatTime12Hour(event.start_time)} - ${formatTime12Hour(event.end_time)}`
+            ? `${formatTime12Hour(event.start_time!)} - ${formatTime12Hour(event.end_time!)}`
             : hasStartTime 
-              ? formatTime12Hour(event.start_time)
+              ? formatTime12Hour(event.start_time!)
               : 'All Day';
           return (
             <GlassListRow key={event.id} onClick={onNavigateToEvents} className="animate-slide-up-stagger tactile-row" style={{ '--stagger-index': index } as React.CSSProperties}>
@@ -258,7 +258,7 @@ export const TodayScheduleSection: React.FC<TodayScheduleSectionProps> = ({
 }) => {
   const navigate = useNavigate();
   const navigateToTab = useCallback((tab: TabType) => {
-    if (tabToPath[tab]) navigate(tabToPath[tab]);
+    if ((tabToPath as Record<string, string>)[tab]) navigate((tabToPath as Record<string, string>)[tab]);
   }, [navigate]);
   const isDesktop = variant.startsWith('desktop');
   const isDesktopGrid = variant === 'desktop-wellness' || variant === 'desktop-events';

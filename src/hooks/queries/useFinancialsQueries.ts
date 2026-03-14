@@ -56,6 +56,7 @@ interface PendingAuthorization {
 }
 
 interface RefundablePayment {
+  id: number;
   paymentIntentId: string;
   memberEmail: string;
   memberName: string;
@@ -63,6 +64,7 @@ interface RefundablePayment {
   description: string;
   createdAt: string;
   status: string;
+  [key: string]: unknown;
 }
 
 interface FutureBookingWithFees {
