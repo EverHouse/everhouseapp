@@ -758,7 +758,7 @@ router.post('/api/member-billing/:email/credit', isStaffOrAdmin, async (req, res
       const memberName = member.first_name && member.last_name 
         ? `${member.first_name} ${member.last_name}` 
         : email;
-      const custResult = await getOrCreateStripeCustomer(String(member.id), String(email), memberName, member.tier);
+      const custResult = await getOrCreateStripeCustomer(String(member.id), String(email), memberName, member.tier ?? undefined);
       stripeCustomerId = custResult.customerId;
       logger.info('[MemberBilling] Stripe customer for', { extra: { custResultIsNew_Created_Found_existing: custResult.isNew ? 'Created' : 'Found existing', stripeCustomerId, email } });
     }

@@ -39,8 +39,8 @@ export async function handleCreditNoteCreated(client: PoolClient, creditNote: St
       createdAt: new Date(created * 1000),
       customerId,
       invoiceId,
-      description: memo || `Credit note ${number}`,
-      metadata: { type: 'credit_note', reason, number },
+      description: memo ?? `Credit note ${number ?? id}`,
+      metadata: { type: 'credit_note', reason: reason ?? '', number: number ?? '' },
       source: 'webhook',
     });
   });

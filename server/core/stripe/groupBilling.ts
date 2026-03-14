@@ -674,7 +674,7 @@ export async function addGroupMember(params: {
         logger.error('[GroupBilling] Background HubSpot sync for sub-member failed:', { error: err });
       });
       
-      return { success: true, memberId: insertedMemberId };
+      return { success: true, memberId: insertedMemberId ?? undefined };
 
     } catch (dbErr: unknown) {
       logger.error('[GroupBilling] DB transaction failed:', { error: dbErr });
@@ -953,7 +953,7 @@ export async function addCorporateMember(params: {
         logger.error('[GroupBilling] Background HubSpot sync for sub-member failed:', { error: err });
       });
       
-      return { success: true, memberId: insertedMemberId };
+      return { success: true, memberId: insertedMemberId ?? undefined };
       
     } catch (dbErr: unknown) {
       if ((dbErr as unknown as EarlyReturnError)?.__earlyReturn) {

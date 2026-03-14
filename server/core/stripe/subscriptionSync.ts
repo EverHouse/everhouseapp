@@ -329,7 +329,7 @@ export async function syncActiveSubscriptionsFromStripe(): Promise<SubscriptionS
                ) VALUES (${email}, ${firstName}, ${lastName}, ${'member'}, ${tier}, ${stripeCustomerId}, ${stripeSubscriptionId}, ${'active'}, ${'stripe'}, ${'stripe_sync'}, ${hubspotId}, NOW(), NOW())`);
             
             try {
-              await findOrCreateHubSpotContact(email, firstName, lastName);
+              await findOrCreateHubSpotContact(email, firstName ?? '', lastName ?? '');
               const { syncMemberToHubSpot } = await import('../hubspot/stages');
               await syncMemberToHubSpot({ email, status: 'active', tier, billingProvider: 'stripe', memberSince: new Date() });
             } catch (e: unknown) {

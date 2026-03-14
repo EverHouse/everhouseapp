@@ -41,7 +41,7 @@ export async function checkExpiringCards(): Promise<CheckExpiringCardsResult> {
     const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
 
     while (hasMore) {
-      const customers = await stripe.customers.list({ 
+      const customers: Stripe.ApiList<Stripe.Customer> = await stripe.customers.list({ 
         limit: 100,
         starting_after: startingAfter
       });

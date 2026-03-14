@@ -99,7 +99,7 @@ router.post('/api/stripe/subscriptions', isStaffOrAdmin, validateBody(createSubs
         broadcastBillingUpdate({ action: 'subscription_created', memberEmail });
       } else {
         const memberLookup = await db.select({ email: users.email }).from(users).where(eq(users.stripeCustomerId, customerId));
-        if (memberLookup.length > 0) {
+        if (memberLookup.length > 0 && memberLookup[0].email) {
           const email = memberLookup[0].email;
           sendNotificationToUser(email, {
             type: 'billing_update',
@@ -138,7 +138,7 @@ router.delete('/api/stripe/subscriptions/:subscriptionId', isStaffOrAdmin, async
     
     try {
       if (memberLookup.length > 0) {
-        const memberEmail = memberLookup[0].email;
+        const memberEmail = memberLookup[0].email!;
         sendNotificationToUser(memberEmail, {
           type: 'billing_update',
           title: 'Subscription Cancelled',
@@ -249,10 +249,10 @@ router.post('/api/stripe/subscriptions/create-for-member', isStaffOrAdmin, subsc
       return res.status(400).json({ error: `The "${tierName}" tier is not set up in Stripe yet. Run "Sync to Stripe" from Products & Pricing first.` });
     }
     
-    const memberName = `${member.firstName || ''} ${member.lastName || ''}`.trim() || member.email;
+    const memberName = `${member.firstName || ''} ${member.lastName || ''}`.trim() || member.email || '';
     const { customerId } = await getOrCreateStripeCustomer(
       member.id.toString(),
-      member.email,
+      member.email!,
       memberName,
       tierName
     );
@@ -272,7 +272,7 @@ router.post('/api/stripe/subscriptions/create-for-member', isStaffOrAdmin, subsc
       priceId: tier.stripePriceId,
       couponId: couponId || undefined,
       metadata: {
-        memberEmail: member.email,
+        memberEmail: member.email || '',
         tier: tierName,
         tier_slug: tier.slug,
         createdBy: sessionUser?.email || 'staff',
@@ -377,7 +377,7 @@ router.post('/api/stripe/subscriptions/create-for-member', isStaffOrAdmin, subsc
     // Sync to HubSpot
     try {
       const { syncMemberToHubSpot } = await import('../../core/hubspot/stages');
-      await syncMemberToHubSpot({ email: member.email, status: memberStatus, tier: tierName, billingProvider: 'stripe', memberSince: new Date(), billingGroupRole: 'Primary' });
+      await syncMemberToHubSpot({ email: member.email!, status: memberStatus, tier: tierName, billingProvider: 'stripe', memberSince: new Date(), billingGroupRole: 'Primary' });
       logger.info('[Stripe] Synced to HubSpot: status=, tier=, billing=stripe, memberSince=now', { extra: { memberEmail: member.email, memberStatus, tierName } });
     } catch (hubspotError) {
       logger.error('[Stripe] HubSpot sync failed for subscription creation', { extra: { hubspotError } });
@@ -386,13 +386,13 @@ router.post('/api/stripe/subscriptions/create-for-member', isStaffOrAdmin, subsc
     logger.info('[Stripe] Created subscription for', { extra: { memberEmail: member.email, subscriptionResultSubscription: subscriptionResult.subscription?.subscriptionId } });
     
     try {
-      sendNotificationToUser(member.email, {
+      sendNotificationToUser(member.email!, {
         type: 'billing_update',
         title: 'Membership Activated',
         message: `Your ${tierName} membership has been activated.`,
         data: { subscriptionId: subscriptionResult.subscription?.subscriptionId, tier: tierName }
       });
-      broadcastBillingUpdate({ action: 'subscription_created', memberEmail: member.email });
+      broadcastBillingUpdate({ action: 'subscription_created', memberEmail: member.email! });
     } catch (notifyError) {
       logger.error('[Stripe] Failed to send membership activation notification', { extra: { notifyError } });
     }
@@ -896,7 +896,7 @@ router.post('/api/stripe/subscriptions/confirm-inline-payment', isStaffOrAdmin, 
       const userResult = await db.select({ email: users.email, tier: users.tier }).from(users).where(eq(users.id, userId));
       
       if (userResult.length > 0) {
-        userEmail = userResult[0].email;
+        userEmail = userResult[0].email || '';
         tierName = userResult[0].tier || '';
         
         await db.update(users).set({ membershipStatus: 'active', billingProvider: 'stripe', archivedAt: null, archivedBy: null, updatedAt: new Date() }).where(eq(users.id, userId));
@@ -910,7 +910,7 @@ router.post('/api/stripe/subscriptions/confirm-inline-payment', isStaffOrAdmin, 
         const custResult = await db.select({ id: users.id, email: users.email, tier: users.tier }).from(users).where(eq(users.stripeCustomerId, piCustId));
         
         if (custResult.length > 0) {
-          userEmail = custResult[0].email;
+          userEmail = custResult[0].email || '';
           tierName = custResult[0].tier || '';
           
           await db.update(users).set({ membershipStatus: 'active', billingProvider: 'stripe', archivedAt: null, archivedBy: null, updatedAt: new Date() }).where(eq(users.stripeCustomerId, piCustId));
@@ -1009,7 +1009,7 @@ router.post('/api/stripe/subscriptions/send-activation-link', isStaffOrAdmin, va
       } else if (existing.membershipStatus === 'pending') {
         const name = [existing.firstName, existing.lastName].filter(Boolean).join(' ') || email;
         return res.status(400).json({ 
-          error: `This email has an incomplete signup from ${new Date(existing.createdAt).toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' })}. Clean it up to proceed.`,
+          error: `This email has an incomplete signup from ${new Date(existing.createdAt || Date.now()).toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' })}. Clean it up to proceed.`,
           isPendingUser: true,
           existingUserId: existing.id,
           existingUserName: name,
@@ -1170,7 +1170,7 @@ router.post('/api/stripe/subscriptions/send-activation-link', isStaffOrAdmin, va
     const emailResult = await sendMembershipActivationEmail(email, {
       memberName,
       tierName: tier.name,
-      monthlyPrice: tier.priceCents / 100,
+      monthlyPrice: (tier.priceCents ?? 0) / 100,
       checkoutUrl: checkoutSession.url,
       expiresAt
     });
@@ -1235,6 +1235,10 @@ router.delete('/api/stripe/subscriptions/cleanup-pending/:userId', isStaffOrAdmi
       });
     }
 
+    if (!user.email) {
+      return res.status(400).json({ error: 'User has no email address' });
+    }
+
     if (!await acquireSubscriptionLock(user.email)) {
       return res.status(409).json({ error: 'A subscription is currently being created for this member. Please wait and try again.' });
     }
@@ -1277,20 +1281,21 @@ router.delete('/api/stripe/subscriptions/cleanup-pending/:userId', isStaffOrAdmi
       }
     }
     
+    const userEmailLower = user.email.toLowerCase();
     const cleanupQueries = [
       { name: 'event_rsvps', query: sql`UPDATE event_rsvps SET matched_user_id = NULL WHERE matched_user_id = ${userId}` },
-      { name: 'notifications', query: sql`DELETE FROM notifications WHERE user_email = ${user.email.toLowerCase()}` },
-      { name: 'push_subscriptions', query: sql`DELETE FROM push_subscriptions WHERE user_email = ${user.email.toLowerCase()}` },
-      { name: 'user_dismissed_notices', query: sql`DELETE FROM user_dismissed_notices WHERE user_email = ${user.email.toLowerCase()}` },
+      { name: 'notifications', query: sql`DELETE FROM notifications WHERE user_email = ${userEmailLower}` },
+      { name: 'push_subscriptions', query: sql`DELETE FROM push_subscriptions WHERE user_email = ${userEmailLower}` },
+      { name: 'user_dismissed_notices', query: sql`DELETE FROM user_dismissed_notices WHERE user_email = ${userEmailLower}` },
       { name: 'audit_log', query: sql`DELETE FROM audit_log WHERE resource_id = ${userId} AND resource_type = 'member'` },
       { name: 'booking_participants', query: sql`UPDATE booking_participants SET user_id = NULL WHERE user_id = ${userId}` },
       { name: 'booking_requests', query: sql`UPDATE booking_requests SET user_id = NULL WHERE user_id = ${userId}` },
-      { name: 'magic_links', query: sql`DELETE FROM magic_links WHERE email = ${user.email.toLowerCase()}` },
-      { name: 'rate_limits', query: sql`DELETE FROM rate_limits WHERE key LIKE ${'otp_verify:' + user.email.toLowerCase() + '%'}` },
-      { name: 'guest_passes', query: sql`DELETE FROM guest_passes WHERE LOWER(member_email) = ${user.email.toLowerCase()}` },
-      { name: 'guest_pass_holds', query: sql`DELETE FROM guest_pass_holds WHERE LOWER(member_email) = ${user.email.toLowerCase()}` },
-      { name: 'usage_ledger', query: sql`DELETE FROM usage_ledger WHERE LOWER(member_id) = ${user.email.toLowerCase()}` },
-      { name: 'member_action_log', query: sql`DELETE FROM member_action_log WHERE LOWER(member_email) = ${user.email.toLowerCase()}` },
+      { name: 'magic_links', query: sql`DELETE FROM magic_links WHERE email = ${userEmailLower}` },
+      { name: 'rate_limits', query: sql`DELETE FROM rate_limits WHERE key LIKE ${'otp_verify:' + userEmailLower + '%'}` },
+      { name: 'guest_passes', query: sql`DELETE FROM guest_passes WHERE LOWER(member_email) = ${userEmailLower}` },
+      { name: 'guest_pass_holds', query: sql`DELETE FROM guest_pass_holds WHERE LOWER(member_email) = ${userEmailLower}` },
+      { name: 'usage_ledger', query: sql`DELETE FROM usage_ledger WHERE LOWER(member_id) = ${userEmailLower}` },
+      { name: 'member_action_log', query: sql`DELETE FROM member_action_log WHERE LOWER(member_email) = ${userEmailLower}` },
     ];
 
     const failedTables: string[] = [];
@@ -1313,7 +1318,7 @@ router.delete('/api/stripe/subscriptions/cleanup-pending/:userId', isStaffOrAdmi
     const userName = [user.firstName, user.lastName].filter(Boolean).join(' ') || user.email;
     logger.info('[Stripe] Cleaned up pending user () by', { extra: { userEmail: user.email, userName, sessionUser: sessionUser?.email } });
     
-    logFromRequest(req, 'cleanup_pending_user', 'member', user.email,
+    logFromRequest(req, 'cleanup_pending_user' as Parameters<typeof logFromRequest>[1], 'member', user.email,
       userName, { status: user.membershipStatus });
     
     res.json({ 

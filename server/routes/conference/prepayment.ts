@@ -124,7 +124,7 @@ router.post('/api/member/conference/prepay/estimate', isAuthenticated, async (re
       extra: { memberEmail: normalizedEmail, date, durationMinutes, overageMinutes, totalCents }
     });
 
-    try { logFromRequest(req, { action: 'create_conference_prepayment', resourceType: 'payment', details: { memberEmail: normalizedEmail, date, startTime, durationMinutes, overageMinutes, totalCents, estimateOnly: true } }); } catch (auditErr) { logger.warn('[Audit] Failed to log create_conference_prepayment estimate:', auditErr); }
+    try { logFromRequest(req, { action: 'create_conference_prepayment', resourceType: 'payment', details: { memberEmail: normalizedEmail, date, startTime, durationMinutes, overageMinutes, totalCents, estimateOnly: true } }); } catch (auditErr) { logger.warn('[Audit] Failed to log create_conference_prepayment estimate:', { error: auditErr }); }
 
     res.json(response);
   } catch (error: unknown) {
@@ -301,7 +301,7 @@ router.post('/api/member/conference/prepay/create-intent', isAuthenticated, asyn
             }
           });
 
-          try { logFromRequest(req, { action: 'create_conference_prepayment', resourceType: 'payment', resourceId: String((prepaymentResult.rows[0] as unknown as PrepaymentInsertRow).id), details: { memberEmail: normalizedEmail, date, startTime, durationMinutes, overageMinutes, amountCents: totalCents, paymentType: 'credit', balanceRef } }); } catch (auditErr) { logger.warn('[Audit] Failed to log create_conference_prepayment:', auditErr); }
+          try { logFromRequest(req, { action: 'create_conference_prepayment', resourceType: 'payment', resourceId: String((prepaymentResult.rows[0] as unknown as PrepaymentInsertRow).id), details: { memberEmail: normalizedEmail, date, startTime, durationMinutes, overageMinutes, amountCents: totalCents, paymentType: 'credit', balanceRef } }); } catch (auditErr) { logger.warn('[Audit] Failed to log create_conference_prepayment:', { error: auditErr }); }
 
           return res.json({
             creditApplied: true,
@@ -361,7 +361,7 @@ router.post('/api/member/conference/prepay/create-intent', isAuthenticated, asyn
         }
       });
 
-      try { logFromRequest(req, { action: 'create_conference_prepayment', resourceType: 'payment', resourceId: String((prepaymentResult.rows[0] as unknown as PrepaymentInsertRow).id), details: { memberEmail: normalizedEmail, date, startTime, durationMinutes, overageMinutes, amountCents: totalCents, paymentType: 'balance', balanceRef } }); } catch (auditErr) { logger.warn('[Audit] Failed to log create_conference_prepayment:', auditErr); }
+      try { logFromRequest(req, { action: 'create_conference_prepayment', resourceType: 'payment', resourceId: String((prepaymentResult.rows[0] as unknown as PrepaymentInsertRow).id), details: { memberEmail: normalizedEmail, date, startTime, durationMinutes, overageMinutes, amountCents: totalCents, paymentType: 'balance', balanceRef } }); } catch (auditErr) { logger.warn('[Audit] Failed to log create_conference_prepayment:', { error: auditErr }); }
 
       return res.json({
         creditApplied: true,
@@ -397,7 +397,7 @@ router.post('/api/member/conference/prepay/create-intent', isAuthenticated, asyn
       }
     });
 
-    try { logFromRequest(req, { action: 'create_conference_prepayment', resourceType: 'payment', resourceId: String(insertedRow.id), details: { memberEmail: normalizedEmail, date, startTime, durationMinutes, overageMinutes, amountCents: totalCents, paymentType: 'stripe', paymentIntentId: result.paymentIntentId, balanceApplied: result.balanceApplied } }); } catch (auditErr) { logger.warn('[Audit] Failed to log create_conference_prepayment:', auditErr); }
+    try { logFromRequest(req, { action: 'create_conference_prepayment', resourceType: 'payment', resourceId: String(insertedRow.id), details: { memberEmail: normalizedEmail, date, startTime, durationMinutes, overageMinutes, amountCents: totalCents, paymentType: 'stripe', paymentIntentId: result.paymentIntentId, balanceApplied: result.balanceApplied } }); } catch (auditErr) { logger.warn('[Audit] Failed to log create_conference_prepayment:', { error: auditErr }); }
 
     res.json({
       clientSecret: result.clientSecret,
@@ -480,7 +480,7 @@ router.post('/api/member/conference/prepay/:id/confirm', isAuthenticated, async 
       extra: { prepaymentId, paymentIntentId }
     });
 
-    try { logFromRequest(req, { action: 'confirm_conference_prepayment', resourceType: 'payment', resourceId: String(prepaymentId), details: { memberEmail: prepayment.member_email, bookingDate: prepayment.booking_date, amountCents: prepayment.amount_cents, paymentIntentId } }); } catch (auditErr) { logger.warn('[Audit] Failed to log confirm_conference_prepayment:', auditErr); }
+    try { logFromRequest(req, { action: 'confirm_conference_prepayment', resourceType: 'payment', resourceId: String(prepaymentId), details: { memberEmail: prepayment.member_email, bookingDate: prepayment.booking_date, amountCents: prepayment.amount_cents, paymentIntentId } }); } catch (auditErr) { logger.warn('[Audit] Failed to log confirm_conference_prepayment:', { error: auditErr }); }
 
     res.json({ success: true });
   } catch (error: unknown) {

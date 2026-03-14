@@ -582,7 +582,15 @@ router.post('/api/member/bookings/:id/pay-fees', isAuthenticated, paymentRateLim
       bookingEmail: booking.user_email,
       serverFees,
       serverTotal,
-      pendingFees,
+      pendingFees: pendingFees.map(f => ({
+        participantId: f.participantId ?? null,
+        displayName: f.displayName,
+        totalCents: f.totalCents,
+        overageCents: f.overageCents,
+        guestCents: f.guestCents,
+        participantType: f.participantType,
+        minutesAllocated: f.minutesAllocated,
+      })),
       resolvedUserId,
       stripeCustomerId,
       trackmanId,
@@ -1655,7 +1663,7 @@ router.post('/api/member/balance/pay', isAuthenticated, async (req: Request, res
           parsedFees = {};
         }
         const existingApplyCredit = parsedFees.applyCredit !== false;
-        const existingParticipantIds = (parsedFees.fees || []).map((p: Record<string, unknown>) => p.id).sort().join(',');
+        const existingParticipantIds = (Array.isArray(parsedFees.fees) ? parsedFees.fees : []).map((p: Record<string, unknown>) => p.id).sort().join(',');
         const newParticipantIds = participantFees.map(p => p.id).sort().join(',');
         const participantsMatch = existingParticipantIds === newParticipantIds;
         

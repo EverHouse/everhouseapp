@@ -100,7 +100,7 @@ export async function checkStripeSubscriptionSync(): Promise<IntegrityCheckResul
             category: 'sync_mismatch',
             severity: 'error',
             table: 'users',
-            recordId: member.id,
+            recordId: member.id ?? '',
             description: `Member "${memberName}" shows as active in database but has no Stripe subscription (billing via Stripe)`,
             suggestion: 'Verify member payment status or update membership status. Note: MindBody-billed members are excluded from this check.',
             context: {
@@ -145,7 +145,7 @@ export async function checkStripeSubscriptionSync(): Promise<IntegrityCheckResul
             category: 'sync_mismatch',
             severity: 'error',
             table: 'users',
-            recordId: member.id,
+            recordId: member.id ?? '',
             description: `Member "${memberName}" has status mismatch: DB shows "${member.membership_status}" but Stripe subscription is "${stripeStatus}"`,
             suggestion: 'Sync membership status with Stripe subscription state',
             context: {
@@ -188,7 +188,7 @@ export async function checkStripeSubscriptionSync(): Promise<IntegrityCheckResul
             category: 'sync_mismatch',
             severity: 'warning',
             table: 'users',
-            recordId: member.id,
+            recordId: member.id ?? '',
             description: `Member "${memberName}" has tier mismatch: DB tier is "${member.tier}" but Stripe product is "${activeProduct.name}"`,
             suggestion: 'Update database tier to match Stripe subscription product',
             context: {
@@ -212,7 +212,7 @@ export async function checkStripeSubscriptionSync(): Promise<IntegrityCheckResul
           category: 'data_quality',
           severity: 'error',
           table: 'users',
-          recordId: member.id,
+          recordId: member.id ?? '',
           description: `Member "${memberName}" has orphaned Stripe customer ID (${customerId}) - customer no longer exists in Stripe`,
           suggestion: 'Clear the stripe_customer_id field or run Stripe cleanup to remove orphaned references',
           context: {
@@ -229,7 +229,7 @@ export async function checkStripeSubscriptionSync(): Promise<IntegrityCheckResul
           category: 'sync_mismatch',
           severity: 'warning',
           table: 'users',
-          recordId: member.id,
+          recordId: member.id ?? '',
           description: `Error fetching Stripe subscriptions for "${memberName}": ${getErrorMessage(err)}`,
           suggestion: 'Check Stripe customer ID validity'
         });

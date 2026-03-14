@@ -366,8 +366,8 @@ function mapInvoice(invoice: Stripe.Invoice): InvoiceResult {
     currency: invoice.currency,
     customerEmail: invoice.customer_email,
     description: invoice.description,
-    hostedInvoiceUrl: invoice.hosted_invoice_url,
-    invoicePdf: invoice.invoice_pdf,
+    hostedInvoiceUrl: invoice.hosted_invoice_url ?? null,
+    invoicePdf: invoice.invoice_pdf ?? null,
     created: new Date(invoice.created * 1000),
     dueDate: invoice.due_date ? new Date(invoice.due_date * 1000) : null,
     paidAt: invoice.status_transitions?.paid_at 
@@ -515,8 +515,8 @@ export async function createBookingFeeInvoice(
         clientSecret: '',
         status: 'succeeded',
         paidInFull: true,
-        hostedInvoiceUrl: paidInvoice.hosted_invoice_url,
-        invoicePdf: paidInvoice.invoice_pdf,
+        hostedInvoiceUrl: paidInvoice.hosted_invoice_url ?? null,
+        invoicePdf: paidInvoice.invoice_pdf ?? null,
         amountFromBalance,
         amountCharged: 0,
       };
@@ -556,8 +556,8 @@ export async function createBookingFeeInvoice(
         paymentIntentId: invoicePiId,
         clientSecret: pi.client_secret || '',
         status: pi.status,
-        hostedInvoiceUrl: paidInvoice.hosted_invoice_url,
-        invoicePdf: paidInvoice.invoice_pdf,
+        hostedInvoiceUrl: paidInvoice.hosted_invoice_url ?? null,
+        invoicePdf: paidInvoice.invoice_pdf ?? null,
         amountFromBalance,
         amountCharged: Math.max(0, amountCharged),
       };
@@ -574,8 +574,8 @@ export async function createBookingFeeInvoice(
       paymentIntentId: invoicePiId,
       clientSecret: paymentIntent.client_secret || '',
       status: paymentIntent.status,
-      hostedInvoiceUrl: finalizedInvoice.hosted_invoice_url,
-      invoicePdf: finalizedInvoice.invoice_pdf,
+      hostedInvoiceUrl: finalizedInvoice.hosted_invoice_url ?? null,
+      invoicePdf: finalizedInvoice.invoice_pdf ?? null,
     };
   } catch (error: unknown) {
     try {

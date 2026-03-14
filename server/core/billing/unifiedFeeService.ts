@@ -265,21 +265,28 @@ async function loadSessionData(sessionId?: number, bookingId?: number): Promise<
         participantId: undefined,
         userId: null,
         email: session.host_email,
-        displayName: session.host_email,
+        displayName: session.host_email || 'Unknown',
         participantType: 'owner'
       }];
     }
     
     return {
-      sessionId: session.session_id,
-      bookingId: session.booking_id,
+      sessionId: session.session_id ?? 0,
+      bookingId: session.booking_id ?? 0,
       sessionDate: session.session_date,
       startTime: session.start_time,
       sessionDuration: session.duration_minutes,
-      declaredPlayerCount: parseInt(session.declared_player_count) || 1,
-      hostEmail: session.host_email,
+      declaredPlayerCount: parseInt(String(session.declared_player_count)) || 1,
+      hostEmail: session.host_email || '',
       isConferenceRoom: session.resource_type === 'conference_room',
-      participants
+      participants: participants.map(p => ({
+        participantId: p.participantId ?? 0,
+        userId: p.userId || undefined,
+        guestId: p.guestId ?? undefined,
+        email: p.email || undefined,
+        displayName: p.displayName,
+        participantType: p.participantType,
+      }))
     };
   } catch (error: unknown) {
     logger.error('[UnifiedFeeService] Error loading session data:', { error: getErrorMessage(error) });
@@ -731,9 +738,9 @@ export async function computeFeeBreakdown(params: FeeComputeParams): Promise<Fee
         continue;
       }
       // Use batched tier data, fallback to individual query if not found
-      let tierName = tierMap.get(ownerEmail.toLowerCase());
+      let tierName: string | undefined = tierMap.get(ownerEmail.toLowerCase());
       if (!tierName && ownerEmail) {
-        tierName = await getMemberTierByEmail(ownerEmail);
+        tierName = (await getMemberTierByEmail(ownerEmail)) ?? undefined;
       }
       const tierLimits = tierName ? await getTierLimits(tierName) : null;
       // Use conference room minutes for conference room bookings, simulator minutes otherwise
@@ -745,7 +752,7 @@ export async function computeFeeBreakdown(params: FeeComputeParams): Promise<Fee
       // Use batched usage data - look up by BOTH userId and email
       const usedMinutesToday = getUsageForParticipant(participant.userId || null, ownerEmail);
       
-      lineItem.tierName = tierName || undefined;
+      lineItem.tierName = tierName ?? undefined;
       lineItem.dailyAllowance = dailyAllowance;
       lineItem.usedMinutesToday = usedMinutesToday;
       
@@ -812,9 +819,9 @@ export async function computeFeeBreakdown(params: FeeComputeParams): Promise<Fee
         continue;
       }
       // Use batched tier data, fallback to individual query if not found
-      let tierName = tierMap.get(memberEmail.toLowerCase());
+      let tierName: string | undefined = tierMap.get(memberEmail.toLowerCase());
       if (!tierName && memberEmail) {
-        tierName = await getMemberTierByEmail(memberEmail);
+        tierName = (await getMemberTierByEmail(memberEmail)) ?? undefined;
       }
       const tierLimits = tierName ? await getTierLimits(tierName) : null;
 
@@ -838,7 +845,7 @@ export async function computeFeeBreakdown(params: FeeComputeParams): Promise<Fee
       // Use batched usage data - look up by BOTH userId and email
       const usedMinutesToday = getUsageForParticipant(participant.userId || null, memberEmail);
       
-      lineItem.tierName = tierName || undefined;
+      lineItem.tierName = tierName ?? undefined;
       lineItem.dailyAllowance = dailyAllowance;
       lineItem.usedMinutesToday = usedMinutesToday;
       

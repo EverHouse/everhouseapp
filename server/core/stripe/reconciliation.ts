@@ -157,7 +157,7 @@ export async function reconcileSubscriptions() {
           } else {
             customer = subscription.customer as Stripe.Customer;
             
-            if (!customer || customer.deleted) {
+            if (!customer || (customer as unknown as Stripe.DeletedCustomer).deleted) {
               logger.warn(`[Reconcile] Subscription ${subscription.id} has deleted/missing customer - skipping`);
               continue;
             }

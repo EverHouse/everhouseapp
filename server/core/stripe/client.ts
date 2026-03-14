@@ -35,7 +35,7 @@ async function getCredentials() {
     throw new Error(`Stripe connector request failed (${response.status}): ${text.slice(0, 200)}`);
   }
 
-  const data = await response.json();
+  const data = await response.json() as { items?: Array<Record<string, unknown>> };
   
   connectionSettings = data.items?.[0];
 

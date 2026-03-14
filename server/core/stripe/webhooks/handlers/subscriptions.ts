@@ -486,7 +486,7 @@ export async function handleSubscriptionCreated(client: PoolClient, subscription
                   email: deferredActivationEmail,
                   status: deferredActivationStatus,
                   billingProvider: 'stripe',
-                  tier: deferredActivationTierName,
+                  tier: deferredActivationTierName ?? undefined,
                   ...(existingJoinDate ? {} : { memberSince: new Date() }),
                   stripeCustomerId: deferredActivationCustomerId,
                   stripePricingInterval: deferredActivationInterval,

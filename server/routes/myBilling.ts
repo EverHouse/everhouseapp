@@ -43,7 +43,7 @@ const optionalEmailSchema = z.object({
 
 router.get('/api/my/billing', requireAuth, validateQuery(optionalEmailSchema), async (req, res) => {
   try {
-    const sessionUser = req.session.user;
+    const sessionUser = req.session.user!;
     const isStaff = await isDbVerifiedStaff(sessionUser.email);
     const vq = (req as Request & { validatedQuery: z.infer<typeof optionalEmailSchema> }).validatedQuery;
     const targetEmail = (vq.email && isStaff) ? vq.email.trim().toLowerCase() : sessionUser.email;
@@ -155,7 +155,7 @@ router.get('/api/my/billing', requireAuth, validateQuery(optionalEmailSchema), a
 
 router.get('/api/my/billing/invoices', requireAuth, validateQuery(optionalEmailSchema), async (req, res) => {
   try {
-    const sessionUser = req.session.user;
+    const sessionUser = req.session.user!;
     const isStaff = await isDbVerifiedStaff(sessionUser.email);
     const vq = (req as Request & { validatedQuery: z.infer<typeof optionalEmailSchema> }).validatedQuery;
     const email = (vq.email && isStaff) ? vq.email.trim().toLowerCase() : sessionUser.email;
@@ -199,7 +199,7 @@ router.get('/api/my/billing/invoices', requireAuth, validateQuery(optionalEmailS
 
 router.post('/api/my/billing/update-payment-method', requireAuth, async (req, res) => {
   try {
-    const email = req.session.user.email;
+    const email = req.session.user!.email;
     
     const result = await db.execute(sql`SELECT stripe_customer_id, billing_provider, migration_status FROM users WHERE LOWER(email) = ${email.toLowerCase()}`);
     
@@ -233,7 +233,7 @@ router.post('/api/my/billing/update-payment-method', requireAuth, async (req, re
 
 router.post('/api/my/billing/portal', requireAuth, async (req, res) => {
   try {
-    const sessionUser = req.session.user;
+    const sessionUser = req.session.user!;
     const isStaff = await isDbVerifiedStaff(sessionUser.email);
     const targetEmail = (req.body.email && isStaff) ? String(req.body.email).trim().toLowerCase() : sessionUser.email;
     
@@ -293,7 +293,7 @@ router.post('/api/my/billing/portal', requireAuth, async (req, res) => {
 // MindBody members use this to add a card for overage fees without requesting migration
 router.post('/api/my/billing/add-payment-method-for-extras', requireAuth, async (req, res) => {
   try {
-    const email = req.session.user.email;
+    const email = req.session.user!.email;
     
     if (await isDbVerifiedStaff(email)) {
       return res.status(400).json({ error: 'Staff accounts do not use billing' });
@@ -337,7 +337,7 @@ router.post('/api/my/billing/add-payment-method-for-extras', requireAuth, async 
 
 router.post('/api/my/billing/migrate-to-stripe', requireAuth, async (req, res) => {
   try {
-    const email = req.session.user.email;
+    const email = req.session.user!.email;
     
     if (await isDbVerifiedStaff(email)) {
       return res.status(400).json({ error: 'Staff accounts do not use billing' });
@@ -404,7 +404,7 @@ router.post('/api/my/billing/migrate-to-stripe', requireAuth, async (req, res) =
 
 router.get('/api/my/balance', requireAuth, async (req, res) => {
   try {
-    const email = req.session.user.email;
+    const email = req.session.user!.email;
     
     if (await isDbVerifiedStaff(email)) {
       return res.json({ balanceCents: 0, balanceDollars: 0, isStaff: true });
@@ -438,7 +438,7 @@ router.get('/api/my/balance', requireAuth, async (req, res) => {
 
 router.post('/api/my/add-funds', requireAuth, async (req, res) => {
   try {
-    const email = req.session.user.email;
+    const email = req.session.user!.email;
     const { amountCents } = req.body;
     
     if (!amountCents || amountCents < 500 || amountCents > 50000) {
@@ -504,7 +504,7 @@ const billingEmailQuerySchema = z.object({
 
 router.get('/api/my-billing/account-balance', requireAuth, validateQuery(billingEmailQuerySchema), async (req, res) => {
   try {
-    const sessionEmail = req.session.user.email;
+    const sessionEmail = req.session.user!.email;
     const isStaffUser = await isDbVerifiedStaff(sessionEmail);
     
     const vq = (req as Request & { validatedQuery: z.infer<typeof billingEmailQuerySchema> }).validatedQuery;
@@ -548,7 +548,7 @@ router.get('/api/my-billing/account-balance', requireAuth, validateQuery(billing
 });
 
 // Sync member to Stripe - create or find customer by email
-router.post('/api/member-billing/:email/sync-stripe', requireStaffAuth, async (req, res) => {
+router.post('/api/member-billing/:email/sync-stripe', requireStaffAuth, async (req: Request, res: Response) => {
   try {
     const targetEmail = decodeURIComponent(req.params.email as string).trim().toLowerCase();
     
@@ -577,7 +577,7 @@ router.post('/api/member-billing/:email/sync-stripe', requireStaffAuth, async (r
 });
 
 // Sync customer metadata to Stripe
-router.post('/api/member-billing/:email/sync-metadata', requireStaffAuth, async (req, res) => {
+router.post('/api/member-billing/:email/sync-metadata', requireStaffAuth, async (req: Request, res: Response) => {
   try {
     const targetEmail = decodeURIComponent(req.params.email as string).trim().toLowerCase();
     
@@ -612,7 +612,7 @@ router.post('/api/member-billing/:email/sync-metadata', requireStaffAuth, async 
 });
 
 // Sync tier from Stripe subscription - fetches active subscription and updates tier based on product name
-router.post('/api/member-billing/:email/sync-tier-from-stripe', requireStaffAuth, async (req, res) => {
+router.post('/api/member-billing/:email/sync-tier-from-stripe', requireStaffAuth, async (req: Request, res: Response) => {
   try {
     const targetEmail = decodeURIComponent(req.params.email as string).trim().toLowerCase();
     
@@ -734,7 +734,7 @@ router.post('/api/member-billing/:email/sync-tier-from-stripe', requireStaffAuth
 });
 
 // Backfill transaction cache for individual member
-router.post('/api/member-billing/:email/backfill-cache', requireStaffAuth, async (req, res) => {
+router.post('/api/member-billing/:email/backfill-cache', requireStaffAuth, async (req: Request, res: Response) => {
   try {
     const targetEmail = decodeURIComponent(req.params.email as string).trim().toLowerCase();
     
@@ -789,7 +789,7 @@ router.post('/api/member-billing/:email/backfill-cache', requireStaffAuth, async
 
 router.post('/api/my/billing/request-cancellation', requireAuth, async (req, res) => {
   try {
-    const email = req.session.user.email;
+    const email = req.session.user!.email;
     const { reason } = req.body;
     
     const result = await db.execute(sql`SELECT id, email, billing_provider, stripe_customer_id, cancellation_requested_at 
@@ -867,7 +867,7 @@ router.post('/api/my/billing/request-cancellation', requireAuth, async (req, res
 
 router.get('/api/my/billing/cancellation-status', requireAuth, async (req, res) => {
   try {
-    const email = req.session.user.email;
+    const email = req.session.user!.email;
     
     const result = await db.execute(sql`SELECT cancellation_requested_at, cancellation_effective_date, cancellation_reason
        FROM users WHERE LOWER(email) = ${email.toLowerCase()}`);
@@ -892,7 +892,7 @@ router.get('/api/my/billing/cancellation-status', requireAuth, async (req, res) 
 router.get('/api/my-billing/receipt/:paymentIntentId', requireAuth, async (req, res) => {
   try {
     const { paymentIntentId } = req.params;
-    const sessionEmail = req.session.user.email;
+    const sessionEmail = req.session.user!.email;
     
     if (!paymentIntentId || !(paymentIntentId as string).startsWith('pi_')) {
       return res.status(400).json({ error: 'Invalid payment intent ID' });

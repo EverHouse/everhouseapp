@@ -206,7 +206,7 @@ export async function handleInvoicePaymentFailed(client: PoolClient, invoice: In
   logPaymentFailure({
     paymentIntentId: typeof invoice.payment_intent === 'string' ? invoice.payment_intent : invoice.payment_intent?.id,
     customerId: invoiceCustomerId,
-    userEmail: invoice.customer_email,
+    userEmail: invoice.customer_email ?? undefined,
     amountCents: invoice.amount_due,
     errorMessage: `Invoice payment failed: ${invoice.id} (attempt ${attemptCount})`,
     errorCode: 'invoice_payment_failed'
@@ -419,7 +419,7 @@ export async function handleInvoiceLifecycle(client: PoolClient, invoice: Invoic
       objectType: 'invoice',
       amountCents: amountDue,
       currency: invoice.currency || 'usd',
-      status: invoice.status,
+      status: invoice.status || 'unknown',
       createdAt: new Date(invoice.created * 1000),
       customerId,
       customerEmail: invoiceEmail,
