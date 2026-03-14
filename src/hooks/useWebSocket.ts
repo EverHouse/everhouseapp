@@ -32,6 +32,8 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isConnectingRef = useRef(false);
   const intentionalCloseRef = useRef(false);
+  const reconnectAttemptRef = useRef(0);
+  const MAX_RECONNECT_ATTEMPTS = 15;
 
   const emailToUse = effectiveEmail || user?.email;
   const isViewAsMode = effectiveEmail && effectiveEmail !== user?.email;
@@ -72,6 +74,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
 
       ws.onopen = () => {
         isConnectingRef.current = false;
+        reconnectAttemptRef.current = 0;
         window.__wsConnected = true;
         ws.send(JSON.stringify({ type: 'auth', email: emailToUse }));
       };
@@ -194,11 +197,18 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
         }
         
         if (emailToUse && !intentionalCloseRef.current && wsRef.current === null) {
-          const jitter = 2000 + Math.floor(Math.random() * 3000);
+          if (reconnectAttemptRef.current >= MAX_RECONNECT_ATTEMPTS) {
+            console.warn(`[WebSocket] Max reconnect attempts (${MAX_RECONNECT_ATTEMPTS}) reached, stopping`);
+            return;
+          }
+          const baseDelay = 2000;
+          const maxDelay = 30000;
+          const delay = Math.min(baseDelay * Math.pow(2, reconnectAttemptRef.current), maxDelay);
+          reconnectAttemptRef.current++;
           reconnectTimeoutRef.current = setTimeout(() => {
             // eslint-disable-next-line react-hooks/immutability
             connect();
-          }, jitter);
+          }, delay);
         }
       };
 

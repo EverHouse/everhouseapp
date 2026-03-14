@@ -8,6 +8,15 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.86.1",
+    date: "2026-03-14",
+    title: "WebSocket Reconnect Loop Fix",
+    changes: [
+      "Fix: WebSocket connections now use exponential backoff and a maximum retry limit — prevents endless reconnection attempts when a session expires, reducing unnecessary server load",
+      "Improvement: Both member and staff WebSocket connections stop retrying after reaching the limit, keeping the app responsive without hammering the server",
+    ]
+  },
+  {
     version: "8.86.0",
     date: "2026-03-14",
     title: "Security Audit & Code Quality Hardening",

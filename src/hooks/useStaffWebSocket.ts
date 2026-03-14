@@ -32,6 +32,7 @@ export function useStaffWebSocket(options: UseStaffWebSocketOptions = {}) {
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const reconnectAttemptRef = useRef(0);
+  const MAX_RECONNECT_ATTEMPTS = 20;
   const initTimerRef = useRef<NodeJS.Timeout | null>(null);
   const isConnectingRef = useRef(false);
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -398,6 +399,10 @@ export function useStaffWebSocket(options: UseStaffWebSocketOptions = {}) {
           const currentEmail = userEmailRef.current;
           const currentRole = userRoleRef.current;
           if (currentEmail && (currentRole === 'staff' || currentRole === 'admin')) {
+            if (reconnectAttemptRef.current >= MAX_RECONNECT_ATTEMPTS) {
+              console.warn(`[StaffWebSocket] Max reconnect attempts (${MAX_RECONNECT_ATTEMPTS}) reached, stopping`);
+              return;
+            }
             const baseDelay = 2000;
             const maxDelay = 30000;
             const delay = Math.min(baseDelay * Math.pow(2, reconnectAttemptRef.current), maxDelay);
