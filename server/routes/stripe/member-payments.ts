@@ -1111,7 +1111,7 @@ router.post('/api/member/bookings/:id/pay-saved-card', isAuthenticated, paymentR
 
       broadcastBillingUpdate({
         memberEmail: sessionEmail,
-        action: 'payment_completed',
+        action: 'payment_confirmed',
         bookingId,
         status: 'paid'
       });
@@ -1396,7 +1396,8 @@ router.post('/api/member/invoices/:invoiceId/pay-saved-card', isAuthenticated, p
       });
     }
 
-    const piId = typeof paidInvoice.payment_intent === 'string' ? paidInvoice.payment_intent : paidInvoice.payment_intent?.id;
+    const rawPi = (paidInvoice as unknown as StripeInvoiceExpanded).payment_intent;
+    const piId = typeof rawPi === 'string' ? rawPi : rawPi?.id;
     if (piId) {
       const pi = await stripe.paymentIntents.retrieve(piId);
       if (pi.status === 'requires_action') {

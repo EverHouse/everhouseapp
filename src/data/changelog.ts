@@ -8,6 +8,15 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.87.10",
+    date: "2026-03-14",
+    title: "Bug Fixes & Code Quality",
+    changes: [
+      "Fixed: Billing notifications now broadcast correctly when members pay with a saved card",
+      "Fixed: Invoice payment processing now properly handles Stripe payment intent verification",
+    ]
+  },
+  {
     version: "8.87.9",
     date: "2026-03-14",
     title: "One-Tap 'Pay with Card on File' for All Member Payments",

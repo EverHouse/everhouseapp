@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 const KNOWN_IDS: Record<string, string> = {
   'membership': '6973a2ea-f8a5-4925-9898-2fcc373512f0',
