@@ -1509,6 +1509,9 @@ export async function handleBookingUpdate(payload: TrackmanWebhookPayload): Prom
               VALUES (${autoApproveResult.sessionId}, NULL, 'guest', ${`Guest ${currentParticipants + i + 1}`}, 'waived', ${slotDuration})`);
           }
           await recalculateSessionFees(autoApproveResult.sessionId, 'trackman_webhook');
+          syncBookingInvoice(autoApproveResult.bookingId, autoApproveResult.sessionId).catch((syncErr: unknown) => {
+            logger.warn('[Trackman Webhook] Invoice sync failed after guest backfill', { extra: { bookingId: autoApproveResult.bookingId, sessionId: autoApproveResult.sessionId, error: syncErr } });
+          });
           logger.info('[Trackman Webhook] Backfilled generic guest slots after auto-approve', {
             extra: { bookingId: autoApproveResult.bookingId, sessionId: autoApproveResult.sessionId, slotsToFill, currentParticipants, targetTotal }
           });

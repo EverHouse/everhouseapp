@@ -424,6 +424,9 @@ router.get('/api/bookings/:id/staff-checkin-context', isStaffOrAdmin, async (req
           }
           
           await recalculateSessionFees(sessionId, 'checkin');
+          syncBookingInvoice(bookingId, sessionId).catch((err: unknown) => {
+            logger.warn('[Checkin Context] Invoice sync failed after fee recalculation', { extra: { bookingId, sessionId, error: getErrorMessage(err) } });
+          });
         }
       } catch (sessionError: unknown) {
         logger.warn('[Checkin Context] Failed to create session for booking', { extra: { bookingId, error: getErrorMessage(sessionError) } });
@@ -455,6 +458,9 @@ router.get('/api/bookings/:id/staff-checkin-context', isStaffOrAdmin, async (req
           
           logger.info('[Checkin Context Sync] Cleaned up orphaned participants for booking', { extra: { length: orphanedIds.length, bookingId, orphanedNames } });
           await recalculateSessionFees(sessionId, 'sync_cleanup');
+          syncBookingInvoice(bookingId, sessionId).catch((err: unknown) => {
+            logger.warn('[Checkin Context Sync] Invoice sync failed after cleanup', { extra: { bookingId, sessionId, error: getErrorMessage(err) } });
+          });
         }
       } catch (syncError: unknown) {
         logger.warn('[Checkin Context Sync] Non-blocking sync cleanup failed for booking', { extra: { bookingId, error: getErrorMessage(syncError) } });
@@ -642,6 +648,9 @@ router.patch('/api/bookings/:id/payments', isStaffOrAdmin, async (req: Request, 
     if (sessionId) {
       try {
         await recalculateSessionFees(sessionId, 'staff_action');
+        syncBookingInvoice(bookingId, sessionId).catch((err: unknown) => {
+          logger.warn('[StaffCheckin] Invoice sync failed after fee recalculation', { extra: { bookingId, sessionId, error: getErrorMessage(err) } });
+        });
       } catch (calcError: unknown) {
         logger.error('[StaffCheckin] Failed to recalculate fees before payment action', { extra: { calcError } });
         // Continue with existing values - non-blocking error
@@ -921,6 +930,9 @@ router.patch('/api/bookings/:id/payments', isStaffOrAdmin, async (req: Request, 
             }
 
             await recalculateSessionFees(sessionId, 'staff_action');
+            syncBookingInvoice(bookingId, sessionId).catch((err: unknown) => {
+              logger.warn('[StaffCheckin] Invoice sync failed after session creation', { extra: { bookingId, sessionId, error: getErrorMessage(err) } });
+            });
           }
         } catch (sessionErr: unknown) {
           logger.error('[StaffCheckin] Failed to create session for payment action', { extra: { sessionErr, bookingId } });
@@ -1296,6 +1308,9 @@ router.post('/api/bookings/:id/staff-direct-add', isStaffOrAdmin, async (req: Re
 
         try {
           await recalculateSessionFees(sessionId, 'staff_add_member');
+          syncBookingInvoice(bookingId, sessionId).catch((err: unknown) => {
+            logger.warn('[Staff Add Member] Invoice sync failed after fee recalculation', { extra: { bookingId, sessionId, error: getErrorMessage(err) } });
+          });
           
           // Create prepayment intent for any new fees (e.g., overage)
           try {
@@ -1385,6 +1400,9 @@ router.post('/api/bookings/:id/staff-direct-add', isStaffOrAdmin, async (req: Re
       // Recalculate fees to update all participant fees
       try {
         await recalculateSessionFees(sessionId, 'staff_add_guest');
+        syncBookingInvoice(bookingId, sessionId).catch((err: unknown) => {
+          logger.warn('[Staff Add Guest] Invoice sync failed after fee recalculation', { extra: { bookingId, sessionId, error: getErrorMessage(err) } });
+        });
         
         // Create prepayment intent for the new fees
         try {
@@ -1526,6 +1544,9 @@ router.post('/api/bookings/:id/staff-direct-add', isStaffOrAdmin, async (req: Re
       // Recalculate fees to update all participant fees
       try {
         await recalculateSessionFees(sessionId, 'staff_add_member');
+        syncBookingInvoice(bookingId, sessionId).catch((err: unknown) => {
+          logger.warn('[Staff Add Member] Invoice sync failed after fee recalculation', { extra: { bookingId, sessionId, error: getErrorMessage(err) } });
+        });
       } catch (feeErr: unknown) {
         logger.warn('[Staff Add Member] Failed to recalculate fees for session', { extra: { sessionId, feeErr } });
       }

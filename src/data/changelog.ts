@@ -8,6 +8,20 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.86.4",
+    date: "2026-03-14",
+    title: "Comprehensive Invoice Sync & Fee Property Fix",
+    changes: [
+      "Fix: All 7 staff check-in paths (session creation, orphan cleanup, payment action, add member, add guest) now sync the Stripe invoice after fee recalculation — previously check-in roster changes could leave invoices out of date",
+      "Fix: Check-in flow in the approval service now syncs invoices after auto-creating sessions and after the fee guard recalculates NULL fees",
+      "Fix: Dev confirm approval path was silently failing to read the calculated fee total due to wrong property access — fees now correctly propagate to the booking confirmation",
+      "Fix: Simulate confirm path had the same wrong property access — calculated fees now display correctly in confirmation flows",
+      "Fix: Trackman webhook billing now syncs invoices after session time updates, session creation, guest creation, and auto-match — 5 previously missed paths",
+      "Fix: Trackman auto-approve guest backfill and auto-match resolution paths now sync invoices after fee recalculation",
+      "Fix: Admin resolution paths (email learning and same-email auto-resolve) now sync invoices when creating sessions for matched bookings",
+    ]
+  },
+  {
     version: "8.86.3",
     date: "2026-03-14",
     title: "Roster Fee Recalculation Bug Fix",

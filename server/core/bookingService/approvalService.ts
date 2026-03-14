@@ -21,7 +21,7 @@ import { getCalendarNameForBayAsync } from '../../routes/bays/helpers';
 import { getCalendarIdByName, createCalendarEventOnCalendar, deleteCalendarEvent } from '../calendar/index';
 import { releaseGuestPassHold } from '../billing/guestPassHoldService';
 import { createPrepaymentIntent } from '../billing/prepaymentService';
-import { voidBookingInvoice, finalizeAndPayInvoice } from '../billing/bookingInvoiceService';
+import { voidBookingInvoice, finalizeAndPayInvoice, syncBookingInvoice } from '../billing/bookingInvoiceService';
 import { getErrorMessage } from '../../utils/errorUtils';
 import { upsertVisitor } from '../visitors/matchingService';
 import { AppError } from '../errors';
@@ -1831,6 +1831,9 @@ export async function checkinBooking(params: CheckinBookingParams) {
       if (sessionResult.sessionId) {
         existing.session_id = sessionResult.sessionId;
         await recalculateSessionFees(sessionResult.sessionId, 'checkin');
+        syncBookingInvoice(bookingId, sessionResult.sessionId).catch((err: unknown) => {
+          logger.warn('[Checkin] Invoice sync failed after session creation', { extra: { bookingId, sessionId: sessionResult.sessionId, error: getErrorMessage(err) } });
+        });
       }
     } catch (err: unknown) {
       logger.error('[Checkin] Failed to auto-create session', { extra: { err } });
@@ -1907,6 +1910,9 @@ export async function checkinBooking(params: CheckinBookingParams) {
       try {
         await recalculateSessionFees(existing.session_id as number, 'checkin');
         logger.info('[Check-in Guard] Recalculated fees for session - some participants had NULL or zero cached_fee_cents', { extra: { existingSession_id: existing.session_id } });
+        syncBookingInvoice(bookingId, existing.session_id as number).catch((err: unknown) => {
+          logger.warn('[Check-in Guard] Invoice sync failed after fee recalculation', { extra: { bookingId, session_id: existing.session_id, error: getErrorMessage(err) } });
+        });
       } catch (recalcError: unknown) {
         logger.error('[Check-in Guard] Failed to recalculate fees for session', { extra: { session_id: existing.session_id, recalcError } });
       }
@@ -2348,8 +2354,8 @@ export async function devConfirmBooking(params: DevConfirmParams) {
   if (sessionId) {
     try {
       const feeResult = await recalculateSessionFees(sessionId as number, 'approval');
-      if (feeResult?.totalSessionFee) {
-        resolvedTotalFeeCents = feeResult.totalSessionFee;
+      if (feeResult?.totals?.totalCents != null) {
+        resolvedTotalFeeCents = feeResult.totals.totalCents;
       }
     } catch (feeError: unknown) {
       logger.warn('[Dev Confirm] Failed to calculate fees', { extra: { feeError } });

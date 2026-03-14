@@ -1287,6 +1287,10 @@ router.post('/api/admin/trackman-webhook/:eventId/auto-match', isStaffOrAdmin, a
           }
           if (transferredCount > 0 || remainingSlots > 0) {
             await recalculateSessionFees(sessionResult.sessionId, 'staff_auto_match');
+            const { syncBookingInvoice } = await import('../../core/billing/bookingInvoiceService');
+            syncBookingInvoice(match.id as number, sessionResult.sessionId).catch((syncErr: unknown) => {
+              logger.warn('[Trackman Auto-Match] Invoice sync failed after fee recalculation', { extra: { bookingId: match.id, sessionId: sessionResult.sessionId, error: syncErr } });
+            });
             logger.info('[Trackman Auto-Match] Created participants for matched booking', {
               extra: { bookingId: match.id, sessionId: sessionResult.sessionId, playerCount, transferredFromRequest: transferredCount, genericGuestSlots: remainingSlots }
             });
@@ -1525,12 +1529,12 @@ router.post('/api/admin/bookings/:id/simulate-confirm', isStaffOrAdmin, async (r
 
           try {
             const feeResult = await recalculateSessionFees(sessionId as number, 'approval');
-            if (feeResult?.totalSessionFee) {
-              booking.calculatedTotalFeeCents = feeResult.totalSessionFee;
+            if (feeResult?.totals?.totalCents != null) {
+              booking.calculatedTotalFeeCents = feeResult.totals.totalCents;
             }
             logger.info('[Simulate Confirm] Calculated fees for session', {
               sessionId,
-              feeResult: feeResult?.totalSessionFee || 0
+              feeResult: feeResult?.totals?.totalCents || 0
             });
           } catch (feeError: unknown) {
             logger.warn('[Simulate Confirm] Failed to calculate fees (non-blocking)', { error: feeError instanceof Error ? feeError : new Error(String(feeError)) });

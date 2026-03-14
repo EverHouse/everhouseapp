@@ -541,6 +541,10 @@ router.put('/api/admin/trackman/unmatched/:id/resolve', isStaffOrAdmin, async (r
                     });
                     try {
                       await recalculateSessionFees(otherSessionId as number, 'checkin');
+                      const { syncBookingInvoice } = await import('../../core/billing/bookingInvoiceService');
+                      syncBookingInvoice(otherBooking.id as number, otherSessionId as number).catch((err: unknown) => {
+                        logger.warn('[Email Learning] Invoice sync failed after fee recalculation', { extra: { bookingId: otherBooking.id, sessionId: otherSessionId, error: err } });
+                      });
                     } catch (feeErr: unknown) {
                       logger.warn('[Email Learning] Failed to recalculate fees for auto-resolved session', { extra: { sessionId: otherSessionId, feeErr } });
                     }
@@ -948,6 +952,10 @@ router.post('/api/admin/trackman/auto-resolve-same-email', isStaffOrAdmin, async
                 });
                 try {
                   await recalculateSessionFees(sameEmailSessionId as number, 'checkin');
+                  const { syncBookingInvoice } = await import('../../core/billing/bookingInvoiceService');
+                  syncBookingInvoice(booking.id as number, sameEmailSessionId as number).catch((err: unknown) => {
+                    logger.warn('[Auto-resolve] Invoice sync failed after fee recalculation', { extra: { bookingId: booking.id, sessionId: sameEmailSessionId, error: err } });
+                  });
                 } catch (feeErr: unknown) {
                   logger.warn('[Auto-resolve] Failed to recalculate fees for auto-resolved session', { extra: { sessionId: sameEmailSessionId, feeErr } });
                 }

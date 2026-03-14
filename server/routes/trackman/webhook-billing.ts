@@ -285,6 +285,9 @@ export async function createBookingForMember(
           try {
             await db.execute(sql`UPDATE booking_sessions SET start_time = ${startTime}, end_time = ${endTime} WHERE id = ${(sessionCheck.rows as Array<Record<string, unknown>>)[0].session_id}`);
             await recalculateSessionFees((sessionCheck.rows as Array<Record<string, unknown>>)[0].session_id as number, 'trackman_webhook');
+            syncBookingInvoice(pendingBookingId, (sessionCheck.rows as Array<Record<string, unknown>>)[0].session_id as number).catch((syncErr: unknown) => {
+              logger.warn('[Trackman Webhook] Invoice sync failed after time update', { extra: { bookingId: pendingBookingId, error: syncErr } });
+            });
           } catch (recalcErr: unknown) {
             logger.warn('[Trackman Webhook] Failed to recalculate fees', { extra: { bookingId: pendingBookingId, error: recalcErr } });
           }
@@ -343,6 +346,9 @@ export async function createBookingForMember(
             }
             
             const feeBreakdown = await recalculateSessionFees(newSessionId, 'trackman_webhook');
+            syncBookingInvoice(pendingBookingId, newSessionId).catch((syncErr: unknown) => {
+              logger.warn('[Trackman Webhook] Invoice sync failed after session creation', { extra: { bookingId: pendingBookingId, sessionId: newSessionId, error: syncErr } });
+            });
             logger.info('[Trackman Webhook] Created session and participants for linked booking', {
               extra: { bookingId: pendingBookingId, sessionId: newSessionId, playerCount, slotDuration, transferredFromRequest: transferredCount, genericGuestSlots: remainingSlots }
             });
@@ -615,6 +621,9 @@ export async function createBookingForMember(
               }
               
               await recalculateSessionFees(sessionId, 'trackman_webhook');
+              syncBookingInvoice(bookingId, sessionId).catch((syncErr: unknown) => {
+                logger.warn('[Trackman Webhook] Invoice sync failed after guest creation', { extra: { bookingId, sessionId, error: syncErr } });
+              });
               logger.info('[Trackman Webhook] Created guest participants and cached fees', {
                 extra: { sessionId, playerCount, slotDuration }
               });
@@ -833,6 +842,9 @@ export async function tryMatchByBayDateTime(
 
         if (transferredCount > 0 || remainingSlots > 0) {
           await recalculateSessionFees(sessionResult.sessionId, 'trackman_auto_match');
+          syncBookingInvoice(bookingId, sessionResult.sessionId).catch((syncErr: unknown) => {
+            logger.warn('[Trackman Webhook] Invoice sync failed after auto-match', { extra: { bookingId, sessionId: sessionResult.sessionId, error: syncErr } });
+          });
           logger.info('[Trackman Webhook] Created participants for bay/date/time matched booking', {
             extra: { bookingId, sessionId: sessionResult.sessionId, playerCount, transferredFromRequest: transferredCount, genericGuestSlots: remainingSlots }
           });
