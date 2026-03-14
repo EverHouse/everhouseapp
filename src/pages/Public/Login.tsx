@@ -67,7 +67,7 @@ const Login: React.FC = () => {
     window.matchMedia('(display-mode: standalone)').matches
   );
 
-  const handleGoogleLogin = async (credential: string) => {
+  const handleGoogleLogin = useCallback(async (credential: string) => {
     setGoogleLoading(true);
     setError('');
     
@@ -95,9 +95,9 @@ const Login: React.FC = () => {
     } finally {
       setGoogleLoading(false);
     }
-  };
+  }, [loginWithMember, startNavigation, navigate]);
 
-  const handleAppleLogin = async (data: { identityToken: string; user?: { name?: { firstName?: string; lastName?: string }; email?: string } }) => {
+  const handleAppleLogin = useCallback(async (data: { identityToken: string; user?: { name?: { firstName?: string; lastName?: string }; email?: string } }) => {
     setAppleLoading(true);
     setError('');
     
@@ -125,7 +125,7 @@ const Login: React.FC = () => {
     } finally {
       setAppleLoading(false);
     }
-  };
+  }, [loginWithMember, startNavigation, navigate]);
 
   const checkStaffAdmin = useCallback(async (emailToCheck: string, signal?: AbortSignal) => {
     if (!emailToCheck || !emailToCheck.includes('@')) return;

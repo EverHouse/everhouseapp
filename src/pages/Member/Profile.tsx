@@ -384,8 +384,8 @@ const Profile: React.FC = () => {
     try {
       const res = await postWithCredentials<{ error?: string }>('/api/auth/google/link', { credential });
       if (res.error) throw new Error(res.error);
+      await refetchGoogleStatus();
       showToast('Google account linked successfully', 'success');
-      refetchGoogleStatus();
     } catch (err: unknown) {
       showToast((err instanceof Error ? err.message : String(err)) || 'Failed to link Google account', 'error');
     } finally {
@@ -393,21 +393,21 @@ const Profile: React.FC = () => {
     }
   }, [showToast, refetchGoogleStatus]);
 
-  const handleGoogleUnlink = async () => {
+  const handleGoogleUnlink = useCallback(async () => {
     setGoogleUnlinking(true);
     try {
       const res = await postWithCredentials<{ error?: string }>('/api/auth/google/unlink', {});
       if (res.error) throw new Error(res.error);
+      await refetchGoogleStatus();
       showToast('Google account unlinked', 'success');
-      refetchGoogleStatus();
     } catch (err: unknown) {
       showToast((err instanceof Error ? err.message : String(err)) || 'Failed to unlink Google account', 'error');
     } finally {
       setGoogleUnlinking(false);
     }
-  };
+  }, [showToast, refetchGoogleStatus]);
 
-  const handleAppleLink = async (data: { identityToken: string; user?: { name?: { firstName?: string; lastName?: string }; email?: string } }) => {
+  const handleAppleLink = useCallback(async (data: { identityToken: string; user?: { name?: { firstName?: string; lastName?: string }; email?: string } }) => {
     setAppleLinking(true);
     try {
       const res = await postWithCredentials<{ error?: string }>('/api/auth/apple/link', {
@@ -415,28 +415,28 @@ const Profile: React.FC = () => {
         user: data.user,
       });
       if (res.error) throw new Error(res.error);
+      await refetchAppleStatus();
       showToast('Apple account linked successfully', 'success');
-      refetchAppleStatus();
     } catch (err: unknown) {
       showToast((err instanceof Error ? err.message : String(err)) || 'Failed to link Apple account', 'error');
     } finally {
       setAppleLinking(false);
     }
-  };
+  }, [showToast, refetchAppleStatus]);
 
-  const handleAppleUnlink = async () => {
+  const handleAppleUnlink = useCallback(async () => {
     setAppleUnlinking(true);
     try {
       const res = await postWithCredentials<{ error?: string }>('/api/auth/apple/unlink', {});
       if (res.error) throw new Error(res.error);
+      await refetchAppleStatus();
       showToast('Apple account unlinked', 'success');
-      refetchAppleStatus();
     } catch (err: unknown) {
       showToast((err instanceof Error ? err.message : String(err)) || 'Failed to unlink Apple account', 'error');
     } finally {
       setAppleUnlinking(false);
     }
-  };
+  }, [showToast, refetchAppleStatus]);
 
   const handlePushToggle = async (newValue: boolean) => {
     if (!user?.email || pushLoading) return;

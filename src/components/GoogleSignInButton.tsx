@@ -19,6 +19,11 @@ const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({
   const [loaded, setLoaded] = useState(false);
   const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
+  const onSuccessRef = useRef(onSuccess);
+  const onErrorRef = useRef(onError);
+  useEffect(() => { onSuccessRef.current = onSuccess; }, [onSuccess]);
+  useEffect(() => { onErrorRef.current = onError; }, [onError]);
+
   useEffect(() => {
     if (!clientId) return;
     
@@ -40,9 +45,9 @@ const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({
     script.async = true;
     script.defer = true;
     script.onload = () => setLoaded(true);
-    script.onerror = () => onError?.('Failed to load Google Sign-In');
+    script.onerror = () => onErrorRef.current?.('Failed to load Google Sign-In');
     document.head.appendChild(script);
-  }, [clientId, onError]);
+  }, [clientId]);
 
   useEffect(() => {
     if (!loaded || !clientId || !buttonRef.current) return;
@@ -55,9 +60,9 @@ const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({
       ux_mode: 'popup',
       callback: (response: { credential: string }) => {
         if (response.credential) {
-          onSuccess(response.credential);
+          onSuccessRef.current(response.credential);
         } else {
-          onError?.('Google sign-in was cancelled');
+          onErrorRef.current?.('Google sign-in was cancelled');
         }
       },
     });
@@ -71,7 +76,7 @@ const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({
       width: width || buttonRef.current.offsetWidth,
       logo_alignment: 'left',
     });
-  }, [loaded, clientId, text, width, onError, onSuccess]);
+  }, [loaded, clientId, text, width]);
 
   if (!clientId) return null;
 
