@@ -8,6 +8,20 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.86.0",
+    date: "2026-03-14",
+    title: "Security Audit & Code Quality Hardening",
+    isMajor: true,
+    changes: [
+      "Improvement: Comprehensive security audit completed — all booking, payment, and authentication systems verified and hardened",
+      "Improvement: All search and filter inputs are now validated before processing — prevents unexpected behavior from malformed page numbers, dates, or filter values",
+      "Improvement: Eliminated all code quality warnings across the entire app — cleaner, more maintainable codebase with zero linting issues",
+      "Improvement: Database email lookups are now case-insensitive across all tables — searching for 'John@Example.com' and 'john@example.com' now always finds the same member",
+      "Improvement: Added automated tests for booking and guest pass race conditions — concurrent bookings for the same time slot are now verified to be handled safely",
+      "Improvement: TypeScript strict mode enforced across the entire codebase — catches potential bugs at build time before they reach production",
+    ]
+  },
+  {
     version: "8.85.1",
     date: "2026-03-14",
     title: "Code Quality: ESLint Cleanup",

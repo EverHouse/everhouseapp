@@ -10,6 +10,7 @@ description: End-to-end booking lifecycle in the Ever Club Members App — booki
 | Task | Primary File(s) | When to touch |
 |---|---|---|
 | Member booking creation | `server/routes/bays/bookings.ts` | Adding/changing booking request creation |
+| Booking creation guard | `server/core/bookingService/bookingCreationGuard.ts` | Advisory locks (`acquireBookingLocks`) and overlap checks (`checkResourceOverlap`) for booking creation (v8.86.0) |
 | Staff manual booking | `server/routes/staff/manualBooking.ts` | Staff-created bookings |
 | Booking approval | `server/routes/bays/approval.ts` | Approval logic, conflict checks, session creation |
 | Member cancellation | `server/routes/bays/bookings.ts` (member-cancel) | Cancel flow, refund logic |
@@ -66,6 +67,7 @@ Is this inside a db.transaction()?
 1. **Session before roster.** A `booking_sessions` row must exist before any `booking_participants` can be linked. Always call `ensureSessionForBooking()`.
 2. **Fee calculation is post-commit.** `recalculateSessionFees()` uses the global `db` pool. NEVER call inside `db.transaction()` — causes $0 fees or deadlock under Read Committed isolation.
 3. **Optimistic locking on status transitions.** All status-changing UPDATEs must include `WHERE status IN (...)` matching expected source statuses. Check `rowCount` after — if 0, reject (concurrent change).
+3a. **Advisory locks on booking creation.** `acquireBookingLocks()` in `bookingCreationGuard.ts` acquires `pg_advisory_xact_lock` on resource first, then member, to prevent double-booking races. `checkResourceOverlap()` uses `SELECT FOR UPDATE` to verify no overlapping bookings exist. Roster edits use `roster_version` optimistic locking with `SELECT FOR UPDATE` (v8.86.0).
 4. **Social tier CAN bring guests.** `enforceSocialTierRules()` always returns `{ allowed: true }`. Social members pay full overage (0 daily minutes) and full guest fees (0 complimentary passes). The restriction is economic, not a hard block.
 5. **Post-commit notifications.** Send HTTP response BEFORE post-commit ops (notifications, event publishing, availability broadcast).
 6. **One invoice per booking.** Each booking has at most one Stripe invoice (`booking_requests.stripe_invoice_id`). Draft at approval → updated on roster changes → finalized at payment → voided on cancel.

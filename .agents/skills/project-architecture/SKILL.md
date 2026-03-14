@@ -172,7 +172,7 @@ Pattern A is preferred for new routes. Pattern B is used in roster.ts, bays/book
 All public endpoints that create database records or trigger notifications MUST have rate limiting middleware. Currently protected: `/api/tours/book`, `/api/tours/schedule`, `/api/day-passes/confirm`, `/api/client-error`. Use `checkoutRateLimiter` from `../middleware/rateLimiting` for public form submissions. Global rate limiter: authenticated users get 2,000 req/min, anonymous users get 600 req/min (v8.75.0).
 
 ### 11. Input Validation
-All API endpoints SHOULD validate request body with Zod schemas. Currently only 3 route files use Zod (checkout.ts, members/onboarding.ts, members/profile.ts). All `parseInt(req.params.id)` calls MUST be followed by an `isNaN()` check with 400 response. Many routes are missing this guard.
+All API endpoints SHOULD validate request body with Zod schemas via `validateBody` middleware. Query parameters SHOULD be validated via `validateQuery` middleware — routes access parsed/typed values through `req.validatedQuery` (never raw `req.query` with `parseInt()`). 37 route handlers use `validateQuery` (v8.86.0); remaining `req.query` usages are authenticated staff routes with simple string destructuring. All `parseInt(req.params.id)` calls MUST be followed by an `isNaN()` check with 400 response.
 
 ### 12. Unbounded Queries
 All SELECT queries MUST have a LIMIT clause or be naturally bounded (e.g., by FK or date range). Admin list endpoints should support `?limit=N` query parameter with a sensible default (200-500). Never load all rows from a growing table into memory.

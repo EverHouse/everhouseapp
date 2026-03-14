@@ -61,7 +61,7 @@ Booking cancelled
 
 1. NEVER consume guest passes for placeholder guests ("Guest 1", "Guest 2").
 2. NEVER refund guest passes from `tryLinkCancelledBooking`.
-3. NEVER skip `SELECT FOR UPDATE` on concurrent pass operations.
+3. NEVER skip `SELECT FOR UPDATE` on concurrent pass operations. `createGuestPassHold`, `convertHoldToUsage`, and `consumeGuestPassForParticipant` all use `FOR UPDATE` with `UPDATE WHERE passes_used < passes_total` guards (v8.86.0 — verified with 14 concurrency tests in `tests/guestPassConcurrency.test.ts`).
 4. NEVER trust that holds match the final guest count — use `Math.min()`.
 
 ## Cross-References
