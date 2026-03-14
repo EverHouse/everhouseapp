@@ -752,7 +752,12 @@ router.post('/api/member/bookings/:id/confirm-payment', isAuthenticated, async (
     }
 
     const currentFees = await computeFeeBreakdown({ sessionId: booking.session_id!, source: 'stripe' as const });
-    const snapshotFees = typeof snapshot.participant_fees === 'string' ? JSON.parse(snapshot.participant_fees) : snapshot.participant_fees;
+    let snapshotFees: unknown;
+    try {
+      snapshotFees = typeof snapshot.participant_fees === 'string' ? JSON.parse(snapshot.participant_fees) : snapshot.participant_fees;
+    } catch {
+      snapshotFees = null;
+    }
     const snapshotTotal = Array.isArray(snapshotFees) 
       ? snapshotFees.reduce((sum: number, f: Record<string, unknown>) => sum + ((f.amountCents as number) || 0), 0)
       : 0;
@@ -1643,7 +1648,12 @@ router.post('/api/member/balance/pay', isAuthenticated, async (req: Request, res
       
       if (existingSnapshot.rows.length > 0) {
         const existing = existingSnapshot.rows[0] as unknown as SnapshotRow;
-        const parsedFees = typeof existing.participant_fees === 'string' ? JSON.parse(existing.participant_fees) : (existing.participant_fees || {});
+        let parsedFees: Record<string, unknown>;
+        try {
+          parsedFees = typeof existing.participant_fees === 'string' ? JSON.parse(existing.participant_fees) : (existing.participant_fees || {});
+        } catch {
+          parsedFees = {};
+        }
         const existingApplyCredit = parsedFees.applyCredit !== false;
         const existingParticipantIds = (parsedFees.fees || []).map((p: Record<string, unknown>) => p.id).sort().join(',');
         const newParticipantIds = participantFees.map(p => p.id).sort().join(',');

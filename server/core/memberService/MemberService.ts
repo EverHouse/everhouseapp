@@ -510,13 +510,19 @@ class MemberServiceClass {
   }
   
   private rowToMemberRecord(row: MemberQueryRow, includeTierConfig: boolean = false): MemberRecord {
-    const linkedEmails = Array.isArray(row.linked_emails) 
-      ? row.linked_emails 
-      : (typeof row.linked_emails === 'string' ? JSON.parse(row.linked_emails) : []);
+    let linkedEmails: string[] = [];
+    if (Array.isArray(row.linked_emails)) {
+      linkedEmails = row.linked_emails;
+    } else if (typeof row.linked_emails === 'string') {
+      try { linkedEmails = JSON.parse(row.linked_emails); } catch { linkedEmails = []; }
+    }
     
-    const tags = Array.isArray(row.tags)
-      ? row.tags
-      : (typeof row.tags === 'string' ? JSON.parse(row.tags) : []);
+    let tags: string[] = [];
+    if (Array.isArray(row.tags)) {
+      tags = row.tags;
+    } else if (typeof row.tags === 'string') {
+      try { tags = JSON.parse(row.tags); } catch { tags = []; }
+    }
     
     let tierConfig: Record<string, unknown> | null = null;
     if (includeTierConfig && row.tier_config_id) {

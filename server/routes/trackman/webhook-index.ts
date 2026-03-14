@@ -1002,7 +1002,12 @@ router.post('/api/admin/trackman-webhook/:eventId/retry', isStaffOrAdmin, async 
     }
     
     const event = eventResult.rows[0] as unknown as WebhookEventRetryRow;
-    const payload = typeof event.payload === 'string' ? JSON.parse(event.payload) : event.payload;
+    let payload: Record<string, unknown>;
+    try {
+      payload = typeof event.payload === 'string' ? JSON.parse(event.payload) : event.payload;
+    } catch {
+      return res.status(400).json({ error: 'Event has corrupted payload data' });
+    }
     
     await db.execute(sql`UPDATE trackman_webhook_events 
        SET retry_count = COALESCE(retry_count, 0) + 1, 
@@ -1088,7 +1093,12 @@ router.post('/api/admin/trackman-webhook/:eventId/auto-match', isStaffOrAdmin, a
       }
     }
     
-    const payload = typeof event.payload === 'string' ? JSON.parse(event.payload) : event.payload;
+    let payload: Record<string, unknown>;
+    try {
+      payload = typeof event.payload === 'string' ? JSON.parse(event.payload) : event.payload;
+    } catch {
+      return res.status(400).json({ error: 'Event has corrupted payload data' });
+    }
     const trackmanBookingId = event.trackman_booking_id;
     
     if (!trackmanBookingId) {

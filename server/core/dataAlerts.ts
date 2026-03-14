@@ -275,7 +275,7 @@ export async function alertOnHubSpotSyncComplete(
     return;
   }
 
-  const errorRate = (errors / total) * 100;
+  const errorRate = total > 0 ? (errors / total) * 100 : 100;
   
   if (errors > 5 || errorRate > 5) {
     const alertKey = 'hubspot_sync_errors';

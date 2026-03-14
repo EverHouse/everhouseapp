@@ -10,7 +10,7 @@ export const changelog: ChangelogEntry[] = [
   {
     version: "8.86.4",
     date: "2026-03-14",
-    title: "Comprehensive Invoice Sync & Fee Property Fix",
+    title: "Comprehensive Invoice Sync, Fee Fix & Data Safety",
     changes: [
       "Fix: All 7 staff check-in paths (session creation, orphan cleanup, payment action, add member, add guest) now sync the Stripe invoice after fee recalculation — previously check-in roster changes could leave invoices out of date",
       "Fix: Check-in flow in the approval service now syncs invoices after auto-creating sessions and after the fee guard recalculates NULL fees",
@@ -19,6 +19,10 @@ export const changelog: ChangelogEntry[] = [
       "Fix: Trackman webhook billing now syncs invoices after session time updates, session creation, guest creation, and auto-match — 5 previously missed paths",
       "Fix: Trackman auto-approve guest backfill and auto-match resolution paths now sync invoices after fee recalculation",
       "Fix: Admin resolution paths (email learning and same-email auto-resolve) now sync invoices when creating sessions for matched bookings",
+      "Fix: Member lookup no longer crashes if linked_emails or tags columns contain corrupt JSON data — gracefully falls back to empty arrays",
+      "Fix: Payment confirmation and snapshot flows no longer crash on corrupt fee data in the database — safely handles malformed JSON",
+      "Fix: Trackman webhook event retry and manual link endpoints now return proper error responses instead of crashing on corrupt stored payloads",
+      "Fix: HubSpot sync error rate calculation no longer divides by zero when total count is zero",
     ]
   },
   {
