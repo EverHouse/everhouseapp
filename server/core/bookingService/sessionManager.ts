@@ -295,7 +295,7 @@ export async function ensureSessionForBooking(params: {
       throw txErr;
     }
 
-    return { sessionId, created };
+    return { sessionId: sessionId!, created };
 
       } finally {
         if (manageLockClient) {

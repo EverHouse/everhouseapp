@@ -8,6 +8,19 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.86.3",
+    date: "2026-03-14",
+    title: "Roster Fee Recalculation Bug Fix",
+    changes: [
+      "Fix: Resolved a bug where adding, removing, or batch-updating booking participants would silently fail to recalculate fees, sync invoices, and create prepayment intents — roster changes now correctly trigger all billing follow-up actions",
+      "Fix: Invoice syncing after roster changes now runs reliably instead of being blocked by a crash in the fee logging step",
+      "Fix: Prepayment creation after adding participants or batch roster updates now works correctly when fees are owed",
+      "Fix: Stripe invoice URLs now handled safely to prevent potential undefined value errors in payment flows",
+      "Fix: Availability slot duration now validates against zero or invalid values to prevent potential system hangs",
+      "Fix: Corrected module import path for background job store",
+    ]
+  },
+  {
     version: "8.86.2",
     date: "2026-03-14",
     title: "Project Cleanup & Dead Code Removal",

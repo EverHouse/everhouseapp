@@ -92,7 +92,7 @@ export async function getCalendarAvailability(
   
   const config = await getResourceConfig(resourceType, date);
   const busyPeriods = await getCalendarBusyTimes(calendarId, date);
-  const slotDuration = durationMinutes || config.slotDuration;
+  const slotDuration = (durationMinutes && durationMinutes > 0) ? durationMinutes : config.slotDuration;
   const slots = generateTimeSlots(date, busyPeriods, config.businessHours, slotDuration);
   
   return { slots, calendarId };

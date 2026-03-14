@@ -183,7 +183,16 @@ async function loadSessionData(sessionId?: number, bookingId?: number): Promise<
     }
     if (sessionResult.rows.length === 0) return null;
     
-    const session = sessionResult.rows[0];
+    const session = sessionResult.rows[0] as {
+      session_id: number | null;
+      booking_id: number | null;
+      session_date: string;
+      start_time: string;
+      duration_minutes: number;
+      declared_player_count: number;
+      host_email: string | null;
+      resource_type: string;
+    };
     
     let participants: Array<{
       participantId: number | undefined;

@@ -917,7 +917,7 @@ export async function addParticipant(params: AddParticipantParams): Promise<AddP
     throw createServiceError('Only the booking owner or staff can add participants', 403);
   }
 
-  let newRosterVersion: number;
+  let newRosterVersion = 0;
   let deferredGuestPassRefund: { ownerEmail: string; guestName: string | undefined } | null = null;
 
   const txResult = await db.transaction(async (tx) => {
@@ -1336,7 +1336,7 @@ export async function addParticipant(params: AddParticipantParams): Promise<AddP
           sessionId,
           bookingId,
           participantsUpdated: recalcResult.participantsUpdated,
-          totalFees: recalcResult.billingResult.totalFees,
+          totalFees: recalcResult.totals.totalCents,
           ledgerUpdated: recalcResult.ledgerUpdated
         }
       });
@@ -1352,7 +1352,7 @@ export async function addParticipant(params: AddParticipantParams): Promise<AddP
         memberEmail: booking.owner_email,
       });
 
-      if (Number(recalcResult.billingResult.totalFees) > 0) {
+      if (recalcResult.totals.totalCents > 0) {
         try {
           const ownerResult = await db.select({
             id: users.id,
@@ -1581,7 +1581,7 @@ export async function removeParticipant(params: RemoveParticipantParams): Promis
           sessionId: txResult.sessionId,
           bookingId,
           participantsUpdated: recalcResult.participantsUpdated,
-          totalFees: recalcResult.billingResult.totalFees,
+          totalFees: recalcResult.totals.totalCents,
           ledgerUpdated: recalcResult.ledgerUpdated
         }
       });
@@ -1734,7 +1734,7 @@ export async function applyRosterBatch(params: BatchRosterUpdateParams): Promise
 
   const operationResults: Array<{ type: string; success: boolean; error?: string }> = [];
   let sessionId = booking.session_id;
-  let newRosterVersion: number;
+  let newRosterVersion = 0;
   const deferredBatchRefunds: Array<{ ownerEmail: string; guestName: string | undefined }> = [];
 
   await db.transaction(async (tx) => {
@@ -2063,12 +2063,12 @@ export async function applyRosterBatch(params: BatchRosterUpdateParams): Promise
           sessionId,
           bookingId,
           participantsUpdated: recalcResult.participantsUpdated,
-          totalFees: recalcResult.billingResult.totalFees,
+          totalFees: recalcResult.totals.totalCents,
           ledgerUpdated: recalcResult.ledgerUpdated
         }
       });
 
-      if (Number(recalcResult.billingResult.totalFees) > 0) {
+      if (recalcResult.totals.totalCents > 0) {
         try {
           const ownerResult = await db.select({
             id: users.id,

@@ -1,5 +1,5 @@
 import { db } from '../db';
-import { backgroundJobs } from '@shared/schema';
+import { backgroundJobs } from '../../shared/schema';
 import { eq, and, desc, lt, sql } from 'drizzle-orm';
 
 const STALE_JOB_TIMEOUT_MINUTES = 30;

@@ -174,7 +174,7 @@ export class PaymentStatusService {
         const participantFees = snapshot.participant_fees;
         
         if (participantFees && Array.isArray(participantFees)) {
-          const participantIds = participantFees.map((f: { id?: number; amountCents?: number }) => f.id).filter(Boolean);
+          const participantIds = participantFees.map((f: { id?: number; amountCents?: number }) => f.id).filter((id): id is number => id != null);
           
           if (participantIds.length > 0) {
             await tx.execute(
@@ -247,7 +247,7 @@ export class PaymentStatusService {
           
           const participantFees = snapshot.participant_fees;
           if (participantFees && Array.isArray(participantFees)) {
-            const participantIds = participantFees.map((f: { id?: number; amountCents?: number }) => f.id).filter(Boolean);
+            const participantIds = participantFees.map((f: { id?: number; amountCents?: number }) => f.id).filter((id): id is number => id != null);
             
             if (participantIds.length > 0) {
               await tx.execute(
