@@ -14,6 +14,7 @@ import { bookingEvents } from '../bookingEvents';
 import { logMemberAction } from '../auditLog';
 import { releaseGuestPassHold } from '../billing/guestPassHoldService';
 import { AppError } from '../errors';
+import { voidBookingPass } from '../../walletPass/bookingPassService';
 
 interface BookingParticipantRow {
   id: number;
@@ -709,6 +710,8 @@ export async function memberCancelBooking(bookingId: number, userEmail: string, 
     notifyStaff: true, 
     cleanupNotifications: true 
   }).catch(err => logger.error('Booking event publish failed', { extra: { error: err } }));
+
+  voidBookingPass(bookingId).catch(err => logger.error('[memberCancelBooking] Failed to void booking wallet pass:', { extra: { err } }));
 
   return { 
     success: true,

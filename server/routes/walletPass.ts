@@ -2,12 +2,13 @@ import { Router } from 'express';
 import { logger } from '../core/logger';
 import { isAuthenticated } from '../core/middleware';
 import { db } from '../db';
-import { users, membershipTiers, guestPasses } from '../../shared/schema';
-import { sql } from 'drizzle-orm';
+import { users, membershipTiers, guestPasses, bookingRequests } from '../../shared/schema';
+import { sql, eq } from 'drizzle-orm';
 import { normalizeTierName } from '../../shared/constants/tiers';
 import { generatePkPass, type PassData, type WalletConfig, type TierColors } from '../walletPass/passGenerator';
 import { getOrCreateAuthToken, sendPassUpdateToAllRegistrations } from '../walletPass/apnPushService';
 import { getWebServiceURL } from '../walletPass/passService';
+import { generateBookingPass } from '../walletPass/bookingPassService';
 import { getSessionUser } from '../types/session';
 import { getSettingValue, getSettingBoolean } from '../core/settingsHelper';
 import { isStaffOrAdmin } from '../core/middleware';
@@ -196,6 +197,74 @@ router.get('/api/member/wallet-pass', isAuthenticated, async (req, res) => {
   } catch (error) {
     logger.error('[WalletPass] Failed to generate wallet pass', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to generate wallet pass' });
+  }
+});
+
+router.get('/api/member/booking-wallet-pass/:bookingId', isAuthenticated, async (req, res) => {
+  try {
+    const isEnabled = await getSettingBoolean('apple_wallet.enabled', false);
+    if (!isEnabled) {
+      return res.status(404).json({ error: 'Apple Wallet passes are not enabled' });
+    }
+
+    const bookingId = parseInt(req.params.bookingId, 10);
+    if (isNaN(bookingId)) {
+      return res.status(400).json({ error: 'Invalid booking ID' });
+    }
+
+    const sessionUser = getSessionUser(req);
+    if (!sessionUser?.email) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    const [user] = await db.select({ id: users.id })
+      .from(users)
+      .where(sql`LOWER(${users.email}) = LOWER(${sessionUser.email})`)
+      .limit(1);
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const [booking] = await db.select({
+      userId: bookingRequests.userId,
+      userEmail: bookingRequests.userEmail,
+      status: bookingRequests.status,
+    })
+      .from(bookingRequests)
+      .where(eq(bookingRequests.id, bookingId))
+      .limit(1);
+
+    if (!booking) {
+      return res.status(404).json({ error: 'Booking not found' });
+    }
+
+    const isOwner = booking.userId === user.id ||
+      (booking.userEmail && booking.userEmail.toLowerCase() === sessionUser.email.toLowerCase());
+    if (!isOwner) {
+      return res.status(403).json({ error: 'You do not own this booking' });
+    }
+
+    const allowedStatuses = ['approved', 'confirmed', 'attended', 'checked_in'];
+    if (!allowedStatuses.includes(booking.status || '')) {
+      return res.status(400).json({ error: 'Wallet pass is only available for approved bookings' });
+    }
+
+    const pkpassBuffer = await generateBookingPass(bookingId, user.id);
+    if (!pkpassBuffer) {
+      return res.status(500).json({ error: 'Failed to generate booking wallet pass' });
+    }
+
+    res.set({
+      'Content-Type': 'application/vnd.apple.pkpass',
+      'Content-Disposition': `inline; filename="EverClub-Booking-${bookingId}.pkpass"`,
+      'Content-Length': pkpassBuffer.length.toString(),
+    });
+
+    res.send(pkpassBuffer);
+  } catch (error) {
+    logger.error('[WalletPass] Failed to generate booking wallet pass', { error: error instanceof Error ? error : new Error(String(error)) });
+    res.status(500).json({ error: 'Failed to generate booking wallet pass' });
   }
 });
 

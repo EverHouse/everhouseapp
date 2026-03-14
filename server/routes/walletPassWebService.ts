@@ -180,8 +180,15 @@ router.get('/v1/passes/:passTypeId/:serialNumber', async (req, res) => {
       return res.status(404).send('Pass not found');
     }
 
-    const { generatePassForMember } = await import('../walletPass/passService');
-    const pkpassBuffer = await generatePassForMember(tokenRecord[0].memberId);
+    let pkpassBuffer: Buffer | null = null;
+
+    if (serialNumber.startsWith('EVERBOOKING-')) {
+      const { generateBookingPassForWebService } = await import('../walletPass/bookingPassService');
+      pkpassBuffer = await generateBookingPassForWebService(serialNumber);
+    } else {
+      const { generatePassForMember } = await import('../walletPass/passService');
+      pkpassBuffer = await generatePassForMember(tokenRecord[0].memberId);
+    }
 
     if (!pkpassBuffer) {
       return res.status(404).send('Pass not found');

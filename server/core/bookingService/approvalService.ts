@@ -26,6 +26,7 @@ import { getErrorMessage } from '../../utils/errorUtils';
 import { upsertVisitor } from '../visitors/matchingService';
 import { AppError } from '../errors';
 import { logPaymentAudit } from '../auditLog';
+import { voidBookingPass } from '../../walletPass/bookingPassService';
 
 type _SqlQueryParam = string | number | boolean | null | Date;
 
@@ -1595,6 +1596,8 @@ export async function handleCancelPostTransaction(
     status: 'cancelled',
     actionBy: cancelledBy
   }, { notifyMember: false, notifyStaff: true, cleanupNotifications: false }).catch(err => logger.error('Booking event publish failed:', { extra: { err } }));
+
+  voidBookingPass(bookingId).catch(err => logger.error('[cancelBooking] Failed to void booking wallet pass:', { extra: { err } }));
 
   broadcastAvailabilityUpdate({
     resourceId: bookingData.resourceId || undefined,

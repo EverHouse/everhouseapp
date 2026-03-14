@@ -395,3 +395,20 @@ export type TrackmanWebhookEvent = typeof trackmanWebhookEvents.$inferSelect;
 export type InsertTrackmanWebhookEvent = typeof trackmanWebhookEvents.$inferInsert;
 export type TrackmanBaySlot = typeof trackmanBaySlots.$inferSelect;
 export type InsertTrackmanBaySlot = typeof trackmanBaySlots.$inferInsert;
+
+export const bookingWalletPasses = pgTable("booking_wallet_passes", {
+  id: serial("id").primaryKey(),
+  bookingId: integer("booking_id").notNull().references(() => bookingRequests.id, { onDelete: 'cascade' }),
+  serialNumber: varchar("serial_number").notNull().unique(),
+  authenticationToken: varchar("authentication_token").notNull(),
+  memberId: varchar("member_id").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  voidedAt: timestamp("voided_at"),
+}, (table) => [
+  index("booking_wallet_passes_booking_idx").on(table.bookingId),
+  index("booking_wallet_passes_member_idx").on(table.memberId),
+  index("booking_wallet_passes_serial_idx").on(table.serialNumber),
+]);
+
+export type BookingWalletPass = typeof bookingWalletPasses.$inferSelect;
+export type InsertBookingWalletPass = typeof bookingWalletPasses.$inferInsert;

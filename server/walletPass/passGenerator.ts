@@ -400,5 +400,197 @@ export async function generatePkPass(data: PassData, config: WalletConfig, dbCol
   });
 }
 
+export interface BookingPassData {
+  bookingId: number;
+  memberId: string;
+  memberName: string;
+  memberEmail: string;
+  bayName: string;
+  bookingDate: string;
+  startTime: string;
+  endTime: string;
+  durationMinutes: number;
+  playerCount: number;
+  serialNumber: string;
+  authenticationToken: string;
+  webServiceURL?: string;
+  clubLatitude?: number;
+  clubLongitude?: number;
+  clubAddress?: string;
+  expirationDate: string;
+  voided?: boolean;
+}
+
+function buildBookingPassJson(data: BookingPassData, config: WalletConfig): Record<string, unknown> {
+  const formattedDate = new Date(data.bookingDate + 'T12:00:00').toLocaleDateString('en-US', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+
+  const formatTime = (t: string) => {
+    const [h, m] = t.split(':').map(Number);
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    const h12 = h % 12 || 12;
+    return `${h12}:${String(m).padStart(2, '0')} ${ampm}`;
+  };
+
+  const formattedStart = formatTime(data.startTime);
+  const formattedEnd = formatTime(data.endTime);
+
+  const colors = {
+    bg: '#293515',
+    foreground: '#FFFFFF',
+    label: '#D1D5DB',
+  };
+
+  const backFields: Array<{ key: string; label: string; value: string }> = [
+    { key: 'bookingId', label: 'Booking ID', value: `#${data.bookingId}` },
+    { key: 'memberName', label: 'Member', value: data.memberName },
+    { key: 'memberEmail', label: 'Email', value: data.memberEmail },
+  ];
+
+  if (data.clubAddress) {
+    backFields.push({ key: 'clubAddress', label: 'Club Address', value: data.clubAddress });
+  }
+
+  const passJson: Record<string, unknown> = {
+    formatVersion: 1,
+    passTypeIdentifier: config.passTypeId,
+    serialNumber: data.serialNumber,
+    teamIdentifier: config.teamId,
+    organizationName: 'Ever Club',
+    description: `Ever Club Booking - ${data.bayName} on ${formattedDate}`,
+    foregroundColor: hexToRgb(colors.foreground),
+    backgroundColor: hexToRgb(colors.bg),
+    labelColor: hexToRgb(colors.label),
+    expirationDate: data.expirationDate,
+  };
+
+  if (data.voided) {
+    (passJson as Record<string, unknown>).voided = true;
+  }
+
+  if (data.webServiceURL && data.authenticationToken) {
+    passJson.webServiceURL = data.webServiceURL;
+    passJson.authenticationToken = data.authenticationToken;
+  }
+
+  passJson.eventTicket = {
+    primaryFields: [
+      {
+        key: 'eventDate',
+        label: 'DATE',
+        value: formattedDate,
+      },
+      {
+        key: 'eventTime',
+        label: 'TIME',
+        value: `${formattedStart} – ${formattedEnd}`,
+      },
+    ],
+    secondaryFields: [
+      {
+        key: 'bayName',
+        label: 'BAY',
+        value: data.bayName,
+      },
+      {
+        key: 'duration',
+        label: 'DURATION',
+        value: `${data.durationMinutes} min`,
+      },
+    ],
+    auxiliaryFields: [
+      {
+        key: 'playerCount',
+        label: 'PLAYERS',
+        value: `${data.playerCount}`,
+      },
+    ],
+    backFields,
+  };
+
+  passJson.barcode = {
+    message: `BOOKING:${data.bookingId}`,
+    format: 'PKBarcodeFormatQR',
+    messageEncoding: 'iso-8859-1',
+  };
+
+  passJson.barcodes = [
+    {
+      message: `BOOKING:${data.bookingId}`,
+      format: 'PKBarcodeFormatQR',
+      messageEncoding: 'iso-8859-1',
+    },
+  ];
+
+  if (
+    data.clubLatitude != null && data.clubLongitude != null &&
+    isFinite(data.clubLatitude) && isFinite(data.clubLongitude) &&
+    data.clubLatitude >= -90 && data.clubLatitude <= 90 &&
+    data.clubLongitude >= -180 && data.clubLongitude <= 180
+  ) {
+    passJson.locations = [
+      {
+        latitude: data.clubLatitude,
+        longitude: data.clubLongitude,
+        relevantText: `Your booking at ${data.bayName} starts at ${formattedStart}`,
+      },
+    ];
+  }
+
+  const startDateTime = new Date(`${data.bookingDate}T${data.startTime}`);
+  passJson.relevantDate = startDateTime.toISOString();
+
+  return passJson;
+}
+
+export async function generateBookingPkPass(data: BookingPassData, config: WalletConfig): Promise<Buffer> {
+  const passJson = buildBookingPassJson(data, config);
+  const passJsonStr = JSON.stringify(passJson, null, 2);
+
+  const colors: TierColors = {
+    bg: '#293515',
+    foreground: '#FFFFFF',
+    label: '#D1D5DB',
+  };
+
+  const images = await generatePassImages(colors);
+
+  const files: Record<string, Buffer | string> = {
+    'pass.json': passJsonStr,
+    ...images,
+  };
+
+  const manifest: Record<string, string> = {};
+  for (const [filename, content] of Object.entries(files)) {
+    const buffer = typeof content === 'string' ? Buffer.from(content, 'utf-8') : content;
+    manifest[filename] = computeSha1(buffer);
+  }
+  const manifestJson = JSON.stringify(manifest);
+  files['manifest.json'] = manifestJson;
+
+  const signature = signManifest(manifestJson, config);
+  files['signature'] = signature;
+
+  return new Promise((resolve, reject) => {
+    const archive = archiver('zip', { zlib: { level: 0 } });
+    const chunks: Buffer[] = [];
+
+    archive.on('data', (chunk: Buffer) => chunks.push(chunk));
+    archive.on('end', () => resolve(Buffer.concat(chunks)));
+    archive.on('error', (err: Error) => reject(err));
+
+    for (const [filename, content] of Object.entries(files)) {
+      const buffer = typeof content === 'string' ? Buffer.from(content, 'utf-8') : content;
+      archive.append(buffer, { name: filename });
+    }
+
+    archive.finalize();
+  });
+}
+
 export { DEFAULT_TIER_COLORS };
 export type { PassData, WalletConfig, TierColors };

@@ -19,6 +19,8 @@ interface BookingConfirmationData {
   durationMinutes?: number;
   addressLine1?: string;
   cityStateZip?: string;
+  bookingId?: number;
+  walletPassEnabled?: boolean;
 }
 
 export function getBookingConfirmationHtml(data: BookingConfirmationData): string {
@@ -116,12 +118,21 @@ export function getBookingConfirmationHtml(data: BookingConfirmationData): strin
           
           <!-- CTA Button -->
           <tr>
-            <td style="text-align: center; padding-bottom: 32px;">
+            <td style="text-align: center; padding-bottom: ${data.bookingId && data.walletPassEnabled ? '16px' : '32px'};">
               <a href="https://everclub.app/bookings" style="display: inline-block; background-color: ${CLUB_COLORS.deepGreen}; color: #ffffff; font-size: 16px; font-weight: 600; text-decoration: none; padding: 14px 32px; border-radius: 8px;">
                 View My Bookings
               </a>
             </td>
           </tr>
+          ${data.bookingId && data.walletPassEnabled ? `
+          <tr>
+            <td style="text-align: center; padding-bottom: 32px;">
+              <a href="https://everclub.app/api/member/booking-wallet-pass/${data.bookingId}" style="display: inline-block; background-color: #000000; color: #ffffff; font-size: 14px; font-weight: 600; text-decoration: none; padding: 12px 24px; border-radius: 8px;">
+                &#63743; Add to Apple Wallet
+              </a>
+            </td>
+          </tr>
+          ` : ''}
           
           <!-- Footer -->
           <tr>

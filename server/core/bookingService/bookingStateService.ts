@@ -14,6 +14,7 @@ import { voidBookingInvoice } from '../billing/bookingInvoiceService';
 import { getErrorMessage } from '../../utils/errorUtils';
 import { toIntArrayLiteral } from '../../utils/sqlArrayLiteral';
 import { queueJob } from '../jobQueue';
+import { voidBookingPass } from '../../walletPass/bookingPassService';
 
 interface CancelResult {
   success: boolean;
@@ -838,6 +839,8 @@ export class BookingStateService {
         status: manifest.bookingEvent.status,
         actionBy: manifest.bookingEvent.actionBy as 'member' | 'staff',
       }, { notifyMember: false, notifyStaff: true, cleanupNotifications: false }).catch(err => logger.error('[BookingStateService] Booking event publish failed', { extra: { error: getErrorMessage(err) } }));
+
+      voidBookingPass(manifest.bookingEvent.bookingId).catch(err => logger.error('[BookingStateService] Failed to void booking wallet pass:', { extra: { error: getErrorMessage(err) } }));
     }
 
     return { errors };

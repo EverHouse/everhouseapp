@@ -14,6 +14,7 @@ import { cancelPendingPaymentIntentsForBooking, refundSucceededPaymentIntentsFor
 import { alertOnTrackmanImportIssues } from '../dataAlerts';
 import { logger } from '../logger';
 import { isSyntheticEmail } from '../notificationService';
+import { refreshBookingPass, voidBookingPass } from '../../walletPass/bookingPassService';
 
 import type { TrackmanRow, PaidCheckRow } from './constants';
 import { isPlaceholderEmail, normalizeStatus, isFutureBooking, isTimeWithinTolerance } from './constants';
@@ -677,6 +678,11 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
             
             process.stderr.write(`[Trackman Import] Updated booking #${existing.id} (Trackman ID: ${row.bookingId}): ${changes.join(', ')}${isWebhookCreated ? ' [webhook backfill]' : ''}\n`);
             updatedRows++;
+
+            const hasTimeOrBayChange = changes.some(c => c.startsWith('start:') || c.startsWith('end:') || c.startsWith('duration:') || c.startsWith('bay:'));
+            if (hasTimeOrBayChange) {
+              refreshBookingPass(existing.id).catch(err => logger.error('[Trackman Import] Booking pass refresh failed', { extra: { bookingId: existing.id, error: getErrorMessage(err) } }));
+            }
           } catch (updateErr: unknown) {
             const errMsg = (updateErr instanceof Error && updateErr.cause instanceof Error ? updateErr.cause.message : null) || getErrorMessage(updateErr) || '';
             if (errMsg.includes('booking_requests_no_overlap') || errMsg.includes('exclusion constraint')) {
