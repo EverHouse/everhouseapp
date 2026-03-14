@@ -311,14 +311,20 @@ router.post('/api/auth/google/link', async (req, res) => {
       return res.status(409).json({ error: 'This Google account is already linked to a different member account.' });
     }
 
-    await db.update(users)
+    const updated = await db.update(users)
       .set({
         googleId: googleUser.sub,
         googleEmail: googleUser.email,
         googleLinkedAt: new Date(),
         updatedAt: new Date(),
       })
-      .where(eq(users.id, sessionUser.id));
+      .where(eq(users.id, sessionUser.id))
+      .returning({ id: users.id });
+
+    if (updated.length === 0) {
+      logger.error('[Google Auth] Link update affected 0 rows', { extra: { sessionUserId: sessionUser.id, sessionEmail: sessionUser.email } });
+      return res.status(404).json({ error: 'User account not found. Please log out and log in again.' });
+    }
 
     logMemberAction({
       memberEmail: sessionUser.email,
@@ -344,14 +350,20 @@ router.post('/api/auth/google/unlink', async (req, res) => {
       return res.status(401).json({ error: 'You must be logged in to unlink a Google account' });
     }
 
-    await db.update(users)
+    const updated = await db.update(users)
       .set({
         googleId: null,
         googleEmail: null,
         googleLinkedAt: null,
         updatedAt: new Date(),
       })
-      .where(eq(users.id, sessionUser.id));
+      .where(eq(users.id, sessionUser.id))
+      .returning({ id: users.id });
+
+    if (updated.length === 0) {
+      logger.error('[Google Auth] Unlink update affected 0 rows', { extra: { sessionUserId: sessionUser.id, sessionEmail: sessionUser.email } });
+      return res.status(404).json({ error: 'User account not found. Please log out and log in again.' });
+    }
 
     logMemberAction({
       memberEmail: sessionUser.email,

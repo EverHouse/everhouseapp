@@ -8,6 +8,15 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.86.5",
+    date: "2026-03-14",
+    title: "Google & Apple Account Linking Reliability Fix",
+    changes: [
+      "Fix: Google and Apple account linking on the profile page now properly verifies the database update succeeded before showing a success message — previously a silent failure could show 'linked successfully' even when the link didn't actually save",
+      "Fix: Google and Apple account unlinking now verifies the database update succeeded before confirming",
+    ]
+  },
+  {
     version: "8.86.4",
     date: "2026-03-14",
     title: "Comprehensive Invoice Sync, Fee Fix & Data Safety",
