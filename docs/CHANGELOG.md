@@ -2,6 +2,48 @@
 
 All notable changes to the Ever Club Members App are documented here.
 
+## [8.86.0] - 2026-03-14
+
+### Security Audit & Code Quality Hardening
+- **Query Parameter Validation**: 37 route handlers now use `validateQuery` middleware with typed `req.validatedQuery`. Remaining `req.query` usages are on authenticated staff routes with simple string destructuring — zero raw `parseInt()` on query params.
+- **Stripe Idempotency**: All 12 `paymentIntents.create` calls verified with deterministic idempotency keys.
+- **WebSocket Auth**: Verified origin check + `getVerifiedUserFromRequest` session verification on connection.
+- **Booking Advisory Locks**: Extracted `acquireBookingLocks()` and `checkResourceOverlap()` into `server/core/bookingService/bookingCreationGuard.ts` for testability. Advisory locks (`pg_advisory_xact_lock`) verified across all creation/approval paths.
+- **LOWER Email Indexes**: 39 `LOWER(email)` indexes across all email-bearing tables. All Drizzle-managed tables have matching schema index definitions (6 remaining DB-only indexes are on raw SQL tables without Drizzle schemas). Schema files updated: `auth-session.ts`, `scheduling.ts`, `content.ts`, `membership.ts`, `billing.ts`, `hubspot-billing.ts`.
+- **TypeScript Strict Mode**: `strict: true` enforced in both `tsconfig.json` (frontend/shared) and `server/tsconfig.json` with 0 errors.
+- **ESLint Zero Warnings**: Reduced from 383 errors/974 warnings to 0/0. All 59 `react-hooks/exhaustive-deps` warnings fixed via `useCallback`/`useMemo` wrapping. 3 unused variable warnings fixed.
+- **Concurrency Tests**: 31 new tests in `tests/bookingConcurrency.test.ts` (17 tests) and `tests/guestPassConcurrency.test.ts` (14 tests) covering advisory lock serialization, roster version optimistic locking, guest pass race conditions. Total test suite: 259 tests, all passing.
+- **req.validatedQuery Refactor**: All routes using `validateQuery` middleware now access parsed values via `req.validatedQuery` typed cast instead of raw `req.query`.
+- **Migrations**: 0052 (initial LOWER email indexes), 0053 (magic_links, tours, bug_reports), 0054 (trackman, terminal_payments, stripe_tx_cache, sync_exclusions, hubspot_sync_queue JSONB).
+- **Files**: `server/core/bookingService/bookingCreationGuard.ts`, `tests/bookingConcurrency.test.ts`, `tests/guestPassConcurrency.test.ts`, `shared/models/auth-session.ts`, `shared/models/scheduling.ts`, `shared/models/content.ts`, `shared/models/membership.ts`, `shared/models/billing.ts`, `shared/models/hubspot-billing.ts`, 18 route files refactored for `req.validatedQuery`
+
+## [8.85.1] - 2026-03-14
+
+### Code Quality: ESLint Cleanup
+- **ESLint Errors**: Resolved all 383 ESLint errors across the codebase (100% reduction).
+- **ESLint Warnings**: Reduced from 974 to 60 (93.8% reduction) — removed unused imports, prefixed unused variables with `_`, added eslint-disable comments for legitimate React Compiler hook patterns.
+- **Code Fixes**: Fixed unnecessary escape characters in regex patterns, empty catch blocks, useless catch statements, and missing case declarations.
+- **ESLint Config**: Updated to ignore `.agents/`, `.local/`, `.config/` directories and disable `no-undef` for TypeScript files.
+
+## [8.85.0] - 2026-03-13
+
+### Trackman Reliability & Availability Block Improvements
+- **Queue Clearing**: Trackman auto-confirmed bookings now clear from the staff queue immediately (was only clearing on refresh).
+- **Duplicate Prevention**: Availability blocks prevented via `createStandaloneBlock()` which checks for existing coverage before inserting.
+- **Calendar Sync**: `closures.ts` now filters out Trackman booking time slots from closure import using a `trackmanSlotSet` lookup.
+- **Error Handling**: Completing already-cancelled bookings now returns a clear error instead of silently succeeding. Availability block creation handles DB constraint errors gracefully.
+- **Bug Fixes**: SSL security warning fix, optional field crash fix, complimentary day pass refund fix, day pass search performance cap, staff assignment dropdown flicker fix, session expiry account deletion fix, booking cancellation date type guard fix.
+
+## [8.84.1] - 2026-03-13
+
+### Booking Fixes, Name Display & Apple Wallet Location
+- **Apple Wallet Location**: Pass now supports lock screen location triggers with admin-configurable coordinates.
+- **Multi-Player Fix**: Adding multiple players to a booking now works reliably.
+- **Admin Stale Data**: Admin booking list no longer shows stale data after cancellations.
+- **Name Display**: Name now displays correctly across the app after signing in with Google or Apple.
+- **Welcome Messages**: Greetings now consistently use first name throughout the app.
+- **Transaction Safety**: Billing and cancellation scheduling no longer conflicts with ongoing booking operations.
+
 ## [8.84.0] - 2026-03-12
 
 ### Linked Email Booking Fix (Comprehensive)
