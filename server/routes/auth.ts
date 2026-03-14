@@ -96,7 +96,7 @@ interface UpsertUserData {
   role?: 'admin' | 'staff' | 'member';
 }
 
-async function upsertUserWithTier(data: UpsertUserData): Promise<void> {
+async function upsertUserWithTier(data: UpsertUserData): Promise<string | null> {
   try {
     const normalizedEmailValue = normalizeEmail(data.email);
     const isStaffOrAdmin = data.role === 'admin' || data.role === 'staff';
@@ -112,7 +112,7 @@ async function upsertUserWithTier(data: UpsertUserData): Promise<void> {
       tierId = tierResult.length > 0 ? tierResult[0].id : null;
     }
     
-    await db.insert(users)
+    const result = await db.insert(users)
       .values({
         id: crypto.randomUUID(),
         email: normalizedEmailValue,
@@ -138,15 +138,18 @@ async function upsertUserWithTier(data: UpsertUserData): Promise<void> {
           role: data.role || 'member',
           updatedAt: new Date()
         }
-      });
+      })
+      .returning({ id: users.id });
     
     if (isStaffOrAdmin) {
       await db.execute(sql`UPDATE users SET membership_status = 'active', tier = 'VIP', membership_tier = 'VIP' WHERE LOWER(email) = LOWER(${normalizedEmailValue}) AND (membership_status IS NULL OR membership_status != 'active' OR tier IS NULL OR tier != 'VIP')`);
     }
     
     if (!isProduction) logger.info('[Auth] Updated user with role , tier', { extra: { normalizedEmailValue, dataRole: data.role, normalizedTier_none: normalizedTier || 'none' } });
+    return result.length > 0 ? result[0].id : null;
   } catch (error: unknown) {
     logger.error('[Auth] Error upserting user tier', { error: error instanceof Error ? error : new Error(String(error)) });
+    return null;
   }
 }
 
@@ -1093,7 +1096,7 @@ router.post('/api/auth/verify-otp', async (req, res) => {
 
     const supabaseToken = await createSupabaseToken(member as unknown as { id: string; email: string; role: string; firstName?: string; lastName?: string });
     
-    await upsertUserWithTier({
+    const dbUserId = await upsertUserWithTier({
       email: member.email,
       tierName: member.tier || '',
       firstName: member.firstName,
@@ -1104,6 +1107,11 @@ router.post('/api/auth/verify-otp', async (req, res) => {
       membershipStartDate: member.membershipStartDate || '',
       role
     });
+    
+    if (dbUserId && dbUserId !== member.id) {
+      member.id = dbUserId;
+      req.session.user = member;
+    }
     
     // Track first login for onboarding (async, non-blocking)
     db.execute(sql`UPDATE users SET first_login_at = NOW(), updated_at = NOW() WHERE LOWER(email) = LOWER(${member.email}) AND first_login_at IS NULL`).catch((err) => logger.warn('[Auth] Non-critical first_login_at update failed:', err));
@@ -1374,7 +1382,7 @@ router.post('/api/auth/password-login', ...authRateLimiter, async (req, res) => 
 
     const supabaseToken = await createSupabaseToken(member);
     
-    await upsertUserWithTier({
+    const dbUserId2 = await upsertUserWithTier({
       email: member.email,
       tierName: member.tier,
       firstName: member.firstName,
@@ -1385,6 +1393,11 @@ router.post('/api/auth/password-login', ...authRateLimiter, async (req, res) => 
       membershipStartDate: member.membershipStartDate,
       role: userRole
     });
+    
+    if (dbUserId2 && dbUserId2 !== member.id) {
+      member.id = dbUserId2;
+      req.session.user = member;
+    }
     
     // Track first login for onboarding (async, non-blocking)
     db.execute(sql`UPDATE users SET first_login_at = NOW(), updated_at = NOW() WHERE LOWER(email) = LOWER(${member.email}) AND first_login_at IS NULL`).catch((err) => logger.warn('[Auth] Non-critical first_login_at update failed:', err));
