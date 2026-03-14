@@ -8,13 +8,14 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
-    version: "8.87.11",
+    version: "8.87.12",
     date: "2026-03-14",
     title: "Bug Fixes & Data Integrity",
     changes: [
       "Fixed: Billing notifications now broadcast correctly when members pay with a saved card",
       "Fixed: Invoice payment processing now properly handles Stripe payment intent verification",
       "Fixed: HubSpot sync queue race condition — rapid tier changes no longer risk stale data overwriting the latest update",
+      "Fixed: Winning a payment dispute no longer blindly reactivates membership — system now checks for other open disputes and subscription status before auto-reactivating",
     ]
   },
   {

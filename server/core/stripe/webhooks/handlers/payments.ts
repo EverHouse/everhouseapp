@@ -435,40 +435,97 @@ export async function handleChargeDisputeClosed(client: PoolClient, dispute: Str
       const terminalPayment = terminalPaymentResult.rows[0];
       logger.info(`[Stripe Webhook] Terminal payment dispute closed for user ${terminalPayment.user_email}: ${status}`);
       
+      let membershipAction: 'reactivated' | 'blocked_manual_review' | 'remained_suspended' | 'skipped_non_stripe' = 'remained_suspended';
+
       if (disputeWon) {
         const disputeClosedUserCheck = await client.query(
-          `SELECT billing_provider FROM users WHERE id = $1`,
+          `SELECT billing_provider, membership_status, stripe_subscription_id FROM users WHERE id = $1`,
           [terminalPayment.user_id]
         );
-        const disputeClosedBillingProvider = disputeClosedUserCheck.rows[0]?.billing_provider;
+        const disputeClosedUser = disputeClosedUserCheck.rows[0];
+        const disputeClosedBillingProvider = disputeClosedUser?.billing_provider;
 
         if (disputeClosedBillingProvider && disputeClosedBillingProvider !== '' && disputeClosedBillingProvider !== 'stripe') {
           logger.info(`[Stripe Webhook] Skipping charge.dispute.closed for ${terminalPayment.user_email} — billing_provider is '${disputeClosedBillingProvider}', not 'stripe'`);
+          membershipAction = 'skipped_non_stripe';
         } else {
-          await client.query(
-            `UPDATE users SET membership_status = 'active', billing_provider = 'stripe', archived_at = NULL, archived_by = NULL, updated_at = NOW() WHERE id = $1`,
-            [terminalPayment.user_id]
+          const otherOpenDisputes = await client.query(
+            `SELECT id FROM terminal_payments 
+             WHERE user_id = $1 AND status = 'disputed' AND id != $2`,
+            [terminalPayment.user_id, terminalPayment.id]
           );
-          logger.info(`[Stripe Webhook] Reactivated membership for user ${terminalPayment.user_id} - dispute won`);
-        
-          await client.query(
-            `INSERT INTO notifications (user_email, title, message, type, related_type, created_at)
-             VALUES ($1, $2, $3, $4, $5, NOW())`,
-            [
-              terminalPayment.user_email.toLowerCase(), 
-              'Membership Reactivated', 
-              'Your membership has been reactivated. The payment dispute has been resolved in your favor.',
-              'billing',
-              'membership'
-            ]
-          );
+
+          const blockingReasons: string[] = [];
+
+          if (otherOpenDisputes.rowCount && otherOpenDisputes.rowCount > 0) {
+            blockingReasons.push(`${otherOpenDisputes.rowCount} other open dispute(s)`);
+          }
+
+          if (disputeClosedUser?.stripe_subscription_id) {
+            try {
+              const stripeClient = await (await import('../../client')).getStripeClient();
+              const sub = await stripeClient.subscriptions.retrieve(disputeClosedUser.stripe_subscription_id);
+              if (sub.status === 'past_due' || sub.status === 'unpaid' || sub.status === 'canceled') {
+                blockingReasons.push(`subscription status is '${sub.status}'`);
+              }
+            } catch (subErr: unknown) {
+              logger.warn(`[Stripe Webhook] Could not verify subscription status for dispute reactivation — blocking as precaution`, { error: getErrorMessage(subErr) });
+              blockingReasons.push('subscription status could not be verified');
+            }
+          }
+
+          if (blockingReasons.length > 0) {
+            membershipAction = 'blocked_manual_review';
+            logger.warn(`[Stripe Webhook] Dispute won for user ${terminalPayment.user_id} but cannot auto-reactivate: ${blockingReasons.join(', ')}`);
+
+            deferredActions.push(async () => {
+              await notifyAllStaff(
+                'Dispute Won — Manual Review Required',
+                `Payment dispute ${id} won for ${terminalPayment.user_email} ($${(amount / 100).toFixed(2)}), ` +
+                `but auto-reactivation was blocked: ${blockingReasons.join('; ')}. ` +
+                `Please review and reactivate manually if appropriate.`,
+                'terminal_dispute_closed',
+                { sendPush: true }
+              );
+            });
+          } else {
+            membershipAction = 'reactivated';
+            await client.query(
+              `UPDATE users SET membership_status = 'active', billing_provider = 'stripe', archived_at = NULL, archived_by = NULL, updated_at = NOW() WHERE id = $1`,
+              [terminalPayment.user_id]
+            );
+            logger.info(`[Stripe Webhook] Reactivated membership for user ${terminalPayment.user_id} - dispute won`);
+          
+            await client.query(
+              `INSERT INTO notifications (user_email, title, message, type, related_type, created_at)
+               VALUES ($1, $2, $3, $4, $5, NOW())`,
+              [
+                terminalPayment.user_email.toLowerCase(), 
+                'Membership Reactivated', 
+                'Your membership has been reactivated. The payment dispute has been resolved in your favor.',
+                'billing',
+                'membership'
+              ]
+            );
+          }
         }
       }
+
+      const disputeStaffTitle = membershipAction === 'reactivated'
+        ? 'Dispute Won - Membership Reactivated'
+        : membershipAction === 'blocked_manual_review'
+          ? 'Dispute Won - Reactivation Blocked (Review Required)'
+          : 'Dispute Lost - Membership Remains Suspended';
+      const disputeStaffMessage = membershipAction === 'reactivated'
+        ? `Payment dispute for ${terminalPayment.user_email} has been closed. Status: ${status}. Amount: $${(amount / 100).toFixed(2)}. Membership has been reactivated.`
+        : membershipAction === 'blocked_manual_review'
+          ? `Payment dispute for ${terminalPayment.user_email} has been closed (won). Amount: $${(amount / 100).toFixed(2)}. Auto-reactivation was blocked — manual review required.`
+          : `Payment dispute for ${terminalPayment.user_email} has been closed. Status: ${status}. Amount: $${(amount / 100).toFixed(2)}. Membership remains suspended.`;
       
       deferredActions.push(async () => {
         await notifyAllStaff(
-          disputeWon ? 'Dispute Won - Membership Reactivated' : 'Dispute Lost - Membership Remains Suspended',
-          `Payment dispute for ${terminalPayment.user_email} has been closed. Status: ${status}. Amount: $${(amount / 100).toFixed(2)}.${disputeWon ? ' Membership has been reactivated.' : ' Membership remains suspended.'}`,
+          disputeStaffTitle,
+          disputeStaffMessage,
           'terminal_dispute_closed',
           { sendPush: true }
         );
@@ -487,7 +544,7 @@ export async function handleChargeDisputeClosed(client: PoolClient, dispute: Str
             stripe_subscription_id: terminalPayment.stripe_subscription_id,
             amount_cents: terminalPayment.amount_cents,
             disputed_amount_cents: amount,
-            membership_action: disputeWon ? 'reactivated' : 'remained_suspended'
+            membership_action: membershipAction
           }
         });
       });
