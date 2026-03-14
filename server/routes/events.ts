@@ -1074,7 +1074,8 @@ router.post('/api/rsvps', isAuthenticated, async (req, res) => {
     sendPushNotification(user_email, {
       title: 'RSVP Confirmed!',
       body: memberMessage,
-      url: '/events'
+      url: '/events',
+      tag: `event-rsvp-${event_id}`
     }).catch((err: unknown) => logger.error('Push notification failed', { error: err instanceof Error ? err : new Error(getErrorMessage(err)) }));
     
     // Send real-time WebSocket notification to member

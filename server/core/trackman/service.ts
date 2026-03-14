@@ -1393,7 +1393,8 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
                   sendPushNotification(resolvedMemberEmail, {
                     title: 'Added to Booking',
                     body: linkedMessage,
-                    tag: `booking-linked-${bookingId}`
+                    url: '/sims',
+                    tag: `booking-${bookingId}`
                   }).catch((err) => { logger.warn('[Trackman Import] Non-critical push notification failed:', err); });
                 }
                 
@@ -1485,6 +1486,7 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
             sendPushNotification(matchedEmail, {
               title: 'Booking Confirmed!',
               body: approvalMessage,
+              url: '/sims',
               tag: `booking-${insertResult[0].id}`
             }).catch(err => {
               process.stderr.write(`[Trackman Import] Push notification failed for ${matchedEmail}: ${getErrorMessage(err)}\n`);
@@ -1706,7 +1708,8 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
           sendPushNotification(booking.userEmail, {
             title: 'Booking Cancelled',
             body: cancelMessage,
-            tag: `booking-cancelled-${booking.id}`
+            url: '/sims',
+            tag: `booking-${booking.id}`
           }).catch(err => {
             process.stderr.write(`[Trackman Import] Push notification failed for cancellation ${booking.userEmail}: ${getErrorMessage(err)}\n`);
           });

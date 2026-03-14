@@ -1105,7 +1105,8 @@ router.post('/api/wellness-enrollments', isAuthenticated, async (req, res) => {
     sendPushNotification(user_email, {
       title: isWaitlisted ? 'Added to Waitlist' : 'Class Booked!',
       body: memberMessage,
-      url: '/wellness'
+      url: '/wellness',
+      tag: `wellness-${class_id}`
     }).catch(err => logger.error('Push notification failed', { extra: { error: err } }));
     
     sendNotificationToUser(user_email, {
@@ -1267,7 +1268,8 @@ router.delete('/api/wellness-enrollments/:class_id/:user_email', isAuthenticated
           sendPushNotification(promotedEmail as string, {
             title: 'Spot Available - You\'re In!',
             body: promotedMessage,
-            url: '/wellness'
+            url: '/wellness',
+            tag: `wellness-promoted-${cls.id}`
           }).catch(err => logger.error('Push notification failed', { extra: { error: err } }));
           
           // Send real-time WebSocket notification
@@ -1457,7 +1459,8 @@ router.post('/api/wellness-classes/:id/enrollments/manual', isStaffOrAdmin, asyn
       sendPushNotification(email, {
         title: 'Wellness Class Confirmed',
         body: memberMessage,
-        url: '/wellness'
+        url: '/wellness',
+        tag: `wellness-${classId}`
       }).catch(err => logger.error('Push notification failed for manual enrollment', { extra: { error: err } }));
       
       sendNotificationToUser(email, {

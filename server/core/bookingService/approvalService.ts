@@ -756,7 +756,8 @@ export async function approveBooking(params: ApproveBookingParams) {
     sendPushNotification(updated.userEmail, {
       title: 'Booking Approved!',
       body: approvalMessage,
-      url: '/sims'
+      url: '/sims',
+      tag: `booking-${bookingId}`
     }).catch(err => logger.error('Push notification failed:', { extra: { err } }));
 
     notifyLinkedMembers(bookingId, updated as unknown as BookingUpdateResult);
@@ -844,7 +845,8 @@ async function notifyLinkedMembers(bookingId: number, updated: BookingUpdateResu
         sendPushNotification(member.userEmail, {
           title: 'Booking Confirmed',
           body: linkedMessage,
-          tag: `booking-approved-linked-${bookingId}`
+          url: '/sims',
+          tag: `booking-${bookingId}`
         }).catch((err) => {
           logger.error('[approval] Failed to send push notification on approval', {
             error: err instanceof Error ? err : new Error(String(err))
@@ -1033,7 +1035,8 @@ export async function declineBooking(params: DeclineBookingParams) {
   sendPushNotification(updated.userEmail, {
     title: 'Booking Request Update',
     body: declineMessage,
-    url: '/sims'
+    url: '/sims',
+    tag: `booking-${bookingId}`
   }).catch(err => logger.error('Push notification failed:', { extra: { err } }));
 
   bookingEvents.publish('booking_declined', {
@@ -1514,7 +1517,8 @@ export async function handlePendingCancellation(bookingId: number, bookingData: 
     sendPushNotification(bookingData.userEmail, {
       title: 'Booking Cancellation in Progress',
       body: `Your booking for ${bookingDate} at ${bookingTime} is being cancelled. You'll be notified once it's fully processed.`,
-      url: '/sims'
+      url: '/sims',
+      tag: `booking-${bookingId}`
     }).catch(err => logger.error('Member push notification failed:', { extra: { err } }));
   }
 }
@@ -1562,7 +1566,8 @@ export async function handleCancelPostTransaction(
         sendPushNotification(pushInfo.email, {
           title: 'Booking Cancelled',
           body: pushInfo.memberMessage || pushInfo.message,
-          url: '/sims'
+          url: '/sims',
+          tag: `booking-${bookingId}`
         }).catch(err => logger.error('Member push notification failed:', { extra: { err } }));
       }
     } else if (pushInfo.type === 'staff') {
@@ -1580,7 +1585,8 @@ export async function handleCancelPostTransaction(
       sendPushNotification(pushInfo.email, {
         title: 'Booking Cancelled',
         body: pushInfo.message,
-        url: '/sims'
+        url: '/sims',
+        tag: `booking-${bookingId}`
       }).catch(err => logger.error('Member push notification failed:', { extra: { err } }));
     }
   }

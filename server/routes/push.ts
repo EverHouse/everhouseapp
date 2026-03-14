@@ -31,7 +31,10 @@ export function isPushNotificationsEnabled(): boolean {
   return vapidConfigured;
 }
 
-export async function sendPushNotification(userEmail: string, payload: { title: string; body: string; url?: string; tag?: string }): Promise<{ sent: boolean; reason?: string }> {
+const PUSH_ICON = '/icon-192.png';
+const PUSH_BADGE = '/badge-72.png';
+
+export async function sendPushNotification(userEmail: string, payload: { title: string; body: string; url?: string; tag?: string; icon?: string; badge?: string }): Promise<{ sent: boolean; reason?: string }> {
   if (!vapidConfigured) {
     return { sent: false, reason: 'VAPID not configured' };
   }
@@ -55,8 +58,9 @@ export async function sendPushNotification(userEmail: string, payload: { title: 
         }
       };
       
+      const enrichedPayload = { ...payload, icon: payload.icon || PUSH_ICON, badge: payload.badge || PUSH_BADGE };
       try {
-        await webpush.sendNotification(pushSubscription, JSON.stringify(payload));
+        await webpush.sendNotification(pushSubscription, JSON.stringify(enrichedPayload));
       } catch (err: unknown) {
         if (getErrorStatusCode(err) === 410) {
           await db.delete(pushSubscriptions).where(eq(pushSubscriptions.endpoint, sub.endpoint));
@@ -72,7 +76,7 @@ export async function sendPushNotification(userEmail: string, payload: { title: 
   }
 }
 
-export async function sendPushNotificationToStaff(payload: { title: string; body: string; url?: string; tag?: string }): Promise<{ sent: boolean; count: number; reason?: string }> {
+export async function sendPushNotificationToStaff(payload: { title: string; body: string; url?: string; tag?: string; icon?: string; badge?: string }): Promise<{ sent: boolean; count: number; reason?: string }> {
   if (!vapidConfigured) {
     return { sent: false, count: 0, reason: 'VAPID not configured' };
   }
@@ -103,8 +107,9 @@ export async function sendPushNotificationToStaff(payload: { title: string; body
         }
       };
       
+      const enrichedPayload = { ...payload, icon: payload.icon || PUSH_ICON, badge: payload.badge || PUSH_BADGE };
       try {
-        await webpush.sendNotification(pushSubscription, JSON.stringify(payload));
+        await webpush.sendNotification(pushSubscription, JSON.stringify(enrichedPayload));
       } catch (err: unknown) {
         if (getErrorStatusCode(err) === 410) {
           await db.delete(pushSubscriptions).where(eq(pushSubscriptions.endpoint, sub.endpoint));
@@ -120,7 +125,7 @@ export async function sendPushNotificationToStaff(payload: { title: string; body
   }
 }
 
-export async function sendPushNotificationToAllMembers(payload: { title: string; body: string; url?: string; tag?: string }): Promise<number> {
+export async function sendPushNotificationToAllMembers(payload: { title: string; body: string; url?: string; tag?: string; icon?: string; badge?: string }): Promise<number> {
   if (!vapidConfigured) {
     logger.info('[Push to Members] Skipped - VAPID not configured');
     return 0;
@@ -171,8 +176,9 @@ export async function sendPushNotificationToAllMembers(payload: { title: string;
         keys: { p256dh: sub.p256dh, auth: sub.auth }
       };
       
+      const enrichedPayload = { ...payload, icon: payload.icon || PUSH_ICON, badge: payload.badge || PUSH_BADGE };
       try {
-        await webpush.sendNotification(pushSubscription, JSON.stringify(payload));
+        await webpush.sendNotification(pushSubscription, JSON.stringify(enrichedPayload));
       } catch (err: unknown) {
         if (getErrorStatusCode(err) === 410) {
           await db.delete(pushSubscriptions).where(eq(pushSubscriptions.endpoint, sub.endpoint));
@@ -255,7 +261,10 @@ router.post('/api/push/test', isAuthenticated, async (req, res) => {
     await sendPushNotification(userEmail!, {
       title: 'Test Notification',
       body: 'This is a test push notification from Ever Club!',
-      url: '/profile'
+      url: '/profile',
+      tag: 'test',
+      icon: PUSH_ICON,
+      badge: PUSH_BADGE
     });
     
     res.json({ success: true });
@@ -304,7 +313,7 @@ export async function sendDailyReminders() {
       
       for (const evt of eventReminders) {
         const message = `Reminder: ${evt.title} is tomorrow${evt.startTime ? ` at ${formatTime12Hour(evt.startTime)}` : ''}${evt.location ? ` - ${evt.location}` : ''}.`;
-        sendPushNotification(evt.userEmail, { title: 'Event Tomorrow', body: message, url: '/events' })
+        sendPushNotification(evt.userEmail, { title: 'Event Tomorrow', body: message, url: '/events', tag: `event-${evt.eventId}`, icon: PUSH_ICON, badge: PUSH_BADGE })
           .catch((err) => {
             results.pushFailed++;
             logger.warn('[push] Push reminder delivery failed', {
@@ -354,7 +363,7 @@ export async function sendDailyReminders() {
       
       for (const booking of bookingReminders) {
         const message = `Reminder: Your simulator booking is tomorrow at ${formatTime12Hour(booking.startTime)}${booking.resourceId ? ` on Bay ${booking.resourceId}` : ''}.`;
-        sendPushNotification(booking.userEmail, { title: 'Booking Tomorrow', body: message, url: '/sims' })
+        sendPushNotification(booking.userEmail, { title: 'Booking Tomorrow', body: message, url: '/sims', tag: `booking-${booking.id}`, icon: PUSH_ICON, badge: PUSH_BADGE })
           .catch((err) => {
             results.pushFailed++;
             logger.warn('[push] Push reminder delivery failed', {
@@ -404,7 +413,7 @@ export async function sendDailyReminders() {
       
       for (const cls of wellnessReminders) {
         const message = `Reminder: ${cls.title} with ${cls.instructor} is tomorrow at ${cls.time}.`;
-        sendPushNotification(cls.userEmail, { title: 'Class Tomorrow', body: message, url: '/wellness' })
+        sendPushNotification(cls.userEmail, { title: 'Class Tomorrow', body: message, url: '/wellness', tag: `wellness-${cls.classId}`, icon: PUSH_ICON, badge: PUSH_BADGE })
           .catch((err) => {
             results.pushFailed++;
             logger.warn('[push] Push reminder delivery failed', {
@@ -561,7 +570,10 @@ export async function sendMorningClosureNotifications() {
           await webpush.sendNotification(pushSubscription, JSON.stringify({
             title: `Today: ${title}`,
             body: message,
-            url: '/updates?tab=notices'
+            url: '/updates?tab=notices',
+            icon: PUSH_ICON,
+            badge: PUSH_BADGE,
+            tag: `closure-${closure.id}`
           }));
         } catch (err: unknown) {
           if (getErrorStatusCode(err) === 410) {

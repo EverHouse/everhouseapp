@@ -694,6 +694,7 @@ export class BookingStateService {
         title: 'Booking Cancellation in Progress',
         body: `Your booking for ${bookingDate} at ${bookingTime} is being cancelled. You'll be notified once it's fully processed.`,
         url: '/sims',
+        tag: `booking-${bookingId}`
       }).catch(err => logger.error('[BookingStateService] Member push notification failed', { extra: { error: getErrorMessage(err) } }));
     }
 
@@ -808,6 +809,7 @@ export class BookingStateService {
         title: manifest.notifications.memberPush.title,
         body: manifest.notifications.memberPush.body,
         url: '/sims',
+        tag: `booking-${manifest.bookingEvent?.bookingId || 'unknown'}`
       }).catch(err => logger.error('[BookingStateService] Member push failed', { extra: { error: getErrorMessage(err) } }));
     }
 

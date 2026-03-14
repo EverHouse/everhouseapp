@@ -141,18 +141,25 @@ self.addEventListener('push', function(event) {
   }
 
   var data = event.data.json();
+  var tag = data.tag || undefined;
   var options = {
     body: data.body || 'You have a new notification',
-    icon: '/favicon.ico',
-    badge: '/favicon.ico',
+    icon: data.icon || '/icon-192.png',
+    badge: data.badge || '/badge-72.png',
     vibrate: [100, 50, 100],
     data: {
       url: data.url || '/',
       dateOfArrival: Date.now(),
       primaryKey: data.id || 1
     },
-    actions: data.actions || []
+    actions: data.actions || [],
+    requireInteraction: false
   };
+
+  if (tag) {
+    options.tag = tag;
+    options.renotify = true;
+  }
 
   event.waitUntil(
     self.registration.showNotification(data.title || 'Ever Club', options)
@@ -169,8 +176,16 @@ self.addEventListener('notificationclick', function(event) {
       .then(function(clientList) {
         for (var i = 0; i < clientList.length; i++) {
           var client = clientList[i];
-          if (client.url.includes(urlToOpen) && 'focus' in client) {
+          if (client.url.indexOf(urlToOpen) !== -1 && 'focus' in client) {
             return client.focus();
+          }
+        }
+        for (var j = 0; j < clientList.length; j++) {
+          var existingClient = clientList[j];
+          if ('focus' in existingClient && 'navigate' in existingClient) {
+            return existingClient.navigate(urlToOpen).then(function() {
+              return existingClient.focus();
+            });
           }
         }
         if (clients.openWindow) {

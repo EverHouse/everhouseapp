@@ -202,7 +202,8 @@ router.post('/api/guest-passes/:email/use', isAuthenticated, async (req, res) =>
     sendPushNotification(normalizedEmail, {
       title: 'Guest Pass Used',
       body: message,
-      url: '/member/profile'
+      url: '/member/profile',
+      tag: 'guest-pass-used'
     }).catch(err => logger.error('Push notification failed', { extra: { error: err } }));
     
     try { broadcastMemberStatsUpdated(normalizedEmail, { guestPasses: remaining }); } catch (err: unknown) { logger.error('[Broadcast] Stats update error', { extra: { error: err } }); }
@@ -311,7 +312,8 @@ export async function useGuestPass(
       sendPushNotification(normalizedEmail, {
         title: 'Guest Pass Used',
         body: notificationMessage,
-        url: '/member/profile'
+        url: '/member/profile',
+        tag: 'guest-pass-used'
       }).catch(err => logger.error('Push notification failed', { extra: { error: err } }));
     }
     
@@ -373,7 +375,8 @@ export async function refundGuestPass(
       sendPushNotification(normalizedEmail, {
         title: 'Guest Pass Refunded',
         body: notificationMessage,
-        url: '/member/profile'
+        url: '/member/profile',
+        tag: 'guest-pass-refunded'
       }).catch(err => logger.error('Push notification failed', { extra: { error: err } }));
       
       sendNotificationToUser(normalizedEmail, {

@@ -548,7 +548,8 @@ export async function createManualBooking(params: {
     await sendPushNotification(resolvedMemberEmail, {
       title: notifTitle,
       body: notifMessage,
-      url: '/dashboard'
+      url: '/dashboard',
+      tag: `booking-${newBooking.id}`
     });
     
     sendNotificationToUser(resolvedMemberEmail, {

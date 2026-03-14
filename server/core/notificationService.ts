@@ -97,6 +97,44 @@ export interface NotificationPayload {
   url?: string;
 }
 
+export interface PushPayload {
+  title: string;
+  body: string;
+  icon: string;
+  badge: string;
+  url?: string;
+  tag?: string;
+}
+
+function buildPushTag(type: NotificationType, relatedId?: number): string {
+  if (type.startsWith('booking') && relatedId) return `booking-${relatedId}`;
+  if (type.startsWith('wellness') && relatedId) return `wellness-${relatedId}`;
+  if (type === 'announcement' && relatedId) return `announcement-${relatedId}`;
+  if (type.startsWith('event') && relatedId) return `event-${relatedId}`;
+  if (type.startsWith('payment') && relatedId) return `payment-${relatedId}`;
+  if (type === 'closure' || type === 'closure_today' || type === 'closure_created') return `closure-${relatedId || 'general'}`;
+  if (type === 'tour' || type === 'tour_scheduled' || type === 'tour_reminder') return `tour-${relatedId || 'general'}`;
+  if (type === 'info' || type === 'success' || type === 'warning' || type === 'error' || type === 'system') return 'alert';
+  return type;
+}
+
+function buildDeepLink(type: NotificationType, url?: string): string {
+  if (url) return url;
+  if (type.startsWith('booking')) return '/dashboard/bookings';
+  if (type.startsWith('wellness')) return '/wellness';
+  if (type.startsWith('event')) return '/events';
+  if (type.startsWith('payment') || type === 'outstanding_balance' || type === 'billing' || type === 'billing_alert') return '/dashboard/billing';
+  if (type === 'announcement') return '/dashboard';
+  if (type === 'closure' || type === 'closure_today' || type === 'closure_created') return '/dashboard';
+  if (type === 'guest_pass') return '/dashboard/guest-passes';
+  if (type.startsWith('membership') || type === 'member_status_change' || type === 'new_member') return '/dashboard/membership';
+  if (type === 'tour' || type === 'tour_scheduled' || type === 'tour_reminder') return '/admin?tab=tours';
+  return '/dashboard';
+}
+
+const PUSH_ICON = '/icon-192.png';
+const PUSH_BADGE = '/badge-72.png';
+
 export interface DeliveryResult {
   channel: 'database' | 'websocket' | 'push' | 'email';
   success: boolean;
@@ -195,7 +233,7 @@ async function deliverViaWebSocket(payload: NotificationPayload): Promise<Delive
   }
 }
 
-async function deliverViaPush(userEmail: string, payload: { title: string; body: string; url?: string; tag?: string }): Promise<DeliveryResult> {
+async function deliverViaPush(userEmail: string, payload: PushPayload): Promise<DeliveryResult> {
   if (!process.env.VAPID_PUBLIC_KEY || !process.env.VAPID_PRIVATE_KEY) {
     return {
       channel: 'push',
@@ -436,8 +474,10 @@ export async function notifyMember(
     const pushResult = await deliverViaPush(payload.userEmail, {
       title: payload.title,
       body: payload.message,
-      url: payload.url,
-      tag: payload.type
+      icon: PUSH_ICON,
+      badge: PUSH_BADGE,
+      url: buildDeepLink(payload.type, payload.url),
+      tag: buildPushTag(payload.type, payload.relatedId)
     });
     deliveryResults.push(pushResult);
   }
@@ -560,8 +600,10 @@ export async function notifyAllStaff(
       const pushResult = await deliverPushToStaff({
         title,
         body: message,
-        url: options.url,
-        tag: type
+        icon: PUSH_ICON,
+        badge: PUSH_BADGE,
+        url: buildDeepLink(type, options.url),
+        tag: buildPushTag(type, options.relatedId)
       });
       deliveryResults.push(pushResult);
     }
@@ -593,7 +635,7 @@ export async function notifyAllStaff(
   }
 }
 
-async function deliverPushToStaff(payload: { title: string; body: string; url?: string; tag?: string }): Promise<DeliveryResult> {
+async function deliverPushToStaff(payload: PushPayload): Promise<DeliveryResult> {
   if (!process.env.VAPID_PUBLIC_KEY || !process.env.VAPID_PRIVATE_KEY) {
     return {
       channel: 'push',

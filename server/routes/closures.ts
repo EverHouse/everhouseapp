@@ -16,7 +16,10 @@ import { getErrorMessage, getErrorCode, getErrorStatusCode } from '../utils/erro
 
 const router = Router();
 
-export async function sendPushNotificationToAllMembers(payload: { title: string; body: string; url?: string }) {
+const PUSH_ICON = '/icon-192.png';
+const PUSH_BADGE = '/badge-72.png';
+
+export async function sendPushNotificationToAllMembers(payload: { title: string; body: string; url?: string; tag?: string; icon?: string; badge?: string }) {
   try {
     const subscriptions = await db
       .select({
@@ -37,8 +40,9 @@ export async function sendPushNotificationToAllMembers(payload: { title: string;
         }
       };
       
+      const enrichedPayload = { ...payload, icon: payload.icon || PUSH_ICON, badge: payload.badge || PUSH_BADGE };
       try {
-        await webpush.sendNotification(pushSubscription, JSON.stringify(payload));
+        await webpush.sendNotification(pushSubscription, JSON.stringify(enrichedPayload));
       } catch (err: unknown) {
         if (getErrorStatusCode(err) === 410) {
           await db.delete(pushSubscriptions).where(eq(pushSubscriptions.endpoint, sub.endpoint));
@@ -823,7 +827,8 @@ router.post('/api/closures', isStaffOrAdmin, async (req, res) => {
         await sendPushNotificationToAllMembers({
           title: notificationTitle,
           body: notificationBody,
-          url: '/announcements'
+          url: '/announcements',
+          tag: `closure-${closureId}`
         });
       } catch (pushError: unknown) {
         logger.error('[Closures] Failed to send push notifications', { extra: { pushError } });
@@ -1188,7 +1193,8 @@ router.put('/api/closures/:id', isStaffOrAdmin, async (req, res) => {
         await sendPushNotificationToAllMembers({
           title: `Today: ${finalTitle}`,
           body: finalReason ? `${finalReason}` : `Effective today`,
-          url: '/updates?tab=notices'
+          url: '/updates?tab=notices',
+          tag: `closure-${closureId}`
         });
         
         // Create in-app notifications for all members

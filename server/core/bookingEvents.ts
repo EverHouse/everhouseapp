@@ -178,7 +178,8 @@ export async function publish(
       sendPushNotification(data.memberEmail, {
         title: memberNotification.title,
         body: memberNotification.message,
-        url: '/dashboard'
+        url: '/dashboard',
+        tag: `booking-${data.bookingId}`
       }).catch(err => logger.error('[BookingEvents] Push notification failed:', { error: err }));
     }
 
@@ -225,7 +226,8 @@ export async function publish(
         sendPushNotificationToStaff({
           title: staffNotification.title,
           body: staffNotification.message,
-          url: '/admin'
+          url: '/admin',
+          tag: `staff-booking-${data.bookingId}`
         }).catch(err => logger.error('[BookingEvents] Staff push notification failed:', { error: err }));
       }
     }
