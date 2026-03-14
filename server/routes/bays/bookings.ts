@@ -83,7 +83,16 @@ interface BookingInsertRow {
 
 const router = Router();
 
-router.get('/api/booking-requests', isAuthenticated, async (req, res) => {
+const bookingRequestsQuerySchema = z.object({
+  user_email: z.string().optional(),
+  status: z.string().optional(),
+  include_all: z.enum(['true', 'false']).optional(),
+  limit: z.string().regex(/^\d+$/).optional(),
+  offset: z.string().regex(/^\d+$/).optional(),
+  page: z.string().regex(/^\d+$/).optional(),
+}).passthrough();
+
+router.get('/api/booking-requests', isAuthenticated, validateQuery(bookingRequestsQuerySchema), async (req, res) => {
   try {
     const { user_email, status, include_all, limit: limitParam, offset: offsetParam, page: pageParam } = req.query;
     const sessionUser = getSessionUser(req);

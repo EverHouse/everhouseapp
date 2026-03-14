@@ -79,7 +79,8 @@ const passesQuerySchema = z.object({
 
 router.get('/v1/devices/:deviceLibraryId/registrations/:passTypeId', validateQuery(passesQuerySchema), async (req, res) => {
   try {
-    const { deviceLibraryId, passTypeId } = req.params;
+    const deviceLibraryId = req.params.deviceLibraryId as string;
+    const passTypeId = req.params.passTypeId as string;
     const passesUpdatedSince = req.query.passesUpdatedSince as string | undefined;
 
     const deviceRegistrations = await db.select({
