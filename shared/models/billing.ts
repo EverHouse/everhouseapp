@@ -176,6 +176,7 @@ export const guestPassHolds = pgTable(
   (table) => [
     index("idx_guest_pass_holds_member_email").on(table.memberEmail),
     index("idx_guest_pass_holds_booking_id").on(table.bookingId),
+    index("idx_guest_pass_holds_lower_member_email").on(sql`LOWER(${table.memberEmail})`),
   ],
 );
 

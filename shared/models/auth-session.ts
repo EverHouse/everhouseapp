@@ -144,6 +144,7 @@ export const magicLinks = pgTable("magic_links", {
   createdAt: timestamp("created_at").defaultNow(),
 }, (table) => [
   index("magic_links_token_idx").on(table.token),
+  index("idx_magic_links_lower_email").on(sql`LOWER(${table.email})`),
 ]);
 
 export type UpsertUser = typeof users.$inferInsert;

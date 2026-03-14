@@ -145,6 +145,7 @@ export const dataExportRequests = pgTable("data_export_requests", {
 }, (table) => ({
   userEmailIdx: index("data_export_requests_user_email_idx").on(table.userEmail),
   statusIdx: index("data_export_requests_status_idx").on(table.status),
+  lowerUserEmailIdx: index("idx_data_export_requests_lower_user_email").on(sql`LOWER(${table.userEmail})`),
 }));
 
 export type DataExportRequest = typeof dataExportRequests.$inferSelect;

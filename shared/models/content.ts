@@ -204,7 +204,9 @@ export const bugReports = pgTable("bug_reports", {
   staffNotes: text("staff_notes"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (table) => [
+  index("idx_bug_reports_lower_user_email").on(sql`LOWER(${table.userEmail})`),
+]);
 
 export type WellnessClass = typeof wellnessClasses.$inferSelect;
 export type InsertWellnessClass = typeof wellnessClasses.$inferInsert;
