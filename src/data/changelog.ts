@@ -37,11 +37,103 @@ export const changelog: ChangelogEntry[] = [
   {
     version: "8.84.0",
     date: "2026-03-12",
-    title: "Linked Email Booking Fix",
+    title: "Linked Email Booking Fix & Migration Safety",
     changes: [
       "Fix: Bookings made under a secondary or linked email now appear correctly on your dashboard — previously these bookings were invisible to the member who made them",
       "Fix: All booking-related screens (dashboard, billing, check-in) now include bookings across all your linked email addresses",
       "Fix: Existing bookings that were orphaned due to linked email issues are automatically repaired on server startup",
+      "Fix: Members migrating from MindBody to Stripe billing now keep their original membership start date — previously the migration reset it to the current date, affecting anniversary-based benefits",
+      "Fix: Guest pass monthly reset scheduler no longer errors when processing members with updated email addresses",
+      "Fix: Duplicate availability blocks no longer cause silent failures during booking conflict checks — conflicts are handled gracefully with proper error messages",
+    ]
+  },
+  {
+    version: "8.83.6",
+    date: "2026-03-12",
+    title: "Apple Wallet Redesign & Pass Improvements",
+    changes: [
+      "Feature: Apple Wallet membership pass completely redesigned with a modern strip-image layout — shows your tier, name, and member information in a cleaner format",
+      "Feature: Wallet pass colors are now configurable per membership tier — each tier gets its own branded pass appearance set from Admin Settings",
+      "Feature: Wallet pass now includes a link to the member portal on the back of the card — quick access to your account from the pass",
+      "Fix: Apple Wallet pass database tables now correctly created on deployment — resolved an issue where pass registration data wasn't being stored",
+      "Fix: Wallet pass layout refined through multiple iterations — tier information, logo placement, and member details now display correctly across all iPhone models",
+    ]
+  },
+  {
+    version: "8.83.5",
+    date: "2026-03-11",
+    title: "Apple Sign-In, Wallet Pass & Legal Updates",
+    changes: [
+      "Feature: Sign in with Apple — members can now log in using their Apple ID, with automatic account linking for existing members",
+      "Feature: Link or unlink your Apple account from your profile's Connected Accounts section",
+      "Feature: Apple Wallet membership card — add a digital membership pass to your iPhone wallet with your name, tier, and a QR code for check-in",
+      "Feature: Tempo CC Inc. now properly referenced as the operating entity across the website footer, Terms of Service, and Privacy Policy",
+      "Fix: Apple Maps now used on the Contact page instead of Google Maps — cleaner integration on Apple devices",
+      "Fix: Content Security Policy updated to allow Apple Sign-In and Apple Maps services",
+      "Improvement: PWA update process now reliably refreshes after deployments — no more stale cached versions",
+      "Improvement: Error handling and logging improved across 13 server files — errors now properly formatted for monitoring",
+    ]
+  },
+  {
+    version: "8.83.4",
+    date: "2026-03-11",
+    title: "Profile Enhancements & HubSpot Resilience",
+    changes: [
+      "Feature: Copy buttons added to profile drawer — quickly copy member email, phone, and ID to clipboard",
+      "Feature: Date of birth and address fields now editable from the profile drawer — changes sync automatically to HubSpot",
+      "Feature: New admin tool to restore lost event descriptions and clean up data artifacts",
+      "Feature: 'Clean Calendar Descriptions' button added to admin Calendar Status section — removes formatting artifacts from Google Calendar synced events",
+      "Fix: HubSpot sync now recovers gracefully from API failures and rate limits — production error logging improved for faster diagnosis",
+      "Fix: Data sync and alert dismissal bugs resolved — system reliability improved for background processes",
+      "Fix: Event and booking availability blocks now created atomically — prevents partial block creation on errors",
+      "Fix: MindBody member ID now displays correctly in the profile drawer",
+    ]
+  },
+  {
+    version: "8.83.3",
+    date: "2026-03-11",
+    title: "PWA Icon, Data Quality & Check-In Fixes",
+    changes: [
+      "Feature: New modern iOS-style app icon for the PWA — cleaner appearance on home screens and app switchers",
+      "Fix: Phantom outstanding fees no longer appear on member accounts — added filters to prevent showing fees from cancelled or deleted bookings",
+      "Fix: Member names now display correctly during check-in — name retrieval uses first and last name fields instead of falling back to email",
+      "Fix: Waiver review notifications removed — eliminated unnecessary review processes and notifications that were creating noise for staff",
+      "Fix: Unreviewed waivers no longer block overdue payment calculations",
+      "Fix: Guest information now consistently saved to user records across all booking paths",
+      "Improvement: Bottom navigation label changed from 'Financials' to 'POS' for clearer staff navigation",
+      "Improvement: Booking cancellation and roster management now provides immediate visual feedback",
+    ]
+  },
+  {
+    version: "8.83.2",
+    date: "2026-03-11",
+    title: "Animations, Safari Polish & Booking UX",
+    changes: [
+      "Feature: Player slot additions in the booking flow now animate smoothly — slots slide in and out with polished transitions",
+      "Feature: Staff can now delete cafe menu items directly from the menu management screen",
+      "Fix: Safari toolbar color now matches the background of modals and drawers — no more jarring white bar at the top on iPhones",
+      "Fix: Splash screen now covers the entire screen including safe areas — no more white gaps at the top and bottom on newer iPhones",
+      "Fix: Member search dropdown now appears correctly in the booking assignment drawer — was previously hidden behind other elements",
+      "Fix: Animation glitches when editing player count in bookings resolved — auto-animate now works correctly when increasing player count",
+      "Fix: Dropdown menus now position correctly when the mobile keyboard is open — no longer hidden behind the keyboard",
+      "Fix: Booking queue cards now animate smoothly when added or removed — smoother transitions in the staff command center",
+      "Fix: Exit animations across the app now use proper fill modes — elements no longer flash or disappear momentarily during transitions",
+      "Improvement: Scheduler task counts updated to accurately reflect all active background tasks",
+    ]
+  },
+  {
+    version: "8.83.1",
+    date: "2026-03-11",
+    title: "UUID Safety & Codebase Audit",
+    changes: [
+      "Fix: Member IDs now handled correctly throughout the entire system — resolved a class of bugs where numeric ID assumptions crashed on UUID-format IDs, affecting integrity checks, Stripe lookups, billing, HubSpot creation, and admin resolution tools",
+      "Fix: Database advisory locks in data integrity routes now work correctly with text-based user IDs — previously could fail silently on non-numeric IDs",
+      "Fix: Input validation added to wellness, closures, announcements, tours, gallery, and events routes — prevents crashes from malformed request parameters",
+      "Fix: Booking status 'cancellation_pending' now properly recognized across all status checks — was missing from the allowed status list",
+      "Fix: Member profile data now aligns correctly between API responses and frontend display — resolved field mismatches that could show blank data",
+      "Fix: Duplicate constant definition in events update handler removed — was causing a silent variable shadowing issue",
+      "Improvement: Fee fields documented as cents throughout the codebase for consistency",
+      "Improvement: HubSpot dead queue startup recovery generalized — no longer hardcoded to specific job IDs",
     ]
   },
   {
@@ -51,6 +143,33 @@ export const changelog: ChangelogEntry[] = [
     changes: [
       "Feature: Your Apple Wallet membership pass now updates automatically when your membership changes — tier upgrades/downgrades, name changes, and monthly guest pass resets are reflected on your pass without needing to re-download it",
       "Feature: Apple Wallet push update infrastructure added — devices register with the server and receive silent push notifications when pass data changes, triggering iOS to fetch the latest version",
+    ]
+  },
+  {
+    version: "8.82.1",
+    date: "2026-03-11",
+    title: "Bug Audit & Critical Safety Fixes",
+    isMajor: true,
+    changes: [
+      "Fix: Server now properly shuts down and restarts when initialization fails — previously it could continue running in a broken state",
+      "Fix: Health check endpoint now waits until WebSocket and background tasks are fully ready before reporting healthy — prevents load balancers from routing traffic too early",
+      "Fix: Booking fee snapshot table now tracked in the database schema — prevents accidental table drops during migrations",
+      "Fix: Duplicate billing prevented with a unique constraint on usage ledger records — same session can no longer generate two billing entries",
+      "Fix: Orphaned booking participant records prevented with a foreign key to the users table",
+      "Fix: Public tour confirmation endpoint now rate-limited — prevents abuse from automated requests",
+      "Fix: Session creation now uses advisory locks matching the booking system's locking pattern — prevents race conditions during concurrent session operations",
+      "Fix: Fee calculations now use cents-based math throughout — eliminates rounding errors from dollar-to-cent conversions",
+      "Fix: Payment matching tolerance tightened from 50 cents to 5 cents — catches more billing discrepancies",
+      "Fix: WebSocket module now shares the main database connection pool — eliminates a redundant connection pool that was consuming database resources",
+      "Fix: Session secret generation now uses cryptographically secure random bytes — replaces a predictable fallback",
+      "Fix: Booking action buttons (approve, decline, cancel, check-in) now properly revert the display if the action fails — previously the UI showed success even when the server returned an error",
+      "Fix: Real-time booking availability updates now work correctly — fixed query key mismatch that silently prevented 6 cache invalidation calls from working",
+      "Fix: Guest pass deduction on HubSpot check-in form now happens after the API call succeeds — prevents permanent pass loss on network errors",
+      "Fix: Advisory lock in session creation now stays held for the full operation — was previously acquiring and instantly releasing",
+      "Fix: Staff directory no longer shows a blank screen during concurrent data refreshes — requests now share a single refresh promise",
+      "Fix: Transaction leak in session creation fixed — all database writes now wrapped in a single transaction to prevent orphaned records on crash",
+      "Fix: HubSpot webhook processing no longer flushes the CRM cache on irrelevant property changes — directory stays responsive during bulk webhook events",
+      "Fix: Guest pass allocation now handles insufficient passes gracefully — uses available passes and charges the rest as paid guests instead of blocking check-in entirely",
     ]
   },
   {
