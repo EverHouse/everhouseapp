@@ -71,7 +71,8 @@ router.get('/api/staff/passes/search', isStaffOrAdmin, async (req: Request, res:
           eq(dayPassPurchases.status, 'active')
         )
       )
-      .orderBy(dayPassPurchases.purchasedAt);
+      .orderBy(dayPassPurchases.purchasedAt)
+      .limit(50);
 
     res.json({ passes });
   } catch (error: unknown) {
@@ -327,16 +328,20 @@ router.post('/api/staff/passes/:passId/refund', isStaffOrAdmin, async (req: Requ
       });
     }
 
-    // Process Stripe refund BEFORE updating database
+    // Process Stripe refund BEFORE updating database (skip for comped passes)
     try {
-      const stripe = await getStripeClient();
-      const refund = await stripe.refunds.create({
-        payment_intent: pass.stripePaymentIntentId,
-        reason: 'requested_by_customer'
-      }, {
-        idempotencyKey: `refund_guest_pass_${passId}_${pass.stripePaymentIntentId}`
-      });
-      logger.info('[Passes] Stripe refund created for pass', { extra: { passId, refundId: refund.id } });
+      if (pass.stripePaymentIntentId) {
+        const stripe = await getStripeClient();
+        const refund = await stripe.refunds.create({
+          payment_intent: pass.stripePaymentIntentId,
+          reason: 'requested_by_customer'
+        }, {
+          idempotencyKey: `refund_guest_pass_${passId}_${pass.stripePaymentIntentId}`
+        });
+        logger.info('[Passes] Stripe refund created for pass', { extra: { passId, refundId: refund.id } });
+      } else {
+        logger.info('[Passes] Skipping Stripe refund for comped pass (no payment intent)', { extra: { passId } });
+      }
     } catch (stripeError: unknown) {
       logger.error('[Passes] Stripe refund failed for pass', { extra: { passId, error: getErrorMessage(stripeError) } });
       return res.status(400).json({ 

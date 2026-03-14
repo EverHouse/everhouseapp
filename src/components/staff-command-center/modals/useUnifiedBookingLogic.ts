@@ -510,23 +510,25 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
   }, [isOpen, isManageMode, ownerEmail, fetchedContext?.ownerEmail, checkSavedCard]);
 
   useEffect(() => {
+    let isCurrent = true;
     const fetchStaffList = async () => {
       if (!showStaffList || staffList.length > 0) return;
       setIsLoadingStaff(true);
       try {
         const res = await fetch('/api/staff/list', { credentials: 'include' });
-        if (res.ok) {
+        if (res.ok && isCurrent) {
           const data = await res.json();
           setStaffList(data);
         }
       } catch (err: unknown) {
-        console.error('Failed to fetch staff list:', err);
+        if (isCurrent) console.error('Failed to fetch staff list:', err);
       } finally {
-        setIsLoadingStaff(false);
+        if (isCurrent) setIsLoadingStaff(false);
       }
     };
     fetchStaffList();
-  }, [showStaffList]);
+    return () => { isCurrent = false; };
+  }, [showStaffList, staffList.length]);
 
   useEffect(() => {
     if (isManageMode) return;

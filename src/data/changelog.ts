@@ -18,6 +18,10 @@ export const changelog: ChangelogEntry[] = [
       "Fix: Completing an already-cancelled booking no longer silently succeeds — staff now receives a clear error message instead of a false confirmation",
       "Improvement: Availability block creation is now more resilient — handles database constraint errors gracefully instead of crashing when duplicate blocks are detected",
       "Fix: Resolved SSL security warning in database connection logs by ensuring all connection paths strip the sslmode parameter consistently",
+      "Fix: Booking requests with optional fields (player count, guardian info) no longer crash when those fields are left empty",
+      "Fix: Refunding a complimentary day pass no longer errors out — the system now correctly skips the payment processor step for free passes",
+      "Fix: Day pass search results are now capped to prevent performance issues with broad search terms",
+      "Fix: Staff assignment dropdown no longer flickers when toggled rapidly — resolved a race condition in the loading behavior",
     ]
   },
   {
