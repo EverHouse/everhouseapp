@@ -17,6 +17,7 @@ export const changelog: ChangelogEntry[] = [
       "Fix: Trackman blocked-bay options on the internal calendar no longer create unwanted facility closure notices — calendar sync now filters out time slots that match active Trackman bookings",
       "Fix: Completing an already-cancelled booking no longer silently succeeds — staff now receives a clear error message instead of a false confirmation",
       "Improvement: Availability block creation is now more resilient — handles database constraint errors gracefully instead of crashing when duplicate blocks are detected",
+      "Fix: Resolved SSL security warning in database connection logs by ensuring all connection paths strip the sslmode parameter consistently",
     ]
   },
   {

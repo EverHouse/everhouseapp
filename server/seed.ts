@@ -3,10 +3,11 @@ import fs from 'fs';
 import path from 'path';
 import { normalizeTierName } from './utils/tierUtils';
 import { logger } from './core/logger';
+import { stripSslMode } from './core/db';
 const { Pool } = pg;
 
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
+  connectionString: stripSslMode(process.env.DATABASE_URL),
 });
 
 function parseCSV(content: string): Record<string, string>[] {
