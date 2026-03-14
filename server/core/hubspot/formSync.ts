@@ -103,13 +103,21 @@ function inferFormTypeStrict(formName: string): string | null {
 }
 
 function updateDiscoveredFormIds(forms: Array<{ id: string; name: string }>): void {
+  discoveredFormIds.clear();
+  const collisions: string[] = [];
   for (const form of forms) {
     const formType = inferFormTypeStrict(form.name);
     if (formType) {
+      if (discoveredFormIds.has(formType)) {
+        collisions.push(`${formType}: "${form.name}" (${form.id}) vs existing ${discoveredFormIds.get(formType)}`);
+      }
       discoveredFormIds.set(formType, form.id);
     } else {
       logger.info(`[HubSpot FormSync] Skipping unrecognized form "${form.name}" (${form.id}) — no matching form type`);
     }
+  }
+  if (collisions.length > 0) {
+    logger.warn(`[HubSpot FormSync] Form type collisions detected (last-wins): ${collisions.join('; ')}`);
   }
   logger.info(`[HubSpot FormSync] Updated discovered form ID registry: ${JSON.stringify(Object.fromEntries(discoveredFormIds))}`);
 }
@@ -210,14 +218,7 @@ function getFieldValue(values: HubSpotSubmissionValue[], fieldName: string): str
 }
 
 function inferFormTypeFromName(formName: string): string {
-  const name = formName.toLowerCase();
-  if (name.includes('check-in') || name.includes('checkin') || name.includes('waiver')) return 'guest-checkin';
-  if (name.includes('membership') || name.includes('application')) return 'membership';
-  if (name.includes('private') && (name.includes('event') || name.includes('hire'))) return 'private-hire';
-  if (name.includes('event') || name.includes('inquiry')) return 'event-inquiry';
-  if (name.includes('tour')) return 'tour-request';
-  if (name.includes('contact')) return 'contact';
-  return 'contact';
+  return inferFormTypeStrict(formName) || 'contact';
 }
 
 function inferFormTypeFromPageUrl(pageUrl: string | undefined, defaultType: string): string {

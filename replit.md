@@ -1,6 +1,6 @@
 # Ever Club Members App
 
-**Current Version**: 8.87.3 (March 14, 2026)
+**Current Version**: 8.87.4 (March 14, 2026)
 
 ## Overview
 The Ever Club Members App is a private members club application designed for golf and wellness centers. Its primary purpose is to serve as a central digital hub for managing golf simulator bookings, wellness service appointments, and club events. The project aims to enhance member satisfaction and operational efficiency through comprehensive membership management, facility booking, and community-building tools, ultimately creating a seamless digital experience for club members and staff.
@@ -147,6 +147,7 @@ The following large files have been split into sub-modules with barrel re-export
 - **Files**: `server/routes/analytics.ts`, `src/pages/Admin/tabs/AnalyticsTab.tsx`
 
 ### Recent Changes
+- **HubSpot Form Submission Fix (v8.87.4)**: Fixed public-facing form submissions (membership application, guest check-in, contact) that failed with "Submission Failed" when env vars weren't set. Added `resolveFormId()` 3-tier fallback (env var → auto-discovered ID → known hardcoded ID). `inferFormTypeFromName` now delegates to `inferFormTypeStrict` for consistent classification. Discovery map clears stale entries each sync and logs collisions. Non-JSON HubSpot error responses no longer crash the submission handler. Startup diagnostic logs which form types have resolved IDs.
 - **Database Connection Fix & Stability (v8.87.3)**: Fixed dev login and staff portal routing failures caused by Task #42's auto-redirect to production Supabase DB (schema mismatch). Local DB redirect is now opt-in via `FORCE_POOLER_REDIRECT=true` instead of automatic. Fixed StripeSync client to follow the same DB routing logic. All 274 tests passing, zero server errors.
 - **Server Code Quality & Stability (v8.87.2)**: Fixed all 286 server TypeScript errors across Tasks #42-#46. Server tsconfig upgraded to ES2022 with proper rootDir. Type-check CI now enforces both root and server tsconfig (0 errors). Added jsdom devDependency for test environment.
 - **Directory Sync Fix & Membership Status Overhaul (v8.87.0)**: Fixed directory sync timeout by replacing HTTP push with direct batched function call. Fixed membership status display across all auth paths (OTP, Google, Apple) and all member-facing pages (Dashboard, BookGolf, Wellness, Events). All frontend active-access checks now consistently use `ACTIVE_STATUSES: ['active', 'trialing', 'past_due']`. HubSpot push now includes trialing/past_due members. TierBadge shows "No Active Membership" for inactive statuses. Session endpoint consolidated to single save. pushErrors surfaced in admin directory sync UI.

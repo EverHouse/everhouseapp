@@ -8,6 +8,19 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.87.4",
+    date: "2026-03-14",
+    title: "HubSpot Form Submission Fix",
+    changes: [
+      "Fix: Membership application, guest check-in, and other public forms no longer fail with 'Submission Failed' when HubSpot form IDs aren't set as environment variables",
+      "Forms now automatically find the correct HubSpot form ID using a 3-step lookup: environment variable, auto-discovered ID from HubSpot, or known default ID",
+      "Better error messages when form submissions fail — logs now include which form, what ID was used, and what went wrong",
+      "Server now reports which form types are ready vs missing at startup, making it easier to spot configuration issues",
+      "Fix: Hardened error handling so form submissions don't crash if HubSpot returns an unexpected response format",
+      "Fix: Form type detection is now consistent across all code paths, preventing edge cases where the same form could be classified differently",
+    ]
+  },
+  {
     version: "8.87.3",
     date: "2026-03-14",
     title: "Login & Database Connection Fix",

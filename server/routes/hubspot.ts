@@ -865,7 +865,12 @@ router.post('/api/hubspot/forms/:formType', async (req, res) => {
     );
     
     if (!response.ok) {
-      const errorData = await response.json();
+      let errorData: unknown;
+      try {
+        errorData = await response.json();
+      } catch {
+        errorData = await response.text().catch(() => 'Unable to read response body');
+      }
       logger.error(`[HubSpot Forms] Submission failed for form type "${formType}" (formId: ${formId}, portalId: ${portalId}, status: ${response.status})`, { extra: { errorData } });
       return res.status(response.status).json({ error: 'Form submission failed' });
     }
