@@ -8,6 +8,16 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.87.8",
+    date: "2026-03-14",
+    title: "Apple Pay, Google Pay & Saved Cards for Booking Prepayments",
+    changes: [
+      "Members can now use Apple Pay and Google Pay when prepaying for booking fees",
+      "Saved cards on file now appear in the payment form — no need to re-enter card details",
+      "Members can save new cards during payment for faster checkout next time",
+    ]
+  },
+  {
     version: "8.87.7",
     date: "2026-03-14",
     title: "Conference Room Booking Fix — No More False Invoice Warnings",

@@ -319,6 +319,9 @@ export async function createDraftInvoiceForBooking(
     description,
     metadata: invoiceMetadata,
     pending_invoice_items_behavior: 'exclude',
+    payment_settings: {
+      payment_method_types: ['card', 'link'],
+    },
   }, {
     idempotencyKey: `invoice_booking_draft_${bookingId}_${sessionId}_${createHash('sha256').update(JSON.stringify(feeLineItems.map(li => ({ id: li.participantId, o: li.overageCents, g: li.guestCents, t: li.totalCents })).sort((a, b) => String(a.id || '').localeCompare(String(b.id || ''))))).digest('hex').substring(0, 12)}`
   });

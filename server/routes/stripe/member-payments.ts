@@ -370,6 +370,9 @@ async function handleExistingInvoicePayment(params: {
     if (existingInvoice.status === 'draft') {
       await stripe.invoices.update(existingInvoiceId, {
         collection_method: 'charge_automatically',
+        payment_settings: {
+          payment_method_types: ['card', 'link'],
+        },
       });
       const piResult = await finalizeInvoiceWithPi(stripe, existingInvoiceId);
       invoicePiId = piResult.piId;
@@ -379,6 +382,9 @@ async function handleExistingInvoicePayment(params: {
       if (existingInvoice.collection_method === 'send_invoice') {
         await stripe.invoices.update(existingInvoiceId, {
           collection_method: 'charge_automatically',
+          payment_settings: {
+            payment_method_types: ['card', 'link'],
+          },
         });
         logger.info('[Stripe] Switched existing open invoice from send_invoice to charge_automatically', { extra: { bookingId, invoiceId: existingInvoiceId } });
       }
@@ -407,6 +413,28 @@ async function handleExistingInvoicePayment(params: {
        ON CONFLICT (stripe_payment_intent_id) DO NOTHING
     `);
 
+    let customerSessionSecret: string | undefined;
+    try {
+      const customerSession = await stripe.customerSessions.create({
+        customer: stripeCustomerId,
+        components: {
+          payment_element: {
+            enabled: true,
+            features: {
+              payment_method_redisplay: 'enabled',
+              payment_method_save: 'enabled',
+              payment_method_remove: 'enabled',
+            },
+          },
+        },
+      });
+      customerSessionSecret = customerSession.client_secret;
+    } catch (csErr: unknown) {
+      logger.warn('[Stripe] Failed to create customer session for saved cards (existing invoice)', {
+        extra: { bookingId, error: getErrorMessage(csErr) }
+      });
+    }
+
     return {
       paidInFull: false,
       clientSecret: invoicePiSecret,
@@ -417,6 +445,7 @@ async function handleExistingInvoicePayment(params: {
       remainingAmount: serverTotal / 100,
       participantFees: participantFeesList,
       description: piDescription,
+      customerSessionClientSecret: customerSessionSecret,
     };
   } catch (invoiceErr: unknown) {
     logger.warn('[Stripe] Failed to use existing draft invoice, falling back to new invoice', {
@@ -682,6 +711,28 @@ router.post('/api/member/bookings/:id/pay-fees', isAuthenticated, paymentRateLim
        ON CONFLICT (stripe_payment_intent_id) DO NOTHING
     `);
 
+    let customerSessionSecret: string | undefined;
+    try {
+      const customerSession = await stripe.customerSessions.create({
+        customer: stripeCustomerId,
+        components: {
+          payment_element: {
+            enabled: true,
+            features: {
+              payment_method_redisplay: 'enabled',
+              payment_method_save: 'enabled',
+              payment_method_remove: 'enabled',
+            },
+          },
+        },
+      });
+      customerSessionSecret = customerSession.client_secret;
+    } catch (csErr: unknown) {
+      logger.warn('[Stripe] Failed to create customer session for saved cards', {
+        extra: { bookingId, error: getErrorMessage(csErr) }
+      });
+    }
+
     res.json({
       paidInFull: false,
       clientSecret: invoicePiSecret,
@@ -692,6 +743,7 @@ router.post('/api/member/bookings/:id/pay-fees', isAuthenticated, paymentRateLim
       remainingAmount: serverTotal / 100,
       participantFees: participantFeesList,
       description: newPiDescription,
+      customerSessionClientSecret: customerSessionSecret,
     });
   } catch (error: unknown) {
     const errMsg = error instanceof Error ? error.message : String(error);

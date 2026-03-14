@@ -35,6 +35,7 @@ interface PayFeesResponse {
   participantFees: ParticipantFee[];
   description?: string;
   error?: string;
+  customerSessionClientSecret?: string;
 }
 
 export function MemberPaymentModal({
@@ -299,6 +300,7 @@ export function MemberPaymentModal({
                 description={paymentData.description || `Booking fees for #${bookingId}`}
                 onSuccess={handlePaymentSuccess}
                 onCancel={onClose}
+                customerSessionClientSecret={paymentData.customerSessionClientSecret}
               />
             ) : paymentData.error ? (
               <div className={`rounded-xl p-4 text-center animate-content-enter ${isDark ? 'bg-amber-500/10 border border-amber-500/20' : 'bg-amber-50 border border-amber-200/60'}`}>

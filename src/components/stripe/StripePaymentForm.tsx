@@ -165,6 +165,7 @@ interface StripePaymentWithSecretProps {
   description: string;
   onSuccess: (paymentIntentId?: string) => void;
   onCancel: () => void;
+  customerSessionClientSecret?: string;
 }
 
 export function StripePaymentWithSecret({
@@ -172,7 +173,8 @@ export function StripePaymentWithSecret({
   amount,
   description,
   onSuccess,
-  onCancel
+  onCancel,
+  customerSessionClientSecret
 }: StripePaymentWithSecretProps) {
   const [stripeInstance, setStripeInstance] = useState<Stripe | null>(null);
   const [loading, setLoading] = useState(true);
@@ -223,6 +225,7 @@ export function StripePaymentWithSecret({
   const options: StripeElementsOptions = {
     clientSecret,
     appearance: getStripeAppearance(isDark),
+    ...(customerSessionClientSecret ? { customerSessionClientSecret } : {}),
   };
 
   return (
