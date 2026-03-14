@@ -45,11 +45,13 @@ if (localDbDetected && !forcePoolerRedirect) {
 }
 
 const directUrl = (forcePoolerRedirect && supabaseDirectUrl) ? supabaseDirectUrl : rawDirectUrl;
-export const usingPooler = (poolerEnabled || forcePoolerRedirect) && !!poolerUrl;
+export const usingPooler = !!poolerUrl && (poolerEnabled || forcePoolerRedirect) && (!localDbDetected || forcePoolerRedirect);
 
 const effectiveConnectionString = usingPooler ? poolerUrl : directUrl;
 if (!effectiveConnectionString) {
-  logger.error('[Database] FATAL: No database connection string configured. Set DATABASE_URL or DATABASE_POOLER_URL + ENABLE_PGBOUNCER=true');
+  const msg = '[Database] FATAL: No database connection string configured. Set DATABASE_URL or DATABASE_POOLER_URL + ENABLE_PGBOUNCER=true';
+  logger.error(msg);
+  throw new Error(msg);
 }
 
 if (forcePoolerRedirect && poolerUrl) {
