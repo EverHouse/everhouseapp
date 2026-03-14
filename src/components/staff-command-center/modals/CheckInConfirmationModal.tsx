@@ -82,8 +82,8 @@ const CheckInConfirmationModal: React.FC<CheckInConfirmationModalProps> = ({
   }, [isOpen, onClose, isActive, statusLower, bookingDetails]);
 
   if (!isOpen) return null;
-  const isExpired = statusLower === 'expired';
-  const isInactive = ['cancelled', 'suspended', 'inactive', 'unpaid', 'terminated', 'past_due', 'paused'].includes(statusLower);
+  const _isExpired = statusLower === 'expired';
+  const _isInactive = ['cancelled', 'suspended', 'inactive', 'unpaid', 'terminated', 'past_due', 'paused'].includes(statusLower);
   const showWarning = !isActive && statusLower !== '';
 
   const modal = (

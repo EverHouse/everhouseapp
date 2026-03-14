@@ -195,7 +195,7 @@ async function getResourceIdsForAffectedAreas(affectedAreas: string | null | und
 
 function getDatesBetween(start: string, end: string): string[] {
   const dates: string[] = [];
-  let current = new Date(start + 'T12:00:00');
+  const current = new Date(start + 'T12:00:00');
   const endDate = new Date(end + 'T12:00:00');
   while (current <= endDate) {
     dates.push(current.toISOString().split('T')[0]);
@@ -383,6 +383,7 @@ export async function syncInternalCalendarToClosures(): Promise<{ synced: number
       }
       
       if (startTime && endTime && !extProps['ehApp_type'] && trackmanSlotSet.has(`${startDate}_${startTime}_${endTime}`)) {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         skippedTrackman++;
         logger.info(`[Calendar Sync] Skipping Trackman booking on Internal Calendar: ${title} on ${startDate} at ${startTime}-${endTime}`);
         continue;

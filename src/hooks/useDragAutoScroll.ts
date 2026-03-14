@@ -23,6 +23,7 @@ export function useDragAutoScroll() {
     const delta = direction === 'up' ? -SCROLL_SPEED : SCROLL_SPEED;
     window.scrollBy(0, delta);
 
+    // eslint-disable-next-line react-hooks/immutability
     rafRef.current = requestAnimationFrame(scrollStep);
   }, []);
 

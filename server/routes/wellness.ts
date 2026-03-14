@@ -1,5 +1,4 @@
 import { Router } from 'express';
-import { isProduction } from '../core/db';
 import { isAuthenticated, isStaffOrAdmin } from '../core/middleware';
 import { syncWellnessCalendarEvents, discoverCalendarIds, getCalendarIdByName, createCalendarEventOnCalendar, deleteCalendarEvent, updateCalendarEvent, CALENDAR_CONFIG } from '../core/calendar/index';
 import { db } from '../db';
@@ -567,7 +566,7 @@ router.put('/api/wellness-classes/:id', isStaffOrAdmin, async (req, res) => {
     
     const existing = await db.execute(sql`SELECT google_calendar_id, title, time, instructor, duration, category, date, block_bookings, block_simulators, block_conference_room, recurring_event_id FROM wellness_classes WHERE id = ${wellnessId}`);
     
-    const previousBlockBookings = existing.rows[0]?.block_bookings || false;
+    const _previousBlockBookings = existing.rows[0]?.block_bookings || false;
     const previousBlockSimulators = existing.rows[0]?.block_simulators || false;
     const previousBlockConferenceRoom = existing.rows[0]?.block_conference_room || false;
     const newBlockBookings = block_bookings === true || block_bookings === 'true';

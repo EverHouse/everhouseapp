@@ -2,7 +2,6 @@ import { Router } from 'express';
 import { eq, sql, desc, and } from 'drizzle-orm';
 import { db } from '../../db';
 import { memberNotes } from '../../../shared/schema';
-import { isProduction } from '../../core/db';
 import { isStaffOrAdmin } from '../../core/middleware';
 import { getSessionUser } from '../../types/session';
 import { logFromRequest } from '../../core/auditLog';

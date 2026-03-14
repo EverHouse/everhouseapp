@@ -25,7 +25,7 @@ const OverduePaymentsPanel: React.FC<SectionProps> = ({ onClose, variant = 'moda
   const [overduePayments, setOverduePayments] = useState<OverduePayment[]>([]);
   const [loading, setLoading] = useState(true);
   const [bookingSheet, setBookingSheet] = useState<{ isOpen: boolean; bookingId: number | null }>({ isOpen: false, bookingId: null });
-  const today = getTodayPacific();
+  const _today = getTodayPacific();
 
   const fetchOverduePayments = useCallback(async () => {
     try {

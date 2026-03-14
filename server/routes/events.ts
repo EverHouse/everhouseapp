@@ -1,5 +1,4 @@
 import { Router } from 'express';
-import { isProduction, pool } from '../core/db';
 import { isAuthenticated, isStaffOrAdmin } from '../core/middleware';
 import { db } from '../db';
 import { events, eventRsvps, users, notifications, availabilityBlocks } from '../../shared/schema';
@@ -7,7 +6,7 @@ import { eq, and, or, sql, gte, desc, isNotNull } from 'drizzle-orm';
 import { syncGoogleCalendarEvents, syncWellnessCalendarEvents, backfillWellnessToCalendar, getCalendarIdByName, createCalendarEventOnCalendar, deleteCalendarEvent, updateCalendarEvent, CALENDAR_CONFIG } from '../core/calendar/index';
 import { sendPushNotification } from './push';
 import { notifyAllStaff, notifyMember } from '../core/notificationService';
-import { createPacificDate, parseLocalDate, formatDateDisplayWithDay, getTodayPacific, getPacificDateParts } from '../utils/dateUtils';
+import { createPacificDate, formatDateDisplayWithDay, getTodayPacific, getPacificDateParts } from '../utils/dateUtils';
 import { getAllActiveBayIds, getConferenceRoomId } from '../core/affectedAreas';
 import { sendNotificationToUser, broadcastToStaff } from '../core/websocket';
 import { getSessionUser } from '../types/session';
@@ -529,7 +528,7 @@ router.put('/api/events/:id', isStaffOrAdmin, async (req, res) => {
       needsReview: events.needsReview
     }).from(events).where(eq(events.id, eventId));
     
-    const previousBlockBookings = existing[0]?.blockBookings || false;
+    const _previousBlockBookings = existing[0]?.blockBookings || false;
     const previousBlockSimulators = existing[0]?.blockSimulators || false;
     const previousBlockConferenceRoom = existing[0]?.blockConferenceRoom || false;
     const newBlockBookings = block_bookings === true || block_bookings === 'true';

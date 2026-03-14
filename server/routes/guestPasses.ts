@@ -272,7 +272,7 @@ export async function useGuestPass(
     // Normalize email for consistent matching
     const normalizedEmail = memberEmail.toLowerCase();
     
-    const { data, remaining, notificationMessage } = await db.transaction(async (tx) => {
+    const { data: _data, remaining, notificationMessage } = await db.transaction(async (tx) => {
       const result = await tx.update(guestPasses)
         .set({ passesUsed: sql`${guestPasses.passesUsed} + 1` })
         .where(and(
@@ -337,7 +337,7 @@ export async function refundGuestPass(
     // Normalize email for consistent matching
     const normalizedEmail = memberEmail.toLowerCase();
     
-    const { data, remaining, notificationMessage } = await db.transaction(async (tx) => {
+    const { data: _data, remaining, notificationMessage } = await db.transaction(async (tx) => {
       const result = await tx.update(guestPasses)
         .set({ passesUsed: sql`GREATEST(0, ${guestPasses.passesUsed} - 1)` })
         .where(sql`LOWER(${guestPasses.memberEmail}) = ${normalizedEmail}`)

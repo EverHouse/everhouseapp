@@ -179,6 +179,7 @@ export const AnnouncementDataProvider: React.FC<{children: ReactNode}> = ({ chil
   );
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useAnnouncementData = () => {
   const context = useContext(AnnouncementDataContext);
   if (!context) {

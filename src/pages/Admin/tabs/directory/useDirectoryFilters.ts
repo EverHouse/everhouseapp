@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import type { MemberProfile } from '../../../../contexts/DataContext';
-import { getMemberStatusLabel, getMemberStatusBadgeClass } from '../../../../utils/statusColors';
+import { getMemberStatusLabel } from '../../../../utils/statusColors';
 import {
     type MemberTab,
     type BillingFilter,
@@ -164,6 +164,7 @@ export function useDirectoryFilters({ members, formerMembers, memberTab }: UseDi
         let filtered = regularMembers;
         
         if (showRecentlyAdded && memberTab === 'active') {
+            // eslint-disable-next-line react-hooks/purity
             const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
             filtered = filtered.filter(m => {
                 if (!m.joinDate) return false;
@@ -250,16 +251,18 @@ export function useDirectoryFilters({ members, formerMembers, memberTab }: UseDi
                 case 'visits':
                     comparison = (a.lifetimeVisits || 0) - (b.lifetimeVisits || 0);
                     break;
-                case 'joinDate':
+                case 'joinDate': {
                     const dateA = a.joinDate ? new Date(a.joinDate).getTime() : 0;
                     const dateB = b.joinDate ? new Date(b.joinDate).getTime() : 0;
                     comparison = dateA - dateB;
                     break;
-                case 'lastVisit':
+                    }
+                case 'lastVisit': {
                     const lastA = a.lastBookingDate ? new Date(a.lastBookingDate).getTime() : 0;
                     const lastB = b.lastBookingDate ? new Date(b.lastBookingDate).getTime() : 0;
                     comparison = lastA - lastB;
                     break;
+                    }
             }
             return sortDirection === 'asc' ? comparison : -comparison;
         });

@@ -64,6 +64,7 @@ export function ManageModeRoster({
   reassignSearchOpen,
   setReassignSearchOpen,
   handleReassignOwner,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   bookingId,
   rosterLocked,
 }: ManageModeRosterProps) {
@@ -76,7 +77,7 @@ export function ManageModeRoster({
       }
     }
   }
-  const renderManageModeSlot = (member: BookingMember, index: number) => {
+  const renderManageModeSlot = (member: BookingMember, _index: number) => {
     const isOwner = member.isPrimary;
     const isUnlinking = unlinkingSlotId === member.id;
     const isGuestSlot = !!member.guestInfo;

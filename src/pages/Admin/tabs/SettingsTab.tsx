@@ -80,7 +80,7 @@ const TIME_OPTIONS = Array.from({ length: 48 }, (_, i) => {
 
 function parseHoursString(str: string): { closed: boolean; open: string; close: string } {
   if (!str || str.toLowerCase() === 'closed') return { closed: true, open: '8:30 AM', close: '8:00 PM' };
-  const parts = str.split(/\s*[–\-]\s*/);
+  const parts = str.split(/\s*[–-]\s*/);
   if (parts.length === 2) return { closed: false, open: parts[0].trim(), close: parts[1].trim() };
   return { closed: false, open: '8:30 AM', close: '8:00 PM' };
 }
@@ -235,6 +235,7 @@ const SettingsTab: React.FC = () => {
 
   useEffect(() => {
     if (fetchedSettings) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSettings(fetchedSettings);
       setHasChanges(false);
     }

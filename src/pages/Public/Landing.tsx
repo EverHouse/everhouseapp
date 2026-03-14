@@ -27,7 +27,7 @@ const Landing: React.FC = () => {
   const { user, actualUser, isViewingAs, sessionChecked } = useData();
   const [tiers, setTiers] = useState<MembershipTier[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const { offset: parallaxOffset, opacity: parallaxOpacity, gradientShift, ref: heroRef } = useParallax({ speed: 0.25, maxOffset: 120 });
+  const { offset: parallaxOffset, opacity: _parallaxOpacity, gradientShift, ref: heroRef } = useParallax({ speed: 0.25, maxOffset: 120 });
   const [heroAnimPlayed] = useState(() => {
     const played = sessionStorage.getItem(HERO_ANIM_KEY) === '1';
     if (!played) sessionStorage.setItem(HERO_ANIM_KEY, '1');

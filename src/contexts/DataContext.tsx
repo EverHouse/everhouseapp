@@ -9,11 +9,17 @@ import { BookingDataProvider, useBookingData } from './BookingDataContext';
 
 export type { CafeItem, EventSource, EventData, Announcement, MemberProfile, Booking };
 export type { PaginatedMembersResponse, FetchMembersOptions } from './MemberDataContext';
+// eslint-disable-next-line react-refresh/only-export-components
 export { useAuthData } from './AuthDataContext';
+// eslint-disable-next-line react-refresh/only-export-components
 export { useMemberData } from './MemberDataContext';
+// eslint-disable-next-line react-refresh/only-export-components
 export { useCafeData } from './CafeDataContext';
+// eslint-disable-next-line react-refresh/only-export-components
 export { useEventData } from './EventDataContext';
+// eslint-disable-next-line react-refresh/only-export-components
 export { useAnnouncementData } from './AnnouncementDataContext';
+// eslint-disable-next-line react-refresh/only-export-components
 export { useBookingData } from './BookingDataContext';
 
 interface DataContextType {
@@ -84,6 +90,7 @@ export const DataProvider: React.FC<{children: ReactNode}> = ({ children }) => {
   );
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useData = (): DataContextType => {
   const auth = useAuthData();
   const member = useMemberData();

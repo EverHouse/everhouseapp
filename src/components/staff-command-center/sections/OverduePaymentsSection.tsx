@@ -48,7 +48,7 @@ export const OverduePaymentsSection: React.FC<OverduePaymentsSectionProps> = ({ 
     fetchOverduePayments();
   }, [fetchOverduePayments]);
 
-  const handleBillingComplete = useCallback(() => {
+  const _handleBillingComplete = useCallback(() => {
     fetchOverduePayments();
   }, [fetchOverduePayments]);
 

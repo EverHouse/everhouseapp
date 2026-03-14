@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import { getSessionUser } from '../types/session';
 
 declare global {
+  // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace Express {
     interface Request {
       requestId?: string;
@@ -77,6 +78,7 @@ export const logger = {
       params: sanitize(context?.params),
       query: sanitize(context?.query),
     };
+    // eslint-disable-next-line no-console
     console.log(JSON.stringify(log));
   },
 
@@ -89,6 +91,7 @@ export const logger = {
       params: sanitize(context?.params),
       query: sanitize(context?.query),
     };
+    // eslint-disable-next-line no-console
     console.log(JSON.stringify(log));
   },
 

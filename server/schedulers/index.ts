@@ -175,6 +175,7 @@ export function initSchedulers(): void {
   slot++;
 
   staggerStart(slot * STAGGER_INTERVAL_MS, 'Pending User Cleanup', () => startPendingUserCleanupScheduler());
+  // eslint-disable-next-line no-useless-assignment
   slot++;
 }
 

@@ -2,14 +2,13 @@ import { logger } from '../core/logger';
 import { Router } from 'express';
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
-import { eq, and, sql, gt, isNotNull } from 'drizzle-orm';
+import { eq, and, sql, isNotNull } from 'drizzle-orm';
 import { db } from '../db';
 import { users, magicLinks, staffUsers, membershipTiers, rateLimits } from '../../shared/schema';
 import { isProduction } from '../core/db';
 import { getHubSpotClient } from '../core/integrations';
 import { normalizeTierName, DEFAULT_TIER } from '../../shared/constants/tiers';
 import { getResendClient } from '../utils/resend';
-import { triggerMemberSync } from '../core/memberSync';
 import { withResendRetry } from '../core/retryUtils';
 import { getSessionUser, SessionUser } from '../types/session';
 import { sendWelcomeEmail } from '../emails/welcomeEmail';
@@ -288,7 +287,7 @@ const checkOtpRequestLimit = async (email: string, ip: string): Promise<{ allowe
   }
 };
 
-const checkMagicLinkRequestLimit = async (email: string, ip: string): Promise<{ allowed: boolean; retryAfter?: number }> => {
+const _checkMagicLinkRequestLimit = async (email: string, ip: string): Promise<{ allowed: boolean; retryAfter?: number }> => {
   const key = `magic_link:${email}:${ip}`;
   const now = new Date();
   const resetAt = new Date(now.getTime() + MAGIC_LINK_REQUEST_WINDOW);
@@ -789,7 +788,7 @@ router.post('/api/auth/request-otp', async (req, res) => {
         limit: 1
       });
       
-      let contact = searchResponse.results[0];
+      const contact = searchResponse.results[0];
       
       if (!contact && !isStaffOrAdmin) {
         return res.status(404).json({ error: 'No member found with this email address' });
@@ -900,7 +899,7 @@ router.post('/api/auth/verify-otp', async (req, res) => {
     
     await clearOtpVerifyAttempts(normalizedEmail, clientIp);
     
-    const otpRecord = atomicResult.rows[0];
+    const _otpRecord = atomicResult.rows[0];
     
     const role = await getUserRole(normalizedEmail);
     const sessionTtl = 30 * 24 * 60 * 60 * 1000;

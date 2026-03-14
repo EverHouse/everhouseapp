@@ -129,7 +129,7 @@ const EmailTemplatesTab: React.FC = () => {
       if (data.templates && data.templates.length > 0) {
         selectTemplate(data.templates[0] as EmailTemplate);
       }
-    } catch (err: unknown) {
+    } catch (_err: unknown) {
       setError('Failed to load email templates');
     } finally {
       setLoading(false);
@@ -143,7 +143,7 @@ const EmailTemplatesTab: React.FC = () => {
     try {
       const data = await fetchWithCredentials<{ html?: string; subject?: string }>(`/api/admin/email-templates/${template.id}/preview`);
       setPreviewHtml(data.html ?? null);
-    } catch (err: unknown) {
+    } catch (_err: unknown) {
       setPreviewHtml('<html><body><p style="padding:40px;color:#666;text-align:center;">Failed to load template preview.</p></body></html>');
     } finally {
       setPreviewLoading(false);

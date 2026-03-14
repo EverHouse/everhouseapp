@@ -4,7 +4,7 @@ import crypto from 'crypto';
 import { isProduction } from '../core/db';
 import { db } from '../db';
 import { users, staffUsers, membershipTiers, notifications, bookingRequests } from '../../shared/schema';
-import { sql, eq, and, like, or } from 'drizzle-orm';
+import { sql, eq, like, or } from 'drizzle-orm';
 import { normalizeTierName, DEFAULT_TIER } from '../../shared/constants/tiers';
 import '../types/session';
 

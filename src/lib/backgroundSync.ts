@@ -137,7 +137,7 @@ const syncAll = async () => {
         window.dispatchEvent(new CustomEvent('notifications-read'));
       }
     );
-  } catch (err: unknown) {
+  } catch (_err: unknown) {
     // Silently fail if session isn't ready - don't log console errors
   }
 };

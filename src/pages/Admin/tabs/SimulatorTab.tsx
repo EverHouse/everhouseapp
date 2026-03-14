@@ -53,7 +53,7 @@ const SimulatorTab: React.FC = () => {
         }
     }, [navigate]);
     
-    const activeMemberEmails = useMemo(() => 
+    const _activeMemberEmails = useMemo(() => 
         new Set(members.map(m => m.email.toLowerCase())),
         [members]
     );
@@ -89,7 +89,7 @@ const SimulatorTab: React.FC = () => {
     const isLoading = resourcesLoading || baysLoading || requestsLoading || approvedLoading;
     
     const resources: Resource[] = resourcesData;
-    const bays: Bay[] = baysData;
+    const _bays: Bay[] = baysData;
     const closures: CalendarClosure[] = closuresData.filter((c: CalendarClosure) => 
         c.startDate <= calendarEndDate && c.endDate >= calendarStartDate
     );
@@ -159,8 +159,8 @@ const SimulatorTab: React.FC = () => {
         return { memberStatusMap: statusMap, memberNameMap: nameMap };
     }, [memberContactsData]);
     
-    const approveBookingMutation = undefined;
-    const declineBookingMutation = undefined;
+    const _approveBookingMutation = undefined;
+    const _declineBookingMutation = undefined;
     
     const [selectedRequest, setSelectedRequest] = useState<BookingRequest | null>(null);
     const [actionModal, setActionModal] = useState<'approve' | 'decline' | null>(null);
@@ -365,6 +365,7 @@ const SimulatorTab: React.FC = () => {
 
     useEffect(() => {
         const handleBookingUpdate = () => {
+            // eslint-disable-next-line no-console
             console.log('[SimulatorTab] Global booking-update event received');
             handleRefresh();
         };
@@ -374,8 +375,9 @@ const SimulatorTab: React.FC = () => {
 
     const handleTrackmanConfirm = useCallback(async (bookingId: number | string, trackmanBookingId: string) => {
         const apiId = typeof bookingId === 'string' ? parseInt(String(bookingId).replace('cal_', '')) : bookingId;
-        const booking = requests.find(r => r.id === bookingId);
+        const _booking = requests.find(r => r.id === bookingId);
 
+        // eslint-disable-next-line no-useless-catch
         try {
             const res = await fetch(`/api/booking-requests/${apiId}`, {
                 method: 'PUT',
@@ -401,6 +403,7 @@ const SimulatorTab: React.FC = () => {
 
     const handleDevConfirm = useCallback(async (bookingId: number | string) => {
         const apiId = typeof bookingId === 'string' ? parseInt(String(bookingId).replace('cal_', '')) : bookingId;
+        // eslint-disable-next-line no-useless-catch
         try {
             const res = await fetch(`/api/admin/bookings/${apiId}/dev-confirm`, {
                 method: 'POST',
@@ -421,7 +424,7 @@ const SimulatorTab: React.FC = () => {
         }
     }, [showToast, handleRefresh]);
 
-    const handleLinkTrackmanToMember = useCallback((event: {
+    const _handleLinkTrackmanToMember = useCallback((event: {
         trackmanBookingId: string;
         bayName?: string;
         bookingDate?: string;
@@ -444,7 +447,7 @@ const SimulatorTab: React.FC = () => {
         });
     }, []);
 
-    const unmatchedBookings = useMemo(() => {
+    const _unmatchedBookings = useMemo(() => {
         const today = getTodayPacific();
         return approvedBookings.filter(b => 
             b.is_unmatched === true && 
@@ -474,6 +477,7 @@ const SimulatorTab: React.FC = () => {
         }
 
         if (newStatus === 'attended' && checkinInProgressRef.current.has(bookingId)) {
+            // eslint-disable-next-line no-console
             console.log('[Check-in v2] Already in progress for booking', bookingId);
             return false;
         }
@@ -692,7 +696,7 @@ const SimulatorTab: React.FC = () => {
                 
                 setAvailabilityStatus(hasConflict ? 'conflict' : 'available');
                 setConflictDetails(hasConflict ? details : null);
-            } catch (err: unknown) {
+            } catch (_err: unknown) {
                 setAvailabilityStatus(null);
             }
         };
@@ -745,7 +749,7 @@ const SimulatorTab: React.FC = () => {
         r.status === 'pending_approval'
     );
     
-    const unmatchedWebhookBookings = approvedBookings.filter(b => {
+    const _unmatchedWebhookBookings = approvedBookings.filter(b => {
         const email = (b.user_email || '').toLowerCase();
         const isPlaceholderEmail = !email || 
             email.includes('@trackman.local') ||
@@ -1361,7 +1365,7 @@ const SimulatorTab: React.FC = () => {
                         setPrefillStartTime(null);
                         
                         if (booking) {
-                            const newBooking: BookingRequest = {
+                            const _newBooking: BookingRequest = {
                                 id: booking.id,
                                 user_email: booking.user_email,
                                 user_name: booking.user_name,

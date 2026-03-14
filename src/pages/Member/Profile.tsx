@@ -7,7 +7,6 @@ import { usePageReady } from '../../contexts/PageReadyContext';
 import { useNavigationLoading } from '../../contexts/NavigationLoadingContext';
 import { useToast } from '../../components/Toast';
 import { formatPhoneNumber } from '../../utils/formatting';
-import HubSpotFormModal from '../../components/HubSpotFormModal';
 import { isPushSupported, isSubscribedToPush, subscribeToPush, unsubscribeFromPush } from '../../services/pushNotifications';
 import Toggle from '../../components/Toggle';
 import MemberBottomNav from '../../components/MemberBottomNav';
@@ -21,7 +20,7 @@ import GoogleSignInButton from '../../components/GoogleSignInButton';
 import AppleSignInButton from '../../components/AppleSignInButton';
 
 
-const GUEST_CHECKIN_FIELDS = [
+const _GUEST_CHECKIN_FIELDS = [
   { name: 'guest_firstname', label: 'Guest First Name', type: 'text' as const, required: true, placeholder: 'John' },
   { name: 'guest_lastname', label: 'Guest Last Name', type: 'text' as const, required: true, placeholder: 'Smith' },
   { name: 'guest_email', label: 'Guest Email', type: 'email' as const, required: true, placeholder: 'john@example.com' },
@@ -67,7 +66,8 @@ const Profile: React.FC = () => {
   const { startNavigation } = useNavigationLoading();
   const { showToast } = useToast();
   const isDark = effectiveTheme === 'dark';
-  const [showGuestCheckin, setShowGuestCheckin] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [_showGuestCheckin, setShowGuestCheckin] = useState(false);
   const [pushEnabled, setPushEnabled] = useState(false);
   const [pushSupported, setPushSupported] = useState(false);
   const [pushLoading, setPushLoading] = useState(false);
@@ -284,7 +284,7 @@ const Profile: React.FC = () => {
         '/api/member/profile',
         data
       ),
-    onMutate: async (data) => {
+    onMutate: async (_data) => {
       await queryClient.cancelQueries({ queryKey: ['member', 'dashboard-data', user?.email] });
       const previousDashboard = queryClient.getQueryData(['member', 'dashboard-data', user?.email]);
       return { previousDashboard, previousName: user?.name, previousPhone: user?.phone };

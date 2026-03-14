@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Stripe } from '@stripe/stripe-js';
 import {
   MemberFlowProps,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   MembershipTier,
   GroupMember,
   EMAIL_REGEX,
@@ -51,7 +52,7 @@ export function MemberFlow({
   const [paymentPath, setPaymentPath] = useState<'choose' | 'card_or_terminal' | 'link'>('choose');
   const [subMemberScannedIds, setSubMemberScannedIds] = useState<Record<number, { base64: string; mimeType: string }>>({});
   const [scanningSubMemberIndex, setScanningSubMemberIndex] = useState<number | null>(null);
-  const [showIdScanner, setShowIdScanner] = useState(false);
+  const [_showIdScanner, setShowIdScanner] = useState(false);
   const reviewSubmittingRef = useRef(false);
 
   const getInputClass = (fieldName: string) => `w-full px-3 py-2.5 rounded-lg border ${
@@ -108,6 +109,7 @@ export function MemberFlow({
             return;
           }
         } catch (_resuseErr) {
+          // intentionally empty
         }
       }
 
@@ -395,7 +397,7 @@ export function MemberFlow({
         email: form.email, 
         name: `${form.firstName} ${form.lastName}` 
       });
-    } catch (err: unknown) {
+    } catch (_err: unknown) {
       setError('Payment confirmation failed. Please contact support.');
     } finally {
       setIsLoading(false);

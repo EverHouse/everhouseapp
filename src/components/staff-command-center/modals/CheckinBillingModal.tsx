@@ -93,12 +93,14 @@ export const CheckinBillingModal: React.FC<CheckinBillingModalProps> = ({
     cardLast4?: string;
     cardBrand?: string;
   } | null>(null);
-  const [checkingCard, setCheckingCard] = useState(false);
+  const [_checkingCard, setCheckingCard] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<'online' | 'terminal'>('terminal');
 
   useEffect(() => {
+    // eslint-disable-next-line no-console
     console.log('[CheckinBillingModal] Props changed:', { isOpen, bookingId });
     if (isOpen && bookingId) {
+      // eslint-disable-next-line no-console
       console.log('[CheckinBillingModal] Opening and fetching context');
       fetchContext();
     }
@@ -117,7 +119,7 @@ export const CheckinBillingModal: React.FC<CheckinBillingModalProps> = ({
       } else {
         setError(getApiErrorMessage(res, 'load billing context'));
       }
-    } catch (err: unknown) {
+    } catch (_err: unknown) {
       setError(getNetworkErrorMessage());
     } finally {
       setLoading(false);
@@ -309,7 +311,7 @@ export const CheckinBillingModal: React.FC<CheckinBillingModalProps> = ({
     }
   };
 
-  const handleCheckinWithPayment = async () => {
+  const _handleCheckinWithPayment = async () => {
     setActionInProgress('checkin');
     try {
       const result = await checkInWithToast(bookingId, { status: 'attended' });
@@ -339,7 +341,7 @@ export const CheckinBillingModal: React.FC<CheckinBillingModalProps> = ({
       } else {
         setError(getApiErrorMessage(res, 'check in'));
       }
-    } catch (err: unknown) {
+    } catch (_err: unknown) {
       setError(getNetworkErrorMessage());
     } finally {
       setActionInProgress(null);
@@ -374,7 +376,7 @@ export const CheckinBillingModal: React.FC<CheckinBillingModalProps> = ({
           showToast(result.error || 'Payment succeeded but check-in failed - please retry', 'error');
         }
       }
-    } catch (err: unknown) {
+    } catch (_err: unknown) {
       showToast('Payment succeeded but check-in failed - please retry', 'error');
     } finally {
       setActionInProgress(null);

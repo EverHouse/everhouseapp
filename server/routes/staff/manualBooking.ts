@@ -6,7 +6,7 @@ import { logFromRequest } from '../../core/auditLog';
 import {logAndRespond, logger } from '../../core/logger';
 import { formatDateDisplayWithDay, formatTime12Hour } from '../../utils/dateUtils';
 import { db } from '../../db';
-import { resources, dayPassPurchases, passRedemptionLogs, bookingRequests } from '../../../shared/schema';
+import { resources, bookingRequests } from '../../../shared/schema';
 import { eq, and, sql } from 'drizzle-orm';
 import { getSessionUser } from '../../types/session';
 import { ensureSessionForBooking } from '../../core/bookingService/sessionManager';

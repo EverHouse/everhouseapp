@@ -339,6 +339,7 @@ export function PauseDurationModal({
   const [selectedDuration, setSelectedDuration] = useState<30 | 60>(30);
 
   const getResumeDate = (days: number) => {
+    // eslint-disable-next-line react-hooks/purity
     const date = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
     return date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'America/Los_Angeles' });
   };

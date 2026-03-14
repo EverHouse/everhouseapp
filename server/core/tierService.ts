@@ -1,6 +1,6 @@
 import { db } from '../db';
 import { sql } from 'drizzle-orm';
-import { normalizeTierName, DEFAULT_TIER } from '../../shared/constants/tiers';
+import { normalizeTierName } from '../../shared/constants/tiers';
 import { normalizeEmail } from './utils/emailNormalization';
 import { normalizeToISODate } from '../utils/dateNormalize';
 import { getTodayPacific, addDaysToPacificDate } from '../utils/dateUtils';

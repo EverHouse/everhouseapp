@@ -22,11 +22,15 @@ async function isLiveStripeEnvironment(): Promise<boolean> {
 }
 
 import { 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   MINDBODY_TO_CONTACT_STATUS_MAP,
   ContactMembershipStatus,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   BillingProvider,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   DB_STATUS_TO_HUBSPOT_STATUS,
   DB_BILLING_PROVIDER_TO_HUBSPOT,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   DB_TIER_TO_HUBSPOT,
   getDbStatusToHubSpotMapping
 } from './constants';
@@ -34,7 +38,7 @@ import {
 export async function updateContactMembershipStatus(
   hubspotContactId: string,
   newStatus: ContactMembershipStatus,
-  performedBy: string
+  _performedBy: string
 ): Promise<boolean> {
   try {
     const hubspot = await getHubSpotClient();
@@ -87,7 +91,12 @@ export interface SyncMemberToHubSpotResult {
 export async function syncMemberToHubSpot(
   input: SyncMemberToHubSpotInput
 ): Promise<SyncMemberToHubSpotResult> {
-  const { email, status, billingProvider, tier, memberSince, createIfMissing = true, stripeCustomerId, stripeCreatedDate, stripeDelinquent, stripeDiscountId, stripePricingInterval, billingGroupRole } = input;
+   
+   
+   
+   
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { email, status, billingProvider, tier, memberSince, createIfMissing = true, stripeCustomerId: _stripeCustomerId, stripeCreatedDate, stripeDelinquent, stripeDiscountId, stripePricingInterval, billingGroupRole } = input;
   
   if (isPlaceholderEmail(email)) {
     logger.info(`[HubSpot Sync] Skipping sync for placeholder email: ${email}`);

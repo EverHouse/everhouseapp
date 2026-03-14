@@ -281,6 +281,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
     );
   }
 
+  // eslint-disable-next-line react-hooks/refs
   return searchInput(inputRef);
 };
 

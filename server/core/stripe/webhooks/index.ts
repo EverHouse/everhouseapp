@@ -72,7 +72,9 @@ import {
 async function dispatchWebhookEvent(
   client: import('pg').PoolClient,
   eventType: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   dataObject: any,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   previousAttributes?: any
 ): Promise<DeferredAction[]> {
   if (eventType === 'payment_intent.processing' || eventType === 'payment_intent.requires_action') {

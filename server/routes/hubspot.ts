@@ -18,7 +18,7 @@ import pRetry, { AbortError } from 'p-retry';
 import { invalidateCache } from '../core/queryCache';
 import { broadcastDirectoryUpdate } from '../core/websocket';
 import { getErrorMessage, getErrorStatusCode, safeErrorDetail } from '../utils/errorUtils';
-import { denormalizeTierForHubSpot, denormalizeTierForHubSpotAsync } from '../utils/tierUtils';
+import { denormalizeTierForHubSpotAsync } from '../utils/tierUtils';
 import { syncRelevantMembersFromHubSpot, getLastMemberSyncTime, setLastMemberSyncTime } from '../core/memberSync';
 
 
@@ -427,11 +427,11 @@ async function enrichContactsWithDbData(contacts: HubSpotContact[]): Promise<Hub
   
   if (emails.length === 0) return contacts;
   
-  let dbUserMap: Record<string, DbUserRow> = {};
-  let lastActivityMap: Record<string, string> = {};
-  let pastBookingsMap: Record<string, number> = {};
-  let eventVisitsMap: Record<string, number> = {};
-  let wellnessVisitsMap: Record<string, number> = {};
+  const dbUserMap: Record<string, DbUserRow> = {};
+  const lastActivityMap: Record<string, string> = {};
+  const pastBookingsMap: Record<string, number> = {};
+  const eventVisitsMap: Record<string, number> = {};
+  const wellnessVisitsMap: Record<string, number> = {};
   
   // Get user data including id for matched_user_id joins
   const dbResult = await db.execute(sql`SELECT id, email, join_date, joined_on, mindbody_client_id, manually_linked_emails 
@@ -1184,7 +1184,7 @@ router.put('/api/hubspot/contacts/:id/tier', isStaffOrAdmin, async (req, res) =>
     const contactEmail = localUser.email;
     const contactName = [localUser.firstName, localUser.lastName].filter(Boolean).join(' ');
     const oldTier = localUser.tier || '(empty)';
-    let hubspotContactId = localUser.hubspotId;
+    const hubspotContactId = localUser.hubspotId;
     
     // Map tier name to tier_id and membership_tier format
     const tierMapping: Record<string, { tier_id: number | null; tier: string }> = {
@@ -1879,7 +1879,7 @@ router.get('/api/admin/hubspot/marketing-contacts-audit', isAdmin, async (_req: 
       .map(c => (c.properties?.email || '').toLowerCase())
       .filter(Boolean);
 
-    let dbMemberMap: Record<string, MarketingContactAuditRow> = {};
+    const dbMemberMap: Record<string, MarketingContactAuditRow> = {};
     if (emails.length > 0) {
       const batchSize = 500;
       for (let i = 0; i < emails.length; i += batchSize) {
@@ -1895,7 +1895,7 @@ router.get('/api/admin/hubspot/marketing-contacts-audit', isAdmin, async (_req: 
       }
     }
 
-    let lastActivityMap: Record<string, string> = {};
+    const lastActivityMap: Record<string, string> = {};
     if (emails.length > 0) {
       const batchSize = 500;
       for (let i = 0; i < emails.length; i += batchSize) {
@@ -2101,6 +2101,7 @@ function checkRecentEngagement(
   return false;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function ensureNonMarketingProperty(hubspot: any): Promise<'ready' | 'skip' | 'failed'> {
   const PROP_NAME = 'remove_from_marketing';
   try {

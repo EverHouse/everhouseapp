@@ -14,11 +14,11 @@ interface StripeInvoiceExpanded extends Stripe.Invoice {
 }
 
 import { getErrorMessage } from '../utils/errorUtils';
-import { logFromRequest, type AuditAction } from '../core/auditLog';
+import { logFromRequest } from '../core/auditLog';
 
 const router = Router();
 
-interface RecentTransaction {
+interface _RecentTransaction {
   id: string;
   type: 'offline' | 'stripe' | 'day_pass';
   amount_cents: number;
@@ -175,7 +175,7 @@ router.post('/api/financials/backfill-stripe-cache', isStaffOrAdmin, async (req:
     let paymentIntentsProcessed = 0;
     let chargesProcessed = 0;
     let invoicesProcessed = 0;
-    let errors: string[] = [];
+    const errors: string[] = [];
     
     logger.info('[Financials Backfill] Starting backfill for last days...', { extra: { daysBack } });
     

@@ -11,7 +11,7 @@ import type Stripe from 'stripe';
 import type { BookingFeeLineItem } from '../stripe/invoices';
 import { PRICING } from './pricingConfig';
 
-interface InvoiceWithPaymentIntent extends Stripe.Invoice {
+interface _InvoiceWithPaymentIntent extends Stripe.Invoice {
   payment_intent: string | Stripe.PaymentIntent | null;
 }
 
@@ -30,7 +30,7 @@ interface ParticipantFeeRow {
   cached_fee_cents: number;
 }
 
-interface RefundCountRow {
+interface _RefundCountRow {
   cnt: string | number;
 }
 

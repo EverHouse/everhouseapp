@@ -9,6 +9,7 @@ function generateBuildVersion(): Plugin {
   return {
     name: 'generate-build-version',
     buildStart() {
+      // eslint-disable-next-line no-console
       console.log(`Build version: ${buildVersion}`);
     },
     transformIndexHtml(html) {
@@ -42,7 +43,9 @@ export default defineConfig({
         target: 'http://localhost:3001',
         changeOrigin: true,
         configure: (proxy) => {
-          proxy.on('error', (err, req, res) => {
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          proxy.on('error', (err, _req, res) => {
+            // eslint-disable-next-line no-console
             console.log('[Vite Proxy] API proxy error (backend may be starting):', err.message);
           });
         },
@@ -51,7 +54,9 @@ export default defineConfig({
         target: 'http://localhost:3001',
         changeOrigin: true,
         configure: (proxy) => {
-          proxy.on('error', (err, req, res) => {
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          proxy.on('error', (err, _req, res) => {
+            // eslint-disable-next-line no-console
             console.log('[Vite Proxy] Health check proxy error (backend may be starting):', err.message);
           });
         },
@@ -60,7 +65,9 @@ export default defineConfig({
         target: 'ws://localhost:3001',
         ws: true,
         configure: (proxy) => {
-          proxy.on('error', (err, req, res) => {
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          proxy.on('error', (err, _req, res) => {
+            // eslint-disable-next-line no-console
             console.log('[Vite Proxy] WebSocket proxy error (backend may be starting):', err.message);
           });
         },

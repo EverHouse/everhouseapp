@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { db } from '../db';
 import { bugReports } from '../../shared/schema';
-import { eq, desc, and, SQL } from 'drizzle-orm';
+import { eq, desc, SQL } from 'drizzle-orm';
 import { isAuthenticated, isStaffOrAdmin } from '../core/middleware';
 import { notifyAllStaff, notifyMember } from '../core/notificationService';
 import { getSessionUser } from '../types/session';

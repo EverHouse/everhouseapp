@@ -361,7 +361,7 @@ router.post('/api/data-tools/link-stripe-hubspot', isAdmin, async (req: Request,
     const { getStripeClient } = await import('../../core/stripe/client');
     const { findOrCreateHubSpotContact } = await import('../../core/hubspot/members');
     const { getOrCreateStripeCustomer } = await import('../../core/stripe/customers');
-    const stripe = await getStripeClient();
+    const _stripe = await getStripeClient();
     
     const stripeOnlyMembers = await db.execute(sql`SELECT id, email, first_name, last_name, tier, stripe_customer_id
        FROM users 
@@ -849,7 +849,7 @@ async function runCleanupInBackground(jobId: string, dryRun: boolean, staffEmail
     await syncProgress();
     
     let deleted = 0;
-    let errors: string[] = [];
+    const errors: string[] = [];
     const deletedList: Array<{ id: string; email: string | null }> = [];
     
     for (const customer of emptyCustomers) {

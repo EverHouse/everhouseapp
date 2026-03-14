@@ -100,8 +100,8 @@ const BlocksTab: React.FC = () => {
     const [isNoticeTypeDrawerOpen, setIsNoticeTypeDrawerOpen] = useState(false);
     const [noticeTypeDrawerData, setNoticeTypeDrawerData] = useState<{ id: number; name: string; sortOrder: number } | null>(null);
     
-    const [closuresFilterResource, setClosuresFilterResource] = useState<string>('all');
-    const [closuresFilterDate, setClosuresFilterDate] = useState<string>('');
+    const [closuresFilterResource, _setClosuresFilterResource] = useState<string>('all');
+    const [closuresFilterDate, _setClosuresFilterDate] = useState<string>('');
     const [showPastAccordion, setShowPastAccordion] = useState(false);
     const [pastNoticesLimit, setPastNoticesLimit] = useState(50);
     const [closureForm, setClosureForm] = useState<BlocksClosureForm>({
@@ -411,6 +411,7 @@ const BlocksTab: React.FC = () => {
         }
     });
 
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const syncClosuresMutation = useMutation({
         mutationFn: async () => {
             await postWithCredentials('/api/closures/sync', {});
@@ -1135,7 +1136,7 @@ const BlocksTab: React.FC = () => {
                     <div className={`accordion-content ${showPastAccordion ? 'is-open' : ''}`}>
                       <div className="accordion-inner">
                         <div className="p-4 space-y-3 bg-gray-50/50 dark:bg-white/5 border-t border-gray-200/50 dark:border-white/10">
-                            {pastClosures.slice(0, pastNoticesLimit).map((closure, index) => {
+                            {pastClosures.slice(0, pastNoticesLimit).map((closure, _index) => {
                                 const blocking = isBlocking(closure.affectedAreas);
                                 const isExpanded = expandedNotices.has(closure.id);
                                 

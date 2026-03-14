@@ -1,8 +1,7 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from 'react';
+import { useSearchParams, useLocation } from 'react-router-dom';
 import { loadStripe, Stripe } from '@stripe/stripe-js';
 import { EmbeddedCheckoutProvider, EmbeddedCheckout } from '@stripe/react-stripe-js';
-import Logo from '../components/Logo';
 import EmptyState from '../components/EmptyState';
 import { usePricing } from '../hooks/usePricing';
 import WalkingGolferSpinner from '../components/WalkingGolferSpinner';
@@ -136,7 +135,7 @@ interface CorporateCheckoutFormProps {
   initialQuantity: number;
 }
 
-function CorporateCheckoutForm({ tier, email, initialQuantity }: CorporateCheckoutFormProps) {
+function CorporateCheckoutForm({ tier, email: _email, initialQuantity }: CorporateCheckoutFormProps) {
   const { getCorporatePrice, corporateTiers, corporateBasePrice } = usePricing();
   const [companyName, setCompanyName] = useState('');
   const [jobTitle, setJobTitle] = useState('');

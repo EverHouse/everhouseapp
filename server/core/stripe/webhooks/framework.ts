@@ -48,7 +48,7 @@ export async function checkResourceEventOrder(
   client: PoolClient,
   resourceId: string,
   eventType: string,
-  eventTimestamp: number
+  _eventTimestamp: number
 ): Promise<boolean> {
   const EVENT_PRIORITY: Record<string, number> = {
     'payment_intent.created': 1,

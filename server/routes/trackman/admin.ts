@@ -378,11 +378,11 @@ router.post('/api/admin/trackman/unmatch-member', isStaffOrAdmin, async (req, re
     
     let affectedCount = 0;
     for (const booking of bookingsResult.rows as DbRow[]) {
-      const notesMatch = String(booking.notes || '').match(/\[Trackman Import ID:\d+\]\s*([^\[]+)/);
+      const notesMatch = String(booking.notes || '').match(/\[Trackman Import ID:\d+\]\s*([^[]+)/);
       const originalName = notesMatch ? notesMatch[1].trim() : booking.user_name || 'Unknown';
       
       const trackmanIdMatch = String(booking.notes || '').match(/\[Trackman Import ID:(\d+)\]/);
-      const trackmanId = trackmanIdMatch ? trackmanIdMatch[1] : booking.id;
+      const _trackmanId = trackmanIdMatch ? trackmanIdMatch[1] : booking.id;
       
       await db.execute(sql`UPDATE booking_requests 
          SET user_email = NULL,

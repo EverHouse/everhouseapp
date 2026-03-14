@@ -26,6 +26,7 @@ export function useSupabaseRealtime(options: UseSupabaseRealtimeOptions = {}) {
 
   const channelsRef = useRef<Map<string, RealtimeChannel>>(new Map());
   const mountedRef = useRef(true);
+  // eslint-disable-next-line react-hooks/purity
   const instanceId = useMemo(() => Math.random().toString(36).slice(2, 8), []);
 
   const onNotificationRef = useRef(onNotification);
@@ -82,6 +83,7 @@ export function useSupabaseRealtime(options: UseSupabaseRealtimeOptions = {}) {
       try {
         supabase.removeChannel(existingChannel);
       } catch (_removeErr) {
+        // intentionally empty
       }
       channelsRef.current.delete(table);
     }
@@ -103,11 +105,13 @@ export function useSupabaseRealtime(options: UseSupabaseRealtimeOptions = {}) {
       if (!mountedRef.current) return;
 
       if (status === 'SUBSCRIBED') {
+        // eslint-disable-next-line no-console
         console.log(`[Supabase Realtime] Subscribed to ${table}`);
       } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
         const errMsg = err ? ` (${err.message || err})` : '';
         console.warn(`[Supabase Realtime] ${status} for ${table}${errMsg} — SDK will auto-recover`);
       } else if (status === 'CLOSED') {
+        // eslint-disable-next-line no-console
         console.log(`[Supabase Realtime] Channel closed for ${table}`);
         channelsRef.current.delete(table);
       }
@@ -135,6 +139,7 @@ export function useSupabaseRealtime(options: UseSupabaseRealtimeOptions = {}) {
         try {
           supabase.removeChannel(channel);
         } catch (_cleanupErr) {
+          // intentionally empty
         }
       });
       channelsRef.current.clear();

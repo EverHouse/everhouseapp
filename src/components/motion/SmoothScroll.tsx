@@ -15,6 +15,7 @@ const SmoothScrollContext = createContext<SmoothScrollContextType>({
   start: () => {},
 });
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useSmoothScroll = () => useContext(SmoothScrollContext);
 
 interface SmoothScrollProviderProps {

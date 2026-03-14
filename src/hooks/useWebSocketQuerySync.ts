@@ -37,6 +37,7 @@ export function useWebSocketQuerySync() {
       const detail = event.detail;
       if (!detail) return;
 
+      // eslint-disable-next-line no-console
       if (import.meta.env.DEV) console.log('[WebSocketQuerySync] Invalidating queries for:', detail.eventType);
 
       queryClient.invalidateQueries({ queryKey: bookingsKeys.all });
@@ -65,19 +66,22 @@ export function useWebSocketQuerySync() {
     };
 
     const handleBookingActionCompleted = () => {
+      // eslint-disable-next-line no-console
       if (import.meta.env.DEV) console.log('[WebSocketQuerySync] Invalidating command center, bookings, and simulator for booking-action-completed');
       queryClient.invalidateQueries({ queryKey: bookingsKeys.all });
       queryClient.invalidateQueries({ queryKey: simulatorKeys.all });
       invalidateCommandCenterBookings();
     };
 
-    const handleCafeMenuUpdate = (event: CustomEvent) => {
+    const handleCafeMenuUpdate = (_event: CustomEvent) => {
+      // eslint-disable-next-line no-console
       if (import.meta.env.DEV) console.log('[WebSocketQuerySync] Invalidating cafe queries');
       queryClient.invalidateQueries({ queryKey: cafeKeys.all });
     };
 
     const handleTourUpdate = (event: CustomEvent) => {
       const detail = event.detail;
+      // eslint-disable-next-line no-console
       if (import.meta.env.DEV) console.log('[WebSocketQuerySync] Invalidating tour queries for action:', detail?.action);
       queryClient.invalidateQueries({ queryKey: toursKeys.all });
       queryClient.invalidateQueries({ queryKey: commandCenterKeys.scheduling() });
@@ -85,13 +89,15 @@ export function useWebSocketQuerySync() {
 
     const handleDirectoryUpdate = (event: CustomEvent) => {
       const detail = event.detail;
+      // eslint-disable-next-line no-console
       if (import.meta.env.DEV) console.log('[WebSocketQuerySync] Invalidating directory queries for action:', detail?.action);
       queryClient.invalidateQueries({ queryKey: directoryKeys.all });
       queryClient.invalidateQueries({ queryKey: directoryKeys.team() });
       queryClient.invalidateQueries({ queryKey: commandCenterKeys.hubspotContacts() });
     };
 
-    const handleBillingUpdate = (event: CustomEvent) => {
+    const handleBillingUpdate = (_event: CustomEvent) => {
+      // eslint-disable-next-line no-console
       if (import.meta.env.DEV) console.log('[WebSocketQuerySync] Invalidating billing/financials/directory queries');
       queryClient.invalidateQueries({ queryKey: financialsKeys.all });
       queryClient.invalidateQueries({ queryKey: ['member'] });
@@ -99,7 +105,8 @@ export function useWebSocketQuerySync() {
       queryClient.invalidateQueries({ queryKey: commandCenterKeys.facility() });
     };
 
-    const handleTierUpdate = (event: CustomEvent) => {
+    const handleTierUpdate = (_event: CustomEvent) => {
+      // eslint-disable-next-line no-console
       if (import.meta.env.DEV) console.log('[WebSocketQuerySync] Invalidating member/profile/directory queries for tier update');
       queryClient.invalidateQueries({ queryKey: ['members'] });
       queryClient.invalidateQueries({ queryKey: ['member'] });
@@ -107,32 +114,37 @@ export function useWebSocketQuerySync() {
       queryClient.invalidateQueries({ queryKey: directoryKeys.all });
     };
 
-    const handleMemberStatsUpdated = (event: CustomEvent) => {
+    const handleMemberStatsUpdated = (_event: CustomEvent) => {
+      // eslint-disable-next-line no-console
       if (import.meta.env.DEV) console.log('[WebSocketQuerySync] Invalidating member/profile queries for stats update');
       queryClient.invalidateQueries({ queryKey: ['member'] });
       queryClient.invalidateQueries({ queryKey: ['members'] });
       queryClient.invalidateQueries({ queryKey: bookGolfKeys.all });
     };
 
-    const handleMemberDataUpdated = (event: CustomEvent) => {
+    const handleMemberDataUpdated = (_event: CustomEvent) => {
+      // eslint-disable-next-line no-console
       if (import.meta.env.DEV) console.log('[WebSocketQuerySync] Invalidating member/profile queries for data update');
       queryClient.invalidateQueries({ queryKey: ['members'] });
       queryClient.invalidateQueries({ queryKey: ['member'] });
       queryClient.invalidateQueries({ queryKey: directoryKeys.all });
     };
 
-    const handleDataIntegrityUpdate = (event: CustomEvent) => {
+    const handleDataIntegrityUpdate = (_event: CustomEvent) => {
+      // eslint-disable-next-line no-console
       if (import.meta.env.DEV) console.log('[WebSocketQuerySync] Invalidating data-integrity queries');
       queryClient.invalidateQueries({ queryKey: ['data-integrity'] });
     };
 
-    const handleDayPassUpdate = (event: CustomEvent) => {
+    const handleDayPassUpdate = (_event: CustomEvent) => {
+      // eslint-disable-next-line no-console
       if (import.meta.env.DEV) console.log('[WebSocketQuerySync] Invalidating day-pass/visitor queries');
       queryClient.invalidateQueries({ queryKey: bookGolfKeys.all });
       queryClient.invalidateQueries({ queryKey: directoryKeys.all });
     };
 
-    const handleClosureUpdate = (event: CustomEvent) => {
+    const handleClosureUpdate = (_event: CustomEvent) => {
+      // eslint-disable-next-line no-console
       if (import.meta.env.DEV) console.log('[WebSocketQuerySync] Invalidating closure/availability queries');
       queryClient.invalidateQueries({ queryKey: ['closures'] });
       queryClient.invalidateQueries({ queryKey: bookingsKeys.all });
@@ -140,7 +152,8 @@ export function useWebSocketQuerySync() {
       queryClient.invalidateQueries({ queryKey: commandCenterKeys.facility() });
     };
 
-    const handleBookingRosterUpdate = (event: CustomEvent) => {
+    const handleBookingRosterUpdate = (_event: CustomEvent) => {
+      // eslint-disable-next-line no-console
       if (import.meta.env.DEV) console.log('[WebSocketQuerySync] Invalidating queries for booking-roster-update');
       queryClient.invalidateQueries({ queryKey: bookingsKeys.all });
       queryClient.invalidateQueries({ queryKey: simulatorKeys.all });
@@ -149,14 +162,16 @@ export function useWebSocketQuerySync() {
       invalidateCommandCenterBookings();
     };
 
-    const handleBookingInvoiceUpdate = (event: CustomEvent) => {
+    const handleBookingInvoiceUpdate = (_event: CustomEvent) => {
+      // eslint-disable-next-line no-console
       if (import.meta.env.DEV) console.log('[WebSocketQuerySync] Invalidating queries for booking-invoice-update');
       queryClient.invalidateQueries({ queryKey: financialsKeys.all });
       queryClient.invalidateQueries({ queryKey: bookingsKeys.all });
       queryClient.invalidateQueries({ queryKey: ['member'] });
     };
 
-    const handleWaitlistUpdate = (event: CustomEvent) => {
+    const handleWaitlistUpdate = (_event: CustomEvent) => {
+      // eslint-disable-next-line no-console
       if (import.meta.env.DEV) console.log('[WebSocketQuerySync] Invalidating queries for waitlist-update');
       queryClient.invalidateQueries({ queryKey: bookingsKeys.all });
       queryClient.invalidateQueries({ queryKey: simulatorKeys.all });
@@ -164,28 +179,32 @@ export function useWebSocketQuerySync() {
       queryClient.invalidateQueries({ queryKey: wellnessKeys.all });
     };
 
-    const handleTrackmanUnmatchedUpdate = (event: CustomEvent) => {
+    const handleTrackmanUnmatchedUpdate = (_event: CustomEvent) => {
+      // eslint-disable-next-line no-console
       if (import.meta.env.DEV) console.log('[WebSocketQuerySync] Invalidating trackman unmatched queries (Supabase Realtime)');
       queryClient.invalidateQueries({ queryKey: ['trackman', 'unmatched'] });
       queryClient.invalidateQueries({ queryKey: ['trackman', 'needs-players'] });
       queryClient.invalidateQueries({ queryKey: ['data-integrity'] });
     };
 
-    const handleBookingAutoConfirmed = (event: CustomEvent) => {
+    const handleBookingAutoConfirmed = (_event: CustomEvent) => {
+      // eslint-disable-next-line no-console
       if (import.meta.env.DEV) console.log('[WebSocketQuerySync] Invalidating queries for booking-auto-confirmed');
       queryClient.invalidateQueries({ queryKey: bookingsKeys.all });
       queryClient.invalidateQueries({ queryKey: simulatorKeys.all });
       invalidateCommandCenterBookings();
     };
 
-    const handleBookingConfirmed = (event: CustomEvent) => {
+    const handleBookingConfirmed = (_event: CustomEvent) => {
+      // eslint-disable-next-line no-console
       if (import.meta.env.DEV) console.log('[WebSocketQuerySync] Invalidating queries for booking-confirmed');
       queryClient.invalidateQueries({ queryKey: bookingsKeys.all });
       queryClient.invalidateQueries({ queryKey: simulatorKeys.all });
       invalidateCommandCenterBookings();
     };
 
-    const handleAvailabilityUpdate = (event: CustomEvent) => {
+    const handleAvailabilityUpdate = (_event: CustomEvent) => {
+      // eslint-disable-next-line no-console
       if (import.meta.env.DEV) console.log('[WebSocketQuerySync] Invalidating queries for availability-update');
       queryClient.invalidateQueries({ queryKey: bookingsKeys.all });
       queryClient.invalidateQueries({ queryKey: simulatorKeys.all });

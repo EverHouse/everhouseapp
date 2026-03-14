@@ -32,8 +32,6 @@ import { PRICING, isPlaceholderGuestName } from '../billing/pricingConfig';
 import { createPrepaymentIntent } from '../billing/prepaymentService';
 import { findConflictingBookings } from './conflictDetection';
 import { notifyMember } from '../notificationService';
-import { getOrCreateStripeCustomer } from '../stripe/customers';
-import { createBalanceAwarePayment } from '../stripe/payments';
 import { useGuestPass, refundGuestPass, ensureGuestPassRecord } from '../../routes/guestPasses';
 import { upsertVisitor } from '../visitors/matchingService';
 import { getErrorMessage } from '../../utils/errorUtils';
@@ -640,7 +638,7 @@ export async function previewRosterFees(
     const pendingCount = parseInt((paidCheck.rows[0] as unknown as PaidCheckRow)?.pending_count || '0');
     const hasCompletedFeeSnapshot = feeSnapshotCheck.rows.length > 0;
     const hasPaidFees = paidCount > 0;
-    const hasOriginalFees = totalWithFees > 0;
+    const _hasOriginalFees = totalWithFees > 0;
 
     allPaid = (hasCompletedFeeSnapshot && pendingCount === 0) || (pendingCount === 0 && hasPaidFees);
 
@@ -1044,6 +1042,7 @@ export async function addParticipant(params: AddParticipantParams): Promise<AddP
 
       if (matchingGuest) {
         matchingGuestId = matchingGuest.id;
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         matchingGuestName = matchingGuest.displayName;
       }
 
@@ -1433,7 +1432,7 @@ export async function addParticipant(params: AddParticipantParams): Promise<AddP
 // ─── removeParticipant ─────────────────────────────────────────
 
 export async function removeParticipant(params: RemoveParticipantParams): Promise<RemoveParticipantResult> {
-  const { bookingId, participantId, rosterVersion, userEmail, sessionUserId } = params;
+  const { bookingId, participantId, rosterVersion, userEmail, sessionUserId: _sessionUserId } = params;
 
   const booking = await getBookingWithSession(bookingId);
   if (!booking) {

@@ -41,7 +41,7 @@ router.get('/api/pricing', async (req, res) => {
       }
     }
     response.tierMinutes = tierMinutes;
-  } catch (e: unknown) {
+  } catch (_e: unknown) {
     response.tierMinutes = {};
   }
 
@@ -57,7 +57,7 @@ router.get('/api/pricing', async (req, res) => {
       }
     }
     response.dayPassPrices = dayPasses;
-  } catch (e: unknown) {
+  } catch (_e: unknown) {
     response.dayPassPrices = {};
   }
 

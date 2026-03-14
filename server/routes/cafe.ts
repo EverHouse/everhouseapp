@@ -20,6 +20,7 @@ router.get('/api/cafe-menu', async (req, res) => {
     const { category, include_inactive } = req.query;
 
     if (!category && include_inactive !== 'true') {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const cached = getCached<any[]>(CAFE_CACHE_KEY);
       if (cached) return res.json(cached);
     }

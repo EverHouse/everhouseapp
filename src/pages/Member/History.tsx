@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useData } from '../../contexts/DataContext';
@@ -58,7 +58,7 @@ const History: React.FC = () => {
   const [visitsDisplayCount, setVisitsDisplayCount] = useState(INITIAL_DISPLAY);
   const [paymentsMonthsCount, setPaymentsMonthsCount] = useState(3);
 
-  const { data: visits = [], isLoading: visitsLoading, refetch: refetchVisits } = useQuery({
+  const { data: visits = [], isLoading: visitsLoading, refetch: _refetchVisits } = useQuery({
     queryKey: ['my-visits', user?.email],
     queryFn: () => fetchWithCredentials<UnifiedVisit[]>(
       `/api/my-visits?user_email=${encodeURIComponent(user?.email || '')}`
@@ -66,7 +66,7 @@ const History: React.FC = () => {
     enabled: !!user?.email,
   });
 
-  const { data: purchases = [], isLoading: purchasesLoading, refetch: refetchPurchases } = useQuery({
+  const { data: purchases = [], isLoading: purchasesLoading, refetch: _refetchPurchases } = useQuery({
     queryKey: ['my-purchases', user?.email],
     queryFn: () => fetchWithCredentials<UnifiedPurchase[]>(
       `/api/my-billing/payment-history`

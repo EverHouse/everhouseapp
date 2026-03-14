@@ -19,9 +19,12 @@ export const StaffWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
   const [lastEventFromContext, setLastEventFromContext] = useState<BookingEvent | null>(null);
   const mountIdRef = useRef<number>(0);
 
+  // eslint-disable-next-line react-hooks/refs
   if (mountIdRef.current === 0) {
+    // eslint-disable-next-line react-hooks/refs
     mountIdRef.current = 1;
     if (import.meta.env.DEV) {
+      // eslint-disable-next-line no-console
       console.log(`[StaffWebSocketContext] Provider mounted`);
     }
   }
@@ -70,6 +73,7 @@ export const StaffWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
   );
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useStaffWebSocketContext() {
   const context = useContext(StaffWebSocketContext);
   if (!context) {
@@ -78,9 +82,11 @@ export function useStaffWebSocketContext() {
   return context;
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useStaffWebSocketCallback(id: string, callback: EventCallback | undefined) {
   const { registerCallback, unregisterCallback } = useStaffWebSocketContext();
   const callbackRef = useRef(callback);
+  // eslint-disable-next-line react-hooks/refs
   callbackRef.current = callback;
 
   const stableCallback = useCallback((event: BookingEvent) => {

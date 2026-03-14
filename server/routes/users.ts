@@ -2,7 +2,6 @@ import { Router } from 'express';
 import { eq, desc, sql, and, inArray } from 'drizzle-orm';
 import { db } from '../db';
 import { staffUsers, users } from '../../shared/schema';
-import { isProduction } from '../core/db';
 import { isAdmin, isStaffOrAdmin } from '../core/middleware';
 import { normalizeEmail } from '../core/utils/emailNormalization';
 import { getErrorCode } from '../utils/errorUtils';

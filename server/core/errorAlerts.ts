@@ -78,7 +78,7 @@ async function loadDailyStateFromDb(): Promise<void> {
         });
       }
     }
-  } catch (err: unknown) {
+  } catch (_err: unknown) {
     logger.warn('[ErrorAlert] Could not load rate limits from database, using in-memory only');
     dbAvailable = false;
   }

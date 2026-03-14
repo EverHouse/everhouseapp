@@ -17,7 +17,7 @@ interface GalleryImage {
 const Gallery: React.FC = () => {
   const { setPageReady } = usePageReady();
   const [images, setImages] = useState<GalleryImage[]>([]);
-  const [isLoadingData, setIsLoadingData] = useState(true);
+  const [_isLoadingData, setIsLoadingData] = useState(true);
   const [filter, setFilter] = useState('All');
   const [viewerState, setViewerState] = useState<{images: string[], index: number} | null>(null);
 

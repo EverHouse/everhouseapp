@@ -8,6 +8,7 @@ import { getSessionUser } from '../types/session';
 import {
   syncGroupAddOnProductsToStripe,
   getGroupAddOnProducts,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   getBillingGroupByPrimaryEmail,
   getBillingGroupByMemberEmail,
   createBillingGroup,
@@ -575,7 +576,7 @@ router.post('/api/family-billing/groups/:groupId/link-subscription', isStaffOrAd
 
 router.post('/api/group-billing/reconcile', isStaffOrAdmin, async (req, res) => {
   try {
-    const staffEmail = getSessionUser(req)?.email || 'unknown';
+    const _staffEmail = getSessionUser(req)?.email || 'unknown';
     logger.info('[GroupBilling] Starting reconciliation with Stripe...');
     const result = await reconcileGroupBillingWithStripe();
     logger.info('[GroupBilling] Reconciliation complete: groups checked, deactivated, reactivated, created, relinked', { extra: { resultGroupsChecked: result.groupsChecked, resultMembersDeactivated: result.membersDeactivated, resultMembersReactivated: result.membersReactivated, resultMembersCreated: result.membersCreated, resultItemsRelinked: result.itemsRelinked } });
@@ -597,7 +598,7 @@ router.post('/api/group-billing/reconcile', isStaffOrAdmin, async (req, res) => 
 
 router.post('/api/family-billing/reconcile', isStaffOrAdmin, async (req, res) => {
   try {
-    const staffEmail = getSessionUser(req)?.email || 'unknown';
+    const _staffEmail = getSessionUser(req)?.email || 'unknown';
     logger.info('[GroupBilling] Starting reconciliation with Stripe...');
     const result = await reconcileGroupBillingWithStripe();
     logger.info('[GroupBilling] Reconciliation complete: groups checked, deactivated, reactivated, created, relinked', { extra: { resultGroupsChecked: result.groupsChecked, resultMembersDeactivated: result.membersDeactivated, resultMembersReactivated: result.membersReactivated, resultMembersCreated: result.membersCreated, resultItemsRelinked: result.itemsRelinked } });

@@ -1,6 +1,6 @@
 import { db } from '../db';
 import { users } from '../../shared/schema';
-import { eq, and, isNotNull, isNull, sql } from 'drizzle-orm';
+import { eq, and, isNull, sql } from 'drizzle-orm';
 import { getErrorMessage } from '../utils/errorUtils';
 import { logger } from '../core/logger';
 

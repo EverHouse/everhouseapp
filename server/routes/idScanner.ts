@@ -94,7 +94,7 @@ Even if quality is poor, still attempt to extract whatever information is visibl
     let parsed: Record<string, unknown>;
     try {
       parsed = JSON.parse(content);
-    } catch (parseErr) {
+    } catch (_parseErr) {
       logger.error('Failed to parse AI response', { extra: { content } });
       return res.status(500).json({ error: 'Failed to parse scan results' });
     }

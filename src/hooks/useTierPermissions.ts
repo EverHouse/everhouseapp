@@ -28,6 +28,7 @@ export function useTierPermissions(tierName: string | undefined): {
 
   useEffect(() => {
     if (!tierName) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setPermissions(DEFAULT_PERMISSIONS);
       setLoading(false);
       return;

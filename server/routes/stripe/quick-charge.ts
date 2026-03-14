@@ -11,6 +11,7 @@ import { findOrCreateHubSpotContact } from '../../core/hubspot/members';
 import {
   createPaymentIntent,
   confirmPaymentSuccess,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   getOrCreateStripeCustomer,
   createInvoiceWithLineItems,
   type CartLineItem,
@@ -23,7 +24,7 @@ import { sendPurchaseReceipt, PurchaseReceiptItem } from '../../emails/paymentEm
 import { getStaffInfo, GUEST_FEE_CENTS, SAVED_CARD_APPROVAL_THRESHOLD_CENTS } from './helpers';
 import { broadcastBillingUpdate } from '../../core/websocket';
 import { alertOnExternalServiceError } from '../../core/errorAlerts';
-import { getErrorMessage, getErrorCode, safeErrorDetail } from '../../utils/errorUtils';
+import { getErrorMessage, safeErrorDetail } from '../../utils/errorUtils';
 import { normalizeTierName } from '../../utils/tierUtils';
 import { validateBody } from '../../middleware/validate';
 import { quickChargeSchema, confirmQuickChargeSchema, attachEmailSchema, chargeSavedCardPosSchema, sendReceiptSchema, chargeSubscriptionInvoiceSchema } from '../../../shared/validators/payments';
@@ -65,7 +66,7 @@ router.post('/api/stripe/staff/quick-charge', isStaffOrAdmin, validateBody(quick
   try {
     const { memberEmail: rawEmail, memberName, amountCents, description, productId, isNewCustomer, firstName, lastName, phone, dob, tierSlug, tierName, createUser, streetAddress, city, state, zipCode, cartItems, guestCheckout } = req.body;
     const memberEmail = rawEmail?.trim()?.toLowerCase();
-    const { sessionUser, staffEmail } = getStaffInfo(req);
+    const { sessionUser: _sessionUser, staffEmail } = getStaffInfo(req);
 
     if (!guestCheckout && !memberEmail) {
       return res.status(400).json({ error: 'Missing required fields: memberEmail, amountCents' });

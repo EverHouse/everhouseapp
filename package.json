@@ -1,7 +1,7 @@
 {
   "name": "ehmembersapp",
   "private": true,
-  "version": "8.83.0",
+  "version": "8.85.1",
   "type": "module",
   "scripts": {
     "dev": "rm -rf node_modules/.vite && concurrently --kill-others-on-fail --names backend,frontend --prefix-colors blue,green \"npm run server\" \"npm run frontend\"",
@@ -103,6 +103,7 @@
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.5.2",
+    "globals": "^17.4.0",
     "postcss": "^8.5.6",
     "prettier": "^3.8.1",
     "tailwindcss": "^4.1.18",

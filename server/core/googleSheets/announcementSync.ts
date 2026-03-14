@@ -3,7 +3,7 @@ import { getErrorMessage } from '../../utils/errorUtils';
 import { db } from '../../db';
 import { announcements } from '../../../shared/schema';
 import { systemSettings } from '../../../shared/models/system';
-import { eq, desc, sql } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { formatDatePacific, createPacificDate } from '../../utils/dateUtils';
 
 export interface AnnouncementData {
@@ -87,7 +87,7 @@ async function getGoogleSheetClient() {
   return google.sheets({ version: 'v4', auth: oauth2Client });
 }
 
-async function getGoogleDriveClient() {
+async function _getGoogleDriveClient() {
   const accessToken = await getAccessToken();
   const oauth2Client = new google.auth.OAuth2();
   oauth2Client.setCredentials({ access_token: accessToken });

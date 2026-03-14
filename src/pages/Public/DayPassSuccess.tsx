@@ -9,7 +9,7 @@ const DayPassSuccess: React.FC = () => {
   const { startNavigation } = useNavigationLoading();
   const { setPageReady } = usePageReady();
   const [searchParams] = useSearchParams();
-  const sessionId = searchParams.get('session_id');
+  const _sessionId = searchParams.get('session_id');
 
   useEffect(() => {
     setPageReady(true);

@@ -55,6 +55,7 @@ export function NewUserDrawer({
   const [createdUser, setCreatedUser] = useState<{ id: string; email: string; name: string } | null>(null);
   const [showIdScanner, setShowIdScanner] = useState(false);
   const [scannedIdImage, setScannedIdImage] = useState<{ base64: string; mimeType: string } | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [subMemberScannedIds, setSubMemberScannedIds] = useState<Record<number, { base64: string; mimeType: string }>>({});
   const [scanningSubMemberIndex, setScanningSubMemberIndex] = useState<number | null>(null);
 
@@ -114,6 +115,7 @@ export function NewUserDrawer({
         }
       }
     } catch (_checkErr) {
+      // intentionally empty
     }
   }, []);
 
@@ -147,7 +149,7 @@ export function NewUserDrawer({
         const data = await res.json();
         setError(data.error || 'Failed to cleanup');
       }
-    } catch (err: unknown) {
+    } catch (_err: unknown) {
       setError('Failed to cleanup pending user');
     } finally {
       setIsCleaningUp(false);
@@ -290,7 +292,7 @@ export function NewUserDrawer({
     resetForm();
   };
 
-  const currentStep = mode === 'member' ? memberStep : visitorStep;
+  const _currentStep = mode === 'member' ? memberStep : visitorStep;
   const stepLabels = mode === 'member' 
     ? ['Details', 'Review', 'Payment', 'Done']
     : ['Details', 'Payment', 'Done'];

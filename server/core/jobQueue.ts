@@ -232,10 +232,11 @@ async function executeJob(job: { id: number; jobType: string; payload: Record<st
       case 'sync_company_to_hubspot':
         await syncCompanyToHubSpot(payload as unknown as Parameters<typeof syncCompanyToHubSpot>[0]);
         break;
-      case 'upsert_transaction_cache':
+      case 'upsert_transaction_cache': {
         const { upsertTransactionCache } = await import('./stripe/transactionCache');
         await upsertTransactionCache(payload as Record<string, string>);
         break;
+          }
       case 'stripe_credit_refund': {
         const { getStripeClient } = await import('./stripe/client');
         const stripeRefund = await getStripeClient();
@@ -360,10 +361,11 @@ async function executeJob(job: { id: number; jobType: string; payload: Record<st
         }
         break;
       }
-      case 'update_member_tier':
+      case 'update_member_tier': {
         const { processMemberTierUpdate } = await import('./memberTierUpdateProcessor');
         await processMemberTierUpdate(payload as unknown as Parameters<typeof processMemberTierUpdate>[0]);
         break;
+          }
       case 'generic_async_task':
         logger.info(`[JobQueue] Executing generic task: ${payload.description || 'no description'}`);
         break;

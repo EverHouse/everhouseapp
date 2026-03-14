@@ -1,22 +1,20 @@
 import { Router, Request, Response } from 'express';
 import { db } from '../db';
-import { bookingRequests, bookingParticipants, bookingSessions, usageLedger, users } from '../../shared/schema';
-import { eq, and, sql } from 'drizzle-orm';
+import { users } from '../../shared/schema';
+import { sql } from 'drizzle-orm';
 import { isStaffOrAdmin } from '../core/middleware';
 import { logAndRespond, logger } from '../core/logger';
 import { getSessionUser } from '../types/session';
 import { notifyMember } from '../core/notificationService';
-import { computeFeeBreakdown, applyFeeBreakdownToParticipants, recalculateSessionFees } from '../core/billing/unifiedFeeService';
+import { computeFeeBreakdown, recalculateSessionFees } from '../core/billing/unifiedFeeService';
 import { consumeGuestPassForParticipant, canUseGuestPass } from '../core/billing/guestPassConsumer';
 import { createPrepaymentIntent } from '../core/billing/prepaymentService';
 import { cancelPaymentIntent } from '../core/stripe';
 import { logFromRequest, logPaymentAudit } from '../core/auditLog';
 import { PRICING } from '../core/billing/pricingConfig';
-import { enforceSocialTierRules, type ParticipantForValidation } from '../core/bookingService/tierRules';
+import { enforceSocialTierRules } from '../core/bookingService/tierRules';
 import { broadcastMemberStatsUpdated, broadcastBookingInvoiceUpdate, broadcastBookingRosterUpdate } from '../core/websocket';
-import { updateHubSpotContactVisitCount } from '../core/memberSync';
 import { ensureSessionForBooking } from '../core/bookingService/sessionManager';
-import { sendFirstVisitConfirmationEmail } from '../emails/firstVisitEmail';
 import { getErrorMessage } from '../utils/errorUtils';
 import { toIntArrayLiteral, toTextArrayLiteral } from '../utils/sqlArrayLiteral';
 import { processWalkInCheckin } from '../core/walkInCheckinService';
@@ -111,28 +109,28 @@ interface PendingParticipantRow {
   payment_status: string;
 }
 
-interface IdRow {
+interface _IdRow {
   id: number;
 }
 
-interface IdSessionRow {
+interface _IdSessionRow {
   id: number;
   session_id: number;
 }
 
-interface SessionBookingRow {
+interface _SessionBookingRow {
   session_id: number;
   booking_id: number;
 }
 
-interface ParticipantCheckRow {
+interface _ParticipantCheckRow {
   id: number;
   session_id: number;
   display_name: string;
   booking_id: number;
 }
 
-interface SessionIdRow {
+interface _SessionIdRow {
   session_id: number;
 }
 
@@ -192,14 +190,14 @@ interface QrBookingRow {
   resource_type: string;
 }
 
-interface WaiverBookingRow {
+interface _WaiverBookingRow {
   session_id: number;
   owner_email: string;
 }
 
 const settlementInFlight = new Set<number>();
 
-async function getMemberDisplayName(email: string): Promise<string> {
+async function _getMemberDisplayName(email: string): Promise<string> {
   try {
     const normalizedEmail = email.toLowerCase();
     const result = await db.select({ firstName: users.firstName, lastName: users.lastName })

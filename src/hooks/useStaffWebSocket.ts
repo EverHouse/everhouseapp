@@ -91,27 +91,32 @@ export function useStaffWebSocket(options: UseStaffWebSocketOptions = {}) {
     const currentMountId = mountIdRef.current;
     
     if (!email) {
+      // eslint-disable-next-line no-console
       if (import.meta.env.DEV) console.log('[StaffWebSocket] Skipping connect: no email');
       return;
     }
     
     if (isConnectingRef.current) {
+      // eslint-disable-next-line no-console
       if (import.meta.env.DEV) console.log('[StaffWebSocket] Skipping connect: already connecting');
       return;
     }
     
     if (wsRef.current?.readyState === WebSocket.OPEN) {
+      // eslint-disable-next-line no-console
       if (import.meta.env.DEV) console.log('[StaffWebSocket] Skipping connect: socket already open');
       return;
     }
     
     if (wsRef.current?.readyState === WebSocket.CONNECTING) {
+      // eslint-disable-next-line no-console
       if (import.meta.env.DEV) console.log('[StaffWebSocket] Skipping connect: socket already connecting');
       return;
     }
 
     const isStaff = role === 'staff' || role === 'admin';
     if (!isStaff) {
+      // eslint-disable-next-line no-console
       if (import.meta.env.DEV) console.log('[StaffWebSocket] Skipping connect: not staff');
       return;
     }
@@ -120,6 +125,7 @@ export function useStaffWebSocket(options: UseStaffWebSocketOptions = {}) {
     const thisConnectionId = globalConnectionId;
     connectionIdRef.current = thisConnectionId;
     
+    // eslint-disable-next-line no-console
     if (import.meta.env.DEV) console.log(`[StaffWebSocket] Connecting (id=${thisConnectionId}, mount=${currentMountId}, reason=${reason}):`, email);
     isConnectingRef.current = true;
 
@@ -132,12 +138,14 @@ export function useStaffWebSocket(options: UseStaffWebSocketOptions = {}) {
 
       ws.onopen = () => {
         if (connectionIdRef.current !== thisConnectionId) {
+          // eslint-disable-next-line no-console
           if (import.meta.env.DEV) console.log(`[StaffWebSocket] Stale connection opened (id=${thisConnectionId}, current=${connectionIdRef.current}), closing`);
           ws.close();
           return;
         }
         
         const currentEmail = userEmailRef.current;
+        // eslint-disable-next-line no-console
         if (import.meta.env.DEV) console.log(`[StaffWebSocket] Connected (id=${thisConnectionId}):`, currentEmail);
         isConnectingRef.current = false;
         setIsConnected(true);
@@ -160,11 +168,13 @@ export function useStaffWebSocket(options: UseStaffWebSocketOptions = {}) {
           }
           
           if (message.type === 'booking_event') {
+            // eslint-disable-next-line no-console
             if (import.meta.env.DEV) console.log('[StaffWebSocket] Received booking_event:', message.eventType);
             handleBookingEvent(message as BookingEvent);
           }
           
           if (message.type === 'notification') {
+            // eslint-disable-next-line no-console
             if (import.meta.env.DEV) console.log('[StaffWebSocket] Received notification');
             handleBookingEvent({
               eventType: 'notification',
@@ -178,6 +188,7 @@ export function useStaffWebSocket(options: UseStaffWebSocketOptions = {}) {
           }
           
           if (message.type === 'rsvp_event') {
+            // eslint-disable-next-line no-console
             if (import.meta.env.DEV) console.log('[StaffWebSocket] Received rsvp_event:', message.action);
             handleBookingEvent({
               eventType: `rsvp_${message.action}`,
@@ -191,6 +202,7 @@ export function useStaffWebSocket(options: UseStaffWebSocketOptions = {}) {
           }
           
           if (message.type === 'wellness_event') {
+            // eslint-disable-next-line no-console
             if (import.meta.env.DEV) console.log('[StaffWebSocket] Received wellness_event:', message.action);
             handleBookingEvent({
               eventType: `wellness_${message.action}`,
@@ -204,16 +216,19 @@ export function useStaffWebSocket(options: UseStaffWebSocketOptions = {}) {
           }
           
           if (message.type === 'walkin_checkin') {
+            // eslint-disable-next-line no-console
             if (import.meta.env.DEV) console.log('[StaffWebSocket] Received walkin_checkin:', message.data?.memberName);
             window.dispatchEvent(new CustomEvent('walkin-checkin', { detail: message }));
           }
 
           if (message.type === 'directory_update') {
+            // eslint-disable-next-line no-console
             if (import.meta.env.DEV) console.log('[StaffWebSocket] Received directory_update:', message.action);
             window.dispatchEvent(new CustomEvent('directory-update', { detail: message }));
           }
 
           if (message.type === 'availability_update') {
+            // eslint-disable-next-line no-console
             if (import.meta.env.DEV) console.log('[StaffWebSocket] Received availability_update');
             handleBookingEvent({
               eventType: 'availability_update',
@@ -235,6 +250,7 @@ export function useStaffWebSocket(options: UseStaffWebSocketOptions = {}) {
           }
 
           if (message.type === 'billing_update') {
+            // eslint-disable-next-line no-console
             if (import.meta.env.DEV) console.log('[StaffWebSocket] Received billing_update:', message.action);
             window.dispatchEvent(new CustomEvent('billing-update', { detail: message }));
             
@@ -252,16 +268,19 @@ export function useStaffWebSocket(options: UseStaffWebSocketOptions = {}) {
           }
 
           if (message.type === 'tier_update') {
+            // eslint-disable-next-line no-console
             if (import.meta.env.DEV) console.log('[StaffWebSocket] Received tier_update:', message.action);
             window.dispatchEvent(new CustomEvent('tier-update', { detail: message }));
           }
 
           if (message.type === 'member_stats_updated') {
+            // eslint-disable-next-line no-console
             if (import.meta.env.DEV) console.log('[StaffWebSocket] Received member_stats_updated for:', message.memberEmail);
             window.dispatchEvent(new CustomEvent('member-stats-updated', { detail: message }));
           }
 
           if (message.type === 'booking_auto_confirmed') {
+            // eslint-disable-next-line no-console
             if (import.meta.env.DEV) console.log('[StaffWebSocket] Received booking_auto_confirmed:', message.data?.memberName);
             window.dispatchEvent(new CustomEvent('booking-auto-confirmed', { detail: message }));
             handleBookingEvent({
@@ -277,6 +296,7 @@ export function useStaffWebSocket(options: UseStaffWebSocketOptions = {}) {
           }
 
           if (message.type === 'booking_confirmed') {
+            // eslint-disable-next-line no-console
             if (import.meta.env.DEV) console.log('[StaffWebSocket] Received booking_confirmed:', message.data?.bookingId);
             window.dispatchEvent(new CustomEvent('booking-confirmed', { detail: message }));
             handleBookingEvent({
@@ -291,21 +311,25 @@ export function useStaffWebSocket(options: UseStaffWebSocketOptions = {}) {
           }
 
           if (message.type === 'data_integrity_update') {
+            // eslint-disable-next-line no-console
             if (import.meta.env.DEV) console.log('[StaffWebSocket] Received data_integrity_update');
             window.dispatchEvent(new CustomEvent('data-integrity-update', { detail: message }));
           }
 
           if (message.type === 'directory_sync_update') {
+            // eslint-disable-next-line no-console
             if (import.meta.env.DEV) console.log('[StaffWebSocket] Received directory_sync_update');
             window.dispatchEvent(new CustomEvent('directory-sync-update', { detail: message }));
           }
 
           if (message.type === 'member_data_updated') {
+            // eslint-disable-next-line no-console
             if (import.meta.env.DEV) console.log('[StaffWebSocket] Received member_data_updated:', message.memberEmail);
             window.dispatchEvent(new CustomEvent('member-data-updated', { detail: message }));
           }
 
           if (message.type === 'announcement_update') {
+            // eslint-disable-next-line no-console
             if (import.meta.env.DEV) console.log('[StaffWebSocket] Received announcement_update');
             window.dispatchEvent(new CustomEvent('announcement-update', { detail: message }));
           }
@@ -323,26 +347,31 @@ export function useStaffWebSocket(options: UseStaffWebSocketOptions = {}) {
           }
 
           if (message.type === 'booking_roster_update') {
+            // eslint-disable-next-line no-console
             if (import.meta.env.DEV) console.log('[StaffWebSocket] Received booking_roster_update:', message.bookingId);
             window.dispatchEvent(new CustomEvent('booking-roster-update', { detail: message }));
           }
 
           if (message.type === 'booking_invoice_update') {
+            // eslint-disable-next-line no-console
             if (import.meta.env.DEV) console.log('[StaffWebSocket] Received booking_invoice_update:', message.bookingId);
             window.dispatchEvent(new CustomEvent('booking-invoice-update', { detail: message }));
           }
 
           if (message.type === 'waitlist_update') {
+            // eslint-disable-next-line no-console
             if (import.meta.env.DEV) console.log('[StaffWebSocket] Received waitlist_update');
             window.dispatchEvent(new CustomEvent('waitlist-update', { detail: message }));
           }
 
           if (message.type === 'day_pass_update') {
+            // eslint-disable-next-line no-console
             if (import.meta.env.DEV) console.log('[StaffWebSocket] Received day_pass_update:', message.action);
             window.dispatchEvent(new CustomEvent('day-pass-update', { detail: message }));
           }
 
           if (message.type === 'tour_update') {
+            // eslint-disable-next-line no-console
             if (import.meta.env.DEV) console.log('[StaffWebSocket] Received tour_update:', message.action);
             window.dispatchEvent(new CustomEvent('tour-update', { detail: message }));
           }
@@ -353,6 +382,7 @@ export function useStaffWebSocket(options: UseStaffWebSocketOptions = {}) {
 
       ws.onclose = () => {
         const wasThisConnection = connectionIdRef.current === thisConnectionId;
+        // eslint-disable-next-line no-console
         if (import.meta.env.DEV) console.log(`[StaffWebSocket] Connection closed (id=${thisConnectionId}, current=${connectionIdRef.current}, wasActive=${wasThisConnection})`);
         
         if (!wasThisConnection) {
@@ -372,9 +402,11 @@ export function useStaffWebSocket(options: UseStaffWebSocketOptions = {}) {
             const maxDelay = 30000;
             const delay = Math.min(baseDelay * Math.pow(2, reconnectAttemptRef.current), maxDelay);
             reconnectAttemptRef.current++;
+            // eslint-disable-next-line no-console
             if (import.meta.env.DEV) console.log(`[StaffWebSocket] Scheduling reconnect in ${delay / 1000}s (attempt ${reconnectAttemptRef.current})`);
             reconnectTimeoutRef.current = setTimeout(() => {
               if (!sessionCheckedRef.current) {
+                // eslint-disable-next-line no-console
                 if (import.meta.env.DEV) console.log('[StaffWebSocket] Session not ready, delaying reconnect');
                 reconnectTimeoutRef.current = setTimeout(() => {
                   connect('session_ready_retry');
@@ -400,6 +432,7 @@ export function useStaffWebSocket(options: UseStaffWebSocketOptions = {}) {
   }, [handleBookingEvent]);
 
   const cleanup = useCallback(() => {
+    // eslint-disable-next-line no-console
     if (import.meta.env.DEV) console.log(`[StaffWebSocket] Cleanup called (mount=${mountIdRef.current})`);
     intentionalDisconnectRef.current = true;
     
@@ -426,9 +459,11 @@ export function useStaffWebSocket(options: UseStaffWebSocketOptions = {}) {
   useEffect(() => {
     mountIdRef.current++;
     const thisMountId = mountIdRef.current;
+    // eslint-disable-next-line no-console
     if (import.meta.env.DEV) console.log(`[StaffWebSocket] Effect running (mount=${thisMountId}, sessionChecked=${sessionChecked}, email=${actualUser?.email})`);
     
     if (!sessionChecked) {
+      // eslint-disable-next-line no-console
       if (import.meta.env.DEV) console.log(`[StaffWebSocket] Waiting for session check (mount=${thisMountId})`);
       return;
     }
@@ -438,6 +473,7 @@ export function useStaffWebSocket(options: UseStaffWebSocketOptions = {}) {
     
     if (!userEmail || !isStaff) {
       if (activeConnectionUserRef.current || wsRef.current) {
+        // eslint-disable-next-line no-console
         if (import.meta.env.DEV) console.log(`[StaffWebSocket] User logged out or no longer staff, cleaning up (mount=${thisMountId})`);
         cleanup();
       }
@@ -447,30 +483,36 @@ export function useStaffWebSocket(options: UseStaffWebSocketOptions = {}) {
     }
     
     if (activeConnectionUserRef.current === userEmail && wsRef.current?.readyState === WebSocket.OPEN) {
+      // eslint-disable-next-line no-console
       if (import.meta.env.DEV) console.log(`[StaffWebSocket] Already connected to ${userEmail}, skipping (mount=${thisMountId})`);
       return;
     }
     
     if (activeConnectionUserRef.current && activeConnectionUserRef.current !== userEmail) {
+      // eslint-disable-next-line no-console
       if (import.meta.env.DEV) console.log(`[StaffWebSocket] User changed from ${activeConnectionUserRef.current} to ${userEmail} (mount=${thisMountId})`);
       cleanup();
     }
     
     if (wsRef.current?.readyState === WebSocket.OPEN || wsRef.current?.readyState === WebSocket.CONNECTING) {
+      // eslint-disable-next-line no-console
       if (import.meta.env.DEV) console.log(`[StaffWebSocket] Socket already open/connecting, skipping (mount=${thisMountId})`);
       return;
     }
     
     if (isConnectingRef.current) {
+      // eslint-disable-next-line no-console
       if (import.meta.env.DEV) console.log(`[StaffWebSocket] Already connecting, skipping (mount=${thisMountId})`);
       return;
     }
     
     if (initTimerRef.current) {
+      // eslint-disable-next-line no-console
       if (import.meta.env.DEV) console.log(`[StaffWebSocket] Init timer already pending, skipping (mount=${thisMountId})`);
       return;
     }
 
+    // eslint-disable-next-line no-console
     if (import.meta.env.DEV) console.log(`[StaffWebSocket] Scheduling connection for ${userEmail} (mount=${thisMountId})`);
     intentionalDisconnectRef.current = false;
     hasInitializedRef.current = true;
@@ -478,6 +520,7 @@ export function useStaffWebSocket(options: UseStaffWebSocketOptions = {}) {
     initTimerRef.current = setTimeout(() => {
       initTimerRef.current = null;
       if (mountIdRef.current !== thisMountId) {
+        // eslint-disable-next-line no-console
         if (import.meta.env.DEV) console.log(`[StaffWebSocket] Stale init timer (mount=${thisMountId}, current=${mountIdRef.current}), skipping`);
         return;
       }

@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { db } from '../db';
 import { faqs } from '../../shared/schema';
-import { eq, asc, desc } from 'drizzle-orm';
+import { eq, asc } from 'drizzle-orm';
 import { isStaffOrAdmin } from '../core/middleware';
 import { logFromRequest } from '../core/auditLog';
 import { logger } from '../core/logger';

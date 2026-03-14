@@ -22,6 +22,7 @@ export async function getCalendarNameForBayAsync(bayId: number | null): Promise<
   return null;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function getCalendarNameForBay(bayId: number | null): string | null {
   return null;
 }
@@ -49,7 +50,7 @@ export async function isStaffOrAdminCheck(email: string): Promise<boolean> {
       [email]
     );
     return (result as unknown as { rows: Array<Record<string, unknown>> }).rows.length > 0;
-  } catch (error: unknown) {
+  } catch (_error: unknown) {
     return false;
   }
 }

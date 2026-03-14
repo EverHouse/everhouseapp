@@ -5,7 +5,7 @@ import { useIsMobile } from '../../../hooks/useBreakpoint';
 import WalkingGolferSpinner from '../../WalkingGolferSpinner';
 import { useConfirmDialog } from '../../ConfirmDialog';
 import { formatTime12Hour } from '../../../utils/dateUtils';
-import RecentTransactionsSection, { TransactionListRef, Transaction } from './TransactionList';
+import RecentTransactionsSection, { Transaction } from './TransactionList';
 import OverduePaymentsPanel from './OverduePaymentsPanel';
 import { UnifiedBookingSheet } from '../../staff-command-center/modals/UnifiedBookingSheet';
 import {
@@ -21,7 +21,7 @@ import {
   useVoidPayment,
 } from '../../../hooks/queries/useFinancialsQueries';
 
-interface Payment {
+interface _Payment {
   id: string;
   memberName?: string;
   description?: string;
@@ -36,7 +36,7 @@ interface SectionProps {
   variant?: 'modal' | 'card';
 }
 
-interface OverduePayment {
+interface _OverduePayment {
   bookingId: number;
   sessionId: number;
   ownerEmail: string;
@@ -75,7 +75,7 @@ interface PendingAuthorization {
   expiresAt: string;
 }
 
-interface FutureBooking {
+interface _FutureBooking {
   bookingId: number;
   memberEmail: string;
   memberName: string;
@@ -1019,7 +1019,7 @@ const RefundsSection: React.FC<SectionProps> = ({ onClose, variant = 'modal' }) 
   );
 };
 
-const QuickInvoiceCard: React.FC = () => {
+const _QuickInvoiceCard: React.FC = () => {
   return (
     <div className="bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-xl p-5">
       <div className="flex items-center gap-2 mb-4">

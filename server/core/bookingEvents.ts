@@ -1,7 +1,7 @@
 import { db } from '../db';
 import { notifications, staffUsers, bookingRequests, bookingParticipants, users } from '../../shared/schema';
 import { eq, and, or, sql } from 'drizzle-orm';
-import { sendNotificationToUser, broadcastToStaff, broadcastBookingEvent } from './websocket';
+import { sendNotificationToUser, broadcastBookingEvent } from './websocket';
 import { sendPushNotification, sendPushNotificationToStaff } from '../routes/push';
 import { formatTime12Hour, formatDateDisplayWithDay } from '../utils/dateUtils';
 
@@ -140,8 +140,8 @@ export async function publish(
     staffNotification
   } = options;
 
-  const friendlyDateTime = formatBookingDateTime(data.bookingDate, data.startTime);
-  const resourceLabel = data.resourceType === 'conference_room' ? 'conference room' : 'golf simulator';
+  const _friendlyDateTime = formatBookingDateTime(data.bookingDate, data.startTime);
+  const _resourceLabel = data.resourceType === 'conference_room' ? 'conference room' : 'golf simulator';
 
   logger.info(`[BookingEvents] Publishing ${eventType} for booking ${data.bookingId}`);
 
@@ -327,10 +327,11 @@ export async function linkAndNotifyParticipants(
       const participantCountResult = await db.select({ count: sql<number>`COUNT(*)` })
         .from(bookingParticipants)
         .where(eq(bookingParticipants.sessionId, bpSessionId));
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       nextSlot = (participantCountResult[0]?.count || 1) + 1;
     }
     
-    const linkedBy = options?.linkedBy || 'auto_link';
+    const _linkedBy = options?.linkedBy || 'auto_link';
     const bayName = options?.bayName || 'Bay';
     const bookingDateStr = typeof booking.requestDate === 'string' 
       ? booking.requestDate 

@@ -198,11 +198,11 @@ function isAllowedOrigin(origin: string | undefined): boolean {
 
 export function closeWebSocketServer(): void {
   if (wss) {
-    clients.forEach((connections, email) => {
+    clients.forEach((connections, _email) => {
       connections.forEach(conn => {
         try {
           conn.ws.close(1001, 'Server shutting down');
-        } catch (err: unknown) {
+        } catch (_err: unknown) {
           // Ignore close errors during shutdown
         }
       });
@@ -715,7 +715,7 @@ export function broadcastBookingEvent(event: BookingEvent) {
   let totalConnections = 0;
   let staffConnections = 0;
   
-  clients.forEach((connections, email) => {
+  clients.forEach((connections, _email) => {
     connections.forEach(conn => {
       totalConnections++;
       if (conn.isStaff) {

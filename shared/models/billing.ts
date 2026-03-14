@@ -7,6 +7,7 @@ import {
   timestamp,
   varchar,
   integer,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   text,
   serial,
 } from "drizzle-orm/pg-core";

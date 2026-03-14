@@ -1,4 +1,4 @@
-import { eq, and, or, sql } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { db } from '../../db';
 import { resources, users, notifications, bookingRequests } from '../../../shared/schema';
 import { logger } from '../logger';

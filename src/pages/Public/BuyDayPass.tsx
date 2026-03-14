@@ -66,7 +66,7 @@ const BuyDayPass: React.FC = () => {
         : dayPasses;
       setTiers(filtered.length > 0 ? filtered : dayPasses);
       setPageReady(true);
-    } catch (err: unknown) {
+    } catch (_err: unknown) {
       setError('Unable to load day passes. Please try again.');
     } finally {
       setLoading(false);

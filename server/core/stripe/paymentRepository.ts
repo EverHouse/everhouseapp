@@ -1,6 +1,6 @@
 import { db } from '../../db';
 import { stripePaymentIntents, users } from '../../../shared/schema';
-import { eq, and, gte, inArray, sql, desc } from 'drizzle-orm';
+import { eq, and, gte, inArray, desc } from 'drizzle-orm';
 
 export interface PaymentWithMember {
   id: number;

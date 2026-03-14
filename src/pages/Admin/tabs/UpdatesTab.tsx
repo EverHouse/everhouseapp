@@ -3,7 +3,7 @@ import { useAutoAnimate } from '@formkit/auto-animate/react';
 import { useNavigate } from 'react-router-dom';
 import { useData } from '../../../contexts/DataContext';
 import { usePageReady } from '../../../contexts/PageReadyContext';
-import { formatDateTimePacific, formatRelativeTime } from '../../../utils/dateUtils';
+import { formatRelativeTime } from '../../../utils/dateUtils';
 import { useNotificationSounds } from '../../../hooks/useNotificationSounds';
 import { useVisibilityAwareInterval } from '../../../hooks/useVisibilityAwareInterval';
 import FloatingActionButton from '../../../components/FloatingActionButton';
@@ -37,6 +37,7 @@ const UpdatesTab: React.FC = () => {
 
     useEffect(() => {
         const handleBookingUpdate = () => {
+            // eslint-disable-next-line no-console
             console.log('[UpdatesTab] Global booking-update event received');
             if (fetchNotificationsRef.current) {
                 fetchNotificationsRef.current();

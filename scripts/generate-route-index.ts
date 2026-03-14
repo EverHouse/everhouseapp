@@ -232,4 +232,5 @@ const markdown = generateMarkdown(allEntries);
 fs.mkdirSync(path.dirname(OUTPUT), { recursive: true });
 fs.writeFileSync(OUTPUT, markdown, 'utf-8');
 
+// eslint-disable-next-line no-console
 console.log(`✓ Generated ${OUTPUT} with ${allEntries.length} routes from ${files.length} files.`);

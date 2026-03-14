@@ -4,8 +4,7 @@ import { isStaffOrAdmin } from '../../core/middleware';
 import { pool, safeRelease } from '../../core/db';
 import { db } from '../../db';
 import { sql } from 'drizzle-orm';
-import { getMemberTierByEmail } from '../../core/tierService';
-import { computeFeeBreakdown, recalculateSessionFees } from '../../core/billing/unifiedFeeService';
+import { recalculateSessionFees } from '../../core/billing/unifiedFeeService';
 import { logFromRequest } from '../../core/auditLog';
 import { getStripeClient } from '../../core/stripe/client';
 import { listCustomerPaymentMethods } from '../../core/stripe/customers';
@@ -346,7 +345,7 @@ router.put('/api/admin/trackman/unmatched/:id/resolve', isStaffOrAdmin, async (r
     const isVisitor = member.role === 'visitor' && !member.staff_role;
     const staffEmail = req.session?.user?.email || 'admin';
     
-    let bookingResult = await db.execute(sql`SELECT id, trackman_booking_id, staff_notes, trackman_customer_notes, request_date, start_time, end_time, 
+    const bookingResult = await db.execute(sql`SELECT id, trackman_booking_id, staff_notes, trackman_customer_notes, request_date, start_time, end_time, 
               duration_minutes, resource_id, session_id
        FROM booking_requests WHERE id = ${numericId}`);
     
@@ -1408,11 +1407,11 @@ router.post('/api/admin/trackman/unmatch-member', isStaffOrAdmin, async (req, re
     
     let affectedCount = 0;
     for (const booking of bookingsResult.rows as DbRow[]) {
-      const notesMatch = String(booking.notes || '').match(/\[Trackman Import ID:\d+\]\s*([^\[]+)/);
+      const notesMatch = String(booking.notes || '').match(/\[Trackman Import ID:\d+\]\s*([^[]+)/);
       const originalName = notesMatch ? notesMatch[1].trim() : booking.user_name || 'Unknown';
       
       const trackmanIdMatch = String(booking.notes || '').match(/\[Trackman Import ID:(\d+)\]/);
-      const trackmanId = trackmanIdMatch ? trackmanIdMatch[1] : booking.id;
+      const _trackmanId = trackmanIdMatch ? trackmanIdMatch[1] : booking.id;
       
       await db.execute(sql`UPDATE booking_requests 
          SET user_email = NULL,

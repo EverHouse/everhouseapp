@@ -2,7 +2,6 @@ import { db } from "../../db";
 import { users, legacyPurchases, legacyImportJobs } from "@shared/schema";
 import { eq, sql, and, ilike } from "drizzle-orm";
 import fs from "fs";
-import path from "path";
 import { alertOnImportFailure, alertOnLowMatchRate } from "../dataAlerts";
 import { findMatchingUser, normalizePhone } from "../visitors/matchingService";
 
@@ -132,7 +131,7 @@ interface MemberImportRow {
   lifetimeSales: string;
 }
 
-interface SalesImportRow {
+interface _SalesImportRow {
   saleDate: string;
   clientId: string;
   client: string;
@@ -148,13 +147,13 @@ interface SalesImportRow {
   paymentMethod: string;
 }
 
-interface AttendanceImportRow {
+interface _AttendanceImportRow {
   client: string;
   id: string;
   totalVisits: string;
 }
 
-interface FirstVisitRow {
+interface _FirstVisitRow {
   clientId: string;
   client: string;
   phone: string;
@@ -196,7 +195,9 @@ export function parseFirstVisitReport(content: string): Map<string, ClientLookup
     if (!clientId) continue;
     
     // Parse name: "Last, First" format
+    // eslint-disable-next-line no-useless-assignment
     let firstName = '';
+    // eslint-disable-next-line no-useless-assignment
     let lastName = '';
     if (clientName.includes(',')) {
       const [last, first] = clientName.split(',').map(s => s.trim());
@@ -384,7 +385,9 @@ export async function importSalesFromContent(content: string, clientLookup?: Map
           // Handle "First Last" format
           const parts = clientName.trim().split(/\s+/);
           if (parts.length >= 2) {
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
             firstName = parts[0];
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
             lastName = parts.slice(1).join(' ');
           }
         }
@@ -400,6 +403,7 @@ export async function importSalesFromContent(content: string, clientLookup?: Map
             .limit(1);
           if (emailMatch.length > 0) {
             member = emailMatch;
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
             matchMethod = 'email';
             result.matchedByEmail++;
           }

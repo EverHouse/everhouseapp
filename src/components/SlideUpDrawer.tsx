@@ -76,6 +76,7 @@ export function SlideUpDrawer({
 
   useEffect(() => {
     if (!isOpen) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setIsClosing(false);
       setHasAnimatedIn(false);
       closingFromDrag.current = false;

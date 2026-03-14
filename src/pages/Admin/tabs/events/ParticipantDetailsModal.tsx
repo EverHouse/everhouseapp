@@ -5,7 +5,7 @@ import { formatDateTimePacific } from '../../../../utils/dateUtils';
 import { useToast } from '../../../../components/Toast';
 import { SlideUpDrawer } from '../../../../components/SlideUpDrawer';
 import TierBadge from '../../../../components/TierBadge';
-import { fetchWithCredentials, postWithCredentials, deleteWithCredentials } from '../../../../hooks/queries/useFetch';
+import { postWithCredentials, deleteWithCredentials } from '../../../../hooks/queries/useFetch';
 import { Participant, ParticipantDetailsModalProps } from './eventsTypes';
 
 export const ParticipantDetailsModal: React.FC<ParticipantDetailsModalProps> = ({
@@ -34,7 +34,7 @@ export const ParticipantDetailsModal: React.FC<ParticipantDetailsModalProps> = (
     
     const [deletingParticipantIds, setDeletingParticipantIds] = useState<Set<number>>(new Set());
     const [optimisticParticipants, setOptimisticParticipants] = useState<Participant[]>([]);
-    const [pendingAddEmail, setPendingAddEmail] = useState<string | null>(null);
+    const [_pendingAddEmail, setPendingAddEmail] = useState<string | null>(null);
 
     const deleteRsvpMutation = useMutation({
         mutationFn: (rsvpId: number) => 
@@ -72,7 +72,7 @@ export const ParticipantDetailsModal: React.FC<ParticipantDetailsModalProps> = (
     });
 
     const deleteEnrollmentMutation = useMutation({
-        mutationFn: ({ userEmail, participantId }: { userEmail: string; participantId: number }) => 
+        mutationFn: ({ userEmail, participantId: _participantId }: { userEmail: string; participantId: number }) => 
             deleteWithCredentials(`/api/wellness-enrollments/${classId}/${encodeURIComponent(userEmail)}`),
         onMutate: async ({ participantId }) => {
             await queryClient.cancelQueries({ queryKey: ['class-enrollments', classId] });

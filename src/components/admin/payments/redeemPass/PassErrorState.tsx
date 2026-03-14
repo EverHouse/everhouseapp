@@ -1,5 +1,5 @@
 import React from 'react';
-import type { ErrorState, PassDetails } from './types';
+import type { ErrorState } from './types';
 
 interface PassErrorStateProps {
   errorState: ErrorState;

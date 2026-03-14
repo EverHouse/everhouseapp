@@ -201,6 +201,7 @@ export const EventsAdminContent: React.FC = () => {
 
     useEffect(() => {
         if (needsReviewEvents.length > 0) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setNeedsReviewExpanded(true);
         }
     }, [needsReviewEvents.length]);
@@ -459,7 +460,7 @@ export const EventsAdminContent: React.FC = () => {
         return `${h12}:${mins.toString().padStart(2, '0')} ${period}`;
     };
 
-    const formatTime12Hour = (time: string | null | undefined) => {
+    const _formatTime12Hour = (time: string | null | undefined) => {
         if (!time) return '';
         const [h, m] = time.split(':').map(Number);
         const period = h >= 12 ? 'PM' : 'AM';

@@ -17,6 +17,7 @@ export function UnifiedBookingSheet(props: UnifiedBookingSheetProps) {
   const {
     isOpen,
     onClose,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     bookingType,
     trackmanBookingId,
     bayName,

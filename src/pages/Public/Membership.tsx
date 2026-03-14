@@ -61,7 +61,7 @@ const MembershipOverview: React.FC = () => {
   const navigate = useNavigate();
   const { startNavigation } = useNavigationLoading();
   const { setPageReady } = usePageReady();
-  const { guestFeeDollars, dayPassPrices } = usePricing();
+  const { guestFeeDollars: _guestFeeDollars, dayPassPrices } = usePricing();
   const [selectedPass, setSelectedPass] = useState<'workspace' | 'sim' | null>(null);
   const [tiers, setTiers] = useState<MembershipTier[]>([]);
   const [loading, setLoading] = useState(true);

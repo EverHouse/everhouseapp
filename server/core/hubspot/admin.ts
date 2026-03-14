@@ -3,6 +3,7 @@ import { discountRules } from '../../../shared/schema';
 import { eq, sql } from 'drizzle-orm';
 
 import { logger } from '../logger';
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function getAllDiscountRules(): Promise<any[]> {
   try {
     const rules = await db.select().from(discountRules).orderBy(discountRules.discountPercent);
@@ -34,6 +35,7 @@ export async function updateDiscountRule(
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function getBillingAuditLog(memberEmail: string, limit: number = 50): Promise<any[]> {
   try {
     const result = await db.execute(sql`SELECT id, action, actor_email, actor_type, resource_type, resource_id, resource_name, details, created_at FROM admin_audit_log 

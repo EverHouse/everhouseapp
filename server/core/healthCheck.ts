@@ -47,7 +47,7 @@ async function checkWithTimeout<T>(
 }
 
 async function checkDatabase(): Promise<ServiceHealth> {
-  const { result, latencyMs, error } = await checkWithTimeout(
+  const { result: _result, latencyMs, error } = await checkWithTimeout(
     () => db.execute(sql`SELECT 1`),
     3000
   );

@@ -5,7 +5,6 @@ import { sql } from 'drizzle-orm';
 import { walletPassDeviceRegistrations, walletPassAuthTokens } from '../../shared/schema';
 import { eq } from 'drizzle-orm';
 import { logger } from '../core/logger';
-import { getSettingValue } from '../core/settingsHelper';
 
 const APN_HOST = 'https://api.push.apple.com';
 
@@ -73,7 +72,7 @@ async function sendApnPush(pushToken: string, passTypeId: string): Promise<boole
       req.end(JSON.stringify({}));
 
       setTimeout(() => {
-        try { client.close(); } catch {}
+        try { client.close(); } catch { /* ignored */ }
         resolve(false);
       }, 10000);
     } catch (err) {

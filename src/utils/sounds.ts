@@ -10,7 +10,7 @@ const setupUnlockListeners = () => {
     if (!audioContext) {
       try {
         audioContext = new (window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext)();
-      } catch (e: unknown) {
+      } catch (_e: unknown) {
         return;
       }
     }
@@ -45,7 +45,7 @@ const getAudioContext = (): AudioContext | null => {
   if (!audioContext) {
     try {
       audioContext = new (window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext)();
-    } catch (e: unknown) {
+    } catch (_e: unknown) {
       return null;
     }
   }
@@ -202,7 +202,7 @@ export const sounds = {
 export const playSound = (type: keyof typeof sounds) => {
   try {
     sounds[type]?.();
-  } catch (e: unknown) {
+  } catch (_e: unknown) {
     // silently ignore
   }
 };

@@ -80,7 +80,7 @@ export const useUserStore = create<UserState>()(
         if (!user?.email) return;
         
         try {
-          const { ok, data, error } = await apiRequest<GuestPasses>(
+          const { ok, data, error: _error } = await apiRequest<GuestPasses>(
             `/api/guest-passes/${encodeURIComponent(user.email)}?tier=${encodeURIComponent(user.tier || 'Social')}`
           );
           if (ok && data) {

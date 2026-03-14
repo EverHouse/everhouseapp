@@ -29,7 +29,7 @@ export async function consumeGuestPassForParticipant(
   guestName: string,
   sessionId: number,
   sessionDate: Date,
-  staffEmail?: string
+  _staffEmail?: string
 ): Promise<GuestPassConsumptionResult> {
   if (isPlaceholderGuestName(guestName)) {
     return {
@@ -70,6 +70,7 @@ export async function consumeGuestPassForParticipant(
          RETURNING passes_total - passes_used as remaining`);
         passesRemaining = (insertResult.rows[0] as unknown as GuestPassRemainingRow)?.remaining as number ?? ((tierGuestPasses as number) - 1);
       } else {
+        // eslint-disable-next-line prefer-const
         let { passes_used, passes_total } = existingPass.rows[0] as unknown as GuestPassRow;
         if ((tierGuestPasses as number) > (passes_total as number)) {
           await tx.execute(sql`UPDATE guest_passes SET passes_total = ${tierGuestPasses} WHERE LOWER(member_email) = ${ownerEmailLower}`);
@@ -296,7 +297,7 @@ export async function refundGuestPassForParticipant(
           logger.warn('[GuestPassConsumer] Non-blocking: draft invoice sync failed after pass refund', { extra: { error: getErrorMessage(err) } });
         });
       }
-    } catch (syncErr) {
+    } catch (_syncErr) {
       logger.warn('[GuestPassConsumer] Non-blocking: failed to sync invoice after pass refund');
     }
 

@@ -4,7 +4,6 @@ import archiver from 'archiver';
 import sharp from 'sharp';
 import path from 'path';
 import fs from 'fs';
-import { logger } from '../core/logger';
 
 interface PassData {
   memberId: string;
@@ -135,6 +134,7 @@ function buildPassJson(data: PassData, config: WalletConfig, colors: TierColors)
     label: 'Member Portal',
     value: portalUrl,
     attributedValue: `<a href="${portalUrl}">Open Member Portal</a>`,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } as any);
 
   const headerFields: Array<{ key: string; label: string; value: string; textAlignment?: string }> = [];
@@ -312,18 +312,21 @@ function signManifest(manifestJson: string, config: WalletConfig): Buffer {
   try {
     cert = forge.pki.certificateFromPem(config.certPem);
   } catch (e) {
+    // eslint-disable-next-line preserve-caught-error
     throw new Error(`Failed to parse pass certificate PEM: ${e instanceof Error ? e.message : String(e)}`);
   }
 
   try {
     key = forge.pki.privateKeyFromPem(config.keyPem);
   } catch (e) {
+    // eslint-disable-next-line preserve-caught-error
     throw new Error(`Failed to parse pass private key PEM: ${e instanceof Error ? e.message : String(e)}`);
   }
 
   try {
     wwdr = forge.pki.certificateFromPem(WWDR_PEM);
   } catch (e) {
+    // eslint-disable-next-line preserve-caught-error
     throw new Error(`Failed to parse WWDR intermediate certificate: ${e instanceof Error ? e.message : String(e)}`);
   }
 

@@ -14,6 +14,7 @@ const BottomNavContext = createContext<BottomNavContextType>({
   setDrawerOpen: () => {},
 });
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useBottomNav = () => useContext(BottomNavContext);
 
 export const BottomNavProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {

@@ -173,8 +173,8 @@ router.get('/api/approved-bookings', isStaffOrAdmin, async (req, res) => {
     
     const bookingIds = dbResult.map(b => b.id).filter(Boolean);
     
-    let paymentStatusMap = new Map<number, { hasUnpaidFees: boolean; totalOwed: number }>();
-    let filledSlotsMap = new Map<number, number>();
+    const paymentStatusMap = new Map<number, { hasUnpaidFees: boolean; totalOwed: number }>();
+    const filledSlotsMap = new Map<number, number>();
     let feeSnapshotPaidSet = new Set<number>();
     
     const bookingIdsLiteral = toIntArrayLiteral(bookingIds);

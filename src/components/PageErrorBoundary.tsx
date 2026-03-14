@@ -101,11 +101,13 @@ class PageErrorBoundary extends Component<Props, State> {
       const reloadCount = getReloadCount();
       
       if (reloadCount < MAX_AUTO_RELOADS) {
+        // eslint-disable-next-line no-console
         console.log(`[PageErrorBoundary] Detected stale chunk error, clearing caches and reloading (${reloadCount + 1}/${MAX_AUTO_RELOADS})...`);
         incrementReloadCount();
         this.clearCachesAndReload();
         return;
       } else {
+        // eslint-disable-next-line no-console
         console.log('[PageErrorBoundary] Max auto-reloads reached, showing error UI');
       }
     }
@@ -134,6 +136,7 @@ class PageErrorBoundary extends Component<Props, State> {
     this.clearTimers();
 
     const delaySeconds = AUTO_RETRY_DELAYS[this.state.autoRetryCount] ?? 5;
+    // eslint-disable-next-line no-console
     console.log(`[PageErrorBoundary${this.props.pageName ? ` - ${this.props.pageName}` : ''}] Auto-retry ${this.state.autoRetryCount + 1}/${MAX_AUTO_RETRIES} in ${delaySeconds}s...`);
 
     this.setState({ countdown: delaySeconds });

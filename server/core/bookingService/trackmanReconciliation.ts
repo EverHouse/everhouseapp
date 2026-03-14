@@ -2,7 +2,6 @@ import { db } from '../../db';
 import { sql } from 'drizzle-orm';
 import { logger } from '../logger';
 import { getErrorMessage } from '../../utils/errorUtils';
-import { getTierLimits, getMemberTierByEmail } from '../tierService';
 import { PRICING } from '../billing/pricingConfig';
 import { logPaymentAudit } from '../auditLog';
 import { recordUsage } from './sessionManager';

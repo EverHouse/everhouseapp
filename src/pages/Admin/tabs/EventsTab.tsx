@@ -8,7 +8,7 @@ import { EventsAdminContent } from './events/EventsAdminContent';
 import { WellnessAdminContent } from './events/WellnessAdminContent';
 
 const EventsTab: React.FC = () => {
-    const { showToast } = useToast();
+    const { showToast: _showToast } = useToast();
     const queryClient = useQueryClient();
     const [searchParams, setSearchParams] = useSearchParams();
     const subtabParam = searchParams.get('subtab');
@@ -27,6 +27,7 @@ const EventsTab: React.FC = () => {
         }, { replace: true });
     };
 
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const syncMutation = useMutation({
         mutationFn: async () => {
             const maxRetries = 3;

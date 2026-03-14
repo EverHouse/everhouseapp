@@ -87,7 +87,7 @@ export function WaiverModal({ isOpen, onComplete, currentVersion }: WaiverModalP
       queryClient.invalidateQueries({ queryKey: ['waiverStatus'] });
       showToast('Waiver signed successfully', 'success');
       onComplete();
-    } catch (error: unknown) {
+    } catch (_error: unknown) {
       showToast('Failed to sign waiver. Please try again.', 'error');
     } finally {
       setIsSubmitting(false);

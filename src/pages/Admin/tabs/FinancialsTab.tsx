@@ -14,7 +14,7 @@ import { useAutoAnimate } from '@formkit/auto-animate/react';
 import WalkingGolferSpinner from '../../../components/WalkingGolferSpinner';
 import { FinancialsSubTabSkeleton } from '../../../components/skeletons';
 
-interface SubscriptionListItem {
+interface _SubscriptionListItem {
   id: string;
   memberEmail: string;
   memberName: string;
@@ -27,7 +27,7 @@ interface SubscriptionListItem {
   cancelAtPeriodEnd: boolean;
 }
 
-interface InvoiceListItem {
+interface _InvoiceListItem {
   id: string;
   memberEmail: string;
   memberName: string;
@@ -150,7 +150,7 @@ const SubscriptionsSubTab: React.FC = () => {
   const { data: subscriptionsData, isLoading, error: queryError, refetch } = useSubscriptions(statusFilter);
   const subscriptions = subscriptionsData?.subscriptions || [];
   const hasMore = subscriptionsData?.hasMore || false;
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [isLoadingMore, _setIsLoadingMore] = useState(false);
   
   const error = localError || (queryError instanceof Error ? queryError.message : null);
 
@@ -534,7 +534,7 @@ const InvoicesSubTab: React.FC = () => {
   const { data: invoicesData, isLoading, error: queryError, refetch } = useInvoices(statusFilter, appliedStartDate, appliedEndDate);
   const invoices = invoicesData?.invoices || [];
   const hasMore = invoicesData?.hasMore || false;
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [isLoadingMore, _setIsLoadingMore] = useState(false);
 
   const error = queryError instanceof Error ? queryError.message : null;
 
@@ -780,7 +780,7 @@ const InvoicesSubTab: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody ref={invTbodyParent} className="divide-y divide-primary/5 dark:divide-white/5">
-                  {filteredInvoices.map((invoice, index) => (
+                  {filteredInvoices.map((invoice, _index) => (
                     <tr key={invoice.id} className="hover:bg-primary/5 dark:hover:bg-white/5 transition-colors tactile-row">
                       <td className="px-4 py-3">
                         <p className="font-medium text-primary dark:text-white font-mono text-sm">

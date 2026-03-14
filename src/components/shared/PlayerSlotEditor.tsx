@@ -131,7 +131,7 @@ const PlayerSlotEditor: React.FC<PlayerSlotEditorProps> = ({
           <div ref={slotListRef} className="space-y-4">
             {slots.map((slot, index) => {
               const isGuestComplete = slot.type === 'guest' && slot.firstName.trim() !== '' && slot.lastName.trim() !== '' && slot.email.includes('@');
-              const isGuestIncomplete = slot.type === 'guest' && !slot.selectedId && (!slot.firstName.trim() || !slot.lastName.trim() || !slot.email.includes('@'));
+              const _isGuestIncomplete = slot.type === 'guest' && !slot.selectedId && (!slot.firstName.trim() || !slot.lastName.trim() || !slot.email.includes('@'));
               const showIndicator = slot.type === 'guest' && !slot.selectedId && (slot.firstName.trim() !== '' || slot.lastName.trim() !== '' || slot.email.trim() !== '');
 
               return (

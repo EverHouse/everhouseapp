@@ -25,7 +25,7 @@ interface ToursSyncResponse {
   error?: string;
 }
 
-interface ToursData {
+interface _ToursData {
   todayTours: Tour[];
   upcomingTours: Tour[];
   pastTours: Tour[];

@@ -23,6 +23,7 @@ const AnnouncementBadgeContext = createContext<AnnouncementBadgeContextType>({
   markAllAsSeen: () => {},
 });
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useAnnouncementBadge = () => useContext(AnnouncementBadgeContext);
 
 const getStorageKey = (email: string) => `eh_seen_announcements_${email}`;
@@ -105,6 +106,7 @@ export const AnnouncementBadgeProvider: React.FC<{ children: React.ReactNode }> 
         body: JSON.stringify({ noticeType, noticeId })
       });
     } catch (_dismissErr) {
+      // intentionally empty
     }
   }, []);
 

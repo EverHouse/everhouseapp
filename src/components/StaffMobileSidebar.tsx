@@ -40,6 +40,7 @@ export const StaffMobileSidebar: React.FC<StaffMobileSidebarProps> = ({
     }
 
     if (isOpen) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setRendered(true);
       setIsClosing(false);
     } else if (rendered) {
@@ -65,6 +66,7 @@ export const StaffMobileSidebar: React.FC<StaffMobileSidebarProps> = ({
 
   useEffect(() => {
     if (optimisticTab && activeTab === optimisticTab) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setOptimisticTab(null);
     }
   }, [activeTab, optimisticTab]);

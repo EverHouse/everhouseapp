@@ -72,7 +72,7 @@ const CafeTab: React.FC = () => {
         }
     };
 
-    const handleSeedMenu = async () => {
+    const _handleSeedMenu = async () => {
         try {
             await seedMenuMutation.mutateAsync();
         } catch (err: unknown) {
@@ -256,7 +256,7 @@ const CafeTab: React.FC = () => {
             </ModalShell>
 
             <div ref={cafeRef} className="space-y-3 animate-content-enter-delay-3">
-                {filteredMenu.map((item, index) => (
+                {filteredMenu.map((item, _index) => (
                     <div key={item.id} onClick={() => openEdit(item)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openEdit(item); } }} role="button" tabIndex={0} className={`bg-white dark:bg-surface-dark p-4 rounded-xl shadow-sm border border-gray-200 dark:border-white/20 flex items-center gap-4 cursor-pointer hover:border-primary/30 transition-colors tactile-card `}>
                         <div className="w-16 h-16 rounded-lg bg-gray-100 dark:bg-white/5 flex-shrink-0 overflow-hidden">
                              {item.image ? <img src={item.image} className="w-full h-full object-cover" alt={item.name || 'Menu item image'} /> : <div className="w-full h-full flex items-center justify-center"><span aria-hidden="true" className="material-symbols-outlined text-gray-600">restaurant</span></div>}

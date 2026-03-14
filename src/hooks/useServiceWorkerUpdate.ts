@@ -32,6 +32,7 @@ export function useServiceWorkerUpdate(): ServiceWorkerUpdateState {
 
     const showUpdate = (worker: ServiceWorker) => {
       if (isDismissCooldown()) return;
+      // eslint-disable-next-line no-console
       console.log('[App] Update available, showing notification');
       setWaitingWorker(worker);
       setUpdateAvailable(true);
@@ -39,6 +40,7 @@ export function useServiceWorkerUpdate(): ServiceWorkerUpdateState {
 
     const handleMessage = (event: MessageEvent) => {
       if (event.data?.type === 'SW_ACTIVATED') {
+        // eslint-disable-next-line no-console
         console.log('[App] Service worker activated, version:', event.data.version);
         if (updateTimeoutRef.current) {
           clearTimeout(updateTimeoutRef.current);
@@ -67,6 +69,7 @@ export function useServiceWorkerUpdate(): ServiceWorkerUpdateState {
             if (navigator.serviceWorker.controller) {
               showUpdate(newWorker);
             } else {
+              // eslint-disable-next-line no-console
               console.log('[App] First SW install, no update prompt needed');
             }
           }
@@ -124,6 +127,7 @@ export function useServiceWorkerUpdate(): ServiceWorkerUpdateState {
     }
 
     updateTimeoutRef.current = setTimeout(() => {
+      // eslint-disable-next-line no-console
       console.log('[App] Update timeout reached, forcing reload');
       updateTimeoutRef.current = null;
       if (isStandalonePWA()) {

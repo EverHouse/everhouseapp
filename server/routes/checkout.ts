@@ -73,7 +73,7 @@ router.post('/api/checkout/sessions', checkoutRateLimiter, async (req, res) => {
     
     const seatCount = isCorporate ? Math.max(quantity || CORPORATE_MIN_SEATS, CORPORATE_MIN_SEATS) : 1;
 
-    let sessionParams: Record<string, unknown> = {
+    const sessionParams: Record<string, unknown> = {
       mode: 'subscription',
       ui_mode: 'embedded',
       return_url: `${baseUrl}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,

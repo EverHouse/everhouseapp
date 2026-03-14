@@ -17,7 +17,7 @@ import {
   TierLimits 
 } from '../tierService';
 import { logger } from '../logger';
-import { getTodayPacific, getPacificDateParts } from '../../utils/dateUtils';
+import { getTodayPacific } from '../../utils/dateUtils';
 
 export interface TierValidationResult {
   allowed: boolean;
@@ -42,7 +42,7 @@ export async function validateTierWindowAndBalance(
   memberEmail: string,
   bookingDate: string,
   duration: number,
-  declaredPlayerCount: number = 1,
+  _declaredPlayerCount: number = 1,
   resourceType?: string
 ): Promise<TierValidationResult> {
   try {
@@ -121,7 +121,7 @@ export async function getRemainingMinutes(
 
 export async function enforceSocialTierRules(
   ownerTier: string,
-  participants: ParticipantForValidation[]
+  _participants: ParticipantForValidation[]
 ): Promise<SocialTierResult> {
   try {
     const { isSocialTier } = await import('../../utils/tierUtils');

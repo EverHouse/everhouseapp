@@ -118,6 +118,7 @@ export async function apiRequest<T = unknown>(
             (config.baseDelay || 500) * Math.pow(2, attempt - 1),
             config.maxDelay || 5000
           );
+          // eslint-disable-next-line no-console
           if (isDev) console.log(`[API] Retrying ${url} in ${delayMs}ms (attempt ${attempt}/${maxRetries})...`);
           await delay(delayMs);
           continue;
@@ -153,6 +154,7 @@ export async function apiRequest<T = unknown>(
           (config.baseDelay || 500) * Math.pow(2, attempt - 1),
           config.maxDelay || 5000
         );
+        // eslint-disable-next-line no-console
         if (isDev) console.log(`[API] Retrying ${url} in ${delayMs}ms (attempt ${attempt}/${maxRetries})...`);
         await delay(delayMs);
         continue;

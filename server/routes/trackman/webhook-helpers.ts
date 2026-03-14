@@ -316,7 +316,7 @@ export function parseDateTime(dateTimeStr: string | undefined, dateStr: string |
     if (dateStr) {
       return { date: dateStr, time: '00:00' };
     }
-  } catch (e: unknown) {
+  } catch (_e: unknown) {
     logger.warn('[Trackman Webhook] Failed to parse date/time', { extra: { dateTimeStr, dateStr } });
   }
   

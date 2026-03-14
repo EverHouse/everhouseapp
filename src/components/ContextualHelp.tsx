@@ -29,6 +29,7 @@ export default function ContextualHelp({ guideIds, title = 'Page Guide' }: Conte
   useEffect(() => {
     if (!isOpen) return;
     let cancelled = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     fetch('/api/training-sections', { credentials: 'include' })
       .then(res => {

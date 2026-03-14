@@ -12,6 +12,7 @@ interface TabButtonProps {
 const TabButton: React.FC<TabButtonProps> = ({ label, active, onClick, isDark = true }) => {
   const handleClick = () => {
     if (import.meta.env.DEV) {
+      // eslint-disable-next-line no-console
       console.log(`[TabButton] click fired for "${label}"`);
     }
     haptic.light();

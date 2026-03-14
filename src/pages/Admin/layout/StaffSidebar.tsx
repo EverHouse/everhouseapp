@@ -26,6 +26,7 @@ export const StaffSidebar: React.FC<StaffSidebarProps> = ({
   
   useEffect(() => {
     if (optimisticTab && activeTab === optimisticTab) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setOptimisticTab(null);
     }
   }, [activeTab, optimisticTab]);

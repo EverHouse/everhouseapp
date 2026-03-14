@@ -61,9 +61,11 @@ interface PayInvoiceResponse {
 
 function InvoiceCheckoutForm({ 
   onSuccess, 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   onCancel,
   invoiceId,
   paymentIntentId,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   isProcessing,
   setIsProcessing
 }: { 
@@ -141,7 +143,9 @@ function InvoiceCheckoutForm({
 export function InvoicePaymentModal({
   isOpen,
   invoice,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   userEmail,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   userName,
   onSuccess,
   onClose

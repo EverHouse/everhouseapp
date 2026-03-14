@@ -30,6 +30,7 @@ export default function OfflineBanner({ staffWsConnected }: OfflineBannerProps) 
 
   useEffect(() => {
     if (justReconnected) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setShowReconnected(true);
       const timer = setTimeout(() => setShowReconnected(false), 3000);
       return () => clearTimeout(timer);
@@ -49,6 +50,7 @@ export default function OfflineBanner({ staffWsConnected }: OfflineBannerProps) 
       clearTimeout(exitTimer.current);
       exitTimer.current = null;
     }
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsExiting(false);
 
     if (target && target !== rendered) {

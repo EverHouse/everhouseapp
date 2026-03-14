@@ -514,7 +514,7 @@ export async function createBalanceAwarePayment(params: {
   remainingCents: number;
   error?: string;
 }> {
-  const { stripeCustomerId, userId, email, memberName, amountCents, purpose, description, bookingId, sessionId, metadata = {} } = params;
+  const { stripeCustomerId, userId, email, memberName: _memberName, amountCents, purpose, description, bookingId, sessionId, metadata = {} } = params;
 
   try {
     const stripe = await getStripeClient();

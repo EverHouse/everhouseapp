@@ -1,7 +1,7 @@
 import { schedulerTracker } from '../core/schedulerTracker';
 import { db } from '../db';
 import { sql } from 'drizzle-orm';
-import { getPacificHour, getTodayPacific, CLUB_TIMEZONE } from '../utils/dateUtils';
+import { getPacificHour, CLUB_TIMEZONE } from '../utils/dateUtils';
 import { sendGracePeriodReminderEmail } from '../emails/membershipEmails';
 import { notifyAllStaff } from '../core/notificationService';
 import { getStripeClient } from '../core/stripe/client';
@@ -53,7 +53,7 @@ async function getReactivationLink(stripeCustomerId: string | null): Promise<str
       },
     });
     return session.url;
-  } catch (error: unknown) {
+  } catch (_error: unknown) {
     logger.warn('[Grace Period] Could not create billing portal session, using fallback link');
     return fallbackLink;
   }

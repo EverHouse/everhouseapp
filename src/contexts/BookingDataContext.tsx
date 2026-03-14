@@ -27,6 +27,7 @@ export const BookingDataProvider: React.FC<{children: ReactNode}> = ({ children 
   );
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useBookingData = () => {
   const context = useContext(BookingDataContext);
   if (!context) {

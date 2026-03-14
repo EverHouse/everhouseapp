@@ -132,7 +132,7 @@ export async function fetchBookings(params: {
   includeAll?: boolean;
   includeArchived?: boolean;
 }) {
-  let conditions: ReturnType<typeof eq | typeof sql>[] = [];
+  const conditions: ReturnType<typeof eq | typeof sql>[] = [];
   
   if (!params.includeArchived) {
     conditions.push(sql`${bookingRequests.archivedAt} IS NULL`);
@@ -141,6 +141,7 @@ export async function fetchBookings(params: {
   if (params.status) {
     conditions.push(eq(bookingRequests.status, params.status));
   } else if (params.includeAll) {
+    // intentionally no filter — include all statuses
   } else {
     conditions.push(or(
       eq(bookingRequests.status, 'confirmed'),
@@ -322,6 +323,7 @@ export async function approveBooking(bookingId: number) {
   return result;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export async function declineBooking(bookingId: number, reason?: string) {
   const result = await db.transaction(async (tx) => {
     const [existing] = await tx.select().from(bookingRequests).where(eq(bookingRequests.id, bookingId));
@@ -504,7 +506,7 @@ export async function getCascadePreview(bookingId: number) {
   }
   
   let participantsCount = 0;
-  let membersCount = 0;
+  const _membersCount = 0;
   
   if (booking.sessionId) {
     const participantsResult = await db.select({ count: sql<number>`count(*)::int` })

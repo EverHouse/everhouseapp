@@ -26,7 +26,7 @@ interface BeforeInstallPromptEvent extends Event {
 
 const OnboardingChecklist: React.FC = () => {
   const navigate = useNavigate();
-  const { user } = useData();
+  const { user: _user } = useData();
   const [status, setStatus] = useState<OnboardingStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [dismissed, setDismissed] = useState(false);

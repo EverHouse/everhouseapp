@@ -104,7 +104,7 @@ const Wellness: React.FC = () => {
     }
   }, [activeTab, setPageReady]);
 
-  const convertTo24Hour = (time12: string): string => {
+  const _convertTo24Hour = (time12: string): string => {
     const match = time12.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
     if (!match) return '09:00:00';
     let hours = parseInt(match[1]);
@@ -115,7 +115,7 @@ const Wellness: React.FC = () => {
     return `${hours.toString().padStart(2, '0')}:${minutes}:00`;
   };
 
-  const calculateEndTime = (startTime24: string, durationStr: string): string => {
+  const _calculateEndTime = (startTime24: string, durationStr: string): string => {
     const durationMatch = durationStr.match(/(\d+)/);
     const durationMinutes = durationMatch ? parseInt(durationMatch[1]) : 60;
     const [hours, minutes] = startTime24.split(':').map(Number);
@@ -153,7 +153,7 @@ const Wellness: React.FC = () => {
     }
   };
 
-  const [refreshKey, setRefreshKey] = useState(0);
+  const [refreshKey, _setRefreshKey] = useState(0);
   const [refreshPromiseResolve, setRefreshPromiseResolve] = useState<(() => void) | null>(null);
 
   const onRefreshComplete = useCallback(() => {
@@ -208,7 +208,7 @@ const Wellness: React.FC = () => {
   );
 };
 
-const ClassesView: React.FC<{onBook: (cls: WellnessClass) => void; isDark?: boolean; userEmail?: string; userStatus?: string; refreshKey?: number; onRefreshComplete?: () => void}> = ({ onBook, isDark = true, userEmail, userStatus, refreshKey = 0, onRefreshComplete }) => {
+const ClassesView: React.FC<{onBook: (cls: WellnessClass) => void; isDark?: boolean; userEmail?: string; userStatus?: string; refreshKey?: number; onRefreshComplete?: () => void}> = ({ onBook: _onBook, isDark = true, userEmail, userStatus, refreshKey = 0, onRefreshComplete }) => {
   const { showToast } = useToast();
   const { setPageReady } = usePageReady();
   const queryClient = useQueryClient();
@@ -655,7 +655,7 @@ const FilterPill: React.FC<{label: string; active?: boolean; onClick?: () => voi
   </button>
 );
 
-const getCategoryIcon = (category: string): string => {
+const _getCategoryIcon = (category: string): string => {
   switch (category?.toLowerCase()) {
     case 'recovery': return 'ac_unit';
     case 'wellness': return 'self_improvement';
@@ -706,7 +706,7 @@ interface ClassCardProps {
   externalUrl?: string;
 }
 
-const ClassCard: React.FC<ClassCardProps> = React.memo(({ title, date, time, instructor, duration, category, spots, spotsRemaining, enrolledCount, status, description, isExpanded, onToggle, onBook, onCancel, isEnrolled, isOnWaitlist, isCancelling, isRsvping, isCancelDisabled = false, isDark = true, isMembershipInactive = false, isFull = false, capacity, waitlistEnabled, waitlistCount = 0, externalUrl }) => {
+const ClassCard: React.FC<ClassCardProps> = React.memo(({ title, date, time, instructor, duration, category, spots, spotsRemaining, enrolledCount, status: _status, description, isExpanded, onToggle, onBook, onCancel, isEnrolled, isOnWaitlist, isCancelling, isRsvping, isCancelDisabled = false, isDark = true, isMembershipInactive = false, isFull = false, capacity, waitlistEnabled, waitlistCount = 0, externalUrl }) => {
   const formattedTime = formatTimeTo12Hour(time);
   const showJoinWaitlist = isFull && waitlistEnabled && !isEnrolled;
   const showFullNoWaitlist = isFull && !waitlistEnabled && !isEnrolled;

@@ -178,8 +178,10 @@ export function MemberFormStep({
         {(() => {
           const currentEmail = form.email.trim().toLowerCase();
           const currentName = `${form.firstName} ${form.lastName}`.trim().toLowerCase();
+          // eslint-disable-next-line react-hooks/purity
           const recentMatch = recentCreations.find(r => (Date.now() - r.timestamp) < 600000 && (r.email === currentEmail || (currentName.length > 1 && r.name.toLowerCase() === currentName)));
           if (recentMatch) {
+            // eslint-disable-next-line react-hooks/purity
             const minsAgo = Math.round((Date.now() - recentMatch.timestamp) / 60000);
             return (
               <div className={`mt-1.5 p-2 rounded-lg flex items-start gap-2 text-xs ${isDark ? 'bg-orange-900/20 border border-orange-700 text-orange-400' : 'bg-orange-50 border border-orange-200 text-orange-700'}`}>

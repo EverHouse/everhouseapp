@@ -39,6 +39,7 @@ const Confetti: React.FC<ConfettiProps> = ({
         size: 6 + Math.random() * 8,
         shape: ['square', 'circle', 'rectangle'][Math.floor(Math.random() * 3)] as 'square' | 'circle' | 'rectangle'
       }));
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setParticles(newParticles);
 
       const timer = setTimeout(() => {

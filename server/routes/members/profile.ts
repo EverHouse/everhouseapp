@@ -13,7 +13,6 @@ import {
   guestPasses,
   guestCheckIns 
 } from '../../../shared/schema';
-import { isProduction } from '../../core/db';
 import { isStaffOrAdmin, isAuthenticated, isAdmin } from '../../core/middleware';
 import { syncSmsPreferencesToHubSpot, syncProfileDetailsToHubSpot } from '../../core/hubspot/contacts';
 import { getSessionUser } from '../../types/session';
@@ -434,7 +433,7 @@ router.get('/api/members/:email/history', isStaffOrAdmin, async (req, res) => {
       .orderBy(desc(bookingRequests.requestDate), desc(bookingRequests.startTime))
       .limit(100);
     
-    const bookingIds = bookingHistory.map(b => b.id);
+    const _bookingIds = bookingHistory.map(b => b.id);
     const historySessionIds = bookingHistory.filter(b => b.sessionId).map(b => b.sessionId!);
     
     type BookingCounts = {

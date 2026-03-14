@@ -41,6 +41,7 @@ export function useRealtimeHealth(staffWsConnected?: boolean) {
     if (!wasConnected && isNowConnected && navigator.onLine) {
       invalidateRealtimeQueries();
 
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setState(prev => ({ ...prev, wsConnected: true, justReconnected: true }));
 
       if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
@@ -108,6 +109,7 @@ export function useRealtimeHealth(staffWsConnected?: boolean) {
     const isOnline = navigator.onLine;
 
     if (!isOnline) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setState(prev => ({ ...prev, status: 'offline' }));
     } else if (!state.wsConnected || !state.supabaseConnected) {
       setState(prev => ({ ...prev, status: 'degraded' }));

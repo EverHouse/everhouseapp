@@ -14,6 +14,7 @@ export const UpdateNotification: React.FC = () => {
       clearTimeout(exitTimer.current);
       exitTimer.current = null;
     }
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsExiting(false);
 
     if (updateAvailable && !rendered) {

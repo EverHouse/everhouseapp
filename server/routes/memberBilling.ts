@@ -632,7 +632,7 @@ router.post('/api/member-billing/:email/cancel', isStaffOrAdmin, async (req, res
       cancelAtTimestamp = Math.floor(effectiveDate.getTime() / 1000);
     }
 
-    const updated = await stripe.subscriptions.update(subscription.id, {
+    const _updated = await stripe.subscriptions.update(subscription.id, {
       cancel_at: cancelAtTimestamp,
     });
 
@@ -1014,7 +1014,7 @@ router.post('/api/member-billing/:email/migrate-to-stripe', isStaffOrAdmin, asyn
       }
     }
 
-    const stripe = await getStripeClient();
+    const _stripe = await getStripeClient();
     let paymentMethods: { id: string; brand?: string; last4?: string; expMonth?: number; expYear?: number }[] = [];
     if (member.stripe_customer_id) {
       paymentMethods = await listCustomerPaymentMethods(member.stripe_customer_id);

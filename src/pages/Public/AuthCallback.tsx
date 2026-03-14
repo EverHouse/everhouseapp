@@ -37,12 +37,12 @@ const AuthCallback: React.FC = () => {
                     navigate('/admin');
                     return;
                   }
-                } catch (parseErr: unknown) {
+                } catch (_parseErr: unknown) {
                   console.error('Failed to parse staff/admin response');
                 }
               }
             }
-          } catch (err: unknown) {
+          } catch (_err: unknown) {
             console.error('Failed to check staff/admin status');
           }
           const nfcRedirect = sessionStorage.getItem('nfc_checkin_redirect');

@@ -151,12 +151,12 @@ const TourCard: React.FC<TourCardProps> = ({ tour, isToday = false, isPast = fal
 const ToursTab: React.FC = () => {
   const { setPageReady } = usePageReady();
   const { data: toursData, isLoading } = useTourData();
-  const syncMutation = useSyncTours();
+  const _syncMutation = useSyncTours();
   const checkInMutation = useCheckInTour();
   const updateStatusMutation = useUpdateTourStatus();
   const { confirm, ConfirmDialogComponent } = useConfirmDialog();
 
-  const [syncMessage, setSyncMessage] = useState<string | null>(null);
+  const [syncMessage, _setSyncMessage] = useState<string | null>(null);
   const [statusMenuTourId, setStatusMenuTourId] = useState<number | null>(null);
 
   React.useEffect(() => {

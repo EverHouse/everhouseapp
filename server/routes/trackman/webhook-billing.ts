@@ -3,14 +3,13 @@ import { sql } from 'drizzle-orm';
 import { logger } from '../../core/logger';
 import { getErrorMessage } from '../../utils/errorUtils';
 import { sendNotificationToUser, broadcastToStaff, broadcastAvailabilityUpdate } from '../../core/websocket';
-import { notifyAllStaff, notifyMember } from '../../core/notificationService';
 import { refundGuestPass } from '../guestPasses';
 import { calculateFullSessionBilling, Participant } from '../../core/bookingService/usageCalculator';
 import { recalculateSessionFees } from '../../core/billing/unifiedFeeService';
-import { recordUsage, createSessionWithUsageTracking, ensureSessionForBooking } from '../../core/bookingService/sessionManager';
+import { recordUsage, ensureSessionForBooking } from '../../core/bookingService/sessionManager';
 import { getMemberTierByEmail } from '../../core/tierService';
 import { linkAndNotifyParticipants } from '../../core/bookingEvents';
-import { calculateDurationMinutes, NormalizedBookingFields } from './webhook-helpers';
+import { calculateDurationMinutes } from './webhook-helpers';
 import { createPrepaymentIntent } from '../../core/billing/prepaymentService';
 import { syncBookingInvoice } from '../../core/billing/bookingInvoiceService';
 import { transferRequestParticipantsToSession } from '../../core/trackmanImport';
@@ -137,7 +136,7 @@ export async function createBookingForMember(
                 extra: { bookingId, sessionId, error: getErrorMessage(syncErr) }
               });
             });
-          } catch (recalcErr: unknown) {
+          } catch (_recalcErr: unknown) {
             logger.warn('[Trackman Webhook] Failed to recalculate fees', { 
               extra: { sessionId } 
             });

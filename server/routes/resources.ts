@@ -43,7 +43,6 @@ import {
   createManualBooking,
   isStaffOrAdminEmail,
 } from '../core/resourceService';
-import { normalizeToISODate } from '../utils/dateNormalize';
 
 interface ServiceError extends Error {
   error?: string;

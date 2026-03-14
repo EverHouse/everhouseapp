@@ -20,7 +20,7 @@ import {
 import { logFromRequest } from '../../core/auditLog';
 import { getStaffInfo } from './helpers';
 
-interface DbMemberRow {
+interface _DbMemberRow {
   id: string;
   email: string;
   name?: string;

@@ -385,6 +385,7 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
         const existingMember = membersByEmail.get(noteEmail);
         if (existingMember) {
           matchedEmail = existingMember;
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
           matchReason = 'Matched via M: tag in notes';
           process.stderr.write(`[Trackman Import] Notes fallback match: ${noteEmail} -> ${existingMember} for "${row.userName}"\n`);
         }
@@ -971,7 +972,7 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
                   .set(updateFields)
                   .where(eq(bookingRequests.id, existing.id));
                 
-                const targetPlayerCount = requestPlayerCount > 0 ? requestPlayerCount : row.playerCount;
+                const _targetPlayerCount = requestPlayerCount > 0 ? requestPlayerCount : row.playerCount;
                 
                 process.stderr.write(`[Trackman Import] Auto-linked Trackman ID ${row.bookingId} to existing app booking #${existing.id} (${matchedEmail}) - exact time match\n`);
                 if (!existing.sessionId && parsedBayId) {
@@ -1116,7 +1117,7 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
                 .set(updateFields)
                 .where(eq(bookingRequests.id, existing.id));
               
-              const targetPlayerCount = requestPlayerCount > 0 ? requestPlayerCount : row.playerCount;
+              const _targetPlayerCount = requestPlayerCount > 0 ? requestPlayerCount : row.playerCount;
               
               process.stderr.write(`[Trackman Import] Auto-linked Trackman ID ${row.bookingId} to existing app booking #${existing.id} (${matchedEmail}) - time tolerance match (${existing.startTime} vs ${startTime})\n`);
               if (!existing.sessionId && parsedBayId) {
@@ -1340,7 +1341,7 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
           if (insertResult[0] && row.playerCount >= 1) {
             const bookingId = insertResult[0].id;
             
-            const memberEmails = parsedPlayersForInsert
+            const _memberEmails = parsedPlayersForInsert
               .filter(p => p.type === 'member' && p.email)
               .map(p => p.email!.toLowerCase());
             
@@ -1360,7 +1361,7 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
                 continue;
               }
               
-              let isLinkedToOwner = await isEmailLinkedToUser(memberEmail, matchedEmail);
+              const isLinkedToOwner = await isEmailLinkedToUser(memberEmail, matchedEmail);
               if (isLinkedToOwner) {
                 process.stderr.write(`[Trackman Import] Skipping M: ${memberEmail} - linked to owner ${matchedEmail}\n`);
                 continue;
@@ -1370,7 +1371,7 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
               const memberExists = membersByEmail.get(memberEmail) || trackmanEmailMapping.get(memberEmail) || 
                 (mappedMemberEmail ? membersByEmail.get(mappedMemberEmail.toLowerCase()) || mappedMemberEmail : undefined);
               
-              let resolvedMemberEmail = memberExists;
+              const resolvedMemberEmail = memberExists;
               
               if (memberSlot <= row.playerCount) {
                 if (resolvedMemberEmail && normalizedStatus === 'approved' && isUpcoming && !isSyntheticEmail(resolvedMemberEmail)) {
@@ -1616,7 +1617,7 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
     }
   }
 
-  const todayStr = getTodayPacific();
+  const _todayStr = getTodayPacific();
   
   let csvMinDate: string | null = null;
   let csvMaxDate: string | null = null;

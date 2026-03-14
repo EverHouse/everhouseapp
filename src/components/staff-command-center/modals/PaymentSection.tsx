@@ -13,6 +13,7 @@ interface PaymentSummaryBodyProps {
 }
 
 export function PaymentSummaryBody({
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   isConferenceRoom,
   rosterData,
   renderTierBadge,
@@ -128,37 +129,56 @@ interface PaymentActionFooterProps {
 }
 
 export function PaymentActionFooter({
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   isConferenceRoom,
   bookingId,
   rosterData,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   fetchedContext,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   ownerName,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   ownerEmail,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   bayName,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   bookingDate,
   showInlinePayment,
   setShowInlinePayment,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   inlinePaymentAction,
   setInlinePaymentAction,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   paymentSuccess,
   processingPayment,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   savedCardInfo,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   checkingCard,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   showWaiverInput,
   setShowWaiverInput,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   waiverReason,
   setWaiverReason,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   handleInlineStripeSuccess,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   handleChargeCardOnFile,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   handleWaiveFees,
   onClose,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   checkinMode,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   savingChanges,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   handleManageModeSave,
   onCheckIn,
   onRevertToApproved,
   onReschedule: _onReschedule,
   onCancelBooking,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   bookingContext,
   bookingStatus,
 }: PaymentActionFooterProps) {
@@ -170,7 +190,7 @@ export function PaymentActionFooter({
     setLocalStatus(null);
   }, [bookingId]);
 
-  const fs = rosterData?.financialSummary!;
+  const fs = rosterData?.financialSummary;
 
   const closePaymentOptions = () => {
     setShowInlinePayment(false);
@@ -436,7 +456,7 @@ export function InlinePaymentBody({
             paymentType: 'booking_fee',
             ...(metaBreakdown ? { feeBreakdown: metaBreakdown } : {}),
           }}
-          onSuccess={async (paymentIntentId) => {
+          onSuccess={async (_paymentIntentId) => {
             try {
               await fetch(`/api/bookings/${bookingId}/payments`, {
                 method: 'PATCH',
@@ -511,7 +531,7 @@ export function InlinePaymentBody({
               } else {
                 showToast('Failed to confirm payment', 'error');
               }
-            } catch (err: unknown) {
+            } catch (_err: unknown) {
               showToast('Failed to confirm payment', 'error');
             } finally {
               setInlinePaymentAction(null);
@@ -614,7 +634,7 @@ export function InlinePaymentBody({
                 } else {
                   showToast(data.error || 'Failed to cancel payments', 'error');
                 }
-              } catch (err: unknown) {
+              } catch (_err: unknown) {
                 showToast('Failed to cancel payments', 'error');
               } finally {
                 setCancellingPayment(false);

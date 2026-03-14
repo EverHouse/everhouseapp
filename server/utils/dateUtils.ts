@@ -121,7 +121,7 @@ export function getPacificMidnightUTC(dateStr?: string): Date {
   
   // First guess: use PST offset (-8)
   let guess = new Date(`${targetDate}T00:00:00-08:00`);
-  let actualOffset = getOffsetAtInstant(guess);
+  const actualOffset = getOffsetAtInstant(guess);
   
   // If the offset at our guess differs, recalculate
   if (actualOffset !== -8) {
@@ -190,7 +190,7 @@ export function createPacificDate(dateStr: string, timeStr: string): Date {
  * This parses the string directly and formats without timezone issues
  */
 export function formatDateDisplay(dateStr: string): string {
-  const [year, month, day] = dateStr.split('-').map(Number);
+  const [_year, month, day] = dateStr.split('-').map(Number);
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   return `${months[month - 1]} ${day}`;
 }

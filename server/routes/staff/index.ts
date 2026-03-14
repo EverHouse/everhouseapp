@@ -4,7 +4,7 @@ import { isStaffOrAdmin } from '../../core/middleware';
 import { logger } from '../../core/logger';
 import { getPacificMidnightUTC, getTodayPacific } from '../../utils/dateUtils';
 import { bookingRequests, tours, adminAuditLog, users, resources } from '../../../shared/schema';
-import { eq, and, inArray, notInArray, desc, asc, sql, gte, lt, count } from 'drizzle-orm';
+import { eq, and, inArray, notInArray, desc, asc, sql, count } from 'drizzle-orm';
 
 const router = Router();
 
@@ -126,7 +126,7 @@ router.get('/api/admin/command-center', isStaffOrAdmin, async (req, res) => {
     ]);
     
     const todayBookingIds = todaysBookingsData.map(b => b.id);
-    let filledCountsMap = new Map<number, number>();
+    const filledCountsMap = new Map<number, number>();
     if (todayBookingIds.length > 0) {
       try {
         const filledResult = await db.execute(sql`
@@ -151,7 +151,7 @@ router.get('/api/admin/command-center', isStaffOrAdmin, async (req, res) => {
     }));
 
     // Financials queries with error handling for missing columns/tables
-    let financials = { todayRevenueCents: 0, overduePaymentsCount: 0, failedPaymentsCount: 0 };
+    const financials = { todayRevenueCents: 0, overduePaymentsCount: 0, failedPaymentsCount: 0 };
     try {
       const todayRevenue = await db.execute(sql`
         SELECT COALESCE(SUM(amount_cents), 0) as total_cents
@@ -352,7 +352,7 @@ router.get('/api/admin/todays-bookings', isStaffOrAdmin, async (req, res) => {
       .orderBy(asc(bookingRequests.startTime));
     
     const todayIds = bookingsData.map(b => b.id);
-    let filledMap = new Map<number, number>();
+    const filledMap = new Map<number, number>();
     if (todayIds.length > 0) {
       try {
         const filledResult = await db.execute(sql`

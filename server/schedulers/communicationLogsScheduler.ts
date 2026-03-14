@@ -1,4 +1,3 @@
-import { schedulerTracker } from '../core/schedulerTracker';
 import { syncCommunicationLogsFromHubSpot } from '../core/memberSync';
 import { logger } from '../core/logger';
 

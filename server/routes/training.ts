@@ -2,7 +2,7 @@ import { logger } from '../core/logger';
 import { Router } from 'express';
 import { db } from '../db';
 import { trainingSections } from '../../shared/schema';
-import { eq, asc, and, max } from 'drizzle-orm';
+import { eq, asc, max } from 'drizzle-orm';
 import { isStaffOrAdmin, isAdmin } from '../core/middleware';
 import { getSessionUser } from '../types/session';
 import { PRICING } from '../core/billing/pricingConfig';
@@ -10,7 +10,7 @@ import { logFromRequest } from '../core/auditLog';
 
 const router = Router();
 
-interface TrainingStep {
+interface _TrainingStep {
   title: string;
   content: string;
   imageUrl?: string;

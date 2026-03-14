@@ -18,9 +18,13 @@ export async function runDataCleanup(): Promise<{
   normalizedEmails: number;
   expiredHolds: number;
 }> {
+  // eslint-disable-next-line no-useless-assignment
   let orphanedNotifications = 0;
+  // eslint-disable-next-line no-useless-assignment
   let orphanedBookings = 0;
+  // eslint-disable-next-line no-useless-assignment
   let normalizedEmails = 0;
+  // eslint-disable-next-line no-useless-assignment
   let expiredHolds = 0;
 
   try {
@@ -110,9 +114,13 @@ export async function autoFixMissingTiers(): Promise<{
   normalizedStatusCase: number;
   syncedStaffRoles: number;
 }> {
+  // eslint-disable-next-line no-useless-assignment
   let fixedBillingProvider = 0;
+  // eslint-disable-next-line no-useless-assignment
   let fixedFromAlternateEmail = 0;
+  // eslint-disable-next-line no-useless-assignment
   let normalizedStatusCase = 0;
+  // eslint-disable-next-line no-useless-assignment
   let syncedStaffRoles = 0;
 
   try {

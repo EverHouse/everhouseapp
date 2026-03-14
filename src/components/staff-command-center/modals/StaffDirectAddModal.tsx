@@ -150,7 +150,7 @@ export const StaffDirectAddModal: React.FC<StaffDirectAddModalProps> = ({
       onSuccess();
       onClose();
       resetForm();
-    } catch (err: unknown) {
+    } catch (_err: unknown) {
       const errorMsg = getNetworkErrorMessage();
       setError(errorMsg);
       showToast(errorMsg, 'error');

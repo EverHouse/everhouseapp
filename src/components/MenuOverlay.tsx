@@ -36,6 +36,7 @@ const MenuOverlay: React.FC<MenuOverlayProps> = ({ isOpen, onClose }) => {
       document.documentElement.style.backgroundColor = menuBgColor;
       document.body.style.backgroundColor = menuBgColor;
       document.querySelectorAll('meta[name="theme-color"]').forEach(el => el.setAttribute('content', menuBgColor));
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setIsVisible(true);
       setIsClosing(false);
     } else if (isVisible) {

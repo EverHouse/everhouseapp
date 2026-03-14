@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { index, uniqueIndex, jsonb, pgTable, timestamp, varchar, serial, boolean, text, date, time, integer, numeric } from "drizzle-orm/pg-core";
+import { index, uniqueIndex, pgTable, timestamp, varchar, serial, boolean, text, integer } from "drizzle-orm/pg-core";
 
 // Notifications table - in-app notifications
 export const notifications = pgTable("notifications", {

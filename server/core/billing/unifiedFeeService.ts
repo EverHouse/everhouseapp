@@ -1,7 +1,7 @@
 import { db } from '../../db';
 import { sql } from 'drizzle-orm';
 import { getMemberTierByEmail, getTierLimits } from '../tierService';
-import { getDailyUsageFromLedger, getGuestPassInfo, calculateOverageFee, calculateIncrementalOverage } from '../bookingService/usageCalculator';
+import { getGuestPassInfo, calculateIncrementalOverage } from '../bookingService/usageCalculator';
 import { MemberService, isEmail, normalizeEmail, isUUID } from '../memberService';
 import { FeeBreakdown, FeeComputeParams, FeeLineItem } from '../../../shared/models/billing';
 import { logger } from '../logger';
@@ -9,7 +9,7 @@ import { getErrorMessage } from '../../utils/errorUtils';
 import { PRICING, isPlaceholderGuestName } from './pricingConfig';
 import { toIntArrayLiteral, toTextArrayLiteral, toBoolArrayLiteral } from '../../utils/sqlArrayLiteral';
 
-type SqlQueryParam = string | number | boolean | null | Date | string[];
+type _SqlQueryParam = string | number | boolean | null | Date | string[];
 
 interface UsageRow {
   identifier: string;
@@ -364,7 +364,7 @@ export async function computeFeeBreakdown(params: FeeComputeParams): Promise<Fee
   
   const resolvedHostEmail = await resolveToEmail(hostEmail);
   const hostTier = await getMemberTierByEmail(resolvedHostEmail);
-  const [hostTierLimits, guestPassInfo] = await Promise.all([
+  const [_hostTierLimits, guestPassInfo] = await Promise.all([
     hostTier ? getTierLimits(hostTier) : Promise.resolve(null),
     getGuestPassInfo(resolvedHostEmail, hostTier || undefined),
   ]);

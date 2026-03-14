@@ -23,7 +23,7 @@ interface MemberBottomNavProps {
   isDarkTheme: boolean;
 }
 
-const MemberBottomNav: React.FC<MemberBottomNavProps> = ({ currentPath, isDarkTheme }) => {
+const MemberBottomNav: React.FC<MemberBottomNavProps> = ({ currentPath, isDarkTheme: _isDarkTheme }) => {
   const navigate = useNavigate();
   const [optimisticPath, setOptimisticPath] = useState<string | null>(null);
   
@@ -33,11 +33,12 @@ const MemberBottomNav: React.FC<MemberBottomNavProps> = ({ currentPath, isDarkTh
   
   useEffect(() => {
     if (optimisticPath && currentPath === optimisticPath) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setOptimisticPath(null);
     }
   }, [currentPath, optimisticPath]);
   
-  const handleNavigation = useCallback((path: string, label: string) => {
+  const handleNavigation = useCallback((path: string, _label: string) => {
     if (path === currentPath) return;
     haptic.light();
     setOptimisticPath(path);

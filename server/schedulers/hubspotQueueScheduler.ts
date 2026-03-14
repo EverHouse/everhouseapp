@@ -60,7 +60,7 @@ async function processQueue(): Promise<void> {
     });
     try {
       await alertOnScheduledTaskFailure('HubSpot Queue Processor', rootError);
-    } catch (alertError: unknown) {
+    } catch (_alertError: unknown) {
       // Ignore alert failures
     }
     schedulerTracker.recordRun('HubSpot Queue', false, rootError);

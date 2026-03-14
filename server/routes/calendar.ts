@@ -4,7 +4,7 @@ import { isProduction } from '../core/db';
 import { db } from '../db';
 import { sql } from 'drizzle-orm';
 import { getGoogleCalendarClient } from '../core/integrations';
-import { CALENDAR_CONFIG, getResourceConfig, getCalendarAvailability, discoverCalendarIds, getCalendarStatus, syncConferenceRoomCalendarToBookings, getCalendarIdByName } from '../core/calendar/index';
+import { CALENDAR_CONFIG, getResourceConfig, getCalendarAvailability, getCalendarStatus, syncConferenceRoomCalendarToBookings, getCalendarIdByName } from '../core/calendar/index';
 import { isStaffOrAdmin, isAdmin } from '../core/middleware';
 import { getErrorMessage, safeErrorDetail } from '../utils/errorUtils';
 import { broadcastToStaff } from '../core/websocket';

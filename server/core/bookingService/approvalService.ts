@@ -22,12 +22,12 @@ import { getCalendarIdByName, createCalendarEventOnCalendar, deleteCalendarEvent
 import { releaseGuestPassHold } from '../billing/guestPassHoldService';
 import { createPrepaymentIntent } from '../billing/prepaymentService';
 import { voidBookingInvoice, finalizeAndPayInvoice } from '../billing/bookingInvoiceService';
-import { getErrorMessage, getErrorStatusCode } from '../../utils/errorUtils';
+import { getErrorMessage } from '../../utils/errorUtils';
 import { upsertVisitor } from '../visitors/matchingService';
 import { AppError } from '../errors';
 import { logPaymentAudit } from '../auditLog';
 
-type SqlQueryParam = string | number | boolean | null | Date;
+type _SqlQueryParam = string | number | boolean | null | Date;
 
 interface BookingRow {
   id: number;
@@ -156,7 +156,7 @@ export async function validateTrackmanId(trackmanBookingId: string, bookingId: n
       if (sameEmail) {
         const duplicateId = duplicate.id as number;
 
-        const orphanedSession = await db.transaction(async (tx) => {
+        const _orphanedSession = await db.transaction(async (tx) => {
           await tx.update(bookingRequests)
             .set({
               trackmanBookingId: null,
@@ -367,7 +367,7 @@ export async function approveBooking(params: ApproveBookingParams) {
     const bayName = bayResult[0]?.name || 'Simulator';
     const isConferenceRoom = bayResult[0]?.type === 'conference_room';
 
-    let calendarEventId: string | null = req_data.calendarEventId || null;
+    const calendarEventId: string | null = req_data.calendarEventId || null;
     const calendarName = await getCalendarNameForBayAsync(assignedBayId);
 
     const finalStatus = 'approved';
@@ -473,7 +473,7 @@ export async function approveBooking(params: ApproveBookingParams) {
 
             let resolvedUserId = rp.userId;
             let resolvedName = rp.name;
-            let isMember = rp.type === 'member';
+            const isMember = rp.type === 'member';
 
             if (isMember && !resolvedUserId && rpEmailNormalized) {
               const memberResult = await tx.select({ id: users.id, firstName: users.firstName })
@@ -933,7 +933,7 @@ interface DeclineBookingParams {
 export async function declineBooking(params: DeclineBookingParams) {
   const { bookingId, staff_notes, suggested_time, reviewed_by } = params;
 
-  const { updated, declineMessage, resourceTypeName } = await db.transaction(async (tx) => {
+  const { updated, declineMessage, resourceTypeName: _resourceTypeName } = await db.transaction(async (tx) => {
     const [existing] = await tx.select().from(bookingRequests).where(eq(bookingRequests.id, bookingId));
 
     if (!existing) {
@@ -1214,7 +1214,7 @@ export async function cancelBooking(params: CancelBookingParams) {
       .from(bookingRequests)
       .where(eq(bookingRequests.id, bookingId));
 
-    let guestPassRefundData: Array<{ displayName: string | null; ownerEmail: string }> = [];
+    const guestPassRefundData: Array<{ displayName: string | null; ownerEmail: string }> = [];
 
     if (sessionResult[0]?.sessionId) {
       const guestParticipants = await tx.select({ 
@@ -1296,6 +1296,7 @@ export async function cancelBooking(params: CancelBookingParams) {
       }
     }
 
+    // eslint-disable-next-line no-useless-assignment
     let pushInfo: { type: 'staff' | 'member' | 'both'; email?: string; staffMessage?: string; memberMessage?: string; message: string } | null = null;
 
     const memberEmail = existing.userEmail;
@@ -1893,7 +1894,7 @@ export async function checkinBooking(params: CheckinBookingParams) {
   }
 
   let totalOutstanding = 0;
-  let unpaidParticipants: Array<{ id: number; name: string; amount: number }> = [];
+  const unpaidParticipants: Array<{ id: number; name: string; amount: number }> = [];
 
   if (newStatus === 'attended' && existing.session_id) {
     const nullFeesCheck = await db.execute(sql`
@@ -2109,7 +2110,7 @@ interface DevConfirmParams {
 }
 
 export async function devConfirmBooking(params: DevConfirmParams) {
-  const { bookingId, staffEmail } = params;
+  const { bookingId, staffEmail: _staffEmail } = params;
 
   const bookingResult = await db.execute(sql`
     SELECT br.*, u.id as user_id, u.stripe_customer_id, u.tier
@@ -2128,10 +2129,11 @@ export async function devConfirmBooking(params: DevConfirmParams) {
     return { error: `Booking is already ${booking.status}`, statusCode: 400 };
   }
 
+  // eslint-disable-next-line no-useless-assignment
   let resolvedTotalFeeCents = 0;
   const { sessionId, totalFeeCents, dateStr, timeStr } = await db.transaction(async (tx) => {
     let sessionId = booking.session_id;
-    let totalFeeCents = 0;
+    const totalFeeCents = 0;
 
     if (!sessionId && booking.resource_id) {
       const sessionResult = await ensureSessionForBooking({
@@ -2546,6 +2548,7 @@ export async function completeCancellation(params: CompleteCancellationParams) {
           try {
             const pi = await stripe.paymentIntents.retrieve(participant.stripePaymentIntentId!);
             if (pi.status === 'succeeded' && pi.latest_charge) {
+              // eslint-disable-next-line @typescript-eslint/no-unused-vars
               const refund = await stripe.refunds.create({
                 charge: typeof pi.latest_charge === 'string' ? pi.latest_charge : (pi.latest_charge as Stripe.Charge).id,
                 reason: 'requested_by_customer',

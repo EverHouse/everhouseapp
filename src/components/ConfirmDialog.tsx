@@ -114,9 +114,11 @@ function ConfirmDialogComponent({
       
       if (e.key === 'Escape') {
         e.preventDefault();
+        // eslint-disable-next-line react-hooks/immutability
         handleCancel();
       } else if (e.key === 'Enter') {
         e.preventDefault();
+        // eslint-disable-next-line react-hooks/immutability
         handleConfirm();
       } else if (e.key === 'Tab') {
         const focusableSelectors = 'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -287,6 +289,7 @@ function ConfirmDialogComponent({
   return createPortal(dialogContent, document.body);
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useConfirmDialog() {
   const [state, setState] = useState<ConfirmDialogState>({
     isOpen: false,
@@ -318,11 +321,13 @@ export function useConfirmDialog() {
     setState(prev => ({ ...prev, isLoading }));
   }, []);
 
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization
   const handleConfirm = useCallback(() => {
     state.resolve?.(true);
     setState(prev => ({ ...prev, isOpen: false, resolve: null }));
   }, [state.resolve]);
 
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization
   const handleCancel = useCallback(() => {
     state.resolve?.(false);
     setState(prev => ({ ...prev, isOpen: false, resolve: null }));

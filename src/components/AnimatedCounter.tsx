@@ -29,6 +29,7 @@ const AnimatedCounter: React.FC<AnimatedCounterProps> = ({
     const endValue = value;
     const startTime = performance.now();
     
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsAnimating(true);
 
     const animate = (currentTime: number) => {

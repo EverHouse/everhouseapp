@@ -199,7 +199,7 @@ export async function bulkPushToHubSpot(dryRun: boolean = true): Promise<{
     const batch = allMembers.slice(i, i + batchSize);
     totalChecked += batch.length;
 
-    let hsContactMap: Record<string, Record<string, string>> = {};
+    const hsContactMap: Record<string, Record<string, string>> = {};
     try {
       const readInput = {
         inputs: batch.map((m: MemberRow) => ({ id: m.hubspot_id as string })),
@@ -533,7 +533,7 @@ export async function createIgnoreRule(params: CreateIgnoreParams): Promise<{
 }
 
 export async function removeIgnoreRule(issueKey: string): Promise<{ removed: boolean }> {
-  const result = await db.update(integrityIgnores)
+  const _result = await db.update(integrityIgnores)
     .set({ isActive: false })
     .where(eq(integrityIgnores.issueKey, issueKey));
 

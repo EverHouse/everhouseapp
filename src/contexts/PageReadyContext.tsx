@@ -12,6 +12,7 @@ const PageReadyContext = createContext<PageReadyContextType>({
   resetPageReady: () => {},
 });
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const usePageReady = () => useContext(PageReadyContext);
 
 export const PageReadyProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -51,6 +52,7 @@ export const PageReadyProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   );
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function usePageLoading() {
   const { setPageReady } = usePageReady();
   

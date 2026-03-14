@@ -8,6 +8,17 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.85.1",
+    date: "2026-03-14",
+    title: "Code Quality: ESLint Cleanup",
+    changes: [
+      "Improvement: Resolved all 383 ESLint errors across the codebase (100% reduction)",
+      "Improvement: Reduced ESLint warnings from 974 to 60 (93.8% reduction) — removed unused imports, prefixed unused variables, added lint-disable comments for legitimate patterns",
+      "Improvement: Fixed unnecessary escape characters in regex patterns, empty catch blocks, useless catch statements, and missing case declarations",
+      "Improvement: Suppressed React Compiler hook warnings with justification comments where patterns are intentional",
+    ]
+  },
+  {
     version: "8.85.0",
     date: "2026-03-13",
     title: "Trackman Reliability & Availability Block Improvements",

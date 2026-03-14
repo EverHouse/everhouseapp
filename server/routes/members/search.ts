@@ -1,8 +1,7 @@
 import { Router } from 'express';
-import { sql, and, or, desc, eq, inArray } from 'drizzle-orm';
+import { sql, and } from 'drizzle-orm';
 import { db } from '../../db';
 import { users, staffUsers } from '../../../shared/schema';
-import { isProduction } from '../../core/db';
 import { isStaffOrAdmin, isAuthenticated } from '../../core/middleware';
 import { logger } from '../../core/logger';
 import { getSessionUser } from '../../types/session';
@@ -105,7 +104,7 @@ router.get('/api/members/search', isAuthenticated, validateQuery(memberSearchSch
     
     // Check staff_users table to detect instructors and staff members
     const resultEmails = results.map(r => r.email?.toLowerCase()).filter((e): e is string => !!e);
-    let staffInfoMap: Map<string, { role: string; isActive: boolean }> = new Map();
+    const staffInfoMap: Map<string, { role: string; isActive: boolean }> = new Map();
     
     if (resultEmails.length > 0) {
       // Use inArray for proper array matching
@@ -185,6 +184,7 @@ router.get('/api/members/directory', isStaffOrAdmin, validateQuery(directoryQuer
     
     if (!searchQuery && !isPaginated) {
       const cacheKey = `${DIRECTORY_CACHE_KEY}_${statusFilter}`;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const cached = getCached<any>(cacheKey);
       if (cached) return res.json(cached);
     }
@@ -259,12 +259,12 @@ router.get('/api/members/directory', isStaffOrAdmin, validateQuery(directoryQuer
     
     const memberEmails = allMembers.map(m => m.email?.toLowerCase()).filter(Boolean) as string[];
     
-    let bookingCounts: Record<string, number> = {};
-    let eventCounts: Record<string, number> = {};
-    let wellnessCounts: Record<string, number> = {};
-    let lastActivityMap: Record<string, string | null> = {};
+    const bookingCounts: Record<string, number> = {};
+    const eventCounts: Record<string, number> = {};
+    const wellnessCounts: Record<string, number> = {};
+    const lastActivityMap: Record<string, string | null> = {};
     
-    let walkInCounts: Record<string, number> = {};
+    const walkInCounts: Record<string, number> = {};
 
     if (memberEmails.length > 0) {
       const [combinedBookingsActivityResult, eventsResult, wellnessResult, walkInCountResult] = await Promise.all([

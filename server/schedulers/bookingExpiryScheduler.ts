@@ -1,6 +1,6 @@
 import { schedulerTracker } from '../core/schedulerTracker';
 import { queryWithRetry } from '../core/db';
-import { getTodayPacific, getPacificHour, formatTimePacific, createPacificDate } from '../utils/dateUtils';
+import { getTodayPacific, formatTimePacific } from '../utils/dateUtils';
 import { notifyAllStaff } from '../core/notificationService';
 import { broadcastAvailabilityUpdate } from '../core/websocket';
 import { logger } from '../core/logger';

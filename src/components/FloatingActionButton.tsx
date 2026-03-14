@@ -73,6 +73,7 @@ const FloatingActionButton: React.FC<FloatingActionButtonProps> = ({
 
   useEffect(() => {
     if (drawerOpen) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setIsExiting(true);
       const timer = setTimeout(() => {
         setShouldRender(false);

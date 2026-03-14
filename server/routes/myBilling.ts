@@ -9,7 +9,7 @@ interface StripeInvoiceExpanded extends Stripe.Invoice {
 import { db } from '../db';
 import { sql } from 'drizzle-orm';
 import { getStripeClient } from '../core/stripe/client';
-import { isPlaceholderEmail, getOrCreateStripeCustomer, listCustomerPaymentMethods } from '../core/stripe/customers';
+import { getOrCreateStripeCustomer, listCustomerPaymentMethods } from '../core/stripe/customers';
 import { listCustomerSubscriptions } from '../core/stripe/subscriptions';
 import { getBillingGroupByMemberEmail } from '../core/stripe/groupBilling';
 import { listCustomerInvoices } from '../core/stripe/invoices';

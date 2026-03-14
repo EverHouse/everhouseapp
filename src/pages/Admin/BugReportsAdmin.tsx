@@ -107,7 +107,7 @@ const BugReportsAdmin: React.FC = () => {
                 haptic.error();
                 showToast('Failed to update status', 'error');
             }
-        } catch (err: unknown) {
+        } catch (_err: unknown) {
             haptic.error();
             showToast('Failed to update status', 'error');
         } finally {
@@ -135,7 +135,7 @@ const BugReportsAdmin: React.FC = () => {
                 haptic.error();
                 showToast('Failed to save notes', 'error');
             }
-        } catch (err: unknown) {
+        } catch (_err: unknown) {
             haptic.error();
             showToast('Failed to save notes', 'error');
         } finally {
@@ -169,7 +169,7 @@ const BugReportsAdmin: React.FC = () => {
                 haptic.error();
                 showToast('Failed to delete report', 'error');
             }
-        } catch (err: unknown) {
+        } catch (_err: unknown) {
             haptic.error();
             showToast('Failed to delete report', 'error');
         } finally {
@@ -227,7 +227,7 @@ const BugReportsAdmin: React.FC = () => {
                     />
                 ) : (
                     <div ref={reportsRef} className="space-y-3">
-                        {reports.map((report, idx) => (
+                        {reports.map((report, _idx) => (
                             <button
                                 key={report.id}
                                 onClick={() => openDetail(report)}

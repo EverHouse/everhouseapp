@@ -79,7 +79,7 @@ const VisitorsList: React.FC<VisitorsListProps> = ({
         sorted.sort((a, b) => {
             let comparison = 0;
             switch (visitorSortField) {
-                case 'name':
+                case 'name': {
                     const nameA = [a.firstName, a.lastName].filter(Boolean).join(' ').toLowerCase();
                     const nameB = [b.firstName, b.lastName].filter(Boolean).join(' ').toLowerCase();
                     if (!nameA && !nameB) comparison = 0;
@@ -87,7 +87,8 @@ const VisitorsList: React.FC<VisitorsListProps> = ({
                     else if (!nameB) comparison = -1;
                     else comparison = nameA.localeCompare(nameB);
                     break;
-                case 'email':
+                    }
+                case 'email': {
                     const emailA = (a.email || '').toLowerCase();
                     const emailB = (b.email || '').toLowerCase();
                     if (!emailA && !emailB) comparison = 0;
@@ -95,7 +96,8 @@ const VisitorsList: React.FC<VisitorsListProps> = ({
                     else if (!emailB) comparison = -1;
                     else comparison = emailA.localeCompare(emailB);
                     break;
-                case 'type':
+                    }
+                case 'type': {
                     const typeA = a.type || '';
                     const typeB = b.type || '';
                     if (!typeA && !typeB) comparison = 0;
@@ -103,7 +105,8 @@ const VisitorsList: React.FC<VisitorsListProps> = ({
                     else if (!typeB) comparison = -1;
                     else comparison = typeA.localeCompare(typeB);
                     break;
-                case 'source':
+                    }
+                case 'source': {
                     const sourceA = a.source || '';
                     const sourceB = b.source || '';
                     if (!sourceA && !sourceB) comparison = 0;
@@ -111,7 +114,8 @@ const VisitorsList: React.FC<VisitorsListProps> = ({
                     else if (!sourceB) comparison = -1;
                     else comparison = sourceA.localeCompare(sourceB);
                     break;
-                case 'lastActivity':
+                    }
+                case 'lastActivity': {
                     const dateStrA = a.lastActivityAt || a.lastPurchaseDate || a.lastGuestDate;
                     const dateStrB = b.lastActivityAt || b.lastPurchaseDate || b.lastGuestDate;
                     const timestampA = dateStrA ? Date.parse(dateStrA) : NaN;
@@ -123,10 +127,11 @@ const VisitorsList: React.FC<VisitorsListProps> = ({
                     else if (!validB) comparison = -1;
                     else comparison = timestampA - timestampB;
                     break;
+                    }
                 case 'purchases':
                     comparison = (a.purchaseCount || 0) - (b.purchaseCount || 0);
                     break;
-                case 'createdAt':
+                case 'createdAt': {
                     const createdA = a.createdAt ? Date.parse(a.createdAt) : NaN;
                     const createdB = b.createdAt ? Date.parse(b.createdAt) : NaN;
                     const createdValidA = !isNaN(createdA);
@@ -136,6 +141,7 @@ const VisitorsList: React.FC<VisitorsListProps> = ({
                     else if (!createdValidB) comparison = -1;
                     else comparison = createdA - createdB;
                     break;
+                    }
             }
             return visitorSortDirection === 'asc' ? comparison : -comparison;
         });

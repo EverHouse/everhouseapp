@@ -102,6 +102,7 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
   isSavingIdImage,
   isDeletingIdImage,
   setShowIdScanner,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   showIdImageFull,
   setShowIdImageFull,
   handleDeleteIdImage,
@@ -178,7 +179,7 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
     return () => window.removeEventListener('billing-update', refresh);
   }, [fetchOutstanding]);
 
-  const hasAddress = member?.streetAddress || member?.city || member?.state || member?.zipCode;
+  const _hasAddress = member?.streetAddress || member?.city || member?.state || member?.zipCode;
   const addressParts = [member?.streetAddress, member?.city, member?.state, member?.zipCode].filter(Boolean);
   const formattedAddress = addressParts.length > 0 
     ? (member?.streetAddress ? member.streetAddress + ', ' : '') + 

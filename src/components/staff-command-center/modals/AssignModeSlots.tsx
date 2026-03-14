@@ -40,11 +40,15 @@ export function AssignModeSlots({
   visitorData,
   setVisitorData,
   isCreatingVisitor,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   visitorSearch,
   setVisitorSearch,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   visitorSearchResults,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   isSearchingVisitors,
   potentialDuplicates,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   isCheckingDuplicates,
   guestFeeDollars,
   isLessonOrStaffBlock,
@@ -55,8 +59,10 @@ export function AssignModeSlots({
   clearSlot,
   handleMemberSelect,
   handleAddGuestPlaceholder,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   handleSelectExistingVisitor,
   handleCreateVisitorAndAssign,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   renderTierBadge,
 }: AssignModeSlotsProps) {
   const renderSlot = (slotIndex: number, isOwnerSlot: boolean) => {

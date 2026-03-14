@@ -359,7 +359,7 @@ export const TrackmanWebhookEventsSection: React.FC<TrackmanWebhookEventsSection
       
       if (autoMatchTimeoutRef.current) clearTimeout(autoMatchTimeoutRef.current);
       autoMatchTimeoutRef.current = setTimeout(() => setAutoMatchResult(null), 5000);
-    } catch (err: unknown) {
+    } catch (_err: unknown) {
       setAutoMatchResult({
         eventId,
         success: false,

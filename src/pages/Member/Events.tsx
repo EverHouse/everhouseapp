@@ -302,7 +302,7 @@ const MemberEvents: React.FC = () => {
                 const optimisticAction = getOptimisticAction(event.id);
                 const isPendingRsvp = optimisticAction === 'rsvp';
                 const isPendingCancel = optimisticAction === 'cancel';
-                const showOptimisticGoing = isRsvpd || isPendingRsvp;
+                const _showOptimisticGoing = isRsvpd || isPendingRsvp;
                 
                 return (
                   <MotionListItem 

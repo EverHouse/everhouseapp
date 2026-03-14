@@ -18,10 +18,12 @@ class MemberCache {
     this.ttlMs = ttlMs;
   }
   
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private isExpired(entry: CacheEntry<any>): boolean {
     return Date.now() > entry.expiresAt;
   }
   
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private evictIfNeeded(cache: Map<string, CacheEntry<any>>): void {
     if (cache.size > MAX_CACHE_SIZE) {
       const keysToDelete: string[] = [];

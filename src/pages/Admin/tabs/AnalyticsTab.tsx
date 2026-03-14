@@ -647,6 +647,7 @@ const AtRiskMembersList: React.FC<{ data: AtRiskMember[] }> = ({ data }) => {
     <div className="space-y-1 max-h-[300px] overflow-y-auto">
       {data.map((member) => {
         const daysSince = member.lastBookingDate
+          // eslint-disable-next-line react-hooks/purity
           ? Math.floor((Date.now() - new Date(member.lastBookingDate).getTime()) / (1000 * 60 * 60 * 24))
           : null;
         return (

@@ -144,7 +144,9 @@ describe('formatTime12Hour', () => {
   });
 
   it('returns empty string for null/undefined', () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect(formatTime12Hour(null as any)).toBe('');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect(formatTime12Hour(undefined as any)).toBe('');
   });
 

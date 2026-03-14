@@ -73,7 +73,7 @@ export function useAsyncAction<T = unknown, Args extends unknown[] = unknown[]>(
             try {
               const result = await execute(...args);
               resolve(result);
-            } catch (err: unknown) {
+            } catch (_err: unknown) {
               resolve(undefined);
             }
           }, waitTime);

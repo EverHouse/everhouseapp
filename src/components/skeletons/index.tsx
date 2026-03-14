@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import Skeleton from './SkeletonPrimitive';
 
 interface SkeletonCardProps {
   className?: string;
@@ -28,6 +27,7 @@ export const SkeletonCrossfade: React.FC<SkeletonCrossfadeProps> = ({
 
   useEffect(() => {
     if (!loading && showSkeleton) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setIsTransitioning(true);
       const timer = setTimeout(() => {
         setShowSkeleton(false);
@@ -55,7 +55,7 @@ export const SkeletonCrossfade: React.FC<SkeletonCrossfadeProps> = ({
 };
 
 const shimmerClass = "skeleton-shimmer";
-const bgLight = "bg-gray-200";
+const _bgLight = "bg-gray-200";
 const bgDark = "bg-white/10";
 const bgAuto = "bg-gray-200 dark:bg-white/10";
 

@@ -58,9 +58,9 @@ function timePeriodsOverlap(
   start2: string,
   end2: string
 ): boolean {
-  let s1 = timeToMinutes(start1);
+  const s1 = timeToMinutes(start1);
   let e1 = timeToMinutes(end1);
-  let s2 = timeToMinutes(start2);
+  const s2 = timeToMinutes(start2);
   let e2 = timeToMinutes(end2);
   
   // Handle cross-midnight: if end < start, add 24 hours to end

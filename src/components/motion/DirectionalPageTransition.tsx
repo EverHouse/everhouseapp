@@ -7,8 +7,10 @@ export interface TransitionCustom {
 
 const defaultCustom: TransitionCustom = { direction: 1, distance: 1 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const TransitionContext = createContext<TransitionCustom>(defaultCustom);
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useTransitionState = () => useContext(TransitionContext);
 
 interface DirectionalPageTransitionProps {

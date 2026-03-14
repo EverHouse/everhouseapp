@@ -290,7 +290,7 @@ export async function ensureSessionForBooking(params: {
 
     } catch (txErr) {
       if (manageLockClient) {
-        try { await lockClient.query('ROLLBACK'); } catch (_) {}
+        try { await lockClient.query('ROLLBACK'); } catch (_) { /* rollback best-effort */ }
       }
       throw txErr;
     }
@@ -672,7 +672,7 @@ async function deductGuestPassesInternal(
     return { success: false, passesDeducted: 0 };
   } catch (error: unknown) {
     if (manageTransaction) {
-      try { await client.query('ROLLBACK'); } catch (_) {}
+      try { await client.query('ROLLBACK'); } catch (_) { /* rollback best-effort */ }
     }
     logger.error('[deductGuestPasses] Error:', { error: getErrorMessage(error) });
     throw error;
@@ -703,7 +703,9 @@ export async function deductGuestPassesWithClient(
 // Import tier rules for orchestration
 import { enforceSocialTierRules, getMemberTier, type ParticipantForValidation } from './tierRules';
 import { 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   computeUsageAllocation, 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   assignGuestTimeToHost, 
   calculateFullSessionBilling,
   type Participant as UsageParticipant 

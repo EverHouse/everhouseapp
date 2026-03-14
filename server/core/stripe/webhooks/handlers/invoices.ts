@@ -158,8 +158,8 @@ export async function handleInvoicePaymentSucceeded(client: PoolClient, invoice:
   const localAmountPaid = amountPaid;
   const localPlanName = planName;
   const localNextBillingDate = nextBillingDate;
-  const localUserId = userId;
-  const localPaymentIntent = (typeof invoice.payment_intent === 'string' ? invoice.payment_intent : invoice.payment_intent?.id) || invoice.id;
+  const _localUserId = userId;
+  const _localPaymentIntent = (typeof invoice.payment_intent === 'string' ? invoice.payment_intent : invoice.payment_intent?.id) || invoice.id;
 
   deferredActions.push(async () => {
     await notifyMember({
@@ -476,8 +476,8 @@ export async function handleInvoiceVoided(client: PoolClient, invoice: InvoiceWi
   });
   
   const localInvoiceEmail = invoiceEmail;
-  const localInvoiceId = invoice.id;
-  const localStatus = status;
+  const _localInvoiceId = invoice.id;
+  const _localStatus = status;
   
   deferredActions.push(async () => {
     broadcastBillingUpdate({

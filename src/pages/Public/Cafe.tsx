@@ -18,7 +18,7 @@ interface CafeItem {
 }
 
 const PublicCafe: React.FC = () => {
-  const navigate = useNavigate();
+  const _navigate = useNavigate();
   const { effectiveTheme } = useTheme();
   const { setPageReady } = usePageReady();
   const isDark = effectiveTheme === 'dark';

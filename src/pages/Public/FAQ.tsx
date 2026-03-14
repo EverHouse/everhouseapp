@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Link } from 'react-router-dom';
 import { Footer } from '../../components/Footer';
 import WalkingGolferSpinner from '../../components/WalkingGolferSpinner';
 import EmptyState from '../../components/EmptyState';
@@ -148,7 +147,7 @@ const FAQ: React.FC = () => {
             variant="compact"
           />
         ) : (
-          filteredFaqs.map((faq, index) => (
+          filteredFaqs.map((faq, _index) => (
             <div key={faq.id}>
               <AccordionItem question={faq.question} answer={faq.answer} />
             </div>

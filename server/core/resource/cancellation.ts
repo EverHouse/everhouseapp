@@ -7,13 +7,11 @@ import { notifyMember, notifyAllStaff, isSyntheticEmail } from '../notificationS
 import { refundGuestPass } from '../../routes/guestPasses';
 import { broadcastAvailabilityUpdate } from '../websocket';
 import { queueJob } from '../jobQueue';
-import { createCalendarEventOnCalendar, getCalendarIdByName, deleteCalendarEvent, CALENDAR_CONFIG } from '../calendar/index';
+import { getCalendarIdByName, deleteCalendarEvent, CALENDAR_CONFIG } from '../calendar/index';
 import { toTextArrayLiteral } from '../../utils/sqlArrayLiteral';
 import { getErrorMessage } from '../../utils/errorUtils';
 import { bookingEvents } from '../bookingEvents';
 import { logMemberAction } from '../auditLog';
-import { sendPushNotification } from '../../routes/push';
-import { sendNotificationToUser } from '../websocket';
 import { releaseGuestPassHold } from '../billing/guestPassHoldService';
 import { AppError } from '../errors';
 
@@ -26,7 +24,7 @@ interface BookingParticipantRow {
   used_guest_pass: boolean | null;
 }
 
-interface UserEmailRow {
+interface _UserEmailRow {
   email: string;
 }
 

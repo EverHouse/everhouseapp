@@ -98,7 +98,7 @@ const GalleryAdmin: React.FC = () => {
             const data = await res.json();
             setNewItem({ ...newItem, imageUrl: data.imageUrl });
             setUploadProgress(`Optimized: ${Math.round(data.originalSize/1024)}KB → ${Math.round(data.optimizedSize/1024)}KB`);
-        } catch (err: unknown) {
+        } catch (_err: unknown) {
             setUploadProgress('Upload failed. Please try again.');
         } finally {
             setUploading(false);

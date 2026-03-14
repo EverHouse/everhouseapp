@@ -1,7 +1,6 @@
 import { Router } from 'express';
 import { isAuthenticated } from '../../core/middleware';
 import { db } from '../../db';
-import { isProduction } from '../../core/db';
 import { 
   bookingRequests, 
   resources, 

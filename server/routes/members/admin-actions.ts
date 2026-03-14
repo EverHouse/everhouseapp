@@ -1,8 +1,8 @@
 import { logger } from '../../core/logger';
 import { Router } from 'express';
-import { eq, sql, and } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { db } from '../../db';
-import { users, membershipTiers, wellnessEnrollments, eventRsvps, staffUsers } from '../../../shared/schema';
+import { users, membershipTiers } from '../../../shared/schema';
 import { isProduction, pool, safeRelease } from '../../core/db';
 import { isStaffOrAdmin, isAdmin } from '../../core/middleware';
 import { getSessionUser } from '../../types/session';
@@ -17,7 +17,7 @@ import { cascadeEmailChange, previewEmailChangeImpact } from '../../core/memberS
 import { getAvailableTiersForChange, previewTierChange, commitTierChange } from '../../core/stripe/tierChanges';
 import { logFromRequest } from '../../core/auditLog';
 import { previewMerge, executeMerge, findPotentialDuplicates } from '../../core/userMerge';
-import { getErrorMessage, safeErrorDetail } from '../../utils/errorUtils';
+import { getErrorMessage } from '../../utils/errorUtils';
 import { invalidateCache } from '../../core/queryCache';
 import { validateBody } from '../../middleware/validate';
 import { tierChangeSchema, createMemberSchema } from '../../../shared/validators/members';
@@ -217,8 +217,8 @@ router.patch('/api/members/:email/tier', isStaffOrAdmin, validateBody(tierChange
 router.post('/api/members/:id/suspend', isStaffOrAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const { startDate, durationDays, reason } = req.body;
-    const sessionUser = getSessionUser(req);
+    const { startDate, durationDays, reason: _reason } = req.body;
+    const _sessionUser = getSessionUser(req);
     
     if (!startDate || !durationDays) {
       return res.status(400).json({ error: 'startDate and durationDays are required' });
@@ -356,7 +356,7 @@ router.delete('/api/members/:email', isStaffOrAdmin, async (req, res) => {
     let subscriptionCancelled = false;
     const stripeSubscriptionId = userResult[0].stripeSubscriptionId;
     const stripeCustomerId = userResult[0].stripeCustomerId;
-    const userEmail = userResult[0].email;
+    const _userEmail = userResult[0].email;
 
     if (stripeSubscriptionId || stripeCustomerId) {
       try {

@@ -270,7 +270,7 @@ const RosterManager: React.FC<RosterManagerProps> = ({
           showToast(error || 'Failed to add member', 'error');
         }
       }
-    } catch (err: unknown) {
+    } catch (_err: unknown) {
       haptic.error();
       showToast('Failed to add member', 'error');
     } finally {

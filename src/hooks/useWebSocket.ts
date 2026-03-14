@@ -196,6 +196,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
         if (emailToUse && !intentionalCloseRef.current && wsRef.current === null) {
           const jitter = 2000 + Math.floor(Math.random() * 3000);
           reconnectTimeoutRef.current = setTimeout(() => {
+            // eslint-disable-next-line react-hooks/immutability
             connect();
           }, jitter);
         }

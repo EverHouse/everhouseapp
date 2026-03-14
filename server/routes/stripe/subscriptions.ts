@@ -29,7 +29,7 @@ import { findOrCreateHubSpotContact } from '../../core/hubspot/members';
 import { randomUUID } from 'crypto';
 import { checkSyncCooldown } from './helpers';
 import { sensitiveActionRateLimiter, subscriptionCreationRateLimiter, acquireSubscriptionLock, releaseSubscriptionLock } from '../../middleware/rateLimiting';
-import { getErrorMessage, getErrorCode, safeErrorDetail } from '../../utils/errorUtils';
+import { getErrorMessage, safeErrorDetail } from '../../utils/errorUtils';
 import { getAppBaseUrl } from '../../utils/urlUtils';
 
 const router = Router();
@@ -332,6 +332,7 @@ router.post('/api/stripe/subscriptions/create-for-member', isStaffOrAdmin, subsc
           } catch {
             logger.error('[Stripe] Failed to send staff notification for rollback failure');
           }
+          // eslint-disable-next-line preserve-caught-error
           throw new Error(
             `Failed to complete subscription setup. Database error: ${dbError instanceof Error ? dbError.message : String(dbError)}. ` +
             `Rollback attempt failed: ${cancelError instanceof Error ? cancelError.message : String(cancelError)}. ` +
@@ -339,6 +340,7 @@ router.post('/api/stripe/subscriptions/create-for-member', isStaffOrAdmin, subsc
           );
         }
       }
+      // eslint-disable-next-line preserve-caught-error
       throw new Error(
         `Failed to activate membership in database: ${dbError instanceof Error ? dbError.message : String(dbError)}. ` +
         `Stripe subscription ${stripeSubscription?.subscriptionId} has been cancelled to prevent unauthorized charges.`
@@ -817,7 +819,7 @@ router.get('/api/stripe/subscriptions/refresh-intent/:subscriptionId', isStaffOr
 router.post('/api/stripe/subscriptions/confirm-inline-payment', isStaffOrAdmin, validateBody(confirmInlinePaymentSchema), async (req: Request, res: Response) => {
   try {
     const { paymentIntentId, subscriptionId, userId } = req.body;
-    const sessionUser = getSessionUser(req);
+    const _sessionUser = getSessionUser(req);
     if (paymentIntentId.startsWith('seti_') || paymentIntentId.startsWith('free_')) {
       return res.status(400).json({ error: 'This is a $0 subscription — no payment confirmation is needed.' });
     }

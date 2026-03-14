@@ -12,6 +12,7 @@ declare global {
   interface Window {
     mapkit: typeof mapkit;
   }
+  // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace mapkit {
     function init(options: { authorizationCallback: (done: (token: string) => void) => void }): void;
     class Map {
@@ -35,6 +36,7 @@ declare global {
       color: string;
       glyphText: string;
     }
+    // eslint-disable-next-line @typescript-eslint/no-namespace
     namespace Map {
       const ColorSchemes: { Light: string; Dark: string };
     }
@@ -255,7 +257,7 @@ const Contact: React.FC = () => {
       setIsSubmitted(true);
       setFormData({ fullName: '', email: '', phone: '', message: '' });
       window.scrollTo({ top: 0, behavior: 'smooth' });
-    } catch (err: unknown) {
+    } catch (_err: unknown) {
       setError(getNetworkErrorMessage());
     } finally {
       setLoading(false);

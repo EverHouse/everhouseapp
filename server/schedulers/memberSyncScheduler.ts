@@ -1,5 +1,5 @@
 import { schedulerTracker } from '../core/schedulerTracker';
-import { syncAllMembersFromHubSpot, getLastMemberSyncTime, setLastMemberSyncTime } from '../core/memberSync';
+import { syncAllMembersFromHubSpot, setLastMemberSyncTime } from '../core/memberSync';
 import { getPacificDateParts } from '../utils/dateUtils';
 import { logger } from '../core/logger';
 

@@ -42,6 +42,7 @@ export function useCommandCenterData(userEmail?: string) {
     return originalName || 'Guest';
   }, [memberNameByEmail]);
 
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization
   const pendingRequests = useMemo((): BookingRequest[] => {
     const raw = pendingRequestsQuery.data;
     if (!raw) return [];

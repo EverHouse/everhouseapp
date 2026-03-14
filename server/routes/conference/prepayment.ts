@@ -5,7 +5,7 @@ import { sql } from 'drizzle-orm';
 import { getMemberTierByEmail, getTierLimits, getDailyBookedMinutes } from '../../core/tierService';
 import { getOrCreateStripeCustomer, createBalanceAwarePayment } from '../../core/stripe';
 import { getStripeClient } from '../../core/stripe/client';
-import { calculateOverageCents, PRICING } from '../../core/billing/pricingConfig';
+import { calculateOverageCents } from '../../core/billing/pricingConfig';
 import { normalizeEmail } from '../../core/utils/emailNormalization';
 import { getSessionUser } from '../../types/session';
 import { logger } from '../../core/logger';
@@ -224,7 +224,7 @@ router.post('/api/member/conference/prepay/create-intent', isAuthenticated, asyn
               reused: true
             });
           }
-        } catch (err: unknown) {
+        } catch (_err: unknown) {
           logger.warn('[ConferencePrepay] Failed to retrieve existing payment intent, creating new one', {
             extra: { paymentIntentId: existing.payment_intent_id }
           });

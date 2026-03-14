@@ -5,10 +5,13 @@ import { SimpleCheckoutForm } from '../../../stripe/StripePaymentForm';
 import { formatPhoneInput } from '../../../../utils/formatting';
 import {
   VisitorFlowProps,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   DayPassProduct,
   EMAIL_REGEX,
   getStripePromise,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   RecentCreation,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   EmailCheckResult,
 } from './newUserTypes';
 import WalkingGolferSpinner from '../../../WalkingGolferSpinner';
@@ -19,6 +22,7 @@ export function VisitorFlow({
   setForm,
   products,
   isDark,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   isLoading,
   setIsLoading,
   setError,
@@ -131,7 +135,7 @@ export function VisitorFlow({
         email: form.email,
         name: `${form.firstName} ${form.lastName}`
       });
-    } catch (err: unknown) {
+    } catch (_err: unknown) {
       setError('Payment confirmation failed. Please contact support.');
     } finally {
       setIsLoading(false);

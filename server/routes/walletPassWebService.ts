@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { db } from '../db';
-import { eq, and, sql, gt } from 'drizzle-orm';
+import { eq, and, gt } from 'drizzle-orm';
 import { walletPassDeviceRegistrations, walletPassAuthTokens } from '../../shared/schema';
 import { validateAuthToken } from '../walletPass/apnPushService';
 import { logger } from '../core/logger';

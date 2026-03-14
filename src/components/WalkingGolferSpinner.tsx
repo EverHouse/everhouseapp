@@ -23,6 +23,7 @@ const WalkingGolferSpinner: React.FC<WalkingGolferSpinnerProps> = ({
     });
     
     observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsDark(document.documentElement.classList.contains('dark'));
     
     return () => observer.disconnect();

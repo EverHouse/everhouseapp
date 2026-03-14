@@ -91,6 +91,7 @@ const BookingRequestsPanel: React.FC<BookingRequestsPanelProps> = ({
     cancelBookingOptimistic,
     updateBookingStatusOptimistic,
     isBookingUnmatched,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     handleRefresh,
     showToast,
     confirm,
@@ -146,7 +147,7 @@ const BookingRequestsPanel: React.FC<BookingRequestsPanelProps> = ({
                                 <p className="text-gray-600 dark:text-white/70">No items in queue</p>
                             </div>
                         ) : (
-                            queueItems.map((item, index) => {
+                            queueItems.map((item, _index) => {
                                 const req = item;
                                 
                                 if (item.queueType === 'cancellation') {

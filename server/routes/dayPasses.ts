@@ -79,8 +79,8 @@ router.post('/api/day-passes/checkout', checkoutRateLimiter, async (req: Request
     }
 
     const resolved = await resolveUserByEmail(email);
-    const resolvedUserId = resolved?.userId || email;
-    const resolvedName = resolved
+    const _resolvedUserId = resolved?.userId || email;
+    const _resolvedName = resolved
       ? [resolved.firstName, resolved.lastName].filter(Boolean).join(' ') || firstName || email.split('@')[0]
       : firstName || email.split('@')[0];
 

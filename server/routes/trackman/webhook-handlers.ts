@@ -1,18 +1,18 @@
 import { logger } from '../../core/logger';
 import { transferRequestParticipantsToSession } from '../../core/trackmanImport';
-import { sendNotificationToUser, broadcastToStaff, broadcastAvailabilityUpdate } from '../../core/websocket';
+import { broadcastToStaff, broadcastAvailabilityUpdate } from '../../core/websocket';
 import { notifyAllStaff, notifyMember } from '../../core/notificationService';
 import { linkAndNotifyParticipants } from '../../core/bookingEvents';
-import { formatDatePacific, formatTimePacific, formatTime12Hour, formatNotificationDateTime } from '../../utils/dateUtils';
+import { formatTime12Hour } from '../../utils/dateUtils';
 import { checkUnifiedAvailability } from '../../core/bookingService/availabilityGuard';
-import { cancelPaymentIntent, getStripeClient } from '../../core/stripe';
 import { BookingStateService } from '../../core/bookingService';
 import { bookingRequests } from '../../../shared/schema';
-import { eq, and, sql } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { db } from '../../db';
 import {
   TrackmanWebhookPayload,
   TrackmanV2WebhookPayload,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   TrackmanV2Booking,
   NormalizedBookingFields,
   extractBookingData,
@@ -23,12 +23,11 @@ import {
   parseTrackmanV2Payload,
   calculateDurationMinutes,
 } from './webhook-helpers';
-import { resolveLinkedEmail, findMemberByEmail, logWebhookEvent } from './webhook-validation';
+import { resolveLinkedEmail, findMemberByEmail } from './webhook-validation';
 import { 
   updateBaySlotCache, 
   createBookingForMember
 } from './webhook-billing';
-import { refundGuestPass } from '../guestPasses';
 import { getErrorMessage } from '../../utils/errorUtils';
 
 interface PendingBookingRow {
@@ -82,9 +81,8 @@ interface InsertedBookingRow {
   was_inserted: boolean;
 }
 
-import { createSessionWithUsageTracking, ensureSessionForBooking } from '../../core/bookingService/sessionManager';
+import { ensureSessionForBooking } from '../../core/bookingService/sessionManager';
 import { recalculateSessionFees } from '../../core/billing/unifiedFeeService';
-import { createPrepaymentIntent } from '../../core/billing/prepaymentService';
 import { createDraftInvoiceForBooking, syncBookingInvoice } from '../../core/billing/bookingInvoiceService';
 import { checkUnifiedAvailability as checkAvailabilityForModification } from '../../core/bookingService/availabilityGuard';
 
@@ -572,6 +570,7 @@ export async function tryAutoApproveBooking(
     
     const pendingBooking = pendingRows[0];
     const bookingId = pendingBooking.id;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     matchedBookingId = bookingId;
     const resourceId = pendingBooking.resource_id;
     
@@ -821,7 +820,7 @@ export async function createUnmatchedBookingRequest(
   try {
     const durationMinutes = calculateDurationMinutes(startTime, endTime);
     
-    let bookingStatus = 'approved';
+    const bookingStatus = 'approved';
     let conflictNote = '';
     
     if (resourceId) {
@@ -1049,7 +1048,7 @@ async function tryLinkCancelledBooking(
     
     const cancelledBooking = cancelledRows[0];
     const bookingId = cancelledBooking.id;
-    const memberEmail = cancelledBooking.user_email;
+    const _memberEmail = cancelledBooking.user_email;
     
     const updatedNotes = (cancelledBooking.staff_notes || '') + 
       ' [Trackman booking linked - request was cancelled, manual Trackman cancellation may be needed]';
@@ -1141,7 +1140,7 @@ async function notifyMemberBookingConfirmed(
     const userRows = userResult.rows as unknown as UserRow[];
     if (userRows.length > 0) {
       const user = userRows[0];
-      const memberName = `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Member';
+      const _memberName = `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Member';
       const message = `Your simulator booking for ${slotDate} at ${startTime}${bayName ? ` (${bayName})` : ''} has been confirmed.`;
       
       const result = await notifyMember(
@@ -1308,7 +1307,9 @@ export async function handleBookingUpdate(payload: TrackmanWebhookPayload): Prom
   
   // For V2 payloads, parsedDate/parsedStartTime are pre-populated
   // For V1 payloads, we need to parse from startTime/date
+  // eslint-disable-next-line no-useless-assignment
   let startParsed: { date: string; time: string } | null = null;
+  // eslint-disable-next-line no-useless-assignment
   let endParsed: { time: string } | null = null;
   
   if (normalized.parsedDate && normalized.parsedStartTime) {

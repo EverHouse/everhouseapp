@@ -59,7 +59,7 @@ const formatTime12Hour = (timeStr: string): string => {
   return `${hour12}:${String(minutes).padStart(2, '0')} ${period}`;
 };
 
-const getStatusBadgeStyle = (status: string, isDark: boolean): string => {
+const getStatusBadgeStyle = (status: string, _isDark: boolean): string => {
   switch (status) {
     case 'attended':
       return 'bg-green-100 text-green-700';
@@ -120,6 +120,7 @@ const EmptyState: React.FC<{ icon: string; message: string; isDark: boolean }> =
 );
 
 const MemberActivityTab: React.FC<MemberActivityTabProps> = ({
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   memberEmail,
   bookingHistory,
   bookingRequestsHistory,

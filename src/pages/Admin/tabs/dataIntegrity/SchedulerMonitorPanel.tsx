@@ -101,6 +101,7 @@ const SchedulerMonitorPanel: React.FC<Props> = ({ isOpen, onToggle }) => {
   const errorCount = schedulers.filter(s => s.lastResult === 'error').length;
   const warningCount = schedulers.filter(s => {
     if (s.lastResult !== 'success' || !s.lastRunAt || s.intervalMs <= 0) return false;
+    // eslint-disable-next-line react-hooks/purity
     return (Date.now() - new Date(ensureUtc(s.lastRunAt)).getTime()) > s.intervalMs * 2;
   }).length;
   const disabledCount = schedulers.filter(s => !s.isEnabled).length;
@@ -162,6 +163,7 @@ const SchedulerMonitorPanel: React.FC<Props> = ({ isOpen, onToggle }) => {
                         tabIndex={0}
                         role="button"
                         onClick={() => scheduler.lastError && setExpandedError(expandedError === scheduler.taskName ? null : scheduler.taskName)}
+                        // eslint-disable-next-line @typescript-eslint/no-unused-expressions
                         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); scheduler.lastError && setExpandedError(expandedError === scheduler.taskName ? null : scheduler.taskName); } }}
                       >
                         <td className="py-2 pr-3 font-medium text-gray-900 dark:text-gray-100">{scheduler.taskName}</td>

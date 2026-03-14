@@ -3,7 +3,7 @@ import { useToast } from '../components/Toast';
 import { getApiErrorMessage, mapBackendError } from '../utils/errorHandling';
 import { haptic } from '../utils/haptics';
 
-interface UseAppMutationOptions<TData, TVariables, TContext = unknown> {
+interface UseAppMutationOptions<TData, TVariables, _TContext = unknown> {
   mutationFn: (variables: TVariables) => Promise<TData>;
   successMessage?: string;
   errorMessage?: string;

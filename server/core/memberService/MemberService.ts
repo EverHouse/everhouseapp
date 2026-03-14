@@ -11,7 +11,9 @@ import {
   normalizeEmail,
   isUUID,
   isEmail,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   isHubSpotId,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   isMindbodyClientId
 } from './memberTypes';
 import type { MembershipTier } from '../../../shared/schema';

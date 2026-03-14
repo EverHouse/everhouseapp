@@ -32,6 +32,7 @@ const PwaSmartBanner: React.FC<PwaSmartBannerProps> = ({
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
 
     if (isIOS) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setPlatform('ios');
       setShow(true);
       return;

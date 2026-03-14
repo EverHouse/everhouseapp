@@ -47,14 +47,14 @@ export function TerminalPayment({
   const [status, setStatus] = useState<'idle' | 'waiting' | 'success' | 'error'>('idle');
   const [statusMessage, setStatusMessage] = useState('');
   const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null);
-  const [setupIntentId, setSetupIntentId] = useState<string | null>(null);
+  const [_setupIntentId, setSetupIntentId] = useState<string | null>(null);
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const successTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const paymentIntentIdRef = useRef<string | null>(null);
   const selectedReaderRef = useRef<string>('');
   const processingRef = useRef(false);
-  const setupIntentIdRef = useRef<string | null>(null);
+  const _setupIntentIdRef = useRef<string | null>(null);
   const [creatingSimulated, setCreatingSimulated] = useState(false);
 
   const isSaveCard = mode === 'save_card';

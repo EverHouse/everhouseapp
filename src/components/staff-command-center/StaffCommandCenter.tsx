@@ -39,7 +39,7 @@ interface OptimisticUpdateRef {
   newStatus: string;
 }
 
-const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: onTabChangeProp, isAdmin }) => {
+const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: onTabChangeProp, isAdmin: _isAdmin }) => {
   const navigate = useNavigate();
   const { showToast } = useToast();
   const { isAtBottom } = useBottomNav();
@@ -63,7 +63,7 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
   const [newUserDrawerMode, setNewUserDrawerMode] = useState<'member' | 'visitor'>('member');
   const [qrScannerOpen, setQrScannerOpen] = useState(false);
   const [manualBookingModalOpen, setManualBookingModalOpen] = useState(false);
-  const [prefillHostMember, setPrefillHostMember] = useState<SelectedMember | null>(null);
+  const [_prefillHostMember, setPrefillHostMember] = useState<SelectedMember | null>(null);
   const [announcementDrawerOpen, setAnnouncementDrawerOpen] = useState(false);
   const [noticeDrawerOpen, setNoticeDrawerOpen] = useState(false);
   const [eventDrawerOpen, setEventDrawerOpen] = useState(false);
@@ -218,7 +218,7 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
           playSound('checkinWarning');
           showToast(result.error || 'Check-in failed', 'error');
         }
-      } catch (err: unknown) {
+      } catch (_err: unknown) {
         playSound('checkinWarning');
         showToast('Failed to process check-in', 'error');
       }
@@ -243,13 +243,13 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
         playSound('checkinWarning');
         showToast('Invalid QR code format.', 'error');
       }
-    } catch (error: unknown) {
+    } catch (_error: unknown) {
       playSound('checkinWarning');
       showToast('Invalid QR code.', 'error');
     }
   };
   
-  const safeRevertOptimisticUpdate = useCallback((
+  const _safeRevertOptimisticUpdate = useCallback((
     bookingId: number | string,
     expectedOptimisticStatus: string,
     activityIdToRemove?: string
@@ -284,7 +284,7 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
   }, [updateTodaysBookings, updateBayStatuses, updateRecentActivity]);
 
   const today = getTodayPacific();
-  const pendingCount = data.pendingRequests.length;
+  const _pendingCount = data.pendingRequests.length;
   
   // Filter unmatched bookings - check is_unmatched flag OR null/placeholder emails
   const unmatchedBookings = data.todaysBookings.filter(b => {
@@ -356,6 +356,7 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
 
   const handleDevConfirm = async (bookingId: number | string) => {
     const apiId = typeof bookingId === 'string' ? parseInt(String(bookingId).replace('cal_', '')) : bookingId;
+    // eslint-disable-next-line no-useless-catch
     try {
       const res = await fetch(`/api/admin/bookings/${apiId}/dev-confirm`, {
         method: 'POST',
@@ -410,7 +411,7 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
         updateRecentActivity(prev => prev.filter(a => a.id !== newActivity.id));
         showToast('Failed to approve booking', 'error');
       }
-    } catch (err: unknown) {
+    } catch (_err: unknown) {
       updatePendingRequests(() => previousPendingRequests);
       updateRecentActivity(prev => prev.filter(a => a.id !== newActivity.id));
       showToast('Failed to approve booking', 'error');
@@ -452,7 +453,7 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
         updateRecentActivity(prev => prev.filter(a => a.id !== newActivity.id));
         showToast('Failed to decline booking', 'error');
       }
-    } catch (err: unknown) {
+    } catch (_err: unknown) {
       updatePendingRequests(() => previousPendingRequests);
       updateRecentActivity(prev => prev.filter(a => a.id !== newActivity.id));
       showToast('Failed to decline booking', 'error');
@@ -499,7 +500,7 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
         updateRecentActivity(prev => prev.filter(a => a.id !== newActivity.id));
         showToast(error.error || 'Failed to complete cancellation', 'error');
       }
-    } catch (err: unknown) {
+    } catch (_err: unknown) {
       updatePendingRequests(() => previousPendingRequests);
       updateRecentActivity(prev => prev.filter(a => a.id !== newActivity.id));
       showToast('Failed to complete cancellation', 'error');

@@ -224,7 +224,9 @@ export const ResourcesSection: React.FC<ResourcesSectionProps> = ({
   upcomingClosure,
   announcements,
   variant,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   recentActivity = [],
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   notifications = []
 }) => {
   const navigate = useNavigate();

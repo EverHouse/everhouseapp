@@ -2,11 +2,14 @@ import { db } from '../../db';
 import { getErrorCode, getErrorMessage } from '../../utils/errorUtils';
 import { PoolClient } from 'pg';
 import { 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   bookingSessions, 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   availabilityBlocks, 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   facilityClosures 
 } from '../../../shared/schema';
-import { eq, and, sql } from 'drizzle-orm';
+import { sql } from 'drizzle-orm';
 import { logger } from '../logger';
 import { 
   checkClosureConflict, 

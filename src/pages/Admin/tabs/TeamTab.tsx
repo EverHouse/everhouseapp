@@ -54,7 +54,7 @@ interface TeamFieldErrors {
 }
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const PHONE_REGEX = /^[\d\s\-\+\(\)\.]+$/;
+const PHONE_REGEX = /^[\d\s\-+().]+$/;
 
 const validateEmail = (value: string): string | undefined => {
   if (!value.trim()) return 'Email is required';
@@ -389,7 +389,7 @@ const TeamTab: React.FC = () => {
           </div>
         ) : (
           <div ref={teamRef} className="space-y-3 animate-content-enter-delay-2">
-            {filteredMembers.map((member, index) => (
+            {filteredMembers.map((member, _index) => (
               <div 
                 key={member.id}
                 onClick={() => openDetailsModal(member)}

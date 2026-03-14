@@ -203,13 +203,17 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
     isSyncing,
     setIsSyncing,
     lastRefresh,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     setLastRefresh,
     isDark,
     showToast,
     calendarColRef,
     activeView,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     guestFeeDollars,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     overageRatePerBlockDollars,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     tierMinutes,
     prefetchDate,
 }) => {

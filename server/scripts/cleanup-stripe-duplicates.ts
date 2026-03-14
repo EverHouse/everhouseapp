@@ -45,7 +45,7 @@ async function checkUserHasHistoricalData(userId: string): Promise<{ hasData: bo
       if (count > 0) {
         reasons.push(`${count} ${check.name}`);
       }
-    } catch (e: unknown) {
+    } catch (_e: unknown) {
       // Table might not exist or column mismatch, skip
     }
   }

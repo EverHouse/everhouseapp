@@ -118,6 +118,7 @@ describe('GuestPassHoldService', () => {
           .mockResolvedValueOnce({ rows: [{ total_held: '0' }] }),
       };
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const result = await getAvailableGuestPasses('test@example.com', undefined, txCtx as any);
       expect(result).toBe(4);
       expect(txCtx.execute).toHaveBeenCalledTimes(3);
@@ -179,6 +180,7 @@ describe('GuestPassHoldService', () => {
           .mockResolvedValueOnce({ rows: [{ passes_used: 2, passes_total: 2 }] })
           .mockResolvedValueOnce({ rows: [{ total_held: '0' }] }),
       };
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       mockTransaction.mockImplementation(async (cb: (tx: any) => Promise<any>) => cb(mockTx));
 
       const result = await createGuestPassHold('test@example.com', 1, 3);
@@ -225,6 +227,7 @@ describe('GuestPassHoldService', () => {
         execute: vi.fn()
           .mockResolvedValueOnce({ rows: [] }),
       };
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       mockTransaction.mockImplementation(async (cb: (tx: any) => Promise<any>) => cb(mockTx));
 
       const result = await convertHoldToUsage(123, 'test@example.com');
@@ -239,6 +242,7 @@ describe('GuestPassHoldService', () => {
           .mockResolvedValueOnce({ rowCount: 1 })
           .mockResolvedValueOnce({ rowCount: 1 }),
       };
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       mockTransaction.mockImplementation(async (cb: (tx: any) => Promise<any>) => cb(mockTx));
 
       const result = await convertHoldToUsage(123, 'test@example.com');

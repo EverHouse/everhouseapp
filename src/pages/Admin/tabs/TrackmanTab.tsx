@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import EmptyState from '../../../components/EmptyState';
 import { usePageReady } from '../../../contexts/PageReadyContext';
@@ -20,7 +20,7 @@ interface OptimisticAction {
 
 const ITEMS_PER_PAGE = 20;
 
-const formatImportLabel = (filename: string, createdAt?: string): string => {
+const formatImportLabel = (filename: string, _createdAt?: string): string => {
   if (!filename) return 'Trackman Import';
   
   const dateRangeMatch = filename.match(/(\d{4}-\d{2}-\d{2})[_\s-]*(to|thru|through)?[_\s-]*(\d{4}-\d{2}-\d{2})?/i);
@@ -43,7 +43,7 @@ const formatImportLabel = (filename: string, createdAt?: string): string => {
     return `${formatShort(startDate)}, ${startYear}`;
   }
   
-  let cleaned = filename.replace(/\.(csv|xlsx?)$/i, '').replace(/^(trackman[_\s-]*|import[_\s-]*)/i, '');
+  const cleaned = filename.replace(/\.(csv|xlsx?)$/i, '').replace(/^(trackman[_\s-]*|import[_\s-]*)/i, '');
   
   if (!cleaned || cleaned.length > 40 || /^[a-f0-9-]{20,}$/i.test(cleaned)) {
     return 'Trackman Import';
@@ -145,7 +145,7 @@ const TrackmanTab: React.FC = () => {
   const toastContext = useToast();
   
   const setPageReady = pageReadyContext?.setPageReady || (() => {});
-  const actualUser = dataContext?.actualUser;
+  const _actualUser = dataContext?.actualUser;
   const showToast = toastContext?.showToast || (() => {});
   
   const [unmatchedPage, setUnmatchedPage] = useState(1);
@@ -167,7 +167,7 @@ const TrackmanTab: React.FC = () => {
       ownerName?: string;
     };
   } | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, _setSearchQuery] = useState('');
   const [unmatchedSearchQuery, setUnmatchedSearchQuery] = useState('');
   const [fuzzySearchQuery, setFuzzySearchQuery] = useState('');
   const [isDragging, setIsDragging] = useState(false);
@@ -210,7 +210,7 @@ const TrackmanTab: React.FC = () => {
     },
   });
 
-  const { data: searchResults = [], isLoading: isSearching } = useQuery<TrackmanMember[]>({
+  const { data: searchResults = [], isLoading: _isSearching } = useQuery<TrackmanMember[]>({
     queryKey: ['members', 'search', searchQuery],
     queryFn: async () => {
       const data = await fetchWithCredentials<TrackmanMember[]>(`/api/members/search?query=${encodeURIComponent(searchQuery)}&limit=20&includeFormer=true`);
@@ -378,7 +378,7 @@ const TrackmanTab: React.FC = () => {
     setNeedsPlayersPage(1);
   }, [needsPlayersSearchQuery]);
 
-  const handleOpenFuzzyMatchModal = (booking: TrackmanBooking) => {
+  const _handleOpenFuzzyMatchModal = (booking: TrackmanBooking) => {
     setFuzzyMatchModal({ booking, selectedEmail: '', rememberEmail: true });
   };
 
@@ -424,7 +424,7 @@ const TrackmanTab: React.FC = () => {
     if (file) handleFileUpload(file);
   };
 
-  const filteredMembers = searchQuery.length >= 2 ? searchResults : members.filter((m: TrackmanMember) => {
+  const _filteredMembers = searchQuery.length >= 2 ? searchResults : members.filter((m: TrackmanMember) => {
     const query = searchQuery.toLowerCase();
     const name = `${m.firstName || m.firstname || ''} ${m.lastName || m.lastname || ''}`.toLowerCase();
     const email = (m.email || '').toLowerCase();
@@ -702,9 +702,9 @@ const TrackmanTab: React.FC = () => {
                       const email = (booking.originalEmail || booking.original_email || '').toLowerCase();
                       return name.includes(query) || email.includes(query);
                     })
-                    .map((booking: TrackmanBooking, idx: number) => {
+                    .map((booking: TrackmanBooking, _idx: number) => {
                       const isLinking = optimisticActions.get(booking.id)?.type === 'linking';
-                      const linkingEmail = optimisticActions.get(booking.id)?.targetEmail;
+                      const _linkingEmail = optimisticActions.get(booking.id)?.targetEmail;
                       
                       return (
                         <tr 

@@ -38,7 +38,7 @@ interface DbLedgerRow {
   stripe_payment_intent_id: string;
 }
 
-interface StripeError extends Error {
+interface _StripeError extends Error {
   type?: string;
   decline_code?: string;
   code?: string;
@@ -478,10 +478,10 @@ router.post('/api/payments/refund', isStaffOrAdmin, validateBody(refundPaymentSc
             const originalOverageCents = Math.round((parseFloat(entry.overage_fee) || 0) * 100);
             const originalGuestCents = Math.round((parseFloat(entry.guest_fee) || 0) * 100);
 
-            let reversedOverageCents = isPartialRefund 
+            const reversedOverageCents = isPartialRefund 
               ? Math.round(originalOverageCents * refundProportion)
               : originalOverageCents;
-            let reversedGuestCents = isPartialRefund 
+            const reversedGuestCents = isPartialRefund 
               ? Math.round(originalGuestCents * refundProportion)
               : originalGuestCents;
 

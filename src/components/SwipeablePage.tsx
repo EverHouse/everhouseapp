@@ -8,7 +8,7 @@ interface SwipeablePageProps {
 
 const SwipeablePage: React.FC<SwipeablePageProps> = ({ children, className = "" }) => {
   const { effectiveTheme } = useTheme();
-  const isDark = effectiveTheme === 'dark';
+  const _isDark = effectiveTheme === 'dark';
 
   return (
     <div 

@@ -8,7 +8,7 @@ import { getBookingInvoiceId } from '../../core/billing/bookingInvoiceService';
 import { logFromRequest } from '../../core/auditLog';
 import { db } from '../../db';
 import { sql } from 'drizzle-orm';
-import { getErrorMessage, getErrorCode, safeErrorDetail } from '../../utils/errorUtils';
+import { getErrorMessage } from '../../utils/errorUtils';
 import { findOrCreateHubSpotContact } from '../../core/hubspot/members';
 import { getSessionUser } from '../../types/session';
 import Stripe from 'stripe';
@@ -70,7 +70,7 @@ router.post('/api/stripe/terminal/create-simulated-reader', isStaffOrAdmin, asyn
   try {
     const stripe = await getStripeClient();
     
-    let locations = await stripe.terminal.locations.list({ limit: 1 });
+    const locations = await stripe.terminal.locations.list({ limit: 1 });
     let locationId: string;
     
     if (locations.data.length === 0) {
@@ -760,6 +760,7 @@ router.post('/api/stripe/terminal/process-subscription-payment', isStaffOrAdmin,
       let readerLabel = readerId;
       try {
         const readerObj = await stripe.terminal.readers.retrieve(readerId);
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         readerLabel = ('label' in readerObj ? (readerObj as Stripe.Terminal.Reader).label : null) || readerId;
       } catch (_) { /* use readerId as fallback label */ }
 
@@ -1177,7 +1178,7 @@ router.post('/api/stripe/terminal/process-existing-payment', isStaffOrAdmin, asy
     try {
       const readerObj = await stripe.terminal.readers.retrieve(readerId);
       readerLabel = (readerObj as Stripe.Terminal.Reader).label || readerId;
-    } catch (e: unknown) { /* reader label is cosmetic, ignore */ }
+    } catch (_e: unknown) { /* reader label is cosmetic, ignore */ }
 
     const updateParams: Stripe.PaymentIntentUpdateParams = {
       payment_method_types: ['card_present'],
@@ -1439,7 +1440,7 @@ router.post('/api/stripe/terminal/confirm-save-card', isStaffOrAdmin, async (req
       return res.status(400).json({ error: 'Could not resolve a reusable payment method from the SetupIntent' });
     }
 
-    let paymentMethodId = reusablePaymentMethodId;
+    const paymentMethodId = reusablePaymentMethodId;
 
     try {
       await stripe.paymentMethods.attach(paymentMethodId, {

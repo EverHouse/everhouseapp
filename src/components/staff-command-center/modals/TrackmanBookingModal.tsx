@@ -203,7 +203,7 @@ export function TrackmanBookingModal({
         copyTimerRef.current = null;
       }
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   }, [isOpen, booking]);
 
   useEffect(() => {

@@ -8,7 +8,7 @@ import { isProduction } from '../../core/db';
 import { isStaffOrAdmin, isAdmin } from '../../core/middleware';
 import { getSessionUser } from '../../types/session';
 import { logFromRequest } from '../../core/auditLog';
-import { getErrorMessage, safeErrorDetail } from '../../utils/errorUtils';
+import { getErrorMessage } from '../../utils/errorUtils';
 import { validateQuery } from '../../middleware/validate';
 import { z } from 'zod';
 
@@ -23,7 +23,7 @@ const PLACEHOLDER_EMAIL_PATTERNS = [
   'placeholder@'
 ];
 
-function isPlaceholderEmail(email: string | null | undefined): boolean {
+function _isPlaceholderEmail(email: string | null | undefined): boolean {
   if (!email) return true;
   const lower = email.toLowerCase();
   return PLACEHOLDER_EMAIL_PATTERNS.some(pattern => lower.includes(pattern));
@@ -44,7 +44,7 @@ const visitorsQuerySchema = z.object({
 
 router.get('/api/visitors', isStaffOrAdmin, validateQuery(visitorsQuerySchema), async (req, res) => {
   try {
-    const { sortBy = 'lastPurchase', order = 'desc', limit = '100', offset = '0', typeFilter = 'all', sourceFilter = 'all', search = '', archived = 'false' } = req.query;
+    const { sortBy = 'lastPurchase', order = 'desc', limit = '100', offset = '0', typeFilter = 'all', sourceFilter = 'all', search = '', archived: _archived = 'false' } = req.query;
     const pageLimit = Math.min(parseInt(limit as string) || 100, 500);
     const pageOffset = Math.max(parseInt(offset as string) || 0, 0);
     const sortOrder = order === 'asc' ? 'ASC' : 'DESC';

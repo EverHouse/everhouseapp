@@ -1,5 +1,4 @@
 import React from 'react';
-import type { MemberProfile } from '../../../../contexts/DataContext';
 import { getTierColor } from '../../../../utils/tierUtils';
 import { getMemberStatusLabel, getMemberStatusBadgeClass } from '../../../../utils/statusColors';
 import {
@@ -63,6 +62,7 @@ const DirectoryFilters: React.FC<DirectoryFiltersProps> = ({
     appUsageFilter, setAppUsageFilter,
     billingFilter, setBillingFilter,
     discountFilter, setDiscountFilter,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     showMissingTierOnly, setShowMissingTierOnly,
     showRecentlyAdded, setShowRecentlyAdded,
     sortField, setSortField,

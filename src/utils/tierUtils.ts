@@ -1,4 +1,4 @@
-import { getBaseTier, type BaseTier, DEFAULT_TIER } from './permissions';
+import { type BaseTier } from './permissions';
 import { normalizeTierName } from '../../shared/constants/tiers';
 
 export type { BaseTier };

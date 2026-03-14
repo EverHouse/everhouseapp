@@ -4,7 +4,7 @@ import { db } from '../../db';
 import { sql } from 'drizzle-orm';
 import { isStaffOrAdmin } from '../../core/middleware';
 import { getMemberTierByEmail, getTierLimits, getDailyBookedMinutes } from '../../core/tierService';
-import { calculateOverageCents, PRICING } from '../../core/billing/pricingConfig';
+import { calculateOverageCents } from '../../core/billing/pricingConfig';
 import { normalizeEmail } from '../../core/utils/emailNormalization';
 import { logFromRequest } from '../../core/auditLog';
 import { logger, logAndRespond } from '../../core/logger';
@@ -88,7 +88,7 @@ router.get('/api/staff/conference-room/available-slots', isStaffOrAdmin, async (
     const displayStr = await getSettingValue(settingKey, fallback);
     const hours = (() => {
       if (!displayStr || displayStr.toLowerCase() === 'closed') return null;
-      const parts = displayStr.split(/\s*[–\-]\s*/);
+      const parts = displayStr.split(/\s*[–-]\s*/);
       if (parts.length !== 2) return null;
       const parseT = (s: string): number | null => {
         const m = s.trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);

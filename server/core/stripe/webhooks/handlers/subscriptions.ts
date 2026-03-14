@@ -285,6 +285,7 @@ export async function handleSubscriptionCreated(client: PoolClient, subscription
       email = userResult.rows[0].email;
       first_name = userResult.rows[0].first_name;
       last_name = userResult.rows[0].last_name;
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       currentTier = userResult.rows[0].tier;
       currentStatus = userResult.rows[0].membership_status;
 
@@ -736,7 +737,7 @@ export async function handleSubscriptionUpdated(client: PoolClient, subscription
     }
 
     if (currentPriceId) {
-      let tierResult = await client.query(
+      const tierResult = await client.query(
         'SELECT slug, name FROM membership_tiers WHERE stripe_price_id = $1 OR founding_price_id = $1',
         [currentPriceId]
       );

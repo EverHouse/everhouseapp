@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useData } from '../../contexts/DataContext';
@@ -74,7 +74,7 @@ const BookGolf: React.FC = () => {
   const [feeRef] = useAutoAnimate();
   const [timeSlotsAnimRef] = useAutoAnimate();
   const [showConfirmation, setShowConfirmation] = useState(false);
-  const [bookingError, setBookingError] = useState<string | null>(null);
+  const [_bookingError, setBookingError] = useState<string | null>(null);
   const isSubmittingRef = useRef(false);
   const [showViewAsConfirm, setShowViewAsConfirm] = useState(false);
   const [expandedHour, setExpandedHour] = useState<string | null>(null);
@@ -616,7 +616,7 @@ const BookGolf: React.FC = () => {
   }, [selectedDateObj, myRequests]);
 
   // Calculate minutes already booked for the selected date
-  const { usedMinutesForDay, remainingMinutes, isAtDailyLimit } = useMemo(() => {
+  const { usedMinutesForDay, remainingMinutes: _remainingMinutes, isAtDailyLimit } = useMemo(() => {
     if (!selectedDateObj?.date || !myRequests.length) {
       const dailyLimit = activeTab === 'simulator' 
         ? tierPermissions.dailySimulatorMinutes 
@@ -1315,7 +1315,7 @@ const BookGolf: React.FC = () => {
             )}
               <div className={`transition-opacity duration-normal ${isLoading ? 'opacity-0 hidden' : 'opacity-100'}`}>
               <div ref={timeSlotsAnimRef} className="space-y-2">
-                {slotsByHour.map((hourGroup, groupIndex) => {
+                {slotsByHour.map((hourGroup, _groupIndex) => {
                   const isExpanded = expandedHour === hourGroup.hour24;
                   const hasSelectedSlot = hourGroup.slots.some(s => selectedSlot?.id === s.id);
                   
@@ -1417,7 +1417,7 @@ const BookGolf: React.FC = () => {
                 {activeTab === 'simulator' ? 'Facility' : 'Select Room'}
               </h3>
               <div ref={resourcesRef} className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3">
-                {getAvailableResourcesForSlot(selectedSlot).map((resource, index) => (
+                {getAvailableResourcesForSlot(selectedSlot).map((resource, _index) => (
                   <div key={resource.id}>
                     <ResourceCard
                       resource={resource}
@@ -1429,7 +1429,7 @@ const BookGolf: React.FC = () => {
                 ))}
                 {resources
                   .filter(r => selectedSlot.requestedResourceDbIds.includes(r.dbId) && !selectedSlot.availableResourceDbIds.includes(r.dbId))
-                  .map((resource, index) => (
+                  .map((resource, _index) => (
                   <div key={`requested-${resource.id}`}>
                     <ResourceCard
                       resource={resource}

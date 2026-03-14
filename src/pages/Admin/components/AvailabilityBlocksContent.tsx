@@ -272,7 +272,7 @@ const AvailabilityBlocksContent: React.FC = () => {
                 const data = await res.json();
                 setFormError(data.error || 'Failed to save block');
             }
-        } catch (err: unknown) {
+        } catch (_err: unknown) {
             setFormError('Failed to save block');
         } finally {
             setIsSaving(false);
@@ -310,7 +310,7 @@ const AvailabilityBlocksContent: React.FC = () => {
                 setPastBlocks(pastSnapshot);
                 showToast('Failed to delete block', 'error');
             }
-        } catch (err: unknown) {
+        } catch (_err: unknown) {
             setUpcomingBlocks(upcomingSnapshot);
             setPastBlocks(pastSnapshot);
             showToast('Failed to delete block', 'error');
@@ -579,7 +579,7 @@ const AvailabilityBlocksContent: React.FC = () => {
                             {!isPastLoading && pastLoaded && pastBlocks.length === 0 && (
                                 <p className="text-center text-sm text-gray-500 dark:text-gray-400 py-4">No past blocks found</p>
                             )}
-                            {groupedPast.map(({ date, blocks: dayBlocks }, groupIndex) => {
+                            {groupedPast.map(({ date, blocks: dayBlocks }, _groupIndex) => {
                                 const isExpanded = expandedDays.has(`past-${date}`);
                                 return (
                                     <div 

@@ -81,7 +81,7 @@ export function useMemberBilling(
       } else {
         showError(await extractApiError(res, 'load billing info'));
       }
-    } catch (err: unknown) {
+    } catch (_err: unknown) {
       showError(getNetworkErrorMessage());
     } finally {
       setIsLoading(false);
@@ -115,6 +115,7 @@ export function useMemberBilling(
       const detail = event.detail;
       if (detail.memberEmail?.toLowerCase() === memberEmail.toLowerCase() ||
           (billingInfo?.stripeCustomerId && detail.customerId === billingInfo.stripeCustomerId)) {
+        // eslint-disable-next-line no-console
         console.log('[MemberBillingTab] Received billing update for this member, refreshing:', detail.action);
         fetchBillingInfo();
       }
@@ -167,7 +168,7 @@ export function useMemberBilling(
       } else {
         showError(await extractApiError(res, 'initiate migration'));
       }
-    } catch (err: unknown) {
+    } catch (_err: unknown) {
       showError(getNetworkErrorMessage());
     } finally {
       setIsMigrationLoading(false);
@@ -190,7 +191,7 @@ export function useMemberBilling(
       } else {
         showError(await extractApiError(res, 'cancel migration'));
       }
-    } catch (err: unknown) {
+    } catch (_err: unknown) {
       showError(getNetworkErrorMessage());
     } finally {
       setIsMigrationLoading(false);
@@ -252,7 +253,7 @@ export function useMemberBilling(
       } else {
         showError(getApiErrorMessage(res, 'update billing source'));
       }
-    } catch (err: unknown) {
+    } catch (_err: unknown) {
       showError(getNetworkErrorMessage());
     } finally {
       setIsUpdatingSource(false);
@@ -280,7 +281,7 @@ export function useMemberBilling(
       } else {
         showError(getApiErrorMessage(res, 'pause subscription'));
       }
-    } catch (err: unknown) {
+    } catch (_err: unknown) {
       showError(getNetworkErrorMessage());
     } finally {
       setIsPausing(false);
@@ -304,7 +305,7 @@ export function useMemberBilling(
       } else {
         showError(getApiErrorMessage(res, 'resume subscription'));
       }
-    } catch (err: unknown) {
+    } catch (_err: unknown) {
       showError(getNetworkErrorMessage());
     } finally {
       setIsResuming(false);
@@ -328,7 +329,7 @@ export function useMemberBilling(
       } else {
         showError(getApiErrorMessage(res, 'cancel subscription'));
       }
-    } catch (err: unknown) {
+    } catch (_err: unknown) {
       showError(getNetworkErrorMessage());
     } finally {
       setIsCanceling(false);
@@ -352,7 +353,7 @@ export function useMemberBilling(
       } else {
         showError(getApiErrorMessage(res, 'apply credit'));
       }
-    } catch (err: unknown) {
+    } catch (_err: unknown) {
       showError(getNetworkErrorMessage());
     } finally {
       setIsApplyingCredit(false);
@@ -376,7 +377,7 @@ export function useMemberBilling(
       } else {
         showError(getApiErrorMessage(res, 'apply discount'));
       }
-    } catch (err: unknown) {
+    } catch (_err: unknown) {
       showError(getNetworkErrorMessage());
     } finally {
       setIsApplyingDiscount(false);
@@ -408,7 +409,7 @@ export function useMemberBilling(
         linkWindow?.close();
         showError(getApiErrorMessage(res, 'get payment link'));
       }
-    } catch (err: unknown) {
+    } catch (_err: unknown) {
       linkWindow?.close();
       showError(getNetworkErrorMessage());
     } finally {
@@ -443,7 +444,7 @@ export function useMemberBilling(
         portalWindow?.close();
         showError(getApiErrorMessage(res, 'open billing portal'));
       }
-    } catch (err: unknown) {
+    } catch (_err: unknown) {
       portalWindow?.close();
       showError(getNetworkErrorMessage());
     } finally {
@@ -469,7 +470,7 @@ export function useMemberBilling(
       } else {
         showSuccess('Activation email sent!');
       }
-    } catch (err: unknown) {
+    } catch (_err: unknown) {
       showError(getNetworkErrorMessage());
     } finally {
       setIsSendingActivation(false);
@@ -512,7 +513,7 @@ export function useMemberBilling(
       } else {
         showError('Could not generate activation link');
       }
-    } catch (err: unknown) {
+    } catch (_err: unknown) {
       showError(getNetworkErrorMessage());
     }
   };
@@ -533,7 +534,7 @@ export function useMemberBilling(
       } else {
         showError(getApiErrorMessage(res, 'sync to Stripe'));
       }
-    } catch (err: unknown) {
+    } catch (_err: unknown) {
       showError(getNetworkErrorMessage());
     } finally {
       setIsSyncingToStripe(false);
@@ -554,7 +555,7 @@ export function useMemberBilling(
         if (metaRes.ok) {
           results.push('Metadata synced');
         }
-      } catch (e: unknown) { /* continue */ }
+      } catch (_e: unknown) { /* continue */ }
       
       try {
         const tierRes = await fetch(`/api/member-billing/${encodeURIComponent(memberEmail)}/sync-tier-from-stripe`, {
@@ -569,7 +570,7 @@ export function useMemberBilling(
             results.push(`Tier: ${data.newTier}`);
           }
         }
-      } catch (e: unknown) { /* continue */ }
+      } catch (_e: unknown) { /* continue */ }
       
       try {
         const cacheRes = await fetch(`/api/member-billing/${encodeURIComponent(memberEmail)}/backfill-cache`, {
@@ -580,7 +581,7 @@ export function useMemberBilling(
           const data = await cacheRes.json();
           results.push(`${data.transactionCount || 0} transactions cached`);
         }
-      } catch (e: unknown) { /* continue */ }
+      } catch (_e: unknown) { /* continue */ }
       
       await fetchBillingInfo();
       onMemberUpdated?.();
@@ -590,7 +591,7 @@ export function useMemberBilling(
       } else {
         showError('Sync completed but no changes were made');
       }
-    } catch (err: unknown) {
+    } catch (_err: unknown) {
       showError(getNetworkErrorMessage());
     } finally {
       setIsSyncingStripeData(false);
@@ -637,7 +638,7 @@ export function useMemberBilling(
           showError(getApiErrorMessage(res, 'create subscription'));
         }
       }
-    } catch (err: unknown) {
+    } catch (_err: unknown) {
       showError(getNetworkErrorMessage());
     } finally {
       setIsCreatingSubscription(false);

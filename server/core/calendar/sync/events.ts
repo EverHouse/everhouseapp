@@ -60,11 +60,13 @@ async function resyncEventAvailabilityBlocks(
             createdBy: 'calendar_sync',
           },
         });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (insertErr: any) {
         const pgMessage = insertErr?.cause?.message || insertErr?.message || String(insertErr);
         logger.warn(`[Events Sync] Insert failed for event #${eventId} resource ${resourceId}: ${pgMessage}`);
       }
     }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } catch (err: any) {
     const pgMessage = err?.cause?.message || err?.message || String(err);
     logger.error(`[Events Sync] Failed to resync availability blocks for event #${eventId}: ${pgMessage}`);

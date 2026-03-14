@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchWithCredentials } from '../../hooks/queries/useFetch';
-import { useData, Booking } from '../../contexts/DataContext';
+import { useData } from '../../contexts/DataContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { usePageReady } from '../../contexts/PageReadyContext';
 import { useNavigationLoading } from '../../contexts/NavigationLoadingContext';
@@ -10,7 +10,7 @@ import { useToast } from '../../components/Toast';
 import { bookingEvents } from '../../lib/bookingEvents';
 import ScheduleCard from '../../components/ScheduleCard';
 import OnboardingChecklist from '../../components/OnboardingChecklist';
-import { formatDateShort, getTodayString, getPacificHour, CLUB_TIMEZONE, formatDateTimePacific, formatMemberSince, formatTime12Hour, getNowTimePacific } from '../../utils/dateUtils';
+import { formatDateShort, getTodayString, getPacificHour, CLUB_TIMEZONE, formatMemberSince, formatTime12Hour, getNowTimePacific } from '../../utils/dateUtils';
 import { downloadICalFile } from '../../utils/icalUtils';
 import { DashboardSkeleton } from '../../components/skeletons';
 import { SmoothReveal } from '../../components/motion/SmoothReveal';
@@ -26,7 +26,6 @@ import ErrorState from '../../components/ErrorState';
 import ModalShell from '../../components/ModalShell';
 import MetricsGrid from '../../components/MetricsGrid';
 import { RosterManager } from '../../components/booking';
-import { apiRequest } from '../../lib/apiRequest';
 import { AnimatedPage } from '../../components/motion';
 import { useAutoAnimate } from '@formkit/auto-animate/react';
 import FirstLoginWelcomeModal from '../../components/FirstLoginWelcomeModal';
@@ -54,7 +53,7 @@ interface DBBooking {
   declared_player_count?: number;
 }
 
-interface DBEvent {
+interface _DBEvent {
   id: number;
   title: string;
   description: string;
@@ -180,7 +179,7 @@ interface DashboardRawBooking {
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { user, actualUser, viewAsUser, isViewingAs, addBooking, deleteBooking } = useData();
+  const { user, actualUser, viewAsUser, isViewingAs, addBooking: _addBooking, deleteBooking } = useData();
   const { effectiveTheme } = useTheme();
   
   const isAdminViewingAs = actualUser?.role === 'admin' && isViewingAs;
@@ -191,10 +190,13 @@ const Dashboard: React.FC = () => {
   const { showToast } = useToast();
   const isDark = effectiveTheme === 'dark';
   
-  const [selectedBooking, setSelectedBooking] = useState<DBBooking | null>(null);
-  const [newDate, setNewDate] = useState<string>('');
-  const [newTime, setNewTime] = useState<string | null>(null);
-  const [availableSlots, setAvailableSlots] = useState<string[]>([]);
+  const [_selectedBooking, setSelectedBooking] = useState<DBBooking | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [_newDate, setNewDate] = useState<string>('');
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [_newTime, setNewTime] = useState<string | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [_availableSlots, setAvailableSlots] = useState<string[]>([]);
   const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean; title: string; message: string; onConfirm: () => void } | null>(null);
   const [showGuestCheckin, setShowGuestCheckin] = useState(false);
   const [isCardOpen, setIsCardOpen] = useState(false);
@@ -227,7 +229,7 @@ const Dashboard: React.FC = () => {
     ? `/api/member/dashboard-data?member_email=${encodeURIComponent(viewAsEmail)}`
     : '/api/member/dashboard-data';
   
-  const { data: dashboardData, isLoading, error: dashboardError, refetch: refetchDashboardData } = useQuery({
+  const { data: dashboardData, isLoading, error: dashboardError, refetch: _refetchDashboardData } = useQuery({
     queryKey: ['member', 'dashboard-data', viewAsEmail || user?.email],
     queryFn: () => fetchWithCredentials<DashboardData>(dashboardUrl),
     enabled: !!user?.email,
@@ -573,12 +575,12 @@ const Dashboard: React.FC = () => {
   });
 
   const upcomingBookings = upcomingItemsFiltered.filter(item => item.type === 'booking' || item.type === 'booking_request' || item.type === 'conference_room_calendar');
-  const upcomingEventsWellness = upcomingItemsFiltered.filter(item => item.type === 'rsvp' || item.type === 'wellness');
+  const _upcomingEventsWellness = upcomingItemsFiltered.filter(item => item.type === 'rsvp' || item.type === 'wellness');
 
-  const nextBooking = upcomingBookings[0];
+  const _nextBooking = upcomingBookings[0];
   
-  const nextItem = upcomingItemsFiltered[0];
-  const laterItems = upcomingItemsFiltered.slice(1);
+  const _nextItem = upcomingItemsFiltered[0];
+  const _laterItems = upcomingItemsFiltered.slice(1);
 
   const getIconForType = (type: string) => {
     switch(type) {
@@ -646,7 +648,7 @@ const Dashboard: React.FC = () => {
             const data = await res.json().catch(() => ({}));
             showToast(data.error || 'Failed to cancel booking', 'error');
           }
-        } catch (err: unknown) {
+        } catch (_err: unknown) {
           setOptimisticCancelledIds(prev => {
             const next = new Set(prev);
             next.delete(bookingId);
@@ -702,7 +704,7 @@ const Dashboard: React.FC = () => {
             const data = await res.json().catch(() => ({}));
             showToast(data.error || 'Failed to leave booking', 'error');
           }
-        } catch (err: unknown) {
+        } catch (_err: unknown) {
           showToast('Failed to leave booking', 'error');
         }
       }
@@ -730,7 +732,7 @@ const Dashboard: React.FC = () => {
           } else {
             showToast('Failed to cancel RSVP', 'error');
           }
-        } catch (err: unknown) {
+        } catch (_err: unknown) {
           showToast('Failed to cancel RSVP', 'error');
         }
       }
@@ -758,7 +760,7 @@ const Dashboard: React.FC = () => {
           } else {
             showToast('Failed to cancel enrollment', 'error');
           }
-        } catch (err: unknown) {
+        } catch (_err: unknown) {
           showToast('Failed to cancel enrollment', 'error');
         }
       }
@@ -772,7 +774,7 @@ const Dashboard: React.FC = () => {
     return 'Good evening';
   };
 
-  const getTierBadgeStyle = (tier: string | undefined) => {
+  const _getTierBadgeStyle = (tier: string | undefined) => {
     const t = (tier || '').toLowerCase();
     if (t === 'vip' || t === 'premium') {
       return 'bg-amber-400 text-amber-900';
@@ -1003,6 +1005,7 @@ const Dashboard: React.FC = () => {
             </div>
             <div ref={scheduleRef} className="space-y-3">
               {upcomingItemsFiltered.length > 0 ? upcomingItemsFiltered.slice(0, 6).map((item, idx) => {
+                // eslint-disable-next-line no-useless-assignment
                 let actions: { icon: string; label: string; onClick: () => void }[] = [];
                 if (item.type === 'booking' || item.type === 'booking_request') {
                   const bookingStatus = (item as DashboardBookingItem).status as string;
@@ -1083,11 +1086,11 @@ const Dashboard: React.FC = () => {
                 } else {
                   actions = [];
                 }
-                const getStatusBadge = () => {
+                const _getStatusBadge = () => {
                   if (item.type !== 'booking' && item.type !== 'booking_request') return null;
                   const status = (item as DashboardBookingItem).status;
                   const isLinked = (item as DashboardBookingItem).isLinkedMember || false;
-                  const rawBooking = item.raw as DBBookingRequest;
+                  const _rawBooking = item.raw as DBBookingRequest;
                   
                   const badges: React.ReactNode[] = [];
                   

@@ -199,7 +199,7 @@ const ApplicationPipeline: React.FC = () => {
         haptic.error();
         showToast('Failed to update status', 'error');
       }
-    } catch (err: unknown) {
+    } catch (_err: unknown) {
       haptic.error();
       showToast('Failed to update status', 'error');
     } finally {
@@ -226,7 +226,7 @@ const ApplicationPipeline: React.FC = () => {
         haptic.error();
         showToast('Failed to save notes', 'error');
       }
-    } catch (err: unknown) {
+    } catch (_err: unknown) {
       haptic.error();
       showToast('Failed to save notes', 'error');
     } finally {
@@ -254,7 +254,7 @@ const ApplicationPipeline: React.FC = () => {
         haptic.error();
         showToast(data.error || 'Failed to send invite', 'error');
       }
-    } catch (err: unknown) {
+    } catch (_err: unknown) {
       haptic.error();
       showToast('Failed to send invite', 'error');
     } finally {

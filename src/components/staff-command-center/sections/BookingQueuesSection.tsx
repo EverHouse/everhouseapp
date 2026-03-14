@@ -23,6 +23,7 @@ interface PendingRequestsCardProps {
 const PendingRequestsCard = memo<PendingRequestsCardProps>(({
   pendingRequests,
   today,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   variant,
   navigateToTab,
   isActionLoading,
@@ -68,7 +69,7 @@ const PendingRequestsCard = memo<PendingRequestsCardProps>(({
             <EmptyState icon="check_circle" title="All caught up!" description="No pending requests" variant="compact" />
           </div>
         ) : (
-          pendingRequests.map((request, index) => {
+          pendingRequests.map((request, _index) => {
             const isDenying = isActionLoading(`deny-${request.id}`);
             
             return (
@@ -211,6 +212,7 @@ const UpcomingBookingsCard = memo<UpcomingBookingsCardProps>(({
   mergedUpcomingBookings,
   today,
   navigateToTab,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   getStatusBadge,
   getSmartActionButton,
   onEditBooking
@@ -246,7 +248,7 @@ const UpcomingBookingsCard = memo<UpcomingBookingsCardProps>(({
             <EmptyState icon="calendar_today" title="No bookings today" variant="compact" />
           </div>
         ) : (
-          mergedUpcomingBookings.map((booking, index) => {
+          mergedUpcomingBookings.map((booking, _index) => {
             const isUnmatched = booking.is_unmatched;
             const cardClass = isUnmatched 
               ? 'bg-amber-50/80 dark:bg-amber-500/10 border border-amber-300 dark:border-amber-500/30' 
@@ -368,6 +370,7 @@ export const BookingQueuesSection: React.FC<BookingQueuesSectionProps> = ({
   }, [navigate]);
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { execute: executeApprove } = useAsyncAction(
     async (request: BookingRequest) => {
       setLoadingAction(`approve-${request.id}`);
@@ -467,7 +470,7 @@ export const BookingQueuesSection: React.FC<BookingQueuesSectionProps> = ({
     });
   }, [todaysBookings, unmatchedBookings]);
 
-  const isDesktopGrid = variant === 'desktop-top' || variant === 'desktop-bottom';
+  const _isDesktopGrid = variant === 'desktop-top' || variant === 'desktop-bottom';
 
   const getStatusBadge = (booking: BookingRequest) => {
     if (booking.status === 'attended' && booking.has_unpaid_fees && (booking.total_owed ?? 0) > 0) {

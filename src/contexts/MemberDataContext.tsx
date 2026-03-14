@@ -98,7 +98,7 @@ export const MemberDataProvider: React.FC<{children: ReactNode}> = ({ children }
   const FORMER_MEMBERS_CACHE_MS = 10 * 60 * 1000;
   const initialMembersFetchedRef = useRef(false);
   const membersFetchUserRoleRef = useRef<string | null>(null);
-  const paginatedMembersCache = useRef<Map<string, MemberProfile[]>>(new Map());
+  const _paginatedMembersCache = useRef<Map<string, MemberProfile[]>>(new Map());
 
   useEffect(() => {
     actualUserRef.current = actualUser;
@@ -316,6 +316,7 @@ export const MemberDataProvider: React.FC<{children: ReactNode}> = ({ children }
   );
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useMemberData = () => {
   const context = useContext(MemberDataContext);
   if (!context) {

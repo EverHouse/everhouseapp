@@ -88,6 +88,7 @@ router.get('/api/tier-features', async (req, res) => {
         if (existingValue && existingValue.value !== null && existingValue.value !== '' && existingValue.value !== false) {
           values[tier.id as number] = existingValue;
         } else if (mapping) {
+          // eslint-disable-next-line no-useless-assignment
           let derivedValue: string | number | boolean | null = null;
           
           if (mapping.column === null) {

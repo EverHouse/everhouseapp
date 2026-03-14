@@ -177,7 +177,7 @@ export function useDataIntegrityActions(state: DataIntegrityState) {
   const { 
     data: cachedData, 
     isLoading: isLoadingCached,
-    refetch: refetchCached
+    refetch: _refetchCached
   } = useQuery({
     queryKey: ['data-integrity', 'cached'],
     queryFn: () => fetchWithCredentials<CachedResultsResponse>('/api/data-integrity/cached'),
@@ -236,6 +236,7 @@ export function useDataIntegrityActions(state: DataIntegrityState) {
   useEffect(() => {
     const handleDataIntegrityUpdate = (event: CustomEvent) => {
       const { action } = event.detail || {};
+      // eslint-disable-next-line no-console
       console.log('[DataIntegrity] Real-time update received:', action);
       
       if (action === 'data_changed' || action === 'issue_resolved') {

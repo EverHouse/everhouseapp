@@ -49,6 +49,7 @@ export const AuthDataProvider: React.FC<{children: ReactNode}> = ({ children }) 
 
   useEffect(() => {
     if (storeUser && !actualUser) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setActualUser(storeUser as MemberProfile);
       safeSetIsLoadingFalse();
     }
@@ -92,6 +93,7 @@ export const AuthDataProvider: React.FC<{children: ReactNode}> = ({ children }) 
           setActualUser(devTestStaff);
           setSessionChecked(true);
           safeSetIsLoadingFalse();
+          // eslint-disable-next-line no-console
           console.log('[SCREENSHOT MODE] Auto-logged in as test staff/admin');
           return;
         }
@@ -113,6 +115,7 @@ export const AuthDataProvider: React.FC<{children: ReactNode}> = ({ children }) 
         setActualUser(devTestMember);
         setSessionChecked(true);
         safeSetIsLoadingFalse();
+        // eslint-disable-next-line no-console
         console.log('[SCREENSHOT MODE] Auto-logged in as test member');
         return;
       }
@@ -194,7 +197,7 @@ export const AuthDataProvider: React.FC<{children: ReactNode}> = ({ children }) 
           const member = JSON.parse(savedMember);
           setActualUser(member);
           useUserStore.getState().setUser(member);
-        } catch (err: unknown) {
+        } catch (_err: unknown) {
           localStorage.removeItem('eh_member');
         }
       }
@@ -390,6 +393,7 @@ export const AuthDataProvider: React.FC<{children: ReactNode}> = ({ children }) 
   );
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useAuthData = () => {
   const context = useContext(AuthDataContext);
   if (!context) {

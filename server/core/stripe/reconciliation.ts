@@ -2,8 +2,6 @@ import { db } from '../../db';
 import { sql } from 'drizzle-orm';
 import { getStripeClient } from './client';
 import { confirmPaymentSuccess } from './payments';
-import { findOrCreateHubSpotContact } from '../hubspot/members';
-import { updateContactMembershipStatus } from '../hubspot/stages';
 import Stripe from 'stripe';
 import { getErrorMessage, getErrorCode } from '../../utils/errorUtils';
 

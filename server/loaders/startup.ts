@@ -1,4 +1,4 @@
-import { ensureDatabaseConstraints, seedDefaultNoticeTypes, createStripeTransactionCache, createSyncExclusionsTable, setupEmailNormalization, normalizeExistingEmails, cleanupOrphanedRecords, seedTierFeatures, fixFunctionSearchPaths, validateTierHierarchy, setupInstantDataTriggers } from '../db-init';
+import { ensureDatabaseConstraints, seedDefaultNoticeTypes, createStripeTransactionCache, createSyncExclusionsTable, setupEmailNormalization, normalizeExistingEmails, seedTierFeatures, fixFunctionSearchPaths, validateTierHierarchy, setupInstantDataTriggers } from '../db-init';
 import { seedTrainingSections } from '../routes/training';
 import { getStripeSync } from '../core/stripe';
 import { getStripeEnvironmentInfo, getStripeClient } from '../core/stripe/client';
@@ -485,7 +485,7 @@ export async function runStartupTasks(): Promise<void> {
               const [eH, eM] = row.end_time.split(':').map(Number);
               slotDuration = (eH * 60 + eM) - (sH * 60 + sM);
               if (slotDuration <= 0) slotDuration = 60;
-            } catch (_) {}
+            } catch (_) { /* ignored */ }
 
             await tx.execute(sql`
               INSERT INTO booking_participants (session_id, user_id, participant_type, display_name, slot_duration, payment_status, invited_at)

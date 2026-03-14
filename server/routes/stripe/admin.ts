@@ -648,8 +648,8 @@ router.post('/api/stripe/sync-member-subscriptions', isStaffOrAdmin, sensitiveAc
     const BATCH_SIZE = 10;
     for (let i = 0; i < members.length; i += BATCH_SIZE) {
       const batch = members.slice(i, i + BATCH_SIZE);
-      const results = await Promise.allSettled(batch.map(async (member) => {
-        const memberName = [member.first_name, member.last_name].filter(Boolean).join(' ') || String(member.email);
+      const _results = await Promise.allSettled(batch.map(async (member) => {
+        const _memberName = [member.first_name, member.last_name].filter(Boolean).join(' ') || String(member.email);
 
         if (member.stripe_subscription_id) {
           try {

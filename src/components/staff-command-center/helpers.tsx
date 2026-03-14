@@ -42,6 +42,7 @@ export const GlassListRow: React.FC<{
   </div>
 );
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const getWellnessIcon = (title: string): string => {
   const lowerTitle = title.toLowerCase();
   if (lowerTitle.includes('yoga')) return 'self_improvement';
@@ -53,6 +54,7 @@ export const getWellnessIcon = (title: string): string => {
   return 'favorite';
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const getEventIcon = (category: string): string => {
   switch (category) {
     case 'Golf': return 'golf_course';
@@ -67,6 +69,7 @@ export const getEventIcon = (category: string): string => {
   }
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const formatTimeLeft = (targetDate: string | Date, targetTime: string): string => {
   if (!targetDate || !targetTime) return 'No upcoming';
   
@@ -112,6 +115,7 @@ export const formatTimeLeft = (targetDate: string | Date, targetTime: string): s
   return `${days}d`;
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const formatLastSynced = (lastSynced: Date): string => {
   const parts = getPacificDateParts();
   const nowMs = Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, 0);
@@ -121,6 +125,7 @@ export const formatLastSynced = (lastSynced: Date): string => {
   return lastSynced.toLocaleTimeString('en-US', { timeZone: 'America/Los_Angeles', hour: 'numeric', minute: '2-digit' });
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const formatTodayDate = (): string => {
   return new Date().toLocaleDateString('en-US', { 
     timeZone: 'America/Los_Angeles',
@@ -131,6 +136,7 @@ export const formatTodayDate = (): string => {
   });
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const EMPLOYEE_RESOURCES_LINKS = [
   { id: 'directory' as const, icon: 'groups', label: 'Member Directory' },
   { id: 'team' as const, icon: 'badge', label: 'Team' },
@@ -138,6 +144,7 @@ export const EMPLOYEE_RESOURCES_LINKS = [
   { id: 'training' as const, icon: 'school', label: 'Training Guide' },
 ];
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const ADMIN_LINKS = [
   { id: 'gallery' as const, icon: 'photo_library', label: 'Gallery' },
   { id: 'faqs' as const, icon: 'help_outline', label: 'FAQs' },
@@ -148,6 +155,7 @@ export const ADMIN_LINKS = [
   { id: 'changelog' as const, icon: 'history', label: 'Version History' },
 ];
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const ADMIN_ROUTE_LINKS = [
   { route: '/admin/data-integrity', icon: 'fact_check', label: 'Data Integrity' },
 ];

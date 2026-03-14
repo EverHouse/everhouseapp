@@ -418,6 +418,7 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
       
       if (res.ok) {
         const data = await res.json();
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         setAccountBalance(prev => ({
           balanceCents: Math.abs(data.endingBalance || 0),
           balanceDollars: Math.abs(data.endingBalance || 0) / 100,
@@ -999,7 +1000,7 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
                           const data = await res.json();
                           alert(data.error || 'Failed to send payment link');
                         }
-                      } catch (err: unknown) {
+                      } catch (_err: unknown) {
                         alert('Failed to send payment link');
                       } finally {
                         setSendingPaymentLink(false);
@@ -1058,7 +1059,7 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
                       const data = await res.json();
                       alert(data.error || 'Failed to send reactivation link');
                     }
-                  } catch (err: unknown) {
+                  } catch (_err: unknown) {
                     alert('Failed to send reactivation link');
                   }
                 }}

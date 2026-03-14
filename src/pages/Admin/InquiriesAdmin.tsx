@@ -3,7 +3,7 @@ import { useAutoAnimate } from '@formkit/auto-animate/react';
 import { usePageReady } from '../../contexts/PageReadyContext';
 import ModalShell from '../../components/ModalShell';
 import { getInquiryStatusColor, formatStatusLabel } from '../../utils/statusColors';
-import { formatRelativeTime, formatCardTimestamp, getRelativeDateLabel } from '../../utils/dateUtils';
+import { formatRelativeTime } from '../../utils/dateUtils';
 import { useToast } from '../../components/Toast';
 import { haptic } from '../../utils/haptics';
 
@@ -405,7 +405,7 @@ const InquiriesAdmin: React.FC = () => {
                 </div>
             ) : (
                 <div ref={inquiriesRef} className="space-y-3 animate-content-enter-delay-4">
-                    {inquiries.map((inquiry, index) => (
+                    {inquiries.map((inquiry, _index) => (
                         <button
                             key={inquiry.id}
                             onClick={() => openDetail(inquiry)}

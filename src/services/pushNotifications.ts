@@ -134,7 +134,7 @@ export async function isSubscribedToPush(): Promise<boolean> {
     const registration = await navigator.serviceWorker.ready;
     const subscription = await registration.pushManager.getSubscription();
     return !!subscription;
-  } catch (error: unknown) {
+  } catch (_error: unknown) {
     return false;
   }
 }

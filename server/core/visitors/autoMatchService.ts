@@ -114,7 +114,7 @@ export function parseBookingNotes(notes: string | null | undefined): ParsedBooki
     result.memberEmail = emailMatch[1].trim().toLowerCase();
   }
 
-  for (const [key, typeInfo] of Object.entries(BOOKING_TYPE_MAPPINGS)) {
+  for (const [_key, typeInfo] of Object.entries(BOOKING_TYPE_MAPPINGS)) {
     if (typeInfo.keyword && lowerNotes.includes(typeInfo.keyword)) {
       result.bookingType = typeInfo;
       break;
@@ -163,7 +163,7 @@ export async function matchBookingToPurchase(
 
     const timeParts = startTime.split(':');
     const bookingHour = parseInt(timeParts[0], 10);
-    const bookingMinute = parseInt(timeParts[1] || '0', 10);
+    const _bookingMinute = parseInt(timeParts[1] || '0', 10);
     
     const minHour = Math.max(0, bookingHour - 2);
     const maxHour = Math.min(23, bookingHour + 2);
@@ -458,7 +458,7 @@ export async function autoMatchSingleBooking(
     
     if (purchaseMatch && purchaseMatch.email) {
       let userId = purchaseMatch.userId;
-      let displayName = `${purchaseMatch.firstName || ''} ${purchaseMatch.lastName || ''}`.trim() || purchaseMatch.email;
+      const displayName = `${purchaseMatch.firstName || ''} ${purchaseMatch.lastName || ''}`.trim() || purchaseMatch.email;
       
       if (!userId) {
         const visitor = await upsertVisitor({
@@ -661,8 +661,8 @@ async function markBookingAsPrivateEvent(bookingId: number, staffEmail?: string)
  */
 async function createGolfNowVisitor(
   userName: string | null,
-  bookingDate: Date | string,
-  startTime: string
+  _bookingDate: Date | string,
+  _startTime: string
 ): Promise<string | null> {
   // No longer create placeholder visitors - return null to keep booking unmatched
   // Staff will manually assign via TrackmanLinkModal

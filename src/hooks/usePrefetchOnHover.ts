@@ -23,6 +23,7 @@ export function usePrefetchOnHover<T>({
   const queryClient = useQueryClient();
   const serialized = serializeKey(queryKey);
   const serializedRef = useRef(serialized);
+  // eslint-disable-next-line react-hooks/refs
   serializedRef.current = serialized;
 
   const triggerPrefetch = useCallback(() => {

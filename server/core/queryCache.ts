@@ -1,4 +1,3 @@
-import { logger } from './logger';
 
 interface CacheEntry<T> {
   data: T;

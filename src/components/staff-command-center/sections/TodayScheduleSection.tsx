@@ -246,11 +246,13 @@ interface TodayScheduleSectionProps {
 }
 
 export const TodayScheduleSection: React.FC<TodayScheduleSectionProps> = ({
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   upcomingTours,
   upcomingEvents,
   upcomingWellness,
   nextTour,
   nextEvent,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   nextScheduleItem,
   nextActivityItem,
   today,

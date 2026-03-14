@@ -1,7 +1,7 @@
 import { logger } from '../../core/logger';
 import { Router, Request, Response } from 'express';
 import { isStaffOrAdmin, isAdmin } from '../../core/middleware';
-import { getErrorMessage, getErrorCode, safeErrorDetail } from '../../utils/errorUtils';
+import { getErrorCode } from '../../utils/errorUtils';
 import { logFromRequest } from '../../core/auditLog';
 import { createHash } from 'crypto';
 

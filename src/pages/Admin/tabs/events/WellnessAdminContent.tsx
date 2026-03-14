@@ -28,7 +28,8 @@ export const WellnessAdminContent: React.FC = () => {
     const [selectedClass, setSelectedClass] = useState<WellnessClass | null>(null);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [classToDelete, setClassToDelete] = useState<WellnessClass | null>(null);
-    const [deletingClassId, setDeletingClassId] = useState<number | null>(null);
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const [_deletingClassId, setDeletingClassId] = useState<number | null>(null);
     const [touchedFields, setTouchedFields] = useState<Set<string>>(new Set());
     const [showAllUpcoming, setShowAllUpcoming] = useState(false);
     const [showAllPast, setShowAllPast] = useState(false);
@@ -54,7 +55,7 @@ export const WellnessAdminContent: React.FC = () => {
 
     const isWellnessFormValid = !wellnessValidation.instructor && !wellnessValidation.category && !wellnessValidation.capacity;
 
-    const { data: classes = [], isLoading, isError, error: queryError, refetch } = useQuery({
+    const { data: classes = [], isLoading, isError, error: _queryError, refetch } = useQuery({
         queryKey: ['wellness-classes'],
         queryFn: () => fetchWithCredentials<WellnessClass[]>('/api/wellness-classes'),
         throwOnError: false
@@ -294,7 +295,7 @@ export const WellnessAdminContent: React.FC = () => {
             const url = editId ? `/api/wellness-classes/${editId}` : '/api/wellness-classes';
             const method = editId ? 'PUT' : 'POST';
 
-            const { imageFile, endTime, ...restFormData } = formData;
+            const { imageFile: _imageFile, endTime, ...restFormData } = formData;
             const duration = calculateDuration(formData.time!, endTime!);
             const spotsDisplay = formData.capacity ? `${formData.capacity} spots` : 'Unlimited';
             const payload = {
@@ -312,7 +313,7 @@ export const WellnessAdminContent: React.FC = () => {
             };
 
             saveClassMutation.mutate({ url, method, payload });
-        } catch (err: unknown) {
+        } catch (_err: unknown) {
             setError(getNetworkErrorMessage());
         } finally {
             setIsUploading(false);

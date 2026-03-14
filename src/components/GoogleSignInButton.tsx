@@ -25,6 +25,7 @@ const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({
     const existingScript = document.querySelector('script[src="https://accounts.google.com/gsi/client"]');
     if (existingScript) {
       if ((window as unknown as { google?: { accounts?: { id?: { initialize: (opts: unknown) => void; renderButton: (el: HTMLElement, opts: unknown) => void } } } }).google?.accounts?.id) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setLoaded(true);
       } else {
         const onLoad = () => setLoaded(true);

@@ -18,7 +18,7 @@ const PLACEHOLDER_EMAIL_PATTERNS = [
   'placeholder@'
 ];
 
-function isPlaceholderEmail(email: string | null | undefined): boolean {
+function _isPlaceholderEmail(email: string | null | undefined): boolean {
   if (!email) return true;
   const lower = email.toLowerCase();
   return PLACEHOLDER_EMAIL_PATTERNS.some(pattern => lower.includes(pattern));
@@ -135,6 +135,7 @@ export async function findMatchingUser(criteria: MatchCriteria): Promise<User | 
  * New users are created with role='visitor' and membershipStatus='visitor'
  * Also ensures a Stripe customer is created for billing purposes
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export async function upsertVisitor(data: VisitorData, createStripeCustomer: boolean = true): Promise<User> {
   // Try to find existing user
   const existingUser = await findMatchingUser(data);

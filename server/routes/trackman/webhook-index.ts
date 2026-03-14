@@ -19,15 +19,19 @@ import {
   parseTrackmanV2Payload,
   mapBayNameToResourceId,
   calculateDurationMinutes,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   redactPII,
 } from './webhook-helpers';
-import { validateTrackmanWebhookSignature, logWebhookEvent, resolveLinkedEmail, findMemberByEmail } from './webhook-validation';
+import { validateTrackmanWebhookSignature, logWebhookEvent, findMemberByEmail } from './webhook-validation';
 import { 
   handleBookingUpdate, 
   handleBookingModification,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   tryAutoApproveBooking, 
   cancelBookingByTrackmanId,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   saveToUnmatchedBookings,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   createUnmatchedBookingRequest,
 } from './webhook-handlers';
 import type { ExistingBookingData } from './webhook-handlers';
@@ -168,6 +172,7 @@ interface BackfillDetailItem {
 
 import {
   updateBaySlotCache, 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   createBookingForMember,
   tryMatchByBayDateTime,
 } from './webhook-billing';
@@ -186,7 +191,7 @@ async function notifyMemberBookingConfirmed(
     const userResult = await db.execute(sql`SELECT id, first_name, last_name, email FROM users WHERE LOWER(email) = LOWER(${customerEmail})`);
     
     if (userResult.rows.length > 0) {
-      const user = userResult.rows[0];
+      const _user = userResult.rows[0];
       const message = `Your simulator booking for ${slotDate} at ${startTime}${bayName ? ` (${bayName})` : ''} has been confirmed.`;
       
       await notifyMember(

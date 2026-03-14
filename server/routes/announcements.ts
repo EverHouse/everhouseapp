@@ -1,5 +1,4 @@
 import { Router } from 'express';
-import { isProduction } from '../core/db';
 import { isStaffOrAdmin } from '../core/middleware';
 import { db } from '../db';
 import { announcements } from '../../shared/schema';
@@ -21,7 +20,7 @@ import {
   AnnouncementData
 } from '../core/googleSheets/announcementSync';
 import { systemSettings } from '../../shared/models/system';
-import { safeErrorDetail, getErrorMessage } from '../utils/errorUtils';
+import { getErrorMessage } from '../utils/errorUtils';
 
 interface AnnouncementRow {
   id: number;

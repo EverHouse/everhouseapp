@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type {
   SystemHealth,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   IntegrityIssue,
   IgnoreModalState,
   BulkIgnoreModalState,

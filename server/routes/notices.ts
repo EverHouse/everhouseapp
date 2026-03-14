@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { isAuthenticated } from '../core/middleware';
 import { db } from '../db';
 import { userDismissedNotices } from '../../shared/schema';
-import { eq, and } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { logAndRespond } from '../core/logger';
 import { getSessionUser } from '../types/session';
 

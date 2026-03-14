@@ -60,11 +60,13 @@ async function resyncWellnessAvailabilityBlocks(
             createdBy: 'calendar_sync',
           },
         });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (insertErr: any) {
         const pgMessage = insertErr?.cause?.message || insertErr?.message || String(insertErr);
         logger.warn(`[Wellness Sync] Insert failed for class #${wellnessClassId} resource ${resourceId}: ${pgMessage}`);
       }
     }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } catch (err: any) {
     const pgMessage = err?.cause?.message || err?.message || String(err);
     logger.error(`[Wellness Sync] Failed to resync availability blocks for class #${wellnessClassId}: ${pgMessage}`);

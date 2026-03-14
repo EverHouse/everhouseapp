@@ -85,7 +85,7 @@ export class BookingStateService {
     staffNotes?: string;
     staffEmail?: string;
   }): Promise<CancelResult> {
-    const { bookingId, source, cancelledBy, staffNotes, staffEmail } = params;
+    const { bookingId, source, cancelledBy, staffNotes, staffEmail: _staffEmail } = params;
 
     let booking: BookingRecord;
     try {
@@ -647,8 +647,8 @@ export class BookingStateService {
   private static async handlePendingCancellationFlow(
     bookingId: number,
     booking: BookingRecord,
-    source: string,
-    cancelledBy?: string,
+    _source: string,
+    _cancelledBy?: string,
   ): Promise<CancelResult> {
     let bayName = 'Bay';
     if (booking.resourceId) {

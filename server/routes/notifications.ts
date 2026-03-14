@@ -20,7 +20,7 @@ async function isStaffUser(email: string): Promise<boolean> {
       sql`SELECT id FROM staff_users WHERE LOWER(email) = LOWER(${email}) AND is_active = true`
     );
     return result.rows.length > 0;
-  } catch (error: unknown) {
+  } catch (_error: unknown) {
     return false;
   }
 }

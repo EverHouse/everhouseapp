@@ -7,7 +7,7 @@ import { getErrorMessage, getErrorCode } from '../utils/errorUtils';
 import { logger } from '../core/logger';
 
 const RECONCILIATION_INTERVAL_MS = 15 * 60 * 1000; // 15 minutes
-const STALE_THRESHOLD_MINUTES = 5;
+const _STALE_THRESHOLD_MINUTES = 5;
 
 async function connectWithTimeout(timeoutMs = 10000): Promise<PoolClient> {
   let timedOut = false;

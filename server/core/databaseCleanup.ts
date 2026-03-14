@@ -1,6 +1,6 @@
 import { db } from '../db';
 import { bookingRequests, notifications, users, eventRsvps } from '../../shared/schema';
-import { sql, eq, like, or, and, lt, inArray } from 'drizzle-orm';
+import { sql, eq, like, or, and, inArray } from 'drizzle-orm';
 import { logger } from './logger';
 
 interface DrizzleExecuteResult {
@@ -16,7 +16,7 @@ interface CleanupResult {
   oldCancelledBookings: number;
 }
 
-const TEST_EMAIL_PATTERNS = [
+const _TEST_EMAIL_PATTERNS = [
   'test-member@example.com',
   'test-staff@example.com',
   'notif-test-member@example.com',
@@ -26,7 +26,7 @@ const TEST_EMAIL_PATTERNS = [
   '%@test.example.com'
 ];
 
-const TEST_NAME_PATTERNS = [
+const _TEST_NAME_PATTERNS = [
   'Test Member',
   'Test Staff',
   'Test User'

@@ -94,7 +94,7 @@ const HubSpotFormModal: React.FC<HubSpotFormModalProps> = ({
           try {
             const data = await response.json();
             errorMessage = data.error || errorMessage;
-          } catch (parseErr) {
+          } catch (_parseErr) {
             // Response was not valid JSON, use default error message
           }
         }

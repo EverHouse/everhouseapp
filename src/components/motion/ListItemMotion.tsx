@@ -87,6 +87,7 @@ export const AnimatedSection: React.FC<AnimatedSectionProps> = ({
   );
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const getStaggerClass = (index: number, prefix: 'list' | 'content' = 'list'): string => {
   if (prefix === 'content') {
     if (index <= 0) return 'animate-content-enter';

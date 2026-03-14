@@ -6,6 +6,7 @@ export function useVisibilityAwareInterval(
   enabled: boolean = true
 ) {
   const callbackRef = useRef(callback);
+  // eslint-disable-next-line react-hooks/refs
   callbackRef.current = callback;
 
   useEffect(() => {

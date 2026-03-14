@@ -24,11 +24,13 @@ window.clearPWACaches = async () => {
   if ('caches' in window) {
     const keys = await caches.keys();
     await Promise.all(keys.map(key => caches.delete(key)));
+    // eslint-disable-next-line no-console
     console.log('[App] All caches cleared');
   }
   if ('serviceWorker' in navigator) {
     const registrations = await navigator.serviceWorker.getRegistrations();
     await Promise.all(registrations.map(reg => reg.unregister()));
+    // eslint-disable-next-line no-console
     console.log('[App] Service workers unregistered');
   }
   window.location.reload();
@@ -41,10 +43,12 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.addEventListener('controllerchange', () => {
     if (refreshing) return;
     if (!hadController) {
+      // eslint-disable-next-line no-console
       console.log('[App] First service worker install, skipping reload');
       return;
     }
     refreshing = true;
+    // eslint-disable-next-line no-console
     console.log('[App] New service worker activated, reloading');
     if (isStandalonePWA()) {
       pwaReload();
@@ -64,6 +68,7 @@ if ('serviceWorker' in navigator) {
         if (newWorker) {
           newWorker.addEventListener('statechange', () => {
             if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+              // eslint-disable-next-line no-console
               console.log('[App] New service worker installed, will auto-activate');
             }
           });
@@ -79,6 +84,7 @@ if ('serviceWorker' in navigator) {
       if ('caches' in window) {
         const keys = await caches.keys();
         await Promise.all(keys.map(key => caches.delete(key)));
+        // eslint-disable-next-line no-console
         console.log('[App] Cleared caches after SW registration failure');
       }
     }

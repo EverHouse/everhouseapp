@@ -28,6 +28,7 @@ export const TabTransition: React.FC<TabTransitionProps> = ({
       if (exitTimerRef.current) clearTimeout(exitTimerRef.current);
       if (enterTimerRef.current) clearTimeout(enterTimerRef.current);
 
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setAnimationPhase('exiting');
       
       exitTimerRef.current = setTimeout(() => {

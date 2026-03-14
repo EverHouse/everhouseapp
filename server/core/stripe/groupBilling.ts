@@ -491,7 +491,7 @@ export async function addGroupMember(params: {
       logger.info(`[GroupBilling] Email ${params.memberEmail} resolved to existing user ${resolvedFamily.primaryEmail} via ${resolvedFamily.matchType}`);
     }
     
-    let userExists = userResult.rows.length > 0;
+    const userExists = userResult.rows.length > 0;
     
     if (userExists) {
       const user = (userResult.rows as unknown as UserBillingRow[])[0];
@@ -731,6 +731,7 @@ export async function addCorporateMember(params: {
     let needsStripeSync = false;
     let newMemberCount = 0;
     let hasPrePaidSeats = false;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     let maxSeats: unknown = null;
     
     try {
@@ -1555,7 +1556,7 @@ export async function handleSubscriptionItemsChanged(
     const billingGroupId = group[0].id;
     
     const currentItemIds = new Set(currentItems.map(i => i.id));
-    const previousItemIds = new Set(previousItems.map(i => i.id));
+    const _previousItemIds = new Set(previousItems.map(i => i.id));
     
     // Build a map of current items by email for safety checks
     const currentEmailToItemMap = new Map<string, { id: string; metadata?: Record<string, string> }>();

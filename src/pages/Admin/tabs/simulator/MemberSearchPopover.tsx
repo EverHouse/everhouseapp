@@ -88,7 +88,7 @@ const ManualBookingModal: React.FC<{
                     setMemberName(null);
                     setMemberTier(null);
                 }
-            } catch (err: unknown) {
+            } catch (_err: unknown) {
                 setMemberLookupStatus('not_found');
                 setMemberName(null);
                 setMemberTier(null);
@@ -202,7 +202,7 @@ const ManualBookingModal: React.FC<{
                 const data = await res.json();
                 setError(data.message || data.error || 'Failed to create booking');
             }
-        } catch (err: unknown) {
+        } catch (_err: unknown) {
             setError('Network error. Please try again.');
         } finally {
             setIsSubmitting(false);

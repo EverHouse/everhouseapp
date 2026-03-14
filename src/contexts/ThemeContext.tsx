@@ -8,6 +8,7 @@ const ThemeContext = createContext<ThemeContextType>({
   effectiveTheme: 'dark'
 });
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useTheme = () => useContext(ThemeContext);
 
 const getSystemPreference = (): 'light' | 'dark' => {
@@ -43,6 +44,7 @@ export const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   useEffect(() => {
     const devOverride = getDevPreviewThemeOverride();
     if (devOverride) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setEffectiveTheme(devOverride);
       return;
     }

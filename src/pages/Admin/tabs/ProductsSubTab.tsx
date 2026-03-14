@@ -53,7 +53,7 @@ const ProductsSubTab: React.FC<ProductsSubTabProps> = ({ activeSubTab }) => {
 
   const formatPrice = (cents: number) => `$${(cents / 100).toFixed(2)}`;
 
-  const renderProduct = (product: StripeProduct, index: number) => {
+  const renderProduct = (product: StripeProduct, _index: number) => {
     return (
       <div key={product.id} className="p-4 rounded-xl bg-gray-50 dark:bg-black/20 border border-gray-200 dark:border-white/10 tactile-row">
         <div className="flex items-start justify-between">

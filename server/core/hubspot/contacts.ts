@@ -347,6 +347,7 @@ export async function syncDayPassPurchaseToHubSpot(
         );
 
         contactId = createResponse.id;
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         isNewContact = true;
 
         if (!isProduction) {

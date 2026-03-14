@@ -5,7 +5,6 @@ import fs from 'fs';
 import { isStaffOrAdmin } from '../../core/middleware';
 import { importTrackmanBookings, getImportRuns, rescanUnmatchedBookings } from '../../core/trackmanImport';
 import { logFromRequest } from '../../core/auditLog';
-import { getErrorMessage, safeErrorDetail } from '../../utils/errorUtils';
 import { logger } from '../../core/logger';
 import { getSessionUser } from '../../types/session';
 
@@ -22,7 +21,7 @@ const storage = multer.diskStorage({
   },
   filename: (req, file, cb) => {
     const timestamp = Date.now();
-    const safeName = file.originalname.replace(/[^a-zA-Z0-9_\-\.]/g, '_');
+    const safeName = file.originalname.replace(/[^a-zA-Z0-9_\-.]/g, '_');
     cb(null, `trackman_${timestamp}_${safeName}`);
   }
 });
@@ -55,7 +54,7 @@ router.post('/api/admin/trackman/import', isStaffOrAdmin, async (req, res) => {
     const user = getSessionUser(req)?.email || 'admin';
     
     const safeFilename = path.basename(filename || 'trackman_bookings_1767009308200.csv');
-    if (!safeFilename.endsWith('.csv') || !/^[a-zA-Z0-9_\-\.]+$/.test(safeFilename)) {
+    if (!safeFilename.endsWith('.csv') || !/^[a-zA-Z0-9_\-.]+$/.test(safeFilename)) {
       return res.status(400).json({ error: 'Invalid filename format' });
     }
     

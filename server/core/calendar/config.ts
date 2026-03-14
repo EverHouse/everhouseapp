@@ -41,7 +41,7 @@ function parseTimeString(timeStr: string): number | null {
 
 function parseDisplayHours(displayStr: string): { startMinutes: number; endMinutes: number } | null {
   if (!displayStr || displayStr.toLowerCase() === 'closed') return null;
-  const parts = displayStr.split(/\s*[–\-]\s*/);
+  const parts = displayStr.split(/\s*[–-]\s*/);
   if (parts.length !== 2) return null;
   const startTime = parseTimeString(parts[0]);
   const endTime = parseTimeString(parts[1]);

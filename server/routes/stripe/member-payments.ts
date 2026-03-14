@@ -29,7 +29,7 @@ import { computeFeeBreakdown, applyFeeBreakdownToParticipants } from '../../core
 import { GUEST_FEE_CENTS } from './helpers';
 import { sendNotificationToUser, broadcastBillingUpdate, broadcastBookingInvoiceUpdate } from '../../core/websocket';
 import { alertOnExternalServiceError } from '../../core/errorAlerts';
-import { getErrorCode, getErrorMessage } from '../../utils/errorUtils';
+import { getErrorMessage } from '../../utils/errorUtils';
 import { toIntArrayLiteral } from '../../utils/sqlArrayLiteral';
 import { getBookingInvoiceId, createDraftInvoiceForBooking, buildInvoiceDescription } from '../../core/billing/bookingInvoiceService';
 import { PRICING } from '../../core/billing/pricingConfig';
@@ -1708,7 +1708,7 @@ router.post('/api/member/balance/pay', isAuthenticated, async (req: Request, res
             creditApplied: false
           });
         }
-      } catch (intentError: unknown) {
+      } catch (_intentError: unknown) {
         logger.info('[Member Balance] Could not reuse intent , creating new one', { extra: { existingPaymentIntentId } });
       }
     }

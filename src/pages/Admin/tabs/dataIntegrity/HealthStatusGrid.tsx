@@ -47,7 +47,7 @@ const HealthStatusGrid: React.FC<HealthStatusGridProps> = ({
               { key: 'hubspot' as const, label: 'HubSpot', icon: 'groups' },
               { key: 'resend' as const, label: 'Resend', icon: 'mail' },
               { key: 'googleCalendar' as const, label: 'Google Calendar', icon: 'calendar_today' },
-            ].map(({ key, label, icon }) => {
+            ].map(({ key, label, icon: _icon }) => {
               const service = systemHealth.services[key];
               const isDegraded = service.status === 'degraded';
               const isUnhealthy = service.status === 'unhealthy';

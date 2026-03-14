@@ -655,7 +655,8 @@ router.post('/api/data-tools/fix-trackman-ghost-bookings', isAdmin, async (req: 
     const fixed: Array<{ bookingId: number; sessionId: number; userEmail: string }> = [];
     const errors: string[] = [];
     
-    const { createSession, recordUsage, linkParticipants, ensureSessionForBooking } = await import('../../core/bookingService/sessionManager');
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { createSession: _createSession, recordUsage, linkParticipants, ensureSessionForBooking } = await import('../../core/bookingService/sessionManager');
     const { getMemberTierByEmail } = await import('../../core/tierService');
     const { calculateFullSessionBilling } = await import('../../core/bookingService/usageCalculator');
     const { recalculateSessionFees } = await import('../../core/billing/unifiedFeeService');
@@ -1096,7 +1097,7 @@ async function runVisitorArchiveInBackground(jobId: string, dryRun: boolean, sta
 
 router.post('/api/data-tools/cleanup-ghost-fees', isAdmin, async (req: Request, res: Response) => {
   try {
-    const staffEmail = getSessionUser(req)?.email || 'unknown';
+    const _staffEmail = getSessionUser(req)?.email || 'unknown';
     const { dryRun = true } = req.body;
 
     const ghostResult = await db.execute(sql`

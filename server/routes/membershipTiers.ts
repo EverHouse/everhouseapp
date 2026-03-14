@@ -4,10 +4,10 @@ import { isProduction } from '../core/db';
 import { db } from '../db';
 import { sql } from 'drizzle-orm';
 import { isAdmin, isStaffOrAdmin } from '../core/middleware';
-import { invalidateTierCache, clearTierCache } from '../core/tierService';
+import { invalidateTierCache } from '../core/tierService';
 import { syncMembershipTiersToStripe, getTierSyncStatus, cleanupOrphanStripeProducts, syncTierFeaturesToStripe, syncCafeItemsToStripe, pullTierFeaturesFromStripe, pullCafeItemsFromStripe } from '../core/stripe/products';
 import { logFromRequest } from '../core/auditLog';
-import { getErrorMessage, getErrorCode, safeErrorDetail } from '../utils/errorUtils';
+import { getErrorCode, safeErrorDetail } from '../utils/errorUtils';
 import { getCached, setCache, invalidateCache as invalidateQueryCache } from '../core/queryCache';
 
 const TIERS_CACHE_KEY = 'membership_tiers';
@@ -29,6 +29,7 @@ router.get('/api/membership-tiers', async (req, res) => {
     const { active } = req.query;
     const cacheKey = active === 'true' ? `${TIERS_CACHE_KEY}_active` : `${TIERS_CACHE_KEY}_all`;
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const cached = getCached<any[]>(cacheKey);
     if (cached) return res.json(cached);
 

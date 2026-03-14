@@ -10,6 +10,7 @@ import { formatPassType } from './redeemPass/types';
 import type { SectionProps, RedemptionSuccess, DayPass, RedemptionLog, ErrorState, UnredeemedPass, DayPassUpdateEvent } from './redeemPass/types';
 
 export type { SectionProps, RedemptionLog };
+// eslint-disable-next-line react-refresh/only-export-components
 export { formatPassType };
 
 const RedeemDayPassSection: React.FC<SectionProps> = ({ onClose, variant = 'modal', onBookGuest, onRedemptionSuccess }) => {
@@ -33,6 +34,7 @@ const RedeemDayPassSection: React.FC<SectionProps> = ({ onClose, variant = 'moda
   const [isScanning, setIsScanning] = useState(false);
   const [scannerError, setScannerError] = useState<string | null>(null);
   const [cameraPermission, setCameraPermission] = useState<'idle' | 'pending' | 'granted' | 'denied'>('idle');
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const qrScannerRef = useRef<any>(null);
   const hasScannedRef = useRef(false);
   const [unredeemedPasses, setUnredeemedPasses] = useState<UnredeemedPass[]>([]);

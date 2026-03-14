@@ -400,7 +400,7 @@ export async function calculateFullSessionBilling(
   let guestPassesUsed = 0;
   
   const guestCount = participants.filter(p => p.participantType === 'guest').length;
-  const memberCount = participants.filter(p => p.participantType !== 'guest').length;
+  const _memberCount = participants.filter(p => p.participantType !== 'guest').length;
   
   const effectivePlayerCount = Math.max(declaredPlayerCount, participants.length);
   const perPersonMinutes = Math.floor(sessionDuration / effectivePlayerCount);

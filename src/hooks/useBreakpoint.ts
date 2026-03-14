@@ -23,6 +23,7 @@ export function useBreakpoint(breakpoint: Breakpoint): boolean {
       setMatches(e.matches);
     };
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMatches(mediaQuery.matches);
 
     mediaQuery.addEventListener('change', handleChange);

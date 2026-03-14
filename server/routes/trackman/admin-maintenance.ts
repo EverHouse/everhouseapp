@@ -9,7 +9,6 @@ import { logFromRequest } from '../../core/auditLog';
 import { ensureSessionForBooking } from '../../core/bookingService/sessionManager';
 import { recalculateSessionFees } from '../../core/billing/unifiedFeeService';
 import { getErrorMessage, safeErrorDetail } from '../../utils/errorUtils';
-import { getTodayPacific } from '../../utils/dateUtils';
 
 interface DbRow {
   [key: string]: unknown;
@@ -247,7 +246,7 @@ router.get('/api/admin/backfill-sessions/preview', isStaffOrAdmin, async (req, r
 });
 
 router.post('/api/admin/backfill-sessions', isStaffOrAdmin, async (req, res) => {
-  let client = await pool.connect();
+  const client = await pool.connect();
   let clientReleased = false;
   
   try {
@@ -362,7 +361,7 @@ router.post('/api/admin/backfill-sessions', isStaffOrAdmin, async (req, res) => 
       } catch (bookingError: unknown) {
         try {
           await client.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
-        } catch (rollbackError: unknown) {
+        } catch (_rollbackError: unknown) {
           logger.error('[Backfill] Failed to rollback savepoint for booking', { extra: { bookingId: booking.id } });
         }
         
@@ -431,7 +430,7 @@ router.post('/api/admin/backfill-sessions', isStaffOrAdmin, async (req, res) => 
     });
   } catch (error: unknown) {
     if (!clientReleased) {
-      try { await client.query('ROLLBACK'); } catch (_) {}
+      try { await client.query('ROLLBACK'); } catch (_) { /* rollback best-effort */ }
     }
     logger.error('[Backfill Sessions] Error', { error: error instanceof Error ? error : new Error(String(error)) });
     
@@ -531,7 +530,7 @@ router.post('/api/admin/trackman/cleanup-duplicates', isStaffOrAdmin, async (req
     
     await client.query('COMMIT');
     
-    const sessionUser = req.session?.user?.email || 'admin';
+    const _sessionUser = req.session?.user?.email || 'admin';
     const { logFromRequest } = await import('../../core/auditLog');
     await logFromRequest(req, {
       action: 'bulk_action',

@@ -114,11 +114,13 @@ import { db } from '../server/db';
 
 import { BookingStateService } from '../server/core/bookingService/bookingStateService';
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function mockDbSelectChain(result: any[]) {
   const chain = {
     from: vi.fn().mockReturnThis(),
     where: vi.fn().mockResolvedValue(result),
   };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (db.select as any).mockReturnValue(chain);
   return chain;
 }
@@ -226,6 +228,7 @@ describe('BookingStateService', () => {
       };
 
       let selectCallCount = 0;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (db.select as any).mockImplementation(() => {
         selectCallCount++;
         if (selectCallCount === 1) {
@@ -237,6 +240,7 @@ describe('BookingStateService', () => {
         return resourceChain;
       });
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (db.transaction as any).mockImplementation(async (fn: any) => {
         return await fn(txMock);
       });
@@ -252,6 +256,7 @@ describe('BookingStateService', () => {
     });
 
     it('handles DB error during booking lookup gracefully', async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (db.select as any).mockImplementation(() => {
         throw new Error('DB connection failed');
       });
@@ -380,6 +385,7 @@ describe('BookingStateService', () => {
       };
 
       let selectCallCount = 0;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (db.select as any).mockImplementation(() => {
         selectCallCount++;
         if (selectCallCount === 1) {
@@ -410,6 +416,7 @@ describe('BookingStateService', () => {
         }),
       };
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (db.transaction as any).mockImplementation(async (fn: any) => {
         return await fn(txMock);
       });

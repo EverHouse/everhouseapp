@@ -48,7 +48,7 @@ export function GuardianConsentForm({ onSubmit, onCancel, memberName }: Guardian
 
     if (!guardianPhone.trim()) {
       newErrors.guardianPhone = 'Phone number is required';
-    } else if (!/^[\d\s\-\+\(\)]{10,}$/.test(guardianPhone.replace(/\s/g, ''))) {
+    } else if (!/^[\d\s\-+()]{10,}$/.test(guardianPhone.replace(/\s/g, ''))) {
       newErrors.guardianPhone = 'Please enter a valid phone number';
     }
 

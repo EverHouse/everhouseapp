@@ -464,7 +464,7 @@ router.post('/api/data-integrity/placeholder-accounts/delete', isAdmin, validate
               hubspot.crm.contacts.batchApi.archive({ inputs: batch.map((id: string) => ({ id })) })
             );
             results.hubspotDeleted += batch.length;
-          } catch (batchErr: unknown) {
+          } catch (_batchErr: unknown) {
             for (const contactId of batch) {
               try {
                 await retryableHubSpotRequest(() =>
@@ -1634,7 +1634,7 @@ router.post('/api/data-integrity/fix/accept-tier', isAdmin, validateBody(acceptT
 router.post('/api/data-integrity/fix/update-tour-status', isAdmin, validateBody(updateTourStatusSchema), async (req: Request, res) => {
   try {
     const { recordId, newStatus } = req.body;
-    const staffEmail = getSessionUser(req)?.email || 'unknown';
+    const _staffEmail = getSessionUser(req)?.email || 'unknown';
 
     const result = await db.execute(sql`
       UPDATE tours 

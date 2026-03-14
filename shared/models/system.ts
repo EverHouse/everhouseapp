@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { index, uniqueIndex, jsonb, pgTable, timestamp, varchar, serial, boolean, text, date, time, integer, numeric } from "drizzle-orm/pg-core";
+import { index, uniqueIndex, jsonb, pgTable, timestamp, varchar, serial, boolean, text, integer } from "drizzle-orm/pg-core";
 
 // System settings table - for storing app configuration like last reminder date
 export const systemSettings = pgTable("system_settings", {

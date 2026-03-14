@@ -12,6 +12,7 @@ import {
     type VisitorPurchase,
     type VisitorsResponse,
     type SyncStatusResponse,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     type SyncResponse,
     type DirectorySyncResult,
     directoryKeys,
@@ -29,6 +30,7 @@ export function useIncrementalLoad<T>(items: T[], threshold: number = VIRTUALIZA
     const hasMore = needsVirtualization && visibleCount < items.length;
     
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setVisibleCount(ITEMS_PER_PAGE);
     }, [items.length]);
     
@@ -264,7 +266,7 @@ export function useDirectoryData({
     });
 
     const assignTierMutation = useMutation({
-        mutationFn: async ({ memberId, tier, memberEmail }: { memberId: string | number; tier: string; memberEmail: string }) => {
+        mutationFn: async ({ memberId, tier, memberEmail: _memberEmail }: { memberId: string | number; tier: string; memberEmail: string }) => {
             return fetchWithCredentials<{ success: boolean }>(`/api/hubspot/contacts/${memberId}/tier`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },

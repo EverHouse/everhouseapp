@@ -4,7 +4,6 @@ import { eq, or, ilike, and, sql } from 'drizzle-orm';
 import { getErrorMessage, getErrorCode } from '../../utils/errorUtils';
 import { bookingEvents } from '../bookingEvents';
 import { toTextArrayLiteral } from '../../utils/sqlArrayLiteral';
-import { cancelPaymentIntent } from '../stripe';
 import { logger } from '../logger';
 import { useGuestPass } from '../../routes/guestPasses';
 import type { SessionCheckRow, PaymentIntentRow } from './constants';
@@ -16,7 +15,7 @@ import { createTrackmanSessionAndParticipants } from './sessionMapper';
 async function insertBookingIfNotExists(
   booking: typeof trackmanUnmatchedBookings.$inferSelect,
   memberEmail: string,
-  resolvedBy?: string
+  _resolvedBy?: string
 ): Promise<{ inserted: boolean; linked?: boolean; reason?: string; finalStatus?: string; bookingId?: number }> {
   const trackmanIdPattern = `[Trackman Import ID:${booking.trackmanBookingId}]`;
   

@@ -40,8 +40,11 @@ interface PayFeesResponse {
 export function MemberPaymentModal({
   isOpen,
   bookingId,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   sessionId,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   ownerEmail,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   ownerName,
   onSuccess,
   onClose

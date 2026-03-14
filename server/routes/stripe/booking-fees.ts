@@ -1,12 +1,11 @@
 import { logger } from '../../core/logger';
 import { Router, Request, Response } from 'express';
-import Stripe from 'stripe';
 import { isStaffOrAdmin } from '../../core/middleware';
 import { db } from '../../db';
 import { sql } from 'drizzle-orm';
 import { isExpandedProduct } from '../../types/stripe-helpers';
 import { getStripeClient } from '../../core/stripe/client';
-import { isPlaceholderEmail, listCustomerPaymentMethods } from '../../core/stripe/customers';
+import { listCustomerPaymentMethods } from '../../core/stripe/customers';
 import {
   createPaymentIntent,
   confirmPaymentSuccess,
@@ -19,13 +18,13 @@ import { computeFeeBreakdown, applyFeeBreakdownToParticipants, getEffectivePlaye
 import {
   getPaymentByIntentId,
 } from '../../core/stripe/paymentRepository';
-import { logFromRequest, logBillingAudit } from '../../core/auditLog';
+import { logFromRequest } from '../../core/auditLog';
 import { getStaffInfo, SAVED_CARD_APPROVAL_THRESHOLD_CENTS } from './helpers';
 import { broadcastBillingUpdate, broadcastBookingInvoiceUpdate } from '../../core/websocket';
 import { alertOnExternalServiceError } from '../../core/errorAlerts';
 import { getErrorMessage, getErrorCode, safeErrorDetail } from '../../utils/errorUtils';
 import { toIntArrayLiteral } from '../../utils/sqlArrayLiteral';
-import { getBookingInvoiceId, finalizeAndPayInvoice, createDraftInvoiceForBooking, finalizeInvoicePaidOutOfBand, recreateDraftInvoiceFromBooking, buildInvoiceDescription } from '../../core/billing/bookingInvoiceService';
+import { getBookingInvoiceId, finalizeAndPayInvoice, createDraftInvoiceForBooking, finalizeInvoicePaidOutOfBand, buildInvoiceDescription } from '../../core/billing/bookingInvoiceService';
 import { validateBody } from '../../middleware/validate';
 import { createPaymentIntentSchema, markBookingPaidSchema, confirmPaymentSchema, cancelPaymentIntentSchema, createCustomerSchema, chargeSavedCardSchema } from '../../../shared/validators/payments';
 
@@ -133,7 +132,7 @@ router.post('/api/stripe/create-payment-intent', isStaffOrAdmin, validateBody(cr
     }
 
     let snapshotId: number | null = null;
-    let serverFees: Array<{id: number; amountCents: number}> = [];
+    const serverFees: Array<{id: number; amountCents: number}> = [];
     let serverTotal = Math.round(amountCents);
     let pendingFees: Array<{ participantId?: number; displayName: string; participantType: string; overageCents: number; guestCents: number; totalCents: number }> = [];
     const isBookingPayment = bookingId && sessionId && participantFees && Array.isArray(participantFees) && participantFees.length > 0;
@@ -199,7 +198,7 @@ router.post('/api/stripe/create-payment-intent', isStaffOrAdmin, validateBody(cr
                 });
               }
             }
-          } catch (err: unknown) {
+          } catch (_err: unknown) {
             logger.warn('[Stripe] Failed to check existing payment intent, creating new one');
           }
         }
@@ -590,7 +589,7 @@ router.get('/api/billing/members/search', isStaffOrAdmin, async (req: Request, r
 
 router.post('/api/stripe/staff/charge-saved-card', isStaffOrAdmin, validateBody(chargeSavedCardSchema), async (req: Request, res: Response) => {
   try {
-    const { memberEmail: rawMemberEmail, bookingId, sessionId, participantIds } = req.body;
+    const { memberEmail: rawMemberEmail, bookingId, sessionId: _sessionId, participantIds } = req.body;
     const memberEmail = rawMemberEmail?.trim()?.toLowerCase();
     const { staffEmail, staffName, sessionUser } = getStaffInfo(req);
 
@@ -602,7 +601,7 @@ router.post('/api/stripe/staff/charge-saved-card', isStaffOrAdmin, validateBody(
     }
 
     const member = memberResult.rows[0] as unknown as DbMemberRow;
-    const memberName = [member.first_name, member.last_name].filter(Boolean).join(' ') || member.email;
+    const _memberName = [member.first_name, member.last_name].filter(Boolean).join(' ') || member.email;
 
     const participantResult = await db.execute(sql`SELECT bp.id, bp.session_id, bp.cached_fee_cents, bp.payment_status, bp.participant_type, bp.display_name,
        br.id as booking_id, bs.trackman_booking_id
@@ -680,7 +679,7 @@ router.post('/api/stripe/staff/charge-saved-card', isStaffOrAdmin, validateBody(
       });
     }
 
-    const stripe = await getStripeClient();
+    const _stripe = await getStripeClient();
 
     const paymentMethods = await listCustomerPaymentMethods(member.stripe_customer_id);
 
@@ -879,7 +878,7 @@ router.post('/api/stripe/staff/charge-saved-card', isStaffOrAdmin, validateBody(
 router.post('/api/stripe/staff/mark-booking-paid', isStaffOrAdmin, validateBody(markBookingPaidSchema), async (req: Request, res: Response) => {
   try {
     const { bookingId, sessionId, participantIds, paymentMethod: paidVia } = req.body;
-    const { staffEmail, staffName } = getStaffInfo(req);
+    const { staffEmail, staffName: _staffName } = getStaffInfo(req);
 
     const oobResult = await finalizeInvoicePaidOutOfBand({
       bookingId,

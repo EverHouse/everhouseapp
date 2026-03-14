@@ -981,6 +981,7 @@ export async function setupInstantDataTriggers(): Promise<void> {
     `);
     if (orphanedResult.rows.length > 0) {
       logger.info(`[DB Init] Fixed ${orphanedResult.rows.length} orphaned staff roles`, {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         extra: { emails: orphanedResult.rows.map((r: any) => r.email) }
       });
     }

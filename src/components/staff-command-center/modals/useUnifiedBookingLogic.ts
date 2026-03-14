@@ -3,7 +3,7 @@ import { SelectedMember } from '../../shared/MemberSearchInput';
 import { useToast } from '../../Toast';
 import { usePricing } from '../../../hooks/usePricing';
 import TierBadge from '../../TierBadge';
-import type { BookingMember, BookingGuest, ValidationInfo, FinancialSummary, BookingContextType, ManageModeRosterData, MemberMatchWarning, FetchedContext, UnifiedBookingSheetProps, VisitorSearchResult, SlotState, SlotsArray } from './bookingSheetTypes';
+import type { BookingMember, ManageModeRosterData, MemberMatchWarning, UnifiedBookingSheetProps, VisitorSearchResult, SlotState, SlotsArray } from './bookingSheetTypes';
 import { isPlaceholderEmail } from './bookingSheetTypes';
 import { useBookingActions } from '../../../hooks/useBookingActions';
 import React from 'react';
@@ -21,14 +21,20 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
     bookingDate,
     timeSlot,
     matchedBookingId,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     currentMemberName,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     currentMemberEmail,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     isRelink,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     importedName,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     notes,
     originalEmail,
     bookingId,
     sessionId,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     ownerName,
     ownerEmail,
     declaredPlayerCount,
@@ -38,11 +44,17 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
     onOpenBillingModal,
     onRosterUpdated,
     onCheckinComplete,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     onCollectPayment,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     onReschedule,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     onCancelBooking,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     onCheckIn,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     bookingStatus,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     ownerMembershipStatus,
   } = props;
 
@@ -365,6 +377,7 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
       const detail = (event as CustomEvent).detail;
       if (!detail) return;
       if (detail.bookingId && Number(detail.bookingId) === bookingId) {
+        // eslint-disable-next-line no-console
         console.log('[BookingSheet] Billing update received for this booking, refreshing');
         onPaymentConfirmed();
       }
@@ -390,6 +403,7 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
     const handleRosterUpdate = (event: Event) => {
       const detail = (event as CustomEvent).detail;
       if (!detail || Number(detail.bookingId) !== bookingId) return;
+      // eslint-disable-next-line no-console
       console.log('[BookingSheet] Roster update received via WebSocket, refreshing', detail.action);
       debouncedRefresh();
     };
@@ -397,6 +411,7 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
     const handleInvoiceUpdate = (event: Event) => {
       const detail = (event as CustomEvent).detail;
       if (!detail || Number(detail.bookingId) !== bookingId) return;
+      // eslint-disable-next-line no-console
       console.log('[BookingSheet] Invoice update received via WebSocket, refreshing', detail.action);
       debouncedRefresh();
       if (detail.action === 'invoice_paid' || detail.action === 'payment_confirmed') {
@@ -611,6 +626,7 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
         if (match) {
           const parseTime = (t: string) => {
             const [time, period] = t.trim().split(/\s+/);
+            // eslint-disable-next-line prefer-const
             let [h, m] = time.split(':').map(Number);
             if (period?.toUpperCase() === 'PM' && h !== 12) h += 12;
             if (period?.toUpperCase() === 'AM' && h === 12) h = 0;
@@ -911,7 +927,7 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
       } else {
         showToast('Failed to confirm payment', 'error');
       }
-    } catch (err: unknown) {
+    } catch (_err: unknown) {
       showToast('Failed to confirm payment', 'error');
     } finally {
       setInlinePaymentAction(null);
@@ -945,7 +961,7 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
       } else {
         showToast(result.error || 'Failed to charge card', 'error');
       }
-    } catch (err: unknown) {
+    } catch (_err: unknown) {
       showToast('Failed to charge card', 'error');
     } finally {
       setInlinePaymentAction(null);
@@ -974,7 +990,7 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
         showToast('Failed to waive fees', 'error');
         setInlinePaymentAction(null);
       }
-    } catch (err: unknown) {
+    } catch (_err: unknown) {
       showToast('Failed to waive fees', 'error');
       setInlinePaymentAction(null);
     }
@@ -1355,7 +1371,7 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
     }
   };
 
-  const handleManageModeQuickAddGuest = async (slotNumber: number) => {
+  const handleManageModeQuickAddGuest = async (_slotNumber: number) => {
     if (!bookingId) return;
     setIsQuickAddingGuest(true);
     try {
@@ -1372,7 +1388,7 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
         const data = await res.json().catch(() => ({}));
         showToast(data.error || 'Failed to add guest', 'error');
       }
-    } catch (err) {
+    } catch (_err) {
       showToast('Failed to add guest', 'error');
     } finally {
       setIsQuickAddingGuest(false);

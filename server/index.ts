@@ -17,6 +17,7 @@ let expressApp: import('express').Express | null = null;
 let cachedIndexHtml: string | null = null;
 
 declare global {
+  // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace Express {
     interface Request {
       rawBody?: string;
@@ -39,7 +40,7 @@ process.on('uncaughtException', (error) => {
 });
 
 let unhandledRejectionCount = 0;
-process.on('unhandledRejection', (reason, promise) => {
+process.on('unhandledRejection', (reason, _promise) => {
   unhandledRejectionCount++;
   const errorMessage = reason instanceof Error ? reason.message : String(reason);
   logger.error('[Process] Unhandled Rejection (non-fatal):', { extra: { errorMessage, totalCount: unhandledRejectionCount } });
@@ -212,15 +213,15 @@ async function initializeApp() {
   const { globalRateLimiter } = await import('./middleware/rateLimiting');
   const { getSession, registerAuthRoutes } = await import('./replit_integrations/auth');
   const { setupSupabaseAuthRoutes } = await import('./supabase/auth');
-  const { isProduction, pool } = await import('./core/db');
+  const { isProduction, pool: _pool } = await import('./core/db');
   const { db } = await import('./db');
   const { sql } = await import('drizzle-orm');
   const { resources, cafeItems } = await import('../shared/schema');
   const { requestIdMiddleware, logRequest } = await import('./core/logger');
   const { registerRoutes } = await import('./loaders/routes');
   const { runStartupTasks, getStartupHealth } = await import('./loaders/startup');
-  const { initWebSocketServer, closeWebSocketServer } = await import('./core/websocket');
-  const { initSchedulers, stopSchedulers } = await import('./schedulers');
+  const { initWebSocketServer, closeWebSocketServer: _closeWebSocketServer } = await import('./core/websocket');
+  const { initSchedulers, stopSchedulers: _stopSchedulers } = await import('./schedulers');
   const { processStripeWebhook } = await import('./core/stripe');
 
   const __filename = fileURLToPath(import.meta.url);
@@ -259,7 +260,7 @@ async function initializeApp() {
         startupHealth,
         uptime: process.uptime()
       });
-    } catch (dbError: unknown) {
+    } catch (_dbError: unknown) {
       res.status(503).json({
         ready: false,
         reason: 'database_unavailable',
@@ -1202,7 +1203,7 @@ async function autoSeedResources(db: { select: (...args: any[]) => any; insert: 
       }
       if (!isProduction) logger.info(`Auto-seeded ${seedResources.length} resources`);
     }
-  } catch (error: unknown) {
+  } catch (_error: unknown) {
     if (!isProduction) logger.info('Resources table may not exist yet, skipping auto-seed');
   }
 }
@@ -1256,7 +1257,7 @@ async function autoSeedCafeMenu(db: { select: (...args: any[]) => any; insert: (
       }
       if (!isProduction) logger.info(`Auto-seeded ${seedCafeItems.length} cafe menu items`);
     }
-  } catch (error: unknown) {
+  } catch (_error: unknown) {
     if (!isProduction) logger.info('Cafe menu table may not exist yet, skipping auto-seed');
   }
 }

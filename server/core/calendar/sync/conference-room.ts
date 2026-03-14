@@ -2,7 +2,7 @@ import { getGoogleCalendarClient } from '../../integrations';
 import { db } from '../../../db';
 import { bookingRequests, users } from '../../../../shared/models/auth';
 import { bookingSessions } from '../../../../shared/models/scheduling';
-import { eq, and, ilike, or, ne, sql } from 'drizzle-orm';
+import { eq, and, ilike, or, sql } from 'drizzle-orm';
 import { getTodayPacific, getPacificMidnightUTC } from '../../../utils/dateUtils';
 import { CALENDAR_CONFIG, ConferenceRoomBooking, MemberMatchResult, CalendarEventData } from '../config';
 import { getCalendarIdByName } from '../cache';

@@ -160,6 +160,7 @@ export class PaymentStatusService {
             await tx.execute(
               sql`UPDATE booking_fee_snapshots SET status = 'superseded', used_at = NOW() WHERE id = ${snapshot.id}`
             );
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             logger.info(`[PaymentStatusService] Snapshot ${snapshot.id} superseded — session ${snapshot.session_id} already has completed snapshot ${(existingCompleted.rows[0] as any).id}`);
             return { success: true, participantsUpdated: 0, snapshotsUpdated: 0 } as PaymentStatusResult;
           }
@@ -222,7 +223,8 @@ export class PaymentStatusService {
   static async markPaymentRefunded(params: PaymentStatusUpdate): Promise<PaymentStatusResult> {
     try {
       const result = await db.transaction(async (tx) => {
-        const { paymentIntentId, refundId, staffEmail, staffName, amountCents } = params;
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { paymentIntentId, refundId: _refundId, staffEmail, staffName, amountCents } = params;
         
         const snapshotResult = await tx.execute(
           sql`SELECT bfs.id, bfs.session_id, bfs.booking_id, bfs.participant_fees, bfs.total_cents, bfs.status

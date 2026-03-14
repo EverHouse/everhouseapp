@@ -35,6 +35,7 @@ export function AssignModeFooter({
   linking,
   feeEstimate,
   isCalculatingFees,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   isConferenceRoom,
   onClose,
   handleFinalizeBooking,

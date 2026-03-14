@@ -5,13 +5,12 @@ import { users, membershipTiers } from '../../shared/schema';
 import { memberNotes, communicationLogs, userLinkedEmails } from '../../shared/models/membership';
 import { getHubSpotClient } from './integrations';
 import { normalizeTierName, TIER_NAMES } from '../../shared/constants/tiers';
-import { sql, eq, and } from 'drizzle-orm';
+import { sql, eq } from 'drizzle-orm';
 import { isProduction } from './db';
 import { broadcastMemberDataUpdated, broadcastDataIntegrityUpdate } from './websocket';
 import { alertOnHubSpotSyncComplete, alertOnSyncFailure } from './dataAlerts';
 import pLimit from 'p-limit';
 import { notifyMember, notifyAllStaff } from './notificationService';
-import { sendOutstandingBalanceEmail } from '../emails/paymentEmails';
 
 import { logger } from './logger';
 
@@ -415,7 +414,7 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
               if (!isNaN(createDate.getTime())) {
                 joinDate = formatDatePacific(createDate);
               }
-            } catch (e: unknown) {
+            } catch (_e: unknown) {
               // If parsing fails, joinDate remains null
             }
           }
@@ -749,7 +748,7 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
                   })
                   .onConflictDoNothing();
                 linkedEmailsAdded++;
-              } catch (err: unknown) {
+              } catch (_err: unknown) {
                 // Ignore duplicate key errors
               }
             }
@@ -1539,7 +1538,7 @@ export async function syncCommunicationLogsFromHubSpot(): Promise<{ synced: numb
                     }
                   }
                 }
-              } catch (err) {
+              } catch (_err) {
                 hubspotCallAssocFailCount++;
               }
               
@@ -1698,7 +1697,7 @@ export async function syncCommunicationLogsFromHubSpot(): Promise<{ synced: numb
                 }
               }
             }
-          } catch (err) {
+          } catch (_err) {
             hubspotCommAssocFailCount++;
           }
           

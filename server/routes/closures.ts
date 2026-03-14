@@ -3,15 +3,15 @@ import { Router } from 'express';
 import { isProduction } from '../core/db';
 import { db } from '../db';
 import { facilityClosures, pushSubscriptions, users, availabilityBlocks, announcements, notifications, resources, noticeTypes, closureReasons } from '../../shared/schema';
-import { eq, desc, or, isNull, inArray, and } from 'drizzle-orm';
+import { eq, desc, or, isNull, and } from 'drizzle-orm';
 import webpush from 'web-push';
 import { isStaffOrAdmin, isAdmin } from '../core/middleware';
-import { getCalendarIdByName, deleteCalendarEvent, CALENDAR_CONFIG, syncInternalCalendarToClosures, getBaseDescription } from '../core/calendar/index';
+import { getCalendarIdByName, deleteCalendarEvent, CALENDAR_CONFIG, syncInternalCalendarToClosures } from '../core/calendar/index';
 import { getGoogleCalendarClient } from '../core/integrations';
-import { createPacificDate, parseLocalDate, addDaysToPacificDate, getPacificISOString, getTodayPacific } from '../utils/dateUtils';
+import { createPacificDate, addDaysToPacificDate, getPacificISOString, getTodayPacific } from '../utils/dateUtils';
 import { clearClosureCache } from '../core/bookingValidation';
 import { broadcastClosureUpdate } from '../core/websocket';
-import { logFromRequest, type AuditAction, type ResourceType } from '../core/auditLog';
+import { logFromRequest } from '../core/auditLog';
 import { getErrorMessage, getErrorCode, getErrorStatusCode } from '../utils/errorUtils';
 
 const router = Router();
@@ -184,7 +184,7 @@ async function formatSingleAreaFromDb(area: string): Promise<string> {
   return trimmed;
 }
 
-async function formatAffectedAreasForDisplay(affectedAreas: string | null | undefined): Promise<string> {
+async function _formatAffectedAreasForDisplay(affectedAreas: string | null | undefined): Promise<string> {
   if (!affectedAreas) return 'No booking restrictions';
   const trimmed = affectedAreas.trim();
   if (trimmed === 'none') return 'No booking restrictions';
@@ -261,7 +261,7 @@ async function createClosureCalendarEvents(
   try {
     const calendar = await getGoogleCalendarClient();
     
-    const isSameDay = startDate === endDate;
+    const _isSameDay = startDate === endDate;
     const hasSpecificTimes = startTime && endTime;
     
     if (hasSpecificTimes) {
@@ -791,7 +791,7 @@ router.post('/api/closures', isStaffOrAdmin, async (req, res) => {
         : affected_areas === 'all_bays' 
           ? 'All Simulator Bays' 
           : affected_areas;
-      const [sny, snm, snd] = start_date.split('-').map(Number);
+      const [_sny, snm, snd] = start_date.split('-').map(Number);
       const monthsNotif = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
       const startDateFormattedNotif = `${monthsNotif[snm - 1]} ${snd}`;
       const notificationBody = reason 
@@ -1139,11 +1139,11 @@ router.put('/api/closures/:id', isStaffOrAdmin, async (req, res) => {
       
       const newStartDate = start_date || existing.startDate;
       const newEndDate = end_date || existing.endDate;
-      const [usy, usm, usd] = newStartDate.split('-').map(Number);
+      const [_usy, usm, usd] = newStartDate.split('-').map(Number);
       const monthsUpdate = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
       const startDateFormatted = `${monthsUpdate[usm - 1]} ${usd}`;
       const endDateFormatted = newEndDate && newEndDate !== newStartDate 
-        ? (() => { const [uey, uem, ued] = newEndDate.split('-').map(Number); return `${monthsUpdate[uem - 1]} ${ued}`; })()
+        ? (() => { const [_uey, uem, ued] = newEndDate.split('-').map(Number); return `${monthsUpdate[uem - 1]} ${ued}`; })()
         : null;
       
       const newStartTime = start_time !== undefined ? start_time : existing.startTime;
@@ -1185,9 +1185,9 @@ router.put('/api/closures/:id', isStaffOrAdmin, async (req, res) => {
         const finalReason = reason !== undefined ? reason : existing.reason;
         
         // Format the date for display
-        const [year, month, day] = finalStartDate.split('-').map(Number);
+        const [_year, month, day] = finalStartDate.split('-').map(Number);
         const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-        const dateFormatted = `${months[month - 1]} ${day}`;
+        const _dateFormatted = `${months[month - 1]} ${day}`;
         
         // Send push notification to all members
         await sendPushNotificationToAllMembers({

@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { db } from '../../db';
 import { bookingRequests, resources, users, bookingParticipants, notifications } from '../../../shared/schema';
-import { eq, and, or, ne, desc, sql, SQL, inArray } from 'drizzle-orm';
+import { eq, and, or, desc, sql, SQL, inArray } from 'drizzle-orm';
 
 class BookingValidationError extends Error {
   constructor(public statusCode: number, public errorBody: Record<string, unknown>) {
@@ -9,21 +9,20 @@ class BookingValidationError extends Error {
     this.name = 'BookingValidationError';
   }
 }
-import { sendPushNotification } from '../push';
 import { checkDailyBookingLimit, getMemberTierByEmail, getTierLimits, getDailyBookedMinutes } from '../../core/tierService';
 import { notifyAllStaff, isSyntheticEmail } from '../../core/notificationService';
-import { formatNotificationDateTime, formatDateDisplayWithDay, formatTime12Hour, createPacificDate, getTodayPacific } from '../../utils/dateUtils';
+import { formatDateDisplayWithDay, formatTime12Hour, createPacificDate, getTodayPacific } from '../../utils/dateUtils';
 import {logAndRespond, logger } from '../../core/logger';
 import { bookingEvents } from '../../core/bookingEvents';
 import { broadcastAvailabilityUpdate } from '../../core/websocket';
 import { getSessionUser } from '../../types/session';
-import { cancelPaymentIntent, getStripeClient } from '../../core/stripe';
+import { getStripeClient } from '../../core/stripe';
 import { logFromRequest, logMemberAction } from '../../core/auditLog';
 import { getCalendarNameForBayAsync, isStaffOrAdminCheck } from './helpers';
-import { isAuthenticated, isStaffOrAdmin } from '../../core/middleware';
+import { isAuthenticated } from '../../core/middleware';
 import { getCalendarIdByName, deleteCalendarEvent } from '../../core/calendar/index';
-import { getGuestPassesRemaining, refundGuestPass } from '../guestPasses';
-import { computeFeeBreakdown, getEffectivePlayerCount, applyFeeBreakdownToParticipants, recalculateSessionFees } from '../../core/billing/unifiedFeeService';
+import { refundGuestPass } from '../guestPasses';
+import { computeFeeBreakdown, applyFeeBreakdownToParticipants, recalculateSessionFees } from '../../core/billing/unifiedFeeService';
 import { voidBookingInvoice, syncBookingInvoice, finalizeAndPayInvoice } from '../../core/billing/bookingInvoiceService';
 import { PRICING } from '../../core/billing/pricingConfig';
 import { createGuestPassHold } from '../../core/billing/guestPassHoldService';
@@ -251,7 +250,7 @@ router.get('/api/booking-requests', isAuthenticated, validateQuery(bookingReques
       return res.json([]);
     }
     
-    const bookingIds = result.map(b => b.id);
+    const _bookingIds = result.map(b => b.id);
     const sessionIds = result.filter(b => b.session_id).map(b => b.session_id!);
     const requestingUserEmail = (user_email as string)?.toLowerCase();
     

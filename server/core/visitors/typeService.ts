@@ -166,7 +166,7 @@ export async function calculateVisitorTypeFromHistory(email: string): Promise<Vi
   const normalizedEmail = email.toLowerCase().trim();
   
   try {
-    const purchaseQuery = `
+    const _purchaseQuery = `
       SELECT 
         item_name,
         sale_date as activity_date
@@ -176,7 +176,7 @@ export async function calculateVisitorTypeFromHistory(email: string): Promise<Vi
       LIMIT 1
     `;
     
-    const guestQuery = `
+    const _guestQuery = `
       SELECT 
         bs.session_date::timestamp as activity_date
       FROM booking_participants bp

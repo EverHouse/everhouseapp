@@ -538,7 +538,7 @@ const TiersTab: React.FC = () => {
                                     </span>
                                 </div>
                                 <div className="space-y-3">
-                                    {oneTimePasses.map((pass, index) => (
+                                    {oneTimePasses.map((pass, _index) => (
                                         <div 
                                             key={pass.id} 
                                             role="button"
@@ -962,7 +962,7 @@ const TiersTab: React.FC = () => {
                                                             checked={(selectedTier as unknown as Record<string, boolean | string | number | null | undefined>)?.[field.key] as boolean || false}
                                                             onChange={(val) => {
                                                                 if (selectedTier?.stripe_product_id) return;
-                                                                selectedTier && setSelectedTier({...selectedTier, [field.key]: val});
+                                                                if (selectedTier) setSelectedTier({...selectedTier, [field.key]: val});
                                                             }}
                                                             label={field.label}
                                                         />
@@ -1284,7 +1284,7 @@ const TiersTab: React.FC = () => {
                         />
                     ) : (
                         <div ref={tiersRef} className="space-y-3 animate-content-enter">
-                            {subscriptionTiers.map((tier, index) => (
+                            {subscriptionTiers.map((tier, _index) => (
                                 <div 
                                     key={tier.id} 
                                     onClick={() => openEdit(tier)}

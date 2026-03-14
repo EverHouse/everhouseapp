@@ -1,8 +1,8 @@
 import Stripe from 'stripe';
 import { getStripeClient } from './client';
 import { db } from '../../db';
-import { membershipTiers, users, memberNotes } from '../../../shared/schema';
-import { eq, ilike, sql } from 'drizzle-orm';
+import { membershipTiers, memberNotes } from '../../../shared/schema';
+import { eq, sql } from 'drizzle-orm';
 import { changeSubscriptionTier } from './subscriptions';
 import { syncCustomerMetadataToStripe } from './customers';
 import { getErrorMessage } from '../../utils/errorUtils';

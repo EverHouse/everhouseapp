@@ -1,6 +1,6 @@
 import React, { useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import type { TabType, QuickLink } from '../types';
+import type { TabType } from '../types';
 import { EMPLOYEE_RESOURCES_LINKS, ADMIN_LINKS, ADMIN_ROUTE_LINKS } from '../helpers';
 import { useNavigationLoading } from '../../../contexts/NavigationLoadingContext';
 import { tabToPath } from '../../../lib/nav-constants';
@@ -12,7 +12,7 @@ interface QuickActionsGridProps {
   onScanQr?: () => void;
 }
 
-export const QuickActionsGrid: React.FC<QuickActionsGridProps> = ({ isAdmin, variant, onNewMember, onScanQr }) => {
+export const QuickActionsGrid: React.FC<QuickActionsGridProps> = ({ isAdmin, variant, onNewMember: _onNewMember, onScanQr }) => {
   const navigate = useNavigate();
   const { startNavigation } = useNavigationLoading();
   const navigateToTab = useCallback((tab: TabType) => {

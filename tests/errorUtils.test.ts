@@ -43,6 +43,7 @@ describe('getErrorCode', () => {
 
   it('extracts code from Drizzle-wrapped error cause', () => {
     const drizzleError = new Error('DrizzleError');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (drizzleError as any).cause = { code: '23505' };
     expect(getErrorCode(drizzleError)).toBe('23505');
   });
@@ -53,6 +54,7 @@ describe('getErrorCode', () => {
 
   it('extracts deadlock code from wrapped error', () => {
     const err = new Error('wrapped');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (err as any).cause = { code: '40P01' };
     expect(getErrorCode(err)).toBe('40P01');
   });

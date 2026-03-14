@@ -25,6 +25,7 @@ export const StaffNavigationRail: React.FC<StaffNavigationRailProps> = ({
 
   useEffect(() => {
     if (optimisticTab && activeTab === optimisticTab) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setOptimisticTab(null);
     }
   }, [activeTab, optimisticTab]);

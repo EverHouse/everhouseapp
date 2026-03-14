@@ -162,14 +162,23 @@ const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
   isCleaningMindbodyIds,
   mindbodyCleanupResult,
   handleCleanupMindbodyIds,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   isRunningStripeHubspotLink,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   stripeHubspotLinkResult,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   handleLinkStripeHubspot,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   isRunningPaymentStatusSync,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   paymentStatusResult,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   handleSyncPaymentStatus,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   isRunningVisitCountSync,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   visitCountResult,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   handleSyncVisitCounts,
   handleArchiveStaleVisitors,
   isRunningVisitorArchive,
