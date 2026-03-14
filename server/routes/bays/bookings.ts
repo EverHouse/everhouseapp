@@ -1768,6 +1768,7 @@ const feeEstimateQuerySchema = z.object({
   guestsWithInfo: z.string().regex(/^\d+$/).optional(),
   memberEmails: z.string().optional(),
   memberUserIds: z.string().optional(),
+  email: z.string().optional(),
 }).passthrough();
 
 router.get('/api/fee-estimate', isAuthenticated, validateQuery(feeEstimateQuerySchema), async (req, res) => {

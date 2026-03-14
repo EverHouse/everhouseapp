@@ -19,7 +19,12 @@ import { logFromRequest } from '../../core/auditLog';
 
 const router = Router();
 
-router.get('/api/stripe/invoices/preview', isStaffOrAdmin, async (req: Request, res: Response) => {
+const invoicePreviewQuerySchema = z.object({
+  customerId: z.string(),
+  priceId: z.string(),
+}).passthrough();
+
+router.get('/api/stripe/invoices/preview', isStaffOrAdmin, validateQuery(invoicePreviewQuerySchema), async (req: Request, res: Response) => {
   try {
     const { customerId, priceId } = req.query;
     
