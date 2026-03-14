@@ -62,6 +62,7 @@ All mutating routes (POST/PUT/PATCH/DELETE) must be protected. Two equivalent pa
 - `webhook-validation.ts` — Payload validation
 - `import.ts` — CSV import endpoint
 - `admin.ts` — Trackman admin tools
+- `admin-roster.ts` — Staff roster linking/unlinking for Trackman bookings (push notifications with booking tags)
 - `reconciliation.ts` — Reconciliation endpoints
 - `index.ts` — Route registration
 

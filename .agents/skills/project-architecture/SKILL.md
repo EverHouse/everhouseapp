@@ -19,6 +19,8 @@ Load the right domain skill BEFORE making changes. If your task spans multiple d
 | Fee computation, overage, guest fees, invoices | `fee-calculation` | `booking-flow`, `checkin-flow` |
 | Guest pass holds, consumption, refunds, monthly reset | `guest-pass-system` | `fee-calculation`, `checkin-flow` |
 | Member status, tier changes, onboarding, cancellation | `member-lifecycle` | `stripe-webhook-flow`, `hubspot-sync` |
+| Passkey, WebAuthn, biometric authentication | `member-lifecycle` (passkey section) | `project-architecture` |
+| Apple Wallet booking passes, pass void/refresh | `booking-flow` (wallet pass section) | `booking-import-standards` |
 | Notifications, WebSocket, push notifications | `notification-system` | — |
 | Scheduled jobs, background tasks, job queue | `scheduler-jobs` | `data-integrity-monitoring` |
 | Stripe webhooks, subscription sync, payment events | `stripe-webhook-flow` | `member-lifecycle`, `fee-calculation` |
@@ -38,6 +40,8 @@ What are you changing?
 │   └── Anything else booking-related → booking-flow
 ├── Stripe API calls, payment intents, pricing config? → billing-stripe-expert
 ├── A Stripe webhook handler? → stripe-webhook-flow
+├── Passkey / WebAuthn / biometric auth? → member-lifecycle (passkey section)
+├── Apple Wallet booking passes? → booking-flow (wallet pass section)
 ├── A member status/tier/onboarding change? → member-lifecycle
 ├── A HubSpot sync or contact/deal operation? → hubspot-sync
 ├── A notification, WebSocket, or push? → notification-system

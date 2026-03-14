@@ -88,6 +88,8 @@ Has trackman_booking_id?
 24. **Session lookup must NOT filter by booking status.** Cancelled bookings may share sessions. Filtering causes unique constraint violations.
 25. **Stuck cancellation safety net.** Scheduler runs every 2 hr, alerts staff about bookings in `cancellation_pending` for 4+ hours.
 
+26. **Wallet pass hooks on Trackman import changes (v8.87.13).** When a Trackman import updates a booking's time, duration, or bay assignment, call `refreshBookingPass(bookingId)` to regenerate the Apple Wallet pass with updated details. When a Trackman import cancels a booking, call `voidBookingPass(bookingId)` to invalidate the pass. Both are fire-and-forget (`.catch(err => logger.error(...))`). Import from `../../walletPass/bookingPassService`.
+
 ## Anti-Patterns (NEVER)
 
 1. NEVER write `INSERT INTO booking_sessions` outside `ensureSessionForBooking()`.
@@ -107,4 +109,5 @@ Has trackman_booking_id?
 - **Check-in billing** → `checkin-flow` skill
 - **Guest pass lifecycle** → `guest-pass-system` skill
 - **Stripe invoice handling** → `stripe-webhook-flow` skill
+- **Apple Wallet booking passes** → `booking-flow` skill (wallet pass lifecycle section)
 - **Unified Booking Sheet** → `project-architecture` skill

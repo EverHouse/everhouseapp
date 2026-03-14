@@ -92,6 +92,23 @@ Only if all 3 fail does it INSERT a new session. When called inside a transactio
 
 ---
 
+## Passkey / WebAuthn Auth (`server/routes/auth-passkey.ts`)
+
+Passkey (Face ID / Touch ID) registration and authentication for members. Uses `@simplewebauthn/server@11` (backend) and `@simplewebauthn/browser@11` (frontend).
+
+| Concern | Detail |
+|---------|--------|
+| Route file | `server/routes/auth-passkey.ts` — 6 endpoints (register options/verify, authenticate options/verify, list, remove) |
+| DB table | `passkeys` — `credentialId`, `publicKey`, `counter`, `transports`, `deviceName`, `memberId`, `lastUsedAt` |
+| Session field | `req.session.webauthnChallenge` — temporary challenge storage, deleted on success AND failure |
+| RP ID | `everclub.app` (prod), `REPLIT_DEV_DOMAIN` (dev), `localhost` (fallback) |
+| Security | Staff/admin blocked from registration (403). Rate-limited authenticate endpoints. Platform authenticators only (`authenticatorAttachment: 'platform'`). Archived users excluded. Non-active members rejected (uses `ACTIVE_STATUSES`). |
+| Login creates session | On successful authenticate, creates full session + Supabase JWT via exported `createSupabaseToken()` from `auth.ts` |
+| Frontend | `Login.tsx` (conditional UI + button), `Dashboard.tsx` (passkey nudge banner), `Profile.tsx` (register/list/remove section) |
+| Session type | `webauthnChallenge` added to `server/types/session.ts` and `shared/models/auth-session.ts` |
+
+---
+
 ## HubSpot CRM (`server/core/hubspot/`)
 
 | File | Purpose |
