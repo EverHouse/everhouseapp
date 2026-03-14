@@ -159,9 +159,37 @@ Defined in `server/core/hubspot/constants.ts`, the membership pipeline stages ar
    - `pageUrl` stored in metadata for type inference
 5. Insert into `form_submissions` with status `new`.
 
-### Form Type Inference
+### Form ID Resolution (v8.87.4/v8.87.5)
 
-When multiple form types share the same HubSpot form ID, `inferFormTypeFromPageUrl` examines the submission's page URL to determine the correct type based on URL keywords (e.g., "private-hire", "event", "tour", "membership", "contact", "checkin").
+`resolveFormId(formType)` is **async** and uses a 4-tier fallback:
+
+1. **Environment variable** — `HUBSPOT_FORM_TOUR_REQUEST`, `HUBSPOT_FORM_MEMBERSHIP`, etc.
+2. **Admin setting** — `hubspot.form_id.{formType}` in the admin Settings page (30s cache via `getSettingValue`)
+3. **Auto-discovered** — `discoveredFormIds` map, populated each sync by `updateDiscoveredFormIds()`
+4. **Hardcoded** — `HUBSPOT_KNOWN_FORM_IDS` lookup table
+
+At startup, `logFormIdResolutionStatus()` logs which form types have resolved IDs and warns about any that are missing.
+
+### Form Type Inference (v8.87.4)
+
+`inferFormTypeStrict(formName)` is the primary classifier used for form discovery:
+- `check-in` / `checkin` / `waiver` → `guest-checkin`
+- `membership` / `application` → `membership`
+- `private` + (`event` / `hire`) → `private-hire`
+- `tour` → `tour-request`
+- `contact` → `contact`
+- `event` / `inquiry` → `event-inquiry`
+- No match → returns `null` (form skipped with log)
+
+`inferFormTypeFromName()` (legacy) delegates to `inferFormTypeStrict()` with `'contact'` as default fallback.
+
+`updateDiscoveredFormIds()` clears the discovery map on each sync run and logs collisions when multiple forms map to the same type (last one wins).
+
+When multiple form types share the same HubSpot form ID, `inferFormTypeFromPageUrl` examines the submission's page URL for fallback type inference.
+
+### Form Submission Allowlist (v8.87.6)
+
+Outbound form submissions (app → HubSpot) in `server/routes/hubspot.ts` pass fields through `VALID_HUBSPOT_CONTACT_FIELDS`. Only listed fields are sent; unlisted fields are silently dropped. The allowlist includes standard fields (name, email, phone), membership fields, private-hire fields (event_date, event_time, additional_details, event_services), guest check-in fields (guest_firstname, guest_lastname, guest_email, guest_phone, member_name, member_email), and contact fields (topic). When adding new form fields, they must be added to this allowlist.
 
 ## Member Sync from HubSpot (Inbound)
 

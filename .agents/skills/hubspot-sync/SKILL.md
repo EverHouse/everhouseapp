@@ -22,6 +22,7 @@ description: HubSpot CRM synchronization system — queue-based sync of contacts
 | Admin discount CRUD | `server/core/hubspot/admin.ts` | Discount rules, billing audit |
 | Request wrapper | `server/core/hubspot/request.ts` | Rate-limit-aware p-retry |
 | Form submissions | `server/core/hubspot/formSync.ts` | Form ingestion from HubSpot; `resolveFormId()` (async) uses 4-tier fallback: env var → admin setting → auto-discovered → hardcoded |
+| Form submission routes | `server/routes/hubspot.ts` | Public form submission endpoint; `VALID_HUBSPOT_CONTACT_FIELDS` allowlist controls which fields pass through to HubSpot |
 | Full member sync | `server/core/memberSync.ts` | Daily inbound reconciliation |
 | Payment line items | `server/core/hubspot/queueHelpers.ts` | Stripe → HubSpot line items (via queue) |
 | Queue monitor | `server/core/hubspotQueueMonitor.ts` | Admin dashboard stats |
@@ -84,7 +85,10 @@ MindBody-billed active member's HubSpot status changes to non-active
 15. **Supersede includes 'processing' status.** `queueTierSync` supersedes jobs with `status IN ('pending', 'failed', 'processing')`. This prevents stale tier syncs from completing after a newer tier change has been queued.
 16. **Worker terminal updates have status guards.** All `UPDATE` queries that mark jobs as completed/failed/dead include `AND status = 'processing'` with `rowCount` checks. If `rowCount === 0`, the job was superseded mid-flight — no false staff alerts.
 17. **Retry backoff has random jitter.** Exponential backoff adds 0–5s random jitter (`Math.floor(Math.random() * 5000)` ms) to prevent thundering herd when multiple failed jobs retry simultaneously.
-18. **Supersede-then-enqueue is NOT atomic.** `queueTierSync` supersedes old jobs via Drizzle `db.execute()` then enqueues via `queryWithRetry()` (raw pg pool). These use different DB connections, so a crash between them could leave jobs superseded with no replacement. Risk is extremely low and self-healing (next tier change creates a new job).
+18. **Form submissions use `VALID_HUBSPOT_CONTACT_FIELDS` allowlist (v8.87.6).** Only explicitly listed field names pass through to HubSpot — unlisted fields are silently dropped. The allowlist in `server/routes/hubspot.ts` includes: `firstname`, `lastname`, `email`, `phone`, `company`, `message`, `membership_interest`, `event_type`, `guest_count`, `eh_email_updates_opt_in`, `event_date`, `event_time`, `additional_details`, `event_services`, `topic`, `guest_firstname`, `guest_lastname`, `guest_email`, `guest_phone`, `member_name`, `member_email`. When adding new form fields, add them to this allowlist or they will be silently dropped.
+19. **`inferFormTypeStrict()` is the primary form classifier (v8.87.4).** `inferFormTypeFromName()` now delegates to `inferFormTypeStrict()` for consistent classification. Discovery map clears stale entries each sync and logs collisions.
+20. **Admin-configurable form IDs (v8.87.5).** 6 `hubspot.form_id.*` settings keys in the admin Settings page. `resolveFormId()` is async (awaits `getSettingValue()` with 30s cache). Startup calls `logFormIdResolutionStatus()` to log which form types have resolved IDs.
+21. **Supersede-then-enqueue is NOT atomic.** `queueTierSync` supersedes old jobs via Drizzle `db.execute()` then enqueues via `queryWithRetry()` (raw pg pool). These use different DB connections, so a crash between them could leave jobs superseded with no replacement. Risk is extremely low and self-healing (next tier change creates a new job).
 
 ## Anti-Patterns (NEVER)
 
