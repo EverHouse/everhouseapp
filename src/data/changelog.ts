@@ -13,7 +13,7 @@ export const changelog: ChangelogEntry[] = [
     title: "Conference Room Booking Fix — No More False Invoice Warnings",
     changes: [
       "Fix: Conference room bookings within your daily allowance (no fees due) no longer trigger false 'invoice not found' warnings",
-      "Both member and staff conference room booking paths now correctly skip the payment step when there are no charges",
+      "All three conference room payment paths (member booking, staff booking, and booking approval) now correctly skip invoice finalization when there are no charges",
     ]
   },
   {
