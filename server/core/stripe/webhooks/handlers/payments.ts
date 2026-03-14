@@ -732,7 +732,7 @@ export async function handlePaymentIntentSucceeded(client: PoolClient, paymentIn
     const participantIds = snapshotFees.map(pf => pf.id);
     
     const statusCheck = await client.query(
-      `SELECT id, payment_status FROM booking_participants WHERE id = ANY($1::int[]) FOR UPDATE`,
+      `SELECT id, payment_status FROM booking_participants WHERE id = ANY($1::int[]) ORDER BY id ASC FOR UPDATE`,
       [participantIds]
     );
     
@@ -864,6 +864,7 @@ export async function handlePaymentIntentSucceeded(client: PoolClient, paymentIn
       `SELECT bp.id, bp.payment_status, bp.cached_fee_cents
        FROM booking_participants bp
        WHERE bp.id = ANY($1::int[])
+       ORDER BY bp.id ASC
        FOR UPDATE`,
       [participantIds]
     );
@@ -915,6 +916,7 @@ export async function handlePaymentIntentSucceeded(client: PoolClient, paymentIn
        WHERE bp.session_id = (SELECT session_id FROM booking_requests WHERE id = $1)
        AND bp.payment_status = 'pending' AND bp.cached_fee_cents > 0
        AND bp.stripe_payment_intent_id IS NULL
+       ORDER BY bp.id ASC
        FOR UPDATE`,
       [bookingId]
     );

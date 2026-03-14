@@ -16,6 +16,7 @@ export const changelog: ChangelogEntry[] = [
       "Fixed: Invoice payment processing now properly handles Stripe payment intent verification",
       "Fixed: HubSpot sync queue race condition — rapid tier changes no longer risk stale data overwriting the latest update",
       "Fixed: Winning a payment dispute no longer blindly reactivates membership — system now checks for other open disputes and subscription status before auto-reactivating",
+      "Fixed: Added consistent lock ordering to prevent potential database deadlocks when processing concurrent payments for the same booking",
     ]
   },
   {
