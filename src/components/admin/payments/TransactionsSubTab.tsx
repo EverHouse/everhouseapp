@@ -386,7 +386,7 @@ const PendingAuthorizationsSection: React.FC<SectionProps> = ({ onClose, variant
       })}
 
       {selectedAuth && actionType && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={resetModal} aria-hidden="true">
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={resetModal} role="button" tabIndex={0} aria-label="Close dialog" onKeyDown={(e) => { if (e.key === 'Escape') resetModal(); }}>
           <div 
             className="bg-white dark:bg-surface-dark rounded-xl w-full max-w-sm shadow-xl p-5"
             onClick={(e) => e.stopPropagation()}
@@ -875,7 +875,7 @@ const FailedPaymentsSection: React.FC<SectionProps> = ({ onClose, variant = 'mod
       })}
 
       {selectedEmail && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setSelectedEmail(null)}>
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setSelectedEmail(null)} role="button" tabIndex={0} aria-label="Close dialog" onKeyDown={(e) => { if (e.key === 'Escape') setSelectedEmail(null); }}>
           <div 
             className="bg-white dark:bg-surface-dark rounded-xl w-full max-w-sm shadow-xl p-5"
             onClick={(e) => e.stopPropagation()}

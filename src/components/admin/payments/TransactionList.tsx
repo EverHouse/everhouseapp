@@ -220,7 +220,7 @@ const RecentTransactionsSection = forwardRef<TransactionListRef, SectionProps>((
       ))}
 
       {selectedTxId && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={handleCloseNotes} aria-label="Close notes">
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={handleCloseNotes} role="button" tabIndex={0} aria-label="Close notes" onKeyDown={(e) => { if (e.key === 'Escape') handleCloseNotes(); }}>
           <div 
             className="bg-white dark:bg-surface-dark rounded-xl w-full max-w-md shadow-xl"
             onClick={(e) => e.stopPropagation()}
@@ -285,7 +285,7 @@ const RecentTransactionsSection = forwardRef<TransactionListRef, SectionProps>((
       )}
 
       {refundTarget && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => { setRefundTarget(null); setRefundError(null); }}>
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => { setRefundTarget(null); setRefundError(null); }} role="button" tabIndex={0} aria-label="Close dialog" onKeyDown={(e) => { if (e.key === 'Escape') { setRefundTarget(null); setRefundError(null); } }}>
           <div
             className="bg-white dark:bg-surface-dark rounded-xl w-full max-w-md shadow-xl"
             onClick={(e) => e.stopPropagation()}

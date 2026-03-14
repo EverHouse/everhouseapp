@@ -945,7 +945,7 @@ export const TrackmanWebhookEventsSection: React.FC<TrackmanWebhookEventsSection
       )}
 
       {showReplayModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => setShowReplayModal(false)} aria-label="Close dialog">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => setShowReplayModal(false)} role="button" tabIndex={0} aria-label="Close dialog" onKeyDown={(e) => { if (e.key === 'Escape') setShowReplayModal(false); }}>
           <div className="w-full max-w-md bg-white dark:bg-gray-800 rounded-xl shadow-xl p-6 space-y-4" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-bold text-primary dark:text-white">Replay Webhooks to Dev</h3>
