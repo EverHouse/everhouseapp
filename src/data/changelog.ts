@@ -8,6 +8,15 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.87.1",
+    date: "2026-03-14",
+    title: "Google & Apple Account Linking Fix",
+    changes: [
+      "Fix: Linking Google or Apple accounts from the profile page no longer shows 'User account not found' error",
+      "Fix: Google account link button now correctly says 'Link' instead of 'Sign in' on the profile page",
+    ]
+  },
+  {
     version: "8.87.0",
     date: "2026-03-14",
     title: "Directory Sync Fix & Membership Status Accuracy Overhaul",

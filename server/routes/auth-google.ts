@@ -318,6 +318,28 @@ router.post('/api/auth/google/callback', requireGoogleConfig, async (req, res) =
   }
 });
 
+async function resolveDbUserId(sessionUser: { id?: string; email: string }): Promise<string | null> {
+  let dbUser = await db.select({ id: users.id })
+    .from(users)
+    .where(sql`${users.id} = ${sessionUser.id!} AND ${users.archivedAt} IS NULL`)
+    .limit(1);
+
+  if (dbUser.length > 0) return dbUser[0].id;
+
+  const normalizedEmail = normalizeEmail(sessionUser.email);
+  dbUser = await db.select({ id: users.id })
+    .from(users)
+    .where(sql`LOWER(${users.email}) = LOWER(${normalizedEmail}) AND ${users.archivedAt} IS NULL`)
+    .limit(1);
+
+  if (dbUser.length > 0) {
+    logger.info('[Google Auth] Resolved user by email fallback', { extra: { sessionId: sessionUser.id, dbId: dbUser[0].id, email: sessionUser.email } });
+    return dbUser[0].id;
+  }
+
+  return null;
+}
+
 router.post('/api/auth/google/link', requireGoogleConfig, async (req, res) => {
   try {
     const sessionUser = req.session?.user;
@@ -332,12 +354,18 @@ router.post('/api/auth/google/link', requireGoogleConfig, async (req, res) => {
 
     const googleUser = await verifyGoogleToken(credential);
 
+    const dbUserId = await resolveDbUserId(sessionUser);
+    if (!dbUserId) {
+      logger.error('[Google Auth] Link: user not found by id or email', { extra: { sessionUserId: sessionUser.id, sessionEmail: sessionUser.email } });
+      return res.status(404).json({ error: 'User account not found. Please log out and log in again.' });
+    }
+
     const existing = await db.select({ id: users.id, email: users.email })
       .from(users)
       .where(eq(users.googleId, googleUser.sub))
       .limit(1);
 
-    if (existing.length > 0 && existing[0].id !== sessionUser.id) {
+    if (existing.length > 0 && existing[0].id !== dbUserId) {
       return res.status(409).json({ error: 'This Google account is already linked to a different member account.' });
     }
 
@@ -348,11 +376,11 @@ router.post('/api/auth/google/link', requireGoogleConfig, async (req, res) => {
         googleLinkedAt: new Date(),
         updatedAt: new Date(),
       })
-      .where(eq(users.id, sessionUser.id))
+      .where(eq(users.id, dbUserId))
       .returning({ id: users.id });
 
     if (updated.length === 0) {
-      logger.error('[Google Auth] Link update affected 0 rows', { extra: { sessionUserId: sessionUser.id, sessionEmail: sessionUser.email } });
+      logger.error('[Google Auth] Link update affected 0 rows', { extra: { dbUserId, sessionEmail: sessionUser.email } });
       return res.status(404).json({ error: 'User account not found. Please log out and log in again.' });
     }
 
@@ -361,7 +389,7 @@ router.post('/api/auth/google/link', requireGoogleConfig, async (req, res) => {
       memberName: `${sessionUser.firstName || ''} ${sessionUser.lastName || ''}`.trim(),
       action: 'update_member',
       resourceType: 'user',
-      resourceId: sessionUser.id,
+      resourceId: dbUserId,
       details: { action: 'google_link', googleEmail: googleUser.email },
       req,
     });
@@ -384,6 +412,12 @@ router.post('/api/auth/google/unlink', requireGoogleConfig, async (req, res) => 
       return res.status(401).json({ error: 'You must be logged in to unlink a Google account' });
     }
 
+    const dbUserId = await resolveDbUserId(sessionUser);
+    if (!dbUserId) {
+      logger.error('[Google Auth] Unlink: user not found by id or email', { extra: { sessionUserId: sessionUser.id, sessionEmail: sessionUser.email } });
+      return res.status(404).json({ error: 'User account not found. Please log out and log in again.' });
+    }
+
     const updated = await db.update(users)
       .set({
         googleId: null,
@@ -391,11 +425,11 @@ router.post('/api/auth/google/unlink', requireGoogleConfig, async (req, res) => 
         googleLinkedAt: null,
         updatedAt: new Date(),
       })
-      .where(eq(users.id, sessionUser.id))
+      .where(eq(users.id, dbUserId))
       .returning({ id: users.id });
 
     if (updated.length === 0) {
-      logger.error('[Google Auth] Unlink update affected 0 rows', { extra: { sessionUserId: sessionUser.id, sessionEmail: sessionUser.email } });
+      logger.error('[Google Auth] Unlink update affected 0 rows', { extra: { dbUserId, sessionEmail: sessionUser.email } });
       return res.status(404).json({ error: 'User account not found. Please log out and log in again.' });
     }
 
@@ -404,7 +438,7 @@ router.post('/api/auth/google/unlink', requireGoogleConfig, async (req, res) => 
       memberName: `${sessionUser.firstName || ''} ${sessionUser.lastName || ''}`.trim(),
       action: 'update_member',
       resourceType: 'user',
-      resourceId: sessionUser.id,
+      resourceId: dbUserId,
       details: { action: 'google_unlink' },
       req,
     });
@@ -423,13 +457,15 @@ router.get('/api/auth/google/status', requireGoogleConfig, async (req, res) => {
       return res.status(401).json({ error: 'You must be logged in to check Google link status' });
     }
 
+    const dbUserId = await resolveDbUserId({ id: sessionUser.id, email: sessionUser.email || '' });
+
     const result = await db.select({
       googleId: users.googleId,
       googleEmail: users.googleEmail,
       googleLinkedAt: users.googleLinkedAt,
     })
       .from(users)
-      .where(eq(users.id, sessionUser.id))
+      .where(eq(users.id, dbUserId || sessionUser.id))
       .limit(1);
 
     if (result.length === 0) {

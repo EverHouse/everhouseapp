@@ -891,8 +891,8 @@ const Profile: React.FC = () => {
                    <GoogleSignInButton
                      onSuccess={handleGoogleLink}
                      onError={(err) => showToast(err, 'error')}
-                     text="signin"
-                     width={100}
+                     compact
+                     label="Link"
                      disabled={googleLinking}
                    />
                  )}

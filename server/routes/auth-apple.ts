@@ -213,6 +213,28 @@ router.post('/api/auth/apple/verify', requireAppleConfig, authRateLimiterByIp, a
   }
 });
 
+async function resolveDbUserId(sessionUser: { id?: string; email: string }): Promise<string | null> {
+  let dbUser = await db.select({ id: users.id })
+    .from(users)
+    .where(sql`${users.id} = ${sessionUser.id!} AND ${users.archivedAt} IS NULL`)
+    .limit(1);
+
+  if (dbUser.length > 0) return dbUser[0].id;
+
+  const normalizedEmail = normalizeEmail(sessionUser.email);
+  dbUser = await db.select({ id: users.id })
+    .from(users)
+    .where(sql`LOWER(${users.email}) = LOWER(${normalizedEmail}) AND ${users.archivedAt} IS NULL`)
+    .limit(1);
+
+  if (dbUser.length > 0) {
+    logger.info('[Apple Auth] Resolved user by email fallback', { extra: { sessionId: sessionUser.id, dbId: dbUser[0].id, email: sessionUser.email } });
+    return dbUser[0].id;
+  }
+
+  return null;
+}
+
 router.post('/api/auth/apple/link', requireAppleConfig, async (req, res) => {
   try {
     const sessionUser = req.session?.user;
@@ -227,12 +249,18 @@ router.post('/api/auth/apple/link', requireAppleConfig, async (req, res) => {
 
     const appleData = await verifyAppleToken(identityToken);
 
+    const dbUserId = await resolveDbUserId(sessionUser);
+    if (!dbUserId) {
+      logger.error('[Apple Auth] Link: user not found by id or email', { extra: { sessionUserId: sessionUser.id, sessionEmail: sessionUser.email } });
+      return res.status(404).json({ error: 'User account not found. Please log out and log in again.' });
+    }
+
     const existing = await db.select({ id: users.id, email: users.email })
       .from(users)
       .where(eq(users.appleId, appleData.sub))
       .limit(1);
 
-    if (existing.length > 0 && existing[0].id !== sessionUser.id) {
+    if (existing.length > 0 && existing[0].id !== dbUserId) {
       return res.status(409).json({ error: 'This Apple account is already linked to a different member account.' });
     }
 
@@ -243,11 +271,11 @@ router.post('/api/auth/apple/link', requireAppleConfig, async (req, res) => {
         appleLinkedAt: new Date(),
         updatedAt: new Date(),
       })
-      .where(eq(users.id, sessionUser.id))
+      .where(eq(users.id, dbUserId))
       .returning({ id: users.id });
 
     if (updated.length === 0) {
-      logger.error('[Apple Auth] Link update affected 0 rows', { extra: { sessionUserId: sessionUser.id, sessionEmail: sessionUser.email } });
+      logger.error('[Apple Auth] Link update affected 0 rows', { extra: { dbUserId, sessionEmail: sessionUser.email } });
       return res.status(404).json({ error: 'User account not found. Please log out and log in again.' });
     }
 
@@ -256,7 +284,7 @@ router.post('/api/auth/apple/link', requireAppleConfig, async (req, res) => {
       memberName: `${sessionUser.firstName || ''} ${sessionUser.lastName || ''}`.trim(),
       action: 'update_member',
       resourceType: 'user',
-      resourceId: sessionUser.id,
+      resourceId: dbUserId,
       details: { action: 'apple_link', appleEmail: appleData.email },
       req,
     });
@@ -279,6 +307,12 @@ router.post('/api/auth/apple/unlink', requireAppleConfig, async (req, res) => {
       return res.status(401).json({ error: 'You must be logged in to unlink an Apple account' });
     }
 
+    const dbUserId = await resolveDbUserId(sessionUser);
+    if (!dbUserId) {
+      logger.error('[Apple Auth] Unlink: user not found by id or email', { extra: { sessionUserId: sessionUser.id, sessionEmail: sessionUser.email } });
+      return res.status(404).json({ error: 'User account not found. Please log out and log in again.' });
+    }
+
     const updated = await db.update(users)
       .set({
         appleId: null,
@@ -286,11 +320,11 @@ router.post('/api/auth/apple/unlink', requireAppleConfig, async (req, res) => {
         appleLinkedAt: null,
         updatedAt: new Date(),
       })
-      .where(eq(users.id, sessionUser.id))
+      .where(eq(users.id, dbUserId))
       .returning({ id: users.id });
 
     if (updated.length === 0) {
-      logger.error('[Apple Auth] Unlink update affected 0 rows', { extra: { sessionUserId: sessionUser.id, sessionEmail: sessionUser.email } });
+      logger.error('[Apple Auth] Unlink update affected 0 rows', { extra: { dbUserId, sessionEmail: sessionUser.email } });
       return res.status(404).json({ error: 'User account not found. Please log out and log in again.' });
     }
 
@@ -299,7 +333,7 @@ router.post('/api/auth/apple/unlink', requireAppleConfig, async (req, res) => {
       memberName: `${sessionUser.firstName || ''} ${sessionUser.lastName || ''}`.trim(),
       action: 'update_member',
       resourceType: 'user',
-      resourceId: sessionUser.id,
+      resourceId: dbUserId,
       details: { action: 'apple_unlink' },
       req,
     });
@@ -318,13 +352,15 @@ router.get('/api/auth/apple/status', requireAppleConfig, async (req, res) => {
       return res.status(401).json({ error: 'You must be logged in to check Apple link status' });
     }
 
+    const dbUserId = await resolveDbUserId({ id: sessionUser.id, email: sessionUser.email || '' });
+
     const result = await db.select({
       appleId: users.appleId,
       appleEmail: users.appleEmail,
       appleLinkedAt: users.appleLinkedAt,
     })
       .from(users)
-      .where(eq(users.id, sessionUser.id))
+      .where(eq(users.id, dbUserId || sessionUser.id))
       .limit(1);
 
     if (result.length === 0) {
