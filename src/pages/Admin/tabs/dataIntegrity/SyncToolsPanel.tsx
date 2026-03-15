@@ -64,8 +64,8 @@ interface SyncToolsPanelProps {
     totalScanned?: number;
     eligibleCount?: number;
     keptCount?: number;
-    archivedCount?: number;
-    sampleArchived?: Array<{ name: string; email: string }>;
+    deletedCount?: number;
+    sampleDeleted?: Array<{ name: string; email: string }>;
   } | null;
   visitorArchiveProgress: {
     phase: string;
@@ -73,7 +73,7 @@ interface SyncToolsPanelProps {
     checked: number;
     eligibleCount: number;
     keptCount: number;
-    archived: number;
+    deleted: number;
     errors: number;
   } | null;
 }
@@ -355,11 +355,11 @@ const SyncToolsPanel: React.FC<SyncToolsPanelProps> = ({
 
           <div className="border-t border-gray-200 dark:border-white/10 pt-4 space-y-3">
             <h4 className="text-sm font-medium text-primary dark:text-white flex items-center gap-2">
-              <span aria-hidden="true" className="material-symbols-outlined text-[18px]">archive</span>
-              Archive Stale Visitors
+              <span aria-hidden="true" className="material-symbols-outlined text-[18px]">delete_sweep</span>
+              Delete Stale Visitors
             </h4>
             <p className="text-xs text-gray-500 dark:text-gray-400">
-              Archive non-member visitors who have zero visit activity, no MindBody transaction history, no day pass purchases, and no Stripe charges. Archived visitors are hidden from search results and directory.
+              Permanently delete non-member visitors who have zero visit activity, no MindBody transaction history, no day pass purchases, and no Stripe charges. These visitors are still preserved in HubSpot.
             </p>
             <div className="flex flex-wrap gap-2">
               <button
@@ -376,7 +376,7 @@ const SyncToolsPanel: React.FC<SyncToolsPanelProps> = ({
                 className="tactile-btn px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-2"
               >
                 {isRunningVisitorArchive && <span className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>}
-                Archive Stale Visitors
+                Delete Stale Visitors
               </button>
             </div>
             {isRunningVisitorArchive && visitorArchiveProgress && (
@@ -386,7 +386,7 @@ const SyncToolsPanel: React.FC<SyncToolsPanelProps> = ({
                   <span className="text-xs font-medium text-blue-700 dark:text-blue-300">
                     {visitorArchiveProgress.phase === 'scanning' && 'Scanning visitors for activity...'}
                     {visitorArchiveProgress.phase === 'checking_stripe' && `Checking Stripe transactions: ${visitorArchiveProgress.checked} / ${visitorArchiveProgress.totalVisitors}`}
-                    {visitorArchiveProgress.phase === 'archiving' && `Archiving: ${visitorArchiveProgress.archived} / ${visitorArchiveProgress.eligibleCount}`}
+                    {visitorArchiveProgress.phase === 'deleting' && `Deleting: ${visitorArchiveProgress.deleted} / ${visitorArchiveProgress.eligibleCount}`}
                   </span>
                 </div>
                 {visitorArchiveProgress.totalVisitors > 0 && (
@@ -396,8 +396,8 @@ const SyncToolsPanel: React.FC<SyncToolsPanelProps> = ({
                       style={{ 
                         width: `${visitorArchiveProgress.phase === 'checking_stripe' 
                           ? Math.round((visitorArchiveProgress.checked / Math.max(1, visitorArchiveProgress.totalVisitors)) * 100)
-                          : visitorArchiveProgress.phase === 'archiving'
-                            ? Math.round((visitorArchiveProgress.archived / Math.max(1, visitorArchiveProgress.eligibleCount)) * 100)
+                          : visitorArchiveProgress.phase === 'deleting'
+                            ? Math.round((visitorArchiveProgress.deleted / Math.max(1, visitorArchiveProgress.eligibleCount)) * 100)
                             : visitorArchiveProgress.phase === 'scanning' ? 0 : 100}%` 
                       }}
                     />
@@ -416,10 +416,10 @@ const SyncToolsPanel: React.FC<SyncToolsPanelProps> = ({
                   <p className="text-[10px] font-bold uppercase text-blue-600 dark:text-blue-400 mb-1">Preview Only - No Changes Made</p>
                 )}
                 <p className={`text-xs ${visitorArchiveResult.success ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'}`}>{visitorArchiveResult.message}</p>
-                {visitorArchiveResult.sampleArchived && visitorArchiveResult.sampleArchived.length > 0 && (
+                {visitorArchiveResult.sampleDeleted && visitorArchiveResult.sampleDeleted.length > 0 && (
                   <div className="mt-2 max-h-32 overflow-y-auto text-xs bg-white dark:bg-white/10 rounded p-2">
-                    <p className="text-[10px] font-medium text-gray-500 mb-1">Sample of {visitorArchiveResult.dryRun ? 'visitors to archive' : 'archived visitors'}:</p>
-                    {visitorArchiveResult.sampleArchived.map((v, i) => (
+                    <p className="text-[10px] font-medium text-gray-500 mb-1">Sample of {visitorArchiveResult.dryRun ? 'visitors to delete' : 'deleted visitors'}:</p>
+                    {visitorArchiveResult.sampleDeleted.map((v, i) => (
                       <div key={i} className="py-0.5 text-gray-600 dark:text-gray-400">
                         {v.name} ({v.email})
                       </div>

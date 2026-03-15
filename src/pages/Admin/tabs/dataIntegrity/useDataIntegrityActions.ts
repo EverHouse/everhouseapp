@@ -143,8 +143,8 @@ interface VisitorArchiveJobResult {
   totalScanned?: number;
   eligibleCount?: number;
   keptCount?: number;
-  archivedCount?: number;
-  sampleArchived?: Array<{ name: string; email: string }>;
+  deletedCount?: number;
+  sampleDeleted?: Array<{ name: string; email: string }>;
 }
 
 interface MemberDetails {
@@ -818,8 +818,8 @@ export function useDataIntegrityActions(state: DataIntegrityState) {
             totalScanned: result.totalScanned,
             eligibleCount: result.eligibleCount,
             keptCount: result.keptCount,
-            archivedCount: result.archivedCount,
-            sampleArchived: result.sampleArchived,
+            deletedCount: result.deletedCount,
+            sampleDeleted: result.sampleDeleted,
           });
           if (!result.dryRun) showToast(result.message, 'success');
         }
@@ -843,7 +843,7 @@ export function useDataIntegrityActions(state: DataIntegrityState) {
         const statusData = await fetchWithCredentials<BackgroundJobStatus>('/api/data-tools/archive-stale-visitors/status');
         if (statusData.hasJob && statusData.job) {
           if (statusData.job.progress != null) {
-            state.setVisitorArchiveProgress(statusData.job.progress as unknown as { phase: string; totalVisitors: number; checked: number; eligibleCount: number; keptCount: number; archived: number; errors: number });
+            state.setVisitorArchiveProgress(statusData.job.progress as unknown as { phase: string; totalVisitors: number; checked: number; eligibleCount: number; keptCount: number; deleted: number; errors: number });
           }
           if (statusData.job.status === 'completed') {
             state.setIsRunningVisitorArchive(false);
@@ -857,8 +857,8 @@ export function useDataIntegrityActions(state: DataIntegrityState) {
                 totalScanned: r.totalScanned,
                 eligibleCount: r.eligibleCount,
                 keptCount: r.keptCount,
-                archivedCount: r.archivedCount,
-                sampleArchived: r.sampleArchived,
+                deletedCount: r.deletedCount,
+                sampleDeleted: r.sampleDeleted,
               });
             }
           } else if (statusData.job.status === 'failed') {

@@ -245,7 +245,7 @@ export function useDataIntegrityState() {
     checked: number;
     eligibleCount: number;
     keptCount: number;
-    archived: number;
+    deleted: number;
     errors: number;
   } | null>(null);
   const [visitorArchiveResult, setVisitorArchiveResult] = useState<{
@@ -255,8 +255,8 @@ export function useDataIntegrityState() {
     totalScanned?: number;
     eligibleCount?: number;
     keptCount?: number;
-    archivedCount?: number;
-    sampleArchived?: Array<{ name: string; email: string }>;
+    deletedCount?: number;
+    sampleDeleted?: Array<{ name: string; email: string }>;
   } | null>(null);
 
   const [isRunningStripeCleanup, setIsRunningStripeCleanup] = useState(false);

@@ -100,8 +100,8 @@ interface IntegrityResultsPanelProps {
     totalScanned?: number;
     eligibleCount?: number;
     keptCount?: number;
-    archivedCount?: number;
-    sampleArchived?: Array<{ name: string; email: string }>;
+    deletedCount?: number;
+    sampleDeleted?: Array<{ name: string; email: string }>;
   } | null;
   visitorArchiveProgress: {
     phase: string;
@@ -109,7 +109,7 @@ interface IntegrityResultsPanelProps {
     checked: number;
     eligibleCount: number;
     keptCount: number;
-    archived: number;
+    deleted: number;
     errors: number;
   } | null;
   isRunningOrphanedParticipantFix: boolean;
@@ -504,8 +504,8 @@ const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
               )}
               <div className="mt-3 pt-3 border-t border-gray-200 dark:border-white/10">
                 <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-1">
-                  <span className="material-symbols-outlined text-[14px]">archive</span>
-                  Archive Stale Visitors
+                  <span className="material-symbols-outlined text-[14px]">delete_sweep</span>
+                  Delete Stale Visitors
                 </p>
                 <div className="flex flex-wrap gap-2 mb-2">
                   <button
@@ -521,7 +521,7 @@ const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
                     disabled={isRunningVisitorArchive || !visitorArchiveResult?.dryRun}
                     className="tactile-btn px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-1"
                   >
-                    Archive Now
+                    Delete Now
                   </button>
                 </div>
                 {isRunningVisitorArchive && visitorArchiveProgress && (
@@ -531,7 +531,7 @@ const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
                       <span className="text-[11px] font-medium text-blue-700 dark:text-blue-300">
                         {visitorArchiveProgress.phase === 'scanning' && 'Scanning...'}
                         {visitorArchiveProgress.phase === 'checking_stripe' && `Stripe: ${visitorArchiveProgress.checked}/${visitorArchiveProgress.totalVisitors}`}
-                        {visitorArchiveProgress.phase === 'archiving' && `Archiving: ${visitorArchiveProgress.archived}/${visitorArchiveProgress.eligibleCount}`}
+                        {visitorArchiveProgress.phase === 'deleting' && `Deleting: ${visitorArchiveProgress.deleted}/${visitorArchiveProgress.eligibleCount}`}
                       </span>
                     </div>
                     {visitorArchiveProgress.totalVisitors > 0 && (
@@ -541,8 +541,8 @@ const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
                           style={{ 
                             width: `${visitorArchiveProgress.phase === 'checking_stripe' 
                               ? Math.round((visitorArchiveProgress.checked / Math.max(1, visitorArchiveProgress.totalVisitors)) * 100)
-                              : visitorArchiveProgress.phase === 'archiving'
-                                ? Math.round((visitorArchiveProgress.archived / Math.max(1, visitorArchiveProgress.eligibleCount)) * 100)
+                              : visitorArchiveProgress.phase === 'deleting'
+                                ? Math.round((visitorArchiveProgress.deleted / Math.max(1, visitorArchiveProgress.eligibleCount)) * 100)
                                 : visitorArchiveProgress.phase === 'scanning' ? 0 : 100}%` 
                           }}
                         />
@@ -556,9 +556,9 @@ const IntegrityResultsPanel: React.FC<IntegrityResultsPanelProps> = ({
                       <p className="text-[10px] font-bold uppercase text-blue-600 dark:text-blue-400 mb-1">Preview Only</p>
                     )}
                     <p className={`text-xs ${getTextStyle(visitorArchiveResult)}`}>{visitorArchiveResult.message}</p>
-                    {visitorArchiveResult.sampleArchived && visitorArchiveResult.sampleArchived.length > 0 && (
+                    {visitorArchiveResult.sampleDeleted && visitorArchiveResult.sampleDeleted.length > 0 && (
                       <div className="mt-1 max-h-24 overflow-y-auto text-[11px] bg-white dark:bg-white/10 rounded p-1">
-                        {visitorArchiveResult.sampleArchived.map((v, i) => (
+                        {visitorArchiveResult.sampleDeleted.map((v, i) => (
                           <div key={i} className="py-0.5 text-gray-600 dark:text-gray-400">
                             {v.name} ({v.email})
                           </div>

@@ -71,12 +71,12 @@ import { createBackgroundJob, updateJobProgress, completeJob, failJob, getActive
 const VISITOR_ARCHIVE_JOB_TYPE = 'visitor_archive';
 
 interface VisitorArchiveProgress {
-  phase: 'scanning' | 'checking_stripe' | 'archiving' | 'done';
+  phase: 'scanning' | 'checking_stripe' | 'deleting' | 'done';
   totalVisitors: number;
   checked: number;
   eligibleCount: number;
   keptCount: number;
-  archived: number;
+  deleted: number;
   errors: number;
 }
 
@@ -864,13 +864,13 @@ router.post('/api/data-tools/archive-stale-visitors', isAdmin, async (req: Reque
   try {
     const existingJob = await getActiveJob(VISITOR_ARCHIVE_JOB_TYPE);
     if (existingJob) {
-      return res.status(409).json({ error: 'A visitor archive job is already running', jobId: existingJob.id });
+      return res.status(409).json({ error: 'A stale visitor deletion job is already running', jobId: existingJob.id });
     }
 
     const dryRun = req.body.dryRun !== false;
     const staffEmail = getSessionUser(req)?.email || 'admin';
 
-    logger.info('[DataTools] Visitor archive initiated by (dryRun: )', { extra: { staffEmail, dryRun } });
+    logger.info('[DataTools] Stale visitor deletion initiated by (dryRun: )', { extra: { staffEmail, dryRun } });
 
     const jobId = `va_${Date.now().toString(36)}`;
     const initialProgress: VisitorArchiveProgress = {
@@ -879,7 +879,7 @@ router.post('/api/data-tools/archive-stale-visitors', isAdmin, async (req: Reque
       checked: 0,
       eligibleCount: 0,
       keptCount: 0,
-      archived: 0,
+      deleted: 0,
       errors: 0,
     };
 
@@ -896,10 +896,10 @@ router.post('/api/data-tools/archive-stale-visitors', isAdmin, async (req: Reque
 
     runVisitorArchiveInBackground(jobId, dryRun, staffEmail, req);
 
-    res.json({ success: true, jobId, message: 'Archive job started' });
+    res.json({ success: true, jobId, message: 'Delete job started' });
   } catch (error: unknown) {
-    logger.error('[DataTools] Visitor archive error', { error: error instanceof Error ? error : new Error(String(error)) });
-    res.status(500).json({ error: 'Failed to start archive job', details: safeErrorDetail(error) });
+    logger.error('[DataTools] Stale visitor deletion error', { error: error instanceof Error ? error : new Error(String(error)) });
+    res.status(500).json({ error: 'Failed to start deletion job', details: safeErrorDetail(error) });
   }
 });
 
@@ -937,7 +937,7 @@ async function runVisitorArchiveInBackground(jobId: string, dryRun: boolean, sta
     checked: 0,
     eligibleCount: 0,
     keptCount: 0,
-    archived: 0,
+    deleted: 0,
     errors: 0,
   };
 
@@ -1025,60 +1025,72 @@ async function runVisitorArchiveInBackground(jobId: string, dryRun: boolean, sta
     broadcastToStaff({ type: 'visitor_archive_progress', data: progress });
     await syncProgress();
 
-    logger.info('[DataTools] eligible for archive, kept (has Stripe charges)', { extra: { eligibleLength: eligible.length, keptCount } });
+    logger.info('[DataTools] eligible for deletion, kept (has Stripe charges)', { extra: { eligibleLength: eligible.length, keptCount } });
 
-    const sampleArchived = eligible.slice(0, 20).map(v => ({
+    const sampleDeleted = eligible.slice(0, 20).map(v => ({
       name: [v.first_name, v.last_name].filter(Boolean).join(' ') || 'Unknown',
       email: v.email
     }));
 
-    let archivedCount = 0;
+    let deletedCount = 0;
 
     if (!dryRun && eligible.length > 0) {
-      progress.phase = 'archiving';
+      progress.phase = 'deleting';
       broadcastToStaff({ type: 'visitor_archive_progress', data: progress });
       await syncProgress();
 
-      const ARCHIVE_BATCH_SIZE = 100;
-      for (let i = 0; i < eligible.length; i += ARCHIVE_BATCH_SIZE) {
-        const batch = eligible.slice(i, i + ARCHIVE_BATCH_SIZE);
-        const ids = batch.map(v => v.id);
+      const DELETE_BATCH_SIZE = 100;
+      for (let i = 0; i < eligible.length; i += DELETE_BATCH_SIZE) {
+        const batch = eligible.slice(i, i + DELETE_BATCH_SIZE);
+        const ids = batch.map(v => v.id) as string[];
+        const emails = batch.map(v => (v.email as string).toLowerCase());
 
         try {
-          await db.update(users)
-            .set({ archivedAt: sql`NOW()`, archivedBy: 'system-cleanup' })
-            .where(inArray(users.id, ids as string[]));
-          archivedCount += batch.length;
+          await db.transaction(async (tx) => {
+            await tx.execute(sql`DELETE FROM notifications WHERE LOWER(user_email) = ANY(${emails})`);
+            await tx.execute(sql`DELETE FROM push_subscriptions WHERE LOWER(user_email) = ANY(${emails})`);
+            await tx.execute(sql`DELETE FROM user_dismissed_notices WHERE LOWER(user_email) = ANY(${emails})`);
+            await tx.execute(sql`DELETE FROM user_linked_emails WHERE LOWER(primary_email) = ANY(${emails})`);
+            await tx.execute(sql`DELETE FROM member_notes WHERE LOWER(member_email) = ANY(${emails})`);
+            await tx.execute(sql`DELETE FROM communication_logs WHERE LOWER(member_email) = ANY(${emails})`);
+            await tx.execute(sql`DELETE FROM form_submissions WHERE LOWER(email) = ANY(${emails})`);
+            await tx.execute(sql`DELETE FROM passkeys WHERE "userId" = ANY(${ids})`);
+            await tx.execute(sql`DELETE FROM users WHERE id = ANY(${ids})`);
+          });
+          deletedCount += batch.length;
         } catch (err: unknown) {
-          logger.error('[DataTools] Error archiving batch ( ids)', { extra: { length: ids.length, error: getErrorMessage(err) } });
+          logger.error('[DataTools] Error deleting batch ( ids)', { extra: { length: ids.length, error: getErrorMessage(err) } });
           progress.errors++;
         }
 
-        progress.archived = archivedCount;
+        progress.deleted = deletedCount;
         broadcastToStaff({ type: 'visitor_archive_progress', data: progress });
         await syncProgress();
       }
     }
 
+    const hasErrors = progress.errors > 0;
     const jobResult = {
-      success: true,
+      success: !hasErrors || deletedCount > 0,
       message: dryRun
-        ? `Preview: Found ${eligible.length} stale visitors eligible for archiving (out of ${candidates.length} scanned). ${keptCount} kept (has Stripe charges).`
-        : `Archived ${archivedCount} stale visitors. ${keptCount} kept (has Stripe charges).`,
+        ? `Preview: Found ${eligible.length} stale visitors eligible for deletion (out of ${candidates.length} scanned). ${keptCount} kept (has Stripe charges).`
+        : hasErrors
+          ? `Deleted ${deletedCount} of ${eligible.length} stale visitors (${progress.errors} batch errors). ${keptCount} kept (has Stripe charges).`
+          : `Deleted ${deletedCount} stale visitors. ${keptCount} kept (has Stripe charges).`,
       dryRun,
       totalScanned: candidates.length,
       eligibleCount: eligible.length,
       keptCount,
-      archivedCount,
-      sampleArchived
+      deletedCount,
+      sampleDeleted
     };
 
-    logFromRequest(req, 'archive_stale_visitors', 'users', null, undefined, {
+    logFromRequest(req, 'delete_stale_visitors', 'users', null, undefined, {
       action: dryRun ? 'preview' : 'execute',
       totalScanned: candidates.length,
       eligibleCount: eligible.length,
       keptCount,
-      archivedCount,
+      deletedCount,
       staffEmail
     });
 
@@ -1087,7 +1099,7 @@ async function runVisitorArchiveInBackground(jobId: string, dryRun: boolean, sta
     currentVisitorArchiveProgress = { ...progress };
     broadcastToStaff({ type: 'visitor_archive_progress', data: progress, result: jobResult });
   } catch (error: unknown) {
-    logger.error('[DataTools] Visitor archive error', { error: error instanceof Error ? error : new Error(String(error)) });
+    logger.error('[DataTools] Stale visitor deletion error', { error: error instanceof Error ? error : new Error(String(error)) });
     progress.phase = 'done';
     await failJob(jobId, getErrorMessage(error), progress as unknown as Record<string, unknown>);
     currentVisitorArchiveProgress = { ...progress };
