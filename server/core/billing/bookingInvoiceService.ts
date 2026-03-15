@@ -1248,19 +1248,19 @@ export async function isBookingInvoicePaid(bookingId: number): Promise<{ locked:
     }
     return { locked: false };
   } catch (err) {
-    logger.warn('[BookingInvoice] Stripe check failed, falling back to local payment status', {
+    logger.warn('[BookingInvoice] Stripe check failed, falling back to local fee snapshot', {
       extra: { bookingId, invoiceId, error: err instanceof Error ? err.message : err }
     });
-    const paidParticipants = await db.execute(sql`
-      SELECT COUNT(*) as cnt FROM booking_participants bp
-      JOIN booking_sessions bs ON bp.session_id = bs.id
-      WHERE bs.booking_id = ${bookingId}
-        AND bp.payment_status = 'paid'
-        AND bp.cached_fee_cents > 0
+    const completedSnapshot = await db.execute(sql`
+      SELECT id, total_cents FROM booking_fee_snapshots
+      WHERE booking_id = ${bookingId}
+        AND status = 'completed'
+        AND total_cents > 0
+      LIMIT 1
     `);
-    const paidCount = Number((paidParticipants.rows as unknown as Array<{ cnt: string }>)[0]?.cnt ?? 0);
-    if (paidCount > 0) {
-      return { locked: true, invoiceId, reason: 'Invoice has been paid (verified from local payment records)' };
+    const snapshot = (completedSnapshot.rows as unknown as Array<{ id: number; total_cents: number }>)[0];
+    if (snapshot) {
+      return { locked: true, invoiceId, reason: 'Invoice has been paid (verified from completed payment snapshot)' };
     }
     return { locked: false };
   }
