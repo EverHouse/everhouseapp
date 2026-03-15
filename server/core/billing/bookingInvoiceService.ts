@@ -1236,32 +1236,46 @@ export async function syncBookingInvoice(bookingId: number, sessionId: number): 
 }
 
 export async function isBookingInvoicePaid(bookingId: number): Promise<{ locked: boolean; invoiceId?: string; reason?: string }> {
-  const bookingResult = await db.execute(sql`SELECT stripe_invoice_id FROM booking_requests WHERE id = ${bookingId} LIMIT 1`);
-  const invoiceId = (bookingResult.rows as unknown as BookingInvoiceIdRow[])[0]?.stripe_invoice_id;
-  if (!invoiceId) return { locked: false };
-
   try {
-    const stripe = await getStripeClient();
-    const invoice = await stripe.invoices.retrieve(invoiceId);
-    if (invoice.status === 'paid') {
-      return { locked: true, invoiceId, reason: 'Invoice has been paid' };
+    const bookingResult = await db.execute(sql`SELECT stripe_invoice_id FROM booking_requests WHERE id = ${bookingId} LIMIT 1`);
+    const invoiceId = (bookingResult.rows as unknown as BookingInvoiceIdRow[])[0]?.stripe_invoice_id;
+    if (!invoiceId) return { locked: false };
+
+    try {
+      const stripe = await getStripeClient();
+      const invoice = await stripe.invoices.retrieve(invoiceId);
+      if (invoice.status === 'paid') {
+        return { locked: true, invoiceId, reason: 'Invoice has been paid' };
+      }
+      return { locked: false };
+    } catch (stripeErr) {
+      logger.warn('[BookingInvoice] Stripe check failed, falling back to local fee snapshot', {
+        extra: { bookingId, invoiceId, error: stripeErr instanceof Error ? stripeErr.message : stripeErr }
+      });
+      try {
+        const completedSnapshot = await db.execute(sql`
+          SELECT id, total_cents FROM booking_fee_snapshots
+          WHERE booking_id = ${bookingId}
+            AND status = 'completed'
+            AND total_cents > 0
+          LIMIT 1
+        `);
+        const snapshot = (completedSnapshot.rows as unknown as Array<{ id: number; total_cents: number }>)[0];
+        if (snapshot) {
+          return { locked: true, invoiceId, reason: 'Invoice has been paid (verified from completed payment snapshot)' };
+        }
+        return { locked: false };
+      } catch (fallbackErr) {
+        logger.error('[BookingInvoice] Both Stripe and local fallback failed for invoice check', {
+          extra: { bookingId, invoiceId, error: fallbackErr instanceof Error ? fallbackErr.message : fallbackErr }
+        });
+        return { locked: true, invoiceId, reason: 'Unable to verify invoice status — locked as a precaution' };
+      }
     }
-    return { locked: false };
-  } catch (err) {
-    logger.warn('[BookingInvoice] Stripe check failed, falling back to local fee snapshot', {
-      extra: { bookingId, invoiceId, error: err instanceof Error ? err.message : err }
+  } catch (dbErr) {
+    logger.error('[BookingInvoice] DB query failed in isBookingInvoicePaid', {
+      extra: { bookingId, error: dbErr instanceof Error ? dbErr.message : dbErr }
     });
-    const completedSnapshot = await db.execute(sql`
-      SELECT id, total_cents FROM booking_fee_snapshots
-      WHERE booking_id = ${bookingId}
-        AND status = 'completed'
-        AND total_cents > 0
-      LIMIT 1
-    `);
-    const snapshot = (completedSnapshot.rows as unknown as Array<{ id: number; total_cents: number }>)[0];
-    if (snapshot) {
-      return { locked: true, invoiceId, reason: 'Invoice has been paid (verified from completed payment snapshot)' };
-    }
     return { locked: false };
   }
 }
