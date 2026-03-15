@@ -281,6 +281,22 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
           }
           
           if (booking.status !== 'cancelled') {
+            await cancelPendingPaymentIntentsForBooking(booking.id);
+            
+            try {
+              await refundSucceededPaymentIntentsForBooking(booking.id);
+            } catch (refundErr: unknown) {
+              logger.error('[Trackman Import] Failed to refund succeeded PIs for booking', { extra: { bookingId: booking.id, error: getErrorMessage(refundErr) } });
+            }
+
+            try {
+              await voidBookingInvoice(booking.id);
+            } catch (voidErr: unknown) {
+              logger.error('[Trackman Import] Failed to void invoice for booking', { extra: { bookingId: booking.id, error: getErrorMessage(voidErr) } });
+            }
+
+            voidBookingPass(booking.id).catch(err => logger.error('[Trackman Import] Failed to void booking wallet pass', { extra: { bookingId: booking.id, error: getErrorMessage(err) } }));
+
             await db.update(bookingRequests)
               .set({ 
                 status: 'cancelled',
@@ -288,23 +304,7 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
               })
               .where(eq(bookingRequests.id, booking.id));
             
-            await cancelPendingPaymentIntentsForBooking(booking.id);
-            
-            try {
-              await refundSucceededPaymentIntentsForBooking(booking.id);
-            } catch (refundErr: unknown) {
-              process.stderr.write(`[Trackman Import] Failed to refund succeeded PIs for booking #${booking.id}: ${getErrorMessage(refundErr)}\n`);
-            }
-
-            try {
-              await voidBookingInvoice(booking.id);
-            } catch (voidErr: unknown) {
-              process.stderr.write(`[Trackman Import] Failed to void invoice for booking #${booking.id}: ${getErrorMessage(voidErr)}\n`);
-            }
-
-            voidBookingPass(booking.id).catch(err => process.stderr.write(`[Trackman Import] Failed to void booking wallet pass for booking #${booking.id}: ${getErrorMessage(err)}\n`));
-            
-            process.stderr.write(`[Trackman Import] Cancelled booking #${booking.id} (Trackman ID: ${row.bookingId}, date: ${bookingDate}) - status was ${booking.status}\n`);
+            logger.info('[Trackman Import] Cancelled booking', { extra: { bookingId: booking.id, trackmanId: row.bookingId, date: bookingDate, previousStatus: booking.status } });
             cancelledBookings++;
           } else {
             skippedRows++;
@@ -1670,6 +1670,22 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
       const isStillFuture = isFutureBooking(bookingDateStr, booking.startTime || '00:00');
       
       if (isStillFuture) {
+        await cancelPendingPaymentIntentsForBooking(booking.id);
+        
+        try {
+          await refundSucceededPaymentIntentsForBooking(booking.id);
+        } catch (refundErr: unknown) {
+          logger.error('[Trackman Import] Failed to refund succeeded PIs for stale booking', { extra: { bookingId: booking.id, error: getErrorMessage(refundErr) } });
+        }
+
+        try {
+          await voidBookingInvoice(booking.id);
+        } catch (voidErr: unknown) {
+          logger.error('[Trackman Import] Failed to void invoice for stale booking', { extra: { bookingId: booking.id, error: getErrorMessage(voidErr) } });
+        }
+
+        voidBookingPass(booking.id).catch(err => logger.error('[Trackman Import] Failed to void booking wallet pass for stale booking', { extra: { bookingId: booking.id, error: getErrorMessage(err) } }));
+
         await db.update(bookingRequests)
           .set({ 
             status: 'cancelled',
@@ -1678,24 +1694,8 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
           })
           .where(eq(bookingRequests.id, booking.id));
         
-        await cancelPendingPaymentIntentsForBooking(booking.id);
-        
-        try {
-          await refundSucceededPaymentIntentsForBooking(booking.id);
-        } catch (refundErr: unknown) {
-          process.stderr.write(`[Trackman Import] Failed to refund succeeded PIs for stale booking #${booking.id}: ${getErrorMessage(refundErr)}\n`);
-        }
-
-        try {
-          await voidBookingInvoice(booking.id);
-        } catch (voidErr: unknown) {
-          process.stderr.write(`[Trackman Import] Failed to void invoice for booking #${booking.id}: ${getErrorMessage(voidErr)}\n`);
-        }
-
-        voidBookingPass(booking.id).catch(err => process.stderr.write(`[Trackman Import] Failed to void booking wallet pass for stale booking #${booking.id}: ${getErrorMessage(err)}\n`));
-        
         cancelledBookings++;
-        process.stderr.write(`[Trackman Import] Cancelled booking ${booking.trackmanBookingId} (${booking.userName}) for ${bookingDateStr} - no longer in Trackman\n`);
+        logger.info('[Trackman Import] Cancelled stale booking', { extra: { bookingId: booking.id, trackmanBookingId: booking.trackmanBookingId, userName: booking.userName, date: bookingDateStr } });
         
         if (booking.userEmail && !isSyntheticEmail(booking.userEmail)) {
           const cancelMessage = `Your simulator booking for ${formatNotificationDateTime(bookingDateStr, booking.startTime || '')} has been cancelled as it was removed from the booking system.`;

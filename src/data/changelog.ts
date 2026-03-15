@@ -8,6 +8,17 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.87.27",
+    date: "2026-03-15",
+    title: "Trackman Cancellation Safety — Idempotent Refund Handling",
+    changes: [
+      "Fixed: Trackman import cancellations now run financial cleanup (refunds, invoice void) before marking the booking as cancelled — prevents partial cancellation where the booking shows cancelled but the member wasn't refunded",
+      "Fixed: BookingStateService now atomically claims payment intents before queueing refund jobs — prevents duplicate refund attempts when both the manifest refund and invoice void target the same payment",
+      "Fixed: Stale Trackman booking cancellations now follow the same cleanup-first ordering — refunds and invoice void complete before the status changes",
+      "Improved: Trackman import cancellation logging now uses structured logger instead of raw stderr output for consistent monitoring",
+    ]
+  },
+  {
     version: "8.87.26",
     date: "2026-03-15",
     title: "Cancellation Safety & Timezone Fixes",

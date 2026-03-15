@@ -54,7 +54,9 @@ Has trackman_booking_id?
 
 ```
 1. Refund Stripe charges (individual participant, not bulk)
-   └── Before each direct refund, check stripe_payment_intents for status IN ('refunding', 'refunded') 
+   └── Before each refund, atomically CLAIM the PI: UPDATE status='refunding' WHERE status='succeeded'
+       If rowCount=0, skip — another process already claimed it (v8.87.27)
+   └── For direct refund paths, also check stripe_payment_intents for status IN ('refunding', 'refunded')
        to avoid double-refunding PIs already queued by voidBookingInvoice (v8.87.26)
 2. After EACH successful refund → mark that participant 'refunded'
 3. Clear fee snapshots, refund guest passes
