@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  boolean,
   index,
   uniqueIndex,
   jsonb,
@@ -250,6 +251,26 @@ export const terminalPayments = pgTable(
 );
 
 export type TerminalPayment = typeof terminalPayments.$inferSelect;
+
+export const failedSideEffects = pgTable("failed_side_effects", {
+  id: serial("id").primaryKey(),
+  bookingId: integer("booking_id").notNull(),
+  actionType: varchar("action_type", { length: 64 }).notNull(),
+  stripePaymentIntentId: varchar("stripe_payment_intent_id"),
+  errorMessage: text("error_message").notNull(),
+  context: jsonb("context"),
+  resolved: boolean("resolved").default(false).notNull(),
+  resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+  resolvedBy: varchar("resolved_by"),
+  retryCount: integer("retry_count").default(0).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+}, (table) => [
+  index("idx_failed_side_effects_booking_id").on(table.bookingId),
+  index("idx_failed_side_effects_resolved").on(table.resolved),
+]);
+
+export type FailedSideEffect = typeof failedSideEffects.$inferSelect;
 
 // Note: billingGroups, groupMembers, and familyAddOnProducts are defined in hubspot-billing.ts
 // to avoid duplicate exports. Import them from there or from the main schema.

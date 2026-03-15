@@ -400,14 +400,6 @@ export async function deleteBooking(bookingId: number, archivedBy: string, hardD
   
   if (hardDelete) {
     try {
-      await releaseGuestPassHold(bookingId);
-    } catch (holdErr: unknown) {
-      logger.warn('[DELETE /api/bookings] Failed to release guest pass hold before hard delete', {
-        extra: { bookingId, error: getErrorMessage(holdErr) }
-      });
-    }
-
-    try {
       const { voidBookingInvoice } = await import('../billing/bookingInvoiceService');
       const voidResult = await voidBookingInvoice(bookingId);
       if (!voidResult.success) {
@@ -429,7 +421,7 @@ export async function deleteBooking(bookingId: number, archivedBy: string, hardD
       `);
       for (const row of associatedPIs.rows as unknown as Array<{ stripe_payment_intent_id: string; status: string; amount_cents: number }>) {
         try {
-          if (row.status === 'succeeded' && !row.stripe_payment_intent_id.startsWith('balance-')) {
+          if (row.status === 'succeeded' && !row.stripe_payment_intent_id.startsWith('balance-') && !row.stripe_payment_intent_id.startsWith('invoice-')) {
             const stripe = await getStripeClient();
             await stripe.refunds.create({
               payment_intent: row.stripe_payment_intent_id,
@@ -439,7 +431,7 @@ export async function deleteBooking(bookingId: number, archivedBy: string, hardD
             logger.info('[DELETE /api/bookings] Refunded succeeded PI before hard delete', {
               extra: { bookingId, paymentIntentId: row.stripe_payment_intent_id }
             });
-          } else if (row.status !== 'canceled' && row.status !== 'refunded' && !row.stripe_payment_intent_id.startsWith('balance-')) {
+          } else if (row.status !== 'canceled' && row.status !== 'refunded' && !row.stripe_payment_intent_id.startsWith('balance-') && !row.stripe_payment_intent_id.startsWith('invoice-')) {
             const cancelResult = await cancelPaymentIntent(row.stripe_payment_intent_id);
             if (!cancelResult.success) {
               logger.warn('[DELETE /api/bookings] Failed to cancel PI before hard delete', {
@@ -479,6 +471,14 @@ export async function deleteBooking(bookingId: number, archivedBy: string, hardD
       await tx.execute(sql`DELETE FROM booking_fee_snapshots WHERE booking_id = ${bookingId}`);
       await tx.execute(sql`DELETE FROM booking_requests WHERE id = ${bookingId}`);
     });
+
+    try {
+      await releaseGuestPassHold(bookingId);
+    } catch (holdErr: unknown) {
+      logger.warn('[DELETE /api/bookings] Failed to release guest pass hold after hard delete', {
+        extra: { bookingId, error: getErrorMessage(holdErr) }
+      });
+    }
     
     logger.info('[DELETE /api/bookings] Hard delete complete', {
       extra: {

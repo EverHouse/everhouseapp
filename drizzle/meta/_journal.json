@@ -204,6 +204,13 @@
       "when": 1774051200000,
       "tag": "0055_add_passkeys_table",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1774137600000,
+      "tag": "0056_add_failed_side_effects_table",
+      "breakpoints": true
     }
   ]
 }

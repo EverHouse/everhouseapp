@@ -147,7 +147,7 @@ export async function createPaymentIntent(
 
   // Generate idempotency key to prevent duplicate payment intents
   // Booking payments use deterministic keys (same booking = same key = dedup)
-  // Non-booking purchases (merch, cafe) use timestamp for uniqueness per transaction
+  // Non-booking purchases (merch, cafe) use a crypto-random nonce for uniqueness per transaction
   const isBookingPayment = !!(bookingId || sessionId);
   const idempotencyComponents = [
     purpose,
@@ -157,7 +157,7 @@ export async function createPaymentIntent(
     metadata?.feeSnapshotId || `${userId}-${email}`.replace(/[^a-zA-Z0-9-]/g, '')
   ];
   if (!isBookingPayment) {
-    idempotencyComponents.push(Math.floor(Date.now() / 300000).toString());
+    idempotencyComponents.push(crypto.randomUUID());
   }
   const idempotencyKey = `pi_${idempotencyComponents.join('_')}`;
   
@@ -645,7 +645,7 @@ export async function createBalanceAwarePayment(params: {
       : [];
     const idempotencyKey = bookingId && sessionId
       ? generatePaymentIdempotencyKey(bookingId, sessionId, participantIds, remainingCents)
-      : `pi_${purpose}_${userId.replace(/[^a-zA-Z0-9-]/g, '')}_${remainingCents}_${Math.floor(Date.now() / 300000)}`;
+      : `pi_${purpose}_${userId.replace(/[^a-zA-Z0-9-]/g, '')}_${remainingCents}_${crypto.randomUUID()}`;
 
     const paymentIntent = await stripe.paymentIntents.create({
       amount: remainingCents,
@@ -766,9 +766,14 @@ export async function chargeWithBalance(params: {
     const amountFromBalance = Math.max(0, Math.abs(startingBalance) - Math.abs(endingBalance));
     const amountCharged = Math.max(0, (paidInvoice.amount_paid || 0) - amountFromBalance);
 
+    const invoicePaymentIntentId = typeof paidInvoice.payment_intent === 'string'
+      ? paidInvoice.payment_intent
+      : paidInvoice.payment_intent?.id || `invoice-${invoice.id}`;
+
     await db.execute(sql`INSERT INTO stripe_payment_intents 
        (user_id, stripe_payment_intent_id, stripe_customer_id, amount_cents, purpose, booking_id, session_id, description, status)
-       VALUES (${userId}, ${`invoice-${invoice.id}`}, ${stripeCustomerId}, ${amountCents}, ${purpose}, ${bookingId || null}, ${sessionId || null}, ${description}, ${paidInvoice.status === 'paid' ? 'succeeded' : paidInvoice.status})`);
+       VALUES (${userId}, ${invoicePaymentIntentId}, ${stripeCustomerId}, ${amountCents}, ${purpose}, ${bookingId || null}, ${sessionId || null}, ${description}, ${paidInvoice.status === 'paid' ? 'succeeded' : paidInvoice.status})`);
+
 
     logger.info(`[Stripe] Charged ${purpose} via invoice ${invoice.id}: $${(amountCents / 100).toFixed(2)} (balance: $${(amountFromBalance / 100).toFixed(2)}, card: $${(amountCharged / 100).toFixed(2)})`);
 

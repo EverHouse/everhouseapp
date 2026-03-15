@@ -17,6 +17,7 @@ import { voidBookingPass } from '../../walletPass/bookingPassService';
 import { getStripeClient } from '../stripe/client';
 import { cancelPaymentIntent } from '../stripe/payments';
 import { markPaymentRefunded } from '../billing/PaymentStatusService';
+import { failedSideEffects } from '../../../shared/schema';
 
 interface CancelResult {
   success: boolean;
@@ -392,6 +393,8 @@ export class BookingStateService {
 
     const { errors } = await BookingStateService.executeSideEffects(manifest);
 
+    await BookingStateService.persistFailedSideEffects(bookingId, manifest, errors);
+
     return {
       success: true,
       status: 'cancelled',
@@ -725,6 +728,8 @@ export class BookingStateService {
     }
 
     const { errors } = await BookingStateService.executeSideEffects(manifest);
+
+    await BookingStateService.persistFailedSideEffects(bookingId, manifest, errors);
 
     logger.info('[BookingStateService] Completed pending cancellation', { extra: { bookingId, staffEmail, source, errorCount: errors.length } });
 
@@ -1068,6 +1073,61 @@ export class BookingStateService {
     }
 
     return { errors };
+  }
+
+  private static async persistFailedSideEffects(bookingId: number, manifest: SideEffectsManifest, errors: string[]): Promise<void> {
+    if (errors.length === 0) return;
+
+    try {
+      const records = errors.map((errorMessage) => {
+        let actionType = 'unknown';
+        let stripePaymentIntentId: string | null = null;
+
+        if (errorMessage.includes('snapshot refund')) {
+          actionType = 'stripe_snapshot_refund';
+          const match = manifest.stripeSnapshotRefunds.find(r => errorMessage.includes(r.paymentIntentId.substring(0, 12)));
+          if (match) stripePaymentIntentId = match.paymentIntentId;
+        } else if (errorMessage.includes('balance refund')) {
+          actionType = 'balance_refund';
+          const match = manifest.balanceRefunds.find(r => errorMessage.includes(r.balanceRecordId));
+          if (match) stripePaymentIntentId = match.balanceRecordId;
+        } else if (errorMessage.includes('void') || errorMessage.includes('invoice')) {
+          actionType = 'invoice_void';
+        } else if (errorMessage.includes('calendar')) {
+          actionType = 'calendar_cleanup';
+        } else if (errorMessage.includes('refund') || errorMessage.includes('cancel')) {
+          actionType = 'stripe_refund';
+          const match = manifest.stripeRefunds.find(r => errorMessage.includes(r.paymentIntentId.substring(0, 12)));
+          if (match) stripePaymentIntentId = match.paymentIntentId;
+        }
+
+        return {
+          bookingId,
+          actionType,
+          stripePaymentIntentId,
+          errorMessage,
+          context: {
+            hasStripeRefunds: manifest.stripeRefunds.length > 0,
+            hasSnapshotRefunds: manifest.stripeSnapshotRefunds.length > 0,
+            hasBalanceRefunds: manifest.balanceRefunds.length > 0,
+            hasInvoiceVoid: !!manifest.invoiceVoid,
+            hasCalendarDeletion: !!manifest.calendarDeletion,
+          },
+        };
+      });
+
+      for (const record of records) {
+        await db.insert(failedSideEffects).values(record);
+      }
+
+      logger.warn('[BookingStateService] Persisted failed side effects for retry', {
+        extra: { bookingId, failureCount: errors.length }
+      });
+    } catch (persistErr: unknown) {
+      logger.error('[BookingStateService] CRITICAL: Failed to persist side effect failures', {
+        extra: { bookingId, errors, persistError: getErrorMessage(persistErr) }
+      });
+    }
   }
 
   private static extractBookingData(booking: BookingRecord): CancelResult['bookingData'] {
