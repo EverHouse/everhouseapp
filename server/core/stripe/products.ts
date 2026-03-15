@@ -1,6 +1,6 @@
 import { db } from '../../db';
 import { sql } from 'drizzle-orm';
-import { stripeProducts, membershipTiers } from '../../../shared/schema';
+import { membershipTiers } from '../../../shared/schema';
 import { eq } from 'drizzle-orm';
 import { getStripeClient } from './client';
 import Stripe from 'stripe';
@@ -21,20 +21,6 @@ interface StripePaginationParams {
 }
 
 import { logger } from '../logger';
-
-export interface StripeProductWithPrice {
-  id: number;
-  hubspotProductId: string;
-  stripeProductId: string;
-  stripePriceId: string;
-  name: string;
-  priceCents: number;
-  billingInterval: string;
-  billingIntervalCount: number;
-  isActive: boolean;
-  createdAt: Date | null;
-  updatedAt: Date | null;
-}
 
 async function findExistingStripeProduct(
   stripe: Stripe,
@@ -70,15 +56,6 @@ async function findExistingStripeProduct(
   }
 }
 
-export async function getStripeProducts(): Promise<StripeProductWithPrice[]> {
-  try {
-    const products = await db.select().from(stripeProducts);
-    return products;
-  } catch (error: unknown) {
-    logger.error('[Stripe Products] Error getting products:', { error: error });
-    return [];
-  }
-}
 
 
 export interface TierSyncResult {

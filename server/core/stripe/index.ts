@@ -3,14 +3,12 @@ export { getOrCreateStripeCustomer, getStripeCustomerByEmail, updateCustomerPaym
 export { createPaymentIntent, confirmPaymentSuccess, getPaymentIntentStatus, cancelPaymentIntent, chargeWithBalance, createBalanceAwarePayment, generatePaymentIdempotencyKey, createInvoiceWithLineItems, type PaymentPurpose, type CreatePaymentIntentParams, type PaymentIntentResult, type CartLineItem, type CreatePOSInvoiceParams, type InvoicePaymentResult } from './payments';
 export { processStripeWebhook, replayStripeEvent } from './webhooks';
 export { 
-  getStripeProducts, 
   syncMembershipTiersToStripe,
   getTierSyncStatus,
   syncTierFeaturesToStripe,
   syncCafeItemsToStripe,
   pullTierFeaturesFromStripe,
   pullCafeItemsFromStripe,
-  type StripeProductWithPrice,
   type TierSyncResult
 } from './products';
 export { 

@@ -8,7 +8,6 @@ import Stripe from 'stripe';
 
 import { CustomerSyncResult } from '../../core/stripe/customerSync';
 import {
-  getStripeProducts,
   syncMembershipTiersToStripe,
   getTierSyncStatus,
   syncDiscountRulesToStripeCoupons,
@@ -62,20 +61,6 @@ router.post('/api/admin/check-stale-waivers', isAdmin, async (req: Request, res:
   } catch (error: unknown) {
     logger.error('[Admin] Error checking stale waivers', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to check stale waivers', details: safeErrorDetail(error) });
-  }
-});
-
-router.get('/api/stripe/products', isStaffOrAdmin, async (req: Request, res: Response) => {
-  try {
-    const stripeProducts = await getStripeProducts();
-    
-    res.json({
-      products: stripeProducts,
-      count: stripeProducts.length
-    });
-  } catch (error: unknown) {
-    logger.error('[Stripe] Error getting products', { error: error instanceof Error ? error : new Error(String(error)) });
-    res.status(500).json({ error: 'Failed to get Stripe products' });
   }
 });
 

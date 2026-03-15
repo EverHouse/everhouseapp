@@ -6,7 +6,6 @@ import EmptyState from '../../../components/EmptyState';
 import SlideUpDrawer from '../../../components/SlideUpDrawer';
 import Toggle from '../../../components/Toggle';
 import FloatingActionButton from '../../../components/FloatingActionButton';
-import ProductsSubTab from './ProductsSubTab';
 import DiscountsSubTab from './DiscountsSubTab';
 import { fetchWithCredentials, postWithCredentials, deleteWithCredentials } from '../../../hooks/queries/useFetch';
 import { useConfirmDialog } from '../../../components/ConfirmDialog';
@@ -14,7 +13,7 @@ import { TiersTabSkeleton } from '../../../components/skeletons';
 import { useToast } from '../../../components/Toast';
 import CafeTab from './CafeTab';
 
-type SubTab = 'tiers' | 'products' | 'fees' | 'discounts' | 'cafe';
+type SubTab = 'tiers' | 'fees' | 'discounts' | 'cafe';
 
 interface TierFeature {
     id: number;
@@ -105,7 +104,7 @@ const TiersTab: React.FC = () => {
     const [tiersRef] = useAutoAnimate();
     const [searchParams, setSearchParams] = useSearchParams();
     const subtabParam = searchParams.get('subtab');
-    const activeSubTab: SubTab = subtabParam === 'products' ? 'products' : subtabParam === 'fees' ? 'fees' : subtabParam === 'discounts' ? 'discounts' : subtabParam === 'cafe' ? 'cafe' : 'tiers';
+    const activeSubTab: SubTab = subtabParam === 'fees' ? 'fees' : subtabParam === 'discounts' ? 'discounts' : subtabParam === 'cafe' ? 'cafe' : 'tiers';
     
     const setActiveSubTab = (tab: SubTab) => {
         setSearchParams(params => {
@@ -130,7 +129,6 @@ const TiersTab: React.FC = () => {
 
     const SUB_TABS: { key: SubTab; label: string; icon: string }[] = [
         { key: 'tiers', label: 'Memberships', icon: 'layers' },
-        { key: 'products', label: 'Products', icon: 'inventory_2' },
         { key: 'fees', label: 'Fees & Passes', icon: 'receipt_long' },
         { key: 'discounts', label: 'Discounts', icon: 'percent' },
         { key: 'cafe', label: 'Cafe Menu', icon: 'local_cafe' },
@@ -520,9 +518,8 @@ const TiersTab: React.FC = () => {
                 ))}
             </div>
 
-            {/* Products/Fees/Discounts sub-tabs */}
+            {/* Fees/Discounts sub-tabs */}
             <div key={activeSubTab} className="animate-content-enter">
-            {activeSubTab === 'products' && <ProductsSubTab activeSubTab="membership" />}
             {activeSubTab === 'fees' && (() => {
                 const oneTimePasses = tiers.filter(t => t.product_type === 'one_time');
                 return (
@@ -572,12 +569,6 @@ const TiersTab: React.FC = () => {
                                 </div>
                             </div>
                         )}
-                        <div>
-                            <h3 className="text-[11px] font-semibold uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400 mb-4">
-                                HubSpot Fee Products
-                            </h3>
-                            <ProductsSubTab activeSubTab="fees" />
-                        </div>
                     </div>
                 );
             })()}
