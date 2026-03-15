@@ -201,7 +201,7 @@ export class BookingStateService {
         sideEffects.stripeSnapshotRefunds.push({
           paymentIntentId: snapshot.stripe_payment_intent_id,
           amountCents: snapshot.total_cents,
-          idempotencyKey: `refund_cancel_snapshot_${bookingId}_${snapshot.stripe_payment_intent_id}`,
+          idempotencyKey: `refund_cancel_snapshot_${bookingId}_${snapshot.stripe_payment_intent_id}_${Math.floor(Date.now() / 300000)}`,
         });
       }
 
@@ -539,7 +539,7 @@ export class BookingStateService {
         sideEffects.stripeSnapshotRefunds.push({
           paymentIntentId: snapshot.stripe_payment_intent_id,
           amountCents: snapshot.total_cents,
-          idempotencyKey: `refund_complete_cancel_snapshot_${bookingId}_${snapshot.stripe_payment_intent_id}`,
+          idempotencyKey: `refund_complete_cancel_snapshot_${bookingId}_${snapshot.stripe_payment_intent_id}_${Math.floor(Date.now() / 300000)}`,
         });
       }
 
@@ -868,6 +868,17 @@ export class BookingStateService {
 
     for (const snapshotRefund of manifest.stripeSnapshotRefunds) {
       try {
+        const piStatusResult = await db.execute(sql`SELECT status FROM stripe_payment_intents WHERE stripe_payment_intent_id = ${snapshotRefund.paymentIntentId}`);
+        const piRow = (piStatusResult.rows as unknown as Array<{ status: string }>)[0];
+        const nonSucceededStatuses = ['pending', 'requires_action', 'requires_payment_method', 'requires_confirmation', 'requires_capture'];
+        if (piRow && nonSucceededStatuses.includes(piRow.status)) {
+          const cancelResult = await cancelPaymentIntent(snapshotRefund.paymentIntentId);
+          if (!cancelResult.success) {
+            throw new Error(cancelResult.error || 'Failed to cancel pending snapshot PI');
+          }
+          logger.info('[BookingStateService] Cancelled pending snapshot PI instead of refunding', { extra: { paymentIntentId: snapshotRefund.paymentIntentId, originalStatus: piRow.status } });
+          continue;
+        }
         const claimResult = await db.execute(sql`UPDATE stripe_payment_intents 
           SET status = 'refunding', updated_at = NOW() 
           WHERE stripe_payment_intent_id = ${snapshotRefund.paymentIntentId} AND status = 'succeeded'

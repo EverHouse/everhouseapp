@@ -158,7 +158,7 @@ const MemberMenuOverlay: React.FC<MemberMenuOverlayProps> = ({ isOpen, onClose }
         className={`relative w-[85%] md:w-[320px] lg:w-[320px] h-full flex flex-col border-l-0 ${isClosing ? 'animate-slide-out-left' : 'animate-slide-in-left'}`}
       >
       <div 
-        style={{ height: '100dvh' }}
+        style={{ height: '100%' }}
         className={`relative flex flex-col overflow-hidden rounded-tr-[2rem] rounded-br-[2rem] ${isDark ? 'bg-[#141414]' : 'bg-[#F2F2EC]'} backdrop-blur-xl`}
       >
         <div className="absolute inset-0 opacity-[0.03] pointer-events-none mix-blend-multiply"></div>

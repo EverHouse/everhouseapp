@@ -228,14 +228,14 @@ export function SlideUpDrawer({
         overscrollBehavior: 'contain', 
         touchAction: isModal ? 'none' : undefined, 
         zIndex: drawerZIndex, 
-        height: isModal ? '100dvh' : undefined,
+        height: isModal ? '100%' : undefined,
       }}
     >
       {isModal && (
         <div 
           className={`fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity duration-normal ${isClosing ? 'opacity-0' : 'animate-backdrop-fade-in'}`}
           aria-hidden="true"
-          style={{ touchAction: 'none', height: '100dvh' }}
+          style={{ touchAction: 'none', height: '100%' }}
           onClick={dismissible ? handleClose : undefined}
         />
       )}

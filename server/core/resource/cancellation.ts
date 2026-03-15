@@ -455,6 +455,14 @@ export async function deleteBooking(bookingId: number, archivedBy: string, hardD
       });
     }
 
+    try {
+      await releaseGuestPassHold(bookingId);
+    } catch (holdErr: unknown) {
+      logger.warn('[DELETE /api/bookings] Failed to release guest pass hold before hard delete', {
+        extra: { bookingId, error: getErrorMessage(holdErr) }
+      });
+    }
+
     await db.transaction(async (tx) => {
       if (booking.sessionId) {
         await tx.execute(sql`DELETE FROM booking_participants WHERE session_id = ${booking.sessionId}`);
@@ -471,14 +479,6 @@ export async function deleteBooking(bookingId: number, archivedBy: string, hardD
       await tx.execute(sql`DELETE FROM booking_fee_snapshots WHERE booking_id = ${bookingId}`);
       await tx.execute(sql`DELETE FROM booking_requests WHERE id = ${bookingId}`);
     });
-
-    try {
-      await releaseGuestPassHold(bookingId);
-    } catch (holdErr: unknown) {
-      logger.warn('[DELETE /api/bookings] Failed to release guest pass hold after hard delete', {
-        extra: { bookingId, error: getErrorMessage(holdErr) }
-      });
-    }
     
     logger.info('[DELETE /api/bookings] Hard delete complete', {
       extra: {

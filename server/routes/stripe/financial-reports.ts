@@ -225,7 +225,7 @@ router.get('/api/stripe/transactions/today', isStaffOrAdmin, async (req: Request
       const memberResults = await db
         .select({ email: users.email, firstName: users.firstName, lastName: users.lastName })
         .from(users)
-        .where(inArray(users.email, uniqueEmails));
+        .where(inArray(users.email, uniqueEmails.length ? uniqueEmails : ['__never_match__']));
       for (const m of memberResults) {
         if (m.email) {
           const name = [m.firstName, m.lastName].filter(Boolean).join(' ');
