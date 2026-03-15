@@ -59,6 +59,7 @@ export interface InvoicePaymentModalProps {
 }
 
 interface PayInvoiceResponse {
+  paidInFull?: boolean;
   clientSecret: string;
   paymentIntentId: string;
   invoiceId: string;
@@ -170,6 +171,7 @@ export function InvoicePaymentModal({
   const [savedCard, setSavedCard] = useState<SavedPaymentMethod | null>(null);
   const [savedCardLoading, setSavedCardLoading] = useState(false);
   const [savedCardSuccess, setSavedCardSuccess] = useState(false);
+  const [autoPaid, setAutoPaid] = useState(false);
 
   const formatCardBrand = (brand: string | undefined) => {
     if (!brand) return 'Card';
@@ -218,6 +220,7 @@ export function InvoicePaymentModal({
       setError(null);
       setSavedCard(null);
       setSavedCardSuccess(false);
+      setAutoPaid(false);
       setSavedCardLoading(false);
 
       const [stripe, methodsResult] = await Promise.all([
@@ -248,6 +251,13 @@ export function InvoicePaymentModal({
       );
 
       if (ok && data) {
+        if (data.paidInFull) {
+          setAutoPaid(true);
+          setSavedCardSuccess(true);
+          setTimeout(() => onSuccess(), 1500);
+          setLoading(false);
+          return;
+        }
         setPaymentData(data);
       } else {
         setError(apiError || 'Failed to initialize payment');
@@ -384,7 +394,7 @@ export function InvoicePaymentModal({
                   Payment Successful
                 </p>
                 <p className={`text-sm mt-1 ${isDark ? 'text-emerald-400/80' : 'text-emerald-600'}`}>
-                  Charged to {formatCardBrand(savedCard?.brand)} •••• {savedCard?.last4}
+                  {autoPaid ? 'Paid from account balance' : `Charged to ${formatCardBrand(savedCard?.brand)} •••• ${savedCard?.last4}`}
                 </p>
               </div>
             ) : (

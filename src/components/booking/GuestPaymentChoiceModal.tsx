@@ -32,6 +32,7 @@ export function GuestPaymentChoiceModal({
   const [selectedMethod, setSelectedMethod] = useState<'guest_pass' | 'pay_fee' | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [locked, setLocked] = useState(false);
 
   const [guestFirstName, setGuestFirstName] = useState('');
   const [guestLastName, setGuestLastName] = useState('');
@@ -91,6 +92,7 @@ export function GuestPaymentChoiceModal({
       if (ok) {
         onSuccess(fullName);
       } else if (errorData?.code === 'ROSTER_LOCKED') {
+        setLocked(true);
         setError('This booking has been paid — the roster is locked. Please ask staff to add your guest at check-in.');
       } else {
         setError(apiError || "We couldn't add your guest at this time. Please try again.");
@@ -125,6 +127,7 @@ export function GuestPaymentChoiceModal({
       if (ok) {
         onSuccess('Guest (info pending)');
       } else if (errorData?.code === 'ROSTER_LOCKED') {
+        setLocked(true);
         setError('This booking has been paid — the roster is locked. Please ask staff to add your guest at check-in.');
       } else {
         setError(apiError || "Something went wrong adding your guest. Please try again.");
@@ -158,7 +161,20 @@ export function GuestPaymentChoiceModal({
           </div>
         )}
 
-        {step === 'choice' && (
+        {locked && (
+          <div key="locked-action" className="pt-2">
+            <button
+              onClick={handleClose}
+              className={`w-full py-3 rounded-xl font-semibold transition-all ${
+                isDark ? 'bg-white/10 text-white hover:bg-white/15' : 'bg-gray-100 text-primary hover:bg-gray-200'
+              }`}
+            >
+              Close
+            </button>
+          </div>
+        )}
+
+        {step === 'choice' && !locked && (
           <div key="choice" className="space-y-4">
             <p className={`text-center text-sm font-medium ${isDark ? 'text-white/70' : 'text-primary/70'}`}>
               How would you like to handle your guest's visit?

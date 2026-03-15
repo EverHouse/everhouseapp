@@ -8,6 +8,15 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.87.22",
+    date: "2026-03-15",
+    title: "Credit Balance Protection & UX Fix",
+    changes: [
+      "Fixed: Account credit balance no longer drained by repeated Pay Now attempts — if an invoice was already auto-paid from credit, the system now detects it and stops creating duplicates",
+      "Fixed: 'Add Guest' modal now hides payment options when the roster is locked after payment — no more confusing buttons after paying",
+    ]
+  },
+  {
     version: "8.87.21",
     date: "2026-03-15",
     title: "Fee Display & Payment Fix",

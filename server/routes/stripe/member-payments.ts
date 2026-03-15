@@ -28,6 +28,7 @@ import { resolveUserByEmail } from '../../core/stripe/customers';
 import { computeFeeBreakdown, applyFeeBreakdownToParticipants } from '../../core/billing/unifiedFeeService';
 import { GUEST_FEE_CENTS } from './helpers';
 import { sendNotificationToUser, broadcastBillingUpdate, broadcastBookingInvoiceUpdate } from '../../core/websocket';
+import { logPaymentAudit } from '../../core/auditLog';
 import { alertOnExternalServiceError } from '../../core/errorAlerts';
 import { getErrorMessage } from '../../utils/errorUtils';
 import { toIntArrayLiteral } from '../../utils/sqlArrayLiteral';
@@ -365,6 +366,19 @@ async function handleExistingInvoicePayment(params: {
   const existingInvoiceId = await getBookingInvoiceId(bookingId);
   if (!existingInvoiceId) return null;
 
+  const participantFeesList = pendingFees.map(f => {
+    const isGuest = f.participantType === 'guest';
+    const { feeType, feeDescription } = describeFee(isGuest, f.overageCents || 0, f.guestCents || 0);
+    return {
+      id: f.participantId,
+      displayName: f.displayName,
+      amount: f.totalCents / 100,
+      feeType,
+      feeDescription,
+      participantType: f.participantType || 'member',
+    };
+  });
+
   try {
     const { getStripeClient } = await import('../../core/stripe/client');
     const stripe = await getStripeClient();
@@ -391,19 +405,6 @@ async function handleExistingInvoicePayment(params: {
         return null;
       }
     }
-
-    const participantFeesList = pendingFees.map(f => {
-      const isGuest = f.participantType === 'guest';
-      const { feeType, feeDescription } = describeFee(isGuest, f.overageCents || 0, f.guestCents || 0);
-      return {
-        id: f.participantId,
-        displayName: f.displayName,
-        amount: f.totalCents / 100,
-        feeType,
-        feeDescription,
-        participantType: f.participantType || 'member',
-      };
-    });
 
     if (existingInvoice.status === 'void' || existingInvoice.status === 'uncollectible') {
       logger.info('[Stripe] Existing invoice is void/uncollectible, clearing and falling back to new invoice', {
@@ -455,6 +456,15 @@ async function handleExistingInvoicePayment(params: {
           `);
         }
         logger.info('[Stripe] Existing draft invoice auto-paid after finalization', { extra: { bookingId, invoiceId: existingInvoiceId } });
+        await logPaymentAudit({
+          bookingId,
+          sessionId,
+          action: 'payment_confirmed',
+          staffEmail: 'system',
+          amountAffected: serverTotal / 100,
+          paymentMethod: 'account_credit',
+          metadata: { invoiceId: existingInvoiceId, trigger: 'auto_pay_existing_draft' },
+        });
         return {
           paidInFull: true,
           invoiceId: existingInvoiceId,
@@ -538,7 +548,7 @@ async function handleExistingInvoicePayment(params: {
       customerSessionClientSecret: customerSessionSecret,
     };
   } catch (invoiceErr: unknown) {
-    logger.warn('[Stripe] Failed to use existing draft invoice, falling back to new invoice', {
+    logger.warn('[Stripe] Failed to use existing invoice, checking status before fallback', {
       extra: { bookingId, existingInvoiceId, error: getErrorMessage(invoiceErr) }
     });
 
@@ -546,6 +556,39 @@ async function handleExistingInvoicePayment(params: {
       const { getStripeClient } = await import('../../core/stripe');
       const stripe = await getStripeClient();
       const staleInvoice = await stripe.invoices.retrieve(existingInvoiceId);
+
+      if (staleInvoice.status === 'paid') {
+        logger.info('[Stripe] Invoice was actually paid (auto-pay from credit balance), returning paidInFull', {
+          extra: { bookingId, invoiceId: existingInvoiceId }
+        });
+        const paidParticipantIds = pendingFees.map(f => f.participantId!).filter(Boolean);
+        if (paidParticipantIds.length > 0) {
+          await db.execute(sql`
+            UPDATE booking_participants
+             SET payment_status = 'paid', paid_at = NOW(), updated_at = NOW()
+             WHERE id = ANY(${toIntArrayLiteral(paidParticipantIds)}::int[])
+          `);
+        }
+        await logPaymentAudit({
+          bookingId,
+          sessionId,
+          action: 'payment_confirmed',
+          staffEmail: 'system',
+          amountAffected: serverTotal / 100,
+          paymentMethod: 'account_credit',
+          metadata: { invoiceId: existingInvoiceId, trigger: 'auto_pay_recovery' },
+        });
+        return {
+          paidInFull: true,
+          invoiceId: existingInvoiceId,
+          paymentIntentId: '',
+          totalAmount: serverTotal / 100,
+          balanceApplied: serverTotal / 100,
+          remainingAmount: 0,
+          participantFees: participantFeesList,
+        };
+      }
+
       if (staleInvoice.status === 'draft') {
         await stripe.invoices.del(existingInvoiceId);
         logger.info('[Stripe] Deleted stale draft invoice before retry', { extra: { bookingId, invoiceId: existingInvoiceId } });
@@ -817,6 +860,15 @@ router.post('/api/member/bookings/:id/pay-fees', isAuthenticated, paymentRateLim
         UPDATE booking_fee_snapshots SET status = 'completed', used_at = NOW() WHERE id = ${snapshotId}
       `);
       logger.info('[Stripe] New invoice auto-paid after finalization', { extra: { bookingId, invoiceId: draftResult.invoiceId } });
+      await logPaymentAudit({
+        bookingId,
+        sessionId: booking.session_id,
+        action: 'payment_confirmed',
+        staffEmail: 'system',
+        amountAffected: serverTotal / 100,
+        paymentMethod: 'account_credit',
+        metadata: { invoiceId: draftResult.invoiceId, trigger: 'auto_pay_new_invoice' },
+      });
       return res.json({
         paidInFull: true,
         invoiceId: draftResult.invoiceId,
@@ -1405,6 +1457,23 @@ router.post('/api/member/invoices/:invoiceId/pay', isAuthenticated, async (req: 
       const piResult = await finalizeInvoiceWithPi(stripe, invoiceId as string);
       if (piResult.paidInFull) {
         logger.info('[Stripe] Invoice auto-paid after finalization', { extra: { invoiceId } });
+        const metaBookingId = stripeInvoice.metadata?.bookingId ? parseInt(stripeInvoice.metadata.bookingId, 10) : 0;
+        if (metaBookingId) {
+          await db.execute(sql`
+            UPDATE booking_participants
+             SET payment_status = 'paid', paid_at = NOW(), updated_at = NOW()
+             WHERE booking_id = ${metaBookingId}
+               AND payment_status IN ('pending', 'unpaid')
+          `);
+          await logPaymentAudit({
+            bookingId: metaBookingId,
+            action: 'payment_confirmed',
+            staffEmail: 'system',
+            amountAffected: amountDue / 100,
+            paymentMethod: 'account_credit',
+            metadata: { invoiceId, trigger: 'auto_pay_invoice_endpoint' },
+          });
+        }
         return res.json({
           paidInFull: true,
           invoiceId,

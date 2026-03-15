@@ -1,6 +1,6 @@
 # Ever Club Members App
 
-**Current Version**: 8.87.21 (March 15, 2026)
+**Current Version**: 8.87.22 (March 15, 2026)
 
 ## Overview
 The Ever Club Members App is a private members club application designed for golf and wellness centers. Its primary purpose is to serve as a central digital hub for managing golf simulator bookings, wellness service appointments, and club events. The project aims to enhance member satisfaction and operational efficiency through comprehensive membership management, facility booking, and community-building tools, ultimately creating a seamless digital experience for club members and staff.
@@ -151,6 +151,8 @@ The following large files have been split into sub-modules with barrel re-export
 - **Files**: `server/routes/analytics.ts`, `src/pages/Admin/tabs/AnalyticsTab.tsx`
 
 ### Recent Changes
+- **Credit Balance Protection & UX Fix (v8.87.22)**: Fixed critical bug where repeated Pay Now taps drained the member's Stripe credit balance by creating duplicate auto-paid invoices. The error handler in `handleExistingInvoicePayment` now detects paid invoices and returns `paidInFull` instead of clearing `stripe_invoice_id` and falling through to new invoice creation. `GuestPaymentChoiceModal` now hides payment choice buttons when roster is locked (sets `locked` state on `ROSTER_LOCKED` error).
+- **Fee Display & Auto-Pay Fix (v8.87.21)**: `finalizeInvoiceWithPi` returns `FinalizeResult` union (`paidInFull: true` | `paidInFull: false + piId + clientSecret`). All 3 call sites in `member-payments.ts` handle auto-pay case. `InvoicePaymentModal` shows "Paid from account balance" success state on `paidInFull: true` response.
 - **One-Tap 'Pay with Card on File' (v8.87.9)**: Members with a saved card now see a prominent "Pay $X.XX with Visa •••• 1234" button above the standard payment form in both booking prepayments (`MemberPaymentModal`) and invoice payments (`InvoicePaymentModal`). One tap charges the card instantly via the invoice API (off-session). Falls back to the standard form if 3D Secure verification is required. New endpoints: `GET /api/member/payment-methods`, `POST /api/member/bookings/:id/pay-saved-card`, `POST /api/member/invoices/:invoiceId/pay-saved-card`. Full billing audit trail.
 - **Apple Pay, Google Pay & Saved Cards (v8.87.8)**: Stripe Customer Sessions now created for all member payment flows. `payment_settings.payment_method_types: ['card', 'link']` added to all invoice creation/update calls. Frontend passes `customerSessionClientSecret` into Stripe Elements.
 - **HubSpot Field Mapping Fix (v8.87.6)**: Fixed silently dropped form fields — Private Hire (event_date, event_time, additional_details, event_services), Guest Check-in (guest_firstname, guest_lastname, guest_email, guest_phone, member_name, member_email), and Contact (topic) now all pass through the `VALID_HUBSPOT_CONTACT_FIELDS` allowlist to HubSpot.
