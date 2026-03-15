@@ -209,7 +209,15 @@
 | GET | `/api/members/:email/history` | 🛡️ | Member activity history |
 | GET | `/api/members/:email/guests` | 🛡️ | List member's guests |
 | GET | `/api/members/:email/cascade-preview` | 🛡️ | Preview cascade effects of member deletion |
-| GET | `/api/member/dashboard-data` | 👤 | Member dashboard summary data |
+| GET | `/api/member/dashboard-data` | 👤 | Member dashboard summary data *(legacy — no frontend consumers)* |
+| GET | `/api/member/dashboard/bookings` | 👤 | Member upcoming simulator bookings |
+| GET | `/api/member/dashboard/booking-requests` | 👤 | Member pending booking requests |
+| GET | `/api/member/dashboard/rsvps` | 👤 | Member event RSVPs |
+| GET | `/api/member/dashboard/wellness` | 👤 | Member wellness enrollments + classes |
+| GET | `/api/member/dashboard/events` | 👤 | Upcoming club events |
+| GET | `/api/member/dashboard/conference-rooms` | 👤 | Member conference room bookings |
+| GET | `/api/member/dashboard/stats` | 👤 | Member stats (guest passes, visit count) |
+| GET | `/api/member/dashboard/announcements` | 👤 | Active banner announcement |
 
 ---
 

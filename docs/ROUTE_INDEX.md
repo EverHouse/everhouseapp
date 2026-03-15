@@ -75,7 +75,15 @@ Total routes: **643**
 | GET | `/api/members/me/preferences` | server/routes/members/communications.ts | 154 | Auth |
 | GET | `/api/my-visits` | server/routes/members/communications.ts | 193 | Auth |
 | POST | `/api/members/me/data-export-request` | server/routes/members/communications.ts | 339 | Auth |
-| GET | `/api/member/dashboard-data` | server/routes/members/dashboard.ts | 27 | Auth |
+| GET | `/api/member/dashboard-data` | server/routes/members/dashboard.ts | 27 | Auth | *(legacy — kept for backward compat, no frontend consumers)* |
+| GET | `/api/member/dashboard/bookings` | server/routes/members/dashboard.ts | | Auth |
+| GET | `/api/member/dashboard/booking-requests` | server/routes/members/dashboard.ts | | Auth |
+| GET | `/api/member/dashboard/rsvps` | server/routes/members/dashboard.ts | | Auth |
+| GET | `/api/member/dashboard/wellness` | server/routes/members/dashboard.ts | | Auth |
+| GET | `/api/member/dashboard/events` | server/routes/members/dashboard.ts | | Auth |
+| GET | `/api/member/dashboard/conference-rooms` | server/routes/members/dashboard.ts | | Auth |
+| GET | `/api/member/dashboard/stats` | server/routes/members/dashboard.ts | | Auth |
+| GET | `/api/member/dashboard/announcements` | server/routes/members/dashboard.ts | | Auth |
 | GET | `/api/members/:email/notes` | server/routes/members/notes.ts | 13 | Staff |
 | POST | `/api/members/:email/notes` | server/routes/members/notes.ts | 31 | Staff |
 | PUT | `/api/members/:email/notes/:noteId` | server/routes/members/notes.ts | 63 | Staff |
