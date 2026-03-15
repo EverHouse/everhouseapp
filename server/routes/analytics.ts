@@ -382,7 +382,7 @@ router.get('/api/analytics/extended-stats', isStaffOrAdmin, async (_req: Request
 
 router.get('/api/analytics/membership-insights', isStaffOrAdmin, async (_req: Request, res: Response) => {
   try {
-    const [tierResult, atRiskResult, growthResult] = await Promise.all([
+    const [tierResult, atRiskResult, growthResult, churnResult] = await Promise.all([
       db.execute(sql`
         SELECT
           COALESCE(mt.name, 'Unknown') AS tier,
@@ -442,7 +442,36 @@ router.get('/api/analytics/membership-insights', isStaffOrAdmin, async (_req: Re
         LEFT JOIN signups s ON s.month = m.month
         ORDER BY m.month
       `),
+
+      db.execute(sql`
+        WITH months AS (
+          SELECT TO_CHAR(d, 'YYYY-MM') AS month
+          FROM generate_series(
+            DATE_TRUNC('month', CURRENT_DATE - INTERVAL '5 months'),
+            DATE_TRUNC('month', CURRENT_DATE),
+            '1 month'::interval
+          ) d
+        ),
+        churns AS (
+          SELECT
+            TO_CHAR(DATE_TRUNC('month', COALESCE(cancellation_effective_date, updated_at::date)), 'YYYY-MM') AS month,
+            COUNT(*)::int AS lost_members
+          FROM users
+          WHERE role = 'member'
+            AND membership_status IN ('terminated', 'expired', 'suspended', 'inactive')
+            AND COALESCE(cancellation_effective_date, updated_at::date) >= DATE_TRUNC('month', CURRENT_DATE - INTERVAL '5 months')
+          GROUP BY DATE_TRUNC('month', COALESCE(cancellation_effective_date, updated_at::date))
+        )
+        SELECT m.month, COALESCE(c.lost_members, 0)::int AS lost_members
+        FROM months m
+        LEFT JOIN churns c ON c.month = m.month
+        ORDER BY m.month
+      `),
     ]);
+
+    const growthRows = growthResult.rows as { month: string; new_members: number }[];
+    const churnRows = churnResult.rows as { month: string; lost_members: number }[];
+    const churnByMonth = new Map(churnRows.map(r => [r.month, r.lost_members]));
 
     res.json({
       tierDistribution: (tierResult.rows as { tier: string; member_count: number }[]).map(r => ({
@@ -456,9 +485,10 @@ router.get('/api/analytics/membership-insights', isStaffOrAdmin, async (_req: Re
         tier: r.tier || 'Unknown',
         lastBookingDate: r.last_booking_date,
       })),
-      newMemberGrowth: (growthResult.rows as { month: string; new_members: number }[]).map(r => ({
+      newMemberGrowth: growthRows.map(r => ({
         month: r.month,
         newMembers: r.new_members,
+        lostMembers: churnByMonth.get(r.month) || 0,
       })),
     });
   } catch (error) {

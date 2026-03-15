@@ -18,6 +18,7 @@ import {
   Area,
   PieChart,
   Pie,
+  Legend,
 } from 'recharts';
 
 interface PeakHourEntry {
@@ -112,6 +113,7 @@ interface AtRiskMember {
 interface NewMemberGrowthEntry {
   month: string;
   newMembers: number;
+  lostMembers: number;
 }
 
 interface MembershipInsights {
@@ -683,10 +685,10 @@ const AtRiskMembersList: React.FC<{ data: AtRiskMember[] }> = ({ data }) => {
 };
 
 const NewMemberGrowthChart: React.FC<{ data: NewMemberGrowthEntry[] }> = ({ data }) => {
-  if (!data.length) return <p className="text-primary/40 dark:text-white/40 text-sm text-center py-8">No signup data available.</p>;
+  if (!data.length) return <p className="text-primary/40 dark:text-white/40 text-sm text-center py-8">No membership data available.</p>;
   const formatted = data.map(d => ({
     ...d,
-    label: new Date(d.month + '-01').toLocaleDateString('en-US', { month: 'short', year: '2-digit' }),
+    label: new Date(d.month + '-15T12:00:00').toLocaleDateString('en-US', { month: 'short', year: '2-digit' }),
   }));
   return (
     <ResponsiveContainer width="100%" height={220}>
@@ -694,8 +696,10 @@ const NewMemberGrowthChart: React.FC<{ data: NewMemberGrowthEntry[] }> = ({ data
         <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" />
         <XAxis dataKey="label" tick={{ fontSize: 12 }} stroke="#94a3b8" />
         <YAxis tick={{ fontSize: 12 }} stroke="#94a3b8" allowDecimals={false} />
-        <Tooltip contentStyle={TOOLTIP_STYLE} formatter={((value: number) => [value, 'New Members']) as never} />
-        <Line type="monotone" dataKey="newMembers" stroke="#22c55e" strokeWidth={2.5} dot={{ fill: '#22c55e', r: 4 }} activeDot={{ r: 6 }} />
+        <Tooltip contentStyle={TOOLTIP_STYLE} formatter={((value: number, name: string) => [value, name === 'newMembers' ? 'New Members' : 'Former Members']) as never} />
+        <Legend formatter={(value: string) => value === 'newMembers' ? 'New Members' : 'Former Members'} wrapperStyle={{ fontSize: 12 }} />
+        <Line type="monotone" dataKey="newMembers" name="newMembers" stroke="#22c55e" strokeWidth={2.5} dot={{ fill: '#22c55e', r: 4 }} activeDot={{ r: 6 }} />
+        <Line type="monotone" dataKey="lostMembers" name="lostMembers" stroke="#ef4444" strokeWidth={2.5} dot={{ fill: '#ef4444', r: 4 }} activeDot={{ r: 6 }} />
       </LineChart>
     </ResponsiveContainer>
   );
@@ -830,7 +834,7 @@ const AnalyticsTab: React.FC = () => {
                 <AtRiskMembersList data={memberData.atRiskMembers} />
               </SectionCard>
             </div>
-            <SectionCard icon="trending_up" title="New Member Growth" subtitle="New members by join date over the last 6 months">
+            <SectionCard icon="trending_up" title="Membership Trends" subtitle="New vs. former members over the last 6 months">
               <NewMemberGrowthChart data={memberData.newMemberGrowth} />
             </SectionCard>
           </>
