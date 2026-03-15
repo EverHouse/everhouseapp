@@ -190,6 +190,21 @@ Both `createPaymentIntent` and `createBalanceAwarePayment` in `server/core/strip
 **React StrictMode payment intent cleanup (v8.87.33, Task #69):**
 `StripePaymentForm` uses `intentCreatedRef` inside `initStripe()` to guard against duplicate payment intent creation in React StrictMode. The cleanup function (cancels orphaned PIs on unmount) is returned unconditionally from the useEffect — it was previously only returned conditionally, causing orphaned PIs when StrictMode double-mounted.
 
+**Payment state fragmentation prevention (v8.87.34, Task #70):**
+When `PaymentStatusService.markPaymentSucceeded` fails in `server/core/stripe/payments.ts`, the fallback now sets the PI status to `requires_reconciliation` (not `succeeded`). This prevents split-brain state where the Stripe PI shows succeeded but booking/participants remain pending. The `requires_reconciliation` status signals that manual intervention or the next reconciliation run should resolve the state.
+
+**3D Secure / bank redirect return handling (v8.87.34, Task #70):**
+`StripePaymentForm.tsx` has a useEffect that checks for `payment_intent` and `payment_intent_client_secret` URL params on mount. If present, it calls `stripe.retrievePaymentIntent(piSecret)` and validates that `paymentIntent.id === piId` (security check) and `status === 'succeeded'` before calling `onSuccess`. URL params are cleaned via `history.replaceState` after successful verification.
+
+**Partial refund safety (v8.87.34, Task #70):**
+`cancellation.ts` balance refund path now queries `amount_cents - COALESCE(refunded_amount_cents, 0) AS remaining_cents` before issuing the refund — uses `remainingRaw ?? null` (nullish coalescing) to avoid treating 0 as falsy. Skips refund entirely if `remainingCents <= 0`. Stripe card refunds omit the explicit `amount` param so Stripe defaults to refunding the remaining unrefunded balance.
+
+**Guest pass transaction deadlock fix (v8.87.34, Task #70):**
+`refundGuestPass()` in `server/routes/guestPasses.ts` accepts optional `txClient` parameter. When provided, it uses the existing transaction client directly instead of creating a nested `db.transaction()` (which would deadlock). `bookingStateService.ts` passes `tx` when calling inside `completePendingCancellation`.
+
+**Cancellation rollback floating promise fix (v8.87.34, Task #70):**
+Rollback `db.execute()` calls in `cancellation.ts` use `await` + `try/catch` instead of `.catch()` chains to prevent unhandled promise rejections.
+
 ## Supporting Services
 
 | Service | File | Purpose |

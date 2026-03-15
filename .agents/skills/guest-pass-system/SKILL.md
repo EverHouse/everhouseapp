@@ -64,6 +64,7 @@ Booking cancelled
 3. NEVER skip `SELECT FOR UPDATE` on concurrent pass operations. `createGuestPassHold`, `convertHoldToUsage`, and `consumeGuestPassForParticipant` all use `FOR UPDATE` with `UPDATE WHERE passes_used < passes_total` guards (v8.86.0 — verified with 14 concurrency tests in `tests/guestPassConcurrency.test.ts`).
 4. NEVER trust that holds match the final guest count — use `Math.min()`.
 5. NEVER ignore `refundGuestPass()` return value — always check `refundResult.success`. The function returns `{success: false}` on failure instead of throwing, so catch blocks alone are dead code. All 4 cancellation paths (member cancel, staff cancel, complete pending cancellation, bookingStateService) now check the return value (v8.87.31).
+6. NEVER call `refundGuestPass()` without passing `txClient` when inside an existing transaction — creating a nested `db.transaction()` inside an active transaction causes a deadlock. `bookingStateService.ts` passes `tx` for this reason (v8.87.34).
 
 ## Cross-References
 
@@ -111,6 +112,6 @@ GET endpoint calculates: query `booking_requests` with status in `pending/pendin
 ## Exported Helpers (from `guestPasses.ts`)
 
 - `useGuestPass(email, guestName?, sendNotification?)` — programmatic use
-- `refundGuestPass(email, guestName?, sendNotification?)` — programmatic refund
+- `refundGuestPass(email, guestName?, sendNotification?, txClient?)` — programmatic refund; pass `txClient` when calling inside an existing transaction to avoid deadlock (v8.87.34)
 - `getGuestPassesRemaining(email, tier?)` — remaining count
 - `ensureGuestPassRecord(email, tier?)` — create record if missing

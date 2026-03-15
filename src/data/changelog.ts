@@ -8,6 +8,18 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.87.34",
+    date: "2026-03-15",
+    title: "Critical Financial & Checkout Bug Fixes",
+    changes: [
+      "Fixed: Partial refunds no longer crash when a previous partial refund was already issued — the system now refunds only the remaining balance instead of attempting the full original amount",
+      "Fixed: Guest pass refunds during booking cancellation no longer deadlock when running inside an existing transaction",
+      "Fixed: If a payment succeeds but the booking status update fails, the system now marks the payment as 'requires reconciliation' instead of incorrectly showing it as fully succeeded",
+      "Fixed: Returning from 3D Secure bank verification now properly completes the payment — previously the success wasn't detected after the redirect back to the app",
+      "Fixed: Cancellation rollback errors are now properly awaited instead of running as detached promises, preventing silent failures",
+    ]
+  },
+  {
     version: "8.87.33",
     date: "2026-03-15",
     title: "HubSpot Tour Scheduler Integration & Stripe Payment Fixes",
