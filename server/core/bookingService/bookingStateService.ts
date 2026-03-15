@@ -996,7 +996,7 @@ export class BookingStateService {
       ).catch(err => logger.error('[BookingStateService] Staff notification failed', { extra: { error: getErrorMessage(err) } }));
     }
 
-    if (manifest.notifications.memberWebSocket && !manifest.notifications.memberNotification) {
+    if (manifest.notifications.memberWebSocket) {
       const ws = manifest.notifications.memberWebSocket;
       sendNotificationToUser(ws.email, {
         type: 'notification',

@@ -330,6 +330,8 @@ export function StripePaymentForm({
   const intentCreatedRef = React.useRef(false);
   const paymentIntentIdRef = React.useRef<string | null>(null);
   const paymentSucceededRef = React.useRef(false);
+  const prevAmountRef = React.useRef(amount);
+  const prevParticipantFeesRef = React.useRef(participantFees);
   const { effectiveTheme } = useTheme();
   const isDark = effectiveTheme === 'dark';
 
@@ -337,6 +339,29 @@ export function StripePaymentForm({
     paymentSucceededRef.current = true;
     onSuccess();
   }, [onSuccess]);
+
+  useEffect(() => {
+    const amountChanged = prevAmountRef.current !== amount;
+    const feesChanged = JSON.stringify(prevParticipantFeesRef.current) !== JSON.stringify(participantFees);
+    prevAmountRef.current = amount;
+    prevParticipantFeesRef.current = participantFees;
+
+    if ((amountChanged || feesChanged) && intentCreatedRef.current && paymentIntentIdRef.current && !paymentSucceededRef.current) {
+      fetch('/api/stripe/cancel-payment', {
+        method: 'POST',
+        keepalive: true,
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ paymentIntentId: paymentIntentIdRef.current }),
+      }).catch((err: unknown) => { console.warn('[StripePaymentForm] Failed to cancel stale payment intent:', err); });
+
+      intentCreatedRef.current = false;
+      paymentIntentIdRef.current = null;
+      setClientSecret(null);
+      setLoading(true);
+      setError(null);
+    }
+  }, [amount, participantFees]);
 
   useEffect(() => {
     const initStripe = async () => {
@@ -398,6 +423,7 @@ export function StripePaymentForm({
       if (paymentIntentIdRef.current && !paymentSucceededRef.current) {
         fetch('/api/stripe/cancel-payment', {
           method: 'POST',
+          keepalive: true,
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
           body: JSON.stringify({ paymentIntentId: paymentIntentIdRef.current }),
@@ -405,7 +431,7 @@ export function StripePaymentForm({
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [amount, bookingId, description, memberName, purpose, sessionId, userEmail, userId]);
+  }, [amount, bookingId, description, memberName, participantFees, purpose, sessionId, userEmail, userId]);
 
   if (loading) {
     return (

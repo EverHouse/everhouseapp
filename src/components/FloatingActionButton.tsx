@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useBottomNav } from '../contexts/BottomNavContext';
 import { useScrollDirection } from '../hooks/useScrollDirection';
@@ -36,8 +36,29 @@ const FloatingActionButton: React.FC<FloatingActionButtonProps> = ({
   const { direction, isAtTop } = useScrollDirection(extended);
   const [isExiting, setIsExiting] = useState(false);
   const [shouldRender, setShouldRender] = useState(!drawerOpen);
+  const [collapsed, setCollapsed] = useState(false);
+  const collapseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const collapsed = extended && direction === 'down' && !isAtTop;
+  const shouldCollapse = extended && direction === 'down' && !isAtTop;
+
+  useEffect(() => {
+    if (collapseTimerRef.current) {
+      clearTimeout(collapseTimerRef.current);
+      collapseTimerRef.current = null;
+    }
+    if (shouldCollapse) {
+      collapseTimerRef.current = setTimeout(() => {
+        setCollapsed(true);
+      }, 150);
+    } else {
+      setCollapsed(false);
+    }
+    return () => {
+      if (collapseTimerRef.current) {
+        clearTimeout(collapseTimerRef.current);
+      }
+    };
+  }, [shouldCollapse]);
 
   useEffect(() => {
     const currentCount = parseInt(document.body.getAttribute('data-fab-count') || '0', 10);

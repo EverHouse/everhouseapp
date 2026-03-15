@@ -243,7 +243,17 @@ export async function handleCancellationCascade(
               amountCents: row.amount_cents as number | undefined,
             });
           } catch (statusErr: unknown) {
-            logger.warn('[cancellation-cascade] Non-blocking: failed to mark payment refunded', { extra: { paymentIntentId: row.stripe_payment_intent_id, error: getErrorMessage(statusErr) } });
+            logger.warn('[cancellation-cascade] Non-blocking: failed to mark payment refunded, setting refund_succeeded_sync_failed', { extra: { paymentIntentId: row.stripe_payment_intent_id, error: getErrorMessage(statusErr) } });
+            try {
+              await db.execute(sql`UPDATE stripe_payment_intents 
+                 SET status = 'refund_succeeded_sync_failed', updated_at = NOW() 
+                 WHERE stripe_payment_intent_id = ${row.stripe_payment_intent_id}`);
+            } catch (syncErr: unknown) {
+              logger.error('[cancellation-cascade] CRITICAL: Failed to set refund_succeeded_sync_failed status', {
+                error: getErrorMessage(syncErr),
+                extra: { paymentIntentId: row.stripe_payment_intent_id }
+              });
+            }
           }
           
           result.prepaymentRefunds++;
@@ -578,6 +588,7 @@ export async function memberCancelBooking(bookingId: number, userEmail: string, 
     resourceId: bookingRequests.resourceId,
     requestDate: bookingRequests.requestDate,
     startTime: bookingRequests.startTime,
+    durationMinutes: bookingRequests.durationMinutes,
     sessionId: bookingRequests.sessionId,
     trackmanBookingId: bookingRequests.trackmanBookingId,
   })
@@ -692,8 +703,19 @@ export async function memberCancelBooking(bookingId: number, userEmail: string, 
   
   if (existing.resourceId && existing.requestDate && existing.startTime) {
     try {
-      await db.execute(sql`DELETE FROM trackman_bay_slots 
-         WHERE resource_id = ${existing.resourceId} AND slot_date = ${existing.requestDate} AND start_time = ${existing.startTime}`);
+      if (existing.durationMinutes) {
+        const [startHour, startMin] = existing.startTime.split(':').map(Number);
+        const startTotalMin = startHour * 60 + startMin;
+        const endTotalMin = startTotalMin + existing.durationMinutes;
+        const endHour = Math.floor(endTotalMin / 60);
+        const endMinute = endTotalMin % 60;
+        const endTime = `${String(endHour).padStart(2, '0')}:${String(endMinute).padStart(2, '0')}`;
+        await db.execute(sql`DELETE FROM trackman_bay_slots 
+           WHERE resource_id = ${existing.resourceId} AND slot_date = ${existing.requestDate} AND start_time >= ${existing.startTime} AND start_time < ${endTime}`);
+      } else {
+        await db.execute(sql`DELETE FROM trackman_bay_slots 
+           WHERE resource_id = ${existing.resourceId} AND slot_date = ${existing.requestDate}`);
+      }
     } catch (err: unknown) {
       logger.warn('[Member Cancel] Failed to clean up trackman_bay_slots', { 
         bookingId, 
