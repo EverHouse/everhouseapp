@@ -8,6 +8,15 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.87.41",
+    date: "2026-03-15",
+    title: "Resource Booking Payment Cleanup Fix",
+    changes: [
+      "Fixed: Cancelling a resource booking (conference rooms) now properly cancels any pending Stripe payment intents — previously only the database records were marked cancelled while the actual Stripe charges remained open, potentially resulting in unexpected charges",
+      "Fixed: Fee snapshot status updates during resource booking cancellation no longer incorrectly mark already-collected payments as cancelled — succeeded payments are now handled through the proper refund flow",
+    ]
+  },
+  {
     version: "8.87.40",
     date: "2026-03-15",
     title: "App Update Screen Fix & Error Logging Improvements",

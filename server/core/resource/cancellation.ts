@@ -17,6 +17,7 @@ import { cancelPaymentIntent } from '../stripe/payments';
 import { markPaymentRefunded } from '../billing/PaymentStatusService';
 import { AppError } from '../errors';
 import { voidBookingPass } from '../../walletPass/bookingPassService';
+import { cancelPendingPaymentIntentsForBooking } from '../billing/paymentIntentCleanup';
 
 interface BookingParticipantRow {
   id: number;
@@ -751,7 +752,13 @@ export async function memberCancelBooking(bookingId: number, userEmail: string, 
   
   await releaseGuestPassHold(bookingId);
 
-  await db.execute(sql`UPDATE booking_fee_snapshots SET status = 'cancelled', updated_at = NOW() WHERE booking_id = ${bookingId} AND status IN ('pending', 'requires_action', 'succeeded')`).catch((err: unknown) => {
+  try {
+    await cancelPendingPaymentIntentsForBooking(bookingId);
+  } catch (cancelIntentsErr: unknown) {
+    logger.warn('[Member Cancel] Failed to cancel pending payment intents (non-blocking)', { extra: { bookingId, error: getErrorMessage(cancelIntentsErr) } });
+  }
+
+  await db.execute(sql`UPDATE booking_fee_snapshots SET status = 'cancelled', updated_at = NOW() WHERE booking_id = ${bookingId} AND status IN ('pending', 'requires_action')`).catch((err: unknown) => {
     logger.warn('[Member Cancel] Non-blocking: failed to cancel fee snapshots', { extra: { bookingId, error: getErrorMessage(err) } });
   });
 
