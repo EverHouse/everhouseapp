@@ -174,9 +174,15 @@ class PageErrorBoundary extends Component<Props, State> {
     }));
   };
 
+  private cacheBustReload() {
+    const url = new URL(window.location.href);
+    url.searchParams.set('_r', Date.now().toString());
+    window.location.replace(url.toString());
+  }
+
   handleHardReload = () => {
     clearReloadCount();
-    window.location.reload();
+    this.cacheBustReload();
   };
 
   private clearCachesAndReload() {
@@ -193,7 +199,7 @@ class PageErrorBoundary extends Component<Props, State> {
       } catch (err: unknown) {
         console.error('[PageErrorBoundary] Failed to clear caches:', err);
       }
-      window.location.reload();
+      this.cacheBustReload();
     };
     doClear();
   }

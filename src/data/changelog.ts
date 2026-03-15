@@ -8,6 +8,15 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.87.40",
+    date: "2026-03-15",
+    title: "App Update Screen Fix & Error Logging Improvements",
+    changes: [
+      "Fixed: \"App Update Required\" screen now properly clears cached data on iOS — previously the Clear Cache button could fail to refresh the app on iPhones, requiring manual steps to recover",
+      "Improved: Better error visibility when background systems encounter temporary issues, helping staff diagnose problems faster",
+    ]
+  },
+  {
     version: "8.87.39",
     date: "2026-03-15",
     title: "Notification Delivery Fix — Cancellations & Booking Confirmations",
