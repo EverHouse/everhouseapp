@@ -159,25 +159,29 @@ router.get('/api/analytics/extended-stats', isStaffOrAdmin, async (_req: Request
         ),
         categorized AS (
           SELECT
-            TO_CHAR(DATE_TRUNC('month', created_at), 'YYYY-MM') AS month,
+            TO_CHAR(DATE_TRUNC('month', stc.created_at), 'YYYY-MM') AS month,
             CASE
-              WHEN metadata->>'purpose' = 'overage_fee' THEN 'overage'
-              WHEN metadata->>'purpose' = 'booking_fee'
-                OR metadata->>'paymentType' = 'booking_fee' THEN 'booking'
-              WHEN metadata->>'purpose' = 'one_time_purchase'
-                OR metadata->>'source' = 'pos' THEN 'pos_sale'
-              WHEN metadata->>'paymentType' = 'subscription_terminal'
-                OR metadata->>'source' = 'membership_inline_payment'
-                OR description ILIKE '%subscription%'
-                OR description ILIKE '%payment for invoice%' THEN 'subscription'
-              WHEN description ILIKE '%overage%' THEN 'overage'
+              WHEN stc.metadata->>'purpose' = 'overage_fee' OR spi.purpose = 'overage_fee' THEN 'overage'
+              WHEN stc.metadata->>'purpose' = 'booking_fee'
+                OR stc.metadata->>'purpose' = 'prepayment'
+                OR stc.metadata->>'paymentType' = 'booking_fee'
+                OR spi.purpose IN ('booking_fee', 'prepayment') THEN 'booking'
+              WHEN stc.metadata->>'purpose' = 'one_time_purchase'
+                OR stc.metadata->>'source' = 'pos' THEN 'pos_sale'
+              WHEN stc.metadata->>'paymentType' = 'subscription_terminal'
+                OR stc.metadata->>'source' = 'membership_inline_payment'
+                OR stc.description ILIKE '%subscription%' THEN 'subscription'
+              WHEN stc.description ILIKE '%payment for invoice%' THEN 'subscription'
+              WHEN stc.description ILIKE '%overage%' THEN 'overage'
               ELSE 'other'
             END AS category,
-            amount_cents
-          FROM stripe_transaction_cache
-          WHERE object_type = 'payment_intent'
-            AND status = 'succeeded'
-            AND created_at >= DATE_TRUNC('month', CURRENT_DATE - INTERVAL '5 months')
+            stc.amount_cents
+          FROM stripe_transaction_cache stc
+          LEFT JOIN stripe_payment_intents spi ON spi.stripe_payment_intent_id = stc.stripe_id
+          WHERE stc.object_type = 'payment_intent'
+            AND stc.status = 'succeeded'
+            AND stc.created_at >= DATE_TRUNC('month', CURRENT_DATE - INTERVAL '5 months')
+            AND (spi.status IS NULL OR spi.status NOT IN ('refunded', 'refunding'))
         )
         SELECT
           m.month,

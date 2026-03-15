@@ -336,6 +336,7 @@ router.get('/api/payments/daily-summary', isStaffOrAdmin, async (req: Request, r
       const page = await stripe.paymentIntents.list({
         created: { gte: startOfDay, lt: endOfDay },
         limit: 100,
+        expand: ['data.latest_charge'],
         ...(piStartingAfter && { starting_after: piStartingAfter })
       });
       allPaymentIntents.push(...page.data);
@@ -382,7 +383,7 @@ router.get('/api/payments/daily-summary', isStaffOrAdmin, async (req: Request, r
       if (purpose === 'guest_fee') return 'guestFee';
       if (purpose === 'overage_fee') return 'overage';
       if (purpose === 'one_time_purchase') return 'merchandise';
-      if (purpose === 'booking_fee' || purpose === 'booking_payment') return 'bookingFee';
+      if (purpose === 'booking_fee' || purpose === 'booking_payment' || purpose === 'prepayment') return 'bookingFee';
       if (purpose === 'membership_renewal' || purpose === 'membership') return 'membership';
       const desc = (description || '').toLowerCase();
       if (desc.includes('subscription') || desc.includes('membership')) return 'membership';
@@ -392,11 +393,24 @@ router.get('/api/payments/daily-summary', isStaffOrAdmin, async (req: Request, r
       return 'other';
     };
 
+    const piIdsForLookup = allPaymentIntents
+      .filter(pi => pi.status === 'succeeded')
+      .map(pi => pi.id);
+    const localPurposeMap = new Map<string, string>();
+    if (piIdsForLookup.length > 0) {
+      const localRows = await db.execute(sql`SELECT stripe_payment_intent_id, purpose FROM stripe_payment_intents WHERE stripe_payment_intent_id = ANY(${piIdsForLookup})`);
+      for (const row of localRows.rows as unknown as { stripe_payment_intent_id: string; purpose: string }[]) {
+        if (row.purpose) localPurposeMap.set(row.stripe_payment_intent_id, row.purpose);
+      }
+    }
+
     for (const pi of allPaymentIntents) {
       if (pi.status !== 'succeeded') continue;
+      const charge = typeof pi.latest_charge === 'object' ? pi.latest_charge : null;
+      if (charge && charge.refunded) continue;
       processedIds.add(pi.id);
       
-      const purpose = pi.metadata?.purpose || 'other';
+      const purpose = pi.metadata?.purpose || localPurposeMap.get(pi.id) || 'other';
       const cents = pi.amount || 0;
       const category = categorizePurpose(purpose, pi.description);
       
