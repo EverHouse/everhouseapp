@@ -16,6 +16,8 @@ import { getErrorMessage } from '../../utils/errorUtils';
 import { createPacificDate } from '../../utils/dateUtils';
 import { broadcastBookingRosterUpdate } from '../../core/websocket';
 import { syncBookingInvoice, checkBookingPaymentStatus } from '../../core/billing/bookingInvoiceService';
+import { invalidateCachedFees } from '../../core/billing/unifiedFeeService';
+import { findConflictingBookings } from '../../core/bookingService/conflictDetection';
 
 interface DbRow {
   [key: string]: unknown;
@@ -1245,6 +1247,11 @@ router.post('/api/admin/booking/:id/guests', isStaffOrAdmin, async (req, res) =>
       logger.info('[AddGuest] Created booking_participant for guest in session', { extra: { bookingId, sessionId, guestName: trimmedName, guestPassUsed: passUsed } });
 
       if (req.body.deferFeeRecalc !== true) {
+        const allParticipants = await db.execute(sql`SELECT id FROM booking_participants WHERE session_id = ${sessionId}`);
+        const participantIds = allParticipants.rows.map((r: DbRow) => r.id as number);
+        if (participantIds.length > 0) {
+          await invalidateCachedFees(participantIds, 'guest_added_admin');
+        }
         await recalculateSessionFees(sessionId, 'roster_update');
         syncBookingInvoice(bookingId, sessionId).catch(err => {
           logger.warn('[AddGuest] Non-blocking: draft invoice sync failed after roster change', { extra: { error: getErrorMessage(err), bookingId, sessionId } });
@@ -1344,6 +1351,11 @@ router.delete('/api/admin/booking/:id/guests/:guestId', isStaffOrAdmin, async (r
 
     if (req.query.deferFeeRecalc !== 'true') {
       if (sessionId) {
+        const remainingParticipants = await db.execute(sql`SELECT id FROM booking_participants WHERE session_id = ${sessionId}`);
+        const participantIds = remainingParticipants.rows.map((r: DbRow) => r.id as number);
+        if (participantIds.length > 0) {
+          await invalidateCachedFees(participantIds, 'guest_removed_admin');
+        }
         await recalculateSessionFees(sessionId as number, 'roster_update');
         syncBookingInvoice(bookingId, sessionId as number).catch(err => {
           logger.warn('[RemoveGuest] Non-blocking: draft invoice sync failed after roster change', { extra: { error: getErrorMessage(err), bookingId, sessionId } });
@@ -1388,10 +1400,43 @@ router.put('/api/admin/booking/:bookingId/members/:slotId/link', isStaffOrAdmin,
     }
     
     const bookingResult = await db.execute(sql`SELECT request_date, start_time, end_time, status, session_id, resource_id, user_email, user_name, user_id, trackman_booking_id FROM booking_requests WHERE id = ${bookingId}`);
-    let sessionId = (bookingResult.rows[0] as DbRow)?.session_id;
     
-    if (!sessionId && bookingResult.rows[0]) {
-      const bk = bookingResult.rows[0] as DbRow;
+    if (!bookingResult.rows[0]) {
+      return res.status(404).json({ error: 'Booking not found' });
+    }
+    
+    const bookingRow = bookingResult.rows[0] as DbRow;
+    if (bookingRow.request_date && bookingRow.start_time && bookingRow.end_time) {
+      const conflictResult = await findConflictingBookings(
+        memberEmail,
+        String(bookingRow.request_date),
+        String(bookingRow.start_time),
+        String(bookingRow.end_time),
+        parseInt(bookingId as string)
+      );
+      if (conflictResult.hasConflict) {
+        const conflict = conflictResult.conflicts[0];
+        logger.warn('[Link Member] Conflict detected when linking member', {
+          extra: { bookingId, memberEmail, conflictingBookingId: conflict.bookingId, conflictType: conflict.conflictType }
+        });
+        return res.status(409).json({
+          error: `This member has a scheduling conflict with another booking`,
+          conflict: {
+            bookingId: conflict.bookingId,
+            resourceName: conflict.resourceName,
+            startTime: conflict.startTime,
+            endTime: conflict.endTime,
+            ownerName: conflict.ownerName,
+            conflictType: conflict.conflictType
+          }
+        });
+      }
+    }
+
+    let sessionId = bookingRow.session_id;
+    
+    if (!sessionId) {
+      const bk = bookingRow;
       if (bk.resource_id && bk.request_date && bk.start_time && bk.end_time) {
         try {
           const sessionResult = await ensureSessionForBooking({
@@ -1434,7 +1479,7 @@ router.put('/api/admin/booking/:bookingId/members/:slotId/link', isStaffOrAdmin,
       
       const userId = (memberInfo.rows[0] as DbRow).id;
       const displayName = `${(memberInfo.rows[0] as DbRow).first_name || ''} ${(memberInfo.rows[0] as DbRow).last_name || ''}`.trim() || memberEmail;
-      
+
       const targetSlot = await db.execute(sql`SELECT id, participant_type, user_id FROM booking_participants WHERE id = ${slotId} AND session_id = ${sessionId}`);
       if (targetSlot.rowCount && targetSlot.rowCount > 0) {
         const slot = (targetSlot.rows[0] as DbRow);
@@ -1450,6 +1495,9 @@ router.put('/api/admin/booking/:bookingId/members/:slotId/link', isStaffOrAdmin,
           
           if (req.body.deferFeeRecalc !== true) {
             try {
+              const allParts = await db.execute(sql`SELECT id FROM booking_participants WHERE session_id = ${sessionId}`);
+              const pIds = allParts.rows.map((r: DbRow) => r.id as number);
+              if (pIds.length > 0) await invalidateCachedFees(pIds, 'member_linked_admin');
               await recalculateSessionFees(Number(sessionId), 'roster_update');
               syncBookingInvoice(Number(bookingId), Number(sessionId)).catch(err => {
                 logger.warn('[Link Member] Non-blocking: draft invoice sync failed after roster change', { extra: { error: getErrorMessage(err), bookingId, sessionId } });
@@ -1531,6 +1579,9 @@ router.put('/api/admin/booking/:bookingId/members/:slotId/link', isStaffOrAdmin,
       
       if (req.body.deferFeeRecalc !== true) {
         try {
+          const allParts = await db.execute(sql`SELECT id FROM booking_participants WHERE session_id = ${sessionId}`);
+          const pIds = allParts.rows.map((r: DbRow) => r.id as number);
+          if (pIds.length > 0) await invalidateCachedFees(pIds, 'member_linked_admin');
           await recalculateSessionFees(Number(sessionId), 'roster_update');
           syncBookingInvoice(Number(bookingId), Number(sessionId)).catch(err => {
             logger.warn('[Link Member] Non-blocking: draft invoice sync failed after roster change', { extra: { error: getErrorMessage(err), bookingId, sessionId } });
@@ -1621,7 +1672,9 @@ router.put('/api/admin/booking/:bookingId/members/:slotId/unlink', isStaffOrAdmi
     
     if (req.query.deferFeeRecalc !== 'true') {
       try {
-        const { recalculateSessionFees } = await import('../../core/billing/unifiedFeeService');
+        const remainingParts = await db.execute(sql`SELECT id FROM booking_participants WHERE session_id = ${sessionId}`);
+        const pIds = remainingParts.rows.map((r: DbRow) => r.id as number);
+        if (pIds.length > 0) await invalidateCachedFees(pIds, 'member_unlinked_admin');
         await recalculateSessionFees(Number(sessionId), 'roster_update');
         syncBookingInvoice(Number(bookingId), Number(sessionId)).catch(err => {
           logger.warn('[unlink] Non-blocking: draft invoice sync failed after roster change', { extra: { error: getErrorMessage(err), bookingId, sessionId } });

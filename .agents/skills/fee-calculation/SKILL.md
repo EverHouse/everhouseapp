@@ -82,6 +82,7 @@ After calling recalculateSessionFees()?
 3. NEVER hardcode dollar amounts — always source from Stripe product prices.
 4. NEVER skip `syncBookingInvoice()` after fee recalculation when a Stripe invoice exists.
 5. NEVER skip the cascade recalculation — changing one booking's fees affects later same-day bookings.
+6. NEVER call `recalculateSessionFees()` without calling `invalidateCachedFees()` on all session participants first — stale cached fees cause the already-paid guard (rule 11) to skip participants, producing incorrect totals. All roster mutation paths (member-side `rosterService.ts` and staff-side `admin-roster.ts`) must invalidate before recalculating.
 
 ## Cross-References
 

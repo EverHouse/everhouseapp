@@ -101,6 +101,8 @@ Has trackman_booking_id?
 7. NEVER refund guest passes from `tryLinkCancelledBooking` — cancellation workflows handle their own refunds.
 8. NEVER pass `undefined` to Drizzle `sql` template literals — use `?? null`.
 9. NEVER filter session lookups by booking status — sessions can be shared across bookings including cancelled ones.
+10. NEVER call `recalculateSessionFees()` without calling `invalidateCachedFees()` first — stale cached fees cause the recalculation to skip participants, producing incorrect fee totals.
+11. NEVER add a member to a booking without calling `findConflictingBookings()` first — applies to both member-facing `addParticipant` and staff-facing link-member endpoints.
 
 ## Cross-References
 

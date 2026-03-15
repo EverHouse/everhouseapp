@@ -19,6 +19,8 @@ export const changelog: ChangelogEntry[] = [
       "Safety: POS café/shop saved card charges now use the same corrected payment method",
       "Fixed: Member dashboard now shows 'Fees Paid' with green checkmark after payment — previously showed 'Estimated Fees' when some participants had $0 fees within their allowance",
       "Internal: Unified payment status logic between member and staff views — both now use the same 'checkBookingPaymentStatus' function to prevent future discrepancies",
+      "Safety: Staff 'Link Member' now checks for scheduling conflicts before adding a member — prevents double-booking a member across simultaneous sessions",
+      "Safety: Staff roster changes (add/remove guest, link/unlink member) now clear cached fees before recalculating — ensures fee display always reflects the current roster",
     ]
   },
   {
