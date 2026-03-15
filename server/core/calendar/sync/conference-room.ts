@@ -56,7 +56,7 @@ export async function getConferenceRoomBookingsFromCalendar(
       if (bookingMatch) {
         extractedName = bookingMatch[1].trim();
       } else if (summary.includes('|')) {
-        const segments = summary.split('|').map(s => s.trim());
+        const segments = summary.split('|').map((s: string) => s.trim());
         extractedName = segments[segments.length - 1] || summary.trim();
       } else {
         extractedName = summary.trim();
