@@ -239,6 +239,9 @@ All async fetches in React hooks MUST use one of these patterns to prevent stale
 - **isFetching guard for setInterval**: `startPaymentPolling` uses `isPollingFetchingRef` to prevent overlapping fetches when the network is slow. If a fetch is already in flight, the next interval tick is skipped.
 - **Booking-specific**: `calculateFees` in `useUnifiedBookingLogic.ts` uses both AbortController and isCurrent flag. Payment polling uses bookingId comparison to stop on navigation.
 
+### 20a. Member Dashboard Split Queries (v8.87.36)
+The member dashboard uses 8 independent React Query hooks fetching `/api/member/dashboard/{section}` in parallel (`bookings`, `booking-requests`, `rsvps`, `wellness`, `events`, `conference-rooms`, `stats`, `announcements`). Query key pattern: `['member', 'dashboard', email, section]`. Any mutation that affects dashboard data must invalidate `['member', 'dashboard']` (prefix match covers all 8 sections). The legacy monolithic endpoint `/api/member/dashboard-data` is kept for backward compatibility but has no frontend consumers.
+
 ---
 
 ## Unified Booking Sheet Architecture

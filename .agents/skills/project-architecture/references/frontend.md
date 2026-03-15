@@ -31,7 +31,7 @@ No auth required:
 
 Authenticated members:
 
-- `Dashboard.tsx` — Member home, balance, upcoming bookings
+- `Dashboard.tsx` — Member home, balance, upcoming bookings. Uses 8 independent React Query hooks fetching `/api/member/dashboard/{section}` in parallel (bookings, booking-requests, rsvps, wellness, events, conference-rooms, stats, announcements). Query key pattern: `['member', 'dashboard', email, section]`. `refetchAllData()` invalidates the `['member', 'dashboard']` prefix (v8.87.36)
 - `BookGolf.tsx` — Simulator booking flow
 - `Events.tsx` — Club events and RSVPs
 - `History.tsx` — Booking and payment history
