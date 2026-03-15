@@ -374,19 +374,13 @@ const RosterManager: React.FC<RosterManagerProps> = ({
 
   const rosterLocked = !!(feePreview?.allPaid);
 
-  const hasUnpaidFees = useMemo(() => {
-    if (!feePreview) return false;
-    if (feePreview.allPaid) return false;
+  const totalEstimatedFees = feePreview?.ownerFees?.estimatedTotalFees ?? ((feePreview?.ownerFees?.estimatedOverageFee ?? 0) + (feePreview?.ownerFees?.estimatedGuestFees ?? 0));
+  const hasEstimatedFees = totalEstimatedFees > 0;
+  const isPaid = !!(feePreview?.allPaid);
+  const showEstimatedFees = isOwner && !isPaid && hasEstimatedFees;
+  const showFeesPaid = isOwner && isPaid && hasEstimatedFees;
 
-    const hasPendingGuests = pendingGuestFees.count > 0;
-
-    const ownerParticipant = participants.find(p => p.participantType === 'owner');
-    const ownerHasUnpaidFee = ownerParticipant && 
-      (ownerParticipant.paymentStatus === 'pending' || ownerParticipant.paymentStatus === null) &&
-      (feePreview?.ownerFees?.estimatedOverageFee ?? 0) > 0;
-
-    return hasPendingGuests || !!ownerHasUnpaidFee;
-  }, [feePreview, pendingGuestFees, participants]);
+  const hasUnpaidFees = showEstimatedFees;
 
   const handlePaymentSuccess = useCallback(() => {
     setShowPaymentModal(false);
@@ -625,7 +619,7 @@ const RosterManager: React.FC<RosterManagerProps> = ({
                 </>
               )}
 
-              {isOwner && hasUnpaidFees && (
+              {showEstimatedFees && (
                 <div className={`mt-4 pt-4 border-t ${isDark ? 'border-white/10' : 'border-black/5'}`}>
                   <div className="flex items-center justify-between mb-3">
                     <div>
@@ -639,7 +633,7 @@ const RosterManager: React.FC<RosterManagerProps> = ({
                       </p>
                     </div>
                     <span className={`text-lg font-bold ${isDark ? 'text-white' : 'text-[#293515]'}`}>
-                      ${(feePreview?.ownerFees?.estimatedTotalFees ?? ((feePreview?.ownerFees?.estimatedOverageFee ?? 0) + (feePreview?.ownerFees?.estimatedGuestFees ?? 0))).toFixed(2)}
+                      ${totalEstimatedFees.toFixed(2)}
                     </span>
                   </div>
                   {(booking?.status === 'confirmed' || booking?.status === 'approved') ? (
@@ -661,7 +655,7 @@ const RosterManager: React.FC<RosterManagerProps> = ({
                 </div>
               )}
 
-              {isOwner && !hasUnpaidFees && (feePreview?.ownerFees?.estimatedTotalFees ?? 0) > 0 && (
+              {showFeesPaid && (
                 <div className={`mt-4 pt-4 border-t ${isDark ? 'border-white/10' : 'border-black/5'}`}>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
@@ -671,7 +665,7 @@ const RosterManager: React.FC<RosterManagerProps> = ({
                       </span>
                     </div>
                     <span className={`text-lg font-bold ${isDark ? 'text-green-400' : 'text-green-600'}`}>
-                      ${(feePreview?.ownerFees?.estimatedTotalFees ?? 0).toFixed(2)}
+                      ${totalEstimatedFees.toFixed(2)}
                     </span>
                   </div>
                 </div>

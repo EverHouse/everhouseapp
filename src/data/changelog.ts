@@ -8,6 +8,15 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.87.19",
+    date: "2026-03-15",
+    title: "Fee Display Fix",
+    changes: [
+      "Fixed: Dashboard no longer shows 'Fees Paid' with a green checkmark when no payment was actually made — now correctly shows 'Estimated Fees' with a Pay Now option",
+      "Fixed: 'Fees Paid' badge only appears after a verified Stripe payment, not based on estimated empty-slot fees",
+    ]
+  },
+  {
     version: "8.87.18",
     date: "2026-03-15",
     title: "Roster Lock Improvements",
