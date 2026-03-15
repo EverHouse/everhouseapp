@@ -954,7 +954,6 @@ async function runVisitorArchiveInBackground(jobId: string, dryRun: boolean, sta
       SELECT u.id, u.email, u.first_name, u.last_name, u.stripe_customer_id, u.membership_status
       FROM users u
       WHERE u.membership_status IN ('non-member', 'visitor')
-        AND u.archived_at IS NULL
         AND u.role NOT IN ('admin', 'staff', 'golf_instructor')
         AND NOT EXISTS (SELECT 1 FROM staff_users su WHERE LOWER(su.email) = LOWER(u.email) AND su.is_active = true)
         AND NOT EXISTS (SELECT 1 FROM booking_requests br WHERE LOWER(br.user_email) = LOWER(u.email))
