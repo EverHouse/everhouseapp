@@ -40,6 +40,8 @@ Check-in: staff clicks "Use Guest Pass"
 
 Booking cancelled
   → releaseGuestPassHold(bookingId) [delete holds]
+    └── Runs AFTER hard-delete transaction commits (v8.87.35)
+        └── Prevents premature release if delete fails partway
   → If >= 1hr before start: refundGuestPassForParticipant()
   → If < 1hr before start: passes forfeited
 ```

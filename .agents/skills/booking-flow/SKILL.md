@@ -50,7 +50,10 @@ Who is cancelling?
 │   └── Was already cancellation_pending?
 │       ├── Yes → completePendingCancellation()
 │       └── No → cancelBooking() with side-effects manifest
-└── Staff → same as member path (via acting_as_email)
+├── Staff → same as member path (via acting_as_email)
+│   └── Staff can override cancellation_pending → 'cancelled' directly (v8.87.35)
+└── Staff decline → declineBooking()
+    └── Deletes ALL trackman_bay_slots in duration range (not just first slot) (v8.87.35)
 ```
 
 ### Fee calculation timing
@@ -73,7 +76,7 @@ Is this inside a db.transaction()?
 6. **One invoice per booking.** Each booking has at most one Stripe invoice (`booking_requests.stripe_invoice_id`). Draft at approval → updated on roster changes → finalized at payment → voided on cancel.
 7. **Roster lock after paid invoice.** `enforceRosterLock()` blocks edits after invoice is paid. Staff can override with reason. `isBookingInvoicePaid()` checks Stripe first; on Stripe failure, falls back to `booking_fee_snapshots` — locks only if a completed snapshot with `total_cents > 0` exists (meaning real money was collected). This avoids false locks on $0 bookings (within daily allowance) while preventing fail-open when Stripe is unreachable.
 8. **Conflict check must include all 6 active statuses.** `pending`, `pending_approval`, `approved`, `confirmed`, `attended`, `cancellation_pending`.
-9. **Guest pass hold-then-convert.** Holds at booking creation → converted to usage inside session creation transaction → released on cancellation.
+9. **Guest pass hold-then-convert.** Holds at booking creation → converted to usage inside session creation transaction → released on cancellation. `releaseGuestPassHold` runs AFTER the hard-delete transaction commits — prevents premature release if the delete fails (v8.87.35).
 10. **Auto-complete runs every 1 hr.** Marks approved/confirmed as `attended` 30 min after end time (same-day) or next day (overnight). Fee guard: blocks auto-complete if unpaid fees exist.
 11. **Usage ledger stores emails, not UUIDs.** `resolveUserIdToEmail()` converts before ledger writes.
 
@@ -90,6 +93,8 @@ Is this inside a db.transaction()?
 9. NEVER call `refundGuestPass()` inside a `db.transaction()` without passing the transaction client as `txClient` — creates a nested transaction that deadlocks. See `bookingStateService.ts` for the correct pattern (v8.87.34).
 10. NEVER issue a Stripe refund for the full `amount_cents` without first querying `amount_cents - COALESCE(refunded_amount_cents, 0)` — partial refunds may have already been issued. For Stripe card refunds, omit the explicit `amount` param so Stripe defaults to the remaining balance (v8.87.34).
 11. NEVER use `.catch()` chains for rollback `db.execute()` calls in cancellation paths — use `await` + `try/catch` to prevent floating promises and unhandled rejections (v8.87.34).
+12. NEVER assume Trackman bay slot cleanup only needs to delete a single slot — multi-slot bookings require duration-aware range DELETE covering `startTime` through `startTime + durationMinutes` at 30-min intervals. Both `cancelBooking`, `completePendingCancellation`, and `declineBooking` use this pattern (v8.87.35).
+13. NEVER silently discard cancellation side-effect failures (refunds, calendar cleanup, notifications). Failed side effects are persisted to the `failed_side_effects` table with `booking_id`, `action_type`, `stripe_payment_intent_id`, and `error_message` for staff recovery (v8.87.35).
 
 ## Cross-References
 

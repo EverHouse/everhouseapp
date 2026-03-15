@@ -172,6 +172,7 @@ What type of alert?
 | `integrity_ignores` | Time-bounded ignore rules |
 | `system_alerts` | Persistent alert log |
 | `system_settings` | DB locks + alert rate-limit state |
+| `failed_side_effects` | Cancellation side-effect failures (refunds, calendar, notifications) for staff recovery (v8.87.35) |
 
 ## Admin Dashboard
 

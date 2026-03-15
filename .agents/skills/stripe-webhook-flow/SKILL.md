@@ -205,6 +205,30 @@ When `PaymentStatusService.markPaymentSucceeded` fails in `server/core/stripe/pa
 **Cancellation rollback floating promise fix (v8.87.34, Task #70):**
 Rollback `db.execute()` calls in `cancellation.ts` use `await` + `try/catch` instead of `.catch()` chains to prevent unhandled promise rejections.
 
+**`cancelPaymentIntent` processing state handling (v8.87.35, Task #71):**
+`cancelPaymentIntent()` in `server/core/stripe/payments.ts` now handles PIs in `processing` state — returns a structured error `{ error: 'processing', message: ... }` and syncs the local DB status to `processing`. Callers can check the error type and retry later instead of crashing.
+
+**POS idempotency key determinism (v8.87.35, Task #71):**
+POS payment intents use a deterministic idempotency key derived from `customerId + SHA-256(sorted cart JSON) + SHA-256(description)`. This prevents duplicate charges from double-taps while allowing legitimate re-charges of the same items.
+
+**Non-booking payment idempotency (v8.87.35, Task #73):**
+Non-booking payments (merchandise, cafe, etc.) use `crypto.randomUUID()` for idempotency keys instead of time-bucketed keys. Time-bucketed keys could collide when multiple payments happen within the same time window, causing false duplicate detection. Convention 14 in `project-architecture` is updated — deterministic keys are required for booking payments; `randomUUID()` is acceptable for non-booking one-off charges.
+
+**`chargeWithBalance` PI ID storage (v8.87.35, Task #73):**
+`chargeWithBalance` now stores the actual Stripe payment intent ID from `paidInvoice.payment_intent` in the `stripe_payment_intents` table. Falls back to `invoice-${invoiceId}` prefix only for 100% balance-paid invoices (where no real PI exists). Previously fabricated IDs for all paths.
+
+**Hard-delete PI cleanup (v8.87.35, Task #71):**
+When hard-deleting a booking, PI cleanup refunds succeeded PIs and cancels non-terminal ones. Skips both `balance-` and `invoice-` prefixed synthetic IDs (not real Stripe objects). Pending participant PIs are also cancelled in both `cancelBooking` and `completePendingCancellation`.
+
+**`refund_succeeded_sync_failed` status (v8.87.35, Tasks #71-#73):**
+When a Stripe refund succeeds but the local `markPaymentRefunded` DB call fails, the system sets status to `refund_succeeded_sync_failed` with CRITICAL logging. This applies in `executeInlineRefund` (bookingStateService), `voidBookingInvoice` (bookingInvoiceService), and the cancellation cascade. Prevents silent data divergence.
+
+**`StripePaymentWithSecret` unmount cleanup (v8.87.35, Task #72):**
+The `StripePaymentWithSecret` component now uses `keepalive: true` in its unmount cleanup `fetch` call, matching the existing pattern in `StripePaymentForm`. Without this, the browser could abort the PI cancellation request during tab close/navigation.
+
+**`failed_side_effects` recovery table (v8.87.35, Task #73):**
+New `failed_side_effects` table (migration 0056) tracks cancellation side-effect failures. Fields: `booking_id`, `action_type`, `stripe_payment_intent_id`, `error_message`, `retry_count`, `resolved`. Populated by `BookingStateService.executeSideEffects` when refunds, calendar cleanup, or notifications fail.
+
 ## Supporting Services
 
 | Service | File | Purpose |
