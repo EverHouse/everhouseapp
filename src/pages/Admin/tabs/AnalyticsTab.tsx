@@ -423,7 +423,7 @@ const RevenueChart: React.FC<{ data: RevenueEntry[] }> = ({ data }) => {
   }
 
   const chartData = data.map(r => ({
-    month: new Date(r.month + '-01').toLocaleDateString('en-US', { month: 'short', year: '2-digit' }),
+    month: new Date(r.month + '-15T12:00:00').toLocaleDateString('en-US', { month: 'short', year: '2-digit' }),
     subscription: r.subscriptionRevenue,
     booking: r.bookingRevenue,
     overage: r.overageRevenue,

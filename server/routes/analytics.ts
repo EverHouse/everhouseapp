@@ -27,6 +27,7 @@ function categorizeCharge(charge: Stripe.Charge): string {
   const pi = charge.payment_intent && typeof charge.payment_intent === 'object' ? charge.payment_intent as Stripe.PaymentIntent : null;
   const meta = pi?.metadata || charge.metadata || {};
   const desc = (pi?.description || charge.description || '').toLowerCase();
+  const hasInvoice = !!(charge.invoice);
 
   if (meta.purpose === 'overage_fee' || desc.includes('overage')) return 'overage';
   if (meta.purpose === 'guest_fee' || desc.includes('guest fee') || desc.includes('guest pass')) return 'guest_fee';
@@ -34,7 +35,8 @@ function categorizeCharge(charge: Stripe.Charge): string {
   if (meta.purpose === 'one_time_purchase' || meta.source === 'pos') return 'pos_sale';
   if (meta.purpose === 'add_funds' || desc.includes('top-up') || desc.includes('account balance')) return 'account_balance';
   if (meta.paymentType === 'subscription_terminal' || meta.source === 'membership_inline_payment') return 'subscription';
-  if (desc.includes('subscription') || desc.includes('payment for invoice')) return 'subscription';
+  if (desc.includes('subscription creation') || desc.includes('subscription update')) return 'subscription';
+  if (hasInvoice && desc.includes('subscription')) return 'subscription';
   if (desc.includes('booking') || desc.includes('simulator') || desc.includes('bay')) return 'booking';
   return 'other';
 }
