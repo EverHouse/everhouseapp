@@ -1055,7 +1055,7 @@ async function runVisitorArchiveInBackground(jobId: string, dryRun: boolean, sta
             await tx.execute(sql`DELETE FROM member_notes WHERE LOWER(member_email) IN (${emailList})`);
             await tx.execute(sql`DELETE FROM communication_logs WHERE LOWER(member_email) IN (${emailList})`);
             await tx.execute(sql`DELETE FROM form_submissions WHERE LOWER(email) IN (${emailList})`);
-            await tx.execute(sql`DELETE FROM passkeys WHERE "userId" IN (${idList})`);
+            await tx.execute(sql`DELETE FROM passkeys WHERE user_id IN (${idList})`);
             await tx.execute(sql`DELETE FROM users WHERE id IN (${idList})`);
           });
           deletedCount += batch.length;
