@@ -23,8 +23,6 @@ const CalendarStatusSection: React.FC<CalendarStatusSectionProps> = ({
 }) => {
   const [isMigrating, setIsMigrating] = useState(false);
   const [migrationResult, setMigrationResult] = useState<{ success: boolean; results?: MigrationResults; error?: string } | null>(null);
-  const [isRestoring, setIsRestoring] = useState(false);
-  const [restoreResult, setRestoreResult] = useState<{ success: boolean; restored?: number; skipped?: number; errors?: number; error?: string } | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<{
     success: boolean;
@@ -60,20 +58,6 @@ const CalendarStatusSection: React.FC<CalendarStatusSectionProps> = ({
     window.addEventListener('calendar-cleanup-complete', handleCleanupComplete);
     return () => window.removeEventListener('calendar-cleanup-complete', handleCleanupComplete);
   }, [handleCleanupComplete]);
-
-  const handleRestoreNotes = async () => {
-    if (!confirm('This will restore facility notice descriptions from Google Calendar extended properties. Continue?')) return;
-    setIsRestoring(true);
-    setRestoreResult(null);
-    try {
-      const data = await postWithCredentials<{ success: boolean; restored?: number; skipped?: number; errors?: number; error?: string }>('/api/admin/calendar/restore-closure-notes', {});
-      setRestoreResult(data);
-    } catch (err: unknown) {
-      setRestoreResult({ success: false, error: err instanceof Error ? err.message : 'Failed to restore' });
-    } finally {
-      setIsRestoring(false);
-    }
-  };
 
   const handleSyncAll = async () => {
     if (!confirm('This will pull all missing events from Google Calendar into the app. Continue?')) return;
@@ -208,39 +192,6 @@ const CalendarStatusSection: React.FC<CalendarStatusSectionProps> = ({
                 <p className="mt-1 text-[11px] text-gray-400 dark:text-gray-500">
                   Re-pushes all events to Google Calendar with clean descriptions and metadata in hidden properties
                 </p>
-
-                <button
-                  onClick={handleRestoreNotes}
-                  disabled={isRestoring}
-                  className="flex items-center gap-2 px-3 py-2 mt-2 text-sm font-medium rounded-lg bg-amber-500/10 dark:bg-amber-400/10 text-amber-700 dark:text-amber-400 hover:bg-amber-500/20 dark:hover:bg-amber-400/20 disabled:opacity-50 transition-colors"
-                >
-                  {isRestoring ? (
-                    <span aria-hidden="true" className="material-symbols-outlined animate-spin text-sm">progress_activity</span>
-                  ) : (
-                    <span aria-hidden="true" className="material-symbols-outlined text-sm">restore</span>
-                  )}
-                  {isRestoring ? 'Restoring notes...' : 'Restore Facility Notice Notes'}
-                </button>
-                <p className="mt-1 text-[11px] text-gray-400 dark:text-gray-500">
-                  Recovers notice descriptions from Google Calendar extended properties if they were cleared by cleanup
-                </p>
-
-                {restoreResult && (
-                  <div className={`mt-2 p-3 rounded-lg text-sm ${
-                    restoreResult.success
-                      ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400'
-                      : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400'
-                  }`}>
-                    {restoreResult.success ? (
-                      <div className="space-y-1">
-                        <p className="font-medium">Restore complete</p>
-                        <p>{restoreResult.restored} notes restored, {restoreResult.skipped} skipped{restoreResult.errors ? `, ${restoreResult.errors} errors` : ''}</p>
-                      </div>
-                    ) : (
-                      <p>{restoreResult.error || 'Restore failed'}</p>
-                    )}
-                  </div>
-                )}
 
                 {migrationResult && (
                   <div className={`mt-2 p-3 rounded-lg text-sm ${
