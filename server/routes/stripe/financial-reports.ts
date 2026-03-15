@@ -144,7 +144,7 @@ router.get('/api/stripe/transactions/today', isStaffOrAdmin, async (req: Request
       stripe.paymentIntents.list({
         created: { gte: startTs },
         limit: 100,
-        expand: ['data.customer'],
+        expand: ['data.customer', 'data.latest_charge'],
       }),
       stripe.charges.list({
         created: { gte: startTs },
@@ -209,7 +209,12 @@ router.get('/api/stripe/transactions/today', isStaffOrAdmin, async (req: Request
     const piIds = new Set(paymentIntents.data.map(pi => pi.id));
 
     const stripeTransactions = paymentIntents.data
-      .filter(pi => pi.status === 'succeeded' || pi.status === 'processing')
+      .filter(pi => {
+        if (pi.status !== 'succeeded' && pi.status !== 'processing') return false;
+        const charge = typeof pi.latest_charge === 'object' ? pi.latest_charge : null;
+        if (charge && charge.refunded) return false;
+        return true;
+      })
       .map(pi => {
         const email = getPaymentEmail(pi);
         const stripeName = getCustomerName(pi);
