@@ -106,14 +106,28 @@ export function SimpleCheckoutForm({
     }
   };
 
+  const [elementReady, setElementReady] = useState(false);
+  const [elementError, setElementError] = useState<string | null>(null);
+
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="bg-white dark:bg-[#1a1d12] rounded-lg p-4 border border-primary/10 dark:border-white/10">
+      <div className="bg-white dark:bg-[#1a1d12] rounded-lg p-4 border border-primary/10 dark:border-white/10" style={{ minHeight: elementReady ? undefined : 100 }}>
         <PaymentElement
           options={{
             layout: 'tabs',
           }}
+          onReady={() => {
+            console.log('[StripePaymentForm] PaymentElement ready');
+            setElementReady(true);
+          }}
+          onLoadError={(event) => {
+            console.error('[StripePaymentForm] PaymentElement load error:', event);
+            setElementError(event?.error?.message || 'Failed to load payment options');
+          }}
         />
+        {elementError && (
+          <p className="text-red-500 text-sm mt-2">{elementError}</p>
+        )}
       </div>
 
       {errorMessage && (
@@ -229,17 +243,19 @@ export function StripePaymentWithSecret({
   };
 
   return (
-    <Elements stripe={stripeInstance} options={options}>
-      <div className="space-y-4">
-        <div className="bg-primary/5 dark:bg-white/5 rounded-xl p-4 flex items-center justify-between">
-          <span className="text-primary/70 dark:text-white/70">{description}</span>
-          <span className="text-xl font-bold text-primary dark:text-white">
-            ${amount.toFixed(2)}
-          </span>
+    <div style={{ transform: 'none', animation: 'none' }}>
+      <Elements stripe={stripeInstance} options={options}>
+        <div className="space-y-4">
+          <div className="bg-primary/5 dark:bg-white/5 rounded-xl p-4 flex items-center justify-between">
+            <span className="text-primary/70 dark:text-white/70">{description}</span>
+            <span className="text-xl font-bold text-primary dark:text-white">
+              ${amount.toFixed(2)}
+            </span>
+          </div>
+          <SimpleCheckoutForm onSuccess={onSuccess} onCancel={onCancel} />
         </div>
-        <SimpleCheckoutForm onSuccess={onSuccess} onCancel={onCancel} />
-      </div>
-    </Elements>
+      </Elements>
+    </div>
   );
 }
 
