@@ -751,7 +751,7 @@ export async function memberCancelBooking(bookingId: number, userEmail: string, 
   
   await releaseGuestPassHold(bookingId);
 
-  await db.execute(sql`UPDATE booking_fee_snapshots SET status = 'cancelled', updated_at = NOW() WHERE booking_id = ${bookingId} AND status IN ('pending', 'requires_action')`).catch((err: unknown) => {
+  await db.execute(sql`UPDATE booking_fee_snapshots SET status = 'cancelled', updated_at = NOW() WHERE booking_id = ${bookingId} AND status IN ('pending', 'requires_action', 'succeeded')`).catch((err: unknown) => {
     logger.warn('[Member Cancel] Non-blocking: failed to cancel fee snapshots', { extra: { bookingId, error: getErrorMessage(err) } });
   });
 

@@ -244,12 +244,15 @@ router.get('/api/stripe/transactions/today', isStaffOrAdmin, async (req: Request
         return true;
       })
       .map(pi => {
+        const charge = typeof pi.latest_charge === 'object' ? pi.latest_charge : null;
+        const amountRefunded = charge && charge.amount_refunded ? charge.amount_refunded : 0;
+        const effectiveAmount = (pi.amount || 0) - amountRefunded;
         const email = getPaymentEmail(pi);
         const stripeName = getCustomerName(pi);
         const dbName = email ? memberNameMap.get(email.toLowerCase()) : undefined;
         return {
           id: pi.id,
-          amount: pi.amount,
+          amount: effectiveAmount,
           status: pi.status,
           description: pi.description || pi.metadata?.purpose || 'Payment',
           memberEmail: email,
@@ -260,15 +263,18 @@ router.get('/api/stripe/transactions/today', isStaffOrAdmin, async (req: Request
       });
 
     const chargeTransactions = allCharges
-      .filter(ch => ch.paid && !ch.refunded && !(ch.payment_intent && piIds.has(ch.payment_intent as string)))
+      .filter(ch => ch.paid && !(ch.payment_intent && piIds.has(ch.payment_intent as string)))
+      .filter(ch => !ch.refunded)
       .map(ch => {
+        const amountRefunded = ch.amount_refunded || 0;
+        const effectiveAmount = (ch.amount || 0) - amountRefunded;
         const email = ch.billing_details?.email || (typeof ch.customer === 'object' && ch.customer && !('deleted' in ch.customer) ? ch.customer.email : '') || '';
         const stripeName = (typeof ch.customer === 'object' && ch.customer && !('deleted' in ch.customer) ? ch.customer.name : undefined) || ch.billing_details?.name || undefined;
         const dbName = email ? memberNameMap.get(email.toLowerCase()) : undefined;
         const piId = typeof ch.payment_intent === 'string' ? ch.payment_intent : ch.payment_intent?.id;
         return {
           id: piId || ch.id,
-          amount: ch.amount,
+          amount: effectiveAmount,
           status: 'succeeded' as const,
           description: ch.description || 'Payment',
           memberEmail: email,
@@ -439,7 +445,8 @@ router.get('/api/payments/daily-summary', isStaffOrAdmin, async (req: Request, r
       processedIds.add(pi.id);
       
       const purpose = pi.metadata?.purpose || localPurposeMap.get(pi.id) || 'other';
-      const cents = pi.amount || 0;
+      const amountRefunded = charge && charge.amount_refunded ? charge.amount_refunded : 0;
+      const cents = (pi.amount || 0) - amountRefunded;
       const category = categorizePurpose(purpose, pi.description);
       
       transactionCount += 1;
@@ -452,7 +459,8 @@ router.get('/api/payments/daily-summary', isStaffOrAdmin, async (req: Request, r
       if (ch.payment_intent && processedIds.has(ch.payment_intent as string)) continue;
       
       processedIds.add(ch.id);
-      const cents = ch.amount || 0;
+      const chAmountRefunded = ch.amount_refunded || 0;
+      const cents = (ch.amount || 0) - chAmountRefunded;
       
       transactionCount += 1;
 

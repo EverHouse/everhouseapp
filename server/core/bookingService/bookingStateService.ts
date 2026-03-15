@@ -205,22 +205,25 @@ export class BookingStateService {
         });
       }
 
-      const otherIntents = await tx.select({ stripePaymentIntentId: stripePaymentIntents.stripePaymentIntentId, amountCents: stripePaymentIntents.amountCents })
+      const otherIntents = await tx.select({ stripePaymentIntentId: stripePaymentIntents.stripePaymentIntentId, amountCents: stripePaymentIntents.amountCents, status: stripePaymentIntents.status })
         .from(stripePaymentIntents)
         .where(and(
           eq(stripePaymentIntents.bookingId, bookingId),
         ));
 
+      const pendingStatuses = new Set(['pending', 'requires_payment_method', 'requires_action', 'requires_confirmation', 'requires_capture']);
       const snapshotPiIds = new Set((allSnapshots.rows as unknown as FeeSnapshotRow[]).map((s) => s.stripe_payment_intent_id));
       const piBookingAmounts = new Map<string, number>();
       for (const row of otherIntents) {
         piBookingAmounts.set(row.stripePaymentIntentId, row.amountCents || 0);
         if (!snapshotPiIds.has(row.stripePaymentIntentId)) {
+          const isPending = pendingStatuses.has(row.status || '');
           sideEffects.stripeRefunds.push({
             paymentIntentId: row.stripePaymentIntentId,
-            type: 'refund',
-            amountCents: row.amountCents || undefined,
-            idempotencyKey: `refund_cancel_orphan_${bookingId}_${row.stripePaymentIntentId}`,
+            type: isPending ? 'cancel' : 'refund',
+            idempotencyKey: isPending
+              ? `cancel_pending_orphan_${bookingId}_${row.stripePaymentIntentId}`
+              : `refund_cancel_orphan_${bookingId}_${row.stripePaymentIntentId}`,
           });
         }
       }

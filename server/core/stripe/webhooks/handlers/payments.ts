@@ -1029,7 +1029,8 @@ export async function handlePaymentIntentSucceeded(client: PoolClient, paymentIn
   }
 
   const creditToConsume = metadata?.creditToConsume ? parseInt(metadata.creditToConsume, 10) : 0;
-  if (creditToConsume > 0 && customerId) {
+  const alreadyConsumedSync = !!metadata?.balanceTransactionId;
+  if (creditToConsume > 0 && customerId && !alreadyConsumedSync) {
     await queueJobInTransaction(client, 'stripe_credit_consume', {
       customerId,
       paymentIntentId: id,

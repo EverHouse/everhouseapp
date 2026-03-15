@@ -623,7 +623,21 @@ export async function createBalanceAwarePayment(params: {
     }
 
     // Case 2: Need card payment
-    // Charge only the remaining amount after credit; credit will be consumed via balance transaction in webhook
+    // Consume credit synchronously before creating the payment intent
+    let balanceTransactionId: string | undefined;
+    if (balanceToApply > 0) {
+      const balanceTxn = await stripe.customers.createBalanceTransaction(
+        stripeCustomerId,
+        {
+          amount: balanceToApply,
+          currency: 'usd',
+          description: `Applied account credit: ${description}`,
+        }
+      );
+      balanceTransactionId = balanceTxn.id;
+      logger.info(`[Stripe] Credit consumed synchronously: $${(balanceToApply / 100).toFixed(2)} for ${email}, txn: ${balanceTxn.id}`);
+    }
+
     const stripeMetadata: Record<string, string> = {
       ...metadata,
       userId,
@@ -634,14 +648,8 @@ export async function createBalanceAwarePayment(params: {
     };
     if (bookingId) stripeMetadata.bookingId = bookingId.toString();
     if (sessionId) stripeMetadata.sessionId = sessionId.toString();
-    
-    // Store credit to consume after payment succeeds (webhook will create balance transaction)
-    if (balanceToApply > 0) {
-      stripeMetadata.creditToConsume = balanceToApply.toString();
-    }
+    if (balanceTransactionId) stripeMetadata.balanceTransactionId = balanceTransactionId;
 
-    // Generate idempotency key to prevent duplicate charges
-    // Uses booking/session IDs, participant IDs, and amount for uniqueness
     const participantIds: number[] = metadata?.participantIds 
       ? metadata.participantIds.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id))
       : [];
@@ -649,25 +657,45 @@ export async function createBalanceAwarePayment(params: {
       ? generatePaymentIdempotencyKey(bookingId, sessionId, participantIds, remainingCents)
       : `pi_${purpose}_${userId.replace(/[^a-zA-Z0-9-]/g, '')}_${remainingCents}_${crypto.randomUUID()}`;
 
-    const paymentIntent = await stripe.paymentIntents.create({
-      amount: remainingCents,
-      currency: 'usd',
-      customer: stripeCustomerId,
-      description: balanceToApply > 0 
-        ? `${description} ($${(balanceToApply / 100).toFixed(2)} account credit applied)` 
-        : description,
-      metadata: stripeMetadata,
-      automatic_payment_methods: { enabled: true },
-      setup_future_usage: 'off_session',
-    }, {
-      idempotencyKey
-    });
+    let paymentIntent;
+    try {
+      paymentIntent = await stripe.paymentIntents.create({
+        amount: remainingCents,
+        currency: 'usd',
+        customer: stripeCustomerId,
+        description: balanceToApply > 0 
+          ? `${description} ($${(balanceToApply / 100).toFixed(2)} account credit applied)` 
+          : description,
+        metadata: stripeMetadata,
+        automatic_payment_methods: { enabled: true },
+        setup_future_usage: 'off_session',
+      }, {
+        idempotencyKey
+      });
+    } catch (piError: unknown) {
+      if (balanceTransactionId) {
+        try {
+          await stripe.customers.createBalanceTransaction(
+            stripeCustomerId,
+            {
+              amount: -balanceToApply,
+              currency: 'usd',
+              description: `Rollback credit for failed payment: ${description}`,
+            }
+          );
+          logger.info(`[Stripe] Rolled back credit consumption of $${(balanceToApply / 100).toFixed(2)} for ${email}`);
+        } catch (rollbackErr: unknown) {
+          logger.error(`[Stripe] CRITICAL: Failed to roll back credit consumption for ${email}`, { error: rollbackErr });
+        }
+      }
+      throw piError;
+    }
 
     await db.execute(sql`INSERT INTO stripe_payment_intents 
        (user_id, stripe_payment_intent_id, stripe_customer_id, amount_cents, purpose, booking_id, session_id, description, status)
        VALUES (${userId}, ${paymentIntent.id}, ${stripeCustomerId}, ${amountCents}, ${purpose}, ${bookingId || null}, ${sessionId || null}, ${description}, 'pending')`);
 
-    logger.info(`[Stripe] Member payment: total $${(amountCents / 100).toFixed(2)}, card charge: $${(remainingCents / 100).toFixed(2)}, credit to consume: $${(balanceToApply / 100).toFixed(2)}`);
+    logger.info(`[Stripe] Member payment: total $${(amountCents / 100).toFixed(2)}, card charge: $${(remainingCents / 100).toFixed(2)}, credit consumed: $${(balanceToApply / 100).toFixed(2)}`);
 
     return {
       paidInFull: false,

@@ -87,7 +87,7 @@ const BackToTop: React.FC<BackToTopProps> = ({
       bottomValue = 'calc(24px + env(safe-area-inset-bottom, 0px))';
     }
   } else {
-    rightValue = hasFab ? `${20 + CENTER_OFFSET}px` : '1.25rem';
+    rightValue = hasFab ? `${32 + CENTER_OFFSET}px` : '1.25rem';
     bottomValue = hasFab
       ? 'calc(env(safe-area-inset-bottom, 0px) + 100px)'
       : 'calc(env(safe-area-inset-bottom, 0px) + 24px)';
