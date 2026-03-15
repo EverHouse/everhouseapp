@@ -12,6 +12,7 @@ import { getSessionUser } from '../../types/session';
 import { ensureSessionForBooking } from '../../core/bookingService/sessionManager';
 import { resolveUserByEmail } from '../../core/stripe/customers';
 import { checkClosureConflict, checkAvailabilityBlockConflict } from '../../core/bookingValidation';
+import { refreshBookingPass } from '../../walletPass/bookingPassService';
 
 class ManualBookingValidationError extends Error {
   constructor(public statusCode: number, public errorBody: Record<string, unknown>) {
@@ -401,6 +402,12 @@ router.post('/api/staff/manual-booking', isStaffOrAdmin, async (req, res) => {
     });
     
     try {
+      if (row.status === 'approved') {
+        refreshBookingPass(row.id as number).catch(err =>
+          logger.error('[StaffManualBooking] Wallet pass refresh failed', { extra: { bookingId: row.id, error: err } })
+        );
+      }
+
       notifyAllStaff(
         staffTitle,
         staffMessage,

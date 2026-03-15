@@ -85,6 +85,7 @@ import { ensureSessionForBooking } from '../../core/bookingService/sessionManage
 import { recalculateSessionFees } from '../../core/billing/unifiedFeeService';
 import { createDraftInvoiceForBooking, syncBookingInvoice } from '../../core/billing/bookingInvoiceService';
 import { checkUnifiedAvailability as checkAvailabilityForModification } from '../../core/bookingService/availabilityGuard';
+import { refreshBookingPass } from '../../walletPass/bookingPassService';
 
 export interface BookingModificationResult {
   modified: boolean;
@@ -521,6 +522,12 @@ export async function handleBookingModification(
           extra: { bookingId, sessionId: effectiveSessionId, error: getErrorMessage(err) }
         });
       });
+    }
+
+    if (bayChanged || timeChanged || dateChanged) {
+      refreshBookingPass(bookingId).catch(err =>
+        logger.error('[Trackman Webhook] Wallet pass refresh failed after modification', { extra: { bookingId, error: getErrorMessage(err) } })
+      );
     }
 
     logger.info('[Trackman Webhook] Successfully applied booking modification', {

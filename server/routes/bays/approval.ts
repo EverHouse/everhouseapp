@@ -15,6 +15,7 @@ import {
   formatBookingRow
 } from '../../core/bookingService/approvalService';
 import { BookingStateService } from '../../core/bookingService';
+import { refreshBookingPass } from '../../walletPass/bookingPassService';
 
 const router = Router();
 
@@ -51,6 +52,10 @@ router.put('/api/booking-requests/:id', isStaffOrAdmin, async (req, res) => {
         trackman_external_id,
         pending_trackman_sync
       });
+
+      refreshBookingPass(bookingId).catch(err =>
+        logger.error('[Approval] Wallet pass refresh failed after approve', { extra: { bookingId, error: err } })
+      );
 
       return res.json(formatBookingRow(updated));
     }
@@ -98,6 +103,10 @@ router.put('/api/booking-requests/:id', isStaffOrAdmin, async (req, res) => {
     if (result.length === 0) {
       return res.status(404).json({ error: 'Booking request not found' });
     }
+
+    refreshBookingPass(bookingId).catch(err =>
+      logger.error('[Approval] Wallet pass refresh failed after status update', { extra: { bookingId, status, error: err } })
+    );
 
     res.json(formatBookingRow(result[0]));
   } catch (error: unknown) {
@@ -238,6 +247,10 @@ router.put('/api/bookings/:id/revert-to-approved', isStaffOrAdmin, async (req, r
     if (result.error && result.statusCode) {
       return res.status(result.statusCode).json({ error: result.error });
     }
+
+    refreshBookingPass(bookingId).catch(err =>
+      logger.error('[Approval] Wallet pass refresh failed after revert to approved', { extra: { bookingId, error: err } })
+    );
 
     logFromRequest(req, 'revert_to_approved', 'booking', req.params.id as string, staffEmail, {
       previous_status: result.previousStatus
