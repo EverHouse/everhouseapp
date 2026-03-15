@@ -1,7 +1,7 @@
 import { schedulerTracker } from '../core/schedulerTracker';
 import { pool, safeRelease } from '../core/db';
 import type { PoolClient } from 'pg';
-import { getStripeClient } from '../core/stripe';
+import { getStripeClient, cancelPaymentIntent } from '../core/stripe';
 import { PaymentStatusService } from '../core/billing/PaymentStatusService';
 import { getErrorMessage, getErrorCode } from '../utils/errorUtils';
 import { logger } from '../core/logger';
@@ -157,7 +157,7 @@ async function cancelAbandonedPaymentIntents(): Promise<{ cancelled: number; err
     for (const spi of abandonedIntents.rows) {
       try {
         try {
-          await stripe.paymentIntents.cancel(spi.stripe_payment_intent_id);
+          await cancelPaymentIntent(spi.stripe_payment_intent_id);
           logger.info(`[Abandoned PI Cleanup] Cancelled payment intent ${spi.stripe_payment_intent_id} in Stripe`);
         } catch (stripeErr: unknown) {
           const errorCode = getErrorCode(stripeErr);
@@ -357,7 +357,7 @@ async function reconcileStalePaymentIntents(): Promise<{ reconciled: number; err
                 [spi.stripe_payment_intent_id]
               );
               try {
-                await stripe.paymentIntents.cancel(spi.stripe_payment_intent_id);
+                await cancelPaymentIntent(spi.stripe_payment_intent_id);
               } catch (cancelErr: unknown) {
                 logger.warn(`[Payment Intent Reconciliation] Could not cancel stale PI in Stripe (non-blocking)`, {
                   extra: { piId: spi.stripe_payment_intent_id, errorMessage: getErrorMessage(cancelErr) }

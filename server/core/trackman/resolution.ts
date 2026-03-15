@@ -5,6 +5,7 @@ import { getErrorMessage, getErrorCode } from '../../utils/errorUtils';
 import { bookingEvents } from '../bookingEvents';
 import { toTextArrayLiteral } from '../../utils/sqlArrayLiteral';
 import { logger } from '../logger';
+import { cancelPaymentIntent } from '../stripe/payments';
 import { useGuestPass } from '../../routes/guestPasses';
 import type { SessionCheckRow, PaymentIntentRow } from './constants';
 import { isPlaceholderEmail, isFutureBooking } from './constants';
@@ -561,8 +562,7 @@ export async function cleanupHistoricalLessons(dryRun = false): Promise<{
       
       for (const intent of pendingIntents.rows) {
         try {
-          const stripe = await import('../stripe').then(m => m.getStripeClient());
-          await stripe.paymentIntents.cancel((intent as unknown as PaymentIntentRow).stripe_payment_intent_id);
+          await cancelPaymentIntent((intent as unknown as PaymentIntentRow).stripe_payment_intent_id);
           log(`[Lesson Cleanup] Cancelled payment intent ${(intent as unknown as PaymentIntentRow).stripe_payment_intent_id}`);
         } catch (err: unknown) {
           log(`[Lesson Cleanup] Could not cancel payment intent ${(intent as unknown as PaymentIntentRow).stripe_payment_intent_id}: ${getErrorMessage(err)}`);

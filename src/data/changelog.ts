@@ -8,6 +8,15 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.87.29",
+    date: "2026-03-15",
+    title: "Payment Intent Cancellation Safety — Migrate to cancelPaymentIntent Helper",
+    changes: [
+      "Fixed: 9 direct stripe.paymentIntents.cancel() calls across schedulers, terminal, data integrity, approval, and Trackman files now use the cancelPaymentIntent() helper — properly handles invoice-generated payment intents by voiding the invoice instead of failing silently",
+      "Improved: Remaining 5 intentional direct cancel calls (pre-OOB payment flows) now have explanatory comments documenting why they bypass the helper",
+    ]
+  },
+  {
     version: "8.87.28",
     date: "2026-03-15",
     title: "Booking Workflow Audit — Safety & Consistency Fixes",

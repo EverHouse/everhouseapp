@@ -2508,7 +2508,7 @@ export async function completeCancellation(params: CompleteCancellationParams) {
             } 
           });
         } else if (['requires_payment_method', 'requires_confirmation', 'requires_action', 'requires_capture', 'processing'].includes(pi.status)) {
-          await stripe.paymentIntents.cancel(snapshot.stripe_payment_intent_id);
+          await cancelPaymentIntent(snapshot.stripe_payment_intent_id);
           logger.info('[Complete Cancellation] Cancelled pending fee snapshot payment', {
             extra: { paymentIntentId: snapshot.stripe_payment_intent_id, bookingId }
           });

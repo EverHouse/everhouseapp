@@ -861,6 +861,7 @@ router.post('/api/stripe/subscriptions/confirm-inline-payment', isStaffOrAdmin, 
             : (typeof invoicePaymentIntent === 'object' && invoicePaymentIntent !== null) ? (invoicePaymentIntent as Stripe.PaymentIntent).id : null;
           if (invoicePiId && invoicePiId !== paymentIntentId) {
             try {
+              // Intentional direct cancel — NOT cancelPaymentIntent() — because we need the invoice to stay open for OOB payment below
               await stripe.paymentIntents.cancel(invoicePiId);
               logger.info('[Stripe Subscriptions] Cancelled invoice-generated PI before OOB reconciliation', { extra: { invoicePiId, invoiceId } });
             } catch (cancelErr: unknown) {

@@ -2,7 +2,7 @@ import { logger } from '../../core/logger';
 import { Router, Request, Response } from 'express';
 import { isStaffOrAdmin } from '../../core/middleware';
 import { getStripeClient } from '../../core/stripe/client';
-import { createInvoiceWithLineItems, confirmPaymentSuccess, type CartLineItem } from '../../core/stripe/payments';
+import { createInvoiceWithLineItems, confirmPaymentSuccess, cancelPaymentIntent, type CartLineItem } from '../../core/stripe/payments';
 import { createDraftBookingFeeInvoice, type BookingFeeLineItem } from '../../core/stripe/invoices';
 import { getBookingInvoiceId } from '../../core/billing/bookingInvoiceService';
 import { logFromRequest } from '../../core/auditLog';
@@ -542,7 +542,7 @@ router.post('/api/stripe/terminal/cancel-payment', isStaffOrAdmin, async (req: R
         if (pi.status === 'succeeded') {
           paymentAlreadySucceeded = true;
         } else if (pi.status !== 'canceled') {
-          await stripe.paymentIntents.cancel(paymentIntentId);
+          await cancelPaymentIntent(paymentIntentId);
           logger.info('[Terminal] Canceled PaymentIntent', { extra: { paymentIntentId } });
         }
 
@@ -670,7 +670,7 @@ router.post('/api/stripe/terminal/process-subscription-payment', isStaffOrAdmin,
         if ((isStaleInline || isStaleTerminal) &&
             (pi.status === 'requires_payment_method' || pi.status === 'requires_confirmation' || pi.status === 'requires_action')) {
           try {
-            await stripe.paymentIntents.cancel(pi.id);
+            await cancelPaymentIntent(pi.id);
             logger.info('[Terminal] Cancelled stale PI for subscription', { extra: { piId: pi.id, subscriptionId } });
           } catch (cancelErr: unknown) {
             logger.error('[Terminal] Failed to cancel stale PI', { extra: { id: pi.id, error: getErrorMessage(cancelErr) } });
@@ -941,6 +941,7 @@ router.post('/api/stripe/terminal/confirm-subscription-payment', isStaffOrAdmin,
             : (typeof latestInvExpanded.payment_intent === 'object' && latestInvExpanded.payment_intent !== null) ? (latestInvExpanded.payment_intent as Stripe.PaymentIntent).id : null;
           if (invoicePiId) {
             try {
+              // Intentional direct cancel — NOT cancelPaymentIntent() — because we need the invoice to stay open for OOB payment below
               await stripe.paymentIntents.cancel(invoicePiId);
               logger.info('[Terminal] Cancelled invoice-generated PI before paying with terminal PI', { extra: { invoicePiId, actualInvoiceId } });
             } catch (cancelErr: unknown) {
@@ -1209,7 +1210,7 @@ router.post('/api/stripe/terminal/process-existing-payment', isStaffOrAdmin, asy
       }
 
       try {
-        await stripe.paymentIntents.cancel(paymentIntentId);
+        await cancelPaymentIntent(paymentIntentId);
         logger.info('[Terminal] Cancelled original PI to create terminal-compatible PI', { extra: { originalPiId: paymentIntentId } });
       } catch (cancelErr: unknown) {
         logger.warn('[Terminal] Could not cancel original PI (may already be cancelled)', { extra: { error: getErrorMessage(cancelErr) } });

@@ -10,6 +10,7 @@ import { sql } from 'drizzle-orm';
 import { broadcastDataIntegrityUpdate } from '../core/websocket';
 import { syncAllCustomerMetadata, isPlaceholderEmail } from '../core/stripe/customers';
 import { getStripeClient } from '../core/stripe/client';
+import { cancelPaymentIntent } from '../core/stripe/payments';
 import { getHubSpotClientWithFallback } from '../core/integrations';
 import { retryableHubSpotRequest } from '../core/hubspot/request';
 import { logFromRequest, type ResourceType } from '../core/auditLog';
@@ -1502,9 +1503,8 @@ router.post('/api/data-integrity/fix/cancel-orphaned-pi', isAdmin, validateBody(
   try {
     const { paymentIntentId } = req.body;
 
-    const stripe = await getStripeClient();
     try {
-      await stripe.paymentIntents.cancel(paymentIntentId);
+      await cancelPaymentIntent(paymentIntentId);
     } catch (stripeError: unknown) {
       const msg = getErrorMessage(stripeError);
       if (msg.includes('already been canceled') || msg.includes('already_canceled') || msg.includes('cannot be canceled')) {

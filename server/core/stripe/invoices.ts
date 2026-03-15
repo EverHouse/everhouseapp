@@ -729,6 +729,7 @@ export async function finalizeInvoicePaidOutOfBand(invoiceId: string): Promise<{
             };
           }
         } else if (existingPi.status !== 'canceled') {
+          // Intentional direct cancel — NOT cancelPaymentIntent() — because we need the invoice to stay open for OOB payment below
           await stripe.paymentIntents.cancel(piId);
         }
       } catch (cancelErr: unknown) {

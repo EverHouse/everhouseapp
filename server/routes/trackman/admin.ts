@@ -7,6 +7,7 @@ import { sql } from 'drizzle-orm';
 import { recalculateSessionFees } from '../../core/billing/unifiedFeeService';
 import { logFromRequest } from '../../core/auditLog';
 import { getStripeClient } from '../../core/stripe/client';
+import { cancelPaymentIntent } from '../../core/stripe/payments';
 import { validateQuery } from '../../middleware/validate';
 import { z } from 'zod';
 
@@ -669,8 +670,7 @@ router.post('/api/trackman/admin/cleanup-lessons', isStaffOrAdmin, async (req, r
         
         for (const intent of pendingIntents.rows as DbRow[]) {
           try {
-            const stripe = await getStripeClient();
-            await stripe.paymentIntents.cancel(intent.stripe_payment_intent_id as string);
+            await cancelPaymentIntent(intent.stripe_payment_intent_id as string);
           } catch (err: unknown) {
             log(`[Lesson Cleanup] Could not cancel payment intent ${intent.stripe_payment_intent_id}: ${getErrorMessage(err)}`);
           }
