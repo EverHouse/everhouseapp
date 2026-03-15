@@ -11,7 +11,7 @@ import { eq, sql } from 'drizzle-orm';
 import type Stripe from 'stripe';
 import type { BookingFeeLineItem } from '../stripe/invoices';
 import { PRICING } from './pricingConfig';
-import { queueJob } from '../jobQueue';
+import { markPaymentRefunded } from './PaymentStatusService';
 
 interface _InvoiceWithPaymentIntent extends Stripe.Invoice {
   payment_intent: string | Stripe.PaymentIntent | null;
@@ -1006,8 +1006,8 @@ export async function voidBookingInvoice(bookingId: number): Promise<{
 
         if (!invoicePI && invoice.amount_paid > 0) {
           const piLookup = await db.execute(sql`
-            SELECT stripe_payment_intent_id FROM stripe_payment_intents 
-            WHERE booking_id = ${bookingId} AND status = 'succeeded' 
+            SELECT stripe_payment_intent_id, status FROM stripe_payment_intents 
+            WHERE booking_id = ${bookingId} AND status IN ('succeeded', 'refunding', 'refunded') 
             ORDER BY updated_at DESC LIMIT 1`);
           if (piLookup.rows.length > 0) {
             invoicePI = (piLookup.rows[0] as { stripe_payment_intent_id: string }).stripe_payment_intent_id;
@@ -1026,17 +1026,6 @@ export async function voidBookingInvoice(bookingId: number): Promise<{
           if ((alreadyQueued.rows?.length || 0) === 0) {
             const idempotencyKey = `refund_paid_invoice_${bookingId}_${invoiceId}`;
             try {
-              await queueJob('stripe_auto_refund', {
-                paymentIntentId: invoicePI,
-                reason: 'requested_by_customer',
-                metadata: {
-                  reason: 'booking_cancellation_paid_invoice',
-                  bookingId: bookingId.toString(),
-                  invoiceId,
-                },
-                idempotencyKey,
-              }, { maxRetries: 5 });
-
               const invoiceCustomerEmail = typeof invoice.customer_email === 'string' ? invoice.customer_email : '';
 
               await db.execute(sql`
@@ -1045,11 +1034,32 @@ export async function voidBookingInvoice(bookingId: number): Promise<{
                 VALUES (${invoiceCustomerEmail}, ${invoicePI}, ${invoice.amount_paid}, 'booking_fee', ${bookingId}, 'Invoice payment refund', 'refunding', NOW(), NOW())
                 ON CONFLICT (stripe_payment_intent_id) DO UPDATE SET status = 'refunding', updated_at = NOW()`);
 
-              logger.info('[BookingInvoice] Queued refund for paid invoice', {
-                extra: { bookingId, invoiceId, paymentIntentId: invoicePI, amountPaid: invoice.amount_paid }
+              const refundCreateParams: { payment_intent: string; reason: 'requested_by_customer'; metadata: Record<string, string>; } = {
+                payment_intent: invoicePI,
+                reason: 'requested_by_customer',
+                metadata: {
+                  reason: 'booking_cancellation_paid_invoice',
+                  bookingId: bookingId.toString(),
+                  invoiceId,
+                },
+              };
+              const refund = await stripe.refunds.create(refundCreateParams, { idempotencyKey });
+              logger.info('[BookingInvoice] Refund issued for paid invoice', {
+                extra: { bookingId, invoiceId, paymentIntentId: invoicePI, refundId: refund.id, amountPaid: invoice.amount_paid }
               });
+
+              try {
+                await markPaymentRefunded({
+                  paymentIntentId: invoicePI,
+                  refundId: refund.id,
+                });
+              } catch (statusErr: unknown) {
+                logger.warn('[BookingInvoice] Non-blocking: failed to mark payment refunded', {
+                  extra: { paymentIntentId: invoicePI, error: getErrorMessage(statusErr) }
+                });
+              }
             } catch (refundErr: unknown) {
-              logger.error('[BookingInvoice] Failed to queue refund for paid invoice', {
+              logger.error('[BookingInvoice] Inline refund failed for paid invoice', {
                 extra: { bookingId, invoiceId, paymentIntentId: invoicePI, error: getErrorMessage(refundErr) }
               });
               errors.push(`Failed to refund paid invoice ${invoiceId}: ${getErrorMessage(refundErr)}`);

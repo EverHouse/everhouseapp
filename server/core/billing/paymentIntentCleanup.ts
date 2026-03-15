@@ -3,7 +3,8 @@ import { sql } from 'drizzle-orm';
 import { cancelPaymentIntent } from '../stripe';
 import { logger } from '../logger';
 import { getErrorMessage } from '../../utils/errorUtils';
-import { queueJob } from '../jobQueue';
+import { getStripeClient } from '../stripe/client';
+import { markPaymentRefunded } from './PaymentStatusService';
 
 export async function cancelPendingPaymentIntentsForBooking(bookingId: number): Promise<void> {
   try {
@@ -48,14 +49,21 @@ export async function refundSucceededPaymentIntentsForBooking(bookingId: number)
       try {
         if (row.stripe_payment_intent_id.startsWith('balance-')) {
           if (row.stripe_customer_id) {
-            await queueJob('stripe_balance_refund', {
-              stripeCustomerId: row.stripe_customer_id,
+            const stripe = await getStripeClient();
+            const balanceTxn = await stripe.customers.createBalanceTransaction(
+              row.stripe_customer_id,
+              {
+                amount: -(row.amount_cents as number),
+                currency: 'usd',
+                description: `Refund for cancelled booking #${bookingId}`,
+              },
+              { idempotencyKey: `balance_refund_cleanup_${bookingId}_${row.stripe_payment_intent_id}` }
+            );
+            await markPaymentRefunded({
+              paymentIntentId: row.stripe_payment_intent_id,
+              refundId: balanceTxn.id,
               amountCents: row.amount_cents as number,
-              description: `Refund for cancelled booking #${bookingId}`,
-              balanceRecordId: row.stripe_payment_intent_id,
-              bookingId,
-              idempotencyKey: `balance_refund_cleanup_${bookingId}_${row.stripe_payment_intent_id}`,
-            }, { maxRetries: 5 });
+            });
           } else {
             await db.execute(sql`UPDATE stripe_payment_intents 
                SET status = 'succeeded', updated_at = NOW() 
@@ -67,20 +75,32 @@ export async function refundSucceededPaymentIntentsForBooking(bookingId: number)
           }
         } else {
           const idempotencyKey = `refund-booking-${bookingId}-${row.stripe_payment_intent_id}`;
-          await queueJob('stripe_auto_refund', {
-            paymentIntentId: row.stripe_payment_intent_id,
+          const stripe = await getStripeClient();
+          const refundParams: { payment_intent: string; reason: 'requested_by_customer'; metadata: Record<string, string>; amount?: number } = {
+            payment_intent: row.stripe_payment_intent_id,
             reason: 'requested_by_customer',
             metadata: {
               reason: 'booking_cancellation',
               bookingId: bookingId.toString(),
             },
-            amountCents: row.amount_cents || undefined,
-            idempotencyKey,
-          }, { maxRetries: 5 });
+          };
+          if (row.amount_cents) {
+            refundParams.amount = row.amount_cents as number;
+          }
+          const refund = await stripe.refunds.create(refundParams, { idempotencyKey });
+          try {
+            await markPaymentRefunded({
+              paymentIntentId: row.stripe_payment_intent_id,
+              refundId: refund.id,
+              amountCents: row.amount_cents as number | undefined,
+            });
+          } catch (statusErr: unknown) {
+            logger.warn('[PI Cleanup] Non-blocking: failed to mark payment refunded', { extra: { paymentIntentId: row.stripe_payment_intent_id, error: getErrorMessage(statusErr) } });
+          }
         }
 
         refundCount++;
-        logger.info('[PI Cleanup] Queued payment refund', {
+        logger.info('[PI Cleanup] Refund issued', {
           extra: { bookingId, paymentIntentId: row.stripe_payment_intent_id, amountCents: row.amount_cents }
         });
       } catch (refundErr: unknown) {

@@ -14,6 +14,9 @@ import { getErrorMessage } from '../../utils/errorUtils';
 import { toIntArrayLiteral } from '../../utils/sqlArrayLiteral';
 import { queueJob } from '../jobQueue';
 import { voidBookingPass } from '../../walletPass/bookingPassService';
+import { getStripeClient } from '../stripe/client';
+import { cancelPaymentIntent } from '../stripe/payments';
+import { markPaymentRefunded } from '../billing/PaymentStatusService';
 
 interface CancelResult {
   success: boolean;
@@ -737,6 +740,44 @@ export class BookingStateService {
     };
   }
 
+  private static async executeInlineRefund(params: {
+    paymentIntentId: string;
+    reason: 'duplicate' | 'fraudulent' | 'requested_by_customer';
+    metadata: Record<string, string>;
+    amountCents?: number;
+    idempotencyKey?: string;
+  }): Promise<{ success: boolean; refundId?: string; error?: string }> {
+    const stripe = await getStripeClient();
+    try {
+      const refundCreateParams: { payment_intent: string; reason: 'duplicate' | 'fraudulent' | 'requested_by_customer'; metadata: Record<string, string>; amount?: number } = {
+        payment_intent: params.paymentIntentId,
+        reason: params.reason,
+        metadata: params.metadata,
+      };
+      if (params.amountCents) {
+        refundCreateParams.amount = params.amountCents;
+      }
+      const refund = await stripe.refunds.create(
+        refundCreateParams,
+        params.idempotencyKey ? { idempotencyKey: params.idempotencyKey } : undefined
+      );
+      logger.info(`[BookingStateService] Refund issued: ${refund.id} for PI ${params.paymentIntentId}, amount: ${params.amountCents || 'full'}`);
+
+      try {
+        await markPaymentRefunded({
+          paymentIntentId: params.paymentIntentId,
+          refundId: refund.id,
+          amountCents: params.amountCents,
+        });
+      } catch (statusErr: unknown) {
+        logger.warn(`[BookingStateService] Non-blocking: failed to mark payment refunded for PI ${params.paymentIntentId}`, { error: statusErr });
+      }
+      return { success: true, refundId: refund.id };
+    } catch (err: unknown) {
+      return { success: false, error: getErrorMessage(err) };
+    }
+  }
+
   private static async executeSideEffects(manifest: SideEffectsManifest): Promise<{ errors: string[] }> {
     const errors: string[] = [];
 
@@ -750,37 +791,44 @@ export class BookingStateService {
           logger.info('[BookingStateService] Snapshot PI already claimed/refunded, skipping', { extra: { paymentIntentId: snapshotRefund.paymentIntentId } });
           continue;
         }
-        try {
-          await queueJob('stripe_auto_refund', {
-            paymentIntentId: snapshotRefund.paymentIntentId,
-            reason: 'requested_by_customer',
-            metadata: { reason: 'booking_cancellation_snapshot' },
-            amountCents: snapshotRefund.amountCents || undefined,
-            idempotencyKey: snapshotRefund.idempotencyKey,
-          }, { maxRetries: 5 });
-          logger.info('[BookingStateService] Queued snapshot refund job', { extra: { paymentIntentId: snapshotRefund.paymentIntentId } });
-        } catch (queueErr: unknown) {
+        const refundResult = await this.executeInlineRefund({
+          paymentIntentId: snapshotRefund.paymentIntentId,
+          reason: 'requested_by_customer',
+          metadata: { reason: 'booking_cancellation_snapshot' },
+          amountCents: snapshotRefund.amountCents || undefined,
+          idempotencyKey: snapshotRefund.idempotencyKey,
+        });
+        if (!refundResult.success) {
           await db.execute(sql`UPDATE stripe_payment_intents 
             SET status = 'succeeded', updated_at = NOW() 
             WHERE stripe_payment_intent_id = ${snapshotRefund.paymentIntentId} AND status = 'refunding'`);
-          logger.warn('[BookingStateService] Reverted snapshot PI claim after queue failure', { extra: { paymentIntentId: snapshotRefund.paymentIntentId, error: getErrorMessage(queueErr) } });
-          throw queueErr;
+          throw new Error(refundResult.error);
         }
       } catch (err: unknown) {
-        const msg = `Failed to queue snapshot refund ${snapshotRefund.paymentIntentId.substring(0, 12)}: ${getErrorMessage(err)}`;
+        const msg = `Failed snapshot refund ${snapshotRefund.paymentIntentId.substring(0, 12)}: ${getErrorMessage(err)}`;
         errors.push(msg);
-        logger.error('[BookingStateService] Failed to queue snapshot refund job', { extra: { paymentIntentId: snapshotRefund.paymentIntentId, error: getErrorMessage(err) } });
+        logger.error('[BookingStateService] Snapshot refund failed', { extra: { paymentIntentId: snapshotRefund.paymentIntentId, error: getErrorMessage(err) } });
       }
     }
 
     for (const refundItem of manifest.stripeRefunds) {
       try {
         if (refundItem.type === 'cancel') {
-          await queueJob('stripe_cancel_payment_intent', {
-            paymentIntentId: refundItem.paymentIntentId,
-            markParticipantsRefunded: true,
-          }, { maxRetries: 5 });
-          logger.info('[BookingStateService] Queued payment intent cancellation job', { extra: { paymentIntentId: refundItem.paymentIntentId } });
+          const cancelResult = await cancelPaymentIntent(refundItem.paymentIntentId);
+          if (cancelResult.success) {
+            logger.info('[BookingStateService] Cancelled payment intent', { extra: { paymentIntentId: refundItem.paymentIntentId } });
+          } else if (cancelResult.error?.includes('already succeeded') || cancelResult.error?.includes('use refund instead')) {
+            logger.warn('[BookingStateService] PI already succeeded, refunding instead', { extra: { paymentIntentId: refundItem.paymentIntentId } });
+            const refundResult = await this.executeInlineRefund({
+              paymentIntentId: refundItem.paymentIntentId,
+              reason: 'requested_by_customer',
+              metadata: { reason: 'booking_cancellation_pi_succeeded_race' },
+            });
+            if (!refundResult.success) throw new Error(refundResult.error);
+          } else {
+            throw new Error(cancelResult.error || 'Unknown cancel error');
+          }
+          await db.execute(sql`UPDATE booking_participants SET payment_status = 'refunded', refunded_at = NOW() WHERE stripe_payment_intent_id = ${refundItem.paymentIntentId} AND payment_status = 'refund_pending'`);
         } else {
           const claimResult = await db.execute(sql`UPDATE stripe_payment_intents 
             SET status = 'refunding', updated_at = NOW() 
@@ -790,47 +838,51 @@ export class BookingStateService {
             logger.info('[BookingStateService] PI already claimed/refunded, skipping', { extra: { paymentIntentId: refundItem.paymentIntentId } });
             continue;
           }
-          try {
-            await queueJob('stripe_auto_refund', {
-              paymentIntentId: refundItem.paymentIntentId,
-              reason: 'requested_by_customer',
-              metadata: { reason: 'booking_cancellation' },
-              amountCents: refundItem.amountCents || undefined,
-              idempotencyKey: refundItem.idempotencyKey,
-            }, { maxRetries: 5 });
-            logger.info('[BookingStateService] Queued refund job', { extra: { paymentIntentId: refundItem.paymentIntentId } });
-          } catch (queueErr: unknown) {
+          const refundResult = await this.executeInlineRefund({
+            paymentIntentId: refundItem.paymentIntentId,
+            reason: 'requested_by_customer',
+            metadata: { reason: 'booking_cancellation' },
+            amountCents: refundItem.amountCents || undefined,
+            idempotencyKey: refundItem.idempotencyKey,
+          });
+          if (!refundResult.success) {
             await db.execute(sql`UPDATE stripe_payment_intents 
               SET status = 'succeeded', updated_at = NOW() 
               WHERE stripe_payment_intent_id = ${refundItem.paymentIntentId} AND status = 'refunding'`);
-            logger.warn('[BookingStateService] Reverted PI claim after queue failure', { extra: { paymentIntentId: refundItem.paymentIntentId, error: getErrorMessage(queueErr) } });
-            throw queueErr;
+            throw new Error(refundResult.error);
           }
         }
       } catch (err: unknown) {
-        const msg = `Failed to queue refund ${refundItem.paymentIntentId.substring(0, 12)}: ${getErrorMessage(err)}`;
+        const msg = `Failed refund ${refundItem.paymentIntentId.substring(0, 12)}: ${getErrorMessage(err)}`;
         errors.push(msg);
-        logger.error('[BookingStateService] Failed to queue refund job', { extra: { paymentIntentId: refundItem.paymentIntentId, error: getErrorMessage(err) } });
+        logger.error('[BookingStateService] Refund failed', { extra: { paymentIntentId: refundItem.paymentIntentId, error: getErrorMessage(err) } });
       }
     }
 
     for (const balanceRefund of manifest.balanceRefunds) {
       try {
-        await queueJob('stripe_balance_refund', {
-          stripeCustomerId: balanceRefund.stripeCustomerId,
+        const stripe = await getStripeClient();
+        const balanceTxn = await stripe.customers.createBalanceTransaction(
+          balanceRefund.stripeCustomerId,
+          {
+            amount: -balanceRefund.amountCents,
+            currency: 'usd',
+            description: balanceRefund.description,
+          },
+          { idempotencyKey: `balance_refund_${balanceRefund.bookingId}_${balanceRefund.balanceRecordId}` }
+        );
+        logger.info('[BookingStateService] Balance refund issued', {
+          extra: { bookingId: balanceRefund.bookingId, balanceRecordId: balanceRefund.balanceRecordId, amountCents: balanceRefund.amountCents, txnId: balanceTxn.id }
+        });
+        await markPaymentRefunded({
+          paymentIntentId: balanceRefund.balanceRecordId,
+          refundId: balanceTxn.id,
           amountCents: balanceRefund.amountCents,
-          description: balanceRefund.description,
-          balanceRecordId: balanceRefund.balanceRecordId,
-          bookingId: balanceRefund.bookingId,
-          idempotencyKey: `balance_refund_${balanceRefund.bookingId}_${balanceRefund.balanceRecordId}`,
-        }, { maxRetries: 5 });
-        logger.info('[BookingStateService] Queued balance refund job', {
-          extra: { bookingId: balanceRefund.bookingId, balanceRecordId: balanceRefund.balanceRecordId, amountCents: balanceRefund.amountCents }
         });
       } catch (err: unknown) {
-        const msg = `Failed to queue balance refund for ${balanceRefund.balanceRecordId}: ${getErrorMessage(err)}`;
+        const msg = `Failed balance refund for ${balanceRefund.balanceRecordId}: ${getErrorMessage(err)}`;
         errors.push(msg);
-        logger.error('[BookingStateService] Failed to queue balance refund job', { extra: { ...balanceRefund, error: getErrorMessage(err) } });
+        logger.error('[BookingStateService] Balance refund failed', { extra: { ...balanceRefund, error: getErrorMessage(err) } });
       }
     }
 

@@ -6,13 +6,15 @@ import { createPacificDate, formatDateDisplayWithDay, formatTime12Hour } from '.
 import { notifyMember, notifyAllStaff, isSyntheticEmail } from '../notificationService';
 import { refundGuestPass } from '../../routes/guestPasses';
 import { broadcastAvailabilityUpdate } from '../websocket';
-import { queueJob } from '../jobQueue';
 import { getCalendarIdByName, deleteCalendarEvent, CALENDAR_CONFIG } from '../calendar/index';
 import { toTextArrayLiteral } from '../../utils/sqlArrayLiteral';
 import { getErrorMessage } from '../../utils/errorUtils';
 import { bookingEvents } from '../bookingEvents';
 import { logMemberAction } from '../auditLog';
 import { releaseGuestPassHold } from '../billing/guestPassHoldService';
+import { getStripeClient } from '../stripe/client';
+import { cancelPaymentIntent } from '../stripe/payments';
+import { markPaymentRefunded } from '../billing/PaymentStatusService';
 import { AppError } from '../errors';
 import { voidBookingPass } from '../../walletPass/bookingPassService';
 
@@ -135,15 +137,20 @@ export async function handleCancellationCascade(
     
   for (const row of txResult.pendingIntents) {
     try {
-      await queueJob('stripe_cancel_payment_intent', {
-        paymentIntentId: row.stripe_payment_intent_id,
-        markParticipantsRefunded: false,
-      }, { maxRetries: 5 });
-      logger.info('[cancellation-cascade] Queued payment intent cancellation', {
-        extra: { bookingId, paymentIntentId: row.stripe_payment_intent_id }
-      });
+      const cancelResult = await cancelPaymentIntent(row.stripe_payment_intent_id);
+      if (cancelResult.success) {
+        logger.info('[cancellation-cascade] Cancelled payment intent', {
+          extra: { bookingId, paymentIntentId: row.stripe_payment_intent_id }
+        });
+      } else if (cancelResult.error?.includes('already succeeded') || cancelResult.error?.includes('use refund instead')) {
+        logger.warn('[cancellation-cascade] PI already succeeded, will refund via succeeded intents path', {
+          extra: { bookingId, paymentIntentId: row.stripe_payment_intent_id }
+        });
+      } else {
+        throw new Error(cancelResult.error || 'Unknown cancel error');
+      }
     } catch (cancelErr: unknown) {
-      const errorMsg = `Failed to queue cancel for payment intent ${row.stripe_payment_intent_id}: ${getErrorMessage(cancelErr)}`;
+      const errorMsg = `Failed to cancel payment intent ${row.stripe_payment_intent_id}: ${getErrorMessage(cancelErr)}`;
       result.errors.push(errorMsg);
       logger.warn('[cancellation-cascade] ' + errorMsg);
     }
@@ -169,21 +176,29 @@ export async function handleCancellationCascade(
         
         if (row.stripe_payment_intent_id.startsWith('balance-')) {
           if (row.stripe_customer_id) {
-            await queueJob('stripe_balance_refund', {
-              stripeCustomerId: row.stripe_customer_id,
+            const stripe = await getStripeClient();
+            const balanceTxn = await stripe.customers.createBalanceTransaction(
+              row.stripe_customer_id,
+              {
+                amount: -(row.amount_cents as number),
+                currency: 'usd',
+                description: `Refund for cancelled booking #${bookingId}`,
+              },
+              { idempotencyKey: `balance_refund_cascade_${bookingId}_${row.stripe_payment_intent_id}` }
+            );
+            await markPaymentRefunded({
+              paymentIntentId: row.stripe_payment_intent_id,
+              refundId: balanceTxn.id,
               amountCents: row.amount_cents as number,
-              description: `Refund for cancelled booking #${bookingId}`,
-              balanceRecordId: row.stripe_payment_intent_id,
-              bookingId,
-              idempotencyKey: `balance_refund_cascade_${bookingId}_${row.stripe_payment_intent_id}`,
-            }, { maxRetries: 5 });
+            });
             
             result.prepaymentRefunds++;
-            logger.info('[cancellation-cascade] Queued balance refund for cancelled payment', {
+            logger.info('[cancellation-cascade] Balance refund issued', {
               extra: { 
                 bookingId, 
                 paymentIntentId: row.stripe_payment_intent_id,
-                amountCents: row.amount_cents
+                amountCents: row.amount_cents,
+                txnId: balanceTxn.id
               }
             });
           } else {
@@ -196,22 +211,35 @@ export async function handleCancellationCascade(
           }
         } else {
           const idempotencyKey = `refund-booking-${bookingId}-${row.stripe_payment_intent_id}`;
-          await queueJob('stripe_auto_refund', {
-            paymentIntentId: row.stripe_payment_intent_id,
+          const stripe = await getStripeClient();
+          const refundParams: { payment_intent: string; reason: 'requested_by_customer'; metadata: Record<string, string>; amount?: number } = {
+            payment_intent: row.stripe_payment_intent_id,
             reason: 'requested_by_customer',
             metadata: {
               reason: 'booking_cancellation',
               bookingId: bookingId.toString(),
             },
-            amountCents: row.amount_cents || undefined,
-            idempotencyKey,
-          }, { maxRetries: 5 });
+          };
+          if (row.amount_cents) {
+            refundParams.amount = row.amount_cents as number;
+          }
+          const refund = await stripe.refunds.create(refundParams, { idempotencyKey });
+          try {
+            await markPaymentRefunded({
+              paymentIntentId: row.stripe_payment_intent_id,
+              refundId: refund.id,
+              amountCents: row.amount_cents as number | undefined,
+            });
+          } catch (statusErr: unknown) {
+            logger.warn('[cancellation-cascade] Non-blocking: failed to mark payment refunded', { extra: { paymentIntentId: row.stripe_payment_intent_id, error: getErrorMessage(statusErr) } });
+          }
           
           result.prepaymentRefunds++;
-          logger.info('[cancellation-cascade] Queued payment refund', {
+          logger.info('[cancellation-cascade] Refund issued', {
             extra: { 
               bookingId, 
               paymentIntentId: row.stripe_payment_intent_id,
+              refundId: refund.id,
               amountCents: row.amount_cents
             }
           });
