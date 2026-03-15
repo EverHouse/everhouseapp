@@ -87,7 +87,9 @@ In addition to PWA web push, Apple Wallet passes with `changeMessage` fields pro
 In-app database and WebSocket notifications are always delivered regardless.
 
 **Booking dedupe types:** `booking_approved`, `booking_update(d)`, `booking_confirmed`, `booking_auto_confirmed`, `booking_cancelled*`, `booking_checked_in`.
-**Membership dedupe types:** `membership_renewed`, `membership_past_due`, `membership_cancelled`, `membership_terminated`, `membership_cancellation`, `member_status_change`, `guest_pass`.
+**Membership dedupe types:** `membership_renewed`, `membership_past_due`, `membership_cancelled`, `membership_terminated`, `membership_cancellation`, `member_status_change`, `membership_tier_change`, `guest_pass`.
+
+**Notification type alignment (v8.87.16):** Tier changes now use `membership_tier_change` (was `system`). Membership status changes (pause, restore, suspend) now use `member_status_change` (was `system`). This enables proper dedupe matching and deep-link routing.
 
 ## Hard Rules
 

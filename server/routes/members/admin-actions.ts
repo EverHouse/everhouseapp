@@ -158,8 +158,8 @@ router.patch('/api/members/:email/tier', isStaffOrAdmin, validateBody(tierChange
         : (normalizedTier 
           ? `Your membership has been ${changeType} from ${oldTierDisplay} to ${newTierDisplay}`
           : `Your membership tier has been cleared (was ${oldTierDisplay})`),
-      type: 'system',
-      url: '/member/profile'
+      type: 'membership_tier_change',
+      url: '/dashboard/membership'
     });
 
     invalidateCache('members_directory');
@@ -301,8 +301,12 @@ router.post('/api/members/:id/suspend', isStaffOrAdmin, async (req, res) => {
         userEmail: member.email || '',
         title: 'Membership Paused',
         message: `Your membership has been paused for ${durationDays} days starting ${start.toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' })}.`,
-        type: 'system',
-        url: '/member/profile'
+        type: 'member_status_change',
+        url: '/dashboard/membership'
+      });
+
+      sendPassUpdateForMemberByEmail(member.email || '').catch(err => {
+        logger.warn('[Members] Wallet pass push failed after suspend', { extra: { email: member.email, error: getErrorMessage(err) } });
       });
       
       invalidateCache('members_directory');

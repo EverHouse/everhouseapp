@@ -137,8 +137,8 @@ export async function processMemberTierUpdate(payload: MemberTierUpdatePayload):
         : newTier
         ? `Your membership has been ${changeType} from ${oldTier} to ${newTier}`
         : `Your membership tier has been cleared (was ${oldTier})`,
-      type: 'system',
-      url: '/member/profile'
+      type: 'membership_tier_change',
+      url: '/dashboard/membership'
     });
 
     logger.info(`[MemberTierUpdateProcessor] Successfully updated ${normalizedEmail}: ${oldTier || 'None'} → ${newTier}`);

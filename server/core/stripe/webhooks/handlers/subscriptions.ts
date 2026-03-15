@@ -812,7 +812,7 @@ export async function handleSubscriptionUpdated(client: PoolClient, subscription
               userEmail: deferredTierEmail,
               title: 'Membership Updated',
               message: `Your membership has been changed to ${deferredNewTierName}.`,
-              type: 'system',
+              type: 'membership_tier_change',
             });
           } catch (notifyErr: unknown) {
             logger.error('[Stripe Webhook] Notification failed (non-fatal):', { error: getErrorMessage(notifyErr) });
@@ -942,7 +942,7 @@ export async function handleSubscriptionUpdated(client: PoolClient, subscription
                     userEmail: subEmail,
                     title: 'Membership Restored',
                     message: 'Your membership access has been restored. Welcome back!',
-                    type: 'system',
+                    type: 'member_status_change',
                   }, { sendPush: true });
                 }
               } catch (notifyErr: unknown) {
@@ -1293,7 +1293,7 @@ export async function handleSubscriptionPaused(client: PoolClient, subscription:
           userEmail: deferredEmail,
           title: 'Membership Paused',
           message: 'Your membership has been paused. You can resume anytime to restore full access.',
-          type: 'system',
+          type: 'member_status_change',
         });
       } catch (notifyErr: unknown) {
         logger.error('[Stripe Webhook] Notification failed (non-fatal):', { extra: { detail: getErrorMessage(notifyErr) } });

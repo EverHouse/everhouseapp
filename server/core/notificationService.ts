@@ -67,6 +67,7 @@ export type NotificationType =
   | 'day_pass'
   | 'new_member'
   | 'member_status_change'
+  | 'membership_tier_change'
   | 'card_expiring'
   | 'staff_note'
   | 'account_deletion'
@@ -149,6 +150,7 @@ const MEMBERSHIP_WALLET_TYPES = new Set<NotificationType>([
   'membership_terminated',
   'membership_cancellation',
   'member_status_change',
+  'membership_tier_change',
   'guest_pass',
 ]);
 
