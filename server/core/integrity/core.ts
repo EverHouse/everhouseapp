@@ -778,7 +778,7 @@ export async function runAllIntegrityChecks(triggeredBy: 'manual' | 'scheduled' 
     safeCheck(checkArchivedMemberLingeringData, 'Archived Member Lingering Data'),
     safeCheck(checkActiveMembersWithoutWaivers, 'Active Members Without Waivers'),
     safeCheck(checkEmailOrphans, 'Email Cascade Orphans'),
-    safeCheck(checkLateCancelPreservedPaymentIntents, 'Late-Cancel Preserved Payment Intents'),
+    safeCheck(checkLateCancelPreservedPaymentIntents, 'Lingering Payment Intents on Terminal Bookings'),
   ]);
 
   const now = new Date();

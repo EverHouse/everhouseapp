@@ -8,6 +8,15 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.87.42",
+    date: "2026-03-15",
+    title: "Declined Booking Payment Cleanup & Broader Monitoring",
+    changes: [
+      "Fixed: Declining a booking request now cancels all pending Stripe payment intents via the centralized cleanup — previously only payment intents linked to fee snapshots were cancelled, so standalone payment intents could be orphaned",
+      "Improved: The payment intent monitoring check now covers all terminal booking statuses (cancelled, declined, denied, expired) — previously only cancelled bookings were monitored, meaning lingering charges on declined or expired bookings could go unnoticed",
+    ]
+  },
+  {
     version: "8.87.41",
     date: "2026-03-15",
     title: "Resource Booking Payment Cleanup Fix",

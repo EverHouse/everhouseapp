@@ -13,9 +13,22 @@ export async function cancelPendingPaymentIntentsForBooking(bookingId: number, o
        FROM stripe_payment_intents 
        WHERE booking_id = ${bookingId} AND status IN ('pending', 'requires_payment_method', 'requires_action', 'requires_confirmation', 'requires_capture')`
     );
-    const cancelledPiIds: string[] = [];
+    const piIdsFromSPI = new Set<string>();
     for (const row of pendingIntents.rows) {
-      const piId = row.stripe_payment_intent_id as string;
+      piIdsFromSPI.add(row.stripe_payment_intent_id as string);
+    }
+
+    const snapshotPIs = await db.execute(
+      sql`SELECT stripe_payment_intent_id 
+       FROM booking_fee_snapshots 
+       WHERE booking_id = ${bookingId} AND stripe_payment_intent_id IS NOT NULL AND status IN ('pending', 'requires_action')`
+    );
+    for (const row of snapshotPIs.rows) {
+      piIdsFromSPI.add(row.stripe_payment_intent_id as string);
+    }
+
+    const cancelledPiIds: string[] = [];
+    for (const piId of piIdsFromSPI) {
       try {
         const result = await cancelPaymentIntent(piId);
         if (result.success) {

@@ -1014,19 +1014,11 @@ export async function declineBooking(params: DeclineBookingParams) {
 
   (async () => {
     try {
-      const snapshots = await db.execute(sql`
-        SELECT stripe_payment_intent_id FROM booking_fee_snapshots 
-        WHERE booking_id = ${bookingId} AND stripe_payment_intent_id IS NOT NULL AND status IN ('pending', 'requires_action')
-      `);
-      for (const row of snapshots.rows) {
-        const piId = String(row.stripe_payment_intent_id);
-        try {
-          await cancelPaymentIntent(piId);
-          await PaymentStatusService.markPaymentCancelled({ paymentIntentId: piId });
-        } catch (err: unknown) {
-          logger.warn('[Decline] Non-blocking: failed to cancel PI', { extra: { piId, error: getErrorMessage(err) } });
-        }
-      }
+      await cancelPendingPaymentIntentsForBooking(bookingId);
+    } catch (err: unknown) {
+      logger.warn('[Decline] Non-blocking: failed to cancel pending payment intents', { extra: { bookingId, error: getErrorMessage(err) } });
+    }
+    try {
       await db.execute(sql`UPDATE booking_fee_snapshots SET status = 'cancelled', updated_at = NOW() WHERE booking_id = ${bookingId} AND status IN ('pending', 'requires_action')`);
     } catch (err: unknown) {
       logger.warn('[Decline] Non-blocking: failed to clean up fee snapshots', { extra: { bookingId, error: getErrorMessage(err) } });
