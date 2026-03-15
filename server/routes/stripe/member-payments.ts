@@ -172,7 +172,12 @@ async function finalizeInvoiceWithPi(
       }
     }
     if (piId) {
-      logger.info('[Stripe] Got client_secret via confirmation_secret (fallback)', { extra: { invoiceId, piId } });
+      const directPi = await stripe.paymentIntents.retrieve(piId);
+      if (directPi.client_secret && directPi.status !== 'canceled') {
+        logger.info('[Stripe] Got PI client_secret via direct retrieve after finalization (confirmation_secret path)', { extra: { invoiceId, piId } });
+        return { paidInFull: false, piId, clientSecret: directPi.client_secret };
+      }
+      logger.info('[Stripe] PI has no client_secret after finalization, using confirmation_secret', { extra: { invoiceId, piId, piStatus: directPi.status } });
       return { paidInFull: false, piId, clientSecret: finalized.confirmation_secret.client_secret };
     }
   }
@@ -226,7 +231,12 @@ async function retrieveInvoicePaymentIntent(
       }
     }
     if (piId) {
-      logger.info('[Stripe] Using confirmation_secret as fallback', { extra: { invoiceId, piId } });
+      const directPi = await stripe.paymentIntents.retrieve(piId);
+      if (directPi.client_secret && directPi.status !== 'canceled') {
+        logger.info('[Stripe] Got PI client_secret via direct retrieve (confirmation_secret path)', { extra: { invoiceId, piId } });
+        return { piId, clientSecret: directPi.client_secret };
+      }
+      logger.info('[Stripe] PI has no client_secret, using confirmation_secret', { extra: { invoiceId, piId, piStatus: directPi.status } });
       return { piId, clientSecret: inv.confirmation_secret.client_secret };
     }
   }
@@ -469,6 +479,15 @@ async function handleExistingInvoicePayment(params: {
           participantFees: participantFeesList,
         };
       }
+      if (!piResult.clientSecret?.startsWith('pi_')) {
+        logger.warn('[Stripe] Finalized draft invoice returned non-standard client_secret, voiding for fresh invoice', {
+          extra: { bookingId, invoiceId: existingInvoiceId, piId: piResult.piId }
+        });
+        await stripe.invoices.voidInvoice(existingInvoiceId);
+        await db.execute(sql`UPDATE booking_requests SET stripe_invoice_id = NULL, updated_at = NOW() WHERE id = ${bookingId}`);
+        await db.execute(sql`UPDATE stripe_payment_intents SET status = 'cancelled', updated_at = NOW() WHERE booking_id = ${bookingId} AND status = 'pending'`);
+        return null;
+      }
       invoicePiId = piResult.piId;
       invoicePiSecret = piResult.clientSecret;
       logger.info('[Stripe] Finalized draft invoice as charge_automatically for interactive member payment', { extra: { bookingId, invoiceId: existingInvoiceId, paymentIntentId: invoicePiId } });
@@ -482,9 +501,31 @@ async function handleExistingInvoicePayment(params: {
         });
         logger.info('[Stripe] Switched existing open invoice from send_invoice to charge_automatically', { extra: { bookingId, invoiceId: existingInvoiceId } });
       }
-      const piResult = await retrieveInvoicePaymentIntent(stripe, existingInvoiceId);
-      invoicePiId = piResult.piId;
-      invoicePiSecret = piResult.clientSecret;
+      try {
+        const piResult = await retrieveInvoicePaymentIntent(stripe, existingInvoiceId);
+        if (piResult.clientSecret.startsWith('pi_')) {
+          invoicePiId = piResult.piId;
+          invoicePiSecret = piResult.clientSecret;
+        } else {
+          logger.warn('[Stripe] Existing invoice PI has non-standard client_secret (confirmation_secret), voiding for fresh invoice', {
+            extra: { bookingId, invoiceId: existingInvoiceId, piId: piResult.piId }
+          });
+          await stripe.invoices.voidInvoice(existingInvoiceId);
+          await db.execute(sql`UPDATE booking_requests SET stripe_invoice_id = NULL, updated_at = NOW() WHERE id = ${bookingId}`);
+          await db.execute(sql`UPDATE stripe_payment_intents SET status = 'cancelled', updated_at = NOW() WHERE booking_id = ${bookingId} AND status = 'pending'`);
+          return null;
+        }
+      } catch (piErr: unknown) {
+        logger.warn('[Stripe] Could not retrieve usable PI from existing open invoice, voiding for fresh invoice', {
+          extra: { bookingId, invoiceId: existingInvoiceId, error: getErrorMessage(piErr) }
+        });
+        try {
+          await stripe.invoices.voidInvoice(existingInvoiceId);
+        } catch { /* void may fail if already void */ }
+        await db.execute(sql`UPDATE booking_requests SET stripe_invoice_id = NULL, updated_at = NOW() WHERE id = ${bookingId}`);
+        await db.execute(sql`UPDATE stripe_payment_intents SET status = 'cancelled', updated_at = NOW() WHERE booking_id = ${bookingId} AND status = 'pending'`);
+        return null;
+      }
     }
 
     logger.info('[Stripe] Returning invoice PI for interactive member payment (existing invoice)', {
@@ -875,7 +916,16 @@ router.post('/api/member/bookings/:id/pay-fees', isAuthenticated, paymentRateLim
     }
 
     const invoicePiId = newPiResult.piId;
-    const invoicePiSecret = newPiResult.clientSecret;
+    let invoicePiSecret = newPiResult.clientSecret;
+    if (!invoicePiSecret?.startsWith('pi_')) {
+      logger.warn('[Stripe] New invoice finalization returned non-standard client_secret, attempting direct PI retrieve', {
+        extra: { bookingId, invoiceId: draftResult.invoiceId, piId: invoicePiId }
+      });
+      const directPi = await stripe.paymentIntents.retrieve(invoicePiId);
+      if (directPi.client_secret) {
+        invoicePiSecret = directPi.client_secret;
+      }
+    }
     logger.info('[Stripe] Finalized new invoice as charge_automatically for interactive member payment', { extra: { bookingId, invoiceId: draftResult.invoiceId, paymentIntentId: invoicePiId } });
 
     await db.execute(sql`
