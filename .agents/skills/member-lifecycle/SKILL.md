@@ -95,12 +95,28 @@ invoice.payment_failed webhook fires
 6. NEVER skip the per-email operation lock during subscription creation.
 7. NEVER use `FOR UPDATE` on multi-row queries without `ORDER BY id ASC`.
 
+## Apple Wallet Pass Integration (v8.87.16)
+
+Membership status and tier changes update the Apple Wallet pass via `changeMessage` fields. When field values change (tier, status, guest passes), iOS shows lock-screen notifications.
+
+**Notification type alignment (v8.87.16):**
+- Tier changes now use `type: 'membership_tier_change'` (was `'system'`) in admin-actions.ts, subscriptions.ts, and memberTierUpdateProcessor.ts
+- Status changes (pause, restore, suspend) now use `type: 'member_status_change'` (was `'system'`)
+- This enables PWA push dedupe: `notifyMember()` checks `EVERCLUB-{userId}` in `wallet_pass_device_registrations` and skips web push when wallet pass is registered
+
+**Wallet pass update triggers:** `sendPassUpdateForMemberByEmail()` is called after:
+- Tier changes (admin-actions.ts line 167)
+- Subscription tier updates (subscriptions.ts deferred actions)
+- Member suspend (admin-actions.ts)
+- Guest pass changes, membership status changes via Stripe webhooks
+
 ## Cross-References
 
 - **Stripe webhook status changes** → `stripe-webhook-flow` skill
 - **HubSpot sync rules** → `hubspot-sync` skill
 - **Grace period scheduler** → `scheduler-jobs` skill
 - **Booking fee impact of tier** → `fee-calculation` skill
+- **Wallet pass changeMessage + dedupe** → `notification-system` skill
 
 ## Detailed Reference
 

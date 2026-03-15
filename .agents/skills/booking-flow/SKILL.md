@@ -105,9 +105,21 @@ Is this inside a db.transaction()?
 
 ---
 
-## Apple Wallet Booking Passes (v8.87.13)
+## Apple Wallet Booking Passes (v8.87.13, updated v8.87.16)
 
-Approved bookings can generate Apple Wallet event tickets. The pass shows bay name, date/time, player count, and includes geofencing for the club address.
+Approved bookings can generate Apple Wallet event tickets. The pass shows bay name, date/time, player count, booking status, and includes geofencing for the club address.
+
+**Wallet changeMessage notifications (v8.87.16):** All booking pass fields include `changeMessage` templates so iOS shows lock-screen alerts when field values change:
+- `eventDate` → "Booking date changed to %@"
+- `eventTime` → "Booking time changed to %@"
+- `bayName` → "Bay changed to %@"
+- `duration` → "Duration changed to %@"
+- `playerCount` → "Player count changed to %@"
+- `bookingStatus` → "Booking status changed to %@"
+
+**PWA push dedupe:** Booking notification types (`booking_approved`, `booking_update(d)`, `booking_confirmed`, `booking_auto_confirmed`, `booking_cancelled*`, `booking_checked_in`) are deduped in `notifyMember()`. If the specific booking has a registered wallet pass (`EVERBOOKING-{bookingId}` in `wallet_pass_device_registrations`), PWA web push is skipped. In-app and WebSocket notifications always fire.
+
+**Back-field deep link:** Booking passes include a "View Bookings" back-field linking to `/dashboard/bookings` with `attributedValue` for tappable link on iOS.
 
 | Hook | File | When |
 |---|---|---|
