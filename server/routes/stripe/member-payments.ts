@@ -35,6 +35,64 @@ import { getBookingInvoiceId, createDraftInvoiceForBooking, buildInvoiceDescript
 import { listCustomerPaymentMethods } from '../../core/stripe/customers';
 import { PRICING } from '../../core/billing/pricingConfig';
 
+function getStripeDeclineMessage(error: unknown): string {
+  const stripeError = error as {
+    type?: string;
+    code?: string;
+    decline_code?: string;
+    message?: string;
+  };
+
+  if (stripeError.code === 'card_declined' || stripeError.decline_code) {
+    const declineCode = stripeError.decline_code || '';
+    switch (declineCode) {
+      case 'insufficient_funds':
+        return 'Your card has insufficient funds. Please try a different card.';
+      case 'lost_card':
+      case 'stolen_card':
+        return 'This card has been reported lost or stolen. Please use a different card.';
+      case 'expired_card':
+        return 'Your card has expired. Please update your card details or use a different card.';
+      case 'incorrect_cvc':
+        return 'The CVC code is incorrect. Please check and try again.';
+      case 'processing_error':
+        return 'There was a processing error with your card. Please try again in a few minutes.';
+      case 'incorrect_number':
+        return 'The card number is incorrect. Please check and try again.';
+      case 'do_not_honor':
+      case 'generic_decline':
+      default:
+        return 'Your card was declined. Please try a different card or contact your bank.';
+    }
+  }
+
+  if (stripeError.code === 'expired_card') {
+    return 'Your card has expired. Please update your card details or use a different card.';
+  }
+
+  if (stripeError.code === 'incorrect_cvc') {
+    return 'The CVC code is incorrect. Please check and try again.';
+  }
+
+  if (stripeError.code === 'payment_intent_unexpected_state') {
+    return 'This payment has already been processed.';
+  }
+
+  if (stripeError.code === 'processing_error') {
+    return 'There was a processing error with your card. Please try again in a few minutes.';
+  }
+
+  if (stripeError.code === 'amount_too_small') {
+    return 'The payment amount is too small to process.';
+  }
+
+  if (stripeError.type === 'StripeCardError') {
+    return stripeError.message || 'Your card was declined. Please try a different card.';
+  }
+
+  return '';
+}
+
 function describeFee(
   isGuest: boolean,
   overageCents: number,
@@ -536,6 +594,28 @@ router.post('/api/member/bookings/:id/pay-fees', isAuthenticated, paymentRateLim
     `);
 
     if (pendingParticipants.rows.length === 0) {
+      const unpaidCheck = await db.execute(sql`
+        SELECT COUNT(*) as total,
+               SUM(CASE WHEN payment_status = 'paid' THEN 1 ELSE 0 END) as paid_count,
+               SUM(CASE WHEN cached_fee_cents > 0 AND payment_status != 'paid' THEN 1 ELSE 0 END) as unpaid_with_fees
+        FROM booking_participants
+        WHERE session_id = ${booking.session_id}
+      `);
+      const row = unpaidCheck.rows[0] as { total: string; paid_count: string; unpaid_with_fees: string };
+      const totalCount = parseInt(row.total) || 0;
+      const paidCount = parseInt(row.paid_count) || 0;
+      const unpaidWithFees = parseInt(row.unpaid_with_fees) || 0;
+      if (totalCount > 0 && paidCount > 0 && unpaidWithFees === 0) {
+        logger.info('[Stripe] All fee-bearing participants already paid (race condition)', { extra: { bookingId, paidCount, totalCount } });
+        return res.json({
+          paidInFull: true,
+          message: 'This booking has already been paid.',
+          totalAmount: 0,
+          balanceApplied: 0,
+          remainingAmount: 0,
+          participantFees: [],
+        });
+      }
       return res.status(400).json({ error: 'No unpaid fees found' });
     }
 
@@ -750,14 +830,25 @@ router.post('/api/member/bookings/:id/pay-fees', isAuthenticated, paymentRateLim
     const errMsg = error instanceof Error ? error.message : String(error);
     const stripeCode = (error as { code?: string })?.code;
     const stripeType = (error as { type?: string })?.type;
+    const stripeDeclineCode = (error as { decline_code?: string })?.decline_code;
+    const bookingIdForLog = parseInt(req.params.id as string);
     logger.error('[Stripe] Error creating member payment intent', { 
       error: error instanceof Error ? error : new Error(String(error)),
-      extra: { stripeCode, stripeType, message: errMsg }
+      extra: {
+        stripeCode,
+        stripeType,
+        stripeDeclineCode,
+        message: errMsg,
+        bookingId: isNaN(bookingIdForLog) ? req.params.id : bookingIdForLog,
+        endpoint: 'pay-fees',
+      }
     });
     await alertOnExternalServiceError('Stripe', error instanceof Error ? error : new Error(String(error)), 'create member payment intent');
-    res.status(500).json({ 
-      error: 'Payment processing failed. Please try again.',
-      retryable: true
+    const friendlyMessage = getStripeDeclineMessage(error);
+    const statusCode = friendlyMessage ? 402 : 500;
+    res.status(statusCode).json({ 
+      error: friendlyMessage || 'Payment processing failed. Please try again.',
+      retryable: !friendlyMessage,
     });
   }
 });
@@ -914,11 +1005,29 @@ router.post('/api/member/bookings/:id/confirm-payment', isAuthenticated, async (
 
     res.json({ success: true });
   } catch (error: unknown) {
-    logger.error('[Stripe] Error confirming member payment', { error: error instanceof Error ? error : new Error(String(error)) });
+    const errMsg = error instanceof Error ? error.message : String(error);
+    const stripeCode = (error as { code?: string })?.code;
+    const stripeType = (error as { type?: string })?.type;
+    const stripeDeclineCode = (error as { decline_code?: string })?.decline_code;
+    const bookingIdForLog = parseInt(req.params.id as string);
+    logger.error('[Stripe] Error confirming member payment', {
+      error: error instanceof Error ? error : new Error(String(error)),
+      extra: {
+        stripeCode,
+        stripeType,
+        stripeDeclineCode,
+        message: errMsg,
+        bookingId: isNaN(bookingIdForLog) ? req.params.id : bookingIdForLog,
+        paymentIntentId: req.body?.paymentIntentId,
+        endpoint: 'confirm-payment',
+      }
+    });
     await alertOnExternalServiceError('Stripe', error instanceof Error ? error : new Error(String(error)), 'confirm member payment');
-    res.status(500).json({ 
-      error: 'Payment confirmation failed. Please try again.',
-      retryable: true
+    const friendlyMessage = getStripeDeclineMessage(error);
+    const statusCode = friendlyMessage ? 402 : 500;
+    res.status(statusCode).json({ 
+      error: friendlyMessage || 'Payment confirmation failed. Please try again.',
+      retryable: !friendlyMessage,
     });
   }
 });
@@ -1145,11 +1254,29 @@ router.post('/api/member/bookings/:id/pay-saved-card', isAuthenticated, paymentR
       status: invoiceResult.status,
     });
   } catch (error: unknown) {
-    logger.error('[MemberPayments] Error processing saved card payment', { error: error instanceof Error ? error : new Error(String(error)) });
+    const errMsg = error instanceof Error ? error.message : String(error);
+    const stripeCode = (error as { code?: string })?.code;
+    const stripeType = (error as { type?: string })?.type;
+    const stripeDeclineCode = (error as { decline_code?: string })?.decline_code;
+    const bookingIdForLog = parseInt(req.params.id as string);
+    logger.error('[MemberPayments] Error processing saved card payment', {
+      error: error instanceof Error ? error : new Error(String(error)),
+      extra: {
+        stripeCode,
+        stripeType,
+        stripeDeclineCode,
+        message: errMsg,
+        bookingId: isNaN(bookingIdForLog) ? req.params.id : bookingIdForLog,
+        paymentMethodId: req.body?.paymentMethodId,
+        endpoint: 'pay-saved-card',
+      }
+    });
     await alertOnExternalServiceError('Stripe', error instanceof Error ? error : new Error(String(error)), 'member saved card payment');
-    return res.status(500).json({
-      error: 'Payment failed. Please try using the standard payment form.',
-      retryable: true
+    const friendlyMessage = getStripeDeclineMessage(error);
+    const statusCode = friendlyMessage ? 402 : 500;
+    return res.status(statusCode).json({
+      error: friendlyMessage || 'Payment failed. Please try using the standard payment form.',
+      retryable: !friendlyMessage,
     });
   }
 });

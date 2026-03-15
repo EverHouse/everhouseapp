@@ -542,6 +542,67 @@ export async function finalizeAndPayInvoice(params: {
     }
   }
 
+  if (invoice.status === 'void' || invoice.status === 'uncollectible') {
+    logger.info('[BookingInvoice] Invoice is void/uncollectible, clearing and recreating draft', {
+      extra: { bookingId, invoiceId, status: invoice.status }
+    });
+    await db.execute(sql`UPDATE booking_requests SET stripe_invoice_id = NULL, updated_at = NOW() WHERE id = ${bookingId}`);
+
+    const bookingInfoResult = await db.execute(sql`
+      SELECT br.user_email, br.session_id, br.trackman_booking_id, br.resource_id,
+             COALESCE(r.type, 'simulator') as resource_type
+      FROM booking_requests br
+      LEFT JOIN resources r ON br.resource_id = r.id
+      WHERE br.id = ${bookingId} LIMIT 1
+    `);
+    const bookingInfo = bookingInfoResult.rows[0] as { user_email: string; session_id: number; trackman_booking_id: string | null; resource_type: string } | undefined;
+
+    if (!bookingInfo) {
+      throw new Error(`Booking ${bookingId} not found when trying to recreate invoice`);
+    }
+
+    const custResult = await db.execute(sql`SELECT stripe_customer_id FROM users WHERE LOWER(email) = LOWER(${bookingInfo.user_email}) LIMIT 1`);
+    const custId = (custResult.rows as unknown as StripeCustomerIdRow[])[0]?.stripe_customer_id;
+    if (!custId) {
+      logger.error('[BookingInvoice] No Stripe customer for invoice recovery', {
+        extra: { bookingId, email: bookingInfo.user_email, invoiceId, invoiceStatus: invoice.status }
+      });
+      throw new Error(`No billing account found. Please contact support. (Booking #${bookingId})`);
+    }
+
+    const partResult = await db.execute(sql`
+      SELECT id, display_name, participant_type, cached_fee_cents
+      FROM booking_participants
+      WHERE session_id = ${bookingInfo.session_id} AND cached_fee_cents > 0
+    `);
+    const newFeeLineItems: BookingFeeLineItem[] = (partResult.rows as unknown as ParticipantFeeRow[]).map((row) => {
+      const isGuest = row.participant_type === 'guest';
+      return {
+        participantId: row.id,
+        displayName: row.display_name || 'Unknown',
+        participantType: row.participant_type as 'owner' | 'member' | 'guest',
+        overageCents: isGuest ? 0 : row.cached_fee_cents,
+        guestCents: isGuest ? row.cached_fee_cents : 0,
+        totalCents: row.cached_fee_cents,
+      };
+    });
+
+    if (newFeeLineItems.length === 0) {
+      throw new Error(`No fee line items found for booking ${bookingId} when recreating invoice`);
+    }
+
+    await createDraftInvoiceForBooking({
+      customerId: custId,
+      bookingId,
+      sessionId: bookingInfo.session_id,
+      trackmanBookingId: bookingInfo.trackman_booking_id || null,
+      feeLineItems: newFeeLineItems,
+      purpose: 'booking_fee',
+    });
+
+    return finalizeAndPayInvoice({ bookingId, paymentMethodId, offSession });
+  }
+
   if (invoice.status !== 'draft' && invoice.status !== 'open') {
     throw new Error(`Invoice ${invoiceId} is in unexpected status: ${invoice.status}`);
   }
