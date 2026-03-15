@@ -154,6 +154,16 @@ export async function executeDeferredActions(actions: DeferredAction[], eventCon
 
 export async function upsertTransactionCache(params: CacheTransactionParams): Promise<void> {
   try {
+    if (params.customerId) {
+      const known = await db.execute(
+        sql`SELECT 1 FROM users WHERE stripe_customer_id = ${params.customerId} LIMIT 1`
+      );
+      if (known.rows.length === 0) {
+        logger.debug('[Stripe Cache] Skipping cache for unknown customer', { extra: { customerId: params.customerId, stripeId: params.stripeId } });
+        return;
+      }
+    }
+
     await db.execute(
       sql`INSERT INTO stripe_transaction_cache 
        (stripe_id, object_type, amount_cents, currency, status, created_at, updated_at, 
