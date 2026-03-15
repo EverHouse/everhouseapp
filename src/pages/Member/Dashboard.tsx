@@ -215,6 +215,7 @@ const Dashboard: React.FC = () => {
   }, [location.state]);
   // Optimistic UI state
   const [optimisticCancelledIds, setOptimisticCancelledIds] = useState<Set<number>>(new Set());
+  const [walletPassDownloading, setWalletPassDownloading] = useState<number | null>(null);
   const [scheduleRef] = useAutoAnimate();
   const [showFirstLoginModal, setShowFirstLoginModal] = useState(false);
   const firstLoginCheckedRef = useRef(false);
@@ -776,6 +777,34 @@ const Dashboard: React.FC = () => {
     });
   };
 
+  const isAppleDevice = useMemo(() => {
+    if (typeof navigator === 'undefined') return false;
+    const ua = navigator.userAgent;
+    return /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  }, []);
+
+  const handleDownloadBookingWalletPass = async (bookingId: number) => {
+    setWalletPassDownloading(bookingId);
+    try {
+      const response = await fetch(`/api/member/booking-wallet-pass/${bookingId}`, { credentials: 'include' });
+      if (!response.ok) throw new Error('Failed to download');
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `EverClub-Booking-${bookingId}.pkpass`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast('Wallet pass downloaded — open it to add to Apple Wallet', 'success', 5000);
+    } catch {
+      showToast('Failed to download booking wallet pass', 'error');
+    } finally {
+      setWalletPassDownloading(null);
+    }
+  };
+
   const getGreeting = () => {
     const hour = getPacificHour();
     if (hour < 12) return 'Good morning';
@@ -1058,10 +1087,17 @@ const Dashboard: React.FC = () => {
                     ? new Date(`${item.rawDate}T${startTime24}`) <= new Date()
                     : false;
                   
+                  const isWalletEligible = walletPassAvailable && isAppleDevice && ['approved', 'confirmed', 'attended', 'checked_in'].includes(bookingStatus);
+
                   if (isCancellationPending) {
                     actions = [];
                   } else {
                     actions = [
+                      ...(isWalletEligible ? [{
+                        icon: walletPassDownloading === Number(item.dbId) ? 'progress_activity' : 'wallet',
+                        label: 'Add to Apple Wallet',
+                        onClick: () => handleDownloadBookingWalletPass(Number(item.dbId))
+                      }] : []),
                       ...(isConfirmed ? [{
                         icon: 'calendar_add_on',
                         label: 'Add to Calendar',
@@ -1117,6 +1153,17 @@ const Dashboard: React.FC = () => {
                       }, `EverClub_${item.rawDate}_${item.title.replace(/[^a-zA-Z0-9]/g, '_')}.ics`)
                     },
                     { icon: 'close', label: 'Cancel', onClick: () => handleCancelWellness(wellnessRaw.class_id) }
+                  ];
+                } else if (item.type === 'conference_room_calendar') {
+                  const confCalRaw = item.raw as DashboardBookingItem;
+                  const confCalStatus = confCalRaw.status || '';
+                  const confCalWalletEligible = walletPassAvailable && isAppleDevice && ['approved', 'confirmed', 'attended', 'checked_in'].includes(confCalStatus);
+                  actions = [
+                    ...(confCalWalletEligible && typeof item.dbId === 'number' ? [{
+                      icon: walletPassDownloading === item.dbId ? 'progress_activity' : 'wallet',
+                      label: 'Add to Apple Wallet',
+                      onClick: () => handleDownloadBookingWalletPass(item.dbId as number)
+                    }] : []),
                   ];
                 } else {
                   actions = [];
