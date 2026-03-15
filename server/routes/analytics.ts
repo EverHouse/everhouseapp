@@ -54,6 +54,13 @@ async function fetchRevenueFromStripe(): Promise<Record<string, RevenueMonth>> {
   sixMonthsAgo.setHours(0, 0, 0, 0);
   const startTimestamp = Math.floor(sixMonthsAgo.getTime() / 1000);
 
+  const knownCustomersResult = await db.execute(sql`
+    SELECT stripe_customer_id FROM users WHERE stripe_customer_id IS NOT NULL
+  `);
+  const knownCustomerIds = new Set(
+    (knownCustomersResult.rows as { stripe_customer_id: string }[]).map(r => r.stripe_customer_id)
+  );
+
   const months: Record<string, RevenueMonth> = {};
   const currentDate = new Date();
   for (let i = 5; i >= 0; i--) {
@@ -64,6 +71,7 @@ async function fetchRevenueFromStripe(): Promise<Record<string, RevenueMonth>> {
 
   let hasMore = true;
   let startingAfter: string | undefined;
+  let skippedOrphans = 0;
 
   while (hasMore) {
     const params: Stripe.ChargeListParams = {
@@ -80,6 +88,12 @@ async function fetchRevenueFromStripe(): Promise<Record<string, RevenueMonth>> {
 
       const netAmount = charge.amount - (charge.amount_refunded || 0);
       if (netAmount <= 0) continue;
+
+      const customerId = typeof charge.customer === 'string' ? charge.customer : charge.customer?.id;
+      if (customerId && !knownCustomerIds.has(customerId)) {
+        skippedOrphans++;
+        continue;
+      }
 
       const created = new Date(charge.created * 1000);
       const monthKey = `${created.getFullYear()}-${String(created.getMonth() + 1).padStart(2, '0')}`;
@@ -100,7 +114,7 @@ async function fetchRevenueFromStripe(): Promise<Record<string, RevenueMonth>> {
   }
 
   revenueCache = { data: months, fetchedAt: now };
-  logger.info('[Analytics] Fetched revenue data from Stripe', { extra: { monthCount: Object.keys(months).length } });
+  logger.info('[Analytics] Fetched revenue data from Stripe', { extra: { monthCount: Object.keys(months).length, skippedOrphans } });
   return months;
 }
 
