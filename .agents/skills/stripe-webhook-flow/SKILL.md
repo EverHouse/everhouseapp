@@ -223,6 +223,9 @@ When hard-deleting a booking, PI cleanup refunds succeeded PIs and cancels non-t
 **`refund_succeeded_sync_failed` status (v8.87.35, Tasks #71-#73):**
 When a Stripe refund succeeds but the local `markPaymentRefunded` DB call fails, the system sets status to `refund_succeeded_sync_failed` with CRITICAL logging. This applies in `executeInlineRefund` (bookingStateService), `voidBookingInvoice` (bookingInvoiceService), and the cancellation cascade. Prevents silent data divergence.
 
+**Stale amount detection in `StripePaymentForm` (v8.87.35, Task #72):**
+When the payment amount or fee changes while a PI already exists, `StripePaymentForm` cancels the existing PI and creates a new one with the correct amount. This prevents charging stale amounts when roster changes or fee recalculations happen while the payment form is open.
+
 **`StripePaymentWithSecret` unmount cleanup (v8.87.35, Task #72):**
 The `StripePaymentWithSecret` component now uses `keepalive: true` in its unmount cleanup `fetch` call, matching the existing pattern in `StripePaymentForm`. Without this, the browser could abort the PI cancellation request during tab close/navigation.
 

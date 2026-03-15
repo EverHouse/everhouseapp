@@ -58,10 +58,13 @@ Has trackman_booking_id?
        If rowCount=0, skip — another process already claimed it (v8.87.27)
    └── For direct refund paths, also check stripe_payment_intents for status IN ('refunding', 'refunded')
        to avoid double-refunding PIs already queued by voidBookingInvoice (v8.87.26)
+   └── If refund succeeds but markPaymentRefunded fails → set refund_succeeded_sync_failed (v8.87.35)
 2. After EACH successful refund → mark that participant 'refunded'
 3. Clear fee snapshots, refund guest passes
-4. THEN update status to 'cancelled'
-5. THEN notify member
+4. Delete trackman_bay_slots (duration-aware range: startTime through startTime + durationMinutes at 30-min intervals) (v8.87.35)
+5. THEN update status to 'cancelled'
+6. THEN notify member
+7. Persist any side-effect failures to failed_side_effects table for staff recovery (v8.87.35)
 ```
 
 ## Hard Rules
@@ -113,6 +116,8 @@ Has trackman_booking_id?
 13. NEVER use `process.stderr.write` in Trackman service — use structured `logger.*` calls.
 14. NEVER ignore `ensureSessionForBooking()` return value — always check `sessionResult.error` and log/throw on failure. The function returns `{error}` for validation failures (missing time, invalid format, zero duration) instead of throwing (v8.87.31).
 15. NEVER ignore `refundGuestPass()` return value — always check `refundResult.success`. The function returns `{success: false}` on failure instead of throwing, so catch blocks alone are dead code (v8.87.31).
+16. NEVER assume Trackman bay slot cleanup only needs to delete a single slot — multi-slot bookings require duration-aware range DELETE covering `startTime` through `startTime + durationMinutes` at 30-min intervals (v8.87.35).
+17. NEVER silently discard cancellation side-effect failures — persist to `failed_side_effects` table for staff recovery (v8.87.35).
 
 ## Cross-References
 
