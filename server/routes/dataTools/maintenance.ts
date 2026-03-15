@@ -943,7 +943,9 @@ async function runVisitorArchiveInBackground(jobId: string, dryRun: boolean, sta
 
   const syncProgress = async () => {
     currentVisitorArchiveProgress = { ...progress };
-    await updateJobProgress(jobId, progress as unknown as Record<string, unknown>).catch(() => {});
+    await updateJobProgress(jobId, progress as unknown as Record<string, unknown>).catch((err: unknown) => {
+      logger.warn('[Maintenance] Failed to update job progress', { extra: { jobId, error: String(err) } });
+    });
   };
 
   try {

@@ -804,6 +804,12 @@ export async function cancelBookingByTrackmanId(
     }
 
     if (!result.success) {
+      if (result.alreadyCancelled) {
+        logger.warn('[Trackman Webhook] Booking already cancelled (idempotent)', {
+          extra: { bookingId: booking.id }
+        });
+        return { cancelled: true, bookingId: booking.id };
+      }
       logger.error('[Trackman Webhook] Failed to cancel booking', {
         extra: { bookingId: booking.id, error: result.error }
       });

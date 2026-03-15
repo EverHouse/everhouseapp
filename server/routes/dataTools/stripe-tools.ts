@@ -716,7 +716,9 @@ async function runCleanupInBackground(jobId: string, dryRun: boolean, staffEmail
 
   const syncProgress = async () => {
     currentCleanupProgress = { ...progress };
-    await updateJobProgress(jobId, progress as unknown as Record<string, unknown>).catch(() => {});
+    await updateJobProgress(jobId, progress as unknown as Record<string, unknown>).catch((err: unknown) => {
+      logger.warn('[StripeTools] Failed to update job progress', { extra: { jobId, error: String(err) } });
+    });
   };
 
   try {

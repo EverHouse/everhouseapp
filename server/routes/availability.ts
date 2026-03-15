@@ -6,6 +6,7 @@ import { getCalendarBusyTimes, getCalendarIdByName, CALENDAR_CONFIG } from '../c
 import { getTodayPacific, getPacificDateParts } from '../utils/dateUtils';
 import { logFromRequest } from '../core/auditLog';
 import { logger } from '../core/logger';
+import { getErrorMessage } from '../utils/errorUtils';
 import { toIntArrayLiteral, toTextArrayLiteral } from '../utils/sqlArrayLiteral';
 import { getSessionUser } from '../types/session';
 import { getSettingValue } from '../core/settingsHelper';
@@ -180,9 +181,15 @@ router.post('/api/availability/batch', async (req, res) => {
            AND NOT EXISTS (
              SELECT 1 FROM booking_requests br 
              WHERE br.trackman_booking_id = tub.trackman_booking_id::text
-           )`).catch(() => ({ rows: [] })),
+           )`).catch((err: unknown) => {
+        logger.warn('[Availability] Failed to query trackman_unmatched_bookings, proceeding without Trackman conflict data', { extra: { error: getErrorMessage(err) } });
+        return { rows: [] };
+      }),
       db.execute(sql`SELECT resource_id, start_time, end_time FROM trackman_bay_slots 
-         WHERE resource_id = ANY(${resourceIdsLiteral}::int[]) AND slot_date = ${date} AND status = 'booked'`).catch(() => ({ rows: [] })),
+         WHERE resource_id = ANY(${resourceIdsLiteral}::int[]) AND slot_date = ${date} AND status = 'booked'`).catch((err: unknown) => {
+        logger.warn('[Availability] Failed to query trackman_bay_slots, proceeding without bay slot data', { extra: { error: getErrorMessage(err) } });
+        return { rows: [] };
+      }),
       requestingEmail
         ? db.execute(sql`SELECT resource_id, start_time, end_time FROM booking_requests 
              WHERE resource_id = ANY(${resourceIdsLiteral}::int[]) AND request_date = ${date} 
