@@ -587,7 +587,6 @@ const BlocksTab: React.FC = () => {
         const past: BlocksClosure[] = [];
         
         for (const closure of filteredClosures) {
-            if (closure.needsReview) continue;
             const endDateStr = closure.endDate || closure.startDate;
             const endDateNormalized = endDateStr.split('T')[0];
             if (endDateNormalized < today) {
@@ -616,20 +615,6 @@ const BlocksTab: React.FC = () => {
         }
         return missing;
     };
-
-    const needsReviewClosures = useMemo(() => {
-        const today = getTodayPacific();
-        return closures.filter(closure => {
-            if (!closure.needsReview) return false;
-            const endDateStr = closure.endDate || closure.startDate;
-            const endDateNormalized = endDateStr.split('T')[0];
-            return endDateNormalized >= today;
-        }).sort((a, b) => {
-            const aStart = a.startDate.split('T')[0];
-            const bStart = b.startDate.split('T')[0];
-            return aStart.localeCompare(bStart);
-        });
-    }, [closures]);
 
     const configuredClosures = upcomingClosures;
 
@@ -726,7 +711,7 @@ const BlocksTab: React.FC = () => {
                     <span className="text-gray-500 dark:text-white/60">Info</span>
                 </div>
                 <div className="flex items-center gap-1">
-                    <span className="w-2 h-2 rounded-full bg-cyan-500 inline-block"></span>
+                    <span className="w-2 h-2 rounded-full bg-blue-500 inline-block"></span>
                     <span className="text-gray-500 dark:text-white/60">Draft</span>
                 </div>
                 <span className="text-gray-300 dark:text-white/20">|</span>
@@ -884,66 +869,9 @@ const BlocksTab: React.FC = () => {
                 </div>
             )}
 
-            {needsReviewClosures.length > 0 && (
-                <div className="space-y-3 animate-content-enter-delay-1">
-                    <div className="flex items-center gap-2">
-                        <span aria-hidden="true" className="material-symbols-outlined text-cyan-500">rate_review</span>
-                        <h3 className="font-semibold text-primary dark:text-white">Needs Review</h3>
-                        <span className="text-xs bg-cyan-100 dark:bg-cyan-500/20 text-cyan-700 dark:text-cyan-300 px-2 py-0.5 rounded-[4px]">{needsReviewClosures.length}</span>
-                    </div>
-                    <p className="text-xs text-gray-500 dark:text-white/60">
-                        These calendar events were imported and need to be configured before members can see them.
-                    </p>
-                    <div className="space-y-2">
-                        {needsReviewClosures.map((closure, index) => {
-                            const missingFields = getMissingFields(closure);
-                            return (
-                                <div 
-                                    key={closure.id}
-                                    onClick={() => handleEditClosure(closure)}
-                                    className={`bg-white/60 dark:bg-white/5 backdrop-blur-sm border border-white/80 dark:border-white/10 border-l-4 border-l-cyan-500 rounded-xl shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-colors duration-fast overflow-hidden group cursor-pointer tactile-card ${index < 10 ? `animate-list-item-delay-${index}` : 'animate-list-item'}`}
-                                >
-                                    <div className="p-4 flex items-start justify-between gap-3">
-                                        <div className="flex-1 min-w-0">
-                                            <div className="flex items-center gap-1.5 mb-1">
-                                                <span className="w-2 h-2 rounded-full bg-cyan-500 flex-shrink-0"></span>
-                                                <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-cyan-200 dark:bg-cyan-500/30 text-cyan-700 dark:text-cyan-300">
-                                                    Draft
-                                                </span>
-                                            </div>
-                                            <h4 className="font-bold text-primary dark:text-white truncate">{closure.title}</h4>
-                                            <div className="flex items-center gap-1 text-xs text-cyan-600 dark:text-cyan-400 mt-1">
-                                                <span aria-hidden="true" className="material-symbols-outlined text-[12px]">calendar_today</span>
-                                                <span>{formatDate(closure.startDate)}{closure.startDate !== closure.endDate ? ` - ${formatDate(closure.endDate)}` : ''}</span>
-                                            </div>
-                                            {missingFields.length > 0 && (
-                                                <div className="flex items-center gap-1.5 mt-2 text-xs text-amber-600 dark:text-amber-400">
-                                                    <span aria-hidden="true" className="material-symbols-outlined text-[14px]">warning</span>
-                                                    <span>Missing: {missingFields.join(', ')}</span>
-                                                </div>
-                                            )}
-                                        </div>
-                                        <div
-                                            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-cyan-500 text-white text-sm font-medium flex-shrink-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-fast"
-                                        >
-                                            <span aria-hidden="true" className="material-symbols-outlined text-base">edit</span>
-                                            Edit
-                                        </div>
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                </div>
-            )}
-
-            {needsReviewClosures.length > 0 && (configuredClosures.length > 0 || closuresLoading) && (
-                <div className="h-4" />
-            )}
-
             {closuresLoading ? (
                 <div className="text-center py-8 text-gray-600 dark:text-white/70">Loading notices...</div>
-            ) : configuredClosures.length === 0 && needsReviewClosures.length === 0 ? (
+            ) : configuredClosures.length === 0 ? (
                 <div className="text-center py-12 text-gray-600 dark:text-white/70">
                     <span aria-hidden="true" className="material-symbols-outlined text-4xl mb-2">event_available</span>
                     <p>{closures.length === 0 ? 'No notices' : 'No notices match filters'}</p>
@@ -951,16 +879,20 @@ const BlocksTab: React.FC = () => {
             ) : configuredClosures.length > 0 && (
                 <div className="space-y-3">
                     {configuredClosures.map((closure, index) => {
-                        const blocking = isBlocking(closure.affectedAreas);
+                        const missingFields = getMissingFields(closure);
+                        const isIncomplete = missingFields.length > 0;
+                        const blocking = !isIncomplete && isBlocking(closure.affectedAreas);
                         const isExpanded = expandedNotices.has(closure.id);
                         
                         return (
                             <div 
                                 key={closure.id} 
                                 className={`bg-white/60 dark:bg-white/5 backdrop-blur-sm border border-white/80 dark:border-white/10 rounded-xl shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-colors duration-fast overflow-hidden group tactile-card ${index < 10 ? `animate-list-item-delay-${index}` : 'animate-list-item'} ${
-                                    blocking 
-                                        ? 'border-l-4 border-l-red-500'
-                                        : 'border-l-4 border-l-amber-500'
+                                    isIncomplete
+                                        ? 'border-l-4 border-l-blue-500'
+                                        : blocking 
+                                            ? 'border-l-4 border-l-red-500'
+                                            : 'border-l-4 border-l-amber-500'
                                 }`}
                             >
                                 <div className="w-full p-4 text-left">
@@ -970,7 +902,12 @@ const BlocksTab: React.FC = () => {
                                             onClick={() => toggleNoticeExpand(closure.id)}
                                         >
                                             <div className="flex flex-wrap items-center gap-1.5 mb-1">
-                                                <span className={`w-2 h-2 rounded-full flex-shrink-0 ${blocking ? 'bg-red-500' : 'bg-amber-500'}`}></span>
+                                                <span className={`w-2 h-2 rounded-full flex-shrink-0 ${isIncomplete ? 'bg-blue-500' : blocking ? 'bg-red-500' : 'bg-amber-500'}`}></span>
+                                                {isIncomplete ? (
+                                                    <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-blue-200 dark:bg-blue-500/30 text-blue-700 dark:text-blue-300">
+                                                        Draft
+                                                    </span>
+                                                ) : (
                                                 <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded ${
                                                     blocking 
                                                         ? 'bg-red-200 dark:bg-red-500/30 text-red-700 dark:text-red-300'
@@ -981,11 +918,14 @@ const BlocksTab: React.FC = () => {
                                                         : (closure.noticeType && closure.noticeType.toLowerCase() !== 'closure' ? formatTitleForDisplay(closure.noticeType) : 'Notice')
                                                     }
                                                 </span>
+                                                )}
                                                 {closure.reason && closure.reason.trim() && (
                                                     <span className={`text-[10px] px-1.5 py-0.5 rounded ${
-                                                        blocking 
-                                                            ? 'bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400'
-                                                            : 'bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400'
+                                                        isIncomplete
+                                                            ? 'bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400'
+                                                            : blocking 
+                                                                ? 'bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400'
+                                                                : 'bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400'
                                                     }`}>
                                                         {closure.reason}
                                                     </span>
@@ -997,9 +937,11 @@ const BlocksTab: React.FC = () => {
                                             )}
                                             <div className="flex flex-wrap gap-2">
                                                 <div className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs ${
-                                                    blocking 
-                                                        ? 'bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400'
-                                                        : 'bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400'
+                                                    isIncomplete
+                                                        ? 'bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400'
+                                                        : blocking 
+                                                            ? 'bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400'
+                                                            : 'bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400'
                                                 }`}>
                                                     <span aria-hidden="true" className="material-symbols-outlined text-[12px]">calendar_today</span>
                                                     <span>
@@ -1007,11 +949,19 @@ const BlocksTab: React.FC = () => {
                                                         {closure.endDate && closure.endDate !== closure.startDate ? ` - ${formatDate(closure.endDate)}` : ''}
                                                     </span>
                                                 </div>
+                                                {isIncomplete && (
+                                                    <div className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400">
+                                                        <span aria-hidden="true" className="material-symbols-outlined text-[12px]">warning</span>
+                                                        <span>Missing: {missingFields.join(', ')}</span>
+                                                    </div>
+                                                )}
                                                 {(closure.startTime || closure.endTime) && (
                                                     <div className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs ${
-                                                        blocking 
-                                                            ? 'bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400'
-                                                            : 'bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400'
+                                                        isIncomplete
+                                                            ? 'bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400'
+                                                            : blocking 
+                                                                ? 'bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400'
+                                                                : 'bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400'
                                                     }`}>
                                                         <span aria-hidden="true" className="material-symbols-outlined text-[12px]">schedule</span>
                                                         <span>{formatTime(closure.startTime || '')}{closure.endTime ? ` - ${formatTime(closure.endTime)}` : ''}</span>
