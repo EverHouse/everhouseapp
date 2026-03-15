@@ -77,6 +77,7 @@ export async function assignMemberToBooking(bookingId: number, memberEmail: stri
       title: 'Booking Confirmed',
       message: `Your simulator booking for ${formattedDate} at ${formattedTime} has been confirmed.`,
       type: 'booking_confirmed',
+      relatedId: bookingId,
       relatedType: 'booking'
     });
   }
@@ -302,6 +303,7 @@ export async function assignWithPlayers(
         title: 'Booking Confirmed',
         message: `Your simulator booking for ${dateStr} at ${timeStr} has been confirmed.${feeMessage}`,
         type: 'booking_confirmed',
+        relatedId: bookingId,
         relatedType: 'booking'
       });
     } catch (notifyErr: unknown) {
