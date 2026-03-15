@@ -1,5 +1,5 @@
 import { db } from '../../db';
-import { bookingRequests, resources, bookingParticipants, stripePaymentIntents } from '../../../shared/schema';
+import { bookingRequests, resources, bookingParticipants, stripePaymentIntents, notifications } from '../../../shared/schema';
 import { eq, and, or, ne, sql, isNull, isNotNull } from 'drizzle-orm';
 import { formatNotificationDateTime } from '../../utils/dateUtils';
 import { logger } from '../logger';
@@ -369,7 +369,7 @@ export class BookingStateService {
   }): Promise<CancelResult> {
     const { bookingId, staffEmail, source } = params;
 
-    const [existing] = await db.select({
+    const [precheck] = await db.select({
       id: bookingRequests.id,
       userEmail: bookingRequests.userEmail,
       userName: bookingRequests.userName,
@@ -385,7 +385,7 @@ export class BookingStateService {
       .from(bookingRequests)
       .where(eq(bookingRequests.id, bookingId));
 
-    if (!existing) {
+    if (!precheck) {
       return {
         success: false,
         status: 'cancelled',
@@ -396,13 +396,13 @@ export class BookingStateService {
       };
     }
 
-    if (existing.status !== 'cancellation_pending') {
-      if (existing.status === 'cancelled') {
+    if (precheck.status !== 'cancellation_pending') {
+      if (precheck.status === 'cancelled') {
         return {
           success: false,
           status: 'cancelled',
           bookingId,
-          bookingData: this.extractBookingData(existing),
+          bookingData: this.extractBookingData(precheck),
           alreadyCancelled: true,
           error: 'Booking is already cancelled',
           statusCode: 400,
@@ -412,22 +412,49 @@ export class BookingStateService {
         success: false,
         status: 'cancelled',
         bookingId,
-        bookingData: this.extractBookingData(existing),
-        error: `Cannot complete cancellation — booking status is '${existing.status}', expected 'cancellation_pending'`,
+        bookingData: this.extractBookingData(precheck),
+        error: `Cannot complete cancellation — booking status is '${precheck.status}', expected 'cancellation_pending'`,
         statusCode: 400,
       };
     }
 
     let resourceType = 'simulator';
-    if (existing.resourceId) {
-      const [resource] = await db.select({ type: resources.type }).from(resources).where(eq(resources.id, existing.resourceId));
+    if (precheck.resourceId) {
+      const [resource] = await db.select({ type: resources.type }).from(resources).where(eq(resources.id, precheck.resourceId));
       if (resource?.type === 'conference_room') resourceType = 'conference_room';
     }
 
-    const friendlyDateTime = formatNotificationDateTime(existing.requestDate, existing.startTime || '00:00');
+    const friendlyDateTime = formatNotificationDateTime(precheck.requestDate, precheck.startTime || '00:00');
     const completedByLabel = source === 'trackman_webhook' ? 'Trackman webhook' : `staff (${staffEmail})`;
 
     const manifest = await db.transaction(async (tx) => {
+      const lockedResult = await tx.execute(sql`
+        SELECT id, user_email, user_name, resource_id, request_date, start_time, status,
+               calendar_event_id, session_id, trackman_booking_id, staff_notes
+        FROM booking_requests
+        WHERE id = ${bookingId}
+        ORDER BY id ASC
+        FOR UPDATE
+      `);
+      const lockedRow = lockedResult.rows[0] as Record<string, unknown> | undefined;
+      if (!lockedRow || lockedRow.status !== 'cancellation_pending') {
+        return null;
+      }
+
+      const existing = {
+        id: lockedRow.id as number,
+        userEmail: lockedRow.user_email as string | null,
+        userName: lockedRow.user_name as string | null,
+        resourceId: lockedRow.resource_id as number | null,
+        requestDate: lockedRow.request_date as string,
+        startTime: lockedRow.start_time as string,
+        status: lockedRow.status as string,
+        calendarEventId: lockedRow.calendar_event_id as string | null,
+        sessionId: lockedRow.session_id as number | null,
+        trackmanBookingId: lockedRow.trackman_booking_id as string | null,
+        staffNotes: lockedRow.staff_notes as string | null,
+      };
+
       const sideEffects: SideEffectsManifest = {
         stripeRefunds: [],
         stripeSnapshotRefunds: [],
@@ -436,7 +463,7 @@ export class BookingStateService {
         calendarDeletion: existing.calendarEventId ? { eventId: existing.calendarEventId, resourceId: existing.resourceId } : null,
         notifications: {},
         availabilityBroadcast: { resourceId: existing.resourceId || undefined, resourceType, date: existing.requestDate },
-        bookingEvent: { bookingId, memberEmail: existing.userEmail, status: 'cancelled', actionBy: 'staff', bookingDate: existing.requestDate, startTime: existing.startTime || '' },
+        bookingEvent: { bookingId, memberEmail: existing.userEmail || '', status: 'cancelled', actionBy: 'staff', bookingDate: existing.requestDate, startTime: existing.startTime || '' },
       };
 
       const pendingIntents = await tx.select({ stripePaymentIntentId: stripePaymentIntents.stripePaymentIntentId })
@@ -587,14 +614,19 @@ export class BookingStateService {
         ? '\n[Cancellation completed via Trackman webhook]'
         : `\n[Cancellation completed manually by ${staffEmail}]`;
 
-      await tx.update(bookingRequests)
-        .set({
-          status: 'cancelled',
-          isUnmatched: false,
-          staffNotes: sql`COALESCE(staff_notes, '') || ${noteAppend}`,
-          updatedAt: new Date(),
-        })
-        .where(eq(bookingRequests.id, bookingId));
+      const updateResult = await tx.execute(sql`
+        UPDATE booking_requests
+        SET status = 'cancelled',
+            is_unmatched = false,
+            staff_notes = COALESCE(staff_notes, '') || ${noteAppend},
+            updated_at = NOW()
+        WHERE id = ${bookingId}
+          AND status = 'cancellation_pending'
+      `);
+
+      if (updateResult.rowCount === 0) {
+        return null;
+      }
 
       const memberMessage = `Your booking for ${friendlyDateTime} has been cancelled and any charges have been refunded.`;
 
@@ -607,6 +639,18 @@ export class BookingStateService {
       return sideEffects;
     });
 
+    if (!manifest) {
+      logger.warn('[BookingStateService] Concurrent cancellation conflict', { extra: { bookingId, staffEmail, source } });
+      return {
+        success: false,
+        status: 'cancelled',
+        bookingId,
+        bookingData: this.extractBookingData(precheck),
+        error: 'Booking status changed concurrently — cancellation already completed or no longer pending',
+        statusCode: 409,
+      };
+    }
+
     const { errors } = await BookingStateService.executeSideEffects(manifest);
 
     logger.info('[BookingStateService] Completed pending cancellation', { extra: { bookingId, staffEmail, source, errorCount: errors.length } });
@@ -615,7 +659,7 @@ export class BookingStateService {
       success: true,
       status: 'cancelled',
       bookingId,
-      bookingData: this.extractBookingData(existing),
+      bookingData: this.extractBookingData(precheck),
       sideEffectErrors: errors.length > 0 ? errors : undefined,
     };
   }
@@ -636,17 +680,31 @@ export class BookingStateService {
     const bookingDate = booking.requestDate;
     const bookingTime = booking.startTime?.substring(0, 5) || '';
 
-    await db.transaction(async (tx) => {
-      await tx.update(bookingRequests)
-        .set({
-          status: 'cancellation_pending',
-          cancellationPendingAt: new Date(),
-          staffNotes: (booking.staffNotes || '') + '\n[Staff initiated cancellation - awaiting Trackman cancellation]',
-          updatedAt: new Date(),
-        })
-        .where(eq(bookingRequests.id, bookingId));
+    const transitionResult = await db.transaction(async (tx) => {
+      const result = await tx.execute(sql`
+        UPDATE booking_requests
+        SET status = 'cancellation_pending',
+            cancellation_pending_at = NOW(),
+            staff_notes = COALESCE(staff_notes, '') || ${'\n[Staff initiated cancellation - awaiting Trackman cancellation]'},
+            updated_at = NOW()
+        WHERE id = ${bookingId}
+          AND status IN ('approved', 'confirmed')
+      `);
 
+      return (result.rowCount ?? 0) > 0;
     });
+
+    if (!transitionResult) {
+      logger.warn('[BookingStateService] Pending cancellation transition blocked by concurrent status change', { extra: { bookingId, currentStatus: booking.status } });
+      return {
+        success: false,
+        status: 'cancelled',
+        bookingId,
+        bookingData: { userEmail: booking.userEmail || '', userName: booking.userName, resourceId: booking.resourceId, requestDate: booking.requestDate, startTime: booking.startTime || '', calendarEventId: booking.calendarEventId, sessionId: booking.sessionId, trackmanBookingId: booking.trackmanBookingId },
+        error: 'Booking status has already changed — cancellation blocked',
+        statusCode: 409,
+      };
+    }
 
     if (booking.userEmail && !isSyntheticEmail(booking.userEmail)) {
       notifyMember({

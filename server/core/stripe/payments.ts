@@ -448,6 +448,11 @@ export async function cancelPaymentIntent(
       return { success: true };
     }
 
+    if (pi.status === 'succeeded') {
+      logger.warn(`[Stripe] Payment ${paymentIntentId} already succeeded, use refund instead`);
+      return { success: false, error: 'Payment already succeeded, use refund instead' };
+    }
+
     let invoiceId: string | null = null;
 
     if (pi.invoice) {
@@ -488,7 +493,7 @@ export async function cancelPaymentIntent(
       try {
         await stripe.paymentIntents.cancel(paymentIntentId);
       } catch (cancelErr: unknown) {
-        const errMsg = cancelErr instanceof Error ? cancelErr.message : String(cancelErr);
+        const errMsg = getErrorMessage(cancelErr);
         if (errMsg.includes('created by invoices') || errMsg.includes('voiding the invoice')) {
           logger.warn(`[Stripe] PI ${paymentIntentId} is invoice-created but invoice not found via expand or DB — attempting PI-based invoice lookup`);
           const freshPi = await stripe.paymentIntents.retrieve(paymentIntentId);

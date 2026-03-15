@@ -311,21 +311,17 @@ router.post('/api/staff/manual-booking', isStaffOrAdmin, async (req, res) => {
         }
         
         if (isDayPassPayment && dbRow.resource_id) {
-          try {
-            await ensureSessionForBooking({
-              bookingId: bookingId,
-              resourceId: dbRow.resource_id as number,
-              sessionDate: request_date,
-              startTime: start_time,
-              endTime: (dbRow.end_time as string) || end_time,
-              ownerEmail: resolvedEmail,
-              ownerName: user_name || (dbRow.user_name as string) || undefined,
-              source: 'staff_manual',
-              createdBy: 'staff_manual_day_pass'
-            }, createTxQueryClient(tx));
-          } catch (sessionErr: unknown) {
-            logger.error('[StaffManualBooking] Failed to ensure session', { extra: { sessionErr } });
-          }
+          await ensureSessionForBooking({
+            bookingId: bookingId,
+            resourceId: dbRow.resource_id as number,
+            sessionDate: request_date,
+            startTime: start_time,
+            endTime: (dbRow.end_time as string) || end_time,
+            ownerEmail: resolvedEmail,
+            ownerName: user_name || (dbRow.user_name as string) || undefined,
+            source: 'staff_manual',
+            createdBy: 'staff_manual_day_pass'
+          }, createTxQueryClient(tx));
         }
 
         return {

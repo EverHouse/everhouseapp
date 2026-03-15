@@ -94,6 +94,7 @@ export class PaymentStatusService {
                 sql`SELECT id, cached_fee_cents FROM booking_participants
                  WHERE session_id = ${resolvedSessionId} AND payment_status = 'pending' AND cached_fee_cents > 0
                  AND stripe_payment_intent_id IS NULL
+                 ORDER BY id ASC
                  FOR UPDATE`
               );
 

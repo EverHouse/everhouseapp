@@ -61,6 +61,7 @@ export async function checkResourceOverlap(
     AND request_date = ${requestDate} 
     AND status IN ('pending', 'pending_approval', 'approved', 'confirmed', 'attended', 'cancellation_pending')
     AND start_time < ${endTime} AND end_time > ${startTime}
+    ORDER BY id ASC
     FOR UPDATE
   `);
 
