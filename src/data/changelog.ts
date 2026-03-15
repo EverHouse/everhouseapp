@@ -8,6 +8,17 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.87.26",
+    date: "2026-03-15",
+    title: "Cancellation Safety & Timezone Fixes",
+    changes: [
+      "Fixed: Member cancel button now correctly uses Pacific timezone — previously, members in other timezones could see the cancel button disappear too early or too late",
+      "Fixed: Financial cleanup (refunds, invoice void) now runs before the booking status is set to 'cancelled' — prevents partial cancellation where booking shows cancelled but refund didn't process",
+      "Fixed: Duplicate refund prevention — when cancelling a paid booking, the system now checks if a refund was already queued before attempting a second refund",
+      "Improved: All cancellation error logging now uses structured error format for consistent debugging",
+    ]
+  },
+  {
     version: "8.87.25",
     date: "2026-03-15",
     title: "Saved Card Payment — Invoice Reuse Loop Fix",

@@ -221,7 +221,7 @@ export async function handleCancellationCascade(
            SET status = 'succeeded', updated_at = NOW() 
            WHERE stripe_payment_intent_id = ${row.stripe_payment_intent_id} AND status = 'refunding'`).catch((rollbackErr) => {
           logger.error('[cancellation-cascade] CRITICAL: Failed to rollback payment_intent status after refund queue failure', {
-            error: rollbackErr instanceof Error ? rollbackErr : new Error(String(rollbackErr)),
+            error: getErrorMessage(rollbackErr),
             extra: { paymentIntentId: row.stripe_payment_intent_id }
           });
         });
@@ -390,14 +390,6 @@ export async function deleteBooking(bookingId: number, archivedBy: string, hardD
       }
     });
   } else {
-    await db.update(bookingRequests)
-      .set({ 
-        status: 'cancelled',
-        archivedAt: new Date(),
-        archivedBy: archivedBy
-      })
-      .where(eq(bookingRequests.id, bookingId));
-    
     cascadeResult = await handleCancellationCascade(
       bookingId,
       booking.sessionId,
@@ -408,7 +400,6 @@ export async function deleteBooking(bookingId: number, archivedBy: string, hardD
       resourceName
     );
     
-    // Void booking invoice
     try {
       const { voidBookingInvoice } = await import('../billing/bookingInvoiceService');
       await voidBookingInvoice(bookingId);
@@ -424,7 +415,15 @@ export async function deleteBooking(bookingId: number, archivedBy: string, hardD
       logger.warn('[DELETE /api/bookings] Non-blocking: failed to cancel fee snapshots', { extra: { bookingId, error: getErrorMessage(err) } });
     });
 
-    voidBookingPass(bookingId).catch(err => logger.error('[DELETE /api/bookings] Failed to void booking wallet pass:', { extra: { err } }));
+    await db.update(bookingRequests)
+      .set({ 
+        status: 'cancelled',
+        archivedAt: new Date(),
+        archivedBy: archivedBy
+      })
+      .where(eq(bookingRequests.id, bookingId));
+
+    voidBookingPass(bookingId).catch(err => logger.error('[DELETE /api/bookings] Failed to void booking wallet pass:', { extra: { error: getErrorMessage(err) } }));
 
     logger.info('[DELETE /api/bookings] Soft delete complete', {
       extra: {
@@ -458,7 +457,7 @@ export async function deleteBooking(bookingId: number, archivedBy: string, hardD
         }
       }
     } catch (calError: unknown) {
-      logger.error('Failed to delete calendar event (non-blocking)', { extra: { error: calError } });
+      logger.error('Failed to delete calendar event (non-blocking)', { extra: { error: getErrorMessage(calError) } });
     }
   }
   
@@ -561,7 +560,7 @@ export async function memberCancelBooking(bookingId: number, userEmail: string, 
         relatedType: 'booking_request',
         url: '/admin/bookings'
       }
-    ).catch(err => logger.error('Staff cancellation notification failed', { extra: { error: err } }));
+    ).catch(err => logger.error('Staff cancellation notification failed', { extra: { error: getErrorMessage(err) } }));
     
     if (existing.userEmail && !isSyntheticEmail(existing.userEmail)) {
       await db.insert(notifications).values({
@@ -591,13 +590,6 @@ export async function memberCancelBooking(bookingId: number, userEmail: string, 
     resourceName = resource?.name;
   }
   
-  await db.update(bookingRequests)
-    .set({ 
-      status: 'cancelled',
-      trackmanExternalId: null
-    })
-    .where(eq(bookingRequests.id, bookingId));
-  
   if (existing.resourceId && existing.requestDate && existing.startTime) {
     try {
       await db.execute(sql`DELETE FROM trackman_bay_slots 
@@ -621,7 +613,6 @@ export async function memberCancelBooking(bookingId: number, userEmail: string, 
     resourceName
   );
   
-  // Void booking invoice
   try {
     const { voidBookingInvoice } = await import('../billing/bookingInvoiceService');
     await voidBookingInvoice(bookingId);
@@ -636,6 +627,13 @@ export async function memberCancelBooking(bookingId: number, userEmail: string, 
   await db.execute(sql`UPDATE booking_fee_snapshots SET status = 'cancelled', updated_at = NOW() WHERE booking_id = ${bookingId} AND status IN ('pending', 'requires_action')`).catch((err: unknown) => {
     logger.warn('[Member Cancel] Non-blocking: failed to cancel fee snapshots', { extra: { bookingId, error: getErrorMessage(err) } });
   });
+
+  await db.update(bookingRequests)
+    .set({ 
+      status: 'cancelled',
+      trackmanExternalId: null
+    })
+    .where(eq(bookingRequests.id, bookingId));
   
   logger.info('[PUT /api/bookings/member-cancel] Cancellation cascade complete', {
     extra: {
@@ -669,7 +667,7 @@ export async function memberCancelBooking(bookingId: number, userEmail: string, 
       }
     );
   } catch (staffNotifyErr: unknown) {
-    logger.error('Staff notification failed', { extra: { error: staffNotifyErr } });
+    logger.error('Staff notification failed', { extra: { error: getErrorMessage(staffNotifyErr) } });
   }
   
   if (existing.calendarEventId && existing.resourceId) {
@@ -685,7 +683,7 @@ export async function memberCancelBooking(bookingId: number, userEmail: string, 
         }
       }
     } catch (calError: unknown) {
-      logger.error('Failed to delete calendar event (non-blocking)', { extra: { error: calError } });
+      logger.error('Failed to delete calendar event (non-blocking)', { extra: { error: getErrorMessage(calError) } });
     }
   }
   
@@ -711,9 +709,9 @@ export async function memberCancelBooking(bookingId: number, userEmail: string, 
     notifyMember: true, 
     notifyStaff: true, 
     cleanupNotifications: true 
-  }).catch(err => logger.error('Booking event publish failed', { extra: { error: err } }));
+  }).catch(err => logger.error('Booking event publish failed', { extra: { error: getErrorMessage(err) } }));
 
-  voidBookingPass(bookingId).catch(err => logger.error('[memberCancelBooking] Failed to void booking wallet pass:', { extra: { err } }));
+  voidBookingPass(bookingId).catch(err => logger.error('[memberCancelBooking] Failed to void booking wallet pass:', { extra: { error: getErrorMessage(err) } }));
 
   return { 
     success: true,

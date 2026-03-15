@@ -164,6 +164,9 @@ This is the correct Stripe API — it handles PI creation/confirmation internall
 - If existing PI is `requires_payment_method`, `requires_confirmation`, or `requires_action` (non-invoice) → cancel it first via `cancelPaymentIntent()` helper, then proceed
 - Only mark local DB status as `canceled` AFTER confirmed Stripe cancel succeeds
 
+**Double-refund prevention (v8.87.26):**
+When `voidBookingInvoice()` queues a refund for a paid invoice's PI, and a direct refund path also tries to refund the same PI, the direct path must check `stripe_payment_intents` for `status IN ('refunding', 'refunded')` before calling `stripe.refunds.create()`. If already queued, skip the direct refund and just mark the participant as refunded.
+
 **Invoice reuse loop prevention (v8.87.25):**
 When `finalizeAndPayInvoice` fails on an existing invoice and the fallback tries `createDraftInvoiceForBooking`, the latter will REUSE the same broken `open` invoice if the amount matches. This causes the same failure in a loop. FIX: before calling `createDraftInvoiceForBooking`, VOID the broken invoice via `stripe.invoices.voidInvoice()` and clear `booking_requests.stripe_invoice_id` in DB. Also mark stale PIs as `canceled` in `stripe_payment_intents` table.
 

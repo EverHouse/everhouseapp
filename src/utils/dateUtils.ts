@@ -125,6 +125,26 @@ export function getNowTimePacific(): string {
   return `${String(parts.hour).padStart(2, '0')}:${String(parts.minute).padStart(2, '0')}`;
 }
 
+export function createPacificDate(dateStr: string, timeStr: string): Date {
+  const normalizedTime = timeStr.length === 5 ? `${timeStr}:00` : timeStr;
+  const [year, month, day] = dateStr.split('-').map(Number);
+  const targetDate = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: CLUB_TIMEZONE,
+    timeZoneName: 'shortOffset'
+  });
+  const parts = formatter.formatToParts(targetDate);
+  const offsetPart = parts.find(p => p.type === 'timeZoneName')?.value || '-08:00';
+  let offset = '-08:00';
+  const offsetMatch = offsetPart.match(/GMT([+-])(\d+)/);
+  if (offsetMatch) {
+    const sign = offsetMatch[1];
+    const hours = parseInt(offsetMatch[2], 10);
+    offset = `${sign}${hours.toString().padStart(2, '0')}:00`;
+  }
+  return new Date(`${dateStr}T${normalizedTime}${offset}`);
+}
+
 export function addDaysToPacificDate(dateStr: string, days: number): string {
   if (!dateStr) return getTodayPacific();
   const [year, month, day] = dateStr.split('-').map(Number);

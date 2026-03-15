@@ -10,7 +10,7 @@ import { useToast } from '../../components/Toast';
 import { bookingEvents } from '../../lib/bookingEvents';
 import ScheduleCard from '../../components/ScheduleCard';
 import OnboardingChecklist from '../../components/OnboardingChecklist';
-import { formatDateShort, getTodayString, getPacificHour, CLUB_TIMEZONE, formatMemberSince, formatTime12Hour, getNowTimePacific } from '../../utils/dateUtils';
+import { formatDateShort, getTodayString, getPacificHour, CLUB_TIMEZONE, formatMemberSince, formatTime12Hour, getNowTimePacific, createPacificDate } from '../../utils/dateUtils';
 import { downloadICalFile } from '../../utils/icalUtils';
 import { DashboardSkeleton } from '../../components/skeletons';
 import { SmoothReveal } from '../../components/motion/SmoothReveal';
@@ -1084,7 +1084,7 @@ const Dashboard: React.FC = () => {
                   const isCancellationPending = (item as DashboardBookingItem).status === 'cancellation_pending';
 
                   const bookingHasStarted = item.rawDate && startTime24
-                    ? new Date(`${item.rawDate}T${startTime24}`) <= new Date()
+                    ? createPacificDate(item.rawDate, startTime24) <= new Date()
                     : false;
                   
                   const isWalletEligible = walletPassAvailable && isAppleDevice && ['approved', 'confirmed', 'attended', 'checked_in'].includes(bookingStatus);

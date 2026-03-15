@@ -1388,7 +1388,7 @@ router.put('/api/booking-requests/:id/member-cancel', isAuthenticated, async (re
       try {
         await cancelPendingPaymentIntentsForBooking(bookingId);
       } catch (cancelIntentsErr: unknown) {
-        logger.error('[Member Cancel] Failed to cancel pending payment intents (non-blocking)', { extra: { cancelIntentsErr } });
+        logger.error('[Member Cancel] Failed to cancel pending payment intents (non-blocking)', { extra: { error: getErrorMessage(cancelIntentsErr) } });
       }
     }
     
@@ -1411,6 +1411,15 @@ router.put('/api/booking-requests/:id/member-cancel', isAuthenticated, async (re
             const stripe = await getStripeClient();
             for (const rawParticipant of paidParticipants.rows as Array<Record<string, unknown>>) {
               try {
+                const alreadyRefunding = await db.execute(sql`SELECT 1 FROM stripe_payment_intents 
+                   WHERE stripe_payment_intent_id = ${rawParticipant.stripe_payment_intent_id as string} 
+                   AND status IN ('refunding', 'refunded')
+                   LIMIT 1`);
+                if ((alreadyRefunding.rows?.length || 0) > 0) {
+                  await db.execute(sql`UPDATE booking_participants SET payment_status = 'refunded', refunded_at = NOW() WHERE id = ${rawParticipant.id}`);
+                  logger.info('[Member Cancel] PI already queued for refund by invoice void, marking participant refunded', { extra: { bookingId, participantId: rawParticipant.id, piId: rawParticipant.stripe_payment_intent_id } });
+                  continue;
+                }
                 const pi = await stripe.paymentIntents.retrieve(rawParticipant.stripe_payment_intent_id as string);
                 if (pi.status === 'succeeded' && pi.latest_charge) {
                   const refund = await stripe.refunds.create({
@@ -1436,7 +1445,7 @@ router.put('/api/booking-requests/:id/member-cancel', isAuthenticated, async (re
           }
         }
       } catch (participantRefundErr: unknown) {
-        logger.error('[Member Cancel] Failed to process participant refunds (non-blocking)', { extra: { participantRefundErr } });
+        logger.error('[Member Cancel] Failed to process participant refunds (non-blocking)', { extra: { error: getErrorMessage(participantRefundErr) } });
       }
     } else {
       refundSkippedDueToLateCancel = true;
@@ -1444,7 +1453,7 @@ router.put('/api/booking-requests/:id/member-cancel', isAuthenticated, async (re
     
     try {
       const { voidBookingPass } = await import('../../walletPass/bookingPassService');
-      voidBookingPass(bookingId).catch(err => logger.error('[Member Cancel] Failed to void booking wallet pass:', { extra: { err } }));
+      voidBookingPass(bookingId).catch(err => logger.error('[Member Cancel] Failed to void booking wallet pass:', { extra: { error: getErrorMessage(err) } }));
     } catch (importErr: unknown) {
       logger.error('[Member Cancel] Failed to import voidBookingPass:', { extra: { error: getErrorMessage(importErr) } });
     }

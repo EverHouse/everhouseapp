@@ -54,6 +54,8 @@ Has trackman_booking_id?
 
 ```
 1. Refund Stripe charges (individual participant, not bulk)
+   └── Before each direct refund, check stripe_payment_intents for status IN ('refunding', 'refunded') 
+       to avoid double-refunding PIs already queued by voidBookingInvoice (v8.87.26)
 2. After EACH successful refund → mark that participant 'refunded'
 3. Clear fee snapshots, refund guest passes
 4. THEN update status to 'cancelled'
