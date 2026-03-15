@@ -398,7 +398,7 @@ router.get('/api/payments/daily-summary', isStaffOrAdmin, async (req: Request, r
       .map(pi => pi.id);
     const localPurposeMap = new Map<string, string>();
     if (piIdsForLookup.length > 0) {
-      const localRows = await db.execute(sql`SELECT stripe_payment_intent_id, purpose FROM stripe_payment_intents WHERE stripe_payment_intent_id = ANY(${piIdsForLookup})`);
+      const localRows = await db.execute(sql`SELECT stripe_payment_intent_id, purpose FROM stripe_payment_intents WHERE stripe_payment_intent_id IN (${sql.join(piIdsForLookup.map(id => sql`${id}`), sql`, `)})`);
       for (const row of localRows.rows as unknown as { stripe_payment_intent_id: string; purpose: string }[]) {
         if (row.purpose) localPurposeMap.set(row.stripe_payment_intent_id, row.purpose);
       }
