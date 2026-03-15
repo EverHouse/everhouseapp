@@ -225,6 +225,20 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
       return;
     }
 
+    const bookingMatch = decodedText.match(/^BOOKING:(\d+)$/);
+    if (bookingMatch) {
+      const scannedBookingId = Number(bookingMatch[1]);
+      const booking = data.todaysBookings.find(b => Number(b.id) === scannedBookingId);
+      if (booking) {
+        handleCheckIn(booking);
+        showToast(`Checking in ${booking.user_name} for booking #${scannedBookingId}...`, 'info');
+      } else {
+        playSound('checkinWarning');
+        showToast(`Booking #${scannedBookingId} not found for today`, 'error');
+      }
+      return;
+    }
+
     try {
       const scanData = JSON.parse(decodedText);
       if (scanData.bookingId) {
