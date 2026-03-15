@@ -533,6 +533,9 @@ const SimulatorTab: React.FC = () => {
                 return false;
             }
             
+            if (newStatus === 'attended') {
+                checkinInProgressRef.current.delete(bookingId);
+            }
             queryClient.invalidateQueries({ queryKey: simulatorKeys.allRequests() });
             queryClient.invalidateQueries({ queryKey: simulatorKeys.approvedBookings(calendarStartDate, calendarEndDate) });
             return true;
@@ -621,6 +624,13 @@ const SimulatorTab: React.FC = () => {
                 const result = await checkInWithToast(scannedBookingId, { source: 'booking' });
                 if (result.success) {
                     handleRefresh();
+                } else if (result.requiresRoster || result.requiresPayment) {
+                    setBookingSheet({
+                        isOpen: true,
+                        trackmanBookingId: null,
+                        bookingId: scannedBookingId,
+                        mode: 'manage' as const,
+                    });
                 }
             }
             return;
