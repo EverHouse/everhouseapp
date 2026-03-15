@@ -254,6 +254,7 @@ export function StripePaymentWithSecret({
         if (piId && piId.startsWith('pi_')) {
           fetch('/api/stripe/cancel-payment', {
             method: 'POST',
+            keepalive: true,
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
             body: JSON.stringify({ paymentIntentId: piId }),

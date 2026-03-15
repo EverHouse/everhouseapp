@@ -28,6 +28,7 @@ interface CancelResult {
     resourceId: number | null;
     requestDate: string;
     startTime: string;
+    durationMinutes: number | null;
     calendarEventId: string | null;
     sessionId: number | null;
     trackmanBookingId: string | null;
@@ -50,6 +51,7 @@ interface SideEffectsManifest {
     memberPush?: { email: string; title: string; body: string };
     memberWebSocket?: { email: string; title: string; message: string; bookingId: number };
   };
+  trackmanSlotCleanup: { resourceId: number; slotDate: string; startTime: string; durationMinutes: number | null } | null;
   availabilityBroadcast: { resourceId?: number; resourceType: string; date: string } | null;
   bookingEvent: { bookingId: number; memberEmail: string; status: string; actionBy: string; bookingDate: string; startTime: string } | null;
 }
@@ -61,6 +63,7 @@ interface BookingRecord {
   resourceId: number | null;
   requestDate: string;
   startTime: string;
+  durationMinutes: number | null;
   status: string | null;
   calendarEventId: string | null;
   sessionId: number | null;
@@ -100,6 +103,7 @@ export class BookingStateService {
         resourceId: bookingRequests.resourceId,
         requestDate: bookingRequests.requestDate,
         startTime: bookingRequests.startTime,
+        durationMinutes: bookingRequests.durationMinutes,
         status: bookingRequests.status,
         calendarEventId: bookingRequests.calendarEventId,
         sessionId: bookingRequests.sessionId,
@@ -114,7 +118,7 @@ export class BookingStateService {
           success: false,
           status: 'cancelled',
           bookingId,
-          bookingData: { userEmail: '', userName: null, resourceId: null, requestDate: '', startTime: '', calendarEventId: null, sessionId: null, trackmanBookingId: null },
+          bookingData: { userEmail: '', userName: null, resourceId: null, requestDate: '', startTime: '', durationMinutes: null, calendarEventId: null, sessionId: null, trackmanBookingId: null },
           error: 'Booking request not found',
           statusCode: 404,
         };
@@ -125,7 +129,7 @@ export class BookingStateService {
         success: false,
         status: 'cancelled',
         bookingId,
-        bookingData: { userEmail: '', userName: null, resourceId: null, requestDate: '', startTime: '', calendarEventId: null, sessionId: null, trackmanBookingId: null },
+        bookingData: { userEmail: '', userName: null, resourceId: null, requestDate: '', startTime: '', durationMinutes: null, calendarEventId: null, sessionId: null, trackmanBookingId: null },
         error: getErrorMessage(err),
         statusCode: 500,
       };
@@ -181,6 +185,7 @@ export class BookingStateService {
         invoiceVoid: { bookingId },
         calendarDeletion: booking.calendarEventId ? { eventId: booking.calendarEventId, resourceId: booking.resourceId } : null,
         notifications: {},
+        trackmanSlotCleanup: booking.resourceId && booking.requestDate && booking.startTime ? { resourceId: booking.resourceId, slotDate: booking.requestDate, startTime: booking.startTime, durationMinutes: booking.durationMinutes } : null,
         availabilityBroadcast: { resourceId: booking.resourceId || undefined, resourceType, date: booking.requestDate },
         bookingEvent: { bookingId, memberEmail: booking.userEmail, status: 'cancelled', actionBy: memberCancelled ? 'member' : 'staff', bookingDate: booking.requestDate, startTime: booking.startTime || '' },
       };
@@ -410,6 +415,7 @@ export class BookingStateService {
       resourceId: bookingRequests.resourceId,
       requestDate: bookingRequests.requestDate,
       startTime: bookingRequests.startTime,
+      durationMinutes: bookingRequests.durationMinutes,
       status: bookingRequests.status,
       calendarEventId: bookingRequests.calendarEventId,
       sessionId: bookingRequests.sessionId,
@@ -424,7 +430,7 @@ export class BookingStateService {
         success: false,
         status: 'cancelled',
         bookingId,
-        bookingData: { userEmail: '', userName: null, resourceId: null, requestDate: '', startTime: '', calendarEventId: null, sessionId: null, trackmanBookingId: null },
+        bookingData: { userEmail: '', userName: null, resourceId: null, requestDate: '', startTime: '', durationMinutes: null, calendarEventId: null, sessionId: null, trackmanBookingId: null },
         error: 'Booking not found',
         statusCode: 404,
       };
@@ -463,7 +469,7 @@ export class BookingStateService {
 
     const manifest = await db.transaction(async (tx) => {
       const lockedResult = await tx.execute(sql`
-        SELECT id, user_email, user_name, resource_id, request_date, start_time, status,
+        SELECT id, user_email, user_name, resource_id, request_date, start_time, duration_minutes, status,
                calendar_event_id, session_id, trackman_booking_id, staff_notes
         FROM booking_requests
         WHERE id = ${bookingId}
@@ -482,6 +488,7 @@ export class BookingStateService {
         resourceId: lockedRow.resource_id as number | null,
         requestDate: lockedRow.request_date as string,
         startTime: lockedRow.start_time as string,
+        durationMinutes: lockedRow.duration_minutes as number | null,
         status: lockedRow.status as string,
         calendarEventId: lockedRow.calendar_event_id as string | null,
         sessionId: lockedRow.session_id as number | null,
@@ -496,6 +503,7 @@ export class BookingStateService {
         invoiceVoid: { bookingId },
         calendarDeletion: existing.calendarEventId ? { eventId: existing.calendarEventId, resourceId: existing.resourceId } : null,
         notifications: {},
+        trackmanSlotCleanup: existing.resourceId && existing.requestDate && existing.startTime ? { resourceId: existing.resourceId, slotDate: existing.requestDate, startTime: existing.startTime, durationMinutes: existing.durationMinutes } : null,
         availabilityBroadcast: { resourceId: existing.resourceId || undefined, resourceType, date: existing.requestDate },
         bookingEvent: { bookingId, memberEmail: existing.userEmail || '', status: 'cancelled', actionBy: 'staff', bookingDate: existing.requestDate, startTime: existing.startTime || '' },
       };
@@ -765,7 +773,7 @@ export class BookingStateService {
         success: false,
         status: 'cancelled',
         bookingId,
-        bookingData: { userEmail: booking.userEmail || '', userName: booking.userName, resourceId: booking.resourceId, requestDate: booking.requestDate, startTime: booking.startTime || '', calendarEventId: booking.calendarEventId, sessionId: booking.sessionId, trackmanBookingId: booking.trackmanBookingId },
+        bookingData: { userEmail: booking.userEmail || '', userName: booking.userName, resourceId: booking.resourceId, requestDate: booking.requestDate, startTime: booking.startTime || '', durationMinutes: booking.durationMinutes, calendarEventId: booking.calendarEventId, sessionId: booking.sessionId, trackmanBookingId: booking.trackmanBookingId },
         error: 'Booking status has already changed — cancellation blocked',
         statusCode: 409,
       };
@@ -829,7 +837,17 @@ export class BookingStateService {
           amountCents: params.amountCents,
         });
       } catch (statusErr: unknown) {
-        logger.warn(`[BookingStateService] Non-blocking: failed to mark payment refunded for PI ${params.paymentIntentId}`, { error: statusErr });
+        logger.warn(`[BookingStateService] Non-blocking: failed to mark payment refunded for PI ${params.paymentIntentId}, setting refund_succeeded_sync_failed`, { error: statusErr });
+        try {
+          await db.execute(sql`UPDATE stripe_payment_intents 
+             SET status = 'refund_succeeded_sync_failed', updated_at = NOW() 
+             WHERE stripe_payment_intent_id = ${params.paymentIntentId}`);
+        } catch (syncErr: unknown) {
+          logger.error(`[BookingStateService] CRITICAL: Failed to set refund_succeeded_sync_failed status for PI ${params.paymentIntentId}`, {
+            error: getErrorMessage(syncErr),
+            extra: { paymentIntentId: params.paymentIntentId }
+          });
+        }
       }
       return { success: true, refundId: refund.id };
     } catch (err: unknown) {
@@ -960,6 +978,27 @@ export class BookingStateService {
       }
     }
 
+    if (manifest.trackmanSlotCleanup) {
+      try {
+        const { resourceId, slotDate, startTime, durationMinutes } = manifest.trackmanSlotCleanup;
+        if (durationMinutes) {
+          const [startHour, startMin] = startTime.split(':').map(Number);
+          const startTotalMin = startHour * 60 + startMin;
+          const endTotalMin = startTotalMin + durationMinutes;
+          const endHour = Math.floor(endTotalMin / 60);
+          const endMinute = endTotalMin % 60;
+          const endTime = `${String(endHour).padStart(2, '0')}:${String(endMinute).padStart(2, '0')}`;
+          await db.execute(sql`DELETE FROM trackman_bay_slots 
+             WHERE resource_id = ${resourceId} AND slot_date = ${slotDate} AND start_time >= ${startTime} AND start_time < ${endTime}`);
+        } else {
+          await db.execute(sql`DELETE FROM trackman_bay_slots 
+             WHERE resource_id = ${resourceId} AND slot_date = ${slotDate} AND start_time = ${startTime}`);
+        }
+      } catch (err: unknown) {
+        logger.error('[BookingStateService] Trackman slot cleanup failed', { extra: { ...manifest.trackmanSlotCleanup, error: getErrorMessage(err) } });
+      }
+    }
+
     if (manifest.calendarDeletion) {
       try {
         const calendarName = await getCalendarNameForBayAsync(manifest.calendarDeletion.resourceId);
@@ -1038,6 +1077,7 @@ export class BookingStateService {
       resourceId: booking.resourceId,
       requestDate: booking.requestDate,
       startTime: booking.startTime,
+      durationMinutes: booking.durationMinutes,
       calendarEventId: booking.calendarEventId,
       sessionId: booking.sessionId,
       trackmanBookingId: booking.trackmanBookingId,

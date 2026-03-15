@@ -348,8 +348,19 @@ export async function declineBooking(bookingId: number, reason?: string) {
   
   if (result.resourceId && result.requestDate && result.startTime) {
     try {
-      await db.execute(sql`DELETE FROM trackman_bay_slots 
-         WHERE resource_id = ${result.resourceId} AND slot_date = ${result.requestDate} AND start_time = ${result.startTime}`);
+      if (result.durationMinutes) {
+        const [startHour, startMin] = result.startTime.split(':').map(Number);
+        const startTotalMin = startHour * 60 + startMin;
+        const endTotalMin = startTotalMin + result.durationMinutes;
+        const endHour = Math.floor(endTotalMin / 60);
+        const endMinute = endTotalMin % 60;
+        const endTime = `${String(endHour).padStart(2, '0')}:${String(endMinute).padStart(2, '0')}`;
+        await db.execute(sql`DELETE FROM trackman_bay_slots 
+           WHERE resource_id = ${result.resourceId} AND slot_date = ${result.requestDate} AND start_time >= ${result.startTime} AND start_time < ${endTime}`);
+      } else {
+        await db.execute(sql`DELETE FROM trackman_bay_slots 
+           WHERE resource_id = ${result.resourceId} AND slot_date = ${result.requestDate} AND start_time = ${result.startTime}`);
+      }
     } catch (err: unknown) {
       logger.warn('[Staff Decline] Failed to clean up trackman_bay_slots', { 
         bookingId, 

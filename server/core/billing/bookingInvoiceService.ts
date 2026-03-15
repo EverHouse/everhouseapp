@@ -1054,9 +1054,19 @@ export async function voidBookingInvoice(bookingId: number): Promise<{
                   refundId: refund.id,
                 });
               } catch (statusErr: unknown) {
-                logger.warn('[BookingInvoice] Non-blocking: failed to mark payment refunded', {
+                logger.warn('[BookingInvoice] Non-blocking: failed to mark payment refunded, setting refund_succeeded_sync_failed', {
                   extra: { paymentIntentId: invoicePI, error: getErrorMessage(statusErr) }
                 });
+                try {
+                  await db.execute(sql`UPDATE stripe_payment_intents 
+                     SET status = 'refund_succeeded_sync_failed', updated_at = NOW() 
+                     WHERE stripe_payment_intent_id = ${invoicePI}`);
+                } catch (syncErr: unknown) {
+                  logger.error('[BookingInvoice] CRITICAL: Failed to set refund_succeeded_sync_failed status', {
+                    error: getErrorMessage(syncErr),
+                    extra: { paymentIntentId: invoicePI }
+                  });
+                }
               }
             } catch (refundErr: unknown) {
               logger.error('[BookingInvoice] Inline refund failed for paid invoice', {
