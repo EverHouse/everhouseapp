@@ -262,16 +262,36 @@ export async function handlePaymentMethodAttached(client: PoolClient, paymentMet
           try {
             const { getStripeClient } = await import('../../client');
             const stripe = await getStripeClient();
-            const pi = await stripe.paymentIntents.retrieve(row.stripe_payment_intent_id);
+            const pi = await stripe.paymentIntents.retrieve(row.stripe_payment_intent_id, { expand: ['invoice'] });
             if (pi.status === 'requires_payment_method') {
-              const confirmed = await stripe.paymentIntents.confirm(row.stripe_payment_intent_id, {
-                payment_method: paymentMethod.id,
-              });
-              if (confirmed.status === 'succeeded' || confirmed.status === 'processing') {
+              const invoiceObj = pi.invoice;
+              const invoiceId = typeof invoiceObj === 'string' ? invoiceObj : (invoiceObj as { id: string } | null)?.id;
+
+              let retrySucceeded = false;
+              if (invoiceId) {
+                const invoice = await stripe.invoices.retrieve(invoiceId);
+                if (invoice.status === 'open') {
+                  const paidInvoice = await stripe.invoices.pay(invoiceId, {
+                    payment_method: paymentMethod.id,
+                  });
+                  retrySucceeded = paidInvoice.status === 'paid';
+                  logger.info(`[Stripe Webhook] Auto-retried invoice payment ${row.stripe_payment_intent_id} via invoices.pay`, { extra: { invoiceId, result: paidInvoice.status } });
+                } else {
+                  logger.warn(`[Stripe Webhook] Cannot auto-retry invoice ${invoiceId} — status is ${invoice.status}`);
+                }
+              } else {
+                const confirmed = await stripe.paymentIntents.confirm(row.stripe_payment_intent_id, {
+                  payment_method: paymentMethod.id,
+                });
+                retrySucceeded = confirmed.status === 'succeeded' || confirmed.status === 'processing';
+                if (!retrySucceeded) {
+                  logger.warn(`[Stripe Webhook] Auto-retry of ${row.stripe_payment_intent_id} resulted in status: ${confirmed.status}, keeping requires_card_update flag`);
+                }
+              }
+
+              if (retrySucceeded) {
                 await db.execute(sql`UPDATE stripe_payment_intents SET requires_card_update = FALSE, updated_at = NOW() WHERE stripe_payment_intent_id = ${row.stripe_payment_intent_id}`);
                 logger.info(`[Stripe Webhook] Auto-retried payment ${row.stripe_payment_intent_id} successfully, cleared requires_card_update`);
-              } else {
-                logger.warn(`[Stripe Webhook] Auto-retry of ${row.stripe_payment_intent_id} resulted in status: ${confirmed.status}, keeping requires_card_update flag`);
               }
             }
           } catch (retryErr: unknown) {

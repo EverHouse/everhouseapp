@@ -386,19 +386,10 @@ router.post('/api/payments/cancel', isStaffOrAdmin, validateBody(cancelPaymentSc
       return res.json({ success: true, message: 'Payment was already canceled' });
     }
 
-    const stripe = await getStripeClient();
-
-    try {
-      await stripe.paymentIntents.cancel(paymentIntentId);
-    } catch (stripeError: unknown) {
-      if (getErrorCode(stripeError) !== 'payment_intent_unexpected_state') {
-        throw stripeError;
-      }
+    const cancelResult = await cancelPaymentIntent(paymentIntentId);
+    if (!cancelResult.success && cancelResult.error) {
+      logger.warn('[Payments] cancelPaymentIntent returned error during staff cancel', { extra: { paymentIntentId, error: cancelResult.error } });
     }
-
-    await db.execute(sql`UPDATE stripe_payment_intents 
-       SET status = 'canceled', updated_at = NOW()
-       WHERE stripe_payment_intent_id = ${paymentIntentId}`);
 
     await logBillingAudit({
       memberEmail: payment.member_email || 'unknown',
@@ -690,11 +681,10 @@ router.post('/api/payments/void-authorization', isStaffOrAdmin, validateBody(voi
       return res.status(400).json({ error: `Cannot void payment with status: ${payment.status}` });
     }
 
-    const stripe = await getStripeClient();
-
-    await stripe.paymentIntents.cancel(paymentIntentId);
-
-    await updatePaymentStatus(paymentIntentId, 'canceled');
+    const cancelResult = await cancelPaymentIntent(paymentIntentId);
+    if (!cancelResult.success && cancelResult.error) {
+      return res.status(400).json({ error: cancelResult.error });
+    }
 
     await logBillingAudit({
       memberEmail: payment.member_email || 'unknown',

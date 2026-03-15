@@ -20,6 +20,8 @@ export const changelog: ChangelogEntry[] = [
       "Fixed: Staff payment retry failure response no longer crashes — was referencing a variable from the wrong code branch",
       "Fixed: Invoice payment retry failures now store a valid payment status instead of an invoice status that could confuse downstream logic",
       "Safety: Invoice cancellation fallback now verifies the invoice actually belongs to the payment being cancelled — prevents accidentally voiding an unrelated invoice",
+      "Fixed: Staff 'Cancel Payment' and 'Void Authorization' now handle invoice-generated payments correctly — previously would fail silently on invoice-based payments",
+      "Fixed: Auto-retry when member updates their card now uses the correct API for invoice-based payments — previously would fail to retry invoice-generated payments",
     ]
   },
   {
