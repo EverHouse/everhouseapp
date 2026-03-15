@@ -354,6 +354,11 @@ export async function checkDuplicateStripeCustomers(): Promise<IntegrityCheckRes
   };
 }
 
+// Late-cancel bookings are excluded from this check: the late-cancel path marks
+// booking_fee_snapshots as 'cancelled' while preserving Stripe PIs for fee collection
+// via the booking invoice. Since this check filters on status IN ('pending', 'requires_action'),
+// late-cancel snapshots are naturally excluded and will not create false positives.
+// See also: checkLateCancelPreservedPaymentIntents for monitoring those preserved PIs.
 export async function checkOrphanedPaymentIntents(): Promise<IntegrityCheckResult> {
   const issues: IntegrityIssue[] = [];
 
@@ -549,6 +554,62 @@ export async function checkInvoiceBookingReconciliation(): Promise<IntegrityChec
   return {
     checkName: 'Invoice-Booking Reconciliation',
     status: issues.length === 0 ? 'pass' : issues.some(i => i.severity === 'error') ? 'fail' : 'warning',
+    issueCount: issues.length,
+    issues,
+    lastRun: new Date()
+  };
+}
+
+interface LateCancelPIRow {
+  id: number;
+  stripe_payment_intent_id: string;
+  booking_id: number;
+  status: string;
+  created_at: string;
+  user_email: string;
+  booking_status: string;
+}
+
+// Surfaces Stripe payment intents that are still in a pending/unresolved state on
+// cancelled bookings older than 48 hours. This most commonly applies to late-cancel
+// bookings where PIs are intentionally preserved (fee collection happens via the
+// booking invoice), but also catches any other cancelled-booking PI that lingers.
+// PIs flagged here may indicate the reconciliation schedulers have not yet cleaned
+// them up, or that staff should verify the invoice has been finalized for fee collection.
+export async function checkLateCancelPreservedPaymentIntents(): Promise<IntegrityCheckResult> {
+  const issues: IntegrityIssue[] = [];
+
+  const lingeringPIs = await db.execute(sql`
+    SELECT spi.id, spi.stripe_payment_intent_id, spi.booking_id, spi.status, spi.created_at,
+           br.user_email, br.status AS booking_status
+    FROM stripe_payment_intents spi
+    INNER JOIN booking_requests br ON spi.booking_id = br.id
+    WHERE spi.status IN ('pending', 'requires_payment_method', 'requires_action', 'requires_confirmation', 'requires_capture')
+      AND br.status = 'cancelled'
+      AND spi.created_at < NOW() - INTERVAL '48 hours'
+    ORDER BY spi.created_at ASC
+    LIMIT 50
+  `);
+
+  for (const row of lingeringPIs.rows as unknown as LateCancelPIRow[]) {
+    issues.push({
+      category: 'billing_issue',
+      severity: 'warning',
+      table: 'stripe_payment_intents',
+      recordId: row.id,
+      description: `Payment intent ${row.stripe_payment_intent_id} (status: ${row.status}) is still pending on cancelled booking #${row.booking_id} (${row.user_email}) after 48+ hours. Verify the booking invoice has been finalized for late-cancel fee collection, or cancel this PI.`,
+      suggestion: 'Check if the booking invoice was preserved for late-cancel fee collection. If finalized, this PI can be cancelled. If not, finalize the invoice to collect the fee.',
+      context: {
+        stripePaymentIntentId: row.stripe_payment_intent_id,
+        status: row.status,
+        memberEmail: row.user_email || undefined
+      }
+    });
+  }
+
+  return {
+    checkName: 'Late-Cancel Preserved Payment Intents',
+    status: issues.length === 0 ? 'pass' : 'warning',
     issueCount: issues.length,
     issues,
     lastRun: new Date()

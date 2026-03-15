@@ -1441,6 +1441,9 @@ router.put('/api/booking-requests/:id/member-cancel', isAuthenticated, async (re
         });
       }
     } else {
+      // Late-cancel: the booking invoice is intentionally preserved so the club can
+      // collect the late-cancellation fee. The invoice remains open for staff to
+      // finalize and charge the member's payment method on file.
       logger.info('[Member Cancel] Late cancellation — preserving booking invoice for fee collection', { extra: { bookingId } });
     }
     
@@ -1451,6 +1454,18 @@ router.put('/api/booking-requests/:id/member-cancel', isAuthenticated, async (re
         logger.error('[Member Cancel] Failed to cancel pending payment intents (non-blocking)', { extra: { error: getErrorMessage(cancelIntentsErr) } });
       }
     } else {
+      // Late-cancel PI preservation rationale:
+      // - Fee snapshots are marked 'cancelled' so they do NOT trigger false positives
+      //   in the orphaned payment intent integrity check (which filters on
+      //   'pending'/'requires_action' snapshots).
+      // - Stripe PIs in the stripe_payment_intents table are intentionally left open.
+      //   The fee collection mechanism is the preserved booking invoice (above), not
+      //   these PIs directly.
+      // - Resolution path for the preserved PIs:
+      //   1. The fee snapshot reconciliation scheduler periodically cleans up
+      //      abandoned and stale PIs on cancelled bookings.
+      //   2. An integrity check surfaces PIs that remain pending on cancelled
+      //      bookings for staff review.
       try {
         await db.execute(sql`UPDATE booking_fee_snapshots SET status = 'cancelled', updated_at = NOW() WHERE booking_id = ${bookingId} AND status IN ('pending', 'requires_action')`);
         logger.info('[Member Cancel] Late cancel — marked pending fee snapshots as cancelled (Stripe PIs preserved for fee collection)', { extra: { bookingId } });

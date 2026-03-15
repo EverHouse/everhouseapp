@@ -748,7 +748,7 @@ export async function getIntegritySummary(): Promise<IntegritySummary> {
 export async function runAllIntegrityChecks(triggeredBy: 'manual' | 'scheduled' = 'manual'): Promise<IntegrityCheckResult[]> {
   const { checkUnmatchedTrackmanBookings, checkParticipantUserRelationships, checkNeedsReviewItems, checkBookingTimeValidity, checkStalePastTours, checkBookingsWithoutSessions, checkOverlappingBookings, checkSessionsWithoutParticipants, checkGuestPassAccountingDrift, checkStalePendingBookings } = await import('./bookingChecks');
   const { checkHubSpotSyncMismatch, checkHubSpotIdDuplicates } = await import('./hubspotChecks');
-  const { checkStripeSubscriptionSync, checkDuplicateStripeCustomers, checkOrphanedPaymentIntents, checkBillingProviderHybridState, checkInvoiceBookingReconciliation } = await import('./stripeChecks');
+  const { checkStripeSubscriptionSync, checkDuplicateStripeCustomers, checkOrphanedPaymentIntents, checkBillingProviderHybridState, checkInvoiceBookingReconciliation, checkLateCancelPreservedPaymentIntents } = await import('./stripeChecks');
   const { checkMembersWithoutEmail, checkStuckTransitionalMembers, checkTierReconciliation, checkMindBodyStaleSyncMembers, checkMindBodyStatusMismatch, checkGuestPassesForNonExistentMembers, checkArchivedMemberLingeringData, checkActiveMembersWithoutWaivers, checkEmailOrphans } = await import('./memberChecks');
 
   const checks = await Promise.all([
@@ -778,6 +778,7 @@ export async function runAllIntegrityChecks(triggeredBy: 'manual' | 'scheduled' 
     safeCheck(checkArchivedMemberLingeringData, 'Archived Member Lingering Data'),
     safeCheck(checkActiveMembersWithoutWaivers, 'Active Members Without Waivers'),
     safeCheck(checkEmailOrphans, 'Email Cascade Orphans'),
+    safeCheck(checkLateCancelPreservedPaymentIntents, 'Late-Cancel Preserved Payment Intents'),
   ]);
 
   const now = new Date();
