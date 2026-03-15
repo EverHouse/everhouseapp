@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useImperativeHandle, forwardRef } from 'react';
+import { createPortal } from 'react-dom';
 import EmptyState from '../../EmptyState';
 import WalkingGolferSpinner from '../../WalkingGolferSpinner';
 import { useRefundPayment } from '../../../hooks/queries/useFinancialsQueries';
@@ -429,8 +430,8 @@ const RecentTransactionsSection = forwardRef<TransactionListRef, SectionProps>((
           </div>
           {content}
         </div>
-        {notesModal}
-        {refundModal}
+        {notesModal && createPortal(notesModal, document.body)}
+        {refundModal && createPortal(refundModal, document.body)}
       </>
     );
   }
@@ -449,8 +450,8 @@ const RecentTransactionsSection = forwardRef<TransactionListRef, SectionProps>((
         </div>
         {content}
       </div>
-      {notesModal}
-      {refundModal}
+      {notesModal && createPortal(notesModal, document.body)}
+      {refundModal && createPortal(refundModal, document.body)}
     </>
   );
 });
