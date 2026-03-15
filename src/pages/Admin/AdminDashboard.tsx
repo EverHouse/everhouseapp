@@ -297,7 +297,7 @@ const AdminDashboard: React.FC = () => {
         />
       </div>
 
-      <BackToTop threshold={200} />
+      <BackToTop />
 
       <MenuOverlay isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} />
 

@@ -357,7 +357,7 @@ const WhatsOn: React.FC = () => {
 
       <Footer />
 
-      <BackToTop threshold={200} />
+      <BackToTop />
     </div>
     </AnimatedPage>
   );

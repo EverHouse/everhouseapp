@@ -871,37 +871,22 @@ input, select, textarea {
   min-width: 48px;
 }
 
-/* Back to top button styles - positioned bottom-right above nav */
+/* Back to top button - portaled to body, positioned via inline styles */
 .back-to-top {
   position: fixed;
-  bottom: calc(var(--nav-clearance) + 8px);
-  right: 1.5rem;
-  z-index: var(--z-fab);
+  z-index: calc(var(--z-fab) - 1);
   opacity: 0;
-  visibility: hidden;
-  transform: translateY(20px);
-  transition: opacity 0.3s ease-out, visibility 0.3s ease-out, transform 0.3s ease-out;
+  pointer-events: none;
+  transform: translateY(16px) scale(0.9);
+  transition: opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+              transform 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+              bottom 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .back-to-top.visible {
   opacity: 1;
-  visibility: visible;
-  transform: translateY(0);
-}
-
-/* When FAB is present (on pages with has-fab class on body), add extra offset for FAB height (56px) + gap */
-body.has-fab .back-to-top {
-  bottom: calc(var(--nav-clearance) + 72px + 56px);
-}
-
-/* When bottom nav is hidden (user at bottom of scroll), reduce bottom offset */
-.back-to-top:not(.with-nav) {
-  bottom: calc(env(safe-area-inset-bottom, 0px) + 1.5rem);
-}
-
-/* Override for FAB pages when nav is hidden */
-body.has-fab .back-to-top:not(.with-nav) {
-  bottom: calc(env(safe-area-inset-bottom, 0px) + 72px + 56px);
+  pointer-events: auto;
+  transform: translateY(0) scale(1);
 }
 
 /* FAB button mobile positioning - uses CSS variable for dynamic bottom value */

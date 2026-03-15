@@ -59,6 +59,12 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
   const { data, refresh, updatePendingRequests, updateBayStatuses, updateTodaysBookings, updateRecentActivity } = useCommandCenterData(actualUser?.email);
   const [actionInProgress, setActionInProgress] = useState<string | null>(null);
   const [fabOpen, setFabOpen] = useState(false);
+
+  useEffect(() => {
+    document.body.classList.add('has-fab');
+    return () => { document.body.classList.remove('has-fab'); };
+  }, []);
+
   const [billingModal, setBillingModal] = useState<{ isOpen: boolean; bookingId: number | null }>({ isOpen: false, bookingId: null });
   const [newUserDrawerOpen, setNewUserDrawerOpen] = useState(false);
   const [newUserDrawerMode, setNewUserDrawerMode] = useState<'member' | 'visitor'>('member');

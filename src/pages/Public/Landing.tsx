@@ -365,7 +365,7 @@ const Landing: React.FC = () => {
       <Footer hideCta />
 
 
-      <BackToTop threshold={200} />
+      <BackToTop />
 
     </div>
     </AnimatedPage>
