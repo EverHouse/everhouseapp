@@ -8,6 +8,17 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.87.32",
+    date: "2026-03-15",
+    title: "Bug Audit — Notification & Wallet Pass Fixes",
+    changes: [
+      "Fixed: Members are now properly notified when Trackman cancels a conflicting booking — notifications were silently failing due to a mismatched function call format in both the webhook and reprocess paths",
+      "Fixed: Apple Wallet pass generation no longer crashes when adding your membership card — a missing membership status field has been added",
+      "Fixed: Staff linking a member to a booking now correctly records the booking ID in the notification — previously passed as text instead of a number",
+      "Fixed: Booking approval notifications now properly skip when the approval message is unavailable, preventing empty notification delivery",
+    ]
+  },
+  {
     version: "8.87.31",
     date: "2026-03-15",
     title: "Deep Code Audit — Race Condition & Logic Bug Fixes",

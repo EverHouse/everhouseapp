@@ -5,7 +5,7 @@ import { sendNotificationToUser, broadcastBookingEvent } from './websocket';
 import { formatTime12Hour, formatDateDisplayWithDay } from '../utils/dateUtils';
 
 import { logger } from './logger';
-import { isSyntheticEmail, notifyMember as notifyMemberFn, notifyAllStaff as notifyAllStaffFn } from './notificationService';
+import { isSyntheticEmail, notifyMember as notifyMemberFn, notifyAllStaff as notifyAllStaffFn, type NotificationType } from './notificationService';
 interface RequestParticipant {
   email: string;
   type: 'member' | 'guest';
@@ -45,7 +45,7 @@ interface PublishOptions {
   memberNotification?: {
     title: string;
     message: string;
-    type: string;
+    type: NotificationType;
   };
   staffNotification?: {
     title: string;

@@ -204,13 +204,13 @@ export async function ensureSessionForBooking(params: {
         [params.trackmanBookingId]
       );
       if (trackmanMatch.rows.length > 0) {
-        sessionId = trackmanMatch.rows[0].id;
+        sessionId = (trackmanMatch.rows[0] as { id: number }).id;
         const activeCheck = await lockClient.query(
           `SELECT COUNT(*) as cnt FROM booking_requests
            WHERE session_id = $1 AND status NOT IN ('cancelled', 'deleted', 'declined')`,
           [sessionId]
         );
-        if (parseInt(activeCheck.rows[0].cnt) === 0) {
+        if (parseInt(String(activeCheck.rows[0].cnt)) === 0) {
           reusedStaleSession = true;
         }
       }
@@ -232,8 +232,8 @@ export async function ensureSessionForBooking(params: {
            RETURNING id, (xmax = 0) AS was_inserted`,
           [params.resourceId, params.sessionDate, params.startTime, params.endTime, params.trackmanBookingId || null, params.source, params.createdBy]
         );
-        sessionId = insertResult.rows[0].id;
-        const wasInserted = insertResult.rows[0].was_inserted;
+        sessionId = (insertResult.rows[0] as { id: number; was_inserted: boolean }).id;
+        const wasInserted = (insertResult.rows[0] as { id: number; was_inserted: boolean }).was_inserted;
         created = wasInserted;
         if (!wasInserted) {
           const activeCheck = await lockClient.query(
@@ -241,7 +241,7 @@ export async function ensureSessionForBooking(params: {
              WHERE session_id = $1 AND status NOT IN ('cancelled', 'deleted', 'declined')`,
             [sessionId]
           );
-          if (parseInt(activeCheck.rows[0].cnt) === 0) {
+          if (parseInt(String(activeCheck.rows[0].cnt)) === 0) {
             reusedStaleSession = true;
           }
         }
@@ -282,7 +282,7 @@ export async function ensureSessionForBooking(params: {
         [params.ownerEmail]
       );
       if (nameResult.rows.length > 0) {
-        const { id, first_name, last_name } = nameResult.rows[0];
+        const { id, first_name, last_name } = nameResult.rows[0] as { id: string | null; first_name: string | null; last_name: string | null };
         if (!resolvedUserId) {
           resolvedUserId = id || null;
         }

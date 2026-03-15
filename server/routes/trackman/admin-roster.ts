@@ -1527,7 +1527,7 @@ router.put('/api/admin/booking/:bookingId/members/:slotId/link', isStaffOrAdmin,
                 title: 'Added to Booking',
                 message: notificationMessage,
                 type: 'booking_approved',
-                relatedId: bookingId,
+                relatedId: Number(bookingId),
                 relatedType: 'booking_request',
                 url: '/sims'
               }, { sendPush: true }).catch(err => logger.error('[AdminRoster] Notification failed', { extra: { error: getErrorMessage(err) } }));
@@ -1542,7 +1542,7 @@ router.put('/api/admin/booking/:bookingId/members/:slotId/link', isStaffOrAdmin,
           });
 
           broadcastBookingRosterUpdate({
-            bookingId: parseInt(bookingId as string),
+            bookingId: Number(bookingId),
             sessionId: sessionId as number,
             action: 'participant_added',
             memberEmail: memberEmail.toLowerCase(),
@@ -1609,7 +1609,7 @@ router.put('/api/admin/booking/:bookingId/members/:slotId/link', isStaffOrAdmin,
           title: 'Added to Booking',
           message: notificationMessage,
           type: 'booking_approved',
-          relatedId: bookingId,
+          relatedId: Number(bookingId),
           relatedType: 'booking_request',
           url: '/sims'
         }, { sendPush: true }).catch(err => logger.error('[AdminRoster] Notification failed', { extra: { error: getErrorMessage(err) } }));

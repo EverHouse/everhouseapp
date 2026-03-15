@@ -647,7 +647,7 @@ export async function approveBooking(params: ApproveBookingParams) {
     return { updated: updatedRow, bayName, approvalMessage, isConferenceRoom, calendarData, prepaymentData: null as typeof prepaymentData, createdSessionId, createdParticipantIds, ownerUserId };
   });
 
-  if (updated.userEmail && !isSyntheticEmail(updated.userEmail)) {
+  if (updated.userEmail && approvalMessage && !isSyntheticEmail(updated.userEmail)) {
     notifyMember({
       userEmail: updated.userEmail,
       title: 'Booking Request Approved',

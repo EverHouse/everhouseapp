@@ -42,8 +42,6 @@ import { ensureSessionForBooking } from '../../core/bookingService/sessionManage
 import { transferRequestParticipantsToSession } from '../../core/trackmanImport';
 import { voidBookingPass } from '../../walletPass/bookingPassService';
 import { cancelPendingPaymentIntentsForBooking, refundSucceededPaymentIntentsForBooking } from '../../core/billing/paymentIntentCleanup';
-import { getErrorMessage } from '../../utils/errorUtils';
-
 function runReprocessConflictSideEffects(bookingId: number, userEmail: string, reason: string): void {
   (async () => {
     try {
@@ -68,13 +66,15 @@ function runReprocessConflictSideEffects(bookingId: number, userEmail: string, r
     voidBookingPass(bookingId).catch(err => logger.error('[Trackman Reprocess] Failed to void wallet pass for conflict-cancelled booking', { extra: { bookingId, error: getErrorMessage(err) } }));
 
     if (userEmail && !userEmail.endsWith('@trackman.local')) {
-      notifyMember(
+      notifyMember({
         userEmail,
-        'Booking Cancelled',
-        `Your booking has been automatically cancelled: ${reason}. Please contact staff if you have questions.`,
-        'booking_cancelled',
-        { relatedId: bookingId, relatedType: 'booking_request', url: '/my-bookings' }
-      ).catch(err => logger.error('[Trackman Reprocess] Failed to notify member about conflict cancellation', { extra: { bookingId, userEmail, error: getErrorMessage(err) } }));
+        title: 'Booking Cancelled',
+        message: `Your booking has been automatically cancelled: ${reason}. Please contact staff if you have questions.`,
+        type: 'booking_cancelled',
+        relatedId: bookingId,
+        relatedType: 'booking_request',
+        url: '/my-bookings'
+      }).catch(err => logger.error('[Trackman Reprocess] Failed to notify member about conflict cancellation', { extra: { bookingId, userEmail, error: getErrorMessage(err) } }));
     }
   })().catch(err => logger.error('[Trackman Reprocess] Conflict cancellation side effects failed', { extra: { bookingId, error: getErrorMessage(err) } }));
 }
