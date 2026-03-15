@@ -25,7 +25,7 @@ const BackToTop: React.FC<BackToTopProps> = ({
   const [pastThreshold, setPastThreshold] = useState(false);
 
   useEffect(() => {
-    const checkFab = () => setHasFab(document.body.classList.contains('has-fab'));
+    const checkFab = () => setHasFab(parseInt(document.body.getAttribute('data-fab-count') || '0', 10) > 0);
     const checkMobile = () => setIsMobile(window.innerWidth < 768);
     const checkBottomNav = () => setHasBottomNav(
       !!document.querySelector('.staff-bottom-nav, .member-bottom-nav')
@@ -36,7 +36,7 @@ const BackToTop: React.FC<BackToTopProps> = ({
     checkBottomNav();
 
     const fabObserver = new MutationObserver(checkFab);
-    fabObserver.observe(document.body, { attributes: true, attributeFilter: ['class'] });
+    fabObserver.observe(document.body, { attributes: true, attributeFilter: ['data-fab-count'] });
 
     const navObserver = new MutationObserver(() => {
       requestAnimationFrame(checkBottomNav);

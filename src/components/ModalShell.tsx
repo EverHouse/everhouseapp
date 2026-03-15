@@ -77,7 +77,8 @@ export function ModalShell({
     const currentCount = parseInt(document.body.getAttribute('data-modal-count') || '0', 10);
     const newZIndex = BASE_MODAL_Z_INDEX + (currentCount * Z_INDEX_INCREMENT);
     setModalZIndex(newZIndex);
-    document.body.setAttribute('data-modal-count', String(currentCount + 1));
+    const myLayer = currentCount + 1;
+    document.body.setAttribute('data-modal-count', String(myLayer));
     
     setTimeout(() => {
       modalRef.current?.focus();
@@ -91,7 +92,8 @@ export function ModalShell({
         document.body.setAttribute('data-modal-count', String(currentCount - 1));
       }
       
-      if (previousActiveElement.current) {
+      const isTopModal = currentCount === myLayer;
+      if (isTopModal && previousActiveElement.current) {
         previousActiveElement.current.focus();
         previousActiveElement.current = null;
       }

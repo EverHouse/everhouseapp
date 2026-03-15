@@ -40,9 +40,15 @@ const FloatingActionButton: React.FC<FloatingActionButtonProps> = ({
   const collapsed = extended && direction === 'down' && !isAtTop;
 
   useEffect(() => {
-    document.body.classList.add('has-fab');
+    const currentCount = parseInt(document.body.getAttribute('data-fab-count') || '0', 10);
+    document.body.setAttribute('data-fab-count', String(currentCount + 1));
     return () => {
-      document.body.classList.remove('has-fab');
+      const currentCount = parseInt(document.body.getAttribute('data-fab-count') || '0', 10);
+      if (currentCount <= 1) {
+        document.body.removeAttribute('data-fab-count');
+      } else {
+        document.body.setAttribute('data-fab-count', String(currentCount - 1));
+      }
     };
   }, []);
 

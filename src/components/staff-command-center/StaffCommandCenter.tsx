@@ -61,8 +61,16 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
   const [fabOpen, setFabOpen] = useState(false);
 
   useEffect(() => {
-    document.body.classList.add('has-fab');
-    return () => { document.body.classList.remove('has-fab'); };
+    const currentCount = parseInt(document.body.getAttribute('data-fab-count') || '0', 10);
+    document.body.setAttribute('data-fab-count', String(currentCount + 1));
+    return () => {
+      const currentCount = parseInt(document.body.getAttribute('data-fab-count') || '0', 10);
+      if (currentCount <= 1) {
+        document.body.removeAttribute('data-fab-count');
+      } else {
+        document.body.setAttribute('data-fab-count', String(currentCount - 1));
+      }
+    };
   }, []);
 
   const [billingModal, setBillingModal] = useState<{ isOpen: boolean; bookingId: number | null }>({ isOpen: false, bookingId: null });

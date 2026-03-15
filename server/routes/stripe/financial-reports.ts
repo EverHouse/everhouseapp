@@ -140,33 +140,61 @@ router.get('/api/stripe/transactions/today', isStaffOrAdmin, async (req: Request
     const startOfDay = getPacificMidnightUTC();
 
     const startTs = Math.floor(startOfDay.getTime() / 1000);
-    const [paymentIntents, charges, passRedemptions] = await Promise.all([
-      stripe.paymentIntents.list({
+
+    const allPaymentIntents: Stripe.PaymentIntent[] = [];
+    let piHasMore = true;
+    let piStartingAfter: string | undefined;
+
+    while (piHasMore && allPaymentIntents.length < 5000) {
+      const page = await stripe.paymentIntents.list({
         created: { gte: startTs },
         limit: 100,
         expand: ['data.customer', 'data.latest_charge'],
-      }),
-      stripe.charges.list({
+        ...(piStartingAfter && { starting_after: piStartingAfter })
+      });
+      allPaymentIntents.push(...page.data);
+      piHasMore = page.has_more;
+      if (page.data.length > 0) {
+        piStartingAfter = page.data[page.data.length - 1].id;
+      } else {
+        break;
+      }
+    }
+
+    const allCharges: Stripe.Charge[] = [];
+    let chHasMore = true;
+    let chStartingAfter: string | undefined;
+
+    while (chHasMore && allCharges.length < 5000) {
+      const page = await stripe.charges.list({
         created: { gte: startTs },
         limit: 100,
         expand: ['data.customer'],
-      }),
-      db.select({
-        id: passRedemptionLogs.id,
-        purchaseId: passRedemptionLogs.purchaseId,
-        redeemedAt: passRedemptionLogs.redeemedAt,
-        redeemedBy: passRedemptionLogs.redeemedBy,
-        purchaserEmail: dayPassPurchases.purchaserEmail,
-        purchaserFirstName: dayPassPurchases.purchaserFirstName,
-        purchaserLastName: dayPassPurchases.purchaserLastName,
-        productType: dayPassPurchases.productType,
-      })
-        .from(passRedemptionLogs)
-        .innerJoin(dayPassPurchases, eq(passRedemptionLogs.purchaseId, dayPassPurchases.id))
-        .where(gte(passRedemptionLogs.redeemedAt, startOfDay))
-        .orderBy(desc(passRedemptionLogs.redeemedAt))
-        .limit(20)
-    ]);
+        ...(chStartingAfter && { starting_after: chStartingAfter })
+      });
+      allCharges.push(...page.data);
+      chHasMore = page.has_more;
+      if (page.data.length > 0) {
+        chStartingAfter = page.data[page.data.length - 1].id;
+      } else {
+        break;
+      }
+    }
+
+    const passRedemptions = await db.select({
+      id: passRedemptionLogs.id,
+      purchaseId: passRedemptionLogs.purchaseId,
+      redeemedAt: passRedemptionLogs.redeemedAt,
+      redeemedBy: passRedemptionLogs.redeemedBy,
+      purchaserEmail: dayPassPurchases.purchaserEmail,
+      purchaserFirstName: dayPassPurchases.purchaserFirstName,
+      purchaserLastName: dayPassPurchases.purchaserLastName,
+      productType: dayPassPurchases.productType,
+    })
+      .from(passRedemptionLogs)
+      .innerJoin(dayPassPurchases, eq(passRedemptionLogs.purchaseId, dayPassPurchases.id))
+      .where(gte(passRedemptionLogs.redeemedAt, startOfDay))
+      .orderBy(desc(passRedemptionLogs.redeemedAt));
 
     const getPaymentEmail = (pi: Stripe.PaymentIntent): string => {
       if (pi.metadata?.memberEmail) return pi.metadata.memberEmail;
@@ -182,12 +210,12 @@ router.get('/api/stripe/transactions/today', isStaffOrAdmin, async (req: Request
       return undefined;
     };
 
-    const chargeEmails = charges.data
+    const chargeEmails = allCharges
       .map(ch => ch.billing_details?.email || (typeof ch.customer === 'object' && ch.customer && !('deleted' in ch.customer) ? ch.customer.email : null))
       .filter((e): e is string => !!e);
 
     const emails = [
-      ...paymentIntents.data.map(getPaymentEmail).filter((e): e is string => !!e),
+      ...allPaymentIntents.map(getPaymentEmail).filter((e): e is string => !!e),
       ...chargeEmails
     ];
     const uniqueEmails = [...new Set(emails)];
@@ -206,9 +234,9 @@ router.get('/api/stripe/transactions/today', isStaffOrAdmin, async (req: Request
       }
     }
 
-    const piIds = new Set(paymentIntents.data.map(pi => pi.id));
+    const piIds = new Set(allPaymentIntents.map(pi => pi.id));
 
-    const stripeTransactions = paymentIntents.data
+    const stripeTransactions = allPaymentIntents
       .filter(pi => {
         if (pi.status !== 'succeeded' && pi.status !== 'processing') return false;
         const charge = typeof pi.latest_charge === 'object' ? pi.latest_charge : null;
@@ -231,7 +259,7 @@ router.get('/api/stripe/transactions/today', isStaffOrAdmin, async (req: Request
         };
       });
 
-    const chargeTransactions = charges.data
+    const chargeTransactions = allCharges
       .filter(ch => ch.paid && !ch.refunded && !(ch.payment_intent && piIds.has(ch.payment_intent as string)))
       .map(ch => {
         const email = ch.billing_details?.email || (typeof ch.customer === 'object' && ch.customer && !('deleted' in ch.customer) ? ch.customer.email : '') || '';

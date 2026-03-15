@@ -558,7 +558,7 @@ export async function memberCancelBooking(bookingId: number, userEmail: string, 
   }
 
   if (!isAdminViewingAs && existing.requestDate && existing.startTime) {
-    const bookingStart = new Date(`${existing.requestDate}T${existing.startTime}`);
+    const bookingStart = createPacificDate(existing.requestDate, existing.startTime);
     if (bookingStart <= new Date()) {
       throw new AppError(400, 'This booking has already started and cannot be cancelled');
     }
