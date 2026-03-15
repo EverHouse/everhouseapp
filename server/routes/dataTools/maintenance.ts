@@ -1045,16 +1045,18 @@ async function runVisitorArchiveInBackground(jobId: string, dryRun: boolean, sta
         const emails = batch.map(v => (v.email as string).toLowerCase());
 
         try {
+          const emailList = sql.join(emails.map(e => sql`${e}`), sql`, `);
+          const idList = sql.join(ids.map(id => sql`${id}`), sql`, `);
           await db.transaction(async (tx) => {
-            await tx.execute(sql`DELETE FROM notifications WHERE LOWER(user_email) = ANY(${emails})`);
-            await tx.execute(sql`DELETE FROM push_subscriptions WHERE LOWER(user_email) = ANY(${emails})`);
-            await tx.execute(sql`DELETE FROM user_dismissed_notices WHERE LOWER(user_email) = ANY(${emails})`);
-            await tx.execute(sql`DELETE FROM user_linked_emails WHERE LOWER(primary_email) = ANY(${emails})`);
-            await tx.execute(sql`DELETE FROM member_notes WHERE LOWER(member_email) = ANY(${emails})`);
-            await tx.execute(sql`DELETE FROM communication_logs WHERE LOWER(member_email) = ANY(${emails})`);
-            await tx.execute(sql`DELETE FROM form_submissions WHERE LOWER(email) = ANY(${emails})`);
-            await tx.execute(sql`DELETE FROM passkeys WHERE "userId" = ANY(${ids})`);
-            await tx.execute(sql`DELETE FROM users WHERE id = ANY(${ids})`);
+            await tx.execute(sql`DELETE FROM notifications WHERE LOWER(user_email) IN (${emailList})`);
+            await tx.execute(sql`DELETE FROM push_subscriptions WHERE LOWER(user_email) IN (${emailList})`);
+            await tx.execute(sql`DELETE FROM user_dismissed_notices WHERE LOWER(user_email) IN (${emailList})`);
+            await tx.execute(sql`DELETE FROM user_linked_emails WHERE LOWER(primary_email) IN (${emailList})`);
+            await tx.execute(sql`DELETE FROM member_notes WHERE LOWER(member_email) IN (${emailList})`);
+            await tx.execute(sql`DELETE FROM communication_logs WHERE LOWER(member_email) IN (${emailList})`);
+            await tx.execute(sql`DELETE FROM form_submissions WHERE LOWER(email) IN (${emailList})`);
+            await tx.execute(sql`DELETE FROM passkeys WHERE "userId" IN (${idList})`);
+            await tx.execute(sql`DELETE FROM users WHERE id IN (${idList})`);
           });
           deletedCount += batch.length;
         } catch (err: unknown) {
