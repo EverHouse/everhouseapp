@@ -4,7 +4,7 @@ import { isProduction } from '../core/db';
 import { db } from '../db';
 import { sql } from 'drizzle-orm';
 import { getGoogleCalendarClient } from '../core/integrations';
-import { CALENDAR_CONFIG, getResourceConfig, getCalendarAvailability, getCalendarStatus, syncConferenceRoomCalendarToBookings, getCalendarIdByName } from '../core/calendar/index';
+import { CALENDAR_CONFIG, getResourceConfig, getCalendarAvailability, getCalendarStatus, syncConferenceRoomCalendarToBookings, getCalendarIdByName, syncGoogleCalendarEvents, syncWellnessCalendarEvents, syncInternalCalendarToClosures } from '../core/calendar/index';
 import { isStaffOrAdmin, isAdmin } from '../core/middleware';
 import { getErrorMessage, safeErrorDetail } from '../utils/errorUtils';
 import { broadcastToStaff } from '../core/websocket';
@@ -234,6 +234,81 @@ router.post('/api/admin/bookings/sync-calendar', isStaffOrAdmin, async (req, res
   } catch (error: unknown) {
     logger.error('Calendar sync error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to sync calendar' });
+  }
+});
+
+router.post('/api/admin/calendar/sync-all', isStaffOrAdmin, async (req, res) => {
+  try {
+    logger.info('[Admin] Running full calendar sync for all event types...');
+
+    const results = await Promise.allSettled([
+      syncGoogleCalendarEvents({ suppressAlert: true }),
+      syncWellnessCalendarEvents({ suppressAlert: true }),
+      syncInternalCalendarToClosures(),
+      syncConferenceRoomCalendarToBookings(),
+    ]);
+
+    const extract = <T>(r: PromiseSettledResult<T>, label: string): T & { error?: string } => {
+      if (r.status === 'fulfilled') return r.value as T & { error?: string };
+      const msg = r.reason instanceof Error ? r.reason.message : String(r.reason);
+      logger.error(`[Admin] ${label} sync failed: ${msg}`);
+      return { error: msg } as T & { error?: string };
+    };
+
+    const eventsResult = extract(results[0], 'Events');
+    const wellnessResult = extract(results[1], 'Wellness');
+    const closuresResult = extract(results[2], 'Closures');
+    const conferenceResult = extract(results[3], 'Conference');
+
+    const allSucceeded = results.every(r => r.status === 'fulfilled');
+
+    logger.info('[Admin] Full calendar sync complete', {
+      extra: {
+        allSucceeded,
+        events: { created: eventsResult.created ?? 0, updated: eventsResult.updated ?? 0 },
+        wellness: { created: wellnessResult.created ?? 0, updated: wellnessResult.updated ?? 0 },
+        closures: { created: closuresResult.created ?? 0, updated: closuresResult.updated ?? 0 },
+        conference: { created: conferenceResult.created ?? 0, updated: conferenceResult.updated ?? 0 },
+      },
+    });
+
+    res.json({
+      success: allSucceeded,
+      partial: !allSucceeded && results.some(r => r.status === 'fulfilled'),
+      events: {
+        synced: eventsResult.synced ?? 0,
+        created: eventsResult.created ?? 0,
+        updated: eventsResult.updated ?? 0,
+        deleted: eventsResult.deleted ?? 0,
+        error: eventsResult.error,
+      },
+      wellness: {
+        synced: wellnessResult.synced ?? 0,
+        created: wellnessResult.created ?? 0,
+        updated: wellnessResult.updated ?? 0,
+        deleted: wellnessResult.deleted ?? 0,
+        error: wellnessResult.error,
+      },
+      closures: {
+        synced: closuresResult.synced ?? 0,
+        created: closuresResult.created ?? 0,
+        updated: closuresResult.updated ?? 0,
+        deleted: closuresResult.deleted ?? 0,
+        error: closuresResult.error,
+      },
+      conference: {
+        synced: conferenceResult.synced ?? 0,
+        created: conferenceResult.created ?? 0,
+        updated: conferenceResult.updated ?? 0,
+        linked: conferenceResult.linked ?? 0,
+        skipped: conferenceResult.skipped ?? 0,
+        cancelled: conferenceResult.cancelled ?? 0,
+        error: conferenceResult.error,
+      },
+    });
+  } catch (error: unknown) {
+    logger.error('Full calendar sync error', { error: error instanceof Error ? error : new Error(String(error)) });
+    res.status(500).json({ success: false, error: 'Failed to sync calendars' });
   }
 });
 

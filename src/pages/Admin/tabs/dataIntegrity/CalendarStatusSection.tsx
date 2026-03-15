@@ -25,6 +25,16 @@ const CalendarStatusSection: React.FC<CalendarStatusSectionProps> = ({
   const [migrationResult, setMigrationResult] = useState<{ success: boolean; results?: MigrationResults; error?: string } | null>(null);
   const [isRestoring, setIsRestoring] = useState(false);
   const [restoreResult, setRestoreResult] = useState<{ success: boolean; restored?: number; skipped?: number; errors?: number; error?: string } | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState<{
+    success: boolean;
+    partial?: boolean;
+    events?: { synced: number; created: number; updated: number; deleted: number; error?: string };
+    wellness?: { synced: number; created: number; updated: number; deleted: number; error?: string };
+    closures?: { synced: number; created: number; updated: number; deleted: number; error?: string };
+    conference?: { synced: number; created: number; updated: number; linked: number; skipped: number; cancelled: number; error?: string };
+    error?: string;
+  } | null>(null);
 
   useEffect(() => {
     fetchWithCredentials<{ running: boolean }>('/api/admin/calendar/cleanup-status')
@@ -62,6 +72,20 @@ const CalendarStatusSection: React.FC<CalendarStatusSectionProps> = ({
       setRestoreResult({ success: false, error: err instanceof Error ? err.message : 'Failed to restore' });
     } finally {
       setIsRestoring(false);
+    }
+  };
+
+  const handleSyncAll = async () => {
+    if (!confirm('This will pull all missing events from Google Calendar into the app. Continue?')) return;
+    setIsSyncing(true);
+    setSyncResult(null);
+    try {
+      const data = await postWithCredentials<typeof syncResult>('/api/admin/calendar/sync-all', {});
+      setSyncResult(data);
+    } catch (err: unknown) {
+      setSyncResult({ success: false, error: err instanceof Error ? err.message : 'Failed to sync' });
+    } finally {
+      setIsSyncing(false);
     }
   };
 
@@ -124,9 +148,55 @@ const CalendarStatusSection: React.FC<CalendarStatusSectionProps> = ({
 
               <div className="pt-3 border-t border-gray-200 dark:border-white/10">
                 <button
+                  onClick={handleSyncAll}
+                  disabled={isSyncing}
+                  className="flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg bg-blue-500/10 dark:bg-blue-400/10 text-blue-700 dark:text-blue-400 hover:bg-blue-500/20 dark:hover:bg-blue-400/20 disabled:opacity-50 transition-colors"
+                >
+                  {isSyncing ? (
+                    <span aria-hidden="true" className="material-symbols-outlined animate-spin text-sm">progress_activity</span>
+                  ) : (
+                    <span aria-hidden="true" className="material-symbols-outlined text-sm">sync</span>
+                  )}
+                  {isSyncing ? 'Syncing all calendars...' : 'Sync Missing Calendar Events'}
+                </button>
+                <p className="mt-1 text-[11px] text-gray-400 dark:text-gray-500">
+                  Pulls all missing events, wellness classes, closures, and conference room bookings from Google Calendar
+                </p>
+
+                {syncResult && (
+                  <div className={`mt-2 p-3 rounded-lg text-sm ${
+                    syncResult.success
+                      ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400'
+                      : syncResult.partial
+                        ? 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400'
+                        : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400'
+                  }`}>
+                    {(syncResult.success || syncResult.partial) ? (
+                      <div className="space-y-1">
+                        <p className="font-medium">{syncResult.partial ? 'Sync partially complete' : 'Sync complete'}</p>
+                        {syncResult.events && (
+                          <p>Events: {syncResult.events.created} created, {syncResult.events.updated} updated, {syncResult.events.deleted} removed{syncResult.events.error ? ` — ${syncResult.events.error}` : ''}</p>
+                        )}
+                        {syncResult.wellness && (
+                          <p>Wellness: {syncResult.wellness.created} created, {syncResult.wellness.updated} updated, {syncResult.wellness.deleted} removed{syncResult.wellness.error ? ` — ${syncResult.wellness.error}` : ''}</p>
+                        )}
+                        {syncResult.closures && (
+                          <p>Closures: {syncResult.closures.created} created, {syncResult.closures.updated} updated, {syncResult.closures.deleted} removed{syncResult.closures.error ? ` — ${syncResult.closures.error}` : ''}</p>
+                        )}
+                        {syncResult.conference && (
+                          <p>Conference: {syncResult.conference.created} created, {syncResult.conference.updated} updated, {syncResult.conference.linked} linked{syncResult.conference.error ? ` — ${syncResult.conference.error}` : ''}</p>
+                        )}
+                      </div>
+                    ) : (
+                      <p>{syncResult.error || 'Sync failed'}</p>
+                    )}
+                  </div>
+                )}
+
+                <button
                   onClick={handleMigrateDescriptions}
                   disabled={isMigrating}
-                  className="flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg bg-primary/10 dark:bg-white/10 text-primary dark:text-white hover:bg-primary/20 dark:hover:bg-white/20 disabled:opacity-50 transition-colors"
+                  className="flex items-center gap-2 px-3 py-2 mt-3 text-sm font-medium rounded-lg bg-primary/10 dark:bg-white/10 text-primary dark:text-white hover:bg-primary/20 dark:hover:bg-white/20 disabled:opacity-50 transition-colors"
                 >
                   {isMigrating ? (
                     <span aria-hidden="true" className="material-symbols-outlined animate-spin text-sm">progress_activity</span>
