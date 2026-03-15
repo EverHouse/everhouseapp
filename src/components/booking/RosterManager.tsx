@@ -377,10 +377,22 @@ const RosterManager: React.FC<RosterManagerProps> = ({
   const totalEstimatedFees = feePreview?.ownerFees?.estimatedTotalFees ?? ((feePreview?.ownerFees?.estimatedOverageFee ?? 0) + (feePreview?.ownerFees?.estimatedGuestFees ?? 0));
   const hasEstimatedFees = totalEstimatedFees > 0;
   const isPaid = !!(feePreview?.allPaid);
-  const showEstimatedFees = isOwner && !isPaid && hasEstimatedFees;
+
+  const hasPayableParticipantFees = useMemo(() => {
+    if (!feePreview || isPaid) return false;
+    const hasPendingGuests = pendingGuestFees.count > 0;
+    const ownerParticipant = participants.find(p => p.participantType === 'owner');
+    const ownerHasUnpaidFee = ownerParticipant &&
+      (ownerParticipant.paymentStatus === 'pending' || ownerParticipant.paymentStatus === null) &&
+      (feePreview?.ownerFees?.estimatedOverageFee ?? 0) > 0;
+    return hasPendingGuests || !!ownerHasUnpaidFee;
+  }, [feePreview, isPaid, pendingGuestFees, participants]);
+
+  const showPayableUnpaidFees = isOwner && hasPayableParticipantFees;
+  const showEmptySlotEstimate = isOwner && !isPaid && hasEstimatedFees && !hasPayableParticipantFees;
   const showFeesPaid = isOwner && isPaid && hasEstimatedFees;
 
-  const hasUnpaidFees = showEstimatedFees;
+  const hasUnpaidFees = showPayableUnpaidFees;
 
   const handlePaymentSuccess = useCallback(() => {
     setShowPaymentModal(false);
@@ -619,7 +631,7 @@ const RosterManager: React.FC<RosterManagerProps> = ({
                 </>
               )}
 
-              {showEstimatedFees && (
+              {showPayableUnpaidFees && (
                 <div className={`mt-4 pt-4 border-t ${isDark ? 'border-white/10' : 'border-black/5'}`}>
                   <div className="flex items-center justify-between mb-3">
                     <div>
@@ -652,6 +664,24 @@ const RosterManager: React.FC<RosterManagerProps> = ({
                       Pay now or at check-in once booking is approved
                     </p>
                   )}
+                </div>
+              )}
+
+              {showEmptySlotEstimate && (
+                <div className={`mt-4 pt-4 border-t ${isDark ? 'border-white/10' : 'border-black/5'}`}>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className={`text-sm font-semibold ${isDark ? 'text-amber-600' : 'text-amber-600'}`}>
+                        Estimated Fees
+                      </p>
+                      <p className={`text-xs ${isDark ? 'text-white/50' : 'text-[#293515]/50'}`}>
+                        Fill empty slots or pay at check-in
+                      </p>
+                    </div>
+                    <span className={`text-lg font-bold ${isDark ? 'text-amber-400' : 'text-amber-600'}`}>
+                      ${totalEstimatedFees.toFixed(2)}
+                    </span>
+                  </div>
                 </div>
               )}
 
