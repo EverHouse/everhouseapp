@@ -8,6 +8,22 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.87.35",
+    date: "2026-03-15",
+    title: "Financial Safety, Booking Cleanup & Payment Reliability Fixes",
+    changes: [
+      "Fixed: Staff and webhook-initiated booking cancellations now properly release simulator bay slots — previously only member-initiated cancellations cleaned up availability",
+      "Fixed: Declining a multi-slot booking now releases all time slots instead of only the first one",
+      "Fixed: Payment cleanup on page navigation now reliably completes even if the browser is closing the tab",
+      "Fixed: If a refund succeeds but the local record update fails, the system now flags the record for reconciliation instead of silently losing track",
+      "Fixed: Failed cancellation side effects (refunds, calendar cleanup) are now tracked in a recovery table for staff resolution instead of being silently lost",
+      "Fixed: Non-booking payments (merchandise, cafe) now use unique transaction keys to prevent false duplicate detection",
+      "Fixed: Invoice-based payments now store the actual Stripe payment ID instead of a fabricated identifier",
+      "Fixed: Guest pass holds are no longer released prematurely if the booking deletion fails partway through",
+      "Fixed: Payment record user IDs are now stored correctly in all payment flows",
+    ]
+  },
+  {
     version: "8.87.34",
     date: "2026-03-15",
     title: "Critical Financial & Checkout Bug Fixes",
