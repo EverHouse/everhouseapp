@@ -139,12 +139,13 @@ Defined in `server/core/hubspot/constants.ts`, the membership pipeline stages ar
 
 | Form Type       | Environment Variable              | Usage                     |
 |-----------------|-----------------------------------|---------------------------|
-| tour-request    | HUBSPOT_FORM_TOUR_REQUEST         | Tour scheduling requests  |
 | membership      | HUBSPOT_FORM_MEMBERSHIP           | Membership inquiries      |
 | private-hire    | HUBSPOT_FORM_PRIVATE_HIRE         | Private event inquiries   |
 | event-inquiry   | HUBSPOT_FORM_EVENT_INQUIRY        | Event-related inquiries   |
 | guest-checkin   | HUBSPOT_FORM_GUEST_CHECKIN        | Guest check-in forms      |
 | contact         | HUBSPOT_FORM_CONTACT              | General contact forms     |
+
+> **Note (v8.87.33):** `tour-request` was removed — tours now use HubSpot Meeting Scheduler API (`hubspot.tour_scheduler_url` admin setting), not forms. See the Tour Scheduler Integration section in the main SKILL.md.
 
 ### Sync Pipeline
 
@@ -163,7 +164,7 @@ Defined in `server/core/hubspot/constants.ts`, the membership pipeline stages ar
 
 `resolveFormId(formType)` is **async** and uses a 4-tier fallback:
 
-1. **Environment variable** — `HUBSPOT_FORM_TOUR_REQUEST`, `HUBSPOT_FORM_MEMBERSHIP`, etc.
+1. **Environment variable** — `HUBSPOT_FORM_MEMBERSHIP`, `HUBSPOT_FORM_PRIVATE_HIRE`, etc.
 2. **Admin setting** — `hubspot.form_id.{formType}` in the admin Settings page (30s cache via `getSettingValue`)
 3. **Auto-discovered** — `discoveredFormIds` map, populated each sync by `updateDiscoveredFormIds()`
 4. **Hardcoded** — `HUBSPOT_KNOWN_FORM_IDS` lookup table
@@ -176,7 +177,6 @@ At startup, `logFormIdResolutionStatus()` logs which form types have resolved ID
 - `check-in` / `checkin` / `waiver` → `guest-checkin`
 - `membership` / `application` → `membership`
 - `private` + (`event` / `hire`) → `private-hire`
-- `tour` → `tour-request`
 - `contact` → `contact`
 - `event` / `inquiry` → `event-inquiry`
 - No match → returns `null` (form skipped with log)

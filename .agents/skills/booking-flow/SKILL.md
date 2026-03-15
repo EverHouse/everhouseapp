@@ -87,6 +87,9 @@ Is this inside a db.transaction()?
 6. NEVER create new roster editors or player management modals — use the Unified Booking Sheet.
 7. NEVER use raw `fetch()` to booking endpoints in UI components — use `useBookingActions()` hook.
 8. NEVER call `finalizeAndPayInvoice()` without first checking `getBookingInvoiceId()` — conference room bookings within daily allowance have zero fees and no invoice. All three conference room paths (member, staff, approval) must guard with this check (v8.87.7).
+9. NEVER call `refundGuestPass()` inside a `db.transaction()` without passing the transaction client as `txClient` — creates a nested transaction that deadlocks. See `bookingStateService.ts` for the correct pattern (v8.87.34).
+10. NEVER issue a Stripe refund for the full `amount_cents` without first querying `amount_cents - COALESCE(refunded_amount_cents, 0)` — partial refunds may have already been issued. For Stripe card refunds, omit the explicit `amount` param so Stripe defaults to the remaining balance (v8.87.34).
+11. NEVER use `.catch()` chains for rollback `db.execute()` calls in cancellation paths — use `await` + `try/catch` to prevent floating promises and unhandled rejections (v8.87.34).
 
 ## Cross-References
 
