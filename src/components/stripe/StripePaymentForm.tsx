@@ -223,8 +223,14 @@ export function StripePaymentWithSecret({
   const [stripeInstance, setStripeInstance] = useState<Stripe | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const paymentSucceededRef = useRef(false);
   const { effectiveTheme } = useTheme();
   const isDark = effectiveTheme === 'dark';
+
+  const wrappedOnSuccess = React.useCallback((paymentIntentId?: string) => {
+    paymentSucceededRef.current = true;
+    onSuccess(paymentIntentId);
+  }, [onSuccess]);
 
   useEffect(() => {
     const initStripe = async () => {
@@ -241,7 +247,22 @@ export function StripePaymentWithSecret({
       }
     };
     initStripe();
-  }, []);
+
+    return () => {
+      if (clientSecret && !paymentSucceededRef.current) {
+        const piId = clientSecret.split('_secret_')[0];
+        if (piId && piId.startsWith('pi_')) {
+          fetch('/api/stripe/cancel-payment', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ paymentIntentId: piId }),
+          }).catch((err: unknown) => { console.warn('[StripePaymentWithSecret] Failed to cancel payment on unmount:', err); });
+        }
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clientSecret]);
 
   if (loading) {
     return (
@@ -282,7 +303,7 @@ export function StripePaymentWithSecret({
               ${amount.toFixed(2)}
             </span>
           </div>
-          <SimpleCheckoutForm onSuccess={onSuccess} onCancel={onCancel} />
+          <SimpleCheckoutForm onSuccess={wrappedOnSuccess} onCancel={onCancel} />
         </div>
       </Elements>
     </div>

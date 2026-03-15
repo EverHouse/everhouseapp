@@ -228,8 +228,13 @@ export async function createInvoiceWithLineItems(params: CreatePOSInvoiceParams)
   }
   const cartTotal = cartItems.reduce((sum, item) => sum + (item.priceCents * item.quantity), 0);
 
-  const checkoutNonce = crypto.randomBytes(8).toString('hex');
-  const invoiceIdempotencyKey = `invoice_pos_${customerId}_${checkoutNonce}`;
+  const sortedCartFingerprint = cartItems
+    .map(item => `${item.name}:${item.priceCents}:${item.quantity}`)
+    .sort()
+    .join('|');
+  const descriptionHash = crypto.createHash('sha256').update(description || '').digest('hex').substring(0, 12);
+  const cartHash = crypto.createHash('sha256').update(sortedCartFingerprint).digest('hex').substring(0, 16);
+  const invoiceIdempotencyKey = `invoice_pos_${customerId}_${cartHash}_${descriptionHash}`;
   const invoice = await stripe.invoices.create({
     customer: customerId,
     auto_advance: false,
@@ -452,6 +457,14 @@ export async function cancelPaymentIntent(
     if (pi.status === 'succeeded') {
       logger.warn(`[Stripe] Payment ${paymentIntentId} already succeeded, use refund instead`);
       return { success: false, error: 'Payment already succeeded, use refund instead' };
+    }
+
+    if (pi.status === 'processing') {
+      logger.warn(`[Stripe] Payment ${paymentIntentId} is processing, cannot cancel yet`);
+      await db.execute(sql`UPDATE stripe_payment_intents 
+         SET status = 'processing', updated_at = NOW() 
+         WHERE stripe_payment_intent_id = ${paymentIntentId}`);
+      return { success: false, error: 'Payment is processing, cannot cancel' };
     }
 
     let invoiceId: string | null = null;

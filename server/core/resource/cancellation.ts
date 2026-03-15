@@ -411,6 +411,48 @@ export async function deleteBooking(bookingId: number, archivedBy: string, hardD
       });
     }
 
+    try {
+      const associatedPIs = await db.execute(sql`
+        SELECT stripe_payment_intent_id, status, amount_cents
+        FROM stripe_payment_intents
+        WHERE booking_id = ${bookingId}
+      `);
+      for (const row of associatedPIs.rows as unknown as Array<{ stripe_payment_intent_id: string; status: string; amount_cents: number }>) {
+        try {
+          if (row.status === 'succeeded' && !row.stripe_payment_intent_id.startsWith('balance-')) {
+            const stripe = await getStripeClient();
+            await stripe.refunds.create({
+              payment_intent: row.stripe_payment_intent_id,
+              reason: 'requested_by_customer',
+              metadata: { reason: 'hard_delete_booking', bookingId: String(bookingId) },
+            }, { idempotencyKey: `refund_hard_delete_${bookingId}_${row.stripe_payment_intent_id}` });
+            logger.info('[DELETE /api/bookings] Refunded succeeded PI before hard delete', {
+              extra: { bookingId, paymentIntentId: row.stripe_payment_intent_id }
+            });
+          } else if (row.status !== 'canceled' && row.status !== 'refunded' && !row.stripe_payment_intent_id.startsWith('balance-')) {
+            const cancelResult = await cancelPaymentIntent(row.stripe_payment_intent_id);
+            if (!cancelResult.success) {
+              logger.warn('[DELETE /api/bookings] Failed to cancel PI before hard delete', {
+                extra: { bookingId, paymentIntentId: row.stripe_payment_intent_id, error: cancelResult.error }
+              });
+            } else {
+              logger.info('[DELETE /api/bookings] Cancelled PI before hard delete', {
+                extra: { bookingId, paymentIntentId: row.stripe_payment_intent_id }
+              });
+            }
+          }
+        } catch (piErr: unknown) {
+          logger.warn('[DELETE /api/bookings] Failed to refund/cancel PI before hard delete', {
+            extra: { bookingId, paymentIntentId: row.stripe_payment_intent_id, error: getErrorMessage(piErr) }
+          });
+        }
+      }
+    } catch (piQueryErr: unknown) {
+      logger.warn('[DELETE /api/bookings] Failed to query PIs before hard delete', {
+        extra: { bookingId, error: getErrorMessage(piQueryErr) }
+      });
+    }
+
     await db.transaction(async (tx) => {
       if (booking.sessionId) {
         await tx.execute(sql`DELETE FROM booking_participants WHERE session_id = ${booking.sessionId}`);
@@ -568,7 +610,13 @@ export async function memberCancelBooking(bookingId: number, userEmail: string, 
     throw new AppError(400, 'Booking is already cancelled');
   }
   if (existing.status === 'cancellation_pending') {
-    throw new AppError(400, 'Cancellation is already in progress');
+    if (isAdminViewingAs) {
+      logger.warn('[memberCancelBooking] Staff force-cancelling booking stuck in cancellation_pending', {
+        extra: { bookingId, staffEmail: userEmail, actingAsEmail }
+      });
+    } else {
+      throw new AppError(400, 'Cancellation is already in progress');
+    }
   }
 
   if (!isAdminViewingAs && existing.requestDate && existing.startTime) {

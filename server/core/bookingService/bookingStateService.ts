@@ -141,12 +141,18 @@ export class BookingStateService {
     }
 
     if (booking.status === 'cancellation_pending' && source !== 'trackman_webhook') {
-      return {
-        success: true,
-        status: 'cancellation_pending',
-        bookingId,
-        bookingData: this.extractBookingData(booking),
-      };
+      if (source === 'staff') {
+        logger.warn('[BookingStateService] Staff force-cancelling booking stuck in cancellation_pending', {
+          extra: { bookingId, source, cancelledBy }
+        });
+      } else {
+        return {
+          success: true,
+          status: 'cancellation_pending',
+          bookingId,
+          bookingData: this.extractBookingData(booking),
+        };
+      }
     }
 
     const isTrackmanLinked = !!booking.trackmanBookingId && /^\d+$/.test(booking.trackmanBookingId);
@@ -260,6 +266,31 @@ export class BookingStateService {
               bookingId,
               balanceRecordId: rec.stripe_payment_intent_id,
               description: `Refund for cancelled booking #${bookingId}`,
+            });
+          }
+        }
+
+        const pendingParticipantsWithPI = await tx.select({
+          id: bookingParticipants.id,
+          stripePaymentIntentId: bookingParticipants.stripePaymentIntentId,
+        })
+          .from(bookingParticipants)
+          .where(and(
+            eq(bookingParticipants.sessionId, booking.sessionId),
+            or(
+              eq(bookingParticipants.paymentStatus, 'pending'),
+              isNull(bookingParticipants.paymentStatus),
+            ),
+            isNotNull(bookingParticipants.stripePaymentIntentId),
+            ne(bookingParticipants.stripePaymentIntentId, ''),
+          ));
+
+        for (const pending of pendingParticipantsWithPI) {
+          if (pending.stripePaymentIntentId) {
+            sideEffects.stripeRefunds.push({
+              paymentIntentId: pending.stripePaymentIntentId,
+              type: 'cancel',
+              idempotencyKey: `cancel_pending_participant_${bookingId}_${pending.stripePaymentIntentId}`,
             });
           }
         }
@@ -499,11 +530,39 @@ export class BookingStateService {
       }
 
       if (existing.sessionId) {
+        const pendingParticipantsWithPI = await tx.select({
+          id: bookingParticipants.id,
+          stripePaymentIntentId: bookingParticipants.stripePaymentIntentId,
+        })
+          .from(bookingParticipants)
+          .where(and(
+            eq(bookingParticipants.sessionId, existing.sessionId),
+            or(
+              eq(bookingParticipants.paymentStatus, 'pending'),
+              isNull(bookingParticipants.paymentStatus),
+            ),
+            isNotNull(bookingParticipants.stripePaymentIntentId),
+            ne(bookingParticipants.stripePaymentIntentId, ''),
+          ));
+
+        for (const pending of pendingParticipantsWithPI) {
+          if (pending.stripePaymentIntentId) {
+            sideEffects.stripeRefunds.push({
+              paymentIntentId: pending.stripePaymentIntentId,
+              type: 'cancel',
+              idempotencyKey: `cancel_pending_complete_${bookingId}_${pending.stripePaymentIntentId}`,
+            });
+          }
+        }
+
         await tx.update(bookingParticipants)
           .set({ cachedFeeCents: 0, paymentStatus: 'waived' })
           .where(and(
             eq(bookingParticipants.sessionId, existing.sessionId),
-            eq(bookingParticipants.paymentStatus, 'pending'),
+            or(
+              eq(bookingParticipants.paymentStatus, 'pending'),
+              isNull(bookingParticipants.paymentStatus),
+            ),
           ));
 
         const paidParticipants = await tx.select({
