@@ -10,7 +10,8 @@ import { db } from '../../db';
 import { resources, bookingRequests } from '../../../shared/schema';
 import { eq, and, sql } from 'drizzle-orm';
 import { getSessionUser } from '../../types/session';
-import { ensureSessionForBooking } from '../../core/bookingService/sessionManager';
+import { ensureSessionForBooking, createTxQueryClient } from '../../core/bookingService/sessionManager';
+import { acquireBookingLocks } from '../../core/bookingService/bookingCreationGuard';
 import { resolveUserByEmail } from '../../core/stripe/customers';
 import { checkClosureConflict, checkAvailabilityBlockConflict } from '../../core/bookingValidation';
 import { refreshBookingPass } from '../../walletPass/bookingPassService';
@@ -173,6 +174,17 @@ router.post('/api/staff/manual-booking', isStaffOrAdmin, async (req, res) => {
     
     try {
       const txResult = await db.transaction(async (tx) => {
+        await acquireBookingLocks(tx, {
+          resourceId: resource_id || null,
+          requestDate: request_date,
+          startTime: start_time,
+          endTime: end_time,
+          requestEmail: resolvedEmail,
+          isStaffRequest: true,
+          isViewAsMode: false,
+          resourceType: resource_id ? 'simulator' : 'simulator'
+        });
+
         if (isDayPassPayment) {
           const dayPassResult = await tx.execute(sql`
             SELECT id, purchaser_email, redeemed_at, status, remaining_uses, booking_id
@@ -298,6 +310,24 @@ router.post('/api/staff/manual-booking', isStaffOrAdmin, async (req, res) => {
           logger.info('[StaffManualBooking] Day pass redeemed for booking', { extra: { dayPassPurchaseId, bookingId } });
         }
         
+        if (isDayPassPayment && dbRow.resource_id) {
+          try {
+            await ensureSessionForBooking({
+              bookingId: bookingId,
+              resourceId: dbRow.resource_id as number,
+              sessionDate: request_date,
+              startTime: start_time,
+              endTime: (dbRow.end_time as string) || end_time,
+              ownerEmail: resolvedEmail,
+              ownerName: user_name || (dbRow.user_name as string) || undefined,
+              source: 'staff_manual',
+              createdBy: 'staff_manual_day_pass'
+            }, createTxQueryClient(tx));
+          } catch (sessionErr: unknown) {
+            logger.error('[StaffManualBooking] Failed to ensure session', { extra: { sessionErr } });
+          }
+        }
+
         return {
           row: {
             id: dbRow.id as number,
@@ -322,24 +352,6 @@ router.post('/api/staff/manual-booking', isStaffOrAdmin, async (req, res) => {
       
       row = txResult.row;
       dayPassRedeemed = txResult.dayPassRedeemed;
-
-      if (isDayPassPayment && row.resourceId) {
-        try {
-          await ensureSessionForBooking({
-            bookingId: row.id as number,
-            resourceId: row.resourceId as number,
-            sessionDate: request_date,
-            startTime: start_time,
-            endTime: (row.endTime as string) || end_time,
-            ownerEmail: resolvedEmail,
-            ownerName: user_name || row.userName || undefined,
-            source: 'staff_manual',
-            createdBy: 'staff_manual_day_pass'
-          });
-        } catch (sessionErr: unknown) {
-          logger.error('[StaffManualBooking] Failed to ensure session', { extra: { sessionErr } });
-        }
-      }
     } catch (error: unknown) {
       if (error instanceof ManualBookingValidationError) {
         return res.status(error.statusCode).json(error.errorBody);

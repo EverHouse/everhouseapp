@@ -92,7 +92,9 @@ Has trackman_booking_id?
 24. **Session lookup must NOT filter by booking status.** Cancelled bookings may share sessions. Filtering causes unique constraint violations.
 25. **Stuck cancellation safety net.** Scheduler runs every 2 hr, alerts staff about bookings in `cancellation_pending` for 4+ hours.
 
-26. **Wallet pass hooks on Trackman import changes (v8.87.13).** When a Trackman import updates a booking's time, duration, or bay assignment, call `refreshBookingPass(bookingId)` to regenerate the Apple Wallet pass with updated details. When a Trackman import cancels a booking, call `voidBookingPass(bookingId)` to invalidate the pass. Both are fire-and-forget (`.catch(err => logger.error(...))`). Import from `../../walletPass/bookingPassService`.
+26. **Notifications via `notifyMember()` / `notifyAllStaff()` only (v8.87.28).** NEVER insert directly into the `notifications` table from booking files. Use `notifyMember()` for member notifications and `notifyAllStaff()` for staff-wide notifications from `server/core/notificationService.ts`. These handle in-app DB insert, WebSocket broadcast, and push notification delivery in a single call.
+27. **Trackman service uses structured logger (v8.87.28).** NEVER use `process.stderr.write` in `server/core/trackman/service.ts`. All logging uses `logger.info/warn/error` with structured metadata.
+28. **Wallet pass hooks on Trackman import changes (v8.87.13).** When a Trackman import updates a booking's time, duration, or bay assignment, call `refreshBookingPass(bookingId)` to regenerate the Apple Wallet pass with updated details. When a Trackman import cancels a booking, call `voidBookingPass(bookingId)` to invalidate the pass. Both are fire-and-forget (`.catch(err => logger.error(...))`). Import from `../../walletPass/bookingPassService`.
 
 ## Anti-Patterns (NEVER)
 
@@ -107,6 +109,8 @@ Has trackman_booking_id?
 9. NEVER filter session lookups by booking status — sessions can be shared across bookings including cancelled ones.
 10. NEVER call `recalculateSessionFees()` without calling `invalidateCachedFees()` first — stale cached fees cause the recalculation to skip participants, producing incorrect fee totals.
 11. NEVER add a member to a booking without calling `findConflictingBookings()` first — applies to both member-facing `addParticipant` and staff-facing link-member endpoints.
+12. NEVER insert directly into `notifications` table from booking code — use `notifyMember()` or `notifyAllStaff()`.
+13. NEVER use `process.stderr.write` in Trackman service — use structured `logger.*` calls.
 
 ## Cross-References
 

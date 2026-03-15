@@ -8,6 +8,19 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.87.28",
+    date: "2026-03-15",
+    title: "Booking Workflow Audit — Safety & Consistency Fixes",
+    changes: [
+      "Fixed: Financial cleanup (refunds, invoice void, guest pass refunds) now runs before the booking status is set to 'cancelled' — prevents partial cancellation where the booking shows cancelled but the member wasn't refunded",
+      "Fixed: Staff manual bookings now use advisory locks and atomic session creation — prevents double-booking race conditions",
+      "Fixed: Check-in fee computation now runs outside the database transaction — prevents blocking other operations during fee calculation",
+      "Fixed: Trackman auto-approve session creation is now atomic with the status update — prevents orphaned sessions if the status update fails",
+      "Improved: All Trackman service logging now uses structured format for better monitoring and debugging",
+      "Improved: Booking notifications now use the centralized notification system — consistent delivery across push, in-app, and WebSocket channels",
+    ]
+  },
+  {
     version: "8.87.27",
     date: "2026-03-15",
     title: "Trackman Cancellation Safety — Idempotent Refund Handling",

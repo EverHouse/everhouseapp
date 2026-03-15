@@ -3,7 +3,7 @@ import { Router } from 'express';
 import { isStaffOrAdmin } from '../../core/middleware';
 import { db } from '../../db';
 import { sql } from 'drizzle-orm';
-import { sendPushNotification } from '../push';
+import { notifyMember } from '../../core/notificationService';
 import { getGuestPassesRemaining, useGuestPass, ensureGuestPassRecord } from '../guestPasses';
 import { getMemberTierByEmail, getTierLimits } from '../../core/tierService';
 import { computeFeeBreakdown, recalculateSessionFees } from '../../core/billing/unifiedFeeService';
@@ -1518,19 +1518,15 @@ router.put('/api/admin/booking/:bookingId/members/:slotId/link', isStaffOrAdmin,
             if (bookingDateTime > now && bookingForNotif.status === 'approved') {
               const notificationMessage = `You've been added to a simulator booking on ${new Date(bookingDate as string).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'America/Los_Angeles' })}.`;
               
-              await db.execute(sql`INSERT INTO notifications (user_email, title, message, type, related_id, related_type)
-                 VALUES (${memberEmail.toLowerCase()}, ${'Added to Booking'}, ${notificationMessage}, ${'booking_approved'}, ${bookingId}, ${'booking_request'})`);
-              
-              sendPushNotification(memberEmail.toLowerCase(), {
+              await notifyMember({
+                userEmail: memberEmail.toLowerCase(),
                 title: 'Added to Booking',
-                body: notificationMessage,
-                url: '/sims',
-                tag: `booking-${bookingId}`
-              }).catch((err) => {
-                logger.error('[trackman-admin] Failed to send push notification on empty slot link', {
-                  error: err instanceof Error ? err : new Error(String(err))
-                });
-              });
+                message: notificationMessage,
+                type: 'booking_approved',
+                relatedId: bookingId,
+                relatedType: 'booking_request',
+                url: '/sims'
+              }, { sendPush: true }).catch(err => logger.error('[AdminRoster] Notification failed', { extra: { error: getErrorMessage(err) } }));
             }
           }
 
@@ -1604,19 +1600,15 @@ router.put('/api/admin/booking/:bookingId/members/:slotId/link', isStaffOrAdmin,
       if (bookingDateTime > now && booking.status === 'approved') {
         const notificationMessage = `You've been added to a simulator booking on ${new Date(bookingDate as string).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'America/Los_Angeles' })}.`;
         
-        await db.execute(sql`INSERT INTO notifications (user_email, title, message, type, related_id, related_type)
-           VALUES (${memberEmail.toLowerCase()}, ${'Added to Booking'}, ${notificationMessage}, ${'booking_approved'}, ${bookingId}, ${'booking_request'})`);
-        
-        sendPushNotification(memberEmail.toLowerCase(), {
+        await notifyMember({
+          userEmail: memberEmail.toLowerCase(),
           title: 'Added to Booking',
-          body: notificationMessage,
-          url: '/sims',
-          tag: `booking-${bookingId}`
-        }).catch((err) => {
-          logger.error('[trackman-admin] Failed to send push notification on member link', {
-            error: err instanceof Error ? err : new Error(String(err))
-          });
-        });
+          message: notificationMessage,
+          type: 'booking_approved',
+          relatedId: bookingId,
+          relatedType: 'booking_request',
+          url: '/sims'
+        }, { sendPush: true }).catch(err => logger.error('[AdminRoster] Notification failed', { extra: { error: getErrorMessage(err) } }));
       }
     }
     

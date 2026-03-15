@@ -261,6 +261,10 @@ ensureSessionForBooking({ bookingId, resourceId, sessionDate, startTime, endTime
   ├── Link booking to session:
   │   └── UPDATE booking_requests SET session_id = $1 WHERE id = $2
   │
+  ├── Transaction-aware mode (v8.87.28):
+  │   └── Pass createTxQueryClient(tx) as externalTx to run all SQL inside the caller's transaction
+  │       Used by: manualBooking.ts, webhook-handlers.ts (Trackman auto-approve)
+  │
   ├── Retry logic (when not inside an external transaction):
   │   ├── First attempt fails → wait 500ms, retry once
   │   └── Retry also fails → flag booking for staff review:

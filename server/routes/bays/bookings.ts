@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { db } from '../../db';
-import { bookingRequests, resources, users, bookingParticipants, notifications } from '../../../shared/schema';
+import { bookingRequests, resources, users, bookingParticipants } from '../../../shared/schema';
 import { eq, and, or, desc, sql, SQL, inArray } from 'drizzle-orm';
 
 class BookingValidationError extends Error {
@@ -10,7 +10,7 @@ class BookingValidationError extends Error {
   }
 }
 import { checkDailyBookingLimit, getMemberTierByEmail, getTierLimits, getDailyBookedMinutes } from '../../core/tierService';
-import { notifyAllStaff, isSyntheticEmail } from '../../core/notificationService';
+import { notifyAllStaff, notifyMember, isSyntheticEmail } from '../../core/notificationService';
 import { formatDateDisplayWithDay, formatTime12Hour, createPacificDate, getTodayPacific } from '../../utils/dateUtils';
 import {logAndRespond, logger } from '../../core/logger';
 import { bookingEvents } from '../../core/bookingEvents';
@@ -1270,14 +1270,14 @@ router.put('/api/booking-requests/:id/member-cancel', isAuthenticated, async (re
       ).catch((err: unknown) => logger.error('Staff cancellation notification failed:', { error: err instanceof Error ? err : new Error(getErrorMessage(err)) }));
       
       if (existing.userEmail && !isSyntheticEmail(existing.userEmail)) {
-        await db.insert(notifications).values({
+        await notifyMember({
           userEmail: existing.userEmail,
           title: 'Cancellation Request Submitted',
           message: `Your cancellation request for ${bookingDate} at ${bookingTime} has been submitted. You'll be notified once it's fully processed.`,
           type: 'cancellation_pending',
           relatedId: bookingId,
           relatedType: 'booking_request'
-        });
+        }, { sendPush: true }).catch(err => logger.error('[Member Cancel] Notification failed', { extra: { error: getErrorMessage(err) } }));
       }
       
       await logMemberAction({
@@ -1341,22 +1341,6 @@ router.put('/api/booking-requests/:id/member-cancel', isAuthenticated, async (re
           logger.info('[Member Cancel] Late cancellation — preserving pending fees for session', { extra: { sessionId: existing.sessionId } });
         }
       }
-      
-      const cancelResult = await tx.update(bookingRequests)
-        .set({
-          status: 'cancelled',
-          staffNotes: staffNotes || undefined,
-          updatedAt: new Date()
-        })
-        .where(and(
-          eq(bookingRequests.id, bookingId),
-          inArray(bookingRequests.status, ['pending', 'pending_approval', 'approved', 'confirmed'])
-        ))
-        .returning({ id: bookingRequests.id });
-      
-      if (cancelResult.length === 0) {
-        throw new Error('Booking could not be cancelled. Its status was changed concurrently by a staff member.');
-      }
     });
     
     if (!shouldSkipRefund) {
@@ -1370,26 +1354,6 @@ router.put('/api/booking-requests/:id/member-cancel', isAuthenticated, async (re
       }
     } else {
       logger.info('[Member Cancel] Late cancellation — skipping guest pass refund', { extra: { bookingId, hoursUntilStart } });
-    }
-    
-    if (!shouldSkipRefund) {
-      try {
-        await voidBookingInvoice(bookingId);
-      } catch (err: unknown) {
-        logger.error('[Member Cancel] Failed to void/refund booking invoice (non-blocking)', {
-          extra: { bookingId, error: getErrorMessage(err) }
-        });
-      }
-    } else {
-      logger.info('[Member Cancel] Late cancellation — preserving booking invoice for fee collection', { extra: { bookingId } });
-    }
-    
-    if (!shouldSkipRefund) {
-      try {
-        await cancelPendingPaymentIntentsForBooking(bookingId);
-      } catch (cancelIntentsErr: unknown) {
-        logger.error('[Member Cancel] Failed to cancel pending payment intents (non-blocking)', { extra: { error: getErrorMessage(cancelIntentsErr) } });
-      }
     }
     
     let refundedAmountCents = 0;
@@ -1418,6 +1382,16 @@ router.put('/api/booking-requests/:id/member-cancel', isAuthenticated, async (re
                 if ((alreadyRefunding.rows?.length || 0) > 0) {
                   await db.execute(sql`UPDATE booking_participants SET payment_status = 'refunded', refunded_at = NOW() WHERE id = ${rawParticipant.id}`);
                   logger.info('[Member Cancel] PI already queued for refund by invoice void, marking participant refunded', { extra: { bookingId, participantId: rawParticipant.id, piId: rawParticipant.stripe_payment_intent_id } });
+                  continue;
+                }
+                const claimResult = await db.execute(sql`UPDATE stripe_payment_intents 
+                   SET status = 'refunding' 
+                   WHERE stripe_payment_intent_id = ${rawParticipant.stripe_payment_intent_id as string} 
+                   AND status = 'succeeded'
+                   RETURNING id`);
+                if ((claimResult.rows?.length || 0) === 0) {
+                  logger.info('[Member Cancel] PI already claimed for refund, skipping', { extra: { bookingId, piId: rawParticipant.stripe_payment_intent_id } });
+                  await db.execute(sql`UPDATE booking_participants SET payment_status = 'refunded', refunded_at = NOW() WHERE id = ${rawParticipant.id}`);
                   continue;
                 }
                 const pi = await stripe.paymentIntents.retrieve(rawParticipant.stripe_payment_intent_id as string);
@@ -1449,6 +1423,42 @@ router.put('/api/booking-requests/:id/member-cancel', isAuthenticated, async (re
       }
     } else {
       refundSkippedDueToLateCancel = true;
+    }
+    
+    if (!shouldSkipRefund) {
+      try {
+        await voidBookingInvoice(bookingId);
+      } catch (err: unknown) {
+        logger.error('[Member Cancel] Failed to void/refund booking invoice (non-blocking)', {
+          extra: { bookingId, error: getErrorMessage(err) }
+        });
+      }
+    } else {
+      logger.info('[Member Cancel] Late cancellation — preserving booking invoice for fee collection', { extra: { bookingId } });
+    }
+    
+    if (!shouldSkipRefund) {
+      try {
+        await cancelPendingPaymentIntentsForBooking(bookingId);
+      } catch (cancelIntentsErr: unknown) {
+        logger.error('[Member Cancel] Failed to cancel pending payment intents (non-blocking)', { extra: { error: getErrorMessage(cancelIntentsErr) } });
+      }
+    }
+    
+    const cancelResult = await db.update(bookingRequests)
+      .set({
+        status: 'cancelled',
+        staffNotes: staffNotes || undefined,
+        updatedAt: new Date()
+      })
+      .where(and(
+        eq(bookingRequests.id, bookingId),
+        inArray(bookingRequests.status, ['pending', 'pending_approval', 'approved', 'confirmed'])
+      ))
+      .returning({ id: bookingRequests.id });
+    
+    if (cancelResult.length === 0) {
+      throw new Error('Booking could not be cancelled. Its status was changed concurrently by a staff member.');
     }
     
     try {

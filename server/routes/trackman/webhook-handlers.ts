@@ -118,7 +118,7 @@ interface InsertedBookingRow {
   was_inserted: boolean;
 }
 
-import { ensureSessionForBooking } from '../../core/bookingService/sessionManager';
+import { ensureSessionForBooking, createTxQueryClient } from '../../core/bookingService/sessionManager';
 import { recalculateSessionFees } from '../../core/billing/unifiedFeeService';
 import { createDraftInvoiceForBooking, syncBookingInvoice } from '../../core/billing/bookingInvoiceService';
 import { checkUnifiedAvailability as checkAvailabilityForModification } from '../../core/bookingService/availabilityGuard';
@@ -663,7 +663,7 @@ export async function tryAutoApproveBooking(
             trackmanBookingId,
             source: 'trackman_webhook',
             createdBy: 'trackman_webhook'
-          });
+          }, createTxQueryClient(tx));
 
           if (!sessionResult.sessionId) {
             throw new Error(`SESSION_FAILED: ${sessionResult.error}`);

@@ -1,10 +1,9 @@
 import { db } from '../../db';
-import { bookingRequests, resources, notifications, bookingParticipants, stripePaymentIntents } from '../../../shared/schema';
+import { bookingRequests, resources, bookingParticipants, stripePaymentIntents } from '../../../shared/schema';
 import { eq, and, or, ne, sql, isNull, isNotNull } from 'drizzle-orm';
-import { sendPushNotification } from '../../routes/push';
 import { formatNotificationDateTime } from '../../utils/dateUtils';
 import { logger } from '../logger';
-import { notifyAllStaff } from '../notificationService';
+import { notifyAllStaff, notifyMember, isSyntheticEmail } from '../notificationService';
 import { bookingEvents } from '../bookingEvents';
 import { sendNotificationToUser, broadcastAvailabilityUpdate } from '../websocket';
 import { refundGuestPass } from '../../routes/guestPasses';
@@ -44,6 +43,7 @@ interface SideEffectsManifest {
   calendarDeletion: { eventId: string; resourceId: number | null } | null;
   notifications: {
     staffNotification?: { title: string; message: string };
+    memberNotification?: { userEmail: string; title: string; message: string; type: 'booking_cancelled' | 'cancellation_pending'; relatedId: number; relatedType: string };
     memberPush?: { email: string; title: string; body: string };
     memberWebSocket?: { email: string; title: string; message: string; bookingId: number };
   };
@@ -318,15 +318,7 @@ export class BookingStateService {
         const staffMessage = `${booking.userName || booking.userEmail} has cancelled their ${statusLabel} for ${friendlyDateTime}.`;
         const memberMessage = `Your ${statusLabel} for ${friendlyDateTime} has been cancelled.`;
 
-        await tx.insert(notifications).values({
-          userEmail: booking.userEmail,
-          title: 'Booking Cancelled',
-          message: memberMessage,
-          type: 'booking_cancelled',
-          relatedId: bookingId,
-          relatedType: 'booking_request',
-        });
-
+        sideEffects.notifications.memberNotification = { userEmail: booking.userEmail, title: 'Booking Cancelled', message: memberMessage, type: 'booking_cancelled' as const, relatedId: bookingId, relatedType: 'booking_request' };
         sideEffects.notifications.staffNotification = { title: 'Booking Cancelled by Member', message: staffMessage };
         sideEffects.notifications.memberPush = { email: booking.userEmail, title: 'Booking Cancelled', body: memberMessage };
         sideEffects.notifications.memberWebSocket = { email: booking.userEmail, title: 'Booking Cancelled', message: memberMessage, bookingId };
@@ -335,14 +327,7 @@ export class BookingStateService {
           ? `Your booking for ${friendlyDateTime} has been cancelled. Any applicable charges have been refunded.`
           : `Your ${statusLabel} for ${friendlyDateTime} has been cancelled by staff.`;
 
-        await tx.insert(notifications).values({
-          userEmail: booking.userEmail,
-          title: 'Booking Cancelled',
-          message: memberMessage,
-          type: 'booking_cancelled',
-          relatedId: bookingId,
-          relatedType: 'booking_request',
-        });
+        sideEffects.notifications.memberNotification = { userEmail: booking.userEmail, title: 'Booking Cancelled', message: memberMessage, type: 'booking_cancelled' as const, relatedId: bookingId, relatedType: 'booking_request' };
 
         if (source === 'trackman_webhook') {
           sideEffects.notifications.staffNotification = {
@@ -613,21 +598,11 @@ export class BookingStateService {
 
       const memberMessage = `Your booking for ${friendlyDateTime} has been cancelled and any charges have been refunded.`;
 
-      await tx.insert(notifications).values({
-        userEmail: existing.userEmail || '',
-        title: 'Booking Cancelled',
-        message: memberMessage,
-        type: 'booking_cancelled',
-        relatedId: bookingId,
-        relatedType: 'booking_request',
-      });
-
       const staffTitle = source === 'trackman_webhook' ? 'Cancellation Completed via TrackMan' : 'Cancellation Completed';
       const staffMsg = `Cancellation completed via ${completedByLabel}: ${existing.userName || existing.userEmail}'s booking for ${friendlyDateTime}`;
 
+      sideEffects.notifications.memberNotification = { userEmail: existing.userEmail || '', title: 'Booking Cancelled', message: memberMessage, type: 'booking_cancelled' as const, relatedId: bookingId, relatedType: 'booking_request' };
       sideEffects.notifications.staffNotification = { title: staffTitle, message: staffMsg };
-      sideEffects.notifications.memberPush = { email: existing.userEmail || '', title: 'Booking Cancelled', body: memberMessage };
-      sideEffects.notifications.memberWebSocket = { email: existing.userEmail || '', title: 'Booking Cancelled', message: memberMessage, bookingId };
 
       return sideEffects;
     });
@@ -671,15 +646,19 @@ export class BookingStateService {
         })
         .where(eq(bookingRequests.id, bookingId));
 
-      await tx.insert(notifications).values({
+    });
+
+    if (booking.userEmail && !isSyntheticEmail(booking.userEmail)) {
+      notifyMember({
         userEmail: booking.userEmail,
         title: 'Booking Cancellation in Progress',
         message: `Your booking for ${bookingDate} at ${bookingTime} is being cancelled. You'll be notified once it's fully processed.`,
         type: 'cancellation_pending',
         relatedId: bookingId,
         relatedType: 'booking_request',
-      });
-    });
+        url: '/sims'
+      }, { sendPush: true }).catch(err => logger.error('[BookingStateService] Member notification failed', { extra: { error: getErrorMessage(err) } }));
+    }
 
     const staffMessage = `Booking cancellation pending for ${memberName} on ${bookingDate} at ${bookingTime} (${bayName}). Please cancel in Trackman to complete.`;
     notifyAllStaff(
@@ -688,15 +667,6 @@ export class BookingStateService {
       'booking_cancelled',
       { relatedId: bookingId, relatedType: 'booking_request', url: '/admin/bookings' },
     ).catch(err => logger.error('[BookingStateService] Staff cancellation notification failed', { extra: { error: getErrorMessage(err) } }));
-
-    if (booking.userEmail) {
-      sendPushNotification(booking.userEmail, {
-        title: 'Booking Cancellation in Progress',
-        body: `Your booking for ${bookingDate} at ${bookingTime} is being cancelled. You'll be notified once it's fully processed.`,
-        url: '/sims',
-        tag: `booking-${bookingId}`
-      }).catch(err => logger.error('[BookingStateService] Member push notification failed', { extra: { error: getErrorMessage(err) } }));
-    }
 
     return {
       success: true,
@@ -827,6 +797,19 @@ export class BookingStateService {
       }
     }
 
+    if (manifest.notifications.memberNotification) {
+      const mn = manifest.notifications.memberNotification;
+      notifyMember({
+        userEmail: mn.userEmail,
+        title: mn.title,
+        message: mn.message,
+        type: mn.type,
+        relatedId: mn.relatedId,
+        relatedType: mn.relatedType,
+        url: '/sims'
+      }, { sendPush: true, sendWebSocket: true }).catch(err => logger.error('[BookingStateService] Member notification failed', { extra: { error: getErrorMessage(err) } }));
+    }
+
     if (manifest.notifications.staffNotification) {
       notifyAllStaff(
         manifest.notifications.staffNotification.title,
@@ -836,16 +819,7 @@ export class BookingStateService {
       ).catch(err => logger.error('[BookingStateService] Staff notification failed', { extra: { error: getErrorMessage(err) } }));
     }
 
-    if (manifest.notifications.memberPush) {
-      sendPushNotification(manifest.notifications.memberPush.email, {
-        title: manifest.notifications.memberPush.title,
-        body: manifest.notifications.memberPush.body,
-        url: '/sims',
-        tag: `booking-${manifest.bookingEvent?.bookingId || 'unknown'}`
-      }).catch(err => logger.error('[BookingStateService] Member push failed', { extra: { error: getErrorMessage(err) } }));
-    }
-
-    if (manifest.notifications.memberWebSocket) {
+    if (manifest.notifications.memberWebSocket && !manifest.notifications.memberNotification) {
       const ws = manifest.notifications.memberWebSocket;
       sendNotificationToUser(ws.email, {
         type: 'notification',

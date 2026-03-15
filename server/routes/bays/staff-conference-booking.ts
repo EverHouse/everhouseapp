@@ -14,6 +14,7 @@ import { getCalendarIdByName, getCalendarBusyTimes } from '../../core/calendar';
 import { CALENDAR_CONFIG } from '../../core/calendar/config';
 import { broadcastAvailabilityUpdate } from '../../core/websocket';
 import { getErrorMessage } from '../../utils/errorUtils';
+import { notifyMember, isSyntheticEmail } from '../../core/notificationService';
 import { getSettingValue } from '../../core/settingsHelper';
 import { ensureSessionForBooking } from '../../core/bookingService/sessionManager';
 import { recalculateSessionFees } from '../../core/billing/unifiedFeeService';
@@ -319,20 +320,19 @@ router.post('/api/staff/conference-room/booking', isStaffOrAdmin, async (req: Re
       const formattedDate = formatDateDisplayWithDay(date);
       const formattedTime = formatTime12Hour(startTime);
 
-      await client.query(
-        `INSERT INTO notifications (user_email, title, message, type, related_id, related_type, is_read, created_at)
-         VALUES ($1, $2, $3, $4, $5, $6, false, NOW())`,
-        [
-          normalizedEmail,
-          'Conference Room Booked',
-          `A conference room booking was created for you on ${formattedDate} at ${formattedTime} by staff.`,
-          'booking',
-          bookingId,
-          'booking_request'
-        ]
-      );
-
       await client.query('COMMIT');
+
+      if (!isSyntheticEmail(normalizedEmail)) {
+        notifyMember({
+          userEmail: normalizedEmail,
+          title: 'Conference Room Booked',
+          message: `A conference room booking was created for you on ${formattedDate} at ${formattedTime} by staff.`,
+          type: 'booking',
+          relatedId: bookingId,
+          relatedType: 'booking_request',
+          url: '/sims'
+        }, { sendPush: true }).catch(err => logger.error('[ConferenceBooking] Notification failed', { extra: { error: getErrorMessage(err) } }));
+      }
 
       logFromRequest(req, 'create_booking', 'booking', String(bookingId), hostName || normalizedEmail, {
         resourceType: 'conference_room',

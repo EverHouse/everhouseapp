@@ -17,7 +17,42 @@ import {
   BookingParticipant,
   bookingSourceEnum
 } from '../../../shared/schema';
-import { eq, and, isNull, sql } from 'drizzle-orm';
+import { eq, and, isNull, sql, sql as drizzleSql, type SQL } from 'drizzle-orm';
+
+export interface TxQueryClient {
+  query(text: string, values?: unknown[]): Promise<{ rows: Record<string, unknown>[]; rowCount?: number | null }>;
+}
+
+function buildSqlFromRaw(text: string, values: unknown[]): SQL {
+  if (values.length === 0) return drizzleSql.raw(text);
+
+  const strings: string[] = [];
+  const sqlValues: unknown[] = [];
+  let lastIndex = 0;
+  const regex = /\$(\d+)/g;
+  let match;
+
+  while ((match = regex.exec(text)) !== null) {
+    strings.push(text.slice(lastIndex, match.index));
+    const paramIndex = parseInt(match[1]) - 1;
+    sqlValues.push(values[paramIndex]);
+    lastIndex = match.index + match[0].length;
+  }
+  strings.push(text.slice(lastIndex));
+
+  const templateStrings = Object.assign([...strings], { raw: [...strings] });
+  return drizzleSql(templateStrings as unknown as TemplateStringsArray, ...sqlValues);
+}
+
+export function createTxQueryClient(tx: { execute: (query: SQL) => Promise<{ rows: Record<string, unknown>[]; rowCount?: number | null }> }): TxQueryClient {
+  return {
+    async query(text: string, values: unknown[] = []) {
+      const sqlQuery = buildSqlFromRaw(text, values);
+      const result = await tx.execute(sqlQuery);
+      return { rows: result.rows as Record<string, unknown>[], rowCount: result.rowCount ?? null };
+    }
+  };
+}
 import { logger } from '../logger';
 import { getMemberTierByEmail } from '../tierService';
 import { getTodayPacific } from '../../utils/dateUtils';
@@ -127,7 +162,7 @@ export async function ensureSessionForBooking(params: {
   trackmanBookingId?: string;
   source: BookingSource;
   createdBy: string;
-}, client?: PoolClient): Promise<{ sessionId: number; created: boolean; error?: string }> {
+}, client?: PoolClient | TxQueryClient): Promise<{ sessionId: number; created: boolean; error?: string }> {
   if (!params.startTime || !params.endTime) {
     return { sessionId: 0, created: false, error: 'Missing start_time or end_time' };
   }
@@ -148,7 +183,7 @@ export async function ensureSessionForBooking(params: {
     let sessionId: number | null = null;
     let created = false;
 
-    const lockClient = client || await pool.connect();
+    const lockClient: TxQueryClient = client || await pool.connect();
     const manageLockClient = !client;
     try {
       const lockKey = `${params.resourceId}::${params.sessionDate}`;
@@ -304,7 +339,7 @@ export async function ensureSessionForBooking(params: {
       }
     } finally {
       if (manageLockClient) {
-        safeRelease(lockClient);
+        safeRelease(lockClient as unknown as PoolClient);
       }
     }
   };

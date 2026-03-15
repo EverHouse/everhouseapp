@@ -80,9 +80,9 @@ Staff scans QR code (MEMBER:<uuid>)
 
 1. NEVER allow check-in with unpaid fees — always enforce prepayment settlement.
 2. NEVER consume guest passes for placeholder guests ("Guest 1", "Guest 2").
-3. NEVER call fee calculation inside a transaction.
+3. NEVER call fee calculation inside a transaction. Fee computation (`computeFeeBreakdown`) and snapshot insert run outside `db.transaction()` using plain `db.execute()` (v8.87.28).
 4. NEVER create inline check-in buttons without the BookingStatusDropdown component.
-5. NEVER insert directly into `notifications` table — use `notifyMember()`.
+5. NEVER insert directly into `notifications` table — use `notifyMember()` or `notifyAllStaff()` from `server/core/notificationService.ts`.
 
 ## Cross-References
 

@@ -2,6 +2,17 @@
 
 All notable changes to the Ever Club Members App are documented here.
 
+## [8.87.28] - 2026-03-15
+
+### Booking Workflow Audit Fixes
+- **Member Cancel Financial Cleanup**: Financial cleanup (PI refunds, invoice voiding, guest pass refunds) now runs before status is set to `cancelled` in the booking cancellation flow.
+- **Staff Manual Booking Locks**: Added advisory locks (`acquireBookingLocks`) and atomic session creation inside the transaction for staff manual bookings.
+- **Check-in Fee Computation**: `computeFeeBreakdown()` and snapshot insert moved outside the database transaction in the staff check-in confirm_all path.
+- **Trackman Auto-Approve Atomicity**: `ensureSessionForBooking` now runs inside the same transaction as the status update in Trackman webhook handlers via `TxQueryClient` adapter.
+- **Structured Logging**: Replaced all ~112 `process.stderr.write` calls in `trackman/service.ts` with structured `logger.info/warn/error` calls using template literals.
+- **Unified Notifications**: Replaced ~25 direct `db.insert(notifications)` calls across booking files (`bookings.ts`, `bookingStateService.ts`, `trackman/service.ts`, `approvalService.ts`, `bookingEvents.ts`, `webhook-billing.ts`, `admin-roster.ts`) with `notifyMember()` / `notifyAllStaff()` from the centralized notification service.
+- **Files**: `server/routes/bays/bookings.ts`, `server/routes/staff/manualBooking.ts`, `server/routes/staffCheckin.ts`, `server/routes/trackman/webhook-handlers.ts`, `server/routes/trackman/webhook-billing.ts`, `server/routes/trackman/admin-roster.ts`, `server/core/bookingService/sessionManager.ts`, `server/core/bookingService/bookingStateService.ts`, `server/core/bookingService/approvalService.ts`, `server/core/bookingEvents.ts`, `server/core/trackman/service.ts`
+
 ## [8.86.2] - 2026-03-14
 
 ### Project Cleanup & Dead Code Removal

@@ -92,6 +92,7 @@ Does it write to the database?
 8. NEVER log raw error objects — always use `getErrorMessage(err)` from `utils/errorUtils`.
 9. NEVER call `stripe.paymentIntents.cancel()` directly — always use `cancelPaymentIntent()` from `server/core/stripe/payments.ts`. It detects invoice-generated PIs (via `expand: ['invoice']` + booking DB fallback) and voids/deletes the invoice instead, since Stripe rejects direct cancel on invoice-created PIs.
 10. NEVER call `stripe.paymentIntents.confirm()` on invoice-generated PIs — always use `stripe.invoices.pay(invoiceId)` instead. Detect invoice PIs via `expand: ['invoice']` on retrieve, with DB fallback via `getBookingInvoiceId(bookingId)`.
+11. NEVER insert directly into `notifications` table from webhook handlers — use `notifyMember()` / `notifyAllStaff()` from `server/core/notificationService.ts` (v8.87.28).
 
 ## Cross-References
 

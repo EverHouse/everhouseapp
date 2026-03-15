@@ -3,6 +3,7 @@ import { sql } from 'drizzle-orm';
 import { logger } from '../../core/logger';
 import { getErrorMessage } from '../../utils/errorUtils';
 import { sendNotificationToUser, broadcastToStaff, broadcastAvailabilityUpdate } from '../../core/websocket';
+import { notifyMember } from '../../core/notificationService';
 import { refundGuestPass } from '../guestPasses';
 import { calculateFullSessionBilling, Participant } from '../../core/bookingService/usageCalculator';
 import { recalculateSessionFees } from '../../core/billing/unifiedFeeService';
@@ -432,8 +433,14 @@ export async function createBookingForMember(
       
       const confirmMessage = `Your simulator booking for ${slotDate} at ${startTime} (${bayNameForNotification}) has been confirmed.${feeInfo}`;
       
-      await db.execute(sql`INSERT INTO notifications (user_email, title, message, type, related_type, created_at)
-         VALUES (${member.email.toLowerCase()}, ${'Booking Confirmed'}, ${confirmMessage}, ${'booking'}, ${'booking'}, NOW())`);
+      await notifyMember({
+        userEmail: member.email.toLowerCase(),
+        title: 'Booking Confirmed',
+        message: confirmMessage,
+        type: 'booking_confirmed',
+        relatedType: 'booking',
+        url: '/sims'
+      }, { sendPush: true }).catch(err => logger.error('[WebhookBilling] Notification failed', { extra: { error: getErrorMessage(err) } }));
       
       sendNotificationToUser(member.email, {
         type: 'booking_confirmed',
@@ -670,8 +677,14 @@ export async function createBookingForMember(
         }
       });
       
-      await db.execute(sql`INSERT INTO notifications (user_email, title, message, type, related_type, created_at)
-         VALUES (${member.email.toLowerCase()}, ${'Booking Confirmed'}, ${`Your simulator booking for ${slotDate} at ${startTime} (${bayNameForNotification}) has been confirmed.`}, ${'booking'}, ${'booking'}, NOW())`);
+      await notifyMember({
+        userEmail: member.email.toLowerCase(),
+        title: 'Booking Confirmed',
+        message: `Your simulator booking for ${slotDate} at ${startTime} (${bayNameForNotification}) has been confirmed.`,
+        type: 'booking_confirmed',
+        relatedType: 'booking',
+        url: '/sims'
+      }, { sendPush: true }).catch(err => logger.error('[WebhookBilling] Notification failed', { extra: { error: getErrorMessage(err) } }));
       
       sendNotificationToUser(member.email, {
         type: 'booking_confirmed',

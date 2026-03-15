@@ -622,15 +622,6 @@ export async function approveBooking(params: ApproveBookingParams) {
     const resourceTypeName = isConferenceRoom ? 'conference room' : 'simulator';
     const approvalMessage = `Your ${resourceTypeName} booking for ${formatNotificationDateTime(updatedRow.requestDate, updatedRow.startTime)} has been approved.`;
 
-    await tx.insert(notifications).values({
-      userEmail: updatedRow.userEmail,
-      title: 'Booking Request Approved',
-      message: approvalMessage,
-      type: 'booking_approved',
-      relatedId: updatedRow.id,
-      relatedType: 'booking_request'
-    });
-
     await tx.update(notifications)
       .set({ isRead: true })
       .where(and(
@@ -655,6 +646,18 @@ export async function approveBooking(params: ApproveBookingParams) {
 
     return { updated: updatedRow, bayName, approvalMessage, isConferenceRoom, calendarData, prepaymentData: null as typeof prepaymentData, createdSessionId, createdParticipantIds, ownerUserId };
   });
+
+  if (updated.userEmail && !isSyntheticEmail(updated.userEmail)) {
+    notifyMember({
+      userEmail: updated.userEmail,
+      title: 'Booking Request Approved',
+      message: approvalMessage,
+      type: 'booking_approved',
+      relatedId: bookingId,
+      relatedType: 'booking_request',
+      url: '/sims'
+    }, { sendPush: true }).catch(err => logger.error('[Approval] Post-commit notification failed', { extra: { error: getErrorMessage(err) } }));
+  }
 
   let prepaymentData: { sessionId: number; bookingId: number; userId: string | null; userEmail: string; userName: string; totalFeeCents: number; feeBreakdown: { overageCents: number; guestCents: number }; createdSessionId: number } | null = null;
   if (createdSessionId && createdParticipantIds.length > 0) {
@@ -833,22 +836,16 @@ async function notifyLinkedMembers(bookingId: number, updated: BookingUpdateResu
       if (member.userEmail && member.userEmail.toLowerCase() !== updated.userEmail.toLowerCase() && !isSyntheticEmail(member.userEmail)) {
         const linkedMessage = `A booking you're part of has been confirmed for ${formatNotificationDateTime(updated.requestDate, updated.startTime)}.`;
 
-        await db.insert(notifications).values({
+        await notifyMember({
           userEmail: member.userEmail,
           title: 'Booking Confirmed',
           message: linkedMessage,
           type: 'booking_approved',
           relatedId: bookingId,
-          relatedType: 'booking_request'
-        });
-
-        sendPushNotification(member.userEmail, {
-          title: 'Booking Confirmed',
-          body: linkedMessage,
-          url: '/sims',
-          tag: `booking-${bookingId}`
-        }).catch((err) => {
-          logger.error('[approval] Failed to send push notification on approval', {
+          relatedType: 'booking_request',
+          url: '/sims'
+        }, { sendPush: true }).catch((err) => {
+          logger.error('[approval] Failed to send notification on approval', {
             error: err instanceof Error ? err : new Error(String(err))
           });
         });
@@ -908,14 +905,15 @@ async function notifyApprovalParticipants(bookingId: number, updated: BookingUpd
 
       const notificationMsg = `${ownerName} has added you to their simulator booking on ${formattedDate} at ${formattedTime}.`;
 
-      await db.insert(notifications).values({
+      await notifyMember({
         userEmail: participantEmail,
         title: 'Added to Booking',
         message: notificationMsg,
         type: 'booking',
         relatedType: 'booking',
-        relatedId: bookingId
-      });
+        relatedId: bookingId,
+        url: '/sims'
+      }, { sendPush: true }).catch(err => logger.error('[approval] Participant notification failed', { extra: { error: getErrorMessage(err) } }));
 
       sendNotificationToUser(participantEmail, {
         type: 'notification',
@@ -985,15 +983,6 @@ export async function declineBooking(params: DeclineBookingParams) {
       ? `Your ${resourceTypeName} booking request for ${formatDateDisplayWithDay(updatedRow.requestDate)} was declined. Suggested alternative: ${formatTime12Hour(suggested_time)}`
       : `Your ${resourceTypeName} booking request for ${formatDateDisplayWithDay(updatedRow.requestDate)} was declined.`;
 
-    await tx.insert(notifications).values({
-      userEmail: updatedRow.userEmail,
-      title: 'Booking Request Declined',
-      message: declineMessage,
-      type: 'booking_declined',
-      relatedId: updatedRow.id,
-      relatedType: 'booking_request'
-    });
-
     await tx.update(notifications)
       .set({ isRead: true })
       .where(and(
@@ -1004,6 +993,18 @@ export async function declineBooking(params: DeclineBookingParams) {
 
     return { updated: updatedRow, declineMessage, resourceTypeName };
   });
+
+  if (updated.userEmail && !isSyntheticEmail(updated.userEmail)) {
+    notifyMember({
+      userEmail: updated.userEmail,
+      title: 'Booking Request Declined',
+      message: declineMessage,
+      type: 'booking_declined',
+      relatedId: bookingId,
+      relatedType: 'booking_request',
+      url: '/dashboard'
+    }, { sendPush: true }).catch(err => logger.error('[Approval] Decline notification failed', { extra: { error: getErrorMessage(err) } }));
+  }
 
   await releaseGuestPassHold(bookingId);
 
@@ -1321,27 +1322,9 @@ export async function cancelBooking(params: CancelBookingParams) {
       const staffMessage = `${memberName} has cancelled their ${statusLabel} for ${friendlyDateTime}.`;
       const memberMessage = `Your ${statusLabel} for ${friendlyDateTime} has been cancelled.`;
 
-      await tx.insert(notifications).values({
-        userEmail: memberEmail,
-        title: 'Booking Cancelled',
-        message: memberMessage,
-        type: 'booking_cancelled',
-        relatedId: bookingId,
-        relatedType: 'booking_request'
-      });
-
       pushInfo = { type: 'both', email: memberEmail, staffMessage, memberMessage, message: staffMessage };
     } else {
       const memberMessage = `Your ${statusLabel} for ${friendlyDateTime} has been cancelled by staff.`;
-
-      await tx.insert(notifications).values({
-        userEmail: memberEmail,
-        title: 'Booking Cancelled',
-        message: memberMessage,
-        type: 'booking_cancelled',
-        relatedId: bookingId,
-        relatedType: 'booking_request'
-      });
 
       pushInfo = { type: 'member', email: memberEmail, message: memberMessage };
     }
@@ -1505,21 +1488,15 @@ export async function handlePendingCancellation(bookingId: number, bookingData: 
   ).catch(err => logger.error('Staff cancellation notification failed:', { extra: { err } }));
 
   if (bookingData.userEmail && !isSyntheticEmail(bookingData.userEmail)) {
-    await db.insert(notifications).values({
+    await notifyMember({
       userEmail: bookingData.userEmail,
       title: 'Booking Cancellation in Progress',
       message: `Your booking for ${bookingDate} at ${bookingTime} is being cancelled. You'll be notified once it's fully processed.`,
       type: 'cancellation_pending',
       relatedId: bookingId,
-      relatedType: 'booking_request'
-    });
-
-    sendPushNotification(bookingData.userEmail, {
-      title: 'Booking Cancellation in Progress',
-      body: `Your booking for ${bookingDate} at ${bookingTime} is being cancelled. You'll be notified once it's fully processed.`,
-      url: '/sims',
-      tag: `booking-${bookingId}`
-    }).catch(err => logger.error('Member push notification failed:', { extra: { err } }));
+      relatedType: 'booking_request',
+      url: '/sims'
+    }, { sendPush: true }).catch(err => logger.error('Member cancellation notification failed:', { extra: { err } }));
   }
 }
 
@@ -1562,13 +1539,16 @@ export async function handleCancelPostTransaction(
           url: '/admin/bookings'
         }
       ).catch(err => logger.error('Staff cancellation notification failed:', { extra: { err } }));
-      if (pushInfo.email) {
-        sendPushNotification(pushInfo.email, {
+      if (pushInfo.email && !isSyntheticEmail(pushInfo.email)) {
+        notifyMember({
+          userEmail: pushInfo.email,
           title: 'Booking Cancelled',
-          body: pushInfo.memberMessage || pushInfo.message,
-          url: '/sims',
-          tag: `booking-${bookingId}`
-        }).catch(err => logger.error('Member push notification failed:', { extra: { err } }));
+          message: pushInfo.memberMessage || pushInfo.message,
+          type: 'booking_cancelled',
+          relatedId: bookingId,
+          relatedType: 'booking_request',
+          url: '/sims'
+        }, { sendPush: true }).catch(err => logger.error('Member cancellation notification failed:', { extra: { err } }));
       }
     } else if (pushInfo.type === 'staff') {
       notifyAllStaff(
@@ -1581,13 +1561,16 @@ export async function handleCancelPostTransaction(
           url: '/admin/bookings'
         }
       ).catch(err => logger.error('Staff cancellation notification failed:', { extra: { err } }));
-    } else if (pushInfo.email) {
-      sendPushNotification(pushInfo.email, {
+    } else if (pushInfo.email && !isSyntheticEmail(pushInfo.email)) {
+      notifyMember({
+        userEmail: pushInfo.email,
         title: 'Booking Cancelled',
-        body: pushInfo.message,
-        url: '/sims',
-        tag: `booking-${bookingId}`
-      }).catch(err => logger.error('Member push notification failed:', { extra: { err } }));
+        message: pushInfo.message,
+        type: 'booking_cancelled',
+        relatedId: bookingId,
+        relatedType: 'booking_request',
+        url: '/sims'
+      }, { sendPush: true }).catch(err => logger.error('Member cancellation notification failed:', { extra: { err } }));
     }
   }
 
@@ -2105,13 +2088,14 @@ export async function checkinBooking(params: CheckinBookingParams) {
     const formattedDate = formatDateDisplayWithDay(noShowDateStr);
     const formattedTime = formatTime12Hour(booking.startTime);
 
-    await db.insert(notifications).values({
+    await notifyMember({
       userEmail: booking.userEmail,
       title: 'Missed Booking',
       message: `You were marked as a no-show for your booking on ${formattedDate} at ${formattedTime}. If this was in error, please contact staff.`,
       type: 'booking',
-      relatedType: 'booking'
-    });
+      relatedType: 'booking',
+      url: '/dashboard'
+    }, { sendPush: true }).catch(err => logger.error('[approval] No-show notification failed', { extra: { error: getErrorMessage(err) } }));
 
     sendNotificationToUser(booking.userEmail, {
       type: 'notification',
@@ -2151,7 +2135,7 @@ export async function devConfirmBooking(params: DevConfirmParams) {
 
   // eslint-disable-next-line no-useless-assignment
   let resolvedTotalFeeCents = 0;
-  const { sessionId, totalFeeCents, dateStr, timeStr } = await db.transaction(async (tx) => {
+  const { sessionId, totalFeeCents, dateStr, timeStr, participantEmails } = await db.transaction(async (tx) => {
     let sessionId = booking.session_id;
     const totalFeeCents = 0;
 
@@ -2305,18 +2289,11 @@ export async function devConfirmBooking(params: DevConfirmParams) {
       ? booking.start_time.substring(0, 5)
       : String(booking.start_time);
 
-    await tx.insert(notifications).values({
-      userEmail: booking.user_email as string,
-      title: 'Booking Confirmed',
-      message: `Your simulator booking for ${dateStr} at ${timeStr} has been confirmed.`,
-      type: 'booking',
-      relatedType: 'booking'
-    });
-
+    let participantEmails: string[] = [];
     if (booking.user_email) {
       try {
         const participantsResult = await tx.execute(sql`
-          SELECT u.email as user_email, u.first_name, u.last_name 
+          SELECT u.email as user_email
            FROM booking_participants bp
            JOIN booking_sessions bs ON bp.session_id = bs.id
            JOIN booking_requests br2 ON br2.session_id = bs.id
@@ -2327,41 +2304,15 @@ export async function devConfirmBooking(params: DevConfirmParams) {
              AND u.email != ''
              AND LOWER(u.email) != LOWER(${booking.user_email})
         `);
-
-        const ownerName = booking.user_name || (booking.user_email as string)?.split('@')[0] || 'A member';
-        const formattedDate = formatDateDisplayWithDay(dateStr);
-        const formattedTime = formatTime12Hour(timeStr as string);
-
-        for (const participant of participantsResult.rows as unknown as Array<{ user_email: string; first_name: string | null; last_name: string | null }>) {
-          const participantEmail = participant.user_email?.toLowerCase();
-          if (!participantEmail) continue;
-
-          const notificationMsg = `${ownerName} has added you to their simulator booking on ${formattedDate} at ${formattedTime}.`;
-
-          await tx.insert(notifications).values({
-            userEmail: participantEmail,
-            title: 'Added to Booking',
-            message: notificationMsg,
-            type: 'booking',
-            relatedType: 'booking',
-            relatedId: bookingId
-          });
-
-          sendNotificationToUser(participantEmail, {
-            type: 'notification',
-            title: 'Added to Booking',
-            message: notificationMsg,
-            data: { bookingId: bookingId.toString(), eventType: 'booking_participant_added' }
-          }, { action: 'booking_participant_added', bookingId, triggerSource: 'approval.ts' });
-
-          logger.info('[Dev Confirm] Sent Added to Booking notification', { extra: { participantEmail, bookingId } });
-        }
+        participantEmails = (participantsResult.rows as unknown as Array<{ user_email: string }>)
+          .map(p => p.user_email?.toLowerCase())
+          .filter(Boolean);
       } catch (notifyErr: unknown) {
-        logger.error('[Dev Confirm] Failed to notify participants (non-blocking)', { extra: { notifyErr } });
+        logger.error('[Dev Confirm] Failed to query participants (non-blocking)', { extra: { notifyErr } });
       }
     }
 
-    return { sessionId, totalFeeCents, dateStr, timeStr };
+    return { sessionId, totalFeeCents, dateStr, timeStr, participantEmails };
   });
 
   resolvedTotalFeeCents = totalFeeCents ?? 0;
@@ -2376,12 +2327,51 @@ export async function devConfirmBooking(params: DevConfirmParams) {
     }
   }
 
+  if (booking.user_email && !isSyntheticEmail(booking.user_email as string)) {
+    notifyMember({
+      userEmail: booking.user_email as string,
+      title: 'Booking Confirmed',
+      message: `Your simulator booking for ${dateStr} at ${timeStr} has been confirmed.`,
+      type: 'booking_confirmed',
+      relatedType: 'booking',
+      url: '/sims'
+    }, { sendPush: true }).catch(err => logger.error('[Dev Confirm] Owner notification failed', { extra: { error: getErrorMessage(err) } }));
+  }
+
   sendNotificationToUser(booking.user_email as string, {
     type: 'notification',
     title: 'Booking Confirmed',
     message: `Your simulator booking for ${dateStr} at ${timeStr} has been confirmed.`,
     data: { bookingId: bookingId.toString(), eventType: 'booking_confirmed' }
   }, { action: 'booking_confirmed', bookingId, triggerSource: 'approval.ts' });
+
+  if (participantEmails && participantEmails.length > 0) {
+    const ownerName = booking.user_name || (booking.user_email as string)?.split('@')[0] || 'A member';
+    const formattedDate = formatDateDisplayWithDay(dateStr);
+    const formattedTime = formatTime12Hour(timeStr as string);
+    for (const participantEmail of participantEmails) {
+      if (isSyntheticEmail(participantEmail)) continue;
+      const notificationMsg = `${ownerName} has added you to their simulator booking on ${formattedDate} at ${formattedTime}.`;
+      notifyMember({
+        userEmail: participantEmail,
+        title: 'Added to Booking',
+        message: notificationMsg,
+        type: 'booking',
+        relatedType: 'booking',
+        relatedId: bookingId,
+        url: '/sims'
+      }, { sendPush: true }).catch(err => logger.error('[Dev Confirm] Participant notification failed', { extra: { error: getErrorMessage(err) } }));
+
+      sendNotificationToUser(participantEmail, {
+        type: 'notification',
+        title: 'Added to Booking',
+        message: notificationMsg,
+        data: { bookingId: bookingId.toString(), eventType: 'booking_participant_added' }
+      }, { action: 'booking_participant_added', bookingId, triggerSource: 'approval.ts' });
+
+      logger.info('[Dev Confirm] Sent Added to Booking notification', { extra: { participantEmail, bookingId } });
+    }
+  }
 
   const devConfirmRequestParticipants = booking.request_participants as Array<{
     email?: string; type: 'member' | 'guest'; name?: string;
@@ -2449,16 +2439,19 @@ export async function completeCancellation(params: CompleteCancellationParams) {
         eq(bookingRequests.id, bookingId),
         eq(bookingRequests.status, 'cancellation_pending')
       ));
+  });
 
-    await tx.insert(notifications).values({
-      userEmail: existing.userEmail || '',
+  if (existing.userEmail && !isSyntheticEmail(existing.userEmail)) {
+    notifyMember({
+      userEmail: existing.userEmail,
       title: 'Booking Cancelled',
       message: `Your booking on ${bookingDate} at ${bookingTime} has been cancelled and charges have been refunded.`,
       type: 'booking_cancelled',
       relatedId: bookingId,
-      relatedType: 'booking_request'
-    });
-  });
+      relatedType: 'booking_request',
+      url: '/sims'
+    }, { sendPush: true }).catch(err => logger.error('[CompleteCancellation] Notification failed', { extra: { error: getErrorMessage(err) } }));
+  }
 
   try {
     const pendingIntents = await db.select({ stripePaymentIntentId: stripePaymentIntents.stripePaymentIntentId })

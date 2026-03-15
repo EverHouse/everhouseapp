@@ -972,67 +972,62 @@ router.patch('/api/bookings/:id/payments', isStaffOrAdmin, async (req: Request, 
 
       if (action === 'confirm_all') {
         try {
-          await db.transaction(async (tx) => {
-            const existingSnapshot = await tx.execute(
-              sql`SELECT id FROM booking_fee_snapshots WHERE session_id = ${sessionId} AND status IN ('completed', 'paid') LIMIT 1`
-            );
-            if (existingSnapshot.rows.length === 0) {
-              const breakdown = await computeFeeBreakdown({ sessionId: sessionId!, source: 'checkin' as const });
-              const participantFees: Array<{id: number | null; amountCents: number; type: string; description: string}> = [];
-              for (const p of breakdown.participants) {
-                if (!p.participantId) continue;
-                if (p.totalCents <= 0) continue;
-                let feeType = 'booking_fee';
-                let feeDesc = p.displayName || 'Fee';
-                if (p.overageCents > 0 && p.guestCents === 0) {
-                  feeType = 'overage';
-                  feeDesc = `${p.displayName || 'Owner'} overage`;
-                } else if (p.guestCents > 0 && p.overageCents === 0) {
-                  feeType = 'guest_fee';
-                  feeDesc = `Guest: ${p.displayName || 'Guest'}`;
-                } else if (p.overageCents > 0 && p.guestCents > 0) {
-                  feeType = 'overage_and_guest';
-                  feeDesc = `${p.displayName || 'Member'} overage + guest fee`;
-                }
-                participantFees.push({ id: p.participantId, amountCents: p.totalCents, type: feeType, description: feeDesc });
+          const existingSnapshotCheck = await db.execute(
+            sql`SELECT id FROM booking_fee_snapshots WHERE session_id = ${sessionId} AND status IN ('completed', 'paid') LIMIT 1`
+          );
+          if (existingSnapshotCheck.rows.length === 0) {
+            const breakdown = await computeFeeBreakdown({ sessionId: sessionId!, source: 'checkin' as const });
+            const participantFees: Array<{id: number | null; amountCents: number; type: string; description: string}> = [];
+            for (const p of breakdown.participants) {
+              if (!p.participantId) continue;
+              if (p.totalCents <= 0) continue;
+              let feeType = 'booking_fee';
+              let feeDesc = p.displayName || 'Fee';
+              if (p.overageCents > 0 && p.guestCents === 0) {
+                feeType = 'overage';
+                feeDesc = `${p.displayName || 'Owner'} overage`;
+              } else if (p.guestCents > 0 && p.overageCents === 0) {
+                feeType = 'guest_fee';
+                feeDesc = `Guest: ${p.displayName || 'Guest'}`;
+              } else if (p.overageCents > 0 && p.guestCents > 0) {
+                feeType = 'overage_and_guest';
+                feeDesc = `${p.displayName || 'Member'} overage + guest fee`;
               }
-              if (breakdown.totals && breakdown.totals.guestCents > 0) {
-                const emptySlotTotal = breakdown.participants
-                  .filter(p => !p.participantId && p.guestCents > 0)
-                  .reduce((sum, p) => sum + p.guestCents, 0);
-                if (emptySlotTotal > 0) {
-                  const slotCount = breakdown.participants.filter(p => !p.participantId && p.guestCents > 0).length;
-                  const perSlot = slotCount > 0 ? (emptySlotTotal / slotCount / 100).toFixed(0) : '';
-                  participantFees.push({
-                    id: null,
-                    amountCents: emptySlotTotal,
-                    type: 'guest_fee',
-                    description: `${slotCount} empty slot${slotCount > 1 ? 's' : ''}${perSlot ? ` × $${perSlot}` : ''}`
-                  });
-                }
-              }
-              const totalCents = breakdown.totals.totalCents;
-
-              const insertResult = await tx.execute(sql`
-                INSERT INTO booking_fee_snapshots (booking_id, session_id, participant_fees, total_cents, status, created_at)
-                VALUES (${bookingId}, ${sessionId}, ${JSON.stringify(participantFees)}, ${totalCents}, 'completed', NOW())
-                ON CONFLICT (session_id) WHERE status = 'completed' DO NOTHING
-                RETURNING id
-              `);
-              if (insertResult.rowCount === 0) {
-                logger.info('[StaffCheckin] Fee snapshot race: another check-in already created snapshot for session', { extra: { sessionId } });
-                throw new Error('SNAPSHOT_RACE');
-              } else {
-                logger.info('[StaffCheckin] Created fee snapshot for booking , session , total cents', { extra: { bookingId, sessionId, totalCents } });
-              }
-            } else {
-              logger.info('[StaffCheckin] Fee snapshot already exists for session , skipping', { extra: { sessionId } });
+              participantFees.push({ id: p.participantId, amountCents: p.totalCents, type: feeType, description: feeDesc });
             }
-          });
-        } catch (snapshotErr: unknown) {
-          if (getErrorMessage(snapshotErr) !== 'SNAPSHOT_RACE') {
-            logger.error('[StaffCheckin] Failed to create fee snapshot', { extra: { error: getErrorMessage(snapshotErr) } });
+            if (breakdown.totals && breakdown.totals.guestCents > 0) {
+              const emptySlotTotal = breakdown.participants
+                .filter(p => !p.participantId && p.guestCents > 0)
+                .reduce((sum, p) => sum + p.guestCents, 0);
+              if (emptySlotTotal > 0) {
+                const slotCount = breakdown.participants.filter(p => !p.participantId && p.guestCents > 0).length;
+                const perSlot = slotCount > 0 ? (emptySlotTotal / slotCount / 100).toFixed(0) : '';
+                participantFees.push({
+                  id: null,
+                  amountCents: emptySlotTotal,
+                  type: 'guest_fee',
+                  description: `${slotCount} empty slot${slotCount > 1 ? 's' : ''}${perSlot ? ` × $${perSlot}` : ''}`
+                });
+              }
+            }
+            const totalCents = breakdown.totals.totalCents;
+
+            const insertResult = await db.execute(sql`
+              INSERT INTO booking_fee_snapshots (booking_id, session_id, participant_fees, total_cents, status, created_at)
+              VALUES (${bookingId}, ${sessionId}, ${JSON.stringify(participantFees)}, ${totalCents}, 'completed', NOW())
+              ON CONFLICT (session_id) WHERE status = 'completed' DO NOTHING
+              RETURNING id
+            `);
+            if (insertResult.rowCount === 0) {
+              logger.info('[StaffCheckin] Fee snapshot race: another check-in already created snapshot for session', { extra: { sessionId } });
+            } else {
+              logger.info('[StaffCheckin] Created fee snapshot for booking , session , total cents', { extra: { bookingId, sessionId, totalCents } });
+            }
+          } else {
+            logger.info('[StaffCheckin] Fee snapshot already exists for session , skipping', { extra: { sessionId } });
           }
+        } catch (snapshotErr: unknown) {
+          logger.error('[StaffCheckin] Failed to create fee snapshot', { extra: { error: getErrorMessage(snapshotErr) } });
         }
 
         const recentCheckinNotif = await db.execute(

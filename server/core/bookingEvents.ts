@@ -1,12 +1,11 @@
 import { db } from '../db';
-import { notifications, staffUsers, bookingRequests, bookingParticipants, users } from '../../shared/schema';
+import { notifications, bookingRequests, bookingParticipants, users } from '../../shared/schema';
 import { eq, and, or, sql } from 'drizzle-orm';
 import { sendNotificationToUser, broadcastBookingEvent } from './websocket';
-import { sendPushNotification, sendPushNotificationToStaff } from '../routes/push';
 import { formatTime12Hour, formatDateDisplayWithDay } from '../utils/dateUtils';
 
 import { logger } from './logger';
-import { isSyntheticEmail } from './notificationService';
+import { isSyntheticEmail, notifyMember as notifyMemberFn, notifyAllStaff as notifyAllStaffFn } from './notificationService';
 interface RequestParticipant {
   email: string;
   type: 'member' | 'guest';
@@ -156,14 +155,15 @@ export async function publish(
 
     if (notifyMember && memberNotification && !isSyntheticEmail(data.memberEmail)) {
       try {
-        await db.insert(notifications).values({
+        await notifyMemberFn({
           userEmail: data.memberEmail,
           title: memberNotification.title,
           message: memberNotification.message,
           type: memberNotification.type,
           relatedId: data.bookingId,
-          relatedType: 'booking'
-        });
+          relatedType: 'booking',
+          url: '/dashboard'
+        }, { sendPush: true });
       } catch (err: unknown) {
         logger.error('[BookingEvents] Failed to create member notification:', { error: err });
       }
@@ -174,13 +174,6 @@ export async function publish(
         message: memberNotification.message,
         data: { bookingId: data.bookingId, eventType }
       }, { action: eventType, bookingId: data.bookingId, resourceType: data.resourceType, triggerSource: 'bookingEvents.ts' });
-
-      sendPushNotification(data.memberEmail, {
-        title: memberNotification.title,
-        body: memberNotification.message,
-        url: '/dashboard',
-        tag: `booking-${data.bookingId}`
-      }).catch(err => logger.error('[BookingEvents] Push notification failed:', { error: err }));
     }
 
     if (notifyStaff) {
@@ -205,30 +198,21 @@ export async function publish(
       broadcastBookingEvent(staffEvent);
 
       if (staffNotification) {
-        const staffEmails = await getStaffEmails();
-        if (staffEmails.length > 0) {
-          try {
-            await db.insert(notifications).values(
-              staffEmails.map(email => ({
-                userEmail: email,
-                title: staffNotification.title,
-                message: staffNotification.message,
-                type: 'booking',
-                relatedId: data.bookingId,
-                relatedType: 'booking_request'
-              }))
-            );
-          } catch (err: unknown) {
-            logger.error('[BookingEvents] Failed to create staff notifications:', { error: err });
-          }
+        try {
+          await notifyAllStaffFn(
+            staffNotification.title,
+            staffNotification.message,
+            'booking',
+            {
+              relatedId: data.bookingId,
+              relatedType: 'booking_request',
+              sendPush: true,
+              url: '/admin'
+            }
+          );
+        } catch (err: unknown) {
+          logger.error('[BookingEvents] Failed to create staff notifications:', { error: err });
         }
-
-        sendPushNotificationToStaff({
-          title: staffNotification.title,
-          body: staffNotification.message,
-          url: '/admin',
-          tag: `staff-booking-${data.bookingId}`
-        }).catch(err => logger.error('[BookingEvents] Staff push notification failed:', { error: err }));
       }
     }
 
@@ -238,18 +222,6 @@ export async function publish(
   }
 }
 
-async function getStaffEmails(): Promise<string[]> {
-  try {
-    const staff = await db.select({ email: staffUsers.email })
-      .from(staffUsers)
-      .innerJoin(users, eq(sql`LOWER(${staffUsers.email})`, sql`LOWER(${users.email})`))
-      .where(eq(staffUsers.isActive, true));
-    return staff.map(s => s.email.toLowerCase());
-  } catch (error: unknown) {
-    logger.error('[BookingEvents] Failed to get staff emails:', { error: error });
-    return [];
-  }
-}
 
 export async function linkAndNotifyParticipants(
   bookingId: number,
@@ -375,14 +347,17 @@ export async function linkAndNotifyParticipants(
         
         try {
           const notificationMsg = `You have been added to a simulator booking on ${bookingDateStr} at ${startTimeStr} (${bayName}).`;
-          if (!isSyntheticEmail(email)) await db.insert(notifications).values({
-            userEmail: email,
-            title: 'Added to Booking',
-            message: notificationMsg,
-            type: 'booking',
-            relatedId: bookingId,
-            relatedType: 'booking'
-          });
+          if (!isSyntheticEmail(email)) {
+            await notifyMemberFn({
+              userEmail: email,
+              title: 'Added to Booking',
+              message: notificationMsg,
+              type: 'booking',
+              relatedId: bookingId,
+              relatedType: 'booking',
+              url: '/sims'
+            }, { sendPush: true }).catch(err => logger.error('[BookingEvents] Participant notification failed', { error: err }));
+          }
           
           sendNotificationToUser(email, {
             type: 'booking_participant_added',
