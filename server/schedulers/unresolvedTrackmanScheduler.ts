@@ -101,8 +101,8 @@ async function checkUnresolvedTrackmanBookings(): Promise<void> {
             await notifyAllStaff(
               'Unresolved Trackman Bookings',
               message,
-              'system',
-              { sendPush: true }
+              'trackman_unmatched',
+              { sendPush: true, url: '/admin/trackman' }
             );
           } else {
             logger.info('[Unresolved Trackman Check] No unresolved bookings found');

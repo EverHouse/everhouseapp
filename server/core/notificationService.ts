@@ -120,15 +120,22 @@ function buildPushTag(type: NotificationType, relatedId?: number): string {
 
 function buildDeepLink(type: NotificationType, url?: string): string {
   if (url) return url;
+  if (type === 'cancellation_pending' || type === 'cancellation_stuck' || type === 'attendance' || type === 'trackman_cancelled_link') return '/admin/bookings';
   if (type.startsWith('booking')) return '/dashboard/bookings';
   if (type.startsWith('wellness')) return '/wellness';
   if (type.startsWith('event')) return '/events';
-  if (type.startsWith('payment') || type === 'outstanding_balance' || type === 'billing' || type === 'billing_alert') return '/dashboard/billing';
+  if (type.startsWith('payment') || type === 'outstanding_balance' || type === 'billing' || type === 'billing_alert' || type === 'terminal_refund' || type === 'terminal_dispute' || type === 'terminal_dispute_closed' || type === 'terminal_payment_canceled' || type === 'funds_added' || type === 'card_expiring' || type === 'day_pass' || type === 'billing_migration' || type === 'fee_waived') return '/dashboard/billing';
+  if (type === 'trial_expired' || type === 'trial_ending') return '/dashboard/membership';
   if (type === 'announcement') return '/dashboard';
   if (type === 'closure' || type === 'closure_today' || type === 'closure_created') return '/dashboard';
   if (type === 'guest_pass') return '/dashboard/guest-passes';
   if (type.startsWith('membership') || type === 'member_status_change' || type === 'new_member') return '/dashboard/membership';
-  if (type === 'tour' || type === 'tour_scheduled' || type === 'tour_reminder') return '/admin?tab=tours';
+  if (type === 'tour' || type === 'tour_scheduled' || type === 'tour_reminder') return '/admin/tours';
+  if (type === 'staff_note' || type === 'account_deletion') return '/admin/members';
+  if (type === 'bug_report') return '/admin/bugs';
+  if (type === 'import_failure' || type === 'integration_error') return '/admin/data-integrity';
+  if (type === 'waiver_review') return '/admin/waivers';
+  if (type === 'trackman_unmatched') return '/admin/trackman';
   return '/dashboard';
 }
 

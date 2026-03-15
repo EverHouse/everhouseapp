@@ -65,8 +65,8 @@ export async function checkStaleWaivers(): Promise<{
         await notifyAllStaff(
           'Waivers Need Review',
           `${staleWaivers.length} waiver(s) pending review for more than 12 hours`,
-          'system',
-          { relatedType: 'waiver_review', sendPush: false }
+          'waiver_review',
+          { relatedType: 'waiver_review', sendPush: false, url: '/admin/waivers' }
         );
         notificationSent = true;
         logger.info(`[Waiver Review] Staff notification sent for ${staleWaivers.length} stale waiver(s)`);

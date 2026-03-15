@@ -87,6 +87,28 @@ interface NotificationItem {
   created_at: string;
   read: boolean;
   action_url?: string;
+  related_type?: string;
+}
+
+function getNotificationRoute(type: string, relatedType?: string): string {
+  if (type === 'cancellation_pending' || type === 'cancellation_stuck' || type === 'attendance' || type === 'trackman_cancelled_link') return '/admin/bookings';
+  if (type.startsWith('booking')) return '/dashboard/bookings';
+  if (type.startsWith('wellness')) return '/wellness';
+  if (type.startsWith('event')) return '/events';
+  if (type.startsWith('payment') || type === 'outstanding_balance' || type === 'billing' || type === 'billing_alert' || type === 'terminal_refund' || type === 'terminal_dispute' || type === 'terminal_dispute_closed' || type === 'terminal_payment_canceled' || type === 'funds_added' || type === 'card_expiring' || type === 'day_pass' || type === 'billing_migration' || type === 'fee_waived') return '/dashboard/billing';
+  if (type === 'trial_expired' || type === 'trial_ending') return '/dashboard/membership';
+  if (type === 'guest_pass') return '/dashboard/guest-passes';
+  if (type.startsWith('membership') || type === 'member_status_change' || type === 'new_member') return '/dashboard/membership';
+  if (type === 'tour' || type === 'tour_scheduled' || type === 'tour_reminder') return '/admin/tours';
+  if (type === 'staff_note' || type === 'account_deletion') return '/admin/members';
+  if (type === 'bug_report') return '/admin/bugs';
+  if (type === 'import_failure' || type === 'integration_error') return '/admin/data-integrity';
+  if (type === 'waiver_review') return '/admin/waivers';
+  if (type === 'trackman_unmatched') return '/admin/trackman';
+  if (type === 'system' && relatedType === 'waiver_review') return '/admin/waivers';
+  if (type === 'system' && relatedType === 'membership_status') return '/admin/members';
+  if (type === 'system' && relatedType === 'tour') return '/admin/tours';
+  return '/dashboard';
 }
 
 const MemberUpdates: React.FC = () => {
@@ -699,7 +721,7 @@ const MemberUpdates: React.FC = () => {
                 }`}
                 onClick={() => {
                   if (!notification.read) markNotificationRead(notification.id);
-                  if (notification.action_url) navigate(notification.action_url);
+                  navigate(notification.action_url || getNotificationRoute(notification.type, notification.related_type));
                 }}
               >
                 <div className="p-4 flex gap-3">

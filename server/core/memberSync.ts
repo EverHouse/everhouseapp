@@ -79,8 +79,8 @@ async function detectAndNotifyStatusChange(
     await notifyAllStaff(
       'Member Status Changed',
       `${memberName}'s membership status changed from ${oldStatus} to ${newStatus}`,
-      'system',
-      { relatedType: 'membership_status' }
+      'member_status_change',
+      { relatedType: 'membership_status', url: '/admin/members' }
     );
     
     logger.info(`[MemberSync] Notified about status change for ${email}: ${oldStatus} -> ${newStatus}`);
