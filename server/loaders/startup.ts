@@ -167,13 +167,35 @@ export async function runStartupTasks(): Promise<void> {
       await retryWithBackoff(() => runMigrations({ databaseUrl, schema: 'stripe' } as unknown as Parameters<typeof runMigrations>[0]), 'Stripe schema migration');
       logger.info('[Stripe] Schema ready');
 
-      const stripeSync = await retryWithBackoff(() => getStripeSync(), 'Stripe sync init');
+      const origStdoutWrite = process.stdout.write.bind(process.stdout);
+      const origStderrWrite = process.stderr.write.bind(process.stderr);
+      const stripeSyncNoisePatterns = ['StripeSync initialized', 'autoExpandLists', 'Webhook not found', 'orphaned managed webhook', 'StripeInvalidRequestError'];
+      const isStripeSyncNoise = (chunk: string | Buffer) => {
+        const s = typeof chunk === 'string' ? chunk : chunk.toString();
+        return stripeSyncNoisePatterns.some(p => s.includes(p));
+      };
+      process.stdout.write = ((chunk: string | Buffer, ...rest: unknown[]) => {
+        if (isStripeSyncNoise(chunk)) return true;
+        return origStdoutWrite(chunk, ...rest);
+      }) as typeof process.stdout.write;
+      process.stderr.write = ((chunk: string | Buffer, ...rest: unknown[]) => {
+        if (isStripeSyncNoise(chunk)) return true;
+        return origStderrWrite(chunk, ...rest);
+      }) as typeof process.stderr.write;
+
+      let stripeSync: unknown;
+      try {
+        stripeSync = await retryWithBackoff(() => getStripeSync(), 'Stripe sync init');
+      } catch (e) {
+        throw e;
+      }
       
       const replitDomains = process.env.REPLIT_DOMAINS?.split(',')[0];
       if (replitDomains) {
         const webhookUrl = `https://${replitDomains}/api/stripe/webhook`;
         logger.info('[Stripe] Setting up managed webhook...');
-        const result = await retryWithBackoff(() => (stripeSync as unknown as { findOrCreateManagedWebhook: (url: string) => Promise<unknown> }).findOrCreateManagedWebhook(webhookUrl), 'Stripe webhook setup');
+        let result: unknown;
+        result = await retryWithBackoff(() => (stripeSync as unknown as { findOrCreateManagedWebhook: (url: string) => Promise<unknown> }).findOrCreateManagedWebhook(webhookUrl), 'Stripe webhook setup');
         logger.info('[Stripe] Webhook configured');
 
         const requiredEvents = [
@@ -250,6 +272,8 @@ export async function runStartupTasks(): Promise<void> {
         }
       }
       
+      process.stdout.write = origStdoutWrite;
+      process.stderr.write = origStderrWrite;
       startupHealth.stripe = 'ok';
 
       try {
@@ -358,6 +382,7 @@ export async function runStartupTasks(): Promise<void> {
         .catch((err: unknown) => logger.error('[Stripe] Customer sync failed', { error: err instanceof Error ? err : new Error(String(err)) }));
     }
   } catch (err: unknown) {
+    try { process.stdout.write = origStdoutWrite; process.stderr.write = origStderrWrite; } catch {}
     logger.error('[Stripe] Initialization failed', { error: err instanceof Error ? err : new Error(String(err)) });
     startupHealth.stripe = 'failed';
     startupHealth.criticalFailures.push(`Stripe initialization: ${getErrorMessage(err)}`);
