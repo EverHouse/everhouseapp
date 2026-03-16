@@ -11,6 +11,7 @@ import { ensureSessionForBooking } from '../../bookingService/sessionManager';
 import { broadcastAvailabilityUpdate } from '../../websocket';
 
 import { logger } from '../../logger';
+import { withCalendarRetry } from '../../retryUtils';
 export async function getConferenceRoomBookingsFromCalendar(
   memberName?: string,
   memberEmail?: string
@@ -30,7 +31,7 @@ export async function getConferenceRoomBookingsFromCalendar(
     const events: any[] = [];
     let confPageToken: string | undefined;
     do {
-      const response = await calendar.events.list({
+      const response = await withCalendarRetry(() => calendar.events.list({
         calendarId,
         timeMin: pacificMidnight.toISOString(),
         maxResults: 250,
@@ -38,7 +39,7 @@ export async function getConferenceRoomBookingsFromCalendar(
         orderBy: 'startTime',
         showDeleted: true,
         pageToken: confPageToken,
-      });
+      }), 'conference-room-list');
       if (response.data.items) events.push(...response.data.items);
       confPageToken = response.data.nextPageToken ?? undefined;
     } while (confPageToken);
@@ -375,7 +376,7 @@ export async function syncConferenceRoomCalendarToBookings(options?: { monthsBac
     let pageToken: string | undefined = undefined;
     
     do {
-      const response = await calendar.events.list({
+      const response = await withCalendarRetry(() => calendar.events.list({
         calendarId,
         timeMin: timeMin.toISOString(),
         maxResults: 250,
@@ -383,7 +384,7 @@ export async function syncConferenceRoomCalendarToBookings(options?: { monthsBac
         orderBy: 'startTime',
         pageToken: pageToken,
         showDeleted: true,
-      }) as { data: { items?: Array<{ id?: string | null; status?: string | null; summary?: string | null; description?: string | null; start?: { dateTime?: string | null; date?: string | null }; end?: { dateTime?: string | null; date?: string | null }; attendees?: Array<{ email?: string; responseStatus?: string | null }> }>; nextPageToken?: string | null } };
+      }), 'conference-room-sync-list') as { data: { items?: Array<{ id?: string | null; status?: string | null; summary?: string | null; description?: string | null; start?: { dateTime?: string | null; date?: string | null }; end?: { dateTime?: string | null; date?: string | null }; attendees?: Array<{ email?: string; responseStatus?: string | null }> }>; nextPageToken?: string | null } };
 
       const calendarEvents = response.data.items || [];
       pageToken = response.data.nextPageToken || undefined;

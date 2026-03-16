@@ -12,6 +12,7 @@ import { availabilityBlocks } from '../../../../shared/models/scheduling';
 
 import { toIntArrayLiteral } from '../../../utils/sqlArrayLiteral';
 import { logger } from '../../logger';
+import { withCalendarRetry } from '../../retryUtils';
 
 async function resyncEventAvailabilityBlocks(
   eventId: number,
@@ -88,7 +89,7 @@ export async function syncGoogleCalendarEvents(options?: { suppressAlert?: boole
     const calendarEvents: any[] = [];
     let pageToken: string | undefined;
     do {
-      const response = await calendar.events.list({
+      const response = await withCalendarRetry(() => calendar.events.list({
         calendarId,
         timeMin: oneYearAgo.toISOString(),
         maxResults: 250,
@@ -96,7 +97,7 @@ export async function syncGoogleCalendarEvents(options?: { suppressAlert?: boole
         orderBy: 'startTime',
         showDeleted: true,
         pageToken,
-      });
+      }), 'events-list');
       if (response.data.items) calendarEvents.push(...response.data.items);
       pageToken = response.data.nextPageToken ?? undefined;
     } while (pageToken);
@@ -255,7 +256,7 @@ export async function syncGoogleCalendarEvents(options?: { suppressAlert?: boole
                 }
               }
               
-              const patchResult = await calendar.events.patch({
+              const patchResult = await withCalendarRetry(() => calendar.events.patch({
                 calendarId,
                 eventId: googleEventId,
                 requestBody: {
@@ -274,7 +275,7 @@ export async function syncGoogleCalendarEvents(options?: { suppressAlert?: boole
                     private: extendedProps,
                   },
                 },
-              });
+              }), `events-patch-event-${dbRow.id}`);
               
               const newEtag = patchResult.data.etag || null;
               const newUpdatedAt = patchResult.data.updated ? new Date(patchResult.data.updated) : null;

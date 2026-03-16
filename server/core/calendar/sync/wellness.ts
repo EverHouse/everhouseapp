@@ -12,6 +12,7 @@ import { getAllActiveBayIds, getConferenceRoomId } from '../../affectedAreas';
 
 import { toIntArrayLiteral } from '../../../utils/sqlArrayLiteral';
 import { logger } from '../../logger';
+import { withCalendarRetry } from '../../retryUtils';
 
 async function resyncWellnessAvailabilityBlocks(
   wellnessClassId: number,
@@ -88,7 +89,7 @@ export async function syncWellnessCalendarEvents(options?: { suppressAlert?: boo
     const events: any[] = [];
     let pageToken: string | undefined;
     do {
-      const response = await calendar.events.list({
+      const response = await withCalendarRetry(() => calendar.events.list({
         calendarId,
         timeMin: oneYearAgo.toISOString(),
         maxResults: 250,
@@ -96,7 +97,7 @@ export async function syncWellnessCalendarEvents(options?: { suppressAlert?: boo
         orderBy: 'startTime',
         showDeleted: true,
         pageToken,
-      });
+      }), 'wellness-list');
       if (response.data.items) events.push(...response.data.items);
       pageToken = response.data.nextPageToken ?? undefined;
     } while (pageToken);
@@ -323,7 +324,7 @@ export async function syncWellnessCalendarEvents(options?: { suppressAlert?: boo
               if (dbRow.spots) extendedProps['ehApp_spots'] = dbRow.spots as string;
               if (dbRow.status) extendedProps['ehApp_status'] = dbRow.status as string;
               
-              const patchResult = await calendar.events.patch({
+              const patchResult = await withCalendarRetry(() => calendar.events.patch({
                 calendarId,
                 eventId: googleEventId,
                 requestBody: {
@@ -341,7 +342,7 @@ export async function syncWellnessCalendarEvents(options?: { suppressAlert?: boo
                     private: extendedProps,
                   },
                 },
-              });
+              }), `wellness-patch-class-${dbRow.id}`);
               
               const newEtag = patchResult.data.etag || null;
               const newUpdatedAt = patchResult.data.updated ? new Date(patchResult.data.updated) : null;

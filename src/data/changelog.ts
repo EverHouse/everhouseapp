@@ -8,6 +8,15 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.87.45",
+    date: "2026-03-16",
+    title: "Calendar Sync Reliability",
+    changes: [
+      "Fixed: Wellness class and event calendar syncs now automatically retry when hitting Google Calendar rate limits instead of silently failing — previously, batches of updates could be lost during busy sync cycles",
+      "Improved: All Google Calendar API calls across the sync system (wellness, events, closures, and conference room) now have consistent retry-with-backoff protection",
+    ]
+  },
+  {
     version: "8.87.44",
     date: "2026-03-16",
     title: "Membership Trends & Former Members Fix",

@@ -7,6 +7,7 @@ import { getPacificMidnightUTC } from '../../../utils/dateUtils';
 
 import { toIntArrayLiteral } from '../../../utils/sqlArrayLiteral';
 import { logger } from '../../logger';
+import { withCalendarRetry } from '../../retryUtils';
 
 const LESSON_PREFIXES = ['lesson', 'private lesson', 'kids lesson', 'group lesson'];
 function isLessonTitle(title: string): boolean {
@@ -283,7 +284,7 @@ export async function syncInternalCalendarToClosures(): Promise<{ synced: number
     const events: any[] = [];
     let pageToken: string | undefined;
     do {
-      const response = await calendar.events.list({
+      const response = await withCalendarRetry(() => calendar.events.list({
         calendarId,
         timeMin: pacificMidnight.toISOString(),
         maxResults: 250,
@@ -291,7 +292,7 @@ export async function syncInternalCalendarToClosures(): Promise<{ synced: number
         orderBy: 'startTime',
         showDeleted: true,
         pageToken,
-      });
+      }), 'closures-list');
       if (response.data.items) events.push(...response.data.items);
       pageToken = response.data.nextPageToken ?? undefined;
     } while (pageToken);
