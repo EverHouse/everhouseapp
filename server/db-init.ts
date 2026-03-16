@@ -978,106 +978,33 @@ export async function ensureDatabaseConstraints() {
       logger.warn(`[DB Init] Booking requests closure cleanup: ${getErrorMessage(err)}`);
     }
 
-    try {
-      await db.execute(sql`
-        UPDATE booking_requests SET session_id = NULL
-        WHERE session_id IS NOT NULL
-          AND session_id NOT IN (SELECT id FROM booking_sessions)
-      `);
-      await db.execute(sql`
-        DO $$
-        BEGIN
-          ALTER TABLE booking_requests
-            DROP CONSTRAINT IF EXISTS booking_requests_session_id_fkey;
-          ALTER TABLE booking_requests
-            ADD CONSTRAINT booking_requests_session_id_fkey
-            FOREIGN KEY (session_id) REFERENCES booking_sessions(id) ON DELETE SET NULL;
-        END $$;
-      `);
-      logger.info('[DB Init] FK: booking_requests.session_id → booking_sessions.id created/verified');
-    } catch (err: unknown) {
-      logger.warn(`[DB Init] Skipping booking_requests.session_id FK: ${getErrorMessage(err)}`);
+    const legacyFKs = [
+      { table: 'booking_requests', constraint: 'booking_requests_session_id_fkey' },
+      { table: 'booking_requests', constraint: 'booking_requests_closure_id_fkey' },
+      { table: 'usage_ledger', constraint: 'usage_ledger_member_id_fkey' },
+      { table: 'trackman_webhook_events', constraint: 'trackman_webhook_events_matched_booking_id_fkey' },
+      { table: 'booking_wallet_passes', constraint: 'booking_wallet_passes_member_id_fkey' },
+    ];
+    for (const fk of legacyFKs) {
+      try {
+        await db.execute(sql.raw(`ALTER TABLE ${fk.table} DROP CONSTRAINT IF EXISTS ${fk.constraint}`));
+      } catch (err: unknown) {
+        logger.warn(`[DB Init] Could not drop ${fk.constraint}: ${getErrorMessage(err)}`);
+      }
     }
 
     try {
       await db.execute(sql`
-        UPDATE booking_requests SET closure_id = NULL
-        WHERE closure_id IS NOT NULL
-          AND closure_id NOT IN (SELECT id FROM facility_closures)
-      `);
-      await db.execute(sql`
-        DO $$
-        BEGIN
-          ALTER TABLE booking_requests
-            DROP CONSTRAINT IF EXISTS booking_requests_closure_id_fkey;
-          ALTER TABLE booking_requests
-            ADD CONSTRAINT booking_requests_closure_id_fkey
-            FOREIGN KEY (closure_id) REFERENCES facility_closures(id) ON DELETE SET NULL;
-        END $$;
-      `);
-      logger.info('[DB Init] FK: booking_requests.closure_id → facility_closures.id created/verified');
-    } catch (err: unknown) {
-      logger.warn(`[DB Init] Skipping booking_requests.closure_id FK: ${getErrorMessage(err)}`);
-    }
-
-    try {
-      await db.execute(sql`
-        UPDATE usage_ledger SET member_id = NULL
+        DELETE FROM booking_wallet_passes
         WHERE member_id IS NOT NULL
           AND member_id NOT IN (SELECT id FROM users)
       `);
-      await db.execute(sql`
-        DO $$
-        BEGIN
-          ALTER TABLE usage_ledger
-            DROP CONSTRAINT IF EXISTS usage_ledger_member_id_fkey;
-          ALTER TABLE usage_ledger
-            ADD CONSTRAINT usage_ledger_member_id_fkey
-            FOREIGN KEY (member_id) REFERENCES users(id) ON DELETE SET NULL;
-        END $$;
-      `);
-      logger.info('[DB Init] FK: usage_ledger.member_id → users.id created/verified');
+      logger.info('[DB Init] Legacy booking_wallet_passes orphan member references cleaned up');
     } catch (err: unknown) {
-      logger.warn(`[DB Init] Skipping usage_ledger.member_id FK: ${getErrorMessage(err)}`);
+      logger.warn(`[DB Init] Wallet pass orphan cleanup: ${getErrorMessage(err)}`);
     }
 
-    try {
-      await db.execute(sql`
-        UPDATE trackman_webhook_events
-        SET matched_booking_id = NULL
-        WHERE matched_booking_id IS NOT NULL
-          AND matched_booking_id NOT IN (SELECT id FROM booking_requests)
-      `);
-      await db.execute(sql`
-        DO $$
-        BEGIN
-          ALTER TABLE trackman_webhook_events
-            DROP CONSTRAINT IF EXISTS trackman_webhook_events_matched_booking_id_fkey;
-          ALTER TABLE trackman_webhook_events
-            ADD CONSTRAINT trackman_webhook_events_matched_booking_id_fkey
-            FOREIGN KEY (matched_booking_id) REFERENCES booking_requests(id) ON DELETE SET NULL;
-        END $$;
-      `);
-      logger.info('[DB Init] FK: trackman_webhook_events.matched_booking_id → booking_requests.id created/verified');
-    } catch (err: unknown) {
-      logger.warn(`[DB Init] Skipping trackman_webhook_events.matched_booking_id FK: ${getErrorMessage(err)}`);
-    }
-
-    try {
-      await db.execute(sql`
-        DO $$
-        BEGIN
-          ALTER TABLE booking_wallet_passes
-            DROP CONSTRAINT IF EXISTS booking_wallet_passes_member_id_fkey;
-          ALTER TABLE booking_wallet_passes
-            ADD CONSTRAINT booking_wallet_passes_member_id_fkey
-            FOREIGN KEY (member_id) REFERENCES users(id) ON DELETE CASCADE;
-        END $$;
-      `);
-      logger.info('[DB Init] FK: booking_wallet_passes.member_id → users.id created/verified');
-    } catch (err: unknown) {
-      logger.warn(`[DB Init] Skipping booking_wallet_passes.member_id FK: ${getErrorMessage(err)}`);
-    }
+    logger.info('[DB Init] Dropped legacy non-schema FK constraints');
 
     try {
       await db.execute(sql`
@@ -1263,11 +1190,6 @@ export async function verifyIntegrityConstraints(): Promise<{ verified: boolean;
 
   const requiredFKs = [
     { table: 'booking_participants', column: 'user_id', justifies: 'Participant User Relationships check elimination' },
-    { table: 'booking_requests', column: 'session_id', justifies: 'Booking session FK integrity' },
-    { table: 'booking_requests', column: 'closure_id', justifies: 'Booking closure FK integrity' },
-    { table: 'usage_ledger', column: 'member_id', justifies: 'Usage ledger member FK integrity' },
-    { table: 'trackman_webhook_events', column: 'matched_booking_id', justifies: 'Trackman webhook booking FK integrity' },
-    { table: 'booking_wallet_passes', column: 'member_id', justifies: 'Wallet pass member FK integrity' },
   ];
 
   const missing: string[] = [];
