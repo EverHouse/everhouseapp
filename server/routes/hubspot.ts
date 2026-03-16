@@ -1354,7 +1354,16 @@ router.post('/api/hubspot/webhooks', async (req, res) => {
                         logger.info('[HubSpot Webhook] Skipping status change to \'non-member\' for - has active Stripe subscription', { extra: { email } });
                       } else {
                         const prevStatus = existingUser.membership_status;
-                        await db.execute(sql`UPDATE users SET membership_status = ${newStatus}, updated_at = NOW() WHERE LOWER(email) = ${email}`);
+                        const isMindBodyBilled = existingUser.billing_provider === 'mindbody';
+                        const wasActive = (prevStatus || '').toLowerCase() === 'active';
+                        const isMindBodyDeactivation = isMindBodyBilled && wasActive && newStatus !== 'active';
+
+                        if (isMindBodyDeactivation) {
+                          await db.execute(sql`UPDATE users SET membership_status = ${newStatus}, membership_status_changed_at = CASE WHEN membership_status IS DISTINCT FROM ${newStatus} THEN NOW() ELSE membership_status_changed_at END, tier = NULL, tier_id = NULL, last_tier = COALESCE(tier, last_tier), billing_provider = 'stripe', updated_at = NOW() WHERE LOWER(email) = ${email}`);
+                          logger.info('[HubSpot Webhook] MINDBODY DEACTIVATION CASCADE for', { extra: { email, newStatus, prevTier: existingUser.tier } });
+                        } else {
+                          await db.execute(sql`UPDATE users SET membership_status = ${newStatus}, membership_status_changed_at = CASE WHEN membership_status IS DISTINCT FROM ${newStatus} THEN NOW() ELSE membership_status_changed_at END, updated_at = NOW() WHERE LOWER(email) = ${email}`);
+                        }
                         logger.info('[HubSpot Webhook] Updated DB membership_status for to', { extra: { email, newStatus } });
 
                         const activeStatuses = ['active', 'trialing', 'past_due'];

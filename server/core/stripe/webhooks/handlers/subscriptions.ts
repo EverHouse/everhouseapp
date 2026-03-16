@@ -319,6 +319,10 @@ export async function handleSubscriptionCreated(client: PoolClient, subscription
             WHEN membership_status IS NULL OR membership_status IN ('pending', 'inactive', 'non-member', 'terminated', 'cancelled', 'expired', 'former_member', 'deleted', 'suspended', 'frozen', 'froze', 'declined', 'churned') THEN $3
             ELSE membership_status 
           END,
+          membership_status_changed_at = CASE
+            WHEN membership_status IS DISTINCT FROM $3 AND (membership_status IS NULL OR membership_status IN ('pending', 'inactive', 'non-member', 'terminated', 'cancelled', 'expired', 'former_member', 'deleted', 'suspended', 'frozen', 'froze', 'declined', 'churned')) THEN NOW()
+            ELSE membership_status_changed_at
+          END,
           archived_at = NULL,
           archived_by = NULL,
           join_date = CASE WHEN join_date IS NULL AND $3 = 'active' THEN NOW() ELSE join_date END,
@@ -457,7 +461,11 @@ export async function handleSubscriptionCreated(client: PoolClient, subscription
             membership_status = CASE 
               WHEN membership_status IS NULL OR membership_status IN ('pending', 'inactive', 'non-member', 'terminated', 'cancelled', 'expired', 'former_member', 'deleted', 'suspended', 'frozen', 'froze', 'declined', 'churned') THEN $6
               ELSE membership_status 
-            END, 
+            END,
+            membership_status_changed_at = CASE
+              WHEN membership_status IS DISTINCT FROM $6 AND (membership_status IS NULL OR membership_status IN ('pending', 'inactive', 'non-member', 'terminated', 'cancelled', 'expired', 'former_member', 'deleted', 'suspended', 'frozen', 'froze', 'declined', 'churned')) THEN NOW()
+              ELSE membership_status_changed_at
+            END,
             archived_at = NULL, archived_by = NULL,
             updated_at = NOW() 
           WHERE LOWER(email) = LOWER($2) 
@@ -571,6 +579,10 @@ export async function handleSubscriptionCreated(client: PoolClient, subscription
                         membership_status = CASE 
                           WHEN membership_status IS NULL OR membership_status IN ('pending', 'inactive', 'non-member', 'terminated', 'cancelled', 'expired', 'former_member', 'deleted', 'suspended', 'frozen', 'froze', 'declined', 'churned') THEN $4
                           ELSE membership_status 
+                        END,
+                        membership_status_changed_at = CASE
+                          WHEN membership_status IS DISTINCT FROM $4 AND (membership_status IS NULL OR membership_status IN ('pending', 'inactive', 'non-member', 'terminated', 'cancelled', 'expired', 'former_member', 'deleted', 'suspended', 'frozen', 'froze', 'declined', 'churned')) THEN NOW()
+                          ELSE membership_status_changed_at
                         END,
                         billing_provider = 'stripe',
                         stripe_current_period_end = COALESCE($3, stripe_current_period_end),

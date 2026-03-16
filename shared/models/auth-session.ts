@@ -104,6 +104,7 @@ export const users = pgTable("users", {
   migrationTierSnapshot: text("migration_tier_snapshot"),
   migrationStatus: text("migration_status"),
   requiresCardUpdate: boolean("requires_card_update").default(false),
+  membershipStatusChangedAt: timestamp("membership_status_changed_at"),
   lastManualFixAt: timestamp("last_manual_fix_at"),
   lastManualFixBy: varchar("last_manual_fix_by"),
 }, (table) => [

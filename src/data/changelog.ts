@@ -8,6 +8,15 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.87.43",
+    date: "2026-03-16",
+    title: "Membership Trends & Former Members Fix",
+    changes: [
+      "Fixed: The 'Former Members' line in the membership trends chart was always showing 0 — it now correctly displays members who have left the club over time",
+      "Improved: Member status changes are now tracked with accurate dates across all sync paths (HubSpot, Stripe, and daily sync), ensuring the analytics stay accurate going forward",
+    ]
+  },
+  {
     version: "8.87.42",
     date: "2026-03-15",
     title: "Declined Booking Payment Cleanup & Broader Monitoring",

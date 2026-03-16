@@ -539,6 +539,20 @@ export async function ensureDatabaseConstraints() {
       logger.info('[DB Init] Membership status change tracking trigger created');
     } catch (err: unknown) { logger.debug('[DB Init] Membership status change trigger already exists or failed: ' + getErrorMessage(err)); }
 
+    try {
+      const backfillResult = await db.execute(sql`
+        UPDATE users
+        SET membership_status_changed_at = updated_at
+        WHERE membership_status IN ('terminated', 'expired', 'suspended', 'inactive', 'cancelled', 'canceled', 'frozen', 'froze', 'declined', 'churned', 'former_member', 'deleted')
+          AND membership_status_changed_at IS NULL
+          AND updated_at IS NOT NULL
+      `);
+      const backfilled = backfillResult.rowCount || 0;
+      if (backfilled > 0) {
+        logger.info(`[DB Init] Backfilled membership_status_changed_at for ${backfilled} former members from updated_at`);
+      }
+    } catch (err: unknown) { logger.debug('[DB Init] membership_status_changed_at backfill failed: ' + getErrorMessage(err)); }
+
     try { await db.execute(sql`ALTER TABLE membership_tiers ADD COLUMN IF NOT EXISTS wallet_pass_bg_color VARCHAR`); } catch { logger.debug('[DB Init] wallet_pass_bg_color column already exists or failed'); }
     try { await db.execute(sql`ALTER TABLE membership_tiers ADD COLUMN IF NOT EXISTS wallet_pass_foreground_color VARCHAR`); } catch { logger.debug('[DB Init] wallet_pass_foreground_color column already exists or failed'); }
     try { await db.execute(sql`ALTER TABLE membership_tiers ADD COLUMN IF NOT EXISTS wallet_pass_label_color VARCHAR`); } catch { logger.debug('[DB Init] wallet_pass_label_color column already exists or failed'); }
