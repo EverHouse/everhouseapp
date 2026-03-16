@@ -804,6 +804,7 @@ export async function syncRelevantMembersFromHubSpot(): Promise<{ synced: number
     return { synced: 0, errors: 0 };
   }
   
+  const previousSyncTime = getLastMemberSyncTime();
   syncInProgress = true;
   lastSyncTime = now;
   
@@ -865,8 +866,6 @@ export async function syncRelevantMembersFromHubSpot(): Promise<{ synced: number
         ]
       }
     ];
-    
-    const previousSyncTime = getLastMemberSyncTime();
     if (previousSyncTime > 0) {
       const timeFilter = {
         propertyName: 'lastmodifieddate',
@@ -876,6 +875,9 @@ export async function syncRelevantMembersFromHubSpot(): Promise<{ synced: number
       for (const group of filterGroups) {
         group.filters.push(timeFilter);
       }
+      logger.info(`[MemberSync] Focused sync: using time filter since ${new Date(previousSyncTime).toISOString()}`);
+    } else {
+      logger.info('[MemberSync] Focused sync: no previous sync time, fetching all matching contacts');
     }
     
     let allContacts: HubSpotContact[] = [];
