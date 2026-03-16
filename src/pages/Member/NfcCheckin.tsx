@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useData } from '../../contexts/DataContext';
+import { useAuthData } from '../../contexts/DataContext';
 import PwaSmartBanner from '../../components/PwaSmartBanner';
 
 type CheckinResult = 'checking_in' | 'error';
@@ -8,7 +8,7 @@ type CheckinResult = 'checking_in' | 'error';
 const AUTO_REDIRECT_DELAY = 3500;
 
 const NfcCheckin: React.FC = () => {
-  const { user, sessionChecked } = useData();
+  const { user, sessionChecked } = useAuthData();
   const navigate = useNavigate();
   const [result, setResult] = useState<CheckinResult | null>(null);
   const [errorMessage, setErrorMessage] = useState('');

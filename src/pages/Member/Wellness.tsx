@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useData } from '../../contexts/DataContext';
+import { useAuthData } from '../../contexts/DataContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { usePageReady } from '../../contexts/PageReadyContext';
 import { useToast } from '../../components/Toast';
@@ -68,7 +68,7 @@ const formatTimeTo12Hour = (timeStr: string): { time: string; period: string } =
 
 const Wellness: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
-  const { user } = useData();
+  const { user } = useAuthData();
   const { effectiveTheme } = useTheme();
   const { setPageReady } = usePageReady();
   const { showToast } = useToast();

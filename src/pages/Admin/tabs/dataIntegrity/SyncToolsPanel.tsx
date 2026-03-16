@@ -219,6 +219,7 @@ const SyncToolsPanel: React.FC<SyncToolsPanelProps> = ({
                   <div className="mt-2">
                     <button
                       onClick={() => setExpandedDuplicates(prev => ({ ...prev, app: !prev.app }))}
+                      aria-expanded={expandedDuplicates.app}
                       className="text-xs text-blue-600 dark:text-blue-400 flex items-center gap-1"
                     >
                       <span className="material-symbols-outlined text-[14px]">{expandedDuplicates.app ? 'expand_less' : 'expand_more'}</span>
@@ -239,6 +240,7 @@ const SyncToolsPanel: React.FC<SyncToolsPanelProps> = ({
                   <div className="mt-2">
                     <button
                       onClick={() => setExpandedDuplicates(prev => ({ ...prev, hubspot: !prev.hubspot }))}
+                      aria-expanded={expandedDuplicates.hubspot}
                       className="text-xs text-orange-600 dark:text-orange-400 flex items-center gap-1"
                     >
                       <span className="material-symbols-outlined text-[14px]">{expandedDuplicates.hubspot ? 'expand_less' : 'expand_more'}</span>

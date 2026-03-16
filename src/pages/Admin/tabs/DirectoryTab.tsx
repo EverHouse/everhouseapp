@@ -2,7 +2,7 @@ import React, { useState, useCallback, type ErrorInfo } from 'react';
 import { createPortal } from 'react-dom';
 import FeatureErrorBoundary from '../../../components/FeatureErrorBoundary';
 import { useNavigate } from 'react-router-dom';
-import { useData, MemberProfile } from '../../../contexts/DataContext';
+import { useAuthData, useMemberData, MemberProfile } from '../../../contexts/DataContext';
 import { usePageReady } from '../../../contexts/PageReadyContext';
 import MemberProfileDrawer from '../../../components/MemberProfileDrawer';
 import { NewUserDrawer } from '../../../components/staff-command-center/drawers/NewUserDrawer';
@@ -22,7 +22,8 @@ import { ASSIGNABLE_TIERS } from './directory/directoryTypes';
 
 const DirectoryTab: React.FC = () => {
     const { setPageReady } = usePageReady();
-    const { members, formerMembers, fetchFormerMembers, refreshMembers, setViewAsUser, actualUser, isFetchingMembers } = useData();
+    const { setViewAsUser, actualUser } = useAuthData();
+    const { members, formerMembers, fetchFormerMembers, refreshMembers, isFetchingMembers } = useMemberData();
     const navigate = useNavigate();
 
     const [memberTab, setMemberTab] = useState<MemberTab>('active');

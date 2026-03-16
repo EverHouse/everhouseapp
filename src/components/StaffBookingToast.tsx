@@ -1,5 +1,5 @@
 import { useEffect, useCallback, useState } from 'react';
-import { useData } from '../contexts/DataContext';
+import { useAuthData } from '../contexts/DataContext';
 import { useToast } from './Toast';
 import { playSound } from '../utils/sounds';
 
@@ -53,7 +53,7 @@ function formatBookingToastMessage(event: BookingEventData): string {
 }
 
 export function StaffBookingToast() {
-  const { actualUser } = useData();
+  const { actualUser } = useAuthData();
   const { showToast } = useToast();
   const [isInitialized, setIsInitialized] = useState(false);
 

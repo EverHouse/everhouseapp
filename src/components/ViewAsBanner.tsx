@@ -1,9 +1,9 @@
 import React from 'react';
-import { useData } from '../contexts/DataContext';
+import { useAuthData } from '../contexts/DataContext';
 import { getBaseTier } from '../utils/permissions';
 
 const ViewAsBanner: React.FC = () => {
-  const { isViewingAs, viewAsUser, clearViewAsUser, actualUser } = useData();
+  const { isViewingAs, viewAsUser, clearViewAsUser, actualUser } = useAuthData();
   
   if (!isViewingAs || !viewAsUser) return null;
   

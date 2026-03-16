@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
-import { useData } from '../../contexts/DataContext';
+import { useAuthData, useMemberData } from '../../contexts/DataContext';
 import { AnnouncementFormDrawer } from '../admin/AnnouncementFormDrawer';
 import { NoticeFormDrawer } from '../admin/NoticeFormDrawer';
 import { EventFormDrawer } from '../admin/EventFormDrawer';
@@ -45,7 +45,8 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
   const { showToast } = useToast();
   const { isAtBottom } = useBottomNav();
   const isMobile = useIsMobile();
-  const { actualUser, refreshMembers } = useData();
+  const { actualUser } = useAuthData();
+  const { refreshMembers } = useMemberData();
   const { checkInWithToast, staffCancelWithToast, revertToApprovedWithToast } = useBookingActions();
   
   const navigateToTab = useCallback((tab: TabType) => {

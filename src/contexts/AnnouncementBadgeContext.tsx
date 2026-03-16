@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
-import { useData, Announcement } from './DataContext';
+import { useAuthData, useAnnouncementData, Announcement } from './DataContext';
 import { getTodayPacific } from '../utils/dateUtils';
 
 interface DismissedNotice {
@@ -38,7 +38,8 @@ const isActiveAnnouncement = (item: Announcement): boolean => {
 };
 
 export const AnnouncementBadgeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, announcements } = useData();
+  const { user } = useAuthData();
+  const { announcements } = useAnnouncementData();
   const [seenIds, setSeenIds] = useState<Set<string>>(new Set());
   const [isInitialized, setIsInitialized] = useState(false);
 

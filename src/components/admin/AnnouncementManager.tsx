@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useData, Announcement } from '../../contexts/DataContext';
+import { useAnnouncementData, Announcement } from '../../contexts/DataContext';
 import { usePageReady } from '../../contexts/PageReadyContext';
 import { useToast } from '../Toast';
 import { SlideUpDrawer } from '../SlideUpDrawer';
@@ -17,7 +17,7 @@ interface SheetStatus {
 const AnnouncementManager: React.FC<AnnouncementManagerProps> = ({ triggerCreate }) => {
     const { setPageReady } = usePageReady();
     const { showToast } = useToast();
-    const { announcements, addAnnouncement, updateAnnouncement, deleteAnnouncement, refreshAnnouncements } = useData();
+    const { announcements, addAnnouncement, updateAnnouncement, deleteAnnouncement, refreshAnnouncements } = useAnnouncementData();
     const [isEditing, setIsEditing] = useState(false);
     const [editId, setEditId] = useState<string | null>(null);
     const [newItem, setNewItem] = useState<Partial<Announcement>>({ type: 'announcement' });

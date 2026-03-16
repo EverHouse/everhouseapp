@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAutoAnimate } from '@formkit/auto-animate/react';
-import { useData } from '../../../contexts/DataContext';
+import { useAuthData } from '../../../contexts/DataContext';
 import ModalShell from '../../../components/ModalShell';
 import WalkingGolferSpinner from '../../../components/WalkingGolferSpinner';
 import FloatingActionButton from '../../../components/FloatingActionButton';
@@ -73,7 +73,7 @@ const validatePhone = (value: string): string | undefined => {
 };
 
 const TeamTab: React.FC = () => {
-  const { actualUser } = useData();
+  const { actualUser } = useAuthData();
   const isAdmin = actualUser?.role === 'admin';
   const queryClient = useQueryClient();
   const [isEditing, setIsEditing] = useState(false);

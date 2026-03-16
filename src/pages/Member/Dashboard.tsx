@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchWithCredentials } from '../../hooks/queries/useFetch';
-import { useData } from '../../contexts/DataContext';
+import { useAuthData, useBookingData } from '../../contexts/DataContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { usePageReady } from '../../contexts/PageReadyContext';
 import { useNavigationLoading } from '../../contexts/NavigationLoadingContext';
@@ -170,7 +170,8 @@ const Dashboard: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
-  const { user, actualUser, viewAsUser, isViewingAs, addBooking: _addBooking, deleteBooking } = useData();
+  const { user, actualUser, viewAsUser, isViewingAs } = useAuthData();
+  const { addBooking: _addBooking, deleteBooking } = useBookingData();
   const { effectiveTheme } = useTheme();
   
   const isAdminViewingAs = actualUser?.role === 'admin' && isViewingAs;

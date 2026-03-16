@@ -661,7 +661,7 @@ const SettingsTab: React.FC = () => {
         <SectionHeader icon="hub" title="HubSpot Contact Mappings" subtitle="Configure how the app maps contact data to HubSpot properties" />
         <div className="space-y-4">
           <div>
-            <button onClick={() => toggleSection('hubspotTiers')} className="flex items-center gap-2 w-full text-left py-2">
+            <button onClick={() => toggleSection('hubspotTiers')} aria-expanded={expandedSections.hubspotTiers} className="flex items-center gap-2 w-full text-left py-2">
               <span className="material-symbols-outlined text-sm text-primary/50 dark:text-white/50 transition-transform" style={{ transform: expandedSections.hubspotTiers ? 'rotate(90deg)' : 'rotate(0deg)' }}>chevron_right</span>
               <span className="text-xs font-bold text-primary/50 dark:text-white/50 uppercase tracking-widest">Tier Name Mappings</span>
             </button>
@@ -692,7 +692,7 @@ const SettingsTab: React.FC = () => {
           </div>
 
           <div>
-            <button onClick={() => toggleSection('hubspotStatuses')} className="flex items-center gap-2 w-full text-left py-2">
+            <button onClick={() => toggleSection('hubspotStatuses')} aria-expanded={expandedSections.hubspotStatuses} className="flex items-center gap-2 w-full text-left py-2">
               <span className="material-symbols-outlined text-sm text-primary/50 dark:text-white/50 transition-transform" style={{ transform: expandedSections.hubspotStatuses ? 'rotate(90deg)' : 'rotate(0deg)' }}>chevron_right</span>
               <span className="text-xs font-bold text-primary/50 dark:text-white/50 uppercase tracking-widest">Status Mappings</span>
             </button>

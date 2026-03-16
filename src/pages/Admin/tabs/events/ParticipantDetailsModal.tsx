@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useData, MemberProfile } from '../../../../contexts/DataContext';
+import { useMemberData, MemberProfile } from '../../../../contexts/DataContext';
 import { formatDateTimePacific } from '../../../../utils/dateUtils';
 import { useToast } from '../../../../components/Toast';
 import { SlideUpDrawer } from '../../../../components/SlideUpDrawer';
@@ -22,7 +22,7 @@ export const ParticipantDetailsModal: React.FC<ParticipantDetailsModalProps> = (
     eventbriteId
 }) => {
     const { showToast } = useToast();
-    const { members } = useData();
+    const { members } = useMemberData();
     const queryClient = useQueryClient();
     const [isAdding, setIsAdding] = useState(false);
     const [newEmail, setNewEmail] = useState('');

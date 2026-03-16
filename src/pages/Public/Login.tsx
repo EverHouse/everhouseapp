@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Footer } from '../../components/Footer';
-import { useData } from '../../contexts/DataContext';
+import { useAuthData } from '../../contexts/DataContext';
 import { usePageReady } from '../../contexts/PageReadyContext';
 import { useNavigationLoading } from '../../contexts/NavigationLoadingContext';
 import WalkingGolferSpinner from '../../components/WalkingGolferSpinner';
@@ -25,7 +25,7 @@ const Login: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { startNavigation } = useNavigationLoading();
-  const { loginWithMember, user, actualUser, isViewingAs, sessionChecked } = useData();
+  const { loginWithMember, user, actualUser, isViewingAs, sessionChecked } = useAuthData();
   const { setPageReady } = usePageReady();
   const [email, setEmail] = useState('');
   

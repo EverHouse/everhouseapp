@@ -52,6 +52,7 @@ export default function ContextualHelp({ guideIds, title = 'Page Guide' }: Conte
     <>
       <button
         onClick={() => setIsOpen(true)}
+        aria-expanded={isOpen}
         className="p-2 rounded-xl bg-white/60 dark:bg-white/10 backdrop-blur-sm border border-primary/10 dark:border-white/20 hover:bg-white/80 dark:hover:bg-white/15 transition-colors tactile-btn"
       >
         <span className="material-symbols-outlined text-xl text-primary/70 dark:text-white/70">school</span>

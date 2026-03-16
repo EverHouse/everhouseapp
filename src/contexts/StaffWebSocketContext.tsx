@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useRef, useCallback, useState, useMemo } from 'react';
 import { useStaffWebSocket, type BookingEvent } from '../hooks/useStaffWebSocket';
-import { useData } from './DataContext';
+import { useAuthData } from './DataContext';
 
 type EventCallback = (event: BookingEvent) => void;
 
@@ -14,7 +14,7 @@ interface StaffWebSocketContextType {
 const StaffWebSocketContext = createContext<StaffWebSocketContextType | null>(null);
 
 export const StaffWebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { actualUser, sessionChecked } = useData();
+  const { actualUser, sessionChecked } = useAuthData();
   const callbacksRef = useRef<Map<string, EventCallback>>(new Map());
   const [lastEventFromContext, setLastEventFromContext] = useState<BookingEvent | null>(null);
   const mountIdRef = useRef<number>(0);

@@ -8,6 +8,16 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.87.47",
+    date: "2026-03-16",
+    title: "Code Quality & Accessibility Improvements",
+    changes: [
+      "Improved: Replaced all hardcoded z-index values with the centralized z-index scale — splash screen and navigation overlay now use consistent values instead of magic numbers",
+      "Improved: Migrated all 31 components from the aggregated useData() hook to specific context hooks (useAuthData, useMemberData, etc.) — reduces unnecessary re-renders across the app",
+      "Improved: Added aria-expanded attributes to 10+ expandable sections across admin panels, settings, and data integrity views — better screen reader support for collapsible content",
+    ]
+  },
+  {
     version: "8.87.46",
     date: "2026-03-16",
     title: "Recent Playing Partners in Booking Flow",

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useData } from '../../../contexts/DataContext';
+import { useAuthData } from '../../../contexts/DataContext';
 import { useToast } from '../../../components/Toast';
 import { getTodayPacific, formatDateDisplayWithDay } from '../../../utils/dateUtils';
 import { SlideUpDrawer } from '../../../components/SlideUpDrawer';
@@ -81,7 +81,7 @@ function stripHtml(html: string | null | undefined): string {
 }
 
 const BlocksTab: React.FC = () => {
-    const { actualUser } = useData();
+    const { actualUser } = useAuthData();
     const { showToast } = useToast();
     const queryClient = useQueryClient();
     const [activeSubTab, setActiveSubTab] = useState<'notices' | 'blocks'>('notices');

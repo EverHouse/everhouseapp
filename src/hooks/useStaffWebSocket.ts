@@ -1,5 +1,5 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
-import { useData } from '../contexts/DataContext';
+import { useAuthData } from '../contexts/DataContext';
 
 export interface BookingEvent {
   eventType: string;
@@ -28,7 +28,7 @@ let globalConnectionId = 0;
 
 export function useStaffWebSocket(options: UseStaffWebSocketOptions = {}) {
   const { onBookingEvent, debounceMs = 500 } = options;
-  const { actualUser, sessionChecked } = useData();
+  const { actualUser, sessionChecked } = useAuthData();
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const reconnectAttemptRef = useRef(0);

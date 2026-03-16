@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useData, EventData } from '../../contexts/DataContext';
+import { useAuthData, useEventData, EventData } from '../../contexts/DataContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { usePageReady } from '../../contexts/PageReadyContext';
 import { useToast } from '../../components/Toast';
@@ -32,7 +32,8 @@ const parseEventTime = (timeStr: string): { time: string; period: string } => {
 };
 
 const MemberEvents: React.FC = () => {
-  const { events, isLoading, user, actualUser, isViewingAs, viewAsUser } = useData();
+  const { isLoading, user, actualUser, isViewingAs, viewAsUser } = useAuthData();
+  const { events } = useEventData();
   const { effectiveTheme } = useTheme();
   const { setPageReady } = usePageReady();
   const { showToast } = useToast();

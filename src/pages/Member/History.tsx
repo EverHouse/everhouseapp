@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useData } from '../../contexts/DataContext';
+import { useAuthData } from '../../contexts/DataContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { usePageReady } from '../../contexts/PageReadyContext';
 import { fetchWithCredentials } from '../../hooks/queries/useFetch';
@@ -44,7 +44,7 @@ interface UnifiedPurchase {
 }
 
 const History: React.FC = () => {
-  const { user } = useData();
+  const { user } = useAuthData();
   const { effectiveTheme } = useTheme();
   const { setPageReady } = usePageReady();
   const [searchParams] = useSearchParams();

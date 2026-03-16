@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useData } from '../../contexts/DataContext';
+import { useAuthData, useBookingData } from '../../contexts/DataContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { usePageReady } from '../../contexts/PageReadyContext';
 import { useToast } from '../../components/Toast';
@@ -45,7 +45,8 @@ import PlayerSlotEditor from '../../components/shared/PlayerSlotEditor';
 const BookGolf: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
-  const { addBooking, user, viewAsUser, actualUser, isViewingAs } = useData();
+  const { user, viewAsUser, actualUser, isViewingAs } = useAuthData();
+  const { addBooking } = useBookingData();
   const { effectiveTheme } = useTheme();
   const { setPageReady } = usePageReady();
   const { showToast } = useToast();

@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import EmptyState from '../../../components/EmptyState';
 import { usePageReady } from '../../../contexts/PageReadyContext';
-import { useData } from '../../../contexts/DataContext';
+import { useAuthData } from '../../../contexts/DataContext';
 import { useToast } from '../../../components/Toast';
 import { formatDateTimePacific, formatDateDisplayWithDay, formatTime12Hour } from '../../../utils/dateUtils';
 import WalkingGolferSpinner from '../../../components/WalkingGolferSpinner';
@@ -141,11 +141,11 @@ interface NeedsPlayersResponse {
 const TrackmanTab: React.FC = () => {
   const queryClient = useQueryClient();
   const pageReadyContext = usePageReady();
-  const dataContext = useData();
+  const authData = useAuthData();
   const toastContext = useToast();
   
   const setPageReady = useMemo(() => pageReadyContext?.setPageReady || (() => {}), [pageReadyContext?.setPageReady]);
-  const _actualUser = dataContext?.actualUser;
+  const _actualUser = authData?.actualUser;
   const showToast = toastContext?.showToast || (() => {});
   
   const [unmatchedPage, setUnmatchedPage] = useState(1);

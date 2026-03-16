@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback, Suspense } from 'react
 import { createPortal } from 'react-dom';
 import { useNavigate, useLocation, useSearchParams, Outlet } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { useData } from '../../contexts/DataContext';
+import { useAuthData } from '../../contexts/DataContext';
 import { BottomSentinel } from '../../components/layout/BottomSentinel';
 import BackToTop from '../../components/BackToTop';
 import Toggle from '../../components/Toggle';
@@ -40,7 +40,7 @@ const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
-  const { actualUser } = useData();
+  const { actualUser } = useAuthData();
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   
@@ -531,7 +531,7 @@ const StaffTrainingGuide: React.FC = () => {
     const [authError, setAuthError] = useState(false);
     const [modalOpen, setModalOpen] = useState(false);
     const [editingSection, setEditingSection] = useState<TrainingSectionDB | null>(null);
-    const { actualUser } = useData();
+    const { actualUser } = useAuthData();
     const isAdmin = actualUser?.role === 'admin';
     const printRef = useRef<HTMLDivElement>(null);
     const { execute: undoAction } = useUndoAction();
@@ -673,6 +673,7 @@ const StaffTrainingGuide: React.FC = () => {
                         className="tactile-row group bg-white/60 dark:bg-white/5 backdrop-blur-sm rounded-xl border border-primary/10 dark:border-white/25 overflow-hidden print:border print:border-gray-200 print:break-inside-avoid hover:bg-white/80 dark:hover:bg-white/10 transition-colors cursor-pointer"
                         role="button"
                         tabIndex={0}
+                        aria-expanded={expandedSection === String(section.id)}
                         onClick={() => setExpandedSection(expandedSection === String(section.id) ? null : String(section.id))}
                         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpandedSection(expandedSection === String(section.id) ? null : String(section.id)); } }}
                     >

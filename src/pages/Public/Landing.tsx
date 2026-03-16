@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { Footer } from '../../components/Footer';
 import BackToTop from '../../components/BackToTop';
 import { usePageReady } from '../../contexts/PageReadyContext';
-import { useData } from '../../contexts/DataContext';
+import { useAuthData } from '../../contexts/DataContext';
 import { useParallax } from '../../hooks/useParallax';
 import EditorialShowcase from '../../components/layout/EditorialShowcase';
 import { AnimatedPage } from '../../components/motion';
@@ -24,7 +24,7 @@ const HERO_ANIM_KEY = 'ever_hero_played';
 const Landing: React.FC = () => {
   const navigate = useNavigate();
   const { setPageReady } = usePageReady();
-  const { user, actualUser, isViewingAs, sessionChecked } = useData();
+  const { user, actualUser, isViewingAs, sessionChecked } = useAuthData();
   const [tiers, setTiers] = useState<MembershipTier[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { offset: parallaxOffset, opacity: _parallaxOpacity, gradientShift, ref: heroRef } = useParallax({ speed: 0.25, maxOffset: 120 });

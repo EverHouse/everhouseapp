@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useLayoutEffect, useMemo, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { useData } from '../../../contexts/DataContext';
+import { useAuthData, useMemberData } from '../../../contexts/DataContext';
 import { usePageReady } from '../../../contexts/PageReadyContext';
 import { getTodayPacific, formatTime12Hour } from '../../../utils/dateUtils';
 import { usePricing } from '../../../hooks/usePricing';
@@ -46,7 +46,8 @@ import { TrackmanIcon } from '../../../components/icons/TrackmanIcon';
 const SimulatorTab: React.FC = () => {
     const navigate = useNavigate();
     const { setPageReady } = usePageReady();
-    const { user, actualUser, members } = useData();
+    const { user, actualUser } = useAuthData();
+  const { members } = useMemberData();
     const queryClient = useQueryClient();
     const { guestFeeDollars, overageRatePerBlockDollars, tierMinutes } = usePricing();
     

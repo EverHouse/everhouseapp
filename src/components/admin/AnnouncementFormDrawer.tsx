@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useData, Announcement } from '../../contexts/DataContext';
+import { useAnnouncementData, Announcement } from '../../contexts/DataContext';
 import { useToast } from '../Toast';
 import { SlideUpDrawer } from '../SlideUpDrawer';
 
@@ -15,7 +15,7 @@ export const AnnouncementFormDrawer: React.FC<AnnouncementFormDrawerProps> = ({
   editItem = null
 }) => {
   const { showToast } = useToast();
-  const { addAnnouncement, updateAnnouncement } = useData();
+  const { addAnnouncement, updateAnnouncement } = useAnnouncementData();
   const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState<Partial<Announcement>>({ type: 'announcement' });
 

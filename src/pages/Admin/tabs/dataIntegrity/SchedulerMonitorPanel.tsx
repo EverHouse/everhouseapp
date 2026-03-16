@@ -162,6 +162,7 @@ const SchedulerMonitorPanel: React.FC<Props> = ({ isOpen, onToggle }) => {
                         className={`tactile-row border-b border-gray-100 dark:border-gray-800 ${idx % 2 === 0 ? 'bg-gray-50/50 dark:bg-white/[0.02]' : ''} ${status.bgClass} cursor-pointer hover:bg-gray-100 dark:hover:bg-white/[0.05] ${!scheduler.isEnabled ? 'opacity-60' : ''}`}
                         tabIndex={0}
                         role="button"
+                        aria-expanded={expandedError === scheduler.taskName}
                         onClick={() => scheduler.lastError && setExpandedError(expandedError === scheduler.taskName ? null : scheduler.taskName)}
                         // eslint-disable-next-line @typescript-eslint/no-unused-expressions
                         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); scheduler.lastError && setExpandedError(expandedError === scheduler.taskName ? null : scheduler.taskName); } }}

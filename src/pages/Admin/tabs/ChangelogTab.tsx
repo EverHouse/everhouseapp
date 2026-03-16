@@ -4,7 +4,7 @@ import EmptyState from '../../../components/EmptyState';
 import { formatRelativeTime } from '../../../utils/dateUtils';
 import WalkingGolferSpinner from '../../../components/WalkingGolferSpinner';
 import { AnimatedPage } from '../../../components/motion';
-import { useData } from '../../../contexts/DataContext';
+import { useAuthData } from '../../../contexts/DataContext';
 
 interface AuditLogDetails {
     member_email?: string;
@@ -266,7 +266,7 @@ const FILTER_CATEGORIES = [
 ];
 
 const ChangelogTab: React.FC = () => {
-    const { actualUser } = useData();
+    const { actualUser } = useAuthData();
     const isAdmin = actualUser?.role === 'admin';
     const [activeTab, setActiveTab] = useState<'updates' | 'activity'>('updates');
     

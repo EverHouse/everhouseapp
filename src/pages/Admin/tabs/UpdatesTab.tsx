@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAutoAnimate } from '@formkit/auto-animate/react';
 import { useNavigate } from 'react-router-dom';
-import { useData } from '../../../contexts/DataContext';
+import { useAuthData } from '../../../contexts/DataContext';
 import { usePageReady } from '../../../contexts/PageReadyContext';
 import { formatRelativeTime } from '../../../utils/dateUtils';
 import { useNotificationSounds } from '../../../hooks/useNotificationSounds';
@@ -24,7 +24,7 @@ interface StaffNotification {
 const UpdatesTab: React.FC = () => {
     const navigate = useNavigate();
     const { setPageReady } = usePageReady();
-    const { actualUser } = useData();
+    const { actualUser } = useAuthData();
     const [notificationsRef] = useAutoAnimate();
     const [activeSubTab, setActiveSubTab] = useState<'alerts' | 'announcements'>('alerts');
     const [notifications, setNotifications] = useState<StaffNotification[]>([]);

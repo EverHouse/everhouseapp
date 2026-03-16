@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useData } from '../../contexts/DataContext';
+import { useAuthData } from '../../contexts/DataContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { usePageReady } from '../../contexts/PageReadyContext';
 import { useNavigationLoading } from '../../contexts/NavigationLoadingContext';
@@ -60,7 +60,7 @@ const Profile: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
-  const { user, logout, actualUser, isViewingAs, refreshUser } = useData();
+  const { user, logout, actualUser, isViewingAs, refreshUser } = useAuthData();
   const { effectiveTheme } = useTheme();
   const { setPageReady } = usePageReady();
   const { startNavigation } = useNavigationLoading();

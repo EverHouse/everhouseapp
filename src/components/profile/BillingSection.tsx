@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useToast } from '../Toast';
-import { useData } from '../../contexts/DataContext';
+import { useAuthData } from '../../contexts/DataContext';
 
 interface BillingInfo {
   billingProvider: 'stripe' | 'mindbody' | 'family_addon' | 'comped' | null;
@@ -53,7 +53,7 @@ interface Props {
 
 export default function BillingSection({ isDark }: Props) {
   const { showToast } = useToast();
-  const { viewAsUser } = useData();
+  const { viewAsUser } = useAuthData();
   const [billingInfo, setBillingInfo] = useState<BillingInfo | null>(null);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);

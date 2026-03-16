@@ -90,6 +90,7 @@ export const DataProvider: React.FC<{children: ReactNode}> = ({ children }) => {
   );
 };
 
+/** @deprecated Use specific hooks instead: useAuthData, useMemberData, useCafeData, useEventData, useAnnouncementData, useBookingData */
 // eslint-disable-next-line react-refresh/only-export-components
 export const useData = (): DataContextType => {
   const auth = useAuthData();

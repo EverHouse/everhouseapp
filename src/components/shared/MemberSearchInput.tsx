@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback, useId } from 'react';
 import { createPortal } from 'react-dom';
-import { useData } from '../../contexts/DataContext';
+import { useMemberData } from '../../contexts/DataContext';
 
 export interface SelectedMember {
   id: string;
@@ -63,7 +63,7 @@ export const MemberSearchInput: React.FC<MemberSearchInputProps> = ({
   includeFormer = false,
   forceApiSearch = false
 }) => {
-  const { members } = useData();
+  const { members } = useMemberData();
   const [query, setQuery] = useState('');
   const [isOpen, setIsOpen] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(0);

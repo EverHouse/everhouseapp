@@ -703,6 +703,7 @@ export const TrackmanWebhookEventsSection: React.FC<TrackmanWebhookEventsSection
                           )}
                           <button
                             onClick={() => setExpandedEventId(isExpanded ? null : event.id)}
+                            aria-expanded={isExpanded}
                             className="p-1.5 md:p-2 rounded-lg hover:bg-primary/10 dark:hover:bg-white/10 transition-colors shrink-0"
                             title={isExpanded ? 'Hide payload' : 'Show payload'}
                           >

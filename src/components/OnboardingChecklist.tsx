@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useData } from '../contexts/DataContext';
+import { useAuthData } from '../contexts/DataContext';
 import { fetchWithCredentials } from '../hooks/queries/useFetch';
 
 interface OnboardingStep {
@@ -26,7 +26,7 @@ interface BeforeInstallPromptEvent extends Event {
 
 const OnboardingChecklist: React.FC = () => {
   const navigate = useNavigate();
-  const { user: _user } = useData();
+  const { user: _user } = useAuthData();
   const [status, setStatus] = useState<OnboardingStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [dismissed, setDismissed] = useState(false);

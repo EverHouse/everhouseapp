@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../contexts/ThemeContext';
-import { useData } from '../contexts/DataContext';
+import { useAuthData } from '../contexts/DataContext';
 import { getTodayPacific } from '../utils/dateUtils';
 import { isBlockingClosure, getAffectedAreasList, getNoticeLabel as getNoticeLabelUtil } from '../utils/closureUtils';
 
@@ -24,7 +24,7 @@ interface Closure {
 const ClosureAlert: React.FC = () => {
   const navigate = useNavigate();
   const { effectiveTheme } = useTheme();
-  const { user, actualUser } = useData();
+  const { user, actualUser } = useAuthData();
   const isDark = effectiveTheme === 'dark';
   
   // Check if viewing as staff/admin (not in "View As" mode)

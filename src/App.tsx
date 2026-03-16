@@ -4,7 +4,7 @@ import { createPortal } from 'react-dom';
 import { BrowserRouter, Routes, Route, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import { QueryClientProvider, useQueryClient, useQuery } from '@tanstack/react-query';
 import { queryClient } from './lib/queryClient';
-import { DataProvider, useData } from './contexts/DataContext';
+import { DataProvider, useAuthData, useAnnouncementData } from './contexts/DataContext';
 import { ThemeProvider, useTheme } from './contexts/ThemeContext';
 import { SmoothScrollProvider } from './components/motion/SmoothScroll';
 import DirectionalPageTransition, { TransitionContext } from './components/motion/DirectionalPageTransition';
@@ -293,14 +293,14 @@ const ScrollToTop = () => {
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, sessionChecked } = useData();
+  const { user, sessionChecked } = useAuthData();
   if (!sessionChecked) return <div className="min-h-screen" />;
   if (!user) return <Navigate to="/login" replace />;
   return <>{children}</>;
 };
 
 const WaiverGate: React.FC = () => {
-  const { user } = useData();
+  const { user } = useAuthData();
   const [showWaiverModal, setShowWaiverModal] = useState(false);
   const [currentVersion, setCurrentVersion] = useState('1.0');
 
@@ -336,7 +336,7 @@ const WaiverGate: React.FC = () => {
 
 // Members Portal route guard - redirects staff/admin to Staff Portal (unless viewing as member or on profile page)
 const MemberPortalRoute: React.FC<{ children: React.ReactNode; allowStaffAccess?: boolean }> = ({ children, allowStaffAccess }) => {
-  const { user, actualUser, isViewingAs, sessionChecked } = useData();
+  const { user, actualUser, isViewingAs, sessionChecked } = useAuthData();
   if (!sessionChecked) return <div className="min-h-screen" />;
   if (!user) return <Navigate to="/login" replace />;
   
@@ -354,7 +354,7 @@ const MemberPortalRoute: React.FC<{ children: React.ReactNode; allowStaffAccess?
 };
 
 const AdminProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { actualUser, sessionChecked } = useData();
+  const { actualUser, sessionChecked } = useAuthData();
   // Only block rendering until initial session check completes
   if (!sessionChecked) return <div className="min-h-screen" />;
   if (!actualUser) return <Navigate to="/login" replace />;
@@ -537,7 +537,8 @@ const AnimatedRoutes: React.FC = () => {
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { announcements: _announcements, user, actualUser, isViewingAs } = useData();
+  const { user, actualUser, isViewingAs } = useAuthData();
+  const { announcements: _announcements } = useAnnouncementData();
   const { effectiveTheme } = useTheme();
   const { isNavigating, startNavigation, endNavigation } = useNavigationLoading();
   const { processNotifications: _processNotifications } = useNotificationSounds(false, user?.email);

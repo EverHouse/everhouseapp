@@ -39,11 +39,12 @@
     <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400..700;1,400..700&family=Newsreader:ital,opsz,wght@0,6..72,200..800;1,6..72,200..800&display=swap" /></noscript>
     <link rel="canonical" href="https://everclub.app/" />
     <style>
+      :root { --z-splash-inline: 11000; --z-drawer-inline: 9500; }
       #app-splash {
         position: fixed;
         inset: 0;
         background-color: #293515;
-        z-index: 99999;
+        z-index: var(--z-splash-inline);
         display: flex;
         align-items: center;
         justify-content: center;
@@ -200,7 +201,7 @@
       </div>
     </noscript>
     <noscript><img height="1" width="1" style="display:none" src="https://www.facebook.com/tr?id=906341427989429&ev=PageView&noscript=1" /></noscript>
-    <div id="nav-overlay-root" style="position:fixed;inset:0;pointer-events:none;z-index:9999;"></div>
+    <div id="nav-overlay-root" style="position:fixed;inset:0;pointer-events:none;z-index:var(--z-drawer-inline);"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
