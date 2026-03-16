@@ -45,12 +45,17 @@ const InitialLoadingScreen: React.FC<{ children: React.ReactNode }> = ({ childre
     if (typeof window !== 'undefined') {
       const ptrFlag = sessionStorage.getItem('ptr-reload');
       if (ptrFlag) {
-        sessionStorage.removeItem('ptr-reload');
         return true;
       }
     }
     return isInitialLandingLoad();
   });
+
+  React.useEffect(() => {
+    if (shouldShowLoader) {
+      sessionStorage.removeItem('ptr-reload');
+    }
+  }, []);
   const [showLoader, setShowLoader] = React.useState(shouldShowLoader);
   const [hasHiddenLoader, setHasHiddenLoader] = React.useState(!shouldShowLoader);
 

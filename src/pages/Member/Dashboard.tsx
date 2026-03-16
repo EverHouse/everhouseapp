@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { fetchWithCredentials } from '../../hooks/queries/useFetch';
 import { useAuthData, useBookingData } from '../../contexts/DataContext';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -213,13 +213,18 @@ const Dashboard: React.FC = () => {
   const [nfcCheckinData, setNfcCheckinData] = useState<{ type: 'success' | 'already_checked_in', memberName: string, tier?: string | null } | null>(() => {
     const stored = sessionStorage.getItem('nfc_checkin_result');
     if (stored) {
-      sessionStorage.removeItem('nfc_checkin_result');
       try {
         return JSON.parse(stored);
       } catch (e) { console.warn('[Dashboard] Failed to parse NFC checkin data:', e); }
     }
     return null;
   });
+
+  useEffect(() => {
+    if (sessionStorage.getItem('nfc_checkin_result') !== null) {
+      sessionStorage.removeItem('nfc_checkin_result');
+    }
+  }, []);
 
   const isStaffOrAdminProfile = user?.role === 'admin' || user?.role === 'staff';
   const { permissions: tierPermissions } = useTierPermissions(user?.tier);
@@ -633,69 +638,57 @@ const Dashboard: React.FC = () => {
     }
   };
 
+  const cancelBookingMutation = useMutation({
+    mutationFn: async ({ bookingId, bookingType }: { bookingId: number; bookingType: 'booking' | 'booking_request' }) => {
+      const endpoint = bookingType === 'booking'
+        ? `/api/bookings/${bookingId}/member-cancel`
+        : `/api/booking-requests/${bookingId}/member-cancel`;
+      const res = await fetch(endpoint, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(isAdminViewingAs ? { acting_as_email: user?.email } : {}),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Failed to cancel booking');
+      return { bookingId, data };
+    },
+    onMutate: async ({ bookingId }) => {
+      setOptimisticCancelledIds(prev => new Set(prev).add(bookingId));
+      setSelectedBooking(null);
+    },
+    onSuccess: ({ bookingId, data }) => {
+      if (data.status === 'cancellation_pending') {
+        setOptimisticCancelledIds(prev => {
+          const next = new Set(prev);
+          next.delete(bookingId);
+          return next;
+        });
+        showToast('Cancellation request submitted. You\'ll be notified when it\'s complete.', 'success');
+      } else {
+        deleteBooking(String(bookingId));
+        showToast('Booking cancelled successfully', 'success');
+      }
+      refetchAllData();
+    },
+    onError: (error: Error, { bookingId }) => {
+      setOptimisticCancelledIds(prev => {
+        const next = new Set(prev);
+        next.delete(bookingId);
+        return next;
+      });
+      showToast(error.message || 'Failed to cancel booking', 'error');
+    },
+  });
+
   const handleCancelBooking = (bookingId: number, bookingType: 'booking' | 'booking_request') => {
     setConfirmModal({
       isOpen: true,
       title: "Cancel Booking",
       message: "Are you sure you want to cancel this booking?",
-      onConfirm: async () => {
+      onConfirm: () => {
         setConfirmModal(null);
-        
-        setOptimisticCancelledIds(prev => new Set(prev).add(bookingId));
-        setSelectedBooking(null);
-        
-        try {
-          let res;
-          const headers = { 'Content-Type': 'application/json' };
-          
-          if (bookingType === 'booking') {
-            res = await fetch(`/api/bookings/${bookingId}/member-cancel`, {
-              method: 'PUT',
-              headers,
-              credentials: 'include',
-              body: JSON.stringify(isAdminViewingAs ? { acting_as_email: user?.email } : {})
-            });
-          } else {
-            res = await fetch(`/api/booking-requests/${bookingId}/member-cancel`, {
-              method: 'PUT',
-              headers,
-              credentials: 'include',
-              body: JSON.stringify(isAdminViewingAs ? { acting_as_email: user?.email } : {})
-            });
-          }
-
-          if (res.ok) {
-            const data = await res.json().catch(() => ({}));
-            
-            if (data.status === 'cancellation_pending') {
-              setOptimisticCancelledIds(prev => {
-                const next = new Set(prev);
-                next.delete(bookingId);
-                return next;
-              });
-              showToast('Cancellation request submitted. You\'ll be notified when it\'s complete.', 'success');
-            } else {
-              deleteBooking(String(bookingId));
-              showToast('Booking cancelled successfully', 'success');
-            }
-            refetchAllData();
-          } else {
-            setOptimisticCancelledIds(prev => {
-              const next = new Set(prev);
-              next.delete(bookingId);
-              return next;
-            });
-            const data = await res.json().catch(() => ({}));
-            showToast(data.error || 'Failed to cancel booking', 'error');
-          }
-        } catch (_err: unknown) {
-          setOptimisticCancelledIds(prev => {
-            const next = new Set(prev);
-            next.delete(bookingId);
-            return next;
-          });
-          showToast('Failed to cancel booking', 'error');
-        }
+        cancelBookingMutation.mutate({ bookingId, bookingType });
       }
     });
   };
