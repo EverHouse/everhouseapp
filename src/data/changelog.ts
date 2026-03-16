@@ -15,6 +15,7 @@ export const changelog: ChangelogEntry[] = [
       "Fixed: App no longer fires unnecessary API calls on public pages (login, membership) — reduces wasted server requests and eliminates console errors for visitors who aren't logged in",
       "Fixed: Page pre-loading now properly cleans up when navigating away, preventing a potential memory leak",
       "Fixed: Switching accounts now properly refreshes pre-loaded page data instead of showing stale content from the previous session",
+      "Fixed: Profile page scroll-to-passkeys timer now properly cleans up if you navigate away quickly",
     ]
   },
   {

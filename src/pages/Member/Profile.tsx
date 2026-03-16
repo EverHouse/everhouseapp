@@ -196,9 +196,10 @@ const Profile: React.FC = () => {
     }
     if (state?.scrollToPasskeys) {
       window.history.replaceState({}, document.title);
-      setTimeout(() => {
+      const timer = setTimeout(() => {
         document.getElementById('passkeys-section')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }, 500);
+      return () => clearTimeout(timer);
     }
   }, [location.state, isStaffOrAdminProfile]);
 
