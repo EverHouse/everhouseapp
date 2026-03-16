@@ -1363,6 +1363,7 @@ router.post('/api/hubspot/webhooks', async (req, res) => {
                           logger.info('[HubSpot Webhook] MINDBODY DEACTIVATION CASCADE for', { extra: { email, newStatus, prevTier: existingUser.tier } });
                         } else {
                           await db.execute(sql`UPDATE users SET membership_status = ${newStatus}, last_modified_at = CASE WHEN membership_status IS DISTINCT FROM ${newStatus} THEN NOW() ELSE last_modified_at END, updated_at = NOW() WHERE LOWER(email) = ${email}`);
+
                         }
                         logger.info('[HubSpot Webhook] Updated DB membership_status for to', { extra: { email, newStatus } });
 

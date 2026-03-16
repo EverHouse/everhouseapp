@@ -7,7 +7,7 @@ import { useNavigationLoading } from '../../contexts/NavigationLoadingContext';
 import WalkingGolferSpinner from '../../components/WalkingGolferSpinner';
 import GoogleSignInButton from '../../components/GoogleSignInButton';
 import AppleSignInButton from '../../components/AppleSignInButton';
-import { startAuthentication } from '@simplewebauthn/browser';
+import { startAuthentication, WebAuthnAbortService } from '@simplewebauthn/browser';
 
 const Spinner = () => (
   <WalkingGolferSpinner size="sm" variant="light" />
@@ -71,6 +71,7 @@ const Login: React.FC = () => {
   );
 
   const conditionalActiveRef = useRef(false);
+  const manualPasskeyInFlightRef = useRef(false);
 
   useEffect(() => {
     if (typeof window !== 'undefined' && window.PublicKeyCredential) {
@@ -117,7 +118,9 @@ const Login: React.FC = () => {
           const e = err as { name?: string };
           if (e?.name === 'AbortError' || e?.name === 'NotAllowedError') return;
         } finally {
-          setPasskeyLoading(false);
+          if (!manualPasskeyInFlightRef.current) {
+            setPasskeyLoading(false);
+          }
         }
       };
       tryConditionalUI();
@@ -127,8 +130,10 @@ const Login: React.FC = () => {
 
   const handlePasskeyLogin = useCallback(async () => {
     if (conditionalActiveRef.current) {
-      return;
+      WebAuthnAbortService.cancelCeremony();
+      conditionalActiveRef.current = false;
     }
+    manualPasskeyInFlightRef.current = true;
     setPasskeyLoading(true);
     setError('');
 
@@ -170,6 +175,7 @@ const Login: React.FC = () => {
       }
       setError((err instanceof Error ? err.message : String(err)) || 'Passkey authentication failed');
     } finally {
+      manualPasskeyInFlightRef.current = false;
       setPasskeyLoading(false);
     }
   }, [loginWithMember, startNavigation, navigate]);
