@@ -146,10 +146,14 @@ export async function checkHubSpotSyncMismatch(): Promise<IntegrityCheckResult> 
 
   const staleHubSpotIssues = issues.filter(i => i.description.includes('not found in HubSpot'));
   if (staleHubSpotIssues.length > 0) {
-    for (const issue of staleHubSpotIssues) {
-      const userId = issue.recordId;
-      await db.execute(sql`UPDATE users SET hubspot_id = NULL, updated_at = NOW() WHERE id = ${userId}`);
-      logger.info(`[AutoFix] Cleared stale HubSpot ID for user ${issue.context?.memberEmail}`);
+    if (!isProduction) {
+      logger.info(`[AutoFix] Skipping stale HubSpot ID cleanup in dev (${staleHubSpotIssues.length} would be cleared)`);
+    } else {
+      for (const issue of staleHubSpotIssues) {
+        const userId = issue.recordId;
+        await db.execute(sql`UPDATE users SET hubspot_id = NULL, updated_at = NOW() WHERE id = ${userId}`);
+        logger.info(`[AutoFix] Cleared stale HubSpot ID for user ${issue.context?.memberEmail}`);
+      }
     }
   }
 

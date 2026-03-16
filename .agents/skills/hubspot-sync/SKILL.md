@@ -11,6 +11,7 @@ description: HubSpot CRM synchronization system — queue-based sync of contacts
 
 | Task | Primary File(s) | When to touch |
 |---|---|---|
+| Read-only guard | `server/core/hubspot/readOnlyGuard.ts` | Dev/staging write protection |
 | Queue engine | `server/core/hubspot/queue.ts` | Enqueue, process, retry, stats |
 | Queue helpers | `server/core/hubspot/queueHelpers.ts` | Typed enqueue functions |
 | Contact CRUD | `server/core/hubspot/members.ts` | Contact create/update, tier sync, cancel |
@@ -33,12 +34,22 @@ description: HubSpot CRM synchronization system — queue-based sync of contacts
 | Form sync scheduler | `server/schedulers/hubspotFormSyncScheduler.ts` | Every 30 min |
 | Routes + cache | `server/routes/hubspot.ts` | API, contact cache, webhooks |
 
+## Read-Only Mode (Non-Production)
+
+All HubSpot **write** operations are blocked in dev/staging via `isHubSpotReadOnly()` in `server/core/hubspot/readOnlyGuard.ts`. This prevents dev from pushing stale data (membership status, tier, billing provider) to the shared HubSpot account, since dev lacks real Stripe subscriptions.
+
+- **Guard location**: Every write function in the HubSpot core modules (`members.ts`, `stages.ts`, `contacts.ts`, `companies.ts`, `queue.ts`) checks `isHubSpotReadOnly()` before making API calls.
+- **Route-level guards**: Direct HubSpot API calls in route files (`profile.ts`, `onboarding.ts`, `visitors.ts`, `admin-actions.ts`, `hubspot.ts`, `dataIntegrity.ts`, `stripe-tools.ts`, `maintenance.ts`) also use the guard.
+- **Queue**: Jobs are still enqueued in dev (for testing flow), but `executeHubSpotOperation` skips the actual API call.
+- **Reads are unaffected**: Contact search, sync fetches, form submission ingestion, and directory reads all work normally in dev.
+- **Integrity auto-fixes**: The `checkHubSpotSyncMismatch` auto-fix (clearing stale hubspot_ids) is also guarded by `isProduction` to prevent dev from modifying the shared production database.
+
 ## Decision Trees
 
 ### Data direction — which way does it flow?
 
 ```
-App → HubSpot (write)
+App → HubSpot (write) — PRODUCTION ONLY (read-only guard blocks in dev)
 ├── Status/tier/billing_provider → always pushed (app is authoritative)
 ├── Stripe fields → only in live Stripe environment
 ├── Payments/day passes → line items on member deal (via queue)
