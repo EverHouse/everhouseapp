@@ -980,6 +980,11 @@ export async function ensureDatabaseConstraints() {
 
     try {
       await db.execute(sql`
+        UPDATE booking_requests SET session_id = NULL
+        WHERE session_id IS NOT NULL
+          AND session_id NOT IN (SELECT id FROM booking_sessions)
+      `);
+      await db.execute(sql`
         DO $$
         BEGIN
           ALTER TABLE booking_requests
@@ -995,6 +1000,11 @@ export async function ensureDatabaseConstraints() {
     }
 
     try {
+      await db.execute(sql`
+        UPDATE booking_requests SET closure_id = NULL
+        WHERE closure_id IS NOT NULL
+          AND closure_id NOT IN (SELECT id FROM facility_closures)
+      `);
       await db.execute(sql`
         DO $$
         BEGIN
@@ -1012,6 +1022,11 @@ export async function ensureDatabaseConstraints() {
 
     try {
       await db.execute(sql`
+        UPDATE usage_ledger SET member_id = NULL
+        WHERE member_id IS NOT NULL
+          AND member_id NOT IN (SELECT id FROM users)
+      `);
+      await db.execute(sql`
         DO $$
         BEGIN
           ALTER TABLE usage_ledger
@@ -1027,6 +1042,12 @@ export async function ensureDatabaseConstraints() {
     }
 
     try {
+      await db.execute(sql`
+        UPDATE trackman_webhook_events
+        SET matched_booking_id = NULL
+        WHERE matched_booking_id IS NOT NULL
+          AND matched_booking_id NOT IN (SELECT id FROM booking_requests)
+      `);
       await db.execute(sql`
         DO $$
         BEGIN
