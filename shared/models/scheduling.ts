@@ -360,7 +360,7 @@ export const trackmanWebhookEvents = pgTable("trackman_webhook_events", {
   payload: jsonb("payload").notNull(),
   processedAt: timestamp("processed_at"),
   processingError: text("processing_error"),
-  matchedBookingId: integer("matched_booking_id").references(() => bookingRequests.id, { onDelete: 'set null' }),
+  matchedBookingId: integer("matched_booking_id"),
   matchedUserId: varchar("matched_user_id"),
   dedupKey: varchar("dedup_key"),
   createdAt: timestamp("created_at").defaultNow(),

@@ -977,6 +977,27 @@ export async function ensureDatabaseConstraints() {
 
     try {
       await db.execute(sql`
+        DO $$
+        BEGIN
+          IF NOT EXISTS (
+            SELECT 1 FROM pg_constraint
+            WHERE conrelid = 'trackman_webhook_events'::regclass
+              AND contype = 'f'
+              AND conname LIKE '%matched_booking_id%'
+          ) THEN
+            ALTER TABLE trackman_webhook_events
+            ADD CONSTRAINT trackman_webhook_events_matched_booking_id_booking_requests_id_
+            FOREIGN KEY (matched_booking_id) REFERENCES public.booking_requests(id) ON DELETE SET NULL ON UPDATE NO ACTION;
+          END IF;
+        END $$;
+      `);
+      logger.info('[DB Init] Trackman webhook matched_booking_id FK constraint ensured');
+    } catch (err: unknown) {
+      logger.warn(`[DB Init] Trackman webhook FK constraint: ${getErrorMessage(err)}`);
+    }
+
+    try {
+      await db.execute(sql`
         UPDATE booking_requests SET session_id = NULL
         WHERE session_id IS NOT NULL
           AND NOT EXISTS (SELECT 1 FROM booking_sessions bs WHERE bs.id = session_id)
