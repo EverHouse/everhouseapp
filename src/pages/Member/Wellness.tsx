@@ -173,7 +173,7 @@ const Wellness: React.FC = () => {
         <p className={`text-base leading-relaxed max-w-md ${isDark ? 'text-white/60' : 'text-primary/60'}`} style={{ fontFamily: 'var(--font-body)' }}>Performance demands recovery. Browse upcoming classes or explore our MedSpa menu, then reserve your session directly from the schedule below.</p>
       </section>
 
-      <section className={`mb-8 -mx-6 px-6 animate-content-enter-delay-2`}>
+      <section className={`mb-8 animate-content-enter-delay-2`}>
         <SegmentedButton
           options={[
             { value: 'classes' as const, label: 'Upcoming' },

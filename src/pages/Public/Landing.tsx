@@ -27,7 +27,7 @@ const Landing: React.FC = () => {
   const { user, actualUser, isViewingAs, sessionChecked } = useAuthData();
   const [tiers, setTiers] = useState<MembershipTier[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const { offset: parallaxOffset, opacity: _parallaxOpacity, gradientShift, ref: heroRef } = useParallax({ speed: 0.25, maxOffset: 120 });
+  const { offset: parallaxOffset, opacity: _parallaxOpacity, gradientShift, ref: heroRef } = useParallax({ speed: 0.15, maxOffset: 80 });
   const [heroAnimPlayed] = useState(() => {
     const played = sessionStorage.getItem(HERO_ANIM_KEY) === '1';
     if (!played) sessionStorage.setItem(HERO_ANIM_KEY, '1');
@@ -107,15 +107,16 @@ const Landing: React.FC = () => {
         aria-hidden="true"
       />
       
+      {/* Hero Section — cinematic, no glassmorphic card */}
       <div 
         ref={heroRef as React.RefObject<HTMLDivElement>}
-        className="relative flex flex-col justify-end p-6 pb-[max(4rem,env(safe-area-inset-bottom))] overflow-visible h-dvh"
+        className="relative flex flex-col justify-end overflow-visible h-dvh"
         style={{ 
           minHeight: '700px'
         }}
       >
         <div 
-          className="absolute inset-0 overflow-hidden rounded-b-[2.5rem]"
+          className="absolute inset-0 overflow-hidden"
           style={{
             top: 'calc(-1 * env(safe-area-inset-top, 0px))',
             height: 'calc(100% + env(safe-area-inset-top, 0px))'
@@ -124,118 +125,160 @@ const Landing: React.FC = () => {
           <img 
             src="/images/hero-lounge-optimized.webp" 
             alt="Ever Members Club indoor lounge and social space in Tustin, Orange County" 
-            className={`absolute inset-0 w-full h-[120%] object-cover object-[center_35%] will-change-transform ${heroAnimPlayed ? '' : 'animate-hero-bg'}`}
+            className={`absolute inset-0 w-full h-[115%] object-cover object-[center_35%] will-change-transform ${heroAnimPlayed ? '' : 'animate-hero-bg'}`}
             loading="eager"
             fetchPriority="high"
             decoding="sync"
             style={{ 
-              transform: `translateY(${parallaxOffset}px) scale(1.05)`
+              transform: `translateY(${parallaxOffset}px) scale(1.03)`
             }}
           />
           <div 
             className={`absolute inset-0 transition-opacity duration-normal ${heroAnimPlayed ? '' : 'animate-hero-overlay'}`}
             style={{
-              background: `linear-gradient(to top, rgba(0,0,0,${0.7 + gradientShift * 0.003}) 0%, rgba(0,0,0,${0.45 + gradientShift * 0.005}) 20%, rgba(0,0,0,0.2) 35%, rgba(0,0,0,0.08) 50%, transparent 60%)`
+              background: `linear-gradient(to top, rgba(0,0,0,${0.65 + gradientShift * 0.002}) 0%, rgba(0,0,0,${0.35 + gradientShift * 0.003}) 25%, rgba(0,0,0,0.12) 45%, transparent 65%)`
             }}
           />
         </div>
-        
-        <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/80 via-black/20 to-transparent pointer-events-none z-[1] rounded-b-[2.5rem]" />
 
-        <div className={`absolute left-4 right-4 mx-auto bottom-12 md:left-12 md:right-auto md:mx-0 md:bottom-20 z-10 w-auto md:max-w-xl ${heroAnimPlayed ? '' : 'animate-hero-headline'}`}>
-          <div className="bg-black/40 backdrop-blur-3xl border border-white/10 p-8 md:p-12 rounded-xl text-center md:text-left">
-            <h1 className="mb-4 text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.5)]">
-              <span className="block text-4xl md:text-6xl font-normal italic" style={{ fontFamily: 'var(--font-display)' }}>Your</span>
-              <span className="block text-3xl md:text-5xl font-bold uppercase tracking-[0.25em] mt-1" style={{ fontFamily: 'var(--font-body)' }}>Office. Course. Club.</span>
-            </h1>
-            <p className={`text-sm text-white/70 mb-2 max-w-sm leading-relaxed ${heroAnimPlayed ? '' : 'animate-hero-tagline'} mx-auto md:mx-0`} style={{ fontFamily: 'var(--font-body)' }}>
-              Orange County's private club for professionals who work, play, and connect — all under one roof.
-            </p>
-            <p className={`text-[10px] text-white/40 uppercase tracking-[0.3em] mb-6 ${heroAnimPlayed ? '' : 'animate-hero-tagline'}`} style={{ fontFamily: 'var(--font-label)' }}>
-              Formerly Even House · Tustin, CA
-            </p>
-            <div className={`flex flex-wrap gap-4 ${heroAnimPlayed ? '' : 'animate-hero-cta'} justify-center md:justify-start`}>
-              <Link
-                to="/tour"
-                className="bg-white text-primary px-6 py-3 uppercase tracking-[0.2em] text-[10px] font-bold transition-all hover:bg-white/90 shadow-[0_4px_16px_rgba(0,0,0,0.3)]"
-                style={{ fontFamily: 'var(--font-label)' }}
-              >
-                Book a Tour
-              </Link>
-              <Link
-                to="/membership"
-                className="border border-white/40 bg-transparent hover:bg-white/10 text-white px-6 py-3 uppercase tracking-[0.2em] text-[10px] font-medium transition-all drop-shadow-[0_2px_10px_rgba(0,0,0,0.5)]"
-                style={{ fontFamily: 'var(--font-label)' }}
-              >
-                Explore Membership
-              </Link>
-            </div>
+        <div className={`relative z-10 px-6 md:px-16 pb-20 md:pb-28 max-w-2xl ${heroAnimPlayed ? '' : 'animate-hero-headline'}`}>
+          <h1 className="mb-6 text-white">
+            <span
+              className="block text-5xl md:text-7xl font-normal italic leading-[1.05]"
+              style={{ fontFamily: 'var(--font-display)' }}
+            >
+              Your
+            </span>
+            <span
+              className="block text-2xl md:text-3xl font-light uppercase tracking-[0.3em] mt-2 text-white/90"
+              style={{ fontFamily: 'var(--font-body)' }}
+            >
+              Office. Course. Club.
+            </span>
+          </h1>
+          <p
+            className={`text-sm text-white/60 mb-2 max-w-md leading-[1.8] font-light ${heroAnimPlayed ? '' : 'animate-hero-tagline'}`}
+            style={{ fontFamily: 'var(--font-body)' }}
+          >
+            Orange County's private club for professionals who work, play, and connect — all under one roof.
+          </p>
+          <p
+            className={`text-[10px] text-white/30 uppercase tracking-[0.3em] mb-10 ${heroAnimPlayed ? '' : 'animate-hero-tagline'}`}
+            style={{ fontFamily: 'var(--font-label)' }}
+          >
+            Formerly Even House · Tustin, CA
+          </p>
+          <div className={`flex flex-wrap gap-5 ${heroAnimPlayed ? '' : 'animate-hero-cta'}`}>
+            <Link
+              to="/tour"
+              className="border border-white/60 bg-white text-primary px-8 py-3.5 uppercase tracking-[0.2em] text-[10px] font-medium transition-all duration-[600ms] hover:bg-white/90"
+              style={{ fontFamily: 'var(--font-label)' }}
+            >
+              Book a Tour
+            </Link>
+            <Link
+              to="/membership"
+              className="border border-white/30 bg-transparent hover:border-white/60 text-white px-8 py-3.5 uppercase tracking-[0.2em] text-[10px] font-light transition-all duration-[600ms]"
+              style={{ fontFamily: 'var(--font-label)' }}
+            >
+              Explore Membership
+            </Link>
           </div>
         </div>
       </div>
 
       <div className="bg-bone dark:bg-[#141414]">
 
-      <div className="px-6 pt-6 pb-12 bg-bone dark:bg-[#141414] animate-content-enter-delay-1">
-        <p className="text-center text-xs font-bold uppercase tracking-[0.2em] text-primary/50 dark:text-white/50 mb-8">As Featured In</p>
+      {/* As Seen In — minimal horizontal strip */}
+      <div className="px-6 py-16 md:py-20 bg-bone dark:bg-[#141414] animate-content-enter-delay-1">
+        <p
+          className="text-center text-[10px] uppercase tracking-[0.35em] text-primary/30 dark:text-white/30 mb-10"
+          style={{ fontFamily: 'var(--font-label)', fontWeight: 400 }}
+        >
+          As Seen In
+        </p>
         
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-5xl mx-auto">
-          <a 
-            href="https://www.forbes.com/sites/mikedojc/2025/09/09/even-house-turns-indoor-golf-into-a-community-social-hub/" 
-            target="_blank" 
+        <div className="flex flex-wrap items-center justify-center gap-10 md:gap-16 max-w-4xl mx-auto mb-12">
+          <a
+            href="https://www.forbes.com/sites/mikedojc/2025/09/09/even-house-turns-indoor-golf-into-a-community-social-hub/"
+            target="_blank"
             rel="noreferrer"
-            className="backdrop-blur-xl bg-white/40 dark:bg-white/5 p-6 rounded-xl border border-white/60 dark:border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.08),inset_0_1px_1px_rgba(255,255,255,0.6)] hover:bg-white/60 dark:hover:bg-white/10 hover:scale-[1.01] transition-all duration-normal flex flex-col"
+            className="text-primary/40 dark:text-white/40 hover:text-primary/70 dark:hover:text-white/70 transition-opacity duration-[600ms]"
           >
-            <p className="text-xl font-bold text-primary/80 dark:text-white/80 tracking-tight mb-4" style={{ fontFamily: 'Georgia, serif' }}>Forbes</p>
-            <blockquote className="text-sm text-primary/80 dark:text-white/80 leading-relaxed flex-1">
-              "Ever Club has fashioned a tribe-finding concept... creating a 'third place' around an indoor golf experience while layering in a farm-to-table café and flex space for co-working."
-            </blockquote>
-            <p className="text-xs text-primary/50 dark:text-white/50 font-medium mt-4">September 2025</p>
+            <span className="text-xl font-normal tracking-tight" style={{ fontFamily: 'Georgia, serif' }}>Forbes</span>
           </a>
-
-          <a 
-            href="https://hypebeast.com/2025/2/even-house-membership-golf-club-for-the-next-generation" 
-            target="_blank" 
+          <a
+            href="https://hypebeast.com/2025/2/even-house-membership-golf-club-for-the-next-generation"
+            target="_blank"
             rel="noreferrer"
-            className="backdrop-blur-xl bg-white/40 dark:bg-white/5 p-6 rounded-xl border border-white/60 dark:border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.08),inset_0_1px_1px_rgba(255,255,255,0.6)] hover:bg-white/60 dark:hover:bg-white/10 hover:scale-[1.01] transition-all duration-normal flex flex-col"
+            className="text-primary/40 dark:text-white/40 hover:text-primary/70 dark:hover:text-white/70 transition-opacity duration-[600ms]"
           >
-            <p className="text-lg font-black text-primary/80 dark:text-white/80 uppercase tracking-tighter mb-4">Hypebeast</p>
-            <blockquote className="text-sm text-primary/80 dark:text-white/80 leading-relaxed flex-1">
-              "A laid-back yet high-end culture where people can connect and unwind... creating a place where people can come to recharge."
-            </blockquote>
-            <p className="text-xs text-primary/50 dark:text-white/50 font-medium mt-4">February 2025</p>
+            <span className="text-lg font-bold uppercase tracking-tight">Hypebeast</span>
           </a>
-
-          <a 
-            href="https://www.foxla.com/video/fmc-t05loqz15hed9sfa" 
-            target="_blank" 
+          <a
+            href="https://www.foxla.com/video/fmc-t05loqz15hed9sfa"
+            target="_blank"
             rel="noreferrer"
-            className="backdrop-blur-xl bg-white/40 dark:bg-white/5 p-6 rounded-xl border border-white/60 dark:border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.08),inset_0_1px_1px_rgba(255,255,255,0.6)] hover:bg-white/60 dark:hover:bg-white/10 hover:scale-[1.01] transition-all duration-normal flex flex-col"
+            className="text-primary/40 dark:text-white/40 hover:text-primary/70 dark:hover:text-white/70 transition-opacity duration-[600ms]"
           >
-            <p className="text-lg font-black text-primary/80 dark:text-white/80 uppercase tracking-wide mb-4">Fox 11</p>
-            <blockquote className="text-sm text-primary/80 dark:text-white/80 leading-relaxed flex-1">
-              "It's all about having another place where you feel like you belong... the third space. We are missing out on third spaces."
-            </blockquote>
-            <p className="text-xs text-primary/50 dark:text-white/50 font-medium mt-4">December 2025</p>
+            <span className="text-lg font-bold uppercase tracking-wider">Fox 11</span>
           </a>
         </div>
+
+        <blockquote className="max-w-xl mx-auto text-center">
+          <p
+            className="text-sm text-primary/50 dark:text-white/50 leading-[1.9] italic"
+            style={{ fontFamily: 'var(--font-display)' }}
+          >
+            "Ever Club has fashioned a tribe-finding concept... creating a 'third place' around an indoor golf experience while layering in a farm-to-table café and flex space for co-working."
+          </p>
+          <cite
+            className="block mt-4 text-[10px] uppercase tracking-[0.3em] text-primary/30 dark:text-white/30 not-italic"
+            style={{ fontFamily: 'var(--font-label)' }}
+          >
+            Forbes
+          </cite>
+        </blockquote>
       </div>
 
-      <div className="px-4 py-12 bg-bone dark:bg-[#141414] animate-content-enter-delay-2">
-         <div className="relative rounded-xl overflow-hidden h-[400px] group backdrop-blur-xl border border-white/20 shadow-[0_8px_32px_rgba(0,0,0,0.2),inset_0_1px_1px_rgba(255,255,255,0.1)] hover:scale-[1.01] transition-all duration-[400ms] max-w-5xl mx-auto cursor-pointer" onClick={() => navigate('/private-hire')} role="link" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') navigate('/private-hire'); }}>
-            <div className="absolute inset-0 bg-[url('/images/gallery/gallery-l1050555.webp')] bg-cover bg-center opacity-70 transition-transform duration-emphasis group-hover:scale-105"></div>
-            <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/40 to-black/20"></div>
-            <div className="absolute inset-0 p-8 flex flex-col justify-center items-center text-center">
-                <span className="w-fit px-2 py-1.5 bg-white/15 backdrop-blur-md border border-white/30 rounded-[4px] text-white/90 text-xs font-bold uppercase tracking-widest mb-4 shadow-[0_0_12px_rgba(255,255,255,0.1)]">Host with Us</span>
-                <h2 className="text-2xl text-white mb-6 leading-tight drop-shadow-lg" style={{ fontFamily: 'var(--font-headline)' }}>Private Events &<br/>Full Buyouts</h2>
-                <Link to="/private-hire/inquire" className="px-8 py-3 bg-white/95 backdrop-blur text-primary rounded-[4px] font-bold text-sm hover:scale-105 hover:bg-white transition-all duration-normal shadow-[0_8px_24px_rgba(0,0,0,0.2)] inline-block" onClick={(e) => e.stopPropagation()}>
-                    Inquire Now
+      {/* Private Events — editorial spread */}
+      <div className="px-6 md:px-12 py-16 bg-bone dark:bg-[#141414] animate-content-enter-delay-2">
+         <div
+           className="relative overflow-hidden h-[450px] md:h-[500px] group max-w-5xl mx-auto cursor-pointer"
+           onClick={() => navigate('/private-hire')}
+           role="link"
+           tabIndex={0}
+           onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') navigate('/private-hire'); }}
+         >
+            <div className="absolute inset-0 bg-[url('/images/gallery/gallery-l1050555.webp')] bg-cover bg-center transition-opacity duration-[1200ms] ease-out group-hover:opacity-90"></div>
+            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/25 to-transparent"></div>
+            <div className="absolute inset-0 p-10 md:p-16 flex flex-col justify-end items-start text-left">
+                <span
+                  className="text-[10px] uppercase tracking-[0.35em] text-white/40 mb-4"
+                  style={{ fontFamily: 'var(--font-label)', fontWeight: 300 }}
+                >
+                  Host with Us
+                </span>
+                <h2
+                  className="text-3xl md:text-4xl text-white mb-6 leading-[1.1]"
+                  style={{ fontFamily: 'var(--font-display)' }}
+                >
+                  Private Events &<br/>Full Buyouts
+                </h2>
+                <Link
+                  to="/private-hire/inquire"
+                  className="px-8 py-3.5 border border-white/40 text-white text-[10px] uppercase tracking-[0.25em] font-light hover:border-white/70 transition-all duration-[600ms] inline-block"
+                  style={{ fontFamily: 'var(--font-label)' }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  Inquire Now
                 </Link>
             </div>
          </div>
       </div>
 
-      <div className="space-y-24 py-24 px-6 md:px-20 bg-bone dark:bg-[#141414]">
+      {/* Editorial Showcases */}
+      <div className="space-y-32 py-32 px-6 md:px-20 bg-bone dark:bg-[#141414]">
         <EditorialShowcase
           overline="Tour-Level Technology"
           title={<>Trackman Golf <em style={{ fontStyle: 'italic' }}>Simulators</em></>}
@@ -281,79 +324,170 @@ const Landing: React.FC = () => {
         />
       </div>
 
-      <section className="px-6 pb-12 bg-bone dark:bg-[#141414] animate-content-enter-delay-3">
-         <div className="text-center mb-8">
-            <h2 className="text-2xl text-primary dark:text-white mb-2 leading-tight" style={{ fontFamily: 'var(--font-headline)' }}>Membership Tiers</h2>
-            <p className="text-base text-primary/70 dark:text-white/70 leading-relaxed" style={{ fontFamily: 'var(--font-body)' }}>Select the plan that fits your lifestyle.</p>
+      {/* Membership Tiers — typographic, no glassmorphism */}
+      <section className="px-6 py-24 bg-bone dark:bg-[#141414] animate-content-enter-delay-3">
+         <div className="text-center mb-16">
+            <p
+              className="text-[10px] uppercase tracking-[0.35em] text-primary/30 dark:text-white/30 mb-4"
+              style={{ fontFamily: 'var(--font-label)', fontWeight: 400 }}
+            >
+              Membership
+            </p>
+            <h2
+              className="text-3xl md:text-4xl text-primary dark:text-white mb-4 leading-tight"
+              style={{ fontFamily: 'var(--font-display)' }}
+            >
+              Find Your Tier
+            </h2>
+            <p
+              className="text-sm text-primary/50 dark:text-white/50 leading-relaxed font-light max-w-md mx-auto"
+              style={{ fontFamily: 'var(--font-body)' }}
+            >
+              Select the plan that fits your lifestyle.
+            </p>
          </div>
          
-         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 max-w-6xl mx-auto">
+         <div className="grid grid-cols-1 lg:grid-cols-3 gap-px max-w-5xl mx-auto border border-primary/10 dark:border-white/10">
             {socialTier && (
-            <div className="backdrop-blur-xl bg-white/50 dark:bg-white/5 p-6 rounded-xl border border-white/60 dark:border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.08),inset_0_1px_1px_rgba(255,255,255,0.6)] hover:scale-[1.02] hover:-translate-y-1 transition-all duration-[400ms]">
-                <div className="flex justify-between items-center mb-2">
-                    <h3 className="text-xl font-bold text-primary dark:text-white">{socialTier.name}</h3>
-                    <span className="text-lg font-bold text-primary dark:text-white">{extractPrice(socialTier.price_string)}<span className="text-xs font-medium opacity-60">{extractSuffix(socialTier.price_string)}</span></span>
+            <div className="p-8 md:p-10 bg-bone dark:bg-[#1a1a1a] transition-colors duration-[600ms] hover:bg-white/60 dark:hover:bg-white/5">
+                <div className="mb-6">
+                    <h3
+                      className="text-lg text-primary dark:text-white mb-1"
+                      style={{ fontFamily: 'var(--font-display)' }}
+                    >
+                      {socialTier.name}
+                    </h3>
+                    <span className="text-2xl font-light text-primary dark:text-white" style={{ fontFamily: 'var(--font-display)' }}>
+                      {extractPrice(socialTier.price_string)}
+                      <span className="text-xs font-light text-primary/40 dark:text-white/40 ml-0.5">{extractSuffix(socialTier.price_string)}</span>
+                    </span>
                 </div>
-                <p className="text-sm text-primary/70 dark:text-white/70 mb-4">{socialTier.description}</p>
-                <ul className="space-y-2 mb-6">
+                <p className="text-xs text-primary/50 dark:text-white/50 mb-6 leading-[1.8] font-light" style={{ fontFamily: 'var(--font-body)' }}>{socialTier.description}</p>
+                <ul className="space-y-3 mb-8">
                     {(socialTier.highlighted_features || []).slice(0, 3).map((feature, idx) => (
-                        <li key={idx} className="flex gap-2 text-xs font-bold text-primary/80 dark:text-white/80"><span className="material-symbols-outlined text-sm">check</span> {feature}</li>
+                        <li key={idx} className="flex gap-2.5 text-xs text-primary/60 dark:text-white/60 font-light">
+                          <span className="text-primary/30 dark:text-white/30 text-[10px] mt-0.5">—</span> {feature}
+                        </li>
                     ))}
                 </ul>
-                <Link to="/membership" className="tactile-btn w-full py-3 rounded-[4px] bg-white/60 dark:bg-white/10 backdrop-blur border border-white/80 text-primary dark:text-white font-bold text-xs hover:bg-white/80 transition-all duration-normal block text-center">View Details</Link>
+                <Link
+                  to="/membership"
+                  className="block text-center py-3 text-[10px] uppercase tracking-[0.25em] font-normal text-primary/60 dark:text-white/60 border border-primary/15 dark:border-white/15 hover:border-primary/40 dark:hover:border-white/40 hover:text-primary dark:hover:text-white transition-all duration-[600ms]"
+                  style={{ fontFamily: 'var(--font-label)' }}
+                >
+                  View Details
+                </Link>
             </div>
             )}
 
             {coreTier && (
-            <div className="backdrop-blur-xl bg-primary/90 p-6 rounded-xl border border-white/20 shadow-[0_8px_32px_rgba(0,0,0,0.2),0_0_20px_rgba(41,53,21,0.3),inset_0_1px_1px_rgba(255,255,255,0.1)] hover:scale-[1.02] hover:-translate-y-1 transition-all duration-[400ms] relative overflow-hidden">
-                <div className="flex justify-between items-start mb-2 relative z-10">
-                    <div className="flex items-center gap-2">
-                        <h3 className="text-xl font-bold text-white">{coreTier.name}</h3>
-                        {coreTier.is_popular && <span className="bg-accent/90 backdrop-blur text-primary text-[10px] font-bold w-fit px-2 py-0.5 rounded-[4px] uppercase tracking-widest shadow-sm border border-white/20">Popular</span>}
+            <div className="p-8 md:p-10 bg-[#f5f5ef] dark:bg-[#1e1e18] border-x border-primary/10 dark:border-white/10 transition-colors duration-[600ms] hover:bg-[#f0f0e8] dark:hover:bg-[#222218] relative">
+                <div className="mb-6">
+                    <div className="flex items-baseline gap-3">
+                        <h3
+                          className="text-lg text-primary dark:text-white"
+                          style={{ fontFamily: 'var(--font-display)' }}
+                        >
+                          {coreTier.name}
+                        </h3>
+                        {coreTier.is_popular && (
+                          <span
+                            className="text-[9px] italic text-primary/40 dark:text-white/40"
+                            style={{ fontFamily: 'var(--font-display)' }}
+                          >
+                            Most popular
+                          </span>
+                        )}
                     </div>
-                    <span className="text-lg font-bold text-white">{extractPrice(coreTier.price_string)}<span className="text-xs font-medium opacity-60">{extractSuffix(coreTier.price_string)}</span></span>
+                    <span className="text-2xl font-light text-primary dark:text-white" style={{ fontFamily: 'var(--font-display)' }}>
+                      {extractPrice(coreTier.price_string)}
+                      <span className="text-xs font-light text-primary/40 dark:text-white/40 ml-0.5">{extractSuffix(coreTier.price_string)}</span>
+                    </span>
                 </div>
-                <p className="text-sm text-white/70 mb-4 relative z-10">{coreTier.description}</p>
-                <ul className="space-y-2 mb-6 relative z-10">
+                <p className="text-xs text-primary/50 dark:text-white/50 mb-6 leading-[1.8] font-light" style={{ fontFamily: 'var(--font-body)' }}>{coreTier.description}</p>
+                <ul className="space-y-3 mb-8">
                     {(coreTier.highlighted_features || []).slice(0, 3).map((feature, idx) => (
-                        <li key={idx} className="flex gap-2 text-xs font-bold text-white/90"><span className="material-symbols-outlined text-sm text-accent">check</span> {feature}</li>
+                        <li key={idx} className="flex gap-2.5 text-xs text-primary/60 dark:text-white/60 font-light">
+                          <span className="text-primary/30 dark:text-white/30 text-[10px] mt-0.5">—</span> {feature}
+                        </li>
                     ))}
                 </ul>
-                <Link to="/membership" className="tactile-btn w-full py-3 rounded-[4px] bg-white/95 dark:bg-white/10 backdrop-blur text-primary dark:text-white font-bold text-xs hover:bg-white transition-all duration-normal relative z-10 shadow-md block text-center">View Details</Link>
+                <Link
+                  to="/membership"
+                  className="block text-center py-3 text-[10px] uppercase tracking-[0.25em] font-normal text-primary dark:text-white border border-primary/30 dark:border-white/30 hover:border-primary/60 dark:hover:border-white/60 transition-all duration-[600ms]"
+                  style={{ fontFamily: 'var(--font-label)' }}
+                >
+                  View Details
+                </Link>
+                <div className="absolute top-0 left-0 right-0 h-px bg-[#b8a44c]/40"></div>
             </div>
             )}
 
             {corporateTier && (
-            <div className="backdrop-blur-xl bg-white/50 dark:bg-white/5 p-6 rounded-xl border border-white/60 dark:border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.08),inset_0_1px_1px_rgba(255,255,255,0.6)] hover:scale-[1.02] hover:-translate-y-1 transition-all duration-[400ms]">
-                <div className="flex justify-between items-center mb-2">
-                    <h3 className="text-xl font-bold text-primary dark:text-white">{corporateTier.name}</h3>
-                    <span className="text-lg font-bold text-primary dark:text-white">{extractPrice(corporateTier.price_string)}<span className="text-xs font-medium opacity-60">{extractSuffix(corporateTier.price_string)}</span></span>
+            <div className="p-8 md:p-10 bg-bone dark:bg-[#1a1a1a] transition-colors duration-[600ms] hover:bg-white/60 dark:hover:bg-white/5">
+                <div className="mb-6">
+                    <h3
+                      className="text-lg text-primary dark:text-white mb-1"
+                      style={{ fontFamily: 'var(--font-display)' }}
+                    >
+                      {corporateTier.name}
+                    </h3>
+                    <span className="text-2xl font-light text-primary dark:text-white" style={{ fontFamily: 'var(--font-display)' }}>
+                      {extractPrice(corporateTier.price_string)}
+                      <span className="text-xs font-light text-primary/40 dark:text-white/40 ml-0.5">{extractSuffix(corporateTier.price_string)}</span>
+                    </span>
                 </div>
-                <p className="text-sm text-primary/70 dark:text-white/70 mb-4">{corporateTier.description}</p>
-                <ul className="space-y-2 mb-6">
+                <p className="text-xs text-primary/50 dark:text-white/50 mb-6 leading-[1.8] font-light" style={{ fontFamily: 'var(--font-body)' }}>{corporateTier.description}</p>
+                <ul className="space-y-3 mb-8">
                     {(corporateTier.highlighted_features || []).slice(0, 3).map((feature, idx) => (
-                        <li key={idx} className="flex gap-2 text-xs font-bold text-primary/80 dark:text-white/80"><span className="material-symbols-outlined text-sm">check</span> {feature}</li>
+                        <li key={idx} className="flex gap-2.5 text-xs text-primary/60 dark:text-white/60 font-light">
+                          <span className="text-primary/30 dark:text-white/30 text-[10px] mt-0.5">—</span> {feature}
+                        </li>
                     ))}
                 </ul>
-                <Link to="/membership/corporate" className="tactile-btn w-full py-3 rounded-[4px] bg-white/60 dark:bg-white/10 backdrop-blur border border-white/80 text-primary dark:text-white font-bold text-xs hover:bg-white/80 transition-all duration-normal block text-center">View Details</Link>
+                <Link
+                  to="/membership/corporate"
+                  className="block text-center py-3 text-[10px] uppercase tracking-[0.25em] font-normal text-primary/60 dark:text-white/60 border border-primary/15 dark:border-white/15 hover:border-primary/40 dark:hover:border-white/40 hover:text-primary dark:hover:text-white transition-all duration-[600ms]"
+                  style={{ fontFamily: 'var(--font-label)' }}
+                >
+                  View Details
+                </Link>
             </div>
             )}
 
          </div>
 
-            <Link to="/membership/compare" className="tactile-btn w-full mt-4 flex items-center justify-center gap-1 text-xs font-bold uppercase tracking-widest text-primary/60 dark:text-white/60 hover:text-primary dark:hover:text-white transition-colors py-2 max-w-6xl mx-auto">
+            <Link
+              to="/membership/compare"
+              className="w-full mt-8 flex items-center justify-center gap-2 text-[10px] uppercase tracking-[0.25em] text-primary/35 dark:text-white/35 hover:text-primary/60 dark:hover:text-white/60 transition-colors duration-[600ms] py-2 max-w-5xl mx-auto"
+              style={{ fontFamily: 'var(--font-label)', fontWeight: 400 }}
+            >
               Compare all tiers
-              <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
+              <span className="material-symbols-outlined text-[14px]">arrow_forward</span>
             </Link>
       </section>
 
 
-
-      <section className="px-6 py-16 bg-bone dark:bg-[#141414]">
-        <div className="max-w-md mx-auto text-center">
-          <h2 className="text-2xl text-primary dark:text-white mb-3 leading-tight" style={{ fontFamily: 'var(--font-headline)' }}>See it for yourself.</h2>
-          <p className="text-sm sm:text-base text-primary/60 dark:text-white/60 mb-8">Book a private tour and experience Ever Club firsthand.</p>
-          <Link to="/tour" className="inline-block px-10 py-4 rounded-[4px] bg-primary text-white font-bold text-xs uppercase tracking-[0.15em] shadow-lg hover:scale-[1.02] hover:bg-primary/90 transition-all duration-fast">
+      {/* Final CTA — calm invitation */}
+      <section className="px-6 py-28 md:py-36 bg-bone dark:bg-[#141414]">
+        <div className="max-w-lg mx-auto text-center">
+          <h2
+            className="text-3xl md:text-4xl text-primary dark:text-white mb-5 leading-tight"
+            style={{ fontFamily: 'var(--font-display)' }}
+          >
+            See it for yourself.
+          </h2>
+          <p
+            className="text-sm text-primary/45 dark:text-white/45 mb-12 font-light leading-[1.8]"
+            style={{ fontFamily: 'var(--font-body)' }}
+          >
+            Book a private tour and experience Ever Club firsthand.
+          </p>
+          <Link
+            to="/tour"
+            className="inline-block px-12 py-4 border border-primary/30 dark:border-white/30 text-primary dark:text-white text-[10px] uppercase tracking-[0.25em] font-normal hover:border-primary dark:hover:border-white transition-all duration-[600ms]"
+            style={{ fontFamily: 'var(--font-label)' }}
+          >
             Book Your Private Tour
           </Link>
         </div>

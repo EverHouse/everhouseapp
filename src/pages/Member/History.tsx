@@ -146,7 +146,7 @@ const History: React.FC = () => {
           <p className={`text-base leading-relaxed max-w-md ${isDark ? 'text-white/60' : 'text-primary/60'}`} style={{ fontFamily: 'var(--font-body)' }}>Every session, every event, every transaction — all in one place. Switch between visits and payments to review your complete membership history.</p>
         </section>
 
-        <section className={`mb-6 -mx-6 px-6 animate-content-enter-delay-2`}>
+        <section className={`mb-6 animate-content-enter-delay-2`}>
           <SegmentedButton
             options={[
               { value: 'visits' as const, label: 'Visits' },

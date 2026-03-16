@@ -961,7 +961,7 @@ const BookGolf: React.FC = () => {
         </section>
       ) : (
         <>
-        <section className={`mb-8 -mx-6 px-6`}>
+        <section className={`mb-8`}>
           <SegmentedButton
             options={[
               { value: 'simulator' as const, label: 'Golf Simulator' },
