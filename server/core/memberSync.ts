@@ -147,6 +147,8 @@ interface HubSpotContact {
     zip?: string;
     // Date of birth (synced from Mindbody via HubSpot)
     date_of_birth?: string;
+    // Membership status change tracking
+    last_modified_at?: string;
     // Stripe delinquent status (synced from Stripe via HubSpot)
     stripe_delinquent?: string;
     // Granular SMS preferences
@@ -446,7 +448,7 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
             migrationStatus: users.migrationStatus,
             archivedAt: users.archivedAt,
             lastManualFixAt: users.lastManualFixAt,
-            lastModifiedAt: users.lastModifiedAt,
+            lastModifiedAt: sql<string>`last_modified_at`.as('last_modified_at'),
             updatedAt: users.updatedAt,
           })
             .from(users)
@@ -513,8 +515,8 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
             }
           }
 
-          const isBackfillArtifact = existingUser[0]?.lastModifiedAt && existingUser[0]?.updatedAt
-            && Math.abs(new Date(existingUser[0].lastModifiedAt).getTime() - new Date(existingUser[0].updatedAt).getTime()) < 2000;
+          const isBackfillArtifact = (existingUser[0] as any)?.lastModifiedAt && existingUser[0]?.updatedAt
+            && Math.abs(new Date((existingUser[0] as any).lastModifiedAt).getTime() - new Date(existingUser[0].updatedAt!).getTime()) < 2000;
           
           await retryDbOperation(() => db.insert(users)
             .values({
@@ -558,9 +560,6 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
                 tags: tags.length > 0 ? tags : sql`${users.tags}`,
                 hubspotId: contact.id,
                 membershipStatus: isStatusProtected ? sql`${users.membershipStatus}` : status,
-                lastModifiedAt: (!isStatusProtected && oldStatus && oldStatus !== status)
-                  ? (statusChangedDate ? sql`${statusChangedDate}` : sql`NOW()`)
-                  : (isBackfillArtifact && statusChangedDate) ? sql`${statusChangedDate}` : sql`${users.lastModifiedAt}`,
                 billingProvider: isMindBodyDeactivation ? sql`'stripe'` : sql`${users.billingProvider}`,
                 role: isVisitorProtected ? sql`${users.role}` : sql`COALESCE(${users.role}, 'member')`,
                 mindbodyClientId: contact.properties.mindbody_client_id || null,
@@ -581,6 +580,18 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
                 updatedAt: new Date()
               }
             }), email);
+
+          if (!isStatusProtected && oldStatus && oldStatus !== status) {
+            await retryDbOperation(() => db.execute(
+              statusChangedDate
+                ? sql`UPDATE users SET last_modified_at = ${statusChangedDate.toISOString()}::timestamptz WHERE LOWER(email) = ${email.toLowerCase()}`
+                : sql`UPDATE users SET last_modified_at = NOW() WHERE LOWER(email) = ${email.toLowerCase()}`
+            ), email);
+          } else if (isBackfillArtifact && statusChangedDate) {
+            await retryDbOperation(() => db.execute(
+              sql`UPDATE users SET last_modified_at = ${statusChangedDate.toISOString()}::timestamptz WHERE LOWER(email) = ${email.toLowerCase()}`
+            ), email);
+          }
 
           if (isMindBodyDeactivation) {
             logger.info(`[MemberSync] MINDBODY DEACTIVATION CASCADE: ${email} — tier removed, billing_provider set to stripe. Must reactivate via Stripe.`);
@@ -1056,7 +1067,7 @@ export async function syncRelevantMembersFromHubSpot(): Promise<{ synced: number
             migrationStatus: users.migrationStatus,
             archivedAt: users.archivedAt,
             lastManualFixAt: users.lastManualFixAt,
-            lastModifiedAt: users.lastModifiedAt,
+            lastModifiedAt: sql<string>`last_modified_at`.as('last_modified_at'),
             updatedAt: users.updatedAt,
           })
             .from(users)
@@ -1123,8 +1134,8 @@ export async function syncRelevantMembersFromHubSpot(): Promise<{ synced: number
             }
           }
 
-          const isBackfillArtifact = existingUser[0]?.lastModifiedAt && existingUser[0]?.updatedAt
-            && Math.abs(new Date(existingUser[0].lastModifiedAt).getTime() - new Date(existingUser[0].updatedAt).getTime()) < 2000;
+          const isBackfillArtifact = (existingUser[0] as any)?.lastModifiedAt && existingUser[0]?.updatedAt
+            && Math.abs(new Date((existingUser[0] as any).lastModifiedAt).getTime() - new Date(existingUser[0].updatedAt!).getTime()) < 2000;
           
           await retryDbOperation(() => db.insert(users)
             .values({
@@ -1168,9 +1179,6 @@ export async function syncRelevantMembersFromHubSpot(): Promise<{ synced: number
                 tags: tags.length > 0 ? tags : sql`${users.tags}`,
                 hubspotId: contact.id,
                 membershipStatus: isStatusProtected ? sql`${users.membershipStatus}` : status,
-                lastModifiedAt: (!isStatusProtected && oldStatus && oldStatus !== status)
-                  ? (statusChangedDate ? sql`${statusChangedDate}` : sql`NOW()`)
-                  : (isBackfillArtifact && statusChangedDate) ? sql`${statusChangedDate}` : sql`${users.lastModifiedAt}`,
                 billingProvider: isMindBodyDeactivation ? sql`'stripe'` : sql`${users.billingProvider}`,
                 role: isVisitorProtected ? sql`${users.role}` : sql`COALESCE(${users.role}, 'member')`,
                 mindbodyClientId: contact.properties.mindbody_client_id || null,
@@ -1191,6 +1199,18 @@ export async function syncRelevantMembersFromHubSpot(): Promise<{ synced: number
                 updatedAt: new Date()
               }
             }), email);
+
+          if (!isStatusProtected && oldStatus && oldStatus !== status) {
+            await retryDbOperation(() => db.execute(
+              statusChangedDate
+                ? sql`UPDATE users SET last_modified_at = ${statusChangedDate.toISOString()}::timestamptz WHERE LOWER(email) = ${email.toLowerCase()}`
+                : sql`UPDATE users SET last_modified_at = NOW() WHERE LOWER(email) = ${email.toLowerCase()}`
+            ), email);
+          } else if (isBackfillArtifact && statusChangedDate) {
+            await retryDbOperation(() => db.execute(
+              sql`UPDATE users SET last_modified_at = ${statusChangedDate.toISOString()}::timestamptz WHERE LOWER(email) = ${email.toLowerCase()}`
+            ), email);
+          }
 
           if (isMindBodyDeactivation) {
             logger.info(`[MemberSync] MINDBODY DEACTIVATION CASCADE: ${email} — tier removed, billing_provider set to stripe. Must reactivate via Stripe.`);
