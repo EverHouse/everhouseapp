@@ -287,7 +287,7 @@ async function createClosureCalendarEvents(
         };
         
         if (extendedProps && Object.keys(extendedProps).length > 0) {
-          event.extendedProperties = { private: extendedProps };
+          event.extendedProperties = { shared: extendedProps };
         }
         
         const response = await calendar.events.insert({
@@ -316,7 +316,7 @@ async function createClosureCalendarEvents(
       };
       
       if (extendedProps && Object.keys(extendedProps).length > 0) {
-        event.extendedProperties = { private: extendedProps };
+        event.extendedProperties = { shared: extendedProps };
       }
       
       const response = await calendar.events.insert({
@@ -372,7 +372,7 @@ async function patchClosureCalendarEvents(
     };
     
     if (extendedProps && Object.keys(extendedProps).length > 0) {
-      requestBody.extendedProperties = { private: extendedProps };
+      requestBody.extendedProperties = { shared: extendedProps };
     }
     
     if (hasSpecificTimes) {

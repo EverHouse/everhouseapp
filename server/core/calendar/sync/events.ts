@@ -126,7 +126,7 @@ export async function syncGoogleCalendarEvents(options?: { suppressAlert?: boole
       const extractedCategoryFromTitle = bracketMatch ? bracketMatch[1] : null;
       const title = bracketMatch ? rawTitle.replace(/^\[([^\]]+)\]\s*/, '') : rawTitle;
       
-      const extProps = event.extendedProperties?.private || {};
+      const extProps = event.extendedProperties?.shared || event.extendedProperties?.private || {};
       const appMetadata = {
         imageUrl: extProps['ehApp_imageUrl'] || null,
         externalUrl: extProps['ehApp_externalUrl'] || null,
@@ -272,7 +272,7 @@ export async function syncGoogleCalendarEvents(options?: { suppressAlert?: boole
                     timeZone: 'America/Los_Angeles',
                   } : undefined,
                   extendedProperties: {
-                    private: extendedProps,
+                    shared: extendedProps,
                   },
                 },
               }), `events-patch-event-${dbRow.id}`);

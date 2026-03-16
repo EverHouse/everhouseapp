@@ -10,8 +10,9 @@ export const changelog: ChangelogEntry[] = [
   {
     version: "8.87.45",
     date: "2026-03-16",
-    title: "Calendar Sync Reliability",
+    title: "Calendar Sync Reliability & Cross-Environment Fix",
     changes: [
+      "Fixed: Calendar extended properties (image URLs, categories, metadata) are now visible across all environments — previously, data written by one environment was invisible to others due to Google Calendar's private property scoping",
       "Fixed: Wellness class and event calendar syncs now automatically retry when hitting Google Calendar rate limits instead of silently failing — previously, batches of updates could be lost during busy sync cycles",
       "Improved: All Google Calendar API calls across the sync system (wellness, events, closures, and conference room) now have consistent retry-with-backoff protection",
     ]

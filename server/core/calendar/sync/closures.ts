@@ -337,7 +337,7 @@ export async function syncInternalCalendarToClosures(): Promise<{ synced: number
       const { noticeType, cleanTitle } = extractNoticeTypeFromTitle(rawTitle);
       const title = cleanTitle;
       const rawDescription = event.description || '';
-      const extProps = event.extendedProperties?.private || {};
+      const extProps = event.extendedProperties?.shared || event.extendedProperties?.private || {};
       
       const hasExtProps = !!(extProps['ehApp_affectedAreas'] || extProps['ehApp_notifyMembers']);
       const calendarNotes = hasExtProps ? null : (getBaseDescription(rawDescription) || null);

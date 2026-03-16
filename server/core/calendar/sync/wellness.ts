@@ -123,7 +123,7 @@ export async function syncWellnessCalendarEvents(options?: { suppressAlert?: boo
       const rawTitle = event.summary;
       const description = event.description || null;
       
-      const extProps = event.extendedProperties?.private || {};
+      const extProps = event.extendedProperties?.shared || event.extendedProperties?.private || {};
       const appMetadata = {
         imageUrl: extProps['ehApp_imageUrl'] || null,
         externalUrl: extProps['ehApp_externalUrl'] || null,
@@ -339,7 +339,7 @@ export async function syncWellnessCalendarEvents(options?: { suppressAlert?: boo
                     timeZone: 'America/Los_Angeles',
                   },
                   extendedProperties: {
-                    private: extendedProps,
+                    shared: extendedProps,
                   },
                 },
               }), `wellness-patch-class-${dbRow.id}`);
@@ -531,7 +531,7 @@ export async function backfillWellnessToCalendar(): Promise<{ created: number; t
               timeZone: 'America/Los_Angeles',
             },
             extendedProperties: {
-              private: extendedProps,
+              shared: extendedProps,
             },
           },
         });

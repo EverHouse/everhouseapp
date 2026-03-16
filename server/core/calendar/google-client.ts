@@ -78,7 +78,7 @@ export async function createCalendarEventOnCalendar(
     };
     
     if (extendedProperties) {
-      event.extendedProperties = { private: extendedProperties };
+      event.extendedProperties = { shared: extendedProperties };
     }
     
     const response = await withCalendarRetry(
@@ -151,7 +151,7 @@ export async function updateCalendarEvent(
     };
     
     if (extendedProperties) {
-      requestBody.extendedProperties = { private: extendedProperties };
+      requestBody.extendedProperties = { shared: extendedProperties };
     }
     
     const patchResult = await withCalendarRetry(

@@ -366,7 +366,7 @@ router.post('/api/admin/calendar/migrate-clean-descriptions', isAdmin, async (re
             requestBody: {
               summary: `${row.title} with ${row.instructor}`,
               description: (row.description as string) || '',
-              extendedProperties: { private: extendedProps },
+              extendedProperties: { shared: extendedProps },
             },
           });
           results.wellness.cleaned++;
@@ -408,7 +408,7 @@ router.post('/api/admin/calendar/migrate-clean-descriptions', isAdmin, async (re
             requestBody: {
               summary: row.title as string,
               description: (row.description as string) || '',
-              extendedProperties: { private: extendedProps },
+              extendedProperties: { shared: extendedProps },
             },
           });
           results.events.cleaned++;
@@ -447,7 +447,7 @@ router.post('/api/admin/calendar/migrate-clean-descriptions', isAdmin, async (re
                 eventId,
                 requestBody: {
                   description: cleanDescription,
-                  extendedProperties: { private: extendedProps },
+                  extendedProperties: { shared: extendedProps },
                 },
               });
             } catch (patchErr: unknown) {
