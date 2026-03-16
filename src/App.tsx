@@ -522,8 +522,8 @@ const AnimatedRoutes: React.FC = () => {
                 <Route path="/dev-preview/profile-dark" element={<PageErrorBoundary pageName="Profile"><Profile /></PageErrorBoundary>} />
                 <Route path="/dev-preview/updates-dark" element={<PageErrorBoundary pageName="Updates"><MemberUpdates /></PageErrorBoundary>} />
                 {/* Staff/Admin portal dev preview routes */}
-                <Route path="/dev-preview/admin" element={<PageErrorBoundary pageName="AdminDashboard"><AdminDashboard /></PageErrorBoundary>} />
-                <Route path="/dev-preview/admin-dark" element={<PageErrorBoundary pageName="AdminDashboard"><AdminDashboard /></PageErrorBoundary>} />
+                <Route path="/dev-preview/admin" element={<StaffWebSocketProvider><PageErrorBoundary pageName="AdminDashboard"><AdminDashboard /></PageErrorBoundary></StaffWebSocketProvider>} />
+                <Route path="/dev-preview/admin-dark" element={<StaffWebSocketProvider><PageErrorBoundary pageName="AdminDashboard"><AdminDashboard /></PageErrorBoundary></StaffWebSocketProvider>} />
               </>
             )}
             

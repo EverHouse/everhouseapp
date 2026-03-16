@@ -1112,7 +1112,7 @@ router.post('/api/member/bookings/:id/confirm-payment', isAuthenticated, async (
     try {
       participantFees = JSON.parse(typeof snapshot.participant_fees === 'string' ? snapshot.participant_fees : '[]');
     } catch (parseErr: unknown) {
-      logger.error('[MemberPayments] Failed to parse participant_fees for snapshot', { extra: { snapshot_id: snapshot.id, data: ':', parseErr } });
+      logger.error('[MemberPayments] Failed to parse participant_fees for snapshot', { extra: { snapshot_id: snapshot.id, parseErr: getErrorMessage(parseErr) } });
     }
     const participantIds = participantFees.map((pf) => pf.id);
 
@@ -2311,7 +2311,7 @@ router.get('/api/member/balance', isAuthenticated, validateQuery(balanceQuerySch
               }
             }
           } catch (sessionErr: unknown) {
-            logger.error('[Member Balance] Failed to compute fees for session', { extra: { sessionId, sessionErr } });
+            logger.error('[Member Balance] Failed to compute fees for session', { extra: { sessionId, sessionErr: getErrorMessage(sessionErr) } });
           }
         }
 
@@ -2326,12 +2326,12 @@ router.get('/api/member/balance', isAuthenticated, validateQuery(balanceQuerySch
                WHERE bp.id = updates.id
             `);
           } catch (cacheErr: unknown) {
-            logger.error('[Member Balance] Failed to write-through cache', { extra: { cacheErr } });
+            logger.error('[Member Balance] Failed to write-through cache', { extra: { cacheErr: getErrorMessage(cacheErr) } });
           }
         }
       }
     } catch (uncachedErr: unknown) {
-      logger.error('[Member Balance] Error computing on-the-fly fees', { extra: { uncachedErr } });
+      logger.error('[Member Balance] Error computing on-the-fly fees', { extra: { uncachedErr: getErrorMessage(uncachedErr) } });
     }
 
     const unfilledResult = await db.execute(sql`
