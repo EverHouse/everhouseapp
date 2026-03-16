@@ -8,7 +8,7 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
-    version: "8.87.48",
+    version: "8.87.49",
     date: "2026-03-16",
     title: "Bug Fixes & Performance",
     changes: [
@@ -16,6 +16,7 @@ export const changelog: ChangelogEntry[] = [
       "Fixed: Page pre-loading now properly cleans up when navigating away, preventing a potential memory leak",
       "Fixed: Switching accounts now properly refreshes pre-loaded page data instead of showing stale content from the previous session",
       "Fixed: Profile page scroll-to-passkeys timer now properly cleans up if you navigate away quickly",
+      "Fixed: Deployment migration error for Trackman booking references — orphaned data is now cleaned up before adding the database constraint",
     ]
   },
   {

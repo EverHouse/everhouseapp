@@ -211,6 +211,13 @@
       "when": 1774137600000,
       "tag": "0056_add_failed_side_effects_table",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1774224000001,
+      "tag": "0057_fix_trackman_booking_fk",
+      "breakpoints": true
     }
   ]
 }
