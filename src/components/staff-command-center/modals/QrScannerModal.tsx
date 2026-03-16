@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import { Html5Qrcode, Html5QrcodeScannerState } from 'html5-qrcode';
 import ModalShell from '../../ModalShell';
 
 interface QrScannerModalProps {
@@ -8,7 +9,7 @@ interface QrScannerModalProps {
 }
 
 const QrScannerModal: React.FC<QrScannerModalProps> = ({ isOpen, onClose, onScanSuccess }) => {
-  const qrScannerRef = useRef<{ getState: () => number; stop: () => Promise<void>; start: (cameraId: Record<string, string>, config: Record<string, unknown>, onSuccess: (text: string) => void, onError: (err: unknown) => void) => Promise<void> } | null>(null);
+  const qrScannerRef = useRef<Html5Qrcode | null>(null);
   const hasScannedRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const [cameraPermission, setCameraPermission] = useState<'idle' | 'pending' | 'granted' | 'denied'>('idle');
@@ -18,7 +19,6 @@ const QrScannerModal: React.FC<QrScannerModalProps> = ({ isOpen, onClose, onScan
   const stopScanner = useCallback(async () => {
     if (qrScannerRef.current) {
       try {
-        const { Html5QrcodeScannerState } = await import('html5-qrcode');
         const state = qrScannerRef.current.getState();
         if (state === Html5QrcodeScannerState.SCANNING || state === Html5QrcodeScannerState.PAUSED) {
           await qrScannerRef.current.stop();
@@ -54,7 +54,6 @@ const QrScannerModal: React.FC<QrScannerModalProps> = ({ isOpen, onClose, onScan
       hasScannedRef.current = false;
 
       try {
-        const { Html5Qrcode } = await import('html5-qrcode');
         const cameras = await Html5Qrcode.getCameras();
         if (!cameras || cameras.length === 0) {
           setError('No cameras found.');
@@ -63,7 +62,7 @@ const QrScannerModal: React.FC<QrScannerModalProps> = ({ isOpen, onClose, onScan
         }
 
         const qrScanner = new Html5Qrcode(elementId);
-        qrScannerRef.current = qrScanner as unknown as typeof qrScannerRef.current;
+        qrScannerRef.current = qrScanner;
         setCameraPermission('granted');
 
         await qrScanner.start(
