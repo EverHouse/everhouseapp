@@ -232,7 +232,7 @@ router.get('/api/members/directory', isStaffOrAdmin, validateQuery(directoryQuer
     const total = Number(countResult[0]?.count || 0);
     
     const offset = (page - 1) * limit;
-    const allMembers = await db.select({
+    const baseQuery = db.select({
       id: users.id,
       email: users.email,
       firstName: users.firstName,
@@ -256,9 +256,11 @@ router.get('/api/members/directory', isStaffOrAdmin, validateQuery(directoryQuer
     })
       .from(users)
       .where(whereClause)
-      .orderBy(sql`COALESCE(${users.firstName}, ${users.email}) ASC`)
-      .limit(limit)
-      .offset(offset);
+      .orderBy(sql`COALESCE(${users.firstName}, ${users.email}) ASC`);
+
+    const allMembers = isPaginated
+      ? await baseQuery.limit(limit).offset(offset)
+      : await baseQuery;
     
     const memberEmails = allMembers.map(m => m.email?.toLowerCase()).filter(Boolean) as string[];
     
