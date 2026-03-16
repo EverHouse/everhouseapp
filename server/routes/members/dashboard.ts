@@ -109,8 +109,18 @@ router.get('/api/member/dashboard/bookings', isAuthenticated, async (req, res) =
         .from(bookingRequests)
         .innerJoin(resources, eq(bookingRequests.resourceId, resources.id))
         .where(and(...conditions))
-        .orderBy(asc(bookingRequests.requestDate), asc(bookingRequests.startTime))
+        .orderBy(desc(bookingRequests.requestDate), desc(bookingRequests.startTime))
+        .limit(200)
     );
+
+    bookings.sort((a, b) => {
+      const dateA = a.booking_date || '';
+      const dateB = b.booking_date || '';
+      if (dateA !== dateB) return dateA < dateB ? -1 : 1;
+      const timeA = a.start_time || '';
+      const timeB = b.start_time || '';
+      return timeA < timeB ? -1 : timeA > timeB ? 1 : 0;
+    });
 
     res.json(bookings);
   } catch (error: unknown) {
@@ -220,7 +230,8 @@ router.get('/api/member/dashboard/rsvps', isAuthenticated, async (req, res) => {
     .from(eventRsvps)
     .innerJoin(events, eq(eventRsvps.eventId, events.id))
     .where(and(...conditions))
-    .orderBy(events.eventDate, events.startTime);
+    .orderBy(events.eventDate, events.startTime)
+    .limit(100);
 
     res.json(result);
   } catch (error: unknown) {
@@ -259,7 +270,8 @@ router.get('/api/member/dashboard/wellness', isAuthenticated, async (req, res) =
     .from(wellnessEnrollments)
     .innerJoin(wellnessClasses, eq(wellnessEnrollments.classId, wellnessClasses.id))
     .where(and(...conditions))
-    .orderBy(wellnessClasses.date, wellnessClasses.time);
+    .orderBy(wellnessClasses.date, wellnessClasses.time)
+    .limit(100);
 
     const classesResult = await db.execute(sql`
       SELECT wc.*, 
@@ -569,7 +581,7 @@ router.get('/api/member/dashboard-data', isAuthenticated, async (req, res) => {
           )
         ];
         
-        return await withRetry(() =>
+        const result = await withRetry(() =>
           db.select({
             id: bookingRequests.id,
             resource_id: bookingRequests.resourceId,
@@ -587,8 +599,18 @@ router.get('/api/member/dashboard-data', isAuthenticated, async (req, res) => {
             .from(bookingRequests)
             .innerJoin(resources, eq(bookingRequests.resourceId, resources.id))
             .where(and(...conditions))
-            .orderBy(asc(bookingRequests.requestDate), asc(bookingRequests.startTime))
+            .orderBy(desc(bookingRequests.requestDate), desc(bookingRequests.startTime))
+            .limit(200)
         );
+        result.sort((a, b) => {
+          const dateA = a.booking_date || '';
+          const dateB = b.booking_date || '';
+          if (dateA !== dateB) return dateA < dateB ? -1 : 1;
+          const timeA = a.start_time || '';
+          const timeB = b.start_time || '';
+          return timeA < timeB ? -1 : timeA > timeB ? 1 : 0;
+        });
+        return result;
       } catch (error: unknown) {
         logger.warn('[dashboard-data] Failed to fetch bookings', { error: error instanceof Error ? error : new Error(String(error)) });
         return [];
@@ -634,7 +656,8 @@ router.get('/api/member/dashboard-data', isAuthenticated, async (req, res) => {
         .from(eventRsvps)
         .innerJoin(events, eq(eventRsvps.eventId, events.id))
         .where(and(...conditions))
-        .orderBy(events.eventDate, events.startTime);
+        .orderBy(events.eventDate, events.startTime)
+        .limit(100);
       } catch (error: unknown) {
         logger.warn('[dashboard-data] Failed to fetch RSVPs', { error: error instanceof Error ? error : new Error(String(error)) });
         return [];
@@ -666,7 +689,8 @@ router.get('/api/member/dashboard-data', isAuthenticated, async (req, res) => {
         .from(wellnessEnrollments)
         .innerJoin(wellnessClasses, eq(wellnessEnrollments.classId, wellnessClasses.id))
         .where(and(...conditions))
-        .orderBy(wellnessClasses.date, wellnessClasses.time);
+        .orderBy(wellnessClasses.date, wellnessClasses.time)
+        .limit(100);
       } catch (error: unknown) {
         logger.warn('[dashboard-data] Failed to fetch wellness enrollments', { error: error instanceof Error ? error : new Error(String(error)) });
         return [];
@@ -809,7 +833,8 @@ router.get('/api/member/dashboard-data', isAuthenticated, async (req, res) => {
         })
         .from(events)
         .where(and(...conditions))
-        .orderBy(asc(events.eventDate), asc(events.startTime));
+        .orderBy(asc(events.eventDate), asc(events.startTime))
+        .limit(100);
       } catch (error: unknown) {
         logger.warn('[dashboard-data] Failed to fetch events', { error: error instanceof Error ? error : new Error(String(error)) });
         return [];

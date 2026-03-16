@@ -1268,7 +1268,7 @@ body.keyboard-open .modal-keyboard-aware {
   padding: 8px 12px;
   border-radius: 4px;
   font-size: 12px;
-  z-index: 99999;
+  z-index: var(--z-modal);
 }
 
 .material-symbols-outlined {
@@ -1338,7 +1338,7 @@ html.dark a:focus-visible {
   background: #293515;
   color: white;
   padding: 8px 16px;
-  z-index: 100;
+  z-index: var(--z-nav);
   text-decoration: none;
   font-weight: bold;
   border-radius: 0 0 8px 0;
@@ -3007,6 +3007,6 @@ body[data-ptr-active="true"]:has(.ptr-loader-overlay) header[role="banner"] {
   height: 10px;
   top: 0;
   pointer-events: none;
-  z-index: 99999;
+  z-index: var(--z-modal);
   animation: confettiSpread 3s var(--m3-emphasized-decel) forwards;
 }

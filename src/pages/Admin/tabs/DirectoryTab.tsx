@@ -183,6 +183,7 @@ const DirectoryTab: React.FC = () => {
                     disabled={data.isSyncRunning || data.syncMutation.isPending}
                     className="tactile-btn flex items-center justify-center gap-1.5 sm:px-3 px-2 py-1.5 rounded-full text-[11px] sm:text-xs font-medium text-gray-500 dark:text-gray-400 hover:bg-black/5 dark:hover:bg-white/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer shrink-0"
                     title={data.isSyncRunning ? 'Syncing...' : data.lastSyncTime ? `Last sync: ${new Date(data.lastSyncTime).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'America/Los_Angeles' })}` : 'Sync All'}
+                    aria-label={data.isSyncRunning ? 'Syncing members' : 'Sync all members'}
                 >
                     <span className={`material-symbols-outlined text-[16px] ${data.isSyncRunning ? 'animate-spin' : ''}`}>
                         sync
@@ -365,7 +366,7 @@ const DirectoryTab: React.FC = () => {
             />
 
             {assignTierModalOpen && memberToAssignTier && createPortal(
-                <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                <div className="fixed inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" style={{ zIndex: 'var(--z-modal)' }}>
                     <div className="bg-white dark:bg-surface-dark rounded-xl p-6 w-full max-w-md shadow-2xl">
                         <h3 className="text-2xl leading-tight font-bold text-primary dark:text-white mb-2" style={{ fontFamily: 'var(--font-headline)' }}>Assign Tier</h3>
                         <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">

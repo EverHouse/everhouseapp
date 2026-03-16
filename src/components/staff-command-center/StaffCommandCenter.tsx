@@ -928,14 +928,16 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
         <>
           {fabOpen && (
             <div 
-              className="fixed inset-0 z-[9997]" 
+              className="fixed inset-0" 
+              style={{ zIndex: 'var(--z-fab)' }}
               onClick={() => setFabOpen(false)}
               aria-hidden="true"
             />
           )}
           <div 
-            className="fixed right-5 z-[9998] flex flex-col items-end gap-3" 
+            className="fixed right-5 flex flex-col items-end gap-3"
             style={{ 
+              zIndex: 'var(--z-fab)',
               bottom: isMobile 
                 ? (isAtBottom 
                     ? 'calc(24px + env(safe-area-inset-bottom, 0px))' 

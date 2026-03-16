@@ -66,7 +66,7 @@ export const StaffSidebar: React.FC<StaffSidebarProps> = ({
   };
 
   const sidebarContent = (
-    <aside className="hidden xl:flex flex-col w-64 h-screen fixed left-0 top-0 bg-gradient-to-b from-[#293515] via-[#1f2a0f] to-[#1a220c] border-r border-white/10 isolate" style={{ zIndex: 9999 }}>
+    <aside className="hidden xl:flex flex-col w-64 h-screen fixed left-0 top-0 bg-gradient-to-b from-[#293515] via-[#1f2a0f] to-[#1a220c] border-r border-white/10 isolate" style={{ zIndex: 'var(--z-nav)' }}>
       <div className="absolute inset-0 opacity-[0.03] pointer-events-none" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E")` }}></div>
       <button 
         onClick={() => { startNavigation(); navigate('/'); }}

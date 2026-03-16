@@ -182,7 +182,7 @@ router.get('/api/members/directory', isStaffOrAdmin, validateQuery(directoryQuer
     const limitParam = parseInt(vq.limit || '', 10);
     const isPaginated = !isNaN(pageParam) || !isNaN(limitParam);
     const page = isNaN(pageParam) || pageParam < 1 ? 1 : pageParam;
-    const limit = isNaN(limitParam) ? 500 : Math.min(Math.max(limitParam, 1), 500);
+    const limit = isNaN(limitParam) ? 100 : Math.min(Math.max(limitParam, 1), 500);
     
     if (!searchQuery && !isPaginated) {
       const cacheKey = `${DIRECTORY_CACHE_KEY}_${statusFilter}`;

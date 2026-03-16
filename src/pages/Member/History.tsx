@@ -11,6 +11,7 @@ import { formatTime12Hour, getRelativeDateLabel } from '../../utils/dateUtils';
 import InvoicePaymentModal from '../../components/billing/InvoicePaymentModal';
 import { MemberPaymentModal } from '../../components/booking/MemberPaymentModal';
 import { AnimatedPage, MotionListItem } from '../../components/motion';
+import { EmptyVisits, EmptyPayments } from '../../components/EmptyState';
 import { TabTransition } from '../../components/motion/TabTransition';
 
 interface UnifiedVisit {
@@ -171,10 +172,7 @@ const History: React.FC = () => {
                 {visits.length} past visit{visits.length !== 1 ? 's' : ''}
               </div>
               {visits.length === 0 ? (
-                <div className={`text-center py-12 rounded-xl border glass-card animate-pop-in ${isDark ? 'border-white/25' : 'border-black/10'}`}>
-                  <span className={`material-symbols-outlined text-5xl mb-4 ${isDark ? 'text-white/30' : 'text-primary/30'}`}>history</span>
-                  <p className={`${isDark ? 'text-white/80' : 'text-primary/80'}`}>No past visits yet</p>
-                </div>
+                <EmptyVisits onBook={() => window.location.href = '/book'} />
               ) : (<>
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
                   {visits.slice(0, visitsDisplayCount).map((visit, index) => {
@@ -271,11 +269,7 @@ const History: React.FC = () => {
                 {purchases.length} payment{purchases.length !== 1 ? 's' : ''}
               </div>
               {purchases.length === 0 ? (
-                <div className={`text-center py-12 rounded-xl border glass-card animate-pop-in ${isDark ? 'border-white/25' : 'border-black/10'}`}>
-                  <span className={`material-symbols-outlined text-5xl mb-4 ${isDark ? 'text-white/30' : 'text-primary/30'}`}>payments</span>
-                  <p className={`${isDark ? 'text-white/80' : 'text-primary/80'}`}>No payments yet</p>
-                  <p className={`text-sm mt-1 ${isDark ? 'text-white/50' : 'text-primary/50'}`}>Your payment history will appear here</p>
-                </div>
+                <EmptyPayments />
               ) : (
                 <div className="space-y-6">
                   {(() => {

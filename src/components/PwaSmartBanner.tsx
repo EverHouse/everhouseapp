@@ -77,9 +77,10 @@ const PwaSmartBanner: React.FC<PwaSmartBannerProps> = ({
 
   return (
     <div
-      className={`fixed top-0 left-0 right-0 z-[9999] transition-all duration-300 ${
+      className={`fixed top-0 left-0 right-0 transition-all duration-300 ${
         dismissed ? 'opacity-0 -translate-y-full' : 'opacity-100 translate-y-0'
       }`}
+      style={{ zIndex: 'var(--z-nav)' }}
     >
       <div className="bg-gray-100/95 backdrop-blur-xl border-b border-gray-200/60 px-3 py-2.5 safe-area-top">
         <div className="flex items-center gap-3 max-w-lg mx-auto">

@@ -133,6 +133,7 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
   const wsRefreshTimerRef = useRef<NodeJS.Timeout | null>(null);
   const rosterFetchIdRef = useRef(0);
   const checkCardFetchIdRef = useRef(0);
+  const billingModalTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const isManageMode = mode === 'manage';
 
@@ -442,6 +443,10 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
       if (pollingTimerRef.current) {
         clearInterval(pollingTimerRef.current);
         pollingTimerRef.current = null;
+      }
+      if (billingModalTimerRef.current) {
+        clearTimeout(billingModalTimerRef.current);
+        billingModalTimerRef.current = null;
       }
     };
   }, []);
@@ -1184,7 +1189,9 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
           ? resultBookingId 
           : parseInt(String(resultBookingId).replace('review-', ''), 10);
         if (!isNaN(numericBookingId)) {
-          setTimeout(() => {
+          if (billingModalTimerRef.current) clearTimeout(billingModalTimerRef.current);
+          billingModalTimerRef.current = setTimeout(() => {
+            billingModalTimerRef.current = null;
             onOpenBillingModal(numericBookingId);
           }, 300);
         }

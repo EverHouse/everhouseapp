@@ -83,6 +83,42 @@ export const EmptyEvents: React.FC<{ onExplore?: () => void; message?: string }>
   />
 );
 
+export const EmptyWellness: React.FC<{ onExplore?: () => void }> = ({ onExplore }) => (
+  <EmptyState
+    icon="spa"
+    title="No classes scheduled"
+    description="Check back soon for upcoming wellness classes and recovery sessions."
+    action={onExplore ? { label: "View MedSpa", onClick: onExplore } : undefined}
+  />
+);
+
+export const EmptyVisits: React.FC<{ onBook?: () => void }> = ({ onBook }) => (
+  <EmptyState
+    icon="history"
+    title="No past visits yet"
+    description="Your visit history will appear here after your first session."
+    action={onBook ? { label: "Book a Session", onClick: onBook } : undefined}
+  />
+);
+
+export const EmptyPayments: React.FC = () => (
+  <EmptyState
+    icon="payments"
+    title="No payments yet"
+    description="Your payment history will appear here once you have transactions."
+  />
+);
+
+export const EmptySlots: React.FC<{ onChangeDate?: () => void }> = ({ onChangeDate }) => (
+  <EmptyState
+    icon="event_busy"
+    title="No slots available"
+    description="No time slots are open for this date. Try selecting a different day."
+    action={onChangeDate ? { label: "Try Another Date", onClick: onChangeDate } : undefined}
+    variant="compact"
+  />
+);
+
 export const EmptySearch: React.FC<{ query?: string }> = ({ query }) => (
   <EmptyState
     icon="search_off"

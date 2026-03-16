@@ -294,7 +294,10 @@ const MemberEvents: React.FC = () => {
         </div>
         <div className={`transition-opacity duration-normal ${isLoading ? 'opacity-0 hidden' : 'opacity-100'}`}>
           {filteredAndSortedEvents.length === 0 ? (
-            <EmptyEvents />
+            <EmptyEvents 
+              onExplore={filter !== 'All' ? () => setFilter('All') : undefined}
+              message={filter !== 'All' ? `No ${filter} events right now. Try viewing all categories.` : undefined}
+            />
           ) : (
             <MotionList ref={eventsParent} className="space-y-3 -mx-6 px-3">
               {filteredAndSortedEvents.map((event, index) => {

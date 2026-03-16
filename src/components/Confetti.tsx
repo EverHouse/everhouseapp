@@ -54,7 +54,7 @@ const Confetti: React.FC<ConfettiProps> = ({
   if (!isActive || particles.length === 0) return null;
 
   return createPortal(
-    <div className="fixed inset-0 pointer-events-none overflow-hidden" style={{ zIndex: 99999 }}>
+    <div className="fixed inset-0 pointer-events-none overflow-hidden" style={{ zIndex: 'var(--z-modal)' }}>
       {particles.map((particle) => (
         <div
           key={particle.id}

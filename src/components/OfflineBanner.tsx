@@ -107,9 +107,10 @@ export default function OfflineBanner({ staffWsConnected }: OfflineBannerProps) 
 
   return (
     <div
-      className={`fixed top-0 left-0 right-0 z-[100] ${colors[rendered]} text-white text-center py-2 px-4 text-sm font-medium ${
+      className={`fixed top-0 left-0 right-0 ${colors[rendered]} text-white text-center py-2 px-4 text-sm font-medium ${
         isExiting ? 'transition-all duration-normal var(--m3-emphasized-decel) opacity-0 -translate-y-full' : 'animate-banner-slide-down'
       }`}
+      style={{ zIndex: 'var(--z-nav)' }}
     >
       {content[rendered]}
     </div>

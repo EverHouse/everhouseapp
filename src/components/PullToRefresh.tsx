@@ -430,7 +430,7 @@ const PullToRefresh: React.FC<PullToRefreshProps> = ({ children, onRefresh, disa
               left: 0;
               right: 0;
               background-color: #293515;
-              z-index: 9999;
+              z-index: var(--z-modal);
               display: flex;
               align-items: flex-end;
               justify-content: center;
@@ -477,7 +477,7 @@ const PullToRefresh: React.FC<PullToRefreshProps> = ({ children, onRefresh, disa
               right: 0;
               bottom: 0;
               background-color: #293515;
-              z-index: 99999;
+              z-index: var(--z-modal);
               animation: ptrFillScreen 0.35s var(--m3-standard) forwards;
             }
 
@@ -500,7 +500,7 @@ const PullToRefresh: React.FC<PullToRefreshProps> = ({ children, onRefresh, disa
           style={{
             position: 'fixed',
             inset: 0,
-            zIndex: 99999,
+            zIndex: 'var(--z-modal)',
             backgroundColor: '#293515',
             display: 'flex',
             alignItems: 'center',

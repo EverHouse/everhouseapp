@@ -255,7 +255,8 @@ router.get('/api/events/needs-review', isStaffOrAdmin, async (req, res) => {
       block_conference_room: events.blockConferenceRoom,
     }).from(events)
       .where(eq(events.needsReview, true))
-      .orderBy(events.eventDate, events.startTime);
+      .orderBy(events.eventDate, events.startTime)
+      .limit(100);
     
     res.json(result);
   } catch (error: unknown) {

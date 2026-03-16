@@ -203,8 +203,8 @@ export const SearchBar: React.FC<SearchBarProps> = ({
 
     return (
       <div
-        className={`fixed inset-0 z-[100] bg-bone dark:bg-primary flex flex-col transition-all duration-[200ms] ease-[var(--m3-emphasized-decel)] ${mobileAnimClass}`}
-        style={{ overflow: 'hidden', transformOrigin: 'top center' }}
+        className={`fixed inset-0 bg-bone dark:bg-primary flex flex-col transition-all duration-[200ms] ease-[var(--m3-emphasized-decel)] ${mobileAnimClass}`}
+        style={{ zIndex: 'var(--z-nav)', overflow: 'hidden', transformOrigin: 'top center' }}
       >
           <div className="flex items-center gap-2 px-3 pt-safe-top">
             <button

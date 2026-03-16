@@ -256,7 +256,7 @@ const IdScannerModal: React.FC<IdScannerModalProps> = ({ isOpen, onClose, onScan
   const modalContent = (
     <div
       className={`fixed inset-0 ${isDark ? 'dark' : ''}`}
-      style={{ zIndex: 10050, overscrollBehavior: 'contain', touchAction: 'none' }}
+      style={{ zIndex: 'calc(var(--z-modal) + 10)', overscrollBehavior: 'contain', touchAction: 'none' }}
     >
       <div
         className="fixed inset-0 bg-black/60 backdrop-blur-sm"

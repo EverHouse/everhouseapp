@@ -438,6 +438,7 @@ router.get('/api/guests/needs-email', isStaffOrAdmin, async (req, res) => {
       LEFT JOIN users u ON LOWER(u.email) = LOWER(br.user_email)
       WHERE (g.email IS NULL OR g.email = '')
       ORDER BY bs.session_date DESC
+      LIMIT 200
     `);
     
     res.json({

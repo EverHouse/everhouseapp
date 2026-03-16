@@ -10,7 +10,7 @@ import { SegmentedButton } from '../../components/ui/SegmentedButton';
 import SwipeablePage from '../../components/SwipeablePage';
 import { MotionList, MotionListItem, AnimatedPage } from '../../components/motion';
 import { TabTransition } from '../../components/motion/TabTransition';
-import { EmptyEvents } from '../../components/EmptyState';
+import { EmptyWellness } from '../../components/EmptyState';
 import { playSound } from '../../utils/sounds';
 import { formatDateDisplayWithDay } from '../../utils/dateUtils';
 import { bookingEvents } from '../../lib/bookingEvents';
@@ -187,7 +187,7 @@ const Wellness: React.FC = () => {
 
       <TabTransition activeKey={activeTab}>
       <div className="relative z-10 animate-content-enter">
-        {activeTab === 'classes' && <ClassesView onBook={handleBook} isDark={isDark} userEmail={user?.email} userStatus={user?.status} refreshKey={refreshKey} onRefreshComplete={onRefreshComplete} />}
+        {activeTab === 'classes' && <ClassesView onBook={handleBook} isDark={isDark} userEmail={user?.email} userStatus={user?.status} refreshKey={refreshKey} onRefreshComplete={onRefreshComplete} onSwitchToMedSpa={() => setActiveTab('medspa')} />}
         {activeTab === 'medspa' && <MedSpaView isDark={isDark} />}
       </div>
       </TabTransition>
@@ -208,7 +208,7 @@ const Wellness: React.FC = () => {
   );
 };
 
-const ClassesView: React.FC<{onBook: (cls: WellnessClass) => void; isDark?: boolean; userEmail?: string; userStatus?: string; refreshKey?: number; onRefreshComplete?: () => void}> = ({ onBook: _onBook, isDark = true, userEmail, userStatus, refreshKey = 0, onRefreshComplete }) => {
+const ClassesView: React.FC<{onBook: (cls: WellnessClass) => void; isDark?: boolean; userEmail?: string; userStatus?: string; refreshKey?: number; onRefreshComplete?: () => void; onSwitchToMedSpa?: () => void}> = ({ onBook: _onBook, isDark = true, userEmail, userStatus, refreshKey = 0, onRefreshComplete, onSwitchToMedSpa }) => {
   const { showToast } = useToast();
   const { setPageReady } = usePageReady();
   const queryClient = useQueryClient();
@@ -539,7 +539,7 @@ const ClassesView: React.FC<{onBook: (cls: WellnessClass) => void; isDark?: bool
                     );
                 })
             ) : (
-                <EmptyEvents message="No classes scheduled yet. Check back soon!" />
+                <EmptyWellness onExplore={onSwitchToMedSpa} />
             )}
             {hasMore && (
               <div className="flex justify-center pt-2 pb-4">

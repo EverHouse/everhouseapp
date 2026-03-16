@@ -1692,7 +1692,8 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
       </div>
       {showIdImageFull && idImageUrl && (
         <div 
-          className="fixed inset-0 z-[10060] flex items-center justify-center bg-black/80 p-4"
+          className="fixed inset-0 flex items-center justify-center bg-black/80 p-4"
+          style={{ zIndex: 'calc(var(--z-modal) + 10)' }}
           onClick={() => setShowIdImageFull(false)}
           aria-hidden="true"
         >

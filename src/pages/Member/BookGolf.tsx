@@ -16,6 +16,7 @@ import { useTierPermissions } from '../../hooks/useTierPermissions';
 import { canAccessResource } from '../../services/tierService';
 import { formatDateShort, formatTime12Hour } from '../../utils/dateUtils';
 import WalkingGolferSpinner from '../../components/WalkingGolferSpinner';
+import { EmptySlots } from '../../components/EmptyState';
 import ModalShell from '../../components/ModalShell';
 import { GuardianConsentForm, type GuardianConsentData } from '../../components/booking';
 import { AnimatedPage } from '../../components/motion';
@@ -1446,9 +1447,13 @@ const BookGolf: React.FC = () => {
                   );
                 })}
                 {slotsByHour.length === 0 && !isLoading && (
-                  <div className={`text-center py-8 text-sm rounded-xl border border-dashed ${isDark ? 'text-white/80 glass-card border-white/20' : 'text-primary/80 bg-white border-black/20'}`}>
-                    No slots available for this date.
-                  </div>
+                  <EmptySlots onChangeDate={dates.length > 1 ? () => {
+                    if (selectedDateObj) {
+                      const currentIdx = dates.findIndex(d => d.date === selectedDateObj.date);
+                      const nextIdx = (currentIdx + 1) % dates.length;
+                      setSelectedDateObj(dates[nextIdx]);
+                    }
+                  } : undefined} />
                 )}
               </div>
               </div>

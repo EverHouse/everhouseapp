@@ -219,7 +219,7 @@ export const MemberSearchInput: React.FC<MemberSearchInputProps> = ({
       left: rect.left + vvOffsetLeft,
       width: rect.width,
       maxHeight: clampedHeight,
-      zIndex: 99999,
+      zIndex: 'var(--z-dropdown)',
     } as React.CSSProperties);
   }, []);
 

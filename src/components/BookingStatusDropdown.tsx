@@ -224,7 +224,7 @@ export function BookingStatusDropdown({
         left: centerX,
         transform: 'translateX(-50%)',
         bottom: window.innerHeight - rect.top + 4,
-        zIndex: 10050,
+        zIndex: 'var(--z-modal)',
       });
     } else {
       setMenuStyle({
@@ -232,7 +232,7 @@ export function BookingStatusDropdown({
         left: centerX,
         transform: 'translateX(-50%)',
         top: rect.bottom + 4,
-        zIndex: 10050,
+        zIndex: 'var(--z-modal)',
       });
     }
   }, [menuDirection]);
@@ -283,7 +283,7 @@ export function BookingStatusDropdown({
         <>
           <div
             className="fixed inset-0"
-            style={{ zIndex: 10049 }}
+            style={{ zIndex: 'var(--z-modal)' }}
             onClick={handleBackdropClick}
             aria-hidden="true"
           />

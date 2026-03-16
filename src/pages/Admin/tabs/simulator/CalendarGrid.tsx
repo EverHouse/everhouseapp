@@ -339,7 +339,7 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
                         {showDatePicker && ReactDOM.createPortal(
                             <div 
                                 className="fixed inset-0 bg-black/30 flex items-end sm:items-center justify-center sm:p-4"
-                                style={{ zIndex: 9999 }}
+                                style={{ zIndex: 'var(--z-modal)' }}
                                 onClick={() => setShowDatePicker(false)}
                             >
                                 <div 

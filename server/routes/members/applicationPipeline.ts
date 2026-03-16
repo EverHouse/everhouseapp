@@ -29,6 +29,7 @@ router.get('/api/admin/applications', isStaffOrAdmin, async (req, res) => {
           WHEN 'archived' THEN 8
         END,
         fs.created_at DESC
+      LIMIT 500
     `);
 
     res.json(result.rows);
