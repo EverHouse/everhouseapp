@@ -8,6 +8,17 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.87.46",
+    date: "2026-03-16",
+    title: "Recent Playing Partners in Booking Flow",
+    changes: [
+      "New: When adding players to a booking, your most frequent playing partners now appear as quick-tap chips — no more searching for the same people every time",
+      "New: Recent partners are automatically built from your booking history, showing both members and guests you've played with most often",
+      "Improved: Tapping a recent partner auto-fills the player slot with their info — members are selected instantly, guests have their name and email pre-filled",
+      "Privacy: Partners who have opted out of the directory or data sharing are excluded from suggestions, and guest suggestions are limited to your own invited guests only",
+    ]
+  },
+  {
     version: "8.87.45",
     date: "2026-03-16",
     title: "Calendar Sync Reliability & Cross-Environment Fix",

@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useMemo, useState, useEffect } from 'react';
 import { useAutoAnimate } from '@formkit/auto-animate/react';
 import { MemberSearchInput, SelectedMember } from './MemberSearchInput';
 
@@ -13,6 +13,18 @@ export interface PlayerSlot {
   searchQuery: string;
   selectedId?: string;
   selectedName?: string;
+}
+
+interface FrequentPartner {
+  id: string;
+  name: string;
+  email?: string;
+  emailRedacted?: string;
+  firstName?: string;
+  lastName?: string;
+  tier?: string;
+  type: 'member' | 'guest';
+  frequency: number;
 }
 
 export interface PlayerSlotEditorProps {
@@ -44,6 +56,18 @@ const PlayerSlotEditor: React.FC<PlayerSlotEditorProps> = ({
   const [slotListRef] = useAutoAnimate();
   const playerCounts = Array.from({ length: maxPlayers }, (_, i) => i + 1);
   const labels: Record<number, string> = { 1: 'Solo', 2: 'Duo', 3: 'Trio', 4: 'Four' };
+
+  const [frequentPartners, setFrequentPartners] = useState<FrequentPartner[]>([]);
+
+  useEffect(() => {
+    if (!ownerMemberId) return;
+    let cancelled = false;
+    fetch('/api/members/frequent-partners', { credentials: 'include' })
+      .then(r => r.ok ? r.json() : [])
+      .then(data => { if (!cancelled) setFrequentPartners(data); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [ownerMemberId]);
 
   const updateSlot = useCallback((index: number, updates: Partial<PlayerSlot>) => {
     const newSlots = [...slots];
@@ -77,6 +101,37 @@ const PlayerSlotEditor: React.FC<PlayerSlotEditorProps> = ({
     onSlotsChange(newSlots);
   }, [slots, onSlotsChange]);
 
+  const handlePartnerSelect = useCallback((partner: FrequentPartner) => {
+    const emptyIndex = slots.findIndex(s => !s.selectedId && s.firstName.trim() === '' && s.lastName.trim() === '' && s.email.trim() === '');
+    if (emptyIndex === -1) return;
+
+    const newSlots = [...slots];
+    if (partner.type === 'member') {
+      newSlots[emptyIndex] = {
+        ...newSlots[emptyIndex],
+        type: 'member',
+        selectedId: partner.id,
+        selectedName: partner.name,
+        searchQuery: partner.name,
+        email: partner.email || '',
+        emailRedacted: partner.emailRedacted,
+        name: partner.name,
+      };
+    } else {
+      newSlots[emptyIndex] = {
+        ...newSlots[emptyIndex],
+        type: 'guest',
+        firstName: partner.firstName || partner.name.split(' ')[0] || '',
+        lastName: partner.lastName || partner.name.split(' ').slice(1).join(' ') || '',
+        email: partner.email || '',
+        name: partner.name,
+        selectedId: partner.id,
+        selectedName: partner.name,
+      };
+    }
+    onSlotsChange(newSlots);
+  }, [slots, onSlotsChange]);
+
   const excludeIdsForSlot = useMemo(() => {
     const selectedIds = slots
       .filter(s => s.selectedId)
@@ -86,6 +141,18 @@ const PlayerSlotEditor: React.FC<PlayerSlotEditorProps> = ({
     }
     return selectedIds;
   }, [slots, ownerMemberId]);
+
+  const availablePartners = useMemo(() => {
+    const selectedEmails = new Set(slots.filter(s => s.email).map(s => s.email.toLowerCase()));
+    const selectedIds = new Set(excludeIdsForSlot);
+    return frequentPartners.filter(p => {
+      if (selectedIds.has(p.id)) return false;
+      if (p.email && selectedEmails.has(p.email.toLowerCase())) return false;
+      return true;
+    });
+  }, [frequentPartners, slots, excludeIdsForSlot]);
+
+  const hasEmptySlot = slots.some(s => !s.selectedId && s.firstName.trim() === '' && s.lastName.trim() === '' && s.email.trim() === '');
 
   return (
     <div ref={wrapperRef} className="space-y-6">
@@ -127,6 +194,34 @@ const PlayerSlotEditor: React.FC<PlayerSlotEditorProps> = ({
               <span className="material-symbols-outlined text-sm mr-1 align-middle">info</span>
               Provide guest first name, last name, and email to use your guest passes. Unfilled slots are charged the full guest fee.
             </div>
+
+            {availablePartners.length > 0 && hasEmptySlot && (
+              <div className="mb-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className={`material-symbols-outlined text-sm ${isDark ? 'text-white/60' : 'text-primary/60'}`}>group</span>
+                  <span className={`text-[11px] font-bold uppercase tracking-[0.15em] ${isDark ? 'text-white/60' : 'text-primary/60'}`} style={{ fontFamily: 'var(--font-label)' }}>Recent Partners</span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {availablePartners.map(partner => (
+                    <button
+                      key={partner.id}
+                      type="button"
+                      onClick={() => handlePartnerSelect(partner)}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-fast active:scale-95 border ${
+                        isDark
+                          ? 'bg-white/5 border-white/15 text-white/80 hover:bg-white/10 hover:border-white/25'
+                          : 'bg-primary/5 border-primary/10 text-primary/80 hover:bg-primary/10 hover:border-primary/20'
+                      }`}
+                    >
+                      <span className="material-symbols-outlined text-sm" style={{ fontSize: '14px' }}>
+                        {partner.type === 'member' ? 'person' : 'person_add'}
+                      </span>
+                      {partner.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
           <div ref={slotListRef} className="space-y-4">
             {slots.map((slot, index) => {

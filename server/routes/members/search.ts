@@ -2,6 +2,7 @@ import { Router, Request } from 'express';
 import { sql, and } from 'drizzle-orm';
 import { db } from '../../db';
 import { users, staffUsers } from '../../../shared/schema';
+import { bookingParticipants, bookingSessions, resources, guests } from '../../../shared/models/scheduling';
 import { isStaffOrAdmin, isAuthenticated } from '../../core/middleware';
 import { logger } from '../../core/logger';
 import { getSessionUser } from '../../types/session';
@@ -511,6 +512,115 @@ router.get('/api/guests/search', isAuthenticated, validateQuery(guestSearchSchem
   } catch (error: unknown) {
     logger.error('Guest search error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to search guests' });
+  }
+});
+
+router.get('/api/members/frequent-partners', isAuthenticated, async (req, res) => {
+  try {
+    const sessionUser = getSessionUser(req);
+    if (!sessionUser?.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const userId = sessionUser.userId;
+    const userEmail = sessionUser.email?.toLowerCase();
+    const isStaff = sessionUser.isStaff || sessionUser.role === 'admin' || sessionUser.role === 'staff';
+
+    const memberPartners = await db.execute(sql`
+      WITH my_sessions AS (
+        SELECT DISTINCT bp.session_id
+        FROM booking_participants bp
+        JOIN booking_sessions bs ON bp.session_id = bs.id
+        JOIN resources r ON bs.resource_id = r.id
+        JOIN booking_requests br ON br.session_id = bs.id
+        WHERE bp.user_id = ${userId}
+          AND r.type = 'simulator'
+          AND br.status NOT IN ('cancelled', 'declined', 'cancellation_pending', 'deleted')
+          AND br.is_event = false
+      )
+      SELECT
+        u.id,
+        u.first_name,
+        u.last_name,
+        u.email,
+        u.tier,
+        u.membership_status,
+        COUNT(*)::int AS frequency,
+        'member' AS partner_type
+      FROM booking_participants bp
+      JOIN my_sessions ms ON bp.session_id = ms.session_id
+      JOIN users u ON bp.user_id = u.id
+      WHERE bp.user_id != ${userId}
+        AND bp.participant_type IN ('member', 'owner')
+        AND u.archived_at IS NULL
+        AND (u.membership_status IN ('active', 'trialing', 'past_due') OR u.stripe_subscription_id IS NOT NULL)
+        AND (u.tags IS NULL OR NOT (u.tags @> '["directory_hidden"]'::jsonb))
+        AND (u.do_not_sell_my_info IS NULL OR u.do_not_sell_my_info = false)
+      GROUP BY u.id, u.first_name, u.last_name, u.email, u.tier, u.membership_status
+      ORDER BY frequency DESC
+      LIMIT 10
+    `);
+
+    const createdByValue = userEmail || userId;
+    const guestPartners = await db.execute(sql`
+      SELECT
+        g.id,
+        g.name,
+        g.email,
+        COUNT(*)::int AS frequency,
+        'guest' AS partner_type
+      FROM booking_participants bp
+      JOIN booking_sessions bs ON bp.session_id = bs.id
+      JOIN resources r ON bs.resource_id = r.id
+      JOIN booking_requests br ON br.session_id = bs.id
+      JOIN guests g ON bp.guest_id = g.id
+      WHERE g.created_by_member_id = ${createdByValue}
+        AND r.type = 'simulator'
+        AND br.status NOT IN ('cancelled', 'declined', 'cancellation_pending', 'deleted')
+        AND br.is_event = false
+        AND g.name IS NOT NULL
+        AND g.email IS NOT NULL
+      GROUP BY g.id, g.name, g.email
+      ORDER BY frequency DESC
+      LIMIT 10
+    `);
+
+    type MemberRow = { id: string; first_name: string | null; last_name: string | null; email: string | null; tier: string | null; membership_status: string | null; frequency: number; partner_type: string };
+    type GuestRow = { id: number; name: string; email: string | null; frequency: number; partner_type: string };
+
+    const members = (memberPartners.rows as MemberRow[]).map(r => ({
+      id: r.id,
+      name: [r.first_name, r.last_name].filter(Boolean).join(' ') || 'Unknown',
+      email: isStaff ? r.email : undefined,
+      emailRedacted: redactEmail(r.email || ''),
+      tier: r.tier || undefined,
+      type: 'member' as const,
+      frequency: r.frequency,
+    }));
+
+    const guestResults = (guestPartners.rows as GuestRow[]).map(r => {
+      const parts = r.name.split(' ');
+      const firstName = parts[0] || '';
+      const lastName = parts.slice(1).join(' ') || '';
+      return {
+        id: `guest-${r.id}`,
+        name: r.name,
+        firstName,
+        lastName,
+        email: r.email || '',
+        emailRedacted: redactEmail(r.email || ''),
+        type: 'guest' as const,
+        frequency: r.frequency,
+      };
+    });
+
+    const combined = [...members, ...guestResults]
+      .sort((a, b) => b.frequency - a.frequency)
+      .slice(0, 10);
+
+    res.json(combined);
+  } catch (error: unknown) {
+    logger.error('Frequent partners error', { error: error instanceof Error ? error : new Error(String(error)) });
+    res.status(500).json({ error: 'Failed to fetch frequent partners' });
   }
 });
 
