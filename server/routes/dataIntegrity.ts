@@ -1129,7 +1129,7 @@ router.post('/api/data-integrity/fix/deactivate-stale-member', isAdmin, validate
 
     const result = await client.query(
       `UPDATE users 
-       SET membership_status = 'inactive', updated_at = NOW(),
+       SET membership_status = 'inactive', last_modified_at = CASE WHEN membership_status IS DISTINCT FROM 'inactive' THEN NOW() ELSE last_modified_at END, updated_at = NOW(),
            last_manual_fix_at = NOW(), last_manual_fix_by = $2
        WHERE id = $1 AND billing_provider = 'mindbody'
        RETURNING email, tier`,
@@ -1427,7 +1427,7 @@ router.post('/api/data-integrity/fix/activate-stuck-member', isAdmin, validateBo
 
     const result = await client.query(
       `UPDATE users 
-       SET membership_status = 'active', updated_at = NOW(),
+       SET membership_status = 'active', last_modified_at = CASE WHEN membership_status IS DISTINCT FROM 'active' THEN NOW() ELSE last_modified_at END, updated_at = NOW(),
            last_manual_fix_at = NOW(), last_manual_fix_by = $2
        WHERE id = $1 AND membership_status IN ('pending', 'non-member')
        RETURNING email, tier`,

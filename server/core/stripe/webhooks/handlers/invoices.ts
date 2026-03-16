@@ -311,6 +311,7 @@ export async function handleInvoicePaymentFailed(client: PoolClient, invoice: In
         WHEN membership_status = 'active' THEN 'past_due'
         ELSE membership_status 
       END,
+      last_modified_at = CASE WHEN membership_status = 'active' THEN NOW() ELSE last_modified_at END,
       updated_at = NOW()
     WHERE LOWER(email) = LOWER($1) AND grace_period_start IS NULL`,
     [email]

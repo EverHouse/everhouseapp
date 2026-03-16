@@ -177,6 +177,7 @@ export async function handleCheckoutSessionCompleted(client: PoolClient, session
           let updateResult = await client.query(
             `UPDATE users SET 
               membership_status = 'active',
+              last_modified_at = CASE WHEN membership_status IS DISTINCT FROM 'active' THEN NOW() ELSE last_modified_at END,
               stripe_customer_id = COALESCE(stripe_customer_id, $1),
               stripe_subscription_id = $2,
               billing_provider = 'stripe',
@@ -194,6 +195,7 @@ export async function handleCheckoutSessionCompleted(client: PoolClient, session
             updateResult = await client.query(
               `UPDATE users SET 
                 membership_status = 'active',
+                last_modified_at = CASE WHEN membership_status IS DISTINCT FROM 'active' THEN NOW() ELSE last_modified_at END,
                 stripe_customer_id = COALESCE(stripe_customer_id, $1),
                 stripe_subscription_id = $2,
                 billing_provider = 'stripe',
@@ -305,7 +307,7 @@ export async function handleCheckoutSessionCompleted(client: PoolClient, session
           return deferredActions;
         }
         const updateResult = await client.query(
-          `UPDATE users SET stripe_customer_id = $1, membership_status = 'active', billing_provider = 'stripe', archived_at = NULL, archived_by = NULL, updated_at = NOW() WHERE id = $2 AND (stripe_customer_id IS NULL OR stripe_customer_id = $1)`,
+          `UPDATE users SET stripe_customer_id = $1, membership_status = 'active', last_modified_at = CASE WHEN membership_status IS DISTINCT FROM 'active' THEN NOW() ELSE last_modified_at END, billing_provider = 'stripe', archived_at = NULL, archived_by = NULL, updated_at = NOW() WHERE id = $2 AND (stripe_customer_id IS NULL OR stripe_customer_id = $1)`,
           [customerId, resolved.userId]
         );
         if (updateResult.rowCount === 0) {
@@ -342,7 +344,7 @@ export async function handleCheckoutSessionCompleted(client: PoolClient, session
           logger.info(`[Stripe Webhook] User ${email} exists, updating Stripe customer ID and billing provider`);
           const preUpdateCheckDirect = await client.query('SELECT archived_at FROM users WHERE LOWER(email) = LOWER($1)', [email]);
           const updateResultDirect = await client.query(
-            `UPDATE users SET stripe_customer_id = $1, membership_status = 'active', billing_provider = 'stripe', archived_at = NULL, archived_by = NULL, updated_at = NOW() WHERE LOWER(email) = LOWER($2) AND (stripe_customer_id IS NULL OR stripe_customer_id = $1)`,
+            `UPDATE users SET stripe_customer_id = $1, membership_status = 'active', last_modified_at = CASE WHEN membership_status IS DISTINCT FROM 'active' THEN NOW() ELSE last_modified_at END, billing_provider = 'stripe', archived_at = NULL, archived_by = NULL, updated_at = NOW() WHERE LOWER(email) = LOWER($2) AND (stripe_customer_id IS NULL OR stripe_customer_id = $1)`,
             [customerId, email]
           );
           if (updateResultDirect.rowCount === 0) {
@@ -389,6 +391,7 @@ export async function handleCheckoutSessionCompleted(client: PoolClient, session
              stripe_customer_id = EXCLUDED.stripe_customer_id,
              billing_provider = 'stripe',
              membership_status = 'active',
+             last_modified_at = CASE WHEN users.membership_status IS DISTINCT FROM 'active' THEN NOW() ELSE users.last_modified_at END,
              role = 'member',
              archived_at = NULL,
              archived_by = NULL,

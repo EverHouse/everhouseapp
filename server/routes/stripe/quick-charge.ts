@@ -964,7 +964,7 @@ router.post('/api/stripe/staff/charge-subscription-invoice', isStaffOrAdmin, val
     });
 
     if (paidInvoice.status === 'paid') {
-      await db.execute(sql`UPDATE users SET membership_status = 'active', billing_provider = 'stripe', archived_at = NULL, archived_by = NULL, updated_at = NOW() WHERE id = ${userId}`);
+      await db.execute(sql`UPDATE users SET membership_status = 'active', last_modified_at = CASE WHEN membership_status IS DISTINCT FROM 'active' THEN NOW() ELSE last_modified_at END, billing_provider = 'stripe', archived_at = NULL, archived_by = NULL, updated_at = NOW() WHERE id = ${userId}`);
     }
 
     logFromRequest(req, 'charge_subscription_invoice', 'payment', invoice.id, userEmail as string, {

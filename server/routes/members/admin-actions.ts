@@ -83,7 +83,7 @@ router.patch('/api/members/:email/tier', isStaffOrAdmin, validateBody(tierChange
         );
       } else {
         await client.query(
-          'UPDATE users SET last_tier = tier, tier = NULL, membership_status = $1, updated_at = $2, last_manual_fix_at = NOW(), last_manual_fix_by = $3 WHERE LOWER(email) = $4',
+          'UPDATE users SET last_tier = tier, tier = NULL, membership_status = $1, last_modified_at = CASE WHEN membership_status IS DISTINCT FROM $1 THEN NOW() ELSE last_modified_at END, updated_at = $2, last_manual_fix_at = NOW(), last_manual_fix_by = $3 WHERE LOWER(email) = $4',
           ['non-member', new Date(), sessionUser?.email || 'unknown', normalizedEmail]
         );
       }
@@ -257,7 +257,7 @@ router.post('/api/members/:id/suspend', isStaffOrAdmin, async (req, res) => {
       try {
         await client.query('BEGIN');
         await client.query(
-          'UPDATE users SET membership_status = $1, updated_at = $2 WHERE id = $3',
+          'UPDATE users SET membership_status = $1, last_modified_at = CASE WHEN membership_status IS DISTINCT FROM $1 THEN NOW() ELSE last_modified_at END, updated_at = $2 WHERE id = $3',
           ['suspended', new Date(), id]
         );
         await client.query('COMMIT');
@@ -286,7 +286,7 @@ router.post('/api/members/:id/suspend', isStaffOrAdmin, async (req, res) => {
       try {
         await client.query('BEGIN');
         await client.query(
-          'UPDATE users SET membership_status = $1, billing_provider = \'stripe\', updated_at = $2 WHERE id = $3',
+          'UPDATE users SET membership_status = $1, last_modified_at = CASE WHEN membership_status IS DISTINCT FROM $1 THEN NOW() ELSE last_modified_at END, billing_provider = \'stripe\', updated_at = $2 WHERE id = $3',
           ['suspended', new Date(), id]
         );
         await client.query('COMMIT');
@@ -429,7 +429,7 @@ router.delete('/api/members/:email', isStaffOrAdmin, async (req, res) => {
       await client.query('BEGIN');
 
       await client.query(
-        'UPDATE users SET archived_at = $1, archived_by = $2, membership_status = $3, id_image_url = $4, updated_at = $5 WHERE LOWER(email) = $6',
+        'UPDATE users SET archived_at = $1, archived_by = $2, membership_status = $3, last_modified_at = CASE WHEN membership_status IS DISTINCT FROM $3 THEN NOW() ELSE last_modified_at END, id_image_url = $4, updated_at = $5 WHERE LOWER(email) = $6',
         [new Date(), archivedBy, 'archived', null, new Date(), normalizedEmail]
       );
 

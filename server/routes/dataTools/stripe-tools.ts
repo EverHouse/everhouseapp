@@ -169,7 +169,7 @@ router.post('/api/data-tools/sync-subscription-status', isAdmin, async (req: Req
             
             if (!dryRun) {
               await db.execute(sql`UPDATE users 
-                 SET membership_status = ${expectedAppStatus}, billing_provider = 'stripe', updated_at = NOW() 
+                 SET membership_status = ${expectedAppStatus}, last_modified_at = CASE WHEN membership_status IS DISTINCT FROM ${expectedAppStatus} THEN NOW() ELSE last_modified_at END, billing_provider = 'stripe', updated_at = NOW() 
                  WHERE id = ${member.id}`);
               
               try {

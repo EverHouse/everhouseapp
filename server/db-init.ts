@@ -1420,7 +1420,7 @@ export async function setupInstantDataTriggers(): Promise<void> {
       BEGIN
         IF NEW.is_active = true THEN
           UPDATE public.users
-          SET role = NEW.role, tier = 'VIP', membership_status = 'active', updated_at = NOW()
+          SET role = NEW.role, tier = 'VIP', membership_status = 'active', last_modified_at = CASE WHEN membership_status IS DISTINCT FROM 'active' THEN NOW() ELSE last_modified_at END, updated_at = NOW()
           WHERE LOWER(email) = LOWER(NEW.email)
             AND role NOT IN ('admin', 'staff', 'golf_instructor');
         END IF;

@@ -205,6 +205,7 @@ export async function reconcileSubscriptions() {
           if (resolved && resolved.matchType !== 'direct') {
             await db.execute(sql`UPDATE users SET stripe_customer_id = ${customer.id}, stripe_subscription_id = ${subscription.id},
                membership_status = 'active',
+               last_modified_at = CASE WHEN membership_status IS DISTINCT FROM 'active' THEN NOW() ELSE last_modified_at END,
                billing_provider = CASE WHEN billing_provider IN ('mindbody', 'manual', 'comped') THEN billing_provider ELSE 'stripe' END,
                tier = COALESCE(${tierSlug}, tier), updated_at = NOW()
                WHERE id = ${resolved.userId}`);
@@ -221,6 +222,7 @@ export async function reconcileSubscriptions() {
                stripe_customer_id = EXCLUDED.stripe_customer_id,
                stripe_subscription_id = EXCLUDED.stripe_subscription_id,
                membership_status = 'active',
+               last_modified_at = CASE WHEN users.membership_status IS DISTINCT FROM 'active' THEN NOW() ELSE users.last_modified_at END,
                billing_provider = CASE WHEN users.billing_provider IN ('mindbody', 'manual', 'comped') THEN users.billing_provider ELSE 'stripe' END,
                tier = COALESCE(EXCLUDED.tier, users.tier),
                updated_at = NOW()`);

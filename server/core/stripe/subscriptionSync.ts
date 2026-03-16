@@ -251,6 +251,7 @@ export async function syncActiveSubscriptionsFromStripe(): Promise<SubscriptionS
                      stripe_subscription_id = ${stripeSubscriptionId}, 
                      tier = ${tier},
                      membership_status = 'active',
+                     last_modified_at = CASE WHEN membership_status IS DISTINCT FROM 'active' THEN NOW() ELSE last_modified_at END,
                      billing_provider = CASE WHEN billing_provider IN ('mindbody', 'manual', 'comped') THEN billing_provider ELSE 'stripe' END,
                      hubspot_id = COALESCE(${hubspotId}, hubspot_id),
                      grace_period_start = NULL,
@@ -306,6 +307,7 @@ export async function syncActiveSubscriptionsFromStripe(): Promise<SubscriptionS
             if (resolved) {
               await db.execute(sql`UPDATE users SET stripe_customer_id = ${stripeCustomerId}, stripe_subscription_id = ${stripeSubscriptionId}, 
                  membership_status = 'active',
+                 last_modified_at = CASE WHEN membership_status IS DISTINCT FROM 'active' THEN NOW() ELSE last_modified_at END,
                  billing_provider = CASE WHEN billing_provider IN ('mindbody', 'manual', 'comped') THEN billing_provider ELSE 'stripe' END,
                  data_source = 'stripe_sync',
                  tier = COALESCE(${tier}, tier), hubspot_id = COALESCE(${hubspotId}, hubspot_id),

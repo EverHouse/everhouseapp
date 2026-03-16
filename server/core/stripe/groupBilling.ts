@@ -563,6 +563,7 @@ export async function addGroupMember(params: {
             sql`tier = ${normalizedTier}`,
             sql`billing_provider = 'stripe'`,
             sql`membership_status = 'active'`,
+            sql`last_modified_at = CASE WHEN membership_status IS DISTINCT FROM 'active' THEN NOW() ELSE last_modified_at END`,
             sql`updated_at = NOW()`
           ];
           
@@ -656,7 +657,7 @@ export async function addGroupMember(params: {
               sql`UPDATE group_members SET is_active = false, removed_at = NOW() WHERE id = ${insertedMemberId}`
             );
             await db.execute(
-              sql`UPDATE users SET billing_group_id = NULL, membership_status = CASE WHEN billing_group_id = ${params.billingGroupId} THEN 'pending' ELSE membership_status END, tier = CASE WHEN billing_group_id = ${params.billingGroupId} THEN NULL ELSE tier END WHERE LOWER(email) = ${params.memberEmail.toLowerCase()} AND billing_group_id = ${params.billingGroupId}`
+              sql`UPDATE users SET billing_group_id = NULL, membership_status = CASE WHEN billing_group_id = ${params.billingGroupId} THEN 'pending' ELSE membership_status END, last_modified_at = CASE WHEN billing_group_id = ${params.billingGroupId} AND membership_status IS DISTINCT FROM 'pending' THEN NOW() ELSE last_modified_at END, tier = CASE WHEN billing_group_id = ${params.billingGroupId} THEN NULL ELSE tier END WHERE LOWER(email) = ${params.memberEmail.toLowerCase()} AND billing_group_id = ${params.billingGroupId}`
             );
           } catch (compensateErr: unknown) {
             logger.error(`[GroupBilling] CRITICAL: Failed to compensate DB after Stripe failure. Manual intervention required.`, { error: compensateErr });
@@ -824,7 +825,8 @@ export async function addCorporateMember(params: {
             sql`billing_group_id = ${params.billingGroupId}`,
             sql`tier = ${normalizedTier}`,
             sql`billing_provider = 'stripe'`,
-            sql`membership_status = 'active'`
+            sql`membership_status = 'active'`,
+            sql`last_modified_at = CASE WHEN membership_status IS DISTINCT FROM 'active' THEN NOW() ELSE last_modified_at END`
           ];
         
           if (params.firstName) setFragments.push(sql`first_name = ${params.firstName}`);
@@ -935,7 +937,7 @@ export async function addCorporateMember(params: {
               sql`UPDATE group_members SET is_active = false, removed_at = NOW() WHERE id = ${insertedMemberId}`
             );
             await db.execute(
-              sql`UPDATE users SET billing_group_id = NULL, membership_status = CASE WHEN billing_group_id = ${params.billingGroupId} THEN 'pending' ELSE membership_status END, tier = CASE WHEN billing_group_id = ${params.billingGroupId} THEN NULL ELSE tier END WHERE LOWER(email) = ${params.memberEmail.toLowerCase()} AND billing_group_id = ${params.billingGroupId}`
+              sql`UPDATE users SET billing_group_id = NULL, membership_status = CASE WHEN billing_group_id = ${params.billingGroupId} THEN 'pending' ELSE membership_status END, last_modified_at = CASE WHEN billing_group_id = ${params.billingGroupId} AND membership_status IS DISTINCT FROM 'pending' THEN NOW() ELSE last_modified_at END, tier = CASE WHEN billing_group_id = ${params.billingGroupId} THEN NULL ELSE tier END WHERE LOWER(email) = ${params.memberEmail.toLowerCase()} AND billing_group_id = ${params.billingGroupId}`
             );
           } catch (compensateErr: unknown) {
             logger.error(`[GroupBilling] CRITICAL: Failed to compensate DB after Stripe failure. Manual intervention required.`, { error: compensateErr });
@@ -1007,7 +1009,7 @@ export async function removeCorporateMember(params: {
       );
     
       await tx.execute(
-        sql`UPDATE users SET billing_group_id = NULL, membership_status = 'cancelled', last_tier = tier, tier = NULL, updated_at = NOW() WHERE LOWER(email) = ${params.memberEmail.toLowerCase()}`
+        sql`UPDATE users SET billing_group_id = NULL, membership_status = 'cancelled', last_modified_at = CASE WHEN membership_status IS DISTINCT FROM 'cancelled' THEN NOW() ELSE last_modified_at END, last_tier = tier, tier = NULL, updated_at = NOW() WHERE LOWER(email) = ${params.memberEmail.toLowerCase()}`
       );
     
       if (group.length > 0 && group[0].primary_stripe_subscription_id) {
@@ -1089,7 +1091,7 @@ export async function removeCorporateMember(params: {
             sql`UPDATE group_members SET is_active = true, removed_at = NULL WHERE id = ${memberId}`
           );
           await db.execute(
-            sql`UPDATE users SET billing_group_id = ${params.billingGroupId}, membership_status = 'active', tier = last_tier, last_tier = NULL, updated_at = NOW() WHERE LOWER(email) = ${params.memberEmail.toLowerCase()}`
+            sql`UPDATE users SET billing_group_id = ${params.billingGroupId}, membership_status = 'active', last_modified_at = CASE WHEN membership_status IS DISTINCT FROM 'active' THEN NOW() ELSE last_modified_at END, tier = last_tier, last_tier = NULL, updated_at = NOW() WHERE LOWER(email) = ${params.memberEmail.toLowerCase()}`
           );
         } catch (compensateErr: unknown) {
           logger.error(`[GroupBilling] CRITICAL: Failed to compensate DB after Stripe failure. Manual intervention required.`, { error: compensateErr });
@@ -1145,7 +1147,7 @@ export async function removeGroupMember(params: {
       );
     
       await tx.execute(
-        sql`UPDATE users SET billing_group_id = NULL, membership_status = 'cancelled', last_tier = tier, tier = NULL, updated_at = NOW() WHERE LOWER(email) = ${memberEmail}`
+        sql`UPDATE users SET billing_group_id = NULL, membership_status = 'cancelled', last_modified_at = CASE WHEN membership_status IS DISTINCT FROM 'cancelled' THEN NOW() ELSE last_modified_at END, last_tier = tier, tier = NULL, updated_at = NOW() WHERE LOWER(email) = ${memberEmail}`
       );
     });
     
@@ -1162,7 +1164,7 @@ export async function removeGroupMember(params: {
           );
           if (memberEmail && billingGroupId) {
             await db.execute(
-              sql`UPDATE users SET billing_group_id = ${billingGroupId}, membership_status = 'active', tier = last_tier, last_tier = NULL, updated_at = NOW() WHERE LOWER(email) = ${memberEmail}`
+              sql`UPDATE users SET billing_group_id = ${billingGroupId}, membership_status = 'active', last_modified_at = CASE WHEN membership_status IS DISTINCT FROM 'active' THEN NOW() ELSE last_modified_at END, tier = last_tier, last_tier = NULL, updated_at = NOW() WHERE LOWER(email) = ${memberEmail}`
             );
           }
         } catch (compensateErr: unknown) {
@@ -1680,6 +1682,7 @@ export async function handlePrimarySubscriptionCancelled(subscriptionId: string)
           sql`UPDATE users SET 
              billing_group_id = NULL,
              membership_status = 'cancelled',
+             last_modified_at = CASE WHEN membership_status IS DISTINCT FROM 'cancelled' THEN NOW() ELSE last_modified_at END,
              billing_provider = 'stripe',
              last_tier = tier,
              tier = NULL,

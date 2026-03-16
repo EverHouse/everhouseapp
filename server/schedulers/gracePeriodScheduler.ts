@@ -117,6 +117,7 @@ async function processGracePeriodMembers(): Promise<void> {
                 last_tier = tier,
                 tier = NULL,
                 membership_status = 'terminated',
+                last_modified_at = CASE WHEN membership_status IS DISTINCT FROM 'terminated' THEN NOW() ELSE last_modified_at END,
                 grace_period_start = NULL,
                 grace_period_email_count = 0,
                 updated_at = NOW()
