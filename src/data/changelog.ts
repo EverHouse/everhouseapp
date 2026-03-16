@@ -8,6 +8,14 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.87.50",
+    date: "2026-03-16",
+    title: "Deployment Reliability Fix",
+    changes: [
+      "Fixed: Deployments no longer fail due to migration tracking — the build step now automatically registers all existing database migrations so the platform doesn't try to re-apply them from scratch",
+    ]
+  },
+  {
     version: "8.87.49",
     date: "2026-03-16",
     title: "Bug Fixes & Performance",
