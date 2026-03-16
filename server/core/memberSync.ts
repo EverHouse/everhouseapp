@@ -553,9 +553,9 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
                 tags: tags.length > 0 ? tags : sql`${users.tags}`,
                 hubspotId: contact.id,
                 membershipStatus: isStatusProtected ? sql`${users.membershipStatus}` : status,
-                membershipStatusChangedAt: (!isStatusProtected && oldStatus && oldStatus !== status)
+                lastModifiedAt: (!isStatusProtected && oldStatus && oldStatus !== status)
                   ? (statusChangedDate ? sql`${statusChangedDate}` : sql`NOW()`)
-                  : sql`${users.membershipStatusChangedAt}`,
+                  : sql`${users.lastModifiedAt}`,
                 billingProvider: isMindBodyDeactivation ? sql`'stripe'` : sql`${users.billingProvider}`,
                 role: isVisitorProtected ? sql`${users.role}` : sql`COALESCE(${users.role}, 'member')`,
                 mindbodyClientId: contact.properties.mindbody_client_id || null,
@@ -1158,9 +1158,9 @@ export async function syncRelevantMembersFromHubSpot(): Promise<{ synced: number
                 tags: tags.length > 0 ? tags : sql`${users.tags}`,
                 hubspotId: contact.id,
                 membershipStatus: isStatusProtected ? sql`${users.membershipStatus}` : status,
-                membershipStatusChangedAt: (!isStatusProtected && oldStatus && oldStatus !== status)
+                lastModifiedAt: (!isStatusProtected && oldStatus && oldStatus !== status)
                   ? (statusChangedDate ? sql`${statusChangedDate}` : sql`NOW()`)
-                  : sql`${users.membershipStatusChangedAt}`,
+                  : sql`${users.lastModifiedAt}`,
                 billingProvider: isMindBodyDeactivation ? sql`'stripe'` : sql`${users.billingProvider}`,
                 role: isVisitorProtected ? sql`${users.role}` : sql`COALESCE(${users.role}, 'member')`,
                 mindbodyClientId: contact.properties.mindbody_client_id || null,

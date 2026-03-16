@@ -92,7 +92,7 @@ export interface MemberProfile {
   firstName?: string | null;
   lastName?: string | null;
   userId?: string;
-  membershipStatusChangedAt?: string | null;
+  lastModifiedAt?: string | null;
 }
 
 export interface Booking {

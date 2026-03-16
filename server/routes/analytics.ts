@@ -454,14 +454,14 @@ router.get('/api/analytics/membership-insights', isStaffOrAdmin, async (_req: Re
         ),
         churns AS (
           SELECT
-            TO_CHAR(DATE_TRUNC('month', COALESCE(membership_status_changed_at, cancellation_effective_date::timestamp)), 'YYYY-MM') AS month,
+            TO_CHAR(DATE_TRUNC('month', COALESCE(last_modified_at, cancellation_effective_date::timestamp)), 'YYYY-MM') AS month,
             COUNT(*)::int AS lost_members
           FROM users
           WHERE role = 'member'
             AND membership_status IN ('terminated', 'expired', 'suspended', 'inactive')
-            AND COALESCE(membership_status_changed_at, cancellation_effective_date::timestamp) IS NOT NULL
-            AND COALESCE(membership_status_changed_at, cancellation_effective_date::timestamp) >= DATE_TRUNC('month', CURRENT_DATE - INTERVAL '5 months')
-          GROUP BY DATE_TRUNC('month', COALESCE(membership_status_changed_at, cancellation_effective_date::timestamp))
+            AND COALESCE(last_modified_at, cancellation_effective_date::timestamp) IS NOT NULL
+            AND COALESCE(last_modified_at, cancellation_effective_date::timestamp) >= DATE_TRUNC('month', CURRENT_DATE - INTERVAL '5 months')
+          GROUP BY DATE_TRUNC('month', COALESCE(last_modified_at, cancellation_effective_date::timestamp))
         )
         SELECT m.month, COALESCE(c.lost_members, 0)::int AS lost_members
         FROM months m

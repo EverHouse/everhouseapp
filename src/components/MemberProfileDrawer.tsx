@@ -1068,9 +1068,9 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
                   Joined {formatDatePacific(enrichedMember.joinDate)}
                 </span>
               )}
-              {enrichedMember.membershipStatusChangedAt && (
+              {enrichedMember.lastModifiedAt && (
                 <span className={isDark ? 'text-gray-400' : 'text-gray-500'}>
-                  Modified {formatDatePacific(enrichedMember.membershipStatusChangedAt)}
+                  Modified {formatDatePacific(enrichedMember.lastModifiedAt)}
                 </span>
               )}
             </div>

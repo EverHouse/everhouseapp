@@ -358,7 +358,7 @@ export async function handleChargeDisputeCreated(client: PoolClient, dispute: St
         logger.info(`[Stripe Webhook] Skipping charge.dispute.created for ${terminalPayment.user_email} — billing_provider is '${disputeBillingProvider}', not 'stripe'`);
       } else {
         await client.query(
-          `UPDATE users SET membership_status = 'suspended', membership_status_changed_at = CASE WHEN membership_status IS DISTINCT FROM 'suspended' THEN NOW() ELSE membership_status_changed_at END, billing_provider = 'stripe', updated_at = NOW() WHERE id = $1`,
+          `UPDATE users SET membership_status = 'suspended', last_modified_at = CASE WHEN membership_status IS DISTINCT FROM 'suspended' THEN NOW() ELSE last_modified_at END, billing_provider = 'stripe', updated_at = NOW() WHERE id = $1`,
           [terminalPayment.user_id]
         );
         logger.info(`[Stripe Webhook] Suspended membership for user ${terminalPayment.user_id} due to payment dispute`);
