@@ -37,15 +37,14 @@ async function syncMigrationTracking() {
     await client.query(`
       CREATE TABLE IF NOT EXISTS drizzle."__drizzle_migrations" (
         id serial PRIMARY KEY,
-        hash text NOT NULL UNIQUE,
+        hash text NOT NULL,
         created_at bigint
       )
     `);
 
-    await client.query(`
-      ALTER TABLE drizzle."__drizzle_migrations"
-        ADD CONSTRAINT IF NOT EXISTS "__drizzle_migrations_hash_unique" UNIQUE (hash)
-    `).catch(() => {});
+    await client.query(
+      `CREATE UNIQUE INDEX IF NOT EXISTS drizzle_migrations_hash_idx ON drizzle."__drizzle_migrations" (hash)`
+    );
 
     const existing = await client.query<{ hash: string }>(
       `SELECT hash FROM drizzle."__drizzle_migrations"`
@@ -72,7 +71,7 @@ async function syncMigrationTracking() {
       }
 
       await client.query(
-        `INSERT INTO drizzle."__drizzle_migrations" (hash, created_at) VALUES ($1, $2) ON CONFLICT (hash) DO NOTHING`,
+        `INSERT INTO drizzle."__drizzle_migrations" (hash, created_at) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
         [hash, entry.when]
       );
       existingHashes.add(hash);
