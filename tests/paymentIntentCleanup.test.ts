@@ -210,7 +210,7 @@ function findSqlCallsContaining(needle: string) {
 }
 
 interface RouteLayer {
-  route?: { path: string; stack: Array<{ method: string; handle: Function }> };
+  route?: { path: string; stack: Array<{ method: string; handle: (...args: unknown[]) => unknown }> };
 }
 
 async function invokeMemberCancel(req: ReturnType<typeof makeReq>, res: ReturnType<typeof makeRes>): Promise<void> {
@@ -502,7 +502,7 @@ describe('Payment Intent Cleanup Integration Tests', () => {
         return Promise.resolve({ rows: [], rowCount: 0 });
       };
 
-      mockTransaction.mockImplementation(async (fn: Function) => fn({ execute: vi.fn().mockImplementation(txExecuteHandler) }));
+      mockTransaction.mockImplementation(async (fn: (tx: { execute: ReturnType<typeof vi.fn> }) => unknown) => fn({ execute: vi.fn().mockImplementation(txExecuteHandler) }));
 
       mockExecute.mockImplementation((query: unknown) => {
         const q = query as { __sqlStrings?: string[] };
@@ -583,7 +583,7 @@ describe('Payment Intent Cleanup Integration Tests', () => {
         return { from: vi.fn().mockReturnThis(), where: vi.fn().mockResolvedValue([{ name: 'Bay 1' }]) };
       });
 
-      mockTransaction.mockImplementation(async (fn: Function) => fn({
+      mockTransaction.mockImplementation(async (fn: (tx: { execute: ReturnType<typeof vi.fn> }) => unknown) => fn({
         execute: vi.fn().mockImplementation((query: unknown) => {
           const q = query as { __sqlStrings?: string[] };
           if (q?.__sqlStrings?.some(s => s.includes('guest_pass_holds'))) return Promise.resolve({ rows: [] });

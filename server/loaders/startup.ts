@@ -178,26 +178,20 @@ export async function runStartupTasks(): Promise<void> {
       };
       process.stdout.write = ((chunk: string | Buffer, encodingOrCb?: BufferEncoding | ((err?: Error | null) => void), cb?: (err?: Error | null) => void) => {
         if (isStripeSyncNoise(chunk)) return true;
-        return (origStdoutWrite as Function).call(process.stdout, chunk, encodingOrCb, cb);
+        return origStdoutWrite!.call(process.stdout, chunk, encodingOrCb as BufferEncoding, cb);
       }) as typeof process.stdout.write;
       process.stderr.write = ((chunk: string | Buffer, encodingOrCb?: BufferEncoding | ((err?: Error | null) => void), cb?: (err?: Error | null) => void) => {
         if (isStripeSyncNoise(chunk)) return true;
-        return (origStderrWrite as Function).call(process.stderr, chunk, encodingOrCb, cb);
+        return origStderrWrite!.call(process.stderr, chunk, encodingOrCb as BufferEncoding, cb);
       }) as typeof process.stderr.write;
 
-      let stripeSync: unknown;
-      try {
-        stripeSync = await retryWithBackoff(() => getStripeSync(), 'Stripe sync init');
-      } catch (e) {
-        throw e;
-      }
+      const stripeSync: unknown = await retryWithBackoff(() => getStripeSync(), 'Stripe sync init');
       
       const replitDomains = process.env.REPLIT_DOMAINS?.split(',')[0];
       if (replitDomains) {
         const webhookUrl = `https://${replitDomains}/api/stripe/webhook`;
         logger.info('[Stripe] Setting up managed webhook...');
-        let result: unknown;
-        result = await retryWithBackoff(() => (stripeSync as unknown as { findOrCreateManagedWebhook: (url: string) => Promise<unknown> }).findOrCreateManagedWebhook(webhookUrl), 'Stripe webhook setup');
+        const result = await retryWithBackoff(() => (stripeSync as unknown as { findOrCreateManagedWebhook: (url: string) => Promise<unknown> }).findOrCreateManagedWebhook(webhookUrl), 'Stripe webhook setup');
         logger.info('[Stripe] Webhook configured');
 
         const requiredEvents = [
@@ -384,7 +378,7 @@ export async function runStartupTasks(): Promise<void> {
         .catch((err: unknown) => logger.error('[Stripe] Customer sync failed', { error: err instanceof Error ? err : new Error(String(err)) }));
     }
   } catch (err: unknown) {
-    try { if (origStdoutWrite) process.stdout.write = origStdoutWrite; if (origStderrWrite) process.stderr.write = origStderrWrite; } catch {}
+    try { if (origStdoutWrite) process.stdout.write = origStdoutWrite; if (origStderrWrite) process.stderr.write = origStderrWrite; } catch { /* restore best-effort */ }
     logger.error('[Stripe] Initialization failed', { error: err instanceof Error ? err : new Error(String(err)) });
     startupHealth.stripe = 'failed';
     startupHealth.criticalFailures.push(`Stripe initialization: ${getErrorMessage(err)}`);
