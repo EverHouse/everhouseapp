@@ -477,7 +477,7 @@ export function useCommandCenterData(userEmail?: string) {
 
   const updateTodaysBookings = useCallback((updater: (prev: BookingRequest[]) => BookingRequest[]) => {
     queryClient.setQueryData(
-      commandCenterKeys.todaysBookings(today, weekAhead),
+      simulatorKeys.approvedBookings(today, weekAhead),
       (old: BookingRequest[] | undefined) => {
         if (!old) return old;
         return updater(old);

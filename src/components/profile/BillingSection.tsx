@@ -1,6 +1,8 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '../Toast';
 import { useAuthData } from '../../contexts/DataContext';
+import { fetchWithCredentials } from '../../hooks/queries/useFetch';
 
 interface BillingInfo {
   billingProvider: 'stripe' | 'mindbody' | 'family_addon' | 'comped' | null;
@@ -36,6 +38,10 @@ interface BillingInfo {
   };
 }
 
+interface InvoiceData {
+  invoices: Invoice[];
+}
+
 interface Invoice {
   id: string;
   number: string;
@@ -47,6 +53,12 @@ interface Invoice {
   invoicePdf: string;
 }
 
+export const billingKeys = {
+  all: ['billing'] as const,
+  info: (email?: string) => [...billingKeys.all, 'info', email] as const,
+  invoices: (email?: string) => [...billingKeys.all, 'invoices', email] as const,
+};
+
 interface Props {
   isDark: boolean;
 }
@@ -54,40 +66,39 @@ interface Props {
 export default function BillingSection({ isDark }: Props) {
   const { showToast } = useToast();
   const { viewAsUser } = useAuthData();
-  const [billingInfo, setBillingInfo] = useState<BillingInfo | null>(null);
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [showInvoices, setShowInvoices] = useState(false);
   const [updatingPayment, setUpdatingPayment] = useState(false);
   const [openingPortal, setOpeningPortal] = useState(false);
   const [migratingPayment, setMigratingPayment] = useState(false);
 
-  const fetchBillingData = useCallback(() => {
-    const emailParam = viewAsUser?.email ? `?email=${encodeURIComponent(viewAsUser.email)}` : '';
-    Promise.all([
-      fetch(`/api/my/billing${emailParam}`, { credentials: 'include' }).then(r => r.ok ? r.json() : null),
-      fetch(`/api/my/billing/invoices${emailParam}`, { credentials: 'include' }).then(r => r.ok ? r.json() : { invoices: [] }),
-    ]).then(([billing, invoiceData]) => {
-      setBillingInfo(billing);
-      setInvoices(invoiceData?.invoices || []);
-    }).catch((err: unknown) => { console.warn('[BillingSection] Failed to fetch billing data:', err); })
-    .finally(() => setLoading(false));
-  }, [viewAsUser?.email]);
+  const emailParam = viewAsUser?.email ? `?email=${encodeURIComponent(viewAsUser.email)}` : '';
 
-  useEffect(() => {
-    fetchBillingData();
-  }, [viewAsUser?.email, fetchBillingData]);
+  const { data: billingInfo = null, isLoading: billingLoading } = useQuery({
+    queryKey: billingKeys.info(viewAsUser?.email),
+    queryFn: () => fetchWithCredentials<BillingInfo>(`/api/my/billing${emailParam}`),
+    staleTime: 1000 * 60 * 2,
+  });
+
+  const { data: invoiceData } = useQuery({
+    queryKey: billingKeys.invoices(viewAsUser?.email),
+    queryFn: () => fetchWithCredentials<InvoiceData>(`/api/my/billing/invoices${emailParam}`),
+    staleTime: 1000 * 60 * 2,
+  });
+
+  const invoices = invoiceData?.invoices ?? [];
+  const loading = billingLoading;
 
   useEffect(() => {
     const handleBillingUpdate = () => {
-      fetchBillingData();
+      queryClient.invalidateQueries({ queryKey: billingKeys.all });
     };
 
     window.addEventListener('billing-update', handleBillingUpdate);
     return () => {
       window.removeEventListener('billing-update', handleBillingUpdate);
     };
-  }, [viewAsUser?.email, fetchBillingData]);
+  }, [queryClient]);
 
   const handleUpdatePaymentMethod = async () => {
     setUpdatingPayment(true);

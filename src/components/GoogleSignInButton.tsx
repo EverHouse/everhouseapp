@@ -51,6 +51,11 @@ function ensureGoogleScript(): Promise<void> {
   });
 }
 
+// NOTE: For Google Sign-In to work in development, the current Replit dev domain
+// must be added to the Google Cloud Console authorized JavaScript origins for the
+// client ID specified in VITE_GOOGLE_CLIENT_ID. Production domain (everclub.app)
+// must also be listed there. Without this, the browser will show:
+// "The given origin is not allowed for the given client ID"
 const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({ 
   onSuccess, 
   onError, 

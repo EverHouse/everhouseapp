@@ -1,14 +1,11 @@
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { fetchWithCredentials } from './useFetch';
 import { getTodayPacific, addDaysToPacificDate } from '../../utils/dateUtils';
+import { simulatorKeys } from './useBookingsQueries';
 import type { BookingRequest, Tour, DBEvent, WellnessClass, Closure, RecentActivity, StaffNotification, Announcement } from '../../components/staff-command-center/types';
 
 export const commandCenterKeys = {
   all: ['command-center'] as const,
-  todaysBookings: (startDate: string, endDate: string) =>
-    [...commandCenterKeys.all, 'todays-bookings', startDate, endDate] as const,
-  upcomingBookings: (startDate: string, endDate: string) =>
-    [...commandCenterKeys.all, 'upcoming-bookings', startDate, endDate] as const,
   pendingRequests: () => [...commandCenterKeys.all, 'pending-requests'] as const,
   scheduling: () => [...commandCenterKeys.all, 'scheduling'] as const,
   facility: () => [...commandCenterKeys.all, 'facility'] as const,
@@ -23,13 +20,13 @@ export function useCommandCenterTodaysBookings() {
   const weekAhead = addDaysToPacificDate(today, 7);
 
   return useQuery({
-    queryKey: commandCenterKeys.todaysBookings(today, weekAhead),
+    queryKey: simulatorKeys.approvedBookings(today, weekAhead),
     queryFn: () =>
       fetchWithCredentials<BookingRequest[]>(
         `/api/approved-bookings?start_date=${today}&end_date=${weekAhead}`
       ),
     placeholderData: keepPreviousData,
-    staleTime: 1000 * 60 * 2,
+    staleTime: 1000 * 30,
   });
 }
 
@@ -38,13 +35,13 @@ export function useCommandCenterUpcomingBookings() {
   const futureDate = addDaysToPacificDate(today, 30);
 
   return useQuery({
-    queryKey: commandCenterKeys.upcomingBookings(today, futureDate),
+    queryKey: simulatorKeys.approvedBookings(today, futureDate),
     queryFn: () =>
       fetchWithCredentials<BookingRequest[]>(
         `/api/approved-bookings?start_date=${today}&end_date=${futureDate}`
       ),
     placeholderData: keepPreviousData,
-    staleTime: 1000 * 60 * 2,
+    staleTime: 1000 * 30,
   });
 }
 
