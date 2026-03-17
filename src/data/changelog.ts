@@ -8,6 +8,14 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.87.51",
+    date: "2026-03-17",
+    title: "Deployment Migration Fix",
+    changes: [
+      "Fixed: Deployment no longer fails with foreign key constraint errors — all missing database constraints now have proper migration files that clean up orphaned data before adding constraints",
+    ]
+  },
+  {
     version: "8.87.50",
     date: "2026-03-16",
     title: "Deployment Reliability Fix",

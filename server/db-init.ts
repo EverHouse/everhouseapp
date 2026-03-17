@@ -711,49 +711,7 @@ export async function ensureDatabaseConstraints() {
       logger.warn(`[DB Init] Skipping HubSpot ID unique index: ${getErrorMessage(err)}`);
     }
 
-    try {
-      await db.execute(sql`
-        DO $$
-        BEGIN
-          ALTER TABLE booking_fee_snapshots
-            DROP CONSTRAINT IF EXISTS booking_fee_snapshots_booking_id_fkey;
-          ALTER TABLE booking_fee_snapshots
-            ADD CONSTRAINT booking_fee_snapshots_booking_id_fkey
-            FOREIGN KEY (booking_id) REFERENCES booking_requests(id) ON DELETE CASCADE;
-
-          ALTER TABLE booking_fee_snapshots
-            DROP CONSTRAINT IF EXISTS booking_fee_snapshots_session_id_fkey;
-          ALTER TABLE booking_fee_snapshots
-            ADD CONSTRAINT booking_fee_snapshots_session_id_fkey
-            FOREIGN KEY (session_id) REFERENCES booking_sessions(id) ON DELETE CASCADE;
-        END $$;
-      `);
-      logger.info('[DB Init] Fee snapshot CASCADE constraints created/verified');
-    } catch (err: unknown) {
-      logger.warn(`[DB Init] Skipping fee snapshot CASCADE: ${getErrorMessage(err)}`);
-    }
-
-    try {
-      await db.execute(sql`
-        DO $$
-        BEGIN
-          ALTER TABLE guest_pass_holds
-            DROP CONSTRAINT IF EXISTS guest_pass_holds_booking_id_fkey;
-          ALTER TABLE guest_pass_holds
-            ADD CONSTRAINT guest_pass_holds_booking_id_fkey
-            FOREIGN KEY (booking_id) REFERENCES booking_requests(id) ON DELETE CASCADE;
-
-          ALTER TABLE conference_prepayments
-            DROP CONSTRAINT IF EXISTS conference_prepayments_booking_id_fkey;
-          ALTER TABLE conference_prepayments
-            ADD CONSTRAINT conference_prepayments_booking_id_fkey
-            FOREIGN KEY (booking_id) REFERENCES booking_requests(id) ON DELETE CASCADE;
-        END $$;
-      `);
-      logger.info('[DB Init] Guest pass holds & conference prepayments CASCADE constraints created/verified');
-    } catch (err: unknown) {
-      logger.warn(`[DB Init] Skipping guest pass/conference CASCADE: ${getErrorMessage(err)}`);
-    }
+    logger.info('[DB Init] Fee snapshot, guest pass holds & conference prepayments CASCADE constraints now managed by Drizzle migration 0058');
 
     try {
       await db.execute(sql`
@@ -958,56 +916,22 @@ export async function ensureDatabaseConstraints() {
     }
 
 
-    try {
-      await db.execute(sql`
-        UPDATE booking_requests SET session_id = NULL
-        WHERE session_id IS NOT NULL
-          AND NOT EXISTS (SELECT 1 FROM booking_sessions bs WHERE bs.id = session_id)
-      `);
-      logger.info('[DB Init] Legacy booking_requests orphan session_id references cleaned up');
-    } catch (err: unknown) {
-      logger.warn(`[DB Init] Booking requests session cleanup: ${getErrorMessage(err)}`);
-    }
+    logger.info('[DB Init] Orphan cleanup and legacy FK constraints now managed by Drizzle migration 0058');
 
-    try {
-      await db.execute(sql`
-        UPDATE booking_requests SET closure_id = NULL
-        WHERE closure_id IS NOT NULL
-          AND NOT EXISTS (SELECT 1 FROM facility_closures fc WHERE fc.id = closure_id)
-      `);
-      logger.info('[DB Init] Legacy booking_requests orphan closure_id references cleaned up');
-    } catch (err: unknown) {
-      logger.warn(`[DB Init] Booking requests closure cleanup: ${getErrorMessage(err)}`);
-    }
-
-    try {
-      await db.execute(sql`
-        DELETE FROM booking_wallet_passes
-        WHERE member_id IS NOT NULL
-          AND member_id NOT IN (SELECT id FROM users)
-      `);
-      logger.info('[DB Init] Legacy booking_wallet_passes orphan member references cleaned up');
-    } catch (err: unknown) {
-      logger.warn(`[DB Init] Wallet pass orphan cleanup: ${getErrorMessage(err)}`);
-    }
-
-    const legacyFKNames = [
-      { table: 'booking_requests', constraint: 'booking_requests_session_id_fkey' },
-      { table: 'booking_requests', constraint: 'booking_requests_closure_id_fkey' },
+    const remainingLegacyFKNames = [
       { table: 'usage_ledger', constraint: 'usage_ledger_member_id_fkey' },
       { table: 'usage_ledger', constraint: 'usage_ledger_member_id_users_id_fk' },
       { table: 'trackman_webhook_events', constraint: 'trackman_webhook_events_matched_booking_id_fkey' },
       { table: 'trackman_webhook_events', constraint: 'trackman_webhook_events_matched_booking_id_booking_requests_id_' },
-      { table: 'booking_wallet_passes', constraint: 'booking_wallet_passes_member_id_fkey' },
     ];
-    for (const fk of legacyFKNames) {
+    for (const fk of remainingLegacyFKNames) {
       try {
         await db.execute(sql.raw(`ALTER TABLE ${fk.table} DROP CONSTRAINT IF EXISTS ${fk.constraint}`));
       } catch (err: unknown) {
         logger.warn(`[DB Init] Could not drop legacy ${fk.constraint}: ${getErrorMessage(err)}`);
       }
     }
-    logger.info('[DB Init] Legacy db-init FK constraints cleaned up (now managed by Drizzle schema)');
+    logger.info('[DB Init] Remaining legacy FK constraints cleaned up');
 
     try {
       await db.execute(sql`

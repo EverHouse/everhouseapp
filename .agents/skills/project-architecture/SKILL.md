@@ -129,7 +129,15 @@ Response field names must EXACTLY match frontend TypeScript interfaces. Verify f
 Use `db.transaction(async (tx) => { ... })` from Drizzle ORM for multi-statement operations. **BANNED:** Empty `catch {}` blocks anywhere in server code. Drizzle handles `BEGIN`/`COMMIT`/`ROLLBACK` automatically. The callback receives a `tx` object — use `tx.insert()`, `tx.update()`, `tx.execute()` etc. For scheduler error alerting, use `alertOnScheduledTaskFailure()` from `server/core/dataAlerts.ts`.
 
 ### 7. Database Migrations
-NEVER write migration files manually — use `npm run db:push`. Schema changes go in `shared/schema.ts`, then push.
+For development: Use `npm run db:push` for schema sync. Schema changes go in `shared/models/*.ts`, then push.
+
+**For deployment:** Replit runs Drizzle file-based migrations from `drizzle/`. EVERY FK constraint (`.references()`) in the Drizzle schema MUST have a corresponding migration file in `drizzle/`. If a constraint exists in the schema but not in a migration, Drizzle auto-generates an ALTER TABLE during deployment — which FAILS if production has orphaned data violating the constraint. When adding new FK constraints to the schema:
+1. Create a numbered migration file (e.g., `drizzle/0058_description.sql`)
+2. First clean up orphaned data (UPDATE SET NULL or DELETE as appropriate)
+3. Drop any legacy constraint names (`DROP CONSTRAINT IF EXISTS`)
+4. Add the Drizzle-named constraint (naming convention: `{table}_{column}_{ref_table}_{ref_column}_fk`)
+5. Add the entry to `drizzle/meta/_journal.json`
+6. The sync script auto-registers new entries on next build/deploy
 
 ### 8. No External API Calls in DB Transactions (v8.12.0)
 HTTP calls to Stripe, HubSpot, or any external service must NOT be made inside `BEGIN`/`COMMIT` blocks. They hold connections while waiting for network responses. Use the deferred action pattern (`deferredActions.push(async () => { ... })`) or DB-side checks instead. Exceptions: 5 Stripe/HubSpot calls that must stay in-transaction (customer retrieve, product retrieve, payment methods list, company sync, prices retrieve in guestPassConsumer) are wrapped with 5-second `Promise.race()` timeouts and marked with `// NOTE: Must stay in transaction` comments. See `stripe-webhook-flow` skill for the full pattern.
@@ -317,7 +325,7 @@ ALL booking actions (Check-in, Cancel, Pay/Charge) in the frontend are centraliz
 |-----------|---------|-----------|
 | `tests/` | Vitest test setup | When adding/changing logic |
 | `public/` | PWA manifest, service worker, static images | When changing PWA config |
-| `drizzle/` | Auto-generated migrations & snapshots | NEVER edit manually |
+| `drizzle/` | Database migrations & snapshots | Yes — manually write migrations for FK constraints with data cleanup (see Rule 7) |
 | `scripts/` | Root-level maintenance scripts | Run manually |
 | `uploads/trackman/` | Uploaded Trackman CSV files | Auto-managed |
 | `attached_assets/` | Reference images from conversations | Read-only |

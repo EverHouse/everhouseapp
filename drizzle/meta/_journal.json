@@ -218,6 +218,13 @@
       "when": 1774224000001,
       "tag": "0057_fix_trackman_booking_fk",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1774310400000,
+      "tag": "0058_add_missing_fk_constraints",
+      "breakpoints": true
     }
   ]
 }
