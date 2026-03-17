@@ -10,28 +10,25 @@ const RECONCILIATION_INTERVAL_MS = 15 * 60 * 1000; // 15 minutes
 const _STALE_THRESHOLD_MINUTES = 5;
 
 async function connectWithTimeout(timeoutMs = 10000): Promise<PoolClient> {
-  let timedOut = false;
+  let released = false;
   const connectPromise = pool.connect();
-  const timeoutId = setTimeout(() => {
-    timedOut = true;
-    connectPromise.then(c => c.release()).catch(() => {});
-  }, timeoutMs);
+  let timeoutId: ReturnType<typeof setTimeout>;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error(`DB connection timeout after ${timeoutMs / 1000}s`)), timeoutMs);
+  });
   try {
-    const client = await Promise.race([
-      connectPromise,
-      new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error(`DB connection timeout after ${timeoutMs / 1000}s`)), timeoutMs)
-      )
-    ]) as PoolClient;
-    clearTimeout(timeoutId);
-    if (timedOut) {
-      safeRelease(client);
-      throw new Error(`DB connection timeout after ${timeoutMs / 1000}s`);
-    }
+    const client = await Promise.race([connectPromise, timeoutPromise]) as PoolClient;
+    clearTimeout(timeoutId!);
     await client.query('SET statement_timeout = 30000');
     return client;
   } catch (err) {
-    clearTimeout(timeoutId);
+    clearTimeout(timeoutId!);
+    connectPromise.then(c => {
+      if (!released) {
+        released = true;
+        safeRelease(c);
+      }
+    }).catch(() => {});
     throw err;
   }
 }

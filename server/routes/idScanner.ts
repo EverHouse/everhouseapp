@@ -11,7 +11,7 @@ import sharp from 'sharp';
 
 const router = Router();
 const objectStorageService = new ObjectStorageService();
-const largeJsonParser = json({ limit: '20mb' });
+const largeJsonParser = json({ limit: '10mb' });
 
 router.post('/api/admin/scan-id', largeJsonParser, isStaffOrAdmin, async (req, res) => {
   try {

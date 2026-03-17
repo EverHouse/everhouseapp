@@ -1,5 +1,5 @@
 import { schedulerTracker } from '../core/schedulerTracker';
-import { queryWithRetry, pool } from '../core/db';
+import { queryWithRetry, pool, safeRelease } from '../core/db';
 import { getTodayPacific, formatTimePacific } from '../utils/dateUtils';
 import { notifyAllStaff } from '../core/notificationService';
 import { broadcastAvailabilityUpdate } from '../core/websocket';
@@ -105,7 +105,7 @@ async function expireStaleBookingRequests(): Promise<void> {
       await client.query('ROLLBACK');
       throw txErr;
     } finally {
-      client.release();
+      safeRelease(client);
     }
 
     const allExpiredBookings = [...trackmanLinkedRows, ...expiredBookingRows];

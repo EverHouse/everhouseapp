@@ -31,10 +31,6 @@ interface IncomingMessageWithExpressProps extends http.IncomingMessage {
 }
 
 process.on('uncaughtException', (error) => {
-  if (error instanceof Error && error.message?.includes('Release called on client which has already been released')) {
-    logger.warn('[Process] Suppressed benign pool double-release error (pg-pool internal auto-release race)');
-    return;
-  }
   logger.error('[Process] Uncaught Exception - shutting down:', { error: error as Error });
   setTimeout(() => process.exit(1), 3000);
 });
@@ -293,7 +289,7 @@ async function initializeApp() {
         return;
       }
 
-      if (origin.startsWith('exp://')) {
+      if (!isProduction && origin.startsWith('exp://')) {
         callback(null, true);
         return;
       }
@@ -398,10 +394,10 @@ async function initializeApp() {
     }
   );
 
-  const LARGE_BODY_PATHS = ['/api/admin/scan-id', '/api/admin/save-id-image'];
+  const LARGE_BODY_ROUTES = new Set(['/api/admin/scan-id', '/api/admin/save-id-image']);
   app.use((req, res, next) => {
-    if (LARGE_BODY_PATHS.includes(req.path)) {
-      return express.json({ limit: '10mb' })(req, res, next);
+    if (LARGE_BODY_ROUTES.has(req.path)) {
+      return next();
     }
     express.json({
       limit: '1mb',
