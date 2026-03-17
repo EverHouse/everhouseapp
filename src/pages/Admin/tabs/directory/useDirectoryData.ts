@@ -155,7 +155,7 @@ export function useDirectoryData({
     });
 
     const formatSyncResult = useCallback((result: DirectorySyncResult) => {
-        const { pullCount, pushCount, pushErrors = 0, stripeUpdated, errors } = result;
+        const { pullCount, pushCount, pushErrors = 0, stripeUpdated, stripeSkipped, errors } = result;
         const hubspotErrors = errors.filter(e => e === 'pull' || e === 'push');
         const stripeError = errors.includes('stripe');
 
@@ -177,10 +177,12 @@ export function useDirectoryData({
             parts.push(`HubSpot: partial (${failedPart} failed)`);
         }
 
-        if (!stripeError) {
-            if (stripeUpdated > 0) parts.push(`Stripe: ${stripeUpdated} updated`);
-        } else {
+        if (stripeError) {
             parts.push('Stripe: failed');
+        } else if (stripeSkipped) {
+            parts.push('Stripe: skipped (cooldown)');
+        } else if (stripeUpdated > 0) {
+            parts.push(`Stripe: ${stripeUpdated} updated`);
         }
 
         const allFailed = hubspotErrors.length === 2 && stripeError;

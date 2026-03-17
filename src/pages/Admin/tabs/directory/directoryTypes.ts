@@ -98,6 +98,7 @@ export interface DirectorySyncResult {
     pushCount: number;
     pushErrors?: number;
     stripeUpdated: number;
+    stripeSkipped?: boolean;
     errors: string[];
 }
 

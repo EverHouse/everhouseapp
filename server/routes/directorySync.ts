@@ -17,7 +17,7 @@ function getInternalBaseUrl(): string {
   return `http://localhost:${port}`;
 }
 
-async function internalPost(path: string, sessionCookie: string): Promise<{ ok: boolean; data: Record<string, unknown> }> {
+async function internalPost(path: string, sessionCookie: string): Promise<{ ok: boolean; status: number; data: Record<string, unknown> }> {
   const res = await fetch(`${getInternalBaseUrl()}${path}`, {
     method: 'POST',
     headers: {
@@ -27,7 +27,7 @@ async function internalPost(path: string, sessionCookie: string): Promise<{ ok: 
     body: JSON.stringify({}),
   });
   const data = await res.json() as Record<string, unknown>;
-  return { ok: res.ok, data };
+  return { ok: res.ok, status: res.status, data };
 }
 
 const PUSH_BATCH_SIZE = 5;
@@ -117,6 +117,7 @@ async function runDirectorySync(jobId: string, sessionCookie: string) {
   let pullCount = 0;
   let pushCount = 0;
   let stripeUpdated = 0;
+  let stripeSkipped = false;
   const errors: string[] = [];
 
   await updateJobProgress(jobId, { step: 'hubspot_pull' });
@@ -161,8 +162,10 @@ async function runDirectorySync(jobId: string, sessionCookie: string) {
     const result = await internalPost('/api/stripe/sync-member-subscriptions', sessionCookie);
     if (result.ok) {
       stripeUpdated = (result.data.updated as number) || 0;
-    } else if ((result.data as Record<string, unknown>).cooldownRemaining) {
+    } else if (result.status === 429) {
+      stripeSkipped = true;
       stripeUpdated = 0;
+      logger.info('[DirectorySync] Stripe sync skipped (rate limited or cooldown)', { extra: { response: result.data } });
     } else {
       errors.push('stripe');
       logger.error('[DirectorySync] Stripe sync failed', { extra: { response: result.data } });
@@ -172,7 +175,7 @@ async function runDirectorySync(jobId: string, sessionCookie: string) {
     logger.error('[DirectorySync] Stripe sync failed', { error: err instanceof Error ? err : new Error(String(err)) });
   }
 
-  const syncResult = { pullCount, pushCount, pushErrors, stripeUpdated, errors };
+  const syncResult = { pullCount, pushCount, pushErrors, stripeUpdated, stripeSkipped, errors };
   const lastSyncTime = new Date().toISOString();
 
   if (errors.length === 3) {
