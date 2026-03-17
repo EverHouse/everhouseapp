@@ -1,6 +1,6 @@
 import { Pool, PoolClient, QueryResult, QueryResultRow } from 'pg';
-import { getErrorCode, getErrorDetail } from '../utils/errorUtils';
-import { isRetryableError as _isRetryableError } from './retry';
+import { getErrorCode, getErrorDetail, getErrorMessage } from '../utils/errorUtils';
+import { isRetryableError as _isRetryableError, RETRYABLE_ERRORS } from './retry';
 
 import { logger } from './logger';
 export const isProduction = process.env.NODE_ENV === 'production';
@@ -64,9 +64,12 @@ const needsSsl = !isLocalDatabase(effectiveConnectionString);
 const basePool = new Pool({
   connectionString: usingPooler ? poolerUrl : directUrl,
   connectionTimeoutMillis: 10000,
-  idleTimeoutMillis: 30000,
+  idleTimeoutMillis: 10000,
   max: parseInt(process.env.DB_POOL_MAX || '20', 10),
   ssl: needsSsl ? sslConfig : undefined,
+  keepAlive: true,
+  keepAliveInitialDelayMillis: 10000,
+  allowExitOnIdle: true,
 });
 
 export const pool = basePool;
@@ -77,14 +80,31 @@ export const directPool = usingPooler
   ? new Pool({
       connectionString: directConnectionUrl,
       connectionTimeoutMillis: 10000,
-      idleTimeoutMillis: 30000,
+      idleTimeoutMillis: 10000,
       max: 5,
       ssl: !isLocalDatabase(directConnectionUrl) ? sslConfig : undefined,
+      keepAlive: true,
+      keepAliveInitialDelayMillis: 10000,
+      allowExitOnIdle: true,
     })
   : pool;
 
 pool.on('error', (err) => {
-  logger.error('[Database] Pool error:', { extra: { detail: err.message } });
+  const isConnectionError = RETRYABLE_ERRORS.some(e => err.message.includes(e));
+  logger.error('[Database] Pool error:', {
+    extra: {
+      detail: err.message,
+      isConnectionError,
+      poolTotal: pool.totalCount,
+      poolIdle: pool.idleCount,
+      poolWaiting: pool.waitingCount,
+    },
+  });
+  if (isConnectionError) {
+    logger.warn('[Database] Stale connection evicted from pool', {
+      extra: { detail: err.message },
+    });
+  }
 });
 
 let poolConnectCount = 0;
@@ -97,7 +117,21 @@ pool.on('connect', () => {
 
 if (usingPooler && directPool !== pool) {
   directPool.on('error', (err) => {
-    logger.error('[Database] Direct pool error:', { extra: { detail: err.message } });
+    const isConnError = RETRYABLE_ERRORS.some(e => err.message.includes(e));
+    logger.error('[Database] Direct pool error:', {
+      extra: {
+        detail: err.message,
+        isConnectionError: isConnError,
+        poolTotal: directPool.totalCount,
+        poolIdle: directPool.idleCount,
+        poolWaiting: directPool.waitingCount,
+      },
+    });
+    if (isConnError) {
+      logger.warn('[Database] Stale connection evicted from direct pool', {
+        extra: { detail: err.message },
+      });
+    }
   });
 }
 
@@ -113,6 +147,21 @@ export function isConstraintError(error: unknown): { type: 'unique' | 'foreign_k
   return { type: null };
 }
 
+function isConnectionError(error: unknown): boolean {
+  const message = getErrorMessage(error);
+  const connectionPatterns = [
+    'Connection terminated',
+    'connection terminated',
+    'ECONNRESET',
+    'ECONNREFUSED',
+    'ETIMEDOUT',
+    'EPIPE',
+    'socket hang up',
+    'Connection refused',
+  ];
+  return connectionPatterns.some(p => message.includes(p));
+}
+
 export async function queryWithRetry<T extends QueryResultRow = Record<string, unknown>>(
   queryText: string,
   params?: unknown[],
@@ -122,7 +171,18 @@ export async function queryWithRetry<T extends QueryResultRow = Record<string, u
   
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      return await pool.query(queryText, params);
+      if (attempt === 1) {
+        return await pool.query(queryText, params);
+      }
+      const client = await pool.connect();
+      try {
+        const result = await client.query<T>(queryText, params);
+        client.release();
+        return result;
+      } catch (queryError: unknown) {
+        client.release(isConnectionError(queryError));
+        throw queryError;
+      }
     } catch (error: unknown) {
       lastError = error;
       
@@ -131,9 +191,12 @@ export async function queryWithRetry<T extends QueryResultRow = Record<string, u
       }
       
       const delay = Math.min(100 * Math.pow(2, attempt - 1), 2000);
-      if (!isProduction) {
-        logger.info(`[Database] Retrying query (attempt ${attempt}/${maxRetries}) after ${delay}ms...`);
-      }
+      logger.warn(`[Database] Retrying query (attempt ${attempt}/${maxRetries}) after ${delay}ms`, {
+        extra: {
+          errorMessage: getErrorMessage(error),
+          isConnectionError: isConnectionError(error),
+        },
+      });
       await new Promise(resolve => setTimeout(resolve, delay));
     }
   }
