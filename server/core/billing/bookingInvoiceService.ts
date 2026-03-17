@@ -915,21 +915,26 @@ export async function finalizeInvoicePaidOutOfBand(params: {
       };
     }
 
-    await stripe.invoices.pay(invoiceId, { paid_out_of_band: true });
+    if (terminalPaymentIntentId) {
+      await stripe.invoices.pay(invoiceId, { payment_intent: terminalPaymentIntentId });
+    } else {
+      await stripe.invoices.pay(invoiceId, { paid_out_of_band: true });
+    }
 
-    const oobMeta: Record<string, string> = {
+    const invoiceMeta: Record<string, string> = {
       ...(invoice.metadata || {}),
       paidVia,
-      paidOutOfBand: 'true',
     };
     if (terminalPaymentIntentId) {
-      oobMeta.terminalPaymentIntentId = terminalPaymentIntentId;
+      invoiceMeta.terminalPaymentIntentId = terminalPaymentIntentId;
+    } else {
+      invoiceMeta.paidOutOfBand = 'true';
     }
-    await stripe.invoices.update(invoiceId, { metadata: oobMeta });
+    await stripe.invoices.update(invoiceId, { metadata: invoiceMeta });
 
     const paidInvoice = await stripe.invoices.retrieve(invoiceId);
 
-    logger.info('[BookingInvoice] Invoice finalized and paid out-of-band', {
+    logger.info(`[BookingInvoice] Invoice finalized and paid ${terminalPaymentIntentId ? 'via terminal PI' : 'out-of-band'}`, {
       extra: { bookingId, invoiceId, paidVia, terminalPaymentIntentId }
     });
 

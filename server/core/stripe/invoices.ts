@@ -684,7 +684,7 @@ export async function createDraftBookingFeeInvoice(
   return { invoiceId: invoice.id };
 }
 
-export async function finalizeInvoicePaidOutOfBand(invoiceId: string): Promise<{
+export async function finalizeInvoicePaidOutOfBand(invoiceId: string, options?: { terminalPaymentIntentId?: string }): Promise<{
   success: boolean;
   hostedInvoiceUrl?: string | null;
   invoicePdf?: string | null;
@@ -720,7 +720,7 @@ export async function finalizeInvoicePaidOutOfBand(invoiceId: string): Promise<{
       try {
         const existingPi = await stripe.paymentIntents.retrieve(piId);
         if (existingPi.status === 'succeeded') {
-          logger.info(`[Stripe Invoices] Invoice PI ${piId} already succeeded — invoice may have been auto-collected. Skipping OOB.`, { extra: { invoiceId } });
+          logger.info(`[Stripe Invoices] Invoice PI ${piId} already succeeded — invoice may have been auto-collected. Skipping reconciliation.`, { extra: { invoiceId } });
           const freshInvoice = await stripe.invoices.retrieve(invoiceId);
           if (freshInvoice.status === 'paid') {
             return {
@@ -730,21 +730,31 @@ export async function finalizeInvoicePaidOutOfBand(invoiceId: string): Promise<{
             };
           }
         } else if (existingPi.status !== 'canceled') {
-          // Intentional direct cancel — NOT cancelPaymentIntent() — because we need the invoice to stay open for OOB payment below
+          // Intentional direct cancel — NOT cancelPaymentIntent() — because we need the invoice to stay open for payment below
           await stripe.paymentIntents.cancel(piId);
         }
       } catch (cancelErr: unknown) {
-        logger.warn(`[Stripe Invoices] Could not cancel invoice PI ${piId} for out-of-band payment`, { extra: { detail: getErrorMessage(cancelErr) } });
+        logger.warn(`[Stripe Invoices] Could not cancel invoice PI ${piId} for invoice reconciliation`, { extra: { detail: getErrorMessage(cancelErr) } });
       }
     }
 
-    const paidInvoice = await stripe.invoices.pay(invoiceId, {
-      paid_out_of_band: true,
-    });
-
-    logger.info(`[Stripe Invoices] Invoice ${invoiceId} finalized and marked paid out-of-band`, {
-      extra: { status: paidInvoice.status }
-    });
+    const terminalPiId = options?.terminalPaymentIntentId;
+    let paidInvoice: Stripe.Invoice;
+    if (terminalPiId) {
+      paidInvoice = await stripe.invoices.pay(invoiceId, {
+        payment_intent: terminalPiId,
+      });
+      logger.info(`[Stripe Invoices] Invoice ${invoiceId} finalized and paid via terminal PI ${terminalPiId}`, {
+        extra: { status: paidInvoice.status, terminalPaymentIntentId: terminalPiId }
+      });
+    } else {
+      paidInvoice = await stripe.invoices.pay(invoiceId, {
+        paid_out_of_band: true,
+      });
+      logger.info(`[Stripe Invoices] Invoice ${invoiceId} finalized and marked paid out-of-band`, {
+        extra: { status: paidInvoice.status }
+      });
+    }
 
     return {
       success: true,
@@ -752,7 +762,7 @@ export async function finalizeInvoicePaidOutOfBand(invoiceId: string): Promise<{
       invoicePdf: paidInvoice.invoice_pdf,
     };
   } catch (error: unknown) {
-    logger.error(`[Stripe Invoices] Error finalizing invoice ${invoiceId} out-of-band:`, { error: error });
+    logger.error(`[Stripe Invoices] Error finalizing invoice ${invoiceId}:`, { error: error });
     return { success: false, error: getErrorMessage(error) };
   }
 }

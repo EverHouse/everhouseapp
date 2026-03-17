@@ -1059,9 +1059,10 @@ export async function handlePaymentIntentSucceeded(client: PoolClient, paymentIn
   if (posInvoiceId) {
     deferredActions.push(async () => {
       try {
-        const result = await finalizeInvoicePaidOutOfBand(posInvoiceId);
+        const isTerminalPayment = paymentIntent.payment_method_types?.includes('card_present') || metadata?.paidVia === 'terminal';
+        const result = await finalizeInvoicePaidOutOfBand(posInvoiceId, isTerminalPayment ? { terminalPaymentIntentId: id } : undefined);
         if (result.success) {
-          logger.info(`[Stripe Webhook] Invoice ${posInvoiceId} finalized and marked paid out-of-band for terminal PI ${id}`);
+          logger.info(`[Stripe Webhook] Invoice ${posInvoiceId} finalized and paid${isTerminalPayment ? ' via terminal PI' : ' out-of-band'} for PI ${id}`);
         } else {
           logger.error(`[Stripe Webhook] Failed to finalize invoice ${posInvoiceId}: ${result.error}`);
         }

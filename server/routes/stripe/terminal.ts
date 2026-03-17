@@ -437,7 +437,7 @@ router.get('/api/stripe/terminal/payment-status/:paymentIntentId', isStaffOrAdmi
         const inv = await stripe.invoices.retrieve(draftInvoiceId);
         if (inv.status === 'draft' || inv.status === 'open') {
           const { finalizeInvoicePaidOutOfBand } = await import('../../core/stripe/invoices');
-          const oobResult = await finalizeInvoicePaidOutOfBand(draftInvoiceId);
+          const oobResult = await finalizeInvoicePaidOutOfBand(draftInvoiceId, { terminalPaymentIntentId: paymentIntentId as string });
           if (oobResult.success) {
             try {
               await stripe.invoices.update(draftInvoiceId, {
@@ -448,17 +448,17 @@ router.get('/api/stripe/terminal/payment-status/:paymentIntentId', isStaffOrAdmi
                 },
               });
             } catch (metaErr: unknown) {
-              logger.warn('[Terminal] Could not update invoice metadata after OOB payment', { extra: { detail: getErrorMessage(metaErr) } });
+              logger.warn('[Terminal] Could not update invoice metadata after terminal payment', { extra: { detail: getErrorMessage(metaErr) } });
             }
-            logger.info('[Terminal] Invoice finalized and marked paid (out-of-band) after terminal payment', { extra: { invoiceId: draftInvoiceId, paymentIntentId } });
+            logger.info('[Terminal] Invoice finalized and paid via terminal PI', { extra: { invoiceId: draftInvoiceId, paymentIntentId } });
           } else {
-            logger.warn('[Terminal] Could not finalize invoice out-of-band', { extra: { invoiceId: draftInvoiceId, error: oobResult.error } });
+            logger.warn('[Terminal] Could not finalize invoice via terminal PI', { extra: { invoiceId: draftInvoiceId, error: oobResult.error } });
           }
         } else if (inv.status === 'paid') {
           logger.info('[Terminal] Invoice already paid, no action needed', { extra: { invoiceId: draftInvoiceId } });
         }
       } catch (invErr: unknown) {
-        logger.warn('[Terminal] Could not process invoice after terminal payment', { extra: { invoiceId: draftInvoiceId, error: getErrorMessage(invErr) } });
+        logger.warn('[Terminal] Could not reconcile invoice after terminal payment', { extra: { invoiceId: draftInvoiceId, error: getErrorMessage(invErr) } });
       }
     }
 
@@ -953,9 +953,9 @@ router.post('/api/stripe/terminal/confirm-subscription-payment', isStaffOrAdmin,
             }
           }
           await stripe.invoices.pay(actualInvoiceId, {
-            paid_out_of_band: true
+            payment_intent: paymentIntentId,
           });
-          logger.info('[Terminal] Reconciled subscription invoice after terminal payment', { extra: { actualInvoiceId, paymentIntentId } });
+          logger.info('[Terminal] Reconciled subscription invoice via terminal PI', { extra: { actualInvoiceId, paymentIntentId } });
         } else {
           logger.info('[Terminal] Invoice not in open state, skipping reconciliation', { extra: { actualInvoiceId, status: latestInvoice.status } });
         }

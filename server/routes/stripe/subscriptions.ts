@@ -869,21 +869,29 @@ router.post('/api/stripe/subscriptions/confirm-inline-payment', isStaffOrAdmin, 
             }
           }
 
-          await stripe.invoices.pay(invoiceId, {
-            paid_out_of_band: true
-          });
+          const isTerminalPayment = paymentIntent.payment_method_types?.includes('card_present');
+          if (isTerminalPayment) {
+            await stripe.invoices.pay(invoiceId, {
+              payment_intent: paymentIntentId,
+            });
+          } else {
+            await stripe.invoices.pay(invoiceId, {
+              paid_out_of_band: true,
+            });
+          }
 
           try {
             await stripe.invoices.update(invoiceId, {
               metadata: {
                 ...((invoice.metadata as Record<string, string>) || {}),
                 reconciled_by_pi: paymentIntentId,
-                reconciliation_source: 'inline_payment',
+                reconciliation_source: isTerminalPayment ? 'terminal_payment' : 'inline_payment',
+                ...(isTerminalPayment ? { paidVia: 'terminal' } : {}),
               }
             });
           } catch (_metaErr: unknown) { /* non-blocking */ }
 
-          logger.info('[Stripe Subscriptions] Invoice reconciled with inline PI', { extra: { invoiceId, paymentIntentId } });
+          logger.info(`[Stripe Subscriptions] Invoice reconciled ${isTerminalPayment ? 'via terminal PI' : 'with inline PI'}`, { extra: { invoiceId, paymentIntentId } });
         }
       } catch (invoiceError: unknown) {
         logger.error('[Stripe Subscriptions] Error paying invoice', { extra: { invoiceError: getErrorMessage(invoiceError) } });
