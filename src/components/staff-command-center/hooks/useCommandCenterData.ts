@@ -1,9 +1,8 @@
 import { useMemo, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { getTodayPacific, addDaysToPacificDate, getNowTimePacific } from '../../../utils/dateUtils';
-import { bookingsKeys, simulatorKeys } from '../../../hooks/queries/useBookingsQueries';
+import { bookingsKeys, simulatorKeys, commandCenterKeys } from '../../../hooks/queries/adminKeys';
 import {
-  commandCenterKeys,
   useCommandCenterTodaysBookings,
   useCommandCenterUpcomingBookings,
   useCommandCenterPendingRequests,

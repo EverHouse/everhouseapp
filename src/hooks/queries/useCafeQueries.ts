@@ -1,11 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { fetchWithCredentials, postWithCredentials, putWithCredentials, deleteWithCredentials } from './useFetch';
 import type { CafeItem } from '../../types/data';
+import { cafeKeys } from './adminKeys';
 
-export const cafeKeys = {
-  all: ['cafe'] as const,
-  menu: () => [...cafeKeys.all, 'menu'] as const,
-};
+export { cafeKeys };
 
 interface CafeMenuResponse {
   id: number | string;

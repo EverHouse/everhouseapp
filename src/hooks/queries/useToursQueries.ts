@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { fetchWithCredentials, postWithCredentials, patchWithCredentials } from './useFetch';
+import { toursKeys } from './adminKeys';
 
 interface Tour {
   id: number;
@@ -31,12 +32,7 @@ interface _ToursData {
   pastTours: Tour[];
 }
 
-export const toursKeys = {
-  all: ['tours'] as const,
-  today: () => [...toursKeys.all, 'today'] as const,
-  list: () => [...toursKeys.all, 'list'] as const,
-  detail: (id: number) => [...toursKeys.all, 'detail', id] as const,
-};
+export { toursKeys };
 
 export function useTodayTours() {
   return useQuery({

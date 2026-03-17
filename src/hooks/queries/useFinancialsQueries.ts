@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { fetchWithCredentials, postWithCredentials } from './useFetch';
+import { financialsKeys } from './adminKeys';
 
 interface DailySummary {
   date: string;
@@ -110,19 +111,7 @@ interface InvoiceListItem {
   invoicePdf: string | null;
 }
 
-export const financialsKeys = {
-  all: ['financials'] as const,
-  dailySummary: () => [...financialsKeys.all, 'daily-summary'] as const,
-  overduePayments: () => [...financialsKeys.all, 'overdue-payments'] as const,
-  failedPayments: () => [...financialsKeys.all, 'failed-payments'] as const,
-  pendingAuthorizations: () => [...financialsKeys.all, 'pending-authorizations'] as const,
-  futureBookingsWithFees: () => [...financialsKeys.all, 'future-bookings-with-fees'] as const,
-  refundablePayments: () => [...financialsKeys.all, 'refundable-payments'] as const,
-  refundedPayments: () => [...financialsKeys.all, 'refunded-payments'] as const,
-  subscriptions: (status?: string) => [...financialsKeys.all, 'subscriptions', { status }] as const,
-  invoices: (params?: { status?: string; startDate?: string; endDate?: string }) => 
-    [...financialsKeys.all, 'invoices', params] as const,
-};
+export { financialsKeys };
 
 export function useDailySummary() {
   return useQuery({

@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useToast } from '../components/Toast';
-import { bookingsKeys, simulatorKeys } from './queries/useBookingsQueries';
+import { bookingsKeys, simulatorKeys } from './queries/adminKeys';
 
 export interface CheckInOptions {
   status?: 'attended' | 'no_show' | 'cancelled';

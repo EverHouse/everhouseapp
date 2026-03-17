@@ -29,9 +29,8 @@ import {
     useAvailabilityBlocks,
     useMemberContacts,
     useFeeEstimate,
-    bookingsKeys,
-    simulatorKeys,
 } from '../../../hooks/queries/useBookingsQueries';
+import { bookingsKeys, simulatorKeys } from '../../../hooks/queries/adminKeys';
 import { fetchWithCredentials } from '../../../hooks/queries/useFetch';
 
 import type { BookingRequest, Bay, Resource, CalendarClosure, AvailabilityBlock } from './simulator/simulatorTypes';

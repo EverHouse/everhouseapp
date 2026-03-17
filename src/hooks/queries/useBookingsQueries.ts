@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { fetchWithCredentials, postWithCredentials } from './useFetch';
+import { bookingsKeys, simulatorKeys } from './adminKeys';
 
 interface BookingRequest {
   id: number | string;
@@ -56,15 +57,7 @@ interface CalendarClosure {
   reason: string | null;
 }
 
-export const bookingsKeys = {
-  all: ['bookings'] as const,
-  list: (date: string) => [...bookingsKeys.all, 'list', date] as const,
-  requests: (filters?: { status?: string; date?: string }) => [...bookingsKeys.all, 'requests', filters] as const,
-  resources: () => [...bookingsKeys.all, 'resources'] as const,
-  availability: (date: string, resourceId?: number) => [...bookingsKeys.all, 'availability', date, resourceId] as const,
-  closures: () => [...bookingsKeys.all, 'closures'] as const,
-  detail: (id: number | string) => [...bookingsKeys.all, 'detail', id] as const,
-};
+export { bookingsKeys, simulatorKeys };
 
 export function useResources() {
   return useQuery({
@@ -251,16 +244,6 @@ interface MemberContact {
   manuallyLinkedEmails?: string[];
 }
 
-export const simulatorKeys = {
-  all: ['simulator'] as const,
-  allRequests: () => [...simulatorKeys.all, 'allRequests'] as const,
-  pendingBookings: () => [...simulatorKeys.all, 'pendingBookings'] as const,
-  approvedBookings: (startDate: string, endDate: string) => [...simulatorKeys.all, 'approved', startDate, endDate] as const,
-  bays: () => [...simulatorKeys.all, 'bays'] as const,
-  memberContacts: (status?: string) => [...simulatorKeys.all, 'memberContacts', status] as const,
-  feeEstimate: (id: number | string) => [...simulatorKeys.all, 'feeEstimate', id] as const,
-  bayAvailability: (resourceId: number, date: string) => [...simulatorKeys.all, 'bayAvailability', resourceId, date] as const,
-};
 
 export function useAllBookingRequests() {
   return useQuery({

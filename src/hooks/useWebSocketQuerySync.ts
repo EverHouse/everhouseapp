@@ -1,10 +1,6 @@
 import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { bookingsKeys, simulatorKeys } from './queries/useBookingsQueries';
-import { financialsKeys } from './queries/useFinancialsQueries';
-import { cafeKeys } from './queries/useCafeQueries';
-import { toursKeys } from './queries/useToursQueries';
-import { commandCenterKeys } from './queries/useCommandCenterQueries';
+import { bookingsKeys, simulatorKeys, financialsKeys, cafeKeys, toursKeys, commandCenterKeys } from './queries/adminKeys';
 import { bookGolfKeys } from '../pages/Member/bookGolf/bookGolfTypes';
 
 const directoryKeys = {

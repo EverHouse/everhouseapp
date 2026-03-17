@@ -1,19 +1,10 @@
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { fetchWithCredentials } from './useFetch';
 import { getTodayPacific, addDaysToPacificDate } from '../../utils/dateUtils';
-import { simulatorKeys } from './useBookingsQueries';
+import { simulatorKeys, commandCenterKeys } from './adminKeys';
 import type { BookingRequest, Tour, DBEvent, WellnessClass, Closure, RecentActivity, StaffNotification, Announcement } from '../../components/staff-command-center/types';
 
-export const commandCenterKeys = {
-  all: ['command-center'] as const,
-  pendingRequests: () => [...commandCenterKeys.all, 'pending-requests'] as const,
-  scheduling: () => [...commandCenterKeys.all, 'scheduling'] as const,
-  facility: () => [...commandCenterKeys.all, 'facility'] as const,
-  activity: (userEmail?: string) =>
-    [...commandCenterKeys.all, 'activity', userEmail] as const,
-  hubspotContacts: () => [...commandCenterKeys.all, 'hubspot-contacts'] as const,
-  announcements: () => [...commandCenterKeys.all, 'announcements'] as const,
-};
+export { commandCenterKeys };
 
 export function useCommandCenterTodaysBookings() {
   const today = getTodayPacific();

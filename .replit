@@ -86,3 +86,4 @@ externalPort = 3003
 [postMerge]
 path = "scripts/post-merge.sh"
 timeoutMs = 120000
+

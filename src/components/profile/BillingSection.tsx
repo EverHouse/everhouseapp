@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '../Toast';
 import { useAuthData } from '../../contexts/DataContext';
 import { fetchWithCredentials } from '../../hooks/queries/useFetch';
+import { billingKeys } from '../../hooks/queries/adminKeys';
 
 interface BillingInfo {
   billingProvider: 'stripe' | 'mindbody' | 'family_addon' | 'comped' | null;
@@ -52,12 +53,6 @@ interface Invoice {
   hostedInvoiceUrl: string;
   invoicePdf: string;
 }
-
-export const billingKeys = {
-  all: ['billing'] as const,
-  info: (email?: string) => [...billingKeys.all, 'info', email] as const,
-  invoices: (email?: string) => [...billingKeys.all, 'invoices', email] as const,
-};
 
 interface Props {
   isDark: boolean;
