@@ -27,7 +27,7 @@ import { getErrorMessage } from '../../utils/errorUtils';
 import { upsertVisitor } from '../visitors/matchingService';
 import { AppError } from '../errors';
 import { logPaymentAudit } from '../auditLog';
-import { voidBookingPass } from '../../walletPass/bookingPassService';
+import { voidBookingPass, refreshBookingPass } from '../../walletPass/bookingPassService';
 import { BookingUpdateResult, CancelBookingData, CancelPushInfo } from './approvalTypes';
 
 interface DevConfirmParams {
@@ -310,6 +310,10 @@ export async function devConfirmBooking(params: DevConfirmParams) {
       }
     }
   }
+
+  refreshBookingPass(bookingId).catch(err =>
+    logger.error('[Dev Confirm] Wallet pass refresh failed after confirm', { extra: { bookingId, error: getErrorMessage(err) } })
+  );
 
   return { success: true, bookingId, sessionId, totalFeeCents: resolvedTotalFeeCents, booking, dateStr, timeStr };
 }

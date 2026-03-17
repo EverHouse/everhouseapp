@@ -4,6 +4,7 @@ import { getTodayPacific, formatTimePacific } from '../utils/dateUtils';
 import { notifyAllStaff } from '../core/notificationService';
 import { ensureSessionForBooking } from '../core/bookingService/sessionManager';
 import { logger } from '../core/logger';
+import { refreshBookingPass } from '../walletPass/bookingPassService';
 
 interface AutoCompletedBookingResult {
   id: number;
@@ -167,6 +168,12 @@ async function autoCompletePastBookings(): Promise<void> {
       logger.info(`[Booking Auto-Complete] Session backfill: ${sessionsCreated} created, ${sessionErrors} errors`);
     }
 
+    for (const booking of markedBookings.rows) {
+      refreshBookingPass(booking.id).catch(err =>
+        logger.error('[Booking Auto-Complete] Wallet pass refresh failed', { extra: { bookingId: booking.id, error: String(err) } })
+      );
+    }
+
     logger.info(`[Booking Auto-Complete] Auto checked-in ${markedCount} past booking(s)`);
     schedulerTracker.recordRun('Booking Auto-Complete', true);
 
@@ -323,6 +330,12 @@ export async function runManualBookingAutoComplete(): Promise<{ markedCount: num
         logger.error(`[Booking Auto-Complete] Manual: failed to create session for booking #${booking.id}:`, { error: err as Error });
       }
     }
+  }
+
+  for (const booking of result.rows) {
+    refreshBookingPass(booking.id).catch(err =>
+      logger.error('[Booking Auto-Complete] Manual: wallet pass refresh failed', { extra: { bookingId: booking.id, error: String(err) } })
+    );
   }
 
   logger.info(`[Booking Auto-Complete] Manual run auto checked-in ${markedCount} booking(s), created ${sessionsCreated} session(s)`);

@@ -26,7 +26,7 @@ import { getErrorMessage } from '../../utils/errorUtils';
 import { upsertVisitor } from '../visitors/matchingService';
 import { AppError } from '../errors';
 import { logPaymentAudit } from '../auditLog';
-import { voidBookingPass } from '../../walletPass/bookingPassService';
+import { voidBookingPass, refreshBookingPass } from '../../walletPass/bookingPassService';
 import { BookingUpdateResult } from './approvalTypes';
 
 export async function revertToApproved(params: { bookingId: number; staffEmail: string }) {
@@ -505,6 +505,18 @@ export async function checkinBooking(params: CheckinBookingParams) {
       relatedType: 'booking',
       url: '/sims'
     });
+  }
+
+  if (newStatus === 'attended') {
+    refreshBookingPass(bookingId).catch(err =>
+      logger.error('[Checkin] Wallet pass refresh failed after attended', { extra: { bookingId, error: getErrorMessage(err) } })
+    );
+  }
+
+  if (newStatus === 'no_show') {
+    voidBookingPass(bookingId).catch(err =>
+      logger.error('[Checkin] Wallet pass void failed after no-show', { extra: { bookingId, error: getErrorMessage(err) } })
+    );
   }
 
   if (newStatus === 'no_show' && booking.userEmail && !isSyntheticEmail(booking.userEmail)) {

@@ -4,6 +4,7 @@ import { getTodayPacific, formatTimePacific } from '../utils/dateUtils';
 import { notifyAllStaff } from '../core/notificationService';
 import { broadcastAvailabilityUpdate } from '../core/websocket';
 import { logger } from '../core/logger';
+import { voidBookingPass } from '../walletPass/bookingPassService';
 import { cancelPendingPaymentIntentsForBooking } from '../core/billing/paymentIntentCleanup';
 
 interface ExpiredBookingResult {
@@ -114,6 +115,9 @@ async function expireStaleBookingRequests(): Promise<void> {
       } catch (err: unknown) {
         logger.warn(`[Booking Expiry] Failed to cancel Stripe PIs for expired booking #${booking.id}`, { error: err });
       }
+      voidBookingPass(booking.id).catch(err =>
+        logger.error('[Booking Expiry] Wallet pass void failed', { extra: { bookingId: booking.id, error: String(err) } })
+      );
     }
 
     for (const booking of trackmanLinkedRows) {
@@ -286,6 +290,9 @@ export async function runManualBookingExpiry(): Promise<{ expiredCount: number }
       } catch (err: unknown) {
         logger.warn(`[Booking Expiry] Manual: failed to cancel Stripe PIs for expired booking #${expiredId}`, { error: err });
       }
+      voidBookingPass(expiredId).catch(err =>
+        logger.error('[Booking Expiry] Manual: wallet pass void failed', { extra: { bookingId: expiredId, error: String(err) } })
+      );
     }
   }
 

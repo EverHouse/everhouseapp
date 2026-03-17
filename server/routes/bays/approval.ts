@@ -15,7 +15,7 @@ import {
   formatBookingRow
 } from '../../core/bookingService/approvalService';
 import { BookingStateService } from '../../core/bookingService';
-import { refreshBookingPass } from '../../walletPass/bookingPassService';
+import { refreshBookingPass, voidBookingPass } from '../../walletPass/bookingPassService';
 
 const router = Router();
 
@@ -68,6 +68,10 @@ router.put('/api/booking-requests/:id', isStaffOrAdmin, async (req, res) => {
         reviewed_by
       });
 
+      voidBookingPass(bookingId).catch(err =>
+        logger.error('[Approval] Wallet pass void failed after decline', { extra: { bookingId, error: getErrorMessage(err) } })
+      );
+
       return res.json(formatBookingRow(updated));
     }
 
@@ -104,9 +108,16 @@ router.put('/api/booking-requests/:id', isStaffOrAdmin, async (req, res) => {
       return res.status(404).json({ error: 'Booking request not found' });
     }
 
-    refreshBookingPass(bookingId).catch(err =>
-      logger.error('[Approval] Wallet pass refresh failed after status update', { extra: { bookingId, status, error: getErrorMessage(err) } })
-    );
+    const voidStatuses = ['no_show', 'declined', 'cancelled'];
+    if (voidStatuses.includes(status)) {
+      voidBookingPass(bookingId).catch(err =>
+        logger.error('[Approval] Wallet pass void failed after status update', { extra: { bookingId, status, error: getErrorMessage(err) } })
+      );
+    } else {
+      refreshBookingPass(bookingId).catch(err =>
+        logger.error('[Approval] Wallet pass refresh failed after status update', { extra: { bookingId, status, error: getErrorMessage(err) } })
+      );
+    }
 
     res.json(formatBookingRow(result[0]));
   } catch (error: unknown) {
