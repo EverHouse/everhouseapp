@@ -19,6 +19,12 @@ import { cancelPaymentIntent } from '../stripe/payments';
 import { markPaymentRefunded } from '../billing/PaymentStatusService';
 import { failedSideEffects } from '../../../shared/schema';
 
+function isNotifiableEmail(email: string | null | undefined): email is string {
+  if (!email || !email.trim()) return false;
+  if (isSyntheticEmail(email)) return false;
+  return email.includes('@');
+}
+
 interface CancelResult {
   success: boolean;
   status: 'cancelled' | 'cancellation_pending';
@@ -361,16 +367,22 @@ export class BookingStateService {
         const staffMessage = `${booking.userName || booking.userEmail} has cancelled their ${statusLabel} for ${friendlyDateTime}.`;
         const memberMessage = `Your ${statusLabel} for ${friendlyDateTime} has been cancelled.`;
 
-        sideEffects.notifications.memberNotification = { userEmail: booking.userEmail, title: 'Booking Cancelled', message: memberMessage, type: 'booking_cancelled' as const, relatedId: bookingId, relatedType: 'booking_request' };
+        if (isNotifiableEmail(booking.userEmail)) {
+          sideEffects.notifications.memberNotification = { userEmail: booking.userEmail, title: 'Booking Cancelled', message: memberMessage, type: 'booking_cancelled' as const, relatedId: bookingId, relatedType: 'booking_request' };
+          sideEffects.notifications.memberPush = { email: booking.userEmail, title: 'Booking Cancelled', body: memberMessage };
+          sideEffects.notifications.memberWebSocket = { email: booking.userEmail, title: 'Booking Cancelled', message: memberMessage, bookingId };
+        }
         sideEffects.notifications.staffNotification = { title: 'Booking Cancelled by Member', message: staffMessage };
-        sideEffects.notifications.memberPush = { email: booking.userEmail, title: 'Booking Cancelled', body: memberMessage };
-        sideEffects.notifications.memberWebSocket = { email: booking.userEmail, title: 'Booking Cancelled', message: memberMessage, bookingId };
       } else {
         const memberMessage = source === 'trackman_webhook'
           ? `Your booking for ${friendlyDateTime} has been cancelled. Any applicable charges have been refunded.`
           : `Your ${statusLabel} for ${friendlyDateTime} has been cancelled by staff.`;
 
-        sideEffects.notifications.memberNotification = { userEmail: booking.userEmail, title: 'Booking Cancelled', message: memberMessage, type: 'booking_cancelled' as const, relatedId: bookingId, relatedType: 'booking_request' };
+        if (isNotifiableEmail(booking.userEmail)) {
+          sideEffects.notifications.memberNotification = { userEmail: booking.userEmail, title: 'Booking Cancelled', message: memberMessage, type: 'booking_cancelled' as const, relatedId: bookingId, relatedType: 'booking_request' };
+          sideEffects.notifications.memberPush = { email: booking.userEmail, title: 'Booking Cancelled', body: memberMessage };
+          sideEffects.notifications.memberWebSocket = { email: booking.userEmail, title: 'Booking Cancelled', message: memberMessage, bookingId };
+        }
 
         if (source === 'trackman_webhook') {
           sideEffects.notifications.staffNotification = {
@@ -378,9 +390,6 @@ export class BookingStateService {
             message: `Booking cancelled via TrackMan: ${booking.userName || booking.userEmail}'s booking for ${friendlyDateTime}`,
           };
         }
-
-        sideEffects.notifications.memberPush = { email: booking.userEmail, title: 'Booking Cancelled', body: memberMessage };
-        sideEffects.notifications.memberWebSocket = { email: booking.userEmail, title: 'Booking Cancelled', message: memberMessage, bookingId };
       }
 
       await tx.update(notifications)
@@ -712,7 +721,9 @@ export class BookingStateService {
       const staffTitle = source === 'trackman_webhook' ? 'Cancellation Completed via TrackMan' : 'Cancellation Completed';
       const staffMsg = `Cancellation completed via ${completedByLabel}: ${existing.userName || existing.userEmail}'s booking for ${friendlyDateTime}`;
 
-      sideEffects.notifications.memberNotification = { userEmail: existing.userEmail || '', title: 'Booking Cancelled', message: memberMessage, type: 'booking_cancelled' as const, relatedId: bookingId, relatedType: 'booking_request' };
+      if (isNotifiableEmail(existing.userEmail)) {
+        sideEffects.notifications.memberNotification = { userEmail: existing.userEmail, title: 'Booking Cancelled', message: memberMessage, type: 'booking_cancelled' as const, relatedId: bookingId, relatedType: 'booking_request' };
+      }
       sideEffects.notifications.staffNotification = { title: staffTitle, message: staffMsg };
 
       return sideEffects;
@@ -1035,7 +1046,7 @@ export class BookingStateService {
       }
     }
 
-    if (manifest.notifications.memberNotification) {
+    if (manifest.notifications.memberNotification && manifest.notifications.memberNotification.userEmail) {
       const mn = manifest.notifications.memberNotification;
       notifyMember({
         userEmail: mn.userEmail,
@@ -1057,7 +1068,7 @@ export class BookingStateService {
       ).catch(err => logger.error('[BookingStateService] Staff notification failed', { extra: { error: getErrorMessage(err) } }));
     }
 
-    if (manifest.notifications.memberWebSocket) {
+    if (manifest.notifications.memberWebSocket && manifest.notifications.memberWebSocket.email) {
       const ws = manifest.notifications.memberWebSocket;
       sendNotificationToUser(ws.email, {
         type: 'notification',
