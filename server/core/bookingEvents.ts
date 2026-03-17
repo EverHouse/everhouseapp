@@ -5,6 +5,7 @@ import { sendNotificationToUser, broadcastBookingEvent } from './websocket';
 import { formatTime12Hour, formatDateDisplayWithDay } from '../utils/dateUtils';
 
 import { logger } from './logger';
+import { getErrorMessage } from '../utils/errorUtils';
 import { isSyntheticEmail, notifyMember as notifyMemberFn, notifyAllStaff as notifyAllStaffFn, type NotificationType } from './notificationService';
 interface RequestParticipant {
   email: string;
@@ -99,7 +100,7 @@ export async function cleanupNotificationsForBooking(
     }
     return 0;
   } catch (error: unknown) {
-    logger.error('[BookingEvents] Failed to cleanup notifications:', { error: error });
+    logger.error('[BookingEvents] Failed to cleanup notifications:', { error: getErrorMessage(error) });
     return 0;
   }
 }
@@ -121,7 +122,7 @@ export async function validateBookingStatus(
     const isValid = allowedStatuses.includes(booking.status ?? '');
     return { valid: isValid, currentStatus: booking.status ?? undefined, booking };
   } catch (error: unknown) {
-    logger.error('[BookingEvents] Failed to validate booking status:', { error: error });
+    logger.error('[BookingEvents] Failed to validate booking status:', { error: getErrorMessage(error) });
     return { valid: false };
   }
 }
@@ -165,7 +166,7 @@ export async function publish(
           url: '/dashboard'
         }, { sendPush: true });
       } catch (err: unknown) {
-        logger.error('[BookingEvents] Failed to create member notification:', { error: err });
+        logger.error('[BookingEvents] Failed to create member notification:', { error: getErrorMessage(err) });
       }
 
       sendNotificationToUser(data.memberEmail, {
@@ -211,14 +212,14 @@ export async function publish(
             }
           );
         } catch (err: unknown) {
-          logger.error('[BookingEvents] Failed to create staff notifications:', { error: err });
+          logger.error('[BookingEvents] Failed to create staff notifications:', { error: getErrorMessage(err) });
         }
       }
     }
 
     logger.info(`[BookingEvents] Successfully published ${eventType}`);
   } catch (error: unknown) {
-    logger.error(`[BookingEvents] Failed to publish ${eventType}:`, { error: error });
+    logger.error(`[BookingEvents] Failed to publish ${eventType}:`, { error: getErrorMessage(error) });
   }
 }
 
@@ -339,7 +340,7 @@ export async function linkAndNotifyParticipants(
               createdAt: new Date()
             }).onConflictDoNothing();
           } catch (insertErr: unknown) {
-            logger.error('[BookingEvents] Failed to insert member participant', { error: insertErr });
+            logger.error('[BookingEvents] Failed to insert member participant', { error: getErrorMessage(insertErr) });
           }
         }
 
@@ -356,7 +357,7 @@ export async function linkAndNotifyParticipants(
               relatedId: bookingId,
               relatedType: 'booking',
               url: '/sims'
-            }, { sendPush: true }).catch(err => logger.error('[BookingEvents] Participant notification failed', { error: err }));
+            }, { sendPush: true }).catch(err => logger.error('[BookingEvents] Participant notification failed', { error: getErrorMessage(err) }));
           }
           
           sendNotificationToUser(email, {
@@ -368,7 +369,7 @@ export async function linkAndNotifyParticipants(
           
           result.notified++;
         } catch (notifErr: unknown) {
-          logger.error(`[BookingEvents] Failed to notify participant ${email}:`, { error: notifErr });
+          logger.error(`[BookingEvents] Failed to notify participant ${email}:`, { error: getErrorMessage(notifErr) });
         }
       } else if (participant.type === 'guest') {
         if (existingGuestEmails.has(email)) continue;
@@ -386,7 +387,7 @@ export async function linkAndNotifyParticipants(
               createdAt: new Date()
             });
           } catch (insertErr: unknown) {
-            logger.error('[BookingEvents] Failed to insert guest participant', { error: insertErr });
+            logger.error('[BookingEvents] Failed to insert guest participant', { error: getErrorMessage(insertErr) });
           }
         }
 
@@ -397,7 +398,7 @@ export async function linkAndNotifyParticipants(
     logger.info(`[BookingEvents] Linked ${result.linkedMembers} members and ${result.linkedGuests} guests to booking ${bookingId}, notified ${result.notified}`);
     return result;
   } catch (error: unknown) {
-    logger.error(`[BookingEvents] Failed to link participants for booking ${bookingId}:`, { error: error });
+    logger.error(`[BookingEvents] Failed to link participants for booking ${bookingId}:`, { error: getErrorMessage(error) });
     return result;
   }
 }

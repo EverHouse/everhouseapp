@@ -146,18 +146,29 @@ export async function handleChargeRefunded(client: PoolClient, charge: Stripe.Ch
     });
     
     if (refunded || amount_refunded >= amount) {
-    const participantUpdate = await client.query(
-      `WITH updated AS (
-        UPDATE booking_participants
-        SET payment_status = 'refunded', refunded_at = NOW()
-        WHERE stripe_payment_intent_id = $1 AND payment_status = 'paid'
-        RETURNING id, session_id, user_id
-      )
-      SELECT updated.id, updated.session_id, u.email AS user_email
-      FROM updated
-      LEFT JOIN users u ON u.id = updated.user_id`,
+    const lockedRows = await client.query(
+      `SELECT id FROM booking_participants
+       WHERE stripe_payment_intent_id = $1 AND payment_status = 'paid'
+       ORDER BY id ASC
+       FOR UPDATE`,
       [paymentIntentId]
     );
+    const lockedIds = lockedRows.rows.map((r: { id: number }) => r.id);
+
+    const participantUpdate = lockedIds.length > 0
+      ? await client.query(
+        `WITH updated AS (
+          UPDATE booking_participants
+          SET payment_status = 'refunded', refunded_at = NOW()
+          WHERE id = ANY($1::int[])
+          RETURNING id, session_id, user_id
+        )
+        SELECT updated.id, updated.session_id, u.email AS user_email
+        FROM updated
+        LEFT JOIN users u ON u.id = updated.user_id`,
+        [lockedIds]
+      )
+      : { rows: [], rowCount: 0 };
     
     if (participantUpdate.rowCount && participantUpdate.rowCount > 0) {
       logger.info(`[Stripe Webhook] Marked ${participantUpdate.rowCount} participant(s) as refunded for PI ${paymentIntentId} (full refund)`);
@@ -727,24 +738,28 @@ export async function handlePaymentIntentSucceeded(client: PoolClient, paymentIn
       );
     }
     
-    try {
-      const currentFees = await computeFeeBreakdown({ 
-        sessionId: snapshot.session_id, 
-        source: 'stripe',
-        excludeSessionFromUsage: true
-      });
-      
-      if (Math.abs(currentFees.totals.totalCents - snapshot.total_cents) > 100) {
-        logger.error(`[Stripe Webhook] Fee snapshot mismatch - potential drift detected`, { extra: { detail: {
-          sessionId: snapshot.session_id,
-          snapshotTotal: snapshot.total_cents,
-          currentTotal: currentFees.totals.totalCents,
-          difference: currentFees.totals.totalCents - snapshot.total_cents
-        } } });
+    const capturedSessionId = snapshot.session_id;
+    const capturedSnapshotTotal = snapshot.total_cents;
+    deferredActions.push(async () => {
+      try {
+        const currentFees = await computeFeeBreakdown({ 
+          sessionId: capturedSessionId, 
+          source: 'stripe',
+          excludeSessionFromUsage: true
+        });
+        
+        if (Math.abs(currentFees.totals.totalCents - capturedSnapshotTotal) > 100) {
+          logger.error(`[Stripe Webhook] Fee snapshot mismatch - potential drift detected`, { extra: { detail: {
+            sessionId: capturedSessionId,
+            snapshotTotal: capturedSnapshotTotal,
+            currentTotal: currentFees.totals.totalCents,
+            difference: currentFees.totals.totalCents - capturedSnapshotTotal
+          } } });
+        }
+      } catch (verifyError: unknown) {
+        logger.warn(`[Stripe Webhook] Could not verify fee breakdown for session ${capturedSessionId}:`, { error: getErrorMessage(verifyError) });
       }
-    } catch (verifyError: unknown) {
-      logger.warn(`[Stripe Webhook] Could not verify fee breakdown for session ${snapshot.session_id}:`, { error: verifyError });
-    }
+    });
     
     const snapshotFees: ParticipantFee[] = snapshot.participant_fees;
     const participantIds = snapshotFees.map(pf => pf.id);

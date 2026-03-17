@@ -179,7 +179,7 @@ export async function createPaymentIntent(
   
   await db.execute(sql`INSERT INTO stripe_payment_intents 
      (user_id, stripe_payment_intent_id, stripe_customer_id, amount_cents, purpose, booking_id, session_id, description, status, product_id, product_name)
-     VALUES (${dbUserId}, ${paymentIntent.id}, ${customerId}, ${amountCents}, ${purpose}, ${bookingId || null}, ${sessionId || null}, ${description}, 'pending', ${productId || null}, ${productName || null})`);
+     VALUES (${dbUserId}, ${paymentIntent.id}, ${customerId}, ${amountCents}, ${purpose}, ${bookingId ?? null}, ${sessionId ?? null}, ${description}, 'pending', ${productId ?? null}, ${productName ?? null})`);
 
   logger.info(`[Stripe] Created PaymentIntent ${paymentIntent.id} for ${purpose}: $${(amountCents / 100).toFixed(2)}${productName ? ` (${productName})` : ''}`);
 
@@ -609,7 +609,7 @@ export async function createBalanceAwarePayment(params: {
 
       await db.execute(sql`INSERT INTO stripe_payment_intents 
          (user_id, stripe_payment_intent_id, stripe_customer_id, amount_cents, purpose, booking_id, session_id, description, status)
-         VALUES (${userId}, ${`balance-${balanceTransaction.id}`}, ${stripeCustomerId}, ${amountCents}, ${purpose}, ${bookingId || null}, ${sessionId || null}, ${description}, 'succeeded')`);
+         VALUES (${userId}, ${`balance-${balanceTransaction.id}`}, ${stripeCustomerId}, ${amountCents}, ${purpose}, ${bookingId ?? null}, ${sessionId ?? null}, ${description}, 'succeeded')`);
 
       logger.info(`[Stripe] Member payment fully covered by balance: $${(amountCents / 100).toFixed(2)} for ${email}`);
 
@@ -693,7 +693,7 @@ export async function createBalanceAwarePayment(params: {
 
     await db.execute(sql`INSERT INTO stripe_payment_intents 
        (user_id, stripe_payment_intent_id, stripe_customer_id, amount_cents, purpose, booking_id, session_id, description, status)
-       VALUES (${userId}, ${paymentIntent.id}, ${stripeCustomerId}, ${amountCents}, ${purpose}, ${bookingId || null}, ${sessionId || null}, ${description}, 'pending')`);
+       VALUES (${userId}, ${paymentIntent.id}, ${stripeCustomerId}, ${amountCents}, ${purpose}, ${bookingId ?? null}, ${sessionId ?? null}, ${description}, 'pending')`);
 
     logger.info(`[Stripe] Member payment: total $${(amountCents / 100).toFixed(2)}, card charge: $${(remainingCents / 100).toFixed(2)}, credit consumed: $${(balanceToApply / 100).toFixed(2)}`);
 
@@ -803,7 +803,7 @@ export async function chargeWithBalance(params: {
 
     await db.execute(sql`INSERT INTO stripe_payment_intents 
        (user_id, stripe_payment_intent_id, stripe_customer_id, amount_cents, purpose, booking_id, session_id, description, status)
-       VALUES (${userId}, ${invoicePaymentIntentId}, ${stripeCustomerId}, ${amountCents}, ${purpose}, ${bookingId || null}, ${sessionId || null}, ${description}, ${paidInvoice.status === 'paid' ? 'succeeded' : paidInvoice.status})`);
+       VALUES (${userId}, ${invoicePaymentIntentId}, ${stripeCustomerId}, ${amountCents}, ${purpose}, ${bookingId ?? null}, ${sessionId ?? null}, ${description}, ${paidInvoice.status === 'paid' ? 'succeeded' : paidInvoice.status})`);
 
 
     logger.info(`[Stripe] Charged ${purpose} via invoice ${invoice.id}: $${(amountCents / 100).toFixed(2)} (balance: $${(amountFromBalance / 100).toFixed(2)}, card: $${(amountCharged / 100).toFixed(2)})`);
