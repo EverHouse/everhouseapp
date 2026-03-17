@@ -8,6 +8,14 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.87.55",
+    date: "2026-03-17",
+    title: "Fix Notification Mark Read & Dismiss Buttons",
+    changes: [
+      "Fixed: 'Mark all as read' and 'Dismiss all' notification buttons now work — the React Query migration had changed these to use POST requests, but the server requires PUT and DELETE respectively, causing silent 404 errors",
+    ]
+  },
+  {
     version: "8.87.54",
     date: "2026-03-17",
     title: "Error Handling Polish & Dead Code Cleanup",

@@ -617,7 +617,7 @@ export function useMarkAllNotificationsRead() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (email: string) =>
-      postWithCredentials<Record<string, unknown>>('/api/notifications/mark-all-read', { user_email: email }),
+      putWithCredentials<Record<string, unknown>>('/api/notifications/mark-all-read', { user_email: email }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [...adminTabKeys.all, 'staff-notifications'] });
     },
@@ -628,7 +628,11 @@ export function useDismissAllNotifications() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (email: string) =>
-      postWithCredentials<Record<string, unknown>>('/api/notifications/dismiss-all', { user_email: email }),
+      fetchWithCredentials<Record<string, unknown>>('/api/notifications/dismiss-all', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_email: email }),
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [...adminTabKeys.all, 'staff-notifications'] });
     },
