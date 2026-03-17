@@ -105,7 +105,7 @@ router.post('/api/auth/google/verify', requireGoogleConfig, authRateLimiterByIp,
 
     const dbMemberStatus = (user.membershipStatus || '').toLowerCase();
     const rawRole = (user.role || 'member').toLowerCase();
-    const role: 'admin' | 'staff' | 'member' = rawRole === 'admin' || rawRole === 'staff' ? rawRole : 'member';
+    const role: 'admin' | 'staff' | 'member' | 'visitor' = rawRole === 'admin' || rawRole === 'staff' ? rawRole : (rawRole === 'visitor' ? 'visitor' : 'member');
     const activeStatuses = ['active', 'trialing', 'past_due'];
 
     if (role === 'member' && !activeStatuses.includes(dbMemberStatus)) {
@@ -124,7 +124,7 @@ router.post('/api/auth/google/verify', requireGoogleConfig, authRateLimiterByIp,
       lastName: user.lastName || googleUser.lastName || '',
       email: user.email || googleUser.email,
       phone: user.phone || '',
-      tier: normalizeTierName(user.tier),
+      tier: role === 'visitor' ? null : normalizeTierName(user.tier),
       tags: user.tags || [],
       mindbodyClientId: user.mindbodyClientId || '',
       status: statusMap[dbMemberStatus] || (dbMemberStatus ? dbMemberStatus.charAt(0).toUpperCase() + dbMemberStatus.slice(1) : 'Active'),
@@ -242,7 +242,7 @@ router.post('/api/auth/google/callback', requireGoogleConfig, async (req, res) =
     const user = dbUser[0];
     const dbMemberStatus = (user.membershipStatus || '').toLowerCase();
     const rawRole2 = (user.role || 'member').toLowerCase();
-    const role: 'admin' | 'staff' | 'member' = rawRole2 === 'admin' || rawRole2 === 'staff' ? rawRole2 : 'member';
+    const role: 'admin' | 'staff' | 'member' | 'visitor' = rawRole2 === 'admin' || rawRole2 === 'staff' ? rawRole2 : (rawRole2 === 'visitor' ? 'visitor' : 'member');
     const activeStatuses = ['active', 'trialing', 'past_due'];
 
     if (role === 'member' && !activeStatuses.includes(dbMemberStatus)) {
@@ -261,7 +261,7 @@ router.post('/api/auth/google/callback', requireGoogleConfig, async (req, res) =
       lastName: user.lastName || googleUser.lastName || '',
       email: user.email || googleUser.email,
       phone: user.phone || '',
-      tier: normalizeTierName(user.tier),
+      tier: role === 'visitor' ? null : normalizeTierName(user.tier),
       tags: user.tags || [],
       mindbodyClientId: user.mindbodyClientId || '',
       status: statusMap2[dbMemberStatus] || (dbMemberStatus ? dbMemberStatus.charAt(0).toUpperCase() + dbMemberStatus.slice(1) : 'Active'),

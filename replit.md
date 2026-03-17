@@ -1,6 +1,6 @@
 # Ever Club Members App
 
-**Current Version**: 8.87.57 (March 17, 2026)
+**Current Version**: 8.87.58 (March 17, 2026)
 
 ## Overview
 The Ever Club Members App is a private members club application designed for golf and wellness centers. Its primary purpose is to serve as a central digital hub for managing golf simulator bookings, wellness service appointments, and club events. The project aims to enhance member satisfaction and operational efficiency through comprehensive membership management, facility booking, and community-building tools, ultimately creating a seamless digital experience for club members and staff.
@@ -166,6 +166,7 @@ Frontend data fetching is being migrated from raw `fetch()` calls to React Query
 **Patterns**: `staleTime` 2min default, 5-10min for static data. Type casting uses `as unknown as Type` for `Record<string, unknown>` returns. Mutations use `onSuccess`/`onError` callbacks.
 
 ### Recent Changes
+- **Visitor Tier Protection — Complete Auth Fix (v8.87.58)**: Fixed root cause of visitors showing "Social" tier across ALL login flows. `getUserRole()` now checks the `users` table for `role='visitor'` (was only checking `staff_users` table, defaulting everyone else to 'member'). All 5 auth login flows (password verify-member, magic link/OTP, passkey, Google OAuth, Apple Sign-In) now guard tier with `role === 'visitor' ? null : normalizeTierName(...)`. `upsertUserWithTier()` accepts `'visitor'` role and persists `tier=null` instead of normalizing to default 'Social'. `verify-member` endpoint now queries `role` column and returns correct role/tier for visitors. Key files: `server/routes/auth.ts`, `server/routes/auth-google.ts`, `server/routes/auth-apple.ts`, `server/routes/auth-passkey.ts`.
 - **Simplify Connection Banner — Offline Only (v8.87.57)**: OfflineBanner no longer shows "reconnecting" or "degraded" banners — the profile icon's colored dot handles that. Banner now only appears for full offline state. Removed `useRealtimeHealth` hook and the global WS signal bridge (`window.__staffWsConnected` + `staff-ws-status-change` event) since they only served the banner.
 - **Dead Code Cleanup — React Query Migration Leftovers (v8.87.56)**: Removed ~47 unused React Query hooks created during the data-fetching migration that were never adopted by components. Cleaned up `useAdminQueries.ts` (25 dead hooks), `useMemberPageQueries.ts` (16 dead hooks), `useBookingsQueries.ts` (12 dead hooks), plus 1 each from financials, cafe, and tours query files. Also removed orphaned query key definitions from `adminTabKeys`. All remaining hooks verified as actively imported by components.
 - **Fix Notification Mark Read & Dismiss Buttons (v8.87.55)**: Fixed `useMarkAllNotificationsRead` (was POST → now PUT) and `useDismissAllNotifications` (was POST → now DELETE with body) in `useAdminQueries.ts`. The React Query migration had changed these to use `postWithCredentials` but the server routes require PUT and DELETE respectively, causing 404 errors. Full audit confirmed all other used mutations have correct HTTP methods.

@@ -283,7 +283,7 @@ export const ParticipantDetailsModal: React.FC<ParticipantDetailsModalProps> = (
                                                         <p className="text-sm font-medium text-primary dark:text-white truncate">{member.name || member.email || 'Unknown'}</p>
                                                         <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{member.email}</p>
                                                     </div>
-                                                    <TierBadge tier={member.tier} size="sm" />
+                                                    <TierBadge tier={member.tier} size="sm" role={member.role} membershipStatus={member.membershipStatus} />
                                                 </button>
                                             ))}
                                         </div>

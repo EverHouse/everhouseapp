@@ -69,11 +69,21 @@ async function getStaffUserByEmail(email: string): Promise<StaffUserData | null>
   }
 }
 
-async function getUserRole(email: string): Promise<'admin' | 'staff' | 'member'> {
+async function getUserRole(email: string): Promise<'admin' | 'staff' | 'member' | 'visitor'> {
   const normalized = normalizeEmail(email);
   const staffUser = await getStaffUserByEmail(normalized);
   if (staffUser) {
     return staffUser.role;
+  }
+  try {
+    const result = await db.execute(
+      sql`SELECT role FROM users WHERE LOWER(email) = LOWER(${normalized}) LIMIT 1`
+    );
+    const rows = result.rows as Array<{ role: string | null }>;
+    if (rows.length > 0 && rows[0].role === 'visitor') {
+      return 'visitor';
+    }
+  } catch {
   }
   return 'member';
 }
@@ -93,15 +103,16 @@ interface UpsertUserData {
   mindbodyClientId?: string;
   tags?: string[];
   membershipStartDate?: string;
-  role?: 'admin' | 'staff' | 'member';
+  role?: 'admin' | 'staff' | 'member' | 'visitor';
 }
 
 async function upsertUserWithTier(data: UpsertUserData): Promise<string | null> {
   try {
     const normalizedEmailValue = normalizeEmail(data.email);
     const isStaffOrAdmin = data.role === 'admin' || data.role === 'staff';
+    const isVisitor = data.role === 'visitor';
     
-    const normalizedTier = isStaffOrAdmin ? 'VIP' : normalizeTierName(data.tierName);
+    const normalizedTier = isVisitor ? null : (isStaffOrAdmin ? 'VIP' : normalizeTierName(data.tierName));
     let tierId: number | null = null;
     
     if (normalizedTier) {
@@ -502,12 +513,14 @@ router.post('/api/auth/verify-member', async (req, res) => {
       stripeCustomerId: users.stripeCustomerId,
       mindbodyClientId: users.mindbodyClientId,
       hubspotId: users.hubspotId,
+      role: users.role,
     })
       .from(users)
       .where(sql`LOWER(${users.email}) = LOWER(${normalizedEmail})`)
       .limit(1);
     
     const hasDbUser = dbUser.length > 0;
+    const isVisitorUser = hasDbUser && dbUser[0].role === 'visitor';
     const isStripeBilled = hasDbUser && (dbUser[0].stripeSubscriptionId || dbUser[0].stripeCustomerId);
     
     // For Stripe-billed members: verify with Stripe and auto-correct status if needed
@@ -594,11 +607,11 @@ router.post('/api/auth/verify-member', async (req, res) => {
         email: dbUser[0].email || normalizedEmail,
         phone: dbUser[0].phone || '',
         jobTitle: '',
-        tier: normalizeTierName(dbUser[0].tier),
+        tier: isVisitorUser ? null : normalizeTierName(dbUser[0].tier),
         tags: dbUser[0].tags || [],
         mindbodyClientId: dbUser[0].mindbodyClientId || '',
         status: statusMap[dbMemberStatus] || (dbMemberStatus ? dbMemberStatus.charAt(0).toUpperCase() + dbMemberStatus.slice(1) : 'Active'),
-        role: 'member' as const
+        role: (isVisitorUser ? 'visitor' : 'member') as 'member' | 'visitor'
       };
       
       return res.json({ success: true, member });
@@ -650,7 +663,7 @@ router.post('/api/auth/verify-member', async (req, res) => {
       }
     }
     
-    const role = isStaffOrAdmin ? staffUserData!.role : 'member';
+    const role = isStaffOrAdmin ? staffUserData!.role : (isVisitorUser ? 'visitor' : 'member');
 
     // Prefer database data, fall back to HubSpot
     let firstName = dbUser[0]?.firstName || contact?.properties?.firstname || '';
@@ -703,7 +716,7 @@ router.post('/api/auth/verify-member', async (req, res) => {
       email: dbUser[0]?.email || contact?.properties?.email || normalizedEmail,
       phone,
       jobTitle,
-      tier: isStaffOrAdmin ? 'VIP' : normalizeTierName(dbUser[0]?.tier || contact?.properties?.membership_tier),
+      tier: isVisitorUser ? null : (isStaffOrAdmin ? 'VIP' : normalizeTierName(dbUser[0]?.tier || contact?.properties?.membership_tier)),
       tags: dbUser[0]?.tags || [],
       mindbodyClientId: dbUser[0]?.mindbodyClientId || contact?.properties?.mindbody_client_id || '',
       status: statusMap[memberStatusStr] || (memberStatusStr ? memberStatusStr.charAt(0).toUpperCase() + memberStatusStr.slice(1) : 'Active'),
@@ -1013,7 +1026,7 @@ router.post('/api/auth/verify-otp', async (req, res) => {
           lastName: dbUser[0].lastName || '',
           email: dbUser[0].email || normalizedEmail,
           phone: dbUser[0].phone || '',
-          tier: normalizeTierName(dbUser[0].tier),
+          tier: role === 'visitor' ? null : normalizeTierName(dbUser[0].tier),
           tags: (dbUser[0].tags || []) as string[],
           mindbodyClientId: dbUser[0].mindbodyClientId || '',
           status: statusMap[dbMemberStatus] || (dbMemberStatus ? dbMemberStatus.charAt(0).toUpperCase() + dbMemberStatus.slice(1) : 'Active'),
@@ -1080,7 +1093,7 @@ router.post('/api/auth/verify-otp', async (req, res) => {
           lastName: (hasDbUser ? dbUser[0].lastName : contact?.properties?.lastname) || '',
           email: (hasDbUser ? dbUser[0].email : contact?.properties?.email) || normalizedEmail,
           phone: (hasDbUser ? dbUser[0].phone : contact?.properties?.phone) || '',
-          tier: normalizeTierName(hasDbUser ? dbUser[0].tier : contact?.properties?.membership_tier),
+          tier: role === 'visitor' ? null : normalizeTierName(hasDbUser ? dbUser[0].tier : contact?.properties?.membership_tier),
           tags: tags as string[],
           mindbodyClientId: (hasDbUser ? dbUser[0].mindbodyClientId : contact?.properties?.mindbody_client_id) || '',
           status: statusMap[memberStatusStr] || (memberStatusStr ? memberStatusStr.charAt(0).toUpperCase() + memberStatusStr.slice(1) : 'Active'),
@@ -1098,7 +1111,7 @@ router.post('/api/auth/verify-otp', async (req, res) => {
     
     const dbUserId = await upsertUserWithTier({
       email: member.email,
-      tierName: member.tier || '',
+      tierName: member.tier ?? '',
       firstName: member.firstName,
       lastName: member.lastName,
       phone: member.phone,
@@ -1369,7 +1382,7 @@ router.post('/api/auth/password-login', ...authRateLimiter, async (req, res) => 
       lastName: memberData?.lastName || userRecord.name?.split(' ').slice(1).join(' ') || '',
       email: normalizedEmail,
       phone: memberData?.phone || '',
-      tier: memberData?.tier || DEFAULT_TIER,
+      tier: userRole === 'member' ? (memberData?.tier || DEFAULT_TIER) : null,
       tags: memberData?.tags || [],
       mindbodyClientId: memberData?.mindbodyClientId || '',
       membershipStartDate: memberData?.membershipStartDate || '',

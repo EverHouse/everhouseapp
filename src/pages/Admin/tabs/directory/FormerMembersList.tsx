@@ -145,7 +145,7 @@ const FormerMembersList: React.FC<FormerMembersListProps> = ({
                                 <div className="flex items-center justify-between gap-3 mt-3 pt-3 pb-2 border-t border-gray-50 dark:border-white/20">
                                     <div className="flex items-center gap-1.5 flex-wrap">
                                         <div className="flex items-center gap-1">
-                                            <TierBadge tier={m.lastTier || null} size="sm" showNoTier={true} membershipStatus={m.membershipStatus} />
+                                            <TierBadge tier={m.lastTier || null} size="sm" showNoTier={true} membershipStatus={m.membershipStatus} role={m.role} />
                                         </div>
                                         {m.membershipStatus && (
                                             <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${getMemberStatusBadgeClass(m.membershipStatus)}`}>

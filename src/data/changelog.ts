@@ -8,6 +8,16 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.87.58",
+    date: "2026-03-17",
+    title: "Visitor Tier Protection — Complete Auth Fix",
+    changes: [
+      "Fixed: Visitors no longer incorrectly display 'Social' tier — the root cause was all login flows defaulting unknown users to 'member' role, which triggered tier normalization to 'Social'",
+      "All five login methods (password, magic link, passkey, Google, Apple) now correctly detect visitor accounts and return null tier",
+      "The user record upsert during login no longer overwrites visitor tier with 'Social'",
+    ]
+  },
+  {
     version: "8.87.57",
     date: "2026-03-17",
     title: "Simplify Connection Banner — Offline Only",

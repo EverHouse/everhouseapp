@@ -131,7 +131,7 @@ router.post('/api/auth/apple/verify', requireAppleConfig, authRateLimiterByIp, a
 
     const dbMemberStatus = (user.membershipStatus || '').toLowerCase();
     const rawRole = (user.role || 'member').toLowerCase();
-    const role: 'admin' | 'staff' | 'member' = rawRole === 'admin' || rawRole === 'staff' ? rawRole : 'member';
+    const role: 'admin' | 'staff' | 'member' | 'visitor' = rawRole === 'admin' || rawRole === 'staff' ? rawRole : (rawRole === 'visitor' ? 'visitor' : 'member');
     const activeStatuses = ['active', 'trialing', 'past_due'];
 
     if (role === 'member' && !activeStatuses.includes(dbMemberStatus)) {
@@ -150,7 +150,7 @@ router.post('/api/auth/apple/verify', requireAppleConfig, authRateLimiterByIp, a
       lastName: user.lastName || (appleUser?.name?.lastName) || '',
       email: user.email || appleData.email,
       phone: user.phone || '',
-      tier: normalizeTierName(user.tier),
+      tier: role === 'visitor' ? null : normalizeTierName(user.tier),
       tags: user.tags || [],
       mindbodyClientId: user.mindbodyClientId || '',
       status: statusMap[dbMemberStatus] || (dbMemberStatus ? dbMemberStatus.charAt(0).toUpperCase() + dbMemberStatus.slice(1) : 'Active'),
