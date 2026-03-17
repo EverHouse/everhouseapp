@@ -309,16 +309,18 @@ const WaiverGate: React.FC = () => {
   const { user } = useAuthData();
   const [showWaiverModal, setShowWaiverModal] = useState(false);
   const [currentVersion, setCurrentVersion] = useState('1.0');
+  const queryClient = useQueryClient();
 
-  const { data: waiverStatus } = useQuery({
+  const { data: waiverStatus, isError } = useQuery<{ needsWaiverUpdate?: boolean; currentVersion?: string } | null>({
     queryKey: ['waiverStatus'],
     queryFn: async () => {
       const res = await fetch('/api/waivers/status', { credentials: 'include' });
-      if (!res.ok) return null;
+      if (!res.ok) throw new Error(`Waiver status check failed (${res.status})`);
       return res.json();
     },
     enabled: !!user?.email,
     staleTime: 5 * 60 * 1000,
+    retry: 3,
   });
 
   useEffect(() => {
@@ -328,6 +330,23 @@ const WaiverGate: React.FC = () => {
       setShowWaiverModal(true);
     }
   }, [waiverStatus]);
+
+  if (isError) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+        <div className="bg-white dark:bg-surface-dark-200 rounded-xl p-6 max-w-sm mx-4 text-center shadow-xl">
+          <p className="text-lg font-semibold mb-2">Unable to verify waiver status</p>
+          <p className="text-sm text-neutral-500 mb-4">Please check your connection and try again.</p>
+          <button
+            onClick={() => queryClient.invalidateQueries({ queryKey: ['waiverStatus'] })}
+            className="px-4 py-2 bg-primary text-white rounded-[4px] font-medium"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (!showWaiverModal) return null;
 

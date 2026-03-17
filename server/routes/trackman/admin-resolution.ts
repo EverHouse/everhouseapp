@@ -921,6 +921,10 @@ router.post('/api/admin/trackman/auto-resolve-same-email', isStaffOrAdmin, async
                  WHERE id = ${booking.id}`);
             
             const sameEmailDetails = await db.execute(sql`SELECT session_id, request_date, start_time, end_time, duration_minutes, resource_id, trackman_booking_id FROM booking_requests WHERE id = ${booking.id}`);
+            if (sameEmailDetails.rows.length === 0) {
+              logger.warn('[Auto-resolve] Booking disappeared after update', { extra: { bookingId: booking.id } });
+              continue;
+            }
             const sameEmailBD = sameEmailDetails.rows[0] as DbRow;
             let sameEmailSessionId = sameEmailBD?.session_id;
             

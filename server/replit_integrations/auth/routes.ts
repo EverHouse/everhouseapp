@@ -36,7 +36,7 @@ export function registerAuthRoutes(app: Express): void {
       const userResult = await db.select({ id: users.id, tags: users.tags })
         .from(users)
         .where(sql`LOWER(${users.email}) = LOWER(${user.email})`);
-      const dbUser = userResult[0];
+      const dbUser = userResult.length > 0 ? userResult[0] : null;
       
       // Count past bookings using UNION for deduplication
       // Include: host (owner), player (booking_members), guest (booking_guests)
