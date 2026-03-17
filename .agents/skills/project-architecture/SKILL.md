@@ -128,16 +128,20 @@ Response field names must EXACTLY match frontend TypeScript interfaces. Verify f
 ### 6. Safe Database Operations (v8.75.0+)
 Use `db.transaction(async (tx) => { ... })` from Drizzle ORM for multi-statement operations. **BANNED:** Empty `catch {}` blocks anywhere in server code. Drizzle handles `BEGIN`/`COMMIT`/`ROLLBACK` automatically. The callback receives a `tx` object — use `tx.insert()`, `tx.update()`, `tx.execute()` etc. For scheduler error alerting, use `alertOnScheduledTaskFailure()` from `server/core/dataAlerts.ts`.
 
-### 7. Database Migrations
+### 7. Database Migrations & FK Constraints
 For development: Use `npm run db:push` for schema sync. Schema changes go in `shared/models/*.ts`, then push.
 
-**For deployment:** Replit runs Drizzle file-based migrations from `drizzle/`. EVERY FK constraint (`.references()`) in the Drizzle schema MUST have a corresponding migration file in `drizzle/`. If a constraint exists in the schema but not in a migration, Drizzle auto-generates an ALTER TABLE during deployment — which FAILS if production has orphaned data violating the constraint. When adding new FK constraints to the schema:
-1. Create a numbered migration file (e.g., `drizzle/0058_description.sql`)
-2. First clean up orphaned data (UPDATE SET NULL or DELETE as appropriate)
-3. Drop any legacy constraint names (`DROP CONSTRAINT IF EXISTS`)
-4. Add the Drizzle-named constraint (naming convention: `{table}_{column}_{ref_table}_{ref_column}_fk`)
-5. Add the entry to `drizzle/meta/_journal.json`
-6. The sync script auto-registers new entries on next build/deploy
+**CRITICAL — FK constraints and deployment:** Replit's deployment system auto-generates migrations by comparing the Drizzle schema to production. If the schema has `.references()` on a column but the FK constraint doesn't exist in production, the deployment generates an `ALTER TABLE ADD CONSTRAINT` statement — which FAILS if production has orphaned data violating the constraint. The auto-generated migration does NOT include data cleanup.
+
+**Rule: Do NOT use `.references()` in the Drizzle schema for FK constraints that don't already exist in production.** Instead, manage them at runtime via `db-init.ts`:
+1. Clean up orphaned data first (UPDATE SET NULL or DELETE)
+2. DROP any existing constraint names (both `_fkey` and `_fk` variants)
+3. ADD the FK constraint with `_fkey` naming
+4. Wrap in try/catch so startup doesn't fail
+
+The `.references()` declarations that DO exist in the schema (e.g., `booking_requests.user_id`, `booking_requests.resource_id`) are safe because their FK constraints already exist in production from earlier migrations (0022, 0023, etc.).
+
+FK constraints managed at runtime by `db-init.ts` (NOT in schema): `booking_requests.session_id`, `booking_requests.closure_id`, `booking_participants.{session_id, user_id, guest_id}`, `wellness_enrollments.class_id`, `booking_fee_snapshots.{booking_id, session_id}`, `guest_pass_holds.booking_id`, `conference_prepayments.booking_id`, `booking_wallet_passes.{booking_id, member_id}`.
 
 ### 8. No External API Calls in DB Transactions (v8.12.0)
 HTTP calls to Stripe, HubSpot, or any external service must NOT be made inside `BEGIN`/`COMMIT` blocks. They hold connections while waiting for network responses. Use the deferred action pattern (`deferredActions.push(async () => { ... })`) or DB-side checks instead. Exceptions: 5 Stripe/HubSpot calls that must stay in-transaction (customer retrieve, product retrieve, payment methods list, company sync, prices retrieve in guestPassConsumer) are wrapped with 5-second `Promise.race()` timeouts and marked with `// NOTE: Must stay in transaction` comments. See `stripe-webhook-flow` skill for the full pattern.

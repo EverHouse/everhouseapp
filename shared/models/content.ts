@@ -103,7 +103,7 @@ export const wellnessClasses = pgTable("wellness_classes", {
 // Wellness enrollments table - class registrations
 export const wellnessEnrollments = pgTable("wellness_enrollments", {
   id: serial("id").primaryKey(),
-  classId: integer("class_id").references(() => wellnessClasses.id, { onDelete: 'cascade' }),
+  classId: integer("class_id"), // FK to wellness_classes.id managed by db-init.ts (not schema) to avoid deployment migration conflicts
   userEmail: varchar("user_email").notNull(),
   status: varchar("status").default("confirmed"),
   isWaitlisted: boolean("is_waitlisted").default(false),

@@ -12,8 +12,8 @@ import {
   text,
   serial,
 } from "drizzle-orm/pg-core";
-import { bookingRequests } from "./scheduling";
-import { bookingSessions } from "./scheduling";
+// FK constraints for booking_fee_snapshots are managed by db-init.ts (not schema .references())
+// to avoid deployment migration conflicts with orphaned production data
 
 // --- Unified Fee Service Types ---
 
@@ -80,8 +80,8 @@ export const bookingFeeSnapshots = pgTable(
   "booking_fee_snapshots",
   {
     id: serial("id").primaryKey(),
-    bookingId: integer("booking_id").notNull().references(() => bookingRequests.id, { onDelete: 'cascade' }),
-    sessionId: integer("session_id").references(() => bookingSessions.id, { onDelete: 'cascade' }),
+    bookingId: integer("booking_id").notNull(), // FK to booking_requests.id managed by db-init.ts (not schema) to avoid deployment migration conflicts
+    sessionId: integer("session_id"), // FK to booking_sessions.id managed by db-init.ts (not schema) to avoid deployment migration conflicts
     participantFees: jsonb("participant_fees").notNull(),
     totalCents: integer("total_cents").notNull(),
     stripePaymentIntentId: varchar("stripe_payment_intent_id", { length: 255 }),

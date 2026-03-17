@@ -70,7 +70,7 @@ export const bookingRequests = pgTable("booking_requests", {
   trackmanBookingId: varchar("trackman_booking_id"),
   guestCount: integer("guest_count").default(0),
   trackmanPlayerCount: integer("trackman_player_count"),
-  sessionId: integer("session_id").references(() => bookingSessions.id, { onDelete: 'set null' }),
+  sessionId: integer("session_id"), // FK to booking_sessions.id managed by db-init.ts (not schema) to avoid deployment migration conflicts
   declaredPlayerCount: integer("declared_player_count"),
   finalPlayerCount: integer("final_player_count"),
   memberNotes: varchar("member_notes", { length: 280 }),
@@ -109,7 +109,7 @@ export const bookingRequests = pgTable("booking_requests", {
   // Optimistic locking version for roster edits to prevent concurrent overwrites
   rosterVersion: integer("roster_version").default(0),
   // Link to facility closure when booking is marked as private event
-  closureId: integer("closure_id").references(() => facilityClosures.id, { onDelete: 'set null' }),
+  closureId: integer("closure_id"), // FK to facility_closures.id managed by db-init.ts (not schema) to avoid deployment migration conflicts
   cancellationPendingAt: timestamp("cancellation_pending_at"),
 }, (table) => [
   uniqueIndex("idx_booking_requests_trackman_booking_id").on(table.trackmanBookingId),
@@ -284,9 +284,9 @@ export const usageLedger = pgTable("usage_ledger", {
 // Booking participants table - unified table for all participants (replaces booking_members/booking_guests)
 export const bookingParticipants = pgTable("booking_participants", {
   id: serial("id").primaryKey(),
-  sessionId: integer("session_id").notNull().references(() => bookingSessions.id, { onDelete: 'cascade' }),
-  userId: varchar("user_id").references(() => users.id, { onDelete: 'set null' }),
-  guestId: integer("guest_id").references(() => guests.id, { onDelete: 'set null' }),
+  sessionId: integer("session_id").notNull(), // FK to booking_sessions.id managed by db-init.ts (not schema) to avoid deployment migration conflicts
+  userId: varchar("user_id"), // FK to users.id managed by db-init.ts (not schema) to avoid deployment migration conflicts
+  guestId: integer("guest_id"), // FK to guests.id managed by db-init.ts (not schema) to avoid deployment migration conflicts
   participantType: participantTypeEnum("participant_type").notNull(),
   displayName: varchar("display_name").notNull(),
   slotDuration: integer("slot_duration"),
@@ -398,10 +398,10 @@ export type InsertTrackmanBaySlot = typeof trackmanBaySlots.$inferInsert;
 
 export const bookingWalletPasses = pgTable("booking_wallet_passes", {
   id: serial("id").primaryKey(),
-  bookingId: integer("booking_id").notNull().references(() => bookingRequests.id, { onDelete: 'cascade' }),
+  bookingId: integer("booking_id").notNull(), // FK to booking_requests.id managed by db-init.ts (not schema) to avoid deployment migration conflicts
   serialNumber: varchar("serial_number").notNull().unique(),
   authenticationToken: varchar("authentication_token").notNull(),
-  memberId: varchar("member_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
+  memberId: varchar("member_id").notNull(), // FK to users.id managed by db-init.ts (not schema) to avoid deployment migration conflicts
   createdAt: timestamp("created_at").defaultNow(),
   voidedAt: timestamp("voided_at"),
 }, (table) => [

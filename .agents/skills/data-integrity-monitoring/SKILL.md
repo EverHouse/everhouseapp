@@ -79,7 +79,7 @@ What type of alert?
 12. **Abandoned pending cleanup (every 6h).** Delete users pending >24h with no Stripe subscription, cascade-deleting related records in transaction.
 13. **Drizzle SQL null safety.** All optional values in `sql` template literals MUST use `?? null`. Prevents empty placeholder syntax errors.
 14. **Webhook dedup cleanup.** `cleanupOldProcessedEvents()` runs probabilistically (5% of webhooks).
-15. **FK constraints must be in migration files.** All `.references()` in Drizzle schema must have a corresponding migration in `drizzle/`. Migration 0058 added all previously missing FK constraints with data cleanup. `db-init.ts` no longer manages FK constraints that are covered by migrations — only remaining legacy FKs (usage_ledger, trackman_webhook_events, booking_wallet_passes) are still cleaned up at runtime. See `project-architecture` Rule 7.
+15. **FK constraints must NOT use `.references()` unless already in production.** Replit's deployment auto-generates migrations from Drizzle schema — if `.references()` exists but the FK isn't in production, deployment fails on orphaned data. FK constraints for tables with potential orphans are managed at runtime by `db-init.ts` (orphan cleanup → DROP IF EXISTS → ADD CONSTRAINT). See `project-architecture` Rule 7 for the full list.
 
 ## Anti-Patterns (NEVER)
 
