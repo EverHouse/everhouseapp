@@ -99,7 +99,7 @@ Has trackman_booking_id?
 
 26. **Notifications via `notifyMember()` / `notifyAllStaff()` only (v8.87.28).** NEVER insert directly into the `notifications` table from booking files. Use `notifyMember()` for member notifications and `notifyAllStaff()` for staff-wide notifications from `server/core/notificationService.ts`. These handle in-app DB insert, WebSocket broadcast, and push notification delivery in a single call.
 27. **Trackman service uses structured logger (v8.87.28).** NEVER use `process.stderr.write` in `server/core/trackman/service.ts`. All logging uses `logger.info/warn/error` with structured metadata.
-28. **Wallet pass hooks on Trackman import changes (v8.87.13).** When a Trackman import updates a booking's time, duration, or bay assignment, call `refreshBookingPass(bookingId)` to regenerate the Apple Wallet pass with updated details. When a Trackman import cancels a booking, call `voidBookingPass(bookingId)` to invalidate the pass. Both are fire-and-forget (`.catch(err => logger.error(...))`). Import from `../../walletPass/bookingPassService`.
+28. **Wallet pass hooks on ALL booking cancellations (v8.87.61).** Every code path that cancels a booking MUST call `voidBookingPass(bookingId)` (fire-and-forget with `.catch()`). This includes: single-booking cancellations, bulk conflict cancellations in `webhook-billing.ts`, conflict cancellations via `runConflictCancellationSideEffects` in `webhook-modification.ts`/`webhook-matching.ts`, member archive bulk cancels in `admin-actions.ts`, and `cancellation_pending` transitions. When a Trackman import updates a booking's time/duration/bay, call `refreshBookingPass(bookingId)` to regenerate the pass. Import from `../../walletPass/bookingPassService`.
 
 ## Anti-Patterns (NEVER)
 

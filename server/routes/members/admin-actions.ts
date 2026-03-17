@@ -23,6 +23,7 @@ import { invalidateCache } from '../../core/queryCache';
 import { validateBody } from '../../middleware/validate';
 import { tierChangeSchema, createMemberSchema } from '../../../shared/validators/members';
 import { sendPassUpdateForMemberByEmail } from '../../walletPass/apnPushService';
+import { voidBookingPass } from '../../walletPass/bookingPassService';
 
 const router = Router();
 
@@ -428,6 +429,7 @@ router.delete('/api/members/:email', isStaffOrAdmin, async (req, res) => {
     let wellnessEnrollmentsCancelled = 0;
     let eventRsvpsRemoved = 0;
     let bookingParticipantsRemoved = 0;
+    let cancelledBookingIds: number[] = [];
     try {
       await client.query('BEGIN');
 
@@ -441,10 +443,12 @@ router.delete('/api/members/:email', isStaffOrAdmin, async (req, res) => {
            staff_notes = COALESCE(staff_notes, '') || ' [Auto-cancelled: member archived]'
          WHERE (LOWER(user_email) = $1 OR user_id = $2)
            AND status IN ('pending', 'pending_approval', 'approved', 'confirmed')
-           AND request_date >= (NOW() AT TIME ZONE 'America/Los_Angeles')::date`,
+           AND request_date >= (NOW() AT TIME ZONE 'America/Los_Angeles')::date
+         RETURNING id`,
         [normalizedEmail, String(userId)]
       );
       futureBookingsCancelled = futureBookingsResult.rowCount || 0;
+      cancelledBookingIds = futureBookingsResult.rows.map((row: { id: number }) => row.id);
 
       const holdsResult = await client.query(
         `DELETE FROM guest_pass_holds WHERE LOWER(member_email) = $1`,
@@ -503,6 +507,12 @@ router.delete('/api/members/:email', isStaffOrAdmin, async (req, res) => {
       throw txError;
     } finally {
       safeRelease(client);
+    }
+
+    for (const bookingId of cancelledBookingIds) {
+      voidBookingPass(bookingId).catch(err =>
+        logger.warn('[Admin] Void pass failed for archive-cancelled booking (non-fatal)', { extra: { bookingId, error: getErrorMessage(err) } })
+      );
     }
 
     if (futureBookingsCancelled > 0) {

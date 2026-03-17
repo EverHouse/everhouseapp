@@ -8,6 +8,16 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.87.61",
+    date: "2026-03-17",
+    title: "Wallet Booking Pass Voids — Bulk Cancellation Coverage",
+    changes: [
+      "Fixed: When Trackman supersedes existing bookings (conflict cancellation), wallet booking passes are now voided for each cancelled booking",
+      "Fixed: When a member is archived by staff, all their future bookings' wallet passes are now voided alongside the cancellation",
+      "These fixes cover the remaining edge cases where bookings were bulk-cancelled but the member's Apple Wallet pass still showed the old booking",
+    ]
+  },
+  {
     version: "8.87.60",
     date: "2026-03-17",
     title: "Apple Wallet Pass — Complete Lifecycle Coverage",

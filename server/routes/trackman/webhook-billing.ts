@@ -14,6 +14,7 @@ import { calculateDurationMinutes } from './webhook-helpers';
 import { createPrepaymentIntent } from '../../core/billing/prepaymentService';
 import { syncBookingInvoice } from '../../core/billing/bookingInvoiceService';
 import { transferRequestParticipantsToSession } from '../../core/trackmanImport';
+import { voidBookingPass } from '../../walletPass/bookingPassService';
 
 export async function updateBaySlotCache(
   trackmanBookingId: string,
@@ -82,6 +83,11 @@ export async function createBookingForMember(
           logger.info('[Trackman Webhook] createBookingForMember cancelled overlapping bookings before update', {
             extra: { trackmanBookingId, cancelledBookingIds: ids }
           });
+          for (const id of ids) {
+            voidBookingPass(id).catch(err =>
+              logger.warn('[Trackman Webhook] Void pass failed for conflict-cancelled booking (non-fatal)', { extra: { bookingId: id, error: getErrorMessage(err) } })
+            );
+          }
         }
       };
 
@@ -512,6 +518,11 @@ export async function createBookingForMember(
           logger.info('[Trackman Webhook] Cancelled conflicting bookings for member booking', {
             extra: { trackmanBookingId, cancelledBookingIds: conflictIds }
           });
+          for (const id of conflictIds) {
+            voidBookingPass(id).catch(err =>
+              logger.warn('[Trackman Webhook] Void pass failed for conflict-cancelled booking (non-fatal)', { extra: { bookingId: id, error: getErrorMessage(err) } })
+            );
+          }
         }
 
         result = await db.execute(sql`INSERT INTO booking_requests 
