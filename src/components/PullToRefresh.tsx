@@ -125,6 +125,7 @@ const PullToRefresh: React.FC<PullToRefreshProps> = ({ children, onRefresh, disa
     
     const handleWheel = (e: WheelEvent) => {
       if (disabled || isModalOpen || isRefreshing || isFillingScreen || isSpringBack) return;
+      if (document.body.hasAttribute('data-programmatic-scroll')) return;
       
       const scrollTop = window.scrollY || document.documentElement.scrollTop;
       
@@ -223,6 +224,8 @@ const PullToRefresh: React.FC<PullToRefreshProps> = ({ children, onRefresh, disa
 
     const onTouchStart = (e: TouchEvent) => {
       if (disabledRef.current || isModalOpenRef.current || isRefreshingRef.current || isSpringBackRef.current || hasActiveLocks()) return;
+
+      if (document.body.hasAttribute('data-programmatic-scroll')) return;
 
       const container = containerRef.current;
       if (container && !container.contains(e.target as Node)) return;

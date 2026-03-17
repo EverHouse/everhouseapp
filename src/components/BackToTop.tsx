@@ -38,15 +38,12 @@ const BackToTop: React.FC<BackToTopProps> = ({
     const fabObserver = new MutationObserver(checkFab);
     fabObserver.observe(document.body, { attributes: true, attributeFilter: ['data-fab-count'] });
 
-    const navObserver = new MutationObserver(() => {
-      requestAnimationFrame(checkBottomNav);
-    });
-    navObserver.observe(document.body, { childList: true, subtree: true });
+    const navCheckInterval = setInterval(checkBottomNav, 2000);
     window.addEventListener('resize', checkMobile);
 
     return () => {
       fabObserver.disconnect();
-      navObserver.disconnect();
+      clearInterval(navCheckInterval);
       window.removeEventListener('resize', checkMobile);
     };
   }, []);
@@ -67,9 +64,21 @@ const BackToTop: React.FC<BackToTopProps> = ({
   const isVisible = pastThreshold && !isAtTop && direction === 'up';
 
   const handleClick = useCallback(() => {
-    const scrollingElement = document.scrollingElement || document.documentElement;
+    document.body.setAttribute('data-programmatic-scroll', 'true');
     window.scrollTo({ top: 0, behavior: 'smooth' });
-    scrollingElement.scrollTo({ top: 0, behavior: 'smooth' });
+
+    const clearFlag = () => {
+      if (window.scrollY <= 0) {
+        document.body.removeAttribute('data-programmatic-scroll');
+        window.removeEventListener('scroll', clearFlag);
+        clearTimeout(fallbackTimer);
+      }
+    };
+    window.addEventListener('scroll', clearFlag, { passive: true });
+    const fallbackTimer = setTimeout(() => {
+      document.body.removeAttribute('data-programmatic-scroll');
+      window.removeEventListener('scroll', clearFlag);
+    }, 1500);
   }, []);
 
   let bottomValue: string;
