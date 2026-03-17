@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import ModalShell from '../../ModalShell';
 import { haptic } from '../../../utils/haptics';
 import { formatDatePacific, formatDateTimePacific, formatTimePacific } from '../../../utils/dateUtils';
@@ -7,7 +8,8 @@ import RedemptionSuccessCard from './redeemPass/RedemptionSuccessCard';
 import UnredeemedPassesList from './redeemPass/UnredeemedPassesList';
 import PassSearchResults from './redeemPass/PassSearchResults';
 import { formatPassType } from './redeemPass/types';
-import type { SectionProps, RedemptionSuccess, DayPass, RedemptionLog, ErrorState, UnredeemedPass, DayPassUpdateEvent } from './redeemPass/types';
+import type { SectionProps, RedemptionSuccess, PassHolder, DayPass, RedemptionLog, ErrorState, UnredeemedPass, DayPassUpdateEvent } from './redeemPass/types';
+import { fetchWithCredentials, postWithCredentials } from '../../../hooks/queries/useFetch';
 
 export type { SectionProps, RedemptionLog };
 // eslint-disable-next-line react-refresh/only-export-components
@@ -48,12 +50,9 @@ const RedeemDayPassSection: React.FC<SectionProps> = ({ onClose, variant = 'moda
   const fetchUnredeemedPasses = useCallback(async () => {
     setIsLoadingUnredeemed(true);
     try {
-      const res = await fetch('/api/staff/passes/unredeemed', { credentials: 'include' });
-      if (res.ok) {
-        const data = await res.json();
-        setUnredeemedPasses(data.passes || []);
-        previousPassesRef.current = data.passes || [];
-      }
+      const data = await fetchWithCredentials<{ passes: UnredeemedPass[] }>('/api/staff/passes/unredeemed');
+      setUnredeemedPasses(data.passes || []);
+      previousPassesRef.current = data.passes || [];
     } catch (err: unknown) {
       console.error('[RedeemPassCard] Error fetching unredeemed passes:', err);
     } finally {
@@ -117,12 +116,7 @@ const RedeemDayPassSection: React.FC<SectionProps> = ({ onClose, variant = 'moda
     setErrorState(null);
     setSuccessMessage(null);
     try {
-      const res = await fetch(`/api/staff/passes/search?email=${encodeURIComponent(searchEmail.trim())}`, { credentials: 'include' });
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || 'Failed to search passes');
-      }
-      const data = await res.json();
+      const data = await fetchWithCredentials<{ passes: DayPass[] }>(`/api/staff/passes/search?email=${encodeURIComponent(searchEmail.trim())}`);
       setPasses(data.passes || []);
       setHasSearched(true);
     } catch (err: unknown) {
@@ -145,24 +139,13 @@ const RedeemDayPassSection: React.FC<SectionProps> = ({ onClose, variant = 'moda
       return updated.filter(pass => pass.remainingUses > 0);
     });
     try {
-      const res = await fetch(`/api/staff/passes/${passId}/redeem`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        credentials: 'include', body: JSON.stringify({ force })
-      });
-      if (!res.ok) {
-        const data = await res.json();
-        setUnredeemedPasses(previousUnredeemed);
-        setErrorState({ message: data.error || 'Failed to redeem pass', errorCode: data.errorCode || 'UNKNOWN_ERROR', passDetails: data.passDetails });
-        setConfirmingRedeemAnyway(null);
-        return;
-      }
-      const data = await res.json();
+      const data = await postWithCredentials<{ passHolder?: PassHolder; remainingUses: number; redeemedAt?: string; error?: string; errorCode?: string; passDetails?: Record<string, unknown> }>(`/api/staff/passes/${passId}/redeem`, { force });
       haptic.success();
       if (data.passHolder) {
-        const successInfo: RedemptionSuccess = { passHolder: data.passHolder, remainingUses: data.remainingUses, redeemedAt: data.redeemedAt };
+        const successInfo: RedemptionSuccess = { passHolder: data.passHolder, remainingUses: data.remainingUses, redeemedAt: data.redeemedAt || '' };
         setRedemptionSuccess(successInfo);
         if (onRedemptionSuccess) {
-          onRedemptionSuccess({ passHolder: data.passHolder, remainingUses: data.remainingUses, productType: data.passHolder.productType, redeemedAt: data.redeemedAt });
+          onRedemptionSuccess({ passHolder: data.passHolder, remainingUses: data.remainingUses, productType: data.passHolder.productType, redeemedAt: data.redeemedAt || '' });
         }
       } else {
         setSuccessMessage(`Pass redeemed! ${data.remainingUses} uses remaining.`);
@@ -243,15 +226,7 @@ const RedeemDayPassSection: React.FC<SectionProps> = ({ onClose, variant = 'moda
     setUnredeemedPasses(prev => prev.filter(pass => pass.id !== passId));
     setConfirmingRefundId(null);
     try {
-      const res = await fetch(`/api/staff/passes/${passId}/refund`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
-      });
-      if (!res.ok) {
-        const data = await res.json();
-        setUnredeemedPasses(previousUnredeemed);
-        setErrorState({ message: data.error || 'Failed to refund pass', errorCode: data.errorCode || 'REFUND_ERROR' });
-        return;
-      }
+      await postWithCredentials<Record<string, unknown>>(`/api/staff/passes/${passId}/refund`, {});
       haptic.success();
       setSuccessMessage('Pass refunded successfully');
       setTimeout(() => setSuccessMessage(null), 3000);
@@ -280,9 +255,7 @@ const RedeemDayPassSection: React.FC<SectionProps> = ({ onClose, variant = 'moda
     if (cached) { setExpandedPassId(passId); return; }
     setLoadingHistoryId(passId);
     try {
-      const res = await fetch(`/api/staff/passes/${passId}/history`, { credentials: 'include' });
-      if (!res.ok) { const data = await res.json(); throw new Error(data.error || 'Failed to fetch history'); }
-      const data = await res.json();
+      const data = await fetchWithCredentials<{ logs: RedemptionLog[] }>(`/api/staff/passes/${passId}/history`);
       setHistoryData(prev => [...prev, { passId, logs: data.logs || [] }]);
       setExpandedPassId(passId);
     } catch (err: unknown) {

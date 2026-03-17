@@ -16,6 +16,7 @@ import { AnimatedPage } from '../motion';
 import { useBookingActions } from '../../hooks/useBookingActions';
 import { playSound } from '../../utils/sounds';
 import { parseQrCode } from '../../utils/qrCodeParser';
+import { postWithCredentials, putWithCredentials } from '../../hooks/queries/useFetch';
 
 import { useCommandCenterData } from './hooks/useCommandCenterData';
 import { formatTodayDate } from './helpers';
@@ -154,21 +155,27 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
       const memberId = parsed.memberId;
       try {
         showToast('Processing check-in...', 'info');
-        const response = await fetch('/api/staff/qr-checkin', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ memberId })
-        });
-        const result = await response.json();
-        if (response.ok && result.success) {
+        const result = await postWithCredentials<{
+          success?: boolean;
+          hasBooking?: boolean;
+          bookingId?: number;
+          memberName?: string;
+          memberEmail?: string;
+          pinnedNotes?: Array<{ content: string; createdBy: string }>;
+          tier?: string | null;
+          membershipStatus?: string | null;
+          bookingDetails?: { bayName: string; startTime: string; endTime: string; resourceType: string } | null;
+          alreadyCheckedIn?: boolean;
+          error?: string;
+        }>('/api/staff/qr-checkin', { memberId });
+        if (result.success) {
           if (result.hasBooking && result.bookingId) {
             const booking = data.todaysBookings.find(b => Number(b.id) === Number(result.bookingId));
             pendingQrBookingRef.current = {
-              memberName: result.memberName,
+              memberName: result.memberName ?? '',
               pinnedNotes: result.pinnedNotes || [],
-              tier: result.tier,
-              membershipStatus: result.membershipStatus,
+              tier: result.tier ?? null,
+              membershipStatus: result.membershipStatus ?? null,
               bookingDetails: result.bookingDetails || null
             };
             if (booking) {
@@ -177,8 +184,8 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
             } else {
               const syntheticBooking: BookingRequest = {
                 id: result.bookingId,
-                user_email: result.memberEmail,
-                user_name: result.memberName,
+                user_email: result.memberEmail ?? '',
+                user_name: result.memberName ?? '',
                 status: BOOKING_STATUS.APPROVED,
                 bay_name: result.bookingDetails?.bayName || 'Bay',
                 start_time: result.bookingDetails?.startTime || '',
@@ -205,10 +212,10 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
         } else if (result.alreadyCheckedIn && result.hasBooking && result.bookingId) {
           const booking = data.todaysBookings.find(b => Number(b.id) === Number(result.bookingId));
           pendingQrBookingRef.current = {
-            memberName: result.memberName,
+            memberName: result.memberName ?? '',
             pinnedNotes: result.pinnedNotes || [],
-            tier: result.tier,
-            membershipStatus: result.membershipStatus,
+            tier: result.tier ?? null,
+            membershipStatus: result.membershipStatus ?? null,
             bookingDetails: result.bookingDetails || null
           };
           if (booking) {
@@ -347,24 +354,13 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
     }
 
     try {
-      const res = await fetch(`/api/booking-requests/${apiId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ 
-          status: BOOKING_STATUS.APPROVED,
-          trackman_booking_id: trackmanBookingId
-        })
+      await putWithCredentials(`/api/booking-requests/${apiId}`, { 
+        status: BOOKING_STATUS.APPROVED,
+        trackman_booking_id: trackmanBookingId
       });
-      if (res.ok) {
-        showToast('Booking confirmed with Trackman', 'success');
-        window.dispatchEvent(new CustomEvent('booking-action-completed'));
-        refresh();
-      } else {
-        const error = await res.json().catch(() => ({}));
-        updatePendingRequests(() => previousPendingRequests);
-        throw new Error(error.error || 'Failed to confirm booking');
-      }
+      showToast('Booking confirmed with Trackman', 'success');
+      window.dispatchEvent(new CustomEvent('booking-action-completed'));
+      refresh();
     } catch (err: unknown) {
       updatePendingRequests(() => previousPendingRequests);
       throw err;
@@ -373,25 +369,11 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
 
   const handleDevConfirm = async (bookingId: number | string) => {
     const apiId = typeof bookingId === 'string' ? parseInt(String(bookingId).replace('cal_', '')) : bookingId;
-    // eslint-disable-next-line no-useless-catch
-    try {
-      const res = await fetch(`/api/admin/bookings/${apiId}/dev-confirm`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include'
-      });
-      const resData = await res.json();
-      if (res.ok) {
-        const totalFee = (resData.totalFeeCents || 0) / 100;
-        showToast(`Confirmed! Total fees: $${totalFee.toFixed(2)}`, 'success');
-        window.dispatchEvent(new CustomEvent('booking-action-completed'));
-        refresh();
-      } else {
-        throw new Error(resData.error || 'Failed to confirm');
-      }
-    } catch (err: unknown) {
-      throw err;
-    }
+    const resData = await postWithCredentials<{ totalFeeCents?: number }>(`/api/admin/bookings/${apiId}/dev-confirm`, {});
+    const totalFee = (resData.totalFeeCents || 0) / 100;
+    showToast(`Confirmed! Total fees: $${totalFee.toFixed(2)}`, 'success');
+    window.dispatchEvent(new CustomEvent('booking-action-completed'));
+    refresh();
   };
 
   const handleApprove = async (request: BookingRequest) => {
@@ -413,21 +395,10 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
     updateRecentActivity(prev => [newActivity, ...prev]);
     
     try {
-      const res = await fetch(`/api/booking-requests/${apiId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ status: BOOKING_STATUS.APPROVED })
-      });
-      if (res.ok) {
-        showToast('Booking approved', 'success');
-        window.dispatchEvent(new CustomEvent('booking-action-completed'));
-        refresh();
-      } else {
-        updatePendingRequests(() => previousPendingRequests);
-        updateRecentActivity(prev => prev.filter(a => a.id !== newActivity.id));
-        showToast('Failed to approve booking', 'error');
-      }
+      await putWithCredentials(`/api/booking-requests/${apiId}`, { status: BOOKING_STATUS.APPROVED });
+      showToast('Booking approved', 'success');
+      window.dispatchEvent(new CustomEvent('booking-action-completed'));
+      refresh();
     } catch (_err: unknown) {
       updatePendingRequests(() => previousPendingRequests);
       updateRecentActivity(prev => prev.filter(a => a.id !== newActivity.id));
@@ -456,20 +427,9 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
     updateRecentActivity(prev => [newActivity, ...prev]);
     
     try {
-      const res = await fetch(`/api/booking-requests/${apiId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ status: 'declined' })
-      });
-      if (res.ok) {
-        showToast('Booking declined', 'success');
-        window.dispatchEvent(new CustomEvent('booking-action-completed'));
-      } else {
-        updatePendingRequests(() => previousPendingRequests);
-        updateRecentActivity(prev => prev.filter(a => a.id !== newActivity.id));
-        showToast('Failed to decline booking', 'error');
-      }
+      await putWithCredentials(`/api/booking-requests/${apiId}`, { status: 'declined' });
+      showToast('Booking declined', 'success');
+      window.dispatchEvent(new CustomEvent('booking-action-completed'));
     } catch (_err: unknown) {
       updatePendingRequests(() => previousPendingRequests);
       updateRecentActivity(prev => prev.filter(a => a.id !== newActivity.id));
@@ -497,30 +457,18 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
     updateRecentActivity(prev => [newActivity, ...prev]);
     
     try {
-      const res = await fetch(`/api/booking-requests/${apiId}/complete-cancellation`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include'
-      });
-      if (res.ok) {
-        const result = await res.json().catch(() => ({}));
-        if (result.alreadyCancelled) {
-          showToast('Booking was already cancelled', 'info');
-        } else {
-          showToast('Cancellation completed', 'success');
-        }
-        window.dispatchEvent(new CustomEvent('booking-action-completed'));
-        refresh();
+      const result = await putWithCredentials<{ alreadyCancelled?: boolean }>(`/api/booking-requests/${apiId}/complete-cancellation`, {});
+      if (result.alreadyCancelled) {
+        showToast('Booking was already cancelled', 'info');
       } else {
-        const error = await res.json().catch(() => ({}));
-        updatePendingRequests(() => previousPendingRequests);
-        updateRecentActivity(prev => prev.filter(a => a.id !== newActivity.id));
-        showToast(error.error || 'Failed to complete cancellation', 'error');
+        showToast('Cancellation completed', 'success');
       }
-    } catch (_err: unknown) {
+      window.dispatchEvent(new CustomEvent('booking-action-completed'));
+      refresh();
+    } catch (err: unknown) {
       updatePendingRequests(() => previousPendingRequests);
       updateRecentActivity(prev => prev.filter(a => a.id !== newActivity.id));
-      showToast('Failed to complete cancellation', 'error');
+      showToast(err instanceof Error ? err.message : 'Failed to complete cancellation', 'error');
     } finally {
       setActionInProgress(null);
     }

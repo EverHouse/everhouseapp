@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { useMutation } from '@tanstack/react-query';
 import { formatDateDisplayWithDay, getTodayPacific } from '../../../utils/dateUtils';
 import EmptyState from '../../../components/EmptyState';
 import { useToast } from '../../../components/Toast';
 import ModalShell from '../../../components/ModalShell';
 import FloatingActionButton from '../../../components/FloatingActionButton';
+import { fetchWithCredentials, postWithCredentials, putWithCredentials, deleteWithCredentials } from '../../../hooks/queries/useFetch';
 
 interface Resource {
   id: number;
@@ -79,11 +81,8 @@ const AvailabilityBlocksContent: React.FC = () => {
 
     const fetchResources = async (signal?: AbortSignal) => {
         try {
-            const res = await fetch('/api/resources', { credentials: 'include', signal });
-            if (res.ok) {
-                const data = await res.json();
-                setResources(data);
-            }
+            const data = await fetchWithCredentials<Resource[]>('/api/resources', { signal });
+            setResources(data);
         } catch (err: unknown) {
             if (err instanceof DOMException && err.name === 'AbortError') return;
             console.error('Failed to fetch resources:', err);
@@ -102,24 +101,17 @@ const AvailabilityBlocksContent: React.FC = () => {
             if (filterResource) params.append('resource_id', filterResource);
             
             const url = `/api/availability-blocks?${params.toString()}`;
-            const res = await fetch(url, { credentials: 'include', signal });
-            
-            if (res.ok) {
-                const data = await res.json();
-                setUpcomingBlocks(data);
-            } else if (res.status === 401) {
-                setError('Session expired. Please refresh the page to log in again.');
-            } else if (res.status === 429) {
-                setError('Too many requests. Please wait a moment and try again.');
-            } else if (res.status >= 500) {
-                setError('Server error. The system may be temporarily unavailable.');
-            } else {
-                setError('Failed to fetch availability blocks. Try refreshing the page.');
-            }
+            const data = await fetchWithCredentials<AvailabilityBlock[]>(url, { signal });
+            setUpcomingBlocks(data);
         } catch (err: unknown) {
             if (err instanceof DOMException && err.name === 'AbortError') return;
             console.error('Failed to fetch blocks:', err);
-            setError('Network error. Check your connection and try again.');
+            const msg = err instanceof Error ? err.message : '';
+            if (msg.includes('401')) {
+                setError('Session expired. Please refresh the page to log in again.');
+            } else {
+                setError('Failed to fetch availability blocks. Try refreshing the page.');
+            }
         } finally {
             setIsLoading(false);
         }
@@ -138,17 +130,13 @@ const AvailabilityBlocksContent: React.FC = () => {
             if (filterResource) params.append('resource_id', filterResource);
             
             const url = `/api/availability-blocks?${params.toString()}`;
-            const res = await fetch(url, { credentials: 'include', signal: controller.signal });
-            
-            if (res.ok) {
-                const data: AvailabilityBlock[] = await res.json();
-                const todayStr = today;
-                setPastBlocks(data.filter(b => {
-                    const d = b.block_date?.includes('T') ? b.block_date.split('T')[0] : b.block_date;
-                    return d < todayStr;
-                }));
-                setPastLoaded(true);
-            }
+            const data = await fetchWithCredentials<AvailabilityBlock[]>(url, { signal: controller.signal });
+            const todayStr = today;
+            setPastBlocks(data.filter(b => {
+                const d = b.block_date?.includes('T') ? b.block_date.split('T')[0] : b.block_date;
+                return d < todayStr;
+            }));
+            setPastLoaded(true);
         } catch (err: unknown) {
             if (err instanceof DOMException && err.name === 'AbortError') return;
             console.error('Failed to fetch past blocks:', err);
@@ -242,36 +230,25 @@ const AvailabilityBlocksContent: React.FC = () => {
             };
 
             const url = editId ? `/api/availability-blocks/${editId}` : '/api/availability-blocks';
-            const method = editId ? 'PUT' : 'POST';
 
-            const res = await fetch(url, {
-                method,
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify(payload)
-            });
-
-            if (res.ok) {
-                const savedItem = await res.json();
-                const today = getTodayPacific();
-                const savedDate = savedItem.block_date?.includes('T') ? savedItem.block_date.split('T')[0] : savedItem.block_date;
-                const isPast = savedDate < today;
-                
-                if (editId) {
-                    setUpcomingBlocks(prev => prev.map(b => b.id === editId ? savedItem : b));
-                    setPastBlocks(prev => prev.map(b => b.id === editId ? savedItem : b));
-                } else if (isPast) {
-                    setPastBlocks(prev => [savedItem, ...prev]);
-                } else {
-                    setUpcomingBlocks(prev => [savedItem, ...prev]);
-                }
-                
-                showToast(editId ? 'Block updated' : 'Block created', 'success');
-                setIsEditing(false);
+            const savedItem = editId
+                ? await putWithCredentials<AvailabilityBlock>(url, payload)
+                : await postWithCredentials<AvailabilityBlock>(url, payload);
+            const today = getTodayPacific();
+            const savedDate = savedItem.block_date?.includes('T') ? savedItem.block_date.split('T')[0] : savedItem.block_date;
+            const isPast = savedDate < today;
+            
+            if (editId) {
+                setUpcomingBlocks(prev => prev.map(b => b.id === editId ? savedItem : b));
+                setPastBlocks(prev => prev.map(b => b.id === editId ? savedItem : b));
+            } else if (isPast) {
+                setPastBlocks(prev => [savedItem, ...prev]);
             } else {
-                const data = await res.json();
-                setFormError(data.error || 'Failed to save block');
+                setUpcomingBlocks(prev => [savedItem, ...prev]);
             }
+            
+            showToast(editId ? 'Block updated' : 'Block created', 'success');
+            setIsEditing(false);
         } catch (_err: unknown) {
             setFormError('Failed to save block');
         } finally {
@@ -298,18 +275,8 @@ const AvailabilityBlocksContent: React.FC = () => {
 
         try {
             setIsDeleting(true);
-            const res = await fetch(`/api/availability-blocks/${deletedId}`, {
-                method: 'DELETE',
-                credentials: 'include',
-            });
-
-            if (res.ok) {
-                showToast('Block deleted', 'success');
-            } else {
-                setUpcomingBlocks(upcomingSnapshot);
-                setPastBlocks(pastSnapshot);
-                showToast('Failed to delete block', 'error');
-            }
+            await deleteWithCredentials(`/api/availability-blocks/${deletedId}`);
+            showToast('Block deleted', 'success');
         } catch (_err: unknown) {
             setUpcomingBlocks(upcomingSnapshot);
             setPastBlocks(pastSnapshot);

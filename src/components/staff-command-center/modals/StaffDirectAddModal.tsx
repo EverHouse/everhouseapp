@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { MemberSearchInput, SelectedMember } from '../../shared/MemberSearchInput';
 import { useToast } from '../../Toast';
-import { getApiErrorMessage, getNetworkErrorMessage } from '../../../utils/errorHandling';
+import { postWithCredentials } from '../../../hooks/queries/useFetch';
 
 interface StaffDirectAddModalProps {
   isOpen: boolean;
@@ -132,26 +132,14 @@ export const StaffDirectAddModal: React.FC<StaffDirectAddModalProps> = ({
         };
       }
 
-      const res = await fetch(`/api/bookings/${bookingId}/staff-direct-add`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(body)
-      });
-
-      if (!res.ok) {
-        const errorMsg = getApiErrorMessage(res, 'add player');
-        setError(errorMsg);
-        showToast(errorMsg, 'error');
-        return;
-      }
+      await postWithCredentials(`/api/bookings/${bookingId}/staff-direct-add`, body);
       const playerName = mode === 'member' ? selectedMember?.name : guestName.trim();
       showToast(`${playerName || 'Player'} added successfully`, 'success');
       onSuccess();
       onClose();
       resetForm();
-    } catch (_err: unknown) {
-      const errorMsg = getNetworkErrorMessage();
+    } catch (err: unknown) {
+      const errorMsg = err instanceof Error ? err.message : 'Network error. Check your connection and try again.';
       setError(errorMsg);
       showToast(errorMsg, 'error');
     } finally {

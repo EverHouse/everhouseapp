@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useVisibilityAwareInterval } from '../../../../hooks/useVisibilityAwareInterval';
+import { fetchWithCredentials } from '../../../../hooks/queries/useFetch';
 
 export interface CommandCenterCounts {
   pendingBookings: number;
@@ -106,18 +107,9 @@ export function useCommandCenter(): UseCommandCenterResult {
     abortControllerRef.current = new AbortController();
 
     try {
-      const res = await fetch('/api/admin/command-center', {
-        credentials: 'include',
+      const json = await fetchWithCredentials<CommandCenterData>('/api/admin/command-center', {
         signal: abortControllerRef.current.signal
       });
-      if (!res.ok) {
-        if (res.status === 401) {
-          setData(null);
-          return;
-        }
-        throw new Error('Failed to fetch command center data');
-      }
-      const json = await res.json();
       setData(json);
       setError(null);
 

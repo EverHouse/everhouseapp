@@ -3,6 +3,7 @@ import { triggerHaptic } from '../utils/haptics';
 import WalkingGolferSpinner from './WalkingGolferSpinner';
 import { useTheme } from '../contexts/ThemeContext';
 import ModalShell from './ModalShell';
+import { postWithCredentials } from '../hooks/queries/useFetch';
 
 interface BugReportModalProps {
   isOpen: boolean;
@@ -85,21 +86,11 @@ const BugReportModal: React.FC<BugReportModalProps> = ({
         }
       }
 
-      const response = await fetch('/api/bug-reports', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          description: description.trim(),
-          screenshotUrl,
-          pageUrl: window.location.pathname
-        }),
-        credentials: 'include'
+      await postWithCredentials('/api/bug-reports', {
+        description: description.trim(),
+        screenshotUrl,
+        pageUrl: window.location.pathname
       });
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Failed to submit bug report');
-      }
 
       triggerHaptic('success');
       setSuccess(true);

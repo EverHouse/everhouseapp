@@ -22,6 +22,7 @@ import {
   EmailCheckResult,
   EMAIL_REGEX,
 } from './newUser/newUserTypes';
+import { fetchWithCredentials, deleteWithCredentials } from '../../../hooks/queries/useFetch';
 
 export function NewUserDrawer({
   isOpen,
@@ -99,12 +100,9 @@ export function NewUserDrawer({
     if (!email || !EMAIL_REGEX.test(email)) return;
 
     try {
-      const res = await fetch(`/api/visitors/check-email?email=${encodeURIComponent(email.trim())}`, { credentials: 'include' });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.exists) {
-          setEmailCheckResult(data);
-        }
+      const data = await fetchWithCredentials<EmailCheckResult>(`/api/visitors/check-email?email=${encodeURIComponent(email.trim())}`);
+      if (data.exists) {
+        setEmailCheckResult(data);
       }
     } catch (_checkErr) {
       // intentionally empty
@@ -129,18 +127,10 @@ export function NewUserDrawer({
     if (!pendingUserToCleanup) return;
     setIsCleaningUp(true);
     try {
-      const res = await fetch(`/api/stripe/subscriptions/cleanup-pending/${pendingUserToCleanup.id}`, {
-        method: 'DELETE',
-        credentials: 'include'
-      });
-      if (res.ok) {
-        setError(null);
-        setPendingUserToCleanup(null);
-        showToast?.(`Cleaned up incomplete signup. You can now proceed.`, 'success');
-      } else {
-        const data = await res.json();
-        setError(data.error || 'Failed to cleanup');
-      }
+      await deleteWithCredentials(`/api/stripe/subscriptions/cleanup-pending/${pendingUserToCleanup.id}`);
+      setError(null);
+      setPendingUserToCleanup(null);
+      showToast?.(`Cleaned up incomplete signup. You can now proceed.`, 'success');
     } catch (_err: unknown) {
       setError('Failed to cleanup pending user');
     } finally {
@@ -150,60 +140,48 @@ export function NewUserDrawer({
 
   const fetchInitialData = async () => {
     try {
-      const [tiersRes, productsRes, discountsRes, billingGroupsRes] = await Promise.all([
-        fetch('/api/membership-tiers?active=true', { credentials: 'include' }),
-        fetch('/api/day-passes/products', { credentials: 'include' }),
-        fetch('/api/stripe/coupons', { credentials: 'include' }),
-        fetch('/api/group-billing/groups', { credentials: 'include' }),
+      const [tiersData, productsData, discountsData, groupsData] = await Promise.all([
+        fetchWithCredentials<Array<{ id: number; name: string; slug: string; price_cents: number; stripe_price_id?: string; product_type?: string }>>('/api/membership-tiers?active=true'),
+        fetchWithCredentials<{ products: DayPassProduct[] }>('/api/day-passes/products'),
+        fetchWithCredentials<{ coupons: Array<{ valid?: boolean; percentOff?: number; id: string; name?: string }> }>('/api/stripe/coupons'),
+        fetchWithCredentials<Array<{ id: number; isActive: boolean; stripeSubscriptionId?: string; primaryEmail: string; primaryName: string; groupName: string; type?: string; members?: unknown[] }>>('/api/group-billing/groups'),
       ]);
 
-      if (tiersRes.ok) {
-        const tiersData = await tiersRes.json();
-        const subscriptionTiers = tiersData
-          .filter((t: { id: number; name: string; slug: string; price_cents: number; stripe_price_id?: string; product_type?: string }) => t.product_type === 'subscription' && t.stripe_price_id)
-          .map((t: { id: number; name: string; slug: string; price_cents: number; stripe_price_id?: string; product_type?: string }) => ({
-            id: t.id,
-            name: t.name,
-            slug: t.slug,
-            priceCents: t.price_cents,
-            stripePriceId: t.stripe_price_id,
-            productType: t.product_type,
-          }));
-        setTiers(subscriptionTiers);
-      }
+      const subscriptionTiers = tiersData
+        .filter(t => t.product_type === 'subscription' && t.stripe_price_id)
+        .map(t => ({
+          id: t.id,
+          name: t.name,
+          slug: t.slug,
+          priceCents: t.price_cents,
+          stripePriceId: t.stripe_price_id ?? null,
+          productType: t.product_type ?? 'subscription',
+        }));
+      setTiers(subscriptionTiers);
 
-      if (productsRes.ok) {
-        const productsData = await productsRes.json();
-        setDayPassProducts(productsData.products || []);
-      }
+      setDayPassProducts(productsData.products || []);
 
-      if (discountsRes.ok) {
-        const discountsData = await discountsRes.json();
-        setDiscounts((discountsData.coupons || []).filter((c: { valid?: boolean; percentOff?: number; id: string; name?: string }) => c.valid && c.percentOff).map((c: { valid?: boolean; percentOff?: number; id: string; name?: string }) => ({
-          id: c.id,
-          name: c.name || c.id,
-          code: c.id,
-          percentOff: c.percentOff,
-          stripeCouponId: c.id,
-        })));
-      }
+      setDiscounts((discountsData.coupons || []).filter(c => c.valid && c.percentOff).map(c => ({
+        id: c.id,
+        name: c.name || c.id,
+        code: c.id,
+        percentOff: c.percentOff!,
+        stripeCouponId: c.id,
+      })));
 
-      if (billingGroupsRes.ok) {
-        const groupsData = await billingGroupsRes.json();
-        const activeGroups = (groupsData || [])
-          .filter((g: { id: number; isActive: boolean; stripeSubscriptionId?: string; primaryEmail: string; primaryName: string; groupName: string; type?: string; members?: unknown[] }) => g.isActive && g.stripeSubscriptionId)
-          .map((g: { id: number; isActive: boolean; stripeSubscriptionId?: string; primaryEmail: string; primaryName: string; groupName: string; type?: string; members?: unknown[] }) => ({
-            id: g.id,
-            primaryEmail: g.primaryEmail,
-            primaryName: g.primaryName,
-            groupName: g.groupName,
-            groupType: g.type || 'family',
-            isActive: g.isActive,
-            primaryStripeSubscriptionId: g.stripeSubscriptionId,
-            memberCount: g.members?.length || 0,
-          }));
-        setExistingBillingGroups(activeGroups);
-      }
+      const activeGroups = (groupsData || [])
+        .filter(g => g.isActive && g.stripeSubscriptionId)
+        .map(g => ({
+          id: g.id,
+          primaryEmail: g.primaryEmail,
+          primaryName: g.primaryName,
+          groupName: g.groupName ?? null,
+          groupType: (g.type || 'family') as 'family' | 'corporate',
+          isActive: g.isActive,
+          primaryStripeSubscriptionId: g.stripeSubscriptionId ?? null,
+          memberCount: g.members?.length || 0,
+        }));
+      setExistingBillingGroups(activeGroups);
     } catch (err: unknown) {
       console.error('Failed to fetch initial data:', err);
     }

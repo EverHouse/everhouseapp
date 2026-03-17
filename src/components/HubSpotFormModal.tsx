@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { triggerHaptic } from '../utils/haptics';
 import WalkingGolferSpinner from './WalkingGolferSpinner';
 import SlideUpDrawer from './SlideUpDrawer';
+import { postWithCredentials } from '../hooks/queries/useFetch';
 
 
 const getHubspotCookie = (): string | null => {
@@ -78,28 +79,10 @@ const HubSpotFormModal: React.FC<HubSpotFormModalProps> = ({
         context.hutk = hutk;
       }
 
-      const response = await fetch(`/api/hubspot/forms/${formType}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fields: fieldArray,
-          context
-        })
+      await postWithCredentials(`/api/hubspot/forms/${formType}`, {
+        fields: fieldArray,
+        context
       });
-
-      if (!response.ok) {
-        let errorMessage = 'Submission failed';
-        const contentType = response.headers.get('Content-Type') || '';
-        if (contentType.includes('application/json')) {
-          try {
-            const data = await response.json();
-            errorMessage = data.error || errorMessage;
-          } catch (_parseErr) {
-            // Response was not valid JSON, use default error message
-          }
-        }
-        throw new Error(errorMessage);
-      }
 
       triggerHaptic('success');
       setSuccess(true);

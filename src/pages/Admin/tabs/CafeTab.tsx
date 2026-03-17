@@ -6,6 +6,7 @@ import { useToast } from '../../../components/Toast';
 import ModalShell from '../../../components/ModalShell';
 import { useCafeMenu, useUploadCafeImage, useSeedCafeMenu, useUpdateCafeItem, useDeleteCafeItem } from '../../../hooks/queries/useCafeQueries';
 import type { CafeItem } from '../../../types/data';
+import { postWithCredentials } from '../../../hooks/queries/useFetch';
 
 const CafeTab: React.FC = () => {
     const { setPageReady } = usePageReady();
@@ -22,13 +23,7 @@ const CafeTab: React.FC = () => {
     const deleteItemMutation = useDeleteCafeItem();
     const pullMutation = useMutation({
         mutationFn: async () => {
-            const response = await fetch('/api/admin/stripe/pull-from-stripe', {
-                method: 'POST',
-                credentials: 'include',
-                headers: { 'Content-Type': 'application/json' },
-            });
-            if (!response.ok) throw new Error('Failed to pull from Stripe');
-            return response.json();
+            return postWithCredentials<{ cafe?: { synced?: number; created?: number; deactivated?: number } }>('/api/admin/stripe/pull-from-stripe', {});
         },
         onSuccess: (data: { cafe?: { synced?: number; created?: number; deactivated?: number } }) => {
             queryClient.invalidateQueries({ queryKey: ['cafe'] });

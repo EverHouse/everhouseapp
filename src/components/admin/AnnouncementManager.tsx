@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { useAnnouncementData, Announcement } from '../../contexts/DataContext';
 import { usePageReady } from '../../stores/pageReadyStore';
 import { useToast } from '../Toast';
 import { SlideUpDrawer } from '../SlideUpDrawer';
+import { fetchWithCredentials, postWithCredentials } from '../../hooks/queries/useFetch';
 
 interface AnnouncementManagerProps {
     triggerCreate?: number;
@@ -23,31 +25,34 @@ const AnnouncementManager: React.FC<AnnouncementManagerProps> = ({ triggerCreate
     const [newItem, setNewItem] = useState<Partial<Announcement>>({ type: 'announcement' });
 
     const [saving, setSaving] = useState(false);
-    const [sheetStatus, setSheetStatus] = useState<SheetStatus>({ connected: false, sheetId: null, sheetUrl: null });
     const [sheetLoading, setSheetLoading] = useState(false);
-    const [syncingFrom, setSyncingFrom] = useState(false);
-    const [syncingTo, setSyncingTo] = useState(false);
     const [exporting, setExporting] = useState(false);
 
     useEffect(() => {
         setPageReady(true);
     }, [setPageReady]);
 
-    const fetchSheetStatus = useCallback(async () => {
-        try {
-            const res = await fetch('/api/announcements/sheets/status', { credentials: 'include' });
-            if (res.ok) {
-                const data = await res.json();
-                setSheetStatus(data);
-            }
-        } catch (fetchErr) {
-            console.warn('[AnnouncementManager] Failed to fetch sheet status:', fetchErr);
-        }
-    }, []);
+    const { data: sheetStatus = { connected: false, sheetId: null, sheetUrl: null }, refetch: refetchSheetStatus } = useQuery({
+        queryKey: ['announcements', 'sheets', 'status'],
+        queryFn: () => fetchWithCredentials<SheetStatus>('/api/announcements/sheets/status'),
+        staleTime: 1000 * 60 * 5,
+    });
 
-    useEffect(() => {
-        fetchSheetStatus();
-    }, [fetchSheetStatus]);
+    const connectSheetMutation = useMutation({
+        mutationFn: () => postWithCredentials<{ sheetId: string; sheetUrl: string }>('/api/announcements/sheets/connect', {}),
+    });
+
+    const syncFromSheetMutation = useMutation({
+        mutationFn: () => postWithCredentials<{ created: number; updated: number }>('/api/announcements/sheets/sync-from', {}),
+    });
+
+    const syncToSheetMutation = useMutation({
+        mutationFn: () => postWithCredentials<{ pushed: number }>('/api/announcements/sheets/sync-to', {}),
+    });
+
+    const disconnectSheetMutation = useMutation({
+        mutationFn: () => postWithCredentials<Record<string, unknown>>('/api/announcements/sheets/disconnect', {}),
+    });
 
     const openCreate = () => {
         setNewItem({ type: 'announcement' });
@@ -135,84 +140,61 @@ const AnnouncementManager: React.FC<AnnouncementManagerProps> = ({ triggerCreate
 
     const handleConnectSheet = async () => {
         setSheetLoading(true);
-        try {
-            const res = await fetch('/api/announcements/sheets/connect', {
-                method: 'POST',
-                credentials: 'include',
-                headers: { 'Content-Type': 'application/json' }
-            });
-            if (!res.ok) {
-                const data = await res.json();
-                throw new Error(data.error || 'Failed to create sheet');
-            }
-            const data = await res.json();
-            setSheetStatus({ connected: true, sheetId: data.sheetId, sheetUrl: data.sheetUrl });
-            showToast('Google Sheet created and linked', 'success');
-        } catch (err: unknown) {
-            showToast((err instanceof Error ? err.message : String(err)) || 'Failed to connect Google Sheet', 'error');
-        } finally {
-            setSheetLoading(false);
-        }
+        connectSheetMutation.mutate(undefined, {
+            onSuccess: (data) => {
+                refetchSheetStatus();
+                showToast('Google Sheet created and linked', 'success');
+            },
+            onError: (err: unknown) => {
+                showToast((err instanceof Error ? err.message : String(err)) || 'Failed to connect Google Sheet', 'error');
+            },
+            onSettled: () => setSheetLoading(false),
+        });
     };
 
     const handleSyncFromSheet = async () => {
-        setSyncingFrom(true);
-        try {
-            const res = await fetch('/api/announcements/sheets/sync-from', {
-                method: 'POST',
-                credentials: 'include',
-                headers: { 'Content-Type': 'application/json' }
-            });
-            if (!res.ok) throw new Error('Sync failed');
-            const data = await res.json();
-            const parts: string[] = [];
-            if (data.created > 0) parts.push(`${data.created} new`);
-            if (data.updated > 0) parts.push(`${data.updated} updated`);
-            if (parts.length === 0) parts.push('No changes found');
-            showToast(`Synced from Sheet: ${parts.join(', ')}`, 'success');
-            if (refreshAnnouncements) await refreshAnnouncements();
-        } catch {
-            showToast('Failed to sync from Google Sheet', 'error');
-        } finally {
-            setSyncingFrom(false);
-        }
+        syncFromSheetMutation.mutate(undefined, {
+            onSuccess: async (data) => {
+                const parts: string[] = [];
+                if (data.created > 0) parts.push(`${data.created} new`);
+                if (data.updated > 0) parts.push(`${data.updated} updated`);
+                if (parts.length === 0) parts.push('No changes found');
+                showToast(`Synced from Sheet: ${parts.join(', ')}`, 'success');
+                if (refreshAnnouncements) await refreshAnnouncements();
+            },
+            onError: () => {
+                showToast('Failed to sync from Google Sheet', 'error');
+            },
+        });
     };
 
     const handleSyncToSheet = async () => {
-        setSyncingTo(true);
-        try {
-            const res = await fetch('/api/announcements/sheets/sync-to', {
-                method: 'POST',
-                credentials: 'include',
-                headers: { 'Content-Type': 'application/json' }
-            });
-            if (!res.ok) throw new Error('Sync failed');
-            const data = await res.json();
-            showToast(`Pushed ${data.pushed} announcements to Sheet`, 'success');
-        } catch {
-            showToast('Failed to push to Google Sheet', 'error');
-        } finally {
-            setSyncingTo(false);
-        }
+        syncToSheetMutation.mutate(undefined, {
+            onSuccess: (data) => {
+                showToast(`Pushed ${data.pushed} announcements to Sheet`, 'success');
+            },
+            onError: () => {
+                showToast('Failed to push to Google Sheet', 'error');
+            },
+        });
     };
 
     const handleDisconnectSheet = async () => {
         setSheetLoading(true);
-        try {
-            const res = await fetch('/api/announcements/sheets/disconnect', {
-                method: 'POST',
-                credentials: 'include',
-                headers: { 'Content-Type': 'application/json' }
-            });
-            if (!res.ok) throw new Error('Disconnect failed');
-            setSheetStatus({ connected: false, sheetId: null, sheetUrl: null });
-            showToast('Google Sheet disconnected', 'success');
-        } catch {
-            showToast('Failed to disconnect Google Sheet', 'error');
-        } finally {
-            setSheetLoading(false);
-        }
+        disconnectSheetMutation.mutate(undefined, {
+            onSuccess: () => {
+                refetchSheetStatus();
+                showToast('Google Sheet disconnected', 'success');
+            },
+            onError: () => {
+                showToast('Failed to disconnect Google Sheet', 'error');
+            },
+            onSettled: () => setSheetLoading(false),
+        });
     };
+
+    const syncingFrom = syncFromSheetMutation.isPending;
+    const syncingTo = syncToSheetMutation.isPending;
 
     return (
         <div className="animate-content-enter">

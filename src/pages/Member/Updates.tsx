@@ -10,6 +10,7 @@ import { getMemberNoticeTitle, getAffectedAreasList, isBlockingClosure } from '.
 import { useNotificationStore } from '../../stores/notificationStore';
 import { useToast } from '../../components/Toast';
 import { haptic } from '../../utils/haptics';
+import { fetchWithCredentials, putWithCredentials } from '../../hooks/queries/useFetch';
 
 const NOTICE_PREVIEW_DAYS = 7; // Show notices this many days before they start
 
@@ -148,16 +149,12 @@ const MemberUpdates: React.FC = () => {
       return;
     }
     try {
-      const res = await fetch(`/api/notifications?user_email=${encodeURIComponent(user.email)}`, { credentials: 'include' });
-      if (res.ok) {
-        const data = await res.json();
-        // Map is_read from API to read for frontend consistency
-        const mapped = data.map((n: Record<string, unknown>) => ({ ...n, read: n.is_read ?? n.read ?? false }));
-        setNotifications(mapped);
-        const newUnreadCount = mapped.filter((n: NotificationItem) => !n.read).length;
-        setUnreadCount(newUnreadCount);
-        useNotificationStore.getState().setUnreadCount(newUnreadCount);
-      }
+      const data = await fetchWithCredentials<Record<string, unknown>[]>(`/api/notifications?user_email=${encodeURIComponent(user.email)}`);
+      const mapped = data.map((n: Record<string, unknown>) => ({ ...n, read: n.is_read ?? n.read ?? false }));
+      setNotifications(mapped as unknown as NotificationItem[]);
+      const newUnreadCount = mapped.filter((n: Record<string, unknown>) => !n.read).length;
+      setUnreadCount(newUnreadCount);
+      useNotificationStore.getState().setUnreadCount(newUnreadCount);
     } catch (err: unknown) {
       console.error('Failed to fetch notifications:', err);
     } finally {
@@ -171,28 +168,20 @@ const MemberUpdates: React.FC = () => {
 
   const fetchClosures = useCallback(async () => {
     try {
-      const res = await fetch('/api/closures', { credentials: 'include' });
-      if (res.ok) {
-        const data = await res.json();
-        const todayStr = getTodayPacific();
-        const activeClosures = data
-          .filter((c: Closure) => c.endDate >= todayStr)
-          .filter((c: Closure) => {
-            // For members: only show notices where notifyMembers is true OR resources are affected
-            // Staff/admin see all notices (unless in "View As" mode - then show member perspective)
-            if (isStaffOrAdmin && !isViewingAsMember) return true;
-            // Members never see draft notices (needsReview = true)
-            if (c.needsReview) return false;
-            // Members see notices up to 7 days before they start
-            const previewCutoffDate = addDaysToPacificDate(todayStr, NOTICE_PREVIEW_DAYS);
-            if (c.startDate > previewCutoffDate) return false;
-            // Only show notices that affect booking availability
-            const hasAffectedResources = c.affectedAreas && c.affectedAreas !== 'none';
-            return hasAffectedResources || c.notifyMembers === true;
-          })
-          .sort((a: Closure, b: Closure) => a.startDate.localeCompare(b.startDate));
-        setClosures(activeClosures);
-      }
+      const data = await fetchWithCredentials<Closure[]>('/api/closures');
+      const todayStr = getTodayPacific();
+      const activeClosures = data
+        .filter((c: Closure) => c.endDate >= todayStr)
+        .filter((c: Closure) => {
+          if (isStaffOrAdmin && !isViewingAsMember) return true;
+          if (c.needsReview) return false;
+          const previewCutoffDate = addDaysToPacificDate(todayStr, NOTICE_PREVIEW_DAYS);
+          if (c.startDate > previewCutoffDate) return false;
+          const hasAffectedResources = c.affectedAreas && c.affectedAreas !== 'none';
+          return hasAffectedResources || c.notifyMembers === true;
+        })
+        .sort((a: Closure, b: Closure) => a.startDate.localeCompare(b.startDate));
+      setClosures(activeClosures);
     } catch (err: unknown) {
       console.error('Failed to fetch closures:', err);
     } finally {
@@ -232,11 +221,7 @@ const MemberUpdates: React.FC = () => {
 
   const markNotificationRead = async (notificationId: number) => {
     try {
-      const res = await fetch(`/api/notifications/${notificationId}/read`, { 
-        method: 'PUT',
-        credentials: 'include' 
-      });
-      if (!res.ok) return;
+      await putWithCredentials(`/api/notifications/${notificationId}/read`, {});
       setNotifications(prev => prev.map(n => n.id === notificationId ? { ...n, read: true } : n));
       setUnreadCount(prev => Math.max(0, prev - 1));
       useNotificationStore.getState().markAsRead(notificationId);
@@ -250,13 +235,7 @@ const MemberUpdates: React.FC = () => {
   const markAllRead = async () => {
     if (!user?.email) return;
     try {
-      const res = await fetch(`/api/notifications/mark-all-read`, { 
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_email: user.email }),
-        credentials: 'include' 
-      });
-      if (!res.ok) return;
+      await putWithCredentials('/api/notifications/mark-all-read', { user_email: user.email });
       setNotifications(prev => prev.map(n => ({ ...n, read: true })));
       setUnreadCount(0);
       useNotificationStore.getState().markAllAsRead();
@@ -277,19 +256,12 @@ const MemberUpdates: React.FC = () => {
     useNotificationStore.getState().setUnreadCount(0);
 
     try {
-      const res = await fetch('/api/notifications/dismiss-all', {
+      await fetchWithCredentials('/api/notifications/dismiss-all', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ user_email: user.email }),
-        credentials: 'include'
       });
-      if (res.ok) {
-        window.dispatchEvent(new CustomEvent('notifications-read'));
-      } else {
-        setNotifications(snapshot);
-        setUnreadCount(prevUnread);
-        useNotificationStore.getState().setUnreadCount(prevUnread);
-      }
+      window.dispatchEvent(new CustomEvent('notifications-read'));
     } catch {
       haptic.error();
       showToast('Failed to dismiss notifications', 'error');

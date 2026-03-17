@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import ModalShell from './ModalShell';
+import { postWithCredentials } from '../hooks/queries/useFetch';
 
 interface FirstLoginWelcomeModalProps {
   isOpen: boolean;
@@ -25,12 +26,7 @@ const FirstLoginWelcomeModal: React.FC<FirstLoginWelcomeModalProps> = ({ isOpen,
     document.body.removeChild(link);
 
     try {
-      await fetch('/api/member/onboarding/complete-step', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ step: 'concierge' }),
-      });
+      await postWithCredentials('/api/member/onboarding/complete-step', { step: 'concierge' });
     } catch (e) { console.warn('[FirstLoginWelcome] Failed to track onboarding step:', e); }
   };
 

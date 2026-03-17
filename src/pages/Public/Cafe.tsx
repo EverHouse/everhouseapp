@@ -6,6 +6,7 @@ import { MenuItemSkeleton, SkeletonList } from '../../components/skeletons';
 import { usePageReady } from '../../stores/pageReadyStore';
 import { AnimatedPage } from '../../components/motion';
 import SEO from '../../components/SEO';
+import { fetchWithCredentials } from '../../hooks/queries/useFetch';
 
 interface CafeItem {
   id: string;
@@ -38,20 +39,17 @@ const PublicCafe: React.FC = () => {
 
   const fetchMenu = useCallback(async () => {
     try {
-      const response = await fetch('/api/cafe-menu');
-      if (response.ok) {
-        const data = await response.json();
-        const normalized = data.map((item: Record<string, unknown>) => ({
-          id: item.id?.toString() || '',
-          name: item.name || '',
-          category: item.category || '',
-          price: parseFloat(String(item.price)) || 0,
-          desc: item.description || item.desc || '',
-          image: item.image_url || item.image || '',
-          icon: item.icon || ''
-        }));
-        setCafeMenu(normalized);
-      }
+      const data = await fetchWithCredentials<Record<string, unknown>[]>('/api/cafe-menu');
+      const normalized = data.map((item: Record<string, unknown>) => ({
+        id: String(item.id ?? ''),
+        name: String(item.name ?? ''),
+        category: String(item.category ?? ''),
+        price: parseFloat(String(item.price)) || 0,
+        desc: String(item.description ?? item.desc ?? ''),
+        image: String(item.image_url ?? item.image ?? ''),
+        icon: String(item.icon ?? '')
+      }));
+      setCafeMenu(normalized);
     } catch (error: unknown) {
       console.error('Failed to fetch cafe menu:', error);
     } finally {

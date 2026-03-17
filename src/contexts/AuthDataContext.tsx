@@ -3,6 +3,7 @@ import { flushSync } from 'react-dom';
 import { useUserStore } from '../stores/userStore';
 
 import type { MemberProfile } from '../types/data';
+import { fetchWithCredentials, postWithCredentials } from '../hooks/queries/useFetch';
 
 interface AuthDataContextType {
   user: MemberProfile | null;
@@ -212,25 +213,18 @@ export const AuthDataProvider: React.FC<{children: ReactNode}> = ({ children }) 
   const setViewAsUser = useCallback(async (member: MemberProfile) => {
     if (actualUser?.role === 'admin') {
       try {
-        const res = await fetch(`/api/members/${encodeURIComponent(member.email)}/details`, { credentials: 'include' });
-        if (res.ok) {
-          const details = await res.json();
-          const fullMember: MemberProfile = {
-            ...member,
-            tier: member.tier || details.tier,
-            tags: member.tags?.length ? member.tags : details.tags,
-            lifetimeVisits: details.lifetimeVisits || 0,
-            lastBookingDate: details.lastBookingDate || undefined,
-            mindbodyClientId: details.mindbodyClientId || ''
-          };
-          flushSync(() => {
-            setViewAsUserState(fullMember);
-          });
-        } else {
-          flushSync(() => {
-            setViewAsUserState(member);
-          });
-        }
+        const details = await fetchWithCredentials<Record<string, unknown>>(`/api/members/${encodeURIComponent(member.email)}/details`);
+        const fullMember: MemberProfile = {
+          ...member,
+          tier: member.tier || (details.tier as string),
+          tags: member.tags?.length ? member.tags : (details.tags as string[]),
+          lifetimeVisits: (details.lifetimeVisits as number) || 0,
+          lastBookingDate: (details.lastBookingDate as string) || undefined,
+          mindbodyClientId: (details.mindbodyClientId as string) || ''
+        };
+        flushSync(() => {
+          setViewAsUserState(fullMember);
+        });
       } catch (err: unknown) {
         console.error('Failed to fetch member details:', err);
         flushSync(() => {
@@ -277,10 +271,7 @@ export const AuthDataProvider: React.FC<{children: ReactNode}> = ({ children }) 
 
   const logout = useCallback(async () => {
     try {
-      await fetch('/api/auth/logout', {
-        method: 'POST',
-        credentials: 'include'
-      });
+      await postWithCredentials('/api/auth/logout', {});
     } catch (err: unknown) {
       console.error('Server logout failed:', err);
     }
@@ -300,33 +291,26 @@ export const AuthDataProvider: React.FC<{children: ReactNode}> = ({ children }) 
       const currentEmail = actualUserRef.current?.email;
       if (!currentEmail) return;
       try {
-        const res = await fetch('/api/auth/verify-member', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: currentEmail })
-        });
-        if (res.ok) {
-          const { member } = await res.json();
-          const memberProfile: MemberProfile = {
-            id: member.id,
-            name: [member.firstName, member.lastName].filter(Boolean).join(' ') || member.email || 'Member',
-            firstName: member.firstName || null,
-            lastName: member.lastName || null,
-            tier: member.tier || 'Core',
-            tags: member.tags || [],
-            status: member.status || 'Active',
-            email: member.email,
-            phone: member.phone || '',
-            jobTitle: member.jobTitle || '',
-            role: member.role || 'member',
-            mindbodyClientId: member.mindbodyClientId || '',
-            lifetimeVisits: member.lifetimeVisits || 0,
-            lastBookingDate: member.lastBookingDate || undefined,
-            dateOfBirth: member.dateOfBirth || null
-          };
-          localStorage.setItem('eh_member', JSON.stringify(memberProfile));
-          setActualUser(memberProfile);
-        }
+        const { member } = await postWithCredentials<{ member: MemberProfile }>('/api/auth/verify-member', { email: currentEmail });
+        const memberProfile: MemberProfile = {
+          id: member.id,
+          name: member.name || [member.firstName, member.lastName].filter(Boolean).join(' ') || member.email || 'Member',
+          firstName: member.firstName || null,
+          lastName: member.lastName || null,
+          tier: member.tier || 'Core',
+          tags: member.tags || [],
+          status: member.status || 'Active',
+          email: member.email,
+          phone: member.phone || '',
+          jobTitle: member.jobTitle || '',
+          role: member.role || 'member',
+          mindbodyClientId: member.mindbodyClientId || '',
+          lifetimeVisits: member.lifetimeVisits || 0,
+          lastBookingDate: member.lastBookingDate || undefined,
+          dateOfBirth: member.dateOfBirth || null
+        };
+        localStorage.setItem('eh_member', JSON.stringify(memberProfile));
+        setActualUser(memberProfile);
       } catch (err: unknown) {
         console.error('Failed to refresh user data:', err);
       }

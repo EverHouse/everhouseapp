@@ -8,6 +8,7 @@ import { useParallax } from '../../hooks/useParallax';
 import EditorialShowcase from '../../components/layout/EditorialShowcase';
 import { AnimatedPage } from '../../components/motion';
 import SEO from '../../components/SEO';
+import { fetchWithCredentials } from '../../hooks/queries/useFetch';
 
 interface MembershipTier {
   id: number;
@@ -52,11 +53,8 @@ const Landing: React.FC = () => {
   const fetchTiers = useCallback(async () => {
     if (user) return;
     try {
-      const response = await fetch('/api/membership-tiers?active=true');
-      if (response.ok) {
-        const data = await response.json();
-        setTiers(data.filter((t: MembershipTier) => ['social', 'core', 'corporate'].includes(t.slug)));
-      }
+      const data = await fetchWithCredentials<MembershipTier[]>('/api/membership-tiers?active=true');
+      setTiers(data.filter((t: MembershipTier) => ['social', 'core', 'corporate'].includes(t.slug)));
     } catch (error: unknown) {
       console.error('Failed to fetch tiers:', error);
     } finally {

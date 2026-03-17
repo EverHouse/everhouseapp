@@ -2,6 +2,7 @@ import React, { createContext, useState, useContext, ReactNode, useEffect, useCa
 import { useAuthData } from './AuthDataContext';
 import type { CafeItem } from '../types/data';
 import { INITIAL_CAFE } from '../data/defaults';
+import { fetchWithCredentials, postWithCredentials, putWithCredentials, deleteWithCredentials } from '../hooks/queries/useFetch';
 
 interface CafeMenuItem {
   id: number | string;
@@ -48,12 +49,9 @@ export const CafeDataProvider: React.FC<{children: ReactNode}> = ({ children }) 
     cafeMenuFetchedRef.current = true;
     const fetchCafeMenu = async () => {
       try {
-        const res = await fetch('/api/cafe-menu');
-        if (res.ok) {
-          const data = await res.json();
-          if (Array.isArray(data) && data.length > 0) {
-            setCafeMenu(formatCafeData(data));
-          }
+        const data = await fetchWithCredentials<CafeMenuItem[]>('/api/cafe-menu');
+        if (Array.isArray(data) && data.length > 0) {
+          setCafeMenu(formatCafeData(data));
         }
       } catch (err: unknown) {
         if (actualUserRef.current) {
@@ -68,12 +66,9 @@ export const CafeDataProvider: React.FC<{children: ReactNode}> = ({ children }) 
 
   const refreshCafeMenu = useCallback(async () => {
     try {
-      const res = await fetch('/api/cafe-menu');
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data)) {
-          setCafeMenu(formatCafeData(data));
-        }
+      const data = await fetchWithCredentials<CafeMenuItem[]>('/api/cafe-menu');
+      if (Array.isArray(data)) {
+        setCafeMenu(formatCafeData(data));
       }
     } catch (e) { console.warn('[CafeData] Failed to refresh cafe menu:', e); }
   }, []);
@@ -95,32 +90,23 @@ export const CafeDataProvider: React.FC<{children: ReactNode}> = ({ children }) 
     const optimisticItem = { ...item, id: tempId };
     setCafeMenu(prev => [...prev, optimisticItem]);
     try {
-      const res = await fetch('/api/cafe-menu', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          category: item.category,
-          name: item.name,
-          price: item.price,
-          description: item.desc,
-          icon: item.icon,
-          image_url: item.image
-        })
+      const newItem = await postWithCredentials<CafeMenuItem>('/api/cafe-menu', {
+        category: item.category,
+        name: item.name,
+        price: item.price,
+        description: item.desc,
+        icon: item.icon,
+        image_url: item.image
       });
-      if (res.ok) {
-        const newItem = await res.json();
-        setCafeMenu(prev => prev.map(i => i.id === tempId ? {
-          id: newItem.id.toString(),
-          category: newItem.category,
-          name: newItem.name,
-          price: parseFloat(newItem.price) || 0,
-          desc: newItem.description || '',
-          icon: newItem.icon || '',
-          image: newItem.image_url || ''
-        } : i));
-      } else {
-        setCafeMenu(prev => prev.filter(i => i.id !== tempId));
-      }
+      setCafeMenu(prev => prev.map(i => i.id === tempId ? {
+        id: newItem.id.toString(),
+        category: newItem.category,
+        name: newItem.name,
+        price: parseFloat(String(newItem.price)) || 0,
+        desc: newItem.description || '',
+        icon: newItem.icon || '',
+        image: newItem.image_url || ''
+      } : i));
     } catch (err: unknown) {
       console.error('Failed to add cafe item:', err);
       setCafeMenu(prev => prev.filter(i => i.id !== tempId));
@@ -130,19 +116,14 @@ export const CafeDataProvider: React.FC<{children: ReactNode}> = ({ children }) 
   const updateCafeItem = useCallback(async (item: CafeItem) => {
     setCafeMenu(prev => prev.map(i => i.id === item.id ? item : i));
     try {
-      const res = await fetch(`/api/cafe-menu/${item.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          category: item.category,
-          name: item.name,
-          price: item.price,
-          description: item.desc,
-          icon: item.icon,
-          image_url: item.image
-        })
+      await putWithCredentials(`/api/cafe-menu/${item.id}`, {
+        category: item.category,
+        name: item.name,
+        price: item.price,
+        description: item.desc,
+        icon: item.icon,
+        image_url: item.image
       });
-      if (!res.ok) refreshCafeMenu();
     } catch (err: unknown) {
       console.error('Failed to update cafe item:', err);
       refreshCafeMenu();
@@ -152,8 +133,7 @@ export const CafeDataProvider: React.FC<{children: ReactNode}> = ({ children }) 
   const deleteCafeItem = useCallback(async (id: string) => {
     setCafeMenu(prev => prev.filter(i => i.id !== id));
     try {
-      const res = await fetch(`/api/cafe-menu/${id}`, { method: 'DELETE' });
-      if (!res.ok) refreshCafeMenu();
+      await deleteWithCredentials(`/api/cafe-menu/${id}`);
     } catch (err: unknown) {
       console.error('Failed to delete cafe item:', err);
       refreshCafeMenu();

@@ -5,6 +5,7 @@ import { triggerHaptic } from '../../utils/haptics';
 import { formatPhoneNumber } from '../../utils/phoneFormat';
 import { usePageReady } from '../../stores/pageReadyStore';
 import SEO from '../../components/SEO';
+import { fetchWithCredentials, postWithCredentials } from '../../hooks/queries/useFetch';
 
 const ADDRESS_FALLBACK: Record<string, string> = {
   'contact.address_line1': '15771 Red Hill Ave, Ste 500',
@@ -15,9 +16,8 @@ function usePublicSettings() {
   const [settings, setSettings] = useState<Record<string, string>>(ADDRESS_FALLBACK);
 
   useEffect(() => {
-    fetch('/api/settings/public')
-      .then(r => r.ok ? r.json() : Promise.reject())
-      .then((data: Record<string, string>) => setSettings(prev => ({ ...prev, ...data })))
+    fetchWithCredentials<Record<string, string>>('/api/settings/public')
+      .then((data) => setSettings(prev => ({ ...prev, ...data })))
       .catch(() => {});
   }, []);
 
@@ -94,9 +94,7 @@ const BookTour: React.FC = () => {
     setSlots([]);
     setSelectedTime('');
     try {
-      const res = await fetch(`/api/tours/availability?date=${date}`);
-      if (!res.ok) throw new Error('Failed to load availability');
-      const data = await res.json();
+      const data = await fetchWithCredentials<{ availableSlots?: TimeSlot[] }>(`/api/tours/availability?date=${date}`);
       setSlots(data.availableSlots || []);
     } catch {
       setSlots([]);
@@ -136,20 +134,14 @@ const BookTour: React.FC = () => {
     setError('');
     triggerHaptic('medium');
     try {
-      const res = await fetch('/api/tours/schedule', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          firstName: formData.firstName,
-          lastName: formData.lastName,
-          email: formData.email,
-          phone: formData.phone || undefined,
-          date: selectedDate,
-          startTime: selectedTime,
-        }),
+      const data = await postWithCredentials<{ tour: BookingResult }>('/api/tours/schedule', {
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        email: formData.email,
+        phone: formData.phone || undefined,
+        date: selectedDate,
+        startTime: selectedTime,
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to book tour');
       triggerHaptic('success');
       setBookingResult(data.tour);
       setStep(3);

@@ -1,5 +1,6 @@
 import { loadStripe, Stripe } from '@stripe/stripe-js';
 import React from 'react';
+import { fetchWithCredentials } from '../../../../hooks/queries/useFetch';
 
 let stripePromise: Promise<Stripe | null> | null = null;
 
@@ -7,11 +8,9 @@ export async function getStripePromise(): Promise<Stripe | null> {
   if (stripePromise) return stripePromise;
   
   try {
-    const res = await fetch('/api/stripe/config', { credentials: 'include' });
-    if (!res.ok) return null;
-    const { publishableKey } = await res.json();
-    if (!publishableKey) return null;
-    stripePromise = loadStripe(publishableKey);
+    const data = await fetchWithCredentials<{ publishableKey?: string }>('/api/stripe/config');
+    if (!data.publishableKey) return null;
+    stripePromise = loadStripe(data.publishableKey);
     return stripePromise;
   } catch {
     return null;

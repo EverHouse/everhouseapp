@@ -3,6 +3,7 @@ import type { Stripe } from '@stripe/stripe-js';
 import { Elements } from '@stripe/react-stripe-js';
 import { SimpleCheckoutForm } from '../../../stripe/StripePaymentForm';
 import { formatPhoneInput } from '../../../../utils/formatting';
+import { postWithCredentials } from '../../../../hooks/queries/useFetch';
 import {
   VisitorFlowProps,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -60,29 +61,17 @@ export function VisitorFlow({
       }
       setStripeInstance(stripe);
 
-      const res = await fetch('/api/day-passes/staff-checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          productSlug: form.productId,
-          email: form.email,
-          firstName: form.firstName,
-          lastName: form.lastName,
-          phone: form.phone,
-          streetAddress: form.streetAddress || undefined,
-          city: form.city || undefined,
-          state: form.state || undefined,
-          zipCode: form.zipCode || undefined,
-        })
+      const data = await postWithCredentials<{ clientSecret: string; paymentIntentId: string }>('/api/day-passes/staff-checkout', {
+        productSlug: form.productId,
+        email: form.email,
+        firstName: form.firstName,
+        lastName: form.lastName,
+        phone: form.phone,
+        streetAddress: form.streetAddress || undefined,
+        city: form.city || undefined,
+        state: form.state || undefined,
+        zipCode: form.zipCode || undefined,
       });
-
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || 'Failed to create payment');
-      }
-
-      const data = await res.json();
       setClientSecret(data.clientSecret);
       setPaymentIntentId(data.paymentIntentId);
     } catch (err: unknown) {
@@ -104,30 +93,16 @@ export function VisitorFlow({
     setIsLoading(true);
     
     try {
-      const confirmRes = await fetch('/api/day-passes/staff-checkout/confirm', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ paymentIntentId: paymentIntentIdResult || paymentIntentId })
+      const confirmData = await postWithCredentials<{ userId?: string }>('/api/day-passes/staff-checkout/confirm', {
+        paymentIntentId: paymentIntentIdResult || paymentIntentId
       });
-
-      if (!confirmRes.ok) {
-        throw new Error('Failed to confirm purchase');
-      }
-
-      const confirmData = await confirmRes.json();
       showToast('Day pass purchased successfully!', 'success');
       const visitorId = confirmData.userId || 'visitor-' + Date.now();
       if (scannedIdImage && visitorId && !visitorId.startsWith('visitor-')) {
-        fetch('/api/admin/save-id-image', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({
-            userId: visitorId,
-            image: scannedIdImage.base64,
-            mimeType: scannedIdImage.mimeType,
-          }),
+        postWithCredentials('/api/admin/save-id-image', {
+          userId: visitorId,
+          image: scannedIdImage.base64,
+          mimeType: scannedIdImage.mimeType,
         }).catch(err => console.error('Failed to save ID image:', err));
       }
       onSuccess({

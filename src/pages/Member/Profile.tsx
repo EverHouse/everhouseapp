@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import type { PublicKeyCredentialCreationOptionsJSON } from '@simplewebauthn/types';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthData } from '../../contexts/DataContext';
@@ -15,7 +16,7 @@ import ModalShell from '../../components/ModalShell';
 import WaiverModal from '../../components/WaiverModal';
 import BillingSection from '../../components/profile/BillingSection';
 import { AnimatedPage } from '../../components/motion';
-import { fetchWithCredentials, postWithCredentials, patchWithCredentials, putWithCredentials } from '../../hooks/queries/useFetch';
+import { fetchWithCredentials, postWithCredentials, patchWithCredentials, putWithCredentials, deleteWithCredentials } from '../../hooks/queries/useFetch';
 import GoogleSignInButton from '../../components/GoogleSignInButton';
 import AppleSignInButton from '../../components/AppleSignInButton';
 
@@ -451,31 +452,10 @@ const Profile: React.FC = () => {
     try {
       const { startRegistration } = await import('@simplewebauthn/browser');
 
-      const optionsRes = await fetch('/api/auth/passkey/register/options', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-      });
-
-      if (!optionsRes.ok) {
-        throw new Error('Failed to start passkey registration');
-      }
-
-      const options = await optionsRes.json();
+      const options = await postWithCredentials<PublicKeyCredentialCreationOptionsJSON>('/api/auth/passkey/register/options', {});
       const regResponse = await startRegistration({ optionsJSON: options });
 
-      const verifyRes = await fetch('/api/auth/passkey/register/verify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(regResponse),
-        credentials: 'include',
-      });
-
-      const data = await verifyRes.json();
-
-      if (!verifyRes.ok) {
-        throw new Error(data.error || 'Passkey registration failed');
-      }
+      await postWithCredentials('/api/auth/passkey/register/verify', regResponse);
 
       await refetchPasskeys();
       showToast('Passkey registered! You can now sign in with Face ID / Touch ID.', 'success');
@@ -493,15 +473,7 @@ const Profile: React.FC = () => {
   const handlePasskeyRemove = useCallback(async (passkeyId: number) => {
     setPasskeyRemoving(passkeyId);
     try {
-      const res = await fetch(`/api/auth/passkey/${passkeyId}`, {
-        method: 'DELETE',
-        credentials: 'include',
-      });
-
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || 'Failed to remove passkey');
-      }
+      await deleteWithCredentials(`/api/auth/passkey/${passkeyId}`);
 
       await refetchPasskeys();
       showToast('Passkey removed', 'success');

@@ -8,6 +8,7 @@ import { AnimatedPage } from '../../components/motion';
 import SEO from '../../components/SEO';
 import { usePricing } from '../../hooks/usePricing';
 import { usePublicMembershipTiers } from '../../hooks/queries';
+import { fetchWithCredentials } from '../../hooks/queries/useFetch';
 
 interface MembershipTier {
   id: number;
@@ -503,22 +504,20 @@ const CompareFeatures: React.FC = () => {
     const controller = new AbortController();
     const fetchData = async () => {
       try {
-        const [tiersResponse, featuresResponse] = await Promise.all([
-          fetch('/api/membership-tiers?active=true', { signal: controller.signal }),
-          fetch('/api/tier-features', { signal: controller.signal })
+        const [tiersData, featuresData] = await Promise.all([
+          fetchWithCredentials<MembershipTier[]>('/api/membership-tiers?active=true', { signal: controller.signal }).catch(() => null),
+          fetchWithCredentials<{ features: TierFeature[] }>('/api/tier-features', { signal: controller.signal }).catch(() => null)
         ]);
 
         if (controller.signal.aborted) return;
 
-        if (tiersResponse.ok) {
-          const data = await tiersResponse.json();
-          const filteredTiers = data.filter((t: MembershipTier) => t.show_in_comparison !== false);
+        if (tiersData) {
+          const filteredTiers = tiersData.filter((t: MembershipTier) => t.show_in_comparison !== false);
           setTiers(filteredTiers);
         }
 
-        if (featuresResponse.ok) {
-          const data = await featuresResponse.json();
-          const activeFeatures = (data.features || []).filter((f: TierFeature) => f.isActive);
+        if (featuresData) {
+          const activeFeatures = (featuresData.features || []).filter((f: TierFeature) => f.isActive);
           setTierFeatures(activeFeatures);
         }
       } catch (error: unknown) {

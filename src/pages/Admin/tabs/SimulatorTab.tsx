@@ -31,7 +31,7 @@ import {
     useFeeEstimate,
 } from '../../../hooks/queries/useBookingsQueries';
 import { bookingsKeys, simulatorKeys } from '../../../hooks/queries/adminKeys';
-import { fetchWithCredentials } from '../../../hooks/queries/useFetch';
+import { fetchWithCredentials, putWithCredentials, postWithCredentials } from '../../../hooks/queries/useFetch';
 
 import type { BookingRequest, Bay, Resource, CalendarClosure, AvailabilityBlock } from './simulator/simulatorTypes';
 import type { BookingRequest as CommandCenterBookingRequest } from '../../../components/staff-command-center/types';
@@ -270,12 +270,15 @@ const SimulatorTab: React.FC = () => {
 
         const openBookingById = async (bookingId: number | string) => {
             try {
-                const res = await fetch(`/api/booking-requests?id=${bookingId}`, { credentials: 'include' });
+                const data = await fetchWithCredentials<Array<{
+                    id: number; user_email?: string; user_name?: string; trackman_booking_id?: string | null;
+                    is_unmatched?: boolean; bay_name?: string; resource_name?: string; request_date?: string;
+                    start_time?: string; end_time?: string; resource_id?: number; duration_minutes?: number;
+                    status?: string; declared_player_count?: number; player_count?: number; notes?: string; note?: string;
+                    userName?: string;
+                }>>(`/api/booking-requests?id=${bookingId}`);
                 if (cancelled) return;
-                if (res.ok) {
-                    const data = await res.json();
-                    if (cancelled) return;
-                    if (data && data.length > 0) {
+                if (data && data.length > 0) {
                         const booking = data[0];
                         const email = (booking.user_email || '').toLowerCase();
                         const isPlaceholderEmail = !email || 
@@ -295,7 +298,7 @@ const SimulatorTab: React.FC = () => {
                             mode: isUnmatched ? 'assign' as const : 'manage' as const,
                             bayName: booking.bay_name || booking.resource_name,
                             bookingDate: booking.request_date,
-                            timeSlot: `${formatTime12Hour(booking.start_time)} - ${formatTime12Hour(booking.end_time)}`,
+                            timeSlot: `${formatTime12Hour(booking.start_time || '')} - ${formatTime12Hour(booking.end_time || '')}`,
                             matchedBookingId: Number(booking.id),
                             currentMemberName: isUnmatched ? undefined : (booking.user_name || undefined),
                             currentMemberEmail: isUnmatched ? undefined : (booking.user_email || undefined),
@@ -309,7 +312,6 @@ const SimulatorTab: React.FC = () => {
                             bookingContext: { requestDate: booking.request_date, startTime: booking.start_time, endTime: booking.end_time, resourceId: booking.resource_id, resourceName: booking.bay_name || booking.resource_name, durationMinutes: booking.duration_minutes },
                         });
                     }
-                }
             } catch (err: unknown) {
                 console.error('Failed to open booking details:', err);
             }
@@ -383,50 +385,22 @@ const SimulatorTab: React.FC = () => {
         const _booking = requests.find(r => r.id === bookingId);
 
         // eslint-disable-next-line no-useless-catch
-        try {
-            const res = await fetch(`/api/booking-requests/${apiId}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify({ 
-                    status: BOOKING_STATUS.APPROVED,
-                    trackman_booking_id: trackmanBookingId
-                })
-            });
-            if (res.ok) {
-                showToast('Booking confirmed with Trackman', 'success');
-                window.dispatchEvent(new CustomEvent('booking-action-completed'));
-                handleRefresh();
-            } else {
-                const error = await res.json().catch(() => ({}));
-                throw new Error(error.error || 'Failed to confirm booking');
-            }
-        } catch (err: unknown) {
-            throw err;
-        }
+        await putWithCredentials(`/api/booking-requests/${apiId}`, { 
+            status: BOOKING_STATUS.APPROVED,
+            trackman_booking_id: trackmanBookingId
+        });
+        showToast('Booking confirmed with Trackman', 'success');
+        window.dispatchEvent(new CustomEvent('booking-action-completed'));
+        handleRefresh();
     }, [requests, showToast, handleRefresh]);
 
     const handleDevConfirm = useCallback(async (bookingId: number | string) => {
         const apiId = typeof bookingId === 'string' ? parseInt(String(bookingId).replace('cal_', '')) : bookingId;
-        // eslint-disable-next-line no-useless-catch
-        try {
-            const res = await fetch(`/api/admin/bookings/${apiId}/dev-confirm`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include'
-            });
-            const data = await res.json();
-            if (res.ok) {
-                const totalFee = (data.totalFeeCents || 0) / 100;
-                showToast(`Confirmed! Total fees: $${totalFee.toFixed(2)}`, 'success');
-                window.dispatchEvent(new CustomEvent('booking-action-completed'));
-                handleRefresh();
-            } else {
-                throw new Error(data.error || 'Failed to confirm');
-            }
-        } catch (err: unknown) {
-            throw err;
-        }
+        const data = await postWithCredentials<{ totalFeeCents?: number }>(`/api/admin/bookings/${apiId}/dev-confirm`, {});
+        const totalFee = (data.totalFeeCents || 0) / 100;
+        showToast(`Confirmed! Total fees: $${totalFee.toFixed(2)}`, 'success');
+        window.dispatchEvent(new CustomEvent('booking-action-completed'));
+        handleRefresh();
     }, [showToast, handleRefresh]);
 
     const _handleLinkTrackmanToMember = useCallback((event: {
@@ -558,15 +532,18 @@ const SimulatorTab: React.FC = () => {
         if (parsed.type === 'member' && parsed.memberId) {
             try {
                 showToast('Processing check-in...', 'info');
-                const response = await fetch('/api/staff/qr-checkin', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    credentials: 'include',
-                    body: JSON.stringify({ memberId: parsed.memberId })
-                });
-                const result = await response.json();
+                const result = await postWithCredentials<{
+                    success?: boolean;
+                    alreadyCheckedIn?: boolean;
+                    hasBooking?: boolean;
+                    bookingId?: number;
+                    memberEmail?: string;
+                    memberName?: string;
+                    bookingDetails?: { bayName?: string; startTime?: string; endTime?: string };
+                    error?: string;
+                }>('/api/staff/qr-checkin', { memberId: parsed.memberId });
 
-                if (response.ok && result.success) {
+                if (result.success) {
                     const isAlreadyCheckedIn = !!result.alreadyCheckedIn;
                     if (result.hasBooking && result.bookingId) {
                         const bookingId = Number(result.bookingId);
@@ -578,10 +555,10 @@ const SimulatorTab: React.FC = () => {
                         } else {
                             const syntheticBooking: BookingRequest = {
                                 id: bookingId,
-                                user_email: result.memberEmail,
-                                user_name: result.memberName,
+                                user_email: result.memberEmail ?? null,
+                                user_name: result.memberName ?? null,
                                 resource_id: null,
-                                bay_name: result.bookingDetails?.bayName || null,
+                                bay_name: result.bookingDetails?.bayName ?? null,
                                 resource_preference: null,
                                 request_date: getTodayPacific(),
                                 start_time: result.bookingDetails?.startTime || '',
@@ -680,21 +657,11 @@ const SimulatorTab: React.FC = () => {
         );
         
         try {
-            const res = await fetch(`/api/booking-requests/${booking.id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify({ 
-                    status: BOOKING_STATUS.CANCELLED, 
-                    source: booking.source,
-                    cancelled_by: actualUser?.email
-                })
+            await putWithCredentials(`/api/booking-requests/${booking.id}`, { 
+                status: BOOKING_STATUS.CANCELLED, 
+                source: booking.source,
+                cancelled_by: actualUser?.email
             });
-            
-            if (!res.ok) {
-                const err = await res.json();
-                throw new Error(err.error || 'Failed to cancel booking');
-            }
             
             showToast('Booking cancelled', 'success');
             
@@ -736,33 +703,29 @@ const SimulatorTab: React.FC = () => {
             setConflictDetails(null);
             
             try {
-                const [bookingsRes, closuresRes] = await Promise.all([
-                    fetch(`/api/approved-bookings?start_date=${selectedRequest.request_date}&end_date=${selectedRequest.request_date}`),
-                    fetch('/api/closures')
+                const [bookings, allClosures] = await Promise.all([
+                    fetchWithCredentials<Array<{ resource_id?: number; request_date?: string; start_time: string; end_time: string }>>(`/api/approved-bookings?start_date=${selectedRequest.request_date}&end_date=${selectedRequest.request_date}`),
+                    fetchWithCredentials<Array<{ startDate: string; endDate: string; affectedAreas: string | null; startTime?: string; endTime?: string; title: string }>>('/api/closures')
                 ]);
                 
                 let hasConflict = false;
                 let details = '';
                 
-                if (bookingsRes.ok) {
-                    const bookings = await bookingsRes.json();
-                    const reqStart = selectedRequest.start_time;
-                    const reqEnd = selectedRequest.end_time;
-                    
-                    const conflict = bookings.find((b: { resource_id?: number; request_date?: string; start_time: string; end_time: string }) => 
-                        b.resource_id === selectedBayId && 
-                        b.request_date === selectedRequest.request_date &&
-                        b.start_time < reqEnd && b.end_time > reqStart
-                    );
-                    
-                    if (conflict) {
-                        hasConflict = true;
-                        details = `Conflicts with existing booking: ${formatTime12Hour(conflict.start_time)} - ${formatTime12Hour(conflict.end_time)}`;
-                    }
+                const reqStart = selectedRequest.start_time;
+                const reqEnd = selectedRequest.end_time;
+                
+                const conflict = bookings.find((b) => 
+                    b.resource_id === selectedBayId && 
+                    b.request_date === selectedRequest.request_date &&
+                    b.start_time < reqEnd && b.end_time > reqStart
+                );
+                
+                if (conflict) {
+                    hasConflict = true;
+                    details = `Conflicts with existing booking: ${formatTime12Hour(conflict.start_time)} - ${formatTime12Hour(conflict.end_time)}`;
                 }
                 
-                if (!hasConflict && closuresRes.ok) {
-                    const allClosures = await closuresRes.json();
+                if (!hasConflict) {
                     const reqDate = selectedRequest.request_date;
                     const reqStartMins = parseInt(selectedRequest.start_time.split(':')[0]) * 60 + parseInt(selectedRequest.start_time.split(':')[1]);
                     const reqEndMins = parseInt(selectedRequest.end_time.split(':')[0]) * 60 + parseInt(selectedRequest.end_time.split(':')[1]);
@@ -807,19 +770,13 @@ const SimulatorTab: React.FC = () => {
 
         const fetchDeclineSlots = async (bookingDate: string, resourceId: number) => {
             try {
-                const res = await fetch(`/api/bays/${resourceId}/availability?date=${bookingDate}`, {
-                    credentials: 'include'
-                });
+                const blocks = await fetchWithCredentials<Array<{ block_type?: string; start_time?: string }>>(`/api/bays/${resourceId}/availability?date=${bookingDate}`);
                 if (cancelled) return;
-                if (res.ok) {
-                    const blocks = await res.json();
-                    if (cancelled) return;
-                    const available = blocks
-                        .filter((b: { block_type?: string; start_time?: string }) => b.block_type === 'available' || !b.block_type)
-                        .map((b: { block_type?: string; start_time?: string }) => b.start_time?.substring(0, 5))
-                        .filter(Boolean);
-                    setDeclineAvailableSlots(available);
-                }
+                const available = blocks
+                    .filter((b) => b.block_type === 'available' || !b.block_type)
+                    .map((b) => b.start_time?.substring(0, 5))
+                    .filter((s): s is string => !!s);
+                setDeclineAvailableSlots(available);
             } catch (err: unknown) {
                 console.error('Failed to fetch available slots:', err);
                 if (!cancelled) {
@@ -967,36 +924,21 @@ const SimulatorTab: React.FC = () => {
         setStaffNotes('');
         
         try {
-            let res;
             if (approvedRequest.source === 'booking') {
-                res = await fetch(`/api/bookings/${approvedRequest.id}/approve`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' }
-                });
+                await putWithCredentials(`/api/bookings/${approvedRequest.id}/approve`, {});
             } else {
-                res = await fetch(`/api/booking-requests/${approvedRequest.id}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        status: BOOKING_STATUS.APPROVED,
-                        resource_id: approvedBayId,
-                        staff_notes: approvedStaffNotes || null,
-                        reviewed_by: user?.email
-                    })
+                await putWithCredentials(`/api/booking-requests/${approvedRequest.id}`, {
+                    status: BOOKING_STATUS.APPROVED,
+                    resource_id: approvedBayId,
+                    staff_notes: approvedStaffNotes || null,
+                    reviewed_by: user?.email
                 });
             }
             
-            if (!res.ok) {
-                queryClient.setQueryData(simulatorKeys.allRequests(), previousRequests);
-                const errData = await res.json();
-                setError(errData.message || errData.error || 'Failed to approve');
-                showToast(errData.message || errData.error || 'Failed to approve', 'error');
-            } else {
-                showToast('Booking approved', 'success');
-                window.dispatchEvent(new CustomEvent('booking-action-completed'));
-                queryClient.invalidateQueries({ queryKey: bookingsKeys.all });
-                queryClient.invalidateQueries({ queryKey: simulatorKeys.all });
-            }
+            showToast('Booking approved', 'success');
+            window.dispatchEvent(new CustomEvent('booking-action-completed'));
+            queryClient.invalidateQueries({ queryKey: bookingsKeys.all });
+            queryClient.invalidateQueries({ queryKey: simulatorKeys.all });
         } catch (err: unknown) {
             queryClient.setQueryData(simulatorKeys.allRequests(), previousRequests);
             setError((err instanceof Error ? err.message : String(err)));
@@ -1042,42 +984,25 @@ const SimulatorTab: React.FC = () => {
         setSuggestedTime('');
         
         try {
-            let res;
             if (declinedRequest.source === 'booking') {
-                res = await fetch(`/api/bookings/${declinedRequest.id}/decline`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    credentials: 'include'
-                });
+                await putWithCredentials(`/api/bookings/${declinedRequest.id}/decline`, {});
             } else {
-                res = await fetch(`/api/booking-requests/${declinedRequest.id}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    credentials: 'include',
-                    body: JSON.stringify({
-                        status: newStatus,
-                        staff_notes: declinedStaffNotes || null,
-                        suggested_time: declinedSuggestedTime ? declinedSuggestedTime + ':00' : null,
-                        reviewed_by: actualUser?.email || user?.email,
-                        cancelled_by: newStatus === BOOKING_STATUS.CANCELLED ? (actualUser?.email || user?.email) : undefined
-                    })
+                await putWithCredentials(`/api/booking-requests/${declinedRequest.id}`, {
+                    status: newStatus,
+                    staff_notes: declinedStaffNotes || null,
+                    suggested_time: declinedSuggestedTime ? declinedSuggestedTime + ':00' : null,
+                    reviewed_by: actualUser?.email || user?.email,
+                    cancelled_by: newStatus === BOOKING_STATUS.CANCELLED ? (actualUser?.email || user?.email) : undefined
                 });
             }
             
-            if (!res.ok) {
-                queryClient.setQueryData(simulatorKeys.allRequests(), previousRequests);
-                const errData = await res.json();
-                setError(errData.error || 'Failed to process request');
-                showToast(errData.error || 'Failed to process request', 'error');
-            } else {
-                const statusLabel = newStatus === BOOKING_STATUS.CANCELLED ? 'cancelled' : 'declined';
-                showToast(`Booking ${statusLabel}`, 'success');
-                if (wasPending) {
-                    window.dispatchEvent(new CustomEvent('booking-action-completed'));
-                }
-                queryClient.invalidateQueries({ queryKey: bookingsKeys.all });
-                queryClient.invalidateQueries({ queryKey: simulatorKeys.all });
+            const statusLabel = newStatus === BOOKING_STATUS.CANCELLED ? 'cancelled' : 'declined';
+            showToast(`Booking ${statusLabel}`, 'success');
+            if (wasPending) {
+                window.dispatchEvent(new CustomEvent('booking-action-completed'));
             }
+            queryClient.invalidateQueries({ queryKey: bookingsKeys.all });
+            queryClient.invalidateQueries({ queryKey: simulatorKeys.all });
         } catch (err: unknown) {
             queryClient.setQueryData(simulatorKeys.allRequests(), previousRequests);
             setError((err instanceof Error ? err.message : String(err)));
@@ -1546,20 +1471,11 @@ const SimulatorTab: React.FC = () => {
                 });
                 if (!confirmed) return;
                 try {
-                  const res = await fetch(`/api/booking-requests/${bookingId}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    credentials: 'include',
-                    body: JSON.stringify({
+                  await putWithCredentials(`/api/booking-requests/${bookingId}`, {
                       status: BOOKING_STATUS.CANCELLED,
                       staff_notes: 'Cancelled from booking sheet',
                       cancelled_by: actualUser?.email || user?.email
-                    })
-                  });
-                  if (!res.ok) {
-                    const errData = await res.json();
-                    throw new Error(errData.error || 'Failed to cancel booking');
-                  }
+                    });
                   showToast('Booking cancelled successfully', 'success');
                   setBookingSheet({ isOpen: false, trackmanBookingId: null });
                   handleRefresh();

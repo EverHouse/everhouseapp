@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAutoAnimate } from '@formkit/auto-animate/react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { fetchWithCredentials } from '../../../../hooks/queries/useFetch';
+import { fetchWithCredentials, putWithCredentials } from '../../../../hooks/queries/useFetch';
 import Toggle from '../../../../components/Toggle';
 
 interface SchedulerStatus {
@@ -83,14 +83,7 @@ const SchedulerMonitorPanel: React.FC<Props> = ({ isOpen, onToggle }) => {
   const toggleMutation = useMutation({
     mutationFn: async ({ name, enabled }: { name: string; enabled: boolean }) => {
       const settingKey = `scheduler.${name.replace(/\s+/g, '_')}.enabled`;
-      const response = await fetch(`/api/admin/settings/${settingKey}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ value: String(enabled) }),
-      });
-      if (!response.ok) throw new Error('Failed to update scheduler setting');
-      return response.json();
+      return putWithCredentials(`/api/admin/settings/${settingKey}`, { value: String(enabled) });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'monitoring', 'schedulers'] });

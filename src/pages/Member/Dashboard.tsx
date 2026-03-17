@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
-import { fetchWithCredentials } from '../../hooks/queries/useFetch';
+import { fetchWithCredentials, postWithCredentials, putWithCredentials, deleteWithCredentials } from '../../hooks/queries/useFetch';
 import { useAuthData, useBookingData } from '../../contexts/DataContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { usePageReady } from '../../stores/pageReadyStore';
@@ -350,9 +350,7 @@ const Dashboard: React.FC = () => {
 
     (async () => {
       try {
-        const res = await fetch('/api/member/onboarding', { credentials: 'include' });
-        if (!res.ok) return;
-        const data = await res.json();
+        const data = await fetchWithCredentials<Record<string, unknown>>('/api/member/onboarding');
 
         if (data.firstLoginAt || data.onboardingCompletedAt || data.isDismissed) {
           localStorage.setItem(localKey, 'true');
@@ -361,7 +359,7 @@ const Dashboard: React.FC = () => {
 
         const joinOrCreated = data.joinDate || data.createdAt;
         if (joinOrCreated) {
-          const age = Date.now() - new Date(joinOrCreated).getTime();
+          const age = Date.now() - new Date(joinOrCreated as string).getTime();
           if (age > 7 * 24 * 60 * 60 * 1000) {
             localStorage.setItem(localKey, 'true');
             return;
@@ -370,12 +368,7 @@ const Dashboard: React.FC = () => {
 
         localStorage.setItem(localKey, 'true');
 
-        fetch('/api/member/onboarding/complete-step', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ step: 'first_login' }),
-        }).catch(() => {});
+        postWithCredentials('/api/member/onboarding/complete-step', { step: 'first_login' }).catch(() => {});
 
         queueMicrotask(() => setShowFirstLoginModal(true));
       } catch {
@@ -643,14 +636,7 @@ const Dashboard: React.FC = () => {
       const endpoint = bookingType === 'booking'
         ? `/api/bookings/${bookingId}/member-cancel`
         : `/api/booking-requests/${bookingId}/member-cancel`;
-      const res = await fetch(endpoint, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(isAdminViewingAs ? { acting_as_email: user?.email } : {}),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || 'Failed to cancel booking');
+      const data = await putWithCredentials<Record<string, unknown>>(endpoint, isAdminViewingAs ? { acting_as_email: user?.email } : {});
       return { bookingId, data };
     },
     onMutate: async ({ bookingId }) => {
@@ -704,13 +690,7 @@ const Dashboard: React.FC = () => {
         setConfirmModal(null);
         
         try {
-          const participantsRes = await fetch(`/api/bookings/${bookingId}/participants`, { credentials: 'include' });
-          if (!participantsRes.ok) {
-            showToast('Failed to get booking details', 'error');
-            return;
-          }
-          
-          const participantsData = await participantsRes.json();
+          const participantsData = await fetchWithCredentials<{ participants: Array<{ user_email?: string; id?: number }> }>(`/api/bookings/${bookingId}/participants`);
           const participants = participantsData.participants || [];
           
           const myParticipant = participants.find((p: { user_email?: string }) => 
@@ -723,20 +703,13 @@ const Dashboard: React.FC = () => {
           }
           
           const body = isAdminViewingAs && user?.email ? { onBehalfOf: user.email } : {};
-          const res = await fetch(`/api/bookings/${bookingId}/participants/${myParticipant.id}`, {
+          await fetchWithCredentials(`/api/bookings/${bookingId}/participants/${myParticipant.id}`, {
             method: 'DELETE',
             headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
             body: JSON.stringify(body)
           });
-          
-          if (res.ok) {
-            showToast('You have left the booking', 'success');
-            refetchAllData();
-          } else {
-            const data = await res.json().catch(() => ({}));
-            showToast(data.error || 'Failed to leave booking', 'error');
-          }
+          showToast('You have left the booking', 'success');
+          refetchAllData();
         } catch (_err: unknown) {
           showToast('Failed to leave booking', 'error');
         }
@@ -755,16 +728,9 @@ const Dashboard: React.FC = () => {
         setConfirmModal(null);
         
         try {
-          const res = await fetch(`/api/rsvps/${eventId}/${encodeURIComponent(user.email)}`, {
-            method: 'DELETE',
-            credentials: 'include'
-          });
-          if (res.ok) {
-            showToast('RSVP cancelled', 'success');
-            refetchAllData();
-          } else {
-            showToast('Failed to cancel RSVP', 'error');
-          }
+          await deleteWithCredentials(`/api/rsvps/${eventId}/${encodeURIComponent(user.email)}`);
+          showToast('RSVP cancelled', 'success');
+          refetchAllData();
         } catch (_err: unknown) {
           showToast('Failed to cancel RSVP', 'error');
         }
@@ -783,16 +749,9 @@ const Dashboard: React.FC = () => {
         setConfirmModal(null);
         
         try {
-          const res = await fetch(`/api/wellness-enrollments/${classId}/${encodeURIComponent(user.email)}`, {
-            method: 'DELETE',
-            credentials: 'include'
-          });
-          if (res.ok) {
-            showToast('Enrollment cancelled', 'success');
-            refetchAllData();
-          } else {
-            showToast('Failed to cancel enrollment', 'error');
-          }
+          await deleteWithCredentials(`/api/wellness-enrollments/${classId}/${encodeURIComponent(user.email)}`);
+          showToast('Enrollment cancelled', 'success');
+          refetchAllData();
         } catch (_err: unknown) {
           showToast('Failed to cancel enrollment', 'error');
         }

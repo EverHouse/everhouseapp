@@ -8,6 +8,7 @@ import {
   MembershipTier,
   MemberStep,
 } from './newUserTypes';
+import { postWithCredentials, deleteWithCredentials } from '../../../../hooks/queries/useFetch';
 import WalkingGolferSpinner from '../../../WalkingGolferSpinner';
 
 interface PaymentStepProps {
@@ -460,10 +461,7 @@ export function PaymentStep({
                   onCancel={async () => {
                     if (createdUserId && subscriptionId) {
                       try {
-                        await fetch(`/api/stripe/subscriptions/cleanup-pending/${createdUserId}`, {
-                          method: 'DELETE',
-                          credentials: 'include'
-                        });
+                        await deleteWithCredentials(`/api/stripe/subscriptions/cleanup-pending/${createdUserId}`);
                         showToast('Signup cancelled. No charges were made.', 'info');
                       } catch (err: unknown) {
                         console.error('Failed to cleanup pending signup:', err);

@@ -4,6 +4,7 @@ import { formatTime12Hour, getTodayPacific } from '../../../../utils/dateUtils';
 import type { BookingRequest, Resource, CalendarClosure, AvailabilityBlock } from './simulatorTypes';
 import { formatDateShortAdmin, getClosureForSlot, getBlockForSlot } from './simulatorUtils';
 import { prefetchBookingDetail } from '../../../../lib/prefetch-actions';
+import { postWithCredentials } from '../../../../hooks/queries/useFetch';
 
 export interface CalendarGridProps {
     resources: Resource[];
@@ -401,16 +402,11 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
                                 if (isSyncing) return;
                                 setIsSyncing(true);
                                 try {
-                                    const syncRes = await fetch('/api/admin/bookings/sync-calendar', {
-                                        method: 'POST',
-                                        headers: { 'Content-Type': 'application/json' },
-                                        credentials: 'include'
-                                    });
-                                    const syncData = await syncRes.json();
+                                    const syncData = await postWithCredentials<{ conference_room?: { synced?: number } }>('/api/admin/bookings/sync-calendar', {});
                                     
                                     await handleRefresh();
                                     
-                                    if (syncRes.ok && syncData.conference_room?.synced > 0) {
+                                    if (syncData.conference_room?.synced && syncData.conference_room.synced > 0) {
                                         showToast(`Refreshed calendar + synced ${syncData.conference_room.synced} conference room bookings`, 'success');
                                     } else {
                                         showToast('Calendar refreshed', 'success');

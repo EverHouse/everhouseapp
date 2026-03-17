@@ -1,10 +1,12 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAutoAnimate } from '@formkit/auto-animate/react';
 import EmptyState from '../../EmptyState';
 import { DateBlock, GlassListRow } from '../helpers';
 import { getTodayPacific } from '../../../utils/dateUtils';
 import { UnifiedBookingSheet } from '../modals/UnifiedBookingSheet';
 import WalkingGolferSpinner from '../../WalkingGolferSpinner';
+import { fetchWithCredentials } from '../../../hooks/queries/useFetch';
 
 interface OverduePayment {
   bookingId: number;
@@ -23,34 +25,22 @@ interface OverduePaymentsSectionProps {
 }
 
 export const OverduePaymentsSection: React.FC<OverduePaymentsSectionProps> = ({ variant = 'mobile' }) => {
+  const queryClient = useQueryClient();
   const [paymentsRef] = useAutoAnimate();
-  const [overduePayments, setOverduePayments] = useState<OverduePayment[]>([]);
-  const [loading, setLoading] = useState(true);
   const [bookingSheet, setBookingSheet] = useState<{ isOpen: boolean; bookingId: number | null }>({ isOpen: false, bookingId: null });
   const today = getTodayPacific();
   const isDesktop = variant === 'desktop';
 
-  const fetchOverduePayments = useCallback(async () => {
-    try {
-      const overdueRes = await fetch('/api/bookings/overdue-payments', { credentials: 'include' });
-      if (overdueRes.ok) {
-        const data = await overdueRes.json();
-        setOverduePayments(data);
-      }
-    } catch (err: unknown) {
-      console.error('Failed to fetch overdue payments:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const { data: overduePayments = [], isLoading: loading } = useQuery({
+    queryKey: ['admin', 'overdue-payments'],
+    queryFn: () => fetchWithCredentials<OverduePayment[]>('/api/bookings/overdue-payments'),
+  });
 
-  useEffect(() => {
-    fetchOverduePayments();
-  }, [fetchOverduePayments]);
+  const fetchOverduePayments = () => {
+    queryClient.invalidateQueries({ queryKey: ['admin', 'overdue-payments'] });
+  };
 
-  const _handleBillingComplete = useCallback(() => {
-    fetchOverduePayments();
-  }, [fetchOverduePayments]);
+  const _handleBillingComplete = fetchOverduePayments;
 
   const maxItems = isDesktop ? 6 : 4;
   const count = overduePayments.length;

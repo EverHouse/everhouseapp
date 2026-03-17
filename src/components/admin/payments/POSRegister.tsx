@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements } from '@stripe/react-stripe-js';
 import { SimpleCheckoutForm } from '../../stripe/StripePaymentForm';
@@ -10,11 +11,13 @@ import AnimatedCheckmark from '../../AnimatedCheckmark';
 import { useTheme } from '../../../contexts/ThemeContext';
 import { useIsMobile } from '../../../hooks/useBreakpoint';
 import { useCafeMenu } from '../../../hooks/queries/useCafeQueries';
+import { useMembershipTiers } from '../../../hooks/queries/useAdminQueries';
 import type { CafeItem } from '../../../types/data';
 import RedeemDayPassSection from './RedeemPassCard';
 import IdScannerModal from '../../staff-command-center/modals/IdScannerModal';
 import WalkingGolferSpinner from '../../WalkingGolferSpinner';
 import { haptic } from '../../../utils/haptics';
+import { fetchWithCredentials, postWithCredentials } from '../../../hooks/queries/useFetch';
 
 interface CartItem {
   productId: string;
@@ -80,9 +83,7 @@ const POSRegister: React.FC = () => {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch('/api/membership-tiers?active=true');
-        if (!res.ok) throw new Error('Failed to fetch tiers');
-        const tiers = await res.json();
+        const tiers = await fetchWithCredentials<Array<{ slug: string; stripe_product_id?: string; name: string; price_cents: number }>>('/api/membership-tiers?active=true');
         const products = PASS_PRODUCT_SLUGS
           .map(slug => {
             const tier = tiers.find((t: { slug: string }) => t.slug === slug);
@@ -165,11 +166,8 @@ const POSRegister: React.FC = () => {
     setCheckingSavedCard(true);
     setSavedCard(null);
     try {
-      const res = await fetch(`/api/stripe/staff/check-saved-card/${encodeURIComponent(email)}`, { credentials: 'include' });
-      if (res.ok) {
-        const data = await res.json();
-        setSavedCard(data);
-      }
+      const data = await fetchWithCredentials<{ hasSavedCard: boolean; last4?: string; brand?: string }>(`/api/stripe/staff/check-saved-card/${encodeURIComponent(email)}`);
+      setSavedCard(data);
     } catch {
       setSavedCard({ hasSavedCard: false });
     } finally {
@@ -316,19 +314,7 @@ const POSRegister: React.FC = () => {
         }
       }
 
-      const res = await fetch('/api/stripe/staff/quick-charge', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(payload),
-      });
-
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || 'Failed to create payment');
-      }
-
-      const data = await res.json();
+      const data = await postWithCredentials<{ clientSecret: string; paymentIntentId: string }>('/api/stripe/staff/quick-charge', payload);
       setClientSecret(data.clientSecret);
       setPaymentIntentId(data.paymentIntentId);
     } catch (err: unknown) {
@@ -344,15 +330,7 @@ const POSRegister: React.FC = () => {
     if (!intentId) return;
 
     try {
-      const res = await fetch('/api/stripe/staff/quick-charge/confirm', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ paymentIntentId: intentId }),
-      });
-      if (!res.ok) {
-        console.warn('[POS] Confirm call returned non-OK status:', res.status);
-      }
+      await postWithCredentials('/api/stripe/staff/quick-charge/confirm', { paymentIntentId: intentId });
     } catch (err: unknown) {
       console.error('[POS] Failed to confirm payment record:', err);
     }
@@ -364,15 +342,7 @@ const POSRegister: React.FC = () => {
 
   const handleTerminalSuccess = async (piId: string) => {
     try {
-      const res = await fetch('/api/stripe/staff/quick-charge/confirm', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ paymentIntentId: piId }),
-      });
-      if (!res.ok) {
-        console.warn('[POS] Terminal confirm returned non-OK status:', res.status);
-      }
+      await postWithCredentials('/api/stripe/staff/quick-charge/confirm', { paymentIntentId: piId });
     } catch (err: unknown) {
       console.error('[POS] Failed to confirm terminal payment record:', err);
     }
@@ -390,11 +360,7 @@ const POSRegister: React.FC = () => {
     setError(null);
 
     try {
-      const res = await fetch('/api/stripe/staff/charge-saved-card-pos', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
+      const data = await postWithCredentials<{ paymentIntentId: string }>('/api/stripe/staff/charge-saved-card-pos', {
           memberEmail: customer.email,
           memberName: customer.name,
           amountCents: totalCents,
@@ -406,14 +372,7 @@ const POSRegister: React.FC = () => {
             priceCents: item.priceCents,
             quantity: item.quantity,
           })),
-        }),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to charge card');
-      }
+        });
 
       setPaymentIntentId(data.paymentIntentId);
       setSuccess(true);
@@ -439,11 +398,7 @@ const POSRegister: React.FC = () => {
           ? 'terminal'
           : 'card';
 
-      const res = await fetch('/api/purchases/send-receipt', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
+      await postWithCredentials('/api/purchases/send-receipt', {
           email,
           memberName: name,
           items: cartItems.map(item => ({
@@ -455,13 +410,7 @@ const POSRegister: React.FC = () => {
           totalAmount: totalCents,
           paymentMethod: effectivePaymentMethod,
           paymentIntentId: paymentIntentId || undefined,
-        }),
-      });
-
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || 'Failed to send receipt');
-      }
+        });
 
       setReceiptSent(true);
       haptic.success();
@@ -486,17 +435,9 @@ const POSRegister: React.FC = () => {
     setError(null);
 
     try {
-      const attachRes = await fetch('/api/stripe/staff/quick-charge/attach-email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ paymentIntentId, email }),
+      await postWithCredentials('/api/stripe/staff/quick-charge/attach-email', { paymentIntentId, email }).catch((err: unknown) => {
+        console.warn('[POS] Could not attach email to payment:', err instanceof Error ? err.message : err);
       });
-
-      if (!attachRes.ok) {
-        const data = await attachRes.json().catch(() => ({}));
-        console.warn('[POS] Could not attach email to payment:', data.error);
-      }
 
       await handleSendReceipt(email);
     } catch (err: unknown) {
@@ -558,22 +499,14 @@ const POSRegister: React.FC = () => {
 
     (async () => {
       try {
-        const searchRes = await fetch(`/api/members/search?q=${encodeURIComponent(email)}&limit=1`, { credentials: 'include' });
-        if (searchRes.ok) {
-          const results = await searchRes.json();
-          const user = Array.isArray(results) ? results.find((u: { email?: string }) => u.email?.toLowerCase() === email.toLowerCase()) : null;
-          if (user?.id) {
-            await fetch('/api/admin/save-id-image', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              credentials: 'include',
-              body: JSON.stringify({
-                userId: user.id,
-                image: scannedIdImage.base64,
-                mimeType: scannedIdImage.mimeType,
-              }),
-            });
-          }
+        const results = await fetchWithCredentials<Array<{ id?: string; email?: string }>>(`/api/members/search?q=${encodeURIComponent(email)}&limit=1`);
+        const user = Array.isArray(results) ? results.find((u) => u.email?.toLowerCase() === email.toLowerCase()) : null;
+        if (user?.id) {
+          await postWithCredentials('/api/admin/save-id-image', {
+            userId: user.id,
+            image: scannedIdImage.base64,
+            mimeType: scannedIdImage.mimeType,
+          });
         }
       } catch (err: unknown) {
         console.error('[POS] Failed to save scanned ID image:', err);

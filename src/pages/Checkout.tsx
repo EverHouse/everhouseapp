@@ -5,6 +5,7 @@ import { EmbeddedCheckoutProvider, EmbeddedCheckout } from '@stripe/react-stripe
 import EmptyState from '../components/EmptyState';
 import { usePricing } from '../hooks/usePricing';
 import WalkingGolferSpinner from '../components/WalkingGolferSpinner';
+import { fetchWithCredentials, postWithCredentials, isAbortError } from '../hooks/queries/useFetch';
 
 interface DayPassProduct {
   id: string;
@@ -21,11 +22,9 @@ async function getStripePromise(): Promise<Stripe | null> {
   if (stripePromise) return stripePromise;
   
   try {
-    const res = await fetch('/api/stripe/config', { credentials: 'include' });
-    if (!res.ok) return null;
-    const { publishableKey } = await res.json();
-    if (!publishableKey) return null;
-    stripePromise = loadStripe(publishableKey);
+    const data = await fetchWithCredentials<{ publishableKey?: string }>('/api/stripe/config');
+    if (!data.publishableKey) return null;
+    stripePromise = loadStripe(data.publishableKey);
     return stripePromise;
   } catch {
     return null;
@@ -59,28 +58,16 @@ function CheckoutForm({ tier, email, quantity = 1, companyName, jobTitle, isCorp
         }
         setStripeInstance(stripe);
 
-        const res = await fetch('/api/checkout/sessions', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ 
-            tier, 
-            email,
-            quantity: isCorporate ? quantity : 1,
-            companyName: isCorporate ? companyName : undefined,
-            jobTitle: isCorporate ? jobTitle : undefined,
-            firstName: isCorporate ? firstName : undefined,
-            lastName: isCorporate ? lastName : undefined,
-            phone: isCorporate ? phone : undefined,
-          }),
+        const data = await postWithCredentials<{ clientSecret: string }>('/api/checkout/sessions', { 
+          tier, 
+          email,
+          quantity: isCorporate ? quantity : 1,
+          companyName: isCorporate ? companyName : undefined,
+          jobTitle: isCorporate ? jobTitle : undefined,
+          firstName: isCorporate ? firstName : undefined,
+          lastName: isCorporate ? lastName : undefined,
+          phone: isCorporate ? phone : undefined,
         });
-
-        if (!res.ok) {
-          const data = await res.json();
-          throw new Error(data.error || 'Failed to create checkout session');
-        }
-
-        const data = await res.json();
         setClientSecret(data.clientSecret);
       } catch (err: unknown) {
         setError((err instanceof Error ? err.message : String(err)) || 'Failed to initialize checkout');
@@ -453,10 +440,7 @@ function DayPassesSection() {
     const controller = new AbortController();
     const fetchProducts = async () => {
       try {
-        const res = await fetch('/api/day-passes/products', { signal: controller.signal });
-        if (controller.signal.aborted) return;
-        if (!res.ok) throw new Error('Failed to fetch products');
-        const data = await res.json();
+        const data = await fetchWithCredentials<{ products: DayPassProduct[] }>('/api/day-passes/products', { signal: controller.signal });
         if (controller.signal.aborted) return;
         const allProducts = data.products || [];
         if (filterType) {
@@ -472,7 +456,7 @@ function DayPassesSection() {
         }
         setProducts(allProducts);
       } catch (err: unknown) {
-        if (controller.signal.aborted) return;
+        if (controller.signal.aborted || isAbortError(err)) return;
         setError((err instanceof Error ? err.message : String(err)));
       } finally {
         if (!controller.signal.aborted) {
@@ -504,24 +488,13 @@ function DayPassesSection() {
 
     setSubmitting(true);
     try {
-      const res = await fetch('/api/day-passes/checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          productSlug: product.id,
-          email,
-          firstName,
-          lastName,
-          phone,
-        }),
+      const { sessionUrl } = await postWithCredentials<{ sessionUrl: string }>('/api/day-passes/checkout', {
+        productSlug: product.id,
+        email,
+        firstName,
+        lastName,
+        phone,
       });
-
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || 'Failed to create checkout');
-      }
-
-      const { sessionUrl } = await res.json();
       if (sessionUrl) {
         window.location.href = sessionUrl;
         submittingTimerRef.current = setTimeout(() => setSubmitting(false), 2000);
@@ -745,10 +718,7 @@ function CheckoutSuccess() {
 
     const fetchSession = async () => {
       try {
-        const res = await fetch(`/api/checkout/session/${sessionId}`);
-        if (!res.ok) throw new Error('Failed to fetch session');
-
-        const data = await res.json();
+        const data = await fetchWithCredentials<{ customerEmail?: string; tierName?: string; metadata?: { purpose?: string }; status: string; accountReady?: boolean }>(`/api/checkout/session/${sessionId}`);
         setCustomerEmail(data.customerEmail || null);
         setTierName(data.tierName || null);
 
@@ -783,15 +753,12 @@ function CheckoutSuccess() {
     const interval = setInterval(async () => {
       attempts++;
       try {
-        const res = await fetch(`/api/checkout/session/${sessionId}`);
-        if (res.ok) {
-          const data = await res.json();
-          if (data.accountReady) {
-            setAccountReady(true);
-            setPollingDone(true);
-            clearInterval(interval);
-            return;
-          }
+        const data = await fetchWithCredentials<{ accountReady?: boolean }>(`/api/checkout/session/${sessionId}`);
+        if (data.accountReady) {
+          setAccountReady(true);
+          setPollingDone(true);
+          clearInterval(interval);
+          return;
         }
       } catch (e) { console.warn('[Checkout] Payment status poll failed:', e); }
       if (attempts >= maxAttempts) {

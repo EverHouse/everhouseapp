@@ -1,8 +1,10 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import EmptyState from '../../EmptyState';
 import { UnifiedBookingSheet } from '../../staff-command-center/modals/UnifiedBookingSheet';
 import { getTodayPacific } from '../../../utils/dateUtils';
 import WalkingGolferSpinner from '../../WalkingGolferSpinner';
+import { fetchWithCredentials } from '../../../hooks/queries/useFetch';
 
 export interface SectionProps {
   onClose?: () => void;
@@ -22,28 +24,18 @@ export interface OverduePayment {
 }
 
 const OverduePaymentsPanel: React.FC<SectionProps> = ({ onClose, variant = 'modal' }) => {
-  const [overduePayments, setOverduePayments] = useState<OverduePayment[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [bookingSheet, setBookingSheet] = useState<{ isOpen: boolean; bookingId: number | null }>({ isOpen: false, bookingId: null });
   const _today = getTodayPacific();
 
-  const fetchOverduePayments = useCallback(async () => {
-    try {
-      const overdueRes = await fetch('/api/bookings/overdue-payments', { credentials: 'include' });
-      if (overdueRes.ok) {
-        const data = await overdueRes.json();
-        setOverduePayments(data);
-      }
-    } catch (err: unknown) {
-      console.error('Failed to fetch overdue payments:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const { data: overduePayments = [], isLoading: loading } = useQuery({
+    queryKey: ['admin', 'overdue-payments'],
+    queryFn: () => fetchWithCredentials<OverduePayment[]>('/api/bookings/overdue-payments'),
+  });
 
-  useEffect(() => {
-    fetchOverduePayments();
-  }, [fetchOverduePayments]);
+  const fetchOverduePayments = () => {
+    queryClient.invalidateQueries({ queryKey: ['admin', 'overdue-payments'] });
+  };
 
   const content = loading ? (
     <div className="flex items-center justify-center py-12">

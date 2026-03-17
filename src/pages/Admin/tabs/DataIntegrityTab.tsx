@@ -1,4 +1,5 @@
 import React from 'react';
+import { putWithCredentials } from '../../../hooks/queries/useFetch';
 import { formatTimeAgo, downloadCSV } from './dataIntegrity/dataIntegrityUtils';
 import { useDataIntegrityState } from './dataIntegrity/useDataIntegrityState';
 import { useDataIntegrityActions } from './dataIntegrity/useDataIntegrityActions';
@@ -317,20 +318,11 @@ const DataIntegrityTab: React.FC = () => {
         onCheckIn={async (bookingId, targetStatus) => {
           const statusToSet = targetStatus || 'attended';
           try {
-            const res = await fetch(`/api/bookings/${bookingId}/checkin`, {
-              method: 'PUT',
-              headers: { 'Content-Type': 'application/json' },
-              credentials: 'include',
-              body: JSON.stringify({
+            await putWithCredentials(`/api/bookings/${bookingId}/checkin`, {
                 status: statusToSet === 'no_show' ? 'no_show' : 'attended',
                 skipPaymentCheck: true,
                 skipRosterCheck: true
-              })
-            });
-            if (!res.ok) {
-              const data = await res.json().catch(() => ({}));
-              throw new Error(data.error || 'Failed to update booking status');
-            }
+              });
             state.setBookingSheet({ isOpen: false, bookingId: null });
             actions.runIntegrityMutation.mutate();
           } catch (error) {

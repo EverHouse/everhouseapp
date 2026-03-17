@@ -1,6 +1,7 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import WalkingGolferSpinner from '../../WalkingGolferSpinner';
+import { postWithCredentials } from '../../../hooks/queries/useFetch';
 
 interface IdScannerModalProps {
   isOpen: boolean;
@@ -195,19 +196,7 @@ const IdScannerModal: React.FC<IdScannerModalProps> = ({ isOpen, onClose, onScan
     setError(null);
 
     try {
-      const res = await fetch('/api/admin/scan-id', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ image: imageBase64, mimeType: imageMimeType }),
-      });
-
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || 'Failed to scan ID');
-      }
-
-      const result = await res.json();
+      const result = await postWithCredentials<ScanResult>('/api/admin/scan-id', { image: imageBase64, mimeType: imageMimeType });
       setScanResult(result);
       setEditedData(result.data);
       setState('results');

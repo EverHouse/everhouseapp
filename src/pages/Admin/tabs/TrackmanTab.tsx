@@ -9,7 +9,7 @@ import WalkingGolferSpinner from '../../../components/WalkingGolferSpinner';
 import ModalShell from '../../../components/ModalShell';
 import RosterManager from '../../../components/booking/RosterManager';
 import { UnifiedBookingSheet } from '../../../components/staff-command-center/modals/UnifiedBookingSheet';
-import { fetchWithCredentials } from '../../../hooks/queries/useFetch';
+import { fetchWithCredentials, putWithCredentials, postWithCredentials } from '../../../hooks/queries/useFetch';
 import { TrackmanTabSkeleton } from '../../../components/skeletons';
 import TrackmanWebhookEventsSection from '../../../components/staff-command-center/sections/TrackmanWebhookEventsSection';
 
@@ -294,14 +294,7 @@ const TrackmanTab: React.FC = () => {
 
   const resolveMutation = useMutation({
     mutationFn: async ({ bookingId, memberEmail }: { bookingId: number; memberEmail: string }) => {
-      const res = await fetch(`/api/admin/trackman/unmatched/${bookingId}/resolve`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ memberEmail })
-      });
-      if (!res.ok) throw new Error('Failed to resolve booking');
-      return res.json();
+      return putWithCredentials<{ resolved: number; autoResolved: number; message: string }>(`/api/admin/trackman/unmatched/${bookingId}/resolve`, { memberEmail });
     },
     onMutate: async ({ bookingId, memberEmail }) => {
       await queryClient.cancelQueries({ queryKey: ['trackman'] });
@@ -321,14 +314,9 @@ const TrackmanTab: React.FC = () => {
       
       if (shouldRemember && fuzzyMatchModal?.selectedEmail) {
         try {
-          await fetch('/api/admin/linked-emails', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({
-              primaryEmail: fuzzyMatchModal.selectedEmail,
-              linkedEmail: originalEmail
-            })
+          await postWithCredentials('/api/admin/linked-emails', {
+            primaryEmail: fuzzyMatchModal.selectedEmail,
+            linkedEmail: originalEmail
           });
         } catch (linkErr: unknown) {
           console.warn('Failed to save email link:', linkErr);
@@ -1169,16 +1157,11 @@ const TrackmanTab: React.FC = () => {
             const originalEmail = assignPlayersModal.booking.originalEmail || assignPlayersModal.booking.original_email;
             if (originalEmail && memberEmail) {
               try {
-                await fetch('/api/admin/trackman/auto-resolve-same-email', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  credentials: 'include',
-                  body: JSON.stringify({ 
+                await postWithCredentials('/api/admin/trackman/auto-resolve-same-email', { 
                     originalEmail,
                     memberEmail,
                     excludeTrackmanId: bookingId
-                  })
-                });
+                  });
               } catch (err: unknown) {
                 console.warn('Auto-resolve same email failed:', err);
               }

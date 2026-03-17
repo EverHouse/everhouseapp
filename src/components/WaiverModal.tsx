@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import SlideUpDrawer from './SlideUpDrawer';
 import { useTheme } from '../contexts/ThemeContext';
 import { useToast } from './Toast';
+import { postWithCredentials } from '../hooks/queries/useFetch';
 
 interface WaiverModalProps {
   isOpen: boolean;
@@ -74,15 +75,7 @@ export function WaiverModal({ isOpen, onComplete, currentVersion }: WaiverModalP
     
     setIsSubmitting(true);
     try {
-      const res = await fetch('/api/waivers/sign', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-      });
-      
-      if (!res.ok) {
-        throw new Error('Failed to sign waiver');
-      }
+      await postWithCredentials('/api/waivers/sign', {});
       
       queryClient.invalidateQueries({ queryKey: ['waiverStatus'] });
       showToast('Waiver signed successfully', 'success');

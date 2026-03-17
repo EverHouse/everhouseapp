@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '../Toast';
 import { useAuthData } from '../../contexts/DataContext';
-import { fetchWithCredentials } from '../../hooks/queries/useFetch';
+import { fetchWithCredentials, postWithCredentials } from '../../hooks/queries/useFetch';
 import { billingKeys } from '../../hooks/queries/adminKeys';
 
 interface BillingInfo {
@@ -98,11 +98,7 @@ export default function BillingSection({ isDark }: Props) {
   const handleUpdatePaymentMethod = async () => {
     setUpdatingPayment(true);
     try {
-      const res = await fetch('/api/my/billing/update-payment-method', {
-        method: 'POST',
-        credentials: 'include',
-      });
-      const data = await res.json();
+      const data = await postWithCredentials<{ url?: string }>('/api/my/billing/update-payment-method', {});
       if (data.url) {
         window.location.href = data.url;
       } else {
@@ -119,14 +115,7 @@ export default function BillingSection({ isDark }: Props) {
     setOpeningPortal(true);
     const portalWindow = window.open('about:blank', '_blank');
     try {
-      const emailParam = viewAsUser?.email ? JSON.stringify({ email: viewAsUser.email }) : '{}';
-      const res = await fetch('/api/my/billing/portal', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: emailParam,
-      });
-      const data = await res.json();
+      const data = await postWithCredentials<{ url?: string; error?: string }>('/api/my/billing/portal', viewAsUser?.email ? { email: viewAsUser.email } : {});
       if (data.url) {
         if (portalWindow) {
           portalWindow.location.href = data.url;
@@ -148,11 +137,7 @@ export default function BillingSection({ isDark }: Props) {
   const handleAddPaymentMethod = async () => {
     setMigratingPayment(true);
     try {
-      const res = await fetch('/api/my/billing/add-payment-method-for-extras', {
-        method: 'POST',
-        credentials: 'include',
-      });
-      const data = await res.json();
+      const data = await postWithCredentials<{ url?: string; error?: string }>('/api/my/billing/add-payment-method-for-extras', {});
       if (data.url) {
         window.location.href = data.url;
       } else {

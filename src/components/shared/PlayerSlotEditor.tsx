@@ -1,6 +1,7 @@
 import React, { useCallback, useMemo, useState, useEffect } from 'react';
 import { useAutoAnimate } from '@formkit/auto-animate/react';
 import { MemberSearchInput, SelectedMember } from './MemberSearchInput';
+import { fetchWithCredentials } from '../../hooks/queries/useFetch';
 
 export interface PlayerSlot {
   id: string;
@@ -62,8 +63,7 @@ const PlayerSlotEditor: React.FC<PlayerSlotEditorProps> = ({
   useEffect(() => {
     if (!ownerMemberId) return;
     let cancelled = false;
-    fetch('/api/members/frequent-partners', { credentials: 'include' })
-      .then(r => r.ok ? r.json() : [])
+    fetchWithCredentials<FrequentPartner[]>('/api/members/frequent-partners')
       .then(data => { if (!cancelled) setFrequentPartners(data); })
       .catch(() => {});
     return () => { cancelled = true; };

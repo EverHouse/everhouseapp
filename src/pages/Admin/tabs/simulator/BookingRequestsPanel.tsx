@@ -10,6 +10,7 @@ import GuideBookings from '../../../../components/guides/GuideBookings';
 import { TrackmanIcon } from '../../../../components/icons/TrackmanIcon';
 import { useFeeEstimate } from '../../../../hooks/queries/useBookingsQueries';
 import { BookingStatusDropdown } from '../../../../components/BookingStatusDropdown';
+import { putWithCredentials } from '../../../../hooks/queries/useFetch';
 
 function BookingFeeButton({ bookingId, dbOwed, hasUnpaidFees, setBookingSheet, fallback }: {
     bookingId: number;
@@ -232,16 +233,7 @@ const BookingRequestsPanel: React.FC<BookingRequestsPanelProps> = ({
                                                                 setActionInProgress(prev => ({ ...prev, [bookingKey]: 'completing cancellation' }));
                                                                 
                                                                 try {
-                                                                    const res = await fetch(`/api/booking-requests/${item.id}/complete-cancellation`, {
-                                                                        method: 'PUT',
-                                                                        headers: { 'Content-Type': 'application/json' },
-                                                                        credentials: 'include'
-                                                                    });
-                                                                    
-                                                                    if (!res.ok) {
-                                                                        const errData = await res.json();
-                                                                        throw new Error(errData.error || 'Failed to complete cancellation');
-                                                                    }
+                                                                    await putWithCredentials(`/api/booking-requests/${item.id}/complete-cancellation`, {});
                                                                     
                                                                     showToast('Cancellation completed successfully', 'success');
                                                                     queryClient.invalidateQueries({ queryKey: simulatorKeys.approvedBookings(startDate, endDate) });
@@ -538,16 +530,7 @@ const BookingRequestsPanel: React.FC<BookingRequestsPanelProps> = ({
                                                                         setActionInProgress(prev => ({ ...prev, [bookingKey]: 'completing cancellation' }));
                                                                         
                                                                         try {
-                                                                            const res = await fetch(`/api/booking-requests/${booking.id}/complete-cancellation`, {
-                                                                                method: 'PUT',
-                                                                                headers: { 'Content-Type': 'application/json' },
-                                                                                credentials: 'include'
-                                                                            });
-                                                                            
-                                                                            if (!res.ok) {
-                                                                                const errData = await res.json();
-                                                                                throw new Error(errData.error || 'Failed to complete cancellation');
-                                                                            }
+                                                                            await putWithCredentials(`/api/booking-requests/${booking.id}/complete-cancellation`, {});
                                                                             
                                                                             showToast('Cancellation completed successfully', 'success');
                                                                             queryClient.invalidateQueries({ queryKey: simulatorKeys.approvedBookings(startDate, endDate) });

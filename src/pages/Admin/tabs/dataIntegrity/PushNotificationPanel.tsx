@@ -1,6 +1,6 @@
 import React from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { fetchWithCredentials } from '../../../../hooks/queries/useFetch';
+import { fetchWithCredentials, putWithCredentials } from '../../../../hooks/queries/useFetch';
 import Toggle from '../../../../components/Toggle';
 
 interface PushStatus {
@@ -27,14 +27,7 @@ const PushNotificationPanel: React.FC<Props> = ({ isOpen, onToggle }) => {
 
   const toggleMutation = useMutation({
     mutationFn: async (enabled: boolean) => {
-      const response = await fetch('/api/admin/settings/push.enabled', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ value: String(enabled) }),
-      });
-      if (!response.ok) throw new Error('Failed to update push setting');
-      return response.json();
+      return putWithCredentials('/api/admin/settings/push.enabled', { value: String(enabled) });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'monitoring', 'push-status'] });

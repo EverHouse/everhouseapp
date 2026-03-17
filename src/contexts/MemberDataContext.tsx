@@ -1,6 +1,7 @@
 import React, { createContext, useState, useContext, ReactNode, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useAuthData } from './AuthDataContext';
 import type { MemberProfile } from '../types/data';
+import { fetchWithCredentials } from '../hooks/queries/useFetch';
 export interface PaginatedMembersResponse {
   members: MemberProfile[];
   total: number;
@@ -114,24 +115,20 @@ export const MemberDataProvider: React.FC<{children: ReactNode}> = ({ children }
 
       setIsFetchingMembers(true);
       try {
-        const res = await fetch('/api/members/directory?status=active', { credentials: 'include' });
+        const data = await fetchWithCredentials<Record<string, unknown>>('/api/members/directory?status=active');
         if (cancelled) return;
-        if (res.ok) {
-          const data = await res.json();
-          if (cancelled) return;
-          const contacts = Array.isArray(data) ? data : (data.contacts || []);
-          const formatted = contacts.map((c: DirectoryContact) => formatContact(c, 'Active'));
-          setMembers(formatted);
-          initialMembersFetchedRef.current = true;
-          membersFetchUserRoleRef.current = currentRole;
-          if (data.total && data.totalPages) {
-            setMembersPagination({
-              total: data.total,
-              page: 1,
-              totalPages: data.totalPages,
-              hasMore: data.hasMore || data.totalPages > 1
-            });
-          }
+        const contacts = Array.isArray(data) ? data : ((data.contacts || []) as DirectoryContact[]);
+        const formatted = contacts.map((c: DirectoryContact) => formatContact(c, 'Active'));
+        setMembers(formatted);
+        initialMembersFetchedRef.current = true;
+        membersFetchUserRoleRef.current = currentRole;
+        if (data.total && data.totalPages) {
+          setMembersPagination({
+            total: data.total as number,
+            page: 1,
+            totalPages: data.totalPages as number,
+            hasMore: (data.hasMore || (data.totalPages as number) > 1) as boolean
+          });
         }
       } catch (err: unknown) {
         console.error('Failed to fetch initial members:', err);
@@ -152,17 +149,12 @@ export const MemberDataProvider: React.FC<{children: ReactNode}> = ({ children }
       if (formerMembersFetched.current && cacheAge < FORMER_MEMBERS_CACHE_MS) return;
     }
     try {
-      const res = await fetch('/api/members/directory?status=former', { credentials: 'include' });
-      if (res.ok) {
-        const data = await res.json();
-        const contacts = Array.isArray(data) ? data : (data.contacts || []);
-        const formatted = contacts.map((c: DirectoryContact) => formatContact(c, 'Inactive'));
-        setFormerMembers(formatted);
-        formerMembersFetched.current = true;
-        formerMembersLastFetch.current = now;
-      } else {
-        console.error('Failed to fetch former members: API returned', res.status);
-      }
+      const data = await fetchWithCredentials<Record<string, unknown>>('/api/members/directory?status=former');
+      const contacts = Array.isArray(data) ? data : ((data.contacts || []) as DirectoryContact[]);
+      const formatted = contacts.map((c: DirectoryContact) => formatContact(c, 'Inactive'));
+      setFormerMembers(formatted);
+      formerMembersFetched.current = true;
+      formerMembersLastFetch.current = now;
     } catch (err: unknown) {
       console.error('Failed to fetch former members:', err);
     }
@@ -174,16 +166,12 @@ export const MemberDataProvider: React.FC<{children: ReactNode}> = ({ children }
       return { success: false, count: 0 };
     }
     try {
-      const res = await fetch('/api/members/directory?status=active', { credentials: 'include' });
-      if (res.ok) {
-        const data = await res.json();
-        const contacts = Array.isArray(data) ? data : (data.contacts || []);
-        const formatted = contacts.map((c: DirectoryContact) => formatContact(c, 'Active'));
-        setMembers(formatted);
-        formerMembersFetched.current = false;
-        return { success: true, count: formatted.length };
-      }
-      return { success: false, count: 0 };
+      const data = await fetchWithCredentials<Record<string, unknown>>('/api/members/directory?status=active');
+      const contacts = Array.isArray(data) ? data : ((data.contacts || []) as DirectoryContact[]);
+      const formatted = contacts.map((c: DirectoryContact) => formatContact(c, 'Active'));
+      setMembers(formatted);
+      formerMembersFetched.current = false;
+      return { success: true, count: formatted.length };
     } catch (err: unknown) {
       console.error('Failed to refresh members from database:', err);
       return { success: false, count: 0 };
@@ -205,51 +193,47 @@ export const MemberDataProvider: React.FC<{children: ReactNode}> = ({ children }
       });
       if (search.trim()) params.set('search', search.trim());
 
-      const res = await fetch(`/api/members/directory?${params.toString()}`, { credentials: 'include' });
-      if (res.ok) {
-        const data = await res.json();
-        const contacts = Array.isArray(data) ? data : (data.contacts || []);
-        const formatted = contacts.map((c: DirectoryContact) => formatContact(c, status === 'active' ? 'Active' : 'Inactive'));
-        const paginationInfo = {
-          total: data.total || formatted.length,
-          page: data.page || page,
-          totalPages: data.totalPages || 1,
-          hasMore: data.hasMore || false
-        };
-        setMembersPagination(paginationInfo);
-        if (status === 'active') {
-          if (append && page > 1) {
-            setMembers(prev => {
-              const existingIds = new Set(prev.map(m => m.id));
-              const newMembers = formatted.filter((m: MemberProfile) => !existingIds.has(m.id));
-              return [...prev, ...newMembers];
-            });
-          } else if (!append) {
-            setMembers(formatted);
-          }
-        } else if (status === 'former') {
-          if (append && page > 1) {
-            setFormerMembers(prev => {
-              const existingIds = new Set(prev.map(m => m.id));
-              const newMembers = formatted.filter((m: MemberProfile) => !existingIds.has(m.id));
-              return [...prev, ...newMembers];
-            });
-          } else if (!append) {
-            setFormerMembers(formatted);
-          }
-          formerMembersFetched.current = true;
-          formerMembersLastFetch.current = Date.now();
+      const data = await fetchWithCredentials<Record<string, unknown>>(`/api/members/directory?${params.toString()}`);
+      const contacts = Array.isArray(data) ? data : ((data.contacts || []) as DirectoryContact[]);
+      const formatted = contacts.map((c: DirectoryContact) => formatContact(c, status === 'active' ? 'Active' : 'Inactive'));
+      const paginationInfo = {
+        total: (data.total as number) || formatted.length,
+        page: (data.page as number) || page,
+        totalPages: (data.totalPages as number) || 1,
+        hasMore: (data.hasMore as boolean) || false
+      };
+      setMembersPagination(paginationInfo);
+      if (status === 'active') {
+        if (append && page > 1) {
+          setMembers(prev => {
+            const existingIds = new Set(prev.map(m => m.id));
+            const newMembers = formatted.filter((m: MemberProfile) => !existingIds.has(m.id));
+            return [...prev, ...newMembers];
+          });
+        } else if (!append) {
+          setMembers(formatted);
         }
-        return {
-          members: formatted,
-          total: paginationInfo.total,
-          page: paginationInfo.page,
-          limit: data.limit || limit,
-          totalPages: paginationInfo.totalPages,
-          hasMore: paginationInfo.hasMore
-        };
+      } else if (status === 'former') {
+        if (append && page > 1) {
+          setFormerMembers(prev => {
+            const existingIds = new Set(prev.map(m => m.id));
+            const newMembers = formatted.filter((m: MemberProfile) => !existingIds.has(m.id));
+            return [...prev, ...newMembers];
+          });
+        } else if (!append) {
+          setFormerMembers(formatted);
+        }
+        formerMembersFetched.current = true;
+        formerMembersLastFetch.current = Date.now();
       }
-      return { members: [], total: 0, page, limit, totalPages: 0, hasMore: false };
+      return {
+        members: formatted,
+        total: paginationInfo.total,
+        page: paginationInfo.page,
+        limit: (data.limit as number) || limit,
+        totalPages: paginationInfo.totalPages,
+        hasMore: paginationInfo.hasMore
+      };
     } catch (err: unknown) {
       console.error('Failed to fetch paginated members:', err);
       return { members: [], total: 0, page, limit, totalPages: 0, hasMore: false };

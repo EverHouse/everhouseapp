@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { fetchWithCredentials } from './queries/useFetch';
 
 interface CorporateTier {
   minMembers: number;
@@ -20,11 +21,7 @@ interface PricingConfig {
 export function usePricing() {
   const { data } = useQuery<PricingConfig>({
     queryKey: ['pricing'],
-    queryFn: async () => {
-      const res = await fetch('/api/pricing', { credentials: 'include' });
-      if (!res.ok) throw new Error('Failed to fetch pricing');
-      return res.json();
-    },
+    queryFn: () => fetchWithCredentials<PricingConfig>('/api/pricing'),
     staleTime: 5 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
   });

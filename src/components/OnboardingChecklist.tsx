@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthData } from '../contexts/DataContext';
-import { fetchWithCredentials } from '../hooks/queries/useFetch';
+import { fetchWithCredentials, postWithCredentials } from '../hooks/queries/useFetch';
 
 interface OnboardingStep {
   key: string;
@@ -57,12 +57,7 @@ const OnboardingChecklist: React.FC = () => {
           const appStep = data.steps.find((s: OnboardingStep) => s.key === 'app');
           if (appStep && !appStep.completed) {
             try {
-              await fetch('/api/member/onboarding/complete-step', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify({ step: 'app' }),
-              });
+              await postWithCredentials('/api/member/onboarding/complete-step', { step: 'app' });
               if (cancelled) return;
               const refreshed = await fetchWithCredentials<OnboardingStatus>('/api/member/onboarding');
               if (cancelled) return;
@@ -93,11 +88,7 @@ const OnboardingChecklist: React.FC = () => {
 
   const handleDismiss = async () => {
     try {
-      await fetch('/api/member/onboarding/dismiss', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-      });
+      await postWithCredentials('/api/member/onboarding/dismiss', {});
       setDismissed(true);
     } catch {
       // fail silently
@@ -117,12 +108,7 @@ const OnboardingChecklist: React.FC = () => {
         link.click();
         document.body.removeChild(link);
         try {
-          await fetch('/api/member/onboarding/complete-step', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({ step: 'concierge' }),
-          });
+          await postWithCredentials('/api/member/onboarding/complete-step', { step: 'concierge' });
           const data = await fetchWithCredentials<OnboardingStatus>('/api/member/onboarding');
           setStatus(data);
           if (data.isComplete && !data.isDismissed) {
@@ -145,12 +131,7 @@ const OnboardingChecklist: React.FC = () => {
           if (outcome === 'accepted') {
             deferredPromptRef.current = null;
             try {
-              await fetch('/api/member/onboarding/complete-step', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify({ step: 'app' }),
-              });
+              await postWithCredentials('/api/member/onboarding/complete-step', { step: 'app' });
               const data = await fetchWithCredentials<OnboardingStatus>('/api/member/onboarding');
               setStatus(data);
             } catch (e) { console.warn('[OnboardingChecklist] Failed to dismiss checklist:', e); }

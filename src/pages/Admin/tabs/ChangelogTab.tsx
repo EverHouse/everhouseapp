@@ -5,6 +5,7 @@ import { formatRelativeTime } from '../../../utils/dateUtils';
 import WalkingGolferSpinner from '../../../components/WalkingGolferSpinner';
 import { AnimatedPage } from '../../../components/motion';
 import { useAuthData } from '../../../contexts/DataContext';
+import { fetchWithCredentials } from '../../../hooks/queries/useFetch';
 
 interface AuditLogDetails {
     member_email?: string;
@@ -314,11 +315,7 @@ const ChangelogTab: React.FC = () => {
                 params.set('actions', category.actions.join(','));
             }
             
-            const res = await fetch(`/api/data-tools/staff-activity?${params.toString()}`, { credentials: 'include' });
-            if (!res.ok) throw new Error('Failed to fetch activity log');
-            
-            const data = await res.json();
-            // Filter out view-only actions (noise) - only show actual changes
+            const data = await fetchWithCredentials<{ logs?: AuditLogEntry[] }>(`/api/data-tools/staff-activity?${params.toString()}`);
             const viewOnlyActions = ['view_member', 'view_member_profile', 'view_member_billing', 'view_booking', 'view_payment', 'view_directory', 'view_report'];
             const filteredLogs = (data.logs || []).filter((log: AuditLogEntry) => !viewOnlyActions.includes(log.action));
             setEntries(filteredLogs);

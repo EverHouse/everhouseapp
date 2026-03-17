@@ -13,6 +13,7 @@ import { getSubscriptionStatusBadge, getInvoiceStatusBadge } from '../../../util
 import { useAutoAnimate } from '@formkit/auto-animate/react';
 import WalkingGolferSpinner from '../../../components/WalkingGolferSpinner';
 import { FinancialsSubTabSkeleton } from '../../../components/skeletons';
+import { postWithCredentials } from '../../../hooks/queries/useFetch';
 
 
 interface _SubscriptionListItem {
@@ -167,15 +168,7 @@ const SubscriptionsSubTab: React.FC = () => {
     setSyncResult(null);
     setLocalError(null);
     try {
-      const res = await fetch('/api/stripe/sync-subscriptions', {
-        method: 'POST',
-        credentials: 'include',
-      });
-      if (!res.ok) {
-        const errData = await res.json();
-        throw new Error(errData.error || 'Failed to sync from Stripe');
-      }
-      const data = await res.json();
+      const data = await postWithCredentials<{ created: number; updated: number; skipped: number }>('/api/stripe/sync-subscriptions', {});
       setSyncResult({ created: data.created, updated: data.updated, skipped: data.skipped });
       setSuccessMessage(`Synced from Stripe: ${data.created} created, ${data.updated} updated`);
       if (successTimerRef.current) clearTimeout(successTimerRef.current);
@@ -199,14 +192,7 @@ const SubscriptionsSubTab: React.FC = () => {
   const handleSendReminder = async (subscriptionId: string) => {
     setSendingReminder(subscriptionId);
     try {
-      const res = await fetch(`/api/financials/subscriptions/${subscriptionId}/send-reminder`, {
-        method: 'POST',
-        credentials: 'include',
-      });
-      if (!res.ok) {
-        const errData = await res.json();
-        throw new Error(errData.error || 'Failed to send reminder');
-      }
+      await postWithCredentials(`/api/financials/subscriptions/${subscriptionId}/send-reminder`, {});
       setSuccessMessage('Payment reminder sent successfully');
       if (successTimerRef.current) clearTimeout(successTimerRef.current);
       successTimerRef.current = setTimeout(() => setSuccessMessage(null), 3000);

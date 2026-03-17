@@ -3,6 +3,7 @@ import { SlideUpDrawer } from '../../SlideUpDrawer';
 import { MemberSearchInput, type SelectedMember } from '../../shared/MemberSearchInput';
 import { useToast } from '../../Toast';
 import { getTodayPacific, formatTime12Hour } from '../../../utils/dateUtils';
+import { fetchWithCredentials, postWithCredentials } from '../../../hooks/queries/useFetch';
 
 interface FeeEstimate {
   dailyAllowance: number;
@@ -65,8 +66,7 @@ export function StaffManualBookingModal({
 
     const controller = new AbortController();
     setConfLoadingFee(true);
-    fetch(`/api/staff/conference-room/fee-estimate?email=${encodeURIComponent(confHostMember.email)}&date=${confDate}&duration=${confDuration}`, { credentials: 'include', signal: controller.signal })
-      .then(res => res.json())
+    fetchWithCredentials<FeeEstimate>(`/api/staff/conference-room/fee-estimate?email=${encodeURIComponent(confHostMember.email)}&date=${confDate}&duration=${confDuration}`, { signal: controller.signal })
       .then(data => {
         if (!controller.signal.aborted) setConfFeeEstimate(data);
       })
@@ -103,23 +103,13 @@ export function StaffManualBookingModal({
     setConfSubmitting(true);
 
     try {
-      const response = await fetch('/api/staff/conference-room/booking', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          hostEmail: confHostMember.email,
-          hostName: confHostMember.name,
-          date: confDate,
-          startTime: confStartTime,
-          durationMinutes: confDuration
-        })
+      await postWithCredentials('/api/staff/conference-room/booking', {
+        hostEmail: confHostMember.email,
+        hostName: confHostMember.name,
+        date: confDate,
+        startTime: confStartTime,
+        durationMinutes: confDuration
       });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to create booking');
-      }
 
       showToast(`Conference room booked for ${confHostMember.name}`, 'success');
       handleClose();

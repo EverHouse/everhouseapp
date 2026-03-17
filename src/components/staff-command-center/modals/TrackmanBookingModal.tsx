@@ -3,6 +3,7 @@ import { ModalShell } from '../../ModalShell';
 import { useToast } from '../../Toast';
 import { formatTime12Hour, formatDateShort } from '../../../utils/dateUtils';
 import type { BookingRequest } from '../types';
+import { fetchWithCredentials, postWithCredentials } from '../../../hooks/queries/useFetch';
 
 const TRACKMAN_PORTAL_URL = 'https://portal.trackmangolf.com/facility/RmFjaWxpdHkKZGI4YWMyN2FhLTM2YWQtNDM4ZC04MjUzLWVmOWU5NzMwMjkxZg==';
 
@@ -169,9 +170,7 @@ export function TrackmanBookingModal({
     const pollInterval = !alreadyLinked ? setInterval(async () => {
       if (autoApprovedRef.current) return;
       try {
-        const res = await fetch(`/api/booking-requests/${bookingId}`, { credentials: 'include' });
-        if (!res.ok) return;
-        const data = await res.json();
+        const data = await fetchWithCredentials<{ trackman_booking_id?: string }>(`/api/booking-requests/${bookingId}`);
         const linked = data.trackman_booking_id;
         if (linked) {
           setExternalId(String(linked));
@@ -224,27 +223,16 @@ export function TrackmanBookingModal({
     const fetchEmails = async () => {
       try {
         const userIds = participantsNeedingEmail.map(p => p.userId).filter(Boolean);
-        const response = await fetch('/api/users/batch-emails', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ userIds })
-        });
+        const data = await postWithCredentials<{ emails: Record<string, string> }>('/api/users/batch-emails', { userIds });
+        const emailMap = new Map<string, string>(
+          Object.entries(data.emails || {})
+        );
         
-        if (response.ok) {
-          const data = await response.json();
-          const emailMap = new Map<string, string>(
-            Object.entries(data.emails || {})
-          );
-          
-          const enriched = requestParticipants.map(p => ({
-            ...p,
-            email: p.email || (p.userId ? emailMap.get(p.userId) : undefined)
-          }));
-          setEnrichedParticipants(enriched);
-        } else {
-          setEnrichedParticipants(requestParticipants);
-        }
+        const enriched = requestParticipants.map(p => ({
+          ...p,
+          email: p.email || (p.userId ? emailMap.get(p.userId) : undefined)
+        }));
+        setEnrichedParticipants(enriched);
       } catch (err: unknown) {
         console.error('Failed to fetch participant emails:', err);
         setEnrichedParticipants(requestParticipants);

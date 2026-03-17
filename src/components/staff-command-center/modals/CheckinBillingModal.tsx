@@ -3,10 +3,10 @@ import { useToast } from '../../Toast';
 import { StripePaymentForm } from '../../stripe/StripePaymentForm';
 import { TerminalPayment } from '../TerminalPayment';
 import SlideUpDrawer from '../../SlideUpDrawer';
-import { getApiErrorMessage, getNetworkErrorMessage } from '../../../utils/errorHandling';
 import { useBookingActions } from '../../../hooks/useBookingActions';
 import WalkingGolferSpinner from '../../WalkingGolferSpinner';
 import { BOOKING_STATUS, PAYMENT_STATUS, PARTICIPANT_TYPE } from '../../../../shared/constants/statuses';
+import { fetchWithCredentials, postWithCredentials, patchWithCredentials, putWithCredentials } from '../../../hooks/queries/useFetch';
 import type { PaymentStatus, ParticipantType } from '../../../../shared/constants/statuses';
 
 function formatTime12Hour(time: string | undefined): string {
@@ -102,17 +102,10 @@ export const CheckinBillingModal: React.FC<CheckinBillingModalProps> = ({
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/bookings/${bookingId}/staff-checkin-context`, {
-        credentials: 'include'
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setContext(data);
-      } else {
-        setError(getApiErrorMessage(res, 'load billing context'));
-      }
-    } catch (_err: unknown) {
-      setError(getNetworkErrorMessage());
+      const data = await fetchWithCredentials<CheckinContext>(`/api/bookings/${bookingId}/staff-checkin-context`);
+      setContext(data);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to load billing context');
     } finally {
       setLoading(false);
     }
@@ -131,13 +124,8 @@ export const CheckinBillingModal: React.FC<CheckinBillingModalProps> = ({
   const checkSavedCard = async (email: string) => {
     try {
       setCheckingCard(true);
-      const res = await fetch(`/api/stripe/staff/check-saved-card/${encodeURIComponent(email)}`, {
-        credentials: 'include'
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setSavedCardInfo(data);
-      }
+      const data = await fetchWithCredentials<{ hasSavedCard: boolean; cardLast4?: string; cardBrand?: string }>(`/api/stripe/staff/check-saved-card/${encodeURIComponent(email)}`);
+      setSavedCardInfo(data);
     } catch (err: unknown) {
       console.error('Failed to check saved card:', err);
     } finally {
@@ -196,19 +184,9 @@ export const CheckinBillingModal: React.FC<CheckinBillingModalProps> = ({
     
     setActionInProgress(`confirm-${participantId}`);
     try {
-      const res = await fetch(`/api/bookings/${bookingId}/payments`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ participantId, action: 'confirm' })
-      });
-      if (res.ok) {
-        showToast('Payment confirmed', 'success');
-        await fetchContext();
-      } else {
-        setContext(previousContext);
-        showToast('Failed to confirm payment', 'error');
-      }
+      await patchWithCredentials(`/api/bookings/${bookingId}/payments`, { participantId, action: 'confirm' });
+      showToast('Payment confirmed', 'success');
+      await fetchContext();
     } catch (err: unknown) {
       console.error('Failed to confirm payment:', err);
       setContext(previousContext);
@@ -224,24 +202,15 @@ export const CheckinBillingModal: React.FC<CheckinBillingModalProps> = ({
     }
     setActionInProgress(`waive-${participantId}`);
     try {
-      const res = await fetch(`/api/bookings/${bookingId}/payments`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ 
-          participantId: participantId === 'all' ? undefined : participantId,
-          action: participantId === 'all' ? 'waive_all' : 'waive',
-          reason: waiverReason.trim()
-        })
+      await patchWithCredentials(`/api/bookings/${bookingId}/payments`, { 
+        participantId: participantId === 'all' ? undefined : participantId,
+        action: participantId === 'all' ? 'waive_all' : 'waive',
+        reason: waiverReason.trim()
       });
-      if (res.ok) {
-        showToast(participantId === 'all' ? 'All fees waived' : 'Fee waived', 'success');
-        setWaiverReason('');
-        setShowWaiverInput(null);
-        await fetchContext();
-      } else {
-        showToast('Failed to waive fee', 'error');
-      }
+      showToast(participantId === 'all' ? 'All fees waived' : 'Fee waived', 'success');
+      setWaiverReason('');
+      setShowWaiverInput(null);
+      await fetchContext();
     } catch (err: unknown) {
       console.error('Failed to waive payment:', err);
       showToast('Failed to waive fee', 'error');
@@ -253,23 +222,12 @@ export const CheckinBillingModal: React.FC<CheckinBillingModalProps> = ({
   const handleUseGuestPass = async (participantId: number) => {
     setActionInProgress(`guest-pass-${participantId}`);
     try {
-      const res = await fetch(`/api/bookings/${bookingId}/payments`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ participantId, action: 'use_guest_pass' })
-      });
-      if (res.ok) {
-        const data = await res.json();
-        showToast(`Guest pass used${data.passesRemaining !== undefined ? ` (${data.passesRemaining} remaining)` : ''}`, 'success');
-        await fetchContext();
-      } else {
-        const data = await res.json();
-        showToast(data.error || 'Failed to use guest pass', 'error');
-      }
+      const data = await patchWithCredentials<{ passesRemaining?: number }>(`/api/bookings/${bookingId}/payments`, { participantId, action: 'use_guest_pass' });
+      showToast(`Guest pass used${data.passesRemaining !== undefined ? ` (${data.passesRemaining} remaining)` : ''}`, 'success');
+      await fetchContext();
     } catch (err: unknown) {
       console.error('Failed to use guest pass:', err);
-      showToast('Failed to use guest pass', 'error');
+      showToast(err instanceof Error ? err.message : 'Failed to use guest pass', 'error');
     } finally {
       setActionInProgress(null);
     }
@@ -291,19 +249,9 @@ export const CheckinBillingModal: React.FC<CheckinBillingModalProps> = ({
     
     setActionInProgress('confirm-all');
     try {
-      const res = await fetch(`/api/bookings/${bookingId}/payments`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ action: 'confirm_all' })
-      });
-      if (res.ok) {
-        showToast('All payments confirmed', 'success');
-        await fetchContext();
-      } else {
-        setContext(previousContext);
-        showToast('Failed to confirm payments', 'error');
-      }
+      await patchWithCredentials(`/api/bookings/${bookingId}/payments`, { action: 'confirm_all' });
+      showToast('All payments confirmed', 'success');
+      await fetchContext();
     } catch (err: unknown) {
       console.error('Failed to confirm all payments:', err);
       setContext(previousContext);
@@ -331,20 +279,11 @@ export const CheckinBillingModal: React.FC<CheckinBillingModalProps> = ({
   const handleCheckinNoPayment = async () => {
     setActionInProgress('checkin-skip');
     try {
-      const res = await fetch(`/api/bookings/${bookingId}/checkin`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ status: BOOKING_STATUS.ATTENDED })
-      });
-      if (res.ok) {
-        onCheckinComplete();
-        onClose();
-      } else {
-        setError(getApiErrorMessage(res, 'check in'));
-      }
-    } catch (_err: unknown) {
-      setError(getNetworkErrorMessage());
+      await putWithCredentials(`/api/bookings/${bookingId}/checkin`, { status: BOOKING_STATUS.ATTENDED });
+      onCheckinComplete();
+      onClose();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to check in');
     } finally {
       setActionInProgress(null);
     }
@@ -359,12 +298,7 @@ export const CheckinBillingModal: React.FC<CheckinBillingModalProps> = ({
     setActionInProgress('checkin-after-payment');
     try {
       if (paymentIntentId) {
-        await fetch('/api/stripe/confirm-payment', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ paymentIntentId })
-        });
+        await postWithCredentials('/api/stripe/confirm-payment', { paymentIntentId }).catch(() => {});
       }
       const result = await checkInWithToast(bookingId, { status: BOOKING_STATUS.ATTENDED });
       if (result.success) {

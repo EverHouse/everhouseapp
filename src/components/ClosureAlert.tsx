@@ -4,6 +4,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useAuthData } from '../contexts/DataContext';
 import { getTodayPacific } from '../utils/dateUtils';
 import { isBlockingClosure, getAffectedAreasList, getNoticeLabel as getNoticeLabelUtil } from '../utils/closureUtils';
+import { fetchWithCredentials, isAbortError } from '../hooks/queries/useFetch';
 
 const EXIT_DURATION = 250;
 
@@ -55,13 +56,10 @@ const ClosureAlert: React.FC = () => {
     const controller = new AbortController();
     const fetchClosures = async () => {
       try {
-        const res = await fetch('/api/closures', { signal: controller.signal });
-        if (res.ok) {
-          const data = await res.json();
-          setClosures(data);
-        }
+        const data = await fetchWithCredentials<Closure[]>('/api/closures', { signal: controller.signal });
+        setClosures(data);
       } catch (error: unknown) {
-        if (error instanceof DOMException && error.name === 'AbortError') return;
+        if (isAbortError(error)) return;
         console.error('Failed to fetch closures:', error);
       } finally {
         if (!controller.signal.aborted) {

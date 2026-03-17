@@ -2,6 +2,7 @@ import React, { createContext, useState, useContext, ReactNode, useEffect, useCa
 import { useAuthData } from './AuthDataContext';
 import type { Announcement } from '../types/data';
 import { INITIAL_ANNOUNCEMENTS } from '../data/defaults';
+import { fetchWithCredentials, postWithCredentials, putWithCredentials, deleteWithCredentials } from '../hooks/queries/useFetch';
 
 interface AnnouncementDataContextType {
   announcements: Announcement[];
@@ -26,12 +27,9 @@ export const AnnouncementDataProvider: React.FC<{children: ReactNode}> = ({ chil
 
   const refreshAnnouncements = useCallback(async () => {
     try {
-      const res = await fetch('/api/announcements?active_only=true');
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data)) {
-          setAnnouncements(data);
-        }
+      const data = await fetchWithCredentials<Announcement[]>('/api/announcements?active_only=true');
+      if (Array.isArray(data)) {
+        setAnnouncements(data);
       }
     } catch (err: unknown) {
       console.error('Failed to fetch announcements:', err);
@@ -43,12 +41,9 @@ export const AnnouncementDataProvider: React.FC<{children: ReactNode}> = ({ chil
     announcementsFetchedRef.current = true;
     const fetchAnnouncements = async () => {
       try {
-        const res = await fetch('/api/announcements?active_only=true');
-        if (res.ok) {
-          const data = await res.json();
-          if (Array.isArray(data)) {
-            setAnnouncements(data);
-          }
+        const data = await fetchWithCredentials<Announcement[]>('/api/announcements?active_only=true');
+        if (Array.isArray(data)) {
+          setAnnouncements(data);
         }
       } catch (err: unknown) {
         if (actualUserRef.current) {
@@ -85,29 +80,19 @@ export const AnnouncementDataProvider: React.FC<{children: ReactNode}> = ({ chil
     setAnnouncements(prev => [optimisticItem, ...prev]);
     mutatingRef.current = true;
     try {
-      const res = await fetch('/api/announcements', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          title: item.title,
-          description: item.desc,
-          type: item.type,
-          priority: item.priority || 'normal',
-          startDate: item.startDate || null,
-          endDate: item.endDate || null,
-          linkType: item.linkType || null,
-          linkTarget: item.linkTarget || null,
-          notifyMembers: item.notifyMembers || false,
-          showAsBanner: item.showAsBanner || false
-        })
+      const newItem = await postWithCredentials<Announcement>('/api/announcements', {
+        title: item.title,
+        description: item.desc,
+        type: item.type,
+        priority: item.priority || 'normal',
+        startDate: item.startDate || null,
+        endDate: item.endDate || null,
+        linkType: item.linkType || null,
+        linkTarget: item.linkTarget || null,
+        notifyMembers: item.notifyMembers || false,
+        showAsBanner: item.showAsBanner || false
       });
-      if (res.ok) {
-        const newItem = await res.json();
-        setAnnouncements(prev => prev.map(a => a.id === tempId ? newItem : a));
-      } else {
-        setAnnouncements(prev => prev.filter(a => a.id !== tempId));
-      }
+      setAnnouncements(prev => prev.map(a => a.id === tempId ? newItem : a));
     } catch (err: unknown) {
       console.error('Failed to add announcement:', err);
       setAnnouncements(prev => prev.filter(a => a.id !== tempId));
@@ -120,29 +105,19 @@ export const AnnouncementDataProvider: React.FC<{children: ReactNode}> = ({ chil
     setAnnouncements(prev => prev.map(a => a.id === item.id ? item : a));
     mutatingRef.current = true;
     try {
-      const res = await fetch(`/api/announcements/${item.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          title: item.title,
-          description: item.desc,
-          type: item.type,
-          priority: item.priority || 'normal',
-          startDate: item.startDate || null,
-          endDate: item.endDate || null,
-          linkType: item.linkType || null,
-          linkTarget: item.linkTarget || null,
-          notifyMembers: item.notifyMembers || false,
-          showAsBanner: item.showAsBanner || false
-        })
+      const updated = await putWithCredentials<Announcement>(`/api/announcements/${item.id}`, {
+        title: item.title,
+        description: item.desc,
+        type: item.type,
+        priority: item.priority || 'normal',
+        startDate: item.startDate || null,
+        endDate: item.endDate || null,
+        linkType: item.linkType || null,
+        linkTarget: item.linkTarget || null,
+        notifyMembers: item.notifyMembers || false,
+        showAsBanner: item.showAsBanner || false
       });
-      if (res.ok) {
-        const updated = await res.json();
-        setAnnouncements(prev => prev.map(a => a.id === updated.id ? updated : a));
-      } else {
-        refreshAnnouncements();
-      }
+      setAnnouncements(prev => prev.map(a => a.id === updated.id ? updated : a));
     } catch (err: unknown) {
       console.error('Failed to update announcement:', err);
       refreshAnnouncements();
@@ -155,11 +130,7 @@ export const AnnouncementDataProvider: React.FC<{children: ReactNode}> = ({ chil
     setAnnouncements(prev => prev.filter(a => a.id !== id));
     mutatingRef.current = true;
     try {
-      const res = await fetch(`/api/announcements/${id}`, {
-        method: 'DELETE',
-        credentials: 'include'
-      });
-      if (!res.ok) refreshAnnouncements();
+      await deleteWithCredentials(`/api/announcements/${id}`);
     } catch (err: unknown) {
       console.error('Failed to delete announcement:', err);
       refreshAnnouncements();

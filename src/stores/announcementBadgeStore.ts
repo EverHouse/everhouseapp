@@ -3,6 +3,7 @@ import { useEffect, useMemo } from 'react';
 import { useAuthData, useAnnouncementData } from '../contexts/DataContext';
 import type { Announcement } from '../types/data';
 import { getTodayPacific } from '../utils/dateUtils';
+import { fetchWithCredentials, postWithCredentials } from '../hooks/queries/useFetch';
 
 interface DismissedNotice {
   noticeType: 'announcement' | 'closure';
@@ -39,26 +40,12 @@ export const useAnnouncementBadgeStore = create<AnnouncementBadgeState>((set, ge
     set({ _currentEmail: userEmail, isInitialized: false });
 
     try {
-      const response = await fetch('/api/notices/dismissed', { credentials: 'include' });
-      if (response.ok) {
-        const dismissed: DismissedNotice[] = await response.json();
-        const dismissedAnnouncementIds = dismissed
-          .filter(d => d.noticeType === 'announcement')
-          .map(d => d.noticeId.toString());
-        set({ seenIds: new Set(dismissedAnnouncementIds), isInitialized: true });
-        localStorage.setItem(getStorageKey(userEmail), JSON.stringify(dismissedAnnouncementIds));
-      } else {
-        const stored = localStorage.getItem(getStorageKey(userEmail));
-        if (stored) {
-          try {
-            set({ seenIds: new Set(JSON.parse(stored)), isInitialized: true });
-          } catch {
-            set({ seenIds: new Set(), isInitialized: true });
-          }
-        } else {
-          set({ seenIds: new Set(), isInitialized: true });
-        }
-      }
+      const dismissed = await fetchWithCredentials<DismissedNotice[]>('/api/notices/dismissed');
+      const dismissedAnnouncementIds = dismissed
+        .filter(d => d.noticeType === 'announcement')
+        .map(d => d.noticeId.toString());
+      set({ seenIds: new Set(dismissedAnnouncementIds), isInitialized: true });
+      localStorage.setItem(getStorageKey(userEmail), JSON.stringify(dismissedAnnouncementIds));
     } catch {
       const stored = localStorage.getItem(getStorageKey(userEmail));
       if (stored) {
@@ -82,12 +69,7 @@ export const useAnnouncementBadgeStore = create<AnnouncementBadgeState>((set, ge
       return { seenIds: newSet };
     });
     announcementIds.forEach(id => {
-      fetch('/api/notices/dismiss', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ noticeType: 'announcement', noticeId: id })
-      }).catch(() => {});
+      postWithCredentials('/api/notices/dismiss', { noticeType: 'announcement', noticeId: id }).catch(() => {});
     });
   },
 

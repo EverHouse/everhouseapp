@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { ModalShell } from '../../ModalShell';
 import { useTheme } from '../../../contexts/ThemeContext';
 import { getApiErrorMessage, getNetworkErrorMessage } from '../../../utils/errorHandling';
+import { fetchWithCredentials, postWithCredentials } from '../../../hooks/queries/useFetch';
 
 interface Tier {
   id: number;
@@ -39,96 +41,74 @@ export function TierChangeWizard({ isOpen, onClose, memberEmail, subscriptionId,
   const [immediate, setImmediate] = useState(true);
   const [preview, setPreview] = useState<TierChangePreview | null>(null);
   const [loading, setLoading] = useState(false);
-  const [previewLoading, setPreviewLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const { data: tiersData } = useQuery({
+    queryKey: ['admin', 'tier-change', 'tiers'],
+    queryFn: () => fetchWithCredentials<{ tiers: Tier[] }>('/api/admin/tier-change/tiers'),
+    enabled: isOpen,
+    staleTime: 1000 * 60 * 5,
+  });
 
   useEffect(() => {
     if (isOpen) {
-      let cancelled = false;
       setSelectedPriceId('');
       setPreview(null);
       setError(null);
-      fetch('/api/admin/tier-change/tiers', { credentials: 'include' })
-        .then(r => {
-          if (cancelled) return;
-          if (!r.ok) {
-            setError(getApiErrorMessage(r, 'load tiers'));
-            return;
-          }
-          return r.json();
-        })
-        .then(data => {
-          if (cancelled) return;
-          if (data && data.tiers) {
-            setTiers(data.tiers);
-          }
-        })
-        .catch(() => { if (!cancelled) setError(getNetworkErrorMessage()); });
-      return () => { cancelled = true; };
     }
   }, [isOpen]);
 
   useEffect(() => {
-    if (selectedPriceId && subscriptionId) {
-      let cancelled = false;
-      setPreviewLoading(true);
-      setError(null);
-      fetch('/api/admin/tier-change/preview', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ subscriptionId, newPriceId: selectedPriceId, immediate })
-      })
-        .then(r => {
-          if (cancelled) return;
-          if (!r.ok) {
-            setError(getApiErrorMessage(r, 'preview'));
-            return;
-          }
-          return r.json();
-        })
-        .then(data => {
-          if (cancelled) return;
-          if (data && data.preview) {
-            setPreview(data.preview);
-          } else if (data && data.error) {
-            setError(data.error);
-          }
-        })
-        .catch(() => { if (!cancelled) setError(getNetworkErrorMessage()); })
-        .finally(() => { if (!cancelled) setPreviewLoading(false); });
-      return () => { cancelled = true; };
-    } else {
+    if (tiersData?.tiers) {
+      setTiers(tiersData.tiers);
+    }
+  }, [tiersData]);
+
+  const { data: previewData, isFetching: previewLoading } = useQuery({
+    queryKey: ['admin', 'tier-change', 'preview', subscriptionId, selectedPriceId, immediate],
+    queryFn: () => postWithCredentials<{ preview?: TierChangePreview; error?: string }>(
+      '/api/admin/tier-change/preview',
+      { subscriptionId, newPriceId: selectedPriceId, immediate }
+    ),
+    enabled: !!selectedPriceId && !!subscriptionId,
+  });
+
+  useEffect(() => {
+    if (previewData?.preview) {
+      setPreview(previewData.preview);
+    } else if (previewData?.error) {
+      setError(previewData.error);
+    } else if (!selectedPriceId) {
       setPreview(null);
     }
-  }, [selectedPriceId, immediate, subscriptionId]);
+  }, [previewData, selectedPriceId]);
+
+  const commitMutation = useMutation({
+    mutationFn: () => postWithCredentials<{ success?: boolean; error?: string }>(
+      '/api/admin/tier-change/commit',
+      { memberEmail, subscriptionId, newPriceId: selectedPriceId, immediate }
+    ),
+  });
 
   const handleConfirm = async () => {
     setLoading(true);
     setError(null);
-    try {
-      const res = await fetch('/api/admin/tier-change/commit', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ memberEmail, subscriptionId, newPriceId: selectedPriceId, immediate })
-      });
-      if (!res.ok) {
-        setError(getApiErrorMessage(res, 'change tier'));
-        return;
-      }
-      const data = await res.json();
-      if (data.success) {
-        onSuccess();
-        onClose();
-      } else {
-        setError(data.error || 'Failed to change tier');
-      }
-    } catch {
-      setError(getNetworkErrorMessage());
-    } finally {
-      setLoading(false);
-    }
+    commitMutation.mutate(undefined, {
+      onSuccess: (data) => {
+        if (data.success) {
+          onSuccess();
+          onClose();
+        } else {
+          setError(data.error || 'Failed to change tier');
+        }
+      },
+      onError: () => {
+        setError(getNetworkErrorMessage());
+      },
+      onSettled: () => {
+        setLoading(false);
+      },
+    });
   };
 
   const formatCents = (cents: number) => `$${(cents / 100).toFixed(2)}`;

@@ -1,3 +1,5 @@
+import { fetchWithCredentials, postWithCredentials } from '../hooks/queries/useFetch';
+
 const PUBLIC_VAPID_KEY_URL = '/api/push/vapid-public-key';
 const SUBSCRIBE_URL = '/api/push/subscribe';
 const UNSUBSCRIBE_URL = '/api/push/unsubscribe';
@@ -65,12 +67,7 @@ export async function subscribeToPush(userEmail: string): Promise<boolean> {
 
     await navigator.serviceWorker.ready;
 
-    const response = await fetch(PUBLIC_VAPID_KEY_URL, { credentials: 'include' });
-    if (!response.ok) {
-      console.error('[Push] Failed to fetch VAPID key:', response.status);
-      return false;
-    }
-    const { publicKey } = await response.json();
+    const { publicKey } = await fetchWithCredentials<{ publicKey: string }>(PUBLIC_VAPID_KEY_URL);
     
     if (!publicKey) {
       console.error('[Push] No VAPID public key available from server');
@@ -82,21 +79,12 @@ export async function subscribeToPush(userEmail: string): Promise<boolean> {
       applicationServerKey: urlBase64ToUint8Array(publicKey)
     });
 
-    const result = await fetch(SUBSCRIBE_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({
-        subscription: subscription.toJSON(),
-        user_email: userEmail
-      })
+    await postWithCredentials(SUBSCRIBE_URL, {
+      subscription: subscription.toJSON(),
+      user_email: userEmail
     });
 
-    if (!result.ok) {
-      console.error('[Push] Subscribe API failed:', result.status);
-    }
-
-    return result.ok;
+    return true;
   } catch (error: unknown) {
     console.error('[Push] Subscription failed:', error);
     return false;
@@ -109,11 +97,7 @@ export async function unsubscribeFromPush(): Promise<boolean> {
     const subscription = await registration.pushManager.getSubscription();
     
     if (subscription) {
-      await fetch(UNSUBSCRIBE_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ endpoint: subscription.endpoint })
-      });
+      await postWithCredentials(UNSUBSCRIBE_URL, { endpoint: subscription.endpoint });
       
       await subscription.unsubscribe();
     }

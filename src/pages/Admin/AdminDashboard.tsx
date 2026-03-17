@@ -28,6 +28,7 @@ import { StaffNavigationRail } from './layout/StaffNavigationRail';
 import { usePendingCounts } from './layout/hooks/usePendingCounts';
 import { useUnreadNotifications } from './layout/hooks/useUnreadNotifications';
 import { useCommandCenter } from './layout/hooks/useCommandCenter';
+import { fetchWithCredentials, putWithCredentials, postWithCredentials, deleteWithCredentials } from '../../hooks/queries/useFetch';
 
 // Loading fallback for lazy-loaded tabs - matches app aesthetic
 const TabLoadingFallback = () => (
@@ -539,17 +540,17 @@ const StaffTrainingGuide: React.FC = () => {
 
     const fetchSections = useCallback(async () => {
         try {
-            const response = await fetch('/api/training-sections', { credentials: 'include' });
-            if (response.ok) {
-                const data = await response.json();
-                setSections(data.sections);
-                setLastUpdated(data.lastUpdated ?? null);
-                setAuthError(false);
-            } else if (response.status === 401) {
+            const data = await fetchWithCredentials<{ sections: TrainingSectionDB[]; lastUpdated?: string }>('/api/training-sections');
+            setSections(data.sections);
+            setLastUpdated(data.lastUpdated ?? null);
+            setAuthError(false);
+        } catch (err: unknown) {
+            const msg = err instanceof Error ? err.message : '';
+            if (msg.includes('401')) {
                 setAuthError(true);
+            } else {
+                showToast('Failed to load training sections', 'error');
             }
-        } catch {
-            showToast('Failed to load training sections', 'error');
         } finally {
             setLoading(false);
         }
@@ -562,16 +563,12 @@ const StaffTrainingGuide: React.FC = () => {
     const handleSave = async (sectionData: Partial<TrainingSectionDB>) => {
         const isEdit = !!sectionData.id;
         const url = isEdit ? `/api/admin/training-sections/${sectionData.id}` : '/api/admin/training-sections';
-        const method = isEdit ? 'PUT' : 'POST';
 
-        const response = await fetch(url, {
-            method,
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify(sectionData)
-        });
-
-        if (!response.ok) throw new Error('Save failed');
+        if (isEdit) {
+            await putWithCredentials(url, sectionData);
+        } else {
+            await postWithCredentials(url, sectionData);
+        }
         await fetchSections();
     };
 
@@ -584,11 +581,7 @@ const StaffTrainingGuide: React.FC = () => {
         undoAction({
             message: `"${sectionToDelete.title}" deleted`,
             onExecute: async () => {
-                const response = await fetch(`/api/admin/training-sections/${id}`, {
-                    method: 'DELETE',
-                    credentials: 'include'
-                });
-                if (!response.ok) throw new Error('Failed to delete section');
+                await deleteWithCredentials(`/api/admin/training-sections/${id}`);
                 haptic.success();
             },
             onUndo: () => {

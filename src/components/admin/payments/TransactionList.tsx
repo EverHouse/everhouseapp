@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useImperativeHandle, forwardRef } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { createPortal } from 'react-dom';
 import EmptyState from '../../EmptyState';
 import WalkingGolferSpinner from '../../WalkingGolferSpinner';
 import { useRefundPayment } from '../../../hooks/queries/useFinancialsQueries';
+import { fetchWithCredentials, postWithCredentials } from '../../../hooks/queries/useFetch';
 
 export interface Transaction {
   id: string;
@@ -84,11 +86,8 @@ const RecentTransactionsSection = forwardRef<TransactionListRef, SectionProps>((
 
   const fetchTransactions = async () => {
     try {
-      const res = await fetch('/api/stripe/transactions/today', { credentials: 'include' });
-      if (res.ok) {
-        const data = await res.json();
-        setTransactions(data);
-      }
+      const data = await fetchWithCredentials<Transaction[]>('/api/stripe/transactions/today');
+      setTransactions(data);
     } catch (err: unknown) {
       console.error('Failed to fetch transactions:', err);
     } finally {
@@ -112,11 +111,8 @@ const RecentTransactionsSection = forwardRef<TransactionListRef, SectionProps>((
   const fetchNotes = async (txId: string) => {
     setNotesLoading(true);
     try {
-      const res = await fetch(`/api/payments/${txId}/notes`, { credentials: 'include' });
-      if (res.ok) {
-        const data = await res.json();
-        setNotes(data.notes || []);
-      }
+      const data = await fetchWithCredentials<{ notes: TransactionNote[] }>(`/api/payments/${txId}/notes`);
+      setNotes(data.notes || []);
     } catch (err: unknown) {
       console.error('Failed to fetch notes:', err);
     } finally {
@@ -136,30 +132,28 @@ const RecentTransactionsSection = forwardRef<TransactionListRef, SectionProps>((
     setNewNote('');
   };
 
+  const saveNoteMutation = useMutation({
+    mutationFn: (body: { transactionId: string; note: string }) =>
+      postWithCredentials<Record<string, unknown>>('/api/payments/add-note', body),
+  });
+
   const handleSaveNote = async () => {
     if (!selectedTxId || !newNote.trim()) return;
     
     setSavingNote(true);
-    try {
-      const res = await fetch('/api/payments/add-note', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          transactionId: selectedTxId,
-          note: newNote.trim()
-        })
-      });
-
-      if (res.ok) {
-        setNewNote('');
-        await fetchNotes(selectedTxId);
+    saveNoteMutation.mutate(
+      { transactionId: selectedTxId, note: newNote.trim() },
+      {
+        onSuccess: async () => {
+          setNewNote('');
+          await fetchNotes(selectedTxId!);
+        },
+        onError: (err: unknown) => {
+          console.error('Failed to save note:', err);
+        },
+        onSettled: () => setSavingNote(false),
       }
-    } catch (err: unknown) {
-      console.error('Failed to save note:', err);
-    } finally {
-      setSavingNote(false);
-    }
+    );
   };
 
   const content = loading ? (

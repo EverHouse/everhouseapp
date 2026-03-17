@@ -2,6 +2,7 @@ import React, { createContext, useState, useContext, ReactNode, useEffect, useCa
 import { useAuthData } from './AuthDataContext';
 import { formatDateShort, formatTime12Hour } from '../utils/dateUtils';
 import type { EventData } from '../types/data';
+import { fetchWithCredentials, postWithCredentials, putWithCredentials, deleteWithCredentials } from '../hooks/queries/useFetch';
 
 interface DBEventRecord {
   id: number | string;
@@ -72,12 +73,9 @@ export const EventDataProvider: React.FC<{children: ReactNode}> = ({ children })
     eventsFetchedRef.current = true;
     const fetchEvents = async () => {
       try {
-        const res = await fetch('/api/events');
-        if (res.ok) {
-          const data = await res.json();
-          if (Array.isArray(data)) {
-            setEvents(data.length ? formatEventData(data) : []);
-          }
+        const data = await fetchWithCredentials<DBEventRecord[]>('/api/events');
+        if (Array.isArray(data)) {
+          setEvents(data.length ? formatEventData(data) : []);
         }
       } catch (err: unknown) {
         if (actualUserRef.current) {
@@ -94,15 +92,12 @@ export const EventDataProvider: React.FC<{children: ReactNode}> = ({ children })
     try {
       if (actualUserRef.current?.role === 'admin' || actualUserRef.current?.role === 'staff') {
         try {
-          await fetch('/api/events/sync/google', { method: 'POST', credentials: 'include' });
+          await postWithCredentials('/api/events/sync/google', {});
         } catch (e) { console.warn('[EventData] Failed to trigger calendar sync:', e); }
       }
-      const res = await fetch('/api/events');
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data)) {
-          setEvents(data.length ? formatEventData(data) : []);
-        }
+      const data = await fetchWithCredentials<DBEventRecord[]>('/api/events');
+      if (Array.isArray(data)) {
+        setEvents(data.length ? formatEventData(data) : []);
       }
     } catch (err: unknown) {
       console.error('Failed to refresh events:', err);
@@ -117,23 +112,17 @@ export const EventDataProvider: React.FC<{children: ReactNode}> = ({ children })
 
   const addEvent = useCallback(async (item: Partial<EventData>) => {
     try {
-      const res = await fetch('/api/events', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          title: item.title,
-          description: item.description,
-          event_date: item.date,
-          start_time: item.time,
-          location: item.location,
-          category: item.category,
-          image_url: item.image,
-          max_attendees: item.capacity
-        })
+      const data = await postWithCredentials<DBEventRecord>('/api/events', {
+        title: item.title,
+        description: item.description,
+        event_date: item.date,
+        start_time: item.time,
+        location: item.location,
+        category: item.category,
+        image_url: item.image,
+        max_attendees: item.capacity
       });
-      if (res.ok) {
-        const data = await res.json();
+      {
         const formatted = {
           id: data.id.toString(),
           source: data.source === 'eventbrite' ? 'eventbrite' : 'internal',
@@ -158,40 +147,32 @@ export const EventDataProvider: React.FC<{children: ReactNode}> = ({ children })
 
   const updateEvent = useCallback(async (item: EventData) => {
     try {
-      const res = await fetch(`/api/events/${item.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          title: item.title,
-          description: item.description,
-          event_date: item.date,
-          start_time: item.time,
-          location: item.location,
-          category: item.category,
-          image_url: item.image,
-          max_attendees: item.capacity
-        })
+      const data = await putWithCredentials<DBEventRecord>(`/api/events/${item.id}`, {
+        title: item.title,
+        description: item.description,
+        event_date: item.date,
+        start_time: item.time,
+        location: item.location,
+        category: item.category,
+        image_url: item.image,
+        max_attendees: item.capacity
       });
-      if (res.ok) {
-        const data = await res.json();
-        const formatted = {
-          id: data.id.toString(),
-          source: data.source === 'eventbrite' ? 'eventbrite' : 'internal',
-          externalLink: data.eventbrite_url || undefined,
-          title: data.title,
-          category: data.category || 'Social',
-          date: formatDateShort(data.event_date),
-          time: data.start_time || 'TBD',
-          location: data.location || 'Ever Club',
-          image: data.image_url || 'https://images.unsplash.com/photo-1511795409834-ef04bbd61622?q=80&w=1000&auto=format&fit=crop',
-          description: data.description || '',
-          attendees: [],
-          capacity: data.max_attendees || undefined,
-          ticketsSold: undefined
-        } as EventData;
-        setEvents(prev => prev.map(i => i.id === formatted.id ? formatted : i));
-      }
+      const formatted = {
+        id: data.id.toString(),
+        source: data.source === 'eventbrite' ? 'eventbrite' : 'internal',
+        externalLink: data.eventbrite_url || undefined,
+        title: data.title,
+        category: data.category || 'Social',
+        date: formatDateShort(data.event_date),
+        time: data.start_time || 'TBD',
+        location: data.location || 'Ever Club',
+        image: data.image_url || 'https://images.unsplash.com/photo-1511795409834-ef04bbd61622?q=80&w=1000&auto=format&fit=crop',
+        description: data.description || '',
+        attendees: [],
+        capacity: data.max_attendees || undefined,
+        ticketsSold: undefined
+      } as EventData;
+      setEvents(prev => prev.map(i => i.id === formatted.id ? formatted : i));
     } catch (err: unknown) {
       console.error('Failed to update event:', err);
     }
@@ -199,13 +180,8 @@ export const EventDataProvider: React.FC<{children: ReactNode}> = ({ children })
 
   const deleteEvent = useCallback(async (id: string) => {
     try {
-      const res = await fetch(`/api/events/${id}`, {
-        method: 'DELETE',
-        credentials: 'include'
-      });
-      if (res.ok) {
-        setEvents(prev => prev.filter(i => i.id !== id));
-      }
+      await deleteWithCredentials(`/api/events/${id}`);
+      setEvents(prev => prev.filter(i => i.id !== id));
     } catch (err: unknown) {
       console.error('Failed to delete event:', err);
     }
@@ -213,15 +189,10 @@ export const EventDataProvider: React.FC<{children: ReactNode}> = ({ children })
 
   const syncEventbrite = useCallback(async () => {
     try {
-      const res = await fetch('/api/eventbrite/sync', { method: 'POST' });
-      if (res.ok) {
-        const eventsRes = await fetch('/api/events');
-        if (eventsRes.ok) {
-          const data = await eventsRes.json();
-          if (data?.length) {
-            setEvents(formatEventData(data));
-          }
-        }
+      await postWithCredentials('/api/eventbrite/sync', {});
+      const data = await fetchWithCredentials<DBEventRecord[]>('/api/events');
+      if (data?.length) {
+        setEvents(formatEventData(data));
       }
     } catch (err: unknown) {
       console.error('Failed to sync Eventbrite:', err);

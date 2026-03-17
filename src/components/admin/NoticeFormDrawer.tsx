@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { useToast } from '../Toast';
 import { SlideUpDrawer } from '../SlideUpDrawer';
 import { isBlockingClosure, formatAffectedAreas as formatAreasShared } from '../../utils/closureUtils';
+import { fetchWithCredentials, postWithCredentials, putWithCredentials } from '../../hooks/queries/useFetch';
 
 function stripHtml(html: string | null | undefined): string {
   if (!html) return '';
@@ -49,10 +51,6 @@ export const NoticeFormDrawer: React.FC<NoticeFormDrawerProps> = ({
   onSuccess
 }) => {
   const { showToast } = useToast();
-  const [saving, setSaving] = useState(false);
-  const [noticeTypes, setNoticeTypes] = useState<{id: number; name: string}[]>([]);
-  const [closureReasons, setClosureReasons] = useState<{id: number; label: string; isActive: boolean}[]>([]);
-  const [resources, setResources] = useState<{id: number; name: string; type: string}[]>([]);
   const [touchedFields, setTouchedFields] = useState<Set<string>>(new Set());
   const today = new Date().toISOString().split('T')[0];
   
@@ -69,24 +67,33 @@ export const NoticeFormDrawer: React.FC<NoticeFormDrawerProps> = ({
     notify_members: false
   });
 
-  useEffect(() => {
-    let cancelled = false;
-    fetch('/api/notice-types', { credentials: 'include' })
-      .then(r => r.json())
-      .then(data => { if (!cancelled) setNoticeTypes(data || []); })
-      .catch(() => { if (!cancelled) showToast('Failed to load notice types', 'error'); });
-    
-    fetch('/api/closure-reasons', { credentials: 'include' })
-      .then(r => r.json())
-      .then(data => { if (!cancelled) setClosureReasons(data || []); })
-      .catch(() => { if (!cancelled) showToast('Failed to load closure reasons', 'error'); });
+  const { data: noticeTypes = [] } = useQuery({
+    queryKey: ['notice-types'],
+    queryFn: () => fetchWithCredentials<{id: number; name: string}[]>('/api/notice-types'),
+    staleTime: 1000 * 60 * 10,
+  });
 
-    fetch('/api/resources', { credentials: 'include' })
-      .then(r => r.json())
-      .then(data => { if (!cancelled) setResources(data || []); })
-      .catch(() => { if (!cancelled) showToast('Failed to load resources', 'error'); });
-    return () => { cancelled = true; };
-  }, [showToast]);
+  const { data: closureReasons = [] } = useQuery({
+    queryKey: ['closure-reasons'],
+    queryFn: () => fetchWithCredentials<{id: number; label: string; isActive: boolean}[]>('/api/closure-reasons'),
+    staleTime: 1000 * 60 * 10,
+  });
+
+  const { data: resources = [] } = useQuery({
+    queryKey: ['resources'],
+    queryFn: () => fetchWithCredentials<{id: number; name: string; type: string}[]>('/api/resources'),
+    staleTime: 1000 * 60 * 10,
+  });
+
+  const saveNoticeMutation = useMutation({
+    mutationFn: (data: { id?: number; formData: NoticeFormData }) => {
+      const url = data.id ? `/api/closures/${data.id}` : '/api/closures';
+      return data.id
+        ? putWithCredentials<Record<string, unknown>>(url, data.formData)
+        : postWithCredentials<Record<string, unknown>>(url, data.formData);
+    },
+  });
+  const saving = saveNoticeMutation.isPending;
 
   useEffect(() => {
     if (isOpen) {
@@ -145,31 +152,20 @@ export const NoticeFormDrawer: React.FC<NoticeFormDrawerProps> = ({
       showToast('Please fill in all required fields', 'error');
       return;
     }
-    setSaving(true);
-    try {
-      const url = editItem?.id ? `/api/closures/${editItem.id}` : '/api/closures';
-      const method = editItem?.id ? 'PUT' : 'POST';
-      
-      const response = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(formData)
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to save notice');
+    saveNoticeMutation.mutate(
+      { id: editItem?.id, formData },
+      {
+        onSuccess: () => {
+          showToast(editItem?.id ? 'Notice updated' : 'Notice created', 'success');
+          onSuccess?.();
+          onClose();
+        },
+        onError: (err: unknown) => {
+          console.error('Failed to save notice:', err);
+          showToast('Failed to save notice', 'error');
+        },
       }
-      
-      showToast(editItem?.id ? 'Notice updated' : 'Notice created', 'success');
-      onSuccess?.();
-      onClose();
-    } catch (err: unknown) {
-      console.error('Failed to save notice:', err);
-      showToast('Failed to save notice', 'error');
-    } finally {
-      setSaving(false);
-    }
+    );
   };
 
   const handleClose = () => {

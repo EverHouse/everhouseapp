@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback, useId } from 'react';
 import { createPortal } from 'react-dom';
 import { useMemberData } from '../../contexts/DataContext';
+import { fetchWithCredentials } from '../../hooks/queries/useFetch';
 
 export interface SelectedMember {
   id: string;
@@ -120,24 +121,21 @@ export const MemberSearchInput: React.FC<MemberSearchInputProps> = ({
         includeVisitors: includeVisitors.toString()
       });
       
-      const res = await fetch(`/api/members/search?${params}`, { credentials: 'include' });
-      if (res.ok) {
-        const data = await res.json();
-        const results: SelectedMember[] = data
-          .filter((r: { id: string | number; email?: string; emailRedacted?: string; name?: string; tier?: string; membershipStatus?: string }) =>
-            !excludeEmailsLower.includes(r.email?.toLowerCase() || '') &&
-            !excludeIdsSet.has(String(r.id))
-          )
-          .map((r: { id: string | number; email?: string; emailRedacted?: string; name?: string; tier?: string; membershipStatus?: string }) => ({
-            id: r.id,
-            email: r.email || '',
-            emailRedacted: r.emailRedacted || '',
-            name: r.name || 'Unknown',
-            tier: r.tier || null,
-            membershipStatus: r.membershipStatus
-          }));
-        setApiResults(results);
-      }
+      const data = await fetchWithCredentials<Array<{ id: string; email?: string; emailRedacted?: string; name?: string; tier?: string; membershipStatus?: string }>>(`/api/members/search?${params}`);
+      const results: SelectedMember[] = data
+        .filter(r =>
+          !excludeEmailsLower.includes(r.email?.toLowerCase() || '') &&
+          !excludeIdsSet.has(String(r.id))
+        )
+        .map(r => ({
+          id: r.id,
+          email: r.email || '',
+          emailRedacted: r.emailRedacted || '',
+          name: r.name || 'Unknown',
+          tier: r.tier || null,
+          membershipStatus: r.membershipStatus
+        }));
+      setApiResults(results);
     } catch (err: unknown) {
       console.error('Search error:', err);
     } finally {

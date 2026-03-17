@@ -1,6 +1,6 @@
 import React from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { fetchWithCredentials } from '../../../../hooks/queries/useFetch';
+import { fetchWithCredentials, putWithCredentials } from '../../../../hooks/queries/useFetch';
 import Toggle from '../../../../components/Toggle';
 
 interface AutoApproveConfig {
@@ -24,14 +24,7 @@ const AutoApprovePanel: React.FC<Props> = ({ isOpen, onToggle }) => {
 
   const toggleMutation = useMutation({
     mutationFn: async ({ key, enabled }: { key: string; enabled: boolean }) => {
-      const response = await fetch(`/api/admin/settings/${key}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ value: String(enabled) }),
-      });
-      if (!response.ok) throw new Error('Failed to update auto-approve setting');
-      return response.json();
+      return putWithCredentials(`/api/admin/settings/${key}`, { value: String(enabled) });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'monitoring', 'auto-approve'] });

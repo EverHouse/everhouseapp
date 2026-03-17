@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useMutation } from '@tanstack/react-query';
 import { useAutoAnimate } from '@formkit/auto-animate/react';
 import WalkingGolferSpinner from '../../WalkingGolferSpinner';
 import TrackmanIcon from '../../icons/TrackmanIcon';
+import { fetchWithCredentials, postWithCredentials } from '../../../hooks/queries/useFetch';
 
 const ITEMS_PER_PAGE = 10;
 
@@ -212,46 +214,37 @@ export const TrackmanWebhookEventsSection: React.FC<TrackmanWebhookEventsSection
     };
   }, []);
 
+  const replayMutation = useMutation({
+    mutationFn: (body: { dev_url: string; limit: number }) =>
+      postWithCredentials<{ message?: string; sent?: number; failed?: number; error?: string; details?: string }>('/api/trackman/replay-webhooks-to-dev', body),
+  });
+
   const handleReplayToDev = async () => {
     if (!replayDevUrl) return;
     
     setIsReplaying(true);
     setReplayResult(null);
     
-    try {
-      const res = await fetch('/api/trackman/replay-webhooks-to-dev', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          dev_url: replayDevUrl,
-          limit: replayLimit
-        })
-      });
-      
-      const result = await res.json();
-      
-      if (res.ok) {
-        setReplayResult({
-          success: true,
-          message: result.message,
-          sent: result.sent,
-          failed: result.failed
-        });
-      } else {
-        setReplayResult({
-          success: false,
-          message: result.details ? `${result.error}: ${result.details}` : (result.error || 'Failed to replay webhooks')
-        });
+    replayMutation.mutate(
+      { dev_url: replayDevUrl, limit: replayLimit },
+      {
+        onSuccess: (result) => {
+          setReplayResult({
+            success: true,
+            message: result.message || 'Replay complete',
+            sent: result.sent,
+            failed: result.failed
+          });
+        },
+        onError: (err: unknown) => {
+          setReplayResult({
+            success: false,
+            message: (err instanceof Error ? err.message : String(err)) || 'Network error'
+          });
+        },
+        onSettled: () => setIsReplaying(false),
       }
-    } catch (err: unknown) {
-      setReplayResult({
-        success: false,
-        message: (err instanceof Error ? err.message : String(err)) || 'Network error'
-      });
-    } finally {
-      setIsReplaying(false);
-    }
+    );
   };
 
   const fetchWebhookEvents = useCallback(async (page: number) => {
@@ -259,12 +252,9 @@ export const TrackmanWebhookEventsSection: React.FC<TrackmanWebhookEventsSection
     try {
       const offset = (page - 1) * ITEMS_PER_PAGE;
       const cacheBuster = `_t=${Date.now()}`;
-      const res = await fetch(`/api/admin/trackman-webhooks?limit=${ITEMS_PER_PAGE}&offset=${offset}&${cacheBuster}`, { credentials: 'include' });
-      if (res.ok) {
-        const result = await res.json();
-        setWebhookEvents(result.events || []);
-        setWebhookTotalCount(result.totalCount || 0);
-      }
+      const result = await fetchWithCredentials<{ events: TrackmanWebhookEvent[]; totalCount: number }>(`/api/admin/trackman-webhooks?limit=${ITEMS_PER_PAGE}&offset=${offset}&${cacheBuster}`);
+      setWebhookEvents(result.events || []);
+      setWebhookTotalCount(result.totalCount || 0);
     } catch (err: unknown) {
       console.error('Failed to fetch webhook events:', err);
     } finally {
@@ -275,11 +265,8 @@ export const TrackmanWebhookEventsSection: React.FC<TrackmanWebhookEventsSection
   const fetchWebhookStats = useCallback(async () => {
     try {
       const cacheBuster = `_t=${Date.now()}`;
-      const res = await fetch(`/api/admin/trackman-webhooks/stats?${cacheBuster}`, { credentials: 'include' });
-      if (res.ok) {
-        const result = await res.json();
-        setWebhookStats(result);
-      }
+      const result = await fetchWithCredentials<Record<string, unknown>>(`/api/admin/trackman-webhooks/stats?${cacheBuster}`);
+      setWebhookStats(result);
     } catch (err: unknown) {
       console.error('Failed to fetch webhook stats:', err);
     }
@@ -325,25 +312,7 @@ export const TrackmanWebhookEventsSection: React.FC<TrackmanWebhookEventsSection
     setAutoMatchResult(null);
     
     try {
-      const res = await fetch(`/api/admin/trackman-webhook/${eventId}/auto-match`, {
-        method: 'POST',
-        credentials: 'include'
-      });
-      
-      // Handle non-OK responses
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({ error: 'Request failed' }));
-        setAutoMatchResult({
-          eventId,
-          success: false,
-          message: errorData.error || `Failed (${res.status})`
-        });
-        if (autoMatchTimeoutRef.current) clearTimeout(autoMatchTimeoutRef.current);
-        autoMatchTimeoutRef.current = setTimeout(() => setAutoMatchResult(null), 5000);
-        return;
-      }
-      
-      const result = await res.json();
+      const result = await postWithCredentials<{ success: boolean; message?: string }>(`/api/admin/trackman-webhook/${eventId}/auto-match`, {});
       
       setAutoMatchResult({
         eventId,

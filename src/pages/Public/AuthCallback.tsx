@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { getSupabase } from '../../lib/supabase';
 import { useNavigationLoading } from '../../stores/navigationLoadingStore';
 import WalkingGolferSpinner from '../../components/WalkingGolferSpinner';
+import { fetchWithCredentials } from '../../hooks/queries/useFetch';
 
 const AuthCallback: React.FC = () => {
   const navigate = useNavigate();
@@ -26,21 +27,11 @@ const AuthCallback: React.FC = () => {
         
         if (session) {
           try {
-            const res = await fetch(`/api/auth/check-staff-admin?email=${encodeURIComponent(session.user.email || '')}`);
-            if (res.ok) {
-              const contentType = res.headers.get('Content-Type') || '';
-              if (contentType.includes('application/json')) {
-                try {
-                  const data = await res.json();
-                  if (data.isStaffOrAdmin) {
-                    startNavigation();
-                    navigate('/admin');
-                    return;
-                  }
-                } catch (_parseErr: unknown) {
-                  console.error('Failed to parse staff/admin response');
-                }
-              }
+            const data = await fetchWithCredentials<{ isStaffOrAdmin: boolean }>(`/api/auth/check-staff-admin?email=${encodeURIComponent(session.user.email || '')}`);
+            if (data.isStaffOrAdmin) {
+              startNavigation();
+              navigate('/admin');
+              return;
             }
           } catch (_err: unknown) {
             console.error('Failed to check staff/admin status');

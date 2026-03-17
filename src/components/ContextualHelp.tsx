@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { SlideUpDrawer } from './SlideUpDrawer';
 import WalkingGolferSpinner from './WalkingGolferSpinner';
+import { fetchWithCredentials } from '../hooks/queries/useFetch';
 
 interface TrainingSectionDB {
   id: number;
@@ -31,14 +32,10 @@ export default function ContextualHelp({ guideIds, title = 'Page Guide' }: Conte
     let cancelled = false;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
-    fetch('/api/training-sections', { credentials: 'include' })
-      .then(res => {
-        if (res.ok) return res.json();
-        throw new Error('Failed to fetch');
-      })
+    fetchWithCredentials<{sections: TrainingSectionDB[]}>('/api/training-sections')
       .then(data => {
         if (cancelled) return;
-        const filtered = (data.sections as TrainingSectionDB[])
+        const filtered = data.sections
           .filter(s => guideIds.includes(s.guideId))
           .sort((a, b) => a.sortOrder - b.sortOrder);
         setSections(filtered);

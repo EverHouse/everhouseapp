@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { SelectedMember } from '../../shared/MemberSearchInput';
 import { useToast } from '../../Toast';
 import { usePricing } from '../../../hooks/usePricing';
+import { fetchWithCredentials, postWithCredentials, putWithCredentials, deleteWithCredentials, patchWithCredentials } from '../../../hooks/queries/useFetch';
 import TierBadge from '../../TierBadge';
 import type { BookingMember, ManageModeRosterData, MemberMatchWarning, UnifiedBookingSheetProps, VisitorSearchResult, SlotState, SlotsArray } from './bookingSheetTypes';
 import { isPlaceholderEmail } from './bookingSheetTypes';
@@ -169,18 +170,11 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 15000);
-      const res = await fetch(`/api/admin/booking/${bookingId}/members`, { 
-        credentials: 'include',
+      const data = await fetchWithCredentials<ManageModeRosterData>(`/api/admin/booking/${bookingId}/members`, {
         signal: controller.signal,
         headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
       });
       clearTimeout(timeoutId);
-      if (fetchId !== rosterFetchIdRef.current) return;
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error || 'Failed to load roster');
-      }
-      const data: ManageModeRosterData = await res.json();
       if (fetchId !== rosterFetchIdRef.current) return;
       setRosterData(data);
       membersSnapshotRef.current = [...data.members];
@@ -348,12 +342,9 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
       try {
         if (!bookingId) return;
         isPollingFetchingRef.current = true;
-        const res = await fetch(`/api/admin/booking/${bookingId}/members`, {
-          credentials: 'include',
+        const data = await fetchWithCredentials<ManageModeRosterData>(`/api/admin/booking/${bookingId}/members`, {
           headers: { 'Cache-Control': 'no-cache' }
         });
-        if (!res.ok) return;
-        const data: ManageModeRosterData = await res.json();
         if (data.financialSummary?.allPaid) {
           setRosterData(data);
           membersSnapshotRef.current = [...data.members];
@@ -461,12 +452,9 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
     const fetchId = ++checkCardFetchIdRef.current;
     try {
       setCheckingCard(true);
-      const res = await fetch(`/api/stripe/staff/check-saved-card/${encodeURIComponent(email)}`, { credentials: 'include' });
+      const data = await fetchWithCredentials<{ hasSavedCard: boolean; last4?: string; brand?: string }>(`/api/stripe/staff/check-saved-card/${encodeURIComponent(email)}`);
       if (fetchId !== checkCardFetchIdRef.current) return;
-      if (res.ok) {
-        const data = await res.json();
-        setSavedCardInfo(data);
-      }
+      setSavedCardInfo(data);
     } catch (err: unknown) {
       if (fetchId !== checkCardFetchIdRef.current) return;
       console.error('Failed to check saved card:', err);
@@ -484,9 +472,12 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch(`/api/booking-requests/${bookingId}`, { credentials: 'include' });
-        if (!res.ok || cancelled) return;
-        const data = await res.json();
+        const data = await fetchWithCredentials<{
+          start_time?: string; end_time?: string; resource_name?: string; bay_name?: string;
+          resource_id?: number; request_date?: string; trackman_booking_id?: string;
+          status?: string; user_name?: string; user_email?: string; user_id?: number;
+          duration_minutes?: number; notes?: string;
+        }>(`/api/booking-requests/${bookingId}`);
         if (cancelled) return;
         const formatTime = (t: string | null) => {
           if (!t) return '';
@@ -495,8 +486,8 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
           const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
           return `${h12}:${String(m).padStart(2, '0')} ${ampm}`;
         };
-        const start = formatTime(data.start_time);
-        const end = formatTime(data.end_time);
+        const start = formatTime(data.start_time ?? null);
+        const end = formatTime(data.end_time ?? null);
         setFetchedContext({
           bayName: data.resource_name || data.bay_name || (data.resource_id ? `Bay ${data.resource_id}` : undefined),
           bookingDate: data.request_date || undefined,
@@ -535,9 +526,8 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
       if (!showStaffList || staffList.length > 0) return;
       setIsLoadingStaff(true);
       try {
-        const res = await fetch('/api/staff/list', { credentials: 'include' });
-        if (res.ok && isCurrent) {
-          const data = await res.json();
+        const data = await fetchWithCredentials<Array<{ id: string; email: string; first_name: string; last_name: string; role: string; user_id: string | null }>>('/api/staff/list');
+        if (isCurrent) {
           setStaffList(data);
         }
       } catch (err: unknown) {
@@ -562,14 +552,13 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
       
       setIsCheckingDuplicates(true);
       try {
-        const res = await fetch(`/api/visitors/search?query=${encodeURIComponent(fullName)}&limit=5&includeStaff=true&includeMembers=true`, { credentials: 'include' });
-        if (res.ok && isActive) {
-          const data = await res.json();
-          const matches = data.filter((v: { id: string; email: string; name?: string; firstName?: string; lastName?: string }) => {
+        const data = await fetchWithCredentials<Array<{ id: string; email: string; name?: string; firstName?: string; lastName?: string }>>(`/api/visitors/search?query=${encodeURIComponent(fullName)}&limit=5&includeStaff=true&includeMembers=true`);
+        if (isActive) {
+          const matches = data.filter((v) => {
             const vName = (v.name || `${v.firstName} ${v.lastName}`).toLowerCase().trim();
             return vName === fullName.toLowerCase();
           });
-          setPotentialDuplicates(matches.map((v: { id: string; email: string; name?: string; firstName?: string; lastName?: string }) => ({
+          setPotentialDuplicates(matches.map((v) => ({
             id: v.id,
             email: v.email,
             name: v.name || `${v.firstName} ${v.lastName}`
@@ -596,13 +585,9 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
       }
       setIsSearchingVisitors(true);
       try {
-        const res = await fetch(`/api/visitors/search?query=${encodeURIComponent(visitorSearch)}&limit=10&includeMembers=true`, { credentials: 'include' });
-        if (!isActive) return;
-        if (res.ok) {
-          const data = await res.json();
-          if (isActive) {
-            setVisitorSearchResults(data);
-          }
+        const data = await fetchWithCredentials<VisitorSearchResult[]>(`/api/visitors/search?query=${encodeURIComponent(visitorSearch)}&limit=10&includeMembers=true`);
+        if (isActive) {
+          setVisitorSearchResults(data);
         }
       } catch (err: unknown) {
         if (isActive) console.error('Visitor search error:', err);
@@ -658,12 +643,10 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
         if (bookingDate) {
           params.set('date', bookingDate);
         }
-        const res = await fetch(`/api/fee-estimate?${params}`, {
-          credentials: 'include',
+        const data = await fetchWithCredentials<{ totalCents?: number; overageCents?: number; guestCents?: number }>(`/api/fee-estimate?${params}`, {
           signal: controller.signal
         });
-        if (res.ok && isCurrent) {
-          const data = await res.json();
+        if (isCurrent) {
           setFeeEstimate({
             totalCents: data.totalCents || 0,
             overageCents: data.overageCents || 0,
@@ -795,16 +778,7 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
     if (!bookingId || isUpdatingPlayerCount) return;
     setIsUpdatingPlayerCount(true);
     try {
-      const res = await fetch(`/api/admin/booking/${bookingId}/player-count`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ playerCount: newCount })
-      });
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error || 'Failed to update player count');
-      }
+      await patchWithCredentials(`/api/admin/booking/${bookingId}/player-count`, { playerCount: newCount });
       setEditingPlayerCount(newCount);
       showToast(`Player count updated to ${newCount}`, 'success');
       await fetchRosterData();
@@ -819,16 +793,7 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
     if (!bookingId) return;
     setIsLinkingMember(true);
     try {
-      const res = await fetch(`/api/admin/booking/${bookingId}/members/${slotId}/link`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ memberEmail })
-      });
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error || 'Failed to link member');
-      }
+      await putWithCredentials(`/api/admin/booking/${bookingId}/members/${slotId}/link`, { memberEmail });
       showToast('Member linked successfully', 'success');
       await fetchRosterData();
     } catch (err: unknown) {
@@ -843,14 +808,7 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
     if (!bookingId) return;
     setUnlinkingSlotId(slotId);
     try {
-      const res = await fetch(`/api/admin/booking/${bookingId}/members/${slotId}/unlink`, {
-        method: 'PUT',
-        credentials: 'include'
-      });
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error || 'Failed to unlink member');
-      }
+      await putWithCredentials(`/api/admin/booking/${bookingId}/members/${slotId}/unlink`, {});
       showToast('Member removed', 'success');
       await fetchRosterData();
     } catch (err: unknown) {
@@ -918,20 +876,11 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
     if (!bookingId) return;
     setInlinePaymentAction('mark-paid');
     try {
-      const res = await fetch(`/api/bookings/${bookingId}/payments`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ action: 'confirm_all' })
-      });
-      if (res.ok) {
-        showToast('Payment confirmed', 'success');
-        setPaymentSuccess(true);
-        setShowInlinePayment(false);
-        await fetchRosterData();
-      } else {
-        showToast('Failed to confirm payment', 'error');
-      }
+      await patchWithCredentials(`/api/bookings/${bookingId}/payments`, { action: 'confirm_all' });
+      showToast('Payment confirmed', 'success');
+      setPaymentSuccess(true);
+      setShowInlinePayment(false);
+      await fetchRosterData();
     } catch (_err: unknown) {
       showToast('Failed to confirm payment', 'error');
     } finally {
@@ -977,24 +926,14 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
     if (!bookingId || !waiverReason.trim()) return;
     setInlinePaymentAction('waive');
     try {
-      const res = await fetch(`/api/bookings/${bookingId}/payments`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ action: 'waive_all', reason: waiverReason.trim() })
-      });
-      if (res.ok) {
-        showToast('All fees waived', 'success');
-        setPaymentSuccess(true);
-        setShowInlinePayment(false);
-        setShowWaiverInput(false);
-        setWaiverReason('');
-        setInlinePaymentAction(null);
-        await fetchRosterData();
-      } else {
-        showToast('Failed to waive fees', 'error');
-        setInlinePaymentAction(null);
-      }
+      await patchWithCredentials(`/api/bookings/${bookingId}/payments`, { action: 'waive_all', reason: waiverReason.trim() });
+      showToast('All fees waived', 'success');
+      setPaymentSuccess(true);
+      setShowInlinePayment(false);
+      setShowWaiverInput(false);
+      setWaiverReason('');
+      setInlinePaymentAction(null);
+      await fetchRosterData();
     } catch (_err: unknown) {
       showToast('Failed to waive fees', 'error');
       setInlinePaymentAction(null);
@@ -1013,14 +952,7 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
     if (!bookingId) return;
     setRemovingGuestId(guestId);
     try {
-      const res = await fetch(`/api/admin/booking/${bookingId}/guests/${guestId}`, {
-        method: 'DELETE',
-        credentials: 'include'
-      });
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error || 'Failed to remove guest');
-      }
+      await deleteWithCredentials(`/api/admin/booking/${bookingId}/guests/${guestId}`);
       showToast('Guest removed', 'success');
       await fetchRosterData();
     } catch (err: unknown) {
@@ -1037,12 +969,7 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
       if (member) {
         await handleManageModeLinkMember(member.id, memberMatchWarning.memberMatch.email);
       } else {
-        await fetch(`/api/admin/booking/${bookingId}/members`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ memberEmail: memberMatchWarning.memberMatch.email, slotId: memberMatchWarning.slotNumber })
-        });
+        await postWithCredentials(`/api/admin/booking/${bookingId}/members`, { memberEmail: memberMatchWarning.memberMatch.email, slotId: memberMatchWarning.slotNumber });
         await fetchRosterData();
       }
       setMemberMatchWarning(null);
@@ -1107,51 +1034,29 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
       let feesRecalculated = false;
       let resultBookingId = matchedBookingId;
       if (matchedBookingId) {
-        const res = await fetch(`/api/bookings/${matchedBookingId}/assign-with-players`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({
-            owner: {
-              email: owner.email,
-              name: owner.name,
-              member_id: owner.id
-            },
-            additional_players: additionalPlayers,
-            rememberEmail: shouldShowRememberEmail() ? rememberEmail : false,
-            originalEmail: originalEmail
-          })
+        const data = await putWithCredentials<{ feesRecalculated?: boolean }>(`/api/bookings/${matchedBookingId}/assign-with-players`, {
+          owner: {
+            email: owner.email,
+            name: owner.name,
+            member_id: owner.id
+          },
+          additional_players: additionalPlayers,
+          rememberEmail: shouldShowRememberEmail() ? rememberEmail : false,
+          originalEmail: originalEmail
         });
-        
-        if (!res.ok) {
-          const data = await res.json();
-          throw new Error(data.error || data.message || 'Failed to assign member to booking');
-        }
-        const data = await res.json();
         feesRecalculated = data.feesRecalculated === true;
       } else if (trackmanBookingId) {
-        const res = await fetch('/api/bookings/link-trackman-to-member', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({
-            trackman_booking_id: trackmanBookingId,
-            owner: {
-              email: owner.email,
-              name: owner.name,
-              member_id: owner.id
-            },
-            additional_players: additionalPlayers,
-            rememberEmail: shouldShowRememberEmail() ? rememberEmail : false,
-            originalEmail: originalEmail
-          })
+        const data = await postWithCredentials<{ convertedToAvailabilityBlock?: boolean; instructorName?: string; feesRecalculated?: boolean; bookingId?: number }>('/api/bookings/link-trackman-to-member', {
+          trackman_booking_id: trackmanBookingId,
+          owner: {
+            email: owner.email,
+            name: owner.name,
+            member_id: owner.id
+          },
+          additional_players: additionalPlayers,
+          rememberEmail: shouldShowRememberEmail() ? rememberEmail : false,
+          originalEmail: originalEmail
         });
-        
-        if (!res.ok) {
-          const data = await res.json();
-          throw new Error(data.error || data.message || 'Failed to link booking to member');
-        }
-        const data = await res.json();
         if (data.convertedToAvailabilityBlock) {
           showToast(`${data.instructorName || 'Instructor'} lesson converted to availability block`, 'success');
           onSuccess?.({ memberEmail: owner.email, memberName: owner.name });
@@ -1163,21 +1068,11 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
           resultBookingId = data.bookingId;
         }
       } else if (sessionId) {
-        const res = await fetch('/api/data-integrity/fix/assign-session-owner', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({
-            sessionId: sessionId,
-            ownerEmail: owner.email,
-            additional_players: additionalPlayers
-          })
+        await postWithCredentials('/api/data-integrity/fix/assign-session-owner', {
+          sessionId: sessionId,
+          ownerEmail: owner.email,
+          additional_players: additionalPlayers
         });
-
-        if (!res.ok) {
-          const data = await res.json();
-          throw new Error(data.error || data.message || 'Failed to assign member to session');
-        }
       }
       
       showToast(`Booking assigned with ${filledSlotsCount} player${filledSlotsCount > 1 ? 's' : ''}${guestCount > 0 ? ` (${guestCount} guest${guestCount > 1 ? 's' : ''})` : ''}`, 'success');
@@ -1230,11 +1125,8 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
         sameDayOnly: 'true'
       });
       
-      const res = await fetch(`/api/resources/overlapping-notices?${params}`, { credentials: 'include' });
-      if (res.ok) {
-        const notices = await res.json();
-        setOverlappingNotices(notices);
-      }
+      const notices = await fetchWithCredentials<Array<{ id: number; title: string; reason: string | null; notice_type: string | null; start_date: string; end_date: string; start_time: string | null; end_time: string | null; source: string }>>(`/api/resources/overlapping-notices?${params}`);
+      setOverlappingNotices(notices);
       setShowNoticeSelection(true);
       return true;
     } catch (err: unknown) {
@@ -1271,17 +1163,7 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
         body.eventTitle = eventTitle.trim();
       }
 
-      const res = await fetch('/api/bookings/mark-as-event', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(body)
-      });
-      
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || data.message || 'Failed to mark as event');
-      }
+      await postWithCredentials('/api/bookings/mark-as-event', body);
       
       const linkedMsg = existingClosureId ? ' (linked to existing notice)' : '';
       showToast(`Booking marked as private event${linkedMsg}`, 'success');
@@ -1303,46 +1185,26 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
       const staffName = `${staff.first_name} ${staff.last_name}`;
       
       if (matchedBookingId) {
-        const res = await fetch(`/api/bookings/${matchedBookingId}/assign-with-players`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({
-            owner: {
-              email: staff.email,
-              name: staffName,
-              member_id: staff.user_id
-            },
-            additional_players: [],
-            rememberEmail: false
-          })
+        await putWithCredentials(`/api/bookings/${matchedBookingId}/assign-with-players`, {
+          owner: {
+            email: staff.email,
+            name: staffName,
+            member_id: staff.user_id
+          },
+          additional_players: [],
+          rememberEmail: false
         });
-        
-        if (!res.ok) {
-          const data = await res.json();
-          throw new Error(data.error || data.message || 'Failed to assign to staff');
-        }
       } else if (trackmanBookingId) {
-        const res = await fetch('/api/bookings/link-trackman-to-member', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({
-            trackman_booking_id: trackmanBookingId,
-            owner: {
-              email: staff.email,
-              name: staffName,
-              member_id: staff.user_id
-            },
-            additional_players: [],
-            rememberEmail: false
-          })
+        await postWithCredentials('/api/bookings/link-trackman-to-member', {
+          trackman_booking_id: trackmanBookingId,
+          owner: {
+            email: staff.email,
+            name: staffName,
+            member_id: staff.user_id
+          },
+          additional_players: [],
+          rememberEmail: false
         });
-        
-        if (!res.ok) {
-          const data = await res.json();
-          throw new Error(data.error || data.message || 'Failed to assign to staff');
-        }
       }
       
       showToast(`Booking assigned to ${staffName}`, 'success');
@@ -1361,14 +1223,7 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
     if (!window.confirm('Are you sure you want to delete this booking? This cannot be undone.')) return;
     setDeleting(true);
     try {
-      const res = await fetch(`/api/bookings/${deleteId}?hard_delete=true`, {
-        method: 'DELETE',
-        credentials: 'include',
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || data.message || 'Failed to delete booking');
-      }
+      await deleteWithCredentials(`/api/bookings/${deleteId}?hard_delete=true`);
       onSuccess?.();
       onClose();
     } catch (err: unknown) {
@@ -1382,19 +1237,9 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
     if (!bookingId) return;
     setIsQuickAddingGuest(true);
     try {
-      const res = await fetch(`/api/admin/booking/${bookingId}/guests`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ quickAdd: true }),
-      });
-      if (res.ok) {
-        showToast('Guest added', 'success');
-        await fetchRosterData();
-      } else {
-        const data = await res.json().catch(() => ({}));
-        showToast(data.error || 'Failed to add guest', 'error');
-      }
+      await postWithCredentials(`/api/admin/booking/${bookingId}/guests`, { quickAdd: true });
+      showToast('Guest added', 'success');
+      await fetchRosterData();
     } catch (_err) {
       showToast('Failed to add guest', 'error');
     } finally {
@@ -1410,17 +1255,7 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
 
     setIsReassigningOwner(true);
     try {
-      const response = await fetch(`/api/admin/trackman/matched/${bookingId}/reassign`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ newMemberEmail }),
-      });
-
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to reassign owner');
-      }
+      const data = await putWithCredentials<{ message?: string }>(`/api/admin/trackman/matched/${bookingId}/reassign`, { newMemberEmail });
 
       showToast(data.message || `Booking reassigned to ${newMemberEmail}`, 'success');
       setReassignSearchOpen(false);

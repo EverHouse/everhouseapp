@@ -1,8 +1,16 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { TIER_NAMES } from '../../../../shared/constants/tiers';
-import { getApiErrorMessage, getNetworkErrorMessage, extractApiError } from '../../../utils/errorHandling';
+import { fetchWithCredentials, postWithCredentials, putWithCredentials } from '../../../hooks/queries/useFetch';
 import { useToast } from '../../Toast';
 import type { BillingInfo, OutstandingData, MigrationEligibility, CouponOption } from './types';
+
+export const memberBillingKeys = {
+  all: ['member-billing'] as const,
+  info: (email: string) => [...memberBillingKeys.all, email] as const,
+  outstanding: (email: string) => [...memberBillingKeys.all, email, 'outstanding'] as const,
+  migrationStatus: (email: string) => [...memberBillingKeys.all, email, 'migration-status'] as const,
+};
 
 export function useMemberBilling(
   memberEmail: string,
@@ -13,24 +21,11 @@ export function useMemberBilling(
   onDrawerClose?: () => void,
 ) {
   const { showToast } = useToast();
-  const [billingInfo, setBillingInfo] = useState<BillingInfo | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const queryClient = useQueryClient();
 
   const [isEditingTier, setIsEditingTier] = useState(false);
   const [manualTier, setManualTier] = useState('');
-  const [isSavingTier, setIsSavingTier] = useState(false);
   const VALID_TIERS = [...TIER_NAMES];
-
-  const [isUpdatingSource, setIsUpdatingSource] = useState(false);
-  const [isPausing, setIsPausing] = useState(false);
-  const [isResuming, setIsResuming] = useState(false);
-  const [isCanceling, setIsCanceling] = useState(false);
-  const [isApplyingCredit, setIsApplyingCredit] = useState(false);
-  const [isApplyingDiscount, setIsApplyingDiscount] = useState(false);
-  const [isGettingPaymentLink, setIsGettingPaymentLink] = useState(false);
-  const [isOpeningBillingPortal, setIsOpeningBillingPortal] = useState(false);
-  const [isSyncingToStripe, setIsSyncingToStripe] = useState(false);
-  const [isSyncingStripeData, setIsSyncingStripeData] = useState(false);
 
   const [showCreditModal, setShowCreditModal] = useState(false);
   const [showDiscountModal, setShowDiscountModal] = useState(false);
@@ -41,25 +36,15 @@ export function useMemberBilling(
   const [pendingBillingSource, setPendingBillingSource] = useState('');
   const [showTierChangeModal, setShowTierChangeModal] = useState(false);
   const [showCreateSubscriptionModal, setShowCreateSubscriptionModal] = useState(false);
-  const [isCreatingSubscription, setIsCreatingSubscription] = useState(false);
   const [selectedSubscriptionTier, setSelectedSubscriptionTier] = useState('');
   const [selectedCoupon, setSelectedCoupon] = useState('');
-  const [availableCoupons, setAvailableCoupons] = useState<CouponOption[]>([]);
-  const [isLoadingCoupons, setIsLoadingCoupons] = useState(false);
-
-  const [isSendingActivation, setIsSendingActivation] = useState(false);
 
   const [showMigrationDialog, setShowMigrationDialog] = useState(false);
-  const [isMigrationLoading, setIsMigrationLoading] = useState(false);
-  const [migrationEligibility, setMigrationEligibility] = useState<MigrationEligibility>({ hasCardOnFile: false, tierHasStripePrice: true, cardOnFile: null });
 
   const [showUpdateCardTerminal, setShowUpdateCardTerminal] = useState(false);
   const [showCollectPayment, setShowCollectPayment] = useState(false);
   const [collectPaymentAmount, setCollectPaymentAmount] = useState(0);
   const [collectPaymentMode, setCollectPaymentMode] = useState<'terminal' | 'charge_card'>('terminal');
-  const [isChargingCard, setIsChargingCard] = useState(false);
-
-  const [outstandingData, setOutstandingData] = useState<OutstandingData | null>(null);
 
   const showSuccess = (message: string) => {
     showToast(message, 'success');
@@ -69,42 +54,35 @@ export function useMemberBilling(
     if (message) showToast(message, 'error', 5000);
   }, [showToast]);
 
-  const fetchBillingInfo = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const res = await fetch(`/api/member-billing/${encodeURIComponent(memberEmail)}`, {
-        credentials: 'include',
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setBillingInfo(data);
-      } else {
-        showError(await extractApiError(res, 'load billing info'));
-      }
-    } catch (_err: unknown) {
-      showError(getNetworkErrorMessage());
-    } finally {
-      setIsLoading(false);
-    }
-  }, [memberEmail, showError]);
+  const invalidateBilling = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: memberBillingKeys.info(memberEmail) });
+  }, [queryClient, memberEmail]);
 
-  const fetchOutstandingBalance = useCallback(async () => {
-    try {
-      const res = await fetch(`/api/member-billing/${encodeURIComponent(memberEmail)}/outstanding`, {
-        credentials: 'include',
-      });
-      if (res.ok) {
-        setOutstandingData(await res.json());
-      }
-    } catch (err: unknown) {
-      console.error('[MemberBilling] Error fetching outstanding:', err);
-    }
-  }, [memberEmail]);
+  const billingQuery = useQuery({
+    queryKey: memberBillingKeys.info(memberEmail),
+    queryFn: () => fetchWithCredentials<BillingInfo>(`/api/member-billing/${encodeURIComponent(memberEmail)}`),
+  });
 
-  useEffect(() => {
-    fetchBillingInfo();
-    fetchOutstandingBalance();
-  }, [fetchBillingInfo, fetchOutstandingBalance]);
+  const outstandingQuery = useQuery({
+    queryKey: memberBillingKeys.outstanding(memberEmail),
+    queryFn: () => fetchWithCredentials<OutstandingData>(`/api/member-billing/${encodeURIComponent(memberEmail)}/outstanding`),
+  });
+
+  const migrationStatusQuery = useQuery({
+    queryKey: memberBillingKeys.migrationStatus(memberEmail),
+    queryFn: () => fetchWithCredentials<{ hasCardOnFile: boolean; tierHasStripePrice: boolean; cardOnFile: { brand?: string; last4?: string } | null }>(
+      `/api/member-billing/${encodeURIComponent(memberEmail)}/migration-status`
+    ),
+    enabled: billingQuery.data?.billingProvider === 'mindbody',
+  });
+
+  const migrationEligibility: MigrationEligibility = migrationStatusQuery.data
+    ? {
+        hasCardOnFile: migrationStatusQuery.data.hasCardOnFile || false,
+        tierHasStripePrice: migrationStatusQuery.data.tierHasStripePrice || false,
+        cardOnFile: migrationStatusQuery.data.cardOnFile || null,
+      }
+    : { hasCardOnFile: false, tierHasStripePrice: true, cardOnFile: null };
 
   useEffect(() => {
     const handleBillingUpdate = (event: CustomEvent<{
@@ -114,10 +92,8 @@ export function useMemberBilling(
     }>) => {
       const detail = event.detail;
       if (detail.memberEmail?.toLowerCase() === memberEmail.toLowerCase() ||
-          (billingInfo?.stripeCustomerId && detail.customerId === billingInfo.stripeCustomerId)) {
-        // eslint-disable-next-line no-console
-        console.log('[MemberBillingTab] Received billing update for this member, refreshing:', detail.action);
-        fetchBillingInfo();
+          (billingQuery.data?.stripeCustomerId && detail.customerId === billingQuery.data.stripeCustomerId)) {
+        invalidateBilling();
       }
     };
 
@@ -125,107 +101,69 @@ export function useMemberBilling(
     return () => {
       window.removeEventListener('billing-update', handleBillingUpdate as EventListener);
     };
-  }, [memberEmail, billingInfo?.stripeCustomerId, fetchBillingInfo]);
+  }, [memberEmail, billingQuery.data?.stripeCustomerId, invalidateBilling]);
 
-  useEffect(() => {
-    if (billingInfo?.billingProvider === 'mindbody') {
-      const fetchMigrationStatus = async () => {
-        try {
-          const res = await fetch(`/api/member-billing/${encodeURIComponent(memberEmail)}/migration-status`, {
-            credentials: 'include',
-          });
-          if (res.ok) {
-            const data = await res.json();
-            setMigrationEligibility({
-              hasCardOnFile: data.hasCardOnFile || false,
-              tierHasStripePrice: data.tierHasStripePrice || false,
-              cardOnFile: data.cardOnFile || null,
-            });
-          }
-        } catch (err: unknown) {
-          console.error('[MemberBilling] Error fetching migration status:', err);
-        }
-      };
-      fetchMigrationStatus();
-    }
-  }, [billingInfo?.billingProvider, memberEmail]);
+  const couponsQuery = useQuery({
+    queryKey: ['stripe-coupons-for-subscription'],
+    queryFn: () => fetchWithCredentials<{ coupons: CouponOption[] }>('/api/stripe/coupons'),
+    enabled: showCreateSubscriptionModal,
+  });
 
-  const handleInitiateMigration = async (billingStartDate: string) => {
-    setIsMigrationLoading(true);
-    try {
-      const res = await fetch(`/api/member-billing/${encodeURIComponent(memberEmail)}/migrate-to-stripe`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ billingStartDate, confirmedMindBodyCancelled: true }),
-      });
-      if (res.ok) {
-        setShowMigrationDialog(false);
-        fetchBillingInfo();
-        onMemberUpdated?.();
-        showSuccess('Migration initiated successfully');
-        setTimeout(() => onDrawerClose?.(), 600);
-      } else {
-        showError(await extractApiError(res, 'initiate migration'));
-      }
-    } catch (_err: unknown) {
-      showError(getNetworkErrorMessage());
-    } finally {
-      setIsMigrationLoading(false);
-    }
-  };
+  const initiateMigrationMutation = useMutation({
+    mutationFn: (billingStartDate: string) =>
+      postWithCredentials<Record<string, unknown>>(`/api/member-billing/${encodeURIComponent(memberEmail)}/migrate-to-stripe`, {
+        billingStartDate,
+        confirmedMindBodyCancelled: true,
+      }),
+    onSuccess: () => {
+      setShowMigrationDialog(false);
+      invalidateBilling();
+      onMemberUpdated?.();
+      showSuccess('Migration initiated successfully');
+      setTimeout(() => onDrawerClose?.(), 600);
+    },
+    onError: (err: Error) => {
+      showError(err.message || 'Failed to initiate migration');
+    },
+  });
 
-  const handleCancelMigration = async () => {
-    setIsMigrationLoading(true);
-    try {
-      const res = await fetch(`/api/member-billing/${encodeURIComponent(memberEmail)}/cancel-migration`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-      });
-      if (res.ok) {
-        fetchBillingInfo();
-        onMemberUpdated?.();
-        showSuccess('Migration cancelled');
-        setTimeout(() => onDrawerClose?.(), 600);
-      } else {
-        showError(await extractApiError(res, 'cancel migration'));
-      }
-    } catch (_err: unknown) {
-      showError(getNetworkErrorMessage());
-    } finally {
-      setIsMigrationLoading(false);
-    }
-  };
+  const cancelMigrationMutation = useMutation({
+    mutationFn: () =>
+      postWithCredentials<Record<string, unknown>>(`/api/member-billing/${encodeURIComponent(memberEmail)}/cancel-migration`, {}),
+    onSuccess: () => {
+      invalidateBilling();
+      onMemberUpdated?.();
+      showSuccess('Migration cancelled');
+      setTimeout(() => onDrawerClose?.(), 600);
+    },
+    onError: (err: Error) => {
+      showError(err.message || 'Failed to cancel migration');
+    },
+  });
 
-  const handleManualTierSave = async () => {
-    if (!memberEmail) return;
-    
-    setIsSavingTier(true);
-    try {
-      const res = await fetch(`/api/members/${encodeURIComponent(memberEmail)}/tier`, {
+  const manualTierSaveMutation = useMutation({
+    mutationFn: (tier: string) =>
+      fetchWithCredentials<Record<string, unknown>>(`/api/members/${encodeURIComponent(memberEmail)}/tier`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ tier: manualTier })
-      });
-      
-      if (!res.ok) {
-        showError(await extractApiError(res, 'update tier'));
-      } else {
-        setIsEditingTier(false);
-        if (onTierUpdate) onTierUpdate(manualTier);
-        fetchBillingInfo();
-        onMemberUpdated?.();
-        showSuccess('Membership level updated');
-        setTimeout(() => onDrawerClose?.(), 600);
-      }
-    } catch (err: unknown) {
-      console.error('Error updating tier:', err);
-      showError(getNetworkErrorMessage());
-    } finally {
-      setIsSavingTier(false);
-    }
+        body: JSON.stringify({ tier }),
+      }),
+    onSuccess: () => {
+      setIsEditingTier(false);
+      if (onTierUpdate) onTierUpdate(manualTier);
+      invalidateBilling();
+      onMemberUpdated?.();
+      showSuccess('Membership level updated');
+      setTimeout(() => onDrawerClose?.(), 600);
+    },
+    onError: (err: Error) => {
+      showError(err.message || 'Failed to update tier');
+    },
+  });
+
+  const handleManualTierSave = () => {
+    if (!memberEmail) return;
+    manualTierSaveMutation.mutate(manualTier);
   };
 
   const requestBillingSourceChange = (newSource: string) => {
@@ -233,168 +171,105 @@ export function useMemberBilling(
     setShowBillingSourceModal(true);
   };
 
-  const handleConfirmBillingSource = async () => {
-    setIsUpdatingSource(true);
-    showError(null);
-    try {
-      const res = await fetch(`/api/member-billing/${encodeURIComponent(memberEmail)}/source`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ billingProvider: pendingBillingSource || null }),
-      });
-      if (res.ok) {
-        await fetchBillingInfo();
-        onMemberUpdated?.();
-        setShowBillingSourceModal(false);
-        setPendingBillingSource('');
-        showSuccess('Billing source updated');
-        setTimeout(() => onDrawerClose?.(), 600);
-      } else {
-        showError(getApiErrorMessage(res, 'update billing source'));
-      }
-    } catch (_err: unknown) {
-      showError(getNetworkErrorMessage());
-    } finally {
-      setIsUpdatingSource(false);
-    }
+  const confirmBillingSourceMutation = useMutation({
+    mutationFn: (billingProvider: string) =>
+      putWithCredentials<Record<string, unknown>>(`/api/member-billing/${encodeURIComponent(memberEmail)}/source`, {
+        billingProvider: billingProvider || null,
+      }),
+    onSuccess: () => {
+      invalidateBilling();
+      onMemberUpdated?.();
+      setShowBillingSourceModal(false);
+      setPendingBillingSource('');
+      showSuccess('Billing source updated');
+      setTimeout(() => onDrawerClose?.(), 600);
+    },
+    onError: (err: Error) => {
+      showError(err.message || 'Failed to update billing source');
+    },
+  });
+
+  const handleConfirmBillingSource = () => {
+    confirmBillingSourceMutation.mutate(pendingBillingSource);
   };
 
-  const handlePauseSubscription = async (durationDays: 30 | 60) => {
-    setIsPausing(true);
-    showError(null);
-    try {
-      const res = await fetch(`/api/member-billing/${encodeURIComponent(memberEmail)}/pause`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ durationDays }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        await fetchBillingInfo();
-        onMemberUpdated?.();
-        setShowPauseModal(false);
-        const resumeDate = new Date(data.resumeDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'America/Los_Angeles' });
-        showSuccess(`Subscription paused for ${durationDays} days. Billing resumes on ${resumeDate}.`);
-        setTimeout(() => onDrawerClose?.(), 600);
-      } else {
-        showError(getApiErrorMessage(res, 'pause subscription'));
-      }
-    } catch (_err: unknown) {
-      showError(getNetworkErrorMessage());
-    } finally {
-      setIsPausing(false);
-    }
-  };
+  const pauseSubscriptionMutation = useMutation({
+    mutationFn: (durationDays: 30 | 60) =>
+      postWithCredentials<{ resumeDate: string }>(`/api/member-billing/${encodeURIComponent(memberEmail)}/pause`, { durationDays }),
+    onSuccess: (data, durationDays) => {
+      invalidateBilling();
+      onMemberUpdated?.();
+      setShowPauseModal(false);
+      const resumeDate = new Date(data.resumeDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'America/Los_Angeles' });
+      showSuccess(`Subscription paused for ${durationDays} days. Billing resumes on ${resumeDate}.`);
+      setTimeout(() => onDrawerClose?.(), 600);
+    },
+    onError: (err: Error) => {
+      showError(err.message || 'Failed to pause subscription');
+    },
+  });
 
-  const handleResumeSubscription = async () => {
-    setIsResuming(true);
-    showError(null);
-    try {
-      const res = await fetch(`/api/member-billing/${encodeURIComponent(memberEmail)}/resume`, {
-        method: 'POST',
-        credentials: 'include',
-      });
-      if (res.ok) {
-        await fetchBillingInfo();
-        onMemberUpdated?.();
-        setShowResumeModal(false);
-        showSuccess('Subscription resumed');
-        setTimeout(() => onDrawerClose?.(), 600);
-      } else {
-        showError(getApiErrorMessage(res, 'resume subscription'));
-      }
-    } catch (_err: unknown) {
-      showError(getNetworkErrorMessage());
-    } finally {
-      setIsResuming(false);
-    }
-  };
+  const resumeSubscriptionMutation = useMutation({
+    mutationFn: () =>
+      postWithCredentials<Record<string, unknown>>(`/api/member-billing/${encodeURIComponent(memberEmail)}/resume`, {}),
+    onSuccess: () => {
+      invalidateBilling();
+      onMemberUpdated?.();
+      setShowResumeModal(false);
+      showSuccess('Subscription resumed');
+      setTimeout(() => onDrawerClose?.(), 600);
+    },
+    onError: (err: Error) => {
+      showError(err.message || 'Failed to resume subscription');
+    },
+  });
 
-  const handleCancelSubscription = async () => {
-    setIsCanceling(true);
-    showError(null);
-    try {
-      const res = await fetch(`/api/member-billing/${encodeURIComponent(memberEmail)}/cancel`, {
-        method: 'POST',
-        credentials: 'include',
-      });
-      if (res.ok) {
-        await fetchBillingInfo();
-        onMemberUpdated?.();
-        setShowCancelModal(false);
-        showSuccess('Subscription will be canceled at period end');
-        setTimeout(() => onDrawerClose?.(), 600);
-      } else {
-        showError(getApiErrorMessage(res, 'cancel subscription'));
-      }
-    } catch (_err: unknown) {
-      showError(getNetworkErrorMessage());
-    } finally {
-      setIsCanceling(false);
-    }
-  };
+  const cancelSubscriptionMutation = useMutation({
+    mutationFn: () =>
+      postWithCredentials<Record<string, unknown>>(`/api/member-billing/${encodeURIComponent(memberEmail)}/cancel`, {}),
+    onSuccess: () => {
+      invalidateBilling();
+      onMemberUpdated?.();
+      setShowCancelModal(false);
+      showSuccess('Subscription will be canceled at period end');
+      setTimeout(() => onDrawerClose?.(), 600);
+    },
+    onError: (err: Error) => {
+      showError(err.message || 'Failed to cancel subscription');
+    },
+  });
 
-  const handleApplyCredit = async (amountCents: number, description: string) => {
-    setIsApplyingCredit(true);
-    showError(null);
-    try {
-      const res = await fetch(`/api/member-billing/${encodeURIComponent(memberEmail)}/credit`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ amountCents, description }),
-      });
-      if (res.ok) {
-        await fetchBillingInfo();
-        setShowCreditModal(false);
-        showSuccess(`Credit of $${(amountCents / 100).toFixed(2)} applied`);
-      } else {
-        showError(getApiErrorMessage(res, 'apply credit'));
-      }
-    } catch (_err: unknown) {
-      showError(getNetworkErrorMessage());
-    } finally {
-      setIsApplyingCredit(false);
-    }
-  };
+  const applyCreditMutation = useMutation({
+    mutationFn: ({ amountCents, description }: { amountCents: number; description: string }) =>
+      postWithCredentials<Record<string, unknown>>(`/api/member-billing/${encodeURIComponent(memberEmail)}/credit`, { amountCents, description }),
+    onSuccess: (_data, variables) => {
+      invalidateBilling();
+      setShowCreditModal(false);
+      showSuccess(`Credit of $${(variables.amountCents / 100).toFixed(2)} applied`);
+    },
+    onError: (err: Error) => {
+      showError(err.message || 'Failed to apply credit');
+    },
+  });
 
-  const handleApplyDiscount = async (percentOff: number, duration: string) => {
-    setIsApplyingDiscount(true);
-    showError(null);
-    try {
-      const res = await fetch(`/api/member-billing/${encodeURIComponent(memberEmail)}/discount`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ percentOff, duration }),
-      });
-      if (res.ok) {
-        await fetchBillingInfo();
-        setShowDiscountModal(false);
-        showSuccess(`${percentOff}% discount applied`);
-      } else {
-        showError(getApiErrorMessage(res, 'apply discount'));
-      }
-    } catch (_err: unknown) {
-      showError(getNetworkErrorMessage());
-    } finally {
-      setIsApplyingDiscount(false);
-    }
-  };
+  const applyDiscountMutation = useMutation({
+    mutationFn: ({ percentOff, duration }: { percentOff: number; duration: string }) =>
+      postWithCredentials<Record<string, unknown>>(`/api/member-billing/${encodeURIComponent(memberEmail)}/discount`, { percentOff, duration }),
+    onSuccess: (_data, variables) => {
+      invalidateBilling();
+      setShowDiscountModal(false);
+      showSuccess(`${variables.percentOff}% discount applied`);
+    },
+    onError: (err: Error) => {
+      showError(err.message || 'Failed to apply discount');
+    },
+  });
 
-  const handleGetPaymentLink = async () => {
-    setIsGettingPaymentLink(true);
-    showError(null);
-    const linkWindow = window.open('about:blank', '_blank');
-    try {
-      const res = await fetch(`/api/member-billing/${encodeURIComponent(memberEmail)}/payment-link`, {
-        method: 'POST',
-        credentials: 'include',
-      });
-      if (res.ok) {
-        const data = await res.json();
+  const getPaymentLinkMutation = useMutation({
+    mutationFn: async () => {
+      const linkWindow = window.open('about:blank', '_blank');
+      try {
+        const data = await postWithCredentials<{ url?: string }>(`/api/member-billing/${encodeURIComponent(memberEmail)}/payment-link`, {});
         if (data.url) {
           if (linkWindow) {
             linkWindow.location.href = data.url;
@@ -403,33 +278,23 @@ export function useMemberBilling(
           }
         } else {
           linkWindow?.close();
-          showError('No payment link URL returned');
+          throw new Error('No payment link URL returned');
         }
-      } else {
+      } catch (err) {
         linkWindow?.close();
-        showError(getApiErrorMessage(res, 'get payment link'));
+        throw err;
       }
-    } catch (_err: unknown) {
-      linkWindow?.close();
-      showError(getNetworkErrorMessage());
-    } finally {
-      setIsGettingPaymentLink(false);
-    }
-  };
+    },
+    onError: (err: Error) => {
+      showError(err.message || 'Failed to get payment link');
+    },
+  });
 
-  const handleOpenBillingPortal = async () => {
-    setIsOpeningBillingPortal(true);
-    showError(null);
-    const portalWindow = window.open('about:blank', '_blank');
-    try {
-      const res = await fetch('/api/my/billing/portal', {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: memberEmail }),
-      });
-      if (res.ok) {
-        const data = await res.json();
+  const openBillingPortalMutation = useMutation({
+    mutationFn: async () => {
+      const portalWindow = window.open('about:blank', '_blank');
+      try {
+        const data = await postWithCredentials<{ url?: string }>('/api/my/billing/portal', { email: memberEmail });
         if (data.url) {
           if (portalWindow) {
             portalWindow.location.href = data.url;
@@ -438,73 +303,59 @@ export function useMemberBilling(
           }
         } else {
           portalWindow?.close();
-          showError('No billing portal URL returned');
+          throw new Error('No billing portal URL returned');
         }
-      } else {
+      } catch (err) {
         portalWindow?.close();
-        showError(getApiErrorMessage(res, 'open billing portal'));
+        throw err;
       }
-    } catch (_err: unknown) {
-      portalWindow?.close();
-      showError(getNetworkErrorMessage());
-    } finally {
-      setIsOpeningBillingPortal(false);
-    }
-  };
+    },
+    onError: (err: Error) => {
+      showError(err.message || 'Failed to open billing portal');
+    },
+  });
 
-  const handleSendActivationEmail = async () => {
-    if (!memberEmail) return;
-    setIsSendingActivation(true);
-    showError(null);
-    try {
-      const subId = billingInfo?.activeSubscription?.status === 'incomplete' ? billingInfo.activeSubscription.id : undefined;
-      const res = await fetch('/api/stripe/staff/send-reactivation-link', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ memberEmail, subscriptionId: subId }),
+  const sendActivationEmailMutation = useMutation({
+    mutationFn: () => {
+      const subId = billingQuery.data?.activeSubscription?.status === 'incomplete' ? billingQuery.data.activeSubscription.id : undefined;
+      return postWithCredentials<Record<string, unknown>>('/api/stripe/staff/send-reactivation-link', {
+        memberEmail,
+        subscriptionId: subId,
       });
-      const data = await res.json();
-      if (!res.ok) {
-        showError(data.error || 'Failed to send activation email');
-      } else {
-        showSuccess('Activation email sent!');
-      }
-    } catch (_err: unknown) {
-      showError(getNetworkErrorMessage());
-    } finally {
-      setIsSendingActivation(false);
-    }
+    },
+    onSuccess: () => {
+      showSuccess('Activation email sent!');
+    },
+    onError: (err: Error) => {
+      showError(err.message || 'Failed to send activation email');
+    },
+  });
+
+  const handleSendActivationEmail = () => {
+    if (!memberEmail) return;
+    sendActivationEmailMutation.mutate();
   };
 
   const handleCopyActivationLink = async () => {
     if (!memberEmail) return;
-    showError(null);
     try {
-      const subId = billingInfo?.activeSubscription?.status === 'incomplete' ? billingInfo.activeSubscription.id : undefined;
+      const subId = billingQuery.data?.activeSubscription?.status === 'incomplete' ? billingQuery.data.activeSubscription.id : undefined;
       let url: string | null = null;
 
       if (subId) {
-        const invoiceRes = await fetch(`/api/stripe/subscriptions/invoice-link/${subId}?memberEmail=${encodeURIComponent(memberEmail)}`, {
-          credentials: 'include',
-        });
-        if (invoiceRes.ok) {
-          const invoiceData = await invoiceRes.json();
+        try {
+          const invoiceData = await fetchWithCredentials<{ url?: string }>(
+            `/api/stripe/subscriptions/invoice-link/${subId}?memberEmail=${encodeURIComponent(memberEmail)}`
+          );
           url = invoiceData.url || null;
+        } catch {
+          /* continue */
         }
       }
 
       if (!url) {
-        const res = await fetch('/api/my/billing/portal', {
-          method: 'POST',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: memberEmail }),
-        });
-        if (res.ok) {
-          const data = await res.json();
-          url = data.url || null;
-        }
+        const data = await postWithCredentials<{ url?: string }>('/api/my/billing/portal', { email: memberEmail });
+        url = data.url || null;
       }
 
       if (url) {
@@ -513,229 +364,150 @@ export function useMemberBilling(
       } else {
         showError('Could not generate activation link');
       }
-    } catch (_err: unknown) {
-      showError(getNetworkErrorMessage());
+    } catch {
+      showError('Network error. Please check your connection.');
     }
   };
 
-  const handleSyncToStripe = async () => {
-    setIsSyncingToStripe(true);
-    showError(null);
-    try {
-      const res = await fetch(`/api/member-billing/${encodeURIComponent(memberEmail)}/sync-stripe`, {
-        method: 'POST',
-        credentials: 'include',
-      });
-      if (res.ok) {
-        const data = await res.json();
-        await fetchBillingInfo();
-        onMemberUpdated?.();
-        showSuccess(data.created ? 'Created new Stripe customer' : 'Linked existing Stripe customer');
-      } else {
-        showError(getApiErrorMessage(res, 'sync to Stripe'));
-      }
-    } catch (_err: unknown) {
-      showError(getNetworkErrorMessage());
-    } finally {
-      setIsSyncingToStripe(false);
-    }
-  };
-
-  const handleSyncStripeData = async () => {
-    setIsSyncingStripeData(true);
-    showError(null);
-    const results: string[] = [];
-    
-    try {
-      try {
-        const metaRes = await fetch(`/api/member-billing/${encodeURIComponent(memberEmail)}/sync-metadata`, {
-          method: 'POST',
-          credentials: 'include',
-        });
-        if (metaRes.ok) {
-          results.push('Metadata synced');
-        }
-      } catch (_e: unknown) { /* continue */ }
-      
-      try {
-        const tierRes = await fetch(`/api/member-billing/${encodeURIComponent(memberEmail)}/sync-tier-from-stripe`, {
-          method: 'POST',
-          credentials: 'include',
-        });
-        if (tierRes.ok) {
-          const data = await tierRes.json();
-          if (data.previousTier !== data.newTier) {
-            results.push(`Tier: ${data.previousTier || 'none'} → ${data.newTier}`);
-          } else {
-            results.push(`Tier: ${data.newTier}`);
-          }
-        }
-      } catch (_e: unknown) { /* continue */ }
-      
-      try {
-        const cacheRes = await fetch(`/api/member-billing/${encodeURIComponent(memberEmail)}/backfill-cache`, {
-          method: 'POST',
-          credentials: 'include',
-        });
-        if (cacheRes.ok) {
-          const data = await cacheRes.json();
-          results.push(`${data.transactionCount || 0} transactions cached`);
-        }
-      } catch (_e: unknown) { /* continue */ }
-      
-      await fetchBillingInfo();
+  const syncToStripeMutation = useMutation({
+    mutationFn: () =>
+      postWithCredentials<{ created?: boolean }>(`/api/member-billing/${encodeURIComponent(memberEmail)}/sync-stripe`, {}),
+    onSuccess: (data) => {
+      invalidateBilling();
       onMemberUpdated?.();
-      
+      showSuccess(data.created ? 'Created new Stripe customer' : 'Linked existing Stripe customer');
+    },
+    onError: (err: Error) => {
+      showError(err.message || 'Failed to sync to Stripe');
+    },
+  });
+
+  const syncStripeDataMutation = useMutation({
+    mutationFn: async () => {
+      const results: string[] = [];
+
+      try {
+        await postWithCredentials<Record<string, unknown>>(`/api/member-billing/${encodeURIComponent(memberEmail)}/sync-metadata`, {});
+        results.push('Metadata synced');
+      } catch { /* continue */ }
+
+      try {
+        const data = await postWithCredentials<{ previousTier?: string; newTier?: string }>(`/api/member-billing/${encodeURIComponent(memberEmail)}/sync-tier-from-stripe`, {});
+        if (data.previousTier !== data.newTier) {
+          results.push(`Tier: ${data.previousTier || 'none'} → ${data.newTier}`);
+        } else {
+          results.push(`Tier: ${data.newTier}`);
+        }
+      } catch { /* continue */ }
+
+      try {
+        const data = await postWithCredentials<{ transactionCount?: number }>(`/api/member-billing/${encodeURIComponent(memberEmail)}/backfill-cache`, {});
+        results.push(`${data.transactionCount || 0} transactions cached`);
+      } catch { /* continue */ }
+
+      return results;
+    },
+    onSuccess: (results) => {
+      invalidateBilling();
+      onMemberUpdated?.();
       if (results.length > 0) {
         showSuccess(`Stripe sync complete: ${results.join(', ')}`);
       } else {
         showError('Sync completed but no changes were made');
       }
-    } catch (_err: unknown) {
-      showError(getNetworkErrorMessage());
-    } finally {
-      setIsSyncingStripeData(false);
-    }
-  };
+    },
+    onError: (err: Error) => {
+      showError(err.message || 'Failed to sync Stripe data');
+    },
+  });
 
-  const handleCreateSubscription = async () => {
+  const createSubscriptionMutation = useMutation({
+    mutationFn: () =>
+      postWithCredentials<{ message?: string; memberStatus?: string }>('/api/stripe/subscriptions/create-for-member', {
+        memberEmail,
+        tierName: selectedSubscriptionTier,
+        couponId: selectedCoupon || undefined,
+      }),
+    onSuccess: (data) => {
+      invalidateBilling();
+      onMemberUpdated?.();
+      setShowCreateSubscriptionModal(false);
+      setSelectedSubscriptionTier('');
+      setSelectedCoupon('');
+      showSuccess(data.message || 'Subscription created successfully');
+      if (data.memberStatus === 'active') {
+        setTimeout(() => onDrawerClose?.(), 600);
+      }
+    },
+    onError: (err: Error) => {
+      showError(err.message || 'Failed to create subscription');
+    },
+  });
+
+  const handleCreateSubscription = () => {
     if (!selectedSubscriptionTier) {
       showError('Please select a membership tier');
       return;
     }
-    
-    setIsCreatingSubscription(true);
-    showError(null);
-    
-    try {
-      const res = await fetch('/api/stripe/subscriptions/create-for-member', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          memberEmail,
-          tierName: selectedSubscriptionTier,
-          couponId: selectedCoupon || undefined
-        })
-      });
-      
-      if (res.ok) {
-        const data = await res.json();
-        await fetchBillingInfo();
-        onMemberUpdated?.();
-        setShowCreateSubscriptionModal(false);
-        setSelectedSubscriptionTier('');
-        setSelectedCoupon('');
-        showSuccess(data.message || 'Subscription created successfully');
-        if (data.memberStatus === 'active') {
-          setTimeout(() => onDrawerClose?.(), 600);
-        }
-      } else {
-        try {
-          const errorData = await res.json();
-          showError(errorData.error || getApiErrorMessage(res, 'create subscription'));
-        } catch {
-          showError(getApiErrorMessage(res, 'create subscription'));
-        }
-      }
-    } catch (_err: unknown) {
-      showError(getNetworkErrorMessage());
-    } finally {
-      setIsCreatingSubscription(false);
-    }
+    createSubscriptionMutation.mutate();
   };
 
-  const handleOpenCreateSubscription = async () => {
+  const handleOpenCreateSubscription = () => {
     setShowCreateSubscriptionModal(true);
-    setIsLoadingCoupons(true);
-    try {
-      const res = await fetch('/api/stripe/coupons', { credentials: 'include' });
-      if (res.ok) {
-        const data = await res.json();
-        setAvailableCoupons(data.coupons || []);
-      }
-    } catch (err: unknown) {
-      console.error('Failed to load coupons:', err);
-      showError('Failed to load available coupons');
-    } finally {
-      setIsLoadingCoupons(false);
-    }
   };
 
   const handleOpenCollectPayment = () => {
-    const amount = billingInfo?.activeSubscription?.planAmount || 0;
+    const amount = billingQuery.data?.activeSubscription?.planAmount || 0;
     setCollectPaymentAmount(amount);
-    showError(null);
     setShowCollectPayment(true);
   };
 
-  const handleChargeCard = async () => {
-    setIsChargingCard(true);
-    showError(null);
-    try {
-      const res = await fetch('/api/stripe/staff/charge-subscription-invoice', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          subscriptionId: billingInfo?.activeSubscription!.id,
-          userId: memberId
-        })
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        showError(data.error || 'Failed to charge card');
-        return;
-      }
+  const chargeCardMutation = useMutation({
+    mutationFn: () =>
+      postWithCredentials<{ error?: string }>('/api/stripe/staff/charge-subscription-invoice', {
+        subscriptionId: billingQuery.data?.activeSubscription!.id,
+        userId: memberId,
+      }),
+    onSuccess: () => {
       showSuccess('Payment received! Membership activated.');
       setShowCollectPayment(false);
       setCollectPaymentMode('terminal');
-      fetchBillingInfo();
+      invalidateBilling();
       onMemberUpdated?.();
-    } catch (err: unknown) {
-      showError((err instanceof Error ? err.message : String(err)) || 'Failed to charge card');
-    } finally {
-      setIsChargingCard(false);
-    }
-  };
+    },
+    onError: (err: Error) => {
+      showError(err.message || 'Failed to charge card');
+    },
+  });
 
-  const handleTerminalPaymentSuccess = async (piId: string) => {
-    try {
-      const confirmRes = await fetch('/api/stripe/terminal/confirm-subscription-payment', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          paymentIntentId: piId,
-          subscriptionId: billingInfo?.activeSubscription!.id,
-          userId: memberId || null,
-          invoiceId: null
-        })
-      });
-      if (!confirmRes.ok) {
-        const data = await confirmRes.json();
-        showError(data.error || 'Failed to confirm payment');
-        return;
-      }
-      const confirmData = await confirmRes.json();
-      if (confirmData.cardSaveWarning) {
-        showSuccess(`Payment received! Membership activated. Note: ${confirmData.cardSaveWarning}`);
+  const terminalPaymentMutation = useMutation({
+    mutationFn: (piId: string) =>
+      postWithCredentials<{ cardSaveWarning?: string }>('/api/stripe/terminal/confirm-subscription-payment', {
+        paymentIntentId: piId,
+        subscriptionId: billingQuery.data?.activeSubscription!.id,
+        userId: memberId || null,
+        invoiceId: null,
+      }),
+    onSuccess: (data) => {
+      if (data.cardSaveWarning) {
+        showSuccess(`Payment received! Membership activated. Note: ${data.cardSaveWarning}`);
       } else {
         showSuccess('Payment received! Membership activated.');
       }
       setShowCollectPayment(false);
       setCollectPaymentMode('terminal');
-      fetchBillingInfo();
+      invalidateBilling();
       onMemberUpdated?.();
-    } catch (err: unknown) {
-      showError((err instanceof Error ? err.message : String(err)) || 'Failed to confirm payment');
-    }
-  };
+    },
+    onError: (err: Error) => {
+      showError(err.message || 'Failed to confirm payment');
+    },
+  });
 
   const handleUpdateCardSuccess = () => {
     showSuccess('Payment method updated successfully!');
     setShowUpdateCardTerminal(false);
-    fetchBillingInfo();
+    invalidateBilling();
     onMemberUpdated?.();
   };
 
@@ -745,20 +517,20 @@ export function useMemberBilling(
   };
 
   return {
-    billingInfo,
-    isLoading,
-    outstandingData,
+    billingInfo: billingQuery.data ?? null,
+    isLoading: billingQuery.isLoading,
+    outstandingData: outstandingQuery.data ?? null,
     migrationEligibility,
 
     isEditingTier,
     setIsEditingTier,
     manualTier,
     setManualTier,
-    isSavingTier,
+    isSavingTier: manualTierSaveMutation.isPending,
     VALID_TIERS,
     handleManualTierSave,
 
-    isUpdatingSource,
+    isUpdatingSource: confirmBillingSourceMutation.isPending,
     requestBillingSourceChange,
     handleConfirmBillingSource,
     showBillingSourceModal,
@@ -768,20 +540,20 @@ export function useMemberBilling(
     showResumeModal,
     setShowResumeModal,
 
-    isPausing,
-    isResuming,
-    isCanceling,
-    isApplyingCredit,
-    isApplyingDiscount,
-    isGettingPaymentLink,
-    isOpeningBillingPortal,
-    isSyncingToStripe,
-    isSyncingStripeData,
-    isSendingActivation,
-    isCreatingSubscription,
-    isLoadingCoupons,
-    isChargingCard,
-    isMigrationLoading,
+    isPausing: pauseSubscriptionMutation.isPending,
+    isResuming: resumeSubscriptionMutation.isPending,
+    isCanceling: cancelSubscriptionMutation.isPending,
+    isApplyingCredit: applyCreditMutation.isPending,
+    isApplyingDiscount: applyDiscountMutation.isPending,
+    isGettingPaymentLink: getPaymentLinkMutation.isPending,
+    isOpeningBillingPortal: openBillingPortalMutation.isPending,
+    isSyncingToStripe: syncToStripeMutation.isPending,
+    isSyncingStripeData: syncStripeDataMutation.isPending,
+    isSendingActivation: sendActivationEmailMutation.isPending,
+    isCreatingSubscription: createSubscriptionMutation.isPending,
+    isLoadingCoupons: couponsQuery.isLoading && showCreateSubscriptionModal,
+    isChargingCard: chargeCardMutation.isPending,
+    isMigrationLoading: initiateMigrationMutation.isPending || cancelMigrationMutation.isPending,
 
     showCreditModal,
     setShowCreditModal,
@@ -809,30 +581,30 @@ export function useMemberBilling(
     setSelectedSubscriptionTier,
     selectedCoupon,
     setSelectedCoupon,
-    availableCoupons,
+    availableCoupons: couponsQuery.data?.coupons ?? [],
 
-    handlePauseSubscription,
-    handleResumeSubscription,
-    handleCancelSubscription,
-    handleApplyCredit,
-    handleApplyDiscount,
-    handleGetPaymentLink,
-    handleOpenBillingPortal,
+    handlePauseSubscription: (durationDays: 30 | 60) => pauseSubscriptionMutation.mutate(durationDays),
+    handleResumeSubscription: () => resumeSubscriptionMutation.mutate(),
+    handleCancelSubscription: () => cancelSubscriptionMutation.mutate(),
+    handleApplyCredit: (amountCents: number, description: string) => applyCreditMutation.mutate({ amountCents, description }),
+    handleApplyDiscount: (percentOff: number, duration: string) => applyDiscountMutation.mutate({ percentOff, duration }),
+    handleGetPaymentLink: () => getPaymentLinkMutation.mutate(),
+    handleOpenBillingPortal: () => openBillingPortalMutation.mutate(),
     handleSendActivationEmail,
     handleCopyActivationLink,
-    handleSyncToStripe,
-    handleSyncStripeData,
+    handleSyncToStripe: () => syncToStripeMutation.mutate(),
+    handleSyncStripeData: () => syncStripeDataMutation.mutate(),
     handleCreateSubscription,
     handleOpenCreateSubscription,
     handleOpenCollectPayment,
-    handleChargeCard,
-    handleTerminalPaymentSuccess,
-    handleInitiateMigration,
-    handleCancelMigration,
+    handleChargeCard: () => chargeCardMutation.mutate(),
+    handleTerminalPaymentSuccess: (piId: string) => terminalPaymentMutation.mutate(piId),
+    handleInitiateMigration: (billingStartDate: string) => initiateMigrationMutation.mutate(billingStartDate),
+    handleCancelMigration: () => cancelMigrationMutation.mutate(),
     handleUpdateCardSuccess,
     handleUpdateCardError,
 
-    fetchBillingInfo,
+    fetchBillingInfo: invalidateBilling,
     showSuccess,
     showError,
   };

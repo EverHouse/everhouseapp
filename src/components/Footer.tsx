@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import Logo from './Logo';
 import { APP_VERSION, formatLastUpdated } from '../config/version';
+import { fetchWithCredentials } from '../hooks/queries/useFetch';
 
 const FALLBACK: Record<string, string> = {
   'contact.address_line1': '15771 Red Hill Ave, Ste 500',
@@ -20,9 +21,8 @@ function usePublicSettings() {
   const [settings, setSettings] = useState<Record<string, string>>(FALLBACK);
 
   useEffect(() => {
-    fetch('/api/settings/public')
-      .then(r => r.ok ? r.json() : Promise.reject())
-      .then((data: Record<string, string>) => setSettings(prev => ({ ...prev, ...data })))
+    fetchWithCredentials<Record<string, string>>('/api/settings/public')
+      .then((data) => setSettings(prev => ({ ...prev, ...data })))
       .catch((err: unknown) => console.warn('[Footer] Failed to fetch public settings:', err));
   }, []);
 

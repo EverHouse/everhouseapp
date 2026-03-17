@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import TierBadge from '../TierBadge';
 import { MemberSearchInput, SelectedMember } from '../shared/MemberSearchInput';
 import { useToast } from '../Toast';
 import { getApiErrorMessage, getNetworkErrorMessage } from '../../utils/errorHandling';
+import { fetchWithCredentials, postWithCredentials, putWithCredentials, deleteWithCredentials } from '../../hooks/queries/useFetch';
 
 interface FamilyMemberInfo {
   id: number;
@@ -87,19 +89,14 @@ const GroupBillingManager: React.FC<GroupBillingManagerProps> = ({ memberEmail }
     setIsLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/group-billing/group/${encodeURIComponent(memberEmail)}`, {
-        credentials: 'include',
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setFamilyGroup(data);
-      } else if (res.status === 404) {
+      const data = await fetchWithCredentials<FamilyGroupData>(`/api/group-billing/group/${encodeURIComponent(memberEmail)}`);
+      setFamilyGroup(data);
+    } catch (err: unknown) {
+      if (err instanceof Error && err.message.includes('404')) {
         setFamilyGroup(null);
       } else {
-        setError(getApiErrorMessage(res, 'load billing group'));
+        setError(getNetworkErrorMessage());
       }
-    } catch (_err: unknown) {
-      setError(getNetworkErrorMessage());
     } finally {
       setIsLoading(false);
     }
@@ -107,11 +104,8 @@ const GroupBillingManager: React.FC<GroupBillingManagerProps> = ({ memberEmail }
 
   const fetchProducts = useCallback(async () => {
     try {
-      const res = await fetch('/api/group-billing/products', { credentials: 'include' });
-      if (res.ok) {
-        const data = await res.json();
-        setProducts(data);
-      }
+      const data = await fetchWithCredentials<FamilyAddOnProduct[]>('/api/group-billing/products');
+      setProducts(data);
     } catch (err: unknown) {
       console.error('Failed to fetch group billing products', err);
     }
@@ -126,32 +120,52 @@ const GroupBillingManager: React.FC<GroupBillingManagerProps> = ({ memberEmail }
     showToast(message, 'success');
   };
 
+  const createGroupMutation = useMutation({
+    mutationFn: (body: { primaryEmail: string; groupName?: string }) =>
+      postWithCredentials<Record<string, unknown>>('/api/group-billing/groups', body),
+  });
+
+  const addMemberMutation = useMutation({
+    mutationFn: (args: { groupId: number; body: Record<string, unknown> }) =>
+      postWithCredentials<Record<string, unknown>>(`/api/group-billing/groups/${args.groupId}/members`, args.body),
+  });
+
+  const removeMemberMutation = useMutation({
+    mutationFn: (memberId: number) =>
+      deleteWithCredentials<Record<string, unknown>>(`/api/group-billing/members/${memberId}`),
+  });
+
+  const addCorporateMemberMutation = useMutation({
+    mutationFn: (args: { groupId: number; body: Record<string, unknown> }) =>
+      postWithCredentials<Record<string, unknown>>(`/api/group-billing/groups/${args.groupId}/corporate-members`, args.body),
+  });
+
+  const updateGroupNameMutation = useMutation({
+    mutationFn: (args: { groupId: number; groupName: string | null }) =>
+      putWithCredentials<Record<string, unknown>>(`/api/group-billing/group/${args.groupId}/name`, { groupName: args.groupName }),
+  });
+
+  const deleteGroupMutation = useMutation({
+    mutationFn: (groupId: number) =>
+      deleteWithCredentials<Record<string, unknown>>(`/api/group-billing/group/${groupId}`),
+  });
+
   const handleCreateGroup = async () => {
     setIsCreatingGroup(true);
     setError(null);
-    try {
-      const res = await fetch('/api/group-billing/groups', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          primaryEmail: memberEmail,
-          groupName: groupName.trim() || undefined,
-        }),
-      });
-      if (res.ok) {
-        await fetchFamilyGroup();
-        setShowCreateForm(false);
-        setGroupName('');
-        showSuccess('Billing group created successfully');
-      } else {
-        setError(getApiErrorMessage(res, 'create billing group'));
+    createGroupMutation.mutate(
+      { primaryEmail: memberEmail, groupName: groupName.trim() || undefined },
+      {
+        onSuccess: async () => {
+          await fetchFamilyGroup();
+          setShowCreateForm(false);
+          setGroupName('');
+          showSuccess('Billing group created successfully');
+        },
+        onError: () => setError(getNetworkErrorMessage()),
+        onSettled: () => setIsCreatingGroup(false),
       }
-    } catch (_err: unknown) {
-      setError(getNetworkErrorMessage());
-    } finally {
-      setIsCreatingGroup(false);
-    }
+    );
   };
 
   const handleAddMember = async () => {
@@ -159,53 +173,41 @@ const GroupBillingManager: React.FC<GroupBillingManagerProps> = ({ memberEmail }
 
     setIsAddingMember(true);
     setError(null);
-    try {
-      const res = await fetch(`/api/group-billing/groups/${familyGroup.id}/members`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
+    addMemberMutation.mutate(
+      {
+        groupId: familyGroup.id,
+        body: {
           memberEmail: selectedNewMember.email,
           memberTier: selectedTier,
           relationship: selectedRelationship || undefined,
-        }),
-      });
-      if (res.ok) {
-        await fetchFamilyGroup();
-        setShowAddMemberForm(false);
-        setSelectedNewMember(null);
-        setSelectedTier('');
-        setSelectedRelationship('');
-        showSuccess('Group member added successfully');
-      } else {
-        setError(getApiErrorMessage(res, 'add group member'));
+        },
+      },
+      {
+        onSuccess: async () => {
+          await fetchFamilyGroup();
+          setShowAddMemberForm(false);
+          setSelectedNewMember(null);
+          setSelectedTier('');
+          setSelectedRelationship('');
+          showSuccess('Group member added successfully');
+        },
+        onError: () => setError(getNetworkErrorMessage()),
+        onSettled: () => setIsAddingMember(false),
       }
-    } catch (_err: unknown) {
-      setError(getNetworkErrorMessage());
-    } finally {
-      setIsAddingMember(false);
-    }
+    );
   };
 
   const handleRemoveMember = async (memberId: number) => {
     setRemovingMemberId(memberId);
     setError(null);
-    try {
-      const res = await fetch(`/api/group-billing/members/${memberId}`, {
-        method: 'DELETE',
-        credentials: 'include',
-      });
-      if (res.ok) {
+    removeMemberMutation.mutate(memberId, {
+      onSuccess: async () => {
         await fetchFamilyGroup();
         showSuccess('Group member removed');
-      } else {
-        setError(getApiErrorMessage(res, 'remove group member'));
-      }
-    } catch (_err: unknown) {
-      setError(getNetworkErrorMessage());
-    } finally {
-      setRemovingMemberId(null);
-    }
+      },
+      onError: () => setError(getNetworkErrorMessage()),
+      onSettled: () => setRemovingMemberId(null),
+    });
   };
 
   const handleAddCorporateMember = async () => {
@@ -213,36 +215,32 @@ const GroupBillingManager: React.FC<GroupBillingManagerProps> = ({ memberEmail }
     
     setIsAddingMember(true);
     setError(null);
-    try {
-      const res = await fetch(`/api/group-billing/groups/${familyGroup.id}/corporate-members`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ 
+    addCorporateMemberMutation.mutate(
+      {
+        groupId: familyGroup.id,
+        body: {
           email: corporateEmail.trim(),
           firstName: corporateFirstName.trim() || undefined,
           lastName: corporateLastName.trim() || undefined,
           phone: corporatePhone.trim() || undefined,
           dob: corporateDob || undefined,
-        }),
-      });
-      if (res.ok) {
-        await fetchFamilyGroup();
-        setShowAddMemberForm(false);
-        setCorporateEmail('');
-        setCorporateFirstName('');
-        setCorporateLastName('');
-        setCorporatePhone('');
-        setCorporateDob('');
-        showSuccess('Team member added successfully');
-      } else {
-        setError(getApiErrorMessage(res, 'add team member'));
+        },
+      },
+      {
+        onSuccess: async () => {
+          await fetchFamilyGroup();
+          setShowAddMemberForm(false);
+          setCorporateEmail('');
+          setCorporateFirstName('');
+          setCorporateLastName('');
+          setCorporatePhone('');
+          setCorporateDob('');
+          showSuccess('Team member added successfully');
+        },
+        onError: () => setError(getNetworkErrorMessage()),
+        onSettled: () => setIsAddingMember(false),
       }
-    } catch (_err: unknown) {
-      setError(getNetworkErrorMessage());
-    } finally {
-      setIsAddingMember(false);
-    }
+    );
   };
 
   const handleUpdateGroupName = async () => {
@@ -250,26 +248,19 @@ const GroupBillingManager: React.FC<GroupBillingManagerProps> = ({ memberEmail }
     
     setIsSavingGroupName(true);
     setError(null);
-    try {
-      const res = await fetch(`/api/group-billing/group/${familyGroup.id}/name`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ groupName: editedGroupName.trim() || null }),
-      });
-      if (res.ok) {
-        await fetchFamilyGroup();
-        setIsEditingGroupName(false);
-        setEditedGroupName('');
-        showSuccess('Group name updated');
-      } else {
-        setError(getApiErrorMessage(res, 'update group name'));
+    updateGroupNameMutation.mutate(
+      { groupId: familyGroup.id, groupName: editedGroupName.trim() || null },
+      {
+        onSuccess: async () => {
+          await fetchFamilyGroup();
+          setIsEditingGroupName(false);
+          setEditedGroupName('');
+          showSuccess('Group name updated');
+        },
+        onError: () => setError(getNetworkErrorMessage()),
+        onSettled: () => setIsSavingGroupName(false),
       }
-    } catch (_err: unknown) {
-      setError(getNetworkErrorMessage());
-    } finally {
-      setIsSavingGroupName(false);
-    }
+    );
   };
 
   const handleDeleteGroup = async () => {
@@ -277,23 +268,15 @@ const GroupBillingManager: React.FC<GroupBillingManagerProps> = ({ memberEmail }
     
     setIsDeletingGroup(true);
     setError(null);
-    try {
-      const res = await fetch(`/api/group-billing/group/${familyGroup.id}`, {
-        method: 'DELETE',
-        credentials: 'include',
-      });
-      if (res.ok) {
+    deleteGroupMutation.mutate(familyGroup.id, {
+      onSuccess: () => {
         setFamilyGroup(null);
         setShowDeleteConfirm(false);
         showSuccess('Billing group deleted');
-      } else {
-        setError(getApiErrorMessage(res, 'delete billing group'));
-      }
-    } catch (_err: unknown) {
-      setError(getNetworkErrorMessage());
-    } finally {
-      setIsDeletingGroup(false);
-    }
+      },
+      onError: () => setError(getNetworkErrorMessage()),
+      onSettled: () => setIsDeletingGroup(false),
+    });
   };
 
   const formatCurrency = (cents: number) => {

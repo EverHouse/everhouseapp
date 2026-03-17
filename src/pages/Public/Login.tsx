@@ -8,6 +8,9 @@ import WalkingGolferSpinner from '../../components/WalkingGolferSpinner';
 import GoogleSignInButton from '../../components/GoogleSignInButton';
 import AppleSignInButton from '../../components/AppleSignInButton';
 import { startAuthentication, WebAuthnAbortService } from '@simplewebauthn/browser';
+import type { PublicKeyCredentialRequestOptionsJSON } from '@simplewebauthn/types';
+import { fetchWithCredentials, postWithCredentials, isAbortError } from '../../hooks/queries/useFetch';
+import type { MemberProfile } from '../../types/data';
 
 const Spinner = () => (
   <WalkingGolferSpinner size="sm" variant="light" />
@@ -83,14 +86,7 @@ const Login: React.FC = () => {
             && await PublicKeyCredential.isConditionalMediationAvailable();
           if (!available) return;
 
-          const optionsRes = await fetch('/api/auth/passkey/authenticate/options', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-          });
-          if (!optionsRes.ok) return;
-
-          const options = await optionsRes.json();
+          const options = await postWithCredentials<PublicKeyCredentialRequestOptionsJSON>('/api/auth/passkey/authenticate/options', {});
           conditionalActiveRef.current = true;
 
           const authResponse = await startAuthentication({
@@ -100,14 +96,7 @@ const Login: React.FC = () => {
 
           conditionalActiveRef.current = false;
           setPasskeyLoading(true);
-          const verifyRes = await fetch('/api/auth/passkey/authenticate/verify', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(authResponse),
-            credentials: 'include',
-          });
-          const data = await verifyRes.json();
-          if (!verifyRes.ok) throw new Error(data.error || 'Passkey authentication failed');
+          const data = await postWithCredentials<{ member: MemberProfile }>('/api/auth/passkey/authenticate/verify', authResponse);
 
           loginWithMember(data.member);
           const isStaff = data.member.role === 'admin' || data.member.role === 'staff';
@@ -138,31 +127,10 @@ const Login: React.FC = () => {
     setError('');
 
     try {
-      const optionsRes = await fetch('/api/auth/passkey/authenticate/options', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-      });
-
-      if (!optionsRes.ok) {
-        throw new Error('Failed to start passkey authentication');
-      }
-
-      const options = await optionsRes.json();
+      const options = await postWithCredentials<PublicKeyCredentialRequestOptionsJSON>('/api/auth/passkey/authenticate/options', {});
       const authResponse = await startAuthentication({ optionsJSON: options });
 
-      const verifyRes = await fetch('/api/auth/passkey/authenticate/verify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(authResponse),
-        credentials: 'include',
-      });
-
-      const data = await verifyRes.json();
-
-      if (!verifyRes.ok) {
-        throw new Error(data.error || 'Passkey authentication failed');
-      }
+      const data = await postWithCredentials<{ member: MemberProfile }>('/api/auth/passkey/authenticate/verify', authResponse);
 
       loginWithMember(data.member);
       const isStaff = data.member.role === 'admin' || data.member.role === 'staff';
@@ -185,18 +153,7 @@ const Login: React.FC = () => {
     setError('');
     
     try {
-      const res = await fetch('/api/auth/google/verify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ credential }),
-        credentials: 'include'
-      });
-      
-      const data = await res.json();
-      
-      if (!res.ok) {
-        throw new Error(data.error || 'Google sign-in failed');
-      }
+      const data = await postWithCredentials<{ member: MemberProfile }>('/api/auth/google/verify', { credential });
       
       loginWithMember(data.member);
       
@@ -215,18 +172,7 @@ const Login: React.FC = () => {
     setError('');
     
     try {
-      const res = await fetch('/api/auth/apple/verify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ identityToken: data.identityToken, user: data.user }),
-        credentials: 'include'
-      });
-      
-      const responseData = await res.json();
-      
-      if (!res.ok) {
-        throw new Error(responseData.error || 'Apple sign-in failed');
-      }
+      const responseData = await postWithCredentials<{ member: MemberProfile }>('/api/auth/apple/verify', { identityToken: data.identityToken, user: data.user });
       
       loginWithMember(responseData.member);
       
@@ -245,17 +191,17 @@ const Login: React.FC = () => {
     
     setCheckingEmail(true);
     try {
-      const res = await fetch(`/api/auth/check-staff-admin?email=${encodeURIComponent(emailToCheck)}`, { signal });
-      if (res.ok) {
-        const data = await res.json();
-        setIsStaffOrAdmin(data.isStaffOrAdmin);
-        setHasPassword(data.hasPassword);
-        if (data.isStaffOrAdmin && data.hasPassword) {
-          setShowPasswordField(true);
-        }
+      const data = await fetchWithCredentials<{ isStaffOrAdmin: boolean; hasPassword: boolean }>(
+        `/api/auth/check-staff-admin?email=${encodeURIComponent(emailToCheck)}`,
+        { signal }
+      );
+      setIsStaffOrAdmin(data.isStaffOrAdmin);
+      setHasPassword(data.hasPassword);
+      if (data.isStaffOrAdmin && data.hasPassword) {
+        setShowPasswordField(true);
       }
     } catch (err: unknown) {
-      if (err instanceof DOMException && err.name === 'AbortError') return;
+      if (isAbortError(err)) return;
       console.error('Failed to check staff/admin status');
     } finally {
       setCheckingEmail(false);
@@ -290,19 +236,7 @@ const Login: React.FC = () => {
     setError('');
     
     try {
-      const res = await fetch('/api/auth/dev-login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(email ? { email } : {}),
-        credentials: 'include'
-      });
-      
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || 'Dev login failed');
-      }
-      
-      const { member } = await res.json();
+      const { member } = await postWithCredentials<{ member: MemberProfile }>('/api/auth/dev-login', email ? { email } : {});
       loginWithMember(member);
       startNavigation();
       navigate(member.role === 'admin' || member.role === 'staff' ? '/admin' : '/dashboard');
@@ -320,18 +254,7 @@ const Login: React.FC = () => {
     setError('');
     
     try {
-      const res = await fetch('/api/auth/password-login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-        credentials: 'include'
-      });
-      
-      const data = await res.json();
-      
-      if (!res.ok) {
-        throw new Error(data.error || 'Login failed');
-      }
+      const data = await postWithCredentials<{ member: MemberProfile }>('/api/auth/password-login', { email, password });
       
       loginWithMember(data.member);
       startNavigation();
@@ -349,16 +272,7 @@ const Login: React.FC = () => {
     setError('');
     
     try {
-      const res = await fetch('/api/auth/request-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email })
-      });
-      
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || 'Failed to send login code');
-      }
+      await postWithCredentials('/api/auth/request-otp', { email });
       
       setOtpSent(true);
       setOtpInputs(['', '', '', '', '', '']);
@@ -433,38 +347,7 @@ const Login: React.FC = () => {
     setError('');
     
     try {
-      const res = await fetch('/api/auth/verify-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, code }),
-        credentials: 'include'
-      });
-      
-      const data = await res.json();
-      
-      if (!res.ok) {
-        throw new Error(data.error || 'Invalid code');
-      }
-      
-      // NOTE: Supabase Auth Session Sync for RLS
-      // Since OTP is verified server-side (not via Supabase Auth), we cannot directly
-      // establish a Supabase session here. For RLS on the notifications table to work:
-      // 1. The server would need to generate Supabase access/refresh tokens via Admin API
-      // 2. The server would return these tokens in the response
-      // 3. We would call supabase.auth.setSession({ access_token, refresh_token })
-      // 
-      // Current implementation: Supabase Realtime is used for real-time updates without RLS.
-      // If the server returns supabaseSession data in the future, enable the session sync:
-      // if (data.supabaseSession?.access_token && data.supabaseSession?.refresh_token) {
-      //   const { getSupabase } = await import('../../lib/supabase');
-      //   const supabase = getSupabase();
-      //   if (supabase) {
-      //     await supabase.auth.setSession({
-      //       access_token: data.supabaseSession.access_token,
-      //       refresh_token: data.supabaseSession.refresh_token,
-      //     });
-      //   }
-      // }
+      const data = await postWithCredentials<{ member: MemberProfile; shouldSetupPassword?: boolean }>('/api/auth/verify-otp', { email, code });
       
       loginWithMember(data.member);
       

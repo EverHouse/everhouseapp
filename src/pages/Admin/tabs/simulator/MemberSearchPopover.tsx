@@ -4,6 +4,7 @@ import { useToast } from '../../../../components/Toast';
 import { getTodayPacific, formatTime12Hour } from '../../../../utils/dateUtils';
 import { MemberSearchInput, type SelectedMember } from '../../../../components/shared/MemberSearchInput';
 import type { Resource, ManualBookingResult } from './simulatorTypes';
+import { fetchWithCredentials, postWithCredentials } from '../../../../hooks/queries/useFetch';
 
 const ManualBookingModal: React.FC<{
     resources: Resource[];
@@ -73,20 +74,11 @@ const ManualBookingModal: React.FC<{
         lookupTimeoutRef.current = setTimeout(async () => {
             try {
                 const normalizedEmail = memberEmail.toLowerCase().trim();
-                const res = await fetch(`/api/members/${encodeURIComponent(normalizedEmail)}/details`, {
-                    credentials: 'include'
-                });
-                if (res.ok) {
-                    const member = await res.json();
-                    setMemberLookupStatus('found');
-                    setMemberName(member.firstName && member.lastName ? `${member.firstName} ${member.lastName}` : null);
-                    if (member.tier && !memberTier) {
-                        setMemberTier(member.tier);
-                    }
-                } else {
-                    setMemberLookupStatus('not_found');
-                    setMemberName(null);
-                    setMemberTier(null);
+                const member = await fetchWithCredentials<{ firstName?: string; lastName?: string; tier?: string }>(`/api/members/${encodeURIComponent(normalizedEmail)}/details`);
+                setMemberLookupStatus('found');
+                setMemberName(member.firstName && member.lastName ? `${member.firstName} ${member.lastName}` : null);
+                if (member.tier && !memberTier) {
+                    setMemberTier(member.tier);
                 }
             } catch (_err: unknown) {
                 setMemberLookupStatus('not_found');
@@ -113,18 +105,12 @@ const ManualBookingModal: React.FC<{
                 const selectedResource = resources.find(r => r.id === resourceId);
                 const resourceType = selectedResource?.type || 'simulator';
                 
-                const res = await fetch(`/api/bookings/check-existing-staff?member_email=${encodeURIComponent(memberEmail)}&date=${bookingDate}&resource_type=${resourceType}`, {
-                    credentials: 'include'
-                });
-                
-                if (res.ok) {
-                    const data = await res.json();
-                    if (data.hasExisting) {
-                        const typeLabel = resourceType === 'conference_room' ? 'conference room' : 'bay';
-                        setExistingBookingWarning(`This member already has a ${typeLabel} booking on ${bookingDate}`);
-                    } else {
-                        setExistingBookingWarning(null);
-                    }
+                const data = await fetchWithCredentials<{ hasExisting?: boolean }>(`/api/bookings/check-existing-staff?member_email=${encodeURIComponent(memberEmail)}&date=${bookingDate}&resource_type=${resourceType}`);
+                if (data.hasExisting) {
+                    const typeLabel = resourceType === 'conference_room' ? 'conference room' : 'bay';
+                    setExistingBookingWarning(`This member already has a ${typeLabel} booking on ${bookingDate}`);
+                } else {
+                    setExistingBookingWarning(null);
                 }
             } catch (err: unknown) {
                 console.error('Failed to check existing bookings:', err);
@@ -152,56 +138,45 @@ const ManualBookingModal: React.FC<{
         setError(null);
 
         try {
-            const res = await fetch('/api/staff/bookings/manual', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify({
-                    member_email: memberEmail.toLowerCase().trim(),
-                    resource_id: resourceId,
-                    booking_date: bookingDate,
-                    start_time: startTime,
-                    duration_minutes: durationMinutes,
-                    guest_count: guestCount,
-                    booking_source: bookingSource,
-                    notes: notes || undefined,
-                    staff_notes: staffNotes || undefined,
-                    trackman_booking_id: trackmanBookingId || undefined
-                })
+            const data = await postWithCredentials<{ id?: number; booking?: { id?: number } }>('/api/staff/bookings/manual', {
+                member_email: memberEmail.toLowerCase().trim(),
+                resource_id: resourceId,
+                booking_date: bookingDate,
+                start_time: startTime,
+                duration_minutes: durationMinutes,
+                guest_count: guestCount,
+                booking_source: bookingSource,
+                notes: notes || undefined,
+                staff_notes: staffNotes || undefined,
+                trackman_booking_id: trackmanBookingId || undefined
             });
 
-            if (res.ok) {
-                const data = await res.json();
-                showToast('Booking created successfully!', 'success');
-                
-                const selectedResource = resources.find(r => r.id === resourceId);
-                const endTimeCalc = (() => {
-                    const [h, m] = startTime.split(':').map(Number);
-                    const totalMins = h * 60 + m + durationMinutes;
-                    const endHour = Math.floor(totalMins / 60) % 24;
-                    return `${endHour.toString().padStart(2, '0')}:${(totalMins % 60).toString().padStart(2, '0')}`;
-                })();
-                
-                const bookingResult: ManualBookingResult = {
-                    id: data.id || data.booking?.id || Date.now(),
-                    user_email: memberEmail.toLowerCase().trim(),
-                    user_name: memberName,
-                    resource_id: resourceId as number,
-                    bay_name: selectedResource?.name || null,
-                    request_date: bookingDate,
-                    start_time: startTime,
-                    end_time: endTimeCalc,
-                    duration_minutes: durationMinutes,
-                    status: 'confirmed',
-                    notes: notes || null,
-                    staff_notes: staffNotes || null
-                };
-                
-                onSuccess(bookingResult);
-            } else {
-                const data = await res.json();
-                setError(data.message || data.error || 'Failed to create booking');
-            }
+            showToast('Booking created successfully!', 'success');
+            
+            const selectedResource = resources.find(r => r.id === resourceId);
+            const endTimeCalc = (() => {
+                const [h, m] = startTime.split(':').map(Number);
+                const totalMins = h * 60 + m + durationMinutes;
+                const endHour = Math.floor(totalMins / 60) % 24;
+                return `${endHour.toString().padStart(2, '0')}:${(totalMins % 60).toString().padStart(2, '0')}`;
+            })();
+            
+            const bookingResult: ManualBookingResult = {
+                id: data.id || data.booking?.id || Date.now(),
+                user_email: memberEmail.toLowerCase().trim(),
+                user_name: memberName,
+                resource_id: resourceId as number,
+                bay_name: selectedResource?.name || null,
+                request_date: bookingDate,
+                start_time: startTime,
+                end_time: endTimeCalc,
+                duration_minutes: durationMinutes,
+                status: 'confirmed',
+                notes: notes || null,
+                staff_notes: staffNotes || null
+            };
+            
+            onSuccess(bookingResult);
         } catch (_err: unknown) {
             setError('Network error. Please try again.');
         } finally {

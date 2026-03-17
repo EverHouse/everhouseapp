@@ -8,6 +8,7 @@ import {
   EMAIL_REGEX,
   getStripePromise,
 } from './newUserTypes';
+import { fetchWithCredentials, postWithCredentials } from '../../../../hooks/queries/useFetch';
 import { SuccessStep } from './SuccessStep';
 import { PreviewStep } from './PreviewStep';
 import { PaymentStep } from './PaymentStep';
@@ -89,19 +90,14 @@ export function MemberFlow({
 
       if (subscriptionId && createdUserId && !form.joinExistingGroup) {
         try {
-          const refreshRes = await fetch(`/api/stripe/subscriptions/refresh-intent/${subscriptionId}`, {
-            credentials: 'include'
-          });
-          if (refreshRes.ok) {
-            const refreshData = await refreshRes.json();
-            if (refreshData.clientSecret && !refreshData.clientSecret.startsWith('seti_')) {
-              setClientSecret(refreshData.clientSecret);
-              const piId = refreshData.clientSecret.split('_secret_')[0];
-              if (piId) setPaymentIntentId(piId);
-            }
-            setStripeLoading(false);
-            return;
+          const refreshData = await fetchWithCredentials<{ clientSecret?: string }>(`/api/stripe/subscriptions/refresh-intent/${subscriptionId}`);
+          if (refreshData.clientSecret && !refreshData.clientSecret.startsWith('seti_')) {
+            setClientSecret(refreshData.clientSecret);
+            const piId = refreshData.clientSecret.split('_secret_')[0];
+            if (piId) setPaymentIntentId(piId);
           }
+          setStripeLoading(false);
+          return;
         } catch (_resuseErr) {
           // intentionally empty
         }
@@ -110,36 +106,25 @@ export function MemberFlow({
       if (form.joinExistingGroup && form.existingGroupId) {
         const discountedPrice = Math.round(selectedTier.priceCents * 0.8);
         
-        const res = await fetch('/api/stripe/staff/quick-charge', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({
-            memberEmail: form.email,
-            memberName: `${form.firstName} ${form.lastName}`,
-            amountCents: discountedPrice,
-            description: `${selectedTier.name} Membership (Group Add-on)`,
-            isNewCustomer: true,
-            firstName: form.firstName,
-            lastName: form.lastName,
-            phone: form.phone,
-            dob: form.dob || undefined,
-            tierSlug: selectedTier.slug,
-            tierName: selectedTier.name,
-            createUser: true,
-            streetAddress: form.streetAddress || undefined,
-            city: form.city || undefined,
-            state: form.state || undefined,
-            zipCode: form.zipCode || undefined,
-          })
+        const data = await postWithCredentials<{ clientSecret: string; paymentIntentId: string }>('/api/stripe/staff/quick-charge', {
+          memberEmail: form.email,
+          memberName: `${form.firstName} ${form.lastName}`,
+          amountCents: discountedPrice,
+          description: `${selectedTier.name} Membership (Group Add-on)`,
+          isNewCustomer: true,
+          firstName: form.firstName,
+          lastName: form.lastName,
+          phone: form.phone,
+          dob: form.dob || undefined,
+          tierSlug: selectedTier.slug,
+          tierName: selectedTier.name,
+          createUser: true,
+          streetAddress: form.streetAddress || undefined,
+          city: form.city || undefined,
+          state: form.state || undefined,
+          zipCode: form.zipCode || undefined,
         });
 
-        if (!res.ok) {
-          const data = await res.json();
-          throw new Error(data.error || 'Failed to create payment');
-        }
-
-        const data = await res.json();
         setClientSecret(data.clientSecret);
         setPaymentIntentId(data.paymentIntentId);
       } else {
@@ -181,15 +166,10 @@ export function MemberFlow({
           showToast('Membership activated — no payment required (100% discount).', 'success');
           
           if (scannedIdImage && data.userId) {
-            fetch('/api/admin/save-id-image', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              credentials: 'include',
-              body: JSON.stringify({
-                userId: data.userId,
-                image: scannedIdImage.base64,
-                mimeType: scannedIdImage.mimeType,
-              }),
+            postWithCredentials('/api/admin/save-id-image', {
+              userId: data.userId,
+              image: scannedIdImage.base64,
+              mimeType: scannedIdImage.mimeType,
             }).catch(err => console.error('Failed to save ID image:', err));
           }
           
@@ -225,12 +205,7 @@ export function MemberFlow({
     
     try {
       if (form.joinExistingGroup && form.existingGroupId && selectedTier) {
-        await fetch('/api/stripe/staff/quick-charge/confirm', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ paymentIntentId: paymentIntentIdResult })
-        });
+        await postWithCredentials('/api/stripe/staff/quick-charge/confirm', { paymentIntentId: paymentIntentIdResult });
         
         try {
           const endpoint = form.existingGroupType === 'corporate'
@@ -255,140 +230,88 @@ export function MemberFlow({
                 dob: form.dob
               };
           
-          const groupRes = await fetch(endpoint, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify(payload)
-          });
-          
-          if (!groupRes.ok) {
-            const groupData = await groupRes.json();
-            console.error('Failed to add member to group:', groupData.error);
-            showToast('Payment received but failed to add to group. Contact support.', 'error');
-          } else {
-            showToast('Payment received! Member added to billing group.', 'success');
-          }
+          await postWithCredentials(endpoint, payload);
+          showToast('Payment received! Member added to billing group.', 'success');
         } catch (groupErr: unknown) {
           console.error('Error adding member to group:', groupErr);
           showToast('Payment received but failed to add to group. Contact support.', 'error');
         }
       } else {
-        const confirmRes = await fetch('/api/stripe/subscriptions/confirm-inline-payment', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ 
+        try {
+          await postWithCredentials('/api/stripe/subscriptions/confirm-inline-payment', { 
             paymentIntentId: paymentIntentIdResult,
             subscriptionId,
             userId: createdUserId
-          })
-        });
-        
-        if (!confirmRes.ok) {
-          const confirmData = await confirmRes.json();
-          console.error('Payment confirmation failed:', confirmData.error);
-          showToast('Payment received but activation failed. Contact support.', 'error');
-        } else {
+          });
+          
           showToast('Payment received! Membership activated.', 'success');
 
           if (scannedIdImage && createdUserId) {
-            fetch('/api/admin/save-id-image', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              credentials: 'include',
-              body: JSON.stringify({
-                userId: createdUserId,
-                image: scannedIdImage.base64,
-                mimeType: scannedIdImage.mimeType,
-              }),
+            postWithCredentials('/api/admin/save-id-image', {
+              userId: createdUserId,
+              image: scannedIdImage.base64,
+              mimeType: scannedIdImage.mimeType,
             }).catch(err => console.error('Failed to save ID image:', err));
           }
           
           if (form.addGroupMembers && form.groupMembers.length > 0) {
             try {
-              const groupCreateRes = await fetch('/api/family-billing/groups', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify({
-                  primaryEmail: form.email,
-                  groupName: `${form.firstName} ${form.lastName} Family`
-                })
+              const groupCreateData = await postWithCredentials<{ groupId: string }>('/api/family-billing/groups', {
+                primaryEmail: form.email,
+                groupName: `${form.firstName} ${form.lastName} Family`
               });
 
-              if (!groupCreateRes.ok) {
-                const groupCreateData = await groupCreateRes.json();
-                console.error('Failed to create family billing group:', groupCreateData.error);
-                showToast('Membership activated but failed to create family group. You can set this up manually.', 'warning');
-              } else {
-                const groupCreateData = await groupCreateRes.json();
-                const groupId = groupCreateData.groupId;
-                let addedCount = 0;
-                let failedCount = 0;
+              const groupId = groupCreateData.groupId;
+              let addedCount = 0;
+              let failedCount = 0;
 
-                for (let i = 0; i < form.groupMembers.length; i++) {
-                  const member = form.groupMembers[i];
-                  try {
-                    const memberTierSlug = tiers.find(t => t.id === member.tierId)?.slug || selectedTier?.slug;
-                    const addMemberRes = await fetch(`/api/family-billing/groups/${groupId}/members`, {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      credentials: 'include',
-                      body: JSON.stringify({
-                        memberEmail: member.email,
-                        memberTier: memberTierSlug,
-                        relationship: 'family',
-                        firstName: member.firstName,
-                        lastName: member.lastName,
-                        phone: member.phone,
-                        dob: member.dob,
-                        streetAddress: member.streetAddress || undefined,
-                        city: member.city || undefined,
-                        state: member.state || undefined,
-                        zipCode: member.zipCode || undefined,
-                      })
-                    });
+              for (let i = 0; i < form.groupMembers.length; i++) {
+                const member = form.groupMembers[i];
+                try {
+                  const memberTierSlug = tiers.find(t => t.id === member.tierId)?.slug || selectedTier?.slug;
+                  const addData = await postWithCredentials<{ memberId?: string }>(`/api/family-billing/groups/${groupId}/members`, {
+                    memberEmail: member.email,
+                    memberTier: memberTierSlug,
+                    relationship: 'family',
+                    firstName: member.firstName,
+                    lastName: member.lastName,
+                    phone: member.phone,
+                    dob: member.dob,
+                    streetAddress: member.streetAddress || undefined,
+                    city: member.city || undefined,
+                    state: member.state || undefined,
+                    zipCode: member.zipCode || undefined,
+                  });
 
-                    if (addMemberRes.ok) {
-                      addedCount++;
-                      const addData = await addMemberRes.json();
-                      if (subMemberScannedIds[i] && addData.memberId) {
-                        fetch('/api/admin/save-id-image', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          credentials: 'include',
-                          body: JSON.stringify({
-                            userId: addData.memberId,
-                            image: subMemberScannedIds[i].base64,
-                            mimeType: subMemberScannedIds[i].mimeType,
-                          }),
-                        }).catch(err => console.error('Failed to save sub-member ID image:', err));
-                      }
-                    } else {
-                      failedCount++;
-                      const addData = await addMemberRes.json();
-                      console.error(`Failed to add group member ${member.email}:`, addData.error);
-                    }
-                  } catch (memberErr: unknown) {
-                    failedCount++;
-                    console.error(`Error adding group member ${member.email}:`, memberErr);
+                  addedCount++;
+                  if (subMemberScannedIds[i] && addData.memberId) {
+                    postWithCredentials('/api/admin/save-id-image', {
+                      userId: addData.memberId,
+                      image: subMemberScannedIds[i].base64,
+                      mimeType: subMemberScannedIds[i].mimeType,
+                    }).catch(err => console.error('Failed to save sub-member ID image:', err));
                   }
+                } catch (memberErr: unknown) {
+                  failedCount++;
+                  console.error(`Error adding group member ${member.email}:`, memberErr);
                 }
+              }
 
-                if (failedCount === 0) {
-                  showToast(`Family group created with ${addedCount} member${addedCount !== 1 ? 's' : ''}.`, 'success');
-                } else if (addedCount > 0) {
-                  showToast(`Family group created. ${addedCount} added, ${failedCount} failed. Check group billing to fix.`, 'warning');
-                } else {
-                  showToast('Family group created but failed to add members. You can add them manually.', 'warning');
-                }
+              if (failedCount === 0) {
+                showToast(`Family group created with ${addedCount} member${addedCount !== 1 ? 's' : ''}.`, 'success');
+              } else if (addedCount > 0) {
+                showToast(`Family group created. ${addedCount} added, ${failedCount} failed. Check group billing to fix.`, 'warning');
+              } else {
+                showToast('Family group created but failed to add members. You can add them manually.', 'warning');
               }
             } catch (groupErr: unknown) {
               console.error('Error creating family group:', groupErr);
               showToast('Membership activated but failed to create family group. You can set this up manually.', 'warning');
             }
           }
+        } catch (confirmErr: unknown) {
+          console.error('Payment confirmation failed:', confirmErr);
+          showToast('Payment received but activation failed. Contact support.', 'error');
         }
       }
 

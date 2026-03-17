@@ -136,11 +136,7 @@ const TiersTab: React.FC = () => {
 
     const { data: stripeConnection } = useQuery({
         queryKey: ['stripe-connection-mode'],
-        queryFn: async () => {
-            const res = await fetch('/api/stripe/debug-connection', { credentials: 'include' });
-            if (!res.ok) return null;
-            return res.json();
-        },
+        queryFn: () => fetchWithCredentials<{ mode?: string }>('/api/stripe/debug-connection').catch(() => null),
         staleTime: 5 * 60 * 1000,
         retry: 1,
     });

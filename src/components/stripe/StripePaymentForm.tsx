@@ -9,6 +9,7 @@ import { loadStripe, Stripe, StripeElementsOptions } from '@stripe/stripe-js';
 import { useTheme } from '../../contexts/ThemeContext';
 import { getStripeAppearance } from './stripeAppearance';
 import WalkingGolferSpinner from '../WalkingGolferSpinner';
+import { fetchWithCredentials, postWithCredentials } from '../../hooks/queries/useFetch';
 
 let stripePromise: Promise<Stripe | null> | null = null;
 
@@ -16,11 +17,9 @@ async function getStripePromise(): Promise<Stripe | null> {
   if (stripePromise) return stripePromise;
   
   try {
-    const res = await fetch('/api/stripe/config', { credentials: 'include' });
-    if (!res.ok) return null;
-    const { publishableKey } = await res.json();
-    if (!publishableKey) return null;
-    stripePromise = loadStripe(publishableKey);
+    const data = await fetchWithCredentials<{ publishableKey?: string }>('/api/stripe/config');
+    if (!data.publishableKey) return null;
+    stripePromise = loadStripe(data.publishableKey);
     return stripePromise;
   } catch (err: unknown) {
     console.warn('[StripePaymentForm] Failed to load Stripe config:', err);
@@ -377,29 +376,17 @@ export function StripePaymentForm({
         }
         setStripeInstance(stripe);
 
-        const res = await fetch('/api/stripe/create-payment-intent', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({
-            userId,
-            email: userEmail,
-            memberName,
-            amountCents: Math.round(amount * 100),
-            purpose,
-            description,
-            bookingId,
-            sessionId,
-            participantFees,
-          }),
+        const data = await postWithCredentials<{ paidInFull?: boolean; clientSecret: string; paymentIntentId?: string }>('/api/stripe/create-payment-intent', {
+          userId,
+          email: userEmail,
+          memberName,
+          amountCents: Math.round(amount * 100),
+          purpose,
+          description,
+          bookingId,
+          sessionId,
+          participantFees,
         });
-
-        if (!res.ok) {
-          const data = await res.json();
-          throw new Error(data.error || 'Failed to create payment');
-        }
-
-        const data = await res.json();
         if (data.paidInFull) {
           paymentSucceededRef.current = true;
           setLoading(false);

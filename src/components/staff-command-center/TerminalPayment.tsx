@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
 import WalkingGolferSpinner from '../WalkingGolferSpinner';
+import { fetchWithCredentials, postWithCredentials } from '../../hooks/queries/useFetch';
 
 interface TerminalReader {
   id: string;
@@ -79,12 +80,7 @@ export function TerminalPayment({
       clearPollingRef();
       if (selectedReader) {
         try {
-          await fetch('/api/stripe/terminal/cancel-payment', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({ readerId: selectedReader, paymentIntentId: paymentIntentIdRef.current })
-          });
+          await postWithCredentials('/api/stripe/terminal/cancel-payment', { readerId: selectedReader, paymentIntentId: paymentIntentIdRef.current });
         } catch (err: unknown) {
           console.error('Error canceling on timeout:', err);
         }
@@ -99,11 +95,7 @@ export function TerminalPayment({
   const fetchReaders = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/stripe/terminal/readers', {
-        credentials: 'include'
-      });
-      if (!res.ok) throw new Error('Failed to fetch readers');
-      const data = await res.json();
+      const data = await fetchWithCredentials<{ readers: TerminalReader[] }>('/api/stripe/terminal/readers');
       setReaders(data.readers || []);
       
       const onlineReaders = (data.readers || []).filter((r: TerminalReader) => r.status === 'online');
@@ -131,12 +123,8 @@ export function TerminalPayment({
       if (processingRef.current && selectedReaderRef.current) {
         const readerId = selectedReaderRef.current;
         const piId = paymentIntentIdRef.current;
-        fetch('/api/stripe/terminal/cancel-payment', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ readerId, paymentIntentId: piId })
-        }).catch((err: unknown) => { console.warn('[TerminalPayment] Failed to cancel payment on unmount:', err); });
+        postWithCredentials('/api/stripe/terminal/cancel-payment', { readerId, paymentIntentId: piId })
+          .catch((err: unknown) => { console.warn('[TerminalPayment] Failed to cancel payment on unmount:', err); });
       }
     };
   }, [fetchReaders, clearPollingRef, clearTimeoutRef]);
@@ -144,14 +132,7 @@ export function TerminalPayment({
   const createSimulatedReader = async () => {
     try {
       setCreatingSimulated(true);
-      const res = await fetch('/api/stripe/terminal/create-simulated-reader', {
-        method: 'POST',
-        credentials: 'include'
-      });
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || 'Failed to create simulated reader');
-      }
+      await postWithCredentials('/api/stripe/terminal/create-simulated-reader', {});
       await fetchReaders();
     } catch (err: unknown) {
       console.error('Error creating simulated reader:', err);
@@ -163,11 +144,7 @@ export function TerminalPayment({
 
   const pollPaymentStatus = useCallback(async (piId: string) => {
     try {
-      const res = await fetch(`/api/stripe/terminal/payment-status/${piId}`, {
-        credentials: 'include'
-      });
-      if (!res.ok) return;
-      const data = await res.json();
+      const data = await fetchWithCredentials<{ status: string; lastPaymentError?: { declineCode?: string; message?: string } }>(`/api/stripe/terminal/payment-status/${piId}`);
       
       if (data.status === 'succeeded') {
         clearPollingRef();
@@ -203,29 +180,19 @@ export function TerminalPayment({
 
   const pollSetupStatus = useCallback(async (siId: string) => {
     try {
-      const res = await fetch(`/api/stripe/terminal/setup-status/${siId}`, {
-        credentials: 'include'
-      });
-      if (!res.ok) return;
-      const data = await res.json();
+      const data = await fetchWithCredentials<{ status: string }>(`/api/stripe/terminal/setup-status/${siId}`);
 
       if (data.status === 'succeeded') {
         clearPollingRef();
         clearTimeoutRef();
         processingRef.current = false;
         try {
-          const confirmRes = await fetch('/api/stripe/terminal/confirm-save-card', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({
-              setupIntentId: siId,
-              customerId: paymentMetadata?.customerId,
-              subscriptionId
-            })
+          const confirmData = await postWithCredentials<{ cardSaved?: boolean; error?: string }>('/api/stripe/terminal/confirm-save-card', {
+            setupIntentId: siId,
+            customerId: paymentMetadata?.customerId,
+            subscriptionId
           });
-          const confirmData = await confirmRes.json();
-          if (!confirmRes.ok || !confirmData.cardSaved) {
+          if (!confirmData.cardSaved) {
             setStatus('error');
             setStatusMessage(confirmData.error || 'Card was read but could not be saved. Please try again.');
             setProcessing(false);
@@ -278,64 +245,37 @@ export function TerminalPayment({
     setStatusMessage(isSaveCard ? 'Present card on reader to save...' : 'Waiting for card on reader...');
 
     try {
-      let res: Response;
+      let data: { freeActivation?: boolean; paymentIntentId: string; setupIntentId: string };
 
       if (isSaveCard) {
-        res = await fetch('/api/stripe/terminal/save-card', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({
-            readerId: selectedReader,
-            customerId: paymentMetadata?.customerId,
-            email,
-            userId
-          })
+        data = await postWithCredentials('/api/stripe/terminal/save-card', {
+          readerId: selectedReader,
+          customerId: paymentMetadata?.customerId,
+          email,
+          userId
         });
       } else if (existingPaymentIntentId) {
-        res = await fetch('/api/stripe/terminal/process-existing-payment', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({
-            readerId: selectedReader,
-            paymentIntentId: existingPaymentIntentId
-          })
+        data = await postWithCredentials('/api/stripe/terminal/process-existing-payment', {
+          readerId: selectedReader,
+          paymentIntentId: existingPaymentIntentId
         });
       } else if (subscriptionId) {
-        res = await fetch('/api/stripe/terminal/process-subscription-payment', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({
-            readerId: selectedReader,
-            subscriptionId,
-            userId,
-            email
-          })
+        data = await postWithCredentials('/api/stripe/terminal/process-subscription-payment', {
+          readerId: selectedReader,
+          subscriptionId,
+          userId,
+          email
         });
       } else {
-        res = await fetch('/api/stripe/terminal/process-payment', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({
-            readerId: selectedReader,
-            amount,
-            currency: 'usd',
-            description,
-            metadata: paymentMetadata,
-            cartItems
-          })
+        data = await postWithCredentials('/api/stripe/terminal/process-payment', {
+          readerId: selectedReader,
+          amount,
+          currency: 'usd',
+          description,
+          metadata: paymentMetadata,
+          cartItems
         });
       }
-
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || (isSaveCard ? 'Failed to save card' : 'Failed to process payment'));
-      }
-
-      const data = await res.json();
 
       if (data.freeActivation) {
         setStatus('success');
@@ -386,13 +326,7 @@ export function TerminalPayment({
 
     if (selectedReader && processing) {
       try {
-        const res = await fetch('/api/stripe/terminal/cancel-payment', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ readerId: selectedReader, paymentIntentId })
-        });
-        const data = await res.json();
+        const data = await postWithCredentials<{ alreadySucceeded?: boolean }>('/api/stripe/terminal/cancel-payment', { readerId: selectedReader, paymentIntentId });
 
         if (data.alreadySucceeded) {
           setStatus('success');

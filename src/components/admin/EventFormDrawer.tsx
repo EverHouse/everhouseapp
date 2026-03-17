@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useToast } from '../Toast';
 import { SlideUpDrawer } from '../SlideUpDrawer';
+import { postWithCredentials } from '../../hooks/queries/useFetch';
 
 interface EventFormDrawerProps {
   isOpen: boolean;
@@ -96,17 +97,7 @@ export const EventFormDrawer: React.FC<EventFormDrawerProps> = ({ isOpen, onClos
 
     setSaving(true);
     try {
-      const response = await fetch('/api/events', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        throw new Error(data.error || 'Failed to create event');
-      }
+      await postWithCredentials('/api/events', payload);
 
       showToast('Event created successfully', 'success');
       onSuccess?.();

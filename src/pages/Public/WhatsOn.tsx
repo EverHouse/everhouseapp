@@ -8,6 +8,7 @@ import { useNavigationLoading } from '../../stores/navigationLoadingStore';
 import { formatDateDisplayWithDay } from '../../utils/dateUtils';
 import { AnimatedPage } from '../../components/motion';
 import SEO from '../../components/SEO';
+import { fetchWithCredentials } from '../../hooks/queries/useFetch';
 
 interface Event {
   id: number;
@@ -62,18 +63,16 @@ const WhatsOn: React.FC = () => {
 
   const fetchData = useCallback(async () => {
     try {
-      const [eventsRes, wellnessRes] = await Promise.all([
-        fetch('/api/events?visibility=public'),
-        fetch('/api/wellness-classes?active_only=true')
+      const [eventsData, wellnessData] = await Promise.all([
+        fetchWithCredentials<Omit<Event, 'type'>[]>('/api/events?visibility=public').catch(() => null),
+        fetchWithCredentials<Omit<WellnessClass, 'type'>[]>('/api/wellness-classes?active_only=true').catch(() => null)
       ]);
       
-      if (eventsRes.ok) {
-        const data = await eventsRes.json();
-        setEvents(data.map((e: Record<string, unknown>) => ({ ...e, type: 'event' })));
+      if (eventsData) {
+        setEvents(eventsData.map((e) => ({ ...e, type: 'event' as const })));
       }
-      if (wellnessRes.ok) {
-        const data = await wellnessRes.json();
-        setWellnessClasses(data.map((w: Record<string, unknown>) => ({ ...w, type: 'wellness' })));
+      if (wellnessData) {
+        setWellnessClasses(wellnessData.map((w) => ({ ...w, type: 'wellness' as const })));
       }
     } catch (error: unknown) {
       console.error('Failed to fetch data:', error);

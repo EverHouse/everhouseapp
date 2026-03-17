@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useToast } from '../Toast';
 import { SlideUpDrawer } from '../SlideUpDrawer';
+import { postWithCredentials } from '../../hooks/queries/useFetch';
 
 interface WellnessFormDrawerProps {
   isOpen: boolean;
@@ -102,17 +103,7 @@ export const WellnessFormDrawer: React.FC<WellnessFormDrawerProps> = ({ isOpen, 
         waitlist_enabled: formData.waitlist_enabled || false,
       };
 
-      const response = await fetch('/api/wellness-classes', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        throw new Error(data.error || 'Failed to create wellness');
-      }
+      await postWithCredentials('/api/wellness-classes', payload);
 
       showToast('Wellness created successfully', 'success');
       onSuccess?.();

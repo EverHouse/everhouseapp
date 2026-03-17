@@ -5,7 +5,7 @@ import { formatDateDisplayWithDay } from '../../../../utils/dateUtils';
 import { getApiErrorMessage, getNetworkErrorMessage } from '../../../../utils/errorHandling';
 import { useToast } from '../../../../components/Toast';
 import { SlideUpDrawer } from '../../../../components/SlideUpDrawer';
-import { fetchWithCredentials, deleteWithCredentials } from '../../../../hooks/queries/useFetch';
+import { fetchWithCredentials, deleteWithCredentials, putWithCredentials, postWithCredentials } from '../../../../hooks/queries/useFetch';
 import { EventsTabSkeleton } from '../../../../components/skeletons';
 import { getTodayPacific } from '../../../../utils/dateUtils';
 import { Participant, WellnessClass, WellnessFormData, WELLNESS_CATEGORY_TABS, INITIAL_DISPLAY_COUNT } from './eventsTypes';

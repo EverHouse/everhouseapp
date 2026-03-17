@@ -1,14 +1,20 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAutoAnimate } from '@formkit/auto-animate/react';
 import { useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuthData } from '../../../contexts/DataContext';
 import { usePageReady } from '../../../stores/pageReadyStore';
 import { formatRelativeTime } from '../../../utils/dateUtils';
 import { useNotificationSounds } from '../../../hooks/useNotificationSounds';
-import { useVisibilityAwareInterval } from '../../../hooks/useVisibilityAwareInterval';
 import FloatingActionButton from '../../../components/FloatingActionButton';
 import AnnouncementManager from '../../../components/admin/AnnouncementManager';
 import { AnimatedPage } from '../../../components/motion';
+import {
+    useStaffNotifications,
+    useMarkNotificationRead,
+    useMarkAllNotificationsRead,
+    useDismissAllNotifications,
+} from '../../../hooks/queries/useAdminQueries';
 
 interface StaffNotification {
     id: number;
@@ -23,29 +29,42 @@ interface StaffNotification {
 
 const UpdatesTab: React.FC = () => {
     const navigate = useNavigate();
+    const queryClient = useQueryClient();
     const { setPageReady } = usePageReady();
     const { actualUser } = useAuthData();
     const [notificationsRef] = useAutoAnimate();
     const [activeSubTab, setActiveSubTab] = useState<'alerts' | 'announcements'>('alerts');
-    const [notifications, setNotifications] = useState<StaffNotification[]>([]);
-    const [notificationsLoading, setNotificationsLoading] = useState(true);
-    const [unreadCount, setUnreadCount] = useState(0);
     const [triggerCreateAnnouncement, setTriggerCreateAnnouncement] = useState(0);
     const { processNotifications } = useNotificationSounds(true, actualUser?.email);
 
-    const fetchNotificationsRef = React.useRef<(() => Promise<void>) | null>(null);
+    const { data: notificationsData, isLoading: notificationsLoading } = useStaffNotifications(actualUser?.email, {
+        enabled: !!actualUser?.email,
+    });
+    const markReadMutation = useMarkNotificationRead();
+    const markAllReadMutation = useMarkAllNotificationsRead();
+    const dismissAllMutation = useDismissAllNotifications();
+
+    const notifications = useMemo(() => (notificationsData || []) as unknown as StaffNotification[], [notificationsData]);
+    const unreadCount = useMemo(() => notifications.filter(n => !n.is_read).length, [notifications]);
+
+    useEffect(() => {
+        if (notifications.length > 0) {
+            processNotifications(notifications);
+        }
+    }, [notifications, processNotifications]);
+
+    const refetchNotifications = useCallback(() => {
+        queryClient.invalidateQueries({ queryKey: ['admin', 'staff-notifications'] });
+    }, [queryClient]);
 
     useEffect(() => {
         const handleBookingUpdate = () => {
-            // eslint-disable-next-line no-console
             console.log('[UpdatesTab] Global booking-update event received');
-            if (fetchNotificationsRef.current) {
-                fetchNotificationsRef.current();
-            }
+            refetchNotifications();
         };
         window.addEventListener('booking-update', handleBookingUpdate);
         return () => window.removeEventListener('booking-update', handleBookingUpdate);
-    }, []);
+    }, [refetchNotifications]);
 
     useEffect(() => {
         if (!notificationsLoading) {
@@ -68,35 +87,6 @@ const UpdatesTab: React.FC = () => {
             window.removeEventListener('switch-to-alerts-tab', handleSwitchToAlertsTab);
         };
     }, []);
-
-    const fetchNotifications = useCallback(async () => {
-        if (!actualUser?.email) return;
-        try {
-            const res = await fetch(`/api/notifications?user_email=${encodeURIComponent(actualUser.email)}`, { credentials: 'include' });
-            if (res.ok) {
-                const data = await res.json();
-                setNotifications(data);
-                setUnreadCount(data.filter((n: StaffNotification) => !n.is_read).length);
-                processNotifications(data);
-            }
-        } catch (err: unknown) {
-            console.error('Failed to fetch notifications:', err);
-        } finally {
-            setNotificationsLoading(false);
-        }
-    }, [actualUser?.email, processNotifications]);
-
-    useEffect(() => {
-        fetchNotificationsRef.current = fetchNotifications;
-    }, [fetchNotifications]);
-
-    useEffect(() => {
-        if (actualUser?.email) {
-            fetchNotifications();
-        }
-    }, [actualUser?.email, fetchNotifications]);
-
-    useVisibilityAwareInterval(fetchNotifications, 120000, !!actualUser?.email);
 
     const getStaffNotificationRoute = (notif: StaffNotification): string | null => {
         const routeMap: Record<string, string> = {
@@ -180,25 +170,11 @@ const UpdatesTab: React.FC = () => {
 
     const handleNotificationClick = async (notif: StaffNotification) => {
         if (!notif.is_read) {
-            const snapshot = [...notifications];
-            const prevUnread = unreadCount;
-            
-            setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, is_read: true } : n));
-            setUnreadCount(prev => Math.max(0, prev - 1));
-            
-            try {
-                const res = await fetch(`/api/notifications/${notif.id}/read`, { method: 'PUT', credentials: 'include' });
-                if (res.ok) {
+            markReadMutation.mutate(notif.id, {
+                onSuccess: () => {
                     window.dispatchEvent(new CustomEvent('notifications-read'));
-                } else {
-                    setNotifications(snapshot);
-                    setUnreadCount(prevUnread);
-                }
-            } catch (err: unknown) {
-                console.error('Failed to mark notification as read:', err);
-                setNotifications(snapshot);
-                setUnreadCount(prevUnread);
-            }
+                },
+            });
         }
         
         const route = getStaffNotificationRoute(notif);
@@ -209,59 +185,20 @@ const UpdatesTab: React.FC = () => {
 
     const markAllAsRead = async () => {
         if (!actualUser?.email) return;
-        
-        const snapshot = [...notifications];
-        const prevUnread = unreadCount;
-        
-        setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
-        setUnreadCount(0);
-        
-        try {
-            const res = await fetch('/api/notifications/mark-all-read', {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ user_email: actualUser.email }),
-            });
-            if (res.ok) {
+        markAllReadMutation.mutate(actualUser.email, {
+            onSuccess: () => {
                 window.dispatchEvent(new CustomEvent('notifications-read'));
-            } else {
-                setNotifications(snapshot);
-                setUnreadCount(prevUnread);
-            }
-        } catch (err: unknown) {
-            console.error('Failed to mark all as read:', err);
-            setNotifications(snapshot);
-            setUnreadCount(prevUnread);
-        }
+            },
+        });
     };
 
     const dismissAll = async () => {
         if (!actualUser?.email) return;
-        
-        const snapshot = [...notifications];
-        const prevUnread = unreadCount;
-        
-        setNotifications([]);
-        setUnreadCount(0);
-        
-        try {
-            const res = await fetch('/api/notifications/dismiss-all', {
-                method: 'DELETE',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ user_email: actualUser.email }),
-                credentials: 'include'
-            });
-            if (res.ok) {
+        dismissAllMutation.mutate(actualUser.email, {
+            onSuccess: () => {
                 window.dispatchEvent(new CustomEvent('notifications-read'));
-            } else {
-                setNotifications(snapshot);
-                setUnreadCount(prevUnread);
-            }
-        } catch (err: unknown) {
-            console.error('Failed to dismiss all notifications:', err);
-            setNotifications(snapshot);
-            setUnreadCount(prevUnread);
-        }
+            },
+        });
     };
 
     const renderAlertsTab = () => (

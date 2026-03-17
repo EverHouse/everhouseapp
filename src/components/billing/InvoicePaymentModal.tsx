@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { apiRequest } from '../../lib/apiRequest';
+import { fetchWithCredentials } from '../../hooks/queries/useFetch';
 import {
   Elements,
   PaymentElement,
@@ -26,11 +27,9 @@ async function getStripePromise(): Promise<Stripe | null> {
   if (stripePromise) return stripePromise;
   
   try {
-    const res = await fetch('/api/stripe/config', { credentials: 'include' });
-    if (!res.ok) return null;
-    const { publishableKey } = await res.json();
-    if (!publishableKey) return null;
-    stripePromise = loadStripe(publishableKey);
+    const data = await fetchWithCredentials<{ publishableKey?: string }>('/api/stripe/config');
+    if (!data.publishableKey) return null;
+    stripePromise = loadStripe(data.publishableKey);
     return stripePromise;
   } catch {
     return null;

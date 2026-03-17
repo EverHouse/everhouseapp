@@ -4,6 +4,7 @@ import { StripePaymentForm } from '../../stripe/StripePaymentForm';
 import { TerminalPayment } from '../TerminalPayment';
 import { useToast } from '../../Toast';
 import { BookingStatusDropdown } from '../../BookingStatusDropdown';
+import { postWithCredentials, patchWithCredentials } from '../../../hooks/queries/useFetch';
 
 interface PaymentSummaryBodyProps {
   isConferenceRoom: boolean;
@@ -395,14 +396,8 @@ export function InlinePaymentBody({
             if (paymentIntentId) {
               for (let attempt = 0; attempt < 2; attempt++) {
                 try {
-                  const confirmRes = await fetch('/api/stripe/confirm-payment', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    credentials: 'include',
-                    body: JSON.stringify({ paymentIntentId })
-                  });
-                  if (confirmRes.ok) break;
-                  console.warn(`Confirm-payment attempt ${attempt + 1} returned ${confirmRes.status}`);
+                  await postWithCredentials('/api/stripe/confirm-payment', { paymentIntentId });
+                  break;
                 } catch (err: unknown) {
                   console.error(`Confirm-payment attempt ${attempt + 1} failed:`, err);
                 }
@@ -458,12 +453,7 @@ export function InlinePaymentBody({
           }}
           onSuccess={async (_paymentIntentId) => {
             try {
-              await fetch(`/api/bookings/${bookingId}/payments`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify({ action: 'confirm_all' })
-              });
+              await patchWithCredentials(`/api/bookings/${bookingId}/payments`, { action: 'confirm_all' });
             } catch (err: unknown) {
               console.error('Failed to mark participants as paid after terminal payment:', err);
             }
@@ -520,17 +510,8 @@ export function InlinePaymentBody({
           onClick={async () => {
             setInlinePaymentAction('mark-paid');
             try {
-              const res = await fetch(`/api/bookings/${bookingId}/payments`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify({ action: 'confirm_all' })
-              });
-              if (res.ok) {
-                showToast('Payment confirmed — marked as paid', 'success');
-              } else {
-                showToast('Failed to confirm payment', 'error');
-              }
+              await patchWithCredentials(`/api/bookings/${bookingId}/payments`, { action: 'confirm_all' });
+              showToast('Payment confirmed — marked as paid', 'success');
             } catch (_err: unknown) {
               showToast('Failed to confirm payment', 'error');
             } finally {
@@ -618,18 +599,12 @@ export function InlinePaymentBody({
             onClick={async () => {
               setCancellingPayment(true);
               try {
-                const res = await fetch(`/api/bookings/${bookingId}/payments`, {
-                  method: 'PATCH',
-                  headers: { 'Content-Type': 'application/json' },
-                  credentials: 'include',
-                  body: JSON.stringify({ action: 'cancel_all' })
-                });
-                const data = await res.json();
-                if (res.ok && data.success) {
-                  const msg = data.failedCount > 0
+                const data = await patchWithCredentials<{ success?: boolean; failedCount?: number; cancelledCount?: number; message?: string; error?: string }>(`/api/bookings/${bookingId}/payments`, { action: 'cancel_all' });
+                if (data.success) {
+                  const msg = data.failedCount && data.failedCount > 0
                     ? `${data.cancelledCount} cancelled, ${data.failedCount} failed — check Stripe dashboard`
                     : (data.message || 'Payments cancelled');
-                  showToast(msg, data.failedCount > 0 ? 'warning' : 'success');
+                  showToast(msg, data.failedCount && data.failedCount > 0 ? 'warning' : 'success');
                   handleInlineStripeSuccess();
                 } else {
                   showToast(data.error || 'Failed to cancel payments', 'error');
