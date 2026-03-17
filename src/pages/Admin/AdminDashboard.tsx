@@ -28,7 +28,7 @@ import { StaffNavigationRail } from './layout/StaffNavigationRail';
 import { usePendingCounts } from './layout/hooks/usePendingCounts';
 import { useUnreadNotifications } from './layout/hooks/useUnreadNotifications';
 import { useCommandCenter } from './layout/hooks/useCommandCenter';
-import { fetchWithCredentials, putWithCredentials, postWithCredentials, deleteWithCredentials } from '../../hooks/queries/useFetch';
+import { fetchWithCredentials, putWithCredentials, postWithCredentials, deleteWithCredentials, ApiError } from '../../hooks/queries/useFetch';
 
 // Loading fallback for lazy-loaded tabs - matches app aesthetic
 const TabLoadingFallback = () => (
@@ -545,8 +545,7 @@ const StaffTrainingGuide: React.FC = () => {
             setLastUpdated(data.lastUpdated ?? null);
             setAuthError(false);
         } catch (err: unknown) {
-            const msg = err instanceof Error ? err.message : '';
-            if (msg.includes('401')) {
+            if (err instanceof ApiError && err.status === 401) {
                 setAuthError(true);
             } else {
                 showToast('Failed to load training sections', 'error');

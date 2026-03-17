@@ -5,7 +5,7 @@ import EmptyState from '../../../components/EmptyState';
 import { useToast } from '../../../components/Toast';
 import ModalShell from '../../../components/ModalShell';
 import FloatingActionButton from '../../../components/FloatingActionButton';
-import { fetchWithCredentials, postWithCredentials, putWithCredentials, deleteWithCredentials } from '../../../hooks/queries/useFetch';
+import { fetchWithCredentials, postWithCredentials, putWithCredentials, deleteWithCredentials, ApiError } from '../../../hooks/queries/useFetch';
 
 interface Resource {
   id: number;
@@ -106,8 +106,7 @@ const AvailabilityBlocksContent: React.FC = () => {
         } catch (err: unknown) {
             if (err instanceof DOMException && err.name === 'AbortError') return;
             console.error('Failed to fetch blocks:', err);
-            const msg = err instanceof Error ? err.message : '';
-            if (msg.includes('401')) {
+            if (err instanceof ApiError && err.status === 401) {
                 setError('Session expired. Please refresh the page to log in again.');
             } else {
                 setError('Failed to fetch availability blocks. Try refreshing the page.');

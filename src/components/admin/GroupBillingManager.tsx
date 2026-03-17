@@ -92,7 +92,7 @@ const GroupBillingManager: React.FC<GroupBillingManagerProps> = ({ memberEmail }
       const data = await fetchWithCredentials<FamilyGroupData>(`/api/group-billing/group/${encodeURIComponent(memberEmail)}`);
       setFamilyGroup(data);
     } catch (err: unknown) {
-      if ((err instanceof ApiError && err.status === 404) || (err instanceof Error && err.message.includes('404'))) {
+      if (err instanceof ApiError && err.status === 404) {
         setFamilyGroup(null);
       } else {
         setError(getNetworkErrorMessage());

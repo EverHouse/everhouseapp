@@ -13,6 +13,8 @@ export const changelog: ChangelogEntry[] = [
     title: "Error Handling Polish & Dead Code Cleanup",
     changes: [
       "Fixed: Day pass refund errors now show specific server error codes instead of a generic 'network error', matching the same pattern used for redemption errors",
+      "Fixed: Session expiration (401) and payment requirement (402) errors are now detected reliably by checking the actual HTTP status code, instead of fragile string-matching on error messages — affects training guide, availability blocks, and member booking pages",
+      "Fixed: Group billing 'no group found' detection simplified to a direct status code check, removing a redundant string-matching fallback",
       "Cleaned up: Removed unused error utility imports from Group Billing and Tier Change pages left over from the data fetching migration",
     ]
   },

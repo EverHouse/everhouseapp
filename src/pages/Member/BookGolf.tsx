@@ -6,7 +6,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { usePageReady } from '../../stores/pageReadyStore';
 import { useToast } from '../../components/Toast';
 import { bookingEvents } from '../../lib/bookingEvents';
-import { fetchWithCredentials, postWithCredentials, putWithCredentials } from '../../hooks/queries/useFetch';
+import { fetchWithCredentials, postWithCredentials, putWithCredentials, ApiError } from '../../hooks/queries/useFetch';
 import { usePricing } from '../../hooks/usePricing';
 import { SegmentedButton } from '../../components/ui/SegmentedButton';
 import SwipeablePage from '../../components/SwipeablePage';
@@ -838,7 +838,7 @@ const BookGolf: React.FC = () => {
     } catch (err: unknown) {
       haptic.error();
       const errorMessage = (err instanceof Error ? err.message : String(err)) || 'Booking failed. Please try again.';
-      if (errorMessage.includes('402') || errorMessage.includes('payment')) {
+      if ((err instanceof ApiError && err.status === 402) || errorMessage.toLowerCase().includes('payment')) {
         setBookingError('Please contact the front desk to complete your booking.');
       } else {
         showToast(errorMessage, 'error');
