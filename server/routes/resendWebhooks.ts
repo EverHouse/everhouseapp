@@ -189,18 +189,8 @@ router.post('/api/webhooks/resend', async (req: Request, res: Response) => {
       const wh = new Webhook(webhookSecret);
       wh.verify(req.rawBody, svixHeaders);
     } catch (err: unknown) {
-      const errMsg = err instanceof Error ? err.message : String(err);
       logger.warn('Resend webhook signature verification failed', {
-        error: err as Error,
-        extra: {
-          errorMessage: errMsg,
-          secretPrefix: webhookSecret.substring(0, 6),
-          secretLength: webhookSecret.length,
-          hasSvixId: !!svixHeaders['svix-id'],
-          hasSvixTimestamp: !!svixHeaders['svix-timestamp'],
-          hasSvixSignature: !!svixHeaders['svix-signature'],
-          rawBodyLength: req.rawBody?.length ?? 0,
-        }
+        error: err as Error
       });
       return res.status(401).json({ error: 'Invalid signature' });
     }
