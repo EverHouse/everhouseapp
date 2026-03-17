@@ -41,7 +41,7 @@ async function checkUserHasHistoricalData(userId: string): Promise<{ hasData: bo
         `SELECT COUNT(*) as count FROM ${check.table} WHERE ${check.column} = $1`,
         [userId]
       );
-      const count = parseInt(result.rows[0]?.count || '0');
+      const count = parseInt(result.rows[0]?.count || '0', 10);
       if (count > 0) {
         reasons.push(`${count} ${check.name}`);
       }

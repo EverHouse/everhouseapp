@@ -34,7 +34,7 @@ router.get('/api/members/search', isAuthenticated, validateQuery(memberSearchSch
     }
     
     const searchTerm = `%${query.trim().toLowerCase()}%`;
-    const maxResults = Math.min(parseInt(limit) || 10, 50);
+    const maxResults = Math.min(parseInt(limit, 10) || 10, 50);
     const shouldIncludeFormer = includeFormer === 'true';
     const shouldIncludeVisitors = includeVisitors === 'true';
     
@@ -476,7 +476,7 @@ router.get('/api/guests/search', isAuthenticated, validateQuery(guestSearchSchem
     }
     
     const searchTerm = `%${vq.query.trim().toLowerCase()}%`;
-    const maxResults = Math.min(parseInt(vq.limit || '10') || 10, 30);
+    const maxResults = Math.min(parseInt(vq.limit || '10', 10) || 10, 30);
     
     const sessionUser = getSessionUser(req);
     const isStaff = sessionUser?.role === 'admin' || sessionUser?.role === 'staff';

@@ -175,3 +175,36 @@ export async function apiRequestNoRetry<T = unknown>(
 ): Promise<ApiResult<T>> {
   return apiRequest<T>(url, options, { maxRetries: 1 });
 }
+
+export async function apiRequestBlob(
+  url: string,
+  options?: RequestInit
+): Promise<{ ok: boolean; blob?: Blob; error?: string }> {
+  try {
+    const res = await fetch(url, {
+      ...options,
+      credentials: 'include',
+    });
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      return { ok: false, error: errorData.error || `Request failed (${res.status})` };
+    }
+    const blob = await res.blob();
+    return { ok: true, blob };
+  } catch (err: unknown) {
+    return { ok: false, error: err instanceof Error ? err.message : 'Network error' };
+  }
+}
+
+export function fireAndForgetRequest(
+  url: string,
+  options?: RequestInit
+): void {
+  fetch(url, {
+    ...options,
+    credentials: 'include',
+    keepalive: true,
+  }).catch((err: unknown) => {
+    if (isDev) console.warn('[API] Fire-and-forget request failed:', err);
+  });
+}

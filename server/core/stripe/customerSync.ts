@@ -124,8 +124,8 @@ export async function getCustomerSyncStatus(): Promise<{
   `);
   
   return {
-    needsSync: parseInt(result.rows[0].needs_sync as string) || 0,
-    alreadySynced: parseInt(result.rows[0].already_synced as string) || 0,
-    total: parseInt(result.rows[0].total as string) || 0,
+    needsSync: parseInt(result.rows[0].needs_sync as string, 10) || 0,
+    alreadySynced: parseInt(result.rows[0].already_synced as string, 10) || 0,
+    total: parseInt(result.rows[0].total as string, 10) || 0,
   };
 }

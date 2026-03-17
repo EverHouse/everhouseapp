@@ -8,7 +8,8 @@ import {
   MembershipTier,
   MemberStep,
 } from './newUserTypes';
-import { deleteWithCredentials } from '../../../../hooks/queries/useFetch';
+import { deleteWithCredentials, postWithCredentials } from '../../../../hooks/queries/useFetch';
+import { apiRequest } from '../../../../lib/apiRequest';
 import WalkingGolferSpinner from '../../../WalkingGolferSpinner';
 
 interface PaymentStepProps {
@@ -310,39 +311,36 @@ export function PaymentStep({
                       await handlePaymentSuccess(piId);
                     } else {
                       try {
-                        const confirmRes = await fetch('/api/stripe/terminal/confirm-subscription-payment', {
+                        const confirmResult = await apiRequest<Record<string, unknown>>('/api/stripe/terminal/confirm-subscription-payment', {
                           method: 'POST',
                           headers: { 'Content-Type': 'application/json' },
-                          credentials: 'include',
                           body: JSON.stringify({
                             paymentIntentId: piId,
                             subscriptionId,
                             userId: createdUserId,
                             invoiceId: null
                           })
-                        });
-                        if (!confirmRes.ok) {
-                          const data = await confirmRes.json();
-                          if (!data.autoRefunded) {
+                        }, { maxRetries: 1 });
+                        if (!confirmResult.ok) {
+                          if (!confirmResult.errorData?.autoRefunded) {
                             try {
-                              await fetch('/api/stripe/terminal/refund-payment', {
+                              await apiRequest('/api/stripe/terminal/refund-payment', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
-                                credentials: 'include',
                                 body: JSON.stringify({ paymentIntentId: piId })
-                              });
+                              }, { maxRetries: 1 });
                               showToast('Payment activation failed. The charge has been automatically refunded.', 'error');
                             } catch (refundErr) {
                               console.error('Auto-refund attempt failed:', refundErr);
-                              showToast(`Payment activation failed: ${data.error}. Please refund manually in Stripe.`, 'error');
+                              showToast(`Payment activation failed: ${confirmResult.error}. Please refund manually in Stripe.`, 'error');
                             }
                           } else {
                             showToast('Member account not found. Payment has been automatically refunded.', 'error');
                           }
-                          setStripeError(data.error || 'Failed to confirm payment');
+                          setStripeError(confirmResult.error || 'Failed to confirm payment');
                           return;
                         }
-                        const confirmData = await confirmRes.json();
+                        const confirmData = confirmResult.data as Record<string, unknown>;
                         if (confirmData.cardSaveWarning) {
                           showToast(`Payment received! Membership activated. Note: ${confirmData.cardSaveWarning}`, 'warning');
                         } else {
@@ -351,22 +349,20 @@ export function PaymentStep({
 
                         if (form.addGroupMembers && form.groupMembers.length > 0) {
                           try {
-                            const groupCreateRes = await fetch('/api/family-billing/groups', {
+                            const groupCreateResult = await apiRequest<Record<string, unknown>>('/api/family-billing/groups', {
                               method: 'POST',
                               headers: { 'Content-Type': 'application/json' },
-                              credentials: 'include',
                               body: JSON.stringify({
                                 primaryEmail: form.email,
                                 groupName: `${form.firstName} ${form.lastName} Family`
                               })
-                            });
+                            }, { maxRetries: 1 });
 
-                            if (!groupCreateRes.ok) {
-                              const groupCreateData = await groupCreateRes.json();
-                              console.error('Failed to create family billing group:', groupCreateData.error);
+                            if (!groupCreateResult.ok) {
+                              console.error('Failed to create family billing group:', groupCreateResult.error);
                               showToast('Membership activated but failed to create family group. You can set this up manually.', 'warning');
                             } else {
-                              const groupCreateData = await groupCreateRes.json();
+                              const groupCreateData = groupCreateResult.data as Record<string, unknown>;
                               const groupId = groupCreateData.groupId;
                               let addedCount = 0;
                               let failedCount = 0;
@@ -375,10 +371,9 @@ export function PaymentStep({
                                 const member = form.groupMembers[i];
                                 try {
                                   const memberTierSlug = tiers.find(t => t.id === member.tierId)?.slug || selectedTier?.slug;
-                                  const addMemberRes = await fetch(`/api/family-billing/groups/${groupId}/members`, {
+                                  const addMemberResult = await apiRequest<Record<string, unknown>>(`/api/family-billing/groups/${groupId}/members`, {
                                     method: 'POST',
                                     headers: { 'Content-Type': 'application/json' },
-                                    credentials: 'include',
                                     body: JSON.stringify({
                                       memberEmail: member.email,
                                       memberTier: memberTierSlug,
@@ -392,27 +387,21 @@ export function PaymentStep({
                                       state: member.state || undefined,
                                       zipCode: member.zipCode || undefined,
                                     })
-                                  });
+                                  }, { maxRetries: 1 });
 
-                                  if (addMemberRes.ok) {
+                                  if (addMemberResult.ok) {
                                     addedCount++;
-                                    const addData = await addMemberRes.json();
+                                    const addData = addMemberResult.data as Record<string, unknown>;
                                     if (subMemberScannedIds[i] && addData.memberId) {
-                                      fetch('/api/admin/save-id-image', {
-                                        method: 'POST',
-                                        headers: { 'Content-Type': 'application/json' },
-                                        credentials: 'include',
-                                        body: JSON.stringify({
-                                          userId: addData.memberId,
-                                          image: subMemberScannedIds[i].base64,
-                                          mimeType: subMemberScannedIds[i].mimeType,
-                                        }),
+                                      postWithCredentials('/api/admin/save-id-image', {
+                                        userId: addData.memberId,
+                                        image: subMemberScannedIds[i].base64,
+                                        mimeType: subMemberScannedIds[i].mimeType,
                                       }).catch(err => console.error('Failed to save sub-member ID image:', err));
                                     }
                                   } else {
                                     failedCount++;
-                                    const addData = await addMemberRes.json();
-                                    console.error(`Failed to add group member ${member.email}:`, addData.error);
+                                    console.error(`Failed to add group member ${member.email}:`, addMemberResult.error);
                                   }
                                 } catch (memberErr) {
                                   failedCount++;
@@ -435,15 +424,10 @@ export function PaymentStep({
                         }
 
                         if (scannedIdImage && createdUserId) {
-                          fetch('/api/admin/save-id-image', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            credentials: 'include',
-                            body: JSON.stringify({
-                              userId: createdUserId,
-                              image: scannedIdImage.base64,
-                              mimeType: scannedIdImage.mimeType,
-                            }),
+                          postWithCredentials('/api/admin/save-id-image', {
+                            userId: createdUserId,
+                            image: scannedIdImage.base64,
+                            mimeType: scannedIdImage.mimeType,
                           }).catch(err => console.error('Failed to save ID image:', err));
                         }
 

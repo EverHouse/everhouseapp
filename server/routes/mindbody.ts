@@ -20,8 +20,8 @@ const paginationQuerySchema = z.object({
 router.get("/api/admin/mindbody/unmatched", isStaffOrAdmin, validateQuery(paginationQuerySchema), async (req: Request, res: Response) => {
   try {
     const vq = (req as Request & { validatedQuery: z.infer<typeof paginationQuerySchema> }).validatedQuery;
-    const limit = Math.min(parseInt(vq.limit || '') || 50, 100);
-    const offset = parseInt(vq.offset || '') || 0;
+    const limit = Math.min(parseInt(vq.limit || '', 10) || 50, 100);
+    const offset = parseInt(vq.offset || '', 10) || 0;
     const search = vq.search?.trim();
 
     const baseConditions = [
@@ -169,7 +169,7 @@ const linkHistoryQuerySchema = z.object({ limit: z.string().regex(/^\d+$/).optio
 router.get("/api/admin/mindbody/link-history", isStaffOrAdmin, validateQuery(linkHistoryQuerySchema), async (req: Request, res: Response) => {
   try {
     const vq = (req as Request & { validatedQuery: z.infer<typeof linkHistoryQuerySchema> }).validatedQuery;
-    const limit = Math.min(parseInt(vq.limit || '') || 20, 50);
+    const limit = Math.min(parseInt(vq.limit || '', 10) || 20, 50);
 
     const history = await db.select({
       id: adminAuditLog.id,

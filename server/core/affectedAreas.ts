@@ -49,10 +49,10 @@ async function resolveTokenWithCache(token: string, cache: ResourceCache): Promi
     return cache.conferenceRoomId ? [cache.conferenceRoomId] : [];
   }
   if (t.startsWith('bay_')) {
-    const bayId = parseInt(t.replace('bay_', ''));
+    const bayId = parseInt(t.replace('bay_', ''), 10);
     if (!isNaN(bayId)) return [bayId];
   }
-  const parsed = parseInt(t);
+  const parsed = parseInt(t, 10);
   if (!isNaN(parsed)) return [parsed];
   return [];
 }
@@ -84,7 +84,7 @@ export async function parseAffectedAreasBatch(
     }
 
     if (normalized.startsWith('bay_') && !normalized.includes(',') && !normalized.includes('[')) {
-      const bayId = parseInt(normalized.replace('bay_', ''));
+      const bayId = parseInt(normalized.replace('bay_', ''), 10);
       if (!isNaN(bayId)) {
         results.push([bayId]);
         continue;
@@ -164,16 +164,16 @@ export async function parseAffectedAreas(affectedAreas: string | null | undefine
       const confId = await getConferenceRoomId();
       if (confId) idSet.add(confId);
     } else if (t.startsWith('bay_')) {
-      const bayId = parseInt(t.replace('bay_', ''));
+      const bayId = parseInt(t.replace('bay_', ''), 10);
       if (!isNaN(bayId)) idSet.add(bayId);
     } else {
-      const parsed = parseInt(t);
+      const parsed = parseInt(t, 10);
       if (!isNaN(parsed)) idSet.add(parsed);
     }
   };
   
   if (normalized.startsWith('bay_') && !normalized.includes(',') && !normalized.includes('[')) {
-    const bayId = parseInt(normalized.replace('bay_', ''));
+    const bayId = parseInt(normalized.replace('bay_', ''), 10);
     if (!isNaN(bayId)) return [bayId];
   }
   

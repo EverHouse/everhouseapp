@@ -99,7 +99,7 @@ router.get('/api/bookings/conflicts', async (req: Request, res: Response) => {
       return res.status(403).json({ error: 'You can only check conflicts for yourself unless you are staff' });
     }
 
-    const excludeId = excludeBookingId ? parseInt(excludeBookingId as string) : undefined;
+    const excludeId = excludeBookingId ? parseInt(excludeBookingId as string, 10) : undefined;
 
     const result = await checkMemberAvailability(
       memberEmail.trim().toLowerCase(),
@@ -130,7 +130,7 @@ router.get('/api/bookings/:bookingId/participants', async (req: Request, res: Re
       return res.status(401).json({ error: 'Authentication required' });
     }
 
-    const bookingId = parseInt(req.params.bookingId as string);
+    const bookingId = parseInt(req.params.bookingId as string, 10);
     if (isNaN(bookingId)) {
       return res.status(400).json({ error: 'Invalid booking ID' });
     }
@@ -152,7 +152,7 @@ router.post('/api/bookings/:bookingId/participants', isAuthenticated, validateBo
       return res.status(401).json({ error: 'Authentication required' });
     }
 
-    const bookingId = parseInt(req.params.bookingId as string);
+    const bookingId = parseInt(req.params.bookingId as string, 10);
     if (isNaN(bookingId)) {
       return res.status(400).json({ error: 'Invalid booking ID' });
     }
@@ -189,8 +189,8 @@ router.delete('/api/bookings/:bookingId/participants/:participantId', isAuthenti
       return res.status(401).json({ error: 'Authentication required' });
     }
 
-    const bookingId = parseInt(req.params.bookingId as string);
-    const participantId = parseInt(req.params.participantId as string);
+    const bookingId = parseInt(req.params.bookingId as string, 10);
+    const participantId = parseInt(req.params.participantId as string, 10);
     const rosterVersion = req.body?.rosterVersion;
 
     if (isNaN(bookingId) || isNaN(participantId)) {
@@ -220,7 +220,7 @@ router.post('/api/bookings/:bookingId/participants/preview-fees', validateBody(p
       return res.status(401).json({ error: 'Authentication required' });
     }
 
-    const bookingId = parseInt(req.params.bookingId as string);
+    const bookingId = parseInt(req.params.bookingId as string, 10);
     if (isNaN(bookingId)) {
       return res.status(400).json({ error: 'Invalid booking ID' });
     }
@@ -310,7 +310,7 @@ router.post('/api/admin/booking/:bookingId/recalculate-fees', isStaffOrAdmin, as
     const sessionUser = getSessionUser(req);
     if (!sessionUser) return res.status(401).json({ error: 'Authentication required' });
 
-    const bookingId = parseInt(String(req.params.bookingId));
+    const bookingId = parseInt(String(req.params.bookingId), 10);
     if (isNaN(bookingId)) return res.status(400).json({ error: 'Invalid booking ID' });
 
     const booking = await getBookingWithSession(bookingId);
@@ -352,9 +352,9 @@ router.post('/api/admin/booking/:bookingId/recalculate-fees', isStaffOrAdmin, as
         `);
 
         const feeRow = feeResult.rows[0] as unknown as FeeRow | undefined;
-        const feeTotalCents = parseInt(feeRow?.total_cents || '0');
-        const overageCents = parseInt(feeRow?.overage_cents || '0');
-        const guestCents = parseInt(feeRow?.guest_cents || '0');
+        const feeTotalCents = parseInt(feeRow?.total_cents || '0', 10);
+        const overageCents = parseInt(feeRow?.overage_cents || '0', 10);
+        const guestCents = parseInt(feeRow?.guest_cents || '0', 10);
 
         if (feeTotalCents > 0) {
           const { createPrepaymentIntent } = await import('../core/billing/prepaymentService');

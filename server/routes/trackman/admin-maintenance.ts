@@ -19,8 +19,8 @@ const router = Router();
 router.get('/api/admin/trackman/needs-players', isStaffOrAdmin, async (req, res) => {
   try {
     const { limit = '20', offset = '0', search = '' } = req.query;
-    const limitNum = Math.min(parseInt(limit as string) || 20, 100);
-    const offsetNum = parseInt(offset as string) || 0;
+    const limitNum = Math.min(parseInt(limit as string, 10) || 20, 100);
+    const offsetNum = parseInt(offset as string, 10) || 0;
 
     const sqlConditions: ReturnType<typeof sql>[] = [
       sql`br.status = 'approved'`,
@@ -48,7 +48,7 @@ router.get('/api/admin/trackman/needs-players', isStaffOrAdmin, async (req, res)
         HAVING COUNT(bp.id) < COALESCE(br.declared_player_count, br.trackman_player_count, 1)
       ) sub
     `);
-    const totalCount = parseInt((countResult.rows[0] as DbRow).count as string);
+    const totalCount = parseInt((countResult.rows[0] as DbRow).count as string, 10);
 
     const result = await db.execute(sql`
       SELECT
@@ -76,8 +76,8 @@ router.get('/api/admin/trackman/needs-players', isStaffOrAdmin, async (req, res)
     `);
 
     const data = result.rows.map((row: DbRow) => {
-      const expectedPlayerCount = parseInt(row.expected_player_count as string) || 1;
-      const assignedCount = parseInt(row.assigned_count as string) || 0;
+      const expectedPlayerCount = parseInt(row.expected_player_count as string, 10) || 1;
+      const assignedCount = parseInt(row.assigned_count as string, 10) || 0;
       return {
         id: row.id,
         userName: row.user_name,
@@ -170,9 +170,9 @@ router.delete('/api/admin/trackman/reset-data', isStaffOrAdmin, async (req, res)
       success: true,
       message: 'Trackman data reset complete',
       deleted: {
-        bookings: parseInt((bookingCount.rows[0] as DbRow).count as string),
-        sessions: parseInt((sessionCount.rows[0] as DbRow).count as string),
-        unmatched: parseInt((unmatchedCount.rows[0] as DbRow).count as string)
+        bookings: parseInt((bookingCount.rows[0] as DbRow).count as string, 10),
+        sessions: parseInt((sessionCount.rows[0] as DbRow).count as string, 10),
+        unmatched: parseInt((unmatchedCount.rows[0] as DbRow).count as string, 10)
       }
     });
   } catch (error: unknown) {
@@ -194,7 +194,7 @@ router.get('/api/admin/backfill-sessions/preview', isStaffOrAdmin, async (req, r
         AND br.resource_id IS NOT NULL
         AND (br.is_unmatched = false OR br.is_unmatched IS NULL)`);
     
-    const totalCount = parseInt((countResult.rows[0] as DbRow).total as string);
+    const totalCount = parseInt((countResult.rows[0] as DbRow).total as string, 10);
     
     const samplesResult = await db.execute(sql`SELECT 
         br.id,
@@ -466,7 +466,7 @@ router.get('/api/admin/trackman/duplicate-bookings', isStaffOrAdmin, async (req,
       duplicatesFound: result.rows.length,
       duplicates: result.rows.map((row: DbRow) => ({
         trackmanBookingId: row.trackman_booking_id,
-        count: parseInt(row.duplicate_count as string),
+        count: parseInt(row.duplicate_count as string, 10),
         bookingIds: row.booking_ids,
         createdDates: row.created_dates,
         isUnmatchedFlags: row.is_unmatched_flags,

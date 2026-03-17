@@ -194,7 +194,7 @@ async function buildParticipantLineItems(
 
     const lineItems: BookingFeeLineItem[] = [];
     for (const row of participantsResult.rows as unknown as ParticipantLineItemRow[]) {
-      const feeCents = parseInt(row.cached_fee_cents) || 0;
+      const feeCents = parseInt(row.cached_fee_cents, 10) || 0;
       if (feeCents <= 0) continue;
 
       const isGuest = row.participant_type === 'guest';
@@ -210,7 +210,7 @@ async function buildParticipantLineItems(
 
     if (lineItems.length > 0 && resourceType !== 'conference_room') {
       const allParticipantResult = await db.execute(sql`SELECT COUNT(*) as cnt FROM booking_participants WHERE session_id = ${sessionId}`);
-      const actualCount = parseInt((allParticipantResult.rows[0] as { cnt: string }).cnt) || 0;
+      const actualCount = parseInt((allParticipantResult.rows[0] as { cnt: string }).cnt, 10) || 0;
       const declaredResult = await db.execute(sql`SELECT declared_player_count FROM booking_requests WHERE id = ${bookingId} LIMIT 1`);
       const declaredCount = (declaredResult.rows[0] as { declared_player_count: number | null })?.declared_player_count || actualCount;
       const emptySlots = Math.max(0, declaredCount - actualCount);

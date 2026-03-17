@@ -226,7 +226,7 @@ router.post('/api/availability/batch', async (req, res) => {
     const unmatchedByResource = new Map<number, { start_time: string; end_time: string }[]>();
     resource_ids.forEach(id => unmatchedByResource.set(id, []));
     (unmatchedResult.rows as Array<Record<string, unknown>>).forEach((row) => {
-      const resourceId = parseInt(row.bay_number as string);
+      const resourceId = parseInt(row.bay_number as string, 10);
       unmatchedByResource.get(resourceId)?.push({ start_time: row.start_time as string, end_time: row.end_time as string });
     });
     
@@ -312,7 +312,7 @@ router.get('/api/availability', async (req, res) => {
       return res.status(400).json({ error: 'resource_id and date are required' });
     }
     
-    const durationMinutes = parseInt(duration as string) || 60;
+    const durationMinutes = parseInt(duration as string, 10) || 60;
     // 15-minute increment for cleaner time slots (:00, :15, :30, :45)
     const slotIncrement = 15;
     
@@ -321,7 +321,7 @@ router.get('/api/availability', async (req, res) => {
     const resourceType = resourceResult.rows[0]?.type || 'simulator';
     
     // When rescheduling, ignore the original booking so its slot shows as available
-    const ignoreId = ignore_booking_id ? parseInt(ignore_booking_id as string) : null;
+    const ignoreId = ignore_booking_id ? parseInt(ignore_booking_id as string, 10) : null;
     
     const sessionUser = getSessionUser(req);
     const requestingEmail = (sessionUser?.email || '').trim().toLowerCase();

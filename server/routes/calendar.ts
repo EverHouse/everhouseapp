@@ -69,7 +69,7 @@ router.get('/api/calendar-availability/conference', async (req, res) => {
       return res.status(400).json({ error: 'date is required (YYYY-MM-DD format)' });
     }
     
-    const durationMinutes = duration ? parseInt(duration as string) : undefined;
+    const durationMinutes = duration ? parseInt(duration as string, 10) : undefined;
     const result = await getCalendarAvailability('conference', date as string, durationMinutes);
     
     if (result.error) {

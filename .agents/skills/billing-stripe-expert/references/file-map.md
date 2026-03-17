@@ -279,6 +279,6 @@ These files reference billing concepts incidentally. Documented here for zero-or
 | `server/routes/members/search.ts` | Member search (subscription status filters) |
 | `server/routes/members/profile.ts` | Member profile (billing info display) |
 | `server/routes/trackman/webhook-index.ts` | Trackman webhook router (billing webhook registration) |
-| `server/routes/trackman/webhook-handlers.ts` | Trackman webhook handlers (billing session creation) |
+| `server/routes/trackman/webhook-handlers.ts` | Barrel re-export → `webhook-modification.ts`, `webhook-matching.ts`, `webhook-update.ts` |
 | `server/schedulers/integrityScheduler.ts` | Integrity scheduler (billing data consistency checks) |
 | `server/schedulers/waiverReviewScheduler.ts` | Waiver review (subscription status checks) |

@@ -175,7 +175,7 @@ export async function getBookingDataForTrackman(trackmanBookingId: string) {
       
       let resourceId = 1;
       if (bayRef) {
-        const bayNum = parseInt(bayRef);
+        const bayNum = parseInt(bayRef, 10);
         if (bayNum >= 1 && bayNum <= 4) resourceId = bayNum;
       }
       
@@ -353,7 +353,7 @@ export async function linkTrackmanToMember(
       
       let resourceId = 1;
       if (bayRef) {
-        const bayNum = parseInt(bayRef);
+        const bayNum = parseInt(bayRef, 10);
         if (bayNum >= 1 && bayNum <= 4) {
           resourceId = bayNum;
         }

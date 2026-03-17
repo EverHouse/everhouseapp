@@ -39,8 +39,8 @@ router.get('/api/admin/trackman/unmatched', isStaffOrAdmin, validateQuery(unmatc
   try {
     const vq = (req as Request & { validatedQuery: z.infer<typeof unmatchedQuerySchema> }).validatedQuery;
     const { limit = '50', offset = '0', search = '', resolved = 'false', category = '', dateRange = 'all' } = vq;
-    const limitNum = Math.min(parseInt(limit) || 50, 100);
-    const offsetNum = parseInt(offset) || 0;
+    const limitNum = Math.min(parseInt(limit, 10) || 50, 100);
+    const offsetNum = parseInt(offset, 10) || 0;
     const categoryFilter = category.toLowerCase();
     
     const sqlConditions: ReturnType<typeof sql>[] = [
@@ -49,7 +49,7 @@ router.get('/api/admin/trackman/unmatched', isStaffOrAdmin, validateQuery(unmatc
     ];
 
     if (dateRange && dateRange !== 'all') {
-      const days = parseInt(dateRange);
+      const days = parseInt(dateRange, 10);
       if (!isNaN(days)) {
         sqlConditions.push(sql`br.request_date >= CURRENT_DATE - ${days}::integer`);
       }
@@ -91,7 +91,7 @@ router.get('/api/admin/trackman/unmatched', isStaffOrAdmin, validateQuery(unmatc
     const whereFragment = sql.join(sqlConditions, sql` AND `);
     
     const countResult = await db.execute(sql`SELECT COUNT(*) FROM booking_requests br WHERE ${whereFragment}`);
-    const totalCount = parseInt((countResult.rows[0] as DbRow).count as string);
+    const totalCount = parseInt((countResult.rows[0] as DbRow).count as string, 10);
     
     const result = await db.execute(sql`SELECT 
         br.id,
@@ -317,7 +317,7 @@ router.post('/api/admin/trackman/unmatched/bulk-dismiss', isStaffOrAdmin, async 
 router.put('/api/admin/trackman/unmatched/:id/resolve', isStaffOrAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const numericId = parseInt(id as string);
+    const numericId = parseInt(id as string, 10);
     if (isNaN(numericId)) return res.status(400).json({ error: 'Invalid booking ID' });
     const { email: rawEmail, memberEmail: rawMemberEmail, rememberEmail, additional_players } = req.body;
     const email = rawEmail?.trim()?.toLowerCase();
@@ -377,7 +377,7 @@ router.put('/api/admin/trackman/unmatched/:id/resolve', isStaffOrAdmin, async (r
       
       let resourceId = 1;
       if (legacy.bay_number) {
-        const bayNum = parseInt(String(legacy.bay_number).replace(/\D/g, ''));
+        const bayNum = parseInt(String(legacy.bay_number).replace(/\D/g, ''), 10);
         if (bayNum >= 1 && bayNum <= 4) resourceId = bayNum;
       }
       
@@ -1035,7 +1035,7 @@ router.post('/api/admin/trackman/auto-resolve-same-email', isStaffOrAdmin, async
         const member = memberResult.rows[0] as DbRow;
         let resourceId = 1;
         if (booking.bay_number) {
-          const bayNum = parseInt(String(booking.bay_number).replace(/\D/g, ''));
+          const bayNum = parseInt(String(booking.bay_number).replace(/\D/g, ''), 10);
           if (bayNum >= 1 && bayNum <= 4) resourceId = bayNum;
         }
         
@@ -1126,8 +1126,8 @@ const paginatedSearchSchema = z.object({
 router.get('/api/admin/trackman/matched', isStaffOrAdmin, validateQuery(paginatedSearchSchema), async (req, res) => {
   try {
     const vq = (req as Request & { validatedQuery: z.infer<typeof paginatedSearchSchema> }).validatedQuery;
-    const limit = parseInt(vq.limit || '') || 100;
-    const offset = parseInt(vq.offset || '') || 0;
+    const limit = parseInt(vq.limit || '', 10) || 100;
+    const offset = parseInt(vq.offset || '', 10) || 0;
     const search = (vq.search || '').trim().toLowerCase();
     
     const matchedConditions: ReturnType<typeof sql>[] = [
@@ -1195,8 +1195,8 @@ router.get('/api/admin/trackman/matched', isStaffOrAdmin, validateQuery(paginate
        LIMIT ${limit} OFFSET ${offset}`);
     
     const data = result.rows.map((row: DbRow) => {
-      const totalSlots = parseInt(row.total_slots as string) || 1;
-      const filledSlots = parseInt(row.filled_slots as string) || 0;
+      const totalSlots = parseInt(row.total_slots as string, 10) || 1;
+      const filledSlots = parseInt(row.filled_slots as string, 10) || 0;
       return {
         id: row.id,
         userEmail: row.user_email,
@@ -1352,7 +1352,7 @@ router.put('/api/admin/trackman/matched/:id/reassign', isStaffOrAdmin, async (re
       }
       try {
         const { syncBookingInvoice } = await import('../../core/billing/bookingInvoiceService');
-        await syncBookingInvoice(parseInt(id as string), sessionId as number);
+        await syncBookingInvoice(parseInt(id as string, 10), sessionId as number);
       } catch (invoiceErr: unknown) {
         logger.warn('[Reassign] Invoice sync failed after fee recalculation', { extra: { sessionId, bookingId: id, invoiceErr } });
       }
@@ -1476,8 +1476,8 @@ const paginatedSchema = z.object({
 router.get('/api/admin/trackman/potential-matches', isStaffOrAdmin, validateQuery(paginatedSchema), async (req, res) => {
   try {
     const vq = (req as Request & { validatedQuery: z.infer<typeof paginatedSchema> }).validatedQuery;
-    const limit = parseInt(vq.limit || '') || 50;
-    const offset = parseInt(vq.offset || '') || 0;
+    const limit = parseInt(vq.limit || '', 10) || 50;
+    const offset = parseInt(vq.offset || '', 10) || 0;
     
     const unmatchedResult = await db.execute(sql`SELECT 
         tub.id, tub.trackman_booking_id, tub.user_name, tub.original_email, 
@@ -1546,8 +1546,8 @@ router.get('/api/admin/trackman/potential-matches', isStaffOrAdmin, validateQuer
 router.get('/api/admin/trackman/requires-review', isStaffOrAdmin, validateQuery(paginatedSchema), async (req, res) => {
   try {
     const vq = (req as Request & { validatedQuery: z.infer<typeof paginatedSchema> }).validatedQuery;
-    const limit = parseInt(vq.limit || '') || 50;
-    const offset = parseInt(vq.offset || '') || 0;
+    const limit = parseInt(vq.limit || '', 10) || 50;
+    const offset = parseInt(vq.offset || '', 10) || 0;
     
     const result = await db.execute(sql`SELECT 
         tub.id,
@@ -1583,7 +1583,7 @@ router.get('/api/admin/trackman/requires-review', isStaffOrAdmin, validateQuery(
     
     res.json({ 
       data: result.rows,
-      totalCount: parseInt((countResult.rows[0] as DbRow).total as string)
+      totalCount: parseInt((countResult.rows[0] as DbRow).total as string, 10)
     });
   } catch (error: unknown) {
     logger.error('Fetch requires-review error', { error: error instanceof Error ? error : new Error(String(error)) });

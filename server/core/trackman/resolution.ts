@@ -29,7 +29,7 @@ async function insertBookingIfNotExists(
     return { inserted: false, reason: 'Already imported (Trackman ID exists)' };
   }
 
-  const resourceId = parseInt(booking.bayNumber || '') || null;
+  const resourceId = parseInt(booking.bayNumber || '', 10) || null;
   if (booking.bookingDate && booking.startTime) {
     const existingWithFinalStatus = await db.select({ 
       id: bookingRequests.id, 
@@ -235,7 +235,7 @@ export async function resolveUnmatchedBooking(
       const endTime = booking.endTime?.toString() || '';
       
       const parsedPlayers = parseNotesForPlayers(booking.notes || '');
-      const resourceId = parseInt(booking.bayNumber || '0') || 1;
+      const resourceId = parseInt(booking.bayNumber || '0', 10) || 1;
       const isPast = insertResult.finalStatus === 'attended' || insertResult.finalStatus === 'completed';
 
       try {
@@ -305,7 +305,7 @@ export async function resolveUnmatchedBooking(
       bookingId: 0,
       memberEmail: memberEmail,
       memberName: booking.userName || undefined,
-      resourceId: parseInt(booking.bayNumber || '') || undefined,
+      resourceId: parseInt(booking.bayNumber || '', 10) || undefined,
       bookingDate: booking.bookingDate || '',
       startTime: booking.startTime || '',
       status: 'approved',
@@ -340,7 +340,7 @@ export async function resolveUnmatchedBooking(
           const otherStartTime = other.startTime?.toString() || '';
           const otherEndTime = other.endTime?.toString() || '';
           const otherParsedPlayers = parseNotesForPlayers(other.notes || '');
-          const otherResourceId = parseInt(other.bayNumber || '0') || 1;
+          const otherResourceId = parseInt(other.bayNumber || '0', 10) || 1;
           const otherIsPast = otherResult.finalStatus === 'attended' || otherResult.finalStatus === 'completed';
 
           try {
@@ -383,7 +383,7 @@ export async function resolveUnmatchedBooking(
           bookingId: 0,
           memberEmail: memberEmail,
           memberName: other.userName || undefined,
-          resourceId: parseInt(other.bayNumber || '') || undefined,
+          resourceId: parseInt(other.bayNumber || '', 10) || undefined,
           bookingDate: other.bookingDate || '',
           startTime: other.startTime || '',
           status: 'approved',
@@ -602,7 +602,7 @@ export async function cleanupHistoricalLessons(dryRun = false): Promise<{
   log(`[Lesson Cleanup] Found ${unmatched.length} unmatched lesson entries to resolve.`);
 
   for (const item of unmatched) {
-    const resourceId = parseInt(item.bayNumber as string) || null;
+    const resourceId = parseInt(item.bayNumber as string, 10) || null;
     
     if (!resourceId || resourceId <= 0) {
       log(`[Lesson Cleanup] Skipping Unmatched Item #${item.id} - invalid bay number: ${item.bayNumber}`);

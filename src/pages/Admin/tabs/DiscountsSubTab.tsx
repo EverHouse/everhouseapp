@@ -394,7 +394,7 @@ const DiscountsSubTab: React.FC<DiscountsSubTabProps> = ({ onCreateClick }) => {
                 max="100"
                 className="w-full border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-2.5 rounded-xl text-primary dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all duration-fast"
                 value={newCoupon.percentOff}
-                onChange={e => setNewCoupon({ ...newCoupon, percentOff: Math.min(100, Math.max(1, parseInt(e.target.value) || 1)) })}
+                onChange={e => setNewCoupon({ ...newCoupon, percentOff: Math.min(100, Math.max(1, parseInt(e.target.value, 10) || 1)) })}
               />
             </div>
           ) : (
@@ -440,7 +440,7 @@ const DiscountsSubTab: React.FC<DiscountsSubTabProps> = ({ onCreateClick }) => {
                 max="24"
                 className="w-full border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-2.5 rounded-xl text-primary dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all duration-fast"
                 value={newCoupon.durationInMonths}
-                onChange={e => setNewCoupon({ ...newCoupon, durationInMonths: Math.min(24, Math.max(1, parseInt(e.target.value) || 1)) })}
+                onChange={e => setNewCoupon({ ...newCoupon, durationInMonths: Math.min(24, Math.max(1, parseInt(e.target.value, 10) || 1)) })}
               />
             </div>
           )}

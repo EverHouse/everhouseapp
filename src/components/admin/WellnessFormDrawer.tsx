@@ -251,7 +251,7 @@ export const WellnessFormDrawer: React.FC<WellnessFormDrawerProps> = ({ isOpen, 
           <input
             type="number"
             value={formData.capacity || ''}
-            onChange={(e) => setFormData({ ...formData, capacity: parseInt(e.target.value) || null })}
+            onChange={(e) => setFormData({ ...formData, capacity: parseInt(e.target.value, 10) || null })}
             onBlur={() => markTouched('capacity')}
             placeholder="e.g., 20"
             className={`w-full p-3 rounded-lg border bg-gray-50 dark:bg-black/30 text-primary dark:text-white ${

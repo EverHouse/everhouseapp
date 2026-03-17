@@ -54,7 +54,7 @@ router.post('/api/bug-reports', isAuthenticated, async (req, res) => {
 router.get('/api/admin/bug-reports', isStaffOrAdmin, async (req, res) => {
   try {
     const { status, limit: limitParam } = req.query;
-    const queryLimit = Math.min(Math.max(parseInt(limitParam as string) || 200, 1), 2000);
+    const queryLimit = Math.min(Math.max(parseInt(limitParam as string, 10) || 200, 1), 2000);
     
     const conditions: SQL[] = [];
     

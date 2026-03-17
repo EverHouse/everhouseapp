@@ -396,7 +396,7 @@ export const BookingQueuesSection: React.FC<BookingQueuesSectionProps> = ({
 
   const { execute: executeCheckIn } = useAsyncAction(
     async (booking: BookingRequest, targetStatus?: 'attended' | 'no_show' | 'approved') => {
-      const bookingId = typeof booking.id === 'string' ? parseInt(String(booking.id).replace('cal_', '')) : booking.id;
+      const bookingId = typeof booking.id === 'string' ? parseInt(String(booking.id).replace('cal_', ''), 10) : booking.id;
       if (targetStatus === 'approved' && onRevertToApproved) {
         setLoadingAction(`checkin-${booking.id}`);
         try {
@@ -507,7 +507,7 @@ export const BookingQueuesSection: React.FC<BookingQueuesSectionProps> = ({
 
   const getSmartActionButton = (booking: BookingRequest) => {
     const isCheckingIn = isActionLoading(`checkin-${booking.id}`);
-    const bookingId = typeof booking.id === 'string' ? parseInt(String(booking.id).replace('cal_', '')) : booking.id;
+    const bookingId = typeof booking.id === 'string' ? parseInt(String(booking.id).replace('cal_', ''), 10) : booking.id;
     
     if (booking.status === BOOKING_STATUS.ATTENDED && booking.has_unpaid_fees && (booking.total_owed ?? 0) > 0) {
       return (

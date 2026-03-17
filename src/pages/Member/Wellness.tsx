@@ -56,7 +56,7 @@ const formatTimeTo12Hour = (timeStr: string): { time: string; period: string } =
   }
   
   const timePart = timeStr.split(':');
-  let hours = parseInt(timePart[0]) || 0;
+  let hours = parseInt(timePart[0], 10) || 0;
   const minutes = timePart[1] || '00';
   
   const period = hours >= 12 ? 'PM' : 'AM';
@@ -107,7 +107,7 @@ const Wellness: React.FC = () => {
   const _convertTo24Hour = (time12: string): string => {
     const match = time12.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
     if (!match) return '09:00:00';
-    let hours = parseInt(match[1]);
+    let hours = parseInt(match[1], 10);
     const minutes = match[2];
     const period = match[3].toUpperCase();
     if (period === 'PM' && hours !== 12) hours += 12;
@@ -117,7 +117,7 @@ const Wellness: React.FC = () => {
 
   const _calculateEndTime = (startTime24: string, durationStr: string): string => {
     const durationMatch = durationStr.match(/(\d+)/);
-    const durationMinutes = durationMatch ? parseInt(durationMatch[1]) : 60;
+    const durationMinutes = durationMatch ? parseInt(durationMatch[1], 10) : 60;
     const [hours, minutes] = startTime24.split(':').map(Number);
     const totalMinutes = hours * 60 + minutes + durationMinutes;
     const endHours = Math.floor(totalMinutes / 60) % 24;

@@ -949,7 +949,7 @@ export const TrackmanWebhookEventsSection: React.FC<TrackmanWebhookEventsSection
                 <input
                   type="number"
                   value={replayLimit}
-                  onChange={e => setReplayLimit(parseInt(e.target.value) || 100)}
+                  onChange={e => setReplayLimit(parseInt(e.target.value, 10) || 100)}
                   min={1}
                   max={500}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-primary dark:text-white text-sm"

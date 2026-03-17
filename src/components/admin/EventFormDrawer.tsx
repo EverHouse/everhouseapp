@@ -230,7 +230,7 @@ export const EventFormDrawer: React.FC<EventFormDrawerProps> = ({ isOpen, onClos
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">Max Attendees (optional)</label>
-          <input aria-label="Max attendees" type="number" className="w-full border border-gray-200 dark:border-white/25 bg-gray-50 dark:bg-black/20 p-3 rounded-lg text-primary dark:text-white placeholder:text-gray-500 dark:placeholder:text-white/60" placeholder="e.g., 50" value={formData.max_attendees || ''} onChange={e => setFormData({...formData, max_attendees: parseInt(e.target.value) || null})} />
+          <input aria-label="Max attendees" type="number" className="w-full border border-gray-200 dark:border-white/25 bg-gray-50 dark:bg-black/20 p-3 rounded-lg text-primary dark:text-white placeholder:text-gray-500 dark:placeholder:text-white/60" placeholder="e.g., 50" value={formData.max_attendees || ''} onChange={e => setFormData({...formData, max_attendees: parseInt(e.target.value, 10) || null})} />
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">External Link (optional)</label>

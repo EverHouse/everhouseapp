@@ -4,7 +4,7 @@ How Trackman data flows into the booking system, how bookings are matched/create
 
 ## Webhook Flow
 
-**Entry point**: Trackman sends webhook payloads to the app. Handlers are in `server/routes/trackman/webhook-handlers.ts` and `server/routes/trackman/webhook-billing.ts`.
+**Entry point**: Trackman sends webhook payloads to the app. Handlers are split across `server/routes/trackman/webhook-modification.ts`, `webhook-matching.ts`, `webhook-update.ts` (re-exported via `webhook-handlers.ts` barrel) and `server/routes/trackman/webhook-billing.ts`.
 
 ### Webhook Matching Pipeline
 

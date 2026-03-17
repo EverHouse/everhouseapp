@@ -422,7 +422,7 @@ router.post('/api/member/conference/prepay/:id/confirm', isAuthenticated, async 
       return res.status(401).json({ error: 'Not authenticated' });
     }
 
-    const prepaymentId = parseInt(req.params.id as string);
+    const prepaymentId = parseInt(req.params.id as string, 10);
     if (isNaN(prepaymentId)) {
       return res.status(400).json({ error: 'Invalid prepayment ID' });
     }
@@ -497,7 +497,7 @@ router.get('/api/member/conference/prepay/:id', isAuthenticated, async (req: Req
       return res.status(401).json({ error: 'Not authenticated' });
     }
 
-    const prepaymentId = parseInt(req.params.id as string);
+    const prepaymentId = parseInt(req.params.id as string, 10);
     if (isNaN(prepaymentId)) {
       return res.status(400).json({ error: 'Invalid prepayment ID' });
     }

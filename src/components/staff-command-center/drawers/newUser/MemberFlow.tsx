@@ -9,6 +9,7 @@ import {
   getStripePromise,
 } from './newUserTypes';
 import { fetchWithCredentials, postWithCredentials } from '../../../../hooks/queries/useFetch';
+import { apiRequest } from '../../../../lib/apiRequest';
 import { SuccessStep } from './SuccessStep';
 import { PreviewStep } from './PreviewStep';
 import { PaymentStep } from './PaymentStep';
@@ -138,10 +139,9 @@ export function MemberFlow({
         const discount = discounts.find(d => d.code === form.discountCode);
         const couponId = discount?.stripeCouponId || undefined;
         
-        const res = await fetch('/api/stripe/subscriptions/create-new-member', {
+        const result = await apiRequest<Record<string, unknown>>('/api/stripe/subscriptions/create-new-member', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
           body: JSON.stringify({
             email: form.email,
             firstName: form.firstName,
@@ -155,21 +155,20 @@ export function MemberFlow({
             state: form.state || undefined,
             zipCode: form.zipCode || undefined,
           })
-        });
+        }, { maxRetries: 1 });
 
-        if (!res.ok) {
-          const data = await res.json();
-          if (data.canCleanup && data.existingUserId) {
-            setPendingUserToCleanup({ id: data.existingUserId, name: data.existingUserName || form.email });
+        if (!result.ok) {
+          if (result.errorData?.canCleanup && result.errorData?.existingUserId) {
+            setPendingUserToCleanup({ id: result.errorData.existingUserId as string, name: (result.errorData.existingUserName as string) || form.email });
           }
-          throw new Error(data.error || 'Failed to create subscription');
+          throw new Error(result.error || 'Failed to create subscription');
         }
 
-        const data = await res.json();
+        const data = result.data as Record<string, unknown>;
         
         if (data.freeActivation) {
-          setSubscriptionId(data.subscriptionId);
-          setCreatedUserId(data.userId);
+          setSubscriptionId(data.subscriptionId as string);
+          setCreatedUserId(data.userId as string);
           showToast('Membership activated — no payment required (100% discount).', 'success');
           
           if (scannedIdImage && data.userId) {
@@ -180,17 +179,18 @@ export function MemberFlow({
             }).catch(err => console.error('Failed to save ID image:', err));
           }
           
-          onSuccess({ id: data.userId || 'member-' + Date.now(), email: form.email, name: `${form.firstName} ${form.lastName}` });
+          onSuccess({ id: (data.userId as string) || 'member-' + Date.now(), email: form.email, name: `${form.firstName} ${form.lastName}` });
           return;
         }
         
-        if (data.clientSecret && !data.clientSecret.startsWith('seti_')) {
-          setClientSecret(data.clientSecret);
-          const piId = data.clientSecret.split('_secret_')[0];
+        const clientSecret = data.clientSecret as string | undefined;
+        if (clientSecret && !clientSecret.startsWith('seti_')) {
+          setClientSecret(clientSecret);
+          const piId = clientSecret.split('_secret_')[0];
           if (piId) setPaymentIntentId(piId);
         }
-        setSubscriptionId(data.subscriptionId);
-        setCreatedUserId(data.userId);
+        setSubscriptionId(data.subscriptionId as string);
+        setCreatedUserId(data.userId as string);
       }
     } catch (err: unknown) {
       setStripeError((err instanceof Error ? err.message : String(err)) || 'Failed to initialize payment');
@@ -363,10 +363,9 @@ export function MemberFlow({
       
       const discount = discounts.find(d => d.code === form.discountCode);
       
-      const res = await fetch('/api/stripe/subscriptions/send-activation-link', {
+      const result = await apiRequest<Record<string, unknown>>('/api/stripe/subscriptions/send-activation-link', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
         body: JSON.stringify({
           email: form.email,
           firstName: form.firstName,
@@ -380,35 +379,29 @@ export function MemberFlow({
           state: form.state || undefined,
           zipCode: form.zipCode || undefined,
         })
-      });
+      }, { maxRetries: 1 });
       
-      if (!res.ok) {
-        const data = await res.json();
-        if (data.canCleanup && data.existingUserId) {
-          setPendingUserToCleanup({ id: data.existingUserId, name: data.existingUserName || form.email });
+      if (!result.ok) {
+        if (result.errorData?.canCleanup && result.errorData?.existingUserId) {
+          setPendingUserToCleanup({ id: result.errorData.existingUserId as string, name: (result.errorData.existingUserName as string) || form.email });
         }
-        const errMsg = data.error || 'Failed to send activation link';
+        const errMsg = result.error || 'Failed to send activation link';
         throw new Error(errMsg.includes('incomplete signup') ? 'This email has a pending signup that needs to be cleaned up first' : errMsg);
       }
       
-      const data = await res.json();
+      const data = result.data as Record<string, unknown>;
       
-      setActivationUrl(data.checkoutUrl);
+      setActivationUrl(data.checkoutUrl as string);
       showToast(`Activation link sent to ${form.email}`, 'success');
       if (scannedIdImage && data.userId) {
-        fetch('/api/admin/save-id-image', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({
-            userId: data.userId,
-            image: scannedIdImage.base64,
-            mimeType: scannedIdImage.mimeType,
-          }),
+        postWithCredentials('/api/admin/save-id-image', {
+          userId: data.userId,
+          image: scannedIdImage.base64,
+          mimeType: scannedIdImage.mimeType,
         }).catch(err => console.error('Failed to save ID image:', err));
       }
       onSuccess({ 
-        id: data.userId, 
+        id: data.userId as string, 
         email: form.email, 
         name: `${form.firstName} ${form.lastName}` 
       });
@@ -437,10 +430,9 @@ export function MemberFlow({
       
       const discount = discounts.find(d => d.code === form.discountCode);
       
-      const res = await fetch('/api/stripe/subscriptions/send-activation-link', {
+      const result = await apiRequest<Record<string, unknown>>('/api/stripe/subscriptions/send-activation-link', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
         body: JSON.stringify({
           email: form.email,
           firstName: form.firstName,
@@ -454,33 +446,27 @@ export function MemberFlow({
           state: form.state || undefined,
           zipCode: form.zipCode || undefined,
         })
-      });
+      }, { maxRetries: 1 });
       
-      if (!res.ok) {
-        const data = await res.json();
-        if (data.canCleanup && data.existingUserId) {
-          setPendingUserToCleanup({ id: data.existingUserId, name: data.existingUserName || form.email });
+      if (!result.ok) {
+        if (result.errorData?.canCleanup && result.errorData?.existingUserId) {
+          setPendingUserToCleanup({ id: result.errorData.existingUserId as string, name: (result.errorData.existingUserName as string) || form.email });
         }
-        const errMsg = data.error || 'Failed to create activation link';
+        const errMsg = result.error || 'Failed to create activation link';
         throw new Error(errMsg.includes('incomplete signup') ? 'This email has a pending signup that needs to be cleaned up first' : errMsg);
       }
       
-      const data = await res.json();
+      const data = result.data as Record<string, unknown>;
       
       if (data.checkoutUrl) {
-        await navigator.clipboard.writeText(data.checkoutUrl);
-        setActivationUrl(data.checkoutUrl);
+        await navigator.clipboard.writeText(data.checkoutUrl as string);
+        setActivationUrl(data.checkoutUrl as string);
         showToast('Activation link copied to clipboard!', 'success');
         if (scannedIdImage && data.userId) {
-          fetch('/api/admin/save-id-image', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({
-              userId: data.userId,
-              image: scannedIdImage.base64,
-              mimeType: scannedIdImage.mimeType,
-            }),
+          postWithCredentials('/api/admin/save-id-image', {
+            userId: data.userId,
+            image: scannedIdImage.base64,
+            mimeType: scannedIdImage.mimeType,
           }).catch(err => console.error('Failed to save ID image:', err));
         }
       } else {

@@ -155,7 +155,7 @@ export async function getDailyBookedMinutes(email: string, date: string, resourc
         AND br.status IN ('pending', 'approved', 'attended', 'confirmed')
         ${resourceFilter}`);
     
-    return parseInt((result.rows[0] as unknown as TotalMinutesRow).total_minutes) || 0;
+    return parseInt((result.rows[0] as unknown as TotalMinutesRow).total_minutes, 10) || 0;
   } catch (error: unknown) {
     logger.error('[getDailyBookedMinutes] Error:', { error: error });
     return 0;

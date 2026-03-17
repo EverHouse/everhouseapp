@@ -18,7 +18,7 @@ const auditLogQuerySchema = z.object({
 router.get('/api/data-tools/audit-log', isAdmin, validateQuery(auditLogQuerySchema), async (req: Request, res: Response) => {
   try {
     const vq = (req as Request & { validatedQuery: z.infer<typeof auditLogQuerySchema> }).validatedQuery;
-    const limitNum = parseInt(vq.limit || '20');
+    const limitNum = parseInt(vq.limit || '20', 10);
     const actionType = vq.actionType;
     
     const logs = actionType
@@ -52,7 +52,7 @@ const staffActivityQuerySchema = z.object({
 router.get('/api/data-tools/staff-activity', isAdmin, validateQuery(staffActivityQuerySchema), async (req: Request, res: Response) => {
   try {
     const vq = (req as Request & { validatedQuery: z.infer<typeof staffActivityQuerySchema> }).validatedQuery;
-    const limitParam = parseInt(vq.limit || '') || 50;
+    const limitParam = parseInt(vq.limit || '', 10) || 50;
     const staffEmail = vq.staff_email?.trim()?.toLowerCase();
     const actionsParam = vq.actions;
     const actorType = vq.actor_type;

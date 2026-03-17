@@ -294,13 +294,13 @@ router.post('/api/auth/passkey/authenticate/verify', authRateLimiterByIp, async 
       lastName: user.lastName || '',
       email: user.email || '',
       phone: user.phone || '',
-      tier: role === 'visitor' ? null : normalizeTierName(user.tier),
+      tier: role === 'visitor' ? undefined : normalizeTierName(user.tier) || undefined,
       tags: (user.tags || []) as string[],
       mindbodyClientId: user.mindbodyClientId || '',
       status: statusMap[dbMemberStatus] || (dbMemberStatus ? dbMemberStatus.charAt(0).toUpperCase() + dbMemberStatus.slice(1) : 'Active'),
       role,
       expires_at: Date.now() + sessionTtl,
-      dateOfBirth: user.dateOfBirth || null,
+      dateOfBirth: user.dateOfBirth ?? null,
     };
 
     req.session.user = member;

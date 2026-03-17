@@ -153,7 +153,7 @@ PUT /api/booking-requests/:id/member-cancel
 ## Cancel Booking (Trackman Webhook)
 
 **Function**: `cancelBookingByTrackmanId(trackmanBookingId)`
-**File**: `server/routes/trackman/webhook-handlers.ts`
+**File**: `server/routes/trackman/webhook-update.ts` (split from `webhook-handlers.ts` in v8.87.59)
 
 ```
 cancelBookingByTrackmanId(trackmanBookingId)
@@ -263,7 +263,7 @@ ensureSessionForBooking({ bookingId, resourceId, sessionDate, startTime, endTime
   │
   ├── Transaction-aware mode (v8.87.28):
   │   └── Pass createTxQueryClient(tx) as externalTx to run all SQL inside the caller's transaction
-  │       Used by: manualBooking.ts, webhook-handlers.ts (Trackman auto-approve)
+  │       Used by: manualBooking.ts, webhook-matching.ts (Trackman auto-approve)
   │
   ├── Retry logic (when not inside an external transaction):
   │   ├── First attempt fails → wait 500ms, retry once

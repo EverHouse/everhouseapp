@@ -95,7 +95,7 @@ async function getAffectedBayIds(affectedAreas: string | null | undefined): Prom
   }
   
   if (affectedAreas.startsWith('bay_') && !affectedAreas.includes(',') && !affectedAreas.includes('[')) {
-    const bayId = parseInt(affectedAreas.replace('bay_', ''));
+    const bayId = parseInt(affectedAreas.replace('bay_', ''), 10);
     if (!isNaN(bayId)) {
       return [bayId];
     }
@@ -111,12 +111,12 @@ async function getAffectedBayIds(affectedAreas: string | null | undefined): Prom
           idSet.add(item);
         } else if (typeof item === 'string') {
           if (item.startsWith('bay_')) {
-            const bayId = parseInt(item.replace('bay_', ''));
+            const bayId = parseInt(item.replace('bay_', ''), 10);
             if (!isNaN(bayId)) idSet.add(bayId);
           } else if (item === 'conference_room' || item.toLowerCase() === 'conference room') {
             if (conferenceRoomId) idSet.add(conferenceRoomId);
           } else {
-            const bayId = parseInt(item);
+            const bayId = parseInt(item, 10);
             if (!isNaN(bayId)) idSet.add(bayId);
           }
         }
@@ -131,7 +131,7 @@ async function getAffectedBayIds(affectedAreas: string | null | undefined): Prom
   
   for (const part of parts) {
     if (part.startsWith('bay_')) {
-      const bayId = parseInt(part.replace('bay_', ''));
+      const bayId = parseInt(part.replace('bay_', ''), 10);
       if (!isNaN(bayId)) {
         idSet.add(bayId);
       }
@@ -140,15 +140,15 @@ async function getAffectedBayIds(affectedAreas: string | null | undefined): Prom
     } else if (part.match(/^Bay\s*(\d+)$/i)) {
       const match = part.match(/^Bay\s*(\d+)$/i);
       if (match) {
-        idSet.add(parseInt(match[1]));
+        idSet.add(parseInt(match[1], 10));
       }
     } else if (part.match(/^Simulator\s*Bay\s*(\d+)$/i)) {
       const match = part.match(/^Simulator\s*Bay\s*(\d+)$/i);
       if (match) {
-        idSet.add(parseInt(match[1]));
+        idSet.add(parseInt(match[1], 10));
       }
     } else {
-      const parsed = parseInt(part);
+      const parsed = parseInt(part, 10);
       if (!isNaN(parsed)) {
         idSet.add(parsed);
       }
@@ -178,7 +178,7 @@ async function formatSingleAreaFromDb(area: string): Promise<string> {
   if (trimmed === 'none') return '';
 
   if (trimmed.startsWith('bay_')) {
-    const bayId = parseInt(trimmed.replace('bay_', ''));
+    const bayId = parseInt(trimmed.replace('bay_', ''), 10);
     if (!isNaN(bayId)) {
       const [resource] = await db.select({ name: resources.name }).from(resources).where(eq(resources.id, bayId));
       return resource ? resource.name : `Simulator Bay ${bayId}`;
@@ -445,7 +445,7 @@ router.post('/api/notice-types', isStaffOrAdmin, async (req, res) => {
 router.put('/api/notice-types/:id', isStaffOrAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const noticeTypeId = parseInt(id as string);
+    const noticeTypeId = parseInt(id as string, 10);
     if (isNaN(noticeTypeId)) return res.status(400).json({ error: 'Invalid notice type ID' });
     const { name, sort_order } = req.body;
     
@@ -490,7 +490,7 @@ router.put('/api/notice-types/:id', isStaffOrAdmin, async (req, res) => {
 router.delete('/api/notice-types/:id', isStaffOrAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const noticeTypeId = parseInt(id as string);
+    const noticeTypeId = parseInt(id as string, 10);
     if (isNaN(noticeTypeId)) return res.status(400).json({ error: 'Invalid notice type ID' });
     
     const [existing] = await db
@@ -572,7 +572,7 @@ router.post('/api/closure-reasons', isStaffOrAdmin, async (req, res) => {
 router.put('/api/closure-reasons/:id', isStaffOrAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const reasonId = parseInt(id as string);
+    const reasonId = parseInt(id as string, 10);
     if (isNaN(reasonId)) return res.status(400).json({ error: 'Invalid closure reason ID' });
     const { label, sort_order, is_active } = req.body;
     
@@ -609,7 +609,7 @@ router.put('/api/closure-reasons/:id', isStaffOrAdmin, async (req, res) => {
 router.delete('/api/closure-reasons/:id', isStaffOrAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const reasonId = parseInt(id as string);
+    const reasonId = parseInt(id as string, 10);
     if (isNaN(reasonId)) return res.status(400).json({ error: 'Invalid closure reason ID' });
     
     const [result] = await db
@@ -865,7 +865,7 @@ router.post('/api/closures', isStaffOrAdmin, async (req, res) => {
 router.delete('/api/closures/:id', isStaffOrAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const closureId = parseInt(id as string);
+    const closureId = parseInt(id as string, 10);
     if (isNaN(closureId)) return res.status(400).json({ error: 'Invalid closure ID' });
     
     const [closure] = await db
@@ -937,7 +937,7 @@ router.delete('/api/closures/:id', isStaffOrAdmin, async (req, res) => {
 router.put('/api/closures/:id', isStaffOrAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const closureId = parseInt(id as string);
+    const closureId = parseInt(id as string, 10);
     if (isNaN(closureId)) return res.status(400).json({ error: 'Invalid closure ID' });
     const { 
       title, 

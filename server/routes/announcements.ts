@@ -284,7 +284,7 @@ router.post('/api/announcements', isStaffOrAdmin, async (req, res) => {
 router.put('/api/announcements/:id', isStaffOrAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const announcementId = parseInt(id as string);
+    const announcementId = parseInt(id as string, 10);
     if (isNaN(announcementId)) return res.status(400).json({ error: 'Invalid announcement ID' });
     const { title, description, startDate, endDate, linkType, linkTarget, notifyMembers, showAsBanner } = req.body;
     
@@ -378,7 +378,7 @@ router.put('/api/announcements/:id', isStaffOrAdmin, async (req, res) => {
 router.delete('/api/announcements/:id', isStaffOrAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const announcementId = parseInt(id as string);
+    const announcementId = parseInt(id as string, 10);
     if (isNaN(announcementId)) return res.status(400).json({ error: 'Invalid announcement ID' });
     
     const [deleted] = await db.delete(announcements)

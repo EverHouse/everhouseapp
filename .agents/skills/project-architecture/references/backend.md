@@ -26,7 +26,7 @@ ALL business logic lives here. Routes call these modules — never write logic i
 | File | Purpose |
 |------|---------|
 | `sessionManager.ts` | `ensureSessionForBooking()`, `createSession()`, `linkParticipants()` — THE session creation function |
-| `approvalService.ts` | Booking approval/rejection logic |
+| `approvalService.ts` | Barrel re-export for approval submodules (`approvalApprove.ts`, `approvalCancel.ts`, `approvalCompletion.ts`, `approvalFlow.ts`) |
 | `availabilityGuard.ts` | Slot availability checks |
 | `bookingStateService.ts` | Booking state transitions |
 | `conflictDetection.ts` | Double-booking prevention |

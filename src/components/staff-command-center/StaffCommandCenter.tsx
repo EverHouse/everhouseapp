@@ -125,7 +125,7 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
       if (bookingId) {
         updatePendingRequests(prev => prev.filter(r => String(r.id) !== String(bookingId)));
 
-        const apiId = typeof bookingId === 'string' ? parseInt(String(bookingId).replace('cal_', '')) : bookingId;
+        const apiId = typeof bookingId === 'string' ? parseInt(String(bookingId).replace('cal_', ''), 10) : bookingId;
         const newActivity: RecentActivity = {
           id: `auto-confirm-${apiId}-${Date.now()}`,
           type: 'booking_approved',
@@ -335,7 +335,7 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
   };
 
   const handleTrackmanConfirm = async (bookingId: number | string, trackmanBookingId: string) => {
-    const apiId = typeof bookingId === 'string' ? parseInt(String(bookingId).replace('cal_', '')) : bookingId;
+    const apiId = typeof bookingId === 'string' ? parseInt(String(bookingId).replace('cal_', ''), 10) : bookingId;
     const booking = data.pendingRequests.find(r => r.id === bookingId);
     
     const previousPendingRequests = [...data.pendingRequests];
@@ -368,7 +368,7 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
   };
 
   const handleDevConfirm = async (bookingId: number | string) => {
-    const apiId = typeof bookingId === 'string' ? parseInt(String(bookingId).replace('cal_', '')) : bookingId;
+    const apiId = typeof bookingId === 'string' ? parseInt(String(bookingId).replace('cal_', ''), 10) : bookingId;
     const resData = await postWithCredentials<{ totalFeeCents?: number }>(`/api/admin/bookings/${apiId}/dev-confirm`, {});
     const totalFee = (resData.totalFeeCents || 0) / 100;
     showToast(`Confirmed! Total fees: $${totalFee.toFixed(2)}`, 'success');
@@ -377,7 +377,7 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
   };
 
   const handleApprove = async (request: BookingRequest) => {
-    const apiId = typeof request.id === 'string' ? parseInt(String(request.id).replace('cal_', '')) : request.id;
+    const apiId = typeof request.id === 'string' ? parseInt(String(request.id).replace('cal_', ''), 10) : request.id;
     setActionInProgress(`approve-${request.id}`);
     
     const previousPendingRequests = [...data.pendingRequests];
@@ -409,7 +409,7 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
   };
 
   const handleDeny = async (request: BookingRequest) => {
-    const apiId = typeof request.id === 'string' ? parseInt(String(request.id).replace('cal_', '')) : request.id;
+    const apiId = typeof request.id === 'string' ? parseInt(String(request.id).replace('cal_', ''), 10) : request.id;
     setActionInProgress(`deny-${request.id}`);
     
     const previousPendingRequests = [...data.pendingRequests];
@@ -440,7 +440,7 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
   };
 
   const handleCompleteCancellation = async (request: BookingRequest) => {
-    const apiId = typeof request.id === 'string' ? parseInt(String(request.id).replace('cal_', '')) : request.id;
+    const apiId = typeof request.id === 'string' ? parseInt(String(request.id).replace('cal_', ''), 10) : request.id;
     setActionInProgress(`complete-cancel-${request.id}`);
     
     const previousPendingRequests = [...data.pendingRequests];
@@ -475,7 +475,7 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
   };
 
   const handleCheckIn = async (booking: BookingRequest, targetStatus?: 'attended' | 'no_show' | 'approved') => {
-    const id = typeof booking.id === 'string' ? parseInt(String(booking.id).replace('cal_', '')) : booking.id;
+    const id = typeof booking.id === 'string' ? parseInt(String(booking.id).replace('cal_', ''), 10) : booking.id;
     setActionInProgress(`checkin-${id}`);
     
     const originalStatus = booking.status;

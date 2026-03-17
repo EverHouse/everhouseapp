@@ -485,7 +485,7 @@ const clearOtpVerifyAttempts = async (email: string, ip?: string): Promise<void>
 };
 
 
-router.post('/api/auth/verify-member', async (req, res) => {
+router.post('/api/auth/verify-member', ...authRateLimiter, async (req, res) => {
   try {
     const { email } = req.body;
     
@@ -732,7 +732,7 @@ router.post('/api/auth/verify-member', async (req, res) => {
 });
 
 
-router.post('/api/auth/request-otp', async (req, res) => {
+router.post('/api/auth/request-otp', ...authRateLimiter, async (req, res) => {
   try {
     const { email } = req.body;
     
@@ -888,7 +888,7 @@ router.post('/api/auth/request-otp', async (req, res) => {
   }
 });
 
-router.post('/api/auth/verify-otp', async (req, res) => {
+router.post('/api/auth/verify-otp', ...authRateLimiter, async (req, res) => {
   try {
     const { email, code } = req.body;
     
@@ -1027,7 +1027,7 @@ router.post('/api/auth/verify-otp', async (req, res) => {
           lastName: dbUser[0].lastName || '',
           email: dbUser[0].email || normalizedEmail,
           phone: dbUser[0].phone || '',
-          tier: role === 'visitor' ? null : normalizeTierName(dbUser[0].tier),
+          tier: role === 'visitor' ? undefined : normalizeTierName(dbUser[0].tier) || undefined,
           tags: (dbUser[0].tags || []) as string[],
           mindbodyClientId: dbUser[0].mindbodyClientId || '',
           status: statusMap[dbMemberStatus] || (dbMemberStatus ? dbMemberStatus.charAt(0).toUpperCase() + dbMemberStatus.slice(1) : 'Active'),
@@ -1094,7 +1094,7 @@ router.post('/api/auth/verify-otp', async (req, res) => {
           lastName: (hasDbUser ? dbUser[0].lastName : contact?.properties?.lastname) || '',
           email: (hasDbUser ? dbUser[0].email : contact?.properties?.email) || normalizedEmail,
           phone: (hasDbUser ? dbUser[0].phone : contact?.properties?.phone) || '',
-          tier: role === 'visitor' ? null : normalizeTierName(hasDbUser ? dbUser[0].tier : contact?.properties?.membership_tier),
+          tier: role === 'visitor' ? undefined : normalizeTierName(hasDbUser ? dbUser[0].tier : contact?.properties?.membership_tier) || undefined,
           tags: tags as string[],
           mindbodyClientId: (hasDbUser ? dbUser[0].mindbodyClientId : contact?.properties?.mindbody_client_id) || '',
           status: statusMap[memberStatusStr] || (memberStatusStr ? memberStatusStr.charAt(0).toUpperCase() + memberStatusStr.slice(1) : 'Active'),
@@ -1106,6 +1106,10 @@ router.post('/api/auth/verify-otp', async (req, res) => {
       }
     }
     
+    if (!member) {
+      return res.status(500).json({ error: 'Failed to resolve member identity' });
+    }
+
     req.session.user = member;
 
     const supabaseToken = await createSupabaseToken(member as unknown as { id: string; email: string; role: string; firstName?: string; lastName?: string });
@@ -1383,7 +1387,7 @@ router.post('/api/auth/password-login', ...authRateLimiter, async (req, res) => 
       lastName: memberData?.lastName || userRecord.name?.split(' ').slice(1).join(' ') || '',
       email: normalizedEmail,
       phone: memberData?.phone || '',
-      tier: userRole === 'member' ? (memberData?.tier || DEFAULT_TIER) : null,
+      tier: userRole === 'member' ? (memberData?.tier || DEFAULT_TIER) : undefined,
       tags: memberData?.tags || [],
       mindbodyClientId: memberData?.mindbodyClientId || '',
       membershipStartDate: memberData?.membershipStartDate || '',
@@ -1398,7 +1402,7 @@ router.post('/api/auth/password-login', ...authRateLimiter, async (req, res) => 
     
     const dbUserId2 = await upsertUserWithTier({
       email: member.email,
-      tierName: member.tier,
+      tierName: member.tier ?? '',
       firstName: member.firstName,
       lastName: member.lastName,
       phone: member.phone,

@@ -656,7 +656,7 @@ export async function createBalanceAwarePayment(params: {
     if (balanceTransactionId) stripeMetadata.balanceTransactionId = balanceTransactionId;
 
     const participantIds: number[] = metadata?.participantIds 
-      ? metadata.participantIds.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id))
+      ? metadata.participantIds.split(',').map(id => parseInt(id.trim(), 10)).filter(id => !isNaN(id))
       : [];
     const idempotencyKey = bookingId && sessionId
       ? generatePaymentIdempotencyKey(bookingId, sessionId, participantIds, remainingCents)

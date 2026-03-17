@@ -362,7 +362,7 @@ const History: React.FC = () => {
                     {displayedMonths.map((monthKey, monthIndex) => {
                       const monthPurchases = groupedByMonth[monthKey];
                       const [year, month] = monthKey.split('-');
-                      const monthLabel = new Date(parseInt(year), parseInt(month) - 1, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'America/Los_Angeles' });
+                      const monthLabel = new Date(parseInt(year, 10), parseInt(month, 10) - 1, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'America/Los_Angeles' });
                       
                       return (
                         <div key={monthKey} className={monthIndex < 10 ? `animate-content-enter-delay-${monthIndex}` : 'animate-content-enter'}>

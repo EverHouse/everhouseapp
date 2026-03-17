@@ -73,6 +73,8 @@ router.post('/api/admin/faqs', isStaffOrAdmin, async (req, res) => {
 router.put('/api/admin/faqs/:id', isStaffOrAdmin, async (req, res) => {
   try {
     const { id } = req.params;
+    const faqId = parseInt(id as string, 10);
+    if (isNaN(faqId)) return res.status(400).json({ error: 'Invalid FAQ ID' });
     const { question, answer, category, sortOrder, isActive } = req.body;
     
     const [updated] = await db.update(faqs)
@@ -84,7 +86,7 @@ router.put('/api/admin/faqs/:id', isStaffOrAdmin, async (req, res) => {
         ...(isActive !== undefined && { isActive }),
         updatedAt: new Date(),
       })
-      .where(eq(faqs.id, parseInt(id as string)))
+      .where(eq(faqs.id, faqId))
       .returning();
     
     if (!updated) {
@@ -103,9 +105,11 @@ router.put('/api/admin/faqs/:id', isStaffOrAdmin, async (req, res) => {
 router.delete('/api/admin/faqs/:id', isStaffOrAdmin, async (req, res) => {
   try {
     const { id } = req.params;
+    const faqId = parseInt(id as string, 10);
+    if (isNaN(faqId)) return res.status(400).json({ error: 'Invalid FAQ ID' });
     
     const [deleted] = await db.delete(faqs)
-      .where(eq(faqs.id, parseInt(id as string)))
+      .where(eq(faqs.id, faqId))
       .returning();
     
     if (!deleted) {

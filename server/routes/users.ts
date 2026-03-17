@@ -122,7 +122,7 @@ router.post('/api/staff-users', isAdmin, async (req, res) => {
 router.put('/api/staff-users/:id', isAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    if (isNaN(parseInt(id as string))) return res.status(400).json({ error: 'Invalid staff user ID' });
+    if (isNaN(parseInt(id as string, 10))) return res.status(400).json({ error: 'Invalid staff user ID' });
     const { email: rawEmail, name, first_name, last_name, phone, job_title, role, is_active } = req.body;
     const email = rawEmail?.trim()?.toLowerCase();
     
@@ -139,7 +139,7 @@ router.put('/api/staff-users/:id', isAdmin, async (req, res) => {
     if (is_active === false || (role !== undefined && role !== 'admin')) {
       const currentUser = await db.select({ role: staffUsers.role, isActive: staffUsers.isActive })
         .from(staffUsers)
-        .where(eq(staffUsers.id, parseInt(id as string)));
+        .where(eq(staffUsers.id, parseInt(id as string, 10)));
       
       if (currentUser.length > 0 && currentUser[0].role === 'admin' && currentUser[0].isActive) {
         const adminCount = await db.select({ count: sql<number>`count(*)::int` })
@@ -154,7 +154,7 @@ router.put('/api/staff-users/:id', isAdmin, async (req, res) => {
 
     const result = await db.update(staffUsers)
       .set(updateData)
-      .where(eq(staffUsers.id, parseInt(id as string)))
+      .where(eq(staffUsers.id, parseInt(id as string, 10)))
       .returning();
     
     if (result.length === 0) {
@@ -168,7 +168,7 @@ router.put('/api/staff-users/:id', isAdmin, async (req, res) => {
         .where(and(
           eq(sql`LOWER(${staffUsers.email})`, staffEmail),
           eq(staffUsers.isActive, true),
-          sql`${staffUsers.id} != ${parseInt(id as string)}`
+          sql`${staffUsers.id} != ${parseInt(id as string, 10)}`
         ))
         .limit(1);
 
@@ -217,11 +217,11 @@ router.put('/api/staff-users/:id', isAdmin, async (req, res) => {
 router.delete('/api/staff-users/:id', isAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    if (isNaN(parseInt(id as string))) return res.status(400).json({ error: 'Invalid staff user ID' });
+    if (isNaN(parseInt(id as string, 10))) return res.status(400).json({ error: 'Invalid staff user ID' });
     
     const targetUser = await db.select({ role: staffUsers.role, isActive: staffUsers.isActive })
       .from(staffUsers)
-      .where(eq(staffUsers.id, parseInt(id as string)));
+      .where(eq(staffUsers.id, parseInt(id as string, 10)));
     
     if (targetUser.length > 0 && targetUser[0].role === 'admin' && targetUser[0].isActive) {
       const adminCount = await db.select({ count: sql<number>`count(*)::int` })
@@ -234,7 +234,7 @@ router.delete('/api/staff-users/:id', isAdmin, async (req, res) => {
     }
     
     const result = await db.delete(staffUsers)
-      .where(eq(staffUsers.id, parseInt(id as string)))
+      .where(eq(staffUsers.id, parseInt(id as string, 10)))
       .returning();
     
     if (result.length === 0) {
@@ -403,7 +403,7 @@ router.put('/api/admin-users/:id', isAdmin, async (req, res) => {
         .where(and(
           eq(sql`LOWER(${staffUsers.email})`, adminEmail),
           eq(staffUsers.isActive, true),
-          sql`${staffUsers.id} != ${parseInt(id as string)}`
+          sql`${staffUsers.id} != ${parseInt(id as string, 10)}`
         ))
         .limit(1);
 

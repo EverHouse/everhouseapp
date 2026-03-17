@@ -957,6 +957,8 @@ router.post('/api/admin/training-sections', isAdmin, async (req, res) => {
 router.put('/api/admin/training-sections/:id', isAdmin, async (req, res) => {
   try {
     const { id } = req.params;
+    const sectionId = parseInt(id as string, 10);
+    if (isNaN(sectionId)) return res.status(400).json({ error: 'Invalid section ID' });
     const { icon, title, description, steps, isAdminOnly, sortOrder } = req.body;
     
     const [updated] = await db.update(trainingSections)
@@ -969,7 +971,7 @@ router.put('/api/admin/training-sections/:id', isAdmin, async (req, res) => {
         ...(sortOrder !== undefined && { sortOrder }),
         updatedAt: new Date(),
       })
-      .where(eq(trainingSections.id, parseInt(id as string)))
+      .where(eq(trainingSections.id, sectionId))
       .returning();
     
     if (!updated) {
@@ -987,9 +989,11 @@ router.put('/api/admin/training-sections/:id', isAdmin, async (req, res) => {
 router.delete('/api/admin/training-sections/:id', isAdmin, async (req, res) => {
   try {
     const { id } = req.params;
+    const sectionId = parseInt(id as string, 10);
+    if (isNaN(sectionId)) return res.status(400).json({ error: 'Invalid section ID' });
     
     const [deleted] = await db.delete(trainingSections)
-      .where(eq(trainingSections.id, parseInt(id as string)))
+      .where(eq(trainingSections.id, sectionId))
       .returning();
     
     if (!deleted) {

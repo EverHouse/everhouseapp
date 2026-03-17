@@ -20,7 +20,7 @@ Violating any of these rules has caused real data integrity issues in the past.
 | Manual booking | `server/routes/staff/manualBooking.ts` | Staff manual booking |
 | Check-in | `server/routes/staffCheckin.ts` | Check-in flow, session creation |
 | Roster changes | `server/routes/roster.ts` | Roster edits, optimistic locking |
-| Webhook handlers | `server/routes/trackman/webhook-handlers.ts` | Webhook booking updates |
+| Webhook handlers | `server/routes/trackman/webhook-handlers.ts` (barrel) → `webhook-modification.ts`, `webhook-matching.ts`, `webhook-update.ts` | Webhook booking updates |
 | Webhook billing | `server/routes/trackman/webhook-billing.ts` | Session creation, fee recalc |
 | Cancellation | `server/core/bookingService/bookingStateService.ts` | Centralized cancel with side-effects |
 | Invoice lifecycle | `server/core/billing/bookingInvoiceService.ts` | Draft, sync, finalize, void |

@@ -88,7 +88,7 @@ const MemberEvents: React.FC = () => {
       const previousRsvps = queryClient.getQueryData<UserRsvp[]>(['user-rsvps', user?.email]);
       queryClient.setQueryData<UserRsvp[]>(['user-rsvps', user?.email], (old = []) => [
         ...old,
-        { event_id: parseInt(eventId), status: 'confirmed' }
+        { event_id: parseInt(eventId, 10), status: 'confirmed' }
       ]);
       return { previousRsvps, eventId };
     },
@@ -118,7 +118,7 @@ const MemberEvents: React.FC = () => {
       await queryClient.cancelQueries({ queryKey: ['user-rsvps', user?.email] });
       const previousRsvps = queryClient.getQueryData<UserRsvp[]>(['user-rsvps', user?.email]);
       queryClient.setQueryData<UserRsvp[]>(['user-rsvps', user?.email], (old = []) =>
-        old.filter(r => r.event_id !== parseInt(eventId))
+        old.filter(r => r.event_id !== parseInt(eventId, 10))
       );
       return { previousRsvps, eventId };
     },
@@ -167,7 +167,7 @@ const MemberEvents: React.FC = () => {
   }, [events, filter]);
 
   const hasRsvp = (eventId: string) => {
-    return userRsvps.some(r => r.event_id === parseInt(eventId) && r.status === 'confirmed');
+    return userRsvps.some(r => r.event_id === parseInt(eventId, 10) && r.status === 'confirmed');
   };
 
   const handleCardClick = (eventId: string) => {
@@ -221,8 +221,8 @@ const MemberEvents: React.FC = () => {
     let minutes: number;
     
     if (match12Hour) {
-      hours = parseInt(match12Hour[1]);
-      minutes = match12Hour[2] ? parseInt(match12Hour[2]) : 0;
+      hours = parseInt(match12Hour[1], 10);
+      minutes = match12Hour[2] ? parseInt(match12Hour[2], 10) : 0;
       const period = match12Hour[3].toUpperCase();
       if (period === 'AM') {
         hours = hours === 12 ? 0 : hours;
@@ -230,8 +230,8 @@ const MemberEvents: React.FC = () => {
         hours = hours === 12 ? 12 : hours + 12;
       }
     } else if (match24Hour) {
-      hours = parseInt(match24Hour[1]);
-      minutes = parseInt(match24Hour[2]);
+      hours = parseInt(match24Hour[1], 10);
+      minutes = parseInt(match24Hour[2], 10);
     } else {
       hours = 12;
       minutes = 0;

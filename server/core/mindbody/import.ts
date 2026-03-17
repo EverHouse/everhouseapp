@@ -91,9 +91,9 @@ function parseDate(dateStr: string | undefined): Date | null {
   // Handle MM/DD/YYYY format
   const parts = dateStr.split('/');
   if (parts.length === 3) {
-    const month = parseInt(parts[0]) - 1;
-    const day = parseInt(parts[1]);
-    const year = parseInt(parts[2]);
+    const month = parseInt(parts[0], 10) - 1;
+    const day = parseInt(parts[1], 10);
+    const year = parseInt(parts[2], 10);
     return new Date(year, month, day);
   }
   return new Date(dateStr);
@@ -420,7 +420,7 @@ export async function importSalesFromContent(content: string, clientLookup?: Map
       }
       
       const itemPriceCents = dollarsToCents(fields[headerMap['itemprice']]);
-      const quantity = parseInt(fields[headerMap['quantity']] || '1') || 1;
+      const quantity = parseInt(fields[headerMap['quantity']] || '1', 10) || 1;
       const subtotalCents = dollarsToCents(fields[headerMap['subtotal']]);
       const discountPercent = parseFloat(fields[headerMap['discount%']] || '0') || 0;
       const discountAmountCents = dollarsToCents(fields[headerMap['discountamount']]);
@@ -623,7 +623,7 @@ export async function importSalesFromCSV(csvPath: string, batchId?: string): Pro
         .limit(1);
       
       const itemPriceCents = dollarsToCents(fields[headerMap['itemprice']]);
-      const quantity = parseInt(fields[headerMap['quantity']] || '1') || 1;
+      const quantity = parseInt(fields[headerMap['quantity']] || '1', 10) || 1;
       const subtotalCents = dollarsToCents(fields[headerMap['subtotal']]);
       const discountPercent = parseFloat(fields[headerMap['discount%']] || '0') || 0;
       const discountAmountCents = dollarsToCents(fields[headerMap['discountamount']]);
@@ -712,7 +712,7 @@ export async function importAttendanceFromCSV(csvPath: string): Promise<{
     
     try {
       const clientId = fields[headerMap['id']] || '';
-      const totalVisits = parseInt(fields[headerMap['totalvisits']] || '0') || 0;
+      const totalVisits = parseInt(fields[headerMap['totalvisits']] || '0', 10) || 0;
       
       if (!clientId) {
         result.skipped++;

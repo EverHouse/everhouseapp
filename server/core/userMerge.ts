@@ -102,81 +102,81 @@ export async function previewMerge(primaryUserId: string, secondaryUserId: strin
   
   // Count bookings (all booking requests for this user)
   const bookingsResult = await db.execute(sql`SELECT COUNT(*) as count FROM booking_requests WHERE LOWER(user_email) = ${secondaryEmail} OR user_id = ${secondaryUserId}`);
-  const bookingsCount = parseInt((bookingsResult.rows as Array<Record<string, unknown>>)[0]?.count as string || '0');
+  const bookingsCount = parseInt((bookingsResult.rows as Array<Record<string, unknown>>)[0]?.count as string || '0', 10);
   
   // Count attended visits (booking requests with attended status)
   const visitsResult = await db.execute(sql`SELECT COUNT(*) as count FROM booking_requests 
      WHERE (LOWER(user_email) = ${secondaryEmail} OR user_id = ${secondaryUserId}) 
      AND status = 'attended'`);
-  const visitsCount = parseInt((visitsResult.rows as Array<Record<string, unknown>>)[0]?.count as string || '0');
+  const visitsCount = parseInt((visitsResult.rows as Array<Record<string, unknown>>)[0]?.count as string || '0', 10);
   
   // Count wellness enrollments
   const wellnessResult = await db.execute(sql`SELECT COUNT(*) as count FROM wellness_enrollments WHERE LOWER(user_email) = ${secondaryEmail}`);
-  const wellnessCount = parseInt((wellnessResult.rows as Array<Record<string, unknown>>)[0]?.count as string || '0');
+  const wellnessCount = parseInt((wellnessResult.rows as Array<Record<string, unknown>>)[0]?.count as string || '0', 10);
   
   // Count event RSVPs (uses user_email column)
   const eventRsvpsResult = await db.execute(sql`SELECT COUNT(*) as count FROM event_rsvps WHERE LOWER(user_email) = ${secondaryEmail}`);
-  const eventRsvpsCount = parseInt((eventRsvpsResult.rows as Array<Record<string, unknown>>)[0]?.count as string || '0');
+  const eventRsvpsCount = parseInt((eventRsvpsResult.rows as Array<Record<string, unknown>>)[0]?.count as string || '0', 10);
   
   // Count notifications (uses user_email column)
   const notificationsResult = await db.execute(sql`SELECT COUNT(*) as count FROM notifications WHERE LOWER(user_email) = ${secondaryEmail}`);
-  const notificationsCount = parseInt((notificationsResult.rows as Array<Record<string, unknown>>)[0]?.count as string || '0');
+  const notificationsCount = parseInt((notificationsResult.rows as Array<Record<string, unknown>>)[0]?.count as string || '0', 10);
   
   // Count member notes
   const memberNotesResult = await db.execute(sql`SELECT COUNT(*) as count FROM member_notes WHERE LOWER(member_email) = ${secondaryEmail}`);
-  const memberNotesCount = parseInt((memberNotesResult.rows as Array<Record<string, unknown>>)[0]?.count as string || '0');
+  const memberNotesCount = parseInt((memberNotesResult.rows as Array<Record<string, unknown>>)[0]?.count as string || '0', 10);
   
   // Count guest check-ins (uses member_email column)
   const guestCheckInsResult = await db.execute(sql`SELECT COUNT(*) as count FROM guest_check_ins WHERE LOWER(member_email) = ${secondaryEmail}`);
-  const guestCheckInsCount = parseInt((guestCheckInsResult.rows as Array<Record<string, unknown>>)[0]?.count as string || '0');
+  const guestCheckInsCount = parseInt((guestCheckInsResult.rows as Array<Record<string, unknown>>)[0]?.count as string || '0', 10);
   
   // Count usage ledger entries (uses member_id column)
   const usageLedgerResult = await db.execute(sql`SELECT COUNT(*) as count FROM usage_ledger WHERE member_id = ${secondaryUserId}`);
-  const usageLedgerCount = parseInt((usageLedgerResult.rows as Array<Record<string, unknown>>)[0]?.count as string || '0');
+  const usageLedgerCount = parseInt((usageLedgerResult.rows as Array<Record<string, unknown>>)[0]?.count as string || '0', 10);
   
   // Count booking participants (uses user_id column)
   const bookingParticipantsResult = await db.execute(sql`SELECT COUNT(*) as count FROM booking_participants WHERE user_id = ${secondaryUserId}`);
-  const bookingParticipantsCount = parseInt((bookingParticipantsResult.rows as Array<Record<string, unknown>>)[0]?.count as string || '0');
+  const bookingParticipantsCount = parseInt((bookingParticipantsResult.rows as Array<Record<string, unknown>>)[0]?.count as string || '0', 10);
   
   // Count day pass purchases (uses user_id and purchaser_email columns)
   const dayPassResult = await db.execute(sql`SELECT COUNT(*) as count FROM day_pass_purchases WHERE user_id = ${secondaryUserId} OR LOWER(purchaser_email) = ${secondaryEmail}`);
-  const dayPassCount = parseInt((dayPassResult.rows as Array<Record<string, unknown>>)[0]?.count as string || '0');
+  const dayPassCount = parseInt((dayPassResult.rows as Array<Record<string, unknown>>)[0]?.count as string || '0', 10);
   
   // Count legacy purchases (uses user_id and member_email columns)
   const legacyPurchasesResult = await db.execute(sql`SELECT COUNT(*) as count FROM legacy_purchases WHERE user_id = ${secondaryUserId} OR LOWER(member_email) = ${secondaryEmail}`);
-  const legacyPurchasesCount = parseInt((legacyPurchasesResult.rows as Array<Record<string, unknown>>)[0]?.count as string || '0');
+  const legacyPurchasesCount = parseInt((legacyPurchasesResult.rows as Array<Record<string, unknown>>)[0]?.count as string || '0', 10);
   
   // Count group members (uses member_email column)
   const groupMembersResult = await db.execute(sql`SELECT COUNT(*) as count FROM group_members WHERE LOWER(member_email) = ${secondaryEmail}`);
-  const groupMembersCount = parseInt((groupMembersResult.rows as Array<Record<string, unknown>>)[0]?.count as string || '0');
+  const groupMembersCount = parseInt((groupMembersResult.rows as Array<Record<string, unknown>>)[0]?.count as string || '0', 10);
   
   // Count push subscriptions (uses user_email column)
   const pushSubscriptionsResult = await db.execute(sql`SELECT COUNT(*) as count FROM push_subscriptions WHERE LOWER(user_email) = ${secondaryEmail}`);
-  const pushSubscriptionsCount = parseInt((pushSubscriptionsResult.rows as Array<Record<string, unknown>>)[0]?.count as string || '0');
+  const pushSubscriptionsCount = parseInt((pushSubscriptionsResult.rows as Array<Record<string, unknown>>)[0]?.count as string || '0', 10);
   
   // Count dismissed notices (uses user_email column)
   const dismissedNoticesResult = await db.execute(sql`SELECT COUNT(*) as count FROM user_dismissed_notices WHERE LOWER(user_email) = ${secondaryEmail}`);
-  const dismissedNoticesCount = parseInt((dismissedNoticesResult.rows as Array<Record<string, unknown>>)[0]?.count as string || '0');
+  const dismissedNoticesCount = parseInt((dismissedNoticesResult.rows as Array<Record<string, unknown>>)[0]?.count as string || '0', 10);
   
   // Count billing groups where user is primary payer (uses primary_email column)
   const billingGroupsResult = await db.execute(sql`SELECT COUNT(*) as count FROM billing_groups WHERE LOWER(primary_email) = ${secondaryEmail}`);
-  const billingGroupsCount = parseInt((billingGroupsResult.rows as Array<Record<string, unknown>>)[0]?.count as string || '0');
+  const billingGroupsCount = parseInt((billingGroupsResult.rows as Array<Record<string, unknown>>)[0]?.count as string || '0', 10);
   
   // Count bug reports (uses user_email column)
   const bugReportsResult = await db.execute(sql`SELECT COUNT(*) as count FROM bug_reports WHERE LOWER(user_email) = ${secondaryEmail}`);
-  const bugReportsCount = parseInt((bugReportsResult.rows as Array<Record<string, unknown>>)[0]?.count as string || '0');
+  const bugReportsCount = parseInt((bugReportsResult.rows as Array<Record<string, unknown>>)[0]?.count as string || '0', 10);
   
   // Count data export requests (uses user_email column)
   const dataExportResult = await db.execute(sql`SELECT COUNT(*) as count FROM data_export_requests WHERE LOWER(user_email) = ${secondaryEmail}`);
-  const dataExportCount = parseInt((dataExportResult.rows as Array<Record<string, unknown>>)[0]?.count as string || '0');
+  const dataExportCount = parseInt((dataExportResult.rows as Array<Record<string, unknown>>)[0]?.count as string || '0', 10);
   
   // Count HubSpot deals (uses member_email column)
   const hubspotDealsResult = await db.execute(sql`SELECT COUNT(*) as count FROM hubspot_deals WHERE LOWER(member_email) = ${secondaryEmail}`);
-  const hubspotDealsCount = parseInt((hubspotDealsResult.rows as Array<Record<string, unknown>>)[0]?.count as string || '0');
+  const hubspotDealsCount = parseInt((hubspotDealsResult.rows as Array<Record<string, unknown>>)[0]?.count as string || '0', 10);
   
   // Count Stripe payment intents (uses user_id column)
   const stripePaymentIntentsResult = await db.execute(sql`SELECT COUNT(*) as count FROM stripe_payment_intents WHERE user_id = ${secondaryUserId}`);
-  const stripePaymentIntentsCount = parseInt((stripePaymentIntentsResult.rows as Array<Record<string, unknown>>)[0]?.count as string || '0');
+  const stripePaymentIntentsCount = parseInt((stripePaymentIntentsResult.rows as Array<Record<string, unknown>>)[0]?.count as string || '0', 10);
   
   const conflicts: string[] = [];
   const recommendations: string[] = [];
@@ -360,7 +360,7 @@ async function executeMergeInternal(
     // Just count how many attended bookings were transferred
     const attendedResult = await tx.execute(sql`SELECT COUNT(*) as count FROM booking_requests 
        WHERE (LOWER(user_email) = ${primaryEmail} OR user_id = ${primaryUserId}) AND status = 'attended'`);
-    recordsMerged.visits = parseInt((attendedResult.rows as Array<Record<string, unknown>>)[0]?.count as string || '0');
+    recordsMerged.visits = parseInt((attendedResult.rows as Array<Record<string, unknown>>)[0]?.count as string || '0', 10);
     
     // Update wellness enrollments
     const wellnessResult = await tx.execute(sql`UPDATE wellness_enrollments SET user_email = ${primaryEmail} WHERE LOWER(user_email) = ${secondaryEmail}`);

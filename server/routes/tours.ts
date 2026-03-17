@@ -165,7 +165,7 @@ router.get('/api/tours/today', isStaffOrAdmin, async (req, res) => {
 router.post('/api/tours/:id/checkin', isStaffOrAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const tourId = parseInt(id as string);
+    const tourId = parseInt(id as string, 10);
     if (isNaN(tourId)) return res.status(400).json({ error: 'Invalid tour ID' });
     const staffEmail = getSessionUser(req)?.email || req.body.staffEmail;
     
@@ -218,7 +218,7 @@ router.patch('/api/tours/:id/status', isStaffOrAdmin, async (req, res) => {
       return res.status(400).json({ error: `Invalid status. Must be one of: ${validStatuses.join(', ')}` });
     }
     
-    const tourId = parseInt(id as string);
+    const tourId = parseInt(id as string, 10);
     if (isNaN(tourId)) return res.status(400).json({ error: 'Invalid tour ID' });
     
     const [existingTour] = await db.select().from(tours).where(eq(tours.id, tourId));
@@ -352,7 +352,7 @@ router.patch('/api/tours/:id/confirm', checkoutRateLimiter, async (req, res) => 
       return res.status(400).json({ error: 'Email is required to confirm a tour' });
     }
 
-    const tourId = parseInt(Array.isArray(id) ? id[0] : id);
+    const tourId = parseInt(Array.isArray(id) ? id[0] : id, 10);
     if (isNaN(tourId)) {
       return res.status(400).json({ error: 'Invalid tour ID' });
     }

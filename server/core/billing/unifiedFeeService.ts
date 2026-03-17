@@ -276,7 +276,7 @@ async function loadSessionData(sessionId?: number, bookingId?: number): Promise<
       sessionDate: session.session_date,
       startTime: session.start_time,
       sessionDuration: session.duration_minutes,
-      declaredPlayerCount: parseInt(String(session.declared_player_count)) || 1,
+      declaredPlayerCount: parseInt(String(session.declared_player_count), 10) || 1,
       hostEmail: session.host_email || '',
       isConferenceRoom: session.resource_type === 'conference_room',
       participants: participants.map(p => ({
@@ -521,7 +521,7 @@ export async function computeFeeBreakdown(params: FeeComputeParams): Promise<Fee
         FROM all_usage
         GROUP BY identifier
       `);
-      (usageResult.rows as unknown as UsageRow[]).forEach(r => usageMap.set(r.identifier, parseInt(String(r.used)) || 0));
+      (usageResult.rows as unknown as UsageRow[]).forEach(r => usageMap.set(r.identifier, parseInt(String(r.used), 10) || 0));
     } else {
       // Filter by resource type to separate simulator vs conference room usage
       const resourceTypeFilter = isConferenceRoom ? 'conference_room' : 'simulator';
@@ -608,7 +608,7 @@ export async function computeFeeBreakdown(params: FeeComputeParams): Promise<Fee
              SELECT * FROM ghost_usage
            ) combined
            GROUP BY identifier`);
-      (usageResult.rows as unknown as UsageRow[]).forEach(r => usageMap.set(r.identifier, parseInt(String(r.used)) || 0));
+      (usageResult.rows as unknown as UsageRow[]).forEach(r => usageMap.set(r.identifier, parseInt(String(r.used), 10) || 0));
     }
   }
 

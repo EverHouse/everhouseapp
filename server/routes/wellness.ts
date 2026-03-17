@@ -183,7 +183,7 @@ router.post('/api/wellness-classes/backfill-calendar', isStaffOrAdmin, async (re
     const convertTo24Hour = (timeStr: string): string => {
       const match12h = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
       if (match12h) {
-        let hours = parseInt(match12h[1]);
+        let hours = parseInt(match12h[1], 10);
         const minutes = match12h[2];
         const period = match12h[3].toUpperCase();
         if (period === 'PM' && hours !== 12) hours += 12;
@@ -202,7 +202,7 @@ router.post('/api/wellness-classes/backfill-calendar', isStaffOrAdmin, async (re
     
     const calculateEndTime = (startTime24: string, durationStr: string): string => {
       const durationMatch = durationStr.match(/(\d+)/);
-      const durationMinutes = durationMatch ? parseInt(durationMatch[1]) : 60;
+      const durationMinutes = durationMatch ? parseInt(durationMatch[1], 10) : 60;
       const [hours, minutes] = startTime24.split(':').map(Number);
       const totalMinutes = hours * 60 + minutes + durationMinutes;
       const endHours = Math.floor(totalMinutes / 60) % 24;
@@ -283,7 +283,7 @@ router.get('/api/wellness-classes/needs-review', isStaffOrAdmin, async (req, res
 router.post('/api/wellness-classes/:id/mark-reviewed', isStaffOrAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const numId = parseInt(id as string);
+    const numId = parseInt(id as string, 10);
     if (isNaN(numId)) return res.status(400).json({ error: 'Invalid wellness class ID' });
     const { applyToAll } = req.body;
     const sessionUser = getSessionUser(req);
@@ -448,12 +448,12 @@ router.post('/api/wellness-classes', isStaffOrAdmin, async (req, res) => {
     }
     
     const finalSpots = spots || (capacity ? `${capacity} spots` : 'Unlimited');
-    const finalCapacity = capacity || (spots ? parseInt(spots.toString().replace(/[^0-9]/g, '')) || null : null);
+    const finalCapacity = capacity || (spots ? parseInt(spots.toString().replace(/[^0-9]/g, ''), 10) || null : null);
     
     const convertTo24Hour = (timeStr: string): string => {
       const match12h = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
       if (match12h) {
-        let hours = parseInt(match12h[1]);
+        let hours = parseInt(match12h[1], 10);
         const minutes = match12h[2];
         const period = match12h[3].toUpperCase();
         if (period === 'PM' && hours !== 12) hours += 12;
@@ -472,7 +472,7 @@ router.post('/api/wellness-classes', isStaffOrAdmin, async (req, res) => {
     
     const calculateEndTime = (startTime24: string, durationStr: string): string => {
       const durationMatch = durationStr.match(/(\d+)/);
-      const durationMinutes = durationMatch ? parseInt(durationMatch[1]) : 60;
+      const durationMinutes = durationMatch ? parseInt(durationMatch[1], 10) : 60;
       const [hours, minutes] = startTime24.split(':').map(Number);
       const totalMinutes = hours * 60 + minutes + durationMinutes;
       const endHours = Math.floor(totalMinutes / 60) % 24;
@@ -562,9 +562,9 @@ router.put('/api/wellness-classes/:id', isStaffOrAdmin, async (req, res) => {
     const { title, time, instructor, duration, category, spots, status, description, date, is_active, image_url, external_url, block_bookings, block_simulators, block_conference_room, capacity, waitlist_enabled, apply_to_recurring } = req.body;
     
     const finalSpots = spots || (capacity ? `${capacity} spots` : null);
-    const finalCapacity = capacity || (spots ? parseInt(spots.toString().replace(/[^0-9]/g, '')) || null : null);
+    const finalCapacity = capacity || (spots ? parseInt(spots.toString().replace(/[^0-9]/g, ''), 10) || null : null);
     
-    const wellnessId = parseInt(id as string);
+    const wellnessId = parseInt(id as string, 10);
     if (isNaN(wellnessId)) return res.status(400).json({ error: 'Invalid wellness class ID' });
     
     const existing = await db.execute(sql`SELECT google_calendar_id, title, time, instructor, duration, category, date, block_bookings, block_simulators, block_conference_room, recurring_event_id FROM wellness_classes WHERE id = ${wellnessId}`);
@@ -633,7 +633,7 @@ router.put('/api/wellness-classes/:id', isStaffOrAdmin, async (req, res) => {
           const convertTo24Hour = (timeStr: string): string => {
             const match12h = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
             if (match12h) {
-              let hours = parseInt(match12h[1]);
+              let hours = parseInt(match12h[1], 10);
               const minutes = match12h[2];
               const period = match12h[3].toUpperCase();
               if (period === 'PM' && hours !== 12) hours += 12;
@@ -652,7 +652,7 @@ router.put('/api/wellness-classes/:id', isStaffOrAdmin, async (req, res) => {
           
           const calculateEndTime = (startTime24: string, durationStr: string): string => {
             const durationMatch = durationStr.match(/(\d+)/);
-            const durationMinutes = durationMatch ? parseInt(durationMatch[1]) : 60;
+            const durationMinutes = durationMatch ? parseInt(durationMatch[1], 10) : 60;
             const [hours, minutes] = startTime24.split(':').map(Number);
             const totalMinutes = hours * 60 + minutes + durationMinutes;
             const endHours = Math.floor(totalMinutes / 60) % 24;
@@ -757,7 +757,7 @@ router.put('/api/wellness-classes/:id', isStaffOrAdmin, async (req, res) => {
                 const convertTime = (timeStr: string): string => {
                   const match12h = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
                   if (match12h) {
-                    let hours = parseInt(match12h[1]);
+                    let hours = parseInt(match12h[1], 10);
                     const minutes = match12h[2];
                     const period = match12h[3].toUpperCase();
                     if (period === 'PM' && hours !== 12) hours += 12;
@@ -773,7 +773,7 @@ router.put('/api/wellness-classes/:id', isStaffOrAdmin, async (req, res) => {
                 
                 const calcEndTime = (startTime24: string, durationStr: string): string => {
                   const durationMatch = durationStr?.match(/(\d+)/);
-                  const durationMinutes = durationMatch ? parseInt(durationMatch[1]) : 60;
+                  const durationMinutes = durationMatch ? parseInt(durationMatch[1], 10) : 60;
                   const [hours, minutes] = startTime24.split(':').map(Number);
                   const totalMinutes = hours * 60 + minutes + durationMinutes;
                   const endHours = Math.floor(totalMinutes / 60) % 24;
@@ -812,7 +812,8 @@ router.put('/api/wellness-classes/:id', isStaffOrAdmin, async (req, res) => {
     }
     
     updated.recurringUpdated = recurringUpdated;
-    const wellnessClassId = parseInt(id as string);
+    const wellnessClassId = parseInt(id as string, 10);
+    if (isNaN(wellnessClassId)) return res.status(400).json({ error: 'Invalid wellness class ID' });
     const userEmail = getSessionUser(req)?.email || 'system';
     
     logFromRequest(req, 'update_wellness_class', 'wellness', String(wellnessClassId), updated.title as string, {
@@ -829,7 +830,7 @@ router.put('/api/wellness-classes/:id', isStaffOrAdmin, async (req, res) => {
     const convertTo24HourForBlocks = (timeStr: string): string => {
       const match12h = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
       if (match12h) {
-        let hours = parseInt(match12h[1]);
+        let hours = parseInt(match12h[1], 10);
         const minutes = match12h[2];
         const period = match12h[3].toUpperCase();
         if (period === 'PM' && hours !== 12) hours += 12;
@@ -848,7 +849,7 @@ router.put('/api/wellness-classes/:id', isStaffOrAdmin, async (req, res) => {
     
     const calculateEndTimeForBlocks = (startTime24: string, durationStr: string): string => {
       const durationMatch = durationStr.match(/(\d+)/);
-      const durationMinutes = durationMatch ? parseInt(durationMatch[1]) : 60;
+      const durationMinutes = durationMatch ? parseInt(durationMatch[1], 10) : 60;
       const [hours, minutes] = startTime24.split(':').map(Number);
       const totalMinutes = hours * 60 + minutes + durationMinutes;
       const endHours = Math.floor(totalMinutes / 60) % 24;
@@ -883,7 +884,7 @@ router.put('/api/wellness-classes/:id', isStaffOrAdmin, async (req, res) => {
       const hasValidInstructor = updated.instructor && String(updated.instructor).toLowerCase() !== 'tbd' && String(updated.instructor).trim() !== '';
       const hasValidCategory = updated.category && String(updated.category).toLowerCase() !== 'wellness' && String(updated.category).trim() !== '';
       const spotsMatch = String(updated.spots || '').match(/(\d+)/);
-      const spotsValue = spotsMatch ? parseInt(spotsMatch[1]) : 0;
+      const spotsValue = spotsMatch ? parseInt(spotsMatch[1], 10) : 0;
       const capacityValue = updated.capacity || 0;
       const hasValidSpots = spotsValue > 0 || Number(capacityValue) > 0;
       
@@ -994,7 +995,7 @@ router.post('/api/wellness-enrollments', isAuthenticated, async (req, res) => {
     if (!rawClassId || !user_email) {
       return res.status(400).json({ error: 'Missing class_id or user_email' });
     }
-    const class_id = parseInt(String(rawClassId));
+    const class_id = parseInt(String(rawClassId), 10);
     if (isNaN(class_id)) {
       return res.status(400).json({ error: 'Invalid class_id' });
     }
@@ -1138,7 +1139,7 @@ router.post('/api/wellness-enrollments', isAuthenticated, async (req, res) => {
 router.delete('/api/wellness-enrollments/:class_id/:user_email', isAuthenticated, async (req, res) => {
   try {
     const { class_id: rawClassId, user_email: rawUserEmail } = req.params;
-    const class_id = parseInt(rawClassId as string);
+    const class_id = parseInt(rawClassId as string, 10);
     if (isNaN(class_id)) {
       return res.status(400).json({ error: 'Invalid class_id' });
     }
@@ -1231,7 +1232,7 @@ router.delete('/api/wellness-enrollments/:class_id/:user_email', isAuthenticated
     });
     
     // If a regular enrollment was cancelled and there are waitlisted users, promote the first one
-    if (wasNotWaitlisted && parseInt(cls.waitlist_count as string) > 0) {
+    if (wasNotWaitlisted && parseInt(cls.waitlist_count as string, 10) > 0) {
       try {
         const promotedUserRow = await db.transaction(async (tx) => {
           const waitlistedResult = await tx.execute(sql`SELECT * FROM wellness_enrollments 
@@ -1330,7 +1331,7 @@ router.delete('/api/wellness-enrollments/:class_id/:user_email', isAuthenticated
 router.delete('/api/wellness-classes/:id', isStaffOrAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const wellnessClassId = parseInt(id as string);
+    const wellnessClassId = parseInt(id as string, 10);
     if (isNaN(wellnessClassId)) return res.status(400).json({ error: 'Invalid wellness class ID' });
     
     const existing = await db.execute(sql`SELECT google_calendar_id FROM wellness_classes WHERE id = ${wellnessClassId}`);
@@ -1377,7 +1378,7 @@ router.delete('/api/wellness-classes/:id', isStaffOrAdmin, async (req, res) => {
 router.get('/api/wellness-classes/:id/enrollments', isStaffOrAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const classId = parseInt(id as string);
+    const classId = parseInt(id as string, 10);
     if (isNaN(classId)) return res.status(400).json({ error: 'Invalid wellness class ID' });
     
     const result = await db.select({
@@ -1407,7 +1408,7 @@ router.get('/api/wellness-classes/:id/enrollments', isStaffOrAdmin, async (req, 
 router.post('/api/wellness-classes/:id/enrollments/manual', isStaffOrAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const classId = parseInt(id as string);
+    const classId = parseInt(id as string, 10);
     if (isNaN(classId)) return res.status(400).json({ error: 'Invalid wellness class ID' });
     const { email: rawEmail } = req.body;
     const email = rawEmail?.trim()?.toLowerCase();

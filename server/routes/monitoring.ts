@@ -37,8 +37,8 @@ const webhookQuerySchema = z.object({
 router.get('/api/admin/monitoring/webhooks', isStaffOrAdmin, validateQuery(webhookQuerySchema), async (req, res) => {
   try {
     const { type, status, limit: limitStr, offset: offsetStr } = (req as unknown as Request & { validatedQuery: z.infer<typeof webhookQuerySchema> }).validatedQuery;
-    const limit = parseInt(limitStr || '') || 50;
-    const offset = parseInt(offsetStr || '') || 0;
+    const limit = parseInt(limitStr || '', 10) || 50;
+    const offset = parseInt(offsetStr || '', 10) || 0;
 
     const data = await getWebhookEvents({ type, status, limit, offset });
     res.json(data);
@@ -83,7 +83,7 @@ const alertsQuerySchema = z.object({
 router.get('/api/admin/monitoring/alerts', isStaffOrAdmin, validateQuery(alertsQuerySchema), async (req, res) => {
   try {
     const { startDate, endDate, limit: limitStr } = (req as unknown as Request & { validatedQuery: z.infer<typeof alertsQuerySchema> }).validatedQuery;
-    const limit = parseInt(limitStr || '') || 100;
+    const limit = parseInt(limitStr || '', 10) || 100;
 
     const alerts = await getAlertHistory({ startDate, endDate, limit });
     res.json({ alerts });
@@ -112,8 +112,8 @@ router.get('/api/admin/monitoring/audit-logs', isStaffOrAdmin, validateQuery(aud
     const resourceId = vq.resourceId;
     const startDate = vq.startDate ? new Date(vq.startDate) : undefined;
     const endDate = vq.endDate ? new Date(vq.endDate) : undefined;
-    const limit = Math.min(Math.max(parseInt(vq.limit || '') || 50, 1), 100);
-    const offset = Math.max(parseInt(vq.offset || '') || 0, 0);
+    const limit = Math.min(Math.max(parseInt(vq.limit || '', 10) || 50, 1), 100);
+    const offset = Math.max(parseInt(vq.offset || '', 10) || 0, 0);
 
     const data = await getAuditLogs({ staffEmail, action, resourceType, resourceId, startDate, endDate, limit, offset });
     res.json(data);

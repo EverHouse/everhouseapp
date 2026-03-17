@@ -56,7 +56,12 @@ All mutating routes (POST/PUT/PATCH/DELETE) must be protected. Two equivalent pa
 ## Trackman Routes (`server/routes/trackman/`)
 
 - `webhook-index.ts` — Webhook entry point and signature verification
-- `webhook-handlers.ts` — `handleBookingUpdate()`, auto-create, auto-link
+- `webhook-handlers.ts` — Thin barrel re-exporting from the three webhook submodules below
+- `webhook-modification.ts` — `handleBookingModification()`, `runConflictCancellationSideEffects()`
+- `webhook-matching.ts` — `tryAutoApproveBooking()`, `cancelBookingByTrackmanId()`, `saveToUnmatchedBookings()`, `createUnmatchedBookingRequest()`
+- `webhook-update.ts` — `handleBookingUpdate()`, auto-create, auto-link, notification helpers
+- `webhook-receiver.ts` — Webhook entry receiver (consumes barrel exports)
+- `webhook-admin-ops.ts` — Admin webhook replay/reprocess operations
 - `webhook-billing.ts` — Webhook-triggered billing operations
 - `webhook-helpers.ts` — Webhook utility functions
 - `webhook-validation.ts` — Payload validation

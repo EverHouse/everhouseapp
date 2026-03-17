@@ -207,7 +207,7 @@ router.post('/api/stripe/create-payment-intent', isStaffOrAdmin, validateBody(cr
       const requestedIds: number[] = participantFees.map((pf: { id: number }) => pf.id);
 
       const participantCountResult = await db.execute(sql`SELECT COUNT(*) as count FROM booking_participants WHERE session_id = ${sessionId}`);
-      const actualParticipantCount = parseInt((participantCountResult.rows[0] as { count: string })?.count || '1');
+      const actualParticipantCount = parseInt((participantCountResult.rows[0] as { count: string })?.count || '1', 10);
       const effectivePlayerCount = getEffectivePlayerCount(actualParticipantCount, actualParticipantCount);
 
       let feeBreakdown;
@@ -1055,7 +1055,7 @@ router.get('/api/payments/future-bookings-with-fees', isStaffOrAdmin, async (req
       LIMIT 50`);
 
     const futureBookings = (result.rows as unknown as DbFutureBookingRow[]).map((row) => {
-      const totalFeeCents = parseInt(row.pending_fee_cents) || 0;
+      const totalFeeCents = parseInt(row.pending_fee_cents, 10) || 0;
       
       return {
         bookingId: row.booking_id,
@@ -1070,9 +1070,9 @@ router.get('/api/payments/future-bookings-with-fees', isStaffOrAdmin, async (req
         resourceName: row.resource_name,
         status: row.status,
         playerCount: row.player_count || 1,
-        guestCount: parseInt(row.guest_count) || 0,
+        guestCount: parseInt(row.guest_count, 10) || 0,
         estimatedFeeCents: totalFeeCents,
-        hasPaymentIntent: parseInt(row.pending_intent_count) > 0
+        hasPaymentIntent: parseInt(row.pending_intent_count, 10) > 0
       };
     });
 

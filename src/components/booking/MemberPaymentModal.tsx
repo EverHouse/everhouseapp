@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
-import { apiRequest } from '../../lib/apiRequest';
+import { apiRequest, fireAndForgetRequest } from '../../lib/apiRequest';
 import { StripePaymentWithSecret } from '../stripe/StripePaymentForm';
 import { SlideUpDrawer } from '../SlideUpDrawer';
 import WalkingGolferSpinner from '../WalkingGolferSpinner';
@@ -123,13 +123,11 @@ export function MemberPaymentModal({
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
       if (currentPiId && !paymentSucceededRef.current) {
-        fetch(`/api/member/bookings/${bookingId}/cancel-payment`, {
+        fireAndForgetRequest(`/api/member/bookings/${bookingId}/cancel-payment`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
           body: JSON.stringify({ paymentIntentId: currentPiId }),
-          keepalive: true,
-        }).catch((err: unknown) => { console.warn('[MemberPaymentModal] Failed to cancel payment on unmount:', err); });
+        });
       }
     };
   }, [paymentIntentId, bookingId, isOpen]);

@@ -212,7 +212,7 @@ export async function getDailyUsageFromLedger(
            )
            ${warningExclude}`);
       
-      const missingCount = parseInt((missingCheck.rows[0] as { missing_count: string })?.missing_count as string) || 0;
+      const missingCount = parseInt((missingCheck.rows[0] as { missing_count: string })?.missing_count as string, 10) || 0;
       if (missingCount > 0) {
         logger.warn('[getDailyUsageFromLedger] Sessions with participants but no ledger entries detected', {
           extra: { memberEmail, date, missingSessionCount: missingCount }
@@ -222,7 +222,7 @@ export async function getDailyUsageFromLedger(
       logger.warn('[getDailyUsageFromLedger] Ledger consistency check failed:', { error: getErrorMessage(checkError) });
     }
 
-    return parseInt((result.rows[0] as { total_minutes: string }).total_minutes as string) || 0;
+    return parseInt((result.rows[0] as { total_minutes: string }).total_minutes as string, 10) || 0;
   } catch (error: unknown) {
     logger.error('[getDailyUsageFromLedger] Error:', { error: getErrorMessage(error) });
     throw error;

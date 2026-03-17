@@ -128,7 +128,11 @@ export async function getObjectAclPolicy(
   if (!aclPolicy) {
     return null;
   }
-  return JSON.parse(aclPolicy as string);
+  try {
+    return JSON.parse(aclPolicy as string);
+  } catch {
+    return null;
+  }
 }
 
 // Checks if the user can access the object.

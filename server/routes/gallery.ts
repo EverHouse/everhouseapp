@@ -62,7 +62,7 @@ router.post('/api/admin/gallery', isStaffOrAdmin, async (req, res) => {
 router.put('/api/admin/gallery/:id', isStaffOrAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const imageId = parseInt(id as string);
+    const imageId = parseInt(id as string, 10);
     if (isNaN(imageId)) return res.status(400).json({ error: 'Invalid gallery image ID' });
     const { title, imageUrl, category, sortOrder, isActive } = req.body;
     
@@ -91,7 +91,7 @@ router.put('/api/admin/gallery/:id', isStaffOrAdmin, async (req, res) => {
 router.delete('/api/admin/gallery/:id', isStaffOrAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const imageId = parseInt(id as string);
+    const imageId = parseInt(id as string, 10);
     if (isNaN(imageId)) return res.status(400).json({ error: 'Invalid gallery image ID' });
     
     const [updated] = await db.update(galleryImages)

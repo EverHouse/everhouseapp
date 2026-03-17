@@ -160,7 +160,7 @@ export const WellnessAdminContent: React.FC = () => {
         if (!timeStr) return '';
         const match12h = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
         if (match12h) {
-            let hours = parseInt(match12h[1]);
+            let hours = parseInt(match12h[1], 10);
             const minutes = match12h[2];
             const period = match12h[3].toUpperCase();
             if (period === 'PM' && hours !== 12) hours += 12;
@@ -178,7 +178,7 @@ export const WellnessAdminContent: React.FC = () => {
         if (!startTime) return '';
         const time24 = convertTo24Hour(startTime);
         const match = durationStr?.match(/(\d+)/);
-        const durationMinutes = match ? parseInt(match[1]) : 60;
+        const durationMinutes = match ? parseInt(match[1], 10) : 60;
         const [hours, mins] = time24.split(':').map(Number);
         const totalMins = hours * 60 + mins + durationMinutes;
         const endHours = Math.floor(totalMins / 60) % 24;
@@ -190,7 +190,7 @@ export const WellnessAdminContent: React.FC = () => {
         const startTime24 = convertTo24Hour(cls.time);
         const endTime = calculateEndTime(cls.time, cls.duration);
         const dateStr = cls.date || '';
-        const parsedCapacity = cls.capacity || (cls.spots ? parseInt(cls.spots.replace(/[^0-9]/g, '')) || null : null);
+        const parsedCapacity = cls.capacity || (cls.spots ? parseInt(cls.spots.replace(/[^0-9]/g, ''), 10) || null : null);
         setFormData({
             ...cls,
             capacity: parsedCapacity,
@@ -698,7 +698,7 @@ export const WellnessAdminContent: React.FC = () => {
                         <input
                             type="number"
                             value={formData.capacity || ''}
-                            onChange={(e) => setFormData({ ...formData, capacity: parseInt(e.target.value) || null })}
+                            onChange={(e) => setFormData({ ...formData, capacity: parseInt(e.target.value, 10) || null })}
                             onBlur={() => markTouched('capacity')}
                             placeholder="e.g., 20"
                             className={`w-full p-3 rounded-lg border bg-gray-50 dark:bg-black/30 text-primary dark:text-white ${

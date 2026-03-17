@@ -26,8 +26,8 @@ router.get('/api/admin/trackman/reconciliation', isStaffOrAdmin, validateQuery(r
     const startDate = vq.start_date;
     const endDate = vq.end_date;
     const status = vq.status;
-    const limit = parseInt(vq.limit || '') || 100;
-    const offset = parseInt(vq.offset || '') || 0;
+    const limit = parseInt(vq.limit || '', 10) || 100;
+    const offset = parseInt(vq.offset || '', 10) || 0;
     
     const result = await findAttendanceDiscrepancies({
       startDate,
@@ -70,7 +70,7 @@ router.put('/api/admin/trackman/reconciliation/:id', isStaffOrAdmin, async (req,
       });
     }
     
-    const reconciliationId = parseInt(id as string);
+    const reconciliationId = parseInt(id as string, 10);
     if (isNaN(reconciliationId)) {
       return res.status(400).json({ error: 'Invalid ID' });
     }

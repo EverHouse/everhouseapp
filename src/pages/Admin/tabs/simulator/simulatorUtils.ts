@@ -79,7 +79,7 @@ export const parseAffectedBayIds = (affectedAreas: string | null | undefined, re
     }
     
     if (affectedAreas.startsWith('bay_') && !affectedAreas.includes(',') && !affectedAreas.includes('[')) {
-        const areaId = parseInt(affectedAreas.replace('bay_', ''));
+        const areaId = parseInt(affectedAreas.replace('bay_', ''), 10);
         return isNaN(areaId) ? [] : [areaId];
     }
     
@@ -92,10 +92,10 @@ export const parseAffectedBayIds = (affectedAreas: string | null | undefined, re
             return confRoom ? [confRoom.id] : [];
         }
         if (t.startsWith('bay_')) {
-            const areaId = parseInt(t.replace('bay_', ''));
+            const areaId = parseInt(t.replace('bay_', ''), 10);
             return isNaN(areaId) ? [] : [areaId];
         }
-        const areaId = parseInt(t);
+        const areaId = parseInt(t, 10);
         if (!isNaN(areaId)) return [areaId];
         const matched = resources.find(r => r.name?.toLowerCase() === t);
         return matched ? [matched.id] : [];
@@ -148,10 +148,10 @@ export const getClosureForSlot = (
         }
         
         const closureStartMinutes = closure.startTime 
-            ? parseInt(closure.startTime.split(':')[0]) * 60 + parseInt(closure.startTime.split(':')[1] || '0') 
+            ? parseInt(closure.startTime.split(':')[0], 10) * 60 + parseInt(closure.startTime.split(':')[1] || '0', 10) 
             : 0;
         const closureEndMinutes = closure.endTime 
-            ? parseInt(closure.endTime.split(':')[0]) * 60 + parseInt(closure.endTime.split(':')[1] || '0') 
+            ? parseInt(closure.endTime.split(':')[0], 10) * 60 + parseInt(closure.endTime.split(':')[1] || '0', 10) 
             : 24 * 60;
         
         if (slotStart < closureEndMinutes && slotEnd > closureStartMinutes) {
@@ -173,10 +173,10 @@ export const getBlockForSlot = (
         if (block.resourceId !== resourceId) continue;
         
         const blockStartMinutes = block.startTime 
-            ? parseInt(block.startTime.split(':')[0]) * 60 + parseInt(block.startTime.split(':')[1] || '0') 
+            ? parseInt(block.startTime.split(':')[0], 10) * 60 + parseInt(block.startTime.split(':')[1] || '0', 10) 
             : 0;
         const blockEndMinutes = block.endTime 
-            ? parseInt(block.endTime.split(':')[0]) * 60 + parseInt(block.endTime.split(':')[1] || '0') 
+            ? parseInt(block.endTime.split(':')[0], 10) * 60 + parseInt(block.endTime.split(':')[1] || '0', 10) 
             : 24 * 60;
         
         if (slotStart < blockEndMinutes && slotEnd > blockStartMinutes) {

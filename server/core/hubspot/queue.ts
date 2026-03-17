@@ -373,10 +373,10 @@ export async function getQueueStats(): Promise<{
   
   const statsRow = result.rows[0] as unknown as QueueStatsRow;
   return {
-    pending: parseInt(String(statsRow.pending)) || 0,
-    processing: parseInt(String(statsRow.processing)) || 0,
-    failed: parseInt(String(statsRow.failed)) || 0,
-    dead: parseInt(String(statsRow.dead)) || 0,
-    completedToday: parseInt(String(statsRow.completed_today)) || 0
+    pending: parseInt(String(statsRow.pending), 10) || 0,
+    processing: parseInt(String(statsRow.processing), 10) || 0,
+    failed: parseInt(String(statsRow.failed), 10) || 0,
+    dead: parseInt(String(statsRow.dead), 10) || 0,
+    completedToday: parseInt(String(statsRow.completed_today), 10) || 0
   };
 }

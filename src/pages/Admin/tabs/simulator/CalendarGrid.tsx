@@ -291,14 +291,14 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
 
     const [nowMinutes, setNowMinutes] = useState(() => {
         const parts = new Date().toLocaleTimeString('en-US', { timeZone: 'America/Los_Angeles', hour12: false, hour: '2-digit', minute: '2-digit' }).split(':');
-        return parseInt(parts[0]) * 60 + parseInt(parts[1]);
+        return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
     });
 
     useEffect(() => {
         if (!isToday) return;
         const interval = setInterval(() => {
             const parts = new Date().toLocaleTimeString('en-US', { timeZone: 'America/Los_Angeles', hour12: false, hour: '2-digit', minute: '2-digit' }).split(':');
-            setNowMinutes(parseInt(parts[0]) * 60 + parseInt(parts[1]));
+            setNowMinutes(parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10));
         }, 60_000);
         return () => clearInterval(interval);
     }, [isToday]);
@@ -444,7 +444,7 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
                         ))}
                         
                         {timeSlots.map(slot => {
-                            const slotHour = parseInt(slot.split(':')[0]);
+                            const slotHour = parseInt(slot.split(':')[0], 10);
                             const isEvenHour = slotHour % 2 === 0;
                             return (
                             <React.Fragment key={slot}>

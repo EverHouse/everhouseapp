@@ -154,13 +154,13 @@ async function getResourceIdsForAffectedAreas(affectedAreas: string | null | und
       const confResult = await db.execute(sql`SELECT id FROM resources WHERE LOWER(name) LIKE '%conference%' LIMIT 1`);
       if ((confResult.rows as unknown as ResourceIdRow[]).length > 0) idSet.add((confResult.rows[0] as unknown as ResourceIdRow).id);
     } else if (t.startsWith('bay_')) {
-      const bayId = parseInt(t.replace('bay_', ''));
+      const bayId = parseInt(t.replace('bay_', ''), 10);
       if (!isNaN(bayId)) idSet.add(bayId);
     }
   };
   
   if (normalized.startsWith('bay_') && !normalized.includes(',') && !normalized.includes('[')) {
-    const bayId = parseInt(normalized.replace('bay_', ''));
+    const bayId = parseInt(normalized.replace('bay_', ''), 10);
     if (!isNaN(bayId)) {
       idSet.add(bayId);
     }

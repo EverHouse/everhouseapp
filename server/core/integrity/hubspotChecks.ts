@@ -212,7 +212,7 @@ export async function checkHubSpotIdDuplicates(): Promise<IntegrityCheckResult> 
           WHERE LOWER(primary_email) = LOWER(${emails[0]}) 
             AND LOWER(linked_email) IN (${sql.join(remainingEmails.map((e: string) => sql`${e.toLowerCase()}`), sql`, `)})
         `);
-        alreadyLinked = parseInt((linkedCheck.rows[0] as unknown as LinkedCountRow)?.linked_count || '0') > 0;
+        alreadyLinked = parseInt((linkedCheck.rows[0] as unknown as LinkedCountRow)?.linked_count || '0', 10) > 0;
       }
 
       const userDetails = emails.map((email: string, idx: number) =>

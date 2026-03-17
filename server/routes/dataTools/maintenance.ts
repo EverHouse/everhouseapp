@@ -338,9 +338,9 @@ router.post('/api/data-tools/sync-visit-counts', isAdmin, async (req: Request, r
               AND we.status != 'cancelled'
           `);
           
-          const bookingCount = parseInt((visitCountResult.rows[0] as unknown as DbCountRow)?.count || '0');
-          const eventCount = parseInt((eventCountResult.rows[0] as unknown as DbCountRow)?.count || '0');
-          const wellnessCount = parseInt((wellnessCountResult.rows[0] as unknown as DbCountRow)?.count || '0');
+          const bookingCount = parseInt((visitCountResult.rows[0] as unknown as DbCountRow)?.count || '0', 10);
+          const eventCount = parseInt((eventCountResult.rows[0] as unknown as DbCountRow)?.count || '0', 10);
+          const wellnessCount = parseInt((wellnessCountResult.rows[0] as unknown as DbCountRow)?.count || '0', 10);
           const appVisitCount = bookingCount + eventCount + wellnessCount;
           
           let hubspotVisitCount: number | null = null;
@@ -349,7 +349,7 @@ router.post('/api/data-tools/sync-visit-counts', isAdmin, async (req: Request, r
               hubspot.crm.contacts.basicApi.getById(member.hubspot_id!, ['total_visit_count'])
             );
             const rawCount = contact.properties?.total_visit_count;
-            hubspotVisitCount = rawCount ? parseInt(rawCount) : null;
+            hubspotVisitCount = rawCount ? parseInt(rawCount, 10) : null;
           } catch (hubspotErr: unknown) {
             if (!getErrorMessage(hubspotErr)?.includes('404')) {
               throw hubspotErr;
@@ -485,7 +485,7 @@ router.post('/api/data-tools/detect-duplicates', isAdmin, async (req: Request, r
     
     const appDuplicates = (appDuplicatesResult.rows as unknown as DbDuplicateRow[]).map((row) => ({
       email: row.normalized_email,
-      count: parseInt(row.count),
+      count: parseInt(row.count, 10),
       members: row.user_ids.map((id: string, idx: number) => ({
         id,
         email: row.emails[idx],
@@ -634,10 +634,10 @@ router.post('/api/data-tools/fix-trackman-ghost-bookings', isAdmin, async (req: 
       requestDate: row.request_date,
       startTime: row.start_time,
       endTime: row.end_time,
-      durationMinutes: parseInt(row.duration_minutes) || 60,
+      durationMinutes: parseInt(row.duration_minutes, 10) || 60,
       resourceId: row.resource_id,
       trackmanBookingId: row.trackman_booking_id,
-      playerCount: parseInt(row.trackman_player_count) || 1,
+      playerCount: parseInt(row.trackman_player_count, 10) || 1,
       status: row.status,
       tier: row.tier
     }));

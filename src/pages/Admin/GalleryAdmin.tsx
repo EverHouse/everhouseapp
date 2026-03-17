@@ -324,7 +324,7 @@ const GalleryAdmin: React.FC = () => {
                                 type="number" 
                                 placeholder="Sort Order" 
                                 value={newItem.sortOrder || 0} 
-                                onChange={e => setNewItem({...newItem, sortOrder: parseInt(e.target.value) || 0})} 
+                                onChange={e => setNewItem({...newItem, sortOrder: parseInt(e.target.value, 10) || 0})} 
                             />
                         </div>
                         <div className="flex items-center justify-between p-3 rounded-xl bg-gray-50 dark:bg-black/20 border border-gray-200 dark:border-white/25">

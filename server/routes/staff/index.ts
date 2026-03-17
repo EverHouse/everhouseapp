@@ -137,7 +137,7 @@ router.get('/api/admin/command-center', isStaffOrAdmin, async (req, res) => {
           AND br.session_id IS NOT NULL
         `);
         for (const row of filledResult.rows) {
-          filledCountsMap.set(Number(row.booking_id), parseInt(String(row.filled_count)) || 0);
+          filledCountsMap.set(Number(row.booking_id), parseInt(String(row.filled_count), 10) || 0);
         }
       } catch (err) {
         logger.debug('[Command Center] Failed to query filled player counts', { error: err instanceof Error ? err.message : err });
@@ -159,7 +159,7 @@ router.get('/api/admin/command-center', isStaffOrAdmin, async (req, res) => {
         WHERE status IN ('succeeded', 'paid')
         AND created_at >= to_timestamp(${startOfDayUnix}) AND created_at < to_timestamp(${endOfDayUnix})
       `);
-      financials.todayRevenueCents = parseInt(String(todayRevenue.rows[0]?.total_cents || '0'));
+      financials.todayRevenueCents = parseInt(String(todayRevenue.rows[0]?.total_cents || '0'), 10);
     } catch (err) { logger.debug('[Command Center] Failed to query today revenue — table may not have expected structure', { error: err instanceof Error ? err.message : err }); }
     
     res.json({
@@ -270,7 +270,7 @@ router.get('/api/admin/financials/summary', isStaffOrAdmin, async (req, res) => 
           AND ref_ch.status IN ('refunded', 'partially_refunded')
         )
       `);
-      results.todayRevenueCents = parseInt(String(todayRevenue.rows[0]?.total_cents || '0'));
+      results.todayRevenueCents = parseInt(String(todayRevenue.rows[0]?.total_cents || '0'), 10);
     } catch (err) { logger.debug('[Financials] Failed to query today revenue — table may not exist', { error: err instanceof Error ? err.message : err }); }
     
     // Overdue payments from booking sessions
@@ -293,7 +293,7 @@ router.get('/api/admin/financials/summary', isStaffOrAdmin, async (req, res) => 
               AND COALESCE(bp.cached_fee_cents, 0) > 0
           )
       `);
-      results.overduePaymentsCount = parseInt(String(overdueCount.rows[0]?.count || '0'));
+      results.overduePaymentsCount = parseInt(String(overdueCount.rows[0]?.count || '0'), 10);
     } catch (err) { logger.debug('[Financials] Failed to query overdue payments — table may not exist', { error: err instanceof Error ? err.message : err }); }
     
     // Failed payments - only query if table exists
@@ -303,7 +303,7 @@ router.get('/api/admin/financials/summary', isStaffOrAdmin, async (req, res) => 
         FROM stripe_payment_intents
         WHERE status = 'requires_payment_method' OR status = 'requires_confirmation'
       `);
-      results.failedPaymentsCount = parseInt(String(failedPayments.rows[0]?.count || '0'));
+      results.failedPaymentsCount = parseInt(String(failedPayments.rows[0]?.count || '0'), 10);
     } catch (err) { logger.debug('[Financials] Failed to query failed payments — table may not exist', { error: err instanceof Error ? err.message : err }); }
     
     // Pending authorizations - count uncaptured payment intents
@@ -313,7 +313,7 @@ router.get('/api/admin/financials/summary', isStaffOrAdmin, async (req, res) => 
         FROM stripe_payment_intents
         WHERE status = 'requires_capture'
       `);
-      results.pendingAuthorizationsCount = parseInt(String(pendingAuths.rows[0]?.count || '0'));
+      results.pendingAuthorizationsCount = parseInt(String(pendingAuths.rows[0]?.count || '0'), 10);
     } catch (err) { logger.debug('[Financials] Failed to query pending authorizations — table may not exist', { error: err instanceof Error ? err.message : err }); }
     
     res.json({
@@ -371,7 +371,7 @@ router.get('/api/admin/todays-bookings', isStaffOrAdmin, async (req, res) => {
           AND br.session_id IS NOT NULL
         `);
         for (const row of filledResult.rows) {
-          filledMap.set(Number(row.booking_id), parseInt(String(row.filled_count)) || 0);
+          filledMap.set(Number(row.booking_id), parseInt(String(row.filled_count), 10) || 0);
         }
       } catch (err) {
         logger.debug('[Todays Bookings] Failed to query filled player counts', { error: err instanceof Error ? err.message : err });

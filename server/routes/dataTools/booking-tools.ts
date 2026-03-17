@@ -213,7 +213,7 @@ router.get('/api/data-tools/bookings-search', isStaffOrAdmin, async (req: Reques
       queryBuilder.append(sql` AND LOWER(br.user_email) = ${(memberEmail as string).trim().toLowerCase()}`);
     }
     
-    queryBuilder.append(sql` ORDER BY br.request_date DESC, br.start_time ASC LIMIT ${parseInt(limit as string) || 50}`);
+    queryBuilder.append(sql` ORDER BY br.request_date DESC, br.start_time ASC LIMIT ${parseInt(limit as string, 10) || 50}`);
     
     const result = await db.execute(queryBuilder);
     

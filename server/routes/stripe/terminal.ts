@@ -228,7 +228,7 @@ router.post('/api/stripe/terminal/process-payment', isStaffOrAdmin, async (req: 
     if (isBookingFee && metadata?.sessionId) {
       try {
         const pendingParticipants = await db.execute(sql`SELECT id, cached_fee_cents FROM booking_participants
-           WHERE session_id = ${parseInt(metadata.sessionId)} AND payment_status = 'pending' AND cached_fee_cents > 0`);
+           WHERE session_id = ${parseInt(metadata.sessionId, 10)} AND payment_status = 'pending' AND cached_fee_cents > 0`);
         if (pendingParticipants.rows.length > 0) {
           const fees = (pendingParticipants.rows as Array<{ id: number; cached_fee_cents: number }>).map((r) => ({
             id: r.id,
@@ -296,7 +296,7 @@ router.post('/api/stripe/terminal/process-payment', isStaffOrAdmin, async (req: 
     } else {
       if (isBookingFee && customerId && metadata?.sessionId) {
         try {
-          const bookingIdVal = metadata?.bookingId ? parseInt(metadata.bookingId) : 0;
+          const bookingIdVal = metadata?.bookingId ? parseInt(metadata.bookingId, 10) : 0;
 
           if (bookingIdVal) {
             const existingInvoiceId = await getBookingInvoiceId(bookingIdVal);
@@ -310,7 +310,7 @@ router.post('/api/stripe/terminal/process-payment', isStaffOrAdmin, async (req: 
           }
 
           if (!invoiceId) {
-            const sessionIdVal = parseInt(metadata.sessionId);
+            const sessionIdVal = parseInt(metadata.sessionId, 10);
 
             const participantRows = await db.execute(sql`SELECT id, display_name, participant_type, cached_fee_cents
                FROM booking_participants
@@ -368,8 +368,8 @@ router.post('/api/stripe/terminal/process-payment', isStaffOrAdmin, async (req: 
     
     if (customerId || metadata?.ownerEmail || isGuestCheckout) {
       try {
-        const bookingIdVal = isBookingFee && metadata?.bookingId ? parseInt(metadata.bookingId) || null : null;
-        const sessionIdVal = isBookingFee && metadata?.sessionId ? parseInt(metadata.sessionId) || null : null;
+        const bookingIdVal = isBookingFee && metadata?.bookingId ? parseInt(metadata.bookingId, 10) || null : null;
+        const sessionIdVal = isBookingFee && metadata?.sessionId ? parseInt(metadata.sessionId, 10) || null : null;
         const userId = isGuestCheckout ? `guest-pos-${Date.now()}` : (metadata?.userId || `guest-${customerId || 'terminal'}`);
         await db.execute(sql`INSERT INTO stripe_payment_intents 
            (user_id, stripe_payment_intent_id, stripe_customer_id, amount_cents, purpose, description, status, product_id, product_name, booking_id, session_id)
@@ -465,11 +465,11 @@ router.get('/api/stripe/terminal/payment-status/:paymentIntentId', isStaffOrAdmi
     const bookingIdFromMeta = paymentIntent.metadata?.bookingId;
     if (paymentIntent.status === 'succeeded' && bookingIdFromMeta && !draftInvoiceId) {
       try {
-        const bookingInvoiceId = await getBookingInvoiceId(parseInt(bookingIdFromMeta));
+        const bookingInvoiceId = await getBookingInvoiceId(parseInt(bookingIdFromMeta, 10));
         if (bookingInvoiceId) {
           const { finalizeInvoicePaidOutOfBand: finalizeBookingInvoiceOOB } = await import('../../core/billing/bookingInvoiceService');
           const oobResult = await finalizeBookingInvoiceOOB({
-            bookingId: parseInt(bookingIdFromMeta),
+            bookingId: parseInt(bookingIdFromMeta, 10),
             terminalPaymentIntentId: paymentIntentId as string,
             paidVia: 'terminal',
           });

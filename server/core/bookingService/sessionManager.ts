@@ -34,7 +34,7 @@ function buildSqlFromRaw(text: string, values: unknown[]): SQL {
 
   while ((match = regex.exec(text)) !== null) {
     strings.push(text.slice(lastIndex, match.index));
-    const paramIndex = parseInt(match[1]) - 1;
+    const paramIndex = parseInt(match[1], 10) - 1;
     sqlValues.push(values[paramIndex]);
     lastIndex = match.index + match[0].length;
   }
@@ -210,7 +210,7 @@ export async function ensureSessionForBooking(params: {
            WHERE session_id = $1 AND status NOT IN ('cancelled', 'deleted', 'declined')`,
           [sessionId]
         );
-        if (parseInt(String(activeCheck.rows[0].cnt)) === 0) {
+        if (parseInt(String(activeCheck.rows[0].cnt), 10) === 0) {
           reusedStaleSession = true;
         }
       }
@@ -241,7 +241,7 @@ export async function ensureSessionForBooking(params: {
              WHERE session_id = $1 AND status NOT IN ('cancelled', 'deleted', 'declined')`,
             [sessionId]
           );
-          if (parseInt(String(activeCheck.rows[0].cnt)) === 0) {
+          if (parseInt(String(activeCheck.rows[0].cnt), 10) === 0) {
             reusedStaleSession = true;
           }
         }

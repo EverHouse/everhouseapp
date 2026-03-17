@@ -605,7 +605,13 @@ export async function getCachedIntegrityResults(): Promise<CachedIntegrityResult
     return null;
   }
 
-  const results: IntegrityCheckResult[] = JSON.parse(JSON.stringify(latestRun.resultsJson));
+  let results: IntegrityCheckResult[];
+  try {
+    results = JSON.parse(JSON.stringify(latestRun.resultsJson));
+  } catch {
+    logger.error('[Integrity] Failed to parse resultsJson from latest run');
+    return null;
+  }
 
   const activeIgnores = await db.select()
     .from(integrityIgnores)

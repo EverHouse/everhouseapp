@@ -1156,7 +1156,7 @@ export async function recreateDraftInvoiceFromBooking(bookingId: number): Promis
 
     if (booking.resource_type !== RESOURCE_TYPE.CONFERENCE_ROOM) {
       const allParticipantResult = await db.execute(sql`SELECT COUNT(*) as cnt FROM booking_participants WHERE session_id = ${booking.session_id}`);
-      const actualCount = parseInt((allParticipantResult.rows[0] as { cnt: string }).cnt) || 0;
+      const actualCount = parseInt((allParticipantResult.rows[0] as { cnt: string }).cnt, 10) || 0;
       const declaredCount = booking.declared_player_count || actualCount;
       const emptySlots = Math.max(0, declaredCount - actualCount);
       if (emptySlots > 0) {
@@ -1231,7 +1231,7 @@ export async function syncBookingInvoice(bookingId: number, sessionId: number): 
 
       if (booking.resource_type !== RESOURCE_TYPE.CONFERENCE_ROOM) {
         const allParticipantResult = await db.execute(sql`SELECT COUNT(*) as cnt FROM booking_participants WHERE session_id = ${sessionId}`);
-        const actualCount = parseInt((allParticipantResult.rows[0] as { cnt: string }).cnt) || 0;
+        const actualCount = parseInt((allParticipantResult.rows[0] as { cnt: string }).cnt, 10) || 0;
         const declaredCount = booking.declared_player_count || actualCount;
         const emptySlots = Math.max(0, declaredCount - actualCount);
         if (emptySlots > 0) {
@@ -1362,7 +1362,7 @@ export async function syncBookingInvoice(bookingId: number, sessionId: number): 
 
     if (booking.resource_type !== RESOURCE_TYPE.CONFERENCE_ROOM) {
       const allParticipantResult = await db.execute(sql`SELECT COUNT(*) as cnt FROM booking_participants WHERE session_id = ${sessionId}`);
-      const actualCount = parseInt((allParticipantResult.rows[0] as { cnt: string }).cnt) || 0;
+      const actualCount = parseInt((allParticipantResult.rows[0] as { cnt: string }).cnt, 10) || 0;
       const declaredCount = booking.declared_player_count || actualCount;
       const emptySlots = Math.max(0, declaredCount - actualCount);
       if (emptySlots > 0) {
@@ -1488,9 +1488,9 @@ export async function checkBookingPaymentStatus(params: {
 
   interface PaidRow { paid_count: string; total_with_fees: string; pending_count: string }
   const row = paidCheck.rows[0] as unknown as PaidRow;
-  const paidCount = parseInt(row?.paid_count || '0');
-  const totalWithFees = parseInt(row?.total_with_fees || '0');
-  const pendingFeeCount = parseInt(row?.pending_count || '0');
+  const paidCount = parseInt(row?.paid_count || '0', 10);
+  const totalWithFees = parseInt(row?.total_with_fees || '0', 10);
+  const pendingFeeCount = parseInt(row?.pending_count || '0', 10);
   const hasCompletedSnapshot = feeSnapshotCheck.rows.length > 0;
   const hasPaidFees = paidCount > 0;
 

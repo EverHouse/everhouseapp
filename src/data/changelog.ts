@@ -8,6 +8,17 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.87.59",
+    date: "2026-03-17",
+    title: "Codebase Audit — Security & Reliability Improvements",
+    changes: [
+      "Improved: Stronger input validation across all booking, event, and member management pages — invalid inputs are now rejected immediately instead of causing unexpected behavior",
+      "Improved: Login and authentication endpoints now have rate limiting to prevent brute-force attempts",
+      "Improved: Background operations are now properly monitored for failures instead of silently dropping errors",
+      "Improved: Internal data parsing is now more resilient — malformed data is handled gracefully instead of causing crashes",
+    ]
+  },
+  {
     version: "8.87.58",
     date: "2026-03-17",
     title: "Visitor Tier Protection — Complete Auth Fix",

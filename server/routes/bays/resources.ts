@@ -48,7 +48,7 @@ router.get('/api/bays/:bayId/availability', async (req, res) => {
     .from(bookingRequests)
     .leftJoin(users, eq(bookingRequests.userId, users.id))
     .where(and(
-      eq(bookingRequests.resourceId, parseInt(bayId)),
+      eq(bookingRequests.resourceId, parseInt(bayId, 10)),
       eq(bookingRequests.requestDate, date as string),
       or(
         eq(bookingRequests.status, 'approved'),
@@ -66,7 +66,7 @@ router.get('/api/bays/:bayId/availability', async (req, res) => {
     })
     .from(availabilityBlocks)
     .where(and(
-      eq(availabilityBlocks.resourceId, parseInt(bayId)),
+      eq(availabilityBlocks.resourceId, parseInt(bayId, 10)),
       eq(availabilityBlocks.blockDate, date as string)
     ))
     .orderBy(asc(availabilityBlocks.startTime));

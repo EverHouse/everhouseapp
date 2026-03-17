@@ -103,7 +103,7 @@ async function pushMembersDirectly(jobId: string): Promise<{ synced: number; err
   }
 
   try {
-    const { invalidateHubSpotContactsCache } = await import('./hubspot');
+    const { invalidateHubSpotContactsCache } = await import('./hubspot/index');
     invalidateHubSpotContactsCache();
   } catch (_e) {
     logger.debug('[DirectorySync] Could not invalidate HubSpot contacts cache');

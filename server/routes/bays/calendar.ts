@@ -235,7 +235,7 @@ router.get('/api/approved-bookings', isStaffOrAdmin, async (req, res) => {
       `);
       
       for (const row of filledSlotsResult.rows as unknown as FilledSlotsRow[]) {
-        filledSlotsMap.set(row.booking_id, parseInt(row.filled_count) || 0);
+        filledSlotsMap.set(row.booking_id, parseInt(row.filled_count, 10) || 0);
       }
     }
     

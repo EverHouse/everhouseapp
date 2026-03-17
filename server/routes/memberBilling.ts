@@ -270,7 +270,7 @@ router.get('/api/member-billing/:email', isStaffOrAdmin, async (req, res) => {
           AND bp.payment_status = 'pending'
           AND COALESCE(bp.cached_fee_cents, 0) > 0
       `);
-      const totalCents = parseInt(String((outstandingResult.rows[0] as unknown as OutstandingTotalRow)?.total_cents) || '0');
+      const totalCents = parseInt(String((outstandingResult.rows[0] as unknown as OutstandingTotalRow)?.total_cents) || '0', 10);
       billingInfo.outstandingBalanceCents = totalCents;
       billingInfo.outstandingBalanceDollars = totalCents / 100;
     } catch (outstandingErr) {
@@ -371,8 +371,8 @@ router.get('/api/member-billing/:email/outstanding', isStaffOrAdmin, async (req,
 
     const guestFeeCents = Math.round(PRICING.GUEST_FEE_DOLLARS * 100);
     for (const row of (unfilledResult.rows as unknown as UnfilledRow[])) {
-      const declared = parseInt(String(row.declared_player_count)) || 1;
-      const filled = parseInt(String(row.filled_count)) || 0;
+      const declared = parseInt(String(row.declared_player_count), 10) || 1;
+      const filled = parseInt(String(row.filled_count), 10) || 0;
       const unfilled = Math.max(0, declared - filled);
       if (unfilled <= 0) continue;
       const alreadyHasItem = items.some(i => i.bookingId === row.booking_id);
@@ -918,7 +918,7 @@ router.get('/api/member-billing/:email/payment-history', isStaffOrAdmin, async (
 
     const result = await getCustomerPaymentHistory(
       member.stripe_customer_id, 
-      Math.min(parseInt(limit as string) || 50, 200)
+      Math.min(parseInt(limit as string, 10) || 50, 200)
     );
 
     if (!result.success) {

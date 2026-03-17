@@ -793,7 +793,7 @@ export async function getCustomerPaymentHistory(customerId: string, limit = 50):
       transactions: result.rows.map((row: Record<string, unknown>) => ({
         id: row.id as string,
         type: row.type as string,
-        amountCents: parseInt(String(row.amount_cents)),
+        amountCents: parseInt(String(row.amount_cents), 10),
         currency: row.currency as string,
         status: row.status as string,
         description: row.description as string,

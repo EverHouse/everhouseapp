@@ -184,7 +184,15 @@ export async function processStripeWebhook(
   await sync.processWebhook(payload, signature);
 
   const payloadString = payload.toString('utf8');
-  const event = JSON.parse(payloadString);
+  let event: Stripe.Event;
+  try {
+    event = JSON.parse(payloadString) as Stripe.Event;
+  } catch (parseErr) {
+    logger.error('[Stripe Webhook] Failed to parse payload JSON', {
+      error: parseErr instanceof Error ? parseErr : new Error(String(parseErr)),
+    });
+    throw new Error('Invalid JSON payload');
+  }
 
   const resourceId = extractResourceId(event);
   const client = await pool.connect();

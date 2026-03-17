@@ -46,8 +46,8 @@ router.get('/api/visitors', isStaffOrAdmin, validateQuery(visitorsQuerySchema), 
   try {
     const vq = (req as Request & { validatedQuery: z.infer<typeof visitorsQuerySchema> }).validatedQuery;
     const { sortBy = 'lastPurchase', order = 'desc', limit = '100', offset = '0', typeFilter = 'all', sourceFilter = 'all', search = '' } = vq;
-    const pageLimit = Math.min(parseInt(limit) || 100, 500);
-    const pageOffset = Math.max(parseInt(offset) || 0, 0);
+    const pageLimit = Math.min(parseInt(limit, 10) || 100, 500);
+    const pageOffset = Math.max(parseInt(offset, 10) || 0, 0);
     const sortOrder = order === 'asc' ? 'ASC' : 'DESC';
     const searchTerm = (search || '').trim().toLowerCase();
     
@@ -291,8 +291,8 @@ router.get('/api/visitors', isStaffOrAdmin, validateQuery(visitorsQuerySchema), 
         if (row.visitor_type === 'guest') return 'guest';
         if (row.visitor_type === 'lead') return 'lead';
       }
-      const purchaseCount = parseInt(row.purchase_count as string) || 0;
-      const guestCount = parseInt(row.guest_count as string) || 0;
+      const purchaseCount = parseInt(row.purchase_count as string, 10) || 0;
+      const guestCount = parseInt(row.guest_count as string, 10) || 0;
       if (purchaseCount > 0) return 'day_pass';
       if (guestCount > 0) return 'guest';
       return 'lead';
@@ -332,10 +332,10 @@ router.get('/api/visitors', isStaffOrAdmin, validateQuery(visitorsQuerySchema), 
       firstName: row.first_name,
       lastName: row.last_name,
       phone: row.phone,
-      purchaseCount: parseInt(row.purchase_count as string) || 0,
-      totalSpentCents: parseInt(row.total_spent_cents as string) || 0,
+      purchaseCount: parseInt(row.purchase_count as string, 10) || 0,
+      totalSpentCents: parseInt(row.total_spent_cents as string, 10) || 0,
       lastPurchaseDate: row.last_purchase_date,
-      guestCount: parseInt(row.guest_count as string) || 0,
+      guestCount: parseInt(row.guest_count as string, 10) || 0,
       lastGuestDate: row.last_guest_date,
       membershipStatus: row.membership_status,
       role: row.role,
@@ -687,7 +687,7 @@ router.get('/api/visitors/search', isStaffOrAdmin, async (req, res) => {
     }
     
     const searchTerm = `%${query.trim().toLowerCase()}%`;
-    const maxResults = Math.min(parseInt(limit as string) || 10, 50);
+    const maxResults = Math.min(parseInt(limit as string, 10) || 10, 50);
     const shouldIncludeStaff = includeStaff === 'true';
     const shouldIncludeMembers = includeMembers === 'true';
     
@@ -1042,7 +1042,7 @@ router.delete('/api/visitors/:id', isStaffOrAdmin, async (req, res) => {
           const { getHubSpotClient } = await import('../../core/integrations');
           const { retryableHubSpotRequest } = await import('../../core/hubspot/request');
           const hubspot = await getHubSpotClient();
-          await retryableHubSpotRequest(() => hubspot.crm.contacts.basicApi.archive(visitor.hubspotId));
+          await retryableHubSpotRequest(() => hubspot.crm.contacts.basicApi.archive(visitor.hubspotId!));
           hubspotArchived = true;
           deletionLog.push('hubspot_contact (archived)');
         }

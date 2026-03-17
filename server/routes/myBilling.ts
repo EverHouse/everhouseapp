@@ -1071,7 +1071,7 @@ router.get('/api/my-billing/payment-history', requireAuth, async (req, res) => {
               seenInvoiceBookingIds.add(bookingId);
               invoiceBookingIds.add(bookingId);
             }
-            const invBookingId = bookingId ? parseInt(bookingId) : null;
+            const invBookingId = bookingId ? parseInt(bookingId, 10) : null;
             purchases.push({
               id: `inv-${inv.id}`,
               type: 'stripe',

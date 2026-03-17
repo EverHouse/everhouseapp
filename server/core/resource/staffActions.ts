@@ -237,9 +237,9 @@ export async function assignWithPlayers(
       `);
       
       const feeRow = (feeResult.rows as unknown as FeeSumRow[])[0];
-      const totalCents = parseInt(feeRow?.total_cents || '0');
-      const overageCents = parseInt(feeRow?.overage_cents || '0');
-      const guestCents = parseInt(feeRow?.guest_cents || '0');
+      const totalCents = parseInt(feeRow?.total_cents || '0', 10);
+      const overageCents = parseInt(feeRow?.overage_cents || '0', 10);
+      const guestCents = parseInt(feeRow?.guest_cents || '0', 10);
       
       if (totalCents > 0) {
         const prepayResult = await createPrepaymentIntent({
@@ -288,7 +288,7 @@ export async function assignWithPlayers(
         WHERE session_id = ${sessionId}
       `);
       
-      const totalCents = parseInt((feeResult.rows as unknown as FeeSumRow[])[0]?.total_cents || '0');
+      const totalCents = parseInt((feeResult.rows as unknown as FeeSumRow[])[0]?.total_cents || '0', 10);
       const feeMessage = totalCents > 0 
         ? ` Estimated fees: $${(totalCents / 100).toFixed(2)}. You can pay now from your dashboard.`
         : '';

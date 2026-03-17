@@ -974,7 +974,7 @@ export async function ensureDatabaseConstraints() {
           (SELECT COUNT(*) FROM deleted_wellness) AS wellness
       `);
       const row = emailOrphanCleanup.rows[0] as Record<string, string>;
-      const total = ['notifs', 'push', 'dismissed', 'rsvps', 'wellness'].reduce((sum, k) => sum + parseInt(row[k] || '0'), 0);
+      const total = ['notifs', 'push', 'dismissed', 'rsvps', 'wellness'].reduce((sum, k) => sum + parseInt(row[k] || '0', 10), 0);
       if (total > 0) {
         logger.info(`[DB Init] Cleaned ${total} email-orphan records across dependent tables`, { extra: row });
       }
@@ -1472,7 +1472,7 @@ export async function validateTierHierarchy(): Promise<void> {
 export async function seedTierFeatures(): Promise<void> {
   try {
     const existing = await db.execute(sql`SELECT COUNT(*) FROM tier_features`);
-    if (parseInt(existing.rows[0].count as string) > 0) {
+    if (parseInt(existing.rows[0].count as string, 10) > 0) {
       logger.info('[DB Init] Tier features already seeded, skipping');
       return;
     }

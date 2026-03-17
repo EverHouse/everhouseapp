@@ -294,7 +294,7 @@ const AvailabilityBlocksContent: React.FC = () => {
     const formatTime = (timeStr: string) => {
         if (!timeStr) return '';
         const [hours, minutes] = timeStr.split(':');
-        const h = parseInt(hours);
+        const h = parseInt(hours, 10);
         const ampm = h >= 12 ? 'PM' : 'AM';
         const h12 = h % 12 || 12;
         return `${h12}:${minutes} ${ampm}`;
@@ -616,7 +616,7 @@ const AvailabilityBlocksContent: React.FC = () => {
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Resource *</label>
                         <select
                             value={formData.resource_id || ''}
-                            onChange={(e) => setFormData({ ...formData, resource_id: parseInt(e.target.value) || null })}
+                            onChange={(e) => setFormData({ ...formData, resource_id: parseInt(e.target.value, 10) || null })}
                             className="w-full p-3 rounded-lg border border-gray-200 dark:border-white/25 bg-gray-50 dark:bg-black/30 text-primary dark:text-white"
                         >
                             <option value="">Select a resource</option>

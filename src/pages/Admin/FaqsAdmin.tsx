@@ -275,7 +275,7 @@ const FaqsAdmin: React.FC = () => {
                                     type="number"
                                     className="w-full border border-gray-200 dark:border-white/25 bg-gray-50 dark:bg-black/30 p-3.5 rounded-xl text-primary dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all duration-fast"
                                     value={newItem.sortOrder ?? 0}
-                                    onChange={e => setNewItem({ ...newItem, sortOrder: parseInt(e.target.value) || 0 })}
+                                    onChange={e => setNewItem({ ...newItem, sortOrder: parseInt(e.target.value, 10) || 0 })}
                                 />
                             </div>
                         </div>

@@ -11,7 +11,7 @@ const router = Router();
 router.get('/api/admin/inquiries', isStaffOrAdmin, async (req, res) => {
   try {
     const { status, formType, limit: limitParam } = req.query;
-    const queryLimit = Math.min(Math.max(parseInt(limitParam as string) || 500, 1), 5000);
+    const queryLimit = Math.min(Math.max(parseInt(limitParam as string, 10) || 500, 1), 5000);
     
     const conditions: SQL[] = [
       ne(formSubmissions.formType, 'membership'),
@@ -42,7 +42,7 @@ router.get('/api/admin/inquiries', isStaffOrAdmin, async (req, res) => {
 router.get('/api/admin/inquiries/:id', isStaffOrAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const parsedId = parseInt(id as string);
+    const parsedId = parseInt(id as string, 10);
     if (isNaN(parsedId)) return res.status(400).json({ error: 'Invalid ID' });
     
     const [inquiry] = await db.select().from(formSubmissions)
@@ -62,7 +62,7 @@ router.get('/api/admin/inquiries/:id', isStaffOrAdmin, async (req, res) => {
 router.put('/api/admin/inquiries/:id', isStaffOrAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const parsedId = parseInt(id as string);
+    const parsedId = parseInt(id as string, 10);
     if (isNaN(parsedId)) return res.status(400).json({ error: 'Invalid ID' });
     const { status, notes } = req.body;
     
@@ -91,7 +91,7 @@ router.put('/api/admin/inquiries/:id', isStaffOrAdmin, async (req, res) => {
 router.delete('/api/admin/inquiries/:id', isStaffOrAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const parsedId = parseInt(id as string);
+    const parsedId = parseInt(id as string, 10);
     if (isNaN(parsedId)) return res.status(400).json({ error: 'Invalid ID' });
     const { archive } = req.query;
     

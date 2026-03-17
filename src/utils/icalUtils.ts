@@ -22,13 +22,13 @@ export function downloadICalFile(event: {
     
     const match24Hour = timeStr.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
     if (match24Hour) {
-      return { hours: parseInt(match24Hour[1]), minutes: parseInt(match24Hour[2]) };
+      return { hours: parseInt(match24Hour[1], 10), minutes: parseInt(match24Hour[2], 10) };
     }
     
     const match12Hour = timeStr.match(/^(\d{1,2})(?::(\d{2}))?\s*(AM|PM)$/i);
     if (match12Hour) {
-      let hours = parseInt(match12Hour[1]);
-      const minutes = match12Hour[2] ? parseInt(match12Hour[2]) : 0;
+      let hours = parseInt(match12Hour[1], 10);
+      const minutes = match12Hour[2] ? parseInt(match12Hour[2], 10) : 0;
       const period = match12Hour[3].toUpperCase();
       if (period === 'AM') {
         hours = hours === 12 ? 0 : hours;

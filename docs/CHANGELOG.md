@@ -2,6 +2,19 @@
 
 All notable changes to the Ever Club Members App are documented here.
 
+## [8.87.59] - 2026-03-17
+
+### Codebase Audit — Security & Reliability
+- **Security**: Added `parseInt` radix parameter and NaN validation guards across 15+ route files — invalid numeric IDs now return 400 instead of causing server errors
+- **Security**: Auth rate limiting added to 5 authentication endpoints (password login, verify-member, request-otp, verify-otp, passkey) to prevent brute-force attacks
+- **Reliability**: All fire-and-forget promises now have `.catch()` handlers — background operations no longer silently swallow errors
+- **Reliability**: JSON.parse calls in integrity checks now wrapped in try/catch guards
+- **Code Quality**: Split 9 oversized route files, 6 service files, and 7 frontend files into focused submodules
+- **Code Quality**: `webhook-handlers.ts` (1815 lines) split into `webhook-modification.ts`, `webhook-matching.ts`, `webhook-update.ts` with thin barrel re-export
+- **Code Quality**: `approvalService.ts` split into `approvalApprove.ts`, `approvalCancel.ts`, `approvalCompletion.ts`, `approvalFlow.ts`
+- **Code Quality**: Dead approval module duplicates removed
+- **Code Quality**: Frontend raw `fetch()` calls migrated to centralized `apiRequest` utility with new `apiRequestBlob` and `fireAndForgetRequest` helpers
+
 ## [8.87.47] - 2026-03-16
 
 ### Code Quality & Accessibility Improvements

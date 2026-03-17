@@ -262,7 +262,7 @@ export async function syncWellnessCalendarEvents(options?: { suppressAlert?: boo
                WHERE google_calendar_id = ${googleEventId}`);
             if (dbRow.block_simulators || dbRow.block_conference_room) {
               const durationMatch = duration.match(/(\d+)/);
-              const durMins = durationMatch ? parseInt(durationMatch[1]) : durationMinutes;
+              const durMins = durationMatch ? parseInt(durationMatch[1], 10) : durationMinutes;
               const [sh, sm] = startTime.split(':').map(Number);
               const totalMins = sh * 60 + sm + durMins;
               const wellnessEndTime = `${String(Math.floor(totalMins / 60) % 24).padStart(2, '0')}:${String(totalMins % 60).padStart(2, '0')}:00`;
@@ -277,7 +277,7 @@ export async function syncWellnessCalendarEvents(options?: { suppressAlert?: boo
               const convertTo24Hour = (timeStr: string): string => {
                 const match12h = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
                 if (match12h) {
-                  let hours = parseInt(match12h[1]);
+                  let hours = parseInt(match12h[1], 10);
                   const minutes = match12h[2];
                   const period = match12h[3].toUpperCase();
                   if (period === 'PM' && hours !== 12) hours += 12;
@@ -293,7 +293,7 @@ export async function syncWellnessCalendarEvents(options?: { suppressAlert?: boo
               
               const calculateEndTime = (startTime24: string, durationStr: string): string => {
                 const durationMatch = durationStr.match(/(\d+)/);
-                const durationMins = durationMatch ? parseInt(durationMatch[1]) : 60;
+                const durationMins = durationMatch ? parseInt(durationMatch[1], 10) : 60;
                 const [hours, minutes] = startTime24.split(':').map(Number);
                 const totalMinutes = hours * 60 + minutes + durationMins;
                 const endHours = Math.floor(totalMinutes / 60) % 24;
@@ -387,7 +387,7 @@ export async function syncWellnessCalendarEvents(options?: { suppressAlert?: boo
              WHERE google_calendar_id = ${googleEventId}`);
           if (dbRow.block_simulators || dbRow.block_conference_room) {
             const durationMatch = duration.match(/(\d+)/);
-            const durMins = durationMatch ? parseInt(durationMatch[1]) : durationMinutes;
+            const durMins = durationMatch ? parseInt(durationMatch[1], 10) : durationMinutes;
             const [sh, sm] = startTime.split(':').map(Number);
             const totalMins = sh * 60 + sm + durMins;
             const wellnessEndTime = `${String(Math.floor(totalMins / 60) % 24).padStart(2, '0')}:${String(totalMins % 60).padStart(2, '0')}:00`;
@@ -461,7 +461,7 @@ export async function backfillWellnessToCalendar(): Promise<{ created: number; t
     const convertTo24Hour = (timeStr: string): string => {
       const match12h = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
       if (match12h) {
-        let hours = parseInt(match12h[1]);
+        let hours = parseInt(match12h[1], 10);
         const minutes = match12h[2];
         const period = match12h[3].toUpperCase();
         if (period === 'PM' && hours !== 12) hours += 12;
@@ -480,7 +480,7 @@ export async function backfillWellnessToCalendar(): Promise<{ created: number; t
     
     const calculateEndTime = (startTime24: string, durationStr: string): string => {
       const durationMatch = durationStr.match(/(\d+)/);
-      const durationMinutes = durationMatch ? parseInt(durationMatch[1]) : 60;
+      const durationMinutes = durationMatch ? parseInt(durationMatch[1], 10) : 60;
       const [hours, minutes] = startTime24.split(':').map(Number);
       const totalMinutes = hours * 60 + minutes + durationMinutes;
       const endHours = Math.floor(totalMinutes / 60) % 24;

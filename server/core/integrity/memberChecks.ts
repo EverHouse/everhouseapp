@@ -604,7 +604,7 @@ export async function checkArchivedMemberLingeringData(): Promise<IntegrityCheck
         memberEmail: row.email,
         memberName: name,
         issueType: row.issue_type,
-        count: parseInt(row.issue_count)
+        count: parseInt(row.issue_count, 10)
       }
     });
   }
@@ -738,7 +738,7 @@ export async function checkEmailOrphans(): Promise<IntegrityCheckResult> {
       context: {
         sourceTable: row.source_table,
         email: row.email_value,
-        count: parseInt(row.record_count)
+        count: parseInt(row.record_count, 10)
       }
     });
   }

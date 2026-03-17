@@ -144,9 +144,9 @@ export async function findAttendanceDiscrepancies(
     }
 
     const discrepancies: ReconciliationResult[] = (result.rows as unknown as DiscrepancyRow[]).map(row => {
-      const declaredCount = parseInt(row.declared_player_count) || 0;
-      const actualCount = parseInt(row.trackman_player_count) || 0;
-      const durationMinutes = parseInt(row.duration_minutes) || 0;
+      const declaredCount = parseInt(row.declared_player_count, 10) || 0;
+      const actualCount = parseInt(row.trackman_player_count, 10) || 0;
+      const durationMinutes = parseInt(row.duration_minutes, 10) || 0;
       
       let discrepancy: 'over_declared' | 'under_declared' | 'matched';
       if (actualCount > declaredCount) {
@@ -198,10 +198,10 @@ export async function findAttendanceDiscrepancies(
 
     const statsRow = statsResult.rows[0] as unknown as StatsRow;
     const stats: ReconciliationStats = {
-      totalDiscrepancies: parseInt(statsRow.total_discrepancies) || 0,
-      pendingReview: parseInt(statsRow.pending_review) || 0,
-      reviewed: parseInt(statsRow.reviewed) || 0,
-      adjusted: parseInt(statsRow.adjusted) || 0,
+      totalDiscrepancies: parseInt(statsRow.total_discrepancies, 10) || 0,
+      pendingReview: parseInt(statsRow.pending_review, 10) || 0,
+      reviewed: parseInt(statsRow.reviewed, 10) || 0,
+      adjusted: parseInt(statsRow.adjusted, 10) || 0,
       totalPotentialFeeAdjustment
     };
     
@@ -252,9 +252,9 @@ export async function markAsReconciled(
        RETURNING *`);
     
     if (status === 'adjusted') {
-      const declaredCount = parseInt(booking.declared_player_count) || 0;
-      const actualCount = parseInt(booking.trackman_player_count) || 0;
-      const durationMinutes = parseInt(booking.duration_minutes) || 0;
+      const declaredCount = parseInt(booking.declared_player_count, 10) || 0;
+      const actualCount = parseInt(booking.trackman_player_count, 10) || 0;
+      const durationMinutes = parseInt(booking.duration_minutes, 10) || 0;
       const feeAdjustment = calculatePotentialFeeAdjustment(durationMinutes, declaredCount, actualCount);
       
       await logPaymentAudit({
@@ -341,9 +341,9 @@ export async function adjustLedgerForReconciliation(
     }
     
     const booking = bookingResult.rows[0] as unknown as BookingReconciliationRow;
-    const declaredCount = parseInt(booking.declared_player_count) || 0;
-    const actualCount = parseInt(booking.trackman_player_count) || 0;
-    const durationMinutes = parseInt(booking.duration_minutes) || 0;
+    const declaredCount = parseInt(booking.declared_player_count, 10) || 0;
+    const actualCount = parseInt(booking.trackman_player_count, 10) || 0;
+    const durationMinutes = parseInt(booking.duration_minutes, 10) || 0;
     
     if (actualCount <= declaredCount) {
       return { success: true, adjustmentAmount: 0 };

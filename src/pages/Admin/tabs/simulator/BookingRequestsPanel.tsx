@@ -395,7 +395,7 @@ const BookingRequestsPanel: React.FC<BookingRequestsPanelProps> = ({
                                                     label: `$${Math.round(booking.total_owed || 0)} Due`,
                                                     color: 'orange' as const,
                                                     onClick: () => {
-                                                        const bookingId = typeof booking.id === 'string' ? parseInt(String(booking.id).replace('cal_', '')) : booking.id;
+                                                        const bookingId = typeof booking.id === 'string' ? parseInt(String(booking.id).replace('cal_', ''), 10) : booking.id;
                                                         setBookingSheet({ isOpen: true, trackmanBookingId: null, bookingId, mode: 'manage' as const });
                                                     }
                                                 }] : [{
@@ -599,7 +599,7 @@ const BookingRequestsPanel: React.FC<BookingRequestsPanelProps> = ({
                                                                 />
                                                             ) : isToday ? (
                                                                 <BookingFeeButton
-                                                                    bookingId={typeof booking.id === 'string' ? parseInt(String(booking.id).replace('cal_', '')) : booking.id as number}
+                                                                    bookingId={typeof booking.id === 'string' ? parseInt(String(booking.id).replace('cal_', ''), 10) : booking.id as number}
                                                                     dbOwed={booking.total_owed || 0}
                                                                     hasUnpaidFees={booking.has_unpaid_fees === true}
                                                                     setBookingSheet={setBookingSheet}
@@ -617,7 +617,7 @@ const BookingRequestsPanel: React.FC<BookingRequestsPanelProps> = ({
                                                             ) : !isConferenceRoom && (booking.declared_player_count ?? 0) > 0 && (booking.declared_player_count ?? 0) > (booking.filled_player_count || 0) ? (
                                                                 <button
                                                                     onClick={() => {
-                                                                        const bookingId = typeof booking.id === 'string' ? parseInt(String(booking.id).replace('cal_', '')) : booking.id;
+                                                                        const bookingId = typeof booking.id === 'string' ? parseInt(String(booking.id).replace('cal_', ''), 10) : booking.id;
                                                                         setBookingSheet({
                                                                             isOpen: true,
                                                                             trackmanBookingId: null,

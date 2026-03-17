@@ -72,9 +72,9 @@ export async function getSessionStats(): Promise<{
     const row = result.rows[0] as unknown as SessionStatsRow;
     
     return {
-      total: parseInt(String(row.total)) || 0,
-      active: parseInt(String(row.active)) || 0,
-      expired: parseInt(String(row.expired)) || 0,
+      total: parseInt(String(row.total), 10) || 0,
+      active: parseInt(String(row.active), 10) || 0,
+      expired: parseInt(String(row.expired), 10) || 0,
       oldestActive: row.oldest_active ? new Date(String(row.oldest_active)) : null,
       newestActive: row.newest_active ? new Date(String(row.newest_active)) : null,
     };

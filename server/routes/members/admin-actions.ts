@@ -277,7 +277,7 @@ router.post('/api/members/:id/suspend', isStaffOrAdmin, async (req, res) => {
     }
     
     if (member.billingProvider === 'stripe' && member.stripeSubscriptionId) {
-      const result = await pauseSubscription(member.stripeSubscriptionId, parseInt(durationDays), start);
+      const result = await pauseSubscription(member.stripeSubscriptionId, parseInt(durationDays, 10), start);
       
       if (!result.success) {
         return res.status(500).json({ error: result.error || 'Failed to pause subscription' });

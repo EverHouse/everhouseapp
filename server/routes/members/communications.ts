@@ -72,11 +72,13 @@ router.post('/api/members/:email/communications', isStaffOrAdmin, async (req, re
 router.delete('/api/members/:email/communications/:logId', isStaffOrAdmin, async (req, res) => {
   try {
     const { email, logId } = req.params;
+    const parsedLogId = parseInt(logId as string, 10);
+    if (isNaN(parsedLogId)) return res.status(400).json({ error: 'Invalid log ID' });
     const normalizedEmail = decodeURIComponent(email as string).trim().toLowerCase();
     
     const result = await db.delete(communicationLogs)
       .where(and(
-        eq(communicationLogs.id, parseInt(logId as string)),
+        eq(communicationLogs.id, parsedLogId),
         sql`LOWER(${communicationLogs.memberEmail}) = ${normalizedEmail}`
       ))
       .returning();

@@ -69,8 +69,8 @@ const paginatedSearchSchema = z.object({
 router.get('/api/admin/trackman/matched', isStaffOrAdmin, validateQuery(paginatedSearchSchema), async (req, res) => {
   try {
     const vq = (req as Request & { validatedQuery: z.infer<typeof paginatedSearchSchema> }).validatedQuery;
-    const limit = parseInt(vq.limit || '') || 100;
-    const offset = parseInt(vq.offset || '') || 0;
+    const limit = parseInt(vq.limit || '', 10) || 100;
+    const offset = parseInt(vq.offset || '', 10) || 0;
     const search = (vq.search || '').trim().toLowerCase();
     
     const matchedConditions: ReturnType<typeof sql>[] = [
@@ -138,8 +138,8 @@ router.get('/api/admin/trackman/matched', isStaffOrAdmin, validateQuery(paginate
        LIMIT ${limit} OFFSET ${offset}`);
     
     const data = result.rows.map((row: DbRow) => {
-      const totalSlots = parseInt(row.total_slots as string) || 1;
-      const filledSlots = parseInt(row.filled_slots as string) || 0;
+      const totalSlots = parseInt(row.total_slots as string, 10) || 1;
+      const filledSlots = parseInt(row.filled_slots as string, 10) || 0;
       return {
         id: row.id,
         userEmail: row.user_email,
@@ -186,6 +186,8 @@ router.put('/api/admin/trackman/matched/:id/reassign', isStaffOrAdmin, async (re
   const client = await pool.connect();
   try {
     const { id } = req.params;
+    const bookingId = parseInt(id as string, 10);
+    if (isNaN(bookingId)) return res.status(400).json({ error: 'Invalid booking ID' });
     const { newMemberEmail: rawNewMemberEmail } = req.body;
     const newMemberEmail = rawNewMemberEmail?.trim()?.toLowerCase();
     
@@ -301,7 +303,7 @@ router.put('/api/admin/trackman/matched/:id/reassign', isStaffOrAdmin, async (re
       }
       try {
         const { syncBookingInvoice } = await import('../../core/billing/bookingInvoiceService');
-        await syncBookingInvoice(parseInt(id as string), sessionId as number);
+        await syncBookingInvoice(parseInt(id as string, 10), sessionId as number);
       } catch (invoiceErr: unknown) {
         logger.warn('[Reassign] Invoice sync failed after fee recalculation', { extra: { sessionId, bookingId: id, invoiceErr } });
       }
@@ -425,8 +427,8 @@ const paginatedSchema = z.object({
 router.get('/api/admin/trackman/potential-matches', isStaffOrAdmin, validateQuery(paginatedSchema), async (req, res) => {
   try {
     const vq = (req as Request & { validatedQuery: z.infer<typeof paginatedSchema> }).validatedQuery;
-    const limit = parseInt(vq.limit || '') || 50;
-    const offset = parseInt(vq.offset || '') || 0;
+    const limit = parseInt(vq.limit || '', 10) || 50;
+    const offset = parseInt(vq.offset || '', 10) || 0;
     
     const unmatchedResult = await db.execute(sql`SELECT 
         tub.id, tub.trackman_booking_id, tub.user_name, tub.original_email, 
@@ -495,8 +497,8 @@ router.get('/api/admin/trackman/potential-matches', isStaffOrAdmin, validateQuer
 router.get('/api/admin/trackman/requires-review', isStaffOrAdmin, validateQuery(paginatedSchema), async (req, res) => {
   try {
     const vq = (req as Request & { validatedQuery: z.infer<typeof paginatedSchema> }).validatedQuery;
-    const limit = parseInt(vq.limit || '') || 50;
-    const offset = parseInt(vq.offset || '') || 0;
+    const limit = parseInt(vq.limit || '', 10) || 50;
+    const offset = parseInt(vq.offset || '', 10) || 0;
     
     const result = await db.execute(sql`SELECT 
         tub.id,
@@ -532,7 +534,7 @@ router.get('/api/admin/trackman/requires-review', isStaffOrAdmin, validateQuery(
     
     res.json({ 
       data: result.rows,
-      totalCount: parseInt((countResult.rows[0] as DbRow).total as string)
+      totalCount: parseInt((countResult.rows[0] as DbRow).total as string, 10)
     });
   } catch (error: unknown) {
     logger.error('Fetch requires-review error', { error: error instanceof Error ? error : new Error(String(error)) });
@@ -696,7 +698,7 @@ router.post('/api/trackman/admin/cleanup-lessons', isStaffOrAdmin, async (req, r
     log(`[Lesson Cleanup] Found ${unmatchedLessons.rows.length} unmatched lesson entries to resolve.`);
 
     for (const item of unmatchedLessons.rows as DbRow[]) {
-      const resourceId = parseInt(item.bay_number as string) || null;
+      const resourceId = parseInt(item.bay_number as string, 10) || null;
       
       if (resourceId && item.booking_date && item.start_time) {
         if (!dryRun) {

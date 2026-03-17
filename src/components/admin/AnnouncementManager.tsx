@@ -119,9 +119,10 @@ const AnnouncementManager: React.FC<AnnouncementManagerProps> = ({ triggerCreate
     const handleExportCSV = async () => {
         setExporting(true);
         try {
-            const res = await fetch('/api/announcements/export', { credentials: 'include' });
-            if (!res.ok) throw new Error('Export failed');
-            const blob = await res.blob();
+            const { apiRequestBlob } = await import('../../lib/apiRequest');
+            const result = await apiRequestBlob('/api/announcements/export');
+            if (!result.ok || !result.blob) throw new Error(result.error || 'Export failed');
+            const blob = result.blob;
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
@@ -396,8 +397,8 @@ const AnnouncementManager: React.FC<AnnouncementManagerProps> = ({ triggerCreate
                     </h3>
                 )}
                 {[...announcements].sort((a, b) => {
-                    const idA = parseInt(a.id) || 0;
-                    const idB = parseInt(b.id) || 0;
+                    const idA = parseInt(a.id, 10) || 0;
+                    const idB = parseInt(b.id, 10) || 0;
                     return idB - idA;
                 }).map((item, index) => (
                     <div key={item.id} onClick={() => openEdit(item)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openEdit(item); } }} role="button" tabIndex={0} className={`bg-white dark:bg-surface-dark p-4 rounded-xl border border-gray-200 dark:border-white/20 shadow-sm flex justify-between items-start cursor-pointer hover:border-primary/30 transition-all duration-fast tactile-row ${index < 10 ? `animate-list-item-delay-${index}` : 'animate-list-item'}`}>

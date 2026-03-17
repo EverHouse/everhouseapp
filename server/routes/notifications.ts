@@ -88,7 +88,7 @@ router.get('/api/notifications/count', isAuthenticated, async (req, res) => {
       sql`SELECT COUNT(*) as count FROM notifications WHERE LOWER(user_email) = LOWER(${effective.email}) AND is_read = false`
     );
     
-    res.json({ count: parseInt(result.rows[0].count as string) });
+    res.json({ count: parseInt(result.rows[0].count as string, 10) });
   } catch (error: unknown) {
     logAndRespond(req, res, 500, 'Failed to fetch notification count', error, 'NOTIFICATION_COUNT_ERROR');
   }
@@ -164,6 +164,8 @@ router.delete('/api/notifications/dismiss-all', isAuthenticated, async (req, res
 router.delete('/api/notifications/:id', isAuthenticated, async (req, res) => {
   try {
     const { id } = req.params;
+    const notificationId = parseInt(id as string, 10);
+    if (isNaN(notificationId)) return res.status(400).json(createErrorResponse(req, 'Invalid notification ID', 'INVALID_INPUT'));
     const { user_email: raw_user_email } = req.body;
     const user_email = (raw_user_email as string | undefined)?.trim()?.toLowerCase();
     
@@ -181,7 +183,7 @@ router.delete('/api/notifications/:id', isAuthenticated, async (req, res) => {
       return res.status(404).json(createErrorResponse(req, 'Notification not found or access denied', 'NOT_FOUND'));
     }
     
-    res.json({ success: true, deletedId: parseInt(id as string) });
+    res.json({ success: true, deletedId: notificationId });
   } catch (error: unknown) {
     logAndRespond(req, res, 500, 'Failed to delete notification', error, 'NOTIFICATION_DELETE_ERROR');
   }

@@ -175,7 +175,7 @@ router.get('/api/pending-bookings', isStaffOrAdmin, async (req, res) => {
 router.put('/api/bookings/:id/approve', isStaffOrAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const bookingId = parseInt(id as string);
+    const bookingId = parseInt(id as string, 10);
     if (isNaN(bookingId)) return res.status(400).json({ error: 'Invalid booking ID' });
     
     const result = await approveBooking(bookingId);
@@ -201,7 +201,7 @@ router.put('/api/bookings/:id/approve', isStaffOrAdmin, async (req, res) => {
 router.put('/api/bookings/:id/decline', isStaffOrAdmin, validateBody(declineBookingSchema), async (req, res) => {
   try {
     const { id } = req.params;
-    const bookingId = parseInt(id as string);
+    const bookingId = parseInt(id as string, 10);
     if (isNaN(bookingId)) return res.status(400).json({ error: 'Invalid booking ID' });
     
     const result = await declineBooking(bookingId, req.body.reason);
@@ -224,7 +224,7 @@ router.put('/api/bookings/:id/decline', isStaffOrAdmin, validateBody(declineBook
 router.post('/api/bookings/:id/assign-member', isStaffOrAdmin, validateBody(assignMemberSchema), async (req, res) => {
   try {
     const { id } = req.params;
-    const bookingId = parseInt(id as string);
+    const bookingId = parseInt(id as string, 10);
     if (isNaN(bookingId)) return res.status(400).json({ error: 'Invalid booking ID' });
     const { member_email, member_name, member_id } = req.body;
     
@@ -405,7 +405,7 @@ router.post('/api/bookings/mark-as-event', isStaffOrAdmin, validateBody(markAsEv
 
 router.put('/api/bookings/:id/assign-with-players', isStaffOrAdmin, validateBody(assignWithPlayersSchema), async (req, res) => {
   try {
-    const bookingId = parseInt(req.params.id as string);
+    const bookingId = parseInt(req.params.id as string, 10);
     const { owner, additional_players, rememberEmail, originalEmail } = req.body;
     
     if (!bookingId || isNaN(bookingId)) {
@@ -461,7 +461,7 @@ router.put('/api/bookings/:id/assign-with-players', isStaffOrAdmin, validateBody
 
 router.put('/api/bookings/:id/change-owner', isStaffOrAdmin, validateBody(changeOwnerSchema), async (req, res) => {
   try {
-    const bookingId = parseInt(req.params.id as string);
+    const bookingId = parseInt(req.params.id as string, 10);
     const { new_email, new_name, member_id } = req.body;
     
     if (!bookingId || isNaN(bookingId)) {
@@ -540,7 +540,7 @@ router.post('/api/bookings', bookingRateLimiter, validateBody(createBookingSchem
 router.get('/api/bookings/:id/cascade-preview', isStaffOrAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const bookingId = parseInt(id as string);
+    const bookingId = parseInt(id as string, 10);
     if (isNaN(bookingId)) return res.status(400).json({ error: 'Invalid booking ID' });
     
     const result = await getCascadePreview(bookingId);
@@ -557,7 +557,7 @@ router.get('/api/bookings/:id/cascade-preview', isStaffOrAdmin, async (req, res)
 router.delete('/api/bookings/:id', isStaffOrAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const bookingId = parseInt(id as string);
+    const bookingId = parseInt(id as string, 10);
     if (isNaN(bookingId)) return res.status(400).json({ error: 'Invalid booking ID' });
     const sessionUser = getSessionUser(req);
     const archivedBy = sessionUser?.email || 'unknown';
@@ -590,7 +590,7 @@ router.put('/api/bookings/:id/member-cancel', isAuthenticated, validateBody(memb
       return res.status(401).json({ error: 'Authentication required' });
     }
     
-    const bookingId = parseInt(id as string);
+    const bookingId = parseInt(id as string, 10);
     if (isNaN(bookingId)) return res.status(400).json({ error: 'Invalid booking ID' });
     
     const result = await memberCancelBooking(bookingId, userEmail, sessionUserRole, actingAsEmail);

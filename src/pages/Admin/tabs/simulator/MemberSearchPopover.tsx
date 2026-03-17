@@ -315,7 +315,7 @@ const ManualBookingModal: React.FC<{
                                     min="0"
                                     max="10"
                                     value={guestCount}
-                                    onChange={(e) => setGuestCount(Math.max(0, parseInt(e.target.value) || 0))}
+                                    onChange={(e) => setGuestCount(Math.max(0, parseInt(e.target.value, 10) || 0))}
                                     className="w-full p-3 rounded-lg border border-gray-200 dark:border-white/25 bg-white dark:bg-black/20 text-primary dark:text-white"
                                 />
                             </div>

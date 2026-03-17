@@ -62,6 +62,8 @@ router.post('/api/members/:email/notes', isStaffOrAdmin, async (req, res) => {
 router.put('/api/members/:email/notes/:noteId', isStaffOrAdmin, async (req, res) => {
   try {
     const { email, noteId } = req.params;
+    const parsedNoteId = parseInt(noteId as string, 10);
+    if (isNaN(parsedNoteId)) return res.status(400).json({ error: 'Invalid note ID' });
     const { content, isPinned } = req.body;
     const normalizedEmail = decodeURIComponent(email as string).trim().toLowerCase();
     
@@ -72,7 +74,7 @@ router.put('/api/members/:email/notes/:noteId', isStaffOrAdmin, async (req, res)
     const result = await db.update(memberNotes)
       .set(updateData)
       .where(and(
-        eq(memberNotes.id, parseInt(noteId as string)),
+        eq(memberNotes.id, parsedNoteId),
         sql`LOWER(${memberNotes.memberEmail}) = ${normalizedEmail}`
       ))
       .returning();
@@ -92,11 +94,13 @@ router.put('/api/members/:email/notes/:noteId', isStaffOrAdmin, async (req, res)
 router.delete('/api/members/:email/notes/:noteId', isStaffOrAdmin, async (req, res) => {
   try {
     const { email, noteId } = req.params;
+    const parsedNoteId = parseInt(noteId as string, 10);
+    if (isNaN(parsedNoteId)) return res.status(400).json({ error: 'Invalid note ID' });
     const normalizedEmail = decodeURIComponent(email as string).trim().toLowerCase();
     
     const result = await db.delete(memberNotes)
       .where(and(
-        eq(memberNotes.id, parseInt(noteId as string)),
+        eq(memberNotes.id, parsedNoteId),
         sql`LOWER(${memberNotes.memberEmail}) = ${normalizedEmail}`
       ))
       .returning();

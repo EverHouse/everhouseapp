@@ -165,7 +165,7 @@ export async function fetchBookings(params: {
     conditions.push(sql`${bookingRequests.requestDate} = ${params.date}`);
   }
   if (params.resourceId) {
-    conditions.push(eq(bookingRequests.resourceId, parseInt(params.resourceId)));
+    conditions.push(eq(bookingRequests.resourceId, parseInt(params.resourceId, 10)));
   }
   
   return withRetry(() =>

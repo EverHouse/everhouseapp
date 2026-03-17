@@ -131,7 +131,7 @@ export async function syncGoogleCalendarEvents(options?: { suppressAlert?: boole
         imageUrl: extProps['ehApp_imageUrl'] || null,
         externalUrl: extProps['ehApp_externalUrl'] || null,
         category: extProps['ehApp_category'] || null,
-        maxAttendees: extProps['ehApp_maxAttendees'] ? parseInt(extProps['ehApp_maxAttendees']) : null,
+        maxAttendees: extProps['ehApp_maxAttendees'] ? parseInt(extProps['ehApp_maxAttendees'], 10) : null,
         visibility: extProps['ehApp_visibility'] || null,
         requiresRsvp: extProps['ehApp_requiresRsvp'] === 'true',
         location: extProps['ehApp_location'] || null,

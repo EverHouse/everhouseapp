@@ -3,6 +3,7 @@ import { SelectedMember } from '../../shared/MemberSearchInput';
 import { useToast } from '../../Toast';
 import { usePricing } from '../../../hooks/usePricing';
 import { fetchWithCredentials, postWithCredentials, putWithCredentials, deleteWithCredentials, patchWithCredentials } from '../../../hooks/queries/useFetch';
+import { apiRequest } from '../../../lib/apiRequest';
 import TierBadge from '../../TierBadge';
 import type { BookingMember, ManageModeRosterData, MemberMatchWarning, UnifiedBookingSheetProps, VisitorSearchResult, SlotState, SlotsArray } from './bookingSheetTypes';
 import { isPlaceholderEmail } from './bookingSheetTypes';
@@ -724,10 +725,9 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
     setIsCreatingVisitor(true);
     try {
       const autoVisitorType = activeSlotIndex === 0 ? 'day_pass' : 'guest';
-      const createRes = await fetch('/api/visitors', {
+      const createResult = await apiRequest<Record<string, unknown>>('/api/visitors', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
         body: JSON.stringify({
           email: visitorData.email,
           firstName: visitorData.firstName,
@@ -735,22 +735,23 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
           visitorType: autoVisitorType,
           createStripeCustomer: true
         })
-      });
+      }, { maxRetries: 1 });
       
-      if (!createRes.ok) {
-        const errorData = await createRes.json();
-        if (createRes.status === 409 && errorData.existingUser) {
-          showToast(`User already exists: ${errorData.existingUser.name || errorData.existingUser.email}`, 'error');
+      if (!createResult.ok) {
+        if (createResult.errorData?.existingUser) {
+          const existingUser = createResult.errorData.existingUser as Record<string, unknown>;
+          showToast(`User already exists: ${existingUser.name || existingUser.email}`, 'error');
         } else {
-          showToast(errorData.error || 'Failed to create visitor', 'error');
+          showToast(createResult.error || 'Failed to create visitor', 'error');
         }
         setIsCreatingVisitor(false);
         return;
       }
       
-      const data = await createRes.json();
+      const data = createResult.data as Record<string, unknown>;
+      const visitor = data.visitor as Record<string, string>;
       if (data.stripeCreated) {
-        showToast(`Created visitor: ${data.visitor.firstName} ${data.visitor.lastName}`, 'success');
+        showToast(`Created visitor: ${visitor.firstName} ${visitor.lastName}`, 'success');
       } else {
         showToast(`Created visitor but Stripe setup failed - can add later`, 'warning');
       }
@@ -758,9 +759,9 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
       updateSlot(activeSlotIndex, {
         type: 'visitor',
         member: {
-          id: data.visitor.id,
-          email: data.visitor.email,
-          name: `${data.visitor.firstName} ${data.visitor.lastName}`
+          id: visitor.id,
+          email: visitor.email,
+          name: `${visitor.firstName} ${visitor.lastName}`
         }
       });
       
@@ -830,16 +831,14 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
       if (manageModeGuestData.phone) body.guestPhone = manageModeGuestData.phone;
       if (forceAddAsGuest) body.forceAddAsGuest = true;
 
-      const res = await fetch(`/api/admin/booking/${bookingId}/guests`, {
+      const guestResult = await apiRequest<Record<string, unknown>>(`/api/admin/booking/${bookingId}/guests`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
         body: JSON.stringify(body)
-      });
+      }, { maxRetries: 1 });
 
-      if (res.status === 409) {
-        const errData = await res.json();
-        if (errData.memberMatch) {
+      if (!guestResult.ok) {
+        if (guestResult.errorData?.memberMatch) {
           setMemberMatchWarning({
             slotNumber,
             guestData: {
@@ -847,17 +846,12 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
               guestEmail: body.guestEmail as string,
               guestPhone: manageModeGuestData.phone
             },
-            memberMatch: errData.memberMatch
+            memberMatch: guestResult.errorData.memberMatch as MemberMatchWarning['memberMatch']
           });
           setIsAddingManageGuest(false);
           return;
         }
-        throw new Error(errData.error || 'Conflict adding guest');
-      }
-
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error || 'Failed to add guest');
+        throw new Error(guestResult.error || 'Failed to add guest');
       }
 
       showToast('Guest added successfully', 'success');
