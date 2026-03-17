@@ -803,7 +803,7 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
         if (placeholderBooking.rows.length > 1) {
           logger.info(`[Trackman Import] Multiple placeholder candidates (${placeholderBooking.rows.length}) for Trackman ${row.bookingId} on bay ${parsedBayId} at ${startTime} - skipping auto-merge, requires manual resolution`);
         } else if (placeholderBooking.rows.length === 1) {
-          const placeholder = placeholderBooking.rows[0];
+          const placeholder = placeholderBooking.rows[0] as { id: number; user_email: string | null; user_name: string | null; status: string; session_id: number | null; trackman_booking_id: string | null; origin: string | null };
           const mergeStatus = matchedEmail ? 'approved' : (normalizedStatus || 'approved');
           
           const updateFields: Record<string, unknown> = {
