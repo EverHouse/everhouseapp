@@ -22,6 +22,9 @@ interface RecentEvent {
 interface EmailHealthData {
   stats: EmailStats[];
   recentEvents: RecentEvent[];
+  lastEventAt: string | null;
+  lastWebhookAt: string | null;
+  webhookUrl: string;
 }
 
 interface Props {
@@ -60,8 +63,11 @@ function formatTimestamp(dateStr: string): string {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'America/Los_Angeles' });
 }
 
+const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
+
 const EmailHealthPanel: React.FC<Props> = ({ isOpen, onToggle }) => {
   const [showEvents, setShowEvents] = useState(false);
+  const [showWebhookUrl, setShowWebhookUrl] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ['admin', 'monitoring', 'email-health'],
@@ -73,6 +79,14 @@ const EmailHealthPanel: React.FC<Props> = ({ isOpen, onToggle }) => {
 
   const stats = data?.stats || [];
   const recentEvents = data?.recentEvents || [];
+  const lastWebhookAt = data?.lastWebhookAt;
+  const webhookUrl = data?.webhookUrl;
+
+  const isWebhookStale = (() => {
+    if (!lastWebhookAt) return true;
+    const lastTs = new Date(ensureUtc(lastWebhookAt)).getTime();
+    return Date.now() - lastTs > TWENTY_FOUR_HOURS_MS;
+  })();
 
   const latest = stats[0];
   const totalBounces = stats.reduce((sum, s) => sum + s.bounced, 0);
@@ -115,6 +129,38 @@ const EmailHealthPanel: React.FC<Props> = ({ isOpen, onToggle }) => {
             <p className="text-center text-gray-500 dark:text-gray-400 text-sm py-4">Loading...</p>
           ) : (
             <>
+              {isWebhookStale && (
+                <div className="mb-3 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/50">
+                  <div className="flex items-start gap-2">
+                    <span aria-hidden="true" className="material-symbols-outlined text-amber-600 dark:text-amber-400 text-[18px] mt-0.5">warning</span>
+                    <div className="text-xs">
+                      <p className="font-medium text-amber-800 dark:text-amber-300">
+                        Webhook data may be stale
+                      </p>
+                      <p className="text-amber-700 dark:text-amber-400 mt-0.5">
+                        {lastWebhookAt
+                          ? `Last webhook event: ${formatTimestamp(lastWebhookAt)}.`
+                          : 'No webhook events received yet.'}
+                        {' '}The Resend webhook URL may need to be reconfigured.
+                      </p>
+                      {webhookUrl && (
+                        <button
+                          onClick={() => setShowWebhookUrl(!showWebhookUrl)}
+                          className="mt-1 text-amber-800 dark:text-amber-300 underline hover:no-underline"
+                        >
+                          {showWebhookUrl ? 'Hide' : 'Show'} expected webhook URL
+                        </button>
+                      )}
+                      {showWebhookUrl && webhookUrl && (
+                        <div className="mt-1.5 p-2 bg-amber-100 dark:bg-amber-900/30 rounded font-mono text-[11px] text-amber-900 dark:text-amber-200 break-all select-all">
+                          {webhookUrl}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className="overflow-x-auto">
                 <table className="w-full text-xs">
                   <thead>
@@ -155,6 +201,26 @@ const EmailHealthPanel: React.FC<Props> = ({ isOpen, onToggle }) => {
 
               {stats.length === 0 && (
                 <p className="text-center text-gray-500 dark:text-gray-400 text-sm py-4">No email events recorded yet</p>
+              )}
+
+              {!isWebhookStale && webhookUrl && (
+                <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+                  <button
+                    onClick={() => setShowWebhookUrl(!showWebhookUrl)}
+                    className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
+                  >
+                    <span aria-hidden="true" className="material-symbols-outlined text-[14px]">link</span>
+                    Webhook Configuration
+                  </button>
+                  {showWebhookUrl && (
+                    <div className="mt-2 p-2 bg-gray-50 dark:bg-white/[0.03] rounded-lg text-xs">
+                      <p className="text-gray-600 dark:text-gray-400 mb-1">Configure this URL in your Resend dashboard:</p>
+                      <div className="p-2 bg-gray-100 dark:bg-white/[0.05] rounded font-mono text-[11px] text-gray-800 dark:text-gray-200 break-all select-all">
+                        {webhookUrl}
+                      </div>
+                    </div>
+                  )}
+                </div>
               )}
 
               {recentEvents.length > 0 && (

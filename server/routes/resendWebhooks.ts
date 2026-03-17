@@ -143,6 +143,19 @@ async function handleEmailComplained(event: ResendEmailEvent) {
   }
 }
 
+async function handleEmailSent(event: ResendEmailEvent) {
+  const { email_id, to, subject } = event.data;
+
+  logger.info('Email sent', {
+    extra: {
+      event: 'email.sent',
+      emailId: email_id,
+      recipient: to[0],
+      subject
+    }
+  });
+}
+
 async function handleEmailDeliveryDelayed(event: ResendEmailEvent) {
   const { email_id, to, subject } = event.data;
   
@@ -210,6 +223,9 @@ router.post('/api/webhooks/resend', async (req: Request, res: Response) => {
     }
 
     switch (event.type) {
+      case 'email.sent':
+        await handleEmailSent(event);
+        break;
       case 'email.delivered':
         await handleEmailDelivered(event);
         break;

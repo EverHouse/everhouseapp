@@ -126,22 +126,22 @@ router.get('/api/admin/monitoring/email-health', isStaffOrAdmin, async (_req, re
   try {
     const statsResult = await db.execute(sql`
       SELECT
-        COUNT(*) FILTER (WHERE event_type = 'email.sent') AS total_sent,
+        COUNT(*) FILTER (WHERE event_type = 'email.sent' AND event_id LIKE 'local-%') AS total_sent,
         COUNT(*) FILTER (WHERE event_type = 'email.delivered') AS total_delivered,
         COUNT(*) FILTER (WHERE event_type = 'email.bounced') AS total_bounced,
         COUNT(*) FILTER (WHERE event_type = 'email.complained') AS total_complained,
         COUNT(*) FILTER (WHERE event_type = 'email.delivery_delayed') AS total_delivery_delayed,
-        COUNT(*) FILTER (WHERE event_type = 'email.sent' AND created_at >= NOW() - INTERVAL '24 hours') AS sent_24h,
+        COUNT(*) FILTER (WHERE event_type = 'email.sent' AND event_id LIKE 'local-%' AND created_at >= NOW() - INTERVAL '24 hours') AS sent_24h,
         COUNT(*) FILTER (WHERE event_type = 'email.delivered' AND created_at >= NOW() - INTERVAL '24 hours') AS delivered_24h,
         COUNT(*) FILTER (WHERE event_type = 'email.bounced' AND created_at >= NOW() - INTERVAL '24 hours') AS bounced_24h,
         COUNT(*) FILTER (WHERE event_type = 'email.complained' AND created_at >= NOW() - INTERVAL '24 hours') AS complained_24h,
         COUNT(*) FILTER (WHERE event_type = 'email.delivery_delayed' AND created_at >= NOW() - INTERVAL '24 hours') AS delivery_delayed_24h,
-        COUNT(*) FILTER (WHERE event_type = 'email.sent' AND created_at >= NOW() - INTERVAL '7 days') AS sent_7d,
+        COUNT(*) FILTER (WHERE event_type = 'email.sent' AND event_id LIKE 'local-%' AND created_at >= NOW() - INTERVAL '7 days') AS sent_7d,
         COUNT(*) FILTER (WHERE event_type = 'email.delivered' AND created_at >= NOW() - INTERVAL '7 days') AS delivered_7d,
         COUNT(*) FILTER (WHERE event_type = 'email.bounced' AND created_at >= NOW() - INTERVAL '7 days') AS bounced_7d,
         COUNT(*) FILTER (WHERE event_type = 'email.complained' AND created_at >= NOW() - INTERVAL '7 days') AS complained_7d,
         COUNT(*) FILTER (WHERE event_type = 'email.delivery_delayed' AND created_at >= NOW() - INTERVAL '7 days') AS delivery_delayed_7d,
-        COUNT(*) FILTER (WHERE event_type = 'email.sent' AND created_at >= NOW() - INTERVAL '30 days') AS sent_30d,
+        COUNT(*) FILTER (WHERE event_type = 'email.sent' AND event_id LIKE 'local-%' AND created_at >= NOW() - INTERVAL '30 days') AS sent_30d,
         COUNT(*) FILTER (WHERE event_type = 'email.delivered' AND created_at >= NOW() - INTERVAL '30 days') AS delivered_30d,
         COUNT(*) FILTER (WHERE event_type = 'email.bounced' AND created_at >= NOW() - INTERVAL '30 days') AS bounced_30d,
         COUNT(*) FILTER (WHERE event_type = 'email.complained' AND created_at >= NOW() - INTERVAL '30 days') AS complained_30d,
@@ -154,6 +154,15 @@ router.get('/api/admin/monitoring/email-health', isStaffOrAdmin, async (_req, re
       FROM email_events
       ORDER BY created_at DESC
       LIMIT 20
+    `);
+
+    const lastEventResult = await db.execute(sql`
+      SELECT MAX(created_at) AS last_event_at FROM email_events
+    `);
+
+    const lastWebhookResult = await db.execute(sql`
+      SELECT MAX(created_at) AS last_webhook_at FROM email_events
+      WHERE event_id NOT LIKE 'local-%'
     `);
 
     const raw = statsResult.rows[0] as Record<string, string> || {};
@@ -192,7 +201,26 @@ router.get('/api/admin/monitoring/email-health', isStaffOrAdmin, async (_req, re
       createdAt: (row.created_at instanceof Date ? row.created_at.toISOString() : (row.created_at ? new Date(String(row.created_at) + 'Z').toISOString() : '')),
     }));
 
-    res.json({ stats, recentEvents });
+    const lastEventRow = lastEventResult.rows[0] as Record<string, unknown> | undefined;
+    const lastWebhookRow = lastWebhookResult.rows[0] as Record<string, unknown> | undefined;
+
+    const formatTs = (val: unknown): string | null => {
+      if (!val) return null;
+      if (val instanceof Date) return val.toISOString();
+      return new Date(String(val) + 'Z').toISOString();
+    };
+
+    const lastEventAt = formatTs(lastEventRow?.last_event_at);
+    const lastWebhookAt = formatTs(lastWebhookRow?.last_webhook_at);
+
+    const isProduction = process.env.NODE_ENV === 'production';
+    const webhookUrl = isProduction
+      ? 'https://everclub.app/api/webhooks/resend'
+      : process.env.REPLIT_DEV_DOMAIN
+        ? `https://${process.env.REPLIT_DEV_DOMAIN}/api/webhooks/resend`
+        : '/api/webhooks/resend';
+
+    res.json({ stats, recentEvents, lastEventAt, lastWebhookAt, webhookUrl });
   } catch (error: unknown) {
     res.status(500).json({ error: 'Failed to get email health stats', details: safeErrorDetail(error) });
   }

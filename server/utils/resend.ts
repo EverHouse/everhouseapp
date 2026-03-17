@@ -1,5 +1,7 @@
 import { Resend } from 'resend';
 import { logger } from '../core/logger';
+import { db } from '../db';
+import { sql } from 'drizzle-orm';
 
 interface ResendConnectionSettings {
   api_key: string;
@@ -117,7 +119,28 @@ export async function safeSendEmail(options: SafeSendOptions): Promise<{ success
       replyTo: options.replyTo
     });
     
-    return { success: true, id: result.data?.id };
+    const emailId = result.data?.id || null;
+    const finalRecipients = Array.isArray(options.to) ? options.to : [options.to];
+    try {
+      for (const recipient of finalRecipients) {
+        await db.execute(sql`
+          INSERT INTO email_events (event_id, event_type, email_id, recipient_email, subject, event_data)
+          VALUES (
+            ${`local-sent-${emailId || Date.now()}-${recipient}`},
+            'email.sent',
+            ${emailId},
+            ${recipient},
+            ${options.subject || null},
+            ${JSON.stringify({ from: options.from, to: finalRecipients, subject: options.subject, source: 'local' })}
+          )
+          ON CONFLICT (event_id) DO NOTHING
+        `);
+      }
+    } catch (trackErr: unknown) {
+      logger.warn('Failed to track sent email event locally', { error: trackErr as Error });
+    }
+
+    return { success: true, id: emailId || undefined };
   } catch (error: unknown) {
     logger.error('Failed to send email', { 
       error: error as Error,
