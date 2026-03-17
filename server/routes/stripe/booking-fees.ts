@@ -846,22 +846,16 @@ router.post('/api/stripe/staff/charge-saved-card', isStaffOrAdmin, validateBody(
 
       });
 
-      try {
-        await db.execute(sql`INSERT INTO staff_actions (action_type, staff_email, staff_name, target_email, details, created_at)
-           VALUES ('charge_saved_card', ${staffEmail}, ${staffName || ''}, ${member.email}, ${JSON.stringify({
-            amountCents: authoritativeAmountCents,
-            cardCharged: invoiceResult.amountCharged || authoritativeAmountCents,
-            balanceApplied: invoiceResult.amountFromBalance || 0,
-            cardLast4,
-            cardBrand,
-            paymentIntentId: invoiceResult.paymentIntentId,
-            invoiceId: invoiceResult.invoiceId,
-            bookingId: resolvedBookingId,
-            sessionId: resolvedSessionId
-          })}, NOW())`);
-      } catch (auditErr: unknown) {
-        logger.warn('[Stripe] Failed to log staff action (non-blocking)', { extra: { auditErr: auditErr instanceof Error ? auditErr.message : String(auditErr) } });
-      }
+      logFromRequest(req, 'charge_saved_card', 'payment', invoiceResult.paymentIntentId, member.email, {
+        amountCents: authoritativeAmountCents,
+        cardCharged: invoiceResult.amountCharged || authoritativeAmountCents,
+        balanceApplied: invoiceResult.amountFromBalance || 0,
+        cardLast4,
+        cardBrand,
+        invoiceId: invoiceResult.invoiceId,
+        bookingId: resolvedBookingId,
+        sessionId: resolvedSessionId,
+      });
 
       broadcastBillingUpdate({
         action: 'payment_succeeded',

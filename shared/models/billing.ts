@@ -249,6 +249,7 @@ export const terminalPayments = pgTable(
     index("idx_terminal_payments_subscription_id").on(table.stripeSubscriptionId),
     index("idx_terminal_payments_status").on(table.status),
     index("idx_terminal_payments_lower_user_email").on(sql`LOWER(${table.userEmail})`),
+    uniqueIndex("terminal_payments_stripe_pi_unique").on(table.stripePaymentIntentId),
   ],
 );
 

@@ -25,6 +25,11 @@ const TRANSIENT_ERROR_PATTERNS = [
   /429/,
   /503.*service unavailable/i,
   /502.*bad gateway/i,
+  /failed query/i,
+  /connection terminated unexpectedly/i,
+  /idle.*timeout/i,
+  /remaining connection slots are reserved/i,
+  /cannot acquire a connection/i,
 ];
 
 function isTransientError(message: string): boolean {
