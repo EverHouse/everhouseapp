@@ -8,6 +8,16 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.87.57",
+    date: "2026-03-17",
+    title: "Simplify Connection Banner — Offline Only",
+    changes: [
+      "The reconnecting/degraded banner no longer appears when WebSocket or Supabase connections briefly drop — the profile icon's colored dot already indicates connection status without disrupting workflow",
+      "The banner now only shows for full offline state ('You're offline'), which is the one scenario where stale data warnings genuinely matter",
+      "Removed useRealtimeHealth hook and the global WebSocket signal bridge (window.__staffWsConnected + custom event) — no longer needed since the banner doesn't track connection health",
+    ]
+  },
+  {
     version: "8.87.56",
     date: "2026-03-17",
     title: "Dead Code Cleanup — React Query Migration Leftovers",
