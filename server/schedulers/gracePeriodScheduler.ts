@@ -8,6 +8,7 @@ import { getStripeClient } from '../core/stripe/client';
 import { getAppBaseUrl } from '../utils/urlUtils';
 import { logger } from '../core/logger';
 import { getSettingValue } from '../core/settingsHelper';
+import { sendPassUpdateForMemberByEmail } from '../walletPass/apnPushService';
 
 interface GracePeriodMemberRow {
   id: number;
@@ -128,7 +129,11 @@ async function processGracePeriodMembers(): Promise<void> {
 
         if (shouldTerminate) {
           logger.info(`[Grace Period] TERMINATED membership for ${email} (was tier: ${tier})`);
-          
+
+          sendPassUpdateForMemberByEmail(email).catch(err =>
+            logger.warn('[Grace Period] Wallet pass push failed for termination (non-fatal)', { extra: { email, error: String(err) } })
+          );
+
           try {
             const { syncMemberToHubSpot } = await import('../core/hubspot/stages');
             const memberBillingResult = await db.execute(sql`SELECT billing_provider FROM users WHERE id = ${id}`);

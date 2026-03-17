@@ -15,6 +15,7 @@ import type { PoolClient } from 'pg';
 import type { DeferredAction } from '../types';
 import { upsertTransactionCache } from '../framework';
 import { normalizeTierName } from '../../../../utils/tierUtils';
+import { sendPassUpdateForMemberByEmail } from '../../../../walletPass/apnPushService';
 
 export async function handleCheckoutSessionCompleted(client: PoolClient, session: Stripe.Checkout.Session): Promise<DeferredAction[]> {
   const deferredActions: DeferredAction[] = [];
@@ -272,6 +273,14 @@ export async function handleCheckoutSessionCompleted(client: PoolClient, session
                 logger.error('[Stripe Webhook] HubSpot sync failed for activation link checkout:', { error: getErrorMessage(hubspotError) });
               }
             });
+
+            deferredActions.push(async () => {
+              try {
+                await sendPassUpdateForMemberByEmail(deferredUpdatedEmail);
+              } catch (pushErr: unknown) {
+                logger.warn('[Stripe Webhook] Wallet pass push failed for activation (non-fatal):', { extra: { email: deferredUpdatedEmail, error: getErrorMessage(pushErr) } });
+              }
+            });
           } else {
             logger.error(`[Stripe Webhook] Activation link checkout: user not found for userId=${userId} email=${memberEmail}`);
           }
@@ -455,6 +464,14 @@ export async function handleCheckoutSessionCompleted(client: PoolClient, session
         logger.error('[Stripe Webhook] Failed to mark application as converted:', { error: getErrorMessage(convErr) });
       }
       
+      deferredActions.push(async () => {
+        try {
+          await sendPassUpdateForMemberByEmail(email!.toLowerCase());
+        } catch (pushErr: unknown) {
+          logger.warn('[Stripe Webhook] Wallet pass push failed for staff invite activation (non-fatal):', { extra: { email, error: getErrorMessage(pushErr) } });
+        }
+      });
+
       logger.info(`[Stripe Webhook] Staff invite checkout completed for ${email}`);
       return deferredActions;
     }

@@ -8,6 +8,7 @@ import { getErrorMessage } from '../../utils/errorUtils';
 import { normalizeTierName } from '../../utils/tierUtils';
 import { findOrCreateHubSpotContact } from '../hubspot/members';
 import { logger } from '../logger';
+import { sendPassUpdateForMemberByEmail } from '../../walletPass/apnPushService';
 import {
   getCorporateVolumePrice,
   getOrCreateFamilyCoupon,
@@ -243,7 +244,11 @@ export async function addGroupMember(params: {
       ).catch((err: unknown) => {
         logger.error('[GroupBilling] Background HubSpot sync for sub-member failed:', { error: err });
       });
-      
+
+      sendPassUpdateForMemberByEmail(params.memberEmail.toLowerCase()).catch(err =>
+        logger.warn('[GroupBilling] Wallet pass push failed for new group member (non-fatal)', { extra: { email: params.memberEmail, error: getErrorMessage(err) } })
+      );
+
       return { success: true, memberId: insertedMemberId ?? undefined };
 
     } catch (dbErr: unknown) {
@@ -523,7 +528,11 @@ export async function addCorporateMember(params: {
       ).catch((err: unknown) => {
         logger.error('[GroupBilling] Background HubSpot sync for sub-member failed:', { error: err });
       });
-      
+
+      sendPassUpdateForMemberByEmail(params.memberEmail.toLowerCase()).catch(err =>
+        logger.warn('[GroupBilling] Wallet pass push failed for new group member (non-fatal)', { extra: { email: params.memberEmail, error: getErrorMessage(err) } })
+      );
+
       return { success: true, memberId: insertedMemberId ?? undefined };
       
     } catch (dbErr: unknown) {

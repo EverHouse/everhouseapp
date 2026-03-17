@@ -12,6 +12,7 @@ import { isPlaceholderGuestName } from '../core/billing/pricingConfig';
 import { withRetry } from '../core/retry';
 import { getSessionUser } from '../types/session';
 import { logFromRequest } from '../core/auditLog';
+import { sendPassUpdateForMemberByEmail } from '../walletPass/apnPushService';
 
 const router = Router();
 
@@ -392,7 +393,11 @@ export async function refundGuestPass(
     }
     
     try { broadcastMemberStatsUpdated(normalizedEmail, { guestPasses: remaining }); } catch (err: unknown) { logger.error('[Broadcast] Stats update error', { extra: { error: err } }); }
-    
+
+    sendPassUpdateForMemberByEmail(normalizedEmail).catch(err =>
+      logger.warn('[refundGuestPass] Wallet pass push failed (non-fatal)', { extra: { email: normalizedEmail, error: String(err) } })
+    );
+
     return { success: true, remaining };
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : 'Failed to refund guest pass';

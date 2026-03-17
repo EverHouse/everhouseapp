@@ -4,6 +4,7 @@ import { getErrorMessage } from '../../utils/errorUtils';
 
 import { logger } from '../logger';
 import { MEMBERSHIP_STATUS } from '../../../shared/constants/statuses';
+import { sendPassUpdateForMemberByEmail } from '../../walletPass/apnPushService';
 
 interface TierRow {
   id: number;
@@ -108,7 +109,11 @@ export async function syncMemberStatusFromStripe(
     }
     
     logger.info(`[TierSync] Updated ${email} membership_status to ${membershipStatus}`);
-    
+
+    sendPassUpdateForMemberByEmail(email).catch(err =>
+      logger.warn('[TierSync] Wallet pass push failed (non-fatal)', { extra: { email, error: getErrorMessage(err) } })
+    );
+
     try {
       const { syncMemberToHubSpot } = await import('../hubspot/stages');
       await syncMemberToHubSpot({ email, status: membershipStatus, billingProvider: 'stripe' });

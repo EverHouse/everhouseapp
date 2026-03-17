@@ -5,6 +5,7 @@ import { queueTierSync } from './hubspot';
 import { notifyMember, isNotifiableEmail } from './notificationService';
 
 import { logger } from './logger';
+import { sendPassUpdateForMemberByEmail } from '../walletPass/apnPushService';
 function getTierRank(tier: string): number {
   const ranks: Record<string, number> = {
     'social': 1, 'core': 2, 'premium': 3, 'vip': 4, 'corporate': 5
@@ -142,6 +143,10 @@ export async function processMemberTierUpdate(payload: MemberTierUpdatePayload):
         url: '/dashboard/membership'
       });
     }
+
+    sendPassUpdateForMemberByEmail(normalizedEmail).catch(err =>
+      logger.warn('[MemberTierUpdateProcessor] Wallet pass push failed (non-fatal)', { extra: { email: normalizedEmail, error: String(err) } })
+    );
 
     logger.info(`[MemberTierUpdateProcessor] Successfully updated ${normalizedEmail}: ${oldTier || 'None'} → ${newTier}`);
   } catch (error: unknown) {

@@ -519,6 +519,11 @@ router.delete('/api/members/:email', isStaffOrAdmin, async (req, res) => {
     }
 
     invalidateCache('members_directory');
+
+    sendPassUpdateForMemberByEmail(normalizedEmail).catch(err => {
+      logger.warn('[Members] Wallet pass push failed after archive', { extra: { normalizedEmail, error: getErrorMessage(err) } });
+    });
+
     res.json({ 
       success: true, 
       archived: true,

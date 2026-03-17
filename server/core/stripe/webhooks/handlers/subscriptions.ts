@@ -979,6 +979,16 @@ export async function handleSubscriptionUpdated(client: PoolClient, subscription
                 logger.error('[Stripe Webhook] HubSpot sync failed for reactivated sub-members:', { error: getErrorMessage(hubspotErr) });
               }
             });
+
+            deferredActions.push(async () => {
+              for (const subEmail of deferredReactivatedSubEmails) {
+                try {
+                  await sendPassUpdateForMemberByEmail(subEmail);
+                } catch (pushErr: unknown) {
+                  logger.warn('[Stripe Webhook] Wallet pass push failed for reactivated sub-member (non-fatal):', { extra: { email: subEmail, error: getErrorMessage(pushErr) } });
+                }
+              }
+            });
           }
         }
       } catch (groupErr: unknown) {
@@ -1469,6 +1479,14 @@ export async function handleSubscriptionResumed(client: PoolClient, subscription
         );
       } catch (notifyErr: unknown) {
         logger.error('[Stripe Webhook] Notification failed (non-fatal):', { extra: { detail: getErrorMessage(notifyErr) } });
+      }
+    });
+
+    deferredActions.push(async () => {
+      try {
+        await sendPassUpdateForMemberByEmail(deferredEmail);
+      } catch (pushErr: unknown) {
+        logger.warn('[Stripe Webhook] Wallet pass push failed for resumed subscription (non-fatal):', { extra: { email: deferredEmail, error: getErrorMessage(pushErr) } });
       }
     });
 

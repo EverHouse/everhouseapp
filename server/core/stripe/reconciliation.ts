@@ -6,6 +6,7 @@ import Stripe from 'stripe';
 import { getErrorMessage, getErrorCode } from '../../utils/errorUtils';
 
 import { logger } from '../logger';
+import { sendPassUpdateForMemberByEmail } from '../../walletPass/apnPushService';
 export async function reconcileDailyPayments() {
   logger.info('[Reconcile] Starting daily payment reconciliation...');
   
@@ -249,7 +250,11 @@ export async function reconcileSubscriptions() {
           } catch (hubspotError: unknown) {
             logger.error(`[Reconcile] HubSpot sync failed for ${customerEmail}:`, { error: hubspotError });
           }
-          
+
+          sendPassUpdateForMemberByEmail(customerEmail).catch(err =>
+            logger.warn('[Reconcile] Wallet pass push failed (non-fatal)', { extra: { email: customerEmail, error: getErrorMessage(err) } })
+          );
+
         } catch (err: unknown) {
           logger.error(`[Reconcile] Error processing subscription ${subscription.id}:`, { extra: { detail: getErrorMessage(err) } });
         }
