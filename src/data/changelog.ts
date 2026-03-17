@@ -10,10 +10,15 @@ export const changelog: ChangelogEntry[] = [
   {
     version: "8.87.52",
     date: "2026-03-17",
-    title: "Startup Reliability Fix",
+    title: "Startup Reliability & Trackman Billing Fixes",
     changes: [
       "Fixed: Server startup no longer fails on first deploy — the app now waits for the database connection to be ready before running initialization tasks, preventing the 'all tasks fail, then succeed on restart' pattern",
       "Improved: Consolidated scattered startup database queries into a single orchestrated startup sequence for cleaner, more reliable initialization",
+      "Fixed: Trackman-imported sessions no longer auto-waive member fees — real members and named guests now keep 'pending' payment status so overage and guest fees are properly charged. Only ghost/placeholder participants are waived",
+      "Fixed: Fee recalculation now runs after every Trackman import path (CSV upload, webhook linking, placeholder merging) to ensure accurate billing",
+      "Fixed: Waiver verification is now fully fail-closed — if the waiver status check fails, members see a blocking screen instead of being allowed to bypass required waivers",
+      "Fixed: 8 server TypeScript compilation errors across startup, HubSpot webhooks, Trackman status handling, and data integrity checks",
+      "Fixed: 2 failing payment intent cleanup tests — assertions now match actual cancellation behavior",
     ]
   },
   {

@@ -83,6 +83,14 @@ After calling recalculateSessionFees()?
 4. NEVER skip `syncBookingInvoice()` after fee recalculation when a Stripe invoice exists.
 5. NEVER skip the cascade recalculation — changing one booking's fees affects later same-day bookings.
 6. NEVER call `recalculateSessionFees()` without calling `invalidateCachedFees()` on all session participants first — stale cached fees cause the already-paid guard (rule 11) to skip participants, producing incorrect totals. All roster mutation paths (member-side `rosterService.ts` and staff-side `admin-roster.ts`) must invalidate before recalculating.
+7. NEVER auto-waive member fees during Trackman import — only ghost/placeholder participants (`user_id IS NULL AND guest_id IS NULL`) get `'waived'`. Real members and named guests must be `'pending'` so fees are properly computed (v8.87.52).
+
+## Fee Computation Sources
+
+`FeeComputeParams.source` in `shared/models/billing.ts` identifies the caller context. Valid values:
+- `'booking_creation'`, `'booking_approval'`, `'roster_change'`, `'check_in'`, `'admin_override'`, `'cascade'`, `'system_recalc'`, `'trackman_import'`
+
+The `'trackman_import'` source (v8.87.52) is used for fee recalculations triggered by Trackman CSV import paths in `server/core/trackman/service.ts`.
 
 ## Cross-References
 

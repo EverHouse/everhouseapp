@@ -207,6 +207,13 @@ WebAuthn passkeys (Face ID / Touch ID) as an additive login method alongside OTP
 
 **Packages:** `@simplewebauthn/server@11`, `@simplewebauthn/browser@11`. Types from `@simplewebauthn/types`.
 
+## WaiverGate Security (v8.87.52)
+
+- **Fail-closed waiver verification.** `WaiverGate` in `src/App.tsx` uses `fetchWithCredentials` (not raw `fetch`) with React Query (3 retries with backoff). If `/api/waivers/status` returns non-200, the query throws → React Query retries.
+- **Blocking loading state.** While waiver status is being verified (`isLoading`), a full-screen overlay with "Verifying waiver status..." blocks all member interaction.
+- **Blocking error state.** On persistent failure (`isError` after 3 retries), a full-screen overlay with "Unable to verify waiver status" + Retry button blocks member interaction. Previously, API failure returned `null` → `needsWaiverUpdate` evaluated false → members bypassed required waivers.
+- **All three states are fail-closed:** loading (blocked), error (blocked), success (gate checks waiver requirement).
+
 ## Auth Linking Hardening (v8.86.6/v8.87.1)
 
 - **Config guards (fail-closed):** All Google and Apple auth routes (verify, callback, link, unlink, status) return 503 if their client ID env var is missing — prevents silent token-verification bypass.
