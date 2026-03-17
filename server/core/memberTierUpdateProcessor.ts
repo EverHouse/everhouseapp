@@ -2,7 +2,7 @@ import { db } from '../db';
 import { users } from '../../shared/schema';
 import { sql } from 'drizzle-orm';
 import { queueTierSync } from './hubspot';
-import { notifyMember } from './notificationService';
+import { notifyMember, isNotifiableEmail } from './notificationService';
 
 import { logger } from './logger';
 function getTierRank(tier: string): number {
@@ -123,23 +123,25 @@ export async function processMemberTierUpdate(payload: MemberTierUpdatePayload):
         : 'changed'
       : 'cleared';
 
-    await notifyMember({
-      userEmail: normalizedEmail,
-      title: isFirstTier
-        ? 'Membership Tier Assigned'
-        : newTier
-        ? isUpgrade
-          ? 'Membership Upgraded'
-          : 'Membership Updated'
-        : 'Membership Cleared',
-      message: isFirstTier
-        ? `Your membership tier has been set to ${newTier}`
-        : newTier
-        ? `Your membership has been ${changeType} from ${oldTier} to ${newTier}`
-        : `Your membership tier has been cleared (was ${oldTier})`,
-      type: 'membership_tier_change',
-      url: '/dashboard/membership'
-    });
+    if (isNotifiableEmail(normalizedEmail)) {
+      await notifyMember({
+        userEmail: normalizedEmail,
+        title: isFirstTier
+          ? 'Membership Tier Assigned'
+          : newTier
+          ? isUpgrade
+            ? 'Membership Upgraded'
+            : 'Membership Updated'
+          : 'Membership Cleared',
+        message: isFirstTier
+          ? `Your membership tier has been set to ${newTier}`
+          : newTier
+          ? `Your membership has been ${changeType} from ${oldTier} to ${newTier}`
+          : `Your membership tier has been cleared (was ${oldTier})`,
+        type: 'membership_tier_change',
+        url: '/dashboard/membership'
+      });
+    }
 
     logger.info(`[MemberTierUpdateProcessor] Successfully updated ${normalizedEmail}: ${oldTier || 'None'} → ${newTier}`);
   } catch (error: unknown) {

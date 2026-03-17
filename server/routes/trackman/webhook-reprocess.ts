@@ -3,7 +3,7 @@ import { db } from '../../db';
 import { sql } from 'drizzle-orm';
 import { logger } from '../../core/logger';
 import { sendNotificationToUser, broadcastToStaff } from '../../core/websocket';
-import { notifyMember } from '../../core/notificationService';
+import { notifyMember, isNotifiableEmail } from '../../core/notificationService';
 import { isStaffOrAdmin, isAdmin } from '../../core/middleware';
 import { linkAndNotifyParticipants } from '../../core/bookingEvents';
 import { formatDatePacific, formatTimePacific } from '../../utils/dateUtils';
@@ -38,7 +38,7 @@ function runReprocessConflictSideEffects(bookingId: number, userEmail: string, r
 
     voidBookingPass(bookingId).catch(err => logger.error('[Trackman Reprocess] Failed to void wallet pass for conflict-cancelled booking', { extra: { bookingId, error: getErrorMessage(err) } }));
 
-    if (userEmail && !userEmail.endsWith('@trackman.local')) {
+    if (isNotifiableEmail(userEmail)) {
       notifyMember({
         userEmail,
         title: 'Booking Cancelled',
@@ -299,26 +299,29 @@ router.post('/api/admin/bookings/:id/simulate-confirm', isStaffOrAdmin, async (r
        WHERE id = ${bookingId}`);
 
     try {
-      const dateStr = typeof booking.request_date === 'string' ? booking.request_date : formatDatePacific(new Date(booking.request_date));
-      const timeStr = typeof booking.start_time === 'string' 
-        ? booking.start_time.substring(0, 5) 
-        : formatTimePacific(new Date(booking.start_time as string | number));
-      
-      await notifyMember({
-        userEmail: booking.user_email as string,
-        title: 'Booking Confirmed',
-        message: `Your simulator booking for ${dateStr} at ${timeStr} has been confirmed.`,
-        type: 'booking_confirmed' as const,
-        relatedId: bookingId,
-        relatedType: 'booking',
-        url: '/bookings'
-      });
+      const userEmail = booking.user_email as string;
+      if (isNotifiableEmail(userEmail)) {
+        const dateStr = typeof booking.request_date === 'string' ? booking.request_date : formatDatePacific(new Date(booking.request_date));
+        const timeStr = typeof booking.start_time === 'string' 
+          ? booking.start_time.substring(0, 5) 
+          : formatTimePacific(new Date(booking.start_time as string | number));
+        
+        await notifyMember({
+          userEmail,
+          title: 'Booking Confirmed',
+          message: `Your simulator booking for ${dateStr} at ${timeStr} has been confirmed.`,
+          type: 'booking_confirmed' as const,
+          relatedId: bookingId,
+          relatedType: 'booking',
+          url: '/bookings'
+        });
 
-      sendNotificationToUser(booking.user_email as string, {
-        type: 'booking_approved',
-        title: 'Booking Confirmed',
-        message: 'Your booking has been confirmed',
-      });
+        sendNotificationToUser(userEmail, {
+          type: 'booking_approved',
+          title: 'Booking Confirmed',
+          message: 'Your booking has been confirmed',
+        });
+      }
     } catch (notifyError: unknown) {
       logger.error('[Simulate Confirm] Notification error (non-blocking)', { error: notifyError instanceof Error ? notifyError : new Error(String(notifyError)) });
     }

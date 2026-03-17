@@ -6,7 +6,7 @@ import { formatTime12Hour, formatDateDisplayWithDay } from '../utils/dateUtils';
 
 import { logger } from './logger';
 import { getErrorMessage } from '../utils/errorUtils';
-import { isSyntheticEmail, notifyMember as notifyMemberFn, notifyAllStaff as notifyAllStaffFn, type NotificationType } from './notificationService';
+import { isSyntheticEmail, isNotifiableEmail, notifyMember as notifyMemberFn, notifyAllStaff as notifyAllStaffFn, type NotificationType } from './notificationService';
 interface RequestParticipant {
   email: string;
   type: 'member' | 'guest';
@@ -154,7 +154,7 @@ export async function publish(
       });
     }
 
-    if (notifyMember && memberNotification && !isSyntheticEmail(data.memberEmail)) {
+    if (notifyMember && memberNotification && isNotifiableEmail(data.memberEmail)) {
       try {
         await notifyMemberFn({
           userEmail: data.memberEmail,
@@ -348,7 +348,7 @@ export async function linkAndNotifyParticipants(
         
         try {
           const notificationMsg = `You have been added to a simulator booking on ${bookingDateStr} at ${startTimeStr} (${bayName}).`;
-          if (!isSyntheticEmail(email)) {
+          if (isNotifiableEmail(email)) {
             await notifyMemberFn({
               userEmail: email,
               title: 'Added to Booking',
@@ -358,14 +358,14 @@ export async function linkAndNotifyParticipants(
               relatedType: 'booking',
               url: '/sims'
             }, { sendPush: true }).catch(err => logger.error('[BookingEvents] Participant notification failed', { error: getErrorMessage(err) }));
-          }
           
-          sendNotificationToUser(email, {
-            type: 'booking_participant_added',
-            title: 'Added to Booking',
-            message: notificationMsg,
-            data: { bookingId }
-          });
+            sendNotificationToUser(email, {
+              type: 'booking_participant_added',
+              title: 'Added to Booking',
+              message: notificationMsg,
+              data: { bookingId }
+            });
+          }
           
           result.notified++;
         } catch (notifErr: unknown) {

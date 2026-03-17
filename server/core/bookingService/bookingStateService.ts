@@ -3,7 +3,7 @@ import { bookingRequests, resources, bookingParticipants, stripePaymentIntents, 
 import { eq, and, or, ne, sql, isNull, isNotNull } from 'drizzle-orm';
 import { formatNotificationDateTime } from '../../utils/dateUtils';
 import { logger } from '../logger';
-import { notifyAllStaff, notifyMember, isSyntheticEmail } from '../notificationService';
+import { notifyAllStaff, notifyMember, isNotifiableEmail } from '../notificationService';
 import { bookingEvents } from '../bookingEvents';
 import { sendNotificationToUser, broadcastAvailabilityUpdate } from '../websocket';
 import { refundGuestPass } from '../../routes/guestPasses';
@@ -18,12 +18,6 @@ import { getStripeClient } from '../stripe/client';
 import { cancelPaymentIntent } from '../stripe/payments';
 import { markPaymentRefunded } from '../billing/PaymentStatusService';
 import { failedSideEffects } from '../../../shared/schema';
-
-function isNotifiableEmail(email: string | null | undefined): email is string {
-  if (!email || !email.trim()) return false;
-  if (isSyntheticEmail(email)) return false;
-  return email.includes('@');
-}
 
 interface CancelResult {
   success: boolean;

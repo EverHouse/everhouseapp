@@ -5,7 +5,7 @@ import { sql } from 'drizzle-orm';
 import { schedulerTracker } from './schedulerTracker';
 import type { PoolClient } from 'pg';
 import { broadcastBillingUpdate, broadcastDayPassUpdate, sendNotificationToUser } from './websocket';
-import { notifyPaymentSuccess, notifyPaymentFailed, notifyStaffPaymentFailed, notifyMember, notifyAllStaff } from './notificationService';
+import { notifyPaymentSuccess, notifyPaymentFailed, notifyStaffPaymentFailed, notifyMember, notifyAllStaff, isNotifiableEmail } from './notificationService';
 import { sendPaymentReceiptEmail, sendPaymentFailedEmail } from '../emails/paymentEmails';
 import { sendMembershipRenewalEmail, sendMembershipFailedEmail } from '../emails/membershipEmails';
 import { sendPassWithQrEmail } from '../emails/passEmails';
@@ -205,14 +205,18 @@ async function executeJob(job: { id: number; jobType: string; payload: Record<st
         await notifyStaffPaymentFailed(payload.memberEmail as string, payload.memberName as string, Number(payload.amount), payload.reason as string);
         break;
       case 'notify_member':
-        await notifyMember({
-          userEmail: payload.userEmail as string,
-          title: payload.title as string,
-          message: payload.message as string,
-          type: payload.type as 'info' | 'success' | 'warning' | 'error' | 'system' | 'booking' | 'booking_approved' | 'booking_declined' | 'booking_reminder' | 'booking_cancelled',
-          relatedId: payload.relatedId as number,
-          relatedType: payload.relatedType as string,
-        });
+        if (isNotifiableEmail(payload.userEmail as string)) {
+          await notifyMember({
+            userEmail: payload.userEmail as string,
+            title: payload.title as string,
+            message: payload.message as string,
+            type: payload.type as 'info' | 'success' | 'warning' | 'error' | 'system' | 'booking' | 'booking_approved' | 'booking_declined' | 'booking_reminder' | 'booking_cancelled',
+            relatedId: payload.relatedId as number,
+            relatedType: payload.relatedType as string,
+          });
+        } else {
+          logger.warn('[JobQueue] Skipping notify_member job — missing or invalid userEmail', { extra: { userEmail: payload.userEmail } });
+        }
         break;
       case 'notify_all_staff':
         await notifyAllStaff(payload.title as string, payload.message as string, payload.type as 'info' | 'success' | 'warning' | 'error' | 'system' | 'booking' | 'booking_approved' | 'booking_declined' | 'booking_reminder' | 'booking_cancelled', {
@@ -228,7 +232,11 @@ async function executeJob(job: { id: number; jobType: string; payload: Record<st
         broadcastDayPassUpdate(payload as unknown as Parameters<typeof broadcastDayPassUpdate>[0]);
         break;
       case 'send_notification_to_user':
-        sendNotificationToUser(payload.userEmail as string, payload.notification as unknown as { type: string; title: string; message: string; data?: Record<string, unknown> });
+        if (isNotifiableEmail(payload.userEmail as string)) {
+          sendNotificationToUser(payload.userEmail as string, payload.notification as unknown as { type: string; title: string; message: string; data?: Record<string, unknown> });
+        } else {
+          logger.warn('[JobQueue] Skipping send_notification_to_user — missing or invalid userEmail', { extra: { userEmail: payload.userEmail } });
+        }
         break;
       case 'sync_company_to_hubspot':
         await syncCompanyToHubSpot(payload as unknown as Parameters<typeof syncCompanyToHubSpot>[0]);

@@ -12,7 +12,7 @@ import { createMemberLocally, getAllDiscountRules, queueTierSync, syncTierToHubS
 import { retryableHubSpotRequest } from '../../core/hubspot/request';
 import Stripe from 'stripe';
 import { changeSubscriptionTier, pauseSubscription } from '../../core/stripe';
-import { notifyMember } from '../../core/notificationService';
+import { notifyMember, isNotifiableEmail } from '../../core/notificationService';
 import { broadcastTierUpdate } from '../../core/websocket';
 import { cascadeEmailChange, previewEmailChangeImpact } from '../../core/memberService/emailChangeService';
 import { getAvailableTiersForChange, previewTierChange, commitTierChange } from '../../core/stripe/tierChanges';
@@ -298,13 +298,15 @@ router.post('/api/members/:id/suspend', isStaffOrAdmin, async (req, res) => {
         safeRelease(client);
       }
 
-      await notifyMember({
-        userEmail: member.email || '',
-        title: 'Membership Paused',
-        message: `Your membership has been paused for ${durationDays} days starting ${start.toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' })}.`,
-        type: 'member_status_change',
-        url: '/dashboard/membership'
-      });
+      if (isNotifiableEmail(member.email)) {
+        await notifyMember({
+          userEmail: member.email,
+          title: 'Membership Paused',
+          message: `Your membership has been paused for ${durationDays} days starting ${start.toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' })}.`,
+          type: 'member_status_change',
+          url: '/dashboard/membership'
+        });
+      }
 
       sendPassUpdateForMemberByEmail(member.email || '').catch(err => {
         logger.warn('[Members] Wallet pass push failed after suspend', { extra: { email: member.email, error: getErrorMessage(err) } });

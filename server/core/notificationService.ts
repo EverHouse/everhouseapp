@@ -476,6 +476,12 @@ export function isSyntheticEmail(email: string): boolean {
   return SYNTHETIC_EMAIL_PATTERNS.some(pattern => lower.includes(pattern));
 }
 
+export function isNotifiableEmail(email: string | null | undefined): email is string {
+  if (!email || !email.trim()) return false;
+  if (!email.includes('@')) return false;
+  return !isSyntheticEmail(email);
+}
+
 export async function notifyMember(
   payload: NotificationPayload,
   options: { sendPush?: boolean; sendWebSocket?: boolean; sendEmail?: boolean; emailSubject?: string; emailHtml?: string } = {}
