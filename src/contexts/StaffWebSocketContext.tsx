@@ -51,6 +51,15 @@ export const StaffWebSocketProvider: React.FC<{ children: React.ReactNode }> = (
 
   const { isConnected, lastEvent } = useStaffWebSocket(hookOptions);
 
+  React.useEffect(() => {
+    window.__staffWsConnected = isConnected;
+    window.dispatchEvent(new Event('staff-ws-status-change'));
+    return () => {
+      window.__staffWsConnected = undefined;
+      window.dispatchEvent(new Event('staff-ws-status-change'));
+    };
+  }, [isConnected]);
+
   const registerCallback = useCallback((id: string, callback: EventCallback) => {
     callbacksRef.current.set(id, callback);
   }, []);

@@ -13,6 +13,10 @@ interface RealtimeHealthState {
 
 const REALTIME_QUERY_KEYS = ['bookings', 'command-center', 'trackman', 'simulator', 'announcements'];
 
+const SUPABASE_CHECK_INTERVAL_MS = 30000;
+
+const DEGRADED_GRACE_PERIOD_MS = 5000;
+
 export function useRealtimeHealth(staffWsConnected?: boolean) {
   const [state, setState] = useState<RealtimeHealthState>({
     status: navigator.onLine ? 'healthy' : 'offline',
@@ -26,6 +30,7 @@ export function useRealtimeHealth(staffWsConnected?: boolean) {
   const prevOnlineRef = useRef(navigator.onLine);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const supabaseCheckRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const graceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const invalidateRealtimeQueries = useCallback(() => {
     for (const key of REALTIME_QUERY_KEYS) {
@@ -35,7 +40,8 @@ export function useRealtimeHealth(staffWsConnected?: boolean) {
 
   useEffect(() => {
     const wasConnected = prevWsConnectedRef.current;
-    const isNowConnected = staffWsConnected ?? true;
+    const globalStaffWs = typeof window !== 'undefined' ? window.__staffWsConnected : undefined;
+    const isNowConnected = staffWsConnected ?? globalStaffWs ?? true;
     prevWsConnectedRef.current = isNowConnected;
 
     if (!wasConnected && isNowConnected && navigator.onLine) {
@@ -54,19 +60,56 @@ export function useRealtimeHealth(staffWsConnected?: boolean) {
   }, [staffWsConnected, invalidateRealtimeQueries]);
 
   useEffect(() => {
+    const handleStaffWsChange = () => {
+      const globalStaffWs = window.__staffWsConnected;
+      const isNowConnected = globalStaffWs ?? true;
+      const wasConnected = prevWsConnectedRef.current;
+      prevWsConnectedRef.current = isNowConnected;
+
+      if (!wasConnected && isNowConnected && navigator.onLine) {
+        invalidateRealtimeQueries();
+        setState(prev => ({ ...prev, wsConnected: true, justReconnected: true }));
+        if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
+        reconnectTimerRef.current = setTimeout(() => {
+          setState(prev => ({ ...prev, justReconnected: false }));
+        }, 3000);
+      } else {
+        setState(prev => ({ ...prev, wsConnected: isNowConnected }));
+      }
+    };
+
+    window.addEventListener('staff-ws-status-change', handleStaffWsChange);
+    return () => window.removeEventListener('staff-ws-status-change', handleStaffWsChange);
+  }, [invalidateRealtimeQueries]);
+
+  useEffect(() => {
     const supabase = getSupabase();
     if (!supabase) return;
 
     const checkChannels = () => {
       const channels = supabase.getChannels();
+
+      if (channels.length === 0) {
+        const wasDisconnected = !prevSupabaseConnectedRef.current;
+        prevSupabaseConnectedRef.current = true;
+        if (wasDisconnected && navigator.onLine) {
+          invalidateRealtimeQueries();
+        }
+        setState(prev => ({ ...prev, supabaseConnected: true }));
+        return;
+      }
+
       const hasSubscribed = channels.some(
         (ch) => ch.state === 'joined'
       );
-      const hasError = channels.length > 0 && channels.every(
+      const allUnhealthy = channels.every(
         (ch) => ch.state === 'errored' || ch.state === 'closed'
       );
+      const hasTransient = channels.some(
+        (ch) => ch.state === 'joining' || ch.state === 'leaving'
+      );
 
-      const newConnected = channels.length === 0 ? true : hasSubscribed && !hasError;
+      const newConnected = hasSubscribed || hasTransient || !allUnhealthy;
       const wasDisconnected = !prevSupabaseConnectedRef.current;
       prevSupabaseConnectedRef.current = newConnected;
 
@@ -80,7 +123,7 @@ export function useRealtimeHealth(staffWsConnected?: boolean) {
     };
 
     checkChannels();
-    supabaseCheckRef.current = setInterval(checkChannels, 10000);
+    supabaseCheckRef.current = setInterval(checkChannels, SUPABASE_CHECK_INTERVAL_MS);
 
     return () => {
       if (supabaseCheckRef.current) clearInterval(supabaseCheckRef.current);
@@ -109,19 +152,40 @@ export function useRealtimeHealth(staffWsConnected?: boolean) {
     const isOnline = navigator.onLine;
 
     if (!isOnline) {
+      if (graceTimerRef.current) {
+        clearTimeout(graceTimerRef.current);
+        graceTimerRef.current = null;
+      }
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setState(prev => ({ ...prev, status: 'offline' }));
     } else if (!state.wsConnected || !state.supabaseConnected) {
-      setState(prev => ({ ...prev, status: 'degraded' }));
+      if (state.status !== 'degraded') {
+        if (!graceTimerRef.current) {
+          graceTimerRef.current = setTimeout(() => {
+            graceTimerRef.current = null;
+            setState(prev => {
+              if (!prev.wsConnected || !prev.supabaseConnected) {
+                return { ...prev, status: 'degraded' };
+              }
+              return prev;
+            });
+          }, DEGRADED_GRACE_PERIOD_MS);
+        }
+      }
     } else {
+      if (graceTimerRef.current) {
+        clearTimeout(graceTimerRef.current);
+        graceTimerRef.current = null;
+      }
       setState(prev => ({ ...prev, status: 'healthy' }));
     }
-  }, [state.wsConnected, state.supabaseConnected]);
+  }, [state.wsConnected, state.supabaseConnected, state.status]);
 
   useEffect(() => {
     return () => {
       if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
       if (supabaseCheckRef.current) clearInterval(supabaseCheckRef.current);
+      if (graceTimerRef.current) clearTimeout(graceTimerRef.current);
     };
   }, []);
 

@@ -7,6 +7,7 @@ import { bookingEvents } from '../lib/bookingEvents';
 declare global {
   interface Window {
     __wsConnected?: boolean;
+    __staffWsConnected?: boolean;
   }
 }
 
