@@ -702,6 +702,14 @@ export async function createStaffManualBooking(
 
   const isDayPassPayment = input.paymentStatus === 'Paid (Day Pass)' && input.dayPassPurchaseId;
 
+  let resolvedResourceType = 'simulator';
+  if (input.resource_id) {
+    const [resource] = await db.select({ type: resources.type }).from(resources).where(eq(resources.id, input.resource_id)).limit(1);
+    if (resource) {
+      resolvedResourceType = resource.type;
+    }
+  }
+
   let row: Record<string, unknown>;
   let dayPassRedeemed = false;
 
@@ -714,7 +722,7 @@ export async function createStaffManualBooking(
       requestEmail: resolvedEmail,
       isStaffRequest: true,
       isViewAsMode: false,
-      resourceType: input.resource_id ? 'simulator' : 'simulator'
+      resourceType: resolvedResourceType
     });
 
     if (isDayPassPayment) {
@@ -906,17 +914,19 @@ export function fireManualBookingPostCommitEffects(
     }
 
     let resourceName = 'Bay';
+    let resourceType = 'simulator';
     if (row.resourceId) {
-      db.select({ name: resources.name }).from(resources).where(eq(resources.id, row.resourceId as number))
+      db.select({ name: resources.name, type: resources.type }).from(resources).where(eq(resources.id, row.resourceId as number))
         .then(([resource]) => {
           if (resource?.name) resourceName = resource.name;
+          if (resource?.type) resourceType = resource.type;
         })
         .catch((e: unknown) => logger.error('[ManualBooking] Failed to fetch resource name', { extra: { e } }))
         .finally(() => {
-          sendNotificationAndBroadcast(row, resourceName, input, dayPassRedeemed, trackman_id!, auditLogFn, isDayPassPayment);
+          sendNotificationAndBroadcast(row, resourceName, resourceType, input, dayPassRedeemed, trackman_id!, auditLogFn, isDayPassPayment);
         });
     } else {
-      sendNotificationAndBroadcast(row, resourceName, input, dayPassRedeemed, trackman_id!, auditLogFn, isDayPassPayment);
+      sendNotificationAndBroadcast(row, resourceName, resourceType, input, dayPassRedeemed, trackman_id!, auditLogFn, isDayPassPayment);
     }
   } catch (postCommitError: unknown) {
     logger.error('[StaffManualBooking] Post-commit operations failed', { extra: { postCommitError } });
@@ -926,6 +936,7 @@ export function fireManualBookingPostCommitEffects(
 function sendNotificationAndBroadcast(
   row: Record<string, unknown>,
   resourceName: string,
+  resolvedResourceType: string,
   input: StaffManualBookingInput,
   dayPassRedeemed: boolean,
   trackman_id: string,
@@ -967,7 +978,7 @@ function sendNotificationAndBroadcast(
 
   broadcastAvailabilityUpdate({
     resourceId: (row.resourceId as number) || undefined,
-    resourceType: 'simulator',
+    resourceType: resolvedResourceType,
     date: row.requestDate as string,
     action: 'booked'
   });
