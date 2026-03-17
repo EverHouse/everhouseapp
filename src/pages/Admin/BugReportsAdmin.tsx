@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAutoAnimate } from '@formkit/auto-animate/react';
 import { usePageReady } from '../../stores/pageReadyStore';
 import EmptyState from '../../components/EmptyState';
@@ -9,6 +9,7 @@ import { formatRelativeTime, formatCardTimestamp } from '../../utils/dateUtils';
 import { useToast } from '../../components/Toast';
 import { useUndoAction } from '../../hooks/useUndoAction';
 import { haptic } from '../../utils/haptics';
+import { useBugReports, useUpdateBugReport, useDeleteBugReport } from '../../hooks/queries';
 
 interface BugReport {
     id: number;
@@ -38,16 +39,19 @@ const BugReportsAdmin: React.FC = () => {
     const { setPageReady } = usePageReady();
     const { effectiveTheme } = useTheme();
     const isDark = effectiveTheme === 'dark';
-    const [reports, setReports] = useState<BugReport[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
     const [activeStatus, setActiveStatus] = useState('open');
     const [selectedReport, setSelectedReport] = useState<BugReport | null>(null);
     const [isDetailOpen, setIsDetailOpen] = useState(false);
     const [staffNotes, setStaffNotes] = useState('');
-    const [isSaving, setIsSaving] = useState(false);
     const { showToast } = useToast();
     const { execute: undoAction } = useUndoAction();
     const [reportsRef] = useAutoAnimate();
+
+    const { data: reportsData, isLoading } = useBugReports(activeStatus);
+    const reports = (reportsData as unknown as BugReport[]) ?? [];
+    const updateBugReport = useUpdateBugReport();
+    const deleteBugReport = useDeleteBugReport();
+    const isSaving = updateBugReport.isPending;
 
     useEffect(() => {
         window.scrollTo(0, 0);
@@ -59,113 +63,61 @@ const BugReportsAdmin: React.FC = () => {
         }
     }, [isLoading, setPageReady]);
 
-    const fetchReports = useCallback(async () => {
-        try {
-            const params = new URLSearchParams();
-            if (activeStatus !== 'all') params.append('status', activeStatus);
-            
-            const res = await fetch(`/api/admin/bug-reports?${params.toString()}`, { credentials: 'include' });
-            if (res.ok) {
-                const data = await res.json();
-                setReports(data);
-            }
-        } catch (err: unknown) {
-            console.error('Failed to fetch bug reports:', err);
-        } finally {
-            setIsLoading(false);
-        }
-    }, [activeStatus]);
-
-    useEffect(() => {
-        setIsLoading(true);
-        fetchReports();
-    }, [activeStatus, fetchReports]);
-
     const openDetail = (report: BugReport) => {
         setSelectedReport(report);
         setStaffNotes(report.staffNotes || '');
         setIsDetailOpen(true);
     };
 
-    const handleUpdateStatus = async (status: string) => {
+    const handleUpdateStatus = (status: string) => {
         if (!selectedReport) return;
-        setIsSaving(true);
-        try {
-            const res = await fetch(`/api/admin/bug-reports/${selectedReport.id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify({ status }),
-            });
-            if (res.ok) {
-                const updated = await res.json();
-                setReports(prev => prev.map(r => r.id === selectedReport.id ? updated : r));
-                setSelectedReport(updated);
-                haptic.success();
-                showToast(`Status updated to ${formatStatusLabel(status)}`, 'success');
-            } else {
-                haptic.error();
-                showToast('Failed to update status', 'error');
+        updateBugReport.mutate(
+            { id: selectedReport.id, status },
+            {
+                onSuccess: (updated) => {
+                    setSelectedReport(updated as unknown as BugReport);
+                    haptic.success();
+                    showToast(`Status updated to ${formatStatusLabel(status)}`, 'success');
+                },
+                onError: () => {
+                    haptic.error();
+                    showToast('Failed to update status', 'error');
+                },
             }
-        } catch (_err: unknown) {
-            haptic.error();
-            showToast('Failed to update status', 'error');
-        } finally {
-            setIsSaving(false);
-        }
+        );
     };
 
-    const handleSaveNotes = async () => {
+    const handleSaveNotes = () => {
         if (!selectedReport) return;
-        setIsSaving(true);
-        try {
-            const res = await fetch(`/api/admin/bug-reports/${selectedReport.id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify({ staffNotes }),
-            });
-            if (res.ok) {
-                const updated = await res.json();
-                setReports(prev => prev.map(r => r.id === selectedReport.id ? updated : r));
-                setSelectedReport(updated);
-                haptic.success();
-                showToast('Notes saved', 'success');
-            } else {
-                haptic.error();
-                showToast('Failed to save notes', 'error');
+        updateBugReport.mutate(
+            { id: selectedReport.id, staffNotes },
+            {
+                onSuccess: (updated) => {
+                    setSelectedReport(updated as unknown as BugReport);
+                    haptic.success();
+                    showToast('Notes saved', 'success');
+                },
+                onError: () => {
+                    haptic.error();
+                    showToast('Failed to save notes', 'error');
+                },
             }
-        } catch (_err: unknown) {
-            haptic.error();
-            showToast('Failed to save notes', 'error');
-        } finally {
-            setIsSaving(false);
-        }
+        );
     };
 
     const handleDelete = () => {
         if (!selectedReport) return;
         const reportToDelete = selectedReport;
-
-        setReports(prev => prev.filter(r => r.id !== reportToDelete.id));
         setIsDetailOpen(false);
         setSelectedReport(null);
 
         undoAction({
             message: 'Bug report deleted',
             onExecute: async () => {
-                const res = await fetch(`/api/admin/bug-reports/${reportToDelete.id}`, {
-                    method: 'DELETE',
-                    credentials: 'include',
-                });
-                if (!res.ok) throw new Error('Failed to delete report');
+                await deleteBugReport.mutateAsync(reportToDelete.id);
                 haptic.success();
             },
-            onUndo: () => {
-                setReports(prev => [reportToDelete, ...prev].sort((a, b) =>
-                    new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-                ));
-            },
+            onUndo: () => {},
             errorMessage: 'Failed to delete report',
         });
     };

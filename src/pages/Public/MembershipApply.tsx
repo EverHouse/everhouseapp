@@ -9,6 +9,7 @@ import SEO from '../../components/SEO';
 import ConfirmDialogComponent from '../../components/ConfirmDialog';
 import { useUnsavedChanges } from '../../hooks/useUnsavedChanges';
 import { useFormPersistence } from '../../hooks/useFormPersistence';
+import { useSubmitApplication } from '../../hooks/queries';
 
 const getHubspotCookie = (): string | null => {
   const cookies = document.cookie.split(';');
@@ -42,7 +43,6 @@ const INITIAL_FORM_DATA = {
 const MembershipApply: React.FC = () => {
   const { setPageReady } = usePageReady();
   const [step, setStep] = useState(1);
-  const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -112,60 +112,55 @@ const MembershipApply: React.FC = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const applicationMutation = useSubmitApplication();
+  const loading = applicationMutation.isPending;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
     setError('');
 
     if (!formData.consent) {
       setFieldErrors({ consent: 'You must agree to receive communications' });
       setError('Please agree to receive communications');
-      setLoading(false);
       return;
     }
 
     triggerHaptic('medium');
 
-    try {
-      const fields = [
-        { name: 'firstname', value: formData.firstname },
-        { name: 'lastname', value: formData.lastname },
-        { name: 'email', value: formData.email },
-        { name: 'phone', value: formData.phone },
-        { name: 'membership_interest', value: formData.membership_tier },
-        { name: 'message', value: formData.message },
-        { name: 'marketing_consent', value: formData.consent ? 'Yes' : 'No' }
-      ];
+    const fields = [
+      { name: 'firstname', value: formData.firstname },
+      { name: 'lastname', value: formData.lastname },
+      { name: 'email', value: formData.email },
+      { name: 'phone', value: formData.phone },
+      { name: 'membership_interest', value: formData.membership_tier },
+      { name: 'message', value: formData.message },
+      { name: 'marketing_consent', value: formData.consent ? 'Yes' : 'No' }
+    ];
 
-      const hutk = getHubspotCookie();
-      const context: Record<string, unknown> = {
-        pageUri: window.location.href,
-        pageName: 'Membership Application'
-      };
-      if (hutk) {
-        context.hutk = hutk;
-      }
-
-      const response = await fetch('/api/hubspot/forms/membership', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fields, context })
-      });
-
-      if (!response.ok) {
-        throw new Error('Submission failed');
-      }
-
-      triggerHaptic('success');
-      clearPersistedData();
-      setSuccess(true);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    } catch (err: unknown) {
-      triggerHaptic('error');
-      setError((err instanceof Error ? err.message : String(err)) || 'Something went wrong. Please try again.');
-    } finally {
-      setLoading(false);
+    const hutk = getHubspotCookie();
+    const context: Record<string, unknown> = {
+      pageUri: window.location.href,
+      pageName: 'Membership Application'
+    };
+    if (hutk) {
+      context.hutk = hutk;
     }
+
+    applicationMutation.mutate(
+      { fields, context },
+      {
+        onSuccess: () => {
+          triggerHaptic('success');
+          clearPersistedData();
+          setSuccess(true);
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        },
+        onError: (err) => {
+          triggerHaptic('error');
+          setError(err.message || 'Something went wrong. Please try again.');
+        },
+      }
+    );
   };
 
   const getInputClass = (fieldName: string) => `w-full px-4 py-3 rounded-xl border transition-colors focus:outline-none focus:ring-2 ${

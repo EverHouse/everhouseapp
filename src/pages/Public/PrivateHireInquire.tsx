@@ -6,6 +6,7 @@ import { formatPhoneNumber } from '../../utils/phoneFormat';
 import { usePageReady } from '../../stores/pageReadyStore';
 import WalkingGolferSpinner from '../../components/WalkingGolferSpinner';
 import SEO from '../../components/SEO';
+import { useSubmitPrivateHireInquiry } from '../../hooks/queries';
 
 const getHubspotCookie = (): string | null => {
   const cookies = document.cookie.split(';');
@@ -38,7 +39,6 @@ const EVENT_SERVICES = [
 const PrivateHireInquire: React.FC = () => {
   const { setPageReady } = usePageReady();
   const [step, setStep] = useState(1);
-  const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -104,67 +104,62 @@ const PrivateHireInquire: React.FC = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const privateHireMutation = useSubmitPrivateHireInquiry();
+  const loading = privateHireMutation.isPending;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
     setError('');
     triggerHaptic('medium');
 
     if (!formData.consent) {
       setFieldErrors({ consent: 'You must agree to receive communications' });
       setError('Please agree to receive communications before submitting.');
-      setLoading(false);
       return;
     }
 
-    try {
-      const servicesText = formData.services
-        .map(id => EVENT_SERVICES.find(s => s.id === id)?.label || id)
-        .join('; ');
+    const servicesText = formData.services
+      .map(id => EVENT_SERVICES.find(s => s.id === id)?.label || id)
+      .join('; ');
 
-      const fields = [
-        { name: 'company', value: formData.company },
-        { name: 'firstname', value: formData.firstname },
-        { name: 'lastname', value: formData.lastname },
-        { name: 'email', value: formData.email },
-        { name: 'phone', value: formData.phone },
-        { name: 'event_date', value: formData.event_date },
-        { name: 'event_time', value: formData.event_time },
-        { name: 'event_type', value: formData.event_type },
-        { name: 'guest_count', value: formData.guest_count },
-        { name: 'additional_details', value: formData.additional_details },
-        { name: 'event_services', value: servicesText },
-        { name: 'marketing_consent', value: formData.consent ? 'Yes' : 'No' }
-      ];
+    const fields = [
+      { name: 'company', value: formData.company },
+      { name: 'firstname', value: formData.firstname },
+      { name: 'lastname', value: formData.lastname },
+      { name: 'email', value: formData.email },
+      { name: 'phone', value: formData.phone },
+      { name: 'event_date', value: formData.event_date },
+      { name: 'event_time', value: formData.event_time },
+      { name: 'event_type', value: formData.event_type },
+      { name: 'guest_count', value: formData.guest_count },
+      { name: 'additional_details', value: formData.additional_details },
+      { name: 'event_services', value: servicesText },
+      { name: 'marketing_consent', value: formData.consent ? 'Yes' : 'No' }
+    ];
 
-      const hutk = getHubspotCookie();
-      const context: Record<string, unknown> = {
-        pageUri: window.location.href,
-        pageName: 'Private Hire - Event Inquiry'
-      };
-      if (hutk) {
-        context.hutk = hutk;
-      }
-
-      const response = await fetch('/api/hubspot/forms/private-hire', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fields, context })
-      });
-
-      if (!response.ok) {
-        throw new Error('Submission failed');
-      }
-
-      triggerHaptic('success');
-      setSuccess(true);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    } catch (err: unknown) {
-      triggerHaptic('error');
-      setError((err instanceof Error ? err.message : String(err)) || 'Something went wrong. Please try again.');
-    } finally {
-      setLoading(false);
+    const hutk = getHubspotCookie();
+    const context: Record<string, unknown> = {
+      pageUri: window.location.href,
+      pageName: 'Private Hire - Event Inquiry'
+    };
+    if (hutk) {
+      context.hutk = hutk;
     }
+
+    privateHireMutation.mutate(
+      { fields, context },
+      {
+        onSuccess: () => {
+          triggerHaptic('success');
+          setSuccess(true);
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        },
+        onError: (err) => {
+          triggerHaptic('error');
+          setError(err.message || 'Something went wrong. Please try again.');
+        },
+      }
+    );
   };
 
   const getInputClass = (fieldName: string) => `w-full px-4 py-3 rounded-xl border transition-colors focus:outline-none focus:ring-2 ${

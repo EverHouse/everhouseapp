@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { Footer } from '../../components/Footer';
 import Input from '../../components/Input';
@@ -7,6 +7,7 @@ import { usePageReady } from '../../stores/pageReadyStore';
 import { useNavigationLoading } from '../../stores/navigationLoadingStore';
 import SEO from '../../components/SEO';
 import WalkingGolferSpinner from '../../components/WalkingGolferSpinner';
+import { usePublicMembershipTiers, useDayPassCheckout } from '../../hooks/queries';
 
 interface DayPassTier {
   id: number;
@@ -24,53 +25,51 @@ const BuyDayPass: React.FC = () => {
   const filterType = searchParams.get('type');
   const { startNavigation } = useNavigationLoading();
   const { setPageReady } = usePageReady();
-  const [tiers, setTiers] = useState<DayPassTier[]>([]);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [email, setEmail] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [processingSlug, setProcessingSlug] = useState<string | null>(null);
 
+  const tiersQuery = usePublicMembershipTiers();
+  const checkoutMutation = useDayPassCheckout();
+
+  type TierRaw = { product_type?: string; slug?: string; name: string; stripe_price_id?: string; monthly_price?: number; description?: string; id?: number; price_string?: string; price_cents?: number };
+  const rawTiers = (tiersQuery.data as unknown as TierRaw[]) ?? [];
+
+  const tiers = useMemo(() => {
+    const dayPasses = rawTiers
+      .filter((tier) => tier.product_type === 'one_time')
+      .filter((tier) => {
+        const slug = tier.slug?.toLowerCase() || '';
+        const name = tier.name?.toLowerCase() || '';
+        if (slug.includes('overage') || name.includes('overage')) return false;
+        if (slug.includes('guest-pass') || slug.includes('guest_pass') || name.includes('guest fee')) return false;
+        return slug.startsWith('day-pass');
+      })
+      .map((tier) => ({
+        id: tier.id as number,
+        name: tier.name,
+        slug: tier.slug as string,
+        priceString: tier.price_string as string,
+        priceCents: tier.price_cents as number,
+        description: tier.description ?? null,
+        stripePriceId: tier.stripe_price_id ?? null,
+      }));
+    
+    const filtered = filterType 
+      ? dayPasses.filter((t: DayPassTier) => t.slug === filterType || t.slug.includes(filterType)) 
+      : dayPasses;
+    return filtered.length > 0 ? filtered : dayPasses;
+  }, [rawTiers, filterType]);
+
+  const loading = tiersQuery.isLoading;
+
   useEffect(() => {
-    const fetchDayPassTiers = async () => {
-      try {
-        const response = await fetch('/api/membership-tiers?active=true');
-        if (!response.ok) throw new Error('Failed to fetch day passes');
-        
-        const allTiers = await response.json();
-        const dayPasses = allTiers
-          .filter((tier: { product_type?: string; slug?: string; name: string; stripe_price_id?: string; monthly_price?: number; description?: string; id?: number; price_string?: string; price_cents?: number }) => tier.product_type === 'one_time')
-          .filter((tier: { product_type?: string; slug?: string; name: string; stripe_price_id?: string; monthly_price?: number; description?: string; id?: number; price_string?: string; price_cents?: number }) => {
-            const slug = tier.slug?.toLowerCase() || '';
-            const name = tier.name?.toLowerCase() || '';
-            if (slug.includes('overage') || name.includes('overage')) return false;
-            if (slug.includes('guest-pass') || slug.includes('guest_pass') || name.includes('guest fee')) return false;
-            return slug.startsWith('day-pass');
-          })
-          .map((tier: { product_type?: string; slug?: string; name: string; stripe_price_id?: string; monthly_price?: number; description?: string; id?: number; price_string?: string; price_cents?: number }) => ({
-            id: tier.id as number,
-            name: tier.name,
-            slug: tier.slug,
-            priceString: tier.price_string as string,
-            priceCents: tier.price_cents as number,
-            description: tier.description,
-            stripePriceId: tier.stripe_price_id,
-          }));
-        
-        const filtered = filterType 
-          ? dayPasses.filter((t: DayPassTier) => t.slug === filterType || t.slug.includes(filterType)) 
-          : dayPasses;
-        setTiers(filtered.length > 0 ? filtered : dayPasses);
-        setPageReady(true);
-      } catch (_err: unknown) {
-        setError('Unable to load day passes. Please try again.');
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchDayPassTiers();
-  }, [filterType, setPageReady]);
+    if (!tiersQuery.isLoading) {
+      setPageReady(true);
+    }
+  }, [tiersQuery.isLoading, setPageReady]);
 
   const handlePurchase = async (tier: DayPassTier) => {
     if (!email) {
@@ -87,31 +86,20 @@ const BuyDayPass: React.FC = () => {
     setError(null);
     setProcessingSlug(tier.slug);
 
-    try {
-      const response = await fetch('/api/public/day-pass/checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email,
-          passType: tier.slug,
-          firstName,
-          lastName,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to create checkout');
+    checkoutMutation.mutate(
+      { email, passType: tier.slug, firstName, lastName },
+      {
+        onSuccess: (data) => {
+          if (data.checkoutUrl) {
+            window.location.href = data.checkoutUrl;
+          }
+        },
+        onError: (err) => {
+          setError(err.message || 'Something went wrong. Please try again.');
+          setProcessingSlug(null);
+        },
       }
-
-      if (data.checkoutUrl) {
-        window.location.href = data.checkoutUrl;
-      }
-    } catch (err: unknown) {
-      setError((err instanceof Error ? err.message : String(err)) || 'Something went wrong. Please try again.');
-      setProcessingSlug(null);
-    }
+    );
   };
 
   const formatPrice = (cents: number) => {

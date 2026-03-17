@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { useTheme } from '../contexts/ThemeContext';
 import { useBottomNav } from '../stores/bottomNavStore';
 import TierBadge from './TierBadge';
@@ -12,6 +13,15 @@ import { TIER_NAMES } from '../../shared/constants/tiers';
 import IdScannerModal from './staff-command-center/modals/IdScannerModal';
 import { formatDatePacific } from './memberProfile/memberProfileTypes';
 import type { MemberHistory, GuestVisit, MemberNote, CommunicationLog, TabType, BookingHistoryItem } from './memberProfile/memberProfileTypes';
+import {
+  useMemberDetails, useMemberHistory, useMemberNotes, useMemberCommunications,
+  useMemberGuests, useMemberPayments, useMemberBalance, useMemberIdImage,
+  useMemberAddOptions, useAddMemberNote, useUpdateMemberNote, useDeleteMemberNote,
+  useAddCommunication, useDeleteCommunication, useApplyCredit, useSaveIdImage,
+  useDeleteIdImage, useRemoveLinkedEmail, useDeleteMember, useChangeMemberEmail,
+  useUpdateMemberContactInfo, useAssignTier, useSendPaymentLink, useSendReactivationLink,
+  useMergePreview, useExecuteMerge, memberProfileKeys,
+} from '../hooks/queries';
 
 interface PurchaseItem {
   id: number | string;
@@ -129,39 +139,65 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
     if (member) setEnrichedMember(member);
   }, [member]);
 
-  useEffect(() => {
-    if (!isOpen || !member?.email) return;
-    let cancelled = false;
-    fetch(`/api/members/${encodeURIComponent(member.email)}/details`, { credentials: 'include' })
-      .then(res => res.ok ? res.json() : null)
-      .then(details => {
-        if (cancelled || !details) return;
-        setEnrichedMember(prev => ({ ...prev, ...details }));
-      })
-      .catch(() => {});
-    return () => { cancelled = true; };
-  }, [isOpen, member?.email]);
 
-  const activeMemberEmailRef = useRef<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [history, setHistory] = useState<MemberHistory | null>(null);
-  const [notes, setNotes] = useState<MemberNote[]>([]);
-  const [communications, setCommunications] = useState<CommunicationLog[]>([]);
-  const [guestHistory, setGuestHistory] = useState<GuestVisit[]>([]);
-  const [purchases, setPurchases] = useState<PurchaseItem[]>([]);
+  const queryClient = useQueryClient();
+  const memberEmail = isOpen ? member?.email : undefined;
+  const memberId = isOpen ? member?.id : undefined;
+
+  const detailsQuery = useMemberDetails(memberEmail);
+  const historyQuery = useMemberHistory(memberEmail);
+  const notesQuery = useMemberNotes(memberEmail);
+  const commsQuery = useMemberCommunications(memberEmail);
+  const guestsQuery = useMemberGuests(memberEmail);
+  const paymentsQuery = useMemberPayments(memberEmail);
+  const balanceQuery = useMemberBalance(memberEmail);
+  const idImageQuery = useMemberIdImage(memberId ? String(memberId) : undefined, { enabled: isOpen && isAdmin });
+  const addOptionsQuery = useMemberAddOptions({ enabled: isOpen && visitorMode && isAdmin });
+
+  const isLoading = detailsQuery.isLoading || historyQuery.isLoading;
+  const history = (historyQuery.data as unknown as MemberHistory) ?? null;
+  const notes = (notesQuery.data as unknown as MemberNote[]) ?? [];
+  const communications = (commsQuery.data as unknown as CommunicationLog[]) ?? [];
+  const guestHistory = (guestsQuery.data as unknown as GuestVisit[]) ?? [];
+  const rawPurchases = paymentsQuery.data as { payments?: PurchaseItem[] } | PurchaseItem[] | undefined;
+  const purchases: PurchaseItem[] = rawPurchases ? (Array.isArray(rawPurchases) ? rawPurchases : (Array.isArray((rawPurchases as { payments?: PurchaseItem[] }).payments) ? (rawPurchases as { payments: PurchaseItem[] }).payments : [])) : [];
+  const accountBalance = (balanceQuery.data as { balanceCents: number; balanceDollars: number }) ?? null;
+  const idImageUrl = (idImageQuery.data as { idImageUrl: string | null })?.idImageUrl ?? null;
+  const isLoadingIdImage = idImageQuery.isLoading;
+  const membershipTiers = ((addOptionsQuery.data as { tiersWithIds?: Array<{id: number; name: string; priceCents: number; billingInterval: string; hasStripePrice: boolean}> })?.tiersWithIds) ?? [];
+
+  useEffect(() => {
+    if (detailsQuery.data) {
+      setEnrichedMember(prev => prev ? { ...prev, ...(detailsQuery.data as Record<string, unknown>) } : prev);
+    }
+  }, [detailsQuery.data]);
+
+  const addNoteMutation = useAddMemberNote();
+  const updateNoteMutation = useUpdateMemberNote();
+  const deleteNoteMutation = useDeleteMemberNote();
+  const addCommMutation = useAddCommunication();
+  const deleteCommMutation = useDeleteCommunication();
+  const applyCreditMutation = useApplyCredit();
+  const saveIdImageMutation = useSaveIdImage();
+  const deleteIdImageMutation = useDeleteIdImage();
+  const removeLinkedEmailMutation = useRemoveLinkedEmail();
+  const deleteMemberMutation = useDeleteMember();
+  const changeEmailMutation = useChangeMemberEmail();
+  const updateContactInfoMutation = useUpdateMemberContactInfo();
+  const assignTierMutation = useAssignTier();
+  const sendPaymentLinkMutation = useSendPaymentLink();
+  const sendReactivationLinkMutation = useSendReactivationLink();
+  const mergePreviewMutation = useMergePreview();
+  const executeMergeMutation = useExecuteMerge();
+
   const [linkedEmails, setLinkedEmails] = useState<string[]>([]);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteOptions, setDeleteOptions] = useState({ hubspot: true, stripe: true });
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [membershipTiers, setMembershipTiers] = useState<{id: number; name: string; priceCents: number; billingInterval: string; hasStripePrice: boolean}[]>([]);
   const [selectedTierId, setSelectedTierId] = useState<number | null>(null);
-  const [sendingPaymentLink, setSendingPaymentLink] = useState(false);
-  const [assigningTier, setAssigningTier] = useState(false);
   const [selectedAssignTier, setSelectedAssignTier] = useState<string>('');
   const [removingEmail, setRemovingEmail] = useState<string | null>(null);
   const [newNoteContent, setNewNoteContent] = useState('');
   const [newNotePinned, setNewNotePinned] = useState(false);
-  const [isAddingNote, setIsAddingNote] = useState(false);
   const [editingNoteId, setEditingNoteId] = useState<number | null>(null);
   const [editingNoteContent, setEditingNoteContent] = useState('');
   const [showAddComm, setShowAddComm] = useState(false);
@@ -169,160 +205,71 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
   const [newCommDirection, setNewCommDirection] = useState<string>('outbound');
   const [newCommSubject, setNewCommSubject] = useState('');
   const [newCommBody, setNewCommBody] = useState('');
-  const [isAddingComm, setIsAddingComm] = useState(false);
 
   const [displayedTier, setDisplayedTier] = useState<string>('');
   const [showMergeModal, setShowMergeModal] = useState(false);
   const [selectedMergeTarget, setSelectedMergeTarget] = useState<SelectedMember | null>(null);
   const [mergePreview, setMergePreview] = useState<MergePreviewData | null>(null);
-  const [isMerging, setIsMerging] = useState(false);
-  const [isLoadingPreview, setIsLoadingPreview] = useState(false);
-  const [accountBalance, setAccountBalance] = useState<{ balanceCents: number; balanceDollars: number } | null>(null);
   const [showApplyCreditModal, setShowApplyCreditModal] = useState(false);
-  const [isApplyingCredit, setIsApplyingCredit] = useState(false);
   const [creditAmount, setCreditAmount] = useState('');
   const [creditDescription, setCreditDescription] = useState('');
-  const [idImageUrl, setIdImageUrl] = useState<string | null>(null);
-  const [isLoadingIdImage, setIsLoadingIdImage] = useState(false);
   const [showIdScanner, setShowIdScanner] = useState(false);
   const [showIdImageFull, setShowIdImageFull] = useState(false);
-  const [isSavingIdImage, setIsSavingIdImage] = useState(false);
-  const [isDeletingIdImage, setIsDeletingIdImage] = useState(false);
   const [showEmailChange, setShowEmailChange] = useState(false);
   const [newEmailValue, setNewEmailValue] = useState('');
-  const [isChangingEmail, setIsChangingEmail] = useState(false);
   const [emailChangeError, setEmailChangeError] = useState('');
   const [showNameEdit, setShowNameEdit] = useState(false);
   const [editFirstName, setEditFirstName] = useState('');
   const [editLastName, setEditLastName] = useState('');
-  const [isSavingName, setIsSavingName] = useState(false);
   const [nameEditError, setNameEditError] = useState('');
   const [showPhoneEdit, setShowPhoneEdit] = useState(false);
   const [editPhone, setEditPhone] = useState('');
-  const [isSavingPhone, setIsSavingPhone] = useState(false);
   const [phoneEditError, setPhoneEditError] = useState('');
+
+  const isSavingIdImage = saveIdImageMutation.isPending;
+  const isDeletingIdImage = deleteIdImageMutation.isPending;
+  const isAddingNote = addNoteMutation.isPending;
+  const isAddingComm = addCommMutation.isPending;
+  const isApplyingCredit = applyCreditMutation.isPending;
+  const isDeleting = deleteMemberMutation.isPending;
+  const isChangingEmail = changeEmailMutation.isPending;
+  const isSavingName = updateContactInfoMutation.isPending && showNameEdit;
+  const isSavingPhone = updateContactInfoMutation.isPending && showPhoneEdit;
+  const assigningTier = assignTierMutation.isPending;
+  const sendingPaymentLink = sendPaymentLinkMutation.isPending;
+  const isMerging = executeMergeMutation.isPending;
+  const isLoadingPreview = mergePreviewMutation.isPending;
 
   useEffect(() => {
     setDisplayedTier(member?.rawTier || member?.tier || '');
   }, [member?.rawTier, member?.tier]);
 
   useEffect(() => {
-    let cancelled = false;
-    if (isOpen && visitorMode && isAdmin) {
-      fetch('/api/members/add-options', { credentials: 'include' })
-        .then(res => res.ok ? res.json() : null)
-        .then(data => {
-          if (cancelled) return;
-          if (data?.tiersWithIds) {
-            setMembershipTiers(data.tiersWithIds);
-            if (data.tiersWithIds.length > 0 && !selectedTierId) {
-              setSelectedTierId(data.tiersWithIds[0].id);
-            }
-          }
-        })
-        .catch((err: unknown) => { console.warn('[MemberProfileDrawer] Failed to fetch membership tiers:', err); });
-    }
-    return () => { cancelled = true; };
-  }, [isOpen, visitorMode, isAdmin, selectedTierId]);
-
-  const fetchMemberData = useCallback(async () => {
-    if (!member?.email) return;
-    const emailAtFetchStart = member.email;
-    setIsLoading(true);
-    try {
-      const [detailsRes, historyRes, notesRes, commsRes, guestsRes, purchasesRes, balanceRes] = await Promise.all([
-        fetch(`/api/members/${encodeURIComponent(member.email)}/details`, { credentials: 'include' }),
-        fetch(`/api/members/${encodeURIComponent(member.email)}/history`, { credentials: 'include' }),
-        fetch(`/api/members/${encodeURIComponent(member.email)}/notes`, { credentials: 'include' }),
-        fetch(`/api/members/${encodeURIComponent(member.email)}/communications`, { credentials: 'include' }),
-        fetch(`/api/members/${encodeURIComponent(member.email)}/guests`, { credentials: 'include' }),
-        fetch(`/api/stripe/payments/${encodeURIComponent(member.email)}`, { credentials: 'include' }),
-        fetch(`/api/my-billing/account-balance?user_email=${encodeURIComponent(member.email)}`, { credentials: 'include' }),
-      ]);
-
-      if (activeMemberEmailRef.current !== emailAtFetchStart) return;
-
-      if (detailsRes.ok) {
-        const detailsData = await detailsRes.json();
-        setEnrichedMember(prev => ({ ...prev, ...detailsData }));
-      }
-
-      if (historyRes.ok) {
-        const historyData = await historyRes.json();
-        setHistory(historyData);
-      }
-      if (notesRes.ok) {
-        const notesData = await notesRes.json();
-        setNotes(notesData);
-      }
-      if (commsRes.ok) {
-        const commsData = await commsRes.json();
-        setCommunications(commsData);
-      }
-      if (guestsRes.ok) {
-        const guestsData = await guestsRes.json();
-        setGuestHistory(guestsData);
-      }
-      if (purchasesRes.ok) {
-        const purchasesData = await purchasesRes.json();
-        const paymentsArray = purchasesData.payments || purchasesData;
-        setPurchases(Array.isArray(paymentsArray) ? paymentsArray : []);
-      }
-      if (balanceRes.ok) {
-        const balanceData = await balanceRes.json();
-        setAccountBalance(balanceData);
-      }
-    } catch (err: unknown) {
-      console.error('Failed to fetch member data:', err);
-    } finally {
-      if (activeMemberEmailRef.current === emailAtFetchStart) {
-        setIsLoading(false);
-      }
-    }
-  }, [member?.email]);
-
-  const fetchIdImage = useCallback(async () => {
-    if (!member?.id) return;
-    setIsLoadingIdImage(true);
-    try {
-      const res = await fetch(`/api/admin/member/${encodeURIComponent(member.id)}/id-image`, { credentials: 'include' });
-      if (res.ok) {
-        const data = await res.json();
-        setIdImageUrl(data.idImageUrl);
-      }
-    } catch (err: unknown) {
-      console.error('Failed to fetch ID image:', err);
-    } finally {
-      setIsLoadingIdImage(false);
-    }
-  }, [member?.id]);
-
-  useEffect(() => {
     if (isOpen && member) {
-      activeMemberEmailRef.current = member.email;
-      setActiveTab('overview');
       setLinkedEmails(member.manuallyLinkedEmails || []);
-      fetchMemberData();
-    } else {
-      activeMemberEmailRef.current = null;
     }
-  }, [isOpen, member, fetchMemberData]);
+  }, [isOpen, member]);
 
   useEffect(() => {
-    if (isOpen && member) {
-      fetchIdImage();
+    if (membershipTiers.length > 0 && !selectedTierId) {
+      setSelectedTierId(membershipTiers[0].id);
     }
-  }, [isOpen, member, fetchIdImage]);
+  }, [membershipTiers, selectedTierId]);
+
+  const invalidateAllMemberData = useCallback(() => {
+    if (!member?.email) return;
+    queryClient.invalidateQueries({ queryKey: memberProfileKeys.all });
+  }, [member?.email, queryClient]);
 
   useEffect(() => {
     const handleStatsUpdate = (event: CustomEvent) => {
       if (isOpen && member?.email && event.detail?.memberEmail?.toLowerCase() === member.email.toLowerCase()) {
-        fetchMemberData();
+        invalidateAllMemberData();
       }
     };
     window.addEventListener('member-stats-updated', handleStatsUpdate as EventListener);
     return () => window.removeEventListener('member-stats-updated', handleStatsUpdate as EventListener);
-  }, [isOpen, member?.email, fetchMemberData]);
+  }, [isOpen, member?.email, invalidateAllMemberData]);
 
   const hasUnsavedContent = 
     newNoteContent.trim().length > 0 ||
@@ -359,250 +306,141 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
   }) => {
     if (!member?.id) return;
     setShowIdScanner(false);
-    setIsSavingIdImage(true);
-    try {
-      const res = await fetch('/api/admin/save-id-image', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          userId: member.id,
-          image: data.imageBase64,
-          mimeType: data.imageMimeType,
-        }),
-      });
-      if (res.ok) {
-        const result = await res.json();
-        setIdImageUrl(result.imageUrl);
-      }
-    } catch (err: unknown) {
-      console.error('Failed to save ID image:', err);
-    } finally {
-      setIsSavingIdImage(false);
-    }
-  }, [member?.id]);
+    saveIdImageMutation.mutate(
+      { userId: String(member.id), image: data.imageBase64, mimeType: data.imageMimeType },
+      { onError: (err) => console.error('Failed to save ID image:', err) }
+    );
+  }, [member?.id, saveIdImageMutation]);
 
-  const handleDeleteIdImage = useCallback(async () => {
+  const handleDeleteIdImage = useCallback(() => {
     if (!member?.id) return;
-    setIsDeletingIdImage(true);
-    try {
-      const res = await fetch(`/api/admin/member/${encodeURIComponent(member.id)}/id-image`, {
-        method: 'DELETE',
-        credentials: 'include',
-      });
-      if (res.ok) {
-        setIdImageUrl(null);
-        setShowIdImageFull(false);
+    deleteIdImageMutation.mutate(
+      { memberId: String(member.id) },
+      {
+        onSuccess: () => setShowIdImageFull(false),
+        onError: (err) => console.error('Failed to delete ID image:', err),
       }
-    } catch (err: unknown) {
-      console.error('Failed to delete ID image:', err);
-    } finally {
-      setIsDeletingIdImage(false);
-    }
-  }, [member?.id]);
+    );
+  }, [member?.id, deleteIdImageMutation]);
 
-  const handleRemoveLinkedEmail = async (email: string) => {
+  const handleRemoveLinkedEmail = (email: string) => {
     if (!member || !isAdmin) return;
     setRemovingEmail(email);
-    try {
-      const res = await fetch('/api/admin/trackman/linked-email', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ memberEmail: member.email, linkedEmail: email })
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setLinkedEmails(data.manuallyLinkedEmails || []);
+    removeLinkedEmailMutation.mutate(
+      { memberEmail: member.email, linkedEmail: email },
+      {
+        onSuccess: (data) => {
+          setLinkedEmails((data as { manuallyLinkedEmails: string[] }).manuallyLinkedEmails || []);
+          setRemovingEmail(null);
+        },
+        onError: () => setRemovingEmail(null),
       }
-    } catch (err: unknown) {
-      console.error('Failed to remove linked email:', err);
-    } finally {
-      setRemovingEmail(null);
-    }
+    );
   };
 
-  const handleApplyCredit = async () => {
+  const handleApplyCredit = () => {
     if (!member?.email || !creditAmount || isApplyingCredit) return;
     const amountCents = Math.round(parseFloat(creditAmount) * 100);
     if (isNaN(amountCents) || amountCents <= 0) return;
-    
-    setIsApplyingCredit(true);
-    try {
-      const res = await fetch(`/api/member-billing/${encodeURIComponent(member.email)}/credit`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ 
-          amountCents, 
-          description: creditDescription || 'Staff applied credit' 
-        }),
-      });
-      
-      if (res.ok) {
-        const data = await res.json();
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        setAccountBalance(prev => ({
-          balanceCents: Math.abs(data.endingBalance || 0),
-          balanceDollars: Math.abs(data.endingBalance || 0) / 100,
-        }));
-        setShowApplyCreditModal(false);
-        setCreditAmount('');
-        setCreditDescription('');
-      } else {
-        const errorData = await res.json().catch(() => ({}));
-        alert(errorData.error || 'Failed to apply credit');
+    applyCreditMutation.mutate(
+      { email: member.email, amountCents, description: creditDescription || 'Staff applied credit' },
+      {
+        onSuccess: () => {
+          setShowApplyCreditModal(false);
+          setCreditAmount('');
+          setCreditDescription('');
+        },
+        onError: (err) => alert(err.message || 'Failed to apply credit'),
       }
-    } catch (err: unknown) {
-      console.error('Failed to apply credit:', err);
-      alert('Failed to apply credit');
-    } finally {
-      setIsApplyingCredit(false);
-    }
+    );
   };
 
-
-  const handleAddNote = async () => {
+  const handleAddNote = () => {
     if (!member?.email || !newNoteContent.trim()) return;
-    setIsAddingNote(true);
-    try {
-      const res = await fetch(`/api/members/${encodeURIComponent(member.email)}/notes`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ content: newNoteContent, isPinned: newNotePinned })
-      });
-      if (res.ok) {
-        const newNote = await res.json();
-        setNotes(prev => [newNote, ...prev]);
-        setNewNoteContent('');
-        setNewNotePinned(false);
+    addNoteMutation.mutate(
+      { email: member.email, content: newNoteContent, isPinned: newNotePinned },
+      {
+        onSuccess: () => {
+          setNewNoteContent('');
+          setNewNotePinned(false);
+        },
+        onError: (err) => console.error('Failed to add note:', err),
       }
-    } catch (err: unknown) {
-      console.error('Failed to add note:', err);
-    } finally {
-      setIsAddingNote(false);
-    }
+    );
   };
 
-  const handlePermanentDelete = async () => {
+  const handlePermanentDelete = () => {
     if (!member?.email && !member?.id) return;
-    setIsDeleting(true);
-    try {
-      const params = new URLSearchParams();
-      if (deleteOptions.hubspot) params.append('deleteFromHubSpot', 'true');
-      if (deleteOptions.stripe) params.append('deleteFromStripe', 'true');
-      
-      // Use visitor API for visitors, member API for members
-      const url = visitorMode && member.id
-        ? `/api/visitors/${member.id}?${params}`
-        : `/api/members/${encodeURIComponent(member.email)}/permanent?${params}`;
-      
-      const res = await fetch(url, {
-        method: 'DELETE',
-        credentials: 'include'
-      });
-      
-      const entityType = visitorMode ? 'Visitor' : 'Member';
-      
-      if (res.ok) {
-        const result = await res.json();
-        alert(`${entityType} deleted successfully.\n\nDeleted records: ${result.deletedRecords?.join(', ') || 'user'}\nStripe deleted: ${result.stripeDeleted ? 'Yes' : 'No'}\nHubSpot archived: ${result.hubspotArchived ? 'Yes' : 'No'}`);
-        setShowDeleteModal(false);
-        onClose();
-        onMemberDeleted?.();
-      } else {
-        const error = await res.json();
-        alert(`Failed to delete ${entityType.toLowerCase()}: ${error.error || 'Unknown error'}`);
+    const entityType = visitorMode ? 'Visitor' : 'Member';
+    deleteMemberMutation.mutate(
+      {
+        email: member.email,
+        memberId: member.id ? String(member.id) : undefined,
+        visitorMode,
+        deleteFromHubSpot: deleteOptions.hubspot,
+        deleteFromStripe: deleteOptions.stripe,
+      },
+      {
+        onSuccess: (result) => {
+          const r = result as { deletedRecords?: string[]; stripeDeleted?: boolean; hubspotArchived?: boolean };
+          alert(`${entityType} deleted successfully.\n\nDeleted records: ${r.deletedRecords?.join(', ') || 'user'}\nStripe deleted: ${r.stripeDeleted ? 'Yes' : 'No'}\nHubSpot archived: ${r.hubspotArchived ? 'Yes' : 'No'}`);
+          setShowDeleteModal(false);
+          onClose();
+          onMemberDeleted?.();
+        },
+        onError: (err) => alert(`Failed to delete ${entityType.toLowerCase()}: ${err.message || 'Unknown error'}`),
       }
-    } catch (err: unknown) {
-      console.error('Failed to delete:', err);
-      alert('Failed to delete. Please try again.');
-    } finally {
-      setIsDeleting(false);
-    }
+    );
   };
 
-  const handleUpdateNote = async (noteId: number, content: string, isPinned?: boolean) => {
+  const handleUpdateNote = (noteId: number, content: string, isPinned?: boolean) => {
     if (!member?.email) return;
-    try {
-      const res = await fetch(`/api/members/${encodeURIComponent(member.email)}/notes/${noteId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ content, isPinned })
-      });
-      if (res.ok) {
-        const updated = await res.json();
-        setNotes(prev => prev.map(n => n.id === noteId ? updated : n));
-        setEditingNoteId(null);
-        setEditingNoteContent('');
+    updateNoteMutation.mutate(
+      { email: member.email, noteId, content, isPinned },
+      {
+        onSuccess: () => {
+          setEditingNoteId(null);
+          setEditingNoteContent('');
+        },
+        onError: (err) => console.error('Failed to update note:', err),
       }
-    } catch (err: unknown) {
-      console.error('Failed to update note:', err);
-    }
+    );
   };
 
-  const handleDeleteNote = async (noteId: number) => {
+  const handleDeleteNote = (noteId: number) => {
     if (!member?.email) return;
-    try {
-      const res = await fetch(`/api/members/${encodeURIComponent(member.email)}/notes/${noteId}`, {
-        method: 'DELETE',
-        credentials: 'include'
-      });
-      if (res.ok) {
-        setNotes(prev => prev.filter(n => n.id !== noteId));
-      }
-    } catch (err: unknown) {
-      console.error('Failed to delete note:', err);
-    }
+    deleteNoteMutation.mutate(
+      { email: member.email, noteId },
+      { onError: (err) => console.error('Failed to delete note:', err) }
+    );
   };
 
-  const handleAddCommunication = async () => {
+  const handleAddCommunication = () => {
     if (!member?.email || !newCommSubject.trim()) return;
-    setIsAddingComm(true);
-    try {
-      const res = await fetch(`/api/members/${encodeURIComponent(member.email)}/communications`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          type: newCommType,
-          direction: newCommDirection,
-          subject: newCommSubject,
-          body: newCommBody,
-          status: 'completed',
-          occurredAt: new Date().toISOString()
-        })
-      });
-      if (res.ok) {
-        const newComm = await res.json();
-        setCommunications(prev => [newComm, ...prev]);
-        setNewCommType('note');
-        setNewCommDirection('outbound');
-        setNewCommSubject('');
-        setNewCommBody('');
-        setShowAddComm(false);
+    addCommMutation.mutate(
+      {
+        email: member.email, type: newCommType, direction: newCommDirection,
+        subject: newCommSubject, body: newCommBody,
+      },
+      {
+        onSuccess: () => {
+          setNewCommType('note');
+          setNewCommDirection('outbound');
+          setNewCommSubject('');
+          setNewCommBody('');
+          setShowAddComm(false);
+        },
+        onError: (err) => console.error('Failed to add communication:', err),
       }
-    } catch (err: unknown) {
-      console.error('Failed to add communication:', err);
-    } finally {
-      setIsAddingComm(false);
-    }
+    );
   };
 
-  const handleDeleteCommunication = async (logId: number) => {
+  const handleDeleteCommunication = (logId: number) => {
     if (!member?.email) return;
-    try {
-      const res = await fetch(`/api/members/${encodeURIComponent(member.email)}/communications/${logId}`, {
-        method: 'DELETE',
-        credentials: 'include'
-      });
-      if (res.ok) {
-        setCommunications(prev => prev.filter(c => c.id !== logId));
-      }
-    } catch (err: unknown) {
-      console.error('Failed to delete communication:', err);
-    }
+    deleteCommMutation.mutate(
+      { email: member.email, logId },
+      { onError: (err) => console.error('Failed to delete communication:', err) }
+    );
   };
 
   if (!isOpen || !member || !enrichedMember) return null;
@@ -655,7 +493,7 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
             linkedEmails={linkedEmails}
             removingEmail={removingEmail}
             handleRemoveLinkedEmail={handleRemoveLinkedEmail}
-            onMemberUpdated={() => { fetchMemberData(); onMemberUpdated?.(); }}
+            onMemberUpdated={() => { invalidateAllMemberData(); onMemberUpdated?.(); }}
           />
         );
 
@@ -797,38 +635,27 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
                   </div>
                   <div className="flex gap-2">
                     <button
-                      onClick={async () => {
-                        setIsSavingName(true);
+                      onClick={() => {
                         setNameEditError('');
-                        try {
-                          const res = await fetch(`/api/members/${encodeURIComponent(member.email)}/contact-info`, {
-                            method: 'PUT',
-                            headers: { 'Content-Type': 'application/json' },
-                            credentials: 'include',
-                            body: JSON.stringify({ firstName: editFirstName.trim(), lastName: editLastName.trim() }),
-                          });
-                          const data = await res.json();
-                          if (res.ok) {
-                            setShowNameEdit(false);
-                            if (data.name !== undefined) {
-                              setEnrichedMember(prev => prev ? { ...prev, name: data.name, firstName: data.firstName, lastName: data.lastName } : prev);
-                            }
-                            const failedSyncs = [];
-                            if (data.syncResults?.stripe === false) failedSyncs.push('Stripe');
-                            if (data.syncResults?.hubspot === false) failedSyncs.push('HubSpot');
-                            if (failedSyncs.length > 0) {
-                              setNameEditError(`Saved locally but failed to sync to ${failedSyncs.join(' and ')}`);
-                            }
-                            fetchMemberData();
-                            onMemberUpdated?.();
-                          } else {
-                            setNameEditError(data.error || 'Failed to update name');
+                        updateContactInfoMutation.mutate(
+                          { email: member.email, firstName: editFirstName.trim(), lastName: editLastName.trim() },
+                          {
+                            onSuccess: (data) => {
+                              setShowNameEdit(false);
+                              if (data.name !== undefined) {
+                                setEnrichedMember(prev => prev ? { ...prev, name: String(data.name ?? ''), firstName: String(data.firstName ?? ''), lastName: String(data.lastName ?? '') } as MemberProfile : prev);
+                              }
+                              const failedSyncs: string[] = [];
+                              if (data.syncResults?.stripe === false) failedSyncs.push('Stripe');
+                              if (data.syncResults?.hubspot === false) failedSyncs.push('HubSpot');
+                              if (failedSyncs.length > 0) {
+                                setNameEditError(`Saved locally but failed to sync to ${failedSyncs.join(' and ')}`);
+                              }
+                              onMemberUpdated?.();
+                            },
+                            onError: (err) => setNameEditError(err.message || 'Failed to update name'),
                           }
-                        } catch {
-                          setNameEditError('Failed to update name');
-                        } finally {
-                          setIsSavingName(false);
-                        }
+                        );
                       }}
                       disabled={isSavingName}
                       className="px-4 py-2 rounded-lg bg-brand-green text-white text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50 tactile-btn"
@@ -911,33 +738,22 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
                     className={`flex-1 px-3 py-2 rounded-lg border text-sm ${isDark ? 'bg-white/10 border-white/20 text-white' : 'bg-white border-gray-200 text-gray-900'}`}
                   />
                   <button
-                    onClick={async () => {
+                    onClick={() => {
                       if (!newEmailValue.trim()) return;
-                      setIsChangingEmail(true);
                       setEmailChangeError('');
-                      try {
-                        const res = await fetch('/api/admin/member/change-email', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          credentials: 'include',
-                          body: JSON.stringify({ oldEmail: member.email, newEmail: newEmailValue.trim() }),
-                        });
-                        const data = await res.json();
-                        if (res.ok) {
-                          alert(data.message || 'Email changed successfully');
-                          setShowEmailChange(false);
-                          setNewEmailValue('');
-                          setEmailChangeError('');
-                          fetchMemberData();
-                          onMemberUpdated?.();
-                        } else {
-                          setEmailChangeError(data.error || 'Failed to change email');
+                      changeEmailMutation.mutate(
+                        { oldEmail: member.email, newEmail: newEmailValue.trim() },
+                        {
+                          onSuccess: (data) => {
+                            alert((data as { message?: string }).message || 'Email changed successfully');
+                            setShowEmailChange(false);
+                            setNewEmailValue('');
+                            setEmailChangeError('');
+                            onMemberUpdated?.();
+                          },
+                          onError: (err) => setEmailChangeError(err.message || 'Failed to change email'),
                         }
-                      } catch {
-                        setEmailChangeError('Failed to change email');
-                      } finally {
-                        setIsChangingEmail(false);
-                      }
+                      );
                     }}
                     disabled={isChangingEmail || !newEmailValue.trim()}
                     className="px-4 py-2 rounded-lg bg-brand-green text-white text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50 tactile-btn"
@@ -1008,36 +824,25 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
                     className={`flex-1 px-3 py-2 rounded-lg border text-sm ${isDark ? 'bg-white/10 border-white/20 text-white' : 'bg-white border-gray-200 text-gray-900'}`}
                   />
                   <button
-                    onClick={async () => {
-                      setIsSavingPhone(true);
+                    onClick={() => {
                       setPhoneEditError('');
-                      try {
-                        const res = await fetch(`/api/members/${encodeURIComponent(member.email)}/contact-info`, {
-                          method: 'PUT',
-                          headers: { 'Content-Type': 'application/json' },
-                          credentials: 'include',
-                          body: JSON.stringify({ phone: editPhone.trim() || null }),
-                        });
-                        const data = await res.json();
-                        if (res.ok) {
-                          setShowPhoneEdit(false);
-                          setEnrichedMember(prev => prev ? { ...prev, phone: data.phone || '' } : prev);
-                          const failedSyncs = [];
-                          if (data.syncResults?.stripe === false) failedSyncs.push('Stripe');
-                          if (data.syncResults?.hubspot === false) failedSyncs.push('HubSpot');
-                          if (failedSyncs.length > 0) {
-                            setPhoneEditError(`Saved locally but failed to sync to ${failedSyncs.join(' and ')}`);
-                          }
-                          fetchMemberData();
-                          onMemberUpdated?.();
-                        } else {
-                          setPhoneEditError(data.error || 'Failed to update phone');
+                      updateContactInfoMutation.mutate(
+                        { email: member.email, phone: editPhone.trim() || null },
+                        {
+                          onSuccess: (data) => {
+                            setShowPhoneEdit(false);
+                            setEnrichedMember(prev => prev ? { ...prev, phone: data.phone || '' } : prev);
+                            const failedSyncs: string[] = [];
+                            if (data.syncResults?.stripe === false) failedSyncs.push('Stripe');
+                            if (data.syncResults?.hubspot === false) failedSyncs.push('HubSpot');
+                            if (failedSyncs.length > 0) {
+                              setPhoneEditError(`Saved locally but failed to sync to ${failedSyncs.join(' and ')}`);
+                            }
+                            onMemberUpdated?.();
+                          },
+                          onError: (err) => setPhoneEditError(err.message || 'Failed to update phone'),
                         }
-                      } catch {
-                        setPhoneEditError('Failed to update phone');
-                      } finally {
-                        setIsSavingPhone(false);
-                      }
+                      );
                     }}
                     disabled={isSavingPhone}
                     className="px-4 py-2 rounded-lg bg-brand-green text-white text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50 tactile-btn"
@@ -1129,28 +934,18 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
                   ))}
                 </select>
                 <button
-                  onClick={async () => {
+                  onClick={() => {
                     if (!selectedAssignTier) return;
-                    setAssigningTier(true);
-                    try {
-                      const res = await fetch(`/api/members/${encodeURIComponent(member.email)}/tier`, {
-                        method: 'PATCH',
-                        headers: { 'Content-Type': 'application/json' },
-                        credentials: 'include',
-                        body: JSON.stringify({ tier: selectedAssignTier })
-                      });
-                      const data = await res.json();
-                      if (res.ok && data.success) {
-                        setDisplayedTier(selectedAssignTier);
-                        setSelectedAssignTier('');
-                      } else {
-                        alert(data.error || 'Failed to assign tier');
+                    assignTierMutation.mutate(
+                      { email: member.email, tier: selectedAssignTier },
+                      {
+                        onSuccess: () => {
+                          setDisplayedTier(selectedAssignTier);
+                          setSelectedAssignTier('');
+                        },
+                        onError: (err) => alert(err.message || 'Failed to assign tier'),
                       }
-                    } catch {
-                      alert('Failed to assign tier');
-                    } finally {
-                      setAssigningTier(false);
-                    }
+                    );
                   }}
                   disabled={!selectedAssignTier || assigningTier}
                   className="px-4 py-2 rounded-lg bg-brand-green text-white text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
@@ -1182,35 +977,23 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
                     ))}
                   </select>
                   <button
-                    onClick={async () => {
+                    onClick={() => {
                       if (!selectedTierId) {
                         alert('Please select a tier first');
                         return;
                       }
-                      setSendingPaymentLink(true);
-                      try {
-                        const res = await fetch('/api/stripe/staff/send-membership-link', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          credentials: 'include',
-                          body: JSON.stringify({ 
-                            email: member.email,
-                            firstName: enrichedMember.name?.split(' ')[0] || '',
-                            lastName: enrichedMember.name?.split(' ').slice(1).join(' ') || '',
-                            tierId: selectedTierId
-                          })
-                        });
-                        if (res.ok) {
-                          alert(`Payment link sent to ${member.email}`);
-                        } else {
-                          const data = await res.json();
-                          alert(data.error || 'Failed to send payment link');
+                      sendPaymentLinkMutation.mutate(
+                        {
+                          email: member.email,
+                          firstName: enrichedMember.name?.split(' ')[0] || '',
+                          lastName: enrichedMember.name?.split(' ').slice(1).join(' ') || '',
+                          tierId: selectedTierId,
+                        },
+                        {
+                          onSuccess: () => alert(`Payment link sent to ${member.email}`),
+                          onError: (err) => alert(err.message || 'Failed to send payment link'),
                         }
-                      } catch (_err: unknown) {
-                        alert('Failed to send payment link');
-                      } finally {
-                        setSendingPaymentLink(false);
-                      }
+                      );
                     }}
                     disabled={sendingPaymentLink || !selectedTierId}
                     className="py-2.5 px-4 rounded-[4px] bg-brand-green text-white font-medium flex items-center justify-center gap-2 hover:opacity-90 transition-opacity disabled:opacity-50 tactile-btn"
@@ -1251,23 +1034,14 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
           {isAdmin && !visitorMode && enrichedMember.membershipStatus && ['terminated', 'cancelled', 'canceled', 'frozen', 'inactive', 'suspended', 'expired', 'former_member'].includes(enrichedMember.membershipStatus.toLowerCase()) && (
             <div className="mt-3">
               <button
-                onClick={async () => {
-                  try {
-                    const res = await fetch('/api/stripe/staff/send-reactivation-link', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      credentials: 'include',
-                      body: JSON.stringify({ memberEmail: member.email })
-                    });
-                    if (res.ok) {
-                      alert(`Reactivation link sent to ${member.email}`);
-                    } else {
-                      const data = await res.json();
-                      alert(data.error || 'Failed to send reactivation link');
+                onClick={() => {
+                  sendReactivationLinkMutation.mutate(
+                    { memberEmail: member.email },
+                    {
+                      onSuccess: () => alert(`Reactivation link sent to ${member.email}`),
+                      onError: (err) => alert(err.message || 'Failed to send reactivation link'),
                     }
-                  } catch (_err: unknown) {
-                    alert('Failed to send reactivation link');
-                  }
+                  );
                 }}
                 className={`w-full py-2.5 px-4 rounded-[4px] font-medium flex items-center justify-center gap-2 transition-colors tactile-btn ${
                   isDark 
@@ -1383,35 +1157,19 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
                   Search for PRIMARY user (will be kept):
                 </label>
                 <MemberSearchInput
-                  onSelect={async (selected) => {
+                  onSelect={(selected) => {
                     setSelectedMergeTarget(selected);
                     setMergePreview(null);
-                    setIsLoadingPreview(true);
-                    try {
-                      const res = await fetch('/api/members/merge/preview', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        credentials: 'include',
-                        body: JSON.stringify({
-                          primaryUserId: selected.id,
-                          secondaryUserId: member.id
-                        })
-                      });
-                      if (res.ok) {
-                        const data = await res.json();
-                        setMergePreview(data);
-                      } else {
-                        const error = await res.json();
-                        alert(error.error || 'Failed to load merge preview');
-                        setSelectedMergeTarget(null);
+                    mergePreviewMutation.mutate(
+                      { primaryUserId: String(selected.id), secondaryUserId: String(member.id) },
+                      {
+                        onSuccess: (data) => setMergePreview(data as MergePreviewData),
+                        onError: (err) => {
+                          alert(err.message || 'Failed to load merge preview');
+                          setSelectedMergeTarget(null);
+                        },
                       }
-                    } catch (err: unknown) {
-                      console.error('Failed to fetch merge preview:', err);
-                      alert('Failed to load merge preview');
-                      setSelectedMergeTarget(null);
-                    } finally {
-                      setIsLoadingPreview(false);
-                    }
+                    );
                   }}
                   onClear={() => {
                     setSelectedMergeTarget(null);
@@ -1612,37 +1370,23 @@ const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, membe
                   Cancel
                 </button>
                 <button
-                  onClick={async () => {
+                  onClick={() => {
                     if (!selectedMergeTarget) return;
-                    setIsMerging(true);
-                    try {
-                      const res = await fetch('/api/members/merge/execute', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        credentials: 'include',
-                        body: JSON.stringify({
-                          primaryUserId: selectedMergeTarget.id,
-                          secondaryUserId: member.id
-                        })
-                      });
-                      if (res.ok) {
-                        const result = await res.json();
-                        alert(`Merge successful!\n\nRecords merged into ${selectedMergeTarget.name}:\n• Bookings: ${result.mergedCounts?.bookings || 0}\n• Visits: ${result.mergedCounts?.visits || 0}\n• Notes: ${result.mergedCounts?.notes || 0}`);
-                        setShowMergeModal(false);
-                        setSelectedMergeTarget(null);
-                        setMergePreview(null);
-                        onClose();
-                        onMemberDeleted?.();
-                      } else {
-                        const error = await res.json();
-                        alert(error.error || 'Failed to merge users');
+                    executeMergeMutation.mutate(
+                      { primaryUserId: String(selectedMergeTarget.id), secondaryUserId: String(member.id) },
+                      {
+                        onSuccess: (result) => {
+                          const r = result as { mergedCounts?: { bookings?: number; visits?: number; notes?: number } };
+                          alert(`Merge successful!\n\nRecords merged into ${selectedMergeTarget.name}:\n• Bookings: ${r.mergedCounts?.bookings || 0}\n• Visits: ${r.mergedCounts?.visits || 0}\n• Notes: ${r.mergedCounts?.notes || 0}`);
+                          setShowMergeModal(false);
+                          setSelectedMergeTarget(null);
+                          setMergePreview(null);
+                          onClose();
+                          onMemberDeleted?.();
+                        },
+                        onError: (err) => alert(err.message || 'Failed to merge users'),
                       }
-                    } catch (err: unknown) {
-                      console.error('Failed to merge users:', err);
-                      alert('Failed to merge users. Please try again.');
-                    } finally {
-                      setIsMerging(false);
-                    }
+                    );
                   }}
                   disabled={isMerging || !selectedMergeTarget || !mergePreview}
                   className="flex-1 py-2.5 px-4 rounded-[4px] bg-red-600 text-white font-medium hover:bg-red-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"

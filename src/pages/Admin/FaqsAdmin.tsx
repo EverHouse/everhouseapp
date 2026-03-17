@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useAutoAnimate } from '@formkit/auto-animate/react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import Toggle from '../../components/Toggle';
 import { usePageReady } from '../../stores/pageReadyStore';
 import FloatingActionButton from '../../components/FloatingActionButton';
@@ -7,6 +8,8 @@ import ModalShell from '../../components/ModalShell';
 import { haptic } from '../../utils/haptics';
 import { useDragAutoScroll } from '../../hooks/useDragAutoScroll';
 import { useToast } from '../../components/Toast';
+import { useFaqs, useSaveFaq, useDeleteFaq, adminTabKeys } from '../../hooks/queries';
+import { postWithCredentials } from '../../hooks/queries/useFetch';
 
 interface FAQ {
     id: number;
@@ -21,13 +24,10 @@ interface FAQ {
 
 const FaqsAdmin: React.FC = () => {
     const { setPageReady } = usePageReady();
-    const [faqs, setFaqs] = useState<FAQ[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
+    const queryClient = useQueryClient();
     const [isEditing, setIsEditing] = useState(false);
     const [editId, setEditId] = useState<number | null>(null);
     const [newItem, setNewItem] = useState<Partial<FAQ>>({ category: 'General', sortOrder: 0, isActive: true });
-    const [isSaving, setIsSaving] = useState(false);
-    const [isSeeding, setIsSeeding] = useState(false);
     const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
     const [draggedItemId, setDraggedItemId] = useState<number | null>(null);
     const [previewOrder, setPreviewOrder] = useState<FAQ[] | null>(null);
@@ -36,29 +36,32 @@ const FaqsAdmin: React.FC = () => {
     const [faqsRef] = useAutoAnimate();
     const { showToast } = useToast();
 
+    const { data: faqsData, isLoading } = useFaqs();
+    const faqs = (faqsData as unknown as FAQ[]) ?? [];
+    const saveFaq = useSaveFaq();
+    const deleteFaqMutation = useDeleteFaq();
+    const reorderFaqs = useMutation({
+        mutationFn: (order: Array<{ id: number; sortOrder: number }>) =>
+            postWithCredentials<{ success: boolean }>('/api/admin/faqs/reorder', { order }),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: adminTabKeys.faqs() });
+        },
+    });
+    const seedFaqs = useMutation({
+        mutationFn: () =>
+            postWithCredentials<{ count: number }>('/api/admin/faqs/seed', {}),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: adminTabKeys.faqs() });
+        },
+    });
+    const isSaving = saveFaq.isPending;
+    const isSeeding = seedFaqs.isPending;
+
     useEffect(() => {
         if (!isLoading) {
             setPageReady(true);
         }
     }, [isLoading, setPageReady]);
-
-    const fetchFaqs = async () => {
-        try {
-            const res = await fetch('/api/admin/faqs', { credentials: 'include' });
-            if (res.ok) {
-                const data = await res.json();
-                setFaqs(data);
-            }
-        } catch (err: unknown) {
-            console.error('Failed to fetch FAQs:', err);
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    useEffect(() => {
-        fetchFaqs();
-    }, []);
 
     const openEdit = (faq: FAQ) => {
         setNewItem(faq);
@@ -73,101 +76,60 @@ const FaqsAdmin: React.FC = () => {
         setIsEditing(true);
     };
 
-    const handleSave = async () => {
+    const handleSave = () => {
         if (!newItem.question?.trim() || !newItem.answer?.trim()) {
             showToast('Question and answer are required', 'error');
             return;
         }
 
-        setIsSaving(true);
+        const payload = {
+            ...(editId ? { id: editId } : {}),
+            question: newItem.question.trim(),
+            answer: newItem.answer.trim(),
+            category: newItem.category || null,
+            sortOrder: newItem.sortOrder ?? 0,
+            isActive: newItem.isActive ?? true,
+        };
 
-        try {
-            const payload = {
-                question: newItem.question.trim(),
-                answer: newItem.answer.trim(),
-                category: newItem.category || null,
-                sortOrder: newItem.sortOrder ?? 0,
-                isActive: newItem.isActive ?? true,
-            };
-
-            const res = editId
-                ? await fetch(`/api/admin/faqs/${editId}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    credentials: 'include',
-                    body: JSON.stringify(payload),
-                })
-                : await fetch('/api/admin/faqs', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    credentials: 'include',
-                    body: JSON.stringify(payload),
-                });
-
-            if (res.ok) {
+        saveFaq.mutate(payload as Parameters<typeof saveFaq.mutate>[0], {
+            onSuccess: () => {
                 haptic.success();
                 showToast(editId ? 'FAQ updated' : 'FAQ created', 'success');
-                await fetchFaqs();
                 setIsEditing(false);
-            } else {
-                const data = await res.json();
+            },
+            onError: (error) => {
                 haptic.error();
-                showToast(data.error || 'Failed to save', 'error');
-            }
-        } catch {
-            haptic.error();
-            showToast('Network error', 'error');
-        } finally {
-            setIsSaving(false);
-        }
+                showToast(error.message || 'Failed to save', 'error');
+            },
+        });
     };
 
-    const handleDelete = async (id: number) => {
-        try {
-            const res = await fetch(`/api/admin/faqs/${id}`, {
-                method: 'DELETE',
-                credentials: 'include',
-            });
-            if (res.ok) {
+    const handleDelete = (id: number) => {
+        deleteFaqMutation.mutate(id, {
+            onSuccess: () => {
                 haptic.success();
                 showToast('FAQ deleted', 'success');
-                setFaqs(prev => prev.filter(f => f.id !== id));
-            } else {
-                const data = await res.json();
+                setDeleteConfirm(null);
+            },
+            onError: (error) => {
                 haptic.error();
-                showToast(data.error || 'Failed to delete', 'error');
-            }
-        } catch {
-            haptic.error();
-            showToast('Network error', 'error');
-        } finally {
-            setDeleteConfirm(null);
-        }
+                showToast(error.message || 'Failed to delete', 'error');
+                setDeleteConfirm(null);
+            },
+        });
     };
 
-    const handleSeedFaqs = async () => {
-        if (isSeeding) return;
-        setIsSeeding(true);
-        try {
-            const res = await fetch('/api/admin/faqs/seed', {
-                method: 'POST',
-                credentials: 'include',
-            });
-            const data = await res.json();
-            if (res.ok) {
+    const handleSeedFaqs = () => {
+        seedFaqs.mutate(undefined, {
+            onSuccess: (data) => {
                 haptic.success();
                 showToast(`Seeded ${data.count} FAQs`, 'success');
-                await fetchFaqs();
-            } else {
+            },
+            onError: (error) => {
                 haptic.error();
-                showToast(data.error || 'Failed to seed FAQs', 'error');
-            }
-        } catch {
-            haptic.error();
-            showToast('Network error', 'error');
-        } finally {
-            setIsSeeding(false);
-        }
+                showToast(error.message || 'Failed to seed FAQs', 'error');
+            },
+        });
     };
 
     const displayFaqs = useMemo(() => previewOrder ?? faqs, [previewOrder, faqs]);
@@ -202,7 +164,7 @@ const FaqsAdmin: React.FC = () => {
         });
     };
 
-    const handleDrop = async (e: React.DragEvent) => {
+    const handleDrop = (e: React.DragEvent) => {
         e.preventDefault();
         stopAutoScroll();
         
@@ -220,28 +182,22 @@ const FaqsAdmin: React.FC = () => {
 
         const orderUpdates = finalOrder.map((faq, index) => ({
             id: faq.id,
-            sortOrder: index + 1
+            sortOrder: index + 1,
         }));
 
-        setFaqs(finalOrder.map((faq, index) => ({ ...faq, sortOrder: index + 1 })));
+        queryClient.setQueryData(adminTabKeys.faqs(), finalOrder.map((faq, index) => ({ ...faq, sortOrder: index + 1 })));
 
-        try {
-            const res = await fetch('/api/admin/faqs/reorder', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify({ order: orderUpdates }),
-            });
-            if (!res.ok) {
-                throw new Error('Server rejected reorder');
-            }
-            haptic.success();
-            showToast('Order saved', 'success');
-        } catch {
-            haptic.error();
-            showToast('Failed to save new order', 'error');
-            await fetchFaqs();
-        }
+        reorderFaqs.mutate(orderUpdates, {
+            onSuccess: () => {
+                haptic.success();
+                showToast('Order saved', 'success');
+            },
+            onError: () => {
+                haptic.error();
+                showToast('Failed to save new order', 'error');
+                queryClient.invalidateQueries({ queryKey: adminTabKeys.faqs() });
+            },
+        });
     };
 
     const handleDragEnd = () => {

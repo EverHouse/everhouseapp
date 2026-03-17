@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useAutoAnimate } from '@formkit/auto-animate/react';
 import ModalShell from '../../../components/ModalShell';
 import EmptyState from '../../../components/EmptyState';
 import { useToast } from '../../../components/Toast';
 import { haptic } from '../../../utils/haptics';
+import { useStripeCoupons, useCreateCoupon, useUpdateCoupon, useDeleteCoupon } from '../../../hooks/queries';
 
 interface StripeCoupon {
   id: string;
@@ -26,15 +27,20 @@ interface DiscountsSubTabProps {
 }
 
 const DiscountsSubTab: React.FC<DiscountsSubTabProps> = ({ onCreateClick }) => {
-  const [coupons, setCoupons] = useState<StripeCoupon[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const couponsQuery = useStripeCoupons();
+  const createCouponMutation = useCreateCoupon();
+  const updateCouponMutation = useUpdateCoupon();
+  const deleteCouponMutation = useDeleteCoupon();
+
+  const coupons = ((couponsQuery.data as unknown as { coupons?: StripeCoupon[] })?.coupons) ?? [];
+  const isLoading = couponsQuery.isLoading;
+  const error = couponsQuery.error?.message ?? null;
+
   const [isCreating, setIsCreating] = useState(false);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [editingCoupon, setEditingCoupon] = useState<StripeCoupon | null>(null);
   const [editName, setEditName] = useState('');
-  const [isUpdating, setIsUpdating] = useState(false);
   
   const [newCoupon, setNewCoupon] = useState({
     id: '',
@@ -45,86 +51,52 @@ const DiscountsSubTab: React.FC<DiscountsSubTabProps> = ({ onCreateClick }) => {
     duration: 'forever' as 'once' | 'repeating' | 'forever',
     durationInMonths: 3,
   });
-  const [isSaving, setIsSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [discountsRef] = useAutoAnimate();
   const { showToast } = useToast();
 
-  const fetchCoupons = async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const res = await fetch('/api/stripe/coupons', { 
-        credentials: 'include',
-        headers: { 'Cache-Control': 'no-cache' }
-      });
-      if (!res.ok) throw new Error('Failed to fetch coupons');
-      const data = await res.json();
-      setCoupons(data.coupons || []);
-    } catch (err: unknown) {
-      setError((err instanceof Error ? err.message : String(err)) || 'Failed to load coupons');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchCoupons();
-  }, []);
-
   const handleCreate = async () => {
     setFormError(null);
-    setIsSaving(true);
     
-    try {
-      const payload: Record<string, unknown> = {
-        duration: newCoupon.duration,
-        name: newCoupon.name || undefined,
-      };
-      
-      if (newCoupon.id.trim()) {
-        payload.id = newCoupon.id.trim().toUpperCase().replace(/\s+/g, '_');
-      }
-      
-      if (newCoupon.discountType === 'percent') {
-        payload.percentOff = newCoupon.percentOff;
-      } else {
-        payload.amountOffCents = newCoupon.amountOffCents;
-      }
-      
-      if (newCoupon.duration === 'repeating') {
-        payload.durationInMonths = newCoupon.durationInMonths;
-      }
-      
-      const res = await fetch('/api/stripe/coupons', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(payload),
-      });
-      
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to create coupon');
-      
-      await fetchCoupons();
-      setIsCreating(false);
-      setNewCoupon({
-        id: '',
-        name: '',
-        discountType: 'percent',
-        percentOff: 10,
-        amountOffCents: 500,
-        duration: 'forever',
-        durationInMonths: 3,
-      });
-      haptic.success();
-      showToast('Coupon created', 'success');
-    } catch (err: unknown) {
-      haptic.error();
-      setFormError((err instanceof Error ? err.message : String(err)) || 'Failed to create coupon');
-    } finally {
-      setIsSaving(false);
+    const payload: Record<string, unknown> = {
+      duration: newCoupon.duration,
+      name: newCoupon.name || undefined,
+    };
+    
+    if (newCoupon.id.trim()) {
+      payload.id = newCoupon.id.trim().toUpperCase().replace(/\s+/g, '_');
     }
+    
+    if (newCoupon.discountType === 'percent') {
+      payload.percentOff = newCoupon.percentOff;
+    } else {
+      payload.amountOffCents = newCoupon.amountOffCents;
+    }
+    
+    if (newCoupon.duration === 'repeating') {
+      payload.durationInMonths = newCoupon.durationInMonths;
+    }
+    
+    createCouponMutation.mutate(payload, {
+      onSuccess: () => {
+        setIsCreating(false);
+        setNewCoupon({
+          id: '',
+          name: '',
+          discountType: 'percent',
+          percentOff: 10,
+          amountOffCents: 500,
+          duration: 'forever',
+          durationInMonths: 3,
+        });
+        haptic.success();
+        showToast('Coupon created', 'success');
+      },
+      onError: (err) => {
+        haptic.error();
+        setFormError(err.message || 'Failed to create coupon');
+      },
+    });
   };
 
   const handleEdit = (coupon: StripeCoupon) => {
@@ -135,56 +107,39 @@ const DiscountsSubTab: React.FC<DiscountsSubTabProps> = ({ onCreateClick }) => {
 
   const handleUpdate = async () => {
     if (!editingCoupon) return;
-    
-    setIsUpdating(true);
     setFormError(null);
     
-    try {
-      const res = await fetch(`/api/stripe/coupons/${encodeURIComponent(editingCoupon.id)}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ name: editName }),
-      });
-      
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to update coupon');
-      
-      await fetchCoupons();
-      setEditingCoupon(null);
-      haptic.success();
-      showToast('Coupon updated', 'success');
-    } catch (err: unknown) {
-      haptic.error();
-      setFormError((err instanceof Error ? err.message : String(err)) || 'Failed to update coupon');
-    } finally {
-      setIsUpdating(false);
-    }
+    updateCouponMutation.mutate(
+      { id: editingCoupon.id, name: editName },
+      {
+        onSuccess: () => {
+          setEditingCoupon(null);
+          haptic.success();
+          showToast('Coupon updated', 'success');
+        },
+        onError: (err) => {
+          haptic.error();
+          setFormError(err.message || 'Failed to update coupon');
+        },
+      }
+    );
   };
 
   const handleDelete = async (couponId: string) => {
     setIsDeleting(couponId);
-    try {
-      const res = await fetch(`/api/stripe/coupons/${encodeURIComponent(couponId)}`, {
-        method: 'DELETE',
-        credentials: 'include',
-      });
-      
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || 'Failed to delete coupon');
-      }
-      
-      await fetchCoupons();
-      setDeleteConfirmId(null);
-      haptic.success();
-      showToast('Coupon deleted', 'success');
-    } catch (err: unknown) {
-      haptic.error();
-      setError((err instanceof Error ? err.message : String(err)) || 'Failed to delete coupon');
-    } finally {
-      setIsDeleting(null);
-    }
+    deleteCouponMutation.mutate(couponId, {
+      onSuccess: () => {
+        setDeleteConfirmId(null);
+        setIsDeleting(null);
+        haptic.success();
+        showToast('Coupon deleted', 'success');
+      },
+      onError: (err) => {
+        haptic.error();
+        setIsDeleting(null);
+        showToast(err.message || 'Failed to delete coupon', 'error');
+      },
+    });
   };
 
   const openCreateModal = () => {
@@ -227,7 +182,7 @@ const DiscountsSubTab: React.FC<DiscountsSubTabProps> = ({ onCreateClick }) => {
         <h3 className="text-lg font-bold mb-2 text-red-700 dark:text-red-400">Error Loading Coupons</h3>
         <p className="text-sm text-red-600 dark:text-red-300">{error}</p>
         <button 
-          onClick={fetchCoupons}
+          onClick={() => couponsQuery.refetch()}
           className="mt-4 px-4 py-2 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded-lg hover:bg-red-200 dark:hover:bg-red-800/40 transition-colors"
         >
           Try Again
@@ -249,7 +204,7 @@ const DiscountsSubTab: React.FC<DiscountsSubTabProps> = ({ onCreateClick }) => {
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={fetchCoupons}
+            onClick={() => couponsQuery.refetch()}
             disabled={isLoading}
             className="p-2 text-gray-500 hover:text-primary hover:bg-gray-100 dark:hover:bg-white/10 rounded-lg transition-colors disabled:opacity-50"
             title="Refresh coupons"
@@ -499,11 +454,11 @@ const DiscountsSubTab: React.FC<DiscountsSubTabProps> = ({ onCreateClick }) => {
             </button>
             <button 
               onClick={handleCreate} 
-              disabled={isSaving}
+              disabled={createCouponMutation.isPending}
               className="px-6 py-2.5 bg-primary text-white rounded-xl font-bold shadow-md hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center gap-2"
             >
-              {isSaving && <span aria-hidden="true" className="material-symbols-outlined animate-spin text-sm">progress_activity</span>}
-              {isSaving ? 'Creating...' : 'Create Coupon'}
+              {createCouponMutation.isPending && <span aria-hidden="true" className="material-symbols-outlined animate-spin text-sm">progress_activity</span>}
+              {createCouponMutation.isPending ? 'Creating...' : 'Create Coupon'}
             </button>
           </div>
         </div>
@@ -559,11 +514,11 @@ const DiscountsSubTab: React.FC<DiscountsSubTabProps> = ({ onCreateClick }) => {
               </button>
               <button 
                 onClick={handleUpdate} 
-                disabled={isUpdating}
+                disabled={updateCouponMutation.isPending}
                 className="px-6 py-2.5 bg-primary text-white rounded-xl font-bold shadow-md hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center gap-2"
               >
-                {isUpdating && <span aria-hidden="true" className="material-symbols-outlined animate-spin text-sm">progress_activity</span>}
-                {isUpdating ? 'Saving...' : 'Save Changes'}
+                {updateCouponMutation.isPending && <span aria-hidden="true" className="material-symbols-outlined animate-spin text-sm">progress_activity</span>}
+                {updateCouponMutation.isPending ? 'Saving...' : 'Save Changes'}
               </button>
             </div>
           </div>

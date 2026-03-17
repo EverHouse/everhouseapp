@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAutoAnimate } from '@formkit/auto-animate/react';
 import { usePageReady } from '../../stores/pageReadyStore';
 import ModalShell from '../../components/ModalShell';
@@ -6,6 +6,7 @@ import { getInquiryStatusColor, formatStatusLabel } from '../../utils/statusColo
 import { formatRelativeTime } from '../../utils/dateUtils';
 import { useToast } from '../../components/Toast';
 import { haptic } from '../../utils/haptics';
+import { useInquiries, useUpdateInquiry, useArchiveInquiry, useSyncHubSpotSubmissions } from '../../hooks/queries';
 
 const formatDate = (dateStr: string): string => {
     try {
@@ -48,44 +49,37 @@ const FORM_TYPE_CHIPS = [
 
 const InquiriesAdmin: React.FC = () => {
     const { setPageReady } = usePageReady();
-    const [inquiries, setInquiries] = useState<Inquiry[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
     const [activeStatus, setActiveStatus] = useState('all');
     const [activeFormType, setActiveFormType] = useState('all');
     const [selectedInquiry, setSelectedInquiry] = useState<Inquiry | null>(null);
     const [isDetailOpen, setIsDetailOpen] = useState(false);
     const [notes, setNotes] = useState('');
-    const [isSaving, setIsSaving] = useState(false);
     const [inquiriesRef] = useAutoAnimate();
-    const [isSyncing, setIsSyncing] = useState(false);
     const { showToast } = useToast();
 
-    const handleSyncFromHubSpot = async () => {
-        setIsSyncing(true);
-        try {
-            const res = await fetch('/api/admin/hubspot/sync-form-submissions', {
-                method: 'POST',
-                credentials: 'include',
-            });
-            if (res.ok) {
-                const data = await res.json();
+    const { data: inquiriesData, isLoading } = useInquiries(activeStatus, activeFormType);
+    const inquiries = (inquiriesData as unknown as Inquiry[]) ?? [];
+    const updateInquiry = useUpdateInquiry();
+    const archiveInquiry = useArchiveInquiry();
+    const syncHubSpot = useSyncHubSpotSubmissions();
+    const isSaving = updateInquiry.isPending || archiveInquiry.isPending;
+    const isSyncing = syncHubSpot.isPending;
+
+    const handleSyncFromHubSpot = () => {
+        syncHubSpot.mutate(undefined, {
+            onSuccess: (data) => {
                 const inserted = data.newInserted ?? 0;
                 haptic.success();
                 showToast(
                     inserted > 0 ? `Synced ${inserted} new submission${inserted !== 1 ? 's' : ''}` : 'All submissions are up to date',
                     'success',
                 );
-                fetchInquiries();
-            } else {
+            },
+            onError: () => {
                 haptic.error();
                 showToast('Sync failed — please try again', 'error');
-            }
-        } catch {
-            haptic.error();
-            showToast('Sync failed — please try again', 'error');
-        } finally {
-            setIsSyncing(false);
-        }
+            },
+        });
     };
 
     useEffect(() => {
@@ -94,129 +88,77 @@ const InquiriesAdmin: React.FC = () => {
         }
     }, [isLoading, setPageReady]);
 
-    const fetchInquiries = useCallback(async () => {
-        try {
-            const params = new URLSearchParams();
-            if (activeStatus !== 'all') params.append('status', activeStatus);
-            if (activeFormType !== 'all') params.append('formType', activeFormType);
-            
-            const res = await fetch(`/api/admin/inquiries?${params.toString()}`, { credentials: 'include' });
-            if (res.ok) {
-                const data = await res.json();
-                setInquiries(data);
-            }
-        } catch (err: unknown) {
-            console.error('Failed to fetch inquiries:', err);
-        } finally {
-            setIsLoading(false);
-        }
-    }, [activeStatus, activeFormType]);
-
-    useEffect(() => {
-        setIsLoading(true);
-        fetchInquiries();
-    }, [activeStatus, activeFormType, fetchInquiries]);
-
-    const openDetail = async (inquiry: Inquiry) => {
+    const openDetail = (inquiry: Inquiry) => {
         setSelectedInquiry(inquiry);
         setNotes(inquiry.notes || '');
         setIsDetailOpen(true);
         
         if (inquiry.status === 'new') {
-            try {
-                await fetch(`/api/admin/inquiries/${inquiry.id}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    credentials: 'include',
-                    body: JSON.stringify({ status: 'read' }),
-                });
-                setInquiries(prev => prev.map(i => i.id === inquiry.id ? { ...i, status: 'read' } : i));
-                setSelectedInquiry(prev => prev ? { ...prev, status: 'read' } : null);
-            } catch {
-                haptic.error();
-                showToast('Failed to mark as read', 'error');
-            }
+            updateInquiry.mutate(
+                { id: inquiry.id, status: 'read' },
+                {
+                    onSuccess: () => {
+                        setSelectedInquiry(prev => prev ? { ...prev, status: 'read' } : null);
+                    },
+                    onError: () => {
+                        haptic.error();
+                        showToast('Failed to mark as read', 'error');
+                    },
+                }
+            );
         }
     };
 
-    const handleUpdateStatus = async (status: string) => {
+    const handleUpdateStatus = (status: string) => {
         if (!selectedInquiry) return;
-        setIsSaving(true);
-        try {
-            const res = await fetch(`/api/admin/inquiries/${selectedInquiry.id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify({ status }),
-            });
-            if (res.ok) {
-                setInquiries(prev => prev.map(i => i.id === selectedInquiry.id ? { ...i, status } : i));
-                setSelectedInquiry(prev => prev ? { ...prev, status } : null);
-                haptic.success();
-                showToast(`Status updated to ${formatStatusLabel(status)}`, 'success');
-            } else {
-                haptic.error();
-                showToast('Failed to update status', 'error');
+        updateInquiry.mutate(
+            { id: selectedInquiry.id, status },
+            {
+                onSuccess: () => {
+                    setSelectedInquiry(prev => prev ? { ...prev, status } : null);
+                    haptic.success();
+                    showToast(`Status updated to ${formatStatusLabel(status)}`, 'success');
+                },
+                onError: () => {
+                    haptic.error();
+                    showToast('Failed to update status', 'error');
+                },
             }
-        } catch {
-            haptic.error();
-            showToast('Failed to update status', 'error');
-        } finally {
-            setIsSaving(false);
-        }
+        );
     };
 
-    const handleSaveNotes = async () => {
+    const handleSaveNotes = () => {
         if (!selectedInquiry) return;
-        setIsSaving(true);
-        try {
-            const res = await fetch(`/api/admin/inquiries/${selectedInquiry.id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify({ notes }),
-            });
-            if (res.ok) {
-                setInquiries(prev => prev.map(i => i.id === selectedInquiry.id ? { ...i, notes } : i));
-                setSelectedInquiry(prev => prev ? { ...prev, notes } : null);
-                haptic.success();
-                showToast('Notes saved', 'success');
-            } else {
-                haptic.error();
-                showToast('Failed to save notes', 'error');
+        updateInquiry.mutate(
+            { id: selectedInquiry.id, notes },
+            {
+                onSuccess: () => {
+                    setSelectedInquiry(prev => prev ? { ...prev, notes } : null);
+                    haptic.success();
+                    showToast('Notes saved', 'success');
+                },
+                onError: () => {
+                    haptic.error();
+                    showToast('Failed to save notes', 'error');
+                },
             }
-        } catch {
-            haptic.error();
-            showToast('Failed to save notes', 'error');
-        } finally {
-            setIsSaving(false);
-        }
+        );
     };
 
-    const handleArchive = async () => {
+    const handleArchive = () => {
         if (!selectedInquiry) return;
-        setIsSaving(true);
-        try {
-            const res = await fetch(`/api/admin/inquiries/${selectedInquiry.id}?archive=true`, {
-                method: 'DELETE',
-                credentials: 'include',
-            });
-            if (res.ok) {
-                setInquiries(prev => prev.map(i => i.id === selectedInquiry.id ? { ...i, status: 'archived' } : i));
+        archiveInquiry.mutate(selectedInquiry.id, {
+            onSuccess: () => {
                 setIsDetailOpen(false);
                 setSelectedInquiry(null);
                 haptic.success();
                 showToast('Inquiry archived', 'success');
-            } else {
+            },
+            onError: () => {
                 haptic.error();
                 showToast('Failed to archive', 'error');
-            }
-        } catch {
-            haptic.error();
-            showToast('Failed to archive', 'error');
-        } finally {
-            setIsSaving(false);
-        }
+            },
+        });
     };
 
 

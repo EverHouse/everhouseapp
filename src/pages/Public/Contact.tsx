@@ -5,8 +5,9 @@ import Input from '../../components/Input';
 import { usePageReady } from '../../stores/pageReadyStore';
 import { useNavigationLoading } from '../../stores/navigationLoadingStore';
 import { AnimatedPage } from '../../components/motion';
-import { getApiErrorMessage, getNetworkErrorMessage } from '../../utils/errorHandling';
+import { getNetworkErrorMessage } from '../../utils/errorHandling';
 import SEO from '../../components/SEO';
+import { useMapKitToken as useMapKitTokenQuery, usePublicSettings, useSubmitContactForm } from '../../hooks/queries';
 
 declare global {
   interface Window {
@@ -46,17 +47,8 @@ declare global {
 const DEFAULT_CLUB_COORDS = { lat: 33.713744, lng: -117.836476 };
 
 function useMapKitToken() {
-  const [token, setToken] = useState<string | null>(null);
-  const [tokenError, setTokenError] = useState(false);
-
-  useEffect(() => {
-    fetch('/api/mapkit-token')
-      .then(r => r.ok ? r.json() : Promise.reject())
-      .then((data: { token: string }) => setToken(data.token))
-      .catch(() => setTokenError(true));
-  }, []);
-
-  return { token, tokenError };
+  const query = useMapKitTokenQuery();
+  return { token: query.data?.token ?? null, tokenError: query.isError };
 }
 
 function useIsDarkMode() {
@@ -192,17 +184,9 @@ const FALLBACK = {
   'hours.sunday': '8:30 AM – 6:00 PM',
 };
 
-function usePublicSettings() {
-  const [settings, setSettings] = useState<Record<string, string>>(FALLBACK);
-
-  useEffect(() => {
-    fetch('/api/settings/public')
-      .then(r => r.ok ? r.json() : Promise.reject())
-      .then((data: Record<string, string>) => setSettings(prev => ({ ...prev, ...data })))
-      .catch((err: unknown) => console.warn('[Contact] Failed to fetch public settings:', err));
-  }, []);
-
-  return settings;
+function useContactPublicSettings() {
+  const query = usePublicSettings();
+  return { ...FALLBACK, ...(query.data ?? {}) };
 }
 
 const Contact: React.FC = () => {
@@ -210,7 +194,6 @@ const Contact: React.FC = () => {
   const { startNavigation } = useNavigationLoading();
   const { setPageReady } = usePageReady();
   const [isSubmitted, setIsSubmitted] = useState(false);
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     fullName: '',
@@ -218,7 +201,9 @@ const Contact: React.FC = () => {
     phone: '',
     message: ''
   });
-  const s = usePublicSettings();
+  const s = useContactPublicSettings();
+  const contactFormMutation = useSubmitContactForm();
+  const loading = contactFormMutation.isPending;
 
   useEffect(() => {
     setPageReady(true);
@@ -226,42 +211,34 @@ const Contact: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
     setError(null);
 
-    try {
-      const response = await fetch('/api/hubspot/forms/contact', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fields: [
-            { name: 'topic', value: 'General Inquiry' },
-            { name: 'firstname', value: formData.fullName.split(' ')[0] || '' },
-            { name: 'lastname', value: formData.fullName.split(' ').slice(1).join(' ') || '' },
-            { name: 'email', value: formData.email },
-            { name: 'phone', value: formData.phone },
-            { name: 'message', value: formData.message }
-          ],
-          context: {
-            pageUri: window.location.href,
-            pageName: 'Contact'
-          }
-        })
-      });
-
-      if (!response.ok) {
-        setError(getApiErrorMessage(response, 'submit form'));
-        return;
+    contactFormMutation.mutate(
+      {
+        fields: [
+          { name: 'topic', value: 'General Inquiry' },
+          { name: 'firstname', value: formData.fullName.split(' ')[0] || '' },
+          { name: 'lastname', value: formData.fullName.split(' ').slice(1).join(' ') || '' },
+          { name: 'email', value: formData.email },
+          { name: 'phone', value: formData.phone },
+          { name: 'message', value: formData.message }
+        ],
+        context: {
+          pageUri: window.location.href,
+          pageName: 'Contact'
+        }
+      },
+      {
+        onSuccess: () => {
+          setIsSubmitted(true);
+          setFormData({ fullName: '', email: '', phone: '', message: '' });
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        },
+        onError: () => {
+          setError(getNetworkErrorMessage());
+        },
       }
-
-      setIsSubmitted(true);
-      setFormData({ fullName: '', email: '', phone: '', message: '' });
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    } catch (_err: unknown) {
-      setError(getNetworkErrorMessage());
-    } finally {
-      setLoading(false);
-    }
+    );
   };
 
   const phoneDigits = s['contact.phone'].replace(/\D/g, '');

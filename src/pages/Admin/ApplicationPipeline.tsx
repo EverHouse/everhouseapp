@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAutoAnimate } from '@formkit/auto-animate/react';
 import { usePageReady } from '../../stores/pageReadyStore';
 import ModalShell from '../../components/ModalShell';
@@ -6,6 +6,7 @@ import { formatRelativeTime } from '../../utils/dateUtils';
 import { ApplicationPipelineSkeleton } from '../../components/skeletons';
 import { useToast } from '../../components/Toast';
 import { haptic } from '../../utils/haptics';
+import { useApplications, useUpdateApplicationStatus, useSaveApplicationNotes, useSendApplicationInvite, useSyncHubSpotApplications, useMembershipTiers } from '../../hooks/queries';
 
 interface MembershipTier {
   id: number;
@@ -73,46 +74,44 @@ const getStatusIcon = (status: string) => {
 
 const ApplicationPipeline: React.FC = () => {
   const { setPageReady } = usePageReady();
-  const [applications, setApplications] = useState<Application[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [activeStatus, setActiveStatus] = useState('all');
   const [selectedApp, setSelectedApp] = useState<Application | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [notes, setNotes] = useState('');
-  const [isSaving, setIsSaving] = useState(false);
-  const [tiers, setTiers] = useState<MembershipTier[]>([]);
   const [selectedTierId, setSelectedTierId] = useState<number | null>(null);
-  const [isSendingInvite, setIsSendingInvite] = useState(false);
   const [applicationsRef] = useAutoAnimate();
-  const [isSyncing, setIsSyncing] = useState(false);
   const { showToast } = useToast();
 
-  const handleSyncFromHubSpot = async () => {
-    setIsSyncing(true);
-    try {
-      const res = await fetch('/api/admin/hubspot/sync-form-submissions', {
-        method: 'POST',
-        credentials: 'include',
-      });
-      if (res.ok) {
-        const data = await res.json();
+  const { data: applicationsData, isLoading } = useApplications();
+  const applications = (applicationsData as unknown as Application[]) ?? [];
+  const { data: tiersData } = useMembershipTiers(true);
+  const tiers = useMemo(() =>
+    ((tiersData as unknown as MembershipTier[]) ?? []).filter(t => t.product_type === 'subscription' && t.stripe_price_id),
+    [tiersData]
+  );
+  const updateStatus = useUpdateApplicationStatus();
+  const saveNotes = useSaveApplicationNotes();
+  const sendInvite = useSendApplicationInvite();
+  const syncHubSpot = useSyncHubSpotApplications();
+  const isSaving = updateStatus.isPending || saveNotes.isPending;
+  const isSendingInvite = sendInvite.isPending;
+  const isSyncing = syncHubSpot.isPending;
+
+  const handleSyncFromHubSpot = () => {
+    syncHubSpot.mutate(undefined, {
+      onSuccess: (data) => {
         const inserted = data.newInserted ?? 0;
         haptic.success();
         showToast(
           inserted > 0 ? `Synced ${inserted} new submission${inserted !== 1 ? 's' : ''}` : 'All applications are up to date',
           'success',
         );
-        fetchApplications();
-      } else {
+      },
+      onError: () => {
         haptic.error();
         showToast('Sync failed — please try again', 'error');
-      }
-    } catch {
-      haptic.error();
-      showToast('Sync failed — please try again', 'error');
-    } finally {
-      setIsSyncing(false);
-    }
+      },
+    });
   };
 
   useEffect(() => {
@@ -121,145 +120,84 @@ const ApplicationPipeline: React.FC = () => {
     }
   }, [isLoading, setPageReady]);
 
-
-  const fetchApplications = async () => {
-    try {
-      const res = await fetch('/api/admin/applications', { credentials: 'include' });
-      if (res.ok) {
-        const data = await res.json();
-        setApplications(data);
-      }
-    } catch (err: unknown) {
-      console.error('Failed to fetch applications:', err);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const fetchTiers = async () => {
-    try {
-      const res = await fetch('/api/membership-tiers?active=true', { credentials: 'include' });
-      if (res.ok) {
-        const data = await res.json();
-        setTiers(data.filter((t: MembershipTier) => t.product_type === 'subscription' && t.stripe_price_id));
-      }
-    } catch (err: unknown) {
-      console.error('Failed to fetch tiers:', err);
-    }
-  };
-
-  useEffect(() => {
-    fetchApplications();
-    fetchTiers();
-  }, []);
-
   const filteredApplications = activeStatus === 'all'
     ? applications
     : applications.filter(a => a.status === activeStatus);
 
-  const openDetail = async (app: Application) => {
+  const openDetail = (app: Application) => {
     setSelectedApp(app);
     setNotes(app.notes || '');
     setSelectedTierId(null);
     setIsDetailOpen(true);
 
     if (app.status === 'new') {
-      try {
-        await fetch(`/api/admin/applications/${app.id}/status`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ status: 'read' }),
-        });
-        setApplications(prev => prev.map(a => a.id === app.id ? { ...a, status: 'read' } : a));
-        setSelectedApp(prev => prev ? { ...prev, status: 'read' } : null);
-      } catch {
-        haptic.error();
-        showToast('Failed to mark as read', 'error');
-      }
+      updateStatus.mutate(
+        { id: app.id, status: 'read' },
+        {
+          onSuccess: () => {
+            setSelectedApp(prev => prev ? { ...prev, status: 'read' } : null);
+          },
+          onError: () => {
+            haptic.error();
+            showToast('Failed to mark as read', 'error');
+          },
+        }
+      );
     }
   };
 
-  const handleUpdateStatus = async (status: string) => {
+  const handleUpdateStatus = (status: string) => {
     if (!selectedApp) return;
-    setIsSaving(true);
-    try {
-      const res = await fetch(`/api/admin/applications/${selectedApp.id}/status`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ status }),
-      });
-      if (res.ok) {
-        setApplications(prev => prev.map(a => a.id === selectedApp.id ? { ...a, status } : a));
-        setSelectedApp(prev => prev ? { ...prev, status } : null);
-        haptic.success();
-        showToast(`Status updated to ${status}`, 'success');
-      } else {
-        haptic.error();
-        showToast('Failed to update status', 'error');
+    updateStatus.mutate(
+      { id: selectedApp.id, status },
+      {
+        onSuccess: () => {
+          setSelectedApp(prev => prev ? { ...prev, status } : null);
+          haptic.success();
+          showToast(`Status updated to ${status}`, 'success');
+        },
+        onError: () => {
+          haptic.error();
+          showToast('Failed to update status', 'error');
+        },
       }
-    } catch (_err: unknown) {
-      haptic.error();
-      showToast('Failed to update status', 'error');
-    } finally {
-      setIsSaving(false);
-    }
+    );
   };
 
-  const handleSaveNotes = async () => {
+  const handleSaveNotes = () => {
     if (!selectedApp) return;
-    setIsSaving(true);
-    try {
-      const res = await fetch(`/api/admin/applications/${selectedApp.id}/status`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ status: selectedApp.status, notes }),
-      });
-      if (res.ok) {
-        setApplications(prev => prev.map(a => a.id === selectedApp.id ? { ...a, notes } : a));
-        setSelectedApp(prev => prev ? { ...prev, notes } : null);
-        haptic.success();
-        showToast('Notes saved', 'success');
-      } else {
-        haptic.error();
-        showToast('Failed to save notes', 'error');
+    saveNotes.mutate(
+      { id: selectedApp.id, notes },
+      {
+        onSuccess: () => {
+          setSelectedApp(prev => prev ? { ...prev, notes } : null);
+          haptic.success();
+          showToast('Notes saved', 'success');
+        },
+        onError: () => {
+          haptic.error();
+          showToast('Failed to save notes', 'error');
+        },
       }
-    } catch (_err: unknown) {
-      haptic.error();
-      showToast('Failed to save notes', 'error');
-    } finally {
-      setIsSaving(false);
-    }
+    );
   };
 
-  const handleSendInvite = async () => {
+  const handleSendInvite = () => {
     if (!selectedApp || !selectedTierId) return;
-    setIsSendingInvite(true);
-    try {
-      const res = await fetch(`/api/admin/applications/${selectedApp.id}/send-invite`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ tierId: selectedTierId }),
-      });
-      if (res.ok) {
-        setApplications(prev => prev.map(a => a.id === selectedApp.id ? { ...a, status: 'invited' } : a));
-        setSelectedApp(prev => prev ? { ...prev, status: 'invited' } : null);
-        haptic.success();
-        showToast('Checkout invite sent successfully!', 'success');
-      } else {
-        const data = await res.json();
-        haptic.error();
-        showToast(data.error || 'Failed to send invite', 'error');
+    sendInvite.mutate(
+      { applicationId: selectedApp.id, tierId: selectedTierId, email: selectedApp.email, name: `${selectedApp.first_name || ''} ${selectedApp.last_name || ''}`.trim() },
+      {
+        onSuccess: () => {
+          setSelectedApp(prev => prev ? { ...prev, status: 'invited' } : null);
+          haptic.success();
+          showToast('Checkout invite sent successfully!', 'success');
+        },
+        onError: (error) => {
+          haptic.error();
+          showToast(error.message || 'Failed to send invite', 'error');
+        },
       }
-    } catch (_err: unknown) {
-      haptic.error();
-      showToast('Failed to send invite', 'error');
-    } finally {
-      setIsSendingInvite(false);
-    }
+    );
   };
 
   const statusCounts = applications.reduce((acc, app) => {

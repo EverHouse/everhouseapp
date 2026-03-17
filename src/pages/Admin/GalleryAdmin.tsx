@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useAutoAnimate } from '@formkit/auto-animate/react';
+import { useQueryClient } from '@tanstack/react-query';
 import Toggle from '../../components/Toggle';
 import { usePageReady } from '../../stores/pageReadyStore';
 import FloatingActionButton from '../../components/FloatingActionButton';
@@ -7,6 +8,7 @@ import ModalShell from '../../components/ModalShell';
 import { haptic } from '../../utils/haptics';
 import { useDragAutoScroll } from '../../hooks/useDragAutoScroll';
 import { useToast } from '../../components/Toast';
+import { useGalleryImages, useSaveGalleryImage, useDeleteGalleryImage, useUploadImage, useReorderGallery, adminTabKeys } from '../../hooks/queries';
 
 interface GalleryImage {
     id: number;
@@ -19,15 +21,12 @@ interface GalleryImage {
 
 const GalleryAdmin: React.FC = () => {
     const { setPageReady } = usePageReady();
-    const [images, setImages] = useState<GalleryImage[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
+    const queryClient = useQueryClient();
     const [isEditing, setIsEditing] = useState(false);
     const [editId, setEditId] = useState<number | null>(null);
     const [newItem, setNewItem] = useState<Partial<GalleryImage>>({ category: 'venue', isActive: true });
-    const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
-    const [uploading, setUploading] = useState(false);
     const [uploadProgress, setUploadProgress] = useState<string>('');
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [draggedItemId, setDraggedItemId] = useState<number | null>(null);
@@ -39,27 +38,20 @@ const GalleryAdmin: React.FC = () => {
     const [galleryRef] = useAutoAnimate();
     const { showToast } = useToast();
 
+    const { data: imagesData, isLoading } = useGalleryImages();
+    const images = (imagesData as unknown as GalleryImage[]) ?? [];
+    const saveGalleryImage = useSaveGalleryImage();
+    const deleteGalleryImage = useDeleteGalleryImage();
+    const uploadImage = useUploadImage();
+    const reorderGallery = useReorderGallery();
+    const isSaving = saveGalleryImage.isPending;
+    const uploading = uploadImage.isPending;
+
     useEffect(() => {
         if (!isLoading) {
             setPageReady(true);
         }
     }, [isLoading, setPageReady]);
-
-    const fetchImages = async () => {
-        try {
-            const res = await fetch('/api/gallery?include_inactive=true', { credentials: 'include' });
-            const data = await res.json();
-            setImages(data);
-        } catch (err: unknown) {
-            console.error('Failed to fetch gallery images:', err);
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    useEffect(() => {
-        fetchImages();
-    }, []);
 
     const openEdit = (image: GalleryImage) => {
         setNewItem(image);
@@ -83,29 +75,20 @@ const GalleryAdmin: React.FC = () => {
         }
     };
 
-    const handleFileUpload = async (file: File) => {
-        setUploading(true);
+    const handleFileUpload = (file: File) => {
         setUploadProgress('Converting to WebP...');
-        try {
-            const formData = new FormData();
-            formData.append('image', file);
-            const res = await fetch('/api/admin/upload-image', {
-                method: 'POST',
-                credentials: 'include',
-                body: formData,
-            });
-            if (!res.ok) throw new Error('Upload failed');
-            const data = await res.json();
-            setNewItem({ ...newItem, imageUrl: data.imageUrl });
-            setUploadProgress(`Optimized: ${Math.round(data.originalSize/1024)}KB → ${Math.round(data.optimizedSize/1024)}KB`);
-        } catch (_err: unknown) {
-            setUploadProgress('Upload failed. Please try again.');
-        } finally {
-            setUploading(false);
-        }
+        uploadImage.mutate(file, {
+            onSuccess: (data) => {
+                setNewItem(prev => ({ ...prev, imageUrl: data.imageUrl }));
+                setUploadProgress(`Optimized: ${Math.round(data.originalSize/1024)}KB → ${Math.round(data.optimizedSize/1024)}KB`);
+            },
+            onError: () => {
+                setUploadProgress('Upload failed. Please try again.');
+            },
+        });
     };
 
-    const handleSave = async () => {
+    const handleSave = () => {
         setError(null);
         
         if (!newItem.imageUrl?.trim()) {
@@ -113,92 +96,62 @@ const GalleryAdmin: React.FC = () => {
             return;
         }
 
-        setIsSaving(true);
-        try {
-            const payload = {
-                title: newItem.title || null,
-                imageUrl: newItem.imageUrl,
-                category: newItem.category || 'venue',
-                sortOrder: newItem.sortOrder || 0,
-                isActive: newItem.isActive !== false
-            };
+        const payload = {
+            ...(editId ? { id: editId } : {}),
+            title: newItem.title || null,
+            imageUrl: newItem.imageUrl!,
+            category: newItem.category || 'venue',
+            sortOrder: newItem.sortOrder || 0,
+            isActive: newItem.isActive !== false,
+        };
 
-            const url = editId ? `/api/admin/gallery/${editId}` : '/api/admin/gallery';
-            const method = editId ? 'PUT' : 'POST';
-
-            const res = await fetch(url, {
-                method,
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload),
-                credentials: 'include'
-            });
-
-            if (!res.ok) {
-                const data = await res.json();
-                throw new Error(data.error || 'Failed to save');
-            }
-
-            await fetchImages();
-            setIsEditing(false);
-            haptic.success();
-            showToast(editId ? 'Image updated' : 'Image added', 'success');
-        } catch (err: unknown) {
-            haptic.error();
-            const msg = (err instanceof Error ? err.message : String(err)) || 'Failed to save image';
-            setError(msg);
-            showToast(msg, 'error');
-        } finally {
-            setIsSaving(false);
-        }
-    };
-
-    const handleToggleActive = async (image: GalleryImage) => {
-        setTogglingId(image.id);
-        try {
-            const res = await fetch(`/api/admin/gallery/${image.id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ isActive: !image.isActive }),
-                credentials: 'include'
-            });
-
-            if (res.ok) {
-                await fetchImages();
+        saveGalleryImage.mutate(payload as Parameters<typeof saveGalleryImage.mutate>[0], {
+            onSuccess: () => {
+                setIsEditing(false);
                 haptic.success();
-                showToast(image.isActive ? 'Image hidden' : 'Image visible', 'success');
-            } else {
+                showToast(editId ? 'Image updated' : 'Image added', 'success');
+            },
+            onError: (err) => {
                 haptic.error();
-                showToast('Failed to toggle visibility', 'error');
-            }
-        } catch {
-            haptic.error();
-            showToast('Failed to toggle visibility', 'error');
-        } finally {
-            setTogglingId(null);
-        }
+                const msg = err.message || 'Failed to save image';
+                setError(msg);
+                showToast(msg, 'error');
+            },
+        });
     };
 
-    const handleDelete = async (id: number) => {
-        try {
-            const res = await fetch(`/api/admin/gallery/${id}`, {
-                method: 'DELETE',
-                credentials: 'include'
-            });
+    const handleToggleActive = (image: GalleryImage) => {
+        setTogglingId(image.id);
+        saveGalleryImage.mutate(
+            { id: image.id, title: image.title, imageUrl: image.imageUrl, category: image.category, sortOrder: image.sortOrder, isActive: !image.isActive },
+            {
+                onSuccess: () => {
+                    setTogglingId(null);
+                    haptic.success();
+                    showToast(image.isActive ? 'Image hidden' : 'Image visible', 'success');
+                },
+                onError: () => {
+                    setTogglingId(null);
+                    haptic.error();
+                    showToast('Failed to toggle visibility', 'error');
+                },
+            }
+        );
+    };
 
-            if (res.ok) {
-                await fetchImages();
+    const handleDelete = (id: number) => {
+        deleteGalleryImage.mutate(id, {
+            onSuccess: () => {
                 haptic.success();
                 showToast('Image deleted', 'success');
-            } else {
+                setDeleteConfirm(null);
+            },
+            onError: () => {
                 haptic.error();
                 showToast('Failed to delete image', 'error');
-            }
-        } catch {
-            haptic.error();
-            showToast('Failed to delete image', 'error');
-        } finally {
-            setDeleteConfirm(null);
-        }
+                setDeleteConfirm(null);
+            },
+        });
     };
 
     const displayImages = useMemo(() => previewOrder ?? images, [previewOrder, images]);
@@ -233,7 +186,7 @@ const GalleryAdmin: React.FC = () => {
         });
     };
 
-    const handleDrop = async (e: React.DragEvent) => {
+    const handleDrop = (e: React.DragEvent) => {
         e.preventDefault();
         stopAutoScroll();
         
@@ -251,30 +204,24 @@ const GalleryAdmin: React.FC = () => {
 
         const orderUpdates = finalOrder.map((img, index) => ({
             id: img.id,
-            sortOrder: index + 1
+            sortOrder: index + 1,
         }));
 
-        setImages(finalOrder.map((img, index) => ({ ...img, sortOrder: index + 1 })));
+        queryClient.setQueryData(adminTabKeys.gallery(), finalOrder.map((img, index) => ({ ...img, sortOrder: index + 1 })));
 
-        try {
-            const res = await fetch('/api/admin/gallery/reorder', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify({ order: orderUpdates }),
-            });
-            if (!res.ok) {
-                throw new Error('Server rejected reorder');
-            }
-            haptic.success();
-            showToast('Order saved', 'success');
-        } catch {
-            haptic.error();
-            showToast('Failed to save new order', 'error');
-            setReorderError('Failed to save new order');
-            await fetchImages();
-            setTimeout(() => setReorderError(null), 3000);
-        }
+        reorderGallery.mutate({ items: orderUpdates }, {
+            onSuccess: () => {
+                haptic.success();
+                showToast('Order saved', 'success');
+            },
+            onError: () => {
+                haptic.error();
+                showToast('Failed to save new order', 'error');
+                setReorderError('Failed to save new order');
+                queryClient.invalidateQueries({ queryKey: adminTabKeys.gallery() });
+                setTimeout(() => setReorderError(null), 3000);
+            },
+        });
     };
 
     const handleDragEnd = () => {

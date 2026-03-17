@@ -151,6 +151,20 @@ The following large files have been split into sub-modules with barrel re-export
 - **Tech**: Recharts library (BarChart, LineChart, AreaChart, PieChart, SVG ring charts), TanStack Query for data fetching, three parallel queries
 - **Files**: `server/routes/analytics.ts`, `src/pages/Admin/tabs/AnalyticsTab.tsx`
 
+### React Query Migration
+Frontend data fetching is being migrated from raw `fetch()` calls to React Query (`useQuery`/`useMutation`) with proper cache invalidation and query key factories. Hook files live in `src/hooks/queries/`:
+- `useFetch.ts` — Base fetch utilities (`fetchWithCredentials`, `postWithCredentials`, `putWithCredentials`, `deleteWithCredentials`)
+- `useAdminQueries.ts` — Admin panel hooks (applications, bug reports, FAQs, gallery, inquiries, coupons, notifications, etc.)
+- `useMemberPageQueries.ts` — Member-facing and public page hooks (dashboard, bookings, billing, public forms, mapkit, settings)
+- `useMemberProfileQueries.ts` — Member profile drawer hooks
+- `useBookingsQueries.ts` — Booking-specific hooks
+- `useFinancialsQueries.ts`, `useToursQueries.ts`, `useCafeQueries.ts` — Domain-specific hooks
+- `index.ts` — Barrel export for all query hooks
+
+**Migrated files**: MemberProfileDrawer, BugReportsAdmin, FaqsAdmin, InquiriesAdmin, GalleryAdmin, ApplicationPipeline, FAQ, Gallery, Membership, Contact, DiscountsSubTab, MembershipApply, PrivateHireInquire, BuyDayPass (15 files total).
+
+**Patterns**: `staleTime` 2min default, 5-10min for static data. Type casting uses `as unknown as Type` for `Record<string, unknown>` returns. Mutations use `onSuccess`/`onError` callbacks.
+
 ### Recent Changes
 - **Startup Reliability & Trackman Billing Fixes (v8.87.52)**: (1) Fixed deployment startup race condition — added `waitForDatabaseReady()` gate with 20-attempt exponential backoff (~90s window), consolidated 2 inline DB queries into `startup.ts`, added automatic retry (3 attempts, 30s apart). (2) Trackman import no longer auto-waives member fees — real members/guests get `'pending'` status, only ghosts get `'waived'`; `recalculateSessionFees()` now runs after every import path. Added `'trackman_import'` to `FeeComputeParams.source`. (3) WaiverGate is now fully fail-closed — blocking overlay on loading/error states. (4) Fixed 8 TS errors + 2 failing tests from code audit. Key files: `server/loaders/startup.ts`, `server/index.ts`, `server/core/trackman/sessionMapper.ts`, `server/core/trackman/service.ts`, `server/routes/trackman/webhook-billing.ts`, `shared/models/billing.ts`, `src/App.tsx`.
 - **Membership Status Tracking — Full `membership_status_changed_at` Coverage (v8.87.44/v8.87.50)**: Fixed the "Former Members" line in membership trends always showing 0. DB column is `membership_status_changed_at` (Drizzle ORM property: `users.lastModifiedAt`). Backfill in `db-init.ts` sets `membership_status_changed_at = updated_at` for all former members. For MindBody members, the sync reads HubSpot's `last_modified_at` property as the accurate status-change date. For Stripe members, the write side pushes `membership_status_changed_at` back to HubSpot. **All 37+ UPDATE paths** that write `membership_status` now also set `membership_status_changed_at = CASE WHEN membership_status IS DISTINCT FROM '[new_status]' THEN NOW() ELSE membership_status_changed_at END`. INSERT statements for new users are exempt. `membership_status_changed_at` is displayed as "Modified [date]" in member profile drawers. Hard Rule #16 in `member-lifecycle` skill and Hard Rule #15 in `stripe-webhook-flow` skill enforce this pattern going forward, with a regression check grep command. **v8.87.50**: Aligned dev and production on the same column name (`membership_status_changed_at`) to eliminate deployment schema diff prompts. All ~100 raw SQL references across 30 server files updated.

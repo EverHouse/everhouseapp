@@ -6,6 +6,7 @@ import EmptyState from '../../components/EmptyState';
 import { usePageReady } from '../../stores/pageReadyStore';
 import { AnimatedPage } from '../../components/motion';
 import SEO from '../../components/SEO';
+import { usePublicGallery } from '../../hooks/queries';
 
 interface GalleryImage {
   id: number;
@@ -16,38 +17,14 @@ interface GalleryImage {
 
 const Gallery: React.FC = () => {
   const { setPageReady } = usePageReady();
-  const [images, setImages] = useState<GalleryImage[]>([]);
-  const [_isLoadingData, setIsLoadingData] = useState(true);
+  const { data: galleryData } = usePublicGallery();
+  const images = (galleryData as unknown as GalleryImage[]) ?? [];
   const [filter, setFilter] = useState('All');
   const [viewerState, setViewerState] = useState<{images: string[], index: number} | null>(null);
 
   useEffect(() => {
     setPageReady(true);
   }, [setPageReady]);
-
-  const fetchGallery = useCallback(async () => {
-    try {
-      const res = await fetch('/api/gallery');
-      if (res.ok) {
-        const data = await res.json();
-        setImages(data);
-      }
-    } catch (err: unknown) {
-      console.error('Failed to fetch gallery:', err);
-    } finally {
-      setIsLoadingData(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchGallery();
-  }, [fetchGallery]);
-
-  useEffect(() => {
-    const handler = () => { fetchGallery(); };
-    window.addEventListener('app-refresh', handler);
-    return () => window.removeEventListener('app-refresh', handler);
-  }, [fetchGallery]);
 
   const categories = useMemo(() => {
     const cats = new Set(images.map(img => img.category));

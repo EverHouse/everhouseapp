@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Footer } from '../../components/Footer';
 import WalkingGolferSpinner from '../../components/WalkingGolferSpinner';
 import EmptyState from '../../components/EmptyState';
@@ -6,6 +6,7 @@ import { usePageReady } from '../../stores/pageReadyStore';
 import { AnimatedPage } from '../../components/motion';
 import SEO from '../../components/SEO';
 import { useAutoAnimate } from '@formkit/auto-animate/react';
+import { usePublicFaqs } from '../../hooks/queries';
 
 interface FaqItem {
   id: number;
@@ -30,8 +31,8 @@ const CATEGORY_ORDER = ['House Rules', 'Membership', 'Booking', 'Amenities', 'Ev
 
 const FAQ: React.FC = () => {
   const { setPageReady } = usePageReady();
-  const [faqs, setFaqs] = useState<FaqItem[]>(FALLBACK_FAQS);
-  const [loading, setLoading] = useState(true);
+  const { data: faqsData, isLoading: loading } = usePublicFaqs();
+  const faqs = ((faqsData as unknown as FaqItem[])?.length ?? 0) > 0 ? (faqsData as unknown as FaqItem[]) : FALLBACK_FAQS;
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [faqParent] = useAutoAnimate();
 
@@ -40,26 +41,6 @@ const FAQ: React.FC = () => {
       setPageReady(true);
     }
   }, [loading, setPageReady]);
-
-  const fetchFaqs = useCallback(() => {
-    fetch('/api/faqs')
-      .then(res => res.ok ? res.json() : Promise.reject())
-      .then((data: FaqItem[]) => {
-        if (data.length > 0) setFaqs(data);
-      })
-      .catch((err: unknown) => console.warn('[FAQ] Failed to fetch FAQs:', err))
-      .finally(() => setLoading(false));
-  }, []);
-
-  useEffect(() => {
-    fetchFaqs();
-  }, [fetchFaqs]);
-
-  useEffect(() => {
-    const handler = () => { fetchFaqs(); };
-    window.addEventListener('app-refresh', handler);
-    return () => window.removeEventListener('app-refresh', handler);
-  }, [fetchFaqs]);
 
   const categories = useMemo(() => {
     const uniqueCategories = [...new Set(faqs.map(f => f.category).filter(Boolean))] as string[];

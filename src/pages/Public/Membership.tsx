@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Routes, Route, useNavigate, Link } from 'react-router-dom';
 import { Footer } from '../../components/Footer';
 import BackToTop from '../../components/BackToTop';
@@ -7,6 +7,7 @@ import { useNavigationLoading } from '../../stores/navigationLoadingStore';
 import { AnimatedPage } from '../../components/motion';
 import SEO from '../../components/SEO';
 import { usePricing } from '../../hooks/usePricing';
+import { usePublicMembershipTiers } from '../../hooks/queries';
 
 interface MembershipTier {
   id: number;
@@ -63,39 +64,17 @@ const MembershipOverview: React.FC = () => {
   const { setPageReady } = usePageReady();
   const { guestFeeDollars: _guestFeeDollars, dayPassPrices } = usePricing();
   const [selectedPass, setSelectedPass] = useState<'workspace' | 'sim' | null>(null);
-  const [tiers, setTiers] = useState<MembershipTier[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: tiersData, isLoading: loading } = usePublicMembershipTiers();
+  const tiers = useMemo(() =>
+    ((tiersData as unknown as MembershipTier[]) ?? []).filter(t => t.show_on_membership_page !== false && t.product_type === 'subscription'),
+    [tiersData]
+  );
 
   useEffect(() => {
     if (!loading) {
       setPageReady(true);
     }
   }, [loading, setPageReady]);
-
-  const fetchTiers = useCallback(async () => {
-    try {
-      const response = await fetch('/api/membership-tiers?active=true');
-      if (response.ok) {
-        const data = await response.json();
-        const filteredTiers = data.filter((t: MembershipTier) => t.show_on_membership_page !== false && t.product_type === 'subscription');
-        setTiers(filteredTiers);
-      }
-    } catch (error: unknown) {
-      console.error('Failed to fetch membership tiers:', error);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchTiers();
-  }, [fetchTiers]);
-
-  useEffect(() => {
-    const handler = () => { fetchTiers(); };
-    window.addEventListener('app-refresh', handler);
-    return () => window.removeEventListener('app-refresh', handler);
-  }, [fetchTiers]);
 
   const extractPrice = (priceString: string) => {
     const match = priceString.match(/\$[\d,]+/);
