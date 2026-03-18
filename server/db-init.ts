@@ -1547,6 +1547,29 @@ export async function verifyIntegrityConstraints(): Promise<{ verified: boolean;
       }
     }
 
+    const criticalColumns = [
+      { table: 'users', column: 'google_id', description: 'Google auth linking' },
+      { table: 'users', column: 'google_email', description: 'Google auth linking' },
+      { table: 'users', column: 'google_linked_at', description: 'Google auth linking' },
+      { table: 'users', column: 'apple_id', description: 'Apple auth linking' },
+      { table: 'users', column: 'apple_email', description: 'Apple auth linking' },
+      { table: 'users', column: 'apple_linked_at', description: 'Apple auth linking' },
+      { table: 'users', column: 'stripe_customer_id', description: 'Stripe billing' },
+      { table: 'users', column: 'stripe_subscription_id', description: 'Stripe billing' },
+    ];
+
+    for (const col of criticalColumns) {
+      const colCheck = await db.execute(sql`
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'public' AND table_name = ${col.table} AND column_name = ${col.column}
+        LIMIT 1
+      `);
+      if (colCheck.rows.length === 0) {
+        missing.push(`column:${col.table}.${col.column} MISSING (${col.description})`);
+        logger.error(`[DB Init] CRITICAL: Column ${col.table}.${col.column} is MISSING from database — ${col.description} data may have been wiped by schema drift`);
+      }
+    }
+
     if (missing.length > 0) {
       logger.error('[DB Init] INTEGRITY CONSTRAINT VERIFICATION FAILED — missing protections:', { extra: { missing } });
     } else {

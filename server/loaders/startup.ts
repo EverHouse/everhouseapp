@@ -99,6 +99,13 @@ export async function runStartupTasks(): Promise<void> {
     startupHealth.criticalFailures.push(`Database constraints: ${getErrorMessage(err)}`);
   }
 
+  if (!process.env.GOOGLE_CLIENT_ID) {
+    logger.error('[Startup] GOOGLE_CLIENT_ID is not set — Google sign-in and account linking will be unavailable');
+    startupHealth.warnings.push('GOOGLE_CLIENT_ID is not configured — Google auth disabled');
+  } else {
+    logger.info('[Startup] Google auth configured (GOOGLE_CLIENT_ID present)');
+  }
+
   const parallelDbTasks = [
     (async () => {
       try {

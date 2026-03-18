@@ -479,6 +479,7 @@ export const severityMap: Record<string, 'critical' | 'high' | 'medium' | 'low'>
   'Active Members Without Waivers': 'medium',
   'Lingering Payment Intents on Terminal Bookings': 'high',
   'Billing Orphans': 'critical',
+  'Auth Linking Data Integrity': 'critical',
 };
 
 export function getCheckSeverity(checkName: string): 'critical' | 'high' | 'medium' | 'low' {
@@ -752,7 +753,7 @@ export async function runAllIntegrityChecks(triggeredBy: 'manual' | 'scheduled' 
   const { checkUnmatchedTrackmanBookings, checkNeedsReviewItems, checkStalePastTours, checkBookingsWithoutSessions, checkOverlappingBookings, checkSessionsWithoutParticipants, checkGuestPassAccountingDrift, checkStalePendingBookings } = await import('./bookingChecks');
   const { checkHubSpotSyncMismatch } = await import('./hubspotChecks');
   const { checkStripeSubscriptionSync, checkDuplicateStripeCustomers, checkOrphanedPaymentIntents, checkBillingProviderHybridState, checkInvoiceBookingReconciliation, checkLateCancelPreservedPaymentIntents, checkBillingOrphans } = await import('./stripeChecks');
-  const { checkStuckTransitionalMembers, checkTierReconciliation, checkMindBodyStaleSyncMembers, checkMindBodyStatusMismatch, checkArchivedMemberLingeringData, checkActiveMembersWithoutWaivers } = await import('./memberChecks');
+  const { checkStuckTransitionalMembers, checkTierReconciliation, checkMindBodyStaleSyncMembers, checkMindBodyStatusMismatch, checkArchivedMemberLingeringData, checkActiveMembersWithoutWaivers, checkAuthLinkingDataIntegrity } = await import('./memberChecks');
 
   const checks = await Promise.all([
     safeCheck(checkUnmatchedTrackmanBookings, 'Unmatched Trackman Bookings'),
@@ -777,6 +778,7 @@ export async function runAllIntegrityChecks(triggeredBy: 'manual' | 'scheduled' 
     safeCheck(checkActiveMembersWithoutWaivers, 'Active Members Without Waivers'),
     safeCheck(checkLateCancelPreservedPaymentIntents, 'Lingering Payment Intents on Terminal Bookings'),
     safeCheck(checkBillingOrphans, 'Billing Orphans'),
+    safeCheck(checkAuthLinkingDataIntegrity, 'Auth Linking Data Integrity'),
   ]);
 
   const now = new Date();

@@ -751,3 +751,131 @@ export async function checkEmailOrphans(): Promise<IntegrityCheckResult> {
     lastRun: new Date()
   };
 }
+
+export async function checkAuthLinkingDataIntegrity(): Promise<IntegrityCheckResult> {
+  const issues: IntegrityIssue[] = [];
+
+  const googleCountResult = await db.execute(sql`
+    SELECT COUNT(*) AS cnt FROM users WHERE google_id IS NOT NULL AND archived_at IS NULL
+  `);
+  const googleCount = parseInt((googleCountResult.rows[0] as { cnt: string }).cnt, 10);
+
+  const appleCountResult = await db.execute(sql`
+    SELECT COUNT(*) AS cnt FROM users WHERE apple_id IS NOT NULL AND archived_at IS NULL
+  `);
+  const appleCount = parseInt((appleCountResult.rows[0] as { cnt: string }).cnt, 10);
+
+  const totalActiveResult = await db.execute(sql`
+    SELECT COUNT(*) AS cnt FROM users WHERE archived_at IS NULL
+  `);
+  const totalActive = parseInt((totalActiveResult.rows[0] as { cnt: string }).cnt, 10);
+
+  const SETTING_KEY_GOOGLE = 'integrity_google_linked_count';
+  const SETTING_KEY_APPLE = 'integrity_apple_linked_count';
+
+  const prevGoogleResult = await db.execute(sql`
+    SELECT value FROM system_settings WHERE key = ${SETTING_KEY_GOOGLE} LIMIT 1
+  `);
+  const parsedPrevGoogle = prevGoogleResult.rows.length > 0
+    ? parseInt((prevGoogleResult.rows[0] as { value: string }).value, 10)
+    : null;
+  const prevGoogleCount = parsedPrevGoogle !== null && Number.isFinite(parsedPrevGoogle) ? parsedPrevGoogle : null;
+
+  const prevAppleResult = await db.execute(sql`
+    SELECT value FROM system_settings WHERE key = ${SETTING_KEY_APPLE} LIMIT 1
+  `);
+  const parsedPrevApple = prevAppleResult.rows.length > 0
+    ? parseInt((prevAppleResult.rows[0] as { value: string }).value, 10)
+    : null;
+  const prevAppleCount = parsedPrevApple !== null && Number.isFinite(parsedPrevApple) ? parsedPrevApple : null;
+
+  if (parsedPrevGoogle !== prevGoogleCount || parsedPrevApple !== prevAppleCount) {
+    logger.warn('[Auth Linking Integrity] Malformed stored baseline detected, skipping drop comparison for affected provider');
+  }
+
+  const MIN_BASELINE_FOR_DROP_CHECK = 10;
+
+  if (prevGoogleCount !== null && prevGoogleCount >= MIN_BASELINE_FOR_DROP_CHECK) {
+    const dropPercent = ((prevGoogleCount - googleCount) / prevGoogleCount) * 100;
+    const absoluteDrop = prevGoogleCount - googleCount;
+    if (dropPercent >= 50 && absoluteDrop >= 5) {
+      issues.push({
+        category: 'data_quality',
+        severity: 'error',
+        table: 'users',
+        recordId: 'google_id_mass_wipe',
+        description: `Google auth linking count dropped by ${dropPercent.toFixed(0)}% (${prevGoogleCount} → ${googleCount}). Possible mass data wipe detected.`,
+        suggestion: 'Investigate recent migrations or deployments that may have cleared google_id values. Check audit logs and restore from backup if needed.',
+        context: {
+          previousCount: prevGoogleCount,
+          currentCount: googleCount,
+          dropPercent: Math.round(dropPercent),
+        }
+      });
+    }
+  }
+
+  if (prevAppleCount !== null && prevAppleCount >= MIN_BASELINE_FOR_DROP_CHECK) {
+    const dropPercent = ((prevAppleCount - appleCount) / prevAppleCount) * 100;
+    const absoluteDrop = prevAppleCount - appleCount;
+    if (dropPercent >= 50 && absoluteDrop >= 5) {
+      issues.push({
+        category: 'data_quality',
+        severity: 'error',
+        table: 'users',
+        recordId: 'apple_id_mass_wipe',
+        description: `Apple auth linking count dropped by ${dropPercent.toFixed(0)}% (${prevAppleCount} → ${appleCount}). Possible mass data wipe detected.`,
+        suggestion: 'Investigate recent migrations or deployments that may have cleared apple_id values. Check audit logs and restore from backup if needed.',
+        context: {
+          previousCount: prevAppleCount,
+          currentCount: appleCount,
+          dropPercent: Math.round(dropPercent),
+        }
+      });
+    }
+  }
+
+  if (googleCount === 0 && totalActive > 10) {
+    issues.push({
+      category: 'data_quality',
+      severity: 'error',
+      table: 'users',
+      recordId: 'google_id_all_null',
+      description: `Zero users have Google accounts linked out of ${totalActive} active users. All google_id values appear to be NULL.`,
+      suggestion: 'This indicates Google auth linking data has been wiped. Users who previously signed in via Google (with a different email than their member email) cannot sign in. Restore from backup or enable auto-re-linking.',
+    });
+  }
+
+  if (appleCount === 0 && totalActive > 10) {
+    issues.push({
+      category: 'data_quality',
+      severity: 'warning',
+      table: 'users',
+      recordId: 'apple_id_all_null',
+      description: `Zero users have Apple accounts linked out of ${totalActive} active users. All apple_id values appear to be NULL.`,
+      suggestion: 'Check if Apple auth linking data has been wiped similarly to Google auth data.',
+    });
+  }
+
+  await db.execute(sql`
+    INSERT INTO system_settings (key, value, category, updated_by, updated_at)
+    VALUES (${SETTING_KEY_GOOGLE}, ${String(googleCount)}, 'integrity', 'system', NOW())
+    ON CONFLICT (key) DO UPDATE SET value = ${String(googleCount)}, updated_at = NOW()
+  `);
+
+  await db.execute(sql`
+    INSERT INTO system_settings (key, value, category, updated_by, updated_at)
+    VALUES (${SETTING_KEY_APPLE}, ${String(appleCount)}, 'integrity', 'system', NOW())
+    ON CONFLICT (key) DO UPDATE SET value = ${String(appleCount)}, updated_at = NOW()
+  `);
+
+  logger.info(`[Auth Linking Integrity] Google linked: ${googleCount}${prevGoogleCount !== null ? ` (prev: ${prevGoogleCount})` : ''}, Apple linked: ${appleCount}${prevAppleCount !== null ? ` (prev: ${prevAppleCount})` : ''}, Total active: ${totalActive}`);
+
+  return {
+    checkName: 'Auth Linking Data Integrity',
+    status: issues.some(i => i.severity === 'error') ? 'fail' : issues.length > 0 ? 'warning' : 'pass',
+    issueCount: issues.length,
+    issues,
+    lastRun: new Date()
+  };
+}

@@ -163,7 +163,9 @@ router.post('/api/auth/google/verify', requireGoogleConfig, authRateLimiterByIp,
           .set(updateData)
           .where(eq(users.id, user.id))
           .returning({ id: users.id });
-        if (autoLinked.length === 0) {
+        if (autoLinked.length > 0) {
+          logger.info('[Google Auth] Auto-linked Google account on sign-in', { extra: { userId: user.id, userEmail: user.email, googleEmail: googleUser.email, googleSub: googleUser.sub, hadPreviousLink: !!user.googleId } });
+        } else {
           logger.error('[Google Auth] Auto-link update affected 0 rows', { extra: { userId: user.id, userEmail: user.email, googleSub: googleUser.sub } });
         }
       }
@@ -307,7 +309,9 @@ router.post('/api/auth/google/callback', requireGoogleConfig, async (req, res) =
           .set(updateData)
           .where(eq(users.id, user.id))
           .returning({ id: users.id });
-        if (autoLinked.length === 0) {
+        if (autoLinked.length > 0) {
+          logger.info('[Google Auth Callback] Auto-linked Google account on sign-in', { extra: { userId: user.id, userEmail: user.email, googleEmail: googleUser.email, googleSub: googleUser.sub, hadPreviousLink: !!user.googleId } });
+        } else {
           logger.error('[Google Auth Callback] Auto-link update affected 0 rows', { extra: { userId: user.id, userEmail: user.email, googleSub: googleUser.sub } });
         }
       }
@@ -495,6 +499,39 @@ router.get('/api/auth/google/status', requireGoogleConfig, async (req, res) => {
   } catch (error: unknown) {
     logger.error('[Google Auth] Status error', { error: error instanceof Error ? error : new Error(String(error)) });
     res.status(500).json({ error: 'Failed to check Google link status' });
+  }
+});
+
+router.get('/api/auth/google/unlinked-report', async (req, res) => {
+  try {
+    const sessionUser = req.session?.user;
+    if (!sessionUser?.role || !['admin', 'staff'].includes(sessionUser.role)) {
+      return res.status(403).json({ error: 'Staff access required' });
+    }
+
+    const result = await db.execute(sql`
+      SELECT
+        u.id, u.email, u.first_name, u.last_name, u.tier, u.membership_status,
+        u.google_id, u.google_email, u.google_linked_at
+      FROM users u
+      WHERE u.archived_at IS NULL
+        AND u.google_id IS NULL
+        AND u.membership_status IN ('active', 'trialing', 'past_due')
+      ORDER BY u.email
+    `);
+
+    const totalLinked = await db.execute(sql`
+      SELECT COUNT(*) AS cnt FROM users WHERE google_id IS NOT NULL AND archived_at IS NULL
+    `);
+
+    res.json({
+      unlinkedActiveMembers: result.rows.length,
+      currentlyLinked: parseInt((totalLinked.rows[0] as { cnt: string }).cnt, 10),
+      members: result.rows,
+    });
+  } catch (error: unknown) {
+    logger.error('[Google Auth] Unlinked report error', { error: error instanceof Error ? error : new Error(String(error)) });
+    res.status(500).json({ error: 'Failed to generate unlinked report' });
   }
 });
 
