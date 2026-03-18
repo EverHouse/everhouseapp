@@ -14,6 +14,7 @@ export const changelog: ChangelogEntry[] = [
     changes: [
       "Fixed: Deleted cafe menu items no longer reappear when using 'Pull from Stripe' — the sync now respects locally-deleted items instead of reactivating them",
       "Fixed: Unrecognized membership tier names now log clear error messages instead of silently downgrading members to the Social tier",
+      "Fixed: 'Seed Cafe' button now works even if all items were previously deleted — it previously counted soft-deleted items and refused to re-seed",
       "Cleaned up unused auto-seed cafe menu code that was left behind from a previous change",
     ]
   },

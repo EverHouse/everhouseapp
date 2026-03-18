@@ -188,13 +188,13 @@ router.delete('/api/cafe-menu/:id', isStaffOrAdmin, async (req, res) => {
 
 router.post('/api/admin/seed-cafe', isAdmin, async (req, res) => {
   try {
-    const countResult = await db.select({ count: sql<number>`count(*)` }).from(cafeItems);
+    const countResult = await db.select({ count: sql<number>`count(*)` }).from(cafeItems).where(eq(cafeItems.isActive, true));
     const existingCount = Number(countResult[0].count);
     
     if (existingCount > 0) {
       return res.json({ 
         success: true, 
-        message: 'Cafe menu already has items - skipping seed',
+        message: 'Cafe menu already has active items - skipping seed',
         existingBefore: existingCount,
         totalAfter: existingCount
       });
