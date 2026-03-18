@@ -609,7 +609,7 @@ const Login: React.FC = () => {
                       className="tactile-btn flex w-full justify-center items-center gap-2 rounded-[4px] bg-amber-500 px-3 py-3 text-sm font-bold leading-6 text-white hover:bg-amber-600 transition-all duration-fast active:scale-[0.98] disabled:opacity-50"
                     >
                       <span className="material-symbols-outlined text-lg">developer_mode</span>
-                      {devLoading ? 'Logging in...' : 'Dev Login (Nick)'}
+                      {devLoading ? 'Logging in...' : 'Dev Login (Admin)'}
                     </button>
                     <p className="text-center text-xs text-amber-600 dark:text-amber-400">
                       Development only - logs in as nick@evenhouse.club
@@ -621,7 +621,7 @@ const Login: React.FC = () => {
                       className="tactile-btn flex w-full justify-center items-center gap-2 rounded-[4px] bg-purple-500 px-3 py-3 text-sm font-bold leading-6 text-white hover:bg-purple-600 transition-all duration-fast active:scale-[0.98] disabled:opacity-50"
                     >
                       <span className="material-symbols-outlined text-lg">person</span>
-                      {devMemberLoading ? 'Logging in...' : 'Dev Login (Nick Luu Member)'}
+                      {devMemberLoading ? 'Logging in...' : 'Dev Login (Member)'}
                     </button>
                     <p className="text-center text-xs text-purple-600 dark:text-purple-400">
                       Development only - logs in as nicholasallanluu@gmail.com
