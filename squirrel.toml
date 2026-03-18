@@ -1,6 +1,6 @@
 [project]
-domains = []
-name = "ever-club"
+domains = ["www.everclub.app"]
+name = "everclub"
 
 [crawler]
 max_pages = 100
@@ -31,6 +31,6 @@ timeout_ms = 10000
 concurrency = 5
 
 [output]
-format = "console"
+format = "llm"
 
 [rule_options]

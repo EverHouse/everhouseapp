@@ -6,3 +6,9 @@ id = "duEs58W51ozGZy4WDpLHj"
 uri = "file://.local/linked-email-refactor-plan.md"
 type = "text"
 title = "Linked Email Refactor Plan"
+
+[[outputs]]
+id = "-XjjP_fIzpS7aBTqNR77J"
+uri = "file://everclub-audit-report.txt"
+type = "text"
+title = "Ever Club Website Audit Report (Full)"

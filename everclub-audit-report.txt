@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<audit version="0.0.38">
+<site url="https://www.everclub.app" crawled="15" date="2026-03-17T23:40:31.059Z"/>
+<score overall="72" grade="C">
+ <cat name="Images" score="73"/>
+ <cat name="Crawlability" score="91"/>
+ <cat name="Accessibility" score="94"/>
+ <cat name="Performance" score="93"/>
+ <cat name="Content" score="93"/>
+ <cat name="Social Media" score="77"/>
+ <cat name="Security" score="82"/>
+ <cat name="Core SEO" score="99"/>
+ <cat name="E-E-A-T" score="100"/>
+ <cat name="Internationalization" score="100"/>
+ <cat name="Legal Compliance" score="100"/>
+ <cat name="Links" score="100"/>
+ <cat name="Local SEO" score="100"/>
+ <cat name="Mobile" score="100"/>
+ <cat name="Structured Data" score="100"/>
+ <cat name="URL Structure" score="100"/>
+</score>
+<summary passed="1155" warnings="112" failed="16"/>
+<issues>
+ <category name="Crawlability" errors="1" warnings="2">
+  <rule id="crawl/sitemap-valid" severity="error" status="fail" docs="https://docs.squirrelscan.com/rules/crawl/sitemap-valid">
+   7 error(s) in 7 sitemap(s)
+   Items (5/7):
+    - /sitemap_index.xml (Unknown sitemap format) [errorCount: 1, errors: [&quot;Unknown sitemap format&quot;]]
+    - /sitemap-index.xml (Unknown sitemap format) [errorCount: 1, errors: [&quot;Unknown sitemap format&quot;]]
+    - /sitemaps.xml (Unknown sitemap format) [errorCount: 1, errors: [&quot;Unknown sitemap format&quot;]]
+    - /sitemap1.xml (Unknown sitemap format) [errorCount: 1, errors: [&quot;Unknown sitemap format&quot;]]
+    - /post-sitemap.xml (Unknown sitemap format) [errorCount: 1, errors: [&quot;Unknown sitemap format&quot;]]
+  </rule>
+  <rule id="crawl/sitemap-coverage" severity="warning" status="warn" docs="https://docs.squirrelscan.com/rules/crawl/sitemap-coverage">
+   15 indexable page(s) not in sitemap (100%); 15 sitemap URL(s) were not crawled
+   Items (5/30):
+    - /
+    - /about
+    - /contact
+    - /faq
+    - /membership
+  </rule>
+ </category>
+ <category name="Core SEO" errors="0" warnings="2">
+  <rule id="core/meta-description" severity="error" status="warn" docs="https://docs.squirrelscan.com/rules/core/meta-description">
+   Description too short
+   Pages (2): /privacy, /terms
+   Items (2):
+    - /privacy (Ever Members Club privacy policy. How we collect,  (93 chars))
+    - /terms (Ever Members Club terms of service. Membership agr (89 chars))
+  </rule>
+ </category>
+ <category name="Security" errors="0" warnings="4">
+  <rule id="security/leaked-secrets" severity="error" status="warn" docs="https://docs.squirrelscan.com/rules/security/leaked-secrets">
+   1 potential secret(s) detected (verify manually)
+   Items (1):
+    - Supabase Anon Key: eyJhbG********************xOH0 (Found in external-script (https://www.everclub.app/assets/js/index-Ds-RXJnN.js))
+  </rule>
+  <rule id="security/csp" severity="warning" status="warn" docs="https://docs.squirrelscan.com/rules/security/csp">
+   CSP allows &apos;unsafe-inline&apos; and &apos;unsafe-eval&apos;; CSP script-src allows wildcard (*)
+  </rule>
+  <rule id="security/http-to-https" severity="warning" status="warn" docs="https://docs.squirrelscan.com/rules/security/http-to-https">
+   15 HTTP URL(s) redirect to HTTPS
+   Items (5/15):
+    - http://www.everclub.app/ (http://www.everclub.app/ → https://www.everclub.app/ (301)) [statusCode: 301, chain: {&quot;sourceUrl&quot;:&quot;http://www.everclub.app/&quot;,&quot;finalUrl&quot;:&quot;https://www.everclub.app/&quot;,&quot;hops&quot;:[{&quot;url&quot;:&quot;http://www.everclub.app/&quot;,&quot;statusCode&quot;:301,&quot;type&quot;:&quot;http&quot;},{&quot;url&quot;:&quot;https://www.everclub.app/&quot;,&quot;statusCode…]
+    - http://www.everclub.app/about (http://www.everclub.app/about → https://www.everclub.app/about (301)) [statusCode: 301, chain: {&quot;sourceUrl&quot;:&quot;http://www.everclub.app/about&quot;,&quot;finalUrl&quot;:&quot;https://www.everclub.app/about&quot;,&quot;hops&quot;:[{&quot;url&quot;:&quot;http://www.everclub.app/about&quot;,&quot;statusCode&quot;:301,&quot;type&quot;:&quot;http&quot;},{&quot;url&quot;:&quot;https://www.everclub.ap…]
+    - http://www.everclub.app/contact (http://www.everclub.app/contact → https://www.everclub.app/contact (301)) [statusCode: 301, chain: {&quot;sourceUrl&quot;:&quot;http://www.everclub.app/contact&quot;,&quot;finalUrl&quot;:&quot;https://www.everclub.app/contact&quot;,&quot;hops&quot;:[{&quot;url&quot;:&quot;http://www.everclub.app/contact&quot;,&quot;statusCode&quot;:301,&quot;type&quot;:&quot;http&quot;},{&quot;url&quot;:&quot;https://www.everc…]
+    - http://www.everclub.app/faq (http://www.everclub.app/faq → https://www.everclub.app/faq (301)) [statusCode: 301, chain: {&quot;sourceUrl&quot;:&quot;http://www.everclub.app/faq&quot;,&quot;finalUrl&quot;:&quot;https://www.everclub.app/faq&quot;,&quot;hops&quot;:[{&quot;url&quot;:&quot;http://www.everclub.app/faq&quot;,&quot;statusCode&quot;:301,&quot;type&quot;:&quot;http&quot;},{&quot;url&quot;:&quot;https://www.everclub.app/faq&quot;…]
+    - http://www.everclub.app/membership (http://www.everclub.app/membership → https://www.everclub.app/membership (301)) [statusCode: 301, chain: {&quot;sourceUrl&quot;:&quot;http://www.everclub.app/membership&quot;,&quot;finalUrl&quot;:&quot;https://www.everclub.app/membership&quot;,&quot;hops&quot;:[{&quot;url&quot;:&quot;http://www.everclub.app/membership&quot;,&quot;statusCode&quot;:301,&quot;type&quot;:&quot;http&quot;},{&quot;url&quot;:&quot;https://…]
+  </rule>
+ </category>
+ <category name="Content" errors="0" warnings="15">
+  <rule id="content/word-count" severity="warning" status="warn" docs="https://docs.squirrelscan.com/rules/content/word-count">
+   Thin content: 135 words (min 300)
+   Pages (5/15): /, /about, /contact, /day-pass, /faq
+   Items (5/15):
+    - / (Thin content: 135 words (min 300))
+    - /about (Thin content: 135 words (min 300))
+    - /contact (Thin content: 135 words (min 300))
+    - /faq (Thin content: 135 words (min 300))
+    - /membership (Thin content: 135 words (min 300))
+  </rule>
+ </category>
+ <category name="Images" errors="15" warnings="0">
+  <rule id="images/alt-text" severity="warning" status="fail" docs="https://docs.squirrelscan.com/rules/images/alt-text">
+   1 image(s) missing alt text
+   Pages (5/15): /, /about, /contact, /day-pass, /faq
+   Items (1):
+    - https://www.facebook.com/tr?id=906341427989429&amp;ev=PageView&amp;noscript=1
+  </rule>
+ </category>
+ <category name="Performance" errors="0" warnings="30">
+  <rule id="perf/lcp-hints" severity="warning" status="warn" docs="https://docs.squirrelscan.com/rules/perf/lcp-hints">
+   1 potential LCP image(s) without preload
+   Pages (5/15): /, /about, /contact, /day-pass, /faq
+   Items (1):
+    - https://www.facebook.com/tr?id=906341427989429&amp;ev=PageView&amp;noscript=1
+  </rule>
+  <rule id="perf/critical-request-chains" severity="warning" status="warn" docs="https://docs.squirrelscan.com/rules/perf/critical-request-chains">
+   2 critical request chain(s) found
+   Pages (5/15): /, /about, /contact, /day-pass, /faq
+   Items (2):
+    - CSS: https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400..700;1,400..700&amp;family=Newsreader:ital,opsz,wght@0,6..72,200..800;1,6..72,200..800&amp;display=swap
+    - CSS: /assets/index-RrTso44e.css
+  </rule>
+ </category>
+ <category name="Social Media" errors="0" warnings="14">
+  <rule id="social/og-url-match" severity="warning" status="warn" docs="https://docs.squirrelscan.com/rules/social/og-url-match">
+   og:url does not match canonical URL
+   Pages (5/14): /about, /contact, /day-pass, /faq, /gallery
+  </rule>
+ </category>
+ <category name="Accessibility" errors="0" warnings="45">
+  <rule id="a11y/landmark-one-main" severity="warning" status="warn" docs="https://docs.squirrelscan.com/rules/a11y/landmark-one-main">
+   Page has no main landmark
+   Pages (5/15): /, /about, /contact, /day-pass, /faq
+  </rule>
+  <rule id="a11y/skip-link" severity="warning" status="warn" docs="https://docs.squirrelscan.com/rules/a11y/skip-link">
+   No bypass mechanism for repetitive content
+   Pages (5/15): /, /about, /contact, /day-pass, /faq
+  </rule>
+  <rule id="a11y/landmark-regions" severity="info" status="warn" docs="https://docs.squirrelscan.com/rules/a11y/landmark-regions">
+   No &lt;main&gt; landmark found
+   Pages (5/15): /, /about, /contact, /day-pass, /faq
+  </rule>
+ </category>
+</issues>
+</audit>
