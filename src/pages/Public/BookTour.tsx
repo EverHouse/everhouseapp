@@ -174,7 +174,7 @@ const BookTour: React.FC = () => {
       <SEO
         title="Book a Tour | Ever Club — Golf & Social Club, OC"
         description="Schedule a free 30-min tour of Ever Club in Tustin. See Trackman simulators, coworking, café & wellness at OC's top private club."
-        url="/tours"
+        url="/tour"
       />
       <div className="pt-4 px-4 pb-4">
         <Link

@@ -124,7 +124,7 @@ const About: React.FC = () => {
             </p>
             <div className="flex flex-col sm:flex-row justify-center gap-3">
               <Link
-                to="/tours"
+                to="/tour"
                 className="inline-flex items-center justify-center gap-2 bg-[#F2F2EC] text-[#293515] px-6 py-3.5 rounded-[4px] font-bold text-sm hover:opacity-90 transition-opacity"
               >
                 Book a Tour

@@ -703,7 +703,7 @@ async function initializeApp() {
         title: 'Contact Us | Ever Club — Tustin, OC',
         description: 'Contact Ever Club at 15771 Red Hill Ave, Ste 500, Tustin, CA 92780. Membership inquiries, private events, tours & questions. (949) 545-5855.',
       },
-      '/tours': {
+      '/tour': {
         title: 'Book a Tour | Ever Club — Golf & Social Club, OC',
         description: 'Schedule a free 30-min tour of Ever Club in Tustin. See Trackman simulators, coworking, café & wellness at OC\'s top private club.',
       },
@@ -857,7 +857,7 @@ async function initializeApp() {
       "@type": "TouristAttraction",
       "name": "Ever Members Club",
       "description": "Schedule a free 30-minute tour of Orange County's premier indoor golf & social club featuring Trackman simulators, premium coworking, café & wellness facilities.",
-      "url": "https://everclub.app/tours",
+      "url": "https://everclub.app/tour",
       "address": {
         "@type": "PostalAddress",
         "streetAddress": "15771 Red Hill Ave, Ste 500",
@@ -909,7 +909,7 @@ async function initializeApp() {
           { name: "Membership", item: "https://everclub.app/membership" },
           { name: "Apply", item: "https://everclub.app/membership/apply" }
         ],
-        '/tours': [{ name: "Book a Tour", item: "https://everclub.app/tours" }],
+        '/tour': [{ name: "Book a Tour", item: "https://everclub.app/tour" }],
         '/private-hire': [{ name: "Private Events", item: "https://everclub.app/private-hire" }],
         '/private-hire/inquire': [
           { name: "Private Events", item: "https://everclub.app/private-hire" },
@@ -986,7 +986,7 @@ async function initializeApp() {
       if (routePath === '/faq') {
         graphItems.push(FAQ_JSON_LD);
       }
-      if (routePath === '/tours') {
+      if (routePath === '/tour') {
         graphItems.push(TOURS_JSON_LD);
       }
       if (routePath === '/private-hire') {
@@ -1037,13 +1037,16 @@ async function initializeApp() {
           html = html.replace(/<meta property="og:url"[^>]*>/, `<meta property="og:url" content="${ogUrl}" />`);
           html = html.replace(/<meta name="twitter:title"[^>]*>/, `<meta name="twitter:title" content="${meta.title}" />`);
           html = html.replace(/<meta name="twitter:description"[^>]*>/, `<meta name="twitter:description" content="${meta.description}" />`);
-          html = html.replace('</head>', `<link rel="canonical" href="${ogUrl}" />\n${GEO_META_TAGS}\n${getJsonLdScripts(routePath)}\n</head>`);
+          html = html.replace(/<link rel="canonical"[^>]*>/, `<link rel="canonical" href="${ogUrl}" />`);
+          html = html.replace('</head>', `${GEO_META_TAGS}\n${getJsonLdScripts(routePath)}\n</head>`);
           return res.send(html);
         }
 
         let html = cachedIndexHtml;
         const fallbackUrl = `https://everclub.app${routePath === '/' ? '' : routePath}`;
-        html = html.replace('</head>', `<link rel="canonical" href="${fallbackUrl}" />\n${GEO_META_TAGS}\n${getJsonLdScripts(routePath)}\n</head>`);
+        html = html.replace(/<meta property="og:url"[^>]*>/, `<meta property="og:url" content="${fallbackUrl}" />`);
+        html = html.replace(/<link rel="canonical"[^>]*>/, `<link rel="canonical" href="${fallbackUrl}" />`);
+        html = html.replace('</head>', `${GEO_META_TAGS}\n${getJsonLdScripts(routePath)}\n</head>`);
         return res.send(html);
       }
       next();

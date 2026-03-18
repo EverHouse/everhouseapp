@@ -10,11 +10,13 @@ export const changelog: ChangelogEntry[] = [
   {
     version: "8.87.63",
     date: "2026-03-18",
-    title: "Accessibility Audit: Main Landmark & Skip Navigation Verified",
+    title: "Accessibility Audit & SEO Canonical/OG URL Fixes",
     changes: [
       "Verified: All public pages already wrapped in a <main id=\"main-content\"> landmark via the global layout",
       "Verified: Skip-to-content link already present on all pages for keyboard navigation (WCAG 2.4.1)",
-      "No changes needed — existing architecture already provides proper main landmark and skip navigation for all routes",
+      "Fixed: og:url now correctly updated on all pages including fallback routes (previously only set for SEO-mapped pages)",
+      "Fixed: Canonical tag is now replaced instead of duplicated — eliminates duplicate canonical warnings in search console",
+      "Fixed: Tour page route alignment — SEO meta, JSON-LD, breadcrumbs, and internal links now all use /tour consistently",
     ]
   },
   {
