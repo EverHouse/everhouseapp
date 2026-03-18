@@ -164,6 +164,14 @@ export function useStaffWebSocket(options: UseStaffWebSocketOptions = {}) {
         try {
           const message = JSON.parse(event.data);
           
+          if (message.type === 'auth_error') {
+            if (message.shouldReauth) {
+              intentionalDisconnectRef.current = true;
+              console.warn('[StaffWebSocket] Session invalid - stopping reconnection');
+            }
+            return;
+          }
+          
           if (message.type === 'auth_success') {
             ws.send(JSON.stringify({ type: 'staff_register' }));
           }

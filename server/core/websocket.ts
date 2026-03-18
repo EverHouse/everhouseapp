@@ -256,6 +256,7 @@ export function initWebSocketServer(server: Server) {
     let sessionId: string | undefined;
     let authAttempts = 0;
 
+    let initialCookieAuthFailed = false;
     const verifiedUser = await getVerifiedUserFromRequest(req);
     
     if (verifiedUser) {
@@ -292,9 +293,10 @@ export function initWebSocketServer(server: Server) {
         extra: { event: 'websocket.authenticated', role: verifiedUser.role, isStaff: verifiedUser.isStaff, method: 'session_cookie' }
       });
     } else {
+      initialCookieAuthFailed = true;
       const authTimeout = setTimeout(() => {
         if (!isAuthenticated) {
-          logger.warn(`[WebSocket] Connection closed - no valid session within timeout`, {
+          logger.debug(`[WebSocket] Connection closed - no valid session within timeout`, {
             extra: { event: 'websocket.auth_timeout', reason: 'no_valid_session_within_timeout' }
           });
           ws.close(4001, 'Authentication timeout');
@@ -313,10 +315,26 @@ export function initWebSocketServer(server: Server) {
             authAttempts++;
             
             if (authAttempts > MAX_AUTH_ATTEMPTS) {
-              logger.warn(`[WebSocket] Connection closed - max auth attempts exceeded`, {
+              logger.debug(`[WebSocket] Connection closed - max auth attempts exceeded`, {
                 extra: { event: 'websocket.auth_blocked', attempts: authAttempts, reason: 'max_attempts_exceeded' }
               });
               ws.close(4003, 'Too many authentication attempts');
+              return;
+            }
+            
+            if (initialCookieAuthFailed) {
+              ws.send(JSON.stringify({ 
+                type: 'auth_error',
+                message: 'Invalid or expired session. Please refresh to re-authenticate.',
+                attemptsRemaining: 0,
+                shouldReauth: true
+              }));
+              
+              logger.debug(`[WebSocket] Auth rejected - no valid session cookie on upgrade (client: ${message.email})`, {
+                extra: { event: 'websocket.auth_failed', clientEmail: message.email, reason: 'no_session_cookie', attempts: authAttempts }
+              });
+              
+              ws.close(4001, 'No valid session');
               return;
             }
             
@@ -362,7 +380,7 @@ export function initWebSocketServer(server: Server) {
                 attemptsRemaining: MAX_AUTH_ATTEMPTS - authAttempts
               }));
               
-              logger.warn(`[WebSocket] Auth rejected - session verification failed (attempt ${authAttempts}/${MAX_AUTH_ATTEMPTS})`, {
+              logger.debug(`[WebSocket] Auth rejected - session verification failed (attempt ${authAttempts}/${MAX_AUTH_ATTEMPTS})`, {
                 extra: { event: 'websocket.auth_failed', clientEmail: message.email, reason: 'session_verification_failed', attempts: authAttempts }
               });
               

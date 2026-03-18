@@ -8,6 +8,16 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.87.80",
+    date: "2026-03-18",
+    title: "Fix: WebSocket Reconnection Loop Flooding Logs",
+    changes: [
+      "Fixed: WebSocket connections with expired or missing sessions no longer spam the logs with repeated authentication failures — the server now immediately closes the connection with a clear 'session invalid' signal instead of retrying the same failed check",
+      "Fixed: The app now stops trying to reconnect the WebSocket when your session has expired, instead of endlessly retrying every 12 seconds and generating hundreds of warning logs per user",
+      "Improved: WebSocket authentication warnings downgraded to debug-level logs since they represent normal client behavior (e.g. stale browser tabs), not actionable server issues",
+    ]
+  },
+  {
     version: "8.87.79",
     date: "2026-03-18",
     title: "Fix: Cafe Delete Flow, Tier Safety & Dead Code Cleanup",

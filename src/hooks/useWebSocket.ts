@@ -19,6 +19,7 @@ interface WebSocketMessage {
   title?: string;
   message?: string;
   data?: unknown;
+  shouldReauth?: boolean;
 }
 
 interface UseWebSocketOptions {
@@ -82,6 +83,14 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
       ws.onmessage = (event) => {
         try {
           const message: WebSocketMessage = JSON.parse(event.data);
+          
+          if (message.type === 'auth_error') {
+            if (message.shouldReauth) {
+              intentionalCloseRef.current = true;
+              console.warn('[WebSocket] Session invalid - stopping reconnection until next page load');
+            }
+            return;
+          }
           
           if (message.type === 'notification') {
             fetchNotificationsForEmail();
