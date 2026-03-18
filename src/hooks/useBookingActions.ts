@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useToast } from '../components/Toast';
 import { bookingsKeys, simulatorKeys } from './queries/adminKeys';
+import { apiRequest } from '../lib/apiRequest';
 
 export interface CheckInOptions {
   status?: 'attended' | 'no_show' | 'cancelled';
@@ -95,62 +96,52 @@ export function useBookingActions() {
       }
     );
 
-    try {
-      const res = await fetch(`/api/bookings/${bookingId}/checkin`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ status, source, skipPaymentCheck })
-      });
+    const restoreOptimistic = () => {
+      previousBookings.forEach(([key, data]) => queryClient.setQueryData(key, data));
+      previousSimulator.forEach(([key, data]) => queryClient.setQueryData(key, data));
+    };
 
-      if (res.status === 402) {
-        previousBookings.forEach(([key, data]) => queryClient.setQueryData(key, data));
-        previousSimulator.forEach(([key, data]) => queryClient.setQueryData(key, data));
-        const errorData = await res.json();
+    const res = await apiRequest<Record<string, unknown>>(`/api/bookings/${bookingId}/checkin`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status, source, skipPaymentCheck })
+    }, { maxRetries: 1 });
+
+    if (!res.ok) {
+      const errorData = res.errorData || {};
+
+      if (errorData.requiresRoster || errorData.requiresPayment || errorData.error === 'Payment required') {
+        restoreOptimistic();
         return {
           success: false,
           requiresPayment: !errorData.requiresRoster,
           requiresRoster: !!errorData.requiresRoster,
-          error: errorData.error || 'Payment required',
+          error: (errorData.error as string) || 'Payment required',
           data: errorData
         };
       }
 
-      if (res.status === 400) {
-        previousBookings.forEach(([key, data]) => queryClient.setQueryData(key, data));
-        previousSimulator.forEach(([key, data]) => queryClient.setQueryData(key, data));
-        const errorData = await res.json();
-        if (errorData.requiresSync && !skipPaymentCheck) {
-          const retryRes = await fetch(`/api/bookings/${bookingId}/checkin`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({ status, source, skipPaymentCheck: true })
-          });
-          if (retryRes.ok) {
-            invalidateBookingQueries(queryClient);
-            return { success: true };
-          }
-          const retryErr = await retryRes.json().catch(() => ({}));
-          return { success: false, error: retryErr.error || 'Failed to check in after retry' };
+      if (errorData.requiresSync && !skipPaymentCheck) {
+        const retryRes = await apiRequest<Record<string, unknown>>(`/api/bookings/${bookingId}/checkin`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status, source, skipPaymentCheck: true })
+        }, { maxRetries: 1 });
+
+        if (retryRes.ok) {
+          invalidateBookingQueries(queryClient);
+          return { success: true };
         }
-        return { success: false, requiresSync: !!errorData.requiresSync, error: errorData.error || 'Check-in failed' };
+        restoreOptimistic();
+        return { success: false, error: retryRes.error || 'Failed to check in after retry' };
       }
 
-      if (!res.ok) {
-        previousBookings.forEach(([key, data]) => queryClient.setQueryData(key, data));
-        previousSimulator.forEach(([key, data]) => queryClient.setQueryData(key, data));
-        const err = await res.json().catch(() => ({}));
-        return { success: false, error: err.error || 'Failed to update status' };
-      }
-
-      invalidateBookingQueries(queryClient);
-      return { success: true };
-    } catch (err: unknown) {
-      previousBookings.forEach(([key, data]) => queryClient.setQueryData(key, data));
-      previousSimulator.forEach(([key, data]) => queryClient.setQueryData(key, data));
-      return { success: false, error: (err instanceof Error ? err.message : String(err)) || 'Network error during check-in' };
+      restoreOptimistic();
+      return { success: false, requiresSync: !!errorData.requiresSync, error: res.error || 'Failed to update status' };
     }
+
+    invalidateBookingQueries(queryClient);
+    return { success: true };
   }, [queryClient]);
 
   const checkInWithToast = useCallback(async (
@@ -179,49 +170,48 @@ export function useBookingActions() {
   ): Promise<ChargeCardResult> => {
     const { memberEmail, bookingId, sessionId, participantIds } = options;
 
-    try {
-      const res = await fetch('/api/stripe/staff/charge-saved-card', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          memberEmail,
-          bookingId,
-          sessionId,
-          ...(participantIds ? { participantIds } : {})
-        })
-      });
+    const res = await apiRequest<Record<string, unknown>>('/api/stripe/staff/charge-saved-card', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        memberEmail,
+        bookingId,
+        sessionId,
+        ...(participantIds ? { participantIds } : {})
+      })
+    }, { maxRetries: 1 });
 
-      const data = await res.json();
-
-      if (res.ok && data.success) {
-        invalidateBookingQueries(queryClient);
-        return { 
-          success: true, 
-          message: data.message || 'Card charged successfully',
-          invoiceId: data.invoiceId,
-          hostedInvoiceUrl: data.hostedInvoiceUrl,
-          invoicePdf: data.invoicePdf,
-          feeLineItems: data.feeLineItems,
-          totalAmount: data.totalAmount,
-          amountCharged: data.amountCharged,
-          balanceApplied: data.balanceApplied,
-        };
-      }
-
-      if (data.noSavedCard || data.noStripeCustomer) {
-        return { success: false, noSavedCard: true };
-      }
-      if (data.requiresAction) {
-        return { success: false, requiresAction: true };
-      }
-      if (data.cardError) {
-        return { success: false, cardError: true, error: data.error };
-      }
-      return { success: false, error: data.error || 'Failed to charge card' };
-    } catch (err: unknown) {
-      return { success: false, error: (err instanceof Error ? err.message : String(err)) || 'Network error charging card' };
+    if (res.ok && res.data?.success) {
+      const data = res.data;
+      invalidateBookingQueries(queryClient);
+      return { 
+        success: true, 
+        message: (data.message as string) || 'Card charged successfully',
+        invoiceId: data.invoiceId as string | undefined,
+        hostedInvoiceUrl: data.hostedInvoiceUrl as string | null | undefined,
+        invoicePdf: data.invoicePdf as string | null | undefined,
+        feeLineItems: data.feeLineItems as FeeLineItemResult[] | undefined,
+        totalAmount: data.totalAmount as number | undefined,
+        amountCharged: data.amountCharged as number | undefined,
+        balanceApplied: data.balanceApplied as number | undefined,
+      };
     }
+
+    const errorData = res.ok ? res.data : res.errorData;
+    if (!errorData) {
+      return { success: false, error: res.error || 'Failed to charge card' };
+    }
+
+    if (errorData.noSavedCard || errorData.noStripeCustomer) {
+      return { success: false, noSavedCard: true };
+    }
+    if (errorData.requiresAction) {
+      return { success: false, requiresAction: true };
+    }
+    if (errorData.cardError) {
+      return { success: false, cardError: true, error: errorData.error as string };
+    }
+    return { success: false, error: (errorData.error as string) || res.error || 'Failed to charge card' };
   }, [queryClient]);
 
   const chargeCardWithToast = useCallback(async (
@@ -274,28 +264,20 @@ export function useBookingActions() {
       }
     );
 
-    try {
-      const res = await fetch(`/api/booking-requests/${bookingId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ status: 'cancelled', source, cancelled_by: cancelledBy })
-      });
+    const res = await apiRequest(`/api/booking-requests/${bookingId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'cancelled', source, cancelled_by: cancelledBy })
+    }, { maxRetries: 1 });
 
-      if (!res.ok) {
-        previousBookings.forEach(([key, data]) => queryClient.setQueryData(key, data));
-        previousSimulator.forEach(([key, data]) => queryClient.setQueryData(key, data));
-        const err = await res.json().catch(() => ({}));
-        return { success: false, error: err.error || 'Failed to cancel booking' };
-      }
-
-      invalidateBookingQueries(queryClient);
-      return { success: true };
-    } catch (err: unknown) {
+    if (!res.ok) {
       previousBookings.forEach(([key, data]) => queryClient.setQueryData(key, data));
       previousSimulator.forEach(([key, data]) => queryClient.setQueryData(key, data));
-      return { success: false, error: (err instanceof Error ? err.message : String(err)) || 'Network error cancelling booking' };
+      return { success: false, error: res.error || 'Failed to cancel booking' };
     }
+
+    invalidateBookingQueries(queryClient);
+    return { success: true };
   }, [queryClient]);
 
   const staffCancelWithToast = useCallback(async (
@@ -338,27 +320,19 @@ export function useBookingActions() {
       }
     );
 
-    try {
-      const res = await fetch(`/api/bookings/${bookingId}/revert-to-approved`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-      });
+    const res = await apiRequest(`/api/bookings/${bookingId}/revert-to-approved`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+    }, { maxRetries: 1 });
 
-      if (!res.ok) {
-        previousBookings.forEach(([key, data]) => queryClient.setQueryData(key, data));
-        previousSimulator.forEach(([key, data]) => queryClient.setQueryData(key, data));
-        const data = await res.json().catch(() => ({}));
-        return { error: data.error || 'Failed to revert booking' };
-      }
-
-      invalidateBookingQueries(queryClient);
-      return { success: true };
-    } catch {
+    if (!res.ok) {
       previousBookings.forEach(([key, data]) => queryClient.setQueryData(key, data));
       previousSimulator.forEach(([key, data]) => queryClient.setQueryData(key, data));
-      return { error: 'Network error' };
+      return { error: res.error || 'Failed to revert booking' };
     }
+
+    invalidateBookingQueries(queryClient);
+    return { success: true };
   }, [queryClient]);
 
   const revertToApprovedWithToast = useCallback(async (bookingId: number | string) => {

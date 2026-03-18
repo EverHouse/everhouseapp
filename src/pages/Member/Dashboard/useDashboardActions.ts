@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { fetchWithCredentials, putWithCredentials, deleteWithCredentials } from '../../../hooks/queries/useFetch';
+import { apiRequestBlob } from '../../../lib/apiRequest';
 import { useToast } from '../../../components/Toast';
 import type { DBBooking, ConfirmModalState } from './dashboardTypes';
 
@@ -156,10 +157,9 @@ export function useDashboardActions({ user, isAdminViewingAs, deleteBooking, ref
   const handleDownloadBookingWalletPass = async (bookingId: number) => {
     setWalletPassDownloading(bookingId);
     try {
-      const response = await fetch(`/api/member/booking-wallet-pass/${bookingId}`, { credentials: 'include' });
-      if (!response.ok) throw new Error('Failed to download');
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
+      const response = await apiRequestBlob(`/api/member/booking-wallet-pass/${bookingId}`);
+      if (!response.ok || !response.blob) throw new Error(response.error || 'Failed to download');
+      const url = URL.createObjectURL(response.blob);
       const a = document.createElement('a');
       a.href = url;
       a.download = `EverClub-Booking-${bookingId}.pkpass`;
