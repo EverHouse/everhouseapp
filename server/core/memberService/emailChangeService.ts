@@ -9,6 +9,16 @@ interface CountRow {
   count: string;
 }
 
+interface UserSyncRow {
+  stripe_customer_id: string | null;
+  hubspot_id: string | null;
+  first_name: string | null;
+  last_name: string | null;
+  phone: string | null;
+  tier: string | null;
+  id: string;
+}
+
 export interface EmailChangeResult {
   success: boolean;
   oldEmail: string;
@@ -17,6 +27,7 @@ export interface EmailChangeResult {
     tableName: string;
     rowsAffected: number;
   }[];
+  warnings?: string[];
   error?: string;
 }
 
@@ -154,40 +165,106 @@ export async function cascadeEmailChange(
 
     logger.info(`[EmailChangeService] Successfully cascaded email change from ${oldEmail} to ${newEmail}. Tables updated:`, { extra: { detail: tablesUpdated } });
 
+    const warnings: string[] = [];
+    const normalizedOldEmailForSync = oldEmail.toLowerCase().trim();
     const normalizedNewEmailForSync = newEmail.toLowerCase().trim();
-    (async () => {
-      try {
-        const userRow = await db.execute(
-          sql`SELECT stripe_customer_id, hubspot_id FROM users WHERE LOWER(email) = ${normalizedNewEmailForSync}`
-        );
-        const user = userRow.rows[0];
-        if (!user) return;
 
+    try {
+      const userRow = await db.execute(
+        sql`SELECT stripe_customer_id, hubspot_id, first_name, last_name, phone, tier, id FROM users WHERE LOWER(email) = ${normalizedNewEmailForSync}`
+      );
+      const user = userRow.rows[0] as unknown as UserSyncRow | undefined;
+
+      if (user) {
         if (user.stripe_customer_id) {
-          const { getStripeClient } = await import('../stripe/client');
-          const stripe = await getStripeClient();
-          await stripe.customers.update(String(user.stripe_customer_id), { email: normalizedNewEmailForSync });
-          logger.info(`[EmailChangeService] Updated Stripe customer ${user.stripe_customer_id} email to ${normalizedNewEmailForSync}`);
+          try {
+            const { getStripeClient } = await import('../stripe/client');
+            const stripe = await getStripeClient();
+
+            const metadata: Record<string, string> = {
+              primaryEmail: normalizedNewEmailForSync,
+              userId: user.id,
+              source: 'even_house_app',
+            };
+            if (user.tier) metadata.tier = user.tier;
+            if (user.first_name) metadata.firstName = user.first_name;
+            if (user.last_name) metadata.lastName = user.last_name;
+
+            const updateParams: Record<string, unknown> = {
+              email: normalizedNewEmailForSync,
+              metadata,
+            };
+            if (user.first_name || user.last_name) {
+              updateParams.name = [user.first_name, user.last_name].filter(Boolean).join(' ');
+            }
+            if (user.phone) {
+              updateParams.phone = user.phone;
+            }
+
+            await stripe.customers.update(String(user.stripe_customer_id), updateParams);
+            logger.info(`[EmailChangeService] Updated Stripe customer ${user.stripe_customer_id} email and metadata`, {
+              extra: { oldEmail: normalizedOldEmailForSync, newEmail: normalizedNewEmailForSync },
+            });
+          } catch (stripeErr: unknown) {
+            const msg = `Stripe sync failed: ${getErrorMessage(stripeErr)}`;
+            logger.error(`[EmailChangeService] ${msg}`, {
+              error: stripeErr,
+              extra: { stripeCustomerId: user.stripe_customer_id, oldEmail: normalizedOldEmailForSync, newEmail: normalizedNewEmailForSync },
+            });
+            warnings.push(msg);
+          }
         }
 
         if (user.hubspot_id) {
-          const { getHubSpotClient } = await import('../integrations');
-          const hubspotClient = await getHubSpotClient();
-          await hubspotClient.crm.contacts.basicApi.update(String(user.hubspot_id), {
-            properties: { email: normalizedNewEmailForSync },
-          });
-          logger.info(`[EmailChangeService] Updated HubSpot contact ${user.hubspot_id} email to ${normalizedNewEmailForSync}`);
+          try {
+            const { getHubSpotClient } = await import('../integrations');
+            const hubspotClient = await getHubSpotClient();
+            await hubspotClient.crm.contacts.basicApi.update(String(user.hubspot_id), {
+              properties: { email: normalizedNewEmailForSync },
+            });
+            logger.info(`[EmailChangeService] Updated HubSpot contact ${user.hubspot_id} email to ${normalizedNewEmailForSync}`);
+          } catch (hubspotErr: unknown) {
+            const errMsg = getErrorMessage(hubspotErr);
+            logger.warn(`[EmailChangeService] HubSpot immediate sync failed, enqueuing for retry`, {
+              error: hubspotErr,
+              extra: { hubspotId: user.hubspot_id, oldEmail: normalizedOldEmailForSync, newEmail: normalizedNewEmailForSync },
+            });
+            try {
+              const { enqueueHubSpotSync } = await import('../hubspot/queue');
+              const jobId = await enqueueHubSpotSync(
+                'update_contact_email',
+                { hubspotId: user.hubspot_id, email: normalizedNewEmailForSync },
+                { idempotencyKey: `email_change_${user.hubspot_id}_${normalizedNewEmailForSync}`, maxRetries: 5 }
+              );
+              if (jobId) {
+                const queueMsg = `HubSpot sync failed (queued for retry, job ${jobId}): ${errMsg}`;
+                logger.info(`[EmailChangeService] ${queueMsg}`);
+                warnings.push(queueMsg);
+              } else {
+                const queueMsg = `HubSpot sync failed (retry already queued or enqueue conflict): ${errMsg}`;
+                logger.warn(`[EmailChangeService] ${queueMsg}`);
+                warnings.push(queueMsg);
+              }
+            } catch (queueErr: unknown) {
+              const queueMsg = `HubSpot sync failed and queue fallback also failed: ${errMsg}; queue error: ${getErrorMessage(queueErr)}`;
+              logger.error(`[EmailChangeService] ${queueMsg}`, { error: queueErr });
+              warnings.push(queueMsg);
+            }
+          }
         }
-      } catch (err: unknown) {
-        logger.error('[EmailChangeService] Background sync failed:', { error: err });
       }
-    })().catch(err => logger.error('[EmailChangeService] Unhandled async error in background sync', { error: err }));
+    } catch (syncErr: unknown) {
+      const msg = `External sync lookup failed: ${getErrorMessage(syncErr)}`;
+      logger.error(`[EmailChangeService] ${msg}`, { error: syncErr });
+      warnings.push(msg);
+    }
 
     return {
       success: true,
       oldEmail: oldEmail.toLowerCase().trim(),
       newEmail: newEmail.toLowerCase().trim(),
       tablesUpdated,
+      ...(warnings.length > 0 ? { warnings } : {}),
     };
   } catch (error: unknown) {
     logger.error('[EmailChangeService] Error cascading email change:', { error: error });

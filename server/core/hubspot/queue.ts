@@ -6,6 +6,7 @@ import type { ContactMembershipStatus } from './constants';
 export type HubSpotOperation = 
   | 'create_contact'
   | 'update_contact'
+  | 'update_contact_email'
   | 'sync_tier'
   | 'sync_company';
 
@@ -313,6 +314,15 @@ async function executeHubSpotOperation(operation: string, payload: Record<string
       await members.syncTierToHubSpot(payload as unknown as { email: string; newTier: string; oldTier?: string; changedBy?: string; changedByName?: string });
       break;
       
+    case 'update_contact_email': {
+      const { getHubSpotClient } = await import('../integrations');
+      const hubspot = await getHubSpotClient();
+      await hubspot.crm.contacts.basicApi.update(String(payload.hubspotId), {
+        properties: { email: payload.email as string },
+      });
+      break;
+    }
+
     case 'sync_company':
       await companies.syncCompanyToHubSpot(payload as unknown as Parameters<typeof companies.syncCompanyToHubSpot>[0]);
       break;

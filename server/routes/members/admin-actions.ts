@@ -1394,7 +1394,8 @@ router.post('/api/admin/member/change-email', isStaffOrAdmin, async (req, res) =
     res.json({
       success: true,
       message: `Email changed from ${result.oldEmail} to ${result.newEmail}`,
-      tablesUpdated: result.tablesUpdated
+      tablesUpdated: result.tablesUpdated,
+      ...(result.warnings && result.warnings.length > 0 ? { warnings: result.warnings } : {}),
     });
   } catch (error: unknown) {
     logger.error('[Email Change] Error', { error: error instanceof Error ? error : new Error(String(error)) });
