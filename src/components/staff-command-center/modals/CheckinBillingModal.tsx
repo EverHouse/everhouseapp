@@ -61,6 +61,11 @@ interface CheckinContext {
   participants: ParticipantFee[];
   totalOutstanding: number;
   hasUnpaidBalance: boolean;
+  memberAccountBalance?: {
+    availableCreditCents: number;
+    availableCreditDollars: number;
+    stripeCustomerId: string | null;
+  };
 }
 
 interface CheckinBillingModalProps {
@@ -261,6 +266,41 @@ export const CheckinBillingModal: React.FC<CheckinBillingModalProps> = ({
     }
   };
 
+  const handleApplyBalance = async () => {
+    if (!context) return;
+    setActionInProgress('apply-balance');
+    try {
+      const data = await patchWithCredentials<{
+        success?: boolean;
+        paidInFull?: boolean;
+        balanceApplied?: number;
+        remainingCents?: number;
+        remainingDollars?: number;
+        message?: string;
+        error?: string;
+      }>(`/api/bookings/${bookingId}/payments`, { action: 'apply_balance' });
+
+      if (data.success) {
+        if (data.paidInFull) {
+          showToast(data.message || 'Account balance applied — all fees covered', 'success');
+          await fetchContext();
+          onCheckinComplete();
+          onClose();
+        } else {
+          showToast(data.message || `Account balance partially applied — $${(data.remainingDollars || 0).toFixed(2)} remaining`, 'warning');
+          await fetchContext();
+        }
+      } else {
+        showToast(data.error || 'Failed to apply account balance', 'error');
+      }
+    } catch (err: unknown) {
+      console.error('Failed to apply account balance:', err);
+      showToast(err instanceof Error ? err.message : 'Failed to apply account balance', 'error');
+    } finally {
+      setActionInProgress(null);
+    }
+  };
+
   const _handleCheckinWithPayment = async () => {
     setActionInProgress('checkin');
     try {
@@ -381,6 +421,18 @@ export const CheckinBillingModal: React.FC<CheckinBillingModalProps> = ({
         <div className="flex flex-col gap-2">
           {hasPendingPayments ? (
             <>
+              {context?.memberAccountBalance && context.memberAccountBalance.availableCreditCents > 0 && context?.totalOutstanding && context.totalOutstanding > 0 && (
+                <button
+                  onClick={handleApplyBalance}
+                  disabled={actionInProgress !== null}
+                  className="tactile-btn w-full py-3 bg-emerald-600 text-white font-semibold rounded-xl hover:bg-emerald-700 disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  <span className="material-symbols-outlined">account_balance_wallet</span>
+                  {actionInProgress === 'apply-balance'
+                    ? 'Applying...'
+                    : `Apply Account Balance ($${context.memberAccountBalance.availableCreditDollars.toFixed(2)})${context.memberAccountBalance.availableCreditCents >= Math.round(context.totalOutstanding * 100) ? '' : ' — Partial'}`}
+                </button>
+              )}
               {context?.totalOutstanding && context.totalOutstanding > 0 && savedCardInfo?.hasSavedCard && (
                 <button
                   onClick={handleChargeSavedCard}

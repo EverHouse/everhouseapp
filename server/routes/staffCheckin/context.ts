@@ -9,6 +9,7 @@ import { ensureSessionForBooking } from '../../core/bookingService/sessionManage
 import { getErrorMessage } from '../../utils/errorUtils';
 import { toTextArrayLiteral, toIntArrayLiteral } from '../../utils/sqlArrayLiteral';
 import { logger } from '../../core/logger';
+import { getStripeClient } from '../../core/stripe/client';
 import type {
   BookingContextRow,
   UserIdRow,
@@ -24,6 +25,7 @@ import type {
 const router = Router();
 
 router.get('/api/bookings/:id/staff-checkin-context', isStaffOrAdmin, async (req: Request, res: Response) => {
+  res.set('Cache-Control', 'no-store');
   try {
     const bookingId = parseInt(req.params.id as string, 10);
     if (isNaN(bookingId)) {
@@ -249,6 +251,33 @@ router.get('/api/bookings/:id/staff-checkin-context', isStaffOrAdmin, async (req
       LIMIT 20
     `);
 
+    let memberAccountBalance: CheckinContext['memberAccountBalance'] | undefined;
+    if (booking.owner_email) {
+      try {
+        const custResult = await db.execute(sql`
+          SELECT stripe_customer_id FROM users WHERE LOWER(email) = LOWER(${booking.owner_email}) AND stripe_customer_id IS NOT NULL LIMIT 1
+        `);
+        const stripeCustomerId = (custResult.rows[0] as { stripe_customer_id: string } | undefined)?.stripe_customer_id || null;
+        if (stripeCustomerId) {
+          const stripe = await getStripeClient();
+          const customer = await stripe.customers.retrieve(stripeCustomerId);
+          if (!('deleted' in customer && customer.deleted)) {
+            const balance = customer.balance || 0;
+            const availableCreditCents = balance < 0 ? Math.abs(balance) : 0;
+            if (availableCreditCents > 0) {
+              memberAccountBalance = {
+                availableCreditCents,
+                availableCreditDollars: availableCreditCents / 100,
+                stripeCustomerId,
+              };
+            }
+          }
+        }
+      } catch (balanceErr: unknown) {
+        logger.warn('[Checkin Context] Failed to fetch member account balance', { extra: { ownerEmail: booking.owner_email, error: getErrorMessage(balanceErr) } });
+      }
+    }
+
     const context: CheckinContext = {
       bookingId,
       sessionId: sessionId || null,
@@ -263,6 +292,7 @@ router.get('/api/bookings/:id/staff-checkin-context', isStaffOrAdmin, async (req
       participants,
       totalOutstanding,
       hasUnpaidBalance: totalOutstanding > 0,
+      memberAccountBalance,
       auditHistory: (auditResult.rows as unknown as AuditRow[]).map(a => ({
         action: a.action,
         staffEmail: a.staff_email,

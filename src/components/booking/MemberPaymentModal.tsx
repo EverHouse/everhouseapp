@@ -38,12 +38,17 @@ interface PayFeesResponse {
   customerSessionClientSecret?: string;
 }
 
+interface AccountCreditInfo {
+  balanceCents: number;
+  balanceDollars: number;
+  isCredit?: boolean;
+}
+
 export function MemberPaymentModal({
   isOpen,
   bookingId,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   sessionId,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   ownerEmail,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   ownerName,
@@ -58,18 +63,28 @@ export function MemberPaymentModal({
   const [confirming, setConfirming] = useState(false);
   const [paymentData, setPaymentData] = useState<PayFeesResponse | null>(null);
   const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null);
+  const [accountCredit, setAccountCredit] = useState<AccountCreditInfo | null>(null);
   const paymentSucceededRef = useRef(false);
   const successTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const initializePayment = useCallback(async () => {
+  const [applyingCredit, setApplyingCredit] = useState(false);
+
+  const initializePayment = useCallback(async (opts?: { useAccountBalance?: boolean }) => {
     try {
       paymentSucceededRef.current = false;
       setLoading(true);
       setError(null);
 
+      const body: Record<string, unknown> = {};
+      if (opts?.useAccountBalance) body.useAccountBalance = true;
+
       const payResult = await apiRequest<PayFeesResponse>(
         `/api/member/bookings/${bookingId}/pay-fees`,
-        { method: 'POST', headers: { 'Content-Type': 'application/json' } },
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        },
         { maxRetries: 1, timeout: 60000 }
       );
 
@@ -79,6 +94,7 @@ export function MemberPaymentModal({
           setPaymentIntentId(payResult.data.paymentIntentId);
         }
         if (payResult.data.paidInFull) {
+          paymentSucceededRef.current = true;
           if (successTimerRef.current) clearTimeout(successTimerRef.current);
           successTimerRef.current = setTimeout(() => onSuccess(), 1500);
         }
@@ -93,16 +109,67 @@ export function MemberPaymentModal({
   }, [bookingId, onSuccess]);
 
   useEffect(() => {
-    if (isOpen) {
-      initializePayment();
+    if (!isOpen) {
+      return () => {
+        if (successTimerRef.current) {
+          clearTimeout(successTimerRef.current);
+          successTimerRef.current = null;
+        }
+      };
     }
+
+    setLoading(true);
+    setAccountCredit(null);
+    setPaymentData(null);
+    setApplyingCredit(false);
+
+    const fetchCreditThenFees = async () => {
+      if (ownerEmail) {
+        try {
+          const result = await apiRequest<AccountCreditInfo & { isCredit?: boolean }>(
+            `/api/my-billing/account-balance?user_email=${encodeURIComponent(ownerEmail)}`,
+            { method: 'GET' },
+            { maxRetries: 1, timeout: 10000 }
+          );
+          if (result.ok && result.data && result.data.balanceCents > 0 && result.data.isCredit === true) {
+            setAccountCredit(result.data);
+          }
+        } catch {
+          setAccountCredit(null);
+        }
+      }
+      await initializePayment();
+    };
+
+    fetchCreditThenFees();
+
     return () => {
       if (successTimerRef.current) {
         clearTimeout(successTimerRef.current);
         successTimerRef.current = null;
       }
     };
-  }, [isOpen, initializePayment]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
+
+  const handleApplyCredit = async () => {
+    setApplyingCredit(true);
+    setError(null);
+    const previousPiId = paymentIntentId;
+    try {
+      if (previousPiId) {
+        fireAndForgetRequest(`/api/member/bookings/${bookingId}/cancel-payment`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ paymentIntentId: previousPiId }),
+        });
+        setPaymentIntentId(null);
+      }
+      await initializePayment({ useAccountBalance: true });
+    } finally {
+      setApplyingCredit(false);
+    }
+  };
 
   useEffect(() => {
     const currentPiId = paymentIntentId;
@@ -249,32 +316,27 @@ export function MemberPaymentModal({
                 </span>
               </div>
 
-              {paymentData.paidInFull && paymentData.balanceApplied && paymentData.balanceApplied > 0 && (
+              {paymentData.balanceApplied && paymentData.balanceApplied > 0 && (
                 <div className={`mt-3 pt-3 border-t ${isDark ? 'border-white/10' : 'border-primary/10'}`}>
                   <div className="flex items-center justify-between">
                     <span className={`text-sm ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`}>
+                      <span className="material-symbols-outlined text-sm align-middle mr-1">account_balance_wallet</span>
                       Account Credit Applied
                     </span>
                     <span className={`text-sm font-medium ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`}>
                       -${paymentData.balanceApplied.toFixed(2)}
                     </span>
                   </div>
-                </div>
-              )}
-
-              {!paymentData.paidInFull && paymentData.balanceApplied && paymentData.balanceApplied > 0 && (
-                <div className={`mt-3 pt-3 border-t ${isDark ? 'border-white/10' : 'border-primary/10'}`}>
-                  <div className={`rounded-lg p-3 ${isDark ? 'bg-emerald-500/10' : 'bg-emerald-50'}`}>
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="material-symbols-outlined text-sm text-emerald-500">wallet</span>
-                      <span className={`text-sm font-medium ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`}>
-                        Account Credit: ${paymentData.balanceApplied.toFixed(2)}
+                  {!paymentData.paidInFull && paymentData.remainingAmount != null && (
+                    <div className="flex items-center justify-between mt-1">
+                      <span className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-primary'}`}>
+                        Remaining (Card)
+                      </span>
+                      <span className={`text-sm font-bold ${isDark ? 'text-white' : 'text-primary'}`}>
+                        ${paymentData.remainingAmount.toFixed(2)}
                       </span>
                     </div>
-                    <p className={`text-xs ${isDark ? 'text-white/60' : 'text-primary/60'}`}>
-                      Credit will be applied as a refund after payment
-                    </p>
-                  </div>
+                  )}
                 </div>
               )}
             </div>
@@ -289,34 +351,85 @@ export function MemberPaymentModal({
                   Your account balance covered the full amount
                 </p>
               </div>
-            ) : paymentData.clientSecret ? (
-              <StripePaymentWithSecret
-                clientSecret={paymentData.clientSecret}
-                amount={paymentData.remainingAmount || paymentData.totalAmount}
-                description={paymentData.description || `Booking fees for #${bookingId}`}
-                onSuccess={handlePaymentSuccess}
-                onCancel={onClose}
-                customerSessionClientSecret={paymentData.customerSessionClientSecret}
-              />
-            ) : paymentData.error ? (
-              <div className={`rounded-xl p-4 text-center animate-content-enter ${isDark ? 'bg-amber-500/10 border border-amber-500/20' : 'bg-amber-50 border border-amber-200/60'}`}>
-                <span className={`material-symbols-outlined text-4xl mb-2 ${isDark ? 'text-amber-400' : 'text-amber-500'}`}>info</span>
-                <p className={`text-sm ${isDark ? 'text-amber-300' : 'text-amber-700'}`}>
-                  {paymentData.error}
-                </p>
-                <button
-                  onClick={() => setPaymentData(null)}
-                  className={`mt-3 px-4 py-2 rounded-xl text-sm font-medium tactile-btn ${isDark ? 'bg-white/10 text-white hover:bg-white/15' : 'bg-primary/10 text-primary hover:bg-primary/15'}`}
-                >
-                  Try Again
-                </button>
-              </div>
             ) : (
-              <div className="text-center py-4">
-                <p className={`text-sm ${isDark ? 'text-white/60' : 'text-primary/60'}`}>
-                  Processing payment...
-                </p>
-              </div>
+              <>
+                {accountCredit && accountCredit.balanceCents > 0 && !paymentData.balanceApplied && (
+                  <div className={`rounded-xl p-4 ${isDark ? 'bg-emerald-500/10 border border-emerald-500/20' : 'bg-emerald-50 border border-emerald-200'}`}>
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="material-symbols-outlined text-emerald-500">account_balance_wallet</span>
+                      <span className={`text-sm font-semibold ${isDark ? 'text-emerald-400' : 'text-emerald-700'}`}>
+                        Account Credit Available
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className={`text-sm ${isDark ? 'text-white/70' : 'text-primary/70'}`}>Your credit balance</span>
+                      <span className={`text-sm font-medium ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`}>
+                        ${accountCredit.balanceDollars.toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between mb-3">
+                      <span className={`text-sm ${isDark ? 'text-white/70' : 'text-primary/70'}`}>Amount due</span>
+                      <span className={`text-sm font-medium ${isDark ? 'text-white' : 'text-primary'}`}>
+                        ${paymentData.totalAmount.toFixed(2)}
+                      </span>
+                    </div>
+                    {accountCredit.balanceCents >= Math.round(paymentData.totalAmount * 100) ? (
+                      <p className={`text-xs mb-3 ${isDark ? 'text-emerald-400/80' : 'text-emerald-600'}`}>
+                        Your credit fully covers this payment
+                      </p>
+                    ) : (
+                      <p className={`text-xs mb-3 ${isDark ? 'text-white/60' : 'text-primary/60'}`}>
+                        ${accountCredit.balanceDollars.toFixed(2)} credit will be applied, remaining ${(paymentData.totalAmount - accountCredit.balanceDollars).toFixed(2)} charged to card
+                      </p>
+                    )}
+                    <button
+                      onClick={handleApplyCredit}
+                      disabled={applyingCredit || confirming}
+                      className="w-full py-2.5 rounded-lg text-sm font-semibold bg-emerald-600 hover:bg-emerald-700 text-white transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                    >
+                      {applyingCredit ? (
+                        <><span className="material-symbols-outlined animate-spin text-sm">progress_activity</span> Applying Credit...</>
+                      ) : accountCredit.balanceCents >= Math.round(paymentData.totalAmount * 100) ? (
+                        <><span className="material-symbols-outlined text-sm">account_balance_wallet</span> Pay with Account Credit</>
+                      ) : (
+                        <><span className="material-symbols-outlined text-sm">account_balance_wallet</span> Apply ${accountCredit.balanceDollars.toFixed(2)} Credit &amp; Pay Rest by Card</>
+                      )}
+                    </button>
+                  </div>
+                )}
+
+                {accountCredit && accountCredit.balanceCents > 0 && !paymentData.balanceApplied && paymentData.clientSecret && (
+                  <div className={`flex items-center gap-3 my-2 ${isDark ? 'text-white/40' : 'text-primary/30'}`}>
+                    <div className="flex-1 border-t border-current" />
+                    <span className="text-xs font-medium uppercase">or pay by card</span>
+                    <div className="flex-1 border-t border-current" />
+                  </div>
+                )}
+
+                {paymentData.clientSecret ? (
+                  <StripePaymentWithSecret
+                    clientSecret={paymentData.clientSecret}
+                    amount={paymentData.remainingAmount || paymentData.totalAmount}
+                    description={paymentData.description || `Booking fees for #${bookingId}`}
+                    onSuccess={handlePaymentSuccess}
+                    onCancel={onClose}
+                    customerSessionClientSecret={paymentData.customerSessionClientSecret}
+                  />
+                ) : paymentData.error ? (
+                  <div className={`rounded-xl p-4 text-center animate-content-enter ${isDark ? 'bg-amber-500/10 border border-amber-500/20' : 'bg-amber-50 border border-amber-200/60'}`}>
+                    <span className={`material-symbols-outlined text-4xl mb-2 ${isDark ? 'text-amber-400' : 'text-amber-500'}`}>info</span>
+                    <p className={`text-sm ${isDark ? 'text-amber-300' : 'text-amber-700'}`}>
+                      {paymentData.error}
+                    </p>
+                    <button
+                      onClick={() => setPaymentData(null)}
+                      className={`mt-3 px-4 py-2 rounded-xl text-sm font-medium tactile-btn ${isDark ? 'bg-white/10 text-white hover:bg-white/15' : 'bg-primary/10 text-primary hover:bg-primary/15'}`}
+                    >
+                      Try Again
+                    </button>
+                  </div>
+                ) : null}
+              </>
             )}
           </div>
         )}

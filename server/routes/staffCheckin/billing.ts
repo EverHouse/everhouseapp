@@ -7,7 +7,8 @@ import { getSessionUser } from '../../types/session';
 import { notifyMember } from '../../core/notificationService';
 import { computeFeeBreakdown, recalculateSessionFees } from '../../core/billing/unifiedFeeService';
 import { consumeGuestPassForParticipant, canUseGuestPass } from '../../core/billing/guestPassConsumer';
-import { cancelPaymentIntent } from '../../core/stripe';
+import { cancelPaymentIntent, createBalanceAwarePayment, getOrCreateStripeCustomer, getStripeClient } from '../../core/stripe';
+import { resolveUserByEmail } from '../../core/stripe/customers';
 import { logFromRequest, logPaymentAudit } from '../../core/auditLog';
 import { PRICING } from '../../core/billing/pricingConfig';
 import { broadcastMemberStatsUpdated, broadcastBookingInvoiceUpdate } from '../../core/websocket';
@@ -45,8 +46,8 @@ router.patch('/api/bookings/:id/payments', isStaffOrAdmin, async (req: Request, 
 
     const { participantId, action, reason } = req.body;
 
-    if (!action || !['confirm', 'waive', 'use_guest_pass', 'confirm_all', 'waive_all', 'cancel_all'].includes(action)) {
-      return res.status(400).json({ error: 'Invalid action. Must be confirm, waive, use_guest_pass, confirm_all, waive_all, or cancel_all' });
+    if (!action || !['confirm', 'waive', 'use_guest_pass', 'confirm_all', 'waive_all', 'cancel_all', 'apply_balance'].includes(action)) {
+      return res.status(400).json({ error: 'Invalid action. Must be confirm, waive, use_guest_pass, confirm_all, waive_all, cancel_all, or apply_balance' });
     }
 
     if (action === 'waive' && !reason) {
@@ -77,6 +78,21 @@ router.patch('/api/bookings/:id/payments', isStaffOrAdmin, async (req: Request, 
         syncBookingInvoice(bookingId, sessionId).catch((err: unknown) => {
           logger.warn('[StaffCheckin] Invoice sync failed after fee recalculation', { extra: { bookingId, sessionId, error: getErrorMessage(err) } });
         });
+
+        const creditSnapshot = await db.execute(sql`
+          SELECT participant_fees FROM booking_fee_snapshots
+          WHERE booking_id = ${bookingId} AND status = 'credit_adjusted'
+          ORDER BY created_at DESC LIMIT 1
+        `);
+        if (creditSnapshot.rows.length > 0) {
+          const adjustedFees = (creditSnapshot.rows[0] as { participant_fees: Array<{ id: number; adjustedCents: number }> }).participant_fees;
+          for (const adj of adjustedFees) {
+            await db.execute(sql`
+              UPDATE booking_participants SET cached_fee_cents = ${adj.adjustedCents}
+              WHERE id = ${adj.id} AND payment_status = 'pending'
+            `);
+          }
+        }
       } catch (calcError: unknown) {
         logger.error('[StaffCheckin] Failed to recalculate fees before payment action', { extra: { error: getErrorMessage(calcError) } });
       }
@@ -504,6 +520,236 @@ router.patch('/api/bookings/:id/payments', isStaffOrAdmin, async (req: Request, 
         success: true, 
         message: `All payments ${action === 'confirm_all' ? 'confirmed' : 'waived'}`,
         updatedCount: typedPending.length
+      });
+    }
+
+    if (action === 'apply_balance') {
+      if (!sessionId) {
+        return res.status(400).json({ error: 'No session found for this booking' });
+      }
+
+      const pendingParticipants = await db.execute(sql`
+        SELECT id, cached_fee_cents, display_name, participant_type, payment_status
+        FROM booking_participants
+        WHERE session_id = ${sessionId} AND payment_status = 'pending' AND COALESCE(cached_fee_cents, 0) > 0
+      `);
+
+      if (pendingParticipants.rows.length === 0) {
+        return res.status(400).json({ error: 'No pending fees to pay with account balance' });
+      }
+
+      const typedPending = pendingParticipants.rows as unknown as Array<{
+        id: number; cached_fee_cents: number; display_name: string; participant_type: string; payment_status: string;
+      }>;
+      const totalCents = typedPending.reduce((sum, p) => sum + (p.cached_fee_cents || 0), 0);
+
+      if (totalCents < 1) {
+        return res.status(400).json({ error: 'Total amount too small to apply balance' });
+      }
+
+      const resolved = await resolveUserByEmail(booking.owner_email);
+      if (!resolved) {
+        return res.status(400).json({ error: 'Could not resolve member for balance payment' });
+      }
+
+      const memberName = [resolved.firstName, resolved.lastName].filter(Boolean).join(' ') || booking.owner_name || booking.owner_email;
+      const { customerId: stripeCustomerId } = await getOrCreateStripeCustomer(
+        resolved.userId,
+        resolved.primaryEmail,
+        memberName
+      );
+
+      const stripe = await getStripeClient();
+      const customer = await stripe.customers.retrieve(stripeCustomerId);
+      if (customer.deleted) {
+        return res.status(400).json({ error: 'Stripe customer not found' });
+      }
+      const balanceCents = customer.balance || 0;
+      const availableCreditCents = balanceCents < 0 ? Math.abs(balanceCents) : 0;
+
+      if (availableCreditCents === 0) {
+        return res.status(400).json({ error: 'No account credit available' });
+      }
+
+      const description = `Booking #${bookingId} fees - ${booking.resource_name || 'Booking'}`;
+      const balanceResult = await createBalanceAwarePayment({
+        stripeCustomerId,
+        userId: resolved.userId,
+        email: resolved.primaryEmail,
+        memberName,
+        amountCents: totalCents,
+        purpose: 'booking_fee',
+        description,
+        bookingId,
+        sessionId,
+        metadata: {
+          staffAction: 'true',
+          staffEmail: staffEmail,
+        },
+      });
+
+      if (balanceResult.error) {
+        return res.status(500).json({ error: balanceResult.error });
+      }
+
+      if (balanceResult.paidInFull) {
+        const paidIds = typedPending.map(p => p.id);
+        await db.execute(sql`
+          UPDATE booking_participants SET payment_status = 'paid', paid_at = NOW()
+          WHERE id = ANY(${toIntArrayLiteral(paidIds)}::int[])
+        `);
+
+        await db.execute(sql`
+          DELETE FROM booking_fee_snapshots WHERE booking_id = ${bookingId} AND status = 'credit_adjusted'
+        `);
+
+        for (const p of typedPending) {
+          await logPaymentAudit({
+            bookingId,
+            sessionId,
+            participantId: p.id,
+            action: 'balance_payment_applied',
+            staffEmail,
+            staffName,
+            reason: `Account balance applied: $${(balanceResult.balanceApplied / 100).toFixed(2)} covered full amount`,
+            previousStatus: 'pending',
+            newStatus: 'paid',
+          });
+        }
+
+        logFromRequest(req, 'apply_balance', 'booking', bookingId.toString(), booking.resource_name || `Booking #${bookingId}`, {
+          totalCents,
+          balanceApplied: balanceResult.balanceApplied,
+          paidInFull: true,
+          participantCount: paidIds.length,
+        });
+
+        settleBookingInvoiceAfterCheckin(bookingId, sessionId, booking.owner_email).catch((err: unknown) => {
+          logger.error('[StaffCheckin] Invoice settlement failed after balance payment', {
+            extra: { bookingId, sessionId, error: getErrorMessage(err) }
+          });
+        });
+
+        broadcastBookingInvoiceUpdate({
+          bookingId,
+          sessionId,
+          action: 'payment_confirmed',
+          memberEmail: booking.owner_email,
+        });
+
+        return res.json({
+          success: true,
+          paidInFull: true,
+          balanceApplied: balanceResult.balanceApplied / 100,
+          remainingCents: 0,
+          message: `Account balance applied — $${(balanceResult.balanceApplied / 100).toFixed(2)} covered all fees`,
+        });
+      }
+
+      if (balanceResult.paymentIntentId) {
+        try {
+          await cancelPaymentIntent(balanceResult.paymentIntentId);
+        } catch (cancelErr: unknown) {
+          logger.warn('[StaffCheckin] Failed to cancel PI after partial balance', { extra: { bookingId, error: getErrorMessage(cancelErr) } });
+        }
+      }
+
+      const balanceAppliedCents = balanceResult.balanceApplied;
+      let remainingToDistribute = balanceAppliedCents;
+      const sortedPending = [...typedPending].sort((a, b) => a.cached_fee_cents - b.cached_fee_cents);
+      const fullyPaidIds: number[] = [];
+      const creditAdjustments: Array<{ id: number; adjustedCents: number }> = [];
+
+      for (const p of sortedPending) {
+        if (remainingToDistribute <= 0) break;
+        if (remainingToDistribute >= p.cached_fee_cents) {
+          remainingToDistribute -= p.cached_fee_cents;
+          fullyPaidIds.push(p.id);
+        } else {
+          const newCents = p.cached_fee_cents - remainingToDistribute;
+          creditAdjustments.push({ id: p.id, adjustedCents: newCents });
+          remainingToDistribute = 0;
+        }
+      }
+
+      if (fullyPaidIds.length > 0) {
+        await db.execute(sql`
+          UPDATE booking_participants SET payment_status = 'paid', paid_at = NOW(), cached_fee_cents = 0
+          WHERE id = ANY(${toIntArrayLiteral(fullyPaidIds)}::int[])
+        `);
+      }
+
+      for (const adj of creditAdjustments) {
+        await db.execute(sql`
+          UPDATE booking_participants SET cached_fee_cents = ${adj.adjustedCents}
+          WHERE id = ${adj.id}
+        `);
+      }
+
+      if (creditAdjustments.length > 0) {
+        await db.execute(sql`
+          DELETE FROM booking_fee_snapshots WHERE booking_id = ${bookingId} AND status = 'credit_adjusted'
+        `);
+        await db.execute(sql`
+          INSERT INTO booking_fee_snapshots (booking_id, session_id, participant_fees, total_cents, status)
+          VALUES (${bookingId}, ${sessionId}, ${JSON.stringify(creditAdjustments)}, ${balanceResult.remainingCents}, 'credit_adjusted')
+        `);
+      }
+
+      for (const pid of fullyPaidIds) {
+        const p = typedPending.find(pp => pp.id === pid)!;
+        await logPaymentAudit({
+          bookingId,
+          sessionId,
+          participantId: pid,
+          action: 'balance_payment_applied',
+          staffEmail,
+          staffName,
+          reason: `Account balance applied: fully covered $${(p.cached_fee_cents / 100).toFixed(2)} for ${p.display_name}`,
+          previousStatus: 'pending',
+          newStatus: 'paid',
+        });
+      }
+
+      await logPaymentAudit({
+        bookingId,
+        sessionId,
+        participantId: null,
+        action: 'balance_payment_partial',
+        staffEmail,
+        staffName,
+        reason: `Partial account balance applied: $${(balanceAppliedCents / 100).toFixed(2)} of $${(totalCents / 100).toFixed(2)}. Remaining: $${(balanceResult.remainingCents / 100).toFixed(2)}`,
+        previousStatus: 'pending',
+        newStatus: 'pending',
+      });
+
+      logFromRequest(req, 'apply_balance', 'booking', bookingId.toString(), booking.resource_name || `Booking #${bookingId}`, {
+        totalCents,
+        balanceApplied: balanceAppliedCents,
+        remainingCents: balanceResult.remainingCents,
+        paidInFull: false,
+        fullyPaidParticipants: fullyPaidIds.length,
+        partialParticipants: creditAdjustments.length,
+      });
+
+      syncBookingInvoice(bookingId, sessionId).catch((err: unknown) => {
+        logger.warn('[StaffCheckin] Invoice sync failed after partial balance payment', { extra: { bookingId, sessionId, error: getErrorMessage(err) } });
+      });
+
+      broadcastBookingInvoiceUpdate({
+        bookingId,
+        sessionId,
+        action: 'balance_partial_applied',
+        memberEmail: booking.owner_email,
+      });
+
+      return res.json({
+        success: true,
+        paidInFull: false,
+        balanceApplied: balanceAppliedCents / 100,
+        remainingCents: balanceResult.remainingCents,
+        remainingDollars: balanceResult.remainingCents / 100,
+        message: `Account balance partially applied — $${(balanceAppliedCents / 100).toFixed(2)} applied, $${(balanceResult.remainingCents / 100).toFixed(2)} remaining`,
       });
     }
 

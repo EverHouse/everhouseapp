@@ -7,6 +7,8 @@ import { getSessionUser } from '../../../types/session';
 import {
   confirmPaymentSuccess,
   getOrCreateStripeCustomer,
+  createBalanceAwarePayment,
+  cancelPaymentIntent,
   type BookingFeeLineItem,
 } from '../../../core/stripe';
 import { resolveUserByEmail } from '../../../core/stripe/customers';
@@ -181,6 +183,117 @@ router.post('/api/member/bookings/:id/pay-fees', isAuthenticated, paymentRateLim
       booking.user_email,
       memberName
     );
+
+    const useAccountBalance = req.body?.useAccountBalance === true;
+
+    if (useAccountBalance) {
+      const balanceResult = await createBalanceAwarePayment({
+        stripeCustomerId,
+        userId: resolvedUserId,
+        email: booking.user_email,
+        memberName,
+        amountCents: serverTotal,
+        purpose: 'booking_fee',
+        description: `Booking #${bookingId} fees`,
+        bookingId,
+        sessionId: booking.session_id,
+        metadata: {
+          participantIds: participantIds.join(','),
+          source: 'member_pay_fees_balance_aware',
+        },
+      });
+
+      if (balanceResult.error) {
+        return res.status(500).json({ error: balanceResult.error });
+      }
+
+      const participantFeesList = pendingFees.map(f => {
+        const participant = typedParticipants.find(p => p.id === f.participantId);
+        const pType = participant?.participant_type as 'owner' | 'member' | 'guest' | undefined;
+        const isGuest = pType === 'guest';
+        const overageCents = 'overageCents' in f ? (f as { overageCents: number }).overageCents : 0;
+        const guestCents = 'guestCents' in f ? (f as { guestCents: number }).guestCents : 0;
+        const { feeType, feeDescription } = describeFee(isGuest, overageCents, guestCents);
+        return { id: f.participantId, displayName: participant?.display_name || (isGuest ? 'Guest' : 'Member'), amount: f.totalCents / 100, feeType, feeDescription, participantType: pType || 'member' };
+      });
+
+      if (balanceResult.paidInFull) {
+        const paidParticipantIds = pendingFees.map(f => f.participantId!).filter(Boolean);
+        if (paidParticipantIds.length > 0) {
+          await db.execute(sql`
+            UPDATE booking_participants SET payment_status = 'paid', paid_at = NOW()
+            WHERE id = ANY(${toIntArrayLiteral(paidParticipantIds)}::int[])
+          `);
+        }
+
+        await logPaymentAudit({
+          bookingId,
+          sessionId: booking.session_id,
+          action: 'payment_confirmed',
+          staffEmail: 'system',
+          amountAffected: serverTotal / 100,
+          paymentMethod: 'account_credit',
+          metadata: { trigger: 'pay_fees_balance_aware', balanceApplied: balanceResult.balanceApplied },
+        });
+
+        sendNotificationToUser(booking.user_email, {
+          type: 'billing_update',
+          title: 'Payment Confirmed',
+          message: `Account credit of $${(balanceResult.balanceApplied / 100).toFixed(2)} applied to Booking #${bookingId}`,
+          data: { bookingId, status: 'paid' }
+        });
+        broadcastBillingUpdate({ memberEmail: booking.user_email, action: 'payment_confirmed', bookingId, status: 'paid' });
+        broadcastBookingInvoiceUpdate({ bookingId, action: 'payment_confirmed' });
+
+        return res.json({
+          paidInFull: true,
+          totalAmount: serverTotal / 100,
+          balanceApplied: balanceResult.balanceApplied / 100,
+          remainingAmount: 0,
+          participantFees: participantFeesList,
+        });
+      }
+
+      if (balanceResult.balanceApplied === 0) {
+        if (balanceResult.paymentIntentId) {
+          try { await cancelPaymentIntent(balanceResult.paymentIntentId); } catch (_e: unknown) { /* best effort */ }
+        }
+        return res.status(400).json({ error: 'No account credit available to apply' });
+      }
+
+      if (balanceResult.paymentIntentId) {
+        const remainingFees = serverFees.map(f => ({
+          id: f.id,
+          amountCents: Math.max(0, f.amountCents - Math.round(balanceResult.balanceApplied * (f.amountCents / serverTotal))),
+        }));
+
+        await db.execute(sql`
+          INSERT INTO booking_fee_snapshots (booking_id, session_id, participant_fees, total_cents, status, stripe_payment_intent_id)
+          VALUES (${bookingId}, ${booking.session_id}, ${JSON.stringify(remainingFees)}, ${balanceResult.remainingCents}, 'pending', ${balanceResult.paymentIntentId})
+        `);
+      }
+
+      await logPaymentAudit({
+        bookingId,
+        sessionId: booking.session_id,
+        action: 'balance_payment_partial',
+        staffEmail: 'system',
+        amountAffected: balanceResult.balanceApplied / 100,
+        paymentMethod: 'account_credit',
+        metadata: { trigger: 'pay_fees_balance_aware', balanceApplied: balanceResult.balanceApplied, remaining: balanceResult.remainingCents },
+      });
+
+      return res.json({
+        paidInFull: false,
+        clientSecret: balanceResult.clientSecret,
+        paymentIntentId: balanceResult.paymentIntentId,
+        totalAmount: serverTotal / 100,
+        balanceApplied: balanceResult.balanceApplied / 100,
+        remainingAmount: balanceResult.remainingCents / 100,
+        participantFees: participantFeesList,
+        description: `Booking #${bookingId} fees ($${(balanceResult.balanceApplied / 100).toFixed(2)} credit applied)`,
+      });
+    }
 
     const existingInvoiceResult = await handleExistingInvoicePayment({
       bookingId,
@@ -611,11 +724,34 @@ router.post('/api/member/bookings/:bookingId/cancel-payment', isAuthenticated, a
       return res.status(404).json({ error: 'Payment intent not found or already processed' });
     }
 
-    const { cancelPaymentIntent } = await import('../../../core/stripe');
+    const { cancelPaymentIntent, getStripeClient } = await import('../../../core/stripe');
     const result = await cancelPaymentIntent(paymentIntentId);
 
     if (result.success) {
       logger.info('[Member Payment] User cancelled abandoned PI for booking', { extra: { sessionUserEmail: sessionUser.email, paymentIntentId, bookingId } });
+
+      try {
+        const stripe = await getStripeClient();
+        const pi = await stripe.paymentIntents.retrieve(paymentIntentId);
+        const balanceTxnId = pi.metadata?.balanceTransactionId;
+        if (balanceTxnId) {
+          const custId = pi.customer as string;
+          if (custId) {
+            const balanceTxn = await stripe.customers.retrieveBalanceTransaction(custId, balanceTxnId);
+            const refundAmount = balanceTxn.amount;
+            if (refundAmount > 0) {
+              await stripe.customers.createBalanceTransaction(custId, {
+                amount: -refundAmount,
+                currency: 'usd',
+                description: `Refund of account credit — cancelled payment for Booking #${bookingId}`,
+              });
+              logger.info('[Member Payment] Restored account credit after cancelled payment', { extra: { bookingId, refundAmount, balanceTxnId } });
+            }
+          }
+        }
+      } catch (creditErr: unknown) {
+        logger.warn('[Member Payment] Failed to restore credit after payment cancellation', { extra: { bookingId, error: String(creditErr) } });
+      }
 
       try {
         const { voidBookingInvoice, recreateDraftInvoiceFromBooking } = await import('../../../core/billing/bookingInvoiceService');

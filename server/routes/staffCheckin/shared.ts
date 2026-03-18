@@ -209,6 +209,11 @@ export interface CheckinContext {
   participants: ParticipantFee[];
   totalOutstanding: number;
   hasUnpaidBalance: boolean;
+  memberAccountBalance?: {
+    availableCreditCents: number;
+    availableCreditDollars: number;
+    stripeCustomerId: string | null;
+  };
   auditHistory: Array<{
     action: string;
     staffEmail: string;

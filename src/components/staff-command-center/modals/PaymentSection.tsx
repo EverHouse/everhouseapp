@@ -323,6 +323,7 @@ export function InlinePaymentBody({
   handleInlineStripeSuccess,
   handleChargeCardOnFile,
   handleWaiveFees,
+  onRefresh,
 }: {
   bookingId?: number;
   rosterData: ManageModeRosterData | null;
@@ -343,11 +344,28 @@ export function InlinePaymentBody({
   handleInlineStripeSuccess: () => void;
   handleChargeCardOnFile: () => void;
   handleWaiveFees: () => void;
+  onRefresh?: () => void;
 }) {
   const { showToast } = useToast();
   const [showCancelConfirm, setShowCancelConfirm] = React.useState(false);
   const [cancellingPayment, setCancellingPayment] = React.useState(false);
+  const [memberBalance, setMemberBalance] = React.useState<{ availableCreditCents: number; availableCreditDollars: number } | null>(null);
   const fs = rosterData?.financialSummary;
+
+  React.useEffect(() => {
+    if (!showInlinePayment || !bookingId) return;
+    import('../../../hooks/queries/useFetch').then(({ fetchWithCredentials }) => {
+      fetchWithCredentials<{ memberAccountBalance?: { availableCreditCents: number; availableCreditDollars: number } }>(`/api/bookings/${bookingId}/staff-checkin-context`)
+        .then(data => {
+          if (data.memberAccountBalance && data.memberAccountBalance.availableCreditCents > 0) {
+            setMemberBalance(data.memberAccountBalance);
+          } else {
+            setMemberBalance(null);
+          }
+        })
+        .catch(() => setMemberBalance(null));
+    });
+  }, [showInlinePayment, bookingId]);
 
   const scrollRef = React.useCallback((node: HTMLDivElement | null) => {
     if (node) {
@@ -470,6 +488,49 @@ export function InlinePaymentBody({
 
     return (
       <div className="space-y-2">
+        {memberBalance && memberBalance.availableCreditCents > 0 && (
+          <button
+            type="button"
+            onClick={async () => {
+              setInlinePaymentAction('apply-balance');
+              try {
+                const data = await patchWithCredentials<{
+                  success?: boolean;
+                  paidInFull?: boolean;
+                  balanceApplied?: number;
+                  remainingDollars?: number;
+                  message?: string;
+                  error?: string;
+                }>(`/api/bookings/${bookingId}/payments`, { action: 'apply_balance' });
+                if (data.success) {
+                  if (data.paidInFull) {
+                    showToast(data.message || 'Account balance applied — all fees covered', 'success');
+                    handleInlineStripeSuccess();
+                  } else {
+                    showToast(data.message || `Partial balance applied — $${(data.remainingDollars || 0).toFixed(2)} remaining`, 'warning');
+                    setMemberBalance(null);
+                    onRefresh?.();
+                  }
+                } else {
+                  showToast(data.error || 'Failed to apply balance', 'error');
+                }
+              } catch (_err: unknown) {
+                showToast('Failed to apply account balance', 'error');
+              } finally {
+                setInlinePaymentAction(null);
+              }
+            }}
+            disabled={!!inlinePaymentAction}
+            className="tactile-btn w-full py-2 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
+          >
+            {inlinePaymentAction === 'apply-balance' ? (
+              <><span className="material-symbols-outlined animate-spin text-sm">progress_activity</span> Applying...</>
+            ) : (
+              <><span className="material-symbols-outlined text-sm">account_balance_wallet</span> Apply Account Balance (${memberBalance.availableCreditDollars.toFixed(2)}){memberBalance.availableCreditCents >= Math.round(fs.grandTotal * 100) ? '' : ' — Partial'}</>
+            )}
+          </button>
+        )}
+
         {savedCardInfo?.hasSavedCard && (
           <button
             type="button"

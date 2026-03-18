@@ -248,6 +248,7 @@ export function UnifiedBookingSheet(props: UnifiedBookingSheetProps) {
                 handleInlineStripeSuccess={logic.handleInlineStripeSuccess}
                 handleChargeCardOnFile={logic.handleInlineChargeSavedCard}
                 handleWaiveFees={logic.handleInlineWaiveAll}
+                onRefresh={logic.fetchRosterData}
               />
 
             </>
