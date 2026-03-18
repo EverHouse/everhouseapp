@@ -132,7 +132,7 @@ export async function handleCustomerUpdated(client: PoolClient, customer: Stripe
       }
     }
 
-    if (stripeName) {
+    if (stripeName && !stripeName.includes('@')) {
       const nameParts = stripeName.split(' ');
       const stripeFirst = nameParts[0] || '';
       const stripeLast = nameParts.slice(1).join(' ') || '';
