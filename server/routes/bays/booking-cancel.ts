@@ -15,6 +15,7 @@ import { getCalendarIdByName, deleteCalendarEvent } from '../../core/calendar/in
 import { refundGuestPass } from '../guestPasses';
 import { voidBookingInvoice } from '../../core/billing/bookingInvoiceService';
 import { getErrorMessage } from '../../utils/errorUtils';
+import { ensureDateString, ensureTimeString } from '../../utils/dateTimeUtils';
 import { cancelPendingPaymentIntentsForBooking } from '../../core/billing/paymentIntentCleanup';
 import { voidBookingPass } from '../../walletPass/bookingPassService';
 
@@ -100,12 +101,8 @@ router.put('/api/booking-requests/:id/member-cancel', isAuthenticated, async (re
     }
 
     if (!isAdminViewingAs && existing.requestDate && existing.startTime) {
-      const dateStr = existing.requestDate && typeof existing.requestDate === 'object' && 'toISOString' in (existing.requestDate as object)
-        ? (existing.requestDate as unknown as Date).toISOString().split('T')[0] 
-        : String(existing.requestDate);
-      const timeStr = existing.startTime && typeof existing.startTime === 'object' && 'toISOString' in (existing.startTime as object)
-        ? (existing.startTime as unknown as Date).toISOString().substring(11, 16) 
-        : String(existing.startTime).substring(0, 5);
+      const dateStr = ensureDateString(existing.requestDate);
+      const timeStr = ensureTimeString(existing.startTime);
       const bookingStart = createPacificDate(dateStr, timeStr);
       if (bookingStart.getTime() <= new Date().getTime()) {
         return res.status(400).json({ error: 'This booking has already started and cannot be cancelled' });
@@ -142,12 +139,8 @@ router.put('/api/booking-requests/:id/member-cancel', isAuthenticated, async (re
       }).catch(err => logger.error('[BookingCancel] Audit log failed', { extra: { error: getErrorMessage(err) } }));
       
       const memberName = existing.userName || existing.userEmail;
-      const bookingDate = existing.requestDate && typeof existing.requestDate === 'object' && 'toISOString' in (existing.requestDate as object)
-        ? (existing.requestDate as unknown as Date).toISOString().split('T')[0] 
-        : String(existing.requestDate);
-      const bookingTime = existing.startTime && typeof existing.startTime === 'object' && 'toISOString' in (existing.startTime as object)
-        ? (existing.startTime as unknown as Date).toISOString().substring(11, 16) 
-        : String(existing.startTime).substring(0, 5);
+      const bookingDate = ensureDateString(existing.requestDate);
+      const bookingTime = ensureTimeString(existing.startTime);
       let bayName = 'Simulator';
       if (existing.resourceId) {
         const [resource] = await db.select({ name: resources.name }).from(resources).where(eq(resources.id, existing.resourceId));
@@ -204,12 +197,8 @@ router.put('/api/booking-requests/:id/member-cancel', isAuthenticated, async (re
     }
     
     // Calculate time until booking starts using Pacific timezone
-    const refundDateStr = existing.requestDate && typeof existing.requestDate === 'object' && 'toISOString' in (existing.requestDate as object)
-      ? (existing.requestDate as unknown as Date).toISOString().split('T')[0] 
-      : String(existing.requestDate);
-    const refundTimeStr = existing.startTime && typeof existing.startTime === 'object' && 'toISOString' in (existing.startTime as object)
-      ? (existing.startTime as unknown as Date).toISOString().substring(11, 16) 
-      : String(existing.startTime).substring(0, 5);
+    const refundDateStr = ensureDateString(existing.requestDate);
+    const refundTimeStr = ensureTimeString(existing.startTime);
     const bookingStart = createPacificDate(refundDateStr, refundTimeStr || '00:00');
     const nowPacific = new Date();
     const hoursUntilStart = (bookingStart.getTime() - nowPacific.getTime()) / (1000 * 60 * 60);
@@ -402,12 +391,8 @@ router.put('/api/booking-requests/:id/member-cancel', isAuthenticated, async (re
     
     if (wasApproved) {
       const memberName = existing.userName || existing.userEmail;
-      const bookingDate = existing.requestDate && typeof existing.requestDate === 'object' && 'toISOString' in (existing.requestDate as object)
-        ? (existing.requestDate as unknown as Date).toISOString().split('T')[0] 
-        : String(existing.requestDate);
-      const bookingTime = existing.startTime && typeof existing.startTime === 'object' && 'toISOString' in (existing.startTime as object)
-        ? (existing.startTime as unknown as Date).toISOString().substring(11, 16) 
-        : String(existing.startTime).substring(0, 5);
+      const bookingDate = ensureDateString(existing.requestDate);
+      const bookingTime = ensureTimeString(existing.startTime);
       const staffMessage = `${memberName} has cancelled their booking for ${bookingDate} at ${bookingTime}.`;
       
       notifyAllStaff(
@@ -479,12 +464,8 @@ router.put('/api/booking-requests/:id/member-cancel', isAuthenticated, async (re
       }
     }
     
-    const bookingDate = existing.requestDate && typeof existing.requestDate === 'object' && 'toISOString' in (existing.requestDate as object)
-      ? (existing.requestDate as unknown as Date).toISOString().split('T')[0] 
-      : String(existing.requestDate);
-    const bookingTime = existing.startTime && typeof existing.startTime === 'object' && 'toISOString' in (existing.startTime as object)
-      ? (existing.startTime as unknown as Date).toISOString().substring(11, 16) 
-      : String(existing.startTime).substring(0, 5);
+    const bookingDate = ensureDateString(existing.requestDate);
+    const bookingTime = ensureTimeString(existing.startTime);
     
     await logMemberAction({
       memberEmail: existing.userEmail || '',

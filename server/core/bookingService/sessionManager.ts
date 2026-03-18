@@ -364,7 +364,7 @@ export async function ensureSessionForBooking(params: {
       }
     } finally {
       if (manageLockClient) {
-        await lockClient.query(`SET statement_timeout = '0'`).catch(() => {});
+        await lockClient.query(`SET statement_timeout = '0'`).catch((resetErr: unknown) => { logger.warn('[SessionManager] Statement timeout reset failed', { error: getErrorMessage(resetErr) }); });
         safeRelease(lockClient as unknown as PoolClient);
       }
     }

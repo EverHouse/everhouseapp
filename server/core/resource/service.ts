@@ -12,6 +12,7 @@ import { ensureSessionForBooking } from '../bookingService/sessionManager';
 import { getCached, setCache } from '../queryCache';
 import { AppError } from '../errors';
 import { getErrorMessage } from '../../utils/errorUtils';
+import { ensureDateString, ensureTimeString } from '../../utils/dateTimeUtils';
 import { resolveUserByEmail } from '../stripe/customers';
 
 interface ResourceTypeRow {
@@ -281,11 +282,7 @@ export async function approveBooking(bookingId: number) {
     
     if (updated.resourceId) {
       try {
-        const dateStr = typeof updated.requestDate === 'string'
-          ? updated.requestDate
-          : (updated.requestDate as unknown) instanceof Date
-            ? (updated.requestDate as Date).toISOString().split('T')[0]
-            : '';
+        const dateStr = ensureDateString(updated.requestDate);
 
         const sessionResult = await ensureSessionForBooking({
           bookingId: updated.id,
@@ -319,7 +316,7 @@ export async function approveBooking(bookingId: number) {
   sendNotificationToUser(result.userEmail, {
     type: 'booking_update',
     title: 'Booking Confirmed',
-    message: `Your booking for ${result.requestDate} at ${result.startTime?.substring(0, 5) || ''} has been approved.`,
+    message: `Your booking for ${ensureDateString(result.requestDate)} at ${ensureTimeString(result.startTime)} has been approved.`,
     data: { bookingId, status: 'confirmed' }
   });
   
@@ -349,7 +346,7 @@ export async function declineBooking(bookingId: number, reason?: string) {
   if (result.resourceId && result.requestDate && result.startTime) {
     try {
       if (result.durationMinutes) {
-        const [startHour, startMin] = result.startTime.split(':').map(Number);
+        const [startHour, startMin] = ensureTimeString(result.startTime, 8).split(':').map(Number);
         const startTotalMin = startHour * 60 + startMin;
         const endTotalMin = startTotalMin + result.durationMinutes;
         const endHour = Math.floor(endTotalMin / 60);

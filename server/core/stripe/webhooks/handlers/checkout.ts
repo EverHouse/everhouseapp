@@ -639,7 +639,8 @@ export async function handleCheckoutSessionExpired(client: PoolClient, session: 
         if (customer && !customer.deleted) {
           userEmail = customer.email?.toLowerCase() || null;
         }
-      } catch (_err: unknown) {
+      } catch (err: unknown) {
+        logger.warn('[Stripe Checkout] Failed to retrieve customer email for expired session', { extra: { error: getErrorMessage(err), customerId } });
       }
     }
 
@@ -733,7 +734,8 @@ export async function handleCheckoutSessionAsyncPaymentFailed(client: PoolClient
         if (customer && !customer.deleted) {
           userEmail = customer.email?.toLowerCase() || null;
         }
-      } catch (_err: unknown) {
+      } catch (err: unknown) {
+        logger.warn('[Stripe Checkout] Failed to retrieve customer email for async payment failure', { extra: { error: getErrorMessage(err), customerId } });
       }
     }
 

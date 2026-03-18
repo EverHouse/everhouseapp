@@ -10,6 +10,7 @@ import { alertOnHubSpotSyncComplete, alertOnSyncFailure } from './dataAlerts';
 import { retryableHubSpotRequest } from './hubspot/request';
 import pLimit from 'p-limit';
 import { logger } from './logger';
+import { getErrorMessage } from '../utils/errorUtils';
 import {
   type SyncExclusionRow,
   type HubSpotContact,
@@ -187,7 +188,8 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
               if (!isNaN(createDate.getTime())) {
                 joinDate = formatDatePacific(createDate);
               }
-            } catch (_e: unknown) {
+            } catch (e: unknown) {
+              logger.warn('[MemberSync] Failed to parse createdate from HubSpot', { extra: { error: getErrorMessage(e) } });
             }
           }
           
@@ -536,7 +538,8 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
                   })
                   .onConflictDoNothing();
                 linkedEmailsAdded++;
-              } catch (_err: unknown) {
+              } catch (err: unknown) {
+                logger.warn('[MemberSync] Failed to insert linked email during merge', { extra: { error: getErrorMessage(err) } });
               }
             }
           }

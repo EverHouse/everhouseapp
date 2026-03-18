@@ -2,6 +2,7 @@ import { schedulerTracker } from '../core/schedulerTracker';
 import { queryWithRetry } from '../core/db';
 import { notifyAllStaff } from '../core/notificationService';
 import { logger } from '../core/logger';
+import { ensureTimeString } from '../utils/dateTimeUtils';
 
 interface StuckCancellationResult {
   id: number;
@@ -56,7 +57,7 @@ async function checkStuckCancellations(): Promise<void> {
     for (const booking of newStuckBookings) {
       const memberName = booking.user_name || booking.user_email || 'Unknown';
       const bookingDate = booking.request_date;
-      const bookingTime = booking.start_time?.substring(0, 5) || '';
+      const bookingTime = ensureTimeString(booking.start_time);
       const bayName = booking.resource_name || 'Simulator';
       const hoursStuck = Math.round((Date.now() - new Date(booking.cancellation_pending_at).getTime()) / (1000 * 60 * 60));
 

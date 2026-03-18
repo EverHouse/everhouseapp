@@ -13,6 +13,7 @@ import { availabilityBlocks } from '../../../../shared/models/scheduling';
 import { toIntArrayLiteral } from '../../../utils/sqlArrayLiteral';
 import { logger } from '../../logger';
 import { withCalendarRetry } from '../../retryUtils';
+import { ensureDateString, ensureTimeString } from '../../../utils/dateTimeUtils';
 
 async function resyncEventAvailabilityBlocks(
   eventId: number,
@@ -212,12 +213,12 @@ export async function syncGoogleCalendarEvents(options?: { suppressAlert?: boole
           if (calendarIsNewer) {
             await db.execute(sql`UPDATE events SET title = ${title}, description = ${enrichedDescription}, event_date = ${eventDate}, start_time = ${startTime}, 
                end_time = ${endTime}, location = ${location}, source = 'google_calendar',
-               category = COALESCE(${extractedCategory}, category),
-               image_url = COALESCE(${appMetadata.imageUrl}, image_url),
-               external_url = COALESCE(${appMetadata.externalUrl}, external_url),
-               max_attendees = COALESCE(${appMetadata.maxAttendees}, max_attendees),
-               visibility = COALESCE(${appMetadata.visibility}, visibility),
-               requires_rsvp = COALESCE(${appMetadata.requiresRsvp}, requires_rsvp),
+               category = COALESCE(${extractedCategory ?? null}, category),
+               image_url = COALESCE(${appMetadata.imageUrl ?? null}, image_url),
+               external_url = COALESCE(${appMetadata.externalUrl ?? null}, external_url),
+               max_attendees = COALESCE(${appMetadata.maxAttendees ?? null}, max_attendees),
+               visibility = COALESCE(${appMetadata.visibility ?? null}, visibility),
+               requires_rsvp = COALESCE(${appMetadata.requiresRsvp ?? null}, requires_rsvp),
                google_event_etag = ${googleEtag}, google_event_updated_at = ${googleUpdatedAt}, last_synced_at = NOW(),
                locally_edited = false, app_last_modified_at = NULL
                WHERE google_calendar_id = ${googleEventId}`);
@@ -241,7 +242,7 @@ export async function syncGoogleCalendarEvents(options?: { suppressAlert?: boole
               
               const calendarTitle = dbRow.title as string;
               
-              const formattedDate = new Date(dbRow.event_date as string).toISOString().split('T')[0];
+              const formattedDate = ensureDateString(dbRow.event_date);
               
               let endDate = formattedDate;
               if (dbRow.end_time && dbRow.start_time) {
@@ -292,13 +293,11 @@ export async function syncGoogleCalendarEvents(options?: { suppressAlert?: boole
           const reviewDismissed = dbRow.review_dismissed === true;
           const shouldSetNeedsReview = reviewDismissed ? false : needsReview;
           
-          const dbEventDate = dbRow.event_date instanceof Date 
-            ? dbRow.event_date.toISOString().split('T')[0] 
-            : String(dbRow.event_date || '').split('T')[0];
-          const dbStartTime = String(dbRow.start_time || '').substring(0, 8);
-          const dbEndTime = dbRow.end_time ? String(dbRow.end_time).substring(0, 8) : null;
-          const normalizedStartTime = startTime.substring(0, 8);
-          const normalizedEndTime = endTime ? endTime.substring(0, 8) : null;
+          const dbEventDate = ensureDateString(dbRow.event_date);
+          const dbStartTime = ensureTimeString(dbRow.start_time, 8);
+          const dbEndTime = dbRow.end_time ? ensureTimeString(dbRow.end_time, 8) : null;
+          const normalizedStartTime = ensureTimeString(startTime, 8);
+          const normalizedEndTime = endTime ? ensureTimeString(endTime, 8) : null;
           
           const wasReviewed = dbRow.needs_review === false && dbRow.reviewed_at !== null;
           const hasChanges = (
@@ -313,12 +312,12 @@ export async function syncGoogleCalendarEvents(options?: { suppressAlert?: boole
           
           await db.execute(sql`UPDATE events SET title = ${title}, description = ${enrichedDescription}, event_date = ${eventDate}, start_time = ${startTime}, 
              end_time = ${endTime}, location = ${location}, source = 'google_calendar',
-             category = COALESCE(${extractedCategory}, category),
-             image_url = COALESCE(${appMetadata.imageUrl}, image_url),
-             external_url = COALESCE(${appMetadata.externalUrl}, external_url),
-             max_attendees = COALESCE(${appMetadata.maxAttendees}, max_attendees),
-             visibility = COALESCE(${appMetadata.visibility}, visibility),
-             requires_rsvp = COALESCE(${appMetadata.requiresRsvp}, requires_rsvp),
+             category = COALESCE(${extractedCategory ?? null}, category),
+             image_url = COALESCE(${appMetadata.imageUrl ?? null}, image_url),
+             external_url = COALESCE(${appMetadata.externalUrl ?? null}, external_url),
+             max_attendees = COALESCE(${appMetadata.maxAttendees ?? null}, max_attendees),
+             visibility = COALESCE(${appMetadata.visibility ?? null}, visibility),
+             requires_rsvp = COALESCE(${appMetadata.requiresRsvp ?? null}, requires_rsvp),
              google_event_etag = ${googleEtag}, google_event_updated_at = ${googleUpdatedAt}, last_synced_at = NOW(),
              needs_review = CASE WHEN ${reviewDismissed} THEN needs_review ELSE CASE WHEN ${isConflict} THEN true ELSE ${shouldSetNeedsReview} END END,
              conflict_detected = CASE WHEN ${isConflict} THEN true ELSE conflict_detected END
@@ -334,7 +333,7 @@ export async function syncGoogleCalendarEvents(options?: { suppressAlert?: boole
            google_event_etag, google_event_updated_at, last_synced_at, needs_review)
            VALUES (${title}, ${enrichedDescription}, ${eventDate}, ${startTime}, ${endTime}, ${location}, ${extractedCategory || 'Social'}, ${'google_calendar'}, 
             ${appMetadata.visibility || 'public'}, ${appMetadata.requiresRsvp || false}, ${googleEventId},
-            ${appMetadata.imageUrl}, ${appMetadata.externalUrl}, ${appMetadata.maxAttendees},
+            ${appMetadata.imageUrl ?? null}, ${appMetadata.externalUrl ?? null}, ${appMetadata.maxAttendees ?? null},
             ${googleEtag}, ${googleUpdatedAt}, NOW(), ${needsReview})`);
         created++;
       }

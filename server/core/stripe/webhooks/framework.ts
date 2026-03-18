@@ -169,7 +169,7 @@ export async function upsertTransactionCache(params: CacheTransactionParams): Pr
        (stripe_id, object_type, amount_cents, currency, status, created_at, updated_at, 
         customer_id, customer_email, customer_name, description, metadata, source, 
         payment_intent_id, charge_id, invoice_id)
-       VALUES (${params.stripeId}, ${params.objectType}, ${params.amountCents}, ${params.currency || 'usd'}, ${params.status}, ${params.createdAt}, NOW(), ${params.customerId || null}, ${params.customerEmail || null}, ${params.customerName || null}, ${params.description || null}, ${params.metadata ? JSON.stringify(params.metadata) : null}, ${params.source || 'webhook'}, ${params.paymentIntentId || null}, ${params.chargeId || null}, ${params.invoiceId || null})
+       VALUES (${params.stripeId}, ${params.objectType}, ${params.amountCents}, ${params.currency ?? 'usd'}, ${params.status}, ${params.createdAt}, NOW(), ${params.customerId ?? null}, ${params.customerEmail ?? null}, ${params.customerName ?? null}, ${params.description ?? null}, ${params.metadata ? JSON.stringify(params.metadata) : null}, ${params.source ?? 'webhook'}, ${params.paymentIntentId ?? null}, ${params.chargeId ?? null}, ${params.invoiceId ?? null})
        ON CONFLICT (stripe_id) DO UPDATE SET
          status = EXCLUDED.status,
          amount_cents = EXCLUDED.amount_cents,

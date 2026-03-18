@@ -28,7 +28,7 @@ async function connectWithTimeout(timeoutMs = 10000): Promise<PoolClient> {
         released = true;
         safeRelease(c);
       }
-    }).catch(() => {});
+    }).catch((releaseErr: unknown) => { logger.warn('[FeeReconciliation] Failed to release connection on error', { extra: { error: getErrorMessage(releaseErr) } }); });
     throw err;
   }
 }

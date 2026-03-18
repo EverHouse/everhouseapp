@@ -84,7 +84,8 @@ async function getUserRole(email: string): Promise<'admin' | 'staff' | 'member' 
     if (rows.length > 0 && rows[0].role === 'visitor') {
       return 'visitor';
     }
-  } catch {
+  } catch (err: unknown) {
+    logger.warn('[Auth] Failed to check visitor role', { extra: { error: getErrorMessage(err) } });
   }
   return 'member';
 }

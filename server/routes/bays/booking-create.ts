@@ -18,6 +18,7 @@ import { syncBookingInvoice, finalizeAndPayInvoice, getBookingInvoiceId } from '
 import { createGuestPassHold } from '../../core/billing/guestPassHoldService';
 import { ensureSessionForBooking, createSessionWithUsageTracking } from '../../core/bookingService/sessionManager';
 import { getErrorMessage } from '../../utils/errorUtils';
+import { ensureTimeString } from '../../utils/dateTimeUtils';
 import { resolveUserByEmail } from '../../core/stripe/customers';
 import { bookingRateLimiter } from '../../middleware/rateLimiting';
 import { validateBody } from '../../middleware/validate';
@@ -532,12 +533,7 @@ router.post('/api/booking-requests', isAuthenticated, bookingRateLimiter, valida
       ? row.requestDate 
       : request_date;
     const formattedDate = formatDateDisplayWithDay(dateStr);
-    let timeStr: string;
-    if (row.startTime != null && typeof row.startTime === 'object' && 'toISOString' in (row.startTime as object)) {
-      timeStr = (row.startTime as unknown as Date).toISOString().substring(11, 16);
-    } else {
-      timeStr = String(row.startTime ?? start_time).substring(0, 5);
-    }
+    const timeStr = ensureTimeString(row.startTime ?? start_time);
     const formattedTime12h = formatTime12Hour(timeStr);
     
     const durationMins = row.durationMinutes || duration_minutes;

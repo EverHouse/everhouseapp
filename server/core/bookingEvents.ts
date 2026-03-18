@@ -3,6 +3,7 @@ import { notifications, bookingRequests, bookingParticipants, users } from '../.
 import { eq, and, or, sql } from 'drizzle-orm';
 import { sendNotificationToUser, broadcastBookingEvent } from './websocket';
 import { formatTime12Hour, formatDateDisplayWithDay } from '../utils/dateUtils';
+import { ensureDateString, ensureTimeString } from '../utils/dateTimeUtils';
 
 import { logger } from './logger';
 import { getErrorMessage } from '../utils/errorUtils';
@@ -55,7 +56,7 @@ interface PublishOptions {
 }
 
 function formatBookingDateTime(date: string | Date, time: string): string {
-  const dateStr = date instanceof Date ? date.toISOString().split('T')[0] : String(date);
+  const dateStr = ensureDateString(date);
   const formattedDate = formatDateDisplayWithDay(dateStr);
   const formattedTime = formatTime12Hour(time);
   return `${formattedDate} at ${formattedTime}`;
@@ -187,7 +188,7 @@ export async function publish(
         resourceId: data.resourceId,
         resourceName: data.resourceName,
         resourceType: data.resourceType,
-        bookingDate: data.bookingDate instanceof Date ? data.bookingDate.toISOString().split('T')[0] : String(data.bookingDate),
+        bookingDate: ensureDateString(data.bookingDate),
         startTime: data.startTime,
         endTime: data.endTime,
         durationMinutes: data.durationMinutes,
@@ -309,10 +310,8 @@ export async function linkAndNotifyParticipants(
     
     const _linkedBy = options?.linkedBy || 'auto_link';
     const bayName = options?.bayName || 'Bay';
-    const bookingDateStr = typeof booking.requestDate === 'string' 
-      ? booking.requestDate 
-      : (booking.requestDate as Date).toISOString().split('T')[0];
-    const startTimeStr = booking.startTime?.substring(0, 5) || '';
+    const bookingDateStr = ensureDateString(booking.requestDate);
+    const startTimeStr = ensureTimeString(booking.startTime);
     
     for (const participant of participants) {
       const email = participant.email?.toLowerCase()?.trim();

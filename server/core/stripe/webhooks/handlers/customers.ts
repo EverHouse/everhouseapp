@@ -296,6 +296,21 @@ export async function handlePaymentMethodAttached(client: PoolClient, paymentMet
             }
           } catch (retryErr: unknown) {
             logger.error(`[Stripe Webhook] Failed to auto-retry payment ${row.stripe_payment_intent_id}:`, { error: getErrorMessage(retryErr) });
+            try {
+              await db.execute(sql`
+                INSERT INTO system_alerts (severity, category, message, details, created_at)
+                VALUES (
+                  'critical',
+                  'payment',
+                  ${`Auto-retry of payment ${row.stripe_payment_intent_id} failed for customer ${customerId}. Manual recovery required.`},
+                  ${JSON.stringify({ paymentIntentId: row.stripe_payment_intent_id, customerId, paymentMethodId: paymentMethod.id, error: getErrorMessage(retryErr) })}::text,
+                  NOW()
+                )
+                ON CONFLICT DO NOTHING
+              `);
+            } catch (alertErr: unknown) {
+              logger.error('[Stripe Webhook] Failed to record payment retry failure alert', { error: getErrorMessage(alertErr) });
+            }
           }
         });
       }

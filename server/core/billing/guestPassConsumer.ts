@@ -63,7 +63,7 @@ export async function consumeGuestPassForParticipant(
        WHERE LOWER(u.email) = ${ownerEmailLower}`);
       const tierGuestPasses = (tierResult.rows[0] as unknown as TierGuestPassRow)?.guest_passes_per_month ?? 4;
       
-      const existingPass = await tx.execute(sql`SELECT id, passes_used, passes_total FROM guest_passes WHERE LOWER(member_email) = ${ownerEmailLower} FOR UPDATE`);
+      const existingPass = await tx.execute(sql`SELECT id, passes_used, passes_total FROM guest_passes WHERE LOWER(member_email) = ${ownerEmailLower} ORDER BY id ASC FOR UPDATE`);
       
       if (existingPass.rows.length === 0) {
         const insertResult = await tx.execute(sql`INSERT INTO guest_passes (member_email, passes_used, passes_total)

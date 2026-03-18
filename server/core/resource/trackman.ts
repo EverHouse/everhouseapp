@@ -6,6 +6,7 @@ import { parseTimeToMinutes } from '../bookingValidation';
 import { recalculateSessionFees } from '../billing/unifiedFeeService';
 import { ensureSessionForBooking } from '../bookingService/sessionManager';
 import { AppError } from '../errors';
+import { ensureDateString } from '../../utils/dateTimeUtils';
 
 interface DrizzleExecuteResult<T = Record<string, unknown>> {
   rows?: T[];
@@ -415,7 +416,7 @@ export async function linkTrackmanToMember(
       const sessionResult = await ensureSessionForBooking({
         bookingId: booking.id,
         resourceId: booking.resourceId!,
-        sessionDate: typeof booking.requestDate === 'string' ? booking.requestDate : (booking.requestDate as Date).toISOString().split('T')[0],
+        sessionDate: ensureDateString(booking.requestDate),
         startTime: booking.startTime || '',
         endTime: booking.endTime || '',
         ownerEmail: ownerEmail,
