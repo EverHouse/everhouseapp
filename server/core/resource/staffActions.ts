@@ -8,7 +8,7 @@ import { bookingEvents } from '../bookingEvents';
 import { recalculateSessionFees } from '../billing/unifiedFeeService';
 import { createPrepaymentIntent } from '../billing/prepaymentService';
 import { ensureSessionForBooking, createTxQueryClient } from '../bookingService/sessionManager';
-import { acquireBookingLocks } from '../bookingService/bookingCreationGuard';
+import { acquireBookingLocks, checkResourceOverlap, BookingConflictError } from '../bookingService/bookingCreationGuard';
 import { createCalendarEventOnCalendar, getCalendarIdByName, CALENDAR_CONFIG } from '../calendar/index';
 import { AppError } from '../errors';
 import { resolveUserByEmail } from '../stripe/customers';
@@ -762,27 +762,18 @@ export async function createStaffManualBooking(
     `);
 
     if (input.resource_id) {
-      const overlapCheck = await tx.execute(sql`
-        SELECT id, start_time, end_time FROM booking_requests 
-        WHERE resource_id = ${input.resource_id} 
-        AND request_date = ${input.request_date} 
-        AND status IN ('pending', 'pending_approval', 'approved', 'confirmed', 'attended', 'cancellation_pending')
-        AND (
-          (start_time < ${end_time} AND end_time > ${input.start_time}) OR
-          (end_time < start_time AND (start_time < ${end_time} OR end_time > ${input.start_time}))
-        )
-        ORDER BY id ASC
-        FOR UPDATE
-      `);
-
-      if (overlapCheck.rows.length > 0) {
-        const conflict = overlapCheck.rows[0] as Record<string, unknown>;
-        const conflictStart = (conflict.start_time as string)?.substring(0, 5);
-        const conflictEnd = (conflict.end_time as string)?.substring(0, 5);
-        const errorMsg = conflictStart && conflictEnd
-          ? `This time slot conflicts with an existing booking from ${formatTime12Hour(conflictStart)} to ${formatTime12Hour(conflictEnd)}. Please adjust your time or duration.`
-          : 'This time slot is already booked';
-        throw new ManualBookingValidationError(409, { error: errorMsg });
+      try {
+        await checkResourceOverlap(tx as unknown as Parameters<typeof checkResourceOverlap>[0], {
+          resourceId: input.resource_id,
+          requestDate: input.request_date,
+          startTime: input.start_time,
+          endTime: end_time,
+        });
+      } catch (err: unknown) {
+        if (err instanceof BookingConflictError) {
+          throw new ManualBookingValidationError(err.statusCode, err.errorBody);
+        }
+        throw err;
       }
 
       const txClient = tx as unknown as { select: typeof db.select, execute: typeof db.execute };

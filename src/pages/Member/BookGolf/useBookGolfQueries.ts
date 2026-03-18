@@ -48,7 +48,7 @@ export function useBookGolfQueries(
   const resourceIds = resources.map(r => r.dbId);
   const { data: availableSlots = [], isLoading: availabilityLoading } = useQuery({
     queryKey: bookGolfKeys.availability(resourceIds, selectedDateObj?.date || '', duration, undefined, effectiveUser?.email),
-    staleTime: 1000 * 60 * 2,
+    staleTime: 1000 * 30,
     queryFn: async () => {
       if (!selectedDateObj?.date || resourceIds.length === 0) return [];
       const batchResult = await postWithCredentials<Record<number, { slots: APISlot[] }>>('/api/availability/batch', {

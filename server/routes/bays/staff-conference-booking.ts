@@ -20,7 +20,7 @@ import { ensureSessionForBooking } from '../../core/bookingService/sessionManage
 import { recalculateSessionFees } from '../../core/billing/unifiedFeeService';
 import { syncBookingInvoice, finalizeAndPayInvoice, getBookingInvoiceId } from '../../core/billing/bookingInvoiceService';
 import { resolveUserByEmail } from '../../core/stripe/customers';
-import { checkClosureConflict, checkAvailabilityBlockConflict } from '../../core/bookingValidation';
+import { checkClosureConflict, checkAvailabilityBlockConflict, checkBookingConflict } from '../../core/bookingValidation';
 
 const router = Router();
 
@@ -246,18 +246,20 @@ router.post('/api/staff/conference-room/booking', isStaffOrAdmin, async (req: Re
       return res.status(400).json({ error: 'Booking cannot extend past midnight' });
     }
 
-    const overlapCheck = await db.execute(sql`SELECT id, start_time, end_time FROM booking_requests 
-       WHERE resource_id = ${resourceId} AND request_date = ${date} 
-       AND status IN ('pending', 'approved', 'confirmed', 'pending_approval', 'attended', 'cancellation_pending')
-       AND (start_time < ${endTime} AND end_time > ${startTimeWithSeconds})`);
-
-    if (overlapCheck.rows.length > 0) {
-      const conflict = overlapCheck.rows[0] as { id: number; start_time: string; end_time: string };
-      const conflictStart = typeof conflict.start_time === 'string' ? conflict.start_time.substring(0, 5) : undefined;
-      const conflictEnd = typeof conflict.end_time === 'string' ? conflict.end_time.substring(0, 5) : undefined;
+    const bookingConflict = await checkBookingConflict(resourceId as number, date, startTimeWithSeconds, endTime);
+    if (bookingConflict.hasConflict) {
+      const conflict = bookingConflict.conflictingBooking;
+      const rawStart = (conflict?.start_time ?? conflict?.startTime) as string | undefined;
+      const rawEnd = (conflict?.end_time ?? conflict?.endTime) as string | undefined;
+      const conflictStart = typeof rawStart === 'string' ? rawStart.substring(0, 5) : undefined;
+      const conflictEnd = typeof rawEnd === 'string' ? rawEnd.substring(0, 5) : undefined;
+      const sourceLabel = bookingConflict.conflictSource === 'trackman_bay_slot' ? 'Trackman booking'
+        : bookingConflict.conflictSource === 'trackman_unmatched' ? 'unresolved Trackman booking'
+        : bookingConflict.conflictSource === 'booking_session' ? 'active session'
+        : 'existing booking';
       const errorMsg = conflictStart && conflictEnd
-        ? `This time slot conflicts with an existing booking from ${formatTime12Hour(conflictStart)} to ${formatTime12Hour(conflictEnd)}. Please adjust your time or duration.`
-        : 'This time slot conflicts with an existing booking';
+        ? `This time slot conflicts with a ${sourceLabel} from ${formatTime12Hour(conflictStart)} to ${formatTime12Hour(conflictEnd)}. Please adjust your time or duration.`
+        : `This time slot conflicts with a ${sourceLabel}`;
       return res.status(409).json({ error: errorMsg });
     }
 

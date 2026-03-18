@@ -165,7 +165,7 @@ export async function checkBookingConflict(
   startTime: string,
   endTime: string,
   excludeBookingId?: number
-): Promise<{ hasConflict: boolean; conflictingBooking?: Record<string, unknown> }> {
+): Promise<{ hasConflict: boolean; conflictingBooking?: Record<string, unknown>; conflictSource?: string }> {
   try {
     const conditions = [
       eq(bookingRequests.resourceId, resourceId),
@@ -194,7 +194,76 @@ export async function checkBookingConflict(
       : existingBookings;
 
     if (conflicts.length > 0) {
-      return { hasConflict: true, conflictingBooking: conflicts[0] };
+      return { hasConflict: true, conflictingBooking: conflicts[0], conflictSource: 'booking_request' };
+    }
+
+    try {
+      const trackmanBayResult = await db.execute(sql`
+        SELECT resource_id, start_time, end_time FROM trackman_bay_slots
+        WHERE resource_id = ${resourceId}
+        AND slot_date = ${bookingDate}
+        AND status = 'booked'
+        AND start_time < ${endTime} AND end_time > ${startTime}
+        LIMIT 1
+      `);
+      if (trackmanBayResult.rows.length > 0) {
+        return { hasConflict: true, conflictingBooking: trackmanBayResult.rows[0] as Record<string, unknown>, conflictSource: 'trackman_bay_slot' };
+      }
+    } catch (err: unknown) {
+      const msg = String(err);
+      if (!msg.includes('42P01') && !msg.includes('does not exist')) {
+        logger.error('[checkBookingConflict] Failed to check trackman_bay_slots', { error: err instanceof Error ? err : new Error(msg) });
+        throw err;
+      }
+    }
+
+    const resourceIdStr = String(resourceId);
+    try {
+      const unmatchedResult = await db.execute(sql`
+        SELECT tub.bay_number, tub.start_time, tub.end_time FROM trackman_unmatched_bookings tub
+        WHERE tub.bay_number = ${resourceIdStr}
+        AND tub.booking_date = ${bookingDate}
+        AND tub.resolved_at IS NULL
+        AND NOT EXISTS (
+          SELECT 1 FROM booking_requests br
+          WHERE br.trackman_booking_id = tub.trackman_booking_id::text
+        )
+        AND tub.start_time < ${endTime} AND tub.end_time > ${startTime}
+        LIMIT 1
+      `);
+      if (unmatchedResult.rows.length > 0) {
+        return { hasConflict: true, conflictingBooking: unmatchedResult.rows[0] as Record<string, unknown>, conflictSource: 'trackman_unmatched' };
+      }
+    } catch (err: unknown) {
+      const msg = String(err);
+      if (!msg.includes('42P01') && !msg.includes('does not exist')) {
+        logger.error('[checkBookingConflict] Failed to check trackman_unmatched_bookings', { error: err instanceof Error ? err : new Error(msg) });
+        throw err;
+      }
+    }
+
+    try {
+      const sessionResult = await db.execute(sql`
+        SELECT bs.id, bs.start_time, bs.end_time FROM booking_sessions bs
+        WHERE bs.resource_id = ${resourceId}
+        AND bs.session_date = ${bookingDate}
+        AND bs.start_time < ${endTime} AND bs.end_time > ${startTime}
+        AND EXISTS (
+          SELECT 1 FROM booking_requests br
+          WHERE br.session_id = bs.id
+          AND br.status NOT IN ('cancelled', 'deleted', 'declined')
+        )
+        LIMIT 1
+      `);
+      if (sessionResult.rows.length > 0) {
+        return { hasConflict: true, conflictingBooking: sessionResult.rows[0] as Record<string, unknown>, conflictSource: 'booking_session' };
+      }
+    } catch (err: unknown) {
+      const msg = String(err);
+      if (!msg.includes('42P01') && !msg.includes('does not exist')) {
+        logger.error('[checkBookingConflict] Failed to check booking_sessions', { error: err instanceof Error ? err : new Error(msg) });
+        throw err;
+      }
     }
 
     return { hasConflict: false };

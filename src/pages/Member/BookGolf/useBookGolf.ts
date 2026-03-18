@@ -147,7 +147,7 @@ export function useBookGolf() {
   const resourceIds = resources.map(r => r.dbId);
   const { data: availableSlots = [], isLoading: availabilityLoading } = useQuery({
     queryKey: bookGolfKeys.availability(resourceIds, selectedDateObj?.date || '', duration, undefined, effectiveUser?.email),
-    staleTime: 1000 * 60 * 2,
+    staleTime: 1000 * 30,
     queryFn: async () => {
       if (!selectedDateObj?.date || resourceIds.length === 0) return [];
       const batchResult = await postWithCredentials<Record<number, { slots: APISlot[] }>>('/api/availability/batch', {
@@ -503,6 +503,20 @@ export function useBookGolf() {
     try {
       const invalidGuestSlot = playerSlots.find(slot => slot.type === 'guest' && !slot.selectedId && slot.email && !slot.email.includes('@'));
       if (invalidGuestSlot) { setBookingError('Please enter a valid email address for each guest.'); haptic.error(); return; }
+      const freshAvailability = await postWithCredentials<Record<number, { slots: APISlot[] }>>('/api/availability/batch', {
+        resource_ids: [selectedResource.dbId], date: selectedDateObj.date, duration, user_email: effectiveUser.email
+      });
+      const resourceSlots = freshAvailability[selectedResource.dbId]?.slots || [];
+      const slotStillAvailable = resourceSlots.some(
+        s => s.start_time === selectedSlot.startTime24 && s.available
+      );
+      if (!slotStillAvailable) {
+        queryClient.invalidateQueries({ queryKey: bookGolfKeys.all });
+        setBookingError('This time slot is no longer available. The availability grid has been refreshed.');
+        haptic.error();
+        return;
+      }
+
       const requestParticipants = activeTab === 'simulator' && playerSlots.length > 0
         ? playerSlots.filter(slot => slot.selectedId || (slot.email && slot.email.includes('@'))).map(slot => {
             const hasValidEmail = slot.email && slot.email.includes('@') && !slot.email.includes('*');
