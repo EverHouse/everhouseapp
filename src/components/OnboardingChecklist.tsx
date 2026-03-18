@@ -101,12 +101,6 @@ const OnboardingChecklist: React.FC = () => {
         navigate('/profile');
         break;
       case 'concierge': {
-        const link = document.createElement('a');
-        link.href = '/Ever_Club_Concierge.vcf';
-        link.download = 'Ever_Club_Concierge.vcf';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
         try {
           await postWithCredentials('/api/member/onboarding/complete-step', { step: 'concierge' });
           const data = await fetchWithCredentials<OnboardingStatus>('/api/member/onboarding');
@@ -116,6 +110,12 @@ const OnboardingChecklist: React.FC = () => {
             setTimeout(() => setCelebrating(false), 3000);
           }
         } catch (e) { console.warn('[OnboardingChecklist] Failed to complete step:', e); }
+        const link = document.createElement('a');
+        link.href = '/Ever_Club_Concierge.vcf';
+        link.download = 'Ever_Club_Concierge.vcf';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
         break;
       }
       case 'waiver':

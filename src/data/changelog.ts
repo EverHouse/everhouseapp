@@ -10,9 +10,10 @@ export const changelog: ChangelogEntry[] = [
   {
     version: "8.87.78",
     date: "2026-03-18",
-    title: "Fix: Facility Notices Stay Dismissed Across Devices",
+    title: "Fix: Facility Notices & Onboarding Checklist Persistence",
     changes: [
       "Fixed: Facility closure notices no longer reappear after being dismissed — dismissals are now saved to your account (previously only stored in browser memory, so switching devices or clearing browser data would bring them back)",
+      "Fixed: 'Save concierge contact' onboarding step now gets marked complete reliably — previously on iPhone, the contact download would interrupt the app before it could record your progress, causing the checklist to keep showing up",
     ]
   },
   {
