@@ -8,11 +8,12 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
-    version: "8.87.83",
+    version: "8.87.84",
     date: "2026-03-18",
-    title: "Fix: Stripe Name Sync Overwriting Real Names with Email Addresses",
+    title: "Fix: Stripe Name Sync & Orphaned Customer ID Cleanup",
     changes: [
       "Fixed: Member names are no longer overwritten with email addresses when Stripe sends a customer.updated webhook where the customer name field contains an email — the sync now skips name updates when the Stripe name looks like an email address",
+      "Fixed: Clearing an orphaned Stripe customer ID via the data integrity dashboard now also clears the subscription ID and billing provider — previously it only cleared the customer ID, leaving the member in a broken state where the system still thought they were billed through Stripe",
     ]
   },
   {

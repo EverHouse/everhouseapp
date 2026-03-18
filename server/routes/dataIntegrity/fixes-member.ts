@@ -492,7 +492,7 @@ router.post('/api/data-integrity/fix/clear-stripe-customer-id', isAdmin, validat
 
     const result = await client.query(
       `UPDATE users 
-       SET stripe_customer_id = NULL, updated_at = NOW(),
+       SET stripe_customer_id = NULL, stripe_subscription_id = NULL, billing_provider = NULL, updated_at = NOW(),
            last_manual_fix_at = NOW(), last_manual_fix_by = $2
        WHERE id = $1
        RETURNING email, first_name, last_name`,
