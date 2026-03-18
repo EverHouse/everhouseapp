@@ -107,7 +107,7 @@ const ScheduleItemRow: React.FC<ScheduleItemRowProps> = ({
   handleDownloadBookingWalletPass,
 }) => {
   // eslint-disable-next-line no-useless-assignment
-  let actions: { icon: string; label: string; onClick: () => void }[] = [];
+  let actions: { icon: string; label: string; onClick: () => void; disabled?: boolean }[] = [];
 
   if (item.type === 'booking' || item.type === 'booking_request') {
     const bookingStatus = (item as unknown as DashboardBookingItem).status as string;
@@ -132,7 +132,8 @@ const ScheduleItemRow: React.FC<ScheduleItemRowProps> = ({
         ...(isWalletEligible ? [{
           icon: walletPassDownloading === Number(item.dbId) ? 'progress_activity' : 'wallet',
           label: 'Add to Apple Wallet',
-          onClick: () => handleDownloadBookingWalletPass(Number(item.dbId))
+          onClick: () => handleDownloadBookingWalletPass(Number(item.dbId)),
+          disabled: walletPassDownloading === Number(item.dbId)
         }] : []),
         ...(isConfirmed ? [{
           icon: 'calendar_add_on',
@@ -198,7 +199,8 @@ const ScheduleItemRow: React.FC<ScheduleItemRowProps> = ({
       ...(confCalWalletEligible && typeof item.dbId === 'number' ? [{
         icon: walletPassDownloading === item.dbId ? 'progress_activity' : 'wallet',
         label: 'Add to Apple Wallet',
-        onClick: () => handleDownloadBookingWalletPass(item.dbId as number)
+        onClick: () => handleDownloadBookingWalletPass(item.dbId as number),
+        disabled: walletPassDownloading === item.dbId
       }] : []),
     ];
   } else {

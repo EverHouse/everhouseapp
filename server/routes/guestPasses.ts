@@ -7,6 +7,7 @@ import { getTierLimits } from '../core/tierService';
 import { sendPushNotification } from './push';
 import { sendNotificationToUser, broadcastMemberStatsUpdated } from '../core/websocket';
 import { logAndRespond, logger } from '../core/logger';
+import { getErrorMessage } from '../utils/errorUtils';
 import { isSyntheticEmail } from '../core/notificationService';
 import { isPlaceholderGuestName } from '../core/billing/pricingConfig';
 import { withRetry } from '../core/retry';

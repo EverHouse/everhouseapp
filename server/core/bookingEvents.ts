@@ -174,7 +174,8 @@ export async function publish(
         title: memberNotification.title,
         message: memberNotification.message,
         data: { bookingId: data.bookingId, eventType }
-      }, { action: eventType, bookingId: data.bookingId, resourceType: data.resourceType, triggerSource: 'bookingEvents.ts' });
+      }, { action: eventType, bookingId: data.bookingId, resourceType: data.resourceType, triggerSource: 'bookingEvents.ts' })
+      .catch(err => logger.error('[BookingEvents] sendNotificationToUser failed', { extra: { error: getErrorMessage(err) } }));
     }
 
     if (notifyStaff) {
@@ -364,7 +365,7 @@ export async function linkAndNotifyParticipants(
               title: 'Added to Booking',
               message: notificationMsg,
               data: { bookingId }
-            });
+            }).catch(err => logger.error('[BookingEvents] participant sendNotificationToUser failed', { extra: { error: getErrorMessage(err) } }));
           }
           
           result.notified++;

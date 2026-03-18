@@ -10,6 +10,7 @@ interface Action {
   icon: string;
   label: string;
   onClick: () => void;
+  disabled?: boolean;
 }
 
 interface ScheduleCardProps {
@@ -100,11 +101,12 @@ const ScheduleCard: React.FC<ScheduleCardProps> = ({
               {actions.map((action, idx) => (
                 <button
                   key={idx}
-                  onClick={(e) => { e.stopPropagation(); action.onClick(); }}
-                  className={`w-10 h-10 rounded-[4px] flex items-center justify-center active:scale-90 transition-all duration-150 ${isDark ? 'bg-white/[0.08] text-white/60 hover:text-white hover:bg-white/[0.14]' : 'bg-primary/[0.05] text-primary/50 hover:text-primary hover:bg-primary/[0.1]'}`}
+                  onClick={(e) => { e.stopPropagation(); if (!action.disabled) action.onClick(); }}
+                  disabled={action.disabled}
+                  className={`w-10 h-10 rounded-[4px] flex items-center justify-center transition-all duration-150 ${action.disabled ? 'opacity-40 cursor-not-allowed' : 'active:scale-90'} ${isDark ? 'bg-white/[0.08] text-white/60 hover:text-white hover:bg-white/[0.14]' : 'bg-primary/[0.05] text-primary/50 hover:text-primary hover:bg-primary/[0.1]'}`}
                   aria-label={action.label}
                 >
-                  <span className="material-symbols-outlined text-[18px]">{action.icon}</span>
+                  <span className={`material-symbols-outlined text-[18px] ${action.disabled && action.icon === 'progress_activity' ? 'animate-spin' : ''}`}>{action.icon}</span>
                 </button>
               ))}
             </div>

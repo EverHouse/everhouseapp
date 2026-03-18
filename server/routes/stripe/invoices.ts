@@ -16,6 +16,7 @@ import {
 } from '../../core/stripe';
 import { sendNotificationToUser, broadcastBillingUpdate } from '../../core/websocket';
 import { logFromRequest } from '../../core/auditLog';
+import { getErrorMessage } from '../../utils/errorUtils';
 
 const router = Router();
 
