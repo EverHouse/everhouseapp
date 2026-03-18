@@ -266,8 +266,8 @@ export async function handleInvoicePaymentFailed(client: PoolClient, invoice: In
     const userSubId = subMatchCheck.rows[0].stripe_subscription_id;
     const userStatus = subMatchCheck.rows[0].membership_status;
     
-    if (['cancelled', 'inactive'].includes(userStatus)) {
-      logger.info(`[Stripe Webhook] Skipping grace period for ${email} — membership already ${userStatus} (subscription ${subscriptionId})`);
+    if (['cancelled', 'inactive', 'suspended', 'pending', 'non-member', 'visitor'].includes(userStatus)) {
+      logger.info(`[Stripe Webhook] Skipping payment failure handling for ${email} — membership status is ${userStatus}, not eligible for dunning (subscription ${subscriptionId})`);
       return deferredActions;
     }
     

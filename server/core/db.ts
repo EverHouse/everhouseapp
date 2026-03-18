@@ -89,12 +89,20 @@ const basePool = new Pool({
   allowExitOnIdle: true,
 });
 
+if (needsSsl) {
+  basePool.on('connect', (client) => {
+    client.query("SET search_path TO public").catch((err) => {
+      logger.warn('[Database] Failed to set search_path on new connection:', { extra: { errorMessage: getErrorMessage(err) } });
+    });
+  });
+}
+
 export const pool = basePool;
 
 const directConnectionUrl = (forcePoolerRedirect && poolerUrl) ? poolerUrl : directUrl;
 const directConnString = appendSearchPath(directConnectionUrl);
 
-export const directPool = usingPooler
+const directPoolInstance = usingPooler
   ? new Pool({
       connectionString: directConnString,
       connectionTimeoutMillis: 10000,
@@ -106,6 +114,16 @@ export const directPool = usingPooler
       allowExitOnIdle: true,
     })
   : pool;
+
+if (usingPooler && directPoolInstance !== pool && !isLocalDatabase(directConnectionUrl)) {
+  directPoolInstance.on('connect', (client) => {
+    client.query("SET search_path TO public").catch((err) => {
+      logger.warn('[Database] Failed to set search_path on direct pool connection:', { extra: { errorMessage: getErrorMessage(err) } });
+    });
+  });
+}
+
+export const directPool = directPoolInstance;
 
 pool.on('error', (err) => {
   const isConnectionError = RETRYABLE_ERRORS.some(e => err.message.includes(e));
