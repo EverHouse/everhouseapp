@@ -105,6 +105,7 @@ interface ClosureRow {
   end_time: string | null;
   affected_areas: string | null;
   needs_review: boolean;
+  notice_type: string | null;
 }
 
 async function getAllResourceIds(): Promise<number[]> {
@@ -399,15 +400,19 @@ export async function syncInternalCalendarToClosures(): Promise<{ synced: number
       fetchedEventIds.add(event.id);
       
       let existing = await db.execute(
-        sql`SELECT id, start_date, end_date, start_time, end_time, affected_areas, needs_review FROM facility_closures
+        sql`SELECT id, start_date, end_date, start_time, end_time, affected_areas, needs_review, notice_type FROM facility_closures
          WHERE internal_calendar_id = ${internalCalendarId}
             OR POSITION(${internalCalendarId} IN internal_calendar_id) > 0`
       );
       
       if (existing.rows.length === 0) {
         const adoptable = await db.execute(
-          sql`SELECT id, start_date, end_date, start_time, end_time, affected_areas, needs_review FROM facility_closures
-           WHERE title = ${title} AND start_date = ${startDate} AND is_active = true AND needs_review = false
+          sql`SELECT id, start_date, end_date, start_time, end_time, affected_areas, needs_review, notice_type FROM facility_closures
+           WHERE title = ${title}
+             AND is_active = true
+             AND start_date <= ${endDate}
+             AND end_date >= ${startDate}
+           ORDER BY ABS(EXTRACT(EPOCH FROM (start_date::timestamp - ${startDate}::timestamp))) ASC
            LIMIT 1`
         );
         if (adoptable.rows.length > 0) {
@@ -431,12 +436,17 @@ export async function syncInternalCalendarToClosures(): Promise<{ synced: number
           existingClosure.start_time !== startTime ||
           existingClosure.end_time !== endTime;
         
+        const hasValidNoticeType = !!(noticeType || existingClosure.notice_type);
+        const hasValidAffectedAreas = !!(existingClosure.affected_areas && existingClosure.affected_areas !== 'none');
+        const shouldClearNeedsReview = existingClosure.needs_review && hasValidAffectedAreas && hasValidNoticeType;
+
         await db.execute(
           sql`UPDATE facility_closures SET 
            title = ${title}, start_date = ${startDate}, start_time = ${startTime},
            end_date = ${endDate}, end_time = ${endTime},
            notice_type = COALESCE(notice_type, ${noticeType}),
-           notes = COALESCE(${calendarNotes || metadata.notes || null}, notes), is_active = true
+           notes = COALESCE(${calendarNotes || metadata.notes || null}, notes), is_active = true,
+           needs_review = CASE WHEN ${!!shouldClearNeedsReview} THEN false ELSE needs_review END
            WHERE id = ${closureId}`
         );
         
@@ -456,14 +466,42 @@ export async function syncInternalCalendarToClosures(): Promise<{ synced: number
         
         updated++;
       } else {
-        const affectedAreas = metadata.affectedAreas || 'none';
-        const visibility = metadata.visibility || null;
-        const needsReview = !noticeType || affectedAreas === 'none' || !visibility;
-        
+        let affectedAreas = metadata.affectedAreas || 'none';
+        let visibility = metadata.visibility || null;
+        let notifyMembers = metadata.notifyMembers ?? false;
+        let needsReview = !noticeType || affectedAreas === 'none' || !visibility;
+        let restoredNotes = calendarNotes || metadata.notes || null;
+
+        const deactivated = await db.execute(
+          sql`SELECT affected_areas, visibility, notify_members, needs_review, notes FROM facility_closures
+           WHERE title = ${title}
+             AND is_active = false
+             AND start_date <= ${endDate}
+             AND end_date >= ${startDate}
+             AND created_at >= NOW() - INTERVAL '90 days'
+           ORDER BY ABS(EXTRACT(EPOCH FROM (start_date::timestamp - ${startDate}::timestamp))) ASC, created_at DESC
+           LIMIT 1`
+        );
+        if (deactivated.rows.length > 0) {
+          const prev = deactivated.rows[0] as unknown as { affected_areas: string | null; visibility: string | null; notify_members: boolean; needs_review: boolean; notes: string | null };
+          if (prev.affected_areas && prev.affected_areas !== 'none') {
+            affectedAreas = prev.affected_areas;
+          }
+          if (prev.visibility) {
+            visibility = prev.visibility;
+          }
+          notifyMembers = prev.notify_members ?? notifyMembers;
+          needsReview = prev.needs_review;
+          if (!restoredNotes && prev.notes) {
+            restoredNotes = prev.notes;
+          }
+          logger.info(`[Calendar Sync] Restored configured fields from deactivated closure for: ${title}`);
+        }
+
         const result = await db.execute(
           sql`INSERT INTO facility_closures 
-           (title, notes, notice_type, start_date, start_time, end_date, end_time, affected_areas, visibility, is_active, created_by, internal_calendar_id, needs_review)
-           VALUES (${title}, ${calendarNotes || metadata.notes || null}, ${noticeType}, ${startDate}, ${startTime}, ${endDate}, ${endTime}, ${affectedAreas}, ${visibility}, true, 'system', ${internalCalendarId}, ${needsReview})
+           (title, notes, notice_type, start_date, start_time, end_date, end_time, affected_areas, visibility, notify_members, is_active, created_by, internal_calendar_id, needs_review)
+           VALUES (${title}, ${restoredNotes}, ${noticeType}, ${startDate}, ${startTime}, ${endDate}, ${endTime}, ${affectedAreas}, ${visibility}, ${notifyMembers}, true, 'system', ${internalCalendarId}, ${needsReview})
            RETURNING id`
         );
         
@@ -490,12 +528,23 @@ export async function syncInternalCalendarToClosures(): Promise<{ synced: number
     
     let deleted = 0;
     interface ExistingClosureRow { id: number; internal_calendar_id: string }
+    const closuresToDeactivate: ExistingClosureRow[] = [];
     for (const closure of existingClosures.rows as unknown as ExistingClosureRow[]) {
       const closureCalIds = closure.internal_calendar_id.split(',').map((id: string) => id.trim()).filter(Boolean);
       const anyCancelled = closureCalIds.some((id: string) => cancelledEventIds.has(id));
       const anyFetched = closureCalIds.some((id: string) => fetchedEventIds.has(id));
       
       if (anyCancelled || !anyFetched) {
+        closuresToDeactivate.push(closure);
+      }
+    }
+
+    const totalActive = existingClosures.rows.length;
+    const deactivationRatio = totalActive > 0 ? closuresToDeactivate.length / totalActive : 0;
+    if (totalActive > 0 && deactivationRatio > 0.5) {
+      logger.warn(`[Calendar Sync] Mass deactivation guard triggered: ${closuresToDeactivate.length}/${totalActive} (${Math.round(deactivationRatio * 100)}%) closures would be deactivated. Skipping deactivation step to prevent data loss from possible calendar API failure.`);
+    } else {
+      for (const closure of closuresToDeactivate) {
         await deleteAvailabilityBlocks(closure.id);
         await db.execute(sql`UPDATE facility_closures SET is_active = false WHERE id = ${closure.id}`);
         logger.info(`[Calendar Sync] Deactivated closure #${closure.id} and removed availability blocks`);
