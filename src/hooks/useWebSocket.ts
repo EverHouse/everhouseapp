@@ -86,7 +86,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
           const message: WebSocketMessage = JSON.parse(event.data);
           
           if (message.type === 'auth_error') {
-            if (message.shouldReauth || message.attemptsRemaining <= 0) {
+            if (message.shouldReauth || (message.attemptsRemaining !== undefined && message.attemptsRemaining <= 0)) {
               intentionalCloseRef.current = true;
               console.warn('[WebSocket] Session invalid - stopping reconnection until next page load');
             }
