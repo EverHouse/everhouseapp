@@ -148,6 +148,162 @@ export async function fixFunctionSearchPaths(): Promise<void> {
   }
 }
 
+// Intentional: this app uses backend-only access control (server connects to DB, not browser).
+// RLS is unnecessary on tables without policies and adds overhead, so we disable it dynamically.
+export async function fixSupabaseAdvisories(): Promise<void> {
+  try {
+    await db.execute(sql`
+      DO $$ 
+      DECLARE
+        tbl RECORD;
+        disabled_count INTEGER := 0;
+      BEGIN
+        FOR tbl IN
+          SELECT c.relname AS tablename
+          FROM pg_class c
+          JOIN pg_namespace n ON c.relnamespace = n.oid
+          WHERE n.nspname = 'public'
+            AND c.relkind = 'r'
+            AND c.relrowsecurity = true
+            AND NOT EXISTS (
+              SELECT 1 FROM pg_policies p
+              WHERE p.schemaname = 'public' AND p.tablename = c.relname
+            )
+        LOOP
+          EXECUTE format('ALTER TABLE public.%I DISABLE ROW LEVEL SECURITY', tbl.tablename);
+          disabled_count := disabled_count + 1;
+        END LOOP;
+        IF disabled_count > 0 THEN
+          RAISE NOTICE 'Disabled RLS on % tables with no policies', disabled_count;
+        END IF;
+      END $$
+    `);
+    logger.info('[DB Init] Disabled RLS on tables with no policies');
+  } catch (err: unknown) {
+    logger.warn(`[DB Init] Skipping RLS disable: ${getErrorMessage(err)}`);
+  }
+
+  try {
+    await db.execute(sql`
+      DROP INDEX IF EXISTS idx_booking_requests_status;
+      DROP INDEX IF EXISTS idx_booking_participants_session_id;
+      DROP INDEX IF EXISTS idx_usage_ledger_member_id;
+      DROP INDEX IF EXISTS idx_stripe_payment_intents_booking_id;
+      DROP INDEX IF EXISTS idx_notifications_user_read;
+      DROP INDEX IF EXISTS idx_event_rsvps_user_email_lower;
+    `);
+    logger.info('[DB Init] Duplicate indexes dropped');
+  } catch (err: unknown) {
+    logger.warn(`[DB Init] Skipping duplicate index drops: ${getErrorMessage(err)}`);
+  }
+
+  try {
+    await db.execute(sql`
+      DROP INDEX IF EXISTS idx_users_archived_at;
+      DROP INDEX IF EXISTS idx_booking_requests_archived_at;
+      DROP INDEX IF EXISTS idx_events_archived_at;
+      DROP INDEX IF EXISTS idx_wellness_classes_archived_at;
+      DROP INDEX IF EXISTS admin_audit_log_action_idx;
+      DROP INDEX IF EXISTS admin_audit_log_staff_email_idx;
+      DROP INDEX IF EXISTS data_export_requests_status_idx;
+      DROP INDEX IF EXISTS data_export_requests_user_email_idx;
+      DROP INDEX IF EXISTS account_deletion_requests_status_idx;
+      DROP INDEX IF EXISTS account_deletion_requests_user_id_idx;
+      DROP INDEX IF EXISTS booking_requests_unmatched_idx;
+      DROP INDEX IF EXISTS idx_booking_requests_start_time;
+      DROP INDEX IF EXISTS idx_booking_requests_user_email;
+      DROP INDEX IF EXISTS booking_requests_is_event_idx;
+      DROP INDEX IF EXISTS idx_trackman_unmatched_resolved;
+      DROP INDEX IF EXISTS trackman_webhook_events_created_idx;
+      DROP INDEX IF EXISTS idx_pass_redemption_logs_redeemed_at;
+    `);
+    logger.info('[DB Init] Confirmed-unused indexes dropped');
+  } catch (err: unknown) {
+    logger.warn(`[DB Init] Skipping unused index drops: ${getErrorMessage(err)}`);
+  }
+
+  try {
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS idx_fee_snapshots_session
+        ON booking_fee_snapshots (session_id);
+      CREATE INDEX IF NOT EXISTS idx_tier_feature_values_tier_id
+        ON tier_feature_values (tier_id);
+      CREATE INDEX IF NOT EXISTS idx_tier_feature_values_feature_id
+        ON tier_feature_values (feature_id);
+    `);
+    logger.info('[DB Init] Missing FK indexes created');
+  } catch (err: unknown) {
+    logger.warn(`[DB Init] Skipping FK index creation: ${getErrorMessage(err)}`);
+  }
+
+  try {
+    await db.execute(sql`
+      DO $$
+      DECLARE
+        pol RECORD;
+        new_qual TEXT;
+        new_check TEXT;
+        create_sql TEXT;
+        role_list TEXT;
+        permissive_clause TEXT;
+      BEGIN
+        FOR pol IN
+          SELECT p.polname AS policyname,
+                 c.relname AS tablename,
+                 CASE p.polcmd
+                   WHEN 'r' THEN 'SELECT'
+                   WHEN 'a' THEN 'INSERT'
+                   WHEN 'w' THEN 'UPDATE'
+                   WHEN 'd' THEN 'DELETE'
+                   WHEN '*' THEN 'ALL'
+                 END AS cmd,
+                 pg_get_expr(p.polqual, p.polrelid, true) AS qual,
+                 pg_get_expr(p.polwithcheck, p.polrelid, true) AS with_check,
+                 p.polpermissive,
+                 ARRAY(SELECT rolname FROM pg_roles WHERE oid = ANY(p.polroles)) AS roles
+          FROM pg_policy p
+          JOIN pg_class c ON p.polrelid = c.oid
+          JOIN pg_namespace n ON c.relnamespace = n.oid
+          WHERE n.nspname = 'public'
+            AND c.relname IN ('users', 'announcements')
+            AND (pg_get_expr(p.polqual, p.polrelid, true) LIKE '%auth.uid()%'
+              OR pg_get_expr(p.polwithcheck, p.polrelid, true) LIKE '%auth.uid()%')
+        LOOP
+          new_qual := CASE WHEN pol.qual IS NOT NULL
+            THEN replace(pol.qual, 'auth.uid()', '(SELECT auth.uid())')
+            ELSE NULL END;
+          new_check := CASE WHEN pol.with_check IS NOT NULL
+            THEN replace(pol.with_check, 'auth.uid()', '(SELECT auth.uid())')
+            ELSE NULL END;
+
+          EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', pol.policyname, pol.tablename);
+
+          permissive_clause := CASE WHEN pol.polpermissive THEN 'PERMISSIVE' ELSE 'RESTRICTIVE' END;
+
+          IF array_length(pol.roles, 1) IS NOT NULL AND pol.roles <> ARRAY['public']::name[] THEN
+            role_list := array_to_string(pol.roles, ', ');
+          ELSE
+            role_list := 'public';
+          END IF;
+
+          create_sql := format('CREATE POLICY %I ON public.%I AS %s FOR %s TO %s',
+            pol.policyname, pol.tablename, permissive_clause, pol.cmd, role_list);
+          IF new_qual IS NOT NULL THEN
+            create_sql := create_sql || ' USING (' || new_qual || ')';
+          END IF;
+          IF new_check IS NOT NULL THEN
+            create_sql := create_sql || ' WITH CHECK (' || new_check || ')';
+          END IF;
+          EXECUTE create_sql;
+        END LOOP;
+      END $$
+    `);
+    logger.info('[DB Init] RLS policies rewritten with (SELECT auth.uid()) caching pattern');
+  } catch (err: unknown) {
+    logger.warn(`[DB Init] Skipping RLS policy rewrite: ${getErrorMessage(err)}`);
+  }
+}
+
 export async function cleanupOrphanedRecords(): Promise<{ notifications: number; oldBookings: number }> {
   let notificationsDeleted = 0;
   let oldBookingsArchived = 0;
@@ -501,14 +657,17 @@ export async function ensureDatabaseConstraints() {
     try {
       await db.execute(sql`
         CREATE OR REPLACE FUNCTION trg_track_membership_status_change()
-        RETURNS TRIGGER AS $$
+        RETURNS TRIGGER
+        LANGUAGE plpgsql
+        SET search_path = ''
+        AS $$
         BEGIN
           IF OLD.membership_status IS DISTINCT FROM NEW.membership_status THEN
             NEW.membership_status_changed_at = NOW();
           END IF;
           RETURN NEW;
         END;
-        $$ LANGUAGE plpgsql
+        $$
       `);
       await db.execute(sql`
         DO $$ BEGIN

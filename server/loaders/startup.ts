@@ -1,4 +1,4 @@
-import { ensureDatabaseConstraints, seedDefaultNoticeTypes, createStripeTransactionCache, createSyncExclusionsTable, setupEmailNormalization, normalizeExistingEmails, seedTierFeatures, fixFunctionSearchPaths, validateTierHierarchy, setupInstantDataTriggers } from '../db-init';
+import { ensureDatabaseConstraints, seedDefaultNoticeTypes, createStripeTransactionCache, createSyncExclusionsTable, setupEmailNormalization, normalizeExistingEmails, seedTierFeatures, fixFunctionSearchPaths, fixSupabaseAdvisories, validateTierHierarchy, setupInstantDataTriggers } from '../db-init';
 import { seedTrainingSections } from '../routes/training';
 import { getStripeSync } from '../core/stripe';
 import { getStripeEnvironmentInfo, getStripeClient } from '../core/stripe/client';
@@ -125,6 +125,13 @@ export async function runStartupTasks(): Promise<void> {
         await fixFunctionSearchPaths();
       } catch (err: unknown) {
         logger.warn(`[Startup] Function search_path fix failed (non-critical): ${getErrorMessage(err)}`);
+      }
+    })(),
+    (async () => {
+      try {
+        await fixSupabaseAdvisories();
+      } catch (err: unknown) {
+        logger.warn(`[Startup] Supabase advisories fix failed (non-critical): ${getErrorMessage(err)}`);
       }
     })(),
     (async () => {
