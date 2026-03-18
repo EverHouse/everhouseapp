@@ -238,7 +238,7 @@ export async function handleChargeRefunded(client: PoolClient, charge: Stripe.Ch
           );
           
           deferredActions.push(async () => {
-            sendNotificationToUser(row.user_email, {
+            await sendNotificationToUser(row.user_email, {
               type: 'notification',
               title: 'Payment Refunded',
               message: `Your booking payment of $${(amount_refunded / 100).toFixed(2)} has been refunded. It may take 5-10 business days to appear on your statement.`,

@@ -551,7 +551,7 @@ router.delete('/api/members/:email', isStaffOrAdmin, async (req, res) => {
       message: 'Member archived successfully'
     });
 
-    logFromRequest(req, {
+    await logFromRequest(req, {
       action: 'archive_member',
       resourceType: 'user',
       resourceId: String(userResult[0].id),
