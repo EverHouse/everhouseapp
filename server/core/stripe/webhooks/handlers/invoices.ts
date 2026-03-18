@@ -110,7 +110,7 @@ export async function handleInvoicePaymentSucceeded(client: PoolClient, invoice:
       [priceId]
     );
     if (tierResult.rows.length > 0) {
-      restoreTierClause = ', tier = COALESCE(tier, $2)';
+      restoreTierClause = ', tier = $2';
       queryParams = [email, tierResult.rows[0].name];
     }
   }
