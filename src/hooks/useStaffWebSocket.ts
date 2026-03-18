@@ -44,6 +44,7 @@ export function useStaffWebSocket(options: UseStaffWebSocketOptions = {}) {
   const connectionIdRef = useRef<number>(0);
   const activeConnectionUserRef = useRef<string | null>(null);
   const intentionalDisconnectRef = useRef(false);
+  const authRejectedRef = useRef(false);
   const hasInitializedRef = useRef(false);
   
   const onBookingEventRef = useRef(onBookingEvent);
@@ -151,7 +152,6 @@ export function useStaffWebSocket(options: UseStaffWebSocketOptions = {}) {
         isConnectingRef.current = false;
         setIsConnected(true);
         activeConnectionUserRef.current = currentEmail || null;
-        intentionalDisconnectRef.current = false;
         reconnectAttemptRef.current = 0;
         ws.send(JSON.stringify({ 
           type: 'auth', 
@@ -166,6 +166,7 @@ export function useStaffWebSocket(options: UseStaffWebSocketOptions = {}) {
           
           if (message.type === 'auth_error') {
             if (message.shouldReauth || message.attemptsRemaining <= 0) {
+              authRejectedRef.current = true;
               intentionalDisconnectRef.current = true;
               console.warn('[StaffWebSocket] Session invalid - stopping reconnection');
             }
@@ -173,6 +174,7 @@ export function useStaffWebSocket(options: UseStaffWebSocketOptions = {}) {
           }
           
           if (message.type === 'auth_success') {
+            authRejectedRef.current = false;
             ws.send(JSON.stringify({ type: 'staff_register' }));
           }
           
@@ -404,6 +406,7 @@ export function useStaffWebSocket(options: UseStaffWebSocketOptions = {}) {
         activeConnectionUserRef.current = null;
         
         if (event.code >= 4001 && event.code <= 4003) {
+          authRejectedRef.current = true;
           intentionalDisconnectRef.current = true;
           console.warn(`[StaffWebSocket] Auth failed (${event.code}) - stopping reconnection`);
         }
@@ -530,9 +533,12 @@ export function useStaffWebSocket(options: UseStaffWebSocketOptions = {}) {
       return;
     }
 
+    if (authRejectedRef.current) {
+      return;
+    }
+    
     // eslint-disable-next-line no-console
     if (import.meta.env.DEV) console.log(`[StaffWebSocket] Scheduling connection for ${userEmail} (mount=${thisMountId})`);
-    intentionalDisconnectRef.current = false;
     hasInitializedRef.current = true;
     
     initTimerRef.current = setTimeout(() => {

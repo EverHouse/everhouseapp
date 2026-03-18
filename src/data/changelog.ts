@@ -8,6 +8,18 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.87.87",
+    date: "2026-03-18",
+    title: "Fix: WebSocket Reconnection Loop & Stripe Invoice Resilience",
+    changes: [
+      "Fixed: WebSocket connections no longer get stuck in an infinite reconnection loop when a session expires — previously, expired sessions could cause hundreds of reconnect attempts per hour, wasting server resources",
+      "Fixed: WebSocket reconnection now correctly resumes after user/view transitions — auth rejection and routine cleanup are tracked separately to prevent false blocking",
+      "Fixed: Stripe invoice creation now gracefully handles stale price IDs — if a stored Stripe price has been deleted, the system automatically falls back to custom-amount line items instead of failing entirely",
+      "Hardened: Stripe stale-price detection now checks structured error codes (resource_missing) in addition to message text for more reliable fallback",
+      "Improved: WebSocket authentication failure logging upgraded from debug to warn level for better production visibility",
+    ]
+  },
+  {
     version: "8.87.85",
     date: "2026-03-18",
     title: "Fix: Group Member Validation",

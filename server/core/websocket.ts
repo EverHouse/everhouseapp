@@ -382,7 +382,7 @@ export function initWebSocketServer(server: Server) {
                 shouldReauth: attemptsRemaining <= 0
               }));
               
-              logger.debug(`[WebSocket] Auth rejected - session verification failed (attempt ${authAttempts}/${MAX_AUTH_ATTEMPTS})`, {
+              logger.warn(`[WebSocket] Auth rejected - session verification failed (attempt ${authAttempts}/${MAX_AUTH_ATTEMPTS})`, {
                 extra: { event: 'websocket.auth_failed', clientEmail: message.email, reason: 'session_verification_failed', attempts: authAttempts }
               });
               

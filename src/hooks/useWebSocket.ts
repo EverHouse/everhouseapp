@@ -34,6 +34,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isConnectingRef = useRef(false);
   const intentionalCloseRef = useRef(false);
+  const authRejectedRef = useRef(false);
   const reconnectAttemptRef = useRef(0);
   const MAX_RECONNECT_ATTEMPTS = 15;
 
@@ -64,8 +65,11 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
       return;
     }
 
+    if (authRejectedRef.current) {
+      return;
+    }
+    
     isConnectingRef.current = true;
-    intentionalCloseRef.current = false;
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${protocol}//${window.location.host}/ws`;
@@ -85,8 +89,14 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
         try {
           const message: WebSocketMessage = JSON.parse(event.data);
           
+          if (message.type === 'auth_success') {
+            authRejectedRef.current = false;
+            return;
+          }
+          
           if (message.type === 'auth_error') {
             if (message.shouldReauth || (message.attemptsRemaining !== undefined && message.attemptsRemaining <= 0)) {
+              authRejectedRef.current = true;
               intentionalCloseRef.current = true;
               console.warn('[WebSocket] Session invalid - stopping reconnection until next page load');
             }
@@ -207,6 +217,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
         }
         
         if (event.code >= 4001 && event.code <= 4003) {
+          authRejectedRef.current = true;
           intentionalCloseRef.current = true;
           console.warn(`[WebSocket] Auth failed (${event.code}) - stopping reconnection`);
         }

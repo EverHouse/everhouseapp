@@ -195,20 +195,45 @@ async function addLineItemsToInvoice(
       const overageRemainder = overageRateCents > 0 ? li.overageCents % overageRateCents : 0;
 
       if (overagePriceId && overageRateCents > 0 && quantity > 0 && overageRemainder === 0) {
-        await stripe.invoiceItems.create({
-          customer: customerId,
-          invoice: invoiceId,
-          pricing: { price: overagePriceId },
-          quantity,
-          description: overageDesc,
-          metadata: {
-            participantId: li.participantId?.toString() || '',
-            feeType: 'overage',
-            participantType: li.participantType,
-          },
-        }, {
-          idempotencyKey: `invitem_overage_${invoiceId}_${li.participantId || 'unknown'}_${li.overageCents}`
-        });
+        try {
+          await stripe.invoiceItems.create({
+            customer: customerId,
+            invoice: invoiceId,
+            pricing: { price: overagePriceId },
+            quantity,
+            description: overageDesc,
+            metadata: {
+              participantId: li.participantId?.toString() || '',
+              feeType: 'overage',
+              participantType: li.participantType,
+            },
+          }, {
+            idempotencyKey: `invitem_overage_${invoiceId}_${li.participantId || 'unknown'}_${li.overageCents}`
+          });
+        } catch (priceErr: unknown) {
+          const isStalePrice = (priceErr as any)?.type === 'StripeInvalidRequestError' && (priceErr as any)?.code === 'resource_missing'
+            || (priceErr instanceof Error && priceErr.message.includes('No such price'));
+          if (isStalePrice) {
+            const errMsg = priceErr instanceof Error ? priceErr.message : String(priceErr);
+            logger.warn('[BookingInvoice] Stale overage price ID, falling back to custom amount', { extra: { overagePriceId, error: errMsg } });
+            await stripe.invoiceItems.create({
+              customer: customerId,
+              invoice: invoiceId,
+              amount: li.overageCents,
+              currency: 'usd',
+              description: overageDesc,
+              metadata: {
+                participantId: li.participantId?.toString() || '',
+                feeType: 'overage',
+                participantType: li.participantType,
+              },
+            }, {
+              idempotencyKey: `invitem_overage_fallback_${invoiceId}_${li.participantId || 'unknown'}_${li.overageCents}`
+            });
+          } else {
+            throw priceErr;
+          }
+        }
       } else {
         await stripe.invoiceItems.create({
           customer: customerId,
@@ -233,20 +258,45 @@ async function addLineItemsToInvoice(
       const guestRemainder = guestRateCents > 0 ? li.guestCents % guestRateCents : 0;
 
       if (guestPriceId && guestRateCents > 0 && guestQty > 0 && guestRemainder === 0) {
-        await stripe.invoiceItems.create({
-          customer: customerId,
-          invoice: invoiceId,
-          pricing: { price: guestPriceId },
-          quantity: guestQty,
-          description: `Guest fee — ${li.displayName}`,
-          metadata: {
-            participantId: li.participantId?.toString() || '',
-            feeType: 'guest',
-            participantType: li.participantType,
-          },
-        }, {
-          idempotencyKey: `invitem_guest_${invoiceId}_${li.participantId || 'unknown'}_${li.guestCents}`
-        });
+        try {
+          await stripe.invoiceItems.create({
+            customer: customerId,
+            invoice: invoiceId,
+            pricing: { price: guestPriceId },
+            quantity: guestQty,
+            description: `Guest fee — ${li.displayName}`,
+            metadata: {
+              participantId: li.participantId?.toString() || '',
+              feeType: 'guest',
+              participantType: li.participantType,
+            },
+          }, {
+            idempotencyKey: `invitem_guest_${invoiceId}_${li.participantId || 'unknown'}_${li.guestCents}`
+          });
+        } catch (priceErr: unknown) {
+          const isStalePrice = (priceErr as any)?.type === 'StripeInvalidRequestError' && (priceErr as any)?.code === 'resource_missing'
+            || (priceErr instanceof Error && priceErr.message.includes('No such price'));
+          if (isStalePrice) {
+            const errMsg = priceErr instanceof Error ? priceErr.message : String(priceErr);
+            logger.warn('[BookingInvoice] Stale guest price ID, falling back to custom amount', { extra: { guestPriceId, error: errMsg } });
+            await stripe.invoiceItems.create({
+              customer: customerId,
+              invoice: invoiceId,
+              amount: li.guestCents,
+              currency: 'usd',
+              description: `Guest fee — ${li.displayName}`,
+              metadata: {
+                participantId: li.participantId?.toString() || '',
+                feeType: 'guest',
+                participantType: li.participantType,
+              },
+            }, {
+              idempotencyKey: `invitem_guest_fallback_${invoiceId}_${li.participantId || 'unknown'}_${li.guestCents}`
+            });
+          } else {
+            throw priceErr;
+          }
+        }
       } else {
         await stripe.invoiceItems.create({
           customer: customerId,
