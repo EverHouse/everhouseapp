@@ -580,6 +580,7 @@ export async function handleCancelPostTransaction(
       title: 'Booking Cancelled',
       message: pushInfo.memberMessage || pushInfo.message,
       data: { bookingId, eventType: 'booking_cancelled' }
-    }, { action: 'booking_cancelled', bookingId, triggerSource: 'approval.ts' });
+    }, { action: 'booking_cancelled', bookingId, triggerSource: 'approval.ts' })
+    .catch(err => logger.error('[Cancel] sendNotificationToUser failed', { extra: { error: getErrorMessage(err) } }));
   }
 }

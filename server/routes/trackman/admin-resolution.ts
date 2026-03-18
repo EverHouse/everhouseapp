@@ -1451,7 +1451,7 @@ router.post('/api/admin/trackman/unmatch-member', isStaffOrAdmin, async (req, re
         email: normalizedEmail,
         affectedCount,
         unmatchedAt: pacificNow()
-      });
+      }).catch(err => logger.error('[Admin] Audit log failed', { extra: { error: getErrorMessage(err) } }));
     }
     
     res.json({ 
@@ -1613,7 +1613,7 @@ router.post('/api/admin/trackman/auto-match-visitors', isStaffOrAdmin, async (re
           return acc;
         }, {} as Record<string, number>)
       }
-    );
+    ).catch(err => logger.error('[Admin] Audit log failed', { extra: { error: getErrorMessage(err) } }));
     
     res.json({
       success: true,

@@ -538,7 +538,8 @@ export async function checkinBooking(params: CheckinBookingParams) {
       title: 'Missed Booking',
       message: `You were marked as a no-show for your booking on ${formattedDate} at ${formattedTime}. If this was in error, please contact staff.`,
       data: { bookingId, eventType: 'booking_no_show' }
-    }, { action: 'booking_no_show', bookingId, triggerSource: 'approval.ts' });
+    }, { action: 'booking_no_show', bookingId, triggerSource: 'approval.ts' })
+    .catch(err => logger.error('[NoShow] sendNotificationToUser failed', { extra: { error: getErrorMessage(err) } }));
   }
 
   return { success: true, booking: result[0] };

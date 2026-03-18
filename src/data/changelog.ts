@@ -8,6 +8,16 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.87.74",
+    date: "2026-03-18",
+    title: "Fix: Unhandled Async Error Boundaries",
+    changes: [
+      "Fixed: Added .catch() error handlers to 8 floating sendNotificationToUser calls across approvalFlow, approvalCancel, approvalCheckin, and webhook-reprocess — prevents server crashes if WebSocket is briefly unreachable",
+      "Fixed: Added .catch() to 2 floating notifyLinkedMembers/notifyApprovalParticipants calls in approvalFlow — prevents unhandled promise rejections during group notifications",
+      "Fixed: Added .catch() to 2 floating logFromRequest audit log calls in admin-resolution — prevents server crashes on database logger failures during admin bulk operations",
+    ]
+  },
+  {
     version: "8.87.73",
     date: "2026-03-18",
     title: "Security Hardening: SQL Injection Prevention & Privacy",
