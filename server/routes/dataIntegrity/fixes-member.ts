@@ -831,12 +831,19 @@ router.post('/api/data-integrity/fix/bulk-reconnect-stripe', isAdmin, validateBo
       userIds: userIds.join(',')
     });
 
+    const totalLinked = reconnected.length + customerRestored.length;
+    const parts: string[] = [];
+    if (totalLinked > 0) parts.push(`${totalLinked}/${userIds.length} member(s) linked to Stripe`);
+    if (reconnected.length > 0) parts.push(`${reconnected.length} with active subscription`);
+    if (customerRestored.length > 0) parts.push(`${customerRestored.length} customer-only (no subscription)`);
+    if (failed.length > 0) parts.push(`${failed.length} failed`);
+
     res.json({
       success: true,
-      message: `Reconnected ${reconnected.length}/${userIds.length} members (customer + subscription). ${customerRestored.length} customer ID restored (no active subscription). ${failed.length} not found in Stripe.`,
+      message: parts.join('. ') + '.',
       results,
       summary: {
-        reconnected: reconnected.length + customerRestored.length,
+        reconnected: totalLinked,
         customerRestored: customerRestored.length,
         failed: failed.length,
         total: userIds.length
