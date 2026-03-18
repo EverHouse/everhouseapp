@@ -520,17 +520,21 @@ export async function pullCafeItemsFromStripe(): Promise<{
         const category = product.metadata?.category || 'other';
         const cafeItemId = parseInt(product.metadata?.cafe_item_id, 10) || -1;
 
-        const existing = await db.execute(sql`SELECT id FROM cafe_items WHERE stripe_product_id = ${product.id} OR id = ${cafeItemId} LIMIT 1`);
+        const existing = await db.execute(sql`SELECT id, is_active FROM cafe_items WHERE stripe_product_id = ${product.id} OR id = ${cafeItemId} LIMIT 1`);
 
         if (existing.rows.length > 0) {
-          const existingId = (existing.rows[0] as unknown as { id: number }).id;
-          await db.execute(sql`UPDATE cafe_items SET
-              name = ${product.name}, description = ${product.description || null}, price = ${priceDecimal}, category = ${category},
-              image_url = COALESCE(${imageUrl}, image_url), stripe_product_id = ${product.id}, stripe_price_id = ${stripePriceId},
-              is_active = true
-            WHERE id = ${existingId}`);
-          synced++;
-          logger.info(`[Reverse Sync] Updated cafe item "${product.name}" (id: ${existingId})`);
+          const existingRow = existing.rows[0] as unknown as { id: number; is_active: boolean };
+          const existingId = existingRow.id;
+          if (!existingRow.is_active) {
+            logger.info(`[Reverse Sync] Skipped reactivation of locally-deleted cafe item "${product.name}" (id: ${existingId})`);
+          } else {
+            await db.execute(sql`UPDATE cafe_items SET
+                name = ${product.name}, description = ${product.description || null}, price = ${priceDecimal}, category = ${category},
+                image_url = COALESCE(${imageUrl}, image_url), stripe_product_id = ${product.id}, stripe_price_id = ${stripePriceId}
+              WHERE id = ${existingId}`);
+            synced++;
+            logger.info(`[Reverse Sync] Updated cafe item "${product.name}" (id: ${existingId})`);
+          }
         } else {
           await db.execute(sql`INSERT INTO cafe_items (name, description, price, category, image_url, icon, sort_order, is_active, stripe_product_id, stripe_price_id, created_at)
              VALUES (${product.name}, ${product.description || null}, ${priceDecimal}, ${category}, ${imageUrl}, ${'restaurant'}, ${0}, ${true}, ${product.id}, ${stripePriceId}, NOW())`);

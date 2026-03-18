@@ -64,7 +64,7 @@ export function normalizeTierSlug(rawName: string | null | undefined): TierSlug 
     }
   }
 
-  logger.warn('[normalizeTierSlug] No tier match found, defaulting to social', { rawName });
+  logger.error('[normalizeTierSlug] No tier match found, defaulting to social. If this is a new tier, add it to TIER_SLUGS in server/utils/tierUtils.ts AND TIER_NAMES in shared/constants/tiers.ts', { rawName });
   return 'social';
 }
 

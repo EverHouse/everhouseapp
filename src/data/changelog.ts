@@ -8,6 +8,16 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.87.79",
+    date: "2026-03-18",
+    title: "Fix: Cafe Delete Flow, Tier Safety & Dead Code Cleanup",
+    changes: [
+      "Fixed: Deleted cafe menu items no longer reappear when using 'Pull from Stripe' — the sync now respects locally-deleted items instead of reactivating them",
+      "Fixed: Unrecognized membership tier names now log clear error messages instead of silently downgrading members to the Social tier",
+      "Cleaned up unused auto-seed cafe menu code that was left behind from a previous change",
+    ]
+  },
+  {
     version: "8.87.78",
     date: "2026-03-18",
     title: "Fix: Facility Notices & Onboarding Checklist Persistence",

@@ -38,6 +38,7 @@ export function normalizeTierName(tierString: string | null | undefined): TierNa
     return 'Social';
   }
 
+  console.warn(`[normalizeTierName] Unrecognized tier "${tierString}", defaulting to ${DEFAULT_TIER}. If this is a new tier, add it to shared/constants/tiers.ts`);
   return DEFAULT_TIER;
 }
 
