@@ -251,10 +251,17 @@ export async function rescanUnmatchedBookings(performedBy: string = 'system'): P
                       FOR UPDATE`);
                     const conflictIds = (conflicting.rows as { id: number }[]).map(r => r.id);
                     if (conflictIds.length > 0) {
-                      await tx.execute(sql`
+                      const cancelResult = await tx.execute(sql`
                         UPDATE booking_requests SET status = 'cancelled', updated_at = NOW(),
                           staff_notes = COALESCE(staff_notes, '') || ${`\n[Auto-cancelled: superseded by Trackman rescan import ${booking.trackmanBookingId}]`}
-                        WHERE id = ANY(${sql`ARRAY[${sql.join(conflictIds.map(id => sql`${id}`), sql`, `)}]::int[]`})`);
+                        WHERE id = ANY(${sql`ARRAY[${sql.join(conflictIds.map(id => sql`${id}`), sql`, `)}]::int[]`})
+                          AND status IN ('pending', 'approved', 'confirmed', 'pending_approval')
+                        RETURNING id`);
+                      const actuallyCancelledIds = (cancelResult.rows as { id: number }[]).map(r => r.id);
+                      const skippedIds = conflictIds.filter(id => !actuallyCancelledIds.includes(id));
+                      if (skippedIds.length > 0) {
+                        logger.warn(`[Trackman Rescan] Some overlapping bookings were not cancelled — status already changed`, { extra: { trackmanBookingId: booking.trackmanBookingId, skippedIds } });
+                      }
                     }
                     await tx.execute(sql`INSERT INTO booking_requests (
                         user_id, user_email, user_name, request_date, start_time, end_time,

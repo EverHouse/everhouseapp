@@ -328,7 +328,10 @@ export async function createBookingForMember(
             logger.error('[Trackman Webhook] Session creation failed after approval — reverting to pending', {
               extra: { bookingId: pendingBookingId, trackmanBookingId, error: sessionResult.error }
             });
-            await db.execute(sql`UPDATE booking_requests SET status = 'pending', updated_at = NOW() WHERE id = ${pendingBookingId}`);
+            const revertResult = await db.execute(sql`UPDATE booking_requests SET status = 'pending', updated_at = NOW() WHERE id = ${pendingBookingId} AND status = 'approved'`);
+            if (!revertResult.rowCount || revertResult.rowCount === 0) {
+              logger.warn('[Trackman Webhook] Revert to pending skipped — status already changed', { extra: { bookingId: pendingBookingId, trackmanBookingId } });
+            }
             return { success: false };
           }
           
@@ -397,7 +400,10 @@ export async function createBookingForMember(
           }
         } catch (sessionErr: unknown) {
           logger.error('[Trackman Webhook] Failed to ensure session for linked booking — reverting to pending', { extra: { bookingId: pendingBookingId, trackmanBookingId, error: sessionErr } });
-          await db.execute(sql`UPDATE booking_requests SET status = 'pending', updated_at = NOW() WHERE id = ${pendingBookingId}`);
+          const revertResult2 = await db.execute(sql`UPDATE booking_requests SET status = 'pending', updated_at = NOW() WHERE id = ${pendingBookingId} AND status = 'approved'`);
+          if (!revertResult2.rowCount || revertResult2.rowCount === 0) {
+            logger.warn('[Trackman Webhook] Revert to pending skipped — status already changed', { extra: { bookingId: pendingBookingId, trackmanBookingId } });
+          }
         }
       }
       
@@ -847,7 +853,10 @@ export async function tryMatchByBayDateTime(
         logger.error('[Trackman Webhook] Session creation failed after bay/date/time match approval — reverting to pending', {
           extra: { bookingId, trackmanBookingId, error: sessionResult.error }
         });
-        await db.execute(sql`UPDATE booking_requests SET status = 'pending', updated_at = NOW() WHERE id = ${bookingId}`);
+        const revertResult3 = await db.execute(sql`UPDATE booking_requests SET status = 'pending', updated_at = NOW() WHERE id = ${bookingId} AND status = 'approved'`);
+        if (!revertResult3.rowCount || revertResult3.rowCount === 0) {
+          logger.warn('[Trackman Webhook] Revert to pending skipped — status already changed', { extra: { bookingId, trackmanBookingId } });
+        }
         return { matched: false };
       }
 

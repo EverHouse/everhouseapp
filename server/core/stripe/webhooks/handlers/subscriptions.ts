@@ -849,7 +849,7 @@ export async function handleSubscriptionUpdated(client: PoolClient, subscription
         ? ['pending', 'inactive', 'non-member', 'past_due', 'trialing', 'suspended']
         : ['pending', 'inactive', 'non-member', 'past_due', 'trialing'];
 
-      await client.query(
+      const activeResult = await client.query(
         `UPDATE users SET membership_status = 'active', billing_provider = 'stripe', stripe_current_period_end = COALESCE($2, stripe_current_period_end),
          membership_status_changed_at = CASE WHEN membership_status IS DISTINCT FROM 'active' THEN NOW() ELSE membership_status_changed_at END,
          archived_at = NULL, archived_by = NULL, updated_at = NOW() 
@@ -857,6 +857,10 @@ export async function handleSubscriptionUpdated(client: PoolClient, subscription
          AND (membership_status IS NULL OR membership_status IN (${allowedStatuses.map((_, i) => `$${i + 3}`).join(', ')}))`,
         [userId, subscriptionPeriodEnd, ...allowedStatuses]
       );
+      if (activeResult.rowCount === 0) {
+        logger.warn(`[Stripe Webhook] Skipping active transition for ${email} — current status is terminal or incompatible`, { extra: { userId, isReactivation } });
+        return deferredActions;
+      }
       logger.info(`[Stripe Webhook] Membership status set to active for ${email} (reactivation=${isReactivation})`);
 
       const activationStatuses = ['incomplete', 'incomplete_expired'];
@@ -1006,10 +1010,14 @@ export async function handleSubscriptionUpdated(client: PoolClient, subscription
         }
       });
     } else if (status === 'past_due') {
-      await client.query(
-        `UPDATE users SET membership_status = 'past_due', membership_status_changed_at = CASE WHEN membership_status IS DISTINCT FROM 'past_due' THEN NOW() ELSE membership_status_changed_at END, billing_provider = 'stripe', stripe_current_period_end = COALESCE($2, stripe_current_period_end), updated_at = NOW() WHERE id = $1`,
+      const pastDueResult = await client.query(
+        `UPDATE users SET membership_status = 'past_due', membership_status_changed_at = CASE WHEN membership_status IS DISTINCT FROM 'past_due' THEN NOW() ELSE membership_status_changed_at END, billing_provider = 'stripe', stripe_current_period_end = COALESCE($2, stripe_current_period_end), updated_at = NOW() WHERE id = $1 AND (membership_status IS NULL OR membership_status IN ('active', 'trialing', 'past_due'))`,
         [userId, subscriptionPeriodEnd]
       );
+      if (pastDueResult.rowCount === 0) {
+        logger.warn(`[Stripe Webhook] Skipping past_due transition for ${email} — current status is terminal or incompatible`, { extra: { userId } });
+        return deferredActions;
+      }
 
       const statusActuallyChanged = previousAttributes?.status && previousAttributes.status !== 'past_due';
 
@@ -1141,10 +1149,14 @@ export async function handleSubscriptionUpdated(client: PoolClient, subscription
     } else if (status === 'canceled') {
       logger.info(`[Stripe Webhook] Subscription canceled for ${email} - handled by subscription.deleted webhook`);
     } else if (status === 'unpaid') {
-      await client.query(
-        `UPDATE users SET membership_status = 'suspended', billing_provider = 'stripe', stripe_current_period_end = COALESCE($2, stripe_current_period_end), membership_status_changed_at = CASE WHEN membership_status IS DISTINCT FROM 'suspended' THEN NOW() ELSE membership_status_changed_at END, updated_at = NOW() WHERE id = $1`,
+      const unpaidResult = await client.query(
+        `UPDATE users SET membership_status = 'suspended', billing_provider = 'stripe', stripe_current_period_end = COALESCE($2, stripe_current_period_end), membership_status_changed_at = CASE WHEN membership_status IS DISTINCT FROM 'suspended' THEN NOW() ELSE membership_status_changed_at END, updated_at = NOW() WHERE id = $1 AND (membership_status IS NULL OR membership_status IN ('active', 'trialing', 'past_due', 'suspended'))`,
         [userId, subscriptionPeriodEnd]
       );
+      if (unpaidResult.rowCount === 0) {
+        logger.warn(`[Stripe Webhook] Skipping suspended (unpaid) transition for ${email} — current status is terminal or incompatible`, { extra: { userId } });
+        return deferredActions;
+      }
 
       const deferredUnpaidEmail = email;
       const deferredUnpaidMemberName = memberName;
@@ -1335,10 +1347,14 @@ export async function handleSubscriptionPaused(client: PoolClient, subscription:
       return deferredActions;
     }
 
-    await client.query(
-      `UPDATE users SET membership_status = 'frozen', membership_status_changed_at = CASE WHEN membership_status IS DISTINCT FROM 'frozen' THEN NOW() ELSE membership_status_changed_at END, billing_provider = 'stripe', updated_at = NOW() WHERE id = $1`,
+    const frozenResult = await client.query(
+      `UPDATE users SET membership_status = 'frozen', membership_status_changed_at = CASE WHEN membership_status IS DISTINCT FROM 'frozen' THEN NOW() ELSE membership_status_changed_at END, billing_provider = 'stripe', updated_at = NOW() WHERE id = $1 AND (membership_status IS NULL OR membership_status IN ('active', 'trialing', 'past_due', 'suspended', 'frozen'))`,
       [userId]
     );
+    if (frozenResult.rowCount === 0) {
+      logger.warn(`[Stripe Webhook] Skipping frozen transition for ${email} — current status is terminal or incompatible`, { extra: { userId } });
+      return deferredActions;
+    }
     logger.info(`[Stripe Webhook] Subscription paused: ${email} membership_status set to frozen`);
 
     const deferredEmail = email;
@@ -1437,10 +1453,14 @@ export async function handleSubscriptionResumed(client: PoolClient, subscription
       return deferredActions;
     }
 
-    await client.query(
-      `UPDATE users SET membership_status = 'active', membership_status_changed_at = CASE WHEN membership_status IS DISTINCT FROM 'active' THEN NOW() ELSE membership_status_changed_at END, billing_provider = 'stripe', stripe_current_period_end = COALESCE($2, stripe_current_period_end), archived_at = NULL, archived_by = NULL, updated_at = NOW() WHERE id = $1`,
+    const resumeResult = await client.query(
+      `UPDATE users SET membership_status = 'active', membership_status_changed_at = CASE WHEN membership_status IS DISTINCT FROM 'active' THEN NOW() ELSE membership_status_changed_at END, billing_provider = 'stripe', stripe_current_period_end = COALESCE($2, stripe_current_period_end), archived_at = NULL, archived_by = NULL, updated_at = NOW() WHERE id = $1 AND (membership_status IS NULL OR membership_status IN ('frozen', 'suspended', 'past_due', 'paused', 'inactive', 'non-member', 'trialing'))`,
       [userId, subscriptionPeriodEnd]
     );
+    if (resumeResult.rowCount === 0) {
+      logger.warn(`[Stripe Webhook] Skipping resume-to-active transition for ${email} — current status is terminal or incompatible`, { extra: { userId } });
+      return deferredActions;
+    }
     logger.info(`[Stripe Webhook] Subscription resumed: ${email} membership_status set to active`);
 
     const deferredEmail = email;

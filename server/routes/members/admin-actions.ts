@@ -84,10 +84,15 @@ router.patch('/api/members/:email/tier', isStaffOrAdmin, validateBody(tierChange
           [normalizedTier, new Date(), sessionUser?.email || 'unknown', normalizedEmail]
         );
       } else {
-        await client.query(
-          'UPDATE users SET last_tier = tier, tier = NULL, tier_id = NULL, membership_status = $1, membership_status_changed_at = CASE WHEN membership_status IS DISTINCT FROM $1 THEN NOW() ELSE membership_status_changed_at END, updated_at = $2, last_manual_fix_at = NOW(), last_manual_fix_by = $3 WHERE LOWER(email) = $4',
+        const tierClearResult = await client.query(
+          `UPDATE users SET last_tier = tier, tier = NULL, tier_id = NULL, membership_status = $1, membership_status_changed_at = CASE WHEN membership_status IS DISTINCT FROM $1 THEN NOW() ELSE membership_status_changed_at END, updated_at = $2, last_manual_fix_at = NOW(), last_manual_fix_by = $3 WHERE LOWER(email) = $4 AND (membership_status IS NULL OR membership_status NOT IN ('archived'))`,
           ['non-member', new Date(), sessionUser?.email || 'unknown', normalizedEmail]
         );
+        if (tierClearResult.rowCount === 0) {
+          await client.query('ROLLBACK');
+          logger.warn('[Admin] Tier clear to non-member skipped — member may be archived', { extra: { email: normalizedEmail } });
+          return res.status(409).json({ error: 'Member status has changed. Please refresh and try again.' });
+        }
       }
       await client.query('COMMIT');
     } catch (txError) {
@@ -258,10 +263,15 @@ router.post('/api/members/:id/suspend', isStaffOrAdmin, async (req, res) => {
       const client = await pool.connect();
       try {
         await client.query('BEGIN');
-        await client.query(
-          'UPDATE users SET membership_status = $1, membership_status_changed_at = CASE WHEN membership_status IS DISTINCT FROM $1 THEN NOW() ELSE membership_status_changed_at END, updated_at = $2 WHERE id = $3',
+        const mbSuspendResult = await client.query(
+          `UPDATE users SET membership_status = $1, membership_status_changed_at = CASE WHEN membership_status IS DISTINCT FROM $1 THEN NOW() ELSE membership_status_changed_at END, updated_at = $2 WHERE id = $3 AND (membership_status IS NULL OR membership_status IN ('active', 'trialing', 'past_due', 'frozen', 'suspended'))`,
           ['suspended', new Date(), id]
         );
+        if (mbSuspendResult.rowCount === 0) {
+          await client.query('ROLLBACK');
+          logger.warn('[Admin] Suspend skipped for MindBody member — current status is terminal or incompatible', { extra: { memberId: id } });
+          return res.status(409).json({ error: 'Member status has changed. Please refresh and try again.' });
+        }
         await client.query('COMMIT');
       } catch (txError) {
         await client.query('ROLLBACK');
@@ -287,10 +297,15 @@ router.post('/api/members/:id/suspend', isStaffOrAdmin, async (req, res) => {
       const client = await pool.connect();
       try {
         await client.query('BEGIN');
-        await client.query(
-          'UPDATE users SET membership_status = $1, membership_status_changed_at = CASE WHEN membership_status IS DISTINCT FROM $1 THEN NOW() ELSE membership_status_changed_at END, billing_provider = \'stripe\', updated_at = $2 WHERE id = $3',
+        const stripeSuspendResult = await client.query(
+          `UPDATE users SET membership_status = $1, membership_status_changed_at = CASE WHEN membership_status IS DISTINCT FROM $1 THEN NOW() ELSE membership_status_changed_at END, billing_provider = 'stripe', updated_at = $2 WHERE id = $3 AND (membership_status IS NULL OR membership_status IN ('active', 'trialing', 'past_due', 'frozen', 'suspended'))`,
           ['suspended', new Date(), id]
         );
+        if (stripeSuspendResult.rowCount === 0) {
+          await client.query('ROLLBACK');
+          logger.warn('[Admin] Suspend skipped for Stripe member — current status is terminal or incompatible', { extra: { memberId: id } });
+          return res.status(409).json({ error: 'Member status has changed. Please refresh and try again.' });
+        }
         await client.query('COMMIT');
       } catch (txError) {
         await client.query('ROLLBACK');

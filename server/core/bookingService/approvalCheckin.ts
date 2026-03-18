@@ -57,10 +57,18 @@ export async function revertToApproved(params: { bookingId: number; staffEmail: 
   try {
     await client.query('BEGIN');
 
-    await client.query(
-      `UPDATE booking_requests SET status = 'approved', reviewed_by = $1, reviewed_at = NOW(), updated_at = NOW() WHERE id = $2`,
+    const revertResult = await client.query(
+      `UPDATE booking_requests SET status = 'approved', reviewed_by = $1, reviewed_at = NOW(), updated_at = NOW() WHERE id = $2 AND status IN ('attended', 'no_show', 'checked_in')`,
       [staffEmail, bookingId]
     );
+
+    if (revertResult.rowCount === 0) {
+      await client.query('ROLLBACK');
+      logger.warn('[RevertToApproved] Status already changed by concurrent action — skipping revert', {
+        extra: { bookingId, expectedStatuses: ['attended', 'no_show', 'checked_in'], staffEmail }
+      });
+      return { error: 'Booking status was changed by another action. Please refresh and try again.', statusCode: 409 };
+    }
 
     if (existing.sessionId) {
       await client.query(
@@ -114,14 +122,25 @@ export async function updateGenericStatus(bookingId: number, status: string, sta
     throw new Error(`Invalid status transition from '${currentStatus}' to '${status}'`);
   }
 
+  const allowedSourceStatuses = Object.entries(ALLOWED_STATUS_TRANSITIONS)
+    .filter(([, targets]) => targets.includes(status))
+    .map(([source]) => source);
+
   const result = await db.update(bookingRequests)
     .set({
       status: status,
       staffNotes: staff_notes || undefined,
       updatedAt: new Date()
     })
-    .where(eq(bookingRequests.id, bookingId))
+    .where(and(
+      eq(bookingRequests.id, bookingId),
+      sql`status IN (${sql.join(allowedSourceStatuses.map(s => sql`${s}`), sql`, `)})`
+    ))
     .returning();
+
+  if (result.length === 0) {
+    throw new Error(`Booking ${bookingId} status changed concurrently — cannot transition to '${status}'`);
+  }
 
   return result;
 }

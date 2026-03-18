@@ -480,8 +480,10 @@ router.post('/api/booking-requests', isAuthenticated, bookingRateLimiter, valida
         logger.error('[ConferenceRoom] Session creation failed — no session_id after all attempts, reverting to pending', {
           extra: { bookingId: row.id }
         });
-        await db.execute(sql`UPDATE booking_requests SET status = 'pending', staff_notes = 'Auto-confirm failed: session could not be created. Please review and approve manually.', updated_at = NOW() WHERE id = ${row.id}`);
-        row.status = 'pending';
+        const revertResult = await db.execute(sql`UPDATE booking_requests SET status = 'pending', staff_notes = 'Auto-confirm failed: session could not be created. Please review and approve manually.', updated_at = NOW() WHERE id = ${row.id} AND status IN ('approved', 'confirmed')`);
+        if (revertResult.rowCount && revertResult.rowCount > 0) {
+          row.status = 'pending';
+        }
       } else {
         try {
           await recalculateSessionFees(confSessionId, 'approval');

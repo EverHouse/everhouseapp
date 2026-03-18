@@ -354,8 +354,8 @@ export async function completeCancellation(params: CompleteCancellationParams) {
   const bookingDate = existing.requestDate;
   const bookingTime = existing.startTime?.substring(0, 5) || '';
 
-  await db.transaction(async (tx) => {
-    await tx.update(bookingRequests)
+  const cancelResult = await db.transaction(async (tx) => {
+    const [updatedRow] = await tx.update(bookingRequests)
       .set({
         status: 'cancelled',
         staffNotes: sql`COALESCE(staff_notes, '') || ${'\n[Cancellation completed manually by ' + staffEmail + ']'}`,
@@ -364,8 +364,15 @@ export async function completeCancellation(params: CompleteCancellationParams) {
       .where(and(
         eq(bookingRequests.id, bookingId),
         eq(bookingRequests.status, 'cancellation_pending')
-      ));
+      ))
+      .returning({ id: bookingRequests.id });
+    return updatedRow;
   });
+
+  if (!cancelResult) {
+    logger.warn('[CompleteCancellation] Booking status changed before cancellation could complete', { extra: { bookingId } });
+    return { success: false, error: 'Booking status has changed. Please refresh and try again.', errors: ['Status conflict'] };
+  }
 
   if (existing.userEmail && !isSyntheticEmail(existing.userEmail)) {
     notifyMember({

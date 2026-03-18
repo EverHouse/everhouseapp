@@ -516,14 +516,21 @@ router.post('/api/admin/trackman-webhooks/backfill', isAdmin, async (req, res) =
                 const conflictIds = conflictRows.map(r => r.id);
                 const reprocessConflicts: { id: number; userEmail: string }[] = [];
                 if (conflictIds.length > 0) {
-                  await tx.execute(sql`
+                  const cancelResult = await tx.execute(sql`
                     UPDATE booking_requests SET status = 'cancelled', updated_at = NOW(),
                       staff_notes = COALESCE(staff_notes, '') || ${`\n[Auto-cancelled: superseded by Trackman reprocess ${event.trackman_booking_id}]`}
-                    WHERE id = ANY(${sql`ARRAY[${sql.join(conflictIds.map(id => sql`${id}`), sql`, `)}]::int[]`})`);
-                  logger.info('[Trackman Reprocess] Cancelled overlapping bookings', { extra: { trackmanBookingId: event.trackman_booking_id, cancelledIds: conflictIds } });
+                    WHERE id = ANY(${sql`ARRAY[${sql.join(conflictIds.map(id => sql`${id}`), sql`, `)}]::int[]`})
+                      AND status IN ('pending', 'approved', 'confirmed', 'pending_approval')
+                    RETURNING id`);
+                  const actuallyCancelledIds = new Set((cancelResult.rows as { id: number }[]).map(r => r.id));
+                  const skippedIds = conflictIds.filter(id => !actuallyCancelledIds.has(id));
+                  if (skippedIds.length > 0) {
+                    logger.warn('[Trackman Reprocess] Some overlapping bookings were not cancelled — status already changed', { extra: { trackmanBookingId: event.trackman_booking_id, skippedIds } });
+                  }
+                  logger.info('[Trackman Reprocess] Cancelled overlapping bookings', { extra: { trackmanBookingId: event.trackman_booking_id, cancelledIds: [...actuallyCancelledIds] } });
 
                   for (const conflictRow of conflictRows) {
-                    if (['approved', 'confirmed'].includes(conflictRow.status)) {
+                    if (['approved', 'confirmed'].includes(conflictRow.status) && actuallyCancelledIds.has(conflictRow.id)) {
                       reprocessConflicts.push({ id: conflictRow.id, userEmail: conflictRow.user_email });
                     }
                   }

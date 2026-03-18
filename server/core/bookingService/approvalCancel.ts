@@ -87,8 +87,15 @@ export async function cancelBooking(params: CancelBookingParams) {
           staffNotes: (existing.staffNotes || '') + '\n[Staff initiated cancellation - awaiting Trackman cancellation]',
           updatedAt: new Date()
         })
-        .where(eq(bookingRequests.id, bookingId))
+        .where(and(
+          eq(bookingRequests.id, bookingId),
+          or(eq(bookingRequests.status, 'approved'), eq(bookingRequests.status, 'confirmed'))
+        ))
         .returning();
+
+      if (!updatedRow) {
+        throw new AppError(409, 'Booking was modified by another staff member. Please refresh.');
+      }
 
       const memberName = existing.userName || existing.userEmail || 'Member';
       const bookingDate = existing.requestDate;

@@ -316,7 +316,7 @@ export async function handleCheckoutSessionCompleted(client: PoolClient, session
           return deferredActions;
         }
         const updateResult = await client.query(
-          `UPDATE users SET stripe_customer_id = $1, membership_status = 'active', membership_status_changed_at = CASE WHEN membership_status IS DISTINCT FROM 'active' THEN NOW() ELSE membership_status_changed_at END, billing_provider = 'stripe', archived_at = NULL, archived_by = NULL, updated_at = NOW() WHERE id = $2 AND (stripe_customer_id IS NULL OR stripe_customer_id = $1)`,
+          `UPDATE users SET stripe_customer_id = $1, membership_status = 'active', membership_status_changed_at = CASE WHEN membership_status IS DISTINCT FROM 'active' THEN NOW() ELSE membership_status_changed_at END, billing_provider = 'stripe', archived_at = NULL, archived_by = NULL, updated_at = NOW() WHERE id = $2 AND (stripe_customer_id IS NULL OR stripe_customer_id = $1) AND (membership_status IS NULL OR membership_status NOT IN ('cancelled', 'archived'))`,
           [customerId, resolved.userId]
         );
         if (updateResult.rowCount === 0) {
@@ -353,7 +353,7 @@ export async function handleCheckoutSessionCompleted(client: PoolClient, session
           logger.info(`[Stripe Webhook] User ${email} exists, updating Stripe customer ID and billing provider`);
           const preUpdateCheckDirect = await client.query('SELECT archived_at FROM users WHERE LOWER(email) = LOWER($1)', [email]);
           const updateResultDirect = await client.query(
-            `UPDATE users SET stripe_customer_id = $1, membership_status = 'active', membership_status_changed_at = CASE WHEN membership_status IS DISTINCT FROM 'active' THEN NOW() ELSE membership_status_changed_at END, billing_provider = 'stripe', archived_at = NULL, archived_by = NULL, updated_at = NOW() WHERE LOWER(email) = LOWER($2) AND (stripe_customer_id IS NULL OR stripe_customer_id = $1)`,
+            `UPDATE users SET stripe_customer_id = $1, membership_status = 'active', membership_status_changed_at = CASE WHEN membership_status IS DISTINCT FROM 'active' THEN NOW() ELSE membership_status_changed_at END, billing_provider = 'stripe', archived_at = NULL, archived_by = NULL, updated_at = NOW() WHERE LOWER(email) = LOWER($2) AND (stripe_customer_id IS NULL OR stripe_customer_id = $1) AND (membership_status IS NULL OR membership_status NOT IN ('cancelled', 'archived'))`,
             [customerId, email]
           );
           if (updateResultDirect.rowCount === 0) {
