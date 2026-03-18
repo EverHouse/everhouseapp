@@ -287,7 +287,7 @@ router.post('/api/auth/apple/link', requireAppleConfig, async (req, res) => {
       resourceId: dbUserId,
       details: { action: 'apple_link', appleEmail: appleData.email },
       req,
-    });
+    }).catch(err => logger.error('[Apple Auth] Failed to log apple_link action', { error: err instanceof Error ? err : new Error(String(err)) }));
 
     res.json({ success: true, appleEmail: appleData.email });
   } catch (error: unknown) {
@@ -336,7 +336,7 @@ router.post('/api/auth/apple/unlink', requireAppleConfig, async (req, res) => {
       resourceId: dbUserId,
       details: { action: 'apple_unlink' },
       req,
-    });
+    }).catch(err => logger.error('[Apple Auth] Failed to log apple_unlink action', { error: err instanceof Error ? err : new Error(String(err)) }));
 
     res.json({ success: true });
   } catch (error: unknown) {

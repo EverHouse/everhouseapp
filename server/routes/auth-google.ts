@@ -392,7 +392,7 @@ router.post('/api/auth/google/link', requireGoogleConfig, async (req, res) => {
       resourceId: dbUserId,
       details: { action: 'google_link', googleEmail: googleUser.email },
       req,
-    });
+    }).catch(err => logger.error('[Google Auth] Failed to log google_link action', { error: err instanceof Error ? err : new Error(String(err)) }));
 
     res.json({ success: true, googleEmail: googleUser.email });
   } catch (error: unknown) {
@@ -441,7 +441,7 @@ router.post('/api/auth/google/unlink', requireGoogleConfig, async (req, res) => 
       resourceId: dbUserId,
       details: { action: 'google_unlink' },
       req,
-    });
+    }).catch(err => logger.error('[Google Auth] Failed to log google_unlink action', { error: err instanceof Error ? err : new Error(String(err)) }));
 
     res.json({ success: true });
   } catch (error: unknown) {

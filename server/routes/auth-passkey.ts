@@ -163,7 +163,7 @@ router.post('/api/auth/passkey/register/verify', async (req, res) => {
       resourceId: sessionUser.id,
       details: { action: 'passkey_register', credentialId: credential.id.substring(0, 16) + '...' },
       req,
-    });
+    }).catch(err => logger.error('[Passkey] Failed to log passkey_register action', { error: err instanceof Error ? err : new Error(String(err)) }));
 
     logger.info('[Passkey] Registered new passkey', { extra: { userId: sessionUser.id, email: sessionUser.email } });
 
@@ -376,7 +376,7 @@ router.delete('/api/auth/passkey/:passkeyId', async (req, res) => {
       resourceId: sessionUser.id,
       details: { action: 'passkey_remove', passkeyId },
       req,
-    });
+    }).catch(err => logger.error('[Passkey] Failed to log passkey_remove action', { error: err instanceof Error ? err : new Error(String(err)) }));
 
     res.json({ success: true });
   } catch (error: unknown) {
