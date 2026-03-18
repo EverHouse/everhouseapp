@@ -8,6 +8,17 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.87.66",
+    date: "2026-03-18",
+    title: "Security: Tightened Content Security Policy (CSP) Headers",
+    changes: [
+      "Removed: unsafe-eval from script-src CSP directive, eliminating eval-based XSS attack surface",
+      "Removed: unsafe-inline from script-src — replaced with per-request cryptographic nonces for all inline scripts",
+      "Added: Nonce-based CSP for inline scripts — unique nonce generated per HTML response and injected into all script tags",
+      "Retained: unsafe-inline in style-src as a documented trade-off (required by React inline styles and third-party widget CSS)",
+    ]
+  },
+  {
     version: "8.87.65",
     date: "2026-03-18",
     title: "Performance: LCP Preload Hints & Critical Request Chain Optimization",

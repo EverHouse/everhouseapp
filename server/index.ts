@@ -4,6 +4,7 @@ import './core/suppressWarnings';
 
 import http from 'http';
 import type { Server } from 'http';
+import { randomBytes } from 'crypto';
 import { getErrorMessage, getErrorStatusCode } from './utils/errorUtils';
 import { logger } from './core/logger';
 import { usingPooler } from './core/db';
@@ -323,6 +324,9 @@ async function initializeApp() {
 
   app.disable('x-powered-by');
   app.use((req, res, next) => {
+    const nonce = randomBytes(16).toString('base64');
+    res.locals.cspNonce = nonce;
+
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('X-Frame-Options', 'SAMEORIGIN');
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
@@ -330,7 +334,7 @@ async function initializeApp() {
     res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
     res.setHeader('Content-Security-Policy', [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com https://accounts.google.com https://appleid.cdn-apple.com https://cdn.apple-mapkit.com https://*.hs-scripts.com https://*.hsforms.net https://*.hscollectedforms.net https://*.hs-banner.com https://*.hs-analytics.net https://*.hsadspixel.net https://*.hubspot.com https://*.usemessages.com https://connect.facebook.net",
+      `script-src 'self' 'nonce-${nonce}' https://js.stripe.com https://accounts.google.com https://appleid.cdn-apple.com https://cdn.apple-mapkit.com https://*.hs-scripts.com https://*.hsforms.net https://*.hscollectedforms.net https://*.hs-banner.com https://*.hs-analytics.net https://*.hsadspixel.net https://*.hubspot.com https://*.usemessages.com https://connect.facebook.net`,
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com https://cdn.apple-mapkit.com https://*.hsforms.net",
       "img-src 'self' data: blob: https:",
       "connect-src 'self' https://api.stripe.com https://accounts.google.com https://appleid.apple.com https://*.apple-mapkit.com https://*.hubspot.com https://*.hubapi.com https://*.hscollectedforms.net https://*.hsforms.net https://*.hs-analytics.net https://www.facebook.com https://connect.facebook.net wss: ws:",
@@ -1014,6 +1018,10 @@ async function initializeApp() {
       return `<script type="application/ld+json">${JSON.stringify({ "@context": "https://schema.org", "@graph": graphItems })}</script>`;
     }
 
+    const injectCspNonce = (html: string, nonce: string): string => {
+      return html.replace(/<script(?=[\s>])/g, `<script nonce="${nonce}"`);
+    };
+
     app.use((req, res, next) => {
       if (req.method === 'GET' && !req.path.startsWith('/api/') && !req.path.startsWith('/assets/') && req.path !== '/healthz' && req.path !== '/_health') {
         if (!cachedIndexHtml) {
@@ -1022,6 +1030,7 @@ async function initializeApp() {
 
         const routePath = req.path.replace(/\/+$/, '') || '/';
         const meta = SEO_META[routePath];
+        const nonce = res.locals.cspNonce as string;
 
         res.setHeader('Content-Type', 'text/html');
         res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
@@ -1047,7 +1056,7 @@ async function initializeApp() {
           html = html.replace(/<meta name="twitter:description"[^>]*>/, `<meta name="twitter:description" content="${meta.description}" />`);
           html = html.replace(/<link rel="canonical"[^>]*>/, `<link rel="canonical" href="${ogUrl}" />`);
           html = html.replace('</head>', `${GEO_META_TAGS}\n${getJsonLdScripts(routePath)}\n</head>`);
-          return res.send(html);
+          return res.send(injectCspNonce(html, nonce));
         }
 
         let html = cachedIndexHtml;
@@ -1055,7 +1064,7 @@ async function initializeApp() {
         html = html.replace(/<meta property="og:url"[^>]*>/, `<meta property="og:url" content="${fallbackUrl}" />`);
         html = html.replace(/<link rel="canonical"[^>]*>/, `<link rel="canonical" href="${fallbackUrl}" />`);
         html = html.replace('</head>', `${GEO_META_TAGS}\n${getJsonLdScripts(routePath)}\n</head>`);
-        return res.send(html);
+        return res.send(injectCspNonce(html, nonce));
       }
       next();
     });
