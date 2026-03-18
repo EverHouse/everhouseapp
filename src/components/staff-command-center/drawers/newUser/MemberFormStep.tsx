@@ -313,7 +313,7 @@ export function MemberFormStep({
                 setForm(prev => ({
                   ...prev,
                   addGroupMembers: e.target.checked,
-                  groupMembers: e.target.checked ? [{ firstName: '', lastName: '', email: '', phone: '', dob: '', tierId: prev.tierId, streetAddress: '', city: '', state: '', zipCode: '' }] : [],
+                  groupMembers: e.target.checked ? [{ firstName: '', lastName: '', email: '', phone: '', dob: '', tierId: prev.tierId, discountCode: 'FAMILY20', streetAddress: '', city: '', state: '', zipCode: '' }] : [],
                 }));
               }}
               className="w-5 h-5 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
@@ -323,7 +323,7 @@ export function MemberFormStep({
                 Add Group Members?
               </span>
               <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                Family members get 20% off their membership
+                Apply a discount to group members
               </p>
             </div>
           </label>
@@ -363,9 +363,31 @@ export function MemberFormStep({
                       className={`${inputClass} text-sm py-2`}
                     >
                       <option value="">Select tier...</option>
-                      {tiers.map(tier => (
-                        <option key={tier.id} value={tier.id}>
-                          {tier.name} - ${(tier.priceCents * 0.8 / 100).toFixed(2)}/mo (20% off)
+                      {tiers.map(tier => {
+                        const memberDiscount = discounts.find(d => d.code === member.discountCode);
+                        const memberDiscountPercent = memberDiscount?.percentOff || 0;
+                        const discountedPrice = Math.round(tier.priceCents * (1 - memberDiscountPercent / 100));
+                        const priceLabel = memberDiscountPercent > 0
+                          ? `$${(discountedPrice / 100).toFixed(2)}/mo (${memberDiscountPercent}% off)`
+                          : `$${(tier.priceCents / 100).toFixed(2)}/mo`;
+                        return (
+                          <option key={tier.id} value={tier.id}>
+                            {tier.name} - {priceLabel}
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </div>
+                  <div className="mb-2">
+                    <select
+                      value={member.discountCode}
+                      onChange={(e) => updateGroupMember(index, 'discountCode', e.target.value)}
+                      className={`${inputClass} text-sm py-2`}
+                    >
+                      <option value="">No discount</option>
+                      {discounts.map(d => (
+                        <option key={d.id} value={d.code}>
+                          {(d as { id: string; code: string; percentOff: number; name?: string }).name || d.code} ({d.percentOff}% off)
                         </option>
                       ))}
                     </select>

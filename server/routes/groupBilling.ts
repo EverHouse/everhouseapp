@@ -275,7 +275,7 @@ router.post('/api/family-billing/groups', isStaffOrAdmin, async (req, res) => {
 router.post('/api/group-billing/groups/:groupId/members', isStaffOrAdmin, async (req, res) => {
   try {
     const groupId = req.params.groupId as string;
-    const { memberEmail: rawMemberEmail, memberTier, relationship, firstName, lastName, phone, dob, streetAddress, city, state, zipCode } = req.body;
+    const { memberEmail: rawMemberEmail, memberTier, relationship, firstName, lastName, phone, dob, streetAddress, city, state, zipCode, discountCode } = req.body;
     const memberEmail = rawMemberEmail?.trim()?.toLowerCase();
     const user = getSessionUser(req);
     
@@ -296,6 +296,7 @@ router.post('/api/group-billing/groups/:groupId/members', isStaffOrAdmin, async 
       city,
       state,
       zipCode,
+      discountCode,
       addedBy: user?.email || 'staff',
       addedByName: user?.name || 'Staff Member',
     });
@@ -381,7 +382,7 @@ router.post('/api/group-billing/groups/:groupId/corporate-members', isStaffOrAdm
 router.post('/api/family-billing/groups/:groupId/members', isStaffOrAdmin, async (req, res) => {
   try {
     const groupId = req.params.groupId as string;
-    const { memberEmail: rawMemberEmail, memberTier, relationship, firstName, lastName, phone, dob, streetAddress, city, state, zipCode } = req.body;
+    const { memberEmail: rawMemberEmail, memberTier, relationship, firstName, lastName, phone, dob, streetAddress, city, state, zipCode, discountCode } = req.body;
     const memberEmail = rawMemberEmail?.trim()?.toLowerCase();
     const user = getSessionUser(req);
     
@@ -402,6 +403,7 @@ router.post('/api/family-billing/groups/:groupId/members', isStaffOrAdmin, async
       city,
       state,
       zipCode,
+      discountCode,
       addedBy: user?.email || 'staff',
       addedByName: user?.name || 'Staff Member',
     });

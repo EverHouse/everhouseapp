@@ -15,6 +15,7 @@ import { SuccessStep } from './SuccessStep';
 import { PreviewStep } from './PreviewStep';
 import { PaymentStep } from './PaymentStep';
 import { MemberFormStep } from './MemberFormStep';
+import { createGroupAndAddMembers, getGroupResultToast } from './groupMemberHelper';
 
 export function MemberFlow({
   step,
@@ -264,54 +265,14 @@ export function MemberFlow({
           
           if (form.addGroupMembers && form.groupMembers.length > 0) {
             try {
-              const groupCreateData = await postWithCredentials<{ groupId: string }>('/api/family-billing/groups', {
-                primaryEmail: form.email,
-                groupName: `${form.firstName} ${form.lastName} Family`
+              const result = await createGroupAndAddMembers({
+                form,
+                tiers,
+                selectedTierSlug: selectedTier?.slug,
+                subMemberScannedIds,
               });
-
-              const groupId = groupCreateData.groupId;
-              let addedCount = 0;
-              let failedCount = 0;
-
-              for (let i = 0; i < form.groupMembers.length; i++) {
-                const member = form.groupMembers[i];
-                try {
-                  const memberTierSlug = tiers.find(t => t.id === member.tierId)?.slug || selectedTier?.slug;
-                  const addData = await postWithCredentials<{ memberId?: string }>(`/api/family-billing/groups/${groupId}/members`, {
-                    memberEmail: member.email,
-                    memberTier: memberTierSlug,
-                    relationship: 'family',
-                    firstName: member.firstName,
-                    lastName: member.lastName,
-                    phone: member.phone,
-                    dob: member.dob,
-                    streetAddress: member.streetAddress || undefined,
-                    city: member.city || undefined,
-                    state: member.state || undefined,
-                    zipCode: member.zipCode || undefined,
-                  });
-
-                  addedCount++;
-                  if (subMemberScannedIds[i] && addData.memberId) {
-                    postWithCredentials('/api/admin/save-id-image', {
-                      userId: addData.memberId,
-                      image: subMemberScannedIds[i].base64,
-                      mimeType: subMemberScannedIds[i].mimeType,
-                    }).catch(err => console.error('Failed to save sub-member ID image:', err));
-                  }
-                } catch (memberErr: unknown) {
-                  failedCount++;
-                  console.error(`Error adding group member ${member.email}:`, memberErr);
-                }
-              }
-
-              if (failedCount === 0) {
-                showToast(`Family group created with ${addedCount} member${addedCount !== 1 ? 's' : ''}.`, 'success');
-              } else if (addedCount > 0) {
-                showToast(`Family group created. ${addedCount} added, ${failedCount} failed. Check group billing to fix.`, 'warning');
-              } else {
-                showToast('Family group created but failed to add members. You can add them manually.', 'warning');
-              }
+              const toast = getGroupResultToast(result.addedCount, result.failedCount);
+              showToast(toast.message, toast.type);
             } catch (groupErr: unknown) {
               console.error('Error creating family group:', groupErr);
               showToast('Membership activated but failed to create family group. You can set this up manually.', 'warning');
@@ -521,7 +482,7 @@ export function MemberFlow({
   const addGroupMember = () => {
     setForm(prev => ({
       ...prev,
-      groupMembers: [...prev.groupMembers, { firstName: '', lastName: '', email: '', phone: '', dob: '', tierId: prev.tierId, streetAddress: '', city: '', state: '', zipCode: '' }],
+      groupMembers: [...prev.groupMembers, { firstName: '', lastName: '', email: '', phone: '', dob: '', tierId: prev.tierId, discountCode: 'FAMILY20', streetAddress: '', city: '', state: '', zipCode: '' }],
     }));
   };
 

@@ -9,7 +9,7 @@ import {
 interface PreviewStepProps {
   form: MemberFormData;
   tiers: MembershipTier[];
-  discounts: { id: string; code: string; percentOff: number; stripeCouponId?: string }[];
+  discounts: { id: string; code: string; percentOff: number; stripeCouponId?: string; name?: string }[];
   existingBillingGroups: ExistingBillingGroup[];
   selectedTier: MembershipTier | undefined;
   isDark: boolean;
@@ -35,10 +35,13 @@ export function PreviewStep({
   const groupMembersPricing = form.groupMembers.map((member) => {
     const memberTier = tiers.find(t => t.id === member.tierId) || selectedTier;
     const memberTierPrice = memberTier?.priceCents || tierPrice;
+    const memberDiscount = discounts.find(d => d.code === member.discountCode);
+    const memberDiscountPercent = memberDiscount?.percentOff || 0;
     return {
       ...member,
       tierName: memberTier?.name || selectedTier?.name || 'Unknown',
-      price: Math.round(memberTierPrice * 0.8),
+      discountLabel: memberDiscount ? `${memberDiscount.name || memberDiscount.code} ${memberDiscountPercent}% off` : null,
+      price: Math.round(memberTierPrice * (1 - memberDiscountPercent / 100)),
     };
   });
   
@@ -95,7 +98,7 @@ export function PreviewStep({
                   {member.firstName || 'Sub-member'} {member.lastName || index + 1}
                 </p>
                 <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                  {member.tierName} (Family 20% off)
+                  {member.tierName}{member.discountLabel ? ` (${member.discountLabel})` : ''}
                 </p>
               </div>
               <span className={`font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>

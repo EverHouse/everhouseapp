@@ -11,11 +11,12 @@ import {
 import { deleteWithCredentials, postWithCredentials } from '../../../../hooks/queries/useFetch';
 import { apiRequest } from '../../../../lib/apiRequest';
 import WalkingGolferSpinner from '../../../WalkingGolferSpinner';
+import { createGroupAndAddMembers, getGroupResultToast } from './groupMemberHelper';
 
 interface PaymentStepProps {
   form: MemberFormData;
   tiers: MembershipTier[];
-  discounts: { id: string; code: string; percentOff: number; stripeCouponId?: string }[];
+  discounts: { id: string; code: string; percentOff: number; stripeCouponId?: string; name?: string }[];
   selectedTier: MembershipTier | undefined;
   isDark: boolean;
   isLoading: boolean;
@@ -87,7 +88,9 @@ export function PaymentStep({
   const groupMembersTotal = form.groupMembers.reduce((sum, member) => {
     const memberTier = tiers.find(t => t.id === member.tierId) || selectedTier;
     const memberTierPrice = memberTier?.priceCents || tierPrice;
-    return sum + Math.round(memberTierPrice * 0.8);
+    const memberDiscount = discounts.find(d => d.code === member.discountCode);
+    const memberDiscountPercent = memberDiscount?.percentOff || 0;
+    return sum + Math.round(memberTierPrice * (1 - memberDiscountPercent / 100));
   }, 0);
   
   const totalPrice = primaryPrice + groupMembersTotal;
@@ -349,74 +352,15 @@ export function PaymentStep({
 
                         if (form.addGroupMembers && form.groupMembers.length > 0) {
                           try {
-                            const groupCreateResult = await apiRequest<Record<string, unknown>>('/api/family-billing/groups', {
-                              method: 'POST',
-                              headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({
-                                primaryEmail: form.email,
-                                groupName: `${form.firstName} ${form.lastName} Family`
-                              })
-                            }, { maxRetries: 1 });
-
-                            if (!groupCreateResult.ok) {
-                              console.error('Failed to create family billing group:', groupCreateResult.error);
-                              showToast('Membership activated but failed to create family group. You can set this up manually.', 'warning');
-                            } else {
-                              const groupCreateData = groupCreateResult.data as Record<string, unknown>;
-                              const groupId = groupCreateData.groupId;
-                              let addedCount = 0;
-                              let failedCount = 0;
-
-                              for (let i = 0; i < form.groupMembers.length; i++) {
-                                const member = form.groupMembers[i];
-                                try {
-                                  const memberTierSlug = tiers.find(t => t.id === member.tierId)?.slug || selectedTier?.slug;
-                                  const addMemberResult = await apiRequest<Record<string, unknown>>(`/api/family-billing/groups/${groupId}/members`, {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({
-                                      memberEmail: member.email,
-                                      memberTier: memberTierSlug,
-                                      relationship: 'family',
-                                      firstName: member.firstName,
-                                      lastName: member.lastName,
-                                      phone: member.phone,
-                                      dob: member.dob,
-                                      streetAddress: member.streetAddress || undefined,
-                                      city: member.city || undefined,
-                                      state: member.state || undefined,
-                                      zipCode: member.zipCode || undefined,
-                                    })
-                                  }, { maxRetries: 1 });
-
-                                  if (addMemberResult.ok) {
-                                    addedCount++;
-                                    const addData = addMemberResult.data as Record<string, unknown>;
-                                    if (subMemberScannedIds[i] && addData.memberId) {
-                                      postWithCredentials('/api/admin/save-id-image', {
-                                        userId: addData.memberId,
-                                        image: subMemberScannedIds[i].base64,
-                                        mimeType: subMemberScannedIds[i].mimeType,
-                                      }).catch(err => console.error('Failed to save sub-member ID image:', err));
-                                    }
-                                  } else {
-                                    failedCount++;
-                                    console.error(`Failed to add group member ${member.email}:`, addMemberResult.error);
-                                  }
-                                } catch (memberErr) {
-                                  failedCount++;
-                                  console.error(`Error adding group member ${member.email}:`, memberErr);
-                                }
-                              }
-
-                              if (failedCount === 0) {
-                                showToast(`Family group created with ${addedCount} member${addedCount !== 1 ? 's' : ''}.`, 'success');
-                              } else if (addedCount > 0) {
-                                showToast(`Family group created. ${addedCount} added, ${failedCount} failed. Check group billing to fix.`, 'warning');
-                              } else {
-                                showToast('Family group created but failed to add members. You can add them manually.', 'warning');
-                              }
-                            }
+                            const result = await createGroupAndAddMembers({
+                              form,
+                              tiers,
+                              selectedTierSlug: selectedTier?.slug,
+                              subMemberScannedIds,
+                              useApiRequest: true,
+                            });
+                            const toast = getGroupResultToast(result.addedCount, result.failedCount);
+                            showToast(toast.message, toast.type);
                           } catch (groupErr) {
                             console.error('Error creating family group:', groupErr);
                             showToast('Membership activated but failed to create family group. You can set this up manually.', 'warning');

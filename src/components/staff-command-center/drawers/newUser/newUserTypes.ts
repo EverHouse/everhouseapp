@@ -44,6 +44,7 @@ export interface GroupMember {
   phone: string;
   dob: string;
   tierId: number | null;
+  discountCode: string;
   streetAddress: string;
   city: string;
   state: string;

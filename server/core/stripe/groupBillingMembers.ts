@@ -32,6 +32,7 @@ export async function addGroupMember(params: {
   city?: string;
   state?: string;
   zipCode?: string;
+  discountCode?: string;
   addedBy: string;
   addedByName: string;
 }): Promise<{ success: boolean; memberId?: number; error?: string }> {
@@ -192,13 +193,29 @@ export async function addGroupMember(params: {
             },
           };
           
-          if (isFamilyGroup) {
-            try {
-              const couponId = await getOrCreateFamilyCoupon();
-              subscriptionItemParams.discounts = [{ coupon: couponId }];
-              logger.info(`[GroupBilling] Applying FAMILY20 coupon to family member ${params.memberEmail}`);
-            } catch (couponErr: unknown) {
-              logger.warn(`[GroupBilling] Could not apply FAMILY20 coupon: ${getErrorMessage(couponErr)}. Proceeding without discount.`);
+          const explicitDiscount = params.discountCode;
+          const skipDiscount = explicitDiscount === '' || explicitDiscount?.toLowerCase() === 'none';
+          let appliedCouponCode: string | null = null;
+
+          if (!skipDiscount) {
+            if (explicitDiscount) {
+              try {
+                const coupon = await stripe.coupons.retrieve(explicitDiscount);
+                subscriptionItemParams.discounts = [{ coupon: coupon.id }];
+                appliedCouponCode = explicitDiscount;
+                logger.info(`[GroupBilling] Applying coupon ${explicitDiscount} to member ${params.memberEmail}`);
+              } catch (couponErr: unknown) {
+                logger.warn(`[GroupBilling] Could not apply coupon ${explicitDiscount}: ${getErrorMessage(couponErr)}. Proceeding without discount.`);
+              }
+            } else if (isFamilyGroup) {
+              try {
+                const couponId = await getOrCreateFamilyCoupon();
+                subscriptionItemParams.discounts = [{ coupon: couponId }];
+                appliedCouponCode = 'FAMILY20';
+                logger.info(`[GroupBilling] Applying FAMILY20 coupon to family member ${params.memberEmail}`);
+              } catch (couponErr: unknown) {
+                logger.warn(`[GroupBilling] Could not apply FAMILY20 coupon: ${getErrorMessage(couponErr)}. Proceeding without discount.`);
+              }
             }
           }
           
@@ -210,15 +227,20 @@ export async function addGroupMember(params: {
             sql`UPDATE group_members SET stripe_subscription_item_id = ${subscriptionItem.id} WHERE id = ${insertedMemberId}`
           );
 
-          if (isFamilyGroup) {
-            try {
+          try {
+            if (appliedCouponCode) {
               await db.execute(
-                sql`UPDATE users SET discount_code = 'FAMILY20', updated_at = NOW() WHERE LOWER(email) = ${params.memberEmail.toLowerCase()}`
+                sql`UPDATE users SET discount_code = ${appliedCouponCode}, updated_at = NOW() WHERE LOWER(email) = ${params.memberEmail.toLowerCase()}`
               );
-              logger.info(`[GroupBilling] Set discount_code=FAMILY20 for family member ${params.memberEmail}`);
-            } catch (dcErr: unknown) {
-              logger.warn(`[GroupBilling] Failed to set discount_code for family member: ${getErrorMessage(dcErr)}`);
+              logger.info(`[GroupBilling] Set discount_code=${appliedCouponCode} for member ${params.memberEmail}`);
+            } else {
+              await db.execute(
+                sql`UPDATE users SET discount_code = NULL, updated_at = NOW() WHERE LOWER(email) = ${params.memberEmail.toLowerCase()}`
+              );
+              logger.info(`[GroupBilling] Cleared discount_code for member ${params.memberEmail} (no discount applied)`);
             }
+          } catch (dcErr: unknown) {
+            logger.warn(`[GroupBilling] Failed to update discount_code for member: ${getErrorMessage(dcErr)}`);
           }
         } catch (stripeErr: unknown) {
           logger.error('[GroupBilling] Stripe API failed, rolling back DB reservation:', { error: stripeErr });
