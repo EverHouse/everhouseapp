@@ -543,8 +543,7 @@ export async function approveBooking(params: ApproveBookingParams) {
       title: 'Booking Approved',
       message: approvalMessage,
       data: { bookingId, eventType: 'booking_approved' }
-    }, { action: 'booking_approved', bookingId, triggerSource: 'approval.ts' })
-    .catch(err => logger.error('[Approval] sendNotificationToUser failed', { extra: { error: getErrorMessage(err) } }));
+    }, { action: 'booking_approved', bookingId, triggerSource: 'approval.ts' });
 
     notifyApprovalParticipants(bookingId, updated as unknown as BookingUpdateResult)
       .catch(err => logger.error('[Approval] Group notification failed', { extra: { error: getErrorMessage(err) } }));
@@ -675,8 +674,7 @@ async function notifyApprovalParticipants(bookingId: number, updated: BookingUpd
         title: 'Added to Booking',
         message: notificationMsg,
         data: { bookingId: bookingId.toString(), eventType: 'booking_participant_added' }
-      }, { action: 'booking_participant_added', bookingId, triggerSource: 'approval.ts' })
-      .catch(err => logger.error('[Approval] participant sendNotificationToUser failed', { extra: { error: getErrorMessage(err) } }));
+      }, { action: 'booking_participant_added', bookingId, triggerSource: 'approval.ts' });
 
       logger.info('[Approval] Sent Added to Booking notification', { extra: { participantEmail, bookingId } });
     }
@@ -803,8 +801,7 @@ export async function declineBooking(params: DeclineBookingParams) {
     title: 'Booking Declined',
     message: declineMessage,
     data: { bookingId, eventType: 'booking_declined' }
-  }, { action: 'booking_declined', bookingId, triggerSource: 'approval.ts' })
-  .catch(err => logger.error('[Decline] sendNotificationToUser failed', { extra: { error: getErrorMessage(err) } }));
+  }, { action: 'booking_declined', bookingId, triggerSource: 'approval.ts' });
 
   return { updated };
 }

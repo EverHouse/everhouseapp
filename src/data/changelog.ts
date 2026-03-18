@@ -8,6 +8,16 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.87.75",
+    date: "2026-03-18",
+    title: "Fix: Remove Invalid .catch() on Synchronous sendNotificationToUser",
+    changes: [
+      "Fixed: Removed all .catch() chains from sendNotificationToUser calls across 22 server files — the function is synchronous (returns NotificationDeliveryResult, not a Promise), so .catch() would throw TypeError at runtime",
+      "Fixed: Reverted v8.87.74 .catch() additions on sendNotificationToUser in approvalFlow, approvalCancel, approvalCheckin, approvalCompletion, and webhook-reprocess — same synchronous function issue",
+      "Fixed: sendNotificationToUser already handles errors internally (ws.send wrapped in try/catch) — no external error handling needed; calls that were previously bare are safe as-is",
+    ]
+  },
+  {
     version: "8.87.74",
     date: "2026-03-18",
     title: "Fix: Unhandled Async Error Boundaries",

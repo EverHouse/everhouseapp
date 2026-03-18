@@ -320,7 +320,7 @@ router.post('/api/admin/bookings/:id/simulate-confirm', isStaffOrAdmin, async (r
           type: 'booking_approved',
           title: 'Booking Confirmed',
           message: 'Your booking has been confirmed',
-        }).catch(err => logger.error('[Simulate Confirm] sendNotificationToUser failed', { extra: { error: getErrorMessage(err) } }));
+        });
       }
     } catch (notifyError: unknown) {
       logger.error('[Simulate Confirm] Notification error (non-blocking)', { error: notifyError instanceof Error ? notifyError : new Error(String(notifyError)) });
