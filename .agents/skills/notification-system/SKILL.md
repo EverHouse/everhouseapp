@@ -91,6 +91,12 @@ In-app database and WebSocket notifications are always delivered regardless.
 
 **Notification type alignment (v8.87.16):** Tier changes now use `membership_tier_change` (was `system`). Membership status changes (pause, restore, suspend) now use `member_status_change` (was `system`). This enables proper dedupe matching and deep-link routing.
 
+## WebSocket Notification Data Contract (v8.87.90)
+
+`deliverViaWebSocket` sends: `{ type: 'notification', title, message, data: { eventType, notificationType, relatedId, relatedType } }`.
+
+The frontend `useWebSocket` handler checks `data.eventType` to trigger `bookingEvents.emit()` for dashboard refresh. **Both `eventType` and `notificationType` must be present** — `eventType` for the frontend event check, `notificationType` for backwards compatibility.
+
 ## Hard Rules
 
 1. **Always use `notifyMember()` from `notificationService.ts`.** NEVER insert directly into the `notifications` table.

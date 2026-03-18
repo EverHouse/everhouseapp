@@ -138,11 +138,15 @@ export function useCommandCenter(): UseCommandCenterResult {
 
     const handleBookingAction = () => fetchData();
     const handleBookingUpdate = () => fetchData();
+    const handleBookingAutoConfirmed = () => fetchData();
+    const handleBookingConfirmed = () => fetchData();
     
     const handleRefreshRequest = () => fetchData();
 
     window.addEventListener('booking-action-completed', handleBookingAction);
     window.addEventListener('booking-update', handleBookingUpdate);
+    window.addEventListener('booking-auto-confirmed', handleBookingAutoConfirmed);
+    window.addEventListener('booking-confirmed', handleBookingConfirmed);
     window.addEventListener('request-command-center-refresh', handleRefreshRequest);
 
     return () => {
@@ -151,6 +155,8 @@ export function useCommandCenter(): UseCommandCenterResult {
       }
       window.removeEventListener('booking-action-completed', handleBookingAction);
       window.removeEventListener('booking-update', handleBookingUpdate);
+      window.removeEventListener('booking-auto-confirmed', handleBookingAutoConfirmed);
+      window.removeEventListener('booking-confirmed', handleBookingConfirmed);
       window.removeEventListener('request-command-center-refresh', handleRefreshRequest);
     };
   }, [fetchData]);

@@ -8,6 +8,16 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.87.90",
+    date: "2026-03-18",
+    title: "Fix: Bookings Queue Now Updates Instantly After Trackman Auto-Confirm",
+    changes: [
+      "Fixed: Pending booking requests now disappear from the queue immediately when Trackman webhooks auto-confirm a booking — previously the UI would not refresh due to a notification data mismatch",
+      "Fixed: Member dashboard now refreshes booking status in real-time when bookings are confirmed via Trackman",
+      "Improved: Staff navigation badge count now updates instantly on auto-confirmation instead of waiting for the next polling cycle",
+    ]
+  },
+  {
     version: "8.87.89",
     date: "2026-03-18",
     title: "Fix: Stripe Reconnect Now Succeeds When Customer Has No Subscription",

@@ -272,6 +272,7 @@ async function deliverViaWebSocket(payload: NotificationPayload): Promise<Delive
       title: payload.title,
       message: payload.message,
       data: {
+        eventType: payload.type,
         notificationType: payload.type,
         relatedId: payload.relatedId,
         relatedType: payload.relatedType
