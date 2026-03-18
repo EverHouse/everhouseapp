@@ -368,9 +368,37 @@ export async function syncTierToHubSpot(params: {
       logger.warn(`[HubSpot TierSync] Could not clear lifecyclestage for ${normalizedEmail} before setting to '${lifecyclestage}':`, { error: clearError });
     }
 
-    await retryableHubSpotRequest(() =>
-      hubspot.crm.contacts.basicApi.update(hubspotContactId, { properties })
-    );
+    try {
+      await retryableHubSpotRequest(() =>
+        hubspot.crm.contacts.basicApi.update(hubspotContactId, { properties })
+      );
+    } catch (updateError: unknown) {
+      const errBody = updateError && typeof updateError === 'object' && 'body' in updateError ? (updateError as { body: { errors?: Array<{ code: string; context?: { propertyName?: string[] } }> } }).body : undefined;
+      if (errBody?.errors?.some((e) => e.code === 'PROPERTY_DOESNT_EXIST')) {
+        const invalidProps = errBody.errors
+          .filter((e) => e.code === 'PROPERTY_DOESNT_EXIST')
+          .map((e) => e.context?.propertyName?.[0]);
+
+        const validProperties: Record<string, string> = {};
+        for (const [key, value] of Object.entries(properties)) {
+          if (!invalidProps.includes(key)) {
+            validProperties[key] = value;
+          }
+        }
+
+        if (Object.keys(validProperties).length > 0) {
+          logger.info(`[HubSpot TierSync] Retrying ${normalizedEmail} without missing properties: ${invalidProps.join(', ')}`);
+          await retryableHubSpotRequest(() =>
+            hubspot.crm.contacts.basicApi.update(hubspotContactId, { properties: validProperties })
+          );
+        } else {
+          logger.warn(`[HubSpot TierSync] All properties invalid for ${normalizedEmail}: ${invalidProps.join(', ')}`);
+          return;
+        }
+      } else {
+        throw updateError;
+      }
+    }
     
     logger.info(`[HubSpot TierSync] Updated contact ${normalizedEmail}: tier="${hubspotTier}", status="${hubspotStatus}", lifecycle="${lifecyclestage}", billing="${hubspotBillingProvider || 'not set'}"`);
   } catch (error: unknown) {

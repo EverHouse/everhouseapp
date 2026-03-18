@@ -112,7 +112,10 @@ export async function logFormIdResolutionStatus(): Promise<void> {
     }
   }
   if (missing.length > 0) {
-    logger.warn(`[HubSpot Forms] Form types with no resolved ID at startup: ${missing.join(', ')}. These will fail until discovery runs, admin settings are configured, or env vars are set.`);
+    logger.warn(`[HubSpot Forms] Form types with no resolved ID at startup: ${missing.join(', ')}. ` +
+      `These will fail until discovery runs, admin settings are configured, or env vars are set. ` +
+      `To configure manually, set env vars (e.g. HUBSPOT_FORM_GUEST_CHECKIN, HUBSPOT_FORM_CONTACT) ` +
+      `or add admin settings (hubspot.form_id.guest-checkin, hubspot.form_id.contact).`);
   }
   logger.info(`[HubSpot Forms] Resolved form IDs: ${resolved.join(', ')}`);
 }
@@ -144,7 +147,12 @@ function updateDiscoveredFormIds(forms: Array<{ id: string; name: string }>): vo
   if (collisions.length > 0) {
     logger.debug(`[HubSpot FormSync] Form type collisions detected (last-wins): ${collisions.join('; ')}`);
   }
+  const allKnownTypes = ['membership', 'private-hire', 'event-inquiry', 'guest-checkin', 'contact'];
+  const unresolvedTypes = allKnownTypes.filter(t => !discoveredFormIds.has(t));
   logger.info(`[HubSpot FormSync] Updated discovered form ID registry: ${JSON.stringify(Object.fromEntries(discoveredFormIds))}`);
+  if (unresolvedTypes.length > 0) {
+    logger.warn(`[HubSpot FormSync] Form types NOT matched by discovery: ${unresolvedTypes.join(', ')}. These need manual configuration via env vars or admin settings.`);
+  }
 }
 
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;

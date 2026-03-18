@@ -14,7 +14,7 @@ import { listCustomerSubscriptions } from '../core/stripe/subscriptions';
 import { getBillingGroupByMemberEmail } from '../core/stripe/groupBilling';
 import { listCustomerInvoices } from '../core/stripe/invoices';
 import { notifyAllStaff } from '../core/notificationService';
-import { getErrorMessage } from '../utils/errorUtils';
+import { getErrorMessage, getErrorCode } from '../utils/errorUtils';
 import { getAppBaseUrl } from '../utils/urlUtils';
 import { formatDatePacific } from '../utils/dateUtils';
 import { isStaffOrAdmin } from '../replit_integrations/auth';
@@ -418,7 +418,18 @@ router.get('/api/my/balance', requireAuth, async (req, res) => {
     }
     
     const stripe = await getStripeClient();
-    const customer = await stripe.customers.retrieve((result.rows as Array<Record<string, unknown>>)[0].stripe_customer_id as string);
+    const stripeCustomerId = (result.rows as Array<Record<string, unknown>>)[0].stripe_customer_id as string;
+    let customer: Stripe.Customer | Stripe.DeletedCustomer;
+    try {
+      customer = await stripe.customers.retrieve(stripeCustomerId);
+    } catch (stripeErr: unknown) {
+      if (getErrorCode(stripeErr) === 'resource_missing') {
+        logger.warn(`[MyBilling] Stale Stripe customer ${stripeCustomerId} for ${email}, clearing`);
+        await db.execute(sql`UPDATE users SET stripe_customer_id = NULL WHERE LOWER(email) = ${email.toLowerCase()}`);
+        return res.json({ balanceCents: 0, balanceDollars: 0 });
+      }
+      throw stripeErr;
+    }
     
     if (customer.deleted) {
       return res.json({ balanceCents: 0, balanceDollars: 0 });
@@ -529,7 +540,18 @@ router.get('/api/my-billing/account-balance', requireAuth, validateQuery(billing
     }
     
     const stripe = await getStripeClient();
-    const customer = await stripe.customers.retrieve((result.rows as Array<Record<string, unknown>>)[0].stripe_customer_id as string);
+    const stripeCustomerId = (result.rows as Array<Record<string, unknown>>)[0].stripe_customer_id as string;
+    let customer: Stripe.Customer | Stripe.DeletedCustomer;
+    try {
+      customer = await stripe.customers.retrieve(stripeCustomerId);
+    } catch (stripeErr: unknown) {
+      if (getErrorCode(stripeErr) === 'resource_missing') {
+        logger.warn(`[MyBilling] Stale Stripe customer ${stripeCustomerId} for ${targetEmail}, clearing`);
+        await db.execute(sql`UPDATE users SET stripe_customer_id = NULL WHERE LOWER(email) = ${targetEmail.toLowerCase()}`);
+        return res.json({ balanceCents: 0, balanceDollars: 0 });
+      }
+      throw stripeErr;
+    }
     
     if (customer.deleted) {
       return res.json({ balanceCents: 0, balanceDollars: 0 });

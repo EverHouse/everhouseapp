@@ -764,12 +764,13 @@ router.post('/api/data-integrity/fix/bulk-reconnect-stripe', isAdmin, validateBo
     const customerOnly = results.filter(r => !r.success && r.customerId);
     const failed = results.filter(r => !r.success && !r.customerId);
 
-    logFromRequest(req, 'bulk_reconnect_stripe', 'user', userIds.join(','), `Bulk reconnect: ${reconnected.length} reconnected, ${customerOnly.length} customer-only, ${failed.length} not found`, {
+    logFromRequest(req, 'bulk_reconnect_stripe', 'user', `bulk:${userIds.length}`, `Bulk reconnect: ${reconnected.length} reconnected, ${customerOnly.length} customer-only, ${failed.length} not found`, {
       totalRequested: userIds.length,
       reconnectedCount: reconnected.length,
       customerOnlyCount: customerOnly.length,
       failedCount: failed.length,
-      performedBy: staffEmail
+      performedBy: staffEmail,
+      userIds
     });
 
     res.json({
