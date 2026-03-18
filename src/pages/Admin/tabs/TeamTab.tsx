@@ -111,6 +111,7 @@ const TeamTab: React.FC = () => {
           phone: member.phone,
           job_title: member.job_title,
           role: member.role,
+          is_active: member.is_active,
         }),
       }),
     onMutate: async (member: TeamMember) => {
@@ -121,9 +122,9 @@ const TeamTab: React.FC = () => {
       );
       return { previous };
     },
-    onError: (_err, _member, context) => {
+    onError: (err, _member, context) => {
       if (context?.previous) queryClient.setQueryData(['staff-users'], context.previous);
-      setError('Failed to update team member');
+      setError(err instanceof Error ? err.message : 'Failed to update team member');
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['staff-users'] });
@@ -549,6 +550,33 @@ const TeamTab: React.FC = () => {
               <option value="admin">Admin</option>
               <option value="golf_instructor">Golf Instructor</option>
             </select>
+          </div>
+
+          <div className="flex items-center justify-between p-3 rounded-lg border border-gray-200 dark:border-white/25 bg-gray-50 dark:bg-black/30">
+            <div>
+              <span id="active-status-label" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Active Status
+              </span>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                {selectedMember?.is_active ? 'This team member is currently active' : 'This team member is currently inactive'}
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={selectedMember?.is_active ?? true}
+              aria-labelledby="active-status-label"
+              onClick={() => selectedMember && setSelectedMember({...selectedMember, is_active: !selectedMember.is_active})}
+              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-brand-green focus:ring-offset-2 ${
+                selectedMember?.is_active ? 'bg-brand-green' : 'bg-gray-300 dark:bg-gray-600'
+              }`}
+            >
+              <span
+                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                  selectedMember?.is_active ? 'translate-x-5' : 'translate-x-0'
+                }`}
+              />
+            </button>
           </div>
 
           {error && (
