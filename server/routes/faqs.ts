@@ -24,7 +24,8 @@ router.get('/api/faqs', async (req, res) => {
   try {
     const result = await db.select().from(faqs)
       .where(eq(faqs.isActive, true))
-      .orderBy(asc(faqs.sortOrder), asc(faqs.id));
+      .orderBy(asc(faqs.sortOrder), asc(faqs.id))
+      .limit(500);
     
     res.json(result);
   } catch (error: unknown) {
@@ -36,7 +37,8 @@ router.get('/api/faqs', async (req, res) => {
 router.get('/api/admin/faqs', isStaffOrAdmin, async (req, res) => {
   try {
     const result = await db.select().from(faqs)
-      .orderBy(asc(faqs.sortOrder), asc(faqs.id));
+      .orderBy(asc(faqs.sortOrder), asc(faqs.id))
+      .limit(500);
     
     res.json(result);
   } catch (error: unknown) {

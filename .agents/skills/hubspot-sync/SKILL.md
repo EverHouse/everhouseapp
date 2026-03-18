@@ -206,6 +206,10 @@ Queue scheduler: every 2 min, claim up to 50 jobs, exponential backoff on failur
 
 Deal creation is currently disabled. Pipeline infrastructure and stage sync remain active for existing deals.
 
+## Inbound Webhook Processing (v8.87.88)
+
+`POST /api/hubspot/webhooks` validates the HubSpot signature, processes all events synchronously, then returns 200 OK **after** successful processing. If processing fails, the handler returns 500 so HubSpot retries delivery. **Never move the 200 response before event processing** — that was the pre-v8.87.88 bug that caused silent data loss on processing failures.
+
 ## Contact Cache
 
 In-memory cache at `/api/hubspot/contacts`, full refresh every 30 min. Webhook-driven invalidation resets timestamp to 0. Contacts enriched with: lifetime visits, computed join date, former-member classification.

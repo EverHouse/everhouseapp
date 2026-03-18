@@ -487,6 +487,13 @@ export function startFeeSnapshotReconciliationScheduler(): void {
   
   // Run first check after 2 minutes (give server time to start)
   setTimeout(() => {
+    if (isRunning) {
+      logger.info('[Fee Snapshot Reconciliation] Skipping initial run — previous run still in progress');
+      return;
+    }
+    isRunning = true;
+
+    Promise.allSettled([
     reconcilePendingSnapshots()
       .then(result => {
         if (result.synced > 0 || result.errors > 0) {
@@ -497,7 +504,7 @@ export function startFeeSnapshotReconciliationScheduler(): void {
       .catch((err: unknown) => {
         logger.error('[Fee Snapshot Reconciliation] Initial run error:', { error: err as Error });
         schedulerTracker.recordRun('Fee Snapshot Reconciliation', false, String(err));
-      });
+      }),
 
     reconcileStalePaymentIntents()
       .then(result => {
@@ -509,7 +516,7 @@ export function startFeeSnapshotReconciliationScheduler(): void {
       .catch((err: unknown) => {
         logger.error('[Payment Intent Reconciliation] Initial run error:', { error: err as Error });
         schedulerTracker.recordRun('Fee Snapshot Reconciliation', false, String(err));
-      });
+      }),
 
     cancelAbandonedPaymentIntents()
       .then(result => {
@@ -521,7 +528,20 @@ export function startFeeSnapshotReconciliationScheduler(): void {
       .catch((err: unknown) => {
         logger.error('[Abandoned PI Cleanup] Initial run error:', { error: err as Error });
         schedulerTracker.recordRun('Fee Snapshot Reconciliation', false, String(err));
-      });
+      }),
+    ])
+      .then(results => {
+        const failed = results.filter(r => r.status === 'rejected');
+        if (failed.length > 0) {
+          for (const f of failed) {
+            logger.error('[Fee Snapshot Reconciliation] Initial task failed:', { error: (f as PromiseRejectedResult).reason as Error });
+          }
+          schedulerTracker.recordRun('Fee Snapshot Reconciliation', false, `${failed.length} initial task(s) failed`);
+        } else {
+          schedulerTracker.recordRun('Fee Snapshot Reconciliation', true);
+        }
+      })
+      .finally(() => { isRunning = false; });
   }, 2 * 60 * 1000);
   
   intervalId = setInterval(() => {

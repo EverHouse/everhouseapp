@@ -41,7 +41,8 @@ router.get('/api/cafe-menu', async (req, res) => {
     
     const result = await db.select().from(cafeItems)
       .where(conditions.length > 0 ? and(...conditions) : undefined)
-      .orderBy(asc(cafeItems.sortOrder), asc(cafeItems.category), asc(cafeItems.name));
+      .orderBy(asc(cafeItems.sortOrder), asc(cafeItems.category), asc(cafeItems.name))
+      .limit(500);
 
     if (!category && !showInactive) {
       setCache(CAFE_CACHE_KEY, result, CAFE_CACHE_TTL);

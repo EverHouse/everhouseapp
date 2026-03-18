@@ -24,11 +24,9 @@ router.post('/api/hubspot/webhooks', async (req, res) => {
     return res.status(401).json({ error: 'Invalid signature' });
   }
   
-  res.status(200).send('OK');
+  const events = Array.isArray(req.body) ? req.body : [req.body];
   
   try {
-    const events = Array.isArray(req.body) ? req.body : [req.body];
-    
     for (const event of events) {
       const { subscriptionType, objectId, propertyName, propertyValue } = event as { subscriptionType: string; objectId: string; propertyName: string; propertyValue: string | null };
       
@@ -265,6 +263,7 @@ router.post('/api/hubspot/webhooks', async (req, res) => {
             }
           } catch (updateError: unknown) {
             logger.error('[HubSpot Webhook] Failed to update DB for contact', { extra: { objectId, error: getErrorMessage(updateError) } });
+            throw updateError;
           }
         }
       } else if (subscriptionType === 'deal.propertyChange') {
@@ -275,7 +274,13 @@ router.post('/api/hubspot/webhooks', async (req, res) => {
     }
   } catch (error: unknown) {
     logger.error('[HubSpot Webhook] Error processing event', { error: error instanceof Error ? error : new Error(String(error)) });
+    if (!res.headersSent) {
+      return res.status(500).json({ error: 'Webhook processing failed' });
+    }
+    return;
   }
+
+  res.status(200).send('OK');
   } catch (error: unknown) {
     logger.error('[HubSpot Webhook] Unhandled error', { error: error instanceof Error ? error : new Error(String(error)) });
     if (!res.headersSent) {

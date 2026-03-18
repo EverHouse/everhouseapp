@@ -15,10 +15,9 @@ import { getMemberDisplayName } from './shared';
 
 const router = Router();
 
-router.get('/api/rsvps', async (req, res) => {
+router.get('/api/rsvps', isAuthenticated, async (req, res) => {
   try {
     const sessionUser = getSessionUser(req);
-    
     if (!sessionUser) {
       return res.status(401).json({ error: 'Authentication required' });
     }

@@ -69,7 +69,7 @@ async function handleConstraintAndRespond(
   logAndRespond(req, res, 500, fallbackMessage, error);
 }
 
-router.get('/api/bookings/conflicts', async (req: Request, res: Response) => {
+router.get('/api/bookings/conflicts', isAuthenticated, async (req: Request, res: Response) => {
   try {
     const sessionUser = getSessionUser(req);
     if (!sessionUser) {
@@ -123,7 +123,7 @@ router.get('/api/bookings/conflicts', async (req: Request, res: Response) => {
   }
 });
 
-router.get('/api/bookings/:bookingId/participants', async (req: Request, res: Response) => {
+router.get('/api/bookings/:bookingId/participants', isAuthenticated, async (req: Request, res: Response) => {
   try {
     const sessionUser = getSessionUser(req);
     if (!sessionUser) {
@@ -213,7 +213,7 @@ router.delete('/api/bookings/:bookingId/participants/:participantId', isAuthenti
   }
 });
 
-router.post('/api/bookings/:bookingId/participants/preview-fees', validateBody(previewFeesSchema), async (req: Request, res: Response) => {
+router.post('/api/bookings/:bookingId/participants/preview-fees', isAuthenticated, validateBody(previewFeesSchema), async (req: Request, res: Response) => {
   try {
     const sessionUser = getSessionUser(req);
     if (!sessionUser) {
@@ -240,13 +240,13 @@ router.post('/api/bookings/:bookingId/participants/preview-fees', validateBody(p
 router.patch('/api/admin/booking/:bookingId/player-count', isStaffOrAdmin, validateBody(playerCountSchema), async (req: Request, res: Response) => {
   try {
     const bookingId = parseInt(req.params.bookingId as string, 10);
-    const { playerCount } = req.body;
-    const sessionUser = getSessionUser(req);
-    const staffEmail = sessionUser?.email?.toLowerCase() || 'unknown';
-
     if (isNaN(bookingId)) {
       return res.status(400).json({ error: 'Invalid booking ID' });
     }
+
+    const { playerCount } = req.body;
+    const sessionUser = getSessionUser(req);
+    const staffEmail = sessionUser?.email?.toLowerCase() || 'unknown';
 
     const result = await updateDeclaredPlayerCount({
       bookingId,

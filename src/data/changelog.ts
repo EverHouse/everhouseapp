@@ -8,6 +8,20 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.87.88",
+    date: "2026-03-18",
+    title: "Architectural Audit: Security & Reliability Hardening",
+    changes: [
+      "Fixed: HubSpot webhook now processes events before responding — previously it acknowledged receipt immediately, meaning failed processing would never be retried by HubSpot",
+      "Fixed: Fee snapshot reconciliation scheduler now prevents overlapping runs during initial startup — previously the startup run could overlap with the first interval run",
+      "Fixed: Booking roster input validation now rejects invalid IDs immediately before any processing",
+      "Hardened: Stripe error detection in invoice service now uses type-safe property checks instead of unsafe type casts",
+      "Security: Added authentication middleware to booking conflict checks, participant lists, and fee preview endpoints",
+      "Security: RSVP endpoint now uses standard authentication middleware for consistent access control",
+      "Improved: Cafe menu and FAQ queries now include safety limits to prevent unbounded data loading",
+    ]
+  },
+  {
     version: "8.87.87",
     date: "2026-03-18",
     title: "Fix: WebSocket Reconnection Loop & Stripe Invoice Resilience",
