@@ -60,7 +60,7 @@ Has trackman_booking_id?
        to avoid double-refunding PIs already queued by voidBookingInvoice (v8.87.26)
    └── If refund succeeds but markPaymentRefunded fails → set refund_succeeded_sync_failed (v8.87.35)
 2. After EACH successful refund → mark that participant 'refunded'
-3. Clear fee snapshots, refund guest passes
+3. Clear fee snapshots (including NULL-PI orphaned snapshots — v8.87.77), refund guest passes
 4. Delete trackman_bay_slots (duration-aware range: startTime through startTime + durationMinutes at 30-min intervals) (v8.87.35)
 5. THEN update status to 'cancelled'
 6. THEN notify member

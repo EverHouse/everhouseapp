@@ -20,6 +20,8 @@ Central entry point: `computeFeeBreakdown()` in `server/core/billing/unifiedFeeS
 | Invoice lifecycle | `server/core/billing/bookingInvoiceService.ts` | Draft, sync, finalize, void |
 | Guest pass consumer | `server/core/billing/guestPassConsumer.ts` | Pass consumption/refund |
 | Card expiry checker | `server/core/billing/cardExpiryChecker.ts` | Expiring card notifications |
+| Payment intent cleanup | `server/core/billing/paymentIntentCleanup.ts` | `cancelPendingPaymentIntentsForBooking()` — cancels Stripe PIs and all fee snapshots (including NULL-PI orphans). `booking_fee_snapshots` has NO `updated_at` column (v8.87.77). |
+| Payment status service | `server/core/billing/PaymentStatusService.ts` | Payment status tracking and transitions |
 | Billing types | `shared/models/billing.ts` | `FeeComputeParams`, `FeeBreakdown` |
 
 ## Decision Trees

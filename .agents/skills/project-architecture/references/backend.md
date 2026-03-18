@@ -16,7 +16,7 @@ ALL business logic lives here. Routes call these modules — never write logic i
 | `guestPassHoldService.ts` | Guest pass hold/release during booking |
 | `bookingInvoiceService.ts` | Booking invoice creation and management |
 | `cardExpiryChecker.ts` | Card expiry monitoring and alerts |
-| `paymentIntentCleanup.ts` | Stale payment intent cleanup |
+| `paymentIntentCleanup.ts` | Stale payment intent cleanup — `cancelPendingPaymentIntentsForBooking()` cancels Stripe PIs AND marks all fee snapshots (including NULL-PI orphans) as 'cancelled' (v8.87.77). `booking_fee_snapshots` has NO `updated_at` column. |
 | `PaymentStatusService.ts` | Payment status tracking and transitions |
 
 ---

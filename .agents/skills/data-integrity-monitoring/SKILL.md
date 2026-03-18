@@ -87,6 +87,8 @@ What type of alert?
 2. NEVER skip the startup grace period for email alerts.
 3. NEVER bypass the daily email cap (3/day).
 4. NEVER use `|| 0` for nullable IDs — use `?? null` to avoid matching id=0.
+5. NEVER use `SET updated_at = NOW()` on `booking_fee_snapshots` — this table has NO `updated_at` column (v8.87.77).
+6. NEVER assume orphaned fee snapshots always have a `stripe_payment_intent_id` — snapshots can be orphaned with NULL PI when Stripe API fails during intent creation. `cancelPendingPaymentIntentsForBooking()` has two cleanup passes for this reason (v8.87.77).
 
 ## Cross-References
 
@@ -110,7 +112,7 @@ What type of alert?
 
 | Severity | Behavior | Examples |
 |---|---|---|
-| **Critical** | Notify staff every run | Stripe Sub Sync, Orphaned Payments, Invoice-Booking Reconciliation, Active Bookings Without Sessions |
+| **Critical** | Notify staff every run | Stripe Sub Sync, Orphaned Payments, Invoice-Booking Reconciliation, Active Bookings Without Sessions, Lingering Payment Intents on Terminal Bookings |
 | **High** | Notify when count > threshold (10) | Tier Reconciliation, Duplicate Stripe Customers, Guest Pass Drift, Stale Pending, Archived Lingering |
 | **Medium** | Dashboard only, no proactive alert | Unmatched Trackman, MindBody Stale/Quality, Billing Provider Hybrid, Active Members Without Waivers |
 | **Low** | Informational | Sessions Without Participants, Overlapping Bookings, Items Needing Review, Stale Past Tours |

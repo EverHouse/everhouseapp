@@ -170,7 +170,7 @@ notifyAllStaff(title, message, type, options?: {
 
 | Function | Target | Message type |
 |---|---|---|
-| `sendNotificationToUser(email, notification)` | Single user | `notification` |
+| `sendNotificationToUser(email, notification)` | Single user | `notification` | **SYNCHRONOUS** — returns `NotificationDeliveryResult`, NOT a Promise. Do NOT chain `.catch()` — it will throw TypeError at runtime. Errors are handled internally (ws.send wrapped in try/catch). (v8.87.75) |
 | `broadcastToStaff(notification)` | Staff only | `notification` |
 | `broadcastToAllMembers(notification)` | All users | `notification` |
 | `broadcastBookingEvent(event)` | Staff only | `booking_event` |
@@ -193,6 +193,12 @@ notifyAllStaff(title, message, type, options?: {
 80+ types: `info`, `success`, `warning`, `error`, `system`, `booking_*` (16 types), `closure_*`, `wellness_*`, `event_*`, `tour_*`, `payment_*`, `membership_*`, `billing_*`, `guest_pass`, `day_pass`, `trackman_*`, `terminal_*`, `staff/admin types` (announcement, new_member, staff_note, bug_report, etc.).
 
 Add new types to the `NotificationType` union in `notificationService.ts`.
+
+## Anti-Patterns (NEVER)
+
+1. NEVER chain `.catch()` on `sendNotificationToUser()` — it is SYNCHRONOUS (returns `NotificationDeliveryResult`, NOT a Promise). Chaining `.catch()` throws `TypeError: .catch is not a function` at runtime (v8.87.75).
+2. NEVER `await` the result of `sendNotificationToUser()` — it is synchronous. `await` on a non-Promise works but misleads readers.
+3. NEVER assume broadcast functions throw on failure — they catch errors internally and log them.
 
 ## Status Change Source Attribution
 
