@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import * as jose from 'jose';
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, isNull, sql } from 'drizzle-orm';
 import { db } from '../db';
 import { users } from '../../shared/models/auth-session';
 import { normalizeTierName } from '../../shared/constants/tiers';
@@ -167,7 +167,7 @@ router.post('/api/auth/apple/verify', requireAppleConfig, authRateLimiterByIp, a
     if (!user.appleId || user.appleId !== appleData.sub) {
       const existingAppleLink = await db.select({ id: users.id, email: users.email })
         .from(users)
-        .where(eq(users.appleId, appleData.sub))
+        .where(and(eq(users.appleId, appleData.sub), isNull(users.archivedAt)))
         .limit(1);
 
       if (existingAppleLink.length > 0 && existingAppleLink[0].id !== user.id) {
@@ -257,7 +257,7 @@ router.post('/api/auth/apple/link', requireAppleConfig, async (req, res) => {
 
     const existing = await db.select({ id: users.id, email: users.email })
       .from(users)
-      .where(eq(users.appleId, appleData.sub))
+      .where(and(eq(users.appleId, appleData.sub), isNull(users.archivedAt)))
       .limit(1);
 
     if (existing.length > 0 && existing[0].id !== dbUserId) {

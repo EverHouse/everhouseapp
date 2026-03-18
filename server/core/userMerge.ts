@@ -604,6 +604,12 @@ async function executeMergeInternal(
          stripe_customer_id = NULL,
          stripe_subscription_id = NULL,
          hubspot_id = NULL,
+         apple_id = NULL,
+         apple_email = NULL,
+         apple_linked_at = NULL,
+         google_id = NULL,
+         google_email = NULL,
+         google_linked_at = NULL,
          tags = ${JSON.stringify(archiveTags)},
          updated_at = NOW()
        WHERE id = ${secondaryUserId}`);
@@ -613,7 +619,9 @@ async function executeMergeInternal(
     try {
       const stripe = await getStripeClient();
       await stripe.customers.update(stripeCustomerToUpdateId, {
+        email: primaryEmail,
         metadata: {
+          user_id: primaryUserId,
           mergedFromEmail: secondaryEmail,
           mergedFromUserId: secondaryUserId,
           mergedAt: new Date().toISOString(),
@@ -820,7 +828,9 @@ export async function consolidateStripeCustomers(
   try {
     const stripe = await getStripeClient();
     await stripe.customers.update(keptCustomerId, {
+      email: String(primary.email),
       metadata: {
+        user_id: primaryUserId,
         mergedFromEmail: String(secondary.email),
         mergedFromUserId: secondaryUserId,
         consolidatedAt: new Date().toISOString(),

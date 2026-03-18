@@ -58,6 +58,7 @@ export async function syncStripeCustomersForMindBodyMembers(): Promise<CustomerS
         const fullName = [member.first_name as string, member.last_name as string].filter(Boolean).join(' ') || undefined;
         await stripe.customers.update(member.stripe_customer_id as string, {
           metadata: {
+            user_id: member.id as string,
             tier: (member.tier as string) || '',
             billing_provider: 'mindbody',
             ...(fullName ? { name: fullName } : {}),
