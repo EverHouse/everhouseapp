@@ -4,7 +4,7 @@
   "version": "8.87.44",
   "type": "module",
   "scripts": {
-    "dev": "rm -rf node_modules/.vite && concurrently --kill-others-on-fail --names backend,frontend --prefix-colors blue,green \"npm run server\" \"npm run frontend\"",
+    "dev": "concurrently --kill-others-on-fail --names backend,frontend --prefix-colors blue,green \"npm run server\" \"npm run frontend\"",
     "frontend": "vite",
     "server": "tsx server/index.ts",
     "check:ghost-columns": "bash scripts/check-ghost-columns.sh",

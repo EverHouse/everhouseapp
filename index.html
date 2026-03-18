@@ -99,29 +99,22 @@
         var isDark = themeMode === 'dark' || (themeMode === 'system' && prefersDark) || (!themeMode && prefersDark);
         if (isDark) document.documentElement.classList.add('dark');
 
-        requestAnimationFrame(function() {
-          var iconsDone = false;
-          function markIconsLoaded() {
-            if (iconsDone) return;
-            iconsDone = true;
-            document.documentElement.classList.add('icons-loaded');
-          }
+        var iconsDone = false;
+        function markIconsLoaded() {
+          if (iconsDone) return;
+          iconsDone = true;
+          document.documentElement.classList.add('icons-loaded');
+        }
 
-          setTimeout(markIconsLoaded, 3000);
+        setTimeout(markIconsLoaded, 1500);
 
-          var link = document.createElement('link');
-          link.rel = 'stylesheet';
-          link.href = 'https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL@20..48,100..700,0..1&display=swap';
-          link.onload = function() {
-            if (document.fonts && document.fonts.ready) {
-              document.fonts.ready.then(markIconsLoaded);
-            } else {
+        if (document.fonts && document.fonts.ready) {
+          document.fonts.ready.then(function() {
+            if (document.fonts.check('1em Material Symbols Outlined')) {
               markIconsLoaded();
             }
-          };
-          link.onerror = markIconsLoaded;
-          document.head.appendChild(link);
-        });
+          });
+        }
       })();
     </script>
     <!-- Start of HubSpot Embed Code (deferred loader — production only) -->

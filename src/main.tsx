@@ -36,7 +36,11 @@ window.clearPWACaches = async () => {
   window.location.reload();
 };
 
-if ('serviceWorker' in navigator) {
+const isDev = window.location.hostname === 'localhost' ||
+  window.location.hostname === '127.0.0.1' ||
+  window.location.hostname.endsWith('.replit.dev');
+
+if ('serviceWorker' in navigator && !isDev) {
   let refreshing = false;
   const hadController = !!navigator.serviceWorker.controller;
 
@@ -98,6 +102,10 @@ if ('serviceWorker' in navigator) {
       });
     });
   }
+} else if ('serviceWorker' in navigator && isDev) {
+  navigator.serviceWorker.getRegistrations().then(registrations => {
+    registrations.forEach(r => r.unregister());
+  });
 }
 
 if (window.location.search.includes('_r=')) {

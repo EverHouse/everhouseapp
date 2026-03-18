@@ -16,30 +16,75 @@ self.addEventListener('install', function(event) {
   console.log('[SW] Installing new version:', BUILD_VERSION);
   self.skipWaiting();
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(STATIC_ASSETS))
+    caches.open(CACHE_NAME).then(function(cache) {
+      return Promise.all(
+        STATIC_ASSETS.map(function(url) {
+          return fetch(url, { cache: 'no-store' }).then(function(response) {
+            if (!response.ok || response.status === 503) {
+              console.log('[SW] Skipping cache for', url, '- status:', response.status);
+              return;
+            }
+            if (url === '/' || url === '/index.html') {
+              return response.clone().text().then(function(html) {
+                if (html.indexOf('<div id="root">') === -1) {
+                  console.log('[SW] Skipping cache for', url, '- not app HTML');
+                  return;
+                }
+                return cache.put(url, response);
+              });
+            }
+            return cache.put(url, response);
+          }).catch(function(err) {
+            console.log('[SW] Failed to fetch for cache:', url, err.message);
+          });
+        })
+      );
+    })
   );
 });
 
 self.addEventListener('activate', function(event) {
   console.log('[SW] Activating new version:', BUILD_VERSION);
   event.waitUntil(
-    caches.keys().then(keys => {
+    caches.keys().then(function(keys) {
       return Promise.all(
-        keys.filter(key => {
+        keys.filter(function(key) {
           return key.startsWith('ever-club-') || key.startsWith('ever-house-') || key.startsWith('api-cache-');
-        }).filter(key => {
+        }).filter(function(key) {
           return key !== CACHE_NAME && key !== API_CACHE;
-        }).map(key => {
+        }).map(function(key) {
           console.log('[SW] Deleting old cache:', key);
           return caches.delete(key);
         })
       );
-    }).then(() => {
+    }).then(function() {
+      return caches.open(CACHE_NAME).then(function(cache) {
+        return cache.keys().then(function(requests) {
+          return Promise.all(requests.map(function(cachedRequest) {
+            var cachedUrl = new URL(cachedRequest.url);
+            if (cachedUrl.pathname.startsWith('/assets/') || cachedUrl.pathname === '/manifest.webmanifest' || cachedUrl.pathname === '/favicon.ico') {
+              return;
+            }
+            return cache.match(cachedRequest).then(function(cached) {
+              if (!cached) return;
+              var contentType = cached.headers.get('content-type') || '';
+              if (!contentType.includes('text/html')) return;
+              return cached.text().then(function(html) {
+                if (html.indexOf('<div id="root">') === -1) {
+                  console.log('[SW] Cached', cachedUrl.pathname, 'is not valid app HTML, removing');
+                  return cache.delete(cachedRequest);
+                }
+              });
+            });
+          }));
+        });
+      });
+    }).then(function() {
       console.log('[SW] Claiming clients');
       return clients.claim();
-    }).then(() => {
-      return clients.matchAll({ type: 'window' }).then(clientList => {
-        clientList.forEach(client => {
+    }).then(function() {
+      return clients.matchAll({ type: 'window' }).then(function(clientList) {
+        clientList.forEach(function(client) {
           client.postMessage({ type: 'SW_ACTIVATED', version: BUILD_VERSION });
         });
       });
@@ -114,8 +159,15 @@ self.addEventListener('fetch', function(event) {
       fetch(request, { cache: 'no-store' })
         .then(function(response) {
           if (response.ok && response.status !== 503) {
-            var clone = response.clone();
-            caches.open(CACHE_NAME).then(function(cache) { cache.put(request, clone); });
+            var cacheClone = response.clone();
+            var checkClone = response.clone();
+            checkClone.text().then(function(html) {
+              if (html.indexOf('<div id="root">') !== -1) {
+                caches.open(CACHE_NAME).then(function(cache) {
+                  cache.put(request, cacheClone);
+                });
+              }
+            });
           }
           if (response.status === 503) {
             return caches.match(request).then(function(cachedResponse) {
