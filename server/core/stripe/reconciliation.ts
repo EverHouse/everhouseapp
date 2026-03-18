@@ -357,7 +357,7 @@ export async function reconcileDailyRefunds() {
             if (userIds.length > 0) {
               const userIdInts = userIds.map(Number).filter(n => !isNaN(n));
               const emailResult = userIdInts.length > 0
-                ? await db.execute(sql`SELECT email FROM users WHERE id = ANY(${userIdInts})`)
+                ? await db.execute(sql`SELECT email FROM users WHERE id = ANY(${sql`ARRAY[${sql.join(userIdInts.map(id => sql`${id}`), sql`, `)}]::int[]`})`)
                 : { rows: [] };
               emailInfo = ': ' + (emailResult.rows as Array<{ email: string }>).map(r => r.email).join(', ');
             }

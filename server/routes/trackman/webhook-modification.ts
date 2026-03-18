@@ -203,7 +203,7 @@ export async function handleBookingModification(
             UPDATE booking_requests 
             SET status = 'cancelled', updated_at = NOW(),
                 staff_notes = COALESCE(staff_notes, '') || ${`\n[Auto-cancelled: superseded by Trackman modification of booking ${incoming.trackmanBookingId}]`}
-            WHERE id = ANY(${conflictIds})`);
+            WHERE id = ANY(${sql`ARRAY[${sql.join(conflictIds.map(id => sql`${id}`), sql`, `)}]::int[]`})`);
           logger.info('[Trackman Webhook] Cancelled conflicting bookings at destination slot for modification', {
             extra: { bookingId, trackmanBookingId: incoming.trackmanBookingId, cancelledBookingIds: conflictIds }
           });
