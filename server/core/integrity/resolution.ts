@@ -375,6 +375,12 @@ export async function syncPull(params: SyncPullParams): Promise<{ success: boole
 
     const isStripeProtected = user?.billing_provider === 'stripe';
 
+    let resolvedTierId: number | null = null;
+    if (appTier && !(recentlyFixed || isStripeProtected)) {
+      const tierLookup = await db.execute(sql`SELECT id FROM membership_tiers WHERE LOWER(name) = LOWER(${appTier}) LIMIT 1`);
+      resolvedTierId = (tierLookup.rows as Array<{ id: number }>)[0]?.id ?? null;
+    }
+
     await db.execute(sql`
       UPDATE users SET
         first_name = COALESCE(${props.firstname ?? null}, first_name),
@@ -382,6 +388,8 @@ export async function syncPull(params: SyncPullParams): Promise<{ success: boole
         phone = COALESCE(${props.phone ?? null}, phone),
         tier = CASE WHEN ${recentlyFixed || isStripeProtected ? 'skip' : 'apply'} = 'apply' 
           THEN COALESCE(${appTier}, tier) ELSE tier END,
+        tier_id = CASE WHEN ${recentlyFixed || isStripeProtected ? 'skip' : 'apply'} = 'apply' AND ${resolvedTierId} IS NOT NULL
+          THEN ${resolvedTierId} ELSE tier_id END,
         updated_at = NOW()
       WHERE id = ${userId}
     `);
@@ -446,8 +454,10 @@ export async function syncPull(params: SyncPullParams): Promise<{ success: boole
       const stripeTier = productName.toLowerCase();
       const currentTier = (user.tier || '').toLowerCase();
       if (stripeTier !== currentTier) {
+        const tierLookup = await db.execute(sql`SELECT id FROM membership_tiers WHERE LOWER(name) = ${stripeTier} LIMIT 1`);
+        const matchedTierId = (tierLookup.rows as Array<{ id: number }>)[0]?.id ?? null;
         await db.execute(sql`
-          UPDATE users SET tier = ${productName.toLowerCase()}, updated_at = NOW()
+          UPDATE users SET tier = ${productName.toLowerCase()}, tier_id = COALESCE(${matchedTierId}, tier_id), updated_at = NOW()
           WHERE id = ${userId}
         `);
         updates.push(`tier: "${user.tier}" → "${productName.toLowerCase()}"`);

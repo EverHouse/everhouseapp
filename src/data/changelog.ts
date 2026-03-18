@@ -8,6 +8,16 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.87.71",
+    date: "2026-03-18",
+    title: "Bug Fixes: Cafe Soft Delete & Tier Sync Consistency",
+    changes: [
+      "Fixed: Deleting a cafe item now deactivates it instead of permanently removing it — preserves POS transaction history and prevents items from reappearing via Stripe sync",
+      "Fixed: All tier update paths (Stripe sync, HubSpot pull, integrity resolution, staff auth) now update both tier name and tier ID together — prevents mismatches between the two fields",
+      "Fixed: Tier ID lookup now queries the database instead of using a hardcoded map — stays correct if tier IDs change",
+    ]
+  },
+  {
     version: "8.87.70",
     date: "2026-03-18",
     title: "Fix: Corporate Volume Pricing Startup Error",

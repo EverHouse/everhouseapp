@@ -67,12 +67,12 @@ export async function processMemberTierUpdate(payload: MemberTierUpdatePayload):
     }
 
     // Update database with new tier
-    const tierIdValue = tierId || (newTier ? getTierIdFromTierName(newTier) : null);
+    const tierIdValue = tierId || (newTier ? await getTierIdFromTierName(newTier) : null);
     await db
       .update(users)
       .set({
         tier: newTier,
-        tierId: tierIdValue,
+        ...(tierIdValue !== null && { tierId: tierIdValue }),
         ...(csvTier && { membershipTier: csvTier }),
         updatedAt: new Date()
       })
@@ -155,13 +155,16 @@ export async function processMemberTierUpdate(payload: MemberTierUpdatePayload):
   }
 }
 
-function getTierIdFromTierName(tierName: string): number | null {
-  const tierIdMap: Record<string, number> = {
-    Social: 1,
-    Core: 2,
-    Premium: 3,
-    Corporate: 4,
-    VIP: 5
-  };
-  return tierIdMap[tierName] || null;
+async function getTierIdFromTierName(tierName: string): Promise<number | null> {
+  try {
+    const { membershipTiers } = await import('../../shared/schema');
+    const { eq } = await import('drizzle-orm');
+    const result = await db.select({ id: membershipTiers.id })
+      .from(membershipTiers)
+      .where(eq(membershipTiers.name, tierName))
+      .limit(1);
+    return result[0]?.id ?? null;
+  } catch {
+    return null;
+  }
 }

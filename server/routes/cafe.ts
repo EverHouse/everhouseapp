@@ -175,10 +175,10 @@ router.delete('/api/cafe-menu/:id', isStaffOrAdmin, async (req, res) => {
       }
     }
     
-    await db.delete(cafeItems).where(eq(cafeItems.id, numericId));
+    await db.update(cafeItems).set({ isActive: false }).where(eq(cafeItems.id, numericId));
     invalidateCache(CAFE_CACHE_KEY);
     broadcastCafeMenuUpdate('deleted');
-    logFromRequest(req, 'delete_cafe_item', 'cafe', String(id), undefined, {});
+    logFromRequest(req, 'delete_cafe_item', 'cafe', String(id), existing[0].name || undefined, {});
     res.json({ success: true });
   } catch (error: unknown) {
     if (!isProduction) logger.error('Cafe item delete error', { error: getErrorMessage(error) });

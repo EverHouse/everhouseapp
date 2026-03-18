@@ -205,6 +205,11 @@ export async function syncActiveSubscriptionsFromStripe(): Promise<SubscriptionS
           }
 
           const tier = extractTierFromProduct(product);
+          let tierId: number | null = null;
+          if (tier) {
+            const tierLookup = await db.execute(sql`SELECT id FROM membership_tiers WHERE LOWER(name) = LOWER(${tier}) LIMIT 1`);
+            tierId = (tierLookup.rows as Array<{ id: number }>)[0]?.id ?? null;
+          }
           const customerName = customer.name || '';
           const nameParts = customerName.split(' ');
           const firstName = nameParts[0] || null;
@@ -250,6 +255,7 @@ export async function syncActiveSubscriptionsFromStripe(): Promise<SubscriptionS
                  SET stripe_customer_id = ${stripeCustomerId}, 
                      stripe_subscription_id = ${stripeSubscriptionId}, 
                      tier = ${tier},
+                     tier_id = COALESCE(${tierId}, tier_id),
                      membership_status = 'active',
                      membership_status_changed_at = CASE WHEN membership_status IS DISTINCT FROM 'active' THEN NOW() ELSE membership_status_changed_at END,
                      billing_provider = CASE WHEN billing_provider IN ('mindbody', 'manual', 'comped') THEN billing_provider ELSE 'stripe' END,
@@ -310,7 +316,7 @@ export async function syncActiveSubscriptionsFromStripe(): Promise<SubscriptionS
                  membership_status_changed_at = CASE WHEN membership_status IS DISTINCT FROM 'active' THEN NOW() ELSE membership_status_changed_at END,
                  billing_provider = CASE WHEN billing_provider IN ('mindbody', 'manual', 'comped') THEN billing_provider ELSE 'stripe' END,
                  data_source = 'stripe_sync',
-                 tier = COALESCE(${tier}, tier), hubspot_id = COALESCE(${hubspotId}, hubspot_id),
+                 tier = COALESCE(${tier}, tier), tier_id = COALESCE(${tierId}, tier_id), hubspot_id = COALESCE(${hubspotId}, hubspot_id),
                  grace_period_start = NULL, grace_period_email_count = 0, updated_at = NOW()
                  WHERE id = ${resolved.userId}`);
               logger.info(`[Stripe Sync] Cleared grace period for migrated member ${email}`);
@@ -324,11 +330,11 @@ export async function syncActiveSubscriptionsFromStripe(): Promise<SubscriptionS
               result.details.push({ email, action: 'skipped', tier, reason: 'sync_exclusions' });
             } else {
             await db.execute(sql`INSERT INTO users (
-                 email, first_name, last_name, role, tier, 
+                 email, first_name, last_name, role, tier, tier_id,
                  stripe_customer_id, stripe_subscription_id, 
                  membership_status, billing_provider, data_source,
                  hubspot_id, created_at, updated_at
-               ) VALUES (${email}, ${firstName}, ${lastName}, ${'member'}, ${tier}, ${stripeCustomerId}, ${stripeSubscriptionId}, ${'active'}, ${'stripe'}, ${'stripe_sync'}, ${hubspotId}, NOW(), NOW())`);
+               ) VALUES (${email}, ${firstName}, ${lastName}, ${'member'}, ${tier}, ${tierId}, ${stripeCustomerId}, ${stripeSubscriptionId}, ${'active'}, ${'stripe'}, ${'stripe_sync'}, ${hubspotId}, NOW(), NOW())`);
             
             try {
               await findOrCreateHubSpotContact(email, firstName ?? '', lastName ?? '');

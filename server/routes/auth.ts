@@ -154,7 +154,7 @@ async function upsertUserWithTier(data: UpsertUserData): Promise<string | null> 
       .returning({ id: users.id });
     
     if (isStaffOrAdmin) {
-      await db.execute(sql`UPDATE users SET membership_status = 'active', membership_status_changed_at = CASE WHEN membership_status IS DISTINCT FROM 'active' THEN NOW() ELSE membership_status_changed_at END, tier = 'VIP' WHERE LOWER(email) = LOWER(${normalizedEmailValue}) AND (membership_status IS NULL OR membership_status != 'active' OR tier IS NULL OR tier != 'VIP')`);
+      await db.execute(sql`UPDATE users SET membership_status = 'active', membership_status_changed_at = CASE WHEN membership_status IS DISTINCT FROM 'active' THEN NOW() ELSE membership_status_changed_at END, tier = 'VIP', tier_id = COALESCE((SELECT id FROM membership_tiers WHERE LOWER(name) = 'vip' LIMIT 1), tier_id) WHERE LOWER(email) = LOWER(${normalizedEmailValue}) AND (membership_status IS NULL OR membership_status != 'active' OR tier IS NULL OR tier != 'VIP')`);
     }
     
     if (!isProduction) logger.info('[Auth] Updated user with role , tier', { extra: { normalizedEmailValue, dataRole: data.role, normalizedTier_none: normalizedTier || 'none' } });
