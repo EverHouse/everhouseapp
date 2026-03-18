@@ -3,7 +3,7 @@ import { db } from '../../db';
 import { sql, eq, and } from 'drizzle-orm';
 import { logger } from '../../core/logger';
 import { broadcastToStaff, broadcastAvailabilityUpdate } from '../../core/websocket';
-import { notifyMember } from '../../core/notificationService';
+import { notifyMember, notifyAllStaff } from '../../core/notificationService';
 import { linkAndNotifyParticipants } from '../../core/bookingEvents';
 import {
   TrackmanWebhookPayload,
@@ -413,6 +413,12 @@ router.post('/api/webhooks/trackman', async (req: Request, res: Response) => {
               endTime,
             }
           });
+          await notifyAllStaff(
+            'Bay Block Removed (Trackman)',
+            `Bay ${resourceId} block removed for ${v2Result.normalized.parsedDate} ${v2Result.normalized.parsedStartTime}–${endTime}`,
+            'trackman_booking',
+            { relatedId: v2Result.normalized.trackmanBookingId || undefined }
+          ).catch(err => logger.warn('[Trackman Webhook] Failed to notify staff of block removal', { extra: { error: String(err) } }));
         } else {
           const cancelResult = await cancelBookingByTrackmanId(v2Result.normalized.trackmanBookingId!);
           if (cancelResult.cancelled) {
@@ -465,6 +471,12 @@ router.post('/api/webhooks/trackman', async (req: Request, res: Response) => {
                 endTime,
               }
             });
+            await notifyAllStaff(
+              'Bay Blocked (Trackman)',
+              `Bay ${resourceId} blocked for ${blockDate} ${startTime}–${endTime}`,
+              'trackman_booking',
+              { relatedId: v2Result.normalized.trackmanBookingId || undefined }
+            ).catch(err => logger.warn('[Trackman Webhook] Failed to notify staff of block creation', { extra: { error: String(err) } }));
           }
         } else {
           eventType = 'booking.block';
