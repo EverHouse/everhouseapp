@@ -1360,23 +1360,52 @@ export async function handlePaymentIntentCanceled(client: PoolClient, paymentInt
     const email = metadata?.email;
     const subscriptionId = metadata?.subscriptionId;
     
-    await client.query(
-      `INSERT INTO terminal_payments (
-        user_id, user_email, stripe_payment_intent_id, stripe_subscription_id,
-        amount_cents, currency, status, created_at, updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
-      ON CONFLICT (stripe_payment_intent_id) DO UPDATE SET 
-        status = 'canceled', updated_at = NOW()`,
-      [
-        metadata?.userId || null,
-        email || 'unknown',
-        id,
-        subscriptionId || null,
-        amount,
-        paymentIntent.currency || 'usd',
-        'canceled'
-      ]
-    );
+    try {
+      await client.query(
+        `INSERT INTO terminal_payments (
+          user_id, user_email, stripe_payment_intent_id, stripe_subscription_id,
+          amount_cents, currency, status, created_at, updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
+        ON CONFLICT (stripe_payment_intent_id) DO UPDATE SET 
+          status = 'canceled', updated_at = NOW()`,
+        [
+          metadata?.userId || null,
+          email || 'unknown',
+          id,
+          subscriptionId || null,
+          amount,
+          paymentIntent.currency || 'usd',
+          'canceled'
+        ]
+      );
+    } catch (upsertErr: unknown) {
+      logger.warn(`[Stripe Webhook] Upsert failed for canceled payment ${id}, attempting UPDATE fallback`, { error: getErrorMessage(upsertErr) });
+      try {
+        const updateResult = await client.query(
+          `UPDATE terminal_payments SET status = 'canceled', updated_at = NOW() WHERE stripe_payment_intent_id = $1`,
+          [id]
+        );
+        if (updateResult.rowCount === 0) {
+          await client.query(
+            `INSERT INTO terminal_payments (
+              user_id, user_email, stripe_payment_intent_id, stripe_subscription_id,
+              amount_cents, currency, status, created_at, updated_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())`,
+            [
+              metadata?.userId || null,
+              email || 'unknown',
+              id,
+              subscriptionId || null,
+              amount,
+              paymentIntent.currency || 'usd',
+              'canceled'
+            ]
+          );
+        }
+      } catch (fallbackErr: unknown) {
+        logger.error(`[Stripe Webhook] Failed to record canceled payment ${id} even with fallback`, { error: getErrorMessage(fallbackErr) });
+      }
+    }
     
     logger.info(`[Stripe Webhook] Terminal payment canceled/abandoned: ${id} for ${email || 'unknown'}`);
     

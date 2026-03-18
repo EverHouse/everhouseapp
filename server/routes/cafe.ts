@@ -92,7 +92,12 @@ router.put('/api/cafe-menu/:id', isStaffOrAdmin, async (req, res) => {
     }
     const { category, name, price, description, icon, image_url, is_active, sort_order } = req.body;
     
-    const existing = await db.select({ stripeProductId: cafeItems.stripeProductId })
+    const existing = await db.select({ 
+        stripeProductId: cafeItems.stripeProductId,
+        name: cafeItems.name,
+        price: cafeItems.price,
+        category: cafeItems.category,
+      })
       .from(cafeItems)
       .where(eq(cafeItems.id, numericId));
     if (existing.length === 0) {
@@ -101,6 +106,14 @@ router.put('/api/cafe-menu/:id', isStaffOrAdmin, async (req, res) => {
     
     let result;
     if (existing[0].stripeProductId) {
+      const nameChanged = name !== undefined && name !== existing[0].name;
+      const priceChanged = price !== undefined && String(price) !== String(existing[0].price);
+      const categoryChanged = category !== undefined && category !== existing[0].category;
+      if (nameChanged || priceChanged || categoryChanged) {
+        return res.status(400).json({ 
+          error: 'Cannot change name, price, or category for Stripe-linked items. Update these fields directly in Stripe and use "Pull from Stripe" to sync changes.' 
+        });
+      }
       result = await db.update(cafeItems).set({
         description: sql`COALESCE(${description}, ${cafeItems.description})`,
         icon: sql`COALESCE(${icon}, ${cafeItems.icon})`,

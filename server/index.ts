@@ -1171,11 +1171,8 @@ async function initializeApp() {
         } catch (err: unknown) {
           logger.error('[Startup] Auto-seed resources failed:', { error: err as Error });
         }
-        try {
-          await autoSeedCafeMenu(db, sql, cafeItems, isProduction);
-        } catch (err: unknown) {
-          logger.error('[Startup] Auto-seed cafe menu failed:', { error: err as Error });
-        }
+        // Auto-seed cafe menu removed — deleted items should stay deleted.
+        // Use POST /api/admin/seed-cafe for intentional re-seeding.
       }, 30000);
     }
 

@@ -136,19 +136,41 @@ export async function runStartupTasks(): Promise<void> {
     })(),
     (async () => {
       try {
+        await createSyncExclusionsTable();
+      } catch (err: unknown) {
+        const msg = getErrorMessage(err);
+        if (msg.includes('already exists') || msg.includes('duplicate')) {
+          logger.warn('[Startup] Sync exclusions table already exists (non-critical)');
+        } else {
+          logger.error('[Startup] Creating sync exclusions table failed', { error: err instanceof Error ? err : new Error(String(err)) });
+          startupHealth.warnings.push(`Sync exclusions table: ${msg}`);
+        }
+      }
+
+      try {
         await seedDefaultNoticeTypes();
       } catch (err: unknown) {
-        logger.error('[Startup] Seeding notice types failed', { error: err instanceof Error ? err : new Error(String(err)) });
-        startupHealth.warnings.push(`Notice types: ${getErrorMessage(err)}`);
+        const msg = getErrorMessage(err);
+        if (msg.includes('already exists') || msg.includes('duplicate')) {
+          logger.warn('[Startup] Notice types already seeded (non-critical)');
+        } else {
+          logger.error('[Startup] Seeding notice types failed', { error: err instanceof Error ? err : new Error(String(err)) });
+          startupHealth.warnings.push(`Notice types: ${msg}`);
+        }
       }
-    })(),
-    (async () => {
+
       try {
         await seedTierFeatures();
       } catch (err: unknown) {
-        logger.error('[Startup] Seeding tier features failed', { error: err instanceof Error ? err : new Error(String(err)) });
-        startupHealth.warnings.push(`Tier features: ${getErrorMessage(err)}`);
+        const msg = getErrorMessage(err);
+        if (msg.includes('already exists') || msg.includes('duplicate')) {
+          logger.warn('[Startup] Tier features already seeded (non-critical)');
+        } else {
+          logger.error('[Startup] Seeding tier features failed', { error: err instanceof Error ? err : new Error(String(err)) });
+          startupHealth.warnings.push(`Tier features: ${msg}`);
+        }
       }
+
       try {
         await validateTierHierarchy();
       } catch (err: unknown) {
@@ -171,14 +193,6 @@ export async function runStartupTasks(): Promise<void> {
       } catch (err: unknown) {
         logger.error('[Startup] Seeding training sections failed', { error: err instanceof Error ? err : new Error(String(err)) });
         startupHealth.warnings.push(`Training sections: ${getErrorMessage(err)}`);
-      }
-    })(),
-    (async () => {
-      try {
-        await createSyncExclusionsTable();
-      } catch (err: unknown) {
-        logger.error('[Startup] Creating sync exclusions table failed', { error: err instanceof Error ? err : new Error(String(err)) });
-        startupHealth.warnings.push(`Sync exclusions table: ${getErrorMessage(err)}`);
       }
     })(),
     (async () => {
@@ -237,6 +251,22 @@ export async function runStartupTasks(): Promise<void> {
       }, 'Merged user Stripe ID cleanup').catch((err: unknown) => {
         logger.warn('[Startup] Merged user Stripe ID cleanup failed after retries (non-critical):', { error: getErrorMessage(err) });
       });
+    })(),
+    (async () => {
+      try {
+        const fixResult = await db.execute(sql`
+          UPDATE membership_tiers SET product_type = 'one_time', updated_at = NOW()
+          WHERE name IN ('Guest Fee', 'Day Pass - Coworking', 'Day Pass - Golf Sim')
+            AND product_type != 'one_time'
+          RETURNING name
+        `);
+        const fixed = Array.isArray(fixResult) ? fixResult : (fixResult?.rows ?? []);
+        if (fixed.length > 0) {
+          logger.info(`[Startup] Fixed product_type to 'one_time' for: ${fixed.map((r: Record<string, unknown>) => r.name).join(', ')}`);
+        }
+      } catch (err: unknown) {
+        logger.warn(`[Startup] Tier product_type fix failed (non-critical): ${getErrorMessage(err)}`);
+      }
     })(),
   ];
 
