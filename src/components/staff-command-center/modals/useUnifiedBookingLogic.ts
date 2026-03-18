@@ -466,53 +466,57 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
     }
   }, []);
 
+  const refetchBookingContext = useCallback(async () => {
+    if (!bookingId) return;
+    try {
+      const data = await fetchWithCredentials<{
+        start_time?: string; end_time?: string; resource_name?: string; bay_name?: string;
+        resource_id?: number; request_date?: string; trackman_booking_id?: string;
+        status?: string; user_name?: string; user_email?: string; user_id?: number;
+        duration_minutes?: number; notes?: string;
+      }>(`/api/booking-requests/${bookingId}`);
+      const formatTime = (t: string | null) => {
+        if (!t) return '';
+        const [h, m] = t.split(':').map(Number);
+        const ampm = h >= 12 ? 'PM' : 'AM';
+        const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+        return `${h12}:${String(m).padStart(2, '0')} ${ampm}`;
+      };
+      const start = formatTime(data.start_time ?? null);
+      const end = formatTime(data.end_time ?? null);
+      setFetchedContext({
+        bayName: data.resource_name || data.bay_name || (data.resource_id ? `Bay ${data.resource_id}` : undefined),
+        bookingDate: data.request_date || undefined,
+        timeSlot: start && end ? `${start} - ${end}` : undefined,
+        trackmanBookingId: data.trackman_booking_id || undefined,
+        bookingStatus: data.status || undefined,
+        ownerName: data.user_name || undefined,
+        ownerEmail: data.user_email || undefined,
+        ownerUserId: data.user_id?.toString() || undefined,
+        durationMinutes: data.duration_minutes || undefined,
+        resourceId: data.resource_id || undefined,
+        notes: data.notes || undefined,
+      });
+      if (data.user_email) {
+        checkSavedCard(data.user_email);
+      }
+    } catch (err: unknown) {
+      console.error('[UnifiedBooking] Failed to fetch booking context:', err);
+    }
+  }, [bookingId, checkSavedCard]);
+
   useEffect(() => {
     if (!isOpen || !bookingId) return;
     const hasPropContext = bayName || bookingDate || timeSlot || bookingContext;
     if (hasPropContext) return;
     let cancelled = false;
     (async () => {
-      try {
-        const data = await fetchWithCredentials<{
-          start_time?: string; end_time?: string; resource_name?: string; bay_name?: string;
-          resource_id?: number; request_date?: string; trackman_booking_id?: string;
-          status?: string; user_name?: string; user_email?: string; user_id?: number;
-          duration_minutes?: number; notes?: string;
-        }>(`/api/booking-requests/${bookingId}`);
-        if (cancelled) return;
-        const formatTime = (t: string | null) => {
-          if (!t) return '';
-          const [h, m] = t.split(':').map(Number);
-          const ampm = h >= 12 ? 'PM' : 'AM';
-          const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
-          return `${h12}:${String(m).padStart(2, '0')} ${ampm}`;
-        };
-        const start = formatTime(data.start_time ?? null);
-        const end = formatTime(data.end_time ?? null);
-        setFetchedContext({
-          bayName: data.resource_name || data.bay_name || (data.resource_id ? `Bay ${data.resource_id}` : undefined),
-          bookingDate: data.request_date || undefined,
-          timeSlot: start && end ? `${start} - ${end}` : undefined,
-          trackmanBookingId: data.trackman_booking_id || undefined,
-          bookingStatus: data.status || undefined,
-          ownerName: data.user_name || undefined,
-          ownerEmail: data.user_email || undefined,
-          ownerUserId: data.user_id?.toString() || undefined,
-          durationMinutes: data.duration_minutes || undefined,
-          resourceId: data.resource_id || undefined,
-          notes: data.notes || undefined,
-        });
-        if (!ownerEmail && data.user_email) {
-          checkSavedCard(data.user_email);
-        }
-      } catch (err: unknown) {
-        if (!cancelled) {
-          console.error('[UnifiedBooking] Failed to fetch booking context:', err);
-        }
-      }
+      const result = await refetchBookingContext();
+      if (cancelled) return;
+      return result;
     })();
     return () => { cancelled = true; };
-  }, [isOpen, bookingId, bayName, bookingDate, timeSlot, bookingContext, ownerEmail, checkSavedCard]);
+  }, [isOpen, bookingId, bayName, bookingDate, timeSlot, bookingContext, ownerEmail, refetchBookingContext]);
 
   useEffect(() => {
     const email = ownerEmail || fetchedContext?.ownerEmail;
@@ -1254,14 +1258,17 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
       showToast(data.message || `Booking reassigned to ${newMemberEmail}`, 'success');
       setReassignSearchOpen(false);
 
-      await fetchRosterData();
+      await Promise.allSettled([fetchRosterData(), refetchBookingContext()]);
+
+      onRosterUpdated?.();
+      window.dispatchEvent(new CustomEvent('booking-action-completed'));
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Failed to reassign owner';
       showToast(message, 'error');
     } finally {
       setIsReassigningOwner(false);
     }
-  }, [bookingId, showToast, fetchRosterData]);
+  }, [bookingId, showToast, fetchRosterData, refetchBookingContext, onRosterUpdated]);
 
   const getRoleBadge = (role: string) => {
     switch (role) {

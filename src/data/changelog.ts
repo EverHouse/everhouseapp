@@ -8,6 +8,27 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.87.92",
+    date: "2026-03-18",
+    title: "Fix: Booking Owner Change Now Updates Booking Details Immediately",
+    changes: [
+      "Fixed: Changing a booking's owner now updates the booking header, owner name, and email in the booking sheet immediately — previously only the player roster refreshed while the header stayed stale",
+      "Fixed: Booking details panel (payment section, footer) now shows the new owner's info right after reassignment instead of the previous owner's",
+      "Improved: Owner reassignment now broadcasts a real-time WebSocket event to all staff screens so other open dashboards reflect the change instantly",
+      "Improved: Parent booking grids (Command Center, Simulator Tab) now refresh automatically after an owner change",
+    ]
+  },
+  {
+    version: "8.87.91",
+    date: "2026-03-18",
+    title: "Fix: Session Creation Timeout During Trackman Webhook Processing",
+    changes: [
+      "Fixed: Session creation no longer fails with statement timeouts when multiple Trackman webhooks arrive simultaneously for the same bay — replaced blocking advisory lock with non-blocking retry pattern",
+      "Improved: Session manager now uses pg_try_advisory_lock with up to 6 retries (3 seconds total) instead of blocking indefinitely, preventing database timeout kills",
+      "Improved: Explicit 15-second statement timeout set during session creation to prevent Supabase server-level timeouts from interrupting mid-transaction work",
+    ]
+  },
+  {
     version: "8.87.90",
     date: "2026-03-18",
     title: "Fix: Bookings Queue Now Updates Instantly After Trackman Auto-Confirm",

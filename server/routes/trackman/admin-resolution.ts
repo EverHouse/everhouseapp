@@ -1358,6 +1358,20 @@ router.put('/api/admin/trackman/matched/:id/reassign', isStaffOrAdmin, async (re
       }
     }
 
+    try {
+      const { broadcastToStaff } = await import('../../core/websocket');
+      broadcastToStaff({
+        type: 'booking_updated',
+        bookingId: parseInt(id as string, 10),
+        action: 'owner_changed',
+        previousOwner: oldEmail,
+        newOwnerEmail: newMemberEmail.toLowerCase(),
+        newOwnerName: newMemberName
+      });
+    } catch (wsErr: unknown) {
+      logger.warn('[Reassign] WebSocket broadcast failed', { extra: { bookingId: id, wsErr } });
+    }
+
     await logFromRequest(req, {
       action: 'reassign_booking',
       resourceType: 'booking',

@@ -363,6 +363,12 @@ export function useStaffWebSocket(options: UseStaffWebSocketOptions = {}) {
             window.dispatchEvent(new CustomEvent('booking-roster-update', { detail: message }));
           }
 
+          if (message.type === 'booking_updated') {
+            // eslint-disable-next-line no-console
+            if (import.meta.env.DEV) console.log('[StaffWebSocket] Received booking_updated:', message.bookingId, message.action);
+            window.dispatchEvent(new CustomEvent('booking-action-completed', { detail: message }));
+          }
+
           if (message.type === 'booking_invoice_update') {
             // eslint-disable-next-line no-console
             if (import.meta.env.DEV) console.log('[StaffWebSocket] Received booking_invoice_update:', message.bookingId);

@@ -52,7 +52,7 @@ export function UnifiedBookingSheet(props: UnifiedBookingSheetProps) {
 
     const rosterLocked = !!(logic.paymentSuccess || logic.rosterData?.financialSummary?.allPaid);
 
-    const manageModeTitle = ownerName || logic.fetchedContext?.ownerName || 'Booking Details';
+    const manageModeTitle = logic.fetchedContext?.ownerName || ownerName || 'Booking Details';
 
     const handleManagedClose = () => {
       if (logic.paymentSuccess) {
@@ -67,8 +67,8 @@ export function UnifiedBookingSheet(props: UnifiedBookingSheetProps) {
         bookingId={bookingId}
         rosterData={logic.rosterData}
         fetchedContext={logic.fetchedContext}
-        ownerName={ownerName}
-        ownerEmail={ownerEmail}
+        ownerName={logic.fetchedContext?.ownerName || ownerName}
+        ownerEmail={logic.fetchedContext?.ownerEmail || ownerEmail}
         bayName={bayName}
         bookingDate={bookingDate}
         showInlinePayment={logic.showInlinePayment}
@@ -232,8 +232,8 @@ export function UnifiedBookingSheet(props: UnifiedBookingSheetProps) {
                 bookingId={bookingId}
                 rosterData={logic.rosterData}
                 fetchedContext={logic.fetchedContext}
-                ownerName={ownerName}
-                ownerEmail={ownerEmail}
+                ownerName={logic.fetchedContext?.ownerName || ownerName}
+                ownerEmail={logic.fetchedContext?.ownerEmail || ownerEmail}
                 bayName={bayName}
                 bookingDate={bookingDate}
                 showInlinePayment={logic.showInlinePayment}

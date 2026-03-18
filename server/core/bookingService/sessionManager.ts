@@ -187,10 +187,31 @@ export async function ensureSessionForBooking(params: {
     const manageLockClient = !client;
     try {
       const lockKey = `${params.resourceId}::${params.sessionDate}`;
+      if (manageLockClient) {
+        await lockClient.query(`SET statement_timeout = '15s'`);
+      }
       if (!manageLockClient) {
         await lockClient.query(`SELECT pg_advisory_xact_lock(hashtext($1))`, [lockKey]);
       } else {
-        await lockClient.query(`SELECT pg_advisory_lock(hashtext($1))`, [lockKey]);
+        const MAX_LOCK_ATTEMPTS = 6;
+        const LOCK_RETRY_DELAY_MS = 500;
+        let lockAcquired = false;
+        for (let attempt = 0; attempt < MAX_LOCK_ATTEMPTS; attempt++) {
+          const lockResult = await lockClient.query(`SELECT pg_try_advisory_lock(hashtext($1)) AS acquired`, [lockKey]);
+          if ((lockResult.rows[0] as { acquired: boolean }).acquired) {
+            lockAcquired = true;
+            break;
+          }
+          if (attempt < MAX_LOCK_ATTEMPTS - 1) {
+            logger.info(`[SessionManager] Advisory lock contention on ${lockKey}, retry ${attempt + 1}/${MAX_LOCK_ATTEMPTS}`, {
+              extra: { bookingId: params.bookingId, resourceId: params.resourceId }
+            });
+            await new Promise(resolve => setTimeout(resolve, LOCK_RETRY_DELAY_MS));
+          }
+        }
+        if (!lockAcquired) {
+          throw new Error(`Advisory lock timeout: could not acquire lock for ${lockKey} after ${MAX_LOCK_ATTEMPTS} attempts`);
+        }
       }
       try {
 
@@ -343,6 +364,7 @@ export async function ensureSessionForBooking(params: {
       }
     } finally {
       if (manageLockClient) {
+        await lockClient.query(`SET statement_timeout = '0'`).catch(() => {});
         safeRelease(lockClient as unknown as PoolClient);
       }
     }
