@@ -16,7 +16,7 @@ const CafeTab: React.FC = () => {
 
     // Queries and mutations
     const queryClient = useQueryClient();
-    const { data: cafeMenu = [] } = useCafeMenu();
+    const { data: cafeMenu = [] } = useCafeMenu({ includeInactive: true });
     const uploadImageMutation = useUploadCafeImage();
     const seedMenuMutation = useSeedCafeMenu();
     const updateItemMutation = useUpdateCafeItem();
@@ -63,7 +63,7 @@ const CafeTab: React.FC = () => {
             setNewItem(prev => ({ ...prev, image: data.url }));
             setUploadResult({ originalSize: data.originalSize, optimizedSize: data.optimizedSize });
         } catch (err: unknown) {
-            console.error('Upload error:', err);
+            showToast(err instanceof Error ? err.message : 'Failed to upload image', 'error');
         }
     };
 
@@ -71,7 +71,7 @@ const CafeTab: React.FC = () => {
         try {
             await seedMenuMutation.mutateAsync();
         } catch (err: unknown) {
-            console.error('Seed menu error:', err);
+            showToast(err instanceof Error ? err.message : 'Failed to seed menu', 'error');
         }
     };
 
@@ -85,14 +85,15 @@ const CafeTab: React.FC = () => {
             desc: newItem.desc || '',
             category: newItem.category || 'Coffee & Drinks',
             icon: newItem.icon || 'coffee',
-            image: newItem.image || ''
+            image: newItem.image || '',
+            isActive: newItem.isActive,
         };
 
         try {
             await updateItemMutation.mutateAsync(itemData);
             setIsEditing(false);
         } catch (err: unknown) {
-            console.error('Save error:', err);
+            showToast(err instanceof Error ? err.message : 'Failed to save item', 'error');
         }
     };
 
@@ -213,6 +214,22 @@ const CafeTab: React.FC = () => {
                         )}
                     </div>
                     <textarea className="w-full border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-3.5 rounded-xl text-primary dark:text-white placeholder:text-gray-500 dark:placeholder:text-white/60 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all duration-fast resize-none" placeholder="Description" rows={3} value={newItem.desc || ''} onChange={e => setNewItem({...newItem, desc: e.target.value})} />
+                    {editId && newItem.isActive === false && (
+                        <button
+                            type="button"
+                            onClick={() => setNewItem({...newItem, isActive: true})}
+                            className="flex items-center gap-2 w-full p-3 rounded-xl border border-amber-200 dark:border-amber-700/40 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 text-sm font-medium hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors"
+                        >
+                            <span aria-hidden="true" className="material-symbols-outlined text-lg">toggle_off</span>
+                            This item is inactive — click to reactivate
+                        </button>
+                    )}
+                    {editId && newItem.isActive !== false && (
+                        <div className="flex items-center gap-2 p-3 rounded-xl bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 text-sm font-medium">
+                            <span aria-hidden="true" className="material-symbols-outlined text-lg">toggle_on</span>
+                            Active
+                        </div>
+                    )}
                     <div className="flex items-center pt-2">
                         {editId && !showDeleteConfirm && (
                             <button
@@ -252,13 +269,16 @@ const CafeTab: React.FC = () => {
 
             <div ref={cafeRef} className="space-y-3 animate-content-enter-delay-3">
                 {filteredMenu.map((item, _index) => (
-                    <div key={item.id} onClick={() => openEdit(item)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openEdit(item); } }} role="button" tabIndex={0} className={`bg-white dark:bg-surface-dark p-4 rounded-xl shadow-sm border border-gray-200 dark:border-white/20 flex items-center gap-4 cursor-pointer hover:border-primary/30 transition-colors tactile-card `}>
+                    <div key={item.id} onClick={() => openEdit(item)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openEdit(item); } }} role="button" tabIndex={0} className={`bg-white dark:bg-surface-dark p-4 rounded-xl shadow-sm border border-gray-200 dark:border-white/20 flex items-center gap-4 cursor-pointer hover:border-primary/30 transition-colors tactile-card ${item.isActive === false ? 'opacity-50' : ''}`}>
                         <div className="w-16 h-16 rounded-lg bg-gray-100 dark:bg-white/5 flex-shrink-0 overflow-hidden">
                              {item.image ? <img src={item.image} className="w-full h-full object-cover" alt={item.name || 'Menu item image'} /> : <div className="w-full h-full flex items-center justify-center"><span aria-hidden="true" className="material-symbols-outlined text-gray-600">restaurant</span></div>}
                         </div>
                         <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
                                 <h4 className="font-bold text-gray-900 dark:text-white truncate flex-1">{item.name}</h4>
+                                {item.isActive === false && (
+                                    <span className="text-[10px] font-semibold uppercase tracking-wider bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 px-1.5 py-0.5 rounded-[4px]">Inactive</span>
+                                )}
                                 <span className="font-bold text-primary dark:text-white whitespace-nowrap">${item.price}</span>
                             </div>
                             <span className="inline-block text-[11px] font-semibold uppercase tracking-widest w-fit bg-gray-100 dark:bg-white/10 text-gray-500 dark:text-white/80 px-2 py-0.5 rounded-[4px] mt-1 mb-1" style={{ fontFamily: 'var(--font-label)' }}>{item.category}</span>

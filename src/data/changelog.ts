@@ -8,6 +8,27 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.87.70",
+    date: "2026-03-18",
+    title: "Fix: Corporate Volume Pricing Startup Error",
+    changes: [
+      "Fixed: Corporate Volume Pricing product initialization was failing on every startup due to a stale Stripe idempotency key — the product existed in Stripe but the database link was lost during the database migration",
+      "Improved: Product creation now searches Stripe for existing products before attempting to create, automatically re-linking orphaned products",
+    ]
+  },
+  {
+    version: "8.87.69",
+    date: "2026-03-18",
+    title: "Bug Fixes: Cafe Admin, Route Validation & Tier Sync Safety",
+    changes: [
+      "Fixed: Cafe admin tab now shows inactive items (greyed out with badge) so staff can see and reactivate items deactivated by Stripe sync",
+      "Fixed: Cafe route IDs are now validated as numbers — non-numeric IDs return 400 errors instead of silently passing NaN to database queries",
+      "Fixed: Deleting a non-existent cafe item now returns 404 instead of fake success",
+      "Fixed: Tier sync now explicitly skips non-subscription product types (one_time, config, fee) — prevents accidental subscription creation for fee/config tiers",
+      "Fixed: Cafe admin errors (upload, save, seed) now show toast notifications instead of being silently swallowed in console.error",
+    ]
+  },
+  {
     version: "8.87.68",
     date: "2026-03-18",
     title: "Fix: Wellness Calendar Sync — Missing recurring_event_id Column",

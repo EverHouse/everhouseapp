@@ -45,7 +45,7 @@ export function useEdgeSwipe(config: EdgeSwipeConfig = {}) {
     (window.matchMedia('(display-mode: standalone)').matches || 
      (window.navigator as unknown as { standalone?: boolean }).standalone === true);
 
-  const effectiveEdgeWidth = isStandalonePWA ? Math.max(edgeWidth, 150) : edgeWidth;
+  const effectiveEdgeWidth = isStandalonePWA ? Math.max(edgeWidth, 50) : edgeWidth;
 
   const handleStart = useCallback((clientX: number, clientY: number) => {
     if (!enabled || !isTouchDevice) return;

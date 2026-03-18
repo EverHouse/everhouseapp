@@ -39,6 +39,20 @@ export async function syncMembershipTiersToStripe(): Promise<{
 
     for (const tier of tiers) {
       try {
+        const NON_SUBSCRIPTION_PRODUCT_TYPES = ['one_time', 'config', 'fee'];
+        if (tier.productType && NON_SUBSCRIPTION_PRODUCT_TYPES.includes(tier.productType)) {
+          logger.info(`[Tier Sync] Skipping ${tier.name}: Non-subscription product_type "${tier.productType}"`);
+          results.push({
+            tierId: tier.id,
+            tierName: tier.name,
+            tierSlug: tier.slug,
+            success: true,
+            action: 'skipped',
+          });
+          skipped++;
+          continue;
+        }
+
         if (!tier.priceCents || tier.priceCents <= 0) {
           logger.info(`[Tier Sync] Skipping ${tier.name}: No price configured`);
           results.push({
@@ -53,8 +67,7 @@ export async function syncMembershipTiersToStripe(): Promise<{
         }
 
         const billingInterval = (tier.billingInterval as 'month' | 'year' | 'week' | 'day') || 'month';
-        const isOneTime = tier.productType === 'one_time';
-        const productName = isOneTime ? tier.name : `${tier.name} Membership`;
+        const productName = `${tier.name} Membership`;
         let stripeProductId = tier.stripeProductId;
         let stripePriceId = tier.stripePriceId;
 
@@ -89,10 +102,8 @@ export async function syncMembershipTiersToStripe(): Promise<{
                 unit_amount: tier.priceCents,
                 currency: 'usd',
                 metadata: priceMetadata,
+                recurring: { interval: billingInterval },
               };
-              if (!isOneTime) {
-                priceParams.recurring = { interval: billingInterval };
-              }
               const newPrice = await stripe.prices.create(priceParams, {
                 idempotencyKey: `price_tier_${tier.id}_${tier.priceCents}_update`
               });
@@ -105,10 +116,8 @@ export async function syncMembershipTiersToStripe(): Promise<{
               unit_amount: tier.priceCents,
               currency: 'usd',
               metadata: priceMetadata,
+              recurring: { interval: billingInterval },
             };
-            if (!isOneTime) {
-              priceParams.recurring = { interval: billingInterval };
-            }
             const newPrice = await stripe.prices.create(priceParams, {
               idempotencyKey: `price_tier_${tier.id}_${tier.priceCents}_new`
             });
@@ -162,10 +171,8 @@ export async function syncMembershipTiersToStripe(): Promise<{
             unit_amount: tier.priceCents,
             currency: 'usd',
             metadata: priceMetadata,
+            recurring: { interval: billingInterval },
           };
-          if (!isOneTime) {
-            priceParams.recurring = { interval: billingInterval };
-          }
           const stripePrice = await stripe.prices.create(priceParams, {
             idempotencyKey: `price_tier_${tier.id}_${tier.priceCents}_create`
           });

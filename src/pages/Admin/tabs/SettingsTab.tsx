@@ -43,6 +43,7 @@ interface SettingsState {
   maxOnboardingNudges: string;
   gracePeriodDays: string;
   trialCouponCode: string;
+  notificationRetentionDays: string;
   hubspotTourSchedulerUrl: string;
 }
 
@@ -189,6 +190,7 @@ const SettingsTab: React.FC = () => {
     maxOnboardingNudges: '3',
     gracePeriodDays: '3',
     trialCouponCode: 'ASTORIA7',
+    notificationRetentionDays: '30',
   };
 
   const [settings, setSettings] = useState<SettingsState>(defaultSettings);
@@ -252,6 +254,7 @@ const SettingsTab: React.FC = () => {
         maxOnboardingNudges: data['scheduling.max_onboarding_nudges']?.value || '3',
         gracePeriodDays: data['scheduling.grace_period_days']?.value || '3',
         trialCouponCode: data['scheduling.trial_coupon_code']?.value || 'ASTORIA7',
+        notificationRetentionDays: data['cleanup.notification_retention_days']?.value || '30',
       } as SettingsState;
     },
   });
@@ -301,6 +304,7 @@ const SettingsTab: React.FC = () => {
         'scheduling.max_onboarding_nudges': settingsToSave.maxOnboardingNudges,
         'scheduling.grace_period_days': settingsToSave.gracePeriodDays,
         'scheduling.trial_coupon_code': settingsToSave.trialCouponCode,
+        'cleanup.notification_retention_days': settingsToSave.notificationRetentionDays,
       };
 
       for (const [key, val] of Object.entries(settingsToSave.hubspotFormIds ?? {})) {
@@ -776,6 +780,17 @@ const SettingsTab: React.FC = () => {
               <input type="text" value={settings.trialCouponCode ?? ''} onChange={(e) => updateField('trialCouponCode', e.target.value)} className={inputClass} placeholder="COUPONCODE" />
               <p className="text-xs text-gray-400 mt-1">Promo code included in trial welcome email</p>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <div className={sectionClass}>
+        <SectionHeader icon="delete_sweep" title="Data Cleanup" subtitle="Automatic cleanup of old notification and subscription records" />
+        <div className="space-y-4">
+          <div>
+            <FieldLabel>Notification Retention Period (days)</FieldLabel>
+            <input type="number" min="1" max="365" value={settings.notificationRetentionDays ?? ''} onChange={(e) => updateField('notificationRetentionDays', e.target.value)} className={inputClass} />
+            <p className="text-xs text-gray-400 mt-1">Records older than this are automatically deleted daily at midnight. Applies to notifications, push subscriptions, and dismissed notices.</p>
           </div>
         </div>
       </div>

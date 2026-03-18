@@ -6,6 +6,7 @@ export interface CafeItem {
   desc: string;
   icon: string;
   image: string;
+  isActive?: boolean;
 }
 
 export type EventSource = 'internal' | 'eventbrite';

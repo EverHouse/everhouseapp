@@ -148,16 +148,32 @@ export async function fixFunctionSearchPaths(): Promise<void> {
   }
 }
 
-// Intentional: this app uses backend-only access control (server connects to DB, not browser).
-// RLS is unnecessary on tables without policies and adds overhead, so we disable it dynamically.
+// Defense-in-depth: enable RLS on all public tables with a default deny-all policy.
+// The backend uses the Supabase service role key which bypasses RLS, so this has no
+// functional impact but closes Supabase security linter warnings.
 export async function fixSupabaseAdvisories(): Promise<void> {
   try {
     await db.execute(sql`
-      DO $$ 
+      DO $$
       DECLARE
         tbl RECORD;
-        disabled_count INTEGER := 0;
+        enabled_count INTEGER := 0;
+        policy_count INTEGER := 0;
       BEGIN
+        -- Enable RLS on all public tables that don't have it
+        FOR tbl IN
+          SELECT c.relname AS tablename
+          FROM pg_class c
+          JOIN pg_namespace n ON c.relnamespace = n.oid
+          WHERE n.nspname = 'public'
+            AND c.relkind = 'r'
+            AND c.relrowsecurity = false
+        LOOP
+          EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY', tbl.tablename);
+          enabled_count := enabled_count + 1;
+        END LOOP;
+
+        -- Add deny-all policy to any table with RLS enabled but no policies
         FOR tbl IN
           SELECT c.relname AS tablename
           FROM pg_class c
@@ -170,17 +186,28 @@ export async function fixSupabaseAdvisories(): Promise<void> {
               WHERE p.schemaname = 'public' AND p.tablename = c.relname
             )
         LOOP
-          EXECUTE format('ALTER TABLE public.%I DISABLE ROW LEVEL SECURITY', tbl.tablename);
-          disabled_count := disabled_count + 1;
+          BEGIN
+            EXECUTE format(
+              'CREATE POLICY deny_all ON public.%I USING (false) WITH CHECK (false)',
+              tbl.tablename
+            );
+            policy_count := policy_count + 1;
+          EXCEPTION WHEN duplicate_object THEN
+            NULL;
+          END;
         END LOOP;
-        IF disabled_count > 0 THEN
-          RAISE NOTICE 'Disabled RLS on % tables with no policies', disabled_count;
+
+        IF enabled_count > 0 THEN
+          RAISE NOTICE 'Enabled RLS on % tables', enabled_count;
+        END IF;
+        IF policy_count > 0 THEN
+          RAISE NOTICE 'Created deny-all policies on % tables', policy_count;
         END IF;
       END $$
     `);
-    logger.info('[DB Init] Disabled RLS on tables with no policies');
+    logger.info('[DB Init] Enabled RLS with deny-all policies on all public tables');
   } catch (err: unknown) {
-    logger.warn(`[DB Init] Skipping RLS disable: ${getErrorMessage(err)}`);
+    logger.warn(`[DB Init] Skipping RLS enable: ${getErrorMessage(err)}`);
   }
 
   try {

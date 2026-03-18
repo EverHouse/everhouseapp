@@ -554,36 +554,49 @@ export async function ensureCorporateVolumePricingProduct(): Promise<{
     }
     
     if (!stripeProductId) {
-      const tiers = getCorporateVolumeTiers();
-      const basePrice = getCorporateBasePrice();
-      
-      const metadata: Record<string, string> = {
-        tier_id: tierId.toString(),
-        tier_slug: CORPORATE_PRICING_SLUG,
-        product_type: 'config',
-        config_type: 'corporate_volume_pricing',
-        volume_base_price: basePrice.toString(),
-        app_category: 'config',
-      };
-      
-      for (const tier of tiers) {
-        metadata[`volume_tier_${tier.minMembers}`] = tier.priceCents.toString();
-      }
-      
-      const product = await stripe.products.create({
-        name: CORPORATE_PRICING_NAME,
-        description: 'Configuration product for corporate volume pricing tiers. Edit metadata to change pricing.',
-        metadata,
-      }, {
-        idempotencyKey: `product_corporate_${CORPORATE_PRICING_SLUG}`
+      const existingProducts = await stripe.products.search({
+        query: `metadata['config_type']:'corporate_volume_pricing' AND metadata['tier_slug']:'${CORPORATE_PRICING_SLUG}'`,
+        limit: 1,
       });
-      stripeProductId = product.id;
       
-      await db.update(membershipTiers)
-        .set({ stripeProductId })
-        .where(eq(membershipTiers.id, tierId));
-      
-      logger.info(`[Corporate Pricing] Created Stripe product: ${stripeProductId}`);
+      if (existingProducts.data.length > 0) {
+        stripeProductId = existingProducts.data[0].id;
+        await db.update(membershipTiers)
+          .set({ stripeProductId })
+          .where(eq(membershipTiers.id, tierId));
+        logger.info(`[Corporate Pricing] Re-linked existing Stripe product: ${stripeProductId}`);
+      } else {
+        const tiers = getCorporateVolumeTiers();
+        const basePrice = getCorporateBasePrice();
+        
+        const metadata: Record<string, string> = {
+          tier_id: tierId.toString(),
+          tier_slug: CORPORATE_PRICING_SLUG,
+          product_type: 'config',
+          config_type: 'corporate_volume_pricing',
+          volume_base_price: basePrice.toString(),
+          app_category: 'config',
+        };
+        
+        for (const tier of tiers) {
+          metadata[`volume_tier_${tier.minMembers}`] = tier.priceCents.toString();
+        }
+        
+        const product = await stripe.products.create({
+          name: CORPORATE_PRICING_NAME,
+          description: 'Configuration product for corporate volume pricing tiers. Edit metadata to change pricing.',
+          metadata,
+        }, {
+          idempotencyKey: `product_corporate_${CORPORATE_PRICING_SLUG}_${tierId}`
+        });
+        stripeProductId = product.id;
+        
+        await db.update(membershipTiers)
+          .set({ stripeProductId })
+          .where(eq(membershipTiers.id, tierId));
+        
+        logger.info(`[Corporate Pricing] Created Stripe product: ${stripeProductId}`);
+      }
     }
     
     updateCorporateVolumePricing(getCorporateVolumeTiers(), getCorporateBasePrice(), stripeProductId);

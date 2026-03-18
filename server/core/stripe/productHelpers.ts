@@ -49,10 +49,14 @@ export async function findExistingStripeProduct(
 }
 
 export function buildPrivilegeMetadata(tier: TierRecord): Record<string, string> {
+  const NON_SUBSCRIPTION_PRODUCT_TYPES = ['one_time', 'config', 'fee'];
+  const resolvedProductType = tier.productType && NON_SUBSCRIPTION_PRODUCT_TYPES.includes(tier.productType)
+    ? tier.productType
+    : tier.productType || 'subscription';
   const metadata: Record<string, string> = {
     tier_id: tier.id.toString(),
     tier_slug: tier.slug,
-    product_type: tier.productType || 'subscription',
+    product_type: resolvedProductType,
     source: 'ever_house_app',
     app_category: tier.productType === 'one_time' ? 'fee' : tier.productType === 'config' ? 'config' : 'membership',
   };

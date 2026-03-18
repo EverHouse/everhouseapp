@@ -3,7 +3,7 @@ import { readFileSync } from "fs";
 import { join } from "path";
 import pg from "pg";
 
-const DATABASE_URL = process.env.DATABASE_URL;
+const DATABASE_URL = process.env.DATABASE_POOLER_URL || process.env.DATABASE_URL;
 if (!DATABASE_URL) {
   console.log("[MigrationSync] No DATABASE_URL — skipping migration tracking sync");
   process.exit(0);

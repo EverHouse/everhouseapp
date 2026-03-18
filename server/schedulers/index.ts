@@ -22,6 +22,7 @@ import { startPendingUserCleanupScheduler, stopPendingUserCleanupScheduler } fro
 import { startWebhookEventCleanupScheduler, stopWebhookEventCleanupScheduler } from './webhookEventCleanupScheduler';
 import { startOnboardingNudgeScheduler, stopOnboardingNudgeScheduler } from './onboardingNudgeScheduler';
 import { startSupabaseHeartbeatScheduler, stopSupabaseHeartbeatScheduler } from './supabaseHeartbeatScheduler';
+import { startNotificationCleanupScheduler, stopNotificationCleanupScheduler } from './notificationCleanupScheduler';
 import { stopRealtimeRecovery } from '../core/supabase/client';
 import { startJobProcessor, stopJobProcessor } from '../core/jobQueue';
 import { schedulerTracker } from '../core/schedulerTracker';
@@ -78,6 +79,7 @@ export function initSchedulers(): void {
   schedulerTracker.registerScheduler('Webhook Event Cleanup', 24 * 60 * 60 * 1000);
   schedulerTracker.registerScheduler('Onboarding Nudge', 60 * 60 * 1000);
   schedulerTracker.registerScheduler('Supabase Heartbeat', 6 * 60 * 60 * 1000);
+  schedulerTracker.registerScheduler('Notification Cleanup', 24 * 60 * 60 * 1000);
   schedulerTracker.registerScheduler('Job Queue Processor', 5000);
 
   logger.info(`[Schedulers] Staggering scheduler startup over ~${26 * STAGGER_INTERVAL_MS / 1000}s to prevent DB connection spikes`);
@@ -175,6 +177,9 @@ export function initSchedulers(): void {
   slot++;
 
   staggerStart(slot * STAGGER_INTERVAL_MS, 'Pending User Cleanup', () => startPendingUserCleanupScheduler());
+  slot++;
+
+  staggerStart(slot * STAGGER_INTERVAL_MS, 'Notification Cleanup', () => startNotificationCleanupScheduler());
   // eslint-disable-next-line no-useless-assignment
   slot++;
 }
@@ -210,6 +215,7 @@ export function stopSchedulers(): void {
   stopMemberSyncScheduler();
   stopBackgroundSyncScheduler();
   stopSupabaseHeartbeatScheduler();
+  stopNotificationCleanupScheduler();
   stopRealtimeRecovery();
   stopJobProcessor();
 }

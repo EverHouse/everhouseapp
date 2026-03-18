@@ -52,6 +52,7 @@ const DEFAULT_SETTINGS: Record<string, { value: string; category: string }> = {
   'scheduler.Onboarding_Nudge.enabled': { value: 'true', category: 'scheduler' },
   'scheduler.Job_Queue_Processor.enabled': { value: 'true', category: 'scheduler' },
   'scheduler.Invite_Expiry.enabled': { value: 'true', category: 'scheduler' },
+  'scheduler.Notification_Cleanup.enabled': { value: 'true', category: 'scheduler' },
 
   'push.enabled': { value: 'true', category: 'push' },
   'booking.auto_approve.conference_rooms': { value: 'true', category: 'booking' },
@@ -127,6 +128,8 @@ const DEFAULT_SETTINGS: Record<string, { value: string; category: string }> = {
   'scheduling.max_onboarding_nudges': { value: '3', category: 'scheduling' },
   'scheduling.grace_period_days': { value: '3', category: 'scheduling' },
   'scheduling.trial_coupon_code': { value: 'ASTORIA7', category: 'scheduling' },
+
+  'cleanup.notification_retention_days': { value: '30', category: 'cleanup' },
 };
 
 const PUBLIC_CATEGORIES = new Set(['contact', 'social', 'apple_messages', 'hours_display']);

@@ -232,6 +232,13 @@
       "when": 1774396800000,
       "tag": "0059_add_terminal_payments_unique_constraint",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1774483200000,
+      "tag": "0060_drop_duplicate_indexes",
+      "breakpoints": true
     }
   ]
 }

@@ -1,0 +1,12 @@
+DROP INDEX IF EXISTS "idx_admin_audit_log_created";
+DROP INDEX IF EXISTS "idx_availability_blocks_resource_date";
+DROP INDEX IF EXISTS "idx_booking_participants_user_id";
+DROP INDEX IF EXISTS "idx_booking_requests_session_id";
+DROP INDEX IF EXISTS "idx_communication_logs_email";
+DROP INDEX IF EXISTS "idx_day_pass_purchases_payment_intent_unique";
+DROP INDEX IF EXISTS "idx_events_event_date";
+DROP INDEX IF EXISTS "idx_form_submissions_type";
+DROP INDEX IF EXISTS "integrity_ignores_issue_key_idx";
+DROP INDEX IF EXISTS "idx_users_membership_status";
+DROP INDEX IF EXISTS "idx_walk_in_visits_member_email_lower";
+DROP INDEX IF EXISTS "idx_webhook_processed_events_type";

@@ -4,6 +4,7 @@ import { isStaffOrAdmin, isAdmin } from '../core/middleware';
 import { broadcastCafeMenuUpdate } from '../core/websocket';
 import { logFromRequest } from '../core/auditLog';
 import { logger } from '../core/logger';
+import { getErrorMessage } from '../utils/errorUtils';
 import { db } from '../db';
 import { cafeItems } from '../../shared/schema';
 import { sql, eq, and, asc } from 'drizzle-orm';
@@ -14,12 +15,15 @@ const CAFE_CACHE_TTL = 60_000;
 
 const router = Router();
 
-// PUBLIC ROUTE - cafe menu displayed on public website
 router.get('/api/cafe-menu', async (req, res) => {
   try {
     const { category, include_inactive } = req.query;
+    const sessionUser = (req.session as Record<string, unknown>)?.user as Record<string, unknown> | undefined;
+    const userRole = sessionUser?.role as string | undefined;
+    const isStaffOrAdminUser = userRole === 'admin' || userRole === 'staff';
+    const showInactive = include_inactive === 'true' && isStaffOrAdminUser;
 
-    if (!category && include_inactive !== 'true') {
+    if (!category && !showInactive) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const cached = getCached<any[]>(CAFE_CACHE_KEY);
       if (cached) return res.json(cached);
@@ -27,7 +31,7 @@ router.get('/api/cafe-menu', async (req, res) => {
 
     const conditions = [];
     
-    if (include_inactive !== 'true') {
+    if (!showInactive) {
       conditions.push(eq(cafeItems.isActive, true));
     }
     
@@ -39,13 +43,13 @@ router.get('/api/cafe-menu', async (req, res) => {
       .where(conditions.length > 0 ? and(...conditions) : undefined)
       .orderBy(asc(cafeItems.sortOrder), asc(cafeItems.category), asc(cafeItems.name));
 
-    if (!category && include_inactive !== 'true') {
+    if (!category && !showInactive) {
       setCache(CAFE_CACHE_KEY, result, CAFE_CACHE_TTL);
     }
 
     res.json(result);
   } catch (error: unknown) {
-    if (!isProduction) logger.error('Cafe menu error', { error: error instanceof Error ? error : new Error(String(error)) });
+    if (!isProduction) logger.error('Cafe menu error', { error: getErrorMessage(error) });
     res.status(500).json({ error: 'Failed to fetch cafe menu' });
   }
 });
@@ -74,7 +78,7 @@ router.post('/api/cafe-menu', isStaffOrAdmin, async (req, res) => {
     logFromRequest(req, 'create_cafe_item', 'cafe', String(result[0].id), result[0].name || name, {});
     res.status(201).json(result[0]);
   } catch (error: unknown) {
-    if (!isProduction) logger.error('Cafe item creation error', { error: error instanceof Error ? error : new Error(String(error)) });
+    if (!isProduction) logger.error('Cafe item creation error', { error: getErrorMessage(error) });
     res.status(500).json({ error: 'Failed to create cafe item' });
   }
 });
@@ -82,11 +86,15 @@ router.post('/api/cafe-menu', isStaffOrAdmin, async (req, res) => {
 router.put('/api/cafe-menu/:id', isStaffOrAdmin, async (req, res) => {
   try {
     const { id } = req.params;
+    const numericId = Number(id);
+    if (isNaN(numericId)) {
+      return res.status(400).json({ error: 'Invalid cafe item ID: must be a number' });
+    }
     const { category, name, price, description, icon, image_url, is_active, sort_order } = req.body;
     
     const existing = await db.select({ stripeProductId: cafeItems.stripeProductId })
       .from(cafeItems)
-      .where(eq(cafeItems.id, Number(id)));
+      .where(eq(cafeItems.id, numericId));
     if (existing.length === 0) {
       return res.status(404).json({ error: 'Cafe item not found' });
     }
@@ -97,8 +105,9 @@ router.put('/api/cafe-menu/:id', isStaffOrAdmin, async (req, res) => {
         description: sql`COALESCE(${description}, ${cafeItems.description})`,
         icon: sql`COALESCE(${icon}, ${cafeItems.icon})`,
         imageUrl: sql`COALESCE(${image_url}, ${cafeItems.imageUrl})`,
+        isActive: sql`COALESCE(${is_active}, ${cafeItems.isActive})`,
         sortOrder: sql`COALESCE(${sort_order}, ${cafeItems.sortOrder})`,
-      }).where(eq(cafeItems.id, Number(id))).returning();
+      }).where(eq(cafeItems.id, numericId)).returning();
     } else {
       result = await db.update(cafeItems).set({
         category: sql`COALESCE(${category}, ${cafeItems.category})`,
@@ -109,7 +118,7 @@ router.put('/api/cafe-menu/:id', isStaffOrAdmin, async (req, res) => {
         imageUrl: sql`COALESCE(${image_url}, ${cafeItems.imageUrl})`,
         isActive: sql`COALESCE(${is_active}, ${cafeItems.isActive})`,
         sortOrder: sql`COALESCE(${sort_order}, ${cafeItems.sortOrder})`,
-      }).where(eq(cafeItems.id, Number(id))).returning();
+      }).where(eq(cafeItems.id, numericId)).returning();
     }
     
     invalidateCache(CAFE_CACHE_KEY);
@@ -117,7 +126,7 @@ router.put('/api/cafe-menu/:id', isStaffOrAdmin, async (req, res) => {
     logFromRequest(req, 'update_cafe_item', 'cafe', String(id), name, {});
     res.json(result[0]);
   } catch (error: unknown) {
-    if (!isProduction) logger.error('Cafe item update error', { error: error instanceof Error ? error : new Error(String(error)) });
+    if (!isProduction) logger.error('Cafe item update error', { error: getErrorMessage(error) });
     res.status(500).json({ error: 'Failed to update cafe item' });
   }
 });
@@ -125,11 +134,18 @@ router.put('/api/cafe-menu/:id', isStaffOrAdmin, async (req, res) => {
 router.delete('/api/cafe-menu/:id', isStaffOrAdmin, async (req, res) => {
   try {
     const { id } = req.params;
+    const numericId = Number(id);
+    if (isNaN(numericId)) {
+      return res.status(400).json({ error: 'Invalid cafe item ID: must be a number' });
+    }
     
     const existing = await db.select({ stripeProductId: cafeItems.stripeProductId, name: cafeItems.name })
       .from(cafeItems)
-      .where(eq(cafeItems.id, Number(id)));
-    if (existing.length > 0 && existing[0].stripeProductId) {
+      .where(eq(cafeItems.id, numericId));
+    if (existing.length === 0) {
+      return res.status(404).json({ error: 'Cafe item not found' });
+    }
+    if (existing[0].stripeProductId) {
       try {
         const { getStripeClient } = await import('../core/stripe/client');
         const stripe = await getStripeClient();
@@ -141,18 +157,18 @@ router.delete('/api/cafe-menu/:id', isStaffOrAdmin, async (req, res) => {
       } catch (stripeErr: unknown) {
         const isNotFound = stripeErr instanceof Error && 'statusCode' in stripeErr && (stripeErr as { statusCode: number }).statusCode === 404;
         if (!isNotFound) {
-          logger.warn(`[Cafe] Failed to archive Stripe product ${existing[0].stripeProductId} during delete, proceeding with local delete`, { error: stripeErr instanceof Error ? stripeErr : new Error(String(stripeErr)) });
+          logger.warn(`[Cafe] Failed to archive Stripe product ${existing[0].stripeProductId} during delete, proceeding with local delete`, { error: getErrorMessage(stripeErr) });
         }
       }
     }
     
-    await db.delete(cafeItems).where(eq(cafeItems.id, Number(id)));
+    await db.delete(cafeItems).where(eq(cafeItems.id, numericId));
     invalidateCache(CAFE_CACHE_KEY);
     broadcastCafeMenuUpdate('deleted');
     logFromRequest(req, 'delete_cafe_item', 'cafe', String(id), undefined, {});
     res.json({ success: true });
   } catch (error: unknown) {
-    if (!isProduction) logger.error('Cafe item delete error', { error: error instanceof Error ? error : new Error(String(error)) });
+    if (!isProduction) logger.error('Cafe item delete error', { error: getErrorMessage(error) });
     res.status(500).json({ error: 'Failed to delete cafe item' });
   }
 });
@@ -228,7 +244,7 @@ router.post('/api/admin/seed-cafe', isAdmin, async (req, res) => {
       totalAfter: existingCount + inserted
     });
   } catch (error: unknown) {
-    if (!isProduction) logger.error('Cafe seed error', { error: error instanceof Error ? error : new Error(String(error)) });
+    if (!isProduction) logger.error('Cafe seed error', { error: getErrorMessage(error) });
     res.status(500).json({ error: 'Failed to seed cafe menu' });
   }
 });
