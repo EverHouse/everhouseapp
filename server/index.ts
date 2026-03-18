@@ -1029,7 +1029,7 @@ async function initializeApp() {
         res.setHeader('Expires', '0');
         const linkHints = ['</images/hero-lounge-optimized.webp>; rel=preload; as=image; type=image/webp'];
         if (mainCssPath) {
-          linkHints.push(`<${mainCssPath}>; rel=preload; as=style; crossorigin`);
+          linkHints.push(`<${mainCssPath}>; rel=preload; as=style`);
         }
         linkHints.push('<https://fonts.googleapis.com>; rel=preconnect');
         linkHints.push('<https://fonts.gstatic.com>; rel=preconnect; crossorigin');
