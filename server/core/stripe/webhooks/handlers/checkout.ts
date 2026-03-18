@@ -628,6 +628,21 @@ export async function handleCheckoutSessionExpired(client: PoolClient, session: 
       }
     }
 
+    if (!userEmail) {
+      userEmail = metadata.email?.toLowerCase() || metadata.user_email?.toLowerCase() || null;
+    }
+
+    if (!userEmail && customerId) {
+      try {
+        const stripe = await getStripeClient();
+        const customer = await stripe.customers.retrieve(customerId);
+        if (customer && !customer.deleted) {
+          userEmail = customer.email?.toLowerCase() || null;
+        }
+      } catch (_err: unknown) {
+      }
+    }
+
     const displayEmail = userEmail || email || customerId || 'unknown';
     logger.info(`[Stripe Webhook] Checkout session expired: ${session.id}, email: ${displayEmail}, purpose: ${purpose}, source: ${source}, tier: ${tierSlug}`);
 
@@ -704,6 +719,21 @@ export async function handleCheckoutSessionAsyncPaymentFailed(client: PoolClient
       );
       if (userResult.rows.length > 0) {
         userEmail = userResult.rows[0].email;
+      }
+    }
+
+    if (!userEmail) {
+      userEmail = metadata.email?.toLowerCase() || metadata.user_email?.toLowerCase() || null;
+    }
+
+    if (!userEmail && customerId) {
+      try {
+        const stripe = await getStripeClient();
+        const customer = await stripe.customers.retrieve(customerId);
+        if (customer && !customer.deleted) {
+          userEmail = customer.email?.toLowerCase() || null;
+        }
+      } catch (_err: unknown) {
       }
     }
 
