@@ -139,7 +139,7 @@ router.put('/api/booking-requests/:id/member-cancel', isAuthenticated, async (re
       logFromRequest(req, 'cancellation_requested', 'booking', idStr, undefined, {
         member_email: existing.userEmail,
         trackman_booking_id: existing.trackmanBookingId
-      });
+      }).catch(err => logger.error('[BookingCancel] Audit log failed', { extra: { error: getErrorMessage(err) } }));
       
       const memberName = existing.userName || existing.userEmail;
       const bookingDate = existing.requestDate && typeof existing.requestDate === 'object' && 'toISOString' in (existing.requestDate as object)
@@ -398,7 +398,7 @@ router.put('/api/booking-requests/:id/member-cancel', isAuthenticated, async (re
 
     logFromRequest(req, 'cancel_booking', 'booking', idStr, undefined, {
       member_email: existing.userEmail
-    });
+    }).catch(err => logger.error('[BookingCancel] Audit log failed', { extra: { error: getErrorMessage(err) } }));
     
     if (wasApproved) {
       const memberName = existing.userName || existing.userEmail;

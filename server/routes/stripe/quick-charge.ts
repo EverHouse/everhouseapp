@@ -131,7 +131,7 @@ router.post('/api/stripe/staff/quick-charge', isStaffOrAdmin, validateBody(quick
         productId: productId || null,
         productName: finalProductName || null,
         source: 'pos_guest_checkout'
-      });
+      }).catch(err => logger.error('[QuickCharge] Audit log failed', { extra: { error: getErrorMessage(err) } }));
 
       logger.info('[Stripe] Guest checkout PaymentIntent created', { extra: { paymentIntentId: paymentIntent.id, amount: numericAmount } });
 
@@ -288,7 +288,7 @@ router.post('/api/stripe/staff/quick-charge', isStaffOrAdmin, validateBody(quick
           productName: finalProductName || null,
           isNewCustomer: !!isNewCustomer,
           source: 'pos_quick_charge_invoice'
-        });
+        }).catch(err => logger.error('[QuickCharge] Audit log failed', { extra: { error: getErrorMessage(err) } }));
 
         return res.json({
           clientSecret: invoiceResult.clientSecret,
@@ -334,7 +334,7 @@ router.post('/api/stripe/staff/quick-charge', isStaffOrAdmin, validateBody(quick
       productName: finalProductName || null,
       isNewCustomer: !!isNewCustomer,
       source: 'pos_quick_charge'
-    });
+    }).catch(err => logger.error('[QuickCharge] Audit log failed', { extra: { error: getErrorMessage(err) } }));
 
     res.json({
       clientSecret: result.clientSecret,
@@ -517,7 +517,7 @@ router.post('/api/stripe/staff/quick-charge/attach-email', isStaffOrAdmin, valid
     logFromRequest(req, 'attach_email_to_payment', 'payment', paymentIntentId, email, {
       stripeCustomerId,
       source: 'pos_guest_checkout'
-    });
+    }).catch(err => logger.error('[QuickCharge] Audit log failed', { extra: { error: getErrorMessage(err) } }));
 
     res.json({ success: true, stripeCustomerId });
   } catch (error: unknown) {
@@ -547,7 +547,7 @@ router.post('/api/stripe/staff/charge-saved-card-pos', isStaffOrAdmin, validateB
         approvedBy: staffEmail,
         role: 'admin',
         chargeType: 'saved_card_pos'
-      });
+      }).catch(err => logger.error('[QuickCharge] Audit log failed', { extra: { error: getErrorMessage(err) } }));
     }
 
     const memberResult = await db.execute(sql`SELECT id, email, name, first_name, last_name, stripe_customer_id 
@@ -629,7 +629,7 @@ router.post('/api/stripe/staff/charge-saved-card-pos', isStaffOrAdmin, validateB
             cardLast4,
             cardBrand,
             source: 'pos'
-          });
+          }).catch(err => logger.error('[QuickCharge] Audit log failed', { extra: { error: getErrorMessage(err) } }));
 
           return res.json({
             success: true,
@@ -696,7 +696,7 @@ router.post('/api/stripe/staff/charge-saved-card-pos', isStaffOrAdmin, validateB
         cardLast4,
         cardBrand,
         source: 'pos'
-      });
+      }).catch(err => logger.error('[QuickCharge] Audit log failed', { extra: { error: getErrorMessage(err) } }));
 
 
       res.json({
@@ -744,7 +744,7 @@ router.get('/api/stripe/staff/check-saved-card/:email', isStaffOrAdmin, async (r
       resourceId: memberEmail,
       resourceName: memberEmail,
       details: { viewedBy: staffEmail, targetEmail: memberEmail }
-    });
+    }).catch(err => logger.error('[QuickCharge] Audit log failed', { extra: { error: getErrorMessage(err) } }));
 
     const memberResult = await db.execute(sql`SELECT stripe_customer_id FROM users WHERE LOWER(email) = LOWER(${memberEmail})`);
 
@@ -786,7 +786,7 @@ router.get('/api/staff/member-balance/:email', isStaffOrAdmin, async (req: Reque
       resourceId: memberEmail,
       resourceName: memberEmail,
       details: { viewedBy: staffEmail, targetEmail: memberEmail }
-    });
+    }).catch(err => logger.error('[QuickCharge] Audit log failed', { extra: { error: getErrorMessage(err) } }));
 
     const result = await db.execute(sql`SELECT 
         bp.id as participant_id,
@@ -892,7 +892,7 @@ router.post('/api/purchases/send-receipt', isStaffOrAdmin, validateBody(sendRece
         totalAmount,
         itemCount: items.length,
         paymentMethod
-      });
+      }).catch(err => logger.error('[QuickCharge] Audit log failed', { extra: { error: getErrorMessage(err) } }));
 
       res.json({ success: true });
     } else {
@@ -974,7 +974,7 @@ router.post('/api/stripe/staff/charge-subscription-invoice', isStaffOrAdmin, val
       paymentMethodId,
       invoiceStatus: paidInvoice.status,
       chargedBy: staffEmail
-    });
+    }).catch(err => logger.error('[QuickCharge] Audit log failed', { extra: { error: getErrorMessage(err) } }));
 
     broadcastBillingUpdate({
       action: 'subscription_updated',
