@@ -936,6 +936,13 @@ export async function ensureDatabaseConstraints() {
     }
 
     try {
+      await db.execute(sql`ALTER TABLE wellness_classes ADD COLUMN IF NOT EXISTS recurring_event_id VARCHAR`);
+      logger.info('[DB Init] wellness_classes recurring_event_id column verified');
+    } catch (err: unknown) {
+      logger.warn(`[DB Init] recurring_event_id column: ${getErrorMessage(err)}`);
+    }
+
+    try {
       logger.info('[DB Init] Day pass and wellness enrollment indexes are now managed by Drizzle schema');
     } catch (err: unknown) {
       logger.warn(`[DB Init] Skipping index log: ${getErrorMessage(err)}`);

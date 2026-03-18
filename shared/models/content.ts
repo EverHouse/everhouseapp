@@ -98,6 +98,7 @@ export const wellnessClasses = pgTable("wellness_classes", {
   reviewedAt: timestamp("reviewed_at"),
   reviewDismissed: boolean("review_dismissed").default(false),
   conflictDetected: boolean("conflict_detected").default(false),
+  recurringEventId: varchar("recurring_event_id"),
   archivedAt: timestamp("archived_at"),
   archivedBy: varchar("archived_by"),
 });

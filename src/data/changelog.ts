@@ -8,6 +8,15 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.87.68",
+    date: "2026-03-18",
+    title: "Fix: Wellness Calendar Sync — Missing recurring_event_id Column",
+    changes: [
+      "Fixed: Wellness calendar sync was failing because the recurring_event_id column was missing from the wellness_classes database table",
+      "Added: recurring_event_id column to wellness_classes schema and db-init migration for automatic column creation on startup",
+    ]
+  },
+  {
     version: "8.87.67",
     date: "2026-03-18",
     title: "Accessibility: Facebook Pixel Alt Text & Thin Content Investigation",
