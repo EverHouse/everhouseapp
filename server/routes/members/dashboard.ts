@@ -389,7 +389,7 @@ router.get('/api/member/dashboard/stats', isAuthenticated, async (req, res) => {
       const actualTier = (userResult as unknown as Record<string, unknown> & { rows?: Record<string, unknown>[] }).rows?.[0]?.tier as string || null;
       
       const tierLimits = actualTier ? await getTierLimits(actualTier) : null;
-      const passesTotal = tierLimits?.guest_passes_per_month ?? 0;
+      const passesTotal = tierLimits?.guest_passes_per_year ?? 0;
       
       let result = await withRetry(() => 
         db.select()
@@ -849,7 +849,7 @@ router.get('/api/member/dashboard-data', isAuthenticated, async (req, res) => {
         const actualTier = (userResult as unknown as Record<string, unknown> & { rows?: Record<string, unknown>[] }).rows?.[0]?.tier as string || null;
         
         const tierLimits = actualTier ? await getTierLimits(actualTier) : null;
-        const passesTotal = tierLimits?.guest_passes_per_month ?? 0;
+        const passesTotal = tierLimits?.guest_passes_per_year ?? 0;
         
         let result = await withRetry(() => 
           db.select()

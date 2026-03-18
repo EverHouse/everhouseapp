@@ -1142,7 +1142,7 @@ router.get('/api/admin/booking/:id/members', isStaffOrAdmin, async (req, res) =>
       tierLimits: ownerTierLimits ? {
         can_book_simulators: ownerTierLimits.can_book_simulators,
         daily_sim_minutes: ownerTierLimits.daily_sim_minutes,
-        guest_passes_per_month: ownerTierLimits.guest_passes_per_month,
+        guest_passes_per_year: ownerTierLimits.guest_passes_per_year,
         unlimited_access: ownerTierLimits.unlimited_access
       } : null,
       tierContext: {

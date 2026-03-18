@@ -154,7 +154,7 @@ export async function getGuestPassesRemaining(memberEmail: string): Promise<numb
     const tier = await getMemberTierByEmail(memberEmail);
     if (!tier) return 0;
     const limits = await getTierLimits(tier);
-    return limits.guest_passes_per_month;
+    return limits.guest_passes_per_year;
   } catch (error: unknown) {
     logger.error('[getGuestPassesRemaining] Error:', { error: getErrorMessage(error) });
     return 0;

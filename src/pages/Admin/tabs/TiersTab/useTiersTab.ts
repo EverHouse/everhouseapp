@@ -89,7 +89,7 @@ export function useTiersTab() {
         highlighted_features: [],
         all_features: {},
         daily_sim_minutes: 0,
-        guest_passes_per_month: 0,
+        guest_passes_per_year: 0,
         booking_window_days: 7,
         daily_conf_room_minutes: 0,
         can_book_simulators: false,

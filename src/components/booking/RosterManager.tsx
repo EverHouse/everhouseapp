@@ -111,7 +111,7 @@ interface FeePreviewResponse {
     estimatedTotalFees?: number;
   };
   guestPasses: {
-    monthlyAllowance: number;
+    yearlyAllowance: number;
     remaining: number;
     usedThisBooking: number;
     afterBooking: number;
@@ -499,7 +499,7 @@ const RosterManager: React.FC<RosterManagerProps> = ({
               </div>
               <p className={`text-xs text-center ${guestPassesRemaining > 0 ? (isDark ? 'text-white/40' : 'text-[#293515]/40') : (isDark ? 'text-amber-400/70' : 'text-amber-600')}`}>
                 {guestPassesRemaining > 0
-                  ? `${guestPassesRemaining} guest pass${guestPassesRemaining > 1 ? 'es' : ''} remaining this month`
+                  ? `${guestPassesRemaining} guest pass${guestPassesRemaining > 1 ? 'es' : ''} remaining this year`
                   : `No passes left — $${guestFeeDollars} guest fee applies`
                 }
               </p>

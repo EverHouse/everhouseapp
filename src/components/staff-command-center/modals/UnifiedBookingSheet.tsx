@@ -173,12 +173,12 @@ export function UnifiedBookingSheet(props: UnifiedBookingSheetProps) {
                 </div>
               )}
 
-              {!logic.isConferenceRoom && logic.rosterData?.tierLimits?.guest_passes_per_month && (
+              {!logic.isConferenceRoom && logic.rosterData?.tierLimits?.guest_passes_per_year && (
                 <div className="flex items-center gap-2 text-xs">
                   <span className="material-symbols-outlined text-emerald-500 text-sm">redeem</span>
                   <span className="text-primary/70 dark:text-white/70">
                     Guest Passes: <span className="font-semibold text-primary dark:text-white">
-                      {logic.rosterData.ownerGuestPassesRemaining}/{logic.rosterData.tierLimits.guest_passes_per_month}
+                      {logic.rosterData.ownerGuestPassesRemaining}/{logic.rosterData.tierLimits.guest_passes_per_year}
                     </span> remaining
                   </span>
                 </div>

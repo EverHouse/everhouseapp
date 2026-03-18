@@ -95,7 +95,7 @@ vi.mock('../server/core/bookingService/usageCalculator', () => ({
 }));
 
 vi.mock('../server/core/tierService', () => ({
-  getTierLimits: vi.fn().mockResolvedValue({ dailyMinutes: 120, guestPassesPerMonth: 4 }),
+  getTierLimits: vi.fn().mockResolvedValue({ dailyMinutes: 120, guestPassesPerYear: 4 }),
   getMemberTierByEmail: vi.fn().mockResolvedValue('gold'),
   checkDailyBookingLimit: vi.fn().mockResolvedValue({ allowed: true }),
   getDailyBookedMinutes: vi.fn().mockResolvedValue(0),

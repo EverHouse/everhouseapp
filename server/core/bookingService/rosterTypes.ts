@@ -126,7 +126,7 @@ interface PreviewFeesOwnerFees {
 }
 
 interface PreviewFeesGuestPasses {
-  monthlyAllowance: number;
+  yearlyAllowance: number;
   remaining: number;
   usedThisBooking: number;
   afterBooking: number;
@@ -228,7 +228,7 @@ export interface FallbackPreviewParams {
   effectivePlayerCount: number;
   dailyAllowance: number;
   remainingMinutesToday: number;
-  guestPassesPerMonth: number;
+  guestPassesPerYear: number;
   ownerTier: string | null;
   allParticipants: Array<{ participantType: string; displayName: string }>;
   participantsForFeeCalc: FeeParticipantInput[];

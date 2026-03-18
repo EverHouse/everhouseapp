@@ -741,7 +741,7 @@ interface PaymentSectionProps {
 export function PaymentSection(props: PaymentSectionProps) {
   const renderGuestPassInfo = () => {
     if (!props.rosterData) return null;
-    const total = props.rosterData.tierLimits?.guest_passes_per_month;
+    const total = props.rosterData.tierLimits?.guest_passes_per_year;
     if (!total) return null;
     const remaining = props.rosterData.ownerGuestPassesRemaining;
 

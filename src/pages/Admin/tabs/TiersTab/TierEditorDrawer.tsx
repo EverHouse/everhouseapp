@@ -358,12 +358,12 @@ const TierEditorDrawer: React.FC<TierEditorDrawerProps> = ({
                                             />
                                         </div>
                                         <div>
-                                            <label className="text-[10px] uppercase font-bold text-gray-500 dark:text-gray-400">Guest Passes/Month</label>
+                                            <label className="text-[10px] uppercase font-bold text-gray-500 dark:text-gray-400">Guest Passes/Year</label>
                                             <input 
                                                 type="number" 
                                                 className="w-full border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-2.5 rounded-xl text-primary dark:text-white" 
-                                                value={selectedTier?.guest_passes_per_month ?? 0}
-                                                onChange={e => selectedTier && setSelectedTier({...selectedTier, guest_passes_per_month: parseInt(e.target.value, 10) || 0})}
+                                                value={selectedTier?.guest_passes_per_year ?? 0}
+                                                onChange={e => selectedTier && setSelectedTier({...selectedTier, guest_passes_per_year: parseInt(e.target.value, 10) || 0})}
                                             />
                                         </div>
                                         <div>

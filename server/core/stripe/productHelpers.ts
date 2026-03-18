@@ -64,8 +64,8 @@ export function buildPrivilegeMetadata(tier: TierRecord): Record<string, string>
   if (tier.dailySimMinutes != null) {
     metadata.privilege_daily_sim_minutes = tier.dailySimMinutes.toString();
   }
-  if (tier.guestPassesPerMonth != null) {
-    metadata.privilege_guest_passes = tier.guestPassesPerMonth.toString();
+  if (tier.guestPassesPerYear != null) {
+    metadata.privilege_guest_passes = tier.guestPassesPerYear.toString();
   }
   if (tier.bookingWindowDays != null) {
     metadata.privilege_booking_window_days = tier.bookingWindowDays.toString();
@@ -142,18 +142,18 @@ export function buildFeatureKeysForTier(tier: TierRecord): Array<{ lookupKey: st
     }
   }
 
-  const guestPasses = tier.guestPassesPerMonth ?? 0;
+  const guestPasses = tier.guestPassesPerYear ?? 0;
   if (guestPasses > 0) {
     if (guestPasses >= 900) {
-      features.push({ lookupKey: 'guest_passes_unlimited', name: 'Guest Passes: Unlimited/month', metadata: { type: 'guest_passes_per_month', value: 'unlimited', unit: 'passes' } });
+      features.push({ lookupKey: 'guest_passes_unlimited', name: 'Guest Passes: Unlimited/year', metadata: { type: 'guest_passes_per_year', value: 'unlimited', unit: 'passes' } });
     } else if (guestPasses === 4) {
-      features.push({ lookupKey: 'guest_passes_4', name: 'Guest Passes: 4/month' });
+      features.push({ lookupKey: 'guest_passes_4', name: 'Guest Passes: 4/year' });
     } else if (guestPasses === 8) {
-      features.push({ lookupKey: 'guest_passes_8', name: 'Guest Passes: 8/month' });
+      features.push({ lookupKey: 'guest_passes_8', name: 'Guest Passes: 8/year' });
     } else if (guestPasses === 15) {
-      features.push({ lookupKey: 'guest_passes_15', name: 'Guest Passes: 15/month' });
+      features.push({ lookupKey: 'guest_passes_15', name: 'Guest Passes: 15/year' });
     } else {
-      features.push({ lookupKey: `guest_passes_${guestPasses}`, name: `Guest Passes: ${guestPasses}/month`, metadata: { type: 'guest_passes_per_month', value: guestPasses.toString(), unit: 'passes' } });
+      features.push({ lookupKey: `guest_passes_${guestPasses}`, name: `Guest Passes: ${guestPasses}/year`, metadata: { type: 'guest_passes_per_year', value: guestPasses.toString(), unit: 'passes' } });
     }
   }
 

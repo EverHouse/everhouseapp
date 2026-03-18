@@ -64,7 +64,7 @@ router.get('/api/guest-passes/:email', isAuthenticated, async (req, res) => {
     }
     
     const tierLimits = actualTier ? await getTierLimits(actualTier) : null;
-    const passesTotal = tierLimits?.guest_passes_per_month ?? 0;
+    const passesTotal = tierLimits?.guest_passes_per_year ?? 0;
     
     // Always use lowercase email for guest passes to prevent case-sensitivity issues
     const normalizedEmail = requestedEmail.toLowerCase();
@@ -188,8 +188,8 @@ router.post('/api/guest-passes/:email/use', isAuthenticated, async (req, res) =>
     const data = result[0];
     const remaining = data.passesTotal - data.passesUsed;
     const message = guest_name 
-      ? `Guest pass used for ${guest_name}. You have ${remaining} pass${remaining !== 1 ? 'es' : ''} remaining this month.`
-      : `Guest pass used. You have ${remaining} pass${remaining !== 1 ? 'es' : ''} remaining this month.`;
+      ? `Guest pass used for ${guest_name}. You have ${remaining} pass${remaining !== 1 ? 'es' : ''} remaining this year.`
+      : `Guest pass used. You have ${remaining} pass${remaining !== 1 ? 'es' : ''} remaining this year.`;
     
     if (!isSyntheticEmail(normalizedEmail)) {
       await db.insert(notifications).values({
@@ -294,8 +294,8 @@ export async function useGuestPass(
       let notificationMessage: string | null = null;
       if (sendNotification) {
         const message = guestName 
-          ? `Guest pass used for ${guestName}. You have ${remaining} pass${remaining !== 1 ? 'es' : ''} remaining this month.`
-          : `Guest pass used. You have ${remaining} pass${remaining !== 1 ? 'es' : ''} remaining this month.`;
+          ? `Guest pass used for ${guestName}. You have ${remaining} pass${remaining !== 1 ? 'es' : ''} remaining this year.`
+          : `Guest pass used. You have ${remaining} pass${remaining !== 1 ? 'es' : ''} remaining this year.`;
         notificationMessage = message;
         
         await tx.insert(notifications).values({
@@ -358,8 +358,8 @@ export async function refundGuestPass(
       let notificationMessage: string | null = null;
       if (sendNotification) {
         const message = guestName 
-          ? `Guest pass refunded for ${guestName}. You now have ${remaining} pass${remaining !== 1 ? 'es' : ''} remaining this month.`
-          : `Guest pass refunded. You now have ${remaining} pass${remaining !== 1 ? 'es' : ''} remaining this month.`;
+          ? `Guest pass refunded for ${guestName}. You now have ${remaining} pass${remaining !== 1 ? 'es' : ''} remaining this year.`
+          : `Guest pass refunded. You now have ${remaining} pass${remaining !== 1 ? 'es' : ''} remaining this year.`;
         notificationMessage = message;
         
         await tx.insert(notifications).values({
@@ -421,7 +421,7 @@ export async function getGuestPassesRemaining(memberEmail: string, tier?: string
     
     if (result.length === 0) {
       const tierLimits = tier ? await getTierLimits(tier) : null;
-      return tierLimits?.guest_passes_per_month ?? 0;
+      return tierLimits?.guest_passes_per_year ?? 0;
     }
     
     return Math.max(0, result[0].passesTotal - result[0].passesUsed);
@@ -437,7 +437,7 @@ export async function ensureGuestPassRecord(memberEmail: string, tier?: string):
     const normalizedEmail = memberEmail.toLowerCase();
     
     const tierLimits = tier ? await getTierLimits(tier) : null;
-    const passesTotal = tierLimits?.guest_passes_per_month ?? 0;
+    const passesTotal = tierLimits?.guest_passes_per_year ?? 0;
     
     const existing = await db.select()
       .from(guestPasses)

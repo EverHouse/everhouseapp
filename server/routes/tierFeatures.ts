@@ -11,7 +11,7 @@ const router = Router();
 
 const FEATURE_KEY_TO_TIER_COLUMN: Record<string, { column: string | null; type: 'boolean' | 'number' | 'text'; format?: (val: unknown) => string }> = {
   'daily_golf_time': { column: 'daily_sim_minutes', type: 'text', format: (val) => Number(val) > 0 ? `${val} min` : '—' },
-  'guest_passes': { column: 'guest_passes_per_month', type: 'text', format: (val) => Number(val) > 0 ? `${val}/mo` : '—' },
+  'guest_passes': { column: 'guest_passes_per_year', type: 'text', format: (val) => Number(val) > 0 ? `${val}/yr` : '—' },
   'booking_window': { column: 'booking_window_days', type: 'text', format: (val) => Number(val) > 0 ? `${val} days` : '—' },
   'cafe_bar_access': { column: null, type: 'boolean' },
   'lounge_access': { column: null, type: 'boolean' },
@@ -37,7 +37,7 @@ router.get('/api/tier-features', async (req, res) => {
     `);
 
     const tiersResult = await db.execute(sql`
-      SELECT id, name, slug, daily_sim_minutes, guest_passes_per_month, booking_window_days, 
+      SELECT id, name, slug, daily_sim_minutes, guest_passes_per_year, booking_window_days, 
              daily_conf_room_minutes, can_book_simulators, can_book_conference, can_book_wellness,
              has_group_lessons, has_extended_sessions, has_private_lesson, 
              has_simulator_guest_passes, has_discounted_merch

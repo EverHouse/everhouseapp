@@ -25,7 +25,7 @@ interface MembershipTier {
   product_type?: string;
   highlighted_features: string[];
   daily_sim_minutes: number;
-  guest_passes_per_month: number;
+  guest_passes_per_year: number;
   booking_window_days: number;
   daily_conf_room_minutes: number;
   can_book_simulators: boolean;

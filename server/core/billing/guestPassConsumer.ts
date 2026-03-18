@@ -9,7 +9,7 @@ import { sendPassUpdateForMemberByEmail } from '../../walletPass/apnPushService'
 
 interface GuestPassCheckRow { id: number; used_guest_pass: boolean; guest_id: number | null }
 interface OwnerIdRow { id: number }
-interface TierGuestPassRow { guest_passes_per_month: number }
+interface TierGuestPassRow { guest_passes_per_year: number }
 interface GuestPassRemainingRow { remaining: number }
 interface GuestPassRow { passes_used: number; passes_total: number }
 interface PurchaseIdRow { id: number }
@@ -57,11 +57,11 @@ export async function consumeGuestPassForParticipant(
       const ownerResult = await tx.execute(sql`SELECT id FROM users WHERE LOWER(email) = ${ownerEmailLower}`);
       const ownerId = (ownerResult.rows[0] as unknown as OwnerIdRow)?.id;
       
-      const tierResult = await tx.execute(sql`SELECT mt.guest_passes_per_month 
+      const tierResult = await tx.execute(sql`SELECT mt.guest_passes_per_year 
        FROM users u 
        JOIN membership_tiers mt ON u.tier_id = mt.id
        WHERE LOWER(u.email) = ${ownerEmailLower}`);
-      const tierGuestPasses = (tierResult.rows[0] as unknown as TierGuestPassRow)?.guest_passes_per_month ?? 4;
+      const tierGuestPasses = (tierResult.rows[0] as unknown as TierGuestPassRow)?.guest_passes_per_year ?? 4;
       
       const existingPass = await tx.execute(sql`SELECT id, passes_used, passes_total FROM guest_passes WHERE LOWER(member_email) = ${ownerEmailLower} ORDER BY id ASC FOR UPDATE`);
       
@@ -120,7 +120,7 @@ export async function consumeGuestPassForParticipant(
       purchaseId = (purchaseResult.rows[0] as unknown as PurchaseIdRow)?.id as number;
       
       await tx.execute(sql`INSERT INTO notifications (user_email, title, message, type, related_type, created_at)
-       VALUES (${ownerEmailLower}, ${'Guest Pass Used'}, ${`Guest pass used for ${guestName}. You have ${passesRemaining} pass${passesRemaining !== 1 ? 'es' : ''} remaining this month.`}, ${'guest_pass'}, ${'guest_pass'}, NOW())`);
+       VALUES (${ownerEmailLower}, ${'Guest Pass Used'}, ${`Guest pass used for ${guestName}. You have ${passesRemaining} pass${passesRemaining !== 1 ? 'es' : ''} remaining this year.`}, ${'guest_pass'}, ${'guest_pass'}, NOW())`);
     });
     
     if (passesRemaining === -1) {
@@ -186,11 +186,11 @@ export async function canUseGuestPass(ownerEmail: string): Promise<{
   const ownerEmailLower = ownerEmail.toLowerCase().trim();
   
   try {
-    const tierResult = await db.execute(sql`SELECT mt.guest_passes_per_month 
+    const tierResult = await db.execute(sql`SELECT mt.guest_passes_per_year 
        FROM users u 
        JOIN membership_tiers mt ON u.tier_id = mt.id
        WHERE LOWER(u.email) = ${ownerEmailLower}`);
-    const tierGuestPasses = (tierResult.rows[0] as unknown as TierGuestPassRow)?.guest_passes_per_month ?? 4;
+    const tierGuestPasses = (tierResult.rows[0] as unknown as TierGuestPassRow)?.guest_passes_per_year ?? 4;
     
     const result = await db.execute(sql`SELECT passes_used, passes_total FROM guest_passes WHERE LOWER(member_email) = ${ownerEmailLower}`);
     

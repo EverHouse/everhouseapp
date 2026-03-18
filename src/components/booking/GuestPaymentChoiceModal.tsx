@@ -216,7 +216,7 @@ export function GuestPaymentChoiceModal({
                   }`}>
                     {guestPassesRemaining > 0
                       ? `${guestPassesRemaining} pass${guestPassesRemaining > 1 ? 'es' : ''} remaining`
-                      : 'No passes remaining this month'
+                      : 'No passes remaining this year'
                     }
                   </p>
                   <p className={`text-lg font-semibold mt-1 ${

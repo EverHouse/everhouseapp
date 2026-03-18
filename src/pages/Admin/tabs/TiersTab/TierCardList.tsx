@@ -111,7 +111,7 @@ const TierCardList: React.FC<TierCardListProps> = ({
                                 </span>
                                 <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-gray-300">
                                     <span aria-hidden="true" className="material-symbols-outlined text-sm">person_add</span>
-                                    {tier.guest_passes_per_month > 0 ? `${tier.guest_passes_per_month} passes` : 'No passes'}
+                                    {tier.guest_passes_per_year > 0 ? `${tier.guest_passes_per_year} passes/yr` : 'No passes'}
                                 </span>
                                 <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-gray-300">
                                     <span aria-hidden="true" className="material-symbols-outlined text-sm">calendar_today</span>

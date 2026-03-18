@@ -21,12 +21,12 @@ export async function getAvailableGuestPasses(
   const emailLower = memberEmail.toLowerCase().trim();
   
   const tierResult = await executor.execute(sql`
-    SELECT mt.guest_passes_per_month 
+    SELECT mt.guest_passes_per_year 
     FROM users u 
     JOIN membership_tiers mt ON u.tier_id = mt.id
     WHERE LOWER(u.email) = ${emailLower}
   `);
-  const tierGuestPasses = (tierResult.rows[0] as Record<string, unknown>)?.guest_passes_per_month as number ?? 4;
+  const tierGuestPasses = (tierResult.rows[0] as Record<string, unknown>)?.guest_passes_per_year as number ?? 4;
   
   const guestPassResult = await executor.execute(sql`
     SELECT passes_used, passes_total FROM guest_passes WHERE LOWER(member_email) = ${emailLower}
@@ -174,11 +174,11 @@ export async function convertHoldToUsage(
         `);
         if ((updateResult.rowCount ?? 0) === 0) {
           const tierResult = await tx.execute(sql`
-            SELECT mt.guest_passes_per_month 
+            SELECT mt.guest_passes_per_year 
             FROM users u JOIN membership_tiers mt ON u.tier_id = mt.id
             WHERE LOWER(u.email) = ${emailLower} LIMIT 1
           `);
-          const tierAllocation = (tierResult.rows[0] as Record<string, unknown>)?.guest_passes_per_month as number ?? 4;
+          const tierAllocation = (tierResult.rows[0] as Record<string, unknown>)?.guest_passes_per_year as number ?? 4;
           await tx.execute(sql`
             INSERT INTO guest_passes (member_email, passes_total, passes_used)
             VALUES (${emailLower}, ${tierAllocation}, ${passesToConvert})

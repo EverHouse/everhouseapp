@@ -35,8 +35,8 @@ router.get('/api/membership-tiers', async (req, res) => {
     if (cached) return res.json(cached);
 
     const result = active === 'true'
-      ? await db.execute(sql`SELECT id, name, slug, price_string, description, button_text, sort_order, is_active, is_popular, show_in_comparison, show_on_membership_page, highlighted_features, all_features, daily_sim_minutes, guest_passes_per_month, booking_window_days, daily_conf_room_minutes, can_book_simulators, can_book_conference, can_book_wellness, has_group_lessons, has_extended_sessions, has_private_lesson, has_simulator_guest_passes, has_discounted_merch, unlimited_access, guest_fee_cents, stripe_product_id, stripe_price_id, founding_price_id, price_cents, billing_interval, product_type, min_quantity, tier_type, wallet_pass_bg_color, wallet_pass_foreground_color, wallet_pass_label_color, created_at, updated_at FROM membership_tiers WHERE is_active = true ORDER BY sort_order ASC, id ASC`)
-      : await db.execute(sql`SELECT id, name, slug, price_string, description, button_text, sort_order, is_active, is_popular, show_in_comparison, show_on_membership_page, highlighted_features, all_features, daily_sim_minutes, guest_passes_per_month, booking_window_days, daily_conf_room_minutes, can_book_simulators, can_book_conference, can_book_wellness, has_group_lessons, has_extended_sessions, has_private_lesson, has_simulator_guest_passes, has_discounted_merch, unlimited_access, guest_fee_cents, stripe_product_id, stripe_price_id, founding_price_id, price_cents, billing_interval, product_type, min_quantity, tier_type, wallet_pass_bg_color, wallet_pass_foreground_color, wallet_pass_label_color, created_at, updated_at FROM membership_tiers ORDER BY sort_order ASC, id ASC`);
+      ? await db.execute(sql`SELECT id, name, slug, price_string, description, button_text, sort_order, is_active, is_popular, show_in_comparison, show_on_membership_page, highlighted_features, all_features, daily_sim_minutes, guest_passes_per_year, booking_window_days, daily_conf_room_minutes, can_book_simulators, can_book_conference, can_book_wellness, has_group_lessons, has_extended_sessions, has_private_lesson, has_simulator_guest_passes, has_discounted_merch, unlimited_access, guest_fee_cents, stripe_product_id, stripe_price_id, founding_price_id, price_cents, billing_interval, product_type, min_quantity, tier_type, wallet_pass_bg_color, wallet_pass_foreground_color, wallet_pass_label_color, created_at, updated_at FROM membership_tiers WHERE is_active = true ORDER BY sort_order ASC, id ASC`)
+      : await db.execute(sql`SELECT id, name, slug, price_string, description, button_text, sort_order, is_active, is_popular, show_in_comparison, show_on_membership_page, highlighted_features, all_features, daily_sim_minutes, guest_passes_per_year, booking_window_days, daily_conf_room_minutes, can_book_simulators, can_book_conference, can_book_wellness, has_group_lessons, has_extended_sessions, has_private_lesson, has_simulator_guest_passes, has_discounted_merch, unlimited_access, guest_fee_cents, stripe_product_id, stripe_price_id, founding_price_id, price_cents, billing_interval, product_type, min_quantity, tier_type, wallet_pass_bg_color, wallet_pass_foreground_color, wallet_pass_label_color, created_at, updated_at FROM membership_tiers ORDER BY sort_order ASC, id ASC`);
 
     setCache(cacheKey, result.rows, TIERS_CACHE_TTL);
     res.json(result.rows);
@@ -52,7 +52,7 @@ router.get('/api/membership-tiers/limits/:tierName', async (req, res) => {
     const { tierName } = req.params;
     const result = await db.execute(sql`SELECT 
         name, slug,
-        daily_sim_minutes, guest_passes_per_month, booking_window_days,
+        daily_sim_minutes, guest_passes_per_year, booking_window_days,
         daily_conf_room_minutes, can_book_simulators, can_book_conference,
         can_book_wellness, has_group_lessons, has_extended_sessions,
         has_private_lesson, has_simulator_guest_passes, has_discounted_merch,
@@ -65,7 +65,7 @@ router.get('/api/membership-tiers/limits/:tierName', async (req, res) => {
       return res.json({
         name: 'Social',
         daily_sim_minutes: 0,
-        guest_passes_per_month: 0,
+        guest_passes_per_year: 0,
         booking_window_days: 7,
         daily_conf_room_minutes: 0,
         can_book_simulators: false,
@@ -91,7 +91,7 @@ router.get('/api/membership-tiers/limits/:tierName', async (req, res) => {
 router.get('/api/membership-tiers/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const result = await db.execute(sql`SELECT id, name, slug, price_string, description, button_text, sort_order, is_active, is_popular, show_in_comparison, show_on_membership_page, highlighted_features, all_features, daily_sim_minutes, guest_passes_per_month, booking_window_days, daily_conf_room_minutes, can_book_simulators, can_book_conference, can_book_wellness, has_group_lessons, has_extended_sessions, has_private_lesson, has_simulator_guest_passes, has_discounted_merch, unlimited_access, guest_fee_cents, stripe_product_id, stripe_price_id, founding_price_id, price_cents, billing_interval, product_type, min_quantity, tier_type, wallet_pass_bg_color, wallet_pass_foreground_color, wallet_pass_label_color, created_at, updated_at FROM membership_tiers WHERE id = ${id}`);
+    const result = await db.execute(sql`SELECT id, name, slug, price_string, description, button_text, sort_order, is_active, is_popular, show_in_comparison, show_on_membership_page, highlighted_features, all_features, daily_sim_minutes, guest_passes_per_year, booking_window_days, daily_conf_room_minutes, can_book_simulators, can_book_conference, can_book_wellness, has_group_lessons, has_extended_sessions, has_private_lesson, has_simulator_guest_passes, has_discounted_merch, unlimited_access, guest_fee_cents, stripe_product_id, stripe_price_id, founding_price_id, price_cents, billing_interval, product_type, min_quantity, tier_type, wallet_pass_bg_color, wallet_pass_foreground_color, wallet_pass_label_color, created_at, updated_at FROM membership_tiers WHERE id = ${id}`);
     
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Tier not found' });
@@ -110,7 +110,7 @@ router.put('/api/membership-tiers/:id', isAdmin, async (req, res) => {
     const {
       name, slug, price_string, description, button_text, sort_order,
       is_active, is_popular, show_in_comparison, show_on_membership_page, highlighted_features, all_features,
-      daily_sim_minutes, guest_passes_per_month, booking_window_days,
+      daily_sim_minutes, guest_passes_per_year, booking_window_days,
       daily_conf_room_minutes, can_book_simulators, can_book_conference,
       can_book_wellness, has_group_lessons, has_extended_sessions,
       has_private_lesson, has_simulator_guest_passes, has_discounted_merch,
@@ -133,7 +133,7 @@ router.put('/api/membership-tiers/:id', isAdmin, async (req, res) => {
         highlighted_features = COALESCE(${highlighted_features ? JSON.stringify(highlighted_features) : null}, highlighted_features),
         all_features = COALESCE(${all_features ? JSON.stringify(all_features) : null}, all_features),
         daily_sim_minutes = COALESCE(${daily_sim_minutes}, daily_sim_minutes),
-        guest_passes_per_month = COALESCE(${guest_passes_per_month}, guest_passes_per_month),
+        guest_passes_per_year = COALESCE(${guest_passes_per_year}, guest_passes_per_year),
         booking_window_days = COALESCE(${booking_window_days}, booking_window_days),
         daily_conf_room_minutes = COALESCE(${daily_conf_room_minutes}, daily_conf_room_minutes),
         can_book_simulators = COALESCE(${can_book_simulators}, can_book_simulators),
@@ -178,7 +178,7 @@ router.post('/api/membership-tiers', isAdmin, async (req, res) => {
     const {
       name, slug, price_string, description, button_text, sort_order,
       is_active, is_popular, show_in_comparison, show_on_membership_page, highlighted_features, all_features,
-      daily_sim_minutes, guest_passes_per_month, booking_window_days,
+      daily_sim_minutes, guest_passes_per_year, booking_window_days,
       daily_conf_room_minutes, can_book_simulators, can_book_conference,
       can_book_wellness, has_group_lessons, has_extended_sessions,
       has_private_lesson, has_simulator_guest_passes, has_discounted_merch,
@@ -194,7 +194,7 @@ router.post('/api/membership-tiers', isAdmin, async (req, res) => {
       INSERT INTO membership_tiers (
         name, slug, price_string, description, button_text, sort_order,
         is_active, is_popular, show_in_comparison, show_on_membership_page, highlighted_features, all_features,
-        daily_sim_minutes, guest_passes_per_month, booking_window_days,
+        daily_sim_minutes, guest_passes_per_year, booking_window_days,
         daily_conf_room_minutes, can_book_simulators, can_book_conference,
         can_book_wellness, has_group_lessons, has_extended_sessions,
         has_private_lesson, has_simulator_guest_passes, has_discounted_merch,
@@ -204,7 +204,7 @@ router.post('/api/membership-tiers', isAdmin, async (req, res) => {
         ${is_active ?? true}, ${is_popular ?? false}, ${show_in_comparison ?? true}, ${show_on_membership_page ?? true},
         ${JSON.stringify(highlighted_features || [])},
         ${JSON.stringify(all_features || {})},
-        ${daily_sim_minutes || 0}, ${guest_passes_per_month || 0}, ${booking_window_days || 7},
+        ${daily_sim_minutes || 0}, ${guest_passes_per_year || 0}, ${booking_window_days || 7},
         ${daily_conf_room_minutes || 0}, ${can_book_simulators ?? false}, ${can_book_conference ?? false},
         ${can_book_wellness ?? true}, ${has_group_lessons ?? false}, ${has_extended_sessions ?? false},
         ${has_private_lesson ?? false}, ${has_simulator_guest_passes ?? false}, ${has_discounted_merch ?? false},

@@ -62,7 +62,7 @@ export interface ManageModeRosterData {
   guests: BookingGuest[];
   validation: ValidationInfo;
   ownerGuestPassesRemaining: number;
-  tierLimits?: { guest_passes_per_month: number };
+  tierLimits?: { guest_passes_per_year: number };
   guestPassContext?: { passesBeforeBooking: number; passesUsedThisBooking: number };
   financialSummary?: FinancialSummary;
   bookingNotes?: { notes: string | null; staffNotes: string | null; trackmanNotes: string | null };

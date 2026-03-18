@@ -80,7 +80,7 @@ describe('Guest Pass Concurrency Tests', () => {
             execute: vi.fn()
               .mockResolvedValueOnce({ rows: [] })
               .mockResolvedValueOnce({ rows: [{ id: 1 }] })
-              .mockResolvedValueOnce({ rows: [{ guest_passes_per_month: totalPasses }] })
+              .mockResolvedValueOnce({ rows: [{ guest_passes_per_year: totalPasses }] })
               .mockResolvedValueOnce({ rows: [{ passes_used: passesUsed, passes_total: totalPasses }] })
               .mockResolvedValueOnce({ rows: [{ total_held: String(passesHeld) }] })
               .mockResolvedValueOnce({ rows: [{ id: 100 }] }),
@@ -94,7 +94,7 @@ describe('Guest Pass Concurrency Tests', () => {
             execute: vi.fn()
               .mockResolvedValueOnce({ rows: [] })
               .mockResolvedValueOnce({ rows: [{ id: 1 }] })
-              .mockResolvedValueOnce({ rows: [{ guest_passes_per_month: totalPasses }] })
+              .mockResolvedValueOnce({ rows: [{ guest_passes_per_year: totalPasses }] })
               .mockResolvedValueOnce({ rows: [{ passes_used: passesUsed, passes_total: totalPasses }] })
               .mockResolvedValueOnce({ rows: [{ total_held: String(passesHeld) }] }),
           };
@@ -116,7 +116,7 @@ describe('Guest Pass Concurrency Tests', () => {
           execute: vi.fn()
             .mockResolvedValueOnce({ rows: [] })
             .mockResolvedValueOnce({ rows: [{ id: 1 }] })
-            .mockResolvedValueOnce({ rows: [{ guest_passes_per_month: 4 }] })
+            .mockResolvedValueOnce({ rows: [{ guest_passes_per_year: 4 }] })
             .mockResolvedValueOnce({ rows: [] })
             .mockResolvedValueOnce({ rows: [{ total_held: '0' }] })
             .mockResolvedValueOnce({ rows: [{ id: 200 }] }),
@@ -138,7 +138,7 @@ describe('Guest Pass Concurrency Tests', () => {
         execute: vi.fn()
           .mockResolvedValueOnce({ rows: [] })
           .mockResolvedValueOnce({ rows: [{ id: 1 }] })
-          .mockResolvedValueOnce({ rows: [{ guest_passes_per_month: 4 }] })
+          .mockResolvedValueOnce({ rows: [{ guest_passes_per_year: 4 }] })
           .mockResolvedValueOnce({ rows: [{ passes_used: 3, passes_total: 4 }] })
           .mockResolvedValueOnce({ rows: [{ total_held: '0' }] })
           .mockResolvedValueOnce({ rows: [{ id: 200 }] }),
@@ -221,7 +221,7 @@ describe('Guest Pass Concurrency Tests', () => {
                 return { rowCount: 0 };
               }
               if (callIndex === 2) {
-                return { rows: [{ guest_passes_per_month: 4 }] };
+                return { rows: [{ guest_passes_per_year: 4 }] };
               }
               if (callIndex === 3) {
                 return { rowCount: 1 };
@@ -246,7 +246,7 @@ describe('Guest Pass Concurrency Tests', () => {
           execute: vi.fn()
             .mockResolvedValueOnce({ rows: [{ id: 1, used_guest_pass: false, guest_id: null }] })
             .mockResolvedValueOnce({ rows: [{ id: 'owner-1' }] })
-            .mockResolvedValueOnce({ rows: [{ guest_passes_per_month: 4 }] })
+            .mockResolvedValueOnce({ rows: [{ guest_passes_per_year: 4 }] })
             .mockResolvedValueOnce({ rows: [{ id: 1, passes_used: 4, passes_total: 4 }] }),
         };
         return fn(tx);
@@ -272,7 +272,7 @@ describe('Guest Pass Concurrency Tests', () => {
             execute: vi.fn()
               .mockResolvedValueOnce({ rows: [{ id: 1, used_guest_pass: false, guest_id: null }] })
               .mockResolvedValueOnce({ rows: [{ id: 'owner-1' }] })
-              .mockResolvedValueOnce({ rows: [{ guest_passes_per_month: passesTotal }] })
+              .mockResolvedValueOnce({ rows: [{ guest_passes_per_year: passesTotal }] })
               .mockResolvedValueOnce({ rows: [{ id: 1, passes_used: dbPassesUsed, passes_total: passesTotal }] })
               .mockResolvedValueOnce({ rows: [{ remaining: passesTotal - dbPassesUsed - 1 }] })
               .mockResolvedValueOnce({ rows: [] })
@@ -289,7 +289,7 @@ describe('Guest Pass Concurrency Tests', () => {
             execute: vi.fn()
               .mockResolvedValueOnce({ rows: [{ id: 2, used_guest_pass: false, guest_id: null }] })
               .mockResolvedValueOnce({ rows: [{ id: 'owner-1' }] })
-              .mockResolvedValueOnce({ rows: [{ guest_passes_per_month: passesTotal }] })
+              .mockResolvedValueOnce({ rows: [{ guest_passes_per_year: passesTotal }] })
               .mockResolvedValueOnce({ rows: [{ id: 1, passes_used: dbPassesUsed, passes_total: passesTotal }] }),
           };
           return fn(tx);
@@ -332,7 +332,7 @@ describe('Guest Pass Concurrency Tests', () => {
           execute: vi.fn()
             .mockResolvedValueOnce({ rows: [{ id: 1, used_guest_pass: false, guest_id: null }] })
             .mockResolvedValueOnce({ rows: [{ id: 'owner-1' }] })
-            .mockResolvedValueOnce({ rows: [{ guest_passes_per_month: 4 }] })
+            .mockResolvedValueOnce({ rows: [{ guest_passes_per_year: 4 }] })
             .mockResolvedValueOnce({ rows: [{ id: 1, passes_used: 3, passes_total: 4 }] })
             .mockResolvedValueOnce({ rows: [] }),
         };
@@ -357,7 +357,7 @@ describe('Guest Pass Concurrency Tests', () => {
           execute: vi.fn()
             .mockResolvedValueOnce({ rows: [{ id: 1, used_guest_pass: false, guest_id: null }] })
             .mockResolvedValueOnce({ rows: [{ id: 'owner-1' }] })
-            .mockResolvedValueOnce({ rows: [{ guest_passes_per_month: 4 }] })
+            .mockResolvedValueOnce({ rows: [{ guest_passes_per_year: 4 }] })
             .mockResolvedValueOnce({ rows: [{ id: 1, passes_used: 0, passes_total: 4 }] })
             .mockResolvedValueOnce({ rows: [{ remaining: 3 }] })
             .mockResolvedValueOnce({ rows: [] })
@@ -391,7 +391,7 @@ describe('Guest Pass Concurrency Tests', () => {
           execute: vi.fn()
             .mockResolvedValueOnce({ rows: [{ id: 1, used_guest_pass: false, guest_id: null }] })
             .mockResolvedValueOnce({ rows: [{ id: 'owner-1' }] })
-            .mockResolvedValueOnce({ rows: [{ guest_passes_per_month: 4 }] })
+            .mockResolvedValueOnce({ rows: [{ guest_passes_per_year: 4 }] })
             .mockResolvedValueOnce({ rows: [{ id: 1, passes_used: 0, passes_total: 4 }] })
             .mockResolvedValueOnce({ rows: [{ remaining: 3 }] })
             .mockResolvedValueOnce({ rows: [] })
@@ -420,7 +420,7 @@ describe('Guest Pass Concurrency Tests', () => {
   describe('Available Guest Passes with Holds', () => {
     it('available = total - used - held (no negative values)', async () => {
       mockExecute
-        .mockResolvedValueOnce({ rows: [{ guest_passes_per_month: 4 }] })
+        .mockResolvedValueOnce({ rows: [{ guest_passes_per_year: 4 }] })
         .mockResolvedValueOnce({ rows: [{ passes_used: 1, passes_total: 4 }] })
         .mockResolvedValueOnce({ rows: [{ total_held: '2' }] });
 
@@ -430,7 +430,7 @@ describe('Guest Pass Concurrency Tests', () => {
 
     it('available never goes below 0 even with over-holds', async () => {
       mockExecute
-        .mockResolvedValueOnce({ rows: [{ guest_passes_per_month: 4 }] })
+        .mockResolvedValueOnce({ rows: [{ guest_passes_per_year: 4 }] })
         .mockResolvedValueOnce({ rows: [{ passes_used: 3, passes_total: 4 }] })
         .mockResolvedValueOnce({ rows: [{ total_held: '5' }] });
 

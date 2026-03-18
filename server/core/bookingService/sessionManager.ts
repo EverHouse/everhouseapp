@@ -640,10 +640,10 @@ export async function linkBookingRequestToSession(
   }
 }
 
-async function resolveMonthlyAllocation(tierName?: string): Promise<number> {
+async function resolveYearlyAllocation(tierName?: string): Promise<number> {
   const { getTierLimits } = await import('../tierService');
   const tierLimits = tierName ? await getTierLimits(tierName) : null;
-  return tierLimits?.guest_passes_per_month ?? 0;
+  return tierLimits?.guest_passes_per_year ?? 0;
 }
 
 async function deductGuestPassesInternal(
@@ -679,7 +679,7 @@ async function deductGuestPassesInternal(
       const { passes_used, passes_total } = lockResult.rows[0];
       
       const effectiveTotal = (!passes_total || passes_total === 0)
-        ? await resolveMonthlyAllocation(tierName)
+        ? await resolveYearlyAllocation(tierName)
         : passes_total;
 
       const needsBackfill = !passes_total || passes_total === 0;
@@ -703,9 +703,9 @@ async function deductGuestPassesInternal(
       return { success: true, passesDeducted: passCount };
     }
     
-    const monthlyAllocation = await resolveMonthlyAllocation(tierName);
+    const yearlyAllocation = await resolveYearlyAllocation(tierName);
     
-    if (passCount > monthlyAllocation) {
+    if (passCount > yearlyAllocation) {
       if (manageTransaction) await client.query('ROLLBACK');
       return { success: false, passesDeducted: 0 };
     }
@@ -718,7 +718,7 @@ async function deductGuestPassesInternal(
        SET passes_used = guest_passes.passes_used + $2
        WHERE guest_passes.passes_used + $2 <= guest_passes.passes_total
        RETURNING passes_used, passes_total`,
-      [memberEmail, passCount, monthlyAllocation]
+      [memberEmail, passCount, yearlyAllocation]
     );
     
     if (insertResult.rows.length > 0) {
@@ -1026,34 +1026,34 @@ export async function createSessionWithUsageTracking(
                 }
               } else {
                 const tierResult = await tx.execute(sql`
-                  SELECT mt.guest_passes_per_month 
+                  SELECT mt.guest_passes_per_year 
                   FROM users u 
                   JOIN membership_tiers mt ON u.tier = mt.name 
                   WHERE LOWER(u.email) = ${emailLower}
                 `);
-                const monthlyAllocation = tierResult.rows?.[0] 
-                  ? (tierResult.rows[0] as { guest_passes_per_month: number }).guest_passes_per_month as number || 0 
+                const yearlyAllocation = tierResult.rows?.[0] 
+                  ? (tierResult.rows[0] as { guest_passes_per_year: number }).guest_passes_per_year as number || 0 
                   : 0;
                 
-                if (monthlyAllocation < passesToConvert) {
+                if (yearlyAllocation < passesToConvert) {
                   logger.warn('[createSessionWithUsageTracking] Member tier has insufficient guest pass allocation for hold conversion, extra guests will be charged as paid', {
-                    extra: { ownerEmail: request.ownerEmail, monthlyAllocation, passesToConvert }
+                    extra: { ownerEmail: request.ownerEmail, yearlyAllocation, passesToConvert }
                   });
-                  if (monthlyAllocation > 0) {
+                  if (yearlyAllocation > 0) {
                     await tx.execute(sql`
                       INSERT INTO guest_passes (member_email, passes_total, passes_used)
-                      VALUES (${emailLower}, ${monthlyAllocation}, ${monthlyAllocation})
+                      VALUES (${emailLower}, ${yearlyAllocation}, ${yearlyAllocation})
                     `);
-                    actualPassesDeducted = monthlyAllocation;
+                    actualPassesDeducted = yearlyAllocation;
                   }
                 } else {
                   await tx.execute(sql`
                     INSERT INTO guest_passes (member_email, passes_total, passes_used)
-                    VALUES (${emailLower}, ${monthlyAllocation}, ${passesToConvert})
+                    VALUES (${emailLower}, ${yearlyAllocation}, ${passesToConvert})
                   `);
                   actualPassesDeducted = passesToConvert;
                   logger.info('[createSessionWithUsageTracking] Created guest pass record for first-time user (hold conversion)', {
-                    extra: { ownerEmail: request.ownerEmail, monthlyAllocation, passesToConvert }
+                    extra: { ownerEmail: request.ownerEmail, yearlyAllocation, passesToConvert }
                   });
                 }
               }
@@ -1119,29 +1119,29 @@ export async function createSessionWithUsageTracking(
             } else {
               // First-time guest pass user (hold fallback) — create record with tier allocation
               const tierResult = await tx.execute(sql`
-                SELECT mt.guest_passes_per_month 
+                SELECT mt.guest_passes_per_year 
                 FROM users u 
                 JOIN membership_tiers mt ON u.tier = mt.name 
                 WHERE LOWER(u.email) = ${emailLower}
               `);
-              const monthlyAllocation = tierResult.rows?.[0] 
-                ? (tierResult.rows[0] as { guest_passes_per_month: number }).guest_passes_per_month as number || 0 
+              const yearlyAllocation = tierResult.rows?.[0] 
+                ? (tierResult.rows[0] as { guest_passes_per_year: number }).guest_passes_per_year as number || 0 
                 : 0;
               
-              if (monthlyAllocation < passesNeeded) {
+              if (yearlyAllocation < passesNeeded) {
                 logger.info('[createSessionWithUsageTracking] Member tier has insufficient guest pass allocation, guests will be charged as paid', {
-                  extra: { ownerEmail: request.ownerEmail, monthlyAllocation, passesNeeded }
+                  extra: { ownerEmail: request.ownerEmail, yearlyAllocation, passesNeeded }
                 });
                 // Don't throw — guests will be billed via fee calculator as paid guests
               } else {
                 await tx.execute(sql`
                   INSERT INTO guest_passes (member_email, passes_total, passes_used)
-                  VALUES (${emailLower}, ${monthlyAllocation}, ${passesNeeded})
+                  VALUES (${emailLower}, ${yearlyAllocation}, ${passesNeeded})
                 `);
                 actualPassesDeducted = passesNeeded;
                 
                 logger.info('[createSessionWithUsageTracking] Created guest pass record for first-time user (hold fallback)', {
-                  extra: { ownerEmail: request.ownerEmail, monthlyAllocation, passesDeducted: passesNeeded }
+                  extra: { ownerEmail: request.ownerEmail, yearlyAllocation, passesDeducted: passesNeeded }
                 });
               }
             }
@@ -1188,29 +1188,29 @@ export async function createSessionWithUsageTracking(
           } else {
             // First-time guest pass user — create record with tier allocation
             const tierResult = await tx.execute(sql`
-              SELECT mt.guest_passes_per_month 
+              SELECT mt.guest_passes_per_year 
               FROM users u 
               JOIN membership_tiers mt ON u.tier = mt.name 
               WHERE LOWER(u.email) = ${emailLower}
             `);
-            const monthlyAllocation = tierResult.rows?.[0] 
-              ? (tierResult.rows[0] as { guest_passes_per_month: number }).guest_passes_per_month as number || 0 
+            const yearlyAllocation = tierResult.rows?.[0] 
+              ? (tierResult.rows[0] as { guest_passes_per_year: number }).guest_passes_per_year as number || 0 
               : 0;
             
-            if (monthlyAllocation < passesNeeded) {
+            if (yearlyAllocation < passesNeeded) {
               logger.info('[createSessionWithUsageTracking] Member tier has insufficient guest pass allocation, guests will be charged as paid', {
-                extra: { ownerEmail: request.ownerEmail, monthlyAllocation, passesNeeded }
+                extra: { ownerEmail: request.ownerEmail, yearlyAllocation, passesNeeded }
               });
               // Don't throw — guests will be billed via fee calculator as paid guests
             } else {
               await tx.execute(sql`
                 INSERT INTO guest_passes (member_email, passes_total, passes_used)
-                VALUES (${emailLower}, ${monthlyAllocation}, ${passesNeeded})
+                VALUES (${emailLower}, ${yearlyAllocation}, ${passesNeeded})
               `);
               actualPassesDeducted = passesNeeded;
               
               logger.info('[createSessionWithUsageTracking] Created guest pass record for first-time user', {
-                extra: { ownerEmail: request.ownerEmail, monthlyAllocation, passesDeducted: passesNeeded }
+                extra: { ownerEmail: request.ownerEmail, yearlyAllocation, passesDeducted: passesNeeded }
               });
             }
           }

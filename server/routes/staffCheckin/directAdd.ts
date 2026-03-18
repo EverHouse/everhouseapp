@@ -89,7 +89,7 @@ router.post('/api/bookings/:id/staff-direct-add', isStaffOrAdmin, async (req: Re
 
     if (participantType === 'guest') {
       const ownerTierResult = await db.execute(sql`
-        SELECT mt.name as tier_name, mt.guest_passes_per_month as guest_passes
+        SELECT mt.name as tier_name, mt.guest_passes_per_year as guest_passes
         FROM users u
         LEFT JOIN membership_tiers mt ON u.tier_id = mt.id
         WHERE LOWER(u.email) = LOWER(${booking.owner_email})

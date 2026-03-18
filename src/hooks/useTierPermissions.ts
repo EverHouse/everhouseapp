@@ -5,7 +5,7 @@ const DEFAULT_PERMISSIONS: TierPermissions = {
   canBookSimulators: false,
   canBookWellness: true,
   advanceBookingDays: 7,
-  guestPassesPerMonth: 0,
+  guestPassesPerYear: 0,
   dailySimulatorMinutes: 0,
   dailyConfRoomMinutes: 0,
   hasGroupLessons: false,

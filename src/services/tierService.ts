@@ -5,7 +5,7 @@ export interface TierLimits {
   name: string;
   slug?: string;
   daily_sim_minutes: number;
-  guest_passes_per_month: number;
+  guest_passes_per_year: number;
   booking_window_days: number;
   daily_conf_room_minutes: number;
   can_book_simulators: boolean;
@@ -24,7 +24,7 @@ export interface TierPermissions {
   canBookConference: boolean;
   canBookWellness: boolean;
   advanceBookingDays: number;
-  guestPassesPerMonth: number;
+  guestPassesPerYear: number;
   dailySimulatorMinutes: number;
   dailyConfRoomMinutes: number;
   hasGroupLessons: boolean;
@@ -40,7 +40,7 @@ const DEFAULT_PERMISSIONS: TierPermissions = {
   canBookConference: false,
   canBookWellness: true,
   advanceBookingDays: 7,
-  guestPassesPerMonth: 0,
+  guestPassesPerYear: 0,
   dailySimulatorMinutes: 0,
   dailyConfRoomMinutes: 0,
   hasGroupLessons: false,
@@ -66,7 +66,7 @@ function transformToPermissions(limits: TierLimits): TierPermissions {
     canBookConference: limits.can_book_conference,
     canBookWellness: limits.can_book_wellness,
     advanceBookingDays: limits.booking_window_days,
-    guestPassesPerMonth: limits.guest_passes_per_month,
+    guestPassesPerYear: limits.guest_passes_per_year,
     dailySimulatorMinutes: limits.daily_sim_minutes,
     dailyConfRoomMinutes: limits.daily_conf_room_minutes,
     hasGroupLessons: limits.has_group_lessons,

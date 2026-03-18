@@ -56,7 +56,7 @@ interface MemberQueryRow {
   tier_config_id: number;
   tier_name: string;
   daily_sim_minutes: number;
-  guest_passes_per_month: number;
+  guest_passes_per_year: number;
   booking_window_days: number;
   can_book_simulators: boolean;
   can_book_conference: boolean;
@@ -123,7 +123,7 @@ class MemberServiceClass {
         mt.id as tier_config_id,
         mt.name as tier_name,
         mt.daily_sim_minutes,
-        mt.guest_passes_per_month,
+        mt.guest_passes_per_year,
         mt.booking_window_days,
         mt.can_book_simulators,
         mt.can_book_conference,
@@ -185,7 +185,7 @@ class MemberServiceClass {
         mt.id as tier_config_id,
         mt.name as tier_name,
         mt.daily_sim_minutes,
-        mt.guest_passes_per_month,
+        mt.guest_passes_per_year,
         mt.booking_window_days,
         mt.can_book_simulators,
         mt.can_book_conference,
@@ -235,7 +235,7 @@ class MemberServiceClass {
         mt.id as tier_config_id,
         mt.name as tier_name,
         mt.daily_sim_minutes,
-        mt.guest_passes_per_month,
+        mt.guest_passes_per_year,
         mt.booking_window_days,
         mt.can_book_simulators,
         mt.can_book_conference,
@@ -285,7 +285,7 @@ class MemberServiceClass {
         mt.id as tier_config_id,
         mt.name as tier_name,
         mt.daily_sim_minutes,
-        mt.guest_passes_per_month,
+        mt.guest_passes_per_year,
         mt.booking_window_days,
         mt.can_book_simulators,
         mt.can_book_conference,
@@ -540,7 +540,7 @@ class MemberServiceClass {
         highlightedFeatures: [],
         allFeatures: {},
         dailySimMinutes: row.daily_sim_minutes || 0,
-        guestPassesPerMonth: row.guest_passes_per_month || 0,
+        guestPassesPerYear: row.guest_passes_per_year || 0,
         bookingWindowDays: row.booking_window_days || 7,
         dailyConfRoomMinutes: 0,
         canBookSimulators: row.can_book_simulators || false,

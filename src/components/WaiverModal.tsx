@@ -245,7 +245,7 @@ export function WaiverModal({ isOpen, onComplete, currentVersion }: WaiverModalP
           <p>
             Members may bring guests to the Club subject to the guest policy applicable to their 
             membership tier. Each membership tier includes a specified number of complimentary guest 
-            passes per month. Additional guest visits beyond the included passes will incur a guest 
+            passes per year. Additional guest visits beyond the included passes will incur a guest 
             fee, which will be charged to the member's payment method on file. Members are responsible 
             for the conduct of their guests at all times. Guests must comply with all Club rules 
             and policies. The Club reserves the right to refuse entry to any guest and to modify the 

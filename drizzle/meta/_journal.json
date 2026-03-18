@@ -239,6 +239,13 @@
       "when": 1774483200000,
       "tag": "0060_drop_duplicate_indexes",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1774569600000,
+      "tag": "0061_rename_guest_passes_per_month_to_per_year",
+      "breakpoints": true
     }
   ]
 }

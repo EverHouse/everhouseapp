@@ -350,7 +350,7 @@ export async function pullTierFeaturesFromStripe(): Promise<{
           hasDiscountedMerch: false,
           unlimitedAccess: false,
           dailySimMinutes: 0,
-          guestPassesPerMonth: 0,
+          guestPassesPerYear: 0,
           bookingWindowDays: tier.bookingWindowDays || 7,
           dailyConfRoomMinutes: 0,
         };
@@ -370,7 +370,7 @@ export async function pullTierFeaturesFromStripe(): Promise<{
             update.dailySimMinutes = suffix === 'unlimited' ? 900 : (parseInt(suffix, 10) || 0);
           } else if (key.startsWith('guest_passes_')) {
             const suffix = key.replace('guest_passes_', '');
-            update.guestPassesPerMonth = suffix === 'unlimited' ? 900 : (parseInt(suffix, 10) || 0);
+            update.guestPassesPerYear = suffix === 'unlimited' ? 900 : (parseInt(suffix, 10) || 0);
           } else if (key.startsWith('booking_window_')) {
             const suffix = key.replace('booking_window_', '');
             update.bookingWindowDays = parseInt(suffix, 10) || 7;
@@ -387,8 +387,8 @@ export async function pullTierFeaturesFromStripe(): Promise<{
           continue;
         }
 
-        if (tier.guestPassesPerMonth && tier.guestPassesPerMonth > 0 && update.guestPassesPerMonth === 0) {
-          const msg = `SAFETY: Skipping tier "${tier.name}" — guestPassesPerMonth would drop from ${tier.guestPassesPerMonth} to 0. This likely indicates a missing Stripe entitlement feature key.`;
+        if (tier.guestPassesPerYear && tier.guestPassesPerYear > 0 && update.guestPassesPerYear === 0) {
+          const msg = `SAFETY: Skipping tier "${tier.name}" — guestPassesPerYear would drop from ${tier.guestPassesPerYear} to 0. This likely indicates a missing Stripe entitlement feature key.`;
           logger.warn(`[Reverse Sync] ${msg}`);
           errors.push(msg);
           continue;

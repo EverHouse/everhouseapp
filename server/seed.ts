@@ -308,7 +308,7 @@ async function seed() {
       ])},
       { icon: 'loyalty', title: 'Tier Configuration (Admin Only)', description: 'Configure membership tier settings and privileges', is_admin_only: true, sort_order: 13, steps: JSON.stringify([
         { title: 'Accessing Tiers', content: 'From the Home dashboard, tap "Manage Tiers" in the Admin Settings section (admin only).' },
-        { title: 'Tier Settings', content: 'Each tier has configurable limits: daily simulator minutes, guest passes per month, booking window (how far ahead they can book), and access permissions.' },
+        { title: 'Tier Settings', content: 'Each tier has configurable limits: daily simulator minutes, guest passes per year, booking window (how far ahead they can book), and access permissions.' },
         { title: 'Editing Privileges', content: 'Modify tier privileges to adjust what each membership level can access. Changes take effect immediately for all members of that tier.' },
         { title: 'Display Settings', content: 'Update the tier name, price display, and highlighted features shown on the public membership comparison page.' },
       ])},

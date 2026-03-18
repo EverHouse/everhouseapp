@@ -40,7 +40,7 @@ describe('GuestPassHoldService', () => {
   describe('getAvailableGuestPasses', () => {
     it('returns full allowance when no passes used and no holds', async () => {
       mockExecute
-        .mockResolvedValueOnce({ rows: [{ guest_passes_per_month: 4 }] })
+        .mockResolvedValueOnce({ rows: [{ guest_passes_per_year: 4 }] })
         .mockResolvedValueOnce({ rows: [] })
         .mockResolvedValueOnce({ rows: [{ total_held: '0' }] });
 
@@ -50,7 +50,7 @@ describe('GuestPassHoldService', () => {
 
     it('subtracts used passes from total', async () => {
       mockExecute
-        .mockResolvedValueOnce({ rows: [{ guest_passes_per_month: 4 }] })
+        .mockResolvedValueOnce({ rows: [{ guest_passes_per_year: 4 }] })
         .mockResolvedValueOnce({ rows: [{ passes_used: 2, passes_total: 4 }] })
         .mockResolvedValueOnce({ rows: [{ total_held: '0' }] });
 
@@ -60,7 +60,7 @@ describe('GuestPassHoldService', () => {
 
     it('subtracts held passes from available', async () => {
       mockExecute
-        .mockResolvedValueOnce({ rows: [{ guest_passes_per_month: 4 }] })
+        .mockResolvedValueOnce({ rows: [{ guest_passes_per_year: 4 }] })
         .mockResolvedValueOnce({ rows: [{ passes_used: 1, passes_total: 4 }] })
         .mockResolvedValueOnce({ rows: [{ total_held: '1' }] });
 
@@ -70,7 +70,7 @@ describe('GuestPassHoldService', () => {
 
     it('returns 0 when all passes are used', async () => {
       mockExecute
-        .mockResolvedValueOnce({ rows: [{ guest_passes_per_month: 4 }] })
+        .mockResolvedValueOnce({ rows: [{ guest_passes_per_year: 4 }] })
         .mockResolvedValueOnce({ rows: [{ passes_used: 4, passes_total: 4 }] })
         .mockResolvedValueOnce({ rows: [{ total_held: '0' }] });
 
@@ -80,7 +80,7 @@ describe('GuestPassHoldService', () => {
 
     it('returns 0 when passes used plus holds exceed total', async () => {
       mockExecute
-        .mockResolvedValueOnce({ rows: [{ guest_passes_per_month: 4 }] })
+        .mockResolvedValueOnce({ rows: [{ guest_passes_per_year: 4 }] })
         .mockResolvedValueOnce({ rows: [{ passes_used: 3, passes_total: 4 }] })
         .mockResolvedValueOnce({ rows: [{ total_held: '2' }] });
 
@@ -100,7 +100,7 @@ describe('GuestPassHoldService', () => {
 
     it('updates passes_total when tier allows more than current total', async () => {
       mockExecute
-        .mockResolvedValueOnce({ rows: [{ guest_passes_per_month: 6 }] })
+        .mockResolvedValueOnce({ rows: [{ guest_passes_per_year: 6 }] })
         .mockResolvedValueOnce({ rows: [{ passes_used: 1, passes_total: 4 }] })
         .mockResolvedValueOnce({ rows: [] })
         .mockResolvedValueOnce({ rows: [{ total_held: '0' }] });
@@ -113,7 +113,7 @@ describe('GuestPassHoldService', () => {
     it('uses provided transaction context without managing its own', async () => {
       const txCtx = {
         execute: vi.fn()
-          .mockResolvedValueOnce({ rows: [{ guest_passes_per_month: 4 }] })
+          .mockResolvedValueOnce({ rows: [{ guest_passes_per_year: 4 }] })
           .mockResolvedValueOnce({ rows: [] })
           .mockResolvedValueOnce({ rows: [{ total_held: '0' }] }),
       };
@@ -127,7 +127,7 @@ describe('GuestPassHoldService', () => {
 
     it('normalizes email to lowercase and trimmed', async () => {
       mockExecute
-        .mockResolvedValueOnce({ rows: [{ guest_passes_per_month: 4 }] })
+        .mockResolvedValueOnce({ rows: [{ guest_passes_per_year: 4 }] })
         .mockResolvedValueOnce({ rows: [] })
         .mockResolvedValueOnce({ rows: [{ total_held: '0' }] });
 
@@ -176,7 +176,7 @@ describe('GuestPassHoldService', () => {
         execute: vi.fn()
           .mockResolvedValueOnce({ rows: [] })
           .mockResolvedValueOnce({ rows: [{ id: 1 }] })
-          .mockResolvedValueOnce({ rows: [{ guest_passes_per_month: 2 }] })
+          .mockResolvedValueOnce({ rows: [{ guest_passes_per_year: 2 }] })
           .mockResolvedValueOnce({ rows: [{ passes_used: 2, passes_total: 2 }] })
           .mockResolvedValueOnce({ rows: [{ total_held: '0' }] }),
       };

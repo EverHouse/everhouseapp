@@ -19,7 +19,7 @@ interface TotalMinutesRow {
 
 export interface TierLimits {
   daily_sim_minutes: number;
-  guest_passes_per_month: number;
+  guest_passes_per_year: number;
   booking_window_days: number;
   daily_conf_room_minutes: number;
   can_book_simulators: boolean;
@@ -35,7 +35,7 @@ export interface TierLimits {
 
 const DEFAULT_TIER_LIMITS: TierLimits = {
   daily_sim_minutes: 0,
-  guest_passes_per_month: 0,
+  guest_passes_per_year: 0,
   booking_window_days: 7,
   daily_conf_room_minutes: 0,
   can_book_simulators: false,
@@ -66,7 +66,7 @@ export async function getTierLimits(tierName: string): Promise<TierLimits> {
   }
   
   try {
-    const result = await db.execute(sql`SELECT daily_sim_minutes, guest_passes_per_month, booking_window_days, 
+    const result = await db.execute(sql`SELECT daily_sim_minutes, guest_passes_per_year, booking_window_days, 
               daily_conf_room_minutes, can_book_simulators, can_book_conference,
               can_book_wellness, has_group_lessons, has_extended_sessions,
               has_private_lesson, has_simulator_guest_passes, has_discounted_merch,

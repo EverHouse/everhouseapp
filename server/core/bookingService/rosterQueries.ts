@@ -319,7 +319,7 @@ export async function previewRosterFees(
     : Math.max(1, effectivePlayerCount);
 
   let dailyAllowance = 60;
-  let guestPassesPerMonth = 0;
+  let guestPassesPerYear = 0;
   let remainingMinutesToday = 0;
 
   if (ownerTier) {
@@ -328,7 +328,7 @@ export async function previewRosterFees(
       dailyAllowance = isConferenceRoom
         ? tierLimits.daily_conf_room_minutes
         : tierLimits.daily_sim_minutes;
-      guestPassesPerMonth = tierLimits.guest_passes_per_month;
+      guestPassesPerYear = tierLimits.guest_passes_per_year;
     }
     const resourceTypeForRemaining = isConferenceRoom ? 'conference_room' : 'simulator';
     remainingMinutesToday = await getRemainingMinutes(booking.owner_email, ownerTier, booking.request_date, resourceTypeForRemaining);
@@ -408,7 +408,7 @@ export async function previewRosterFees(
       effectivePlayerCount,
       dailyAllowance,
       remainingMinutesToday,
-      guestPassesPerMonth,
+      guestPassesPerYear,
       ownerTier,
       allParticipants,
       participantsForFeeCalc,
@@ -481,7 +481,7 @@ export async function previewRosterFees(
       estimatedTotalFees: Math.round(breakdown.totals.totalCents / 100),
     },
     guestPasses: {
-      monthlyAllowance: guestPassesPerMonth,
+      yearlyAllowance: guestPassesPerYear,
       remaining: breakdown.totals.guestPassesAvailable,
       usedThisBooking: breakdown.totals.guestPassesUsed,
       afterBooking: Math.max(0, breakdown.totals.guestPassesAvailable - guestCount),
@@ -495,7 +495,7 @@ async function buildFallbackPreview(params: FallbackPreviewParams): Promise<Prev
   const {
     booking, durationMinutes, declaredPlayerCount, totalSlots, minutesPerPlayer,
     actualParticipantCount, effectivePlayerCount, dailyAllowance,
-    remainingMinutesToday, guestPassesPerMonth, ownerTier, allParticipants,
+    remainingMinutesToday, guestPassesPerYear, ownerTier, allParticipants,
     participantsForFeeCalc, guestCount, memberCount, isConferenceRoom,
   } = params;
 
@@ -585,7 +585,7 @@ async function buildFallbackPreview(params: FallbackPreviewParams): Promise<Prev
       estimatedTotalFees,
     },
     guestPasses: {
-      monthlyAllowance: guestPassesPerMonth,
+      yearlyAllowance: guestPassesPerYear,
       remaining: guestPassesRemaining,
       usedThisBooking: guestCount,
       afterBooking: Math.max(0, guestPassesRemaining - guestCount),

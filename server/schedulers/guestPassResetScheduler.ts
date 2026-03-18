@@ -7,7 +7,7 @@ import { sendPassUpdateForMemberByEmail } from '../walletPass/apnPushService';
 
 const RESET_HOUR = 3;
 
-async function tryClaimResetSlot(monthKey: string): Promise<boolean> {
+async function tryClaimResetSlot(yearKey: string): Promise<boolean> {
   try {
     const result = await queryWithRetry(
       `INSERT INTO system_settings (key, value, updated_at)
@@ -15,7 +15,7 @@ async function tryClaimResetSlot(monthKey: string): Promise<boolean> {
        ON CONFLICT (key) DO UPDATE SET value = $1, updated_at = NOW()
        WHERE system_settings.value IS DISTINCT FROM $1
        RETURNING key`,
-      [monthKey],
+      [yearKey],
       3
     );
     return (result.rowCount || 0) > 0;
@@ -25,7 +25,7 @@ async function tryClaimResetSlot(monthKey: string): Promise<boolean> {
     alertOnScheduledTaskFailure(
       'Guest Pass Reset',
       err instanceof Error ? err : new Error(String(err)),
-      { context: 'Failed to claim monthly reset slot' }
+      { context: 'Failed to claim yearly reset slot' }
     ).catch((alertErr: unknown) => {
       logger.error('[Guest Pass Reset] Failed to send staff alert:', { error: alertErr as Error });
     });
@@ -37,21 +37,21 @@ async function resetGuestPasses(): Promise<void> {
   try {
     const currentHour = getPacificHour();
     const dayOfMonth = getPacificDayOfMonth();
+    const parts = getPacificDateParts();
     
-    if (dayOfMonth !== 1 || currentHour < RESET_HOUR || currentHour > 8) {
+    if (parts.month !== 1 || dayOfMonth !== 1 || currentHour < RESET_HOUR || currentHour > 8) {
       return;
     }
     
-    const parts = getPacificDateParts();
-    const monthKey = `${parts.year}-${String(parts.month).padStart(2, '0')}`;
+    const yearKey = `${parts.year}`;
     
-    if (!await tryClaimResetSlot(monthKey)) {
-      logger.info('[Guest Pass Reset] Already ran this month, skipping');
+    if (!await tryClaimResetSlot(yearKey)) {
+      logger.info('[Guest Pass Reset] Already ran this year, skipping');
       schedulerTracker.recordRun('Guest Pass Reset', true);
       return;
     }
     
-    logger.info('[Guest Pass Reset] Starting monthly reset...');
+    logger.info('[Guest Pass Reset] Starting yearly reset...');
     schedulerTracker.recordRun('Guest Pass Reset', true);
     
     const result = await queryWithRetry(
@@ -111,7 +111,7 @@ export function startGuestPassResetScheduler(): void {
     return;
   }
 
-  logger.info('[Startup] Guest pass reset scheduler enabled (runs 1st of month, 3am–8am Pacific catch-up window)');
+  logger.info('[Startup] Guest pass reset scheduler enabled (runs January 1st, 3am–8am Pacific catch-up window)');
   schedulerTracker.recordRun('Guest Pass Reset', true);
   
   intervalId = setInterval(() => {

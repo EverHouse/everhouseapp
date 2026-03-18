@@ -236,7 +236,7 @@ export async function getGuestPassInfo(
   try {
     const tierLimits = tierName ? await getTierLimits(tierName) : null;
     const hasGuestPassBenefit = (tierLimits?.has_simulator_guest_passes ?? false) || 
-      (tierLimits?.guest_passes_per_month ?? 0) > 0;
+      (tierLimits?.guest_passes_per_year ?? 0) > 0;
     
     if (!hasGuestPassBenefit) {
       return { remaining: 0, hasGuestPassBenefit: false };
@@ -245,8 +245,8 @@ export async function getGuestPassInfo(
     const result = await db.execute(sql`SELECT passes_used, passes_total FROM guest_passes WHERE LOWER(member_email) = LOWER(${memberEmail})`);
     
     if (result.rows.length === 0) {
-      const monthlyAllocation = tierLimits?.guest_passes_per_month ?? 0;
-      return { remaining: monthlyAllocation, hasGuestPassBenefit: true };
+      const yearlyAllocation = tierLimits?.guest_passes_per_year ?? 0;
+      return { remaining: yearlyAllocation, hasGuestPassBenefit: true };
     }
     
     const row = result.rows[0] as { passes_total: number; passes_used: number };

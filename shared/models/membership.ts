@@ -23,7 +23,7 @@ export const membershipTiers = pgTable("membership_tiers", {
   
   // Logic/Enforcement fields
   dailySimMinutes: integer("daily_sim_minutes").default(0),
-  guestPassesPerMonth: integer("guest_passes_per_month").default(0),
+  guestPassesPerYear: integer("guest_passes_per_year").default(0),
   bookingWindowDays: integer("booking_window_days").default(7),
   dailyConfRoomMinutes: integer("daily_conf_room_minutes").default(0),
   

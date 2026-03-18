@@ -124,7 +124,7 @@ router.get('/api/member/wallet-pass', isAuthenticated, async (req, res) => {
       db.select({
         dailySimMinutes: membershipTiers.dailySimMinutes,
         dailyConfRoomMinutes: membershipTiers.dailyConfRoomMinutes,
-        guestPassesPerMonth: membershipTiers.guestPassesPerMonth,
+        guestPassesPerYear: membershipTiers.guestPassesPerYear,
         walletPassBgColor: membershipTiers.walletPassBgColor,
         walletPassForegroundColor: membershipTiers.walletPassForegroundColor,
         walletPassLabelColor: membershipTiers.walletPassLabelColor,
