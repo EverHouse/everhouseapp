@@ -332,11 +332,43 @@ async function initializeApp() {
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
     res.setHeader('Permissions-Policy', 'camera=(self), microphone=(), geolocation=()');
     res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
+
+    // ─── CSP External Resource Audit ───────────────────────────────────────
+    // Stripe:        js.stripe.com (script, frame), hooks.stripe.com (frame),
+    //                api.stripe.com (connect), *.stripe.com (img — badge/logos)
+    // Google:        accounts.google.com (script, style, connect, frame, img),
+    //                fonts.googleapis.com (style), fonts.gstatic.com (font),
+    //                *.gstatic.com (img — sign-in assets),
+    //                *.googleusercontent.com (img — user avatars),
+    //                www.google.com (frame — reCAPTCHA)
+    // Apple:         appleid.cdn-apple.com (script, img — Sign-In SDK),
+    //                cdn.apple-mapkit.com (script, style — MapKit JS),
+    //                appleid.apple.com (connect, frame — Sign-In flow),
+    //                *.apple-mapkit.com (connect — MapKit tile API)
+    // HubSpot:       *.hs-scripts.com (script — tracking loader),
+    //                *.hsforms.net (script, style, img — forms),
+    //                *.hscollectedforms.net (script, connect — collected forms),
+    //                *.hs-banner.com (script — cookie banner),
+    //                *.hs-analytics.net (script, connect, img — analytics),
+    //                *.hsadspixel.net (script, img — ads pixel),
+    //                *.hubspot.com (script, connect, img — general/tracking),
+    //                *.usemessages.com (script — live chat),
+    //                app.hubspot.com (frame — embedded tools),
+    //                *.hubapi.com (connect — HubSpot API calls)
+    // Facebook:      connect.facebook.net (script, connect — pixel SDK),
+    //                www.facebook.com (connect, img — tracking pixel)
+    // Matterport:    my.matterport.com (frame — virtual tour embed)
+    // QR codes:      api.qrserver.com (img — member card QR generation)
+    // Unsplash:      images.unsplash.com (img — fallback event images)
+    // Object storage: served via /objects/ on same origin ('self')
+    // To debug CSP: check browser DevTools console for "Refused to load" errors
+    // ────────────────────────────────────────────────────────────────────────
+
     res.setHeader('Content-Security-Policy', [
       "default-src 'self'",
       `script-src 'self' 'nonce-${nonce}' https://js.stripe.com https://accounts.google.com https://appleid.cdn-apple.com https://cdn.apple-mapkit.com https://*.hs-scripts.com https://*.hsforms.net https://*.hscollectedforms.net https://*.hs-banner.com https://*.hs-analytics.net https://*.hsadspixel.net https://*.hubspot.com https://*.usemessages.com https://connect.facebook.net`,
-      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com https://cdn.apple-mapkit.com https://*.hsforms.net",
-      "img-src 'self' data: blob: https:",
+      `style-src 'self' 'nonce-${nonce}' https://fonts.googleapis.com https://accounts.google.com https://cdn.apple-mapkit.com https://*.hsforms.net`,
+      "img-src 'self' data: blob: https://*.stripe.com https://accounts.google.com https://*.gstatic.com https://*.googleusercontent.com https://appleid.cdn-apple.com https://*.hubspot.com https://*.hsforms.net https://*.hs-analytics.net https://*.hsadspixel.net https://www.facebook.com https://images.unsplash.com https://api.qrserver.com https://my.matterport.com",
       "connect-src 'self' https://api.stripe.com https://accounts.google.com https://appleid.apple.com https://*.apple-mapkit.com https://*.hubspot.com https://*.hubapi.com https://*.hscollectedforms.net https://*.hsforms.net https://*.hs-analytics.net https://www.facebook.com https://connect.facebook.net wss: ws:",
       "font-src 'self' data: https://fonts.gstatic.com",
       "frame-src 'self' https://js.stripe.com https://hooks.stripe.com https://accounts.google.com https://appleid.apple.com https://www.google.com https://my.matterport.com https://app.hubspot.com",
@@ -1019,7 +1051,9 @@ async function initializeApp() {
     }
 
     const injectCspNonce = (html: string, nonce: string): string => {
-      return html.replace(/<script(?=[\s>])/g, `<script nonce="${nonce}"`);
+      return html
+        .replace(/<script(?=[\s>])/g, `<script nonce="${nonce}"`)
+        .replace(/<style(?=[\s>])/g, `<style nonce="${nonce}"`);
     };
 
     app.use((req, res, next) => {
