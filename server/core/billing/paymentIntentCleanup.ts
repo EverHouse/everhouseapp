@@ -42,11 +42,25 @@ export async function cancelPendingPaymentIntentsForBooking(bookingId: number, o
       }
     }
 
-    if (!options?.skipSnapshotUpdate && cancelledPiIds.length > 0) {
-      for (const piId of cancelledPiIds) {
-        await db.execute(
-          sql`UPDATE booking_fee_snapshots SET status = 'cancelled', updated_at = NOW() WHERE stripe_payment_intent_id = ${piId} AND status IN ('pending', 'requires_action')`
-        );
+    if (!options?.skipSnapshotUpdate) {
+      if (cancelledPiIds.length > 0) {
+        for (const piId of cancelledPiIds) {
+          await db.execute(
+            sql`UPDATE booking_fee_snapshots SET status = 'cancelled' WHERE stripe_payment_intent_id = ${piId} AND status IN ('pending', 'requires_action')`
+          );
+        }
+      }
+
+      const orphanResult = await db.execute(
+        sql`UPDATE booking_fee_snapshots SET status = 'cancelled'
+            WHERE booking_id = ${bookingId}
+              AND stripe_payment_intent_id IS NULL
+              AND status IN ('pending', 'requires_action')
+            RETURNING id`
+      );
+      const orphanCount = (orphanResult.rows as unknown[]).length;
+      if (orphanCount > 0) {
+        logger.info(`[Payment Intent Cleanup] Cancelled ${orphanCount} orphaned fee snapshots (no PI) for booking ${bookingId}`);
       }
     }
   } catch (e: unknown) {
