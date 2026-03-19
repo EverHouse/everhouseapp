@@ -188,7 +188,7 @@ export async function runStartupTasks(): Promise<void> {
     })(),
     (async () => {
       try {
-        await seedTrainingSections();
+        await retryWithBackoff(() => seedTrainingSections(), 'Training sections');
         logger.info('[Startup] Training sections synced');
       } catch (err: unknown) {
         logger.error('[Startup] Seeding training sections failed', { error: getErrorMessage(err) });
@@ -218,11 +218,13 @@ export async function runStartupTasks(): Promise<void> {
     })(),
     (async () => {
       try {
-        const result = await db.execute(sql`
-          UPDATE users SET tier = NULL, tier_id = NULL, updated_at = NOW()
-          WHERE role = 'visitor' AND membership_status = 'visitor' AND (tier IS NOT NULL OR tier_id IS NOT NULL)
-          RETURNING id
-        `);
+        const result = await retryWithBackoff(async () => {
+          return db.execute(sql`
+            UPDATE users SET tier = NULL, tier_id = NULL, updated_at = NOW()
+            WHERE role = 'visitor' AND membership_status = 'visitor' AND (tier IS NOT NULL OR tier_id IS NOT NULL)
+            RETURNING id
+          `);
+        }, 'Visitor tier cleanup');
         const count = Array.isArray(result) ? result.length : (result?.rows?.length ?? 0);
         if (count > 0) {
           logger.info(`[Startup] Cleaned up tier data for ${count} visitor records`);

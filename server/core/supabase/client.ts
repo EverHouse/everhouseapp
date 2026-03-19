@@ -121,7 +121,7 @@ export function isSupabaseConfigured(): boolean {
   return !!(process.env.SUPABASE_URL && process.env.SERVICE_ROLE_KEY);
 }
 
-const REALTIME_SETUP_TIMEOUT = 10000;
+const REALTIME_SETUP_TIMEOUT = 20000;
 
 const REALTIME_TABLES = ['notifications', 'booking_sessions', 'announcements', 'trackman_unmatched_bookings'] as const;
 
@@ -222,7 +222,17 @@ export async function enableRealtimeWithRetry(): Promise<{ successCount: number;
   const results = await Promise.all(
     REALTIME_TABLES.map(table => enableRealtimeForTable(table, { skipAvailabilityCheck: true }))
   );
-  const successCount = results.filter(Boolean).length;
+  let successCount = results.filter(Boolean).length;
+
+  if (successCount < total) {
+    const failedTables = REALTIME_TABLES.filter((_, i) => !results[i]);
+    logger.info(`[Supabase] Retrying ${failedTables.length} failed table(s) in 5s: ${failedTables.join(', ')}`);
+    await new Promise(resolve => setTimeout(resolve, 5000));
+    const retryResults = await Promise.all(
+      failedTables.map(table => enableRealtimeForTable(table, { skipAvailabilityCheck: true }))
+    );
+    successCount += retryResults.filter(Boolean).length;
+  }
 
   if (successCount === total) {
     realtimeTablesEnabled = true;

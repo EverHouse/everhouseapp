@@ -31,12 +31,20 @@ export const GlassListRow: React.FC<{
   onClick?: () => void;
   className?: string;
   style?: React.CSSProperties;
-}> = ({ children, onClick, className = '', style }) => (
+  hasInteractiveChildren?: boolean;
+}> = ({ children, onClick, className = '', style, hasInteractiveChildren }) => (
   <div 
     onClick={onClick}
     style={style}
     className={`flex items-center gap-3 py-3 px-6 w-full hover:bg-primary/[0.06] dark:hover:bg-white/[0.08] transition-colors cursor-pointer border-b border-primary/[0.06] dark:border-white/[0.06] last:border-b-0 ${className}`}
-    {...(onClick ? { role: 'button' as const, tabIndex: 0, onKeyDown: (e: React.KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } } } : {})}
+    {...(onClick && !hasInteractiveChildren ? {
+      role: 'button' as const,
+      tabIndex: 0,
+      onKeyDown: (e: React.KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } }
+    } : onClick ? {
+      tabIndex: 0,
+      onKeyDown: (e: React.KeyboardEvent) => { if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); onClick(); } }
+    } : {})}
   >
     {children}
   </div>

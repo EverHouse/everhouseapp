@@ -77,6 +77,7 @@ const PendingRequestsCard = memo<PendingRequestsCardProps>(({
               <GlassListRow 
                 key={`${request.source || 'request'}-${request.id}`} 
                 className="flex-col !items-stretch !gap-2"
+                hasInteractiveChildren
               >
                 {request.status === BOOKING_STATUS.CANCELLATION_PENDING ? (
                   <>
@@ -260,6 +261,7 @@ const UpcomingBookingsCard = memo<UpcomingBookingsCardProps>(({
                 key={`${isUnmatched ? 'unmatched-' : ''}${booking.id}`}
                 onClick={() => navigateToTab('simulator')}
                 className={`flex-col !items-stretch !gap-2 ${cardClass}`}
+                hasInteractiveChildren
               >
                 <div className="flex items-start gap-3">
                   <DateBlock dateStr={booking.request_date || booking.slot_date || ''} today={today} />

@@ -33,14 +33,16 @@ export function startHubSpotFormSyncScheduler(): void {
   }
 
   logger.info('[Startup] HubSpot form sync scheduler enabled (runs every 30 minutes)');
-  logFormIdResolutionStatus().catch(err => {
-    logger.error('[HubSpot FormSync] Failed to log form ID resolution status:', { error: err as Error });
-  });
 
-  setTimeout(() => {
-    runSync().catch(err => {
+  setTimeout(async () => {
+    try {
+      await runSync();
+    } catch (err: unknown) {
       logger.error('[HubSpot FormSync] Initial run failed:', { error: err as Error });
       schedulerTracker.recordRun('HubSpot Form Sync', false, getErrorMessage(err));
+    }
+    logFormIdResolutionStatus().catch(err => {
+      logger.error('[HubSpot FormSync] Failed to log form ID resolution status:', { error: err as Error });
     });
   }, 60000);
 

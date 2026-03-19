@@ -44,10 +44,13 @@ const ScheduleCard: React.FC<ScheduleCardProps> = ({
   return (
     <div
       onClick={onClick}
-      {...(onClick ? {
+      {...(onClick && !(actions && actions.length > 0) ? {
         role: 'button' as const,
         tabIndex: 0,
         onKeyDown: (e: React.KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } }
+      } : onClick ? {
+        tabIndex: 0,
+        onKeyDown: (e: React.KeyboardEvent) => { if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); onClick(); } }
       } : {})}
       className={`glass-card p-6 animate-slide-up-stagger ${onClick ? 'tactile-row cursor-pointer card-pressable glass-interactive transition-transform active:scale-[0.98]' : ''}`}
       style={staggerIndex !== undefined ? { '--stagger-index': staggerIndex, animationFillMode: 'both' } as React.CSSProperties : { animationFillMode: 'both' }}

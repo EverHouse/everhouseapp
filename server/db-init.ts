@@ -2022,9 +2022,25 @@ export async function seedTierFeatures(): Promise<void> {
   }
 }
 
+async function retryTriggerSetup<T>(fn: () => Promise<T>, label: string, maxRetries = 3): Promise<T> {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (err: unknown) {
+      const msg = getErrorMessage(err);
+      const isRetryable = msg.includes('timeout') || msg.includes('Connection terminated') || msg.includes('ECONNREFUSED');
+      if (!isRetryable || attempt === maxRetries) throw err;
+      const delay = Math.pow(2, attempt) * 1000;
+      logger.info(`[DB Init] ${label} failed (attempt ${attempt}/${maxRetries}), retrying in ${delay / 1000}s...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+  throw new Error('unreachable');
+}
+
 export async function setupInstantDataTriggers(): Promise<void> {
   try {
-    await db.execute(sql`
+    await retryTriggerSetup(() => db.execute(sql`
       CREATE OR REPLACE FUNCTION auto_set_billing_provider()
       RETURNS TRIGGER
       LANGUAGE plpgsql
@@ -2043,7 +2059,7 @@ export async function setupInstantDataTriggers(): Promise<void> {
       BEFORE INSERT OR UPDATE OF stripe_subscription_id, mindbody_client_id, billing_provider ON users
       FOR EACH ROW
       EXECUTE FUNCTION auto_set_billing_provider();
-    `);
+    `), 'auto_set_billing_provider');
     logger.info('[DB Init] Trigger: auto_set_billing_provider created');
   } catch (err: unknown) {
     logger.warn(`[DB Init] Skipping auto_set_billing_provider trigger: ${getErrorMessage(err)}`);
@@ -2060,7 +2076,7 @@ export async function setupInstantDataTriggers(): Promise<void> {
   }
 
   try {
-    await db.execute(sql`
+    await retryTriggerSetup(() => db.execute(sql`
       CREATE OR REPLACE FUNCTION auto_sync_staff_role()
       RETURNS TRIGGER
       LANGUAGE plpgsql
@@ -2082,7 +2098,7 @@ export async function setupInstantDataTriggers(): Promise<void> {
       AFTER INSERT OR UPDATE OF is_active, role ON staff_users
       FOR EACH ROW
       EXECUTE FUNCTION auto_sync_staff_role();
-    `);
+    `), 'auto_sync_staff_role');
     logger.info('[DB Init] Trigger: auto_sync_staff_role created');
 
     const orphanedResult = await db.execute(sql`
@@ -2111,7 +2127,7 @@ export async function setupInstantDataTriggers(): Promise<void> {
   }
 
   try {
-    await db.execute(sql`
+    await retryTriggerSetup(() => db.execute(sql`
       CREATE OR REPLACE FUNCTION auto_link_participant_user_id()
       RETURNS TRIGGER
       LANGUAGE plpgsql
@@ -2141,14 +2157,14 @@ export async function setupInstantDataTriggers(): Promise<void> {
       BEFORE INSERT ON booking_participants
       FOR EACH ROW
       EXECUTE FUNCTION auto_link_participant_user_id();
-    `);
+    `), 'auto_link_participant_user_id');
     logger.info('[DB Init] Trigger: auto_link_participant_user_id created');
   } catch (err: unknown) {
     logger.warn(`[DB Init] Skipping auto_link_participant_user_id trigger: ${getErrorMessage(err)}`);
   }
 
   try {
-    await db.execute(sql`
+    await retryTriggerSetup(() => db.execute(sql`
       CREATE OR REPLACE FUNCTION auto_clear_unmatched_on_terminal()
       RETURNS TRIGGER
       LANGUAGE plpgsql
@@ -2167,7 +2183,7 @@ export async function setupInstantDataTriggers(): Promise<void> {
         BEFORE INSERT OR UPDATE ON booking_requests
         FOR EACH ROW
         EXECUTE FUNCTION auto_clear_unmatched_on_terminal();
-    `);
+    `), 'auto_clear_unmatched_on_terminal');
     logger.info('[DB Init] Trigger: auto_clear_unmatched_on_terminal created');
   } catch (err: unknown) {
     logger.warn(`[DB Init] Skipping auto_clear_unmatched_on_terminal trigger: ${getErrorMessage(err)}`);
