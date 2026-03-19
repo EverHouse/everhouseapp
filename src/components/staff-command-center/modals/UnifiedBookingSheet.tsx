@@ -351,18 +351,11 @@ export function UnifiedBookingSheet(props: UnifiedBookingSheetProps) {
         )}
 
         <AssignModeSecondaryActions
-          markingAsEvent={logic.markingAsEvent}
-          isLoadingNotices={logic.isLoadingNotices}
-          showNoticeSelection={logic.showNoticeSelection}
-          setShowNoticeSelection={logic.setShowNoticeSelection}
-          overlappingNotices={logic.overlappingNotices}
           showStaffList={logic.showStaffList}
           setShowStaffList={logic.setShowStaffList}
           staffList={logic.staffList}
           isLoadingStaff={logic.isLoadingStaff}
           assigningToStaff={logic.assigningToStaff}
-          handleMarkAsEvent={logic.handleMarkAsEvent}
-          executeMarkAsEvent={logic.executeMarkAsEvent}
           handleAssignToStaff={(staff) => logic.handleAssignToStaff({ id: String(staff.id), email: staff.email, first_name: staff.name.split(' ')[0] || '', last_name: staff.name.split(' ').slice(1).join(' ') || '', role: '', user_id: null })}
           getRoleBadge={logic.getRoleBadge}
           onDeleteBooking={logic.handleDeleteBooking}

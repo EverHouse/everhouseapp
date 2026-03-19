@@ -9,6 +9,7 @@ import { CALENDAR_CONFIG } from '../config';
 import { getCalendarIdByName, discoverCalendarIds } from '../cache';
 import { alertOnSyncFailure } from '../../dataAlerts';
 import { getAllActiveBayIds, getConferenceRoomId } from '../../affectedAreas';
+import { findCoveringBlock } from '../../availabilityBlockService';
 
 import { toIntArrayLiteral } from '../../../utils/sqlArrayLiteral';
 import { logger } from '../../logger';
@@ -41,13 +42,21 @@ async function resyncWellnessAvailabilityBlocks(
     }
 
     const blockNotes = classTitle ? `Blocked for: ${classTitle}` : 'Blocked for wellness class';
+    const effectiveEndTime = endTime || startTime;
     for (const resourceId of resourceIds) {
       try {
+        const covering = await findCoveringBlock(resourceId, classDate, startTime, effectiveEndTime);
+        if (covering && covering.wellness_class_id !== wellnessClassId) {
+          logger.info(`[Wellness Sync] Skipping block insert for class #${wellnessClassId} resource ${resourceId} — covered by existing block #${covering.id} (type: ${covering.block_type})`, {
+            extra: { resourceId, classDate, startTime, endTime: effectiveEndTime, wellnessClassId }
+          });
+          continue;
+        }
         await db.insert(availabilityBlocks).values({
           resourceId,
           blockDate: classDate,
           startTime,
-          endTime: endTime || startTime,
+          endTime: effectiveEndTime,
           blockType: 'wellness',
           notes: blockNotes,
           createdBy: 'calendar_sync',

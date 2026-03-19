@@ -8,6 +8,7 @@ import { getPacificMidnightUTC } from '../../../utils/dateUtils';
 import { toIntArrayLiteral } from '../../../utils/sqlArrayLiteral';
 import { logger } from '../../logger';
 import { withCalendarRetry } from '../../retryUtils';
+import { findCoveringBlock } from '../../availabilityBlockService';
 
 const LESSON_PREFIXES = ['lesson', 'private lesson', 'kids lesson', 'group lesson'];
 function isLessonTitle(title: string): boolean {
@@ -250,6 +251,13 @@ async function createAvailabilityBlocks(
   const valueParts: SQL[] = [];
   for (const resId of filteredIds) {
     for (const date of dates) {
+      const covering = await findCoveringBlock(resId, date, blockStartTime, blockEndTime);
+      if (covering) {
+        logger.info(`[Closures Sync] Skipping block insert for closure #${closureId} — covered by existing block #${covering.id} (type: ${covering.block_type})`, {
+          extra: { resourceId: resId, blockDate: date, startTime: blockStartTime, endTime: blockEndTime, closureId }
+        });
+        continue;
+      }
       valueParts.push(sql`(${resId}, ${date}, ${blockStartTime}, ${blockEndTime}, 'blocked', ${notes}, 'system', ${closureId})`);
       blocksCreated++;
     }

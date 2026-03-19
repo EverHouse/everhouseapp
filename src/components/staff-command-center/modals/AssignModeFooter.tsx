@@ -1,5 +1,4 @@
-import React, { useState } from 'react';
-import { formatTitleForDisplay } from '../../../utils/closureUtils';
+import React from 'react';
 
 interface AssignModeFooterProps {
   hasOwner: boolean;
@@ -12,18 +11,11 @@ interface AssignModeFooterProps {
 }
 
 export interface AssignModeSecondaryActionsProps {
-  markingAsEvent: boolean;
-  isLoadingNotices: boolean;
-  showNoticeSelection: boolean;
-  setShowNoticeSelection: (show: boolean) => void;
-  overlappingNotices: Array<{id: number; title: string; reason: string | null; notice_type: string | null; start_date: string; end_date: string; start_time: string | null; end_time: string | null; source: string}>;
   showStaffList: boolean;
   setShowStaffList: (show: boolean) => void;
   staffList: Array<{id: string; email: string; first_name: string; last_name: string; role: string; user_id: string | null}>;
   isLoadingStaff: boolean;
   assigningToStaff: boolean;
-  handleMarkAsEvent: () => Promise<void>;
-  executeMarkAsEvent: (existingClosureId?: number, eventTitle?: string) => Promise<void>;
   handleAssignToStaff: (staff: { id: string | number; name: string; email: string }) => Promise<void>;
   getRoleBadge: (role: string) => React.ReactNode;
   onDeleteBooking?: () => Promise<void>;
@@ -99,135 +91,18 @@ export function AssignModeFooter({
 }
 
 export function AssignModeSecondaryActions({
-  markingAsEvent,
-  isLoadingNotices,
-  showNoticeSelection,
-  setShowNoticeSelection,
-  overlappingNotices,
   showStaffList,
   setShowStaffList,
   staffList,
   isLoadingStaff,
   assigningToStaff,
-  handleMarkAsEvent,
-  executeMarkAsEvent,
   handleAssignToStaff,
   getRoleBadge,
   onDeleteBooking,
   deleting,
 }: AssignModeSecondaryActionsProps) {
-  const [customEventTitle, setCustomEventTitle] = useState('');
-  const [showTitleInput, setShowTitleInput] = useState(false);
-
   return (
     <div className="space-y-2 pt-2 border-t border-primary/10 dark:border-white/10">
-      <button
-        onClick={handleMarkAsEvent}
-        disabled={markingAsEvent || isLoadingNotices}
-        className="tactile-btn w-full py-2.5 px-4 rounded-lg border border-purple-500 text-purple-600 dark:text-purple-400 font-medium hover:bg-purple-50 dark:hover:bg-purple-500/10 transition-colors flex items-center justify-center gap-2"
-      >
-        {markingAsEvent || isLoadingNotices ? (
-          <>
-            <span className="material-symbols-outlined animate-spin text-sm">progress_activity</span>
-            {isLoadingNotices ? 'Checking...' : 'Marking...'}
-          </>
-        ) : (
-          <>
-            <span className="material-symbols-outlined text-sm">event</span>
-            Mark as Private Event
-          </>
-        )}
-      </button>
-
-      {showNoticeSelection && (
-        <div className="p-3 rounded-lg border border-purple-200 dark:border-purple-500/30 bg-purple-50/50 dark:bg-purple-900/10 space-y-2">
-          <div className="flex items-center gap-2 text-purple-700 dark:text-purple-400">
-            <span className="material-symbols-outlined text-sm">info</span>
-            <span className="text-sm font-medium">
-              {overlappingNotices.length > 0 ? 'Existing notices found for this day' : 'No existing notices for this day'}
-            </span>
-          </div>
-          {overlappingNotices.length > 0 && (
-            <p className="text-xs text-primary/60 dark:text-white/60">
-              Link to an existing notice to avoid duplicates, or create a new one.
-            </p>
-          )}
-          <div className="space-y-1.5">
-            {overlappingNotices.map((notice) => (
-              <button
-                key={notice.id}
-                onClick={() => executeMarkAsEvent(notice.id)}
-                disabled={markingAsEvent}
-                className="tactile-btn w-full p-2 text-left rounded-lg bg-white dark:bg-white/5 hover:bg-purple-100 dark:hover:bg-purple-900/20 transition-colors border border-purple-200 dark:border-purple-500/20"
-              >
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-medium text-primary dark:text-white">{notice.title ? formatTitleForDisplay(notice.title) : notice.reason || 'Untitled Notice'}</p>
-                  <span className="px-1.5 py-0.5 text-[10px] font-medium bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300 rounded">
-                    {notice.source}
-                  </span>
-                </div>
-                <p className="text-xs text-primary/60 dark:text-white/60 mt-0.5">
-                  {notice.start_time && notice.end_time 
-                    ? `${notice.start_time.slice(0, 5)} - ${notice.end_time.slice(0, 5)}` 
-                    : 'All day'
-                  }
-                  {notice.notice_type && ` • ${formatTitleForDisplay(notice.notice_type)}`}
-                </p>
-              </button>
-            ))}
-            {!showTitleInput ? (
-              <button
-                onClick={() => setShowTitleInput(true)}
-                disabled={markingAsEvent}
-                className="tactile-btn w-full p-2 text-center rounded-lg border-2 border-dashed border-purple-300 dark:border-purple-600 text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-500/10 transition-colors text-sm font-medium"
-              >
-                <span className="material-symbols-outlined text-sm mr-1">add</span>
-                Create New Notice Instead
-              </button>
-            ) : (
-              <div className="space-y-2 p-2 rounded-lg bg-white dark:bg-white/5 border border-purple-200 dark:border-purple-500/20">
-                <label className="text-xs font-medium text-purple-700 dark:text-purple-400">Event Title</label>
-                <input
-                  type="text"
-                  value={customEventTitle}
-                  onChange={e => setCustomEventTitle(e.target.value)}
-                  maxLength={200}
-                  placeholder="e.g. Corporate Event, Birthday Party..."
-                  className="w-full px-3 py-2 rounded-lg border border-purple-200 dark:border-purple-500/30 bg-white dark:bg-white/5 text-sm text-primary dark:text-white placeholder:text-primary/40 dark:placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
-                  autoFocus
-                  onKeyDown={e => {
-                    if (e.key === 'Enter' && customEventTitle.trim()) {
-                      executeMarkAsEvent(undefined, customEventTitle);
-                    }
-                  }}
-                />
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => executeMarkAsEvent(undefined, customEventTitle || undefined)}
-                    disabled={markingAsEvent || !customEventTitle.trim()}
-                    className="tactile-btn flex-1 py-2 px-3 rounded-lg bg-purple-600 text-white text-sm font-medium hover:bg-purple-700 transition-colors disabled:opacity-50"
-                  >
-                    {markingAsEvent ? 'Creating...' : 'Create Notice'}
-                  </button>
-                  <button
-                    onClick={() => { setShowTitleInput(false); setCustomEventTitle(''); }}
-                    className="tactile-btn py-2 px-3 rounded-lg border border-purple-200 dark:border-purple-500/30 text-purple-600 dark:text-purple-400 text-sm hover:bg-purple-50 dark:hover:bg-purple-500/10 transition-colors"
-                  >
-                    Back
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-          <button
-            onClick={() => { setShowNoticeSelection(false); setShowTitleInput(false); setCustomEventTitle(''); }}
-            className="tactile-btn w-full text-center text-xs text-primary/50 dark:text-white/50 hover:text-primary dark:hover:text-white pt-1"
-          >
-            Cancel
-          </button>
-        </div>
-      )}
-
       <button
         onClick={() => setShowStaffList(!showStaffList)}
         disabled={assigningToStaff}

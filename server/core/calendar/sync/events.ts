@@ -9,6 +9,7 @@ import { alertOnSyncFailure } from '../../dataAlerts';
 import { getPacificMidnightUTC } from '../../../utils/dateUtils';
 import { getAllActiveBayIds, getConferenceRoomId } from '../../affectedAreas';
 import { availabilityBlocks } from '../../../../shared/models/scheduling';
+import { findCoveringBlock } from '../../availabilityBlockService';
 
 import { toIntArrayLiteral } from '../../../utils/sqlArrayLiteral';
 import { logger } from '../../logger';
@@ -42,13 +43,21 @@ async function resyncEventAvailabilityBlocks(
     }
 
     const blockNotes = eventTitle ? `Blocked for: ${eventTitle}` : 'Blocked for event';
+    const effectiveEndTime = endTime || startTime;
     for (const resourceId of resourceIds) {
       try {
+        const covering = await findCoveringBlock(resourceId, eventDate, startTime, effectiveEndTime);
+        if (covering && covering.event_id !== eventId) {
+          logger.info(`[Events Sync] Skipping block insert for event #${eventId} resource ${resourceId} — covered by existing block #${covering.id} (type: ${covering.block_type})`, {
+            extra: { resourceId, eventDate, startTime, endTime: effectiveEndTime, eventId }
+          });
+          continue;
+        }
         await db.insert(availabilityBlocks).values({
           resourceId,
           blockDate: eventDate,
           startTime,
-          endTime: endTime || startTime,
+          endTime: effectiveEndTime,
           blockType: 'event',
           notes: blockNotes,
           createdBy: 'calendar_sync',

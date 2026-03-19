@@ -74,7 +74,6 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
   ]);
   const [activeSlotIndex, setActiveSlotIndex] = useState<number | null>(null);
   const [linking, setLinking] = useState(false);
-  const [markingAsEvent, setMarkingAsEvent] = useState(false);
   const [showAddVisitor, setShowAddVisitor] = useState(false);
   const [visitorData, setVisitorData] = useState({ firstName: '', lastName: '', email: '', visitorType: '' as string });
   const [isCreatingVisitor, setIsCreatingVisitor] = useState(false);
@@ -88,9 +87,6 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
   const [staffList, setStaffList] = useState<Array<{id: string; email: string; first_name: string; last_name: string; role: string; user_id: string | null}>>([]);
   const [isLoadingStaff, setIsLoadingStaff] = useState(false);
   const [assigningToStaff, setAssigningToStaff] = useState(false);
-  const [showNoticeSelection, setShowNoticeSelection] = useState(false);
-  const [overlappingNotices, setOverlappingNotices] = useState<Array<{id: number; title: string; reason: string | null; notice_type: string | null; start_date: string; end_date: string; start_time: string | null; end_time: string | null; source: string}>>([]);
-  const [isLoadingNotices, setIsLoadingNotices] = useState(false);
   const { showToast } = useToast();
   const [feeEstimate, setFeeEstimate] = useState<{ totalCents: number; overageCents: number; guestCents: number } | null>(null);
   const [isCalculatingFees, setIsCalculatingFees] = useState(false);
@@ -271,7 +267,6 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
       ]);
       setActiveSlotIndex(null);
       setLinking(false);
-      setMarkingAsEvent(false);
       setShowAddVisitor(false);
       setVisitorData({ firstName: '', lastName: '', email: '', visitorType: '' });
       setVisitorSearch('');
@@ -280,8 +275,6 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
       setPotentialDuplicates([]);
       setShowStaffList(false);
       setStaffList([]);
-      setShowNoticeSelection(false);
-      setOverlappingNotices([]);
       setFeeEstimate(null);
       setIsCalculatingFees(false);
       setRosterData(null);
@@ -1096,85 +1089,6 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
     }
   };
 
-  const parseTimeSlot = (slot: string | undefined): { startTime: string; endTime: string } => {
-    if (!slot) return { startTime: '00:00:00', endTime: '23:59:59' };
-    const match = slot.match(/(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})/);
-    if (match) {
-      const formatTime = (t: string) => {
-        const [h, m] = t.split(':');
-        return `${h.padStart(2, '0')}:${m}:00`;
-      };
-      return { startTime: formatTime(match[1]), endTime: formatTime(match[2]) };
-    }
-    return { startTime: '00:00:00', endTime: '23:59:59' };
-  };
-
-  const fetchOverlappingNotices = async (): Promise<boolean> => {
-    if (!bookingDate) return false;
-    
-    setIsLoadingNotices(true);
-    try {
-      const { startTime, endTime } = parseTimeSlot(timeSlot);
-      const params = new URLSearchParams({
-        startDate: bookingDate,
-        endDate: bookingDate,
-        startTime,
-        endTime,
-        sameDayOnly: 'true'
-      });
-      
-      const notices = await fetchWithCredentials<Array<{ id: number; title: string; reason: string | null; notice_type: string | null; start_date: string; end_date: string; start_time: string | null; end_time: string | null; source: string }>>(`/api/resources/overlapping-notices?${params}`);
-      setOverlappingNotices(notices);
-      setShowNoticeSelection(true);
-      return true;
-    } catch (err: unknown) {
-      console.error('Failed to fetch overlapping notices:', err);
-      setShowNoticeSelection(true);
-      return false;
-    } finally {
-      setIsLoadingNotices(false);
-    }
-  };
-
-  const handleMarkAsEvent = async () => {
-    if (markingAsEvent || isLoadingNotices) return;
-    
-    await fetchOverlappingNotices();
-  };
-
-  const executeMarkAsEvent = async (existingClosureId?: number, eventTitle?: string) => {
-    if (markingAsEvent) return;
-    
-    setMarkingAsEvent(true);
-    try {
-      const bkId = matchedBookingId;
-      if (!bkId && !trackmanBookingId) {
-        throw new Error('No booking to mark as event');
-      }
-
-      const body: Record<string, unknown> = {
-        booking_id: bkId,
-        trackman_booking_id: trackmanBookingId,
-        existingClosureId,
-      };
-      if (eventTitle?.trim()) {
-        body.eventTitle = eventTitle.trim();
-      }
-
-      await postWithCredentials('/api/bookings/mark-as-event', body);
-      
-      const linkedMsg = existingClosureId ? ' (linked to existing notice)' : '';
-      showToast(`Booking marked as private event${linkedMsg}`, 'success');
-      onSuccess?.({ markedAsEvent: true });
-      onClose();
-    } catch (err: unknown) {
-      showToast((err instanceof Error ? err.message : String(err)) || 'Failed to mark as event', 'error');
-    } finally {
-      setMarkingAsEvent(false);
-      setShowNoticeSelection(false);
-    }
-  };
-
   const handleAssignToStaff = async (staff: {id: string; email: string; first_name: string; last_name: string; role: string; user_id: string | null}) => {
     if (assigningToStaff) return;
     
@@ -1298,7 +1212,6 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
     activeSlotIndex,
     setActiveSlotIndex,
     linking,
-    markingAsEvent,
     showAddVisitor,
     setShowAddVisitor,
     visitorData,
@@ -1317,10 +1230,6 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
     staffList,
     isLoadingStaff,
     assigningToStaff,
-    showNoticeSelection,
-    setShowNoticeSelection,
-    overlappingNotices,
-    isLoadingNotices,
     feeEstimate,
     isCalculatingFees,
     fetchedContext,
@@ -1380,8 +1289,6 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
     handleManageModeMemberMatchResolve,
     handleManageModeSave,
     handleFinalizeBooking,
-    handleMarkAsEvent,
-    executeMarkAsEvent,
     handleAssignToStaff,
     deleting,
     handleDeleteBooking,
