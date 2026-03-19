@@ -58,6 +58,9 @@ export async function getTierLimits(tierName: string): Promise<TierLimits> {
   }
   
   const normalizedTier = normalizeTierName(tierName);
+  if (!normalizedTier) {
+    return DEFAULT_TIER_LIMITS;
+  }
   const cacheKey = normalizedTier.toLowerCase();
   const cached = tierCache.get(cacheKey);
   
@@ -95,8 +98,10 @@ export function clearTierCache(): void {
 }
 
 export function invalidateTierCache(tierName: string): void {
-  const normalizedKey = normalizeTierName(tierName).toLowerCase();
-  tierCache.delete(normalizedKey);
+  const normalized = normalizeTierName(tierName);
+  if (normalized) {
+    tierCache.delete(normalized.toLowerCase());
+  }
   tierCache.delete(tierName.toLowerCase());
 }
 

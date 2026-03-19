@@ -61,6 +61,8 @@ export async function generatePassForMember(memberId: string): Promise<Buffer | 
 
     const tier = normalizeTierName(user.tier);
 
+    if (!tier) return null;
+
     const [tierResult, guestPassResult] = await Promise.all([
       db.select({
         dailySimMinutes: membershipTiers.dailySimMinutes,

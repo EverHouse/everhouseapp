@@ -27,20 +27,20 @@ describe('Tier Constants', () => {
 });
 
 describe('normalizeTierName', () => {
-  it('returns Social for null', () => {
-    expect(normalizeTierName(null)).toBe('Social');
+  it('returns null for null', () => {
+    expect(normalizeTierName(null)).toBeNull();
   });
 
-  it('returns Social for undefined', () => {
-    expect(normalizeTierName(undefined)).toBe('Social');
+  it('returns null for undefined', () => {
+    expect(normalizeTierName(undefined)).toBeNull();
   });
 
-  it('returns Social for empty string', () => {
-    expect(normalizeTierName('')).toBe('Social');
+  it('returns null for empty string', () => {
+    expect(normalizeTierName('')).toBeNull();
   });
 
-  it('returns Social for whitespace-only string', () => {
-    expect(normalizeTierName('   ')).toBe('Social');
+  it('returns null for whitespace-only string', () => {
+    expect(normalizeTierName('   ')).toBeNull();
   });
 
   it('normalizes "vip" to VIP', () => {
@@ -75,12 +75,12 @@ describe('normalizeTierName', () => {
     expect(normalizeTierName('Corporate Plan')).toBe('Corporate');
   });
 
-  it('returns Social for unrecognized string', () => {
-    expect(normalizeTierName('unknown_tier')).toBe('Social');
+  it('returns null for unrecognized string', () => {
+    expect(normalizeTierName('unknown_tier')).toBeNull();
   });
 
   it('handles non-string types gracefully', () => {
-    expect(normalizeTierName(42 as unknown as string)).toBe('Social');
+    expect(normalizeTierName(42 as unknown as string)).toBeNull();
   });
 
   it('handles leading/trailing whitespace', () => {

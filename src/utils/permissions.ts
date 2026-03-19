@@ -7,7 +7,7 @@ import {
 
 export type BaseTier = TierName;
 
-export function getBaseTier(tierName: string): BaseTier {
+export function getBaseTier(tierName: string): BaseTier | null {
   return normalizeTierName(tierName);
 }
 
@@ -17,7 +17,7 @@ export function isVIPMember(tierName: string): boolean {
 }
 
 export function getDisplayTierName(tierName: string): string {
-  return normalizeTierName(tierName);
+  return normalizeTierName(tierName) || tierName || '';
 }
 
 export type MembershipTier = BaseTier;

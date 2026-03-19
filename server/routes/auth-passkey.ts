@@ -294,7 +294,7 @@ router.post('/api/auth/passkey/authenticate/verify', authRateLimiterByIp, async 
       lastName: user.lastName || '',
       email: user.email || '',
       phone: user.phone || '',
-      tier: role === 'visitor' ? undefined : normalizeTierName(user.tier) || undefined,
+      tier: role === 'visitor' ? undefined : (normalizeTierName(user.tier) || null),
       tags: (user.tags || []) as string[],
       mindbodyClientId: user.mindbodyClientId || '',
       status: statusMap[dbMemberStatus] || (dbMemberStatus ? dbMemberStatus.charAt(0).toUpperCase() + dbMemberStatus.slice(1) : 'Active'),

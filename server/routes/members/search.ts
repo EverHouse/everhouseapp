@@ -221,7 +221,7 @@ router.get('/api/members/directory', isStaffOrAdmin, validateQuery(directoryQuer
       statusCondition,
       searchCondition,
       sql`${users.archivedAt} IS NULL`,
-      sql`${users.role} != 'staff'`,
+      sql`(${users.role} IS NULL OR ${users.role} NOT IN ('staff', 'admin', 'visitor'))`,
       // Exclude auto-generated visitors (GolfNow, ClassPass, etc.) from directory
       sql`(${users.tags} IS NULL OR NOT (${users.tags} @> '["directory_hidden"]'::jsonb))`
     );

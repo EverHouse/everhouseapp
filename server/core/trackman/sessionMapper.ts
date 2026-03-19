@@ -110,10 +110,10 @@ export async function createTrackmanSessionAndParticipants(input: SessionCreatio
     let resolvedOwnerName = input.ownerName;
     try {
     const participantInputs: ParticipantInput[] = [];
-    const memberData: { userId: string; tier: string; email?: string }[] = [];
+    const memberData: { userId: string; tier: string | null; email?: string }[] = [];
     
     const ownerUserId = await getUserIdByEmail(input.ownerEmail);
-    const ownerTier = await getMemberTierByEmail(input.ownerEmail) || 'social';
+    const ownerTier = await getMemberTierByEmail(input.ownerEmail) || null;
     
     resolvedOwnerName = input.ownerName;
     if ((!resolvedOwnerName || resolvedOwnerName.includes('@')) && ownerUserId) {
@@ -204,7 +204,7 @@ export async function createTrackmanSessionAndParticipants(input: SessionCreatio
           continue;
         }
         
-        const memberTier = await getMemberTierByEmail(normalizedMemberEmail) || 'social';
+        const memberTier = await getMemberTierByEmail(normalizedMemberEmail) || null;
         
         let memberDisplayName = member.name;
         if ((!memberDisplayName || memberDisplayName.includes('@')) && memberUserId) {
@@ -249,7 +249,7 @@ export async function createTrackmanSessionAndParticipants(input: SessionCreatio
             continue;
           }
           
-          const memberTier = await getMemberTierByEmail(guest.email) || 'social';
+          const memberTier = await getMemberTierByEmail(guest.email) || null;
           let guestAsMemberName = guest.name;
           if ((!guestAsMemberName || guestAsMemberName.includes('@')) && memberByEmail) {
             const gmNameResult = await db.select({ firstName: users.firstName, lastName: users.lastName })

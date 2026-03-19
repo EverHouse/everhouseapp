@@ -7,7 +7,6 @@ import { withRetry } from '../retry';
 import { checkDailyBookingLimit } from '../tierService';
 import { sendNotificationToUser, broadcastAvailabilityUpdate } from '../websocket';
 import { checkAllConflicts } from '../bookingValidation';
-import { DEFAULT_TIER } from '../../../shared/constants/tiers';
 import { ensureSessionForBooking } from '../bookingService/sessionManager';
 import { getCached, setCache } from '../queryCache';
 import { AppError } from '../errors';
@@ -407,7 +406,7 @@ export async function createBookingRequest(params: {
     .where(eq(users.email, resolvedEmail));
   
   const user = userResult[0];
-  const userTier = user?.tier || DEFAULT_TIER;
+  const userTier = user?.tier || null;
   
   const isMemberAuthorized = await isAuthorizedForMemberBooking(userTier);
   

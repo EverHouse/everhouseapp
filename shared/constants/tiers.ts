@@ -11,15 +11,15 @@ export const TIER_HIERARCHY: Record<TierName, number> = {
   'VIP': 5,
 };
 
-export function normalizeTierName(tierString: string | null | undefined): TierName {
+export function normalizeTierName(tierString: string | null | undefined): TierName | null {
   if (!tierString || typeof tierString !== 'string') {
-    return DEFAULT_TIER;
+    return null;
   }
 
   const normalized = tierString.trim().toLowerCase();
   
   if (normalized.length === 0) {
-    return DEFAULT_TIER;
+    return null;
   }
 
   if (normalized.includes('vip')) {
@@ -38,8 +38,8 @@ export function normalizeTierName(tierString: string | null | undefined): TierNa
     return 'Social';
   }
 
-  console.warn(`[normalizeTierName] Unrecognized tier "${tierString}", defaulting to ${DEFAULT_TIER}. If this is a new tier, add it to shared/constants/tiers.ts`);
-  return DEFAULT_TIER;
+  console.warn(`[normalizeTierName] Unrecognized tier "${tierString}", returning null. If this is a new tier, add it to shared/constants/tiers.ts`);
+  return null;
 }
 
 export function compareTiers(tier1: TierName, tier2: TierName): number {

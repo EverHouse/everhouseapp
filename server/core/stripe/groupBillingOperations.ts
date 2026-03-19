@@ -415,7 +415,10 @@ export async function reconcileGroupBillingWithStripe(): Promise<ReconciliationR
                 reason: 'Found active Stripe item, reactivated member',
               });
             } else {
-              const tierFromMetadata = item.metadata?.tier || 'Social';
+              const tierFromMetadata = item.metadata?.tier || null;
+              if (!tierFromMetadata) {
+                logger.warn('[GroupBilling] Stripe item has no tier in metadata, using null', { extra: { itemId: item.id, email } });
+              }
               const priceInfo = item.price;
               const priceCents = priceInfo?.unit_amount || 0;
               

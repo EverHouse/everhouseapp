@@ -120,6 +120,10 @@ router.get('/api/member/wallet-pass', isAuthenticated, async (req, res) => {
 
     const tier = normalizeTierName(user.tier);
 
+    if (!tier) {
+      return res.status(400).json({ error: 'No membership tier assigned' });
+    }
+
     const [tierResult, guestPassResult] = await Promise.all([
       db.select({
         dailySimMinutes: membershipTiers.dailySimMinutes,

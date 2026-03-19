@@ -8,7 +8,7 @@ import { users, magicLinks, staffUsers, membershipTiers, rateLimits } from '../.
 import { isProduction } from '../core/db';
 import { getHubSpotClient } from '../core/integrations';
 import { retryableHubSpotRequest } from '../core/hubspot/request';
-import { normalizeTierName, DEFAULT_TIER } from '../../shared/constants/tiers';
+import { normalizeTierName } from '../../shared/constants/tiers';
 import { getResendClient } from '../utils/resend';
 import { withResendRetry } from '../core/retryUtils';
 import { getSessionUser, SessionUser } from '../types/session';
@@ -125,6 +125,8 @@ async function upsertUserWithTier(data: UpsertUserData): Promise<string | null> 
       tierId = tierResult.length > 0 ? tierResult[0].id : null;
     }
     
+    const hasTierData = normalizedTier !== null;
+    
     const result = await db.insert(users)
       .values({
         id: crypto.randomUUID(),
@@ -141,8 +143,8 @@ async function upsertUserWithTier(data: UpsertUserData): Promise<string | null> 
       .onConflictDoUpdate({
         target: users.email,
         set: {
-          tier: normalizedTier,
-          tierId: tierId,
+          tier: hasTierData ? normalizedTier : sql`COALESCE(${users.tier}, NULL)`,
+          tierId: hasTierData ? tierId : sql`COALESCE(${users.tierId}, NULL)`,
           firstName: sql`COALESCE(${data.firstName || null}, ${users.firstName})`,
           lastName: sql`COALESCE(${data.lastName || null}, ${users.lastName})`,
           phone: sql`COALESCE(${data.phone || null}, ${users.phone})`,
@@ -609,7 +611,7 @@ router.post('/api/auth/verify-member', ...authRateLimiter, async (req, res) => {
         email: dbUser[0].email || normalizedEmail,
         phone: dbUser[0].phone || '',
         jobTitle: '',
-        tier: isVisitorUser ? null : normalizeTierName(dbUser[0].tier),
+        tier: isVisitorUser ? null : (normalizeTierName(dbUser[0].tier) || null),
         tags: dbUser[0].tags || [],
         mindbodyClientId: dbUser[0].mindbodyClientId || '',
         status: statusMap[dbMemberStatus] || (dbMemberStatus ? dbMemberStatus.charAt(0).toUpperCase() + dbMemberStatus.slice(1) : 'Active'),
@@ -718,7 +720,7 @@ router.post('/api/auth/verify-member', ...authRateLimiter, async (req, res) => {
       email: dbUser[0]?.email || contact?.properties?.email || normalizedEmail,
       phone,
       jobTitle,
-      tier: isVisitorUser ? null : (isStaffOrAdmin ? 'VIP' : normalizeTierName(dbUser[0]?.tier || contact?.properties?.membership_tier)),
+      tier: isVisitorUser ? null : (isStaffOrAdmin ? 'VIP' : (normalizeTierName(dbUser[0]?.tier || contact?.properties?.membership_tier) || null)),
       tags: dbUser[0]?.tags || [],
       mindbodyClientId: dbUser[0]?.mindbodyClientId || contact?.properties?.mindbody_client_id || '',
       status: statusMap[memberStatusStr] || (memberStatusStr ? memberStatusStr.charAt(0).toUpperCase() + memberStatusStr.slice(1) : 'Active'),
@@ -1028,7 +1030,7 @@ router.post('/api/auth/verify-otp', ...authRateLimiter, async (req, res) => {
           lastName: dbUser[0].lastName || '',
           email: dbUser[0].email || normalizedEmail,
           phone: dbUser[0].phone || '',
-          tier: role === 'visitor' ? undefined : normalizeTierName(dbUser[0].tier) || undefined,
+          tier: role === 'visitor' ? undefined : (normalizeTierName(dbUser[0].tier) || null),
           tags: (dbUser[0].tags || []) as string[],
           mindbodyClientId: dbUser[0].mindbodyClientId || '',
           status: statusMap[dbMemberStatus] || (dbMemberStatus ? dbMemberStatus.charAt(0).toUpperCase() + dbMemberStatus.slice(1) : 'Active'),
@@ -1095,7 +1097,7 @@ router.post('/api/auth/verify-otp', ...authRateLimiter, async (req, res) => {
           lastName: (hasDbUser ? dbUser[0].lastName : contact?.properties?.lastname) || '',
           email: (hasDbUser ? dbUser[0].email : contact?.properties?.email) || normalizedEmail,
           phone: (hasDbUser ? dbUser[0].phone : contact?.properties?.phone) || '',
-          tier: role === 'visitor' ? undefined : normalizeTierName(hasDbUser ? dbUser[0].tier : contact?.properties?.membership_tier) || undefined,
+          tier: role === 'visitor' ? undefined : (normalizeTierName(hasDbUser ? dbUser[0].tier : contact?.properties?.membership_tier) || null),
           tags: tags as string[],
           mindbodyClientId: (hasDbUser ? dbUser[0].mindbodyClientId : contact?.properties?.mindbody_client_id) || '',
           status: statusMap[memberStatusStr] || (memberStatusStr ? memberStatusStr.charAt(0).toUpperCase() + memberStatusStr.slice(1) : 'Active'),
@@ -1254,7 +1256,7 @@ router.get('/api/auth/session', async (req, res) => {
       lastName: sessionUser.lastName || '',
       email: sessionUser.email,
       phone: sessionUser.phone || '',
-      tier: sessionUser.role === 'visitor' ? null : (sessionUser.tier || 'Social'),
+      tier: sessionUser.role === 'visitor' ? null : (sessionUser.tier || null),
       tags: sessionUser.tags || [],
       mindbodyClientId: sessionUser.mindbodyClientId || '',
       status: freshStatus,
@@ -1403,7 +1405,7 @@ router.post('/api/auth/password-login', ...authRateLimiter, async (req, res) => 
       lastName: memberData?.lastName || userRecord.name?.split(' ').slice(1).join(' ') || '',
       email: normalizedEmail,
       phone: memberData?.phone || '',
-      tier: userRole === 'member' ? (memberData?.tier || DEFAULT_TIER) : undefined,
+      tier: userRole === 'member' ? (memberData?.tier || null) : undefined,
       tags: memberData?.tags || [],
       mindbodyClientId: memberData?.mindbodyClientId || '',
       membershipStartDate: memberData?.membershipStartDate || '',

@@ -85,7 +85,7 @@ export const useUserStore = create<UserState>()(
             return;
           }
           const { ok, data, error: _error } = await apiRequest<GuestPasses>(
-            `/api/guest-passes/${encodeURIComponent(user.email)}?tier=${encodeURIComponent(user.tier || 'Social')}`
+            `/api/guest-passes/${encodeURIComponent(user.email)}?tier=${encodeURIComponent(user.tier || '')}`
           );
           if (ok && data) {
             set({ guestPasses: data });

@@ -5,7 +5,7 @@ import { isProduction } from '../core/db';
 import { db } from '../db';
 import { users, staffUsers, membershipTiers, notifications, bookingRequests } from '../../shared/schema';
 import { sql, eq, like, or } from 'drizzle-orm';
-import { normalizeTierName, DEFAULT_TIER } from '../../shared/constants/tiers';
+import { normalizeTierName } from '../../shared/constants/tiers';
 import '../types/session';
 
 const router = Router();
@@ -42,7 +42,7 @@ async function getOrCreateTestUser(data: TestLoginRequest): Promise<{
   let tierName: string | null = null;
   
   if (!isStaffOrAdmin) {
-    tierName = normalizeTierName(data.tier || DEFAULT_TIER);
+    tierName = normalizeTierName(data.tier) || null;
     const tierResult = await db.select({ id: membershipTiers.id })
       .from(membershipTiers)
       .where(sql`LOWER(${membershipTiers.name}) = LOWER(${tierName})`)

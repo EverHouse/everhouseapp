@@ -47,10 +47,10 @@ export const MembershipCard: React.FC<MembershipCardProps> = ({
 
   const isExpired = user.status === 'Expired';
   const isVisitor = user.role === 'visitor';
-  const tierColors = isVisitor ? { bg: '#EFF6FF', text: '#2563EB', border: '#BFDBFE' } : getTierColor(user.tier || 'Social');
+  const tierColors = isVisitor ? { bg: '#EFF6FF', text: '#2563EB', border: '#BFDBFE' } : getTierColor(user.tier || '');
   const cardBgColor = isExpired ? '#6B7280' : tierColors.bg;
   const cardTextColor = isExpired ? '#F9FAFB' : tierColors.text;
-  const baseTier = isVisitor ? 'visitor' : getBaseTier(user.tier || 'Social');
+  const baseTier = isVisitor ? 'visitor' : (getBaseTier(user.tier || '') || '');
   const useDarkLogo = isExpired || ['Social', 'Premium', 'VIP'].includes(baseTier);
 
   return (

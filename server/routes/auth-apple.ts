@@ -150,7 +150,7 @@ router.post('/api/auth/apple/verify', requireAppleConfig, authRateLimiterByIp, a
       lastName: user.lastName || (appleUser?.name?.lastName) || '',
       email: user.email || appleData.email,
       phone: user.phone || '',
-      tier: role === 'visitor' ? null : normalizeTierName(user.tier),
+      tier: role === 'visitor' ? null : (normalizeTierName(user.tier) || null),
       tags: user.tags || [],
       mindbodyClientId: user.mindbodyClientId || '',
       status: statusMap[dbMemberStatus] || (dbMemberStatus ? dbMemberStatus.charAt(0).toUpperCase() + dbMemberStatus.slice(1) : 'Active'),

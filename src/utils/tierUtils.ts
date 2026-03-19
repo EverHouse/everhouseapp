@@ -17,7 +17,7 @@ export const TIER_COLORS: Record<BaseTier, TierColor> = {
   Social: { bg: '#CCB8E4', text: '#293515', border: '#B8A0D4' },
 };
 
-export function parseTierString(tierString: string): { tier: BaseTier; tags: string[] } {
+export function parseTierString(tierString: string): { tier: BaseTier | null; tags: string[] } {
   return { 
     tier: normalizeTierName(tierString), 
     tags: [] 
@@ -26,10 +26,10 @@ export function parseTierString(tierString: string): { tier: BaseTier; tags: str
 
 export function getTierColor(tier: string): TierColor {
   const { tier: baseTier } = parseTierString(tier);
-  return TIER_COLORS[baseTier] || TIER_COLORS.Social;
+  return (baseTier && TIER_COLORS[baseTier]) || TIER_COLORS.Social;
 }
 
-export function getDisplayTier(tierString: string): BaseTier {
+export function getDisplayTier(tierString: string): BaseTier | null {
   const { tier } = parseTierString(tierString);
   return tier;
 }

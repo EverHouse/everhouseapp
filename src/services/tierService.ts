@@ -79,7 +79,7 @@ function transformToPermissions(limits: TierLimits): TierPermissions {
 }
 
 function getBaseTierName(tierString: string): string {
-  return normalizeTierName(tierString).toLowerCase();
+  return (normalizeTierName(tierString) || tierString || '').toLowerCase();
 }
 
 export async function fetchTierPermissions(tierName: string): Promise<TierPermissions> {
