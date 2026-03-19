@@ -120,7 +120,7 @@ export async function getRemainingMinutes(
 }
 
 export async function enforceSocialTierRules(
-  ownerTier: string,
+  ownerTier: string | null,
   _participants: ParticipantForValidation[]
 ): Promise<SocialTierResult> {
   try {

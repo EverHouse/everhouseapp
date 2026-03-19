@@ -9,6 +9,8 @@ export interface TierColor {
   border: string;
 }
 
+export const VISITOR_COLORS: TierColor = { bg: '#EFF6FF', text: '#2563EB', border: '#BFDBFE' };
+
 export const TIER_COLORS: Record<BaseTier, TierColor> = {
   VIP: { bg: '#E5E4E2', text: '#374151', border: '#C0C0C0' },
   Premium: { bg: '#D4AF37', text: '#1a1a1a', border: '#B8960C' },
@@ -24,9 +26,10 @@ export function parseTierString(tierString: string): { tier: BaseTier | null; ta
   };
 }
 
-export function getTierColor(tier: string): TierColor {
+export function getTierColor(tier: string | null | undefined): TierColor {
+  if (!tier) return VISITOR_COLORS;
   const { tier: baseTier } = parseTierString(tier);
-  return (baseTier && TIER_COLORS[baseTier]) || TIER_COLORS.Social;
+  return (baseTier && TIER_COLORS[baseTier]) || VISITOR_COLORS;
 }
 
 export function getDisplayTier(tierString: string): BaseTier | null {

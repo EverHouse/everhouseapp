@@ -98,7 +98,7 @@ router.post('/api/bookings/:id/staff-direct-add', isStaffOrAdmin, async (req: Re
       if (ownerTierResult.rows.length > 0) {
         const ownerTier = (ownerTierResult.rows as unknown as TierRow[])[0];
         const tierCheck = await enforceSocialTierRules(
-          ownerTier.tier_name || 'Social',
+          ownerTier.tier_name || null,
           [{ type: 'guest', displayName: guestName }]
         );
         if (!tierCheck.allowed) {

@@ -36,6 +36,8 @@ interface WalletConfig {
   keyPem: string;
 }
 
+const VISITOR_TIER_COLORS: TierColors = { bg: '#EFF6FF', foreground: '#2563EB', label: '#60A5FA' };
+
 const DEFAULT_TIER_COLORS: Record<string, TierColors> = {
   VIP: { bg: '#E5E4E2', foreground: '#374151', label: '#6B7280' },
   Premium: { bg: '#D4AF37', foreground: '#1a1a1a', label: '#4a4a4a' },
@@ -95,7 +97,7 @@ function hexToRgb(hex: string): string {
 }
 
 function resolveTierColors(tier: string, dbColors?: TierColors | null): TierColors {
-  const defaults = DEFAULT_TIER_COLORS[tier] || DEFAULT_TIER_COLORS.Social;
+  const defaults = DEFAULT_TIER_COLORS[tier] || VISITOR_TIER_COLORS;
   if (!dbColors) return defaults;
   return {
     bg: isValidHexColor(dbColors.bg) ? dbColors.bg : defaults.bg,

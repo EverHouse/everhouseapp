@@ -158,8 +158,8 @@ const MembershipDetailsModal: React.FC<MembershipDetailsModalProps> = ({
   if (!user) return null;
 
   const isExpiredModal = user.status === 'Expired';
-  const isVisitorModal = user.role === 'visitor';
-  const tierColors = isVisitorModal ? { bg: '#EFF6FF', text: '#2563EB', border: '#BFDBFE' } : getTierColor(user.tier || 'Social');
+  const isVisitorModal = user.role === 'visitor' || !user.tier;
+  const tierColors = isVisitorModal ? { bg: '#EFF6FF', text: '#2563EB', border: '#BFDBFE' } : getTierColor(user.tier);
   const cardBgColor = isExpiredModal ? '#6B7280' : (isStaffOrAdminProfile ? '#293515' : tierColors.bg);
   const cardTextColor = isExpiredModal ? '#F9FAFB' : (isStaffOrAdminProfile ? '#F2F2EC' : tierColors.text);
 
