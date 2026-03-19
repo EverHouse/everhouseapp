@@ -97,26 +97,45 @@ interface SessionData {
   };
 }
 
-async function verifySessionFromDatabase(sessionId: string): Promise<SessionData | null> {
-  const pool = getSessionPool();
-  if (!pool) return null;
+async function verifySessionFromDatabase(sessionId: string, retries = 2): Promise<SessionData | null> {
+  const sessionPool = getSessionPool();
+  if (!sessionPool) return null;
   
-  try {
-    const result = await pool.query(
-      'SELECT sess FROM sessions WHERE sid = $1 AND expire > NOW()',
-      [sessionId]
-    );
-    
-    if (result.rows.length === 0) {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    let client: import('pg').PoolClient | null = null;
+    try {
+      client = await sessionPool.connect();
+      await client.query('SET statement_timeout = 8000');
+      const result = await client.query(
+        'SELECT sess FROM sessions WHERE sid = $1 AND expire > NOW()',
+        [sessionId]
+      );
+      client.release();
+      client = null;
+      
+      if (result.rows.length === 0) {
+        return null;
+      }
+      
+      const sessionData = result.rows[0].sess as SessionData;
+      return sessionData;
+    } catch (err: unknown) {
+      if (client) {
+        try { client.release(true); } catch (_) {}
+        client = null;
+      }
+      const msg = getErrorMessage(err);
+      const isTransient = msg.includes('timeout') || msg.includes('Connection terminated') || msg.includes('ECONNRESET') || msg.includes('statement timeout');
+      if (isTransient && attempt < retries) {
+        logger.warn(`[WebSocket] Session verify retry ${attempt}/${retries}: ${msg}`);
+        await new Promise(resolve => setTimeout(resolve, 500));
+        continue;
+      }
+      logger.error('[WebSocket] Error verifying session:', { error: msg });
       return null;
     }
-    
-    const sessionData = result.rows[0].sess as SessionData;
-    return sessionData;
-  } catch (err: unknown) {
-    logger.error('[WebSocket] Error verifying session:', { error: getErrorMessage(err) });
-    return null;
   }
+  return null;
 }
 
 async function getVerifiedUserFromRequest(req: IncomingMessage): Promise<{

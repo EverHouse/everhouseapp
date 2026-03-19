@@ -9,26 +9,32 @@ import { logger } from '../core/logger';
 const RECONCILIATION_INTERVAL_MS = 15 * 60 * 1000; // 15 minutes
 const _STALE_THRESHOLD_MINUTES = 5;
 
-async function connectWithTimeout(timeoutMs = 10000): Promise<PoolClient> {
-  let released = false;
+async function connectWithTimeout(timeoutMs = 15000): Promise<PoolClient> {
   const connectPromise = pool.connect();
   let timeoutId: ReturnType<typeof setTimeout>;
+  let timedOut = false;
   const timeoutPromise = new Promise<never>((_, reject) => {
-    timeoutId = setTimeout(() => reject(new Error(`DB connection timeout after ${timeoutMs / 1000}s`)), timeoutMs);
+    timeoutId = setTimeout(() => {
+      timedOut = true;
+      reject(new Error(`DB connection timeout after ${timeoutMs / 1000}s`));
+    }, timeoutMs);
   });
+  let client: PoolClient | null = null;
   try {
-    const client = await Promise.race([connectPromise, timeoutPromise]) as PoolClient;
+    client = await Promise.race([connectPromise, timeoutPromise]) as PoolClient;
     clearTimeout(timeoutId!);
     await client.query('SET statement_timeout = 30000');
     return client;
   } catch (err) {
     clearTimeout(timeoutId!);
-    connectPromise.then(c => {
-      if (!released) {
-        released = true;
+    if (client) {
+      safeRelease(client);
+    } else if (timedOut) {
+      connectPromise.then(c => {
         safeRelease(c);
-      }
-    }).catch((releaseErr: unknown) => { logger.warn('[FeeReconciliation] Failed to release connection on error', { extra: { error: getErrorMessage(releaseErr) } }); });
+        logger.info('[FeeReconciliation] Released late-arriving connection after timeout');
+      }).catch(() => {});
+    }
     throw err;
   }
 }

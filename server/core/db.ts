@@ -80,9 +80,9 @@ const mainConnString = appendSearchPath(usingPooler ? poolerUrl : directUrl);
 
 const basePool = new Pool({
   connectionString: mainConnString,
-  connectionTimeoutMillis: 10000,
-  idleTimeoutMillis: 10000,
-  max: parseInt(process.env.DB_POOL_MAX || '40', 10),
+  connectionTimeoutMillis: 15000,
+  idleTimeoutMillis: 30000,
+  max: parseInt(process.env.DB_POOL_MAX || '60', 10),
   ssl: needsSsl ? sslConfig : undefined,
   keepAlive: true,
   keepAliveInitialDelayMillis: 10000,

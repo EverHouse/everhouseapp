@@ -395,6 +395,7 @@ async function executeJob(job: { id: number; jobType: string; payload: Record<st
 }
 
 let processingInterval: ReturnType<typeof setInterval> | null = null;
+let isProcessingJobs = false;
 
 export async function processJobs(): Promise<number> {
   const jobs = await claimJobs();
@@ -424,12 +425,18 @@ export function startJobProcessor(intervalMs: number = 5000): void {
     });
     
     processingInterval = setInterval(async () => {
+      if (isProcessingJobs) {
+        return;
+      }
+      isProcessingJobs = true;
       try {
         await processJobs();
         schedulerTracker.recordRun('Job Queue Processor', true);
       } catch (error: unknown) {
         logger.error('[JobQueue] Processing error:', { error: error });
         schedulerTracker.recordRun('Job Queue Processor', false, String(error));
+      } finally {
+        isProcessingJobs = false;
       }
     }, intervalMs);
   }, 15000);
