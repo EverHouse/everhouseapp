@@ -1800,11 +1800,11 @@ export async function ensureDatabaseConstraints() {
         CREATE OR REPLACE FUNCTION cleanup_fee_snapshots_on_terminal()
         RETURNS TRIGGER
         LANGUAGE plpgsql
-        SET search_path = ''
+        SET search_path = 'public'
         AS $$
         BEGIN
           IF NEW.status IN ('cancelled', 'declined', 'expired') AND OLD.status NOT IN ('cancelled', 'declined', 'expired') THEN
-            UPDATE public.booking_fee_snapshots
+            UPDATE booking_fee_snapshots
             SET status = 'cancelled', updated_at = NOW()
             WHERE booking_id = NEW.id
               AND status IN ('pending', 'requires_action');

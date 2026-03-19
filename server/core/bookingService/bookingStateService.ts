@@ -340,6 +340,13 @@ export class BookingStateService {
         `);
       }
 
+      await tx.execute(sql`
+        UPDATE booking_fee_snapshots
+        SET status = 'cancelled', updated_at = NOW()
+        WHERE booking_id = ${bookingId}
+          AND status IN ('pending', 'requires_action')
+      `);
+
       let updatedStaffNotes = staffNotes || '';
       if (source === 'trackman_webhook') {
         updatedStaffNotes = (booking.staffNotes || '') + ' [Cancelled via Trackman webhook]';
@@ -691,6 +698,13 @@ export class BookingStateService {
           )
         `);
       }
+
+      await tx.execute(sql`
+        UPDATE booking_fee_snapshots
+        SET status = 'cancelled', updated_at = NOW()
+        WHERE booking_id = ${bookingId}
+          AND status IN ('pending', 'requires_action')
+      `);
 
       const noteAppend = source === 'trackman_webhook'
         ? '\n[Cancellation completed via Trackman webhook]'
