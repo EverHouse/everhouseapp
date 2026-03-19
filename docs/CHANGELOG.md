@@ -389,6 +389,78 @@ All notable changes to the Ever Club Members App are documented here.
 - **Code Quality**: Dead approval module duplicates removed
 - **Code Quality**: Frontend raw `fetch()` calls migrated to centralized `apiRequest` utility with new `apiRequestBlob` and `fireAndForgetRequest` helpers
 
+## [8.87.58] - 2026-03-17
+
+### Visitor Tier Protection — Complete Auth Fix
+- **Fixed**: All five login flows (password, magic link, passkey, Google, Apple) now correctly detect visitor accounts and return null tier — visitors were incorrectly defaulting to 'member' role which triggered tier normalization to 'Social'
+- **Fixed**: User record upsert during login no longer overwrites visitor tier with 'Social'
+- **Files**: All auth route handlers (`password-login.ts`, `magic-link.ts`, `passkey.ts`, `google-auth.ts`, `apple-auth.ts`)
+
+## [8.87.57] - 2026-03-17
+
+### Simplify Connection Banner — Offline Only
+- **Removed**: `useRealtimeHealth` hook and global WebSocket signal bridge (`window.__staffWsConnected` + custom event) — no longer needed
+- **Changed**: Connection banner now only shows for full offline state ('You're offline') — removed reconnecting/degraded states since the profile icon's colored dot already indicates connection health
+- **Files**: Connection banner component, staff WebSocket hook
+
+## [8.87.56] - 2026-03-17
+
+### Dead Code Cleanup — React Query Migration Leftovers
+- **Removed**: ~48 unused React Query hooks — `useAdminQueries` (26 hooks including `useStaffActivity`), `useMemberPageQueries` (16 hooks), `useBookingsQueries` (12 hooks), plus 1 each from financials and cafe query files
+- **Removed**: Orphaned query key definitions (notices, announcements, changelog, updates, groupBilling, trackmanWebhookEvents, dayPassProducts, availabilityBlocks, transactions, memberDirectory) from `adminTabKeys`
+- **Reduced**: Bundle size reduction from removing dead mutation/query code and unused interface definitions
+
+## [8.87.55] - 2026-03-17
+
+### Fix Notification Mark Read & Dismiss Buttons
+- **Fixed**: 'Mark all as read' and 'Dismiss all' notification buttons now work — React Query migration changed these to POST requests but server requires PUT and DELETE respectively, causing silent 404 errors
+
+## [8.87.54] - 2026-03-17
+
+### Error Handling Polish & Dead Code Cleanup
+- **Fixed**: Day pass refund errors now show specific server error codes instead of generic 'network error'
+- **Fixed**: Session expiration (401) and payment requirement (402) detection now uses HTTP status codes instead of fragile string-matching on error messages — affects training guide, availability blocks, and member booking pages
+- **Fixed**: Group billing 'no group found' detection simplified to direct status code check
+- **Cleaned up**: Removed unused error utility imports from Group Billing and Tier Change pages (data fetching migration leftovers)
+
+## [8.87.53] - 2026-03-17
+
+### Data Fetching Stability Fixes
+- **Fixed**: Empty response handling — operations like deleting items or confirming payments no longer crash when server returns empty response body
+- **Fixed**: Group billing page now correctly detects when a member has no billing group via status code check
+- **Fixed**: Billing page now invalidates all balance and migration queries after payments, credits, or subscription changes
+- **Fixed**: Day pass redemption errors now surface detailed info (pass holder, usage counts) instead of generic 'network error'
+
+## [8.87.52] - 2026-03-17
+
+### Startup Reliability & Trackman Billing Fixes
+- **Fixed**: Server startup no longer fails on first deploy — app now awaits database connection readiness before running initialization tasks
+- **Improved**: Consolidated scattered startup database queries into a single orchestrated startup sequence
+- **Fixed**: Trackman-imported sessions no longer auto-waive member fees — real members and named guests keep 'pending' payment status for proper overage/guest fee billing. Only ghost/placeholder participants are waived
+- **Fixed**: Fee recalculation now runs after every Trackman import path (CSV upload, webhook linking, placeholder merging)
+- **Fixed**: Waiver verification is now fail-closed — if waiver status check fails, members see a blocking screen instead of bypass
+- **Fixed**: 8 server TypeScript compilation errors across startup, HubSpot webhooks, Trackman status handling, and data integrity checks
+- **Fixed**: 2 failing payment intent cleanup tests — assertions now match actual cancellation behavior
+
+## [8.87.51] - 2026-03-17
+
+### Deployment Migration Fix
+- **Fixed**: Deployment no longer fails with foreign key constraint errors — all missing database constraints now have proper migration files that clean up orphaned data before adding constraints
+
+## [8.87.50] - 2026-03-16
+
+### Deployment Reliability Fix
+- **Fixed**: Build step now automatically registers all existing database migrations so the platform doesn't try to re-apply them from scratch during deployment
+
+## [8.87.49] - 2026-03-16
+
+### Bug Fixes & Performance
+- **Fixed**: Removed unnecessary API calls on public pages (login, membership) — eliminates wasted server requests and console errors for unauthenticated visitors
+- **Fixed**: Page pre-loading now properly cleans up when navigating away (memory leak prevention)
+- **Fixed**: Switching accounts now properly refreshes pre-loaded page data instead of showing stale content
+- **Fixed**: Profile page scroll-to-passkeys timer now properly cleans up on unmount
+- **Fixed**: Deployment migration error for Trackman booking references — orphaned data cleaned up before adding database constraint
+
 ## [8.87.47] - 2026-03-16
 
 ### Code Quality & Accessibility Improvements
@@ -546,6 +618,215 @@ All notable changes to the Ever Club Members App are documented here.
 - **Structured Logging**: Replaced all ~112 `process.stderr.write` calls in `trackman/service.ts` with structured `logger.info/warn/error` calls using template literals.
 - **Unified Notifications**: Replaced ~25 direct `db.insert(notifications)` calls across booking files (`bookings.ts`, `bookingStateService.ts`, `trackman/service.ts`, `approvalService.ts`, `bookingEvents.ts`, `webhook-billing.ts`, `admin-roster.ts`) with `notifyMember()` / `notifyAllStaff()` from the centralized notification service.
 - **Files**: `server/routes/bays/bookings.ts`, `server/routes/staff/manualBooking.ts`, `server/routes/staffCheckin.ts`, `server/routes/trackman/webhook-handlers.ts`, `server/routes/trackman/webhook-billing.ts`, `server/routes/trackman/admin-roster.ts`, `server/core/bookingService/sessionManager.ts`, `server/core/bookingService/bookingStateService.ts`, `server/core/bookingService/approvalService.ts`, `server/core/bookingEvents.ts`, `server/core/trackman/service.ts`
+
+## [8.87.27] - 2026-03-15
+
+### Trackman Cancellation Safety — Idempotent Refund Handling
+- **Fixed**: Trackman import cancellations now run financial cleanup (refunds, invoice void) before marking the booking as cancelled — prevents partial cancellation
+- **Fixed**: `BookingStateService` now atomically claims payment intents before queueing refund jobs — prevents duplicate refund attempts when both manifest refund and invoice void target the same payment
+- **Fixed**: Stale Trackman booking cancellations now follow the same cleanup-first ordering
+- **Improved**: Trackman import cancellation logging now uses structured logger instead of raw stderr
+
+## [8.87.26] - 2026-03-15
+
+### Cancellation Safety & Timezone Fixes
+- **Fixed**: Member cancel button now correctly uses Pacific timezone — previously, members in other timezones could see the cancel button disappear too early or too late
+- **Fixed**: Financial cleanup (refunds, invoice void) now runs before booking status is set to 'cancelled' — prevents partial cancellation
+- **Fixed**: Duplicate refund prevention — system now checks if a refund was already queued before attempting a second refund
+- **Improved**: All cancellation error logging now uses structured error format
+
+## [8.87.25] - 2026-03-15
+
+### Saved Card Payment — Invoice Reuse Loop Fix
+- **Fixed**: 'Pay with Saved Card' no longer fails when the existing invoice has a broken payment — system now voids the broken invoice and creates a fresh one instead of retrying in a loop
+- **Fixed**: Staff 'Charge Card on File' has the same invoice recovery fix
+- **Improved**: Better error logging when Stripe invoice payment fails — now captures specific Stripe error code and decline reason
+- **Improved**: Cards requiring 3D Secure during saved-card payment now return proper status instead of generic failure
+
+## [8.87.24] - 2026-03-15
+
+### Stripe Payment API Fixes — Saved Card & Invoice Handling
+- **Fixed**: Member 'Pay with Saved Card' — database query was referencing wrong column name, causing all saved-card payments to fail
+- **Fixed**: Cancelling invoice-generated payments now voids the invoice instead of trying to cancel the payment intent directly
+- **Fixed**: Staff 'Charge Card on File' now correctly cleans up stale payment intents from previous attempts
+- **Fixed**: Staff payment retry now uses `invoices.pay()` instead of `paymentIntents.confirm()` for invoice-generated payments
+- **Fixed**: Member saved-card payment stale PI cleanup now uses invoice-aware cancellation
+- **Fixed**: Staff payment retry failure response no longer crashes (was referencing variable from wrong code branch)
+- **Fixed**: Invoice payment retry failures now store valid payment status instead of invoice status
+- **Safety**: Invoice cancellation fallback now verifies the invoice belongs to the payment being cancelled
+- **Fixed**: Staff 'Cancel Payment' and 'Void Authorization' now handle invoice-generated payments correctly
+- **Fixed**: Auto-retry on card update now uses correct API for invoice-based payments
+
+## [8.87.23] - 2026-03-15
+
+### Charge Card on File Fix & Payment Safety Audit
+- **Fixed**: 'Charge Card on File' now works for both staff and members — previously failed with 'active payment intent already exists' error
+- **Fixed**: All saved card payments now use correct Stripe API to prevent payment failures
+- **Fixed**: Stale pending payment intents automatically cleaned up before new card-on-file charges
+- **Safety**: Double-charge prevention — if payment is already processing or succeeded, duplicate charges blocked
+- **Safety**: POS café/shop saved card charges now use the same corrected payment method
+- **Fixed**: Member dashboard now shows 'Fees Paid' with green checkmark after payment — previously showed 'Estimated Fees' when some participants had $0 fees
+- **Internal**: Unified payment status logic between member and staff views via shared `checkBookingPaymentStatus` function
+- **Safety**: Staff 'Link Member' now checks for scheduling conflicts before adding a member
+- **Safety**: Staff roster changes (add/remove guest, link/unlink member) now clear cached fees before recalculating
+
+## [8.87.22] - 2026-03-15
+
+### Credit Balance Protection & UX Fix
+- **Fixed**: Account credit balance no longer drained by repeated Pay Now attempts — if invoice was already auto-paid from credit, system detects it and stops creating duplicates
+- **Fixed**: 'Add Guest' modal now hides payment options when roster is locked after payment
+
+## [8.87.21] - 2026-03-15
+
+### Fee Display & Payment Fix
+- **Fixed**: Dashboard no longer shows 'Fees Paid' with green checkmark when no payment was actually made
+- **Fixed**: Empty slots now show 'Estimated Fees' as informational with 'Fill empty slots or pay at check-in'
+- **Fixed**: 'Fees Paid' badge only appears after a verified Stripe payment
+- **Fixed**: Pay Now button only appears when there are actual guest fees to pay, not for empty slot estimates
+- **Fixed**: 'Payment processing failed' error when Stripe auto-applies account credit to cover the full invoice — now handled gracefully as a completed payment
+
+## [8.87.18] - 2026-03-15
+
+### Roster Lock Improvements
+- **Fixed**: Bookings within daily allowance ($0 fees) no longer get falsely locked — staff can add walk-in guests at check-in
+- **Fixed**: Roster lock now shows clear message when editing a paid booking — suggests check-in flow for walk-in guests
+- **Improved**: Roster lock is now fail-closed — if system can't verify payment status, it locks as a precaution
+
+## [8.87.17] - 2026-03-15
+
+### Bug Fixes & Stability Improvements
+- **Fixed**: Prepayment now shows specific error messages for declined/expired/insufficient funds — no more generic 'Payment processing failed'
+- **Fixed**: 'Add to Apple Wallet' button now appears on Dashboard booking cards, not just the booking page
+- **Fixed**: Apple Wallet pass now updates when staff approve, modify, or reassign a booking
+- **Fixed**: Staff no longer receive duplicate 'Roster Changed After Payment' notifications
+- **Fixed**: Roster lock now reliably blocks changes on paid bookings even during brief payment system delays
+- **New**: Staff can scan QR code on Apple Wallet booking pass to check in directly
+
+## [8.87.16] - 2026-03-15
+
+### Apple Wallet Lock-Screen Notifications
+- **New**: Apple Wallet pass shows lock-screen notifications when booking details change (bay, time, date, status, player count)
+- **New**: Membership wallet pass notifications for tier changes, status updates, and guest pass balance changes
+- **New**: Booking passes now show a status field (Confirmed, Checked In, Cancelled, etc.) that updates automatically
+- **Improved**: Apple Wallet notifications deduplicate with push notifications — wallet notification takes priority
+- **Improved**: Booking passes include a direct link to bookings page on the back of the pass
+
+## [8.87.15] - 2026-03-14
+
+### Sign In with Face ID & Touch ID (Passkeys)
+- **New**: WebAuthn passkey registration and authentication flow — Face ID / Touch ID for instant passwordless login
+- **New**: Post-login banner prompts passkey enrollment for eligible users
+- **New**: Profile page passkey management — register new devices, remove old ones
+- **Compatibility**: iPhone, iPad, Mac with supported browsers; synced via iCloud Keychain
+- **Files**: `server/routes/passkey.ts`, passkey registration/authentication components, profile passkey section
+
+## [8.87.14] - 2026-03-14
+
+### Smarter Push Notifications on iOS
+- **Improved**: Push notifications now show Ever Club icon and badge on iOS
+- **Improved**: Notifications for the same booking or event replace each other instead of piling up (collapse key support)
+- **Improved**: Notification tap deep-links to relevant page (bookings, events, billing, etc.)
+- **Fixed**: Notification sounds now play correctly on iOS when an existing notification is updated
+
+## [8.87.13] - 2026-03-14
+
+### Add Bookings to Apple Wallet
+- **New**: Apple Wallet PKPass generation for golf simulator bookings — bay, date, time, player count at a glance
+- **New**: 'Add to Apple Wallet' button on approved, confirmed, and checked-in bookings
+- **New**: Booking confirmation emails include Apple Wallet download link
+- **New**: Pass auto-updates when booking time or bay changes; cancelled bookings are voided
+- **New**: Pass includes map pin for club location
+- **Files**: `server/routes/wallet.ts`, PKPass template generation, email template update
+
+## [8.87.12] - 2026-03-14
+
+### Bug Fixes & Data Integrity
+- **Fixed**: Billing notifications now broadcast correctly when members pay with a saved card
+- **Fixed**: Invoice payment processing now properly handles Stripe payment intent verification
+- **Fixed**: HubSpot sync queue race condition — rapid tier changes no longer risk stale data overwriting the latest update
+- **Fixed**: Winning a payment dispute no longer blindly reactivates membership — system checks for other open disputes and subscription status before auto-reactivating
+- **Fixed**: Added consistent lock ordering to prevent database deadlocks when processing concurrent payments for the same booking
+
+## [8.87.9] - 2026-03-14
+
+### One-Tap 'Pay with Card on File' for All Member Payments
+- **New**: Members with a saved card can now pay with a single tap — no need to fill out payment form
+- **Scope**: Works for both booking prepayments and invoice payments from History page
+- **UX**: Prominent 'Pay with card on file' button above standard payment form showing card brand and last 4 digits
+- **Fallback**: If saved card requires 3D Secure, system gracefully falls back to standard payment form
+- **Audit**: Full audit trail for all saved card member payments
+
+## [8.87.8] - 2026-03-14
+
+### Apple Pay, Google Pay & Saved Cards for Booking Prepayments
+- **New**: Apple Pay and Google Pay support for booking fee prepayments
+- **New**: Saved cards on file now appear in the payment form — no re-entry needed
+- **New**: Members can save new cards during payment for faster checkout
+
+## [8.87.7] - 2026-03-14
+
+### Conference Room Booking Fix — No More False Invoice Warnings
+- **Fixed**: Conference room bookings within daily allowance (no fees due) no longer trigger false 'invoice not found' warnings
+- **Fixed**: All three conference room payment paths (member booking, staff booking, booking approval) now correctly skip invoice finalization when there are no charges
+
+## [8.87.6] - 2026-03-14
+
+### HubSpot Field Mapping Fix — No More Silently Dropped Data
+- **Fixed**: Private Hire inquiry fields (event date, event time, services, additional details) now properly reach HubSpot instead of being silently dropped
+- **Fixed**: Guest Check-in fields (guest name, email, phone, sponsoring member) now sync to HubSpot
+- **Fixed**: Contact form 'topic' field now passes through to HubSpot
+- **Fixed**: All form fields submitted by members and visitors now included in HubSpot submissions
+
+## [8.87.5] - 2026-03-14
+
+### Admin-Configurable HubSpot Form IDs
+- **New**: HubSpot Form IDs configurable from Admin Settings — no more environment variables needed
+- **New**: 'HubSpot Form IDs' section in Settings for Membership, Private Hire, Event Inquiry, Tour Request, Guest Check-in, and Contact forms
+- **Architecture**: Smart 4-level fallback: Environment variable → Admin setting → Auto-discovered → Hardcoded default
+- **Performance**: Settings cached for fast performance, take effect immediately when saved
+
+## [8.87.4] - 2026-03-14
+
+### HubSpot Form Submission Fix
+- **Fixed**: Public forms no longer fail with 'Submission Failed' when HubSpot form IDs aren't set as environment variables
+- **Fixed**: Forms now auto-discover correct HubSpot form ID via 3-step lookup: env var → auto-discovered → known default
+- **Improved**: Better error messages on form submission failure — logs include form type, ID used, and error details
+- **Improved**: Server reports which form types are ready vs missing at startup
+- **Fixed**: Hardened error handling for unexpected HubSpot response formats
+- **Fixed**: Form type detection now consistent across all code paths
+
+## [8.87.3] - 2026-03-14
+
+### Login & Database Connection Fix
+- **Fixed**: Dev login no longer fails with server error
+- **Fixed**: Staff members now correctly see Staff Command Center instead of Member Portal after login
+- **Fixed**: All API endpoints (announcements, closures, café menu, settings, membership tiers) now load reliably
+- **Improved**: Database connection safety — development environment no longer accidentally connects to production database
+
+## [8.87.2] - 2026-03-14
+
+### Server Code Quality & Stability
+- **Fixed**: 286 type-safety issues across all backend files (billing, bookings, Trackman, member sync, etc.)
+- **Improved**: Better error handling throughout server for fee calculations, booking approvals, and data integrity checks
+- **Enforced**: Server type-checking now enforced automatically to catch issues before production
+
+## [8.87.1] - 2026-03-14
+
+### Google & Apple Account Linking Fix
+- **Fixed**: Linking Google or Apple accounts from profile page no longer shows 'User account not found' error
+- **Fixed**: Google account link button now correctly says 'Link' instead of 'Sign in' on profile page
+
+## [8.87.0] - 2026-03-14
+
+### Directory Sync Fix & Membership Status Accuracy Overhaul
+- **Fixed**: Directory sync 'HubSpot: partial (push failed)' error — push now runs directly in batches of 5 instead of through a single HTTP call timing out with 255+ members
+- **Fixed**: Membership status (Active, Trialing, Past Due, etc.) now displays accurately everywhere — previously all members showed as 'Active'
+- **Fixed**: Members on free trial or with past-due payment can now book simulators, enroll in wellness, RSVP to events — previously incorrectly blocked
+- **Fixed**: Staff booking calendar no longer highlights trial and past-due members as 'inactive'
+- **Fixed**: Google and Apple sign-in now correctly carry real membership status through to the app
+- **Fixed**: Directory sync now includes trial and past-due members in HubSpot push
+- **Improved**: Admin directory sync results show partial push error counts (e.g. '250 synced, 3 push errors')
+- **Improved**: Inactive member tier badges show 'No Active Membership' with status label for suspended, terminated, expired, cancelled, frozen, and paused members
 
 ## [8.86.2] - 2026-03-14
 
