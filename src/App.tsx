@@ -221,8 +221,12 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
   }
 
   handleRetry = () => {
-    localStorage.removeItem('sync_events');
-    localStorage.removeItem('sync_cafe_menu');
+    try {
+      localStorage.removeItem('sync_events');
+      localStorage.removeItem('sync_cafe_menu');
+    } catch (e) {
+      console.warn('LocalStorage access denied', e);
+    }
     
     this.setState(prev => ({
       hasError: false,
@@ -286,12 +290,6 @@ const ScrollToTop = () => {
   
   useEffect(() => {
     window.scrollTo(0, 0);
-    document.documentElement.scrollTop = 0;
-    document.body.scrollTop = 0;
-
-    requestAnimationFrame(() => {
-      window.scrollTo(0, 0);
-    });
   }, [pathname]);
   
   return null;

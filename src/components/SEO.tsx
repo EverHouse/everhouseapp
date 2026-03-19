@@ -12,24 +12,44 @@ interface SEOProps {
 const BASE_URL = 'https://everclub.app';
 const DEFAULT_IMAGE = '/images/hero-lounge-optimized.webp';
 
+const setMetaTag = (selector: string, attrType: 'name' | 'property', attrValue: string, content: string) => {
+  let el = document.querySelector(selector);
+  if (!el) {
+    el = document.createElement('meta');
+    el.setAttribute(attrType, attrValue);
+    document.head.appendChild(el);
+  }
+  el.setAttribute('content', content);
+};
+
 export const SEO: React.FC<SEOProps> = ({
   title,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   description,
   url,
   image = DEFAULT_IMAGE,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   type = 'website',
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   keywords,
 }) => {
-  const _fullUrl = url.startsWith('http') ? url : `${BASE_URL}${url}`;
-  const _fullImage = image.startsWith('http') ? image : `${BASE_URL}${image}`;
+  const fullUrl = url.startsWith('http') ? url : `${BASE_URL}${url}`;
+  const fullImage = image.startsWith('http') ? image : `${BASE_URL}${image}`;
   const fullTitle = title.includes('Ever') ? title : `${title} | Ever Members Club`;
 
   useEffect(() => {
     document.title = fullTitle;
-  }, [fullTitle]);
+
+    setMetaTag('meta[name="description"]', 'name', 'description', description);
+    setMetaTag('meta[name="keywords"]', 'name', 'keywords', keywords || '');
+
+    setMetaTag('meta[property="og:title"]', 'property', 'og:title', fullTitle);
+    setMetaTag('meta[property="og:description"]', 'property', 'og:description', description);
+    setMetaTag('meta[property="og:url"]', 'property', 'og:url', fullUrl);
+    setMetaTag('meta[property="og:image"]', 'property', 'og:image', fullImage);
+    setMetaTag('meta[property="og:type"]', 'property', 'og:type', type);
+
+    setMetaTag('meta[name="twitter:title"]', 'name', 'twitter:title', fullTitle);
+    setMetaTag('meta[name="twitter:description"]', 'name', 'twitter:description', description);
+    setMetaTag('meta[name="twitter:image"]', 'name', 'twitter:image', fullImage);
+  }, [fullTitle, description, fullUrl, fullImage, type, keywords]);
 
   return null;
 };
