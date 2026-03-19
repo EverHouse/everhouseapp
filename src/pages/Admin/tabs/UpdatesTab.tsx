@@ -287,17 +287,6 @@ const UpdatesTab: React.FC = () => {
         const announcements = Array.isArray(announcementsData) ? announcementsData : [];
         return (
             <div className="animate-content-enter space-y-3">
-                <div className="flex items-center justify-between mb-2">
-                    <p className="text-sm text-primary/70 dark:text-white/70">
-                        Showing current announcements. To create or edit, go to the{' '}
-                        <button
-                            onClick={() => navigate('/admin/announcements')}
-                            className="underline text-primary dark:text-white font-medium hover:opacity-80 transition-opacity"
-                        >
-                            Announcements tab
-                        </button>.
-                    </p>
-                </div>
                 {announcementsLoading ? (
                     Array.from({ length: 3 }).map((_, i) => (
                         <div key={i} className="p-4 rounded-xl animate-pulse bg-white dark:bg-white/[0.03]">
