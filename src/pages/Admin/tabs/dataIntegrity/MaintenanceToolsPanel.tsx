@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useMutation } from '@tanstack/react-query';
-import { postWithCredentials } from '../../../../hooks/queries/useFetch';
+import { postWithCredentials, fetchWithCredentials } from '../../../../hooks/queries/useFetch';
 
 interface ToolResult {
   success: boolean;
@@ -86,16 +86,60 @@ interface Props {
   onToggle: () => void;
 }
 
+const BACKGROUND_TOOLS = new Set(['backfill-calendar-properties']);
+
 const MaintenanceToolsPanel: React.FC<Props> = ({ isOpen, onToggle }) => {
   const [confirmingKey, setConfirmingKey] = useState<string | null>(null);
   const [results, setResults] = useState<Record<string, ToolResult | null>>({});
+  const [pollingKeys, setPollingKeys] = useState<Set<string>>(new Set());
+  const pollTimerRef = useRef<Record<string, ReturnType<typeof setInterval>>>({});
+
+  const stopPolling = useCallback((key: string) => {
+    if (pollTimerRef.current[key]) {
+      clearInterval(pollTimerRef.current[key]);
+      delete pollTimerRef.current[key];
+    }
+    setPollingKeys(prev => { const next = new Set(prev); next.delete(key); return next; });
+  }, []);
+
+  const startPolling = useCallback((tool: MaintenanceTool) => {
+    const statusUrl = `${tool.endpoint}/status`;
+    setPollingKeys(prev => new Set(prev).add(tool.key));
+    setResults(prev => ({ ...prev, [tool.key]: { success: true, message: 'Running in background...' } }));
+
+    pollTimerRef.current[tool.key] = setInterval(async () => {
+      try {
+        const status = await fetchWithCredentials<{ status: string; message?: string; error?: string }>(statusUrl);
+        if (status.status === 'complete') {
+          stopPolling(tool.key);
+          setResults(prev => ({ ...prev, [tool.key]: { success: true, message: status.message || 'Complete' } }));
+        } else if (status.status === 'error') {
+          stopPolling(tool.key);
+          setResults(prev => ({ ...prev, [tool.key]: { success: false, error: status.error || 'Backfill failed' } }));
+        }
+      } catch {
+        stopPolling(tool.key);
+        setResults(prev => ({ ...prev, [tool.key]: { success: false, error: 'Failed to check status' } }));
+      }
+    }, 5000);
+  }, [stopPolling]);
+
+  useEffect(() => {
+    return () => {
+      Object.values(pollTimerRef.current).forEach(clearInterval);
+    };
+  }, []);
 
   const runToolMutation = useMutation({
     mutationFn: async ({ tool }: { tool: MaintenanceTool }) => {
       return postWithCredentials<ToolResult>(tool.endpoint, tool.body ?? {});
     },
     onSuccess: (data, { tool }) => {
-      setResults(prev => ({ ...prev, [tool.key]: data }));
+      if (BACKGROUND_TOOLS.has(tool.key) && data.success) {
+        startPolling(tool);
+      } else {
+        setResults(prev => ({ ...prev, [tool.key]: data }));
+      }
     },
     onError: (err, { tool }) => {
       setResults(prev => ({
@@ -127,8 +171,10 @@ const MaintenanceToolsPanel: React.FC<Props> = ({ isOpen, onToggle }) => {
     return parts.length > 0 ? parts.join(', ') : result.message || 'Complete';
   };
 
-  const isRunning = runToolMutation.isPending;
-  const runningKey = isRunning && runToolMutation.variables ? runToolMutation.variables.tool.key : null;
+  const isMutating = runToolMutation.isPending;
+  const mutatingKey = isMutating && runToolMutation.variables ? runToolMutation.variables.tool.key : null;
+  const isRunning = isMutating || pollingKeys.size > 0;
+  const isToolBusy = (key: string) => mutatingKey === key || pollingKeys.has(key);
 
   return (
     <div className="mb-6 bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-primary/10 dark:border-white/20 rounded-xl p-4">
@@ -150,7 +196,7 @@ const MaintenanceToolsPanel: React.FC<Props> = ({ isOpen, onToggle }) => {
           </p>
           {TOOLS.map((tool) => {
             const result = results[tool.key];
-            const toolRunning = runningKey === tool.key;
+            const toolRunning = isToolBusy(tool.key);
             const isConfirming = confirmingKey === tool.key;
 
             return (

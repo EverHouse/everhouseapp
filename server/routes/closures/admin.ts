@@ -193,10 +193,20 @@ router.post('/api/closures/fix-orphaned', isAdmin, async (req, res) => {
   }
 });
 
+let backfillStatus: { running: boolean; startedAt?: Date; result?: Awaited<ReturnType<typeof backfillCalendarExtendedProperties>>; error?: string } = { running: false };
+
 router.post('/api/admin/backfill-calendar-extended-properties', isAdmin, async (req, res) => {
+  if (backfillStatus.running) {
+    return res.status(409).json({ success: false, error: 'Backfill is already running', startedAt: backfillStatus.startedAt });
+  }
+
+  backfillStatus = { running: true, startedAt: new Date() };
+  res.json({ success: true, message: 'Backfill started in background. Check status with GET /api/admin/backfill-calendar-extended-properties/status' });
+
   try {
     const result = await backfillCalendarExtendedProperties();
-    
+    backfillStatus = { running: false, startedAt: backfillStatus.startedAt, result };
+
     logFromRequest(req, 'backfill_calendar_props' as Parameters<typeof logFromRequest>[1], 'system', 'calendar', 'Extended Properties Backfill', {
       closures_patched: result.closures.patched,
       closures_skipped: result.closures.skipped,
@@ -205,16 +215,34 @@ router.post('/api/admin/backfill-calendar-extended-properties', isAdmin, async (
       wellness_patched: result.wellness.patched,
       wellness_skipped: result.wellness.skipped,
     });
-    
-    res.json({
-      success: true,
-      message: `Backfilled extended properties: ${result.closures.patched} closures, ${result.events.patched} events, ${result.wellness.patched} wellness classes`,
-      ...result,
+
+    logger.info('[Backfill] Calendar extended properties backfill complete', {
+      extra: { closures: result.closures, events: result.events, wellness: result.wellness },
     });
   } catch (error: unknown) {
-    logger.error('Extended properties backfill error', { error: error instanceof Error ? error : new Error(String(error)) });
-    res.status(500).json({ error: 'Failed to backfill calendar extended properties' });
+    const msg = getErrorMessage(error);
+    backfillStatus = { running: false, startedAt: backfillStatus.startedAt, error: msg };
+    logger.error('Extended properties backfill error', { error: error instanceof Error ? error : new Error(msg) });
   }
+});
+
+router.get('/api/admin/backfill-calendar-extended-properties/status', isAdmin, (_req, res) => {
+  if (backfillStatus.running) {
+    return res.json({ status: 'running', startedAt: backfillStatus.startedAt });
+  }
+  if (backfillStatus.result) {
+    const r = backfillStatus.result;
+    return res.json({
+      status: 'complete',
+      startedAt: backfillStatus.startedAt,
+      message: `Patched: ${r.closures.patched} closures, ${r.events.patched} events, ${r.wellness.patched} wellness. Skipped: ${r.closures.skipped} closures, ${r.events.skipped} events, ${r.wellness.skipped} wellness.`,
+      ...r,
+    });
+  }
+  if (backfillStatus.error) {
+    return res.json({ status: 'error', startedAt: backfillStatus.startedAt, error: backfillStatus.error });
+  }
+  res.json({ status: 'idle' });
 });
 
 export default router;
