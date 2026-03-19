@@ -8,6 +8,40 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.88.5",
+    date: "2026-03-19",
+    title: "Code Review Fixes — DRY Violations, Dead Code & Duplicate Logic",
+    changes: [
+      "Fixed: Removed duplicate handleTrialWillEnd function left in customers.ts after the Task #179 file split — the webhook dispatcher was already correctly importing from the new subscriptions/trialWillEnd.ts location",
+      "Fixed: Extracted 10 duplicated TypeScript interfaces from AnalyticsTab.tsx and AnalyticsChartsSection.tsx into a shared analyticsTypes.ts file — single source of truth for chart data types",
+      "Removed: Deleted orphaned GlassRow.tsx component — had zero usages anywhere in the codebase",
+    ]
+  },
+  {
+    version: "8.88.4",
+    date: "2026-03-19",
+    title: "Performance — N+1 Query Batching, LIMIT Enforcement & Code Splitting",
+    isMajor: true,
+    changes: [
+      "Performance: Visit count sync now uses 3 bulk SQL queries per batch instead of 3 queries per member — reduces database round-trips by up to 90% for large member directories",
+      "Performance: Added LIMIT caps to unbounded queries — inquiries capped at 1000, announcements export and wellness class listings capped at 500 to prevent excessive memory usage",
+      "Performance: QR scanner module (html5-qrcode) is now dynamically imported only when the scanner modal opens, reducing initial bundle size",
+      "Performance: Analytics charts (recharts) are now lazy-loaded with React.lazy() — the heavy charting library only loads when viewing the Analytics tab",
+      "Performance: Wrapped MotionListItem list component in React.memo to reduce unnecessary re-renders in list views",
+    ]
+  },
+  {
+    version: "8.88.3",
+    date: "2026-03-19",
+    title: "Error Handling Consistency — Complete getErrorMessage() Adoption",
+    changes: [
+      "Fixed: Completed the error handling standardization across the entire server codebase — 100+ catch blocks across 55+ files were still using manual String(err) or err instanceof Error patterns instead of the standard getErrorMessage() utility",
+      "Fixed: All 24 scheduler files now use getErrorMessage() for error reporting to the scheduler tracker",
+      "Fixed: Rate limiting middleware, booking validation, calendar sync, Stripe product sync, HubSpot request utilities, wallet pass services, and all route handlers now use consistent error extraction",
+      "Fixed: Removed stale eslint-disable comments for @typescript-eslint/no-explicit-any that were no longer needed after catch block type annotations were changed from 'any' to 'unknown'",
+    ]
+  },
+  {
     version: "8.88.2",
     date: "2026-03-19",
     title: "Skill & Documentation Sync (Phase 7 Code Review)",
