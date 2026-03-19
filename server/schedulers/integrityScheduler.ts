@@ -10,6 +10,7 @@ import { schedulerTracker } from '../core/schedulerTracker';
 import { logger } from '../core/logger';
 import { getSettingBoolean } from '../core/settingsHelper';
 import { getErrorMessage } from '../utils/errorUtils';
+import { withRetry } from '../core/retry';
 
 const INTEGRITY_CHECK_HOUR = 0;
 const INTEGRITY_SETTING_KEY = 'last_integrity_check_date';
@@ -18,31 +19,45 @@ const STALE_RUNNING_TIMEOUT_MS = 30 * 60 * 1000;
 
 async function tryClaimIntegritySlot(todayStr: string): Promise<boolean> {
   try {
-    const runningValue = `running:${todayStr}`;
-    const completedValue = `completed:${todayStr}`;
-    const staleThreshold = new Date(Date.now() - STALE_RUNNING_TIMEOUT_MS);
-    const result = await db
-      .insert(systemSettings)
-      .values({
-        key: INTEGRITY_SETTING_KEY,
-        value: runningValue,
-        category: 'scheduler',
-        updatedBy: 'system',
-        updatedAt: new Date(),
-      })
-      .onConflictDoUpdate({
-        target: systemSettings.key,
-        set: {
-          value: runningValue,
-          updatedAt: new Date(),
+    const result = await withRetry(
+      async () => {
+        const runningValue = `running:${todayStr}`;
+        const completedValue = `completed:${todayStr}`;
+        const staleThreshold = new Date(Date.now() - STALE_RUNNING_TIMEOUT_MS);
+        return db
+          .insert(systemSettings)
+          .values({
+            key: INTEGRITY_SETTING_KEY,
+            value: runningValue,
+            category: 'scheduler',
+            updatedBy: 'system',
+            updatedAt: new Date(),
+          })
+          .onConflictDoUpdate({
+            target: systemSettings.key,
+            set: {
+              value: runningValue,
+              updatedAt: new Date(),
+            },
+            where: sql`${systemSettings.value} IS DISTINCT FROM ${completedValue} AND ${systemSettings.value} IS DISTINCT FROM ${todayStr} AND (${systemSettings.value} IS DISTINCT FROM ${runningValue} OR ${systemSettings.updatedAt} < ${staleThreshold})`,
+          })
+          .returning({ key: systemSettings.key });
+      },
+      {
+        maxRetries: 3,
+        baseDelayMs: 500,
+        maxDelayMs: 5000,
+        onRetry: (attempt, error) => {
+          logger.warn(`[Integrity Check] Retrying slot claim (attempt ${attempt}/3) after connection error`, {
+            extra: { errorMessage: getErrorMessage(error) },
+          });
         },
-        where: sql`${systemSettings.value} IS DISTINCT FROM ${completedValue} AND ${systemSettings.value} IS DISTINCT FROM ${todayStr} AND (${systemSettings.value} IS DISTINCT FROM ${runningValue} OR ${systemSettings.updatedAt} < ${staleThreshold})`,
-      })
-      .returning({ key: systemSettings.key });
+      }
+    );
     
     return result.length > 0;
   } catch (err: unknown) {
-    logger.error('[Integrity Check] Database error claiming slot:', { error: err as Error });
+    logger.error('[Integrity Check] Database error claiming slot after retries:', { error: err as Error });
     alertOnScheduledTaskFailure(
       'Daily Integrity Check',
       err instanceof Error ? err : new Error(getErrorMessage(err)),
@@ -56,10 +71,22 @@ async function tryClaimIntegritySlot(todayStr: string): Promise<boolean> {
 
 async function markIntegritySlotCompleted(todayStr: string): Promise<void> {
   try {
-    await db
-      .update(systemSettings)
-      .set({ value: `completed:${todayStr}`, updatedAt: new Date() })
-      .where(sql`${systemSettings.key} = ${INTEGRITY_SETTING_KEY}`);
+    await withRetry(
+      () => db
+        .update(systemSettings)
+        .set({ value: `completed:${todayStr}`, updatedAt: new Date() })
+        .where(sql`${systemSettings.key} = ${INTEGRITY_SETTING_KEY}`),
+      {
+        maxRetries: 3,
+        baseDelayMs: 500,
+        maxDelayMs: 5000,
+        onRetry: (attempt, error) => {
+          logger.warn(`[Integrity Check] Retrying mark-completed (attempt ${attempt}/3)`, {
+            extra: { errorMessage: getErrorMessage(error) },
+          });
+        },
+      }
+    );
   } catch (err: unknown) {
     logger.error('[Integrity Check] Failed to mark slot as completed:', { error: err as Error });
   }
@@ -67,10 +94,22 @@ async function markIntegritySlotCompleted(todayStr: string): Promise<void> {
 
 async function markIntegritySlotFailed(todayStr: string): Promise<void> {
   try {
-    await db
-      .update(systemSettings)
-      .set({ value: `failed:${todayStr}`, updatedAt: new Date() })
-      .where(sql`${systemSettings.key} = ${INTEGRITY_SETTING_KEY}`);
+    await withRetry(
+      () => db
+        .update(systemSettings)
+        .set({ value: `failed:${todayStr}`, updatedAt: new Date() })
+        .where(sql`${systemSettings.key} = ${INTEGRITY_SETTING_KEY}`),
+      {
+        maxRetries: 3,
+        baseDelayMs: 500,
+        maxDelayMs: 5000,
+        onRetry: (attempt, error) => {
+          logger.warn(`[Integrity Check] Retrying mark-failed (attempt ${attempt}/3)`, {
+            extra: { errorMessage: getErrorMessage(error) },
+          });
+        },
+      }
+    );
   } catch (err: unknown) {
     logger.error('[Integrity Check] Failed to mark slot as failed:', { error: err as Error });
   }
