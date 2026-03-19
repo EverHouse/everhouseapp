@@ -8,6 +8,16 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.87.93",
+    date: "2026-03-19",
+    title: "Audit Fixes: Fee Snapshot Tracking & Integrity Check Improvements",
+    changes: [
+      "Improved: Fee snapshot status changes now track exactly when they were last modified — all 30 update paths across billing, cancellation, and reconciliation now consistently set the updated timestamp",
+      "Improved: Data integrity checks in development now clearly label results as dev-environment to prevent confusion with production issues",
+      "Improved: Updated internal documentation for fee calculation and user validation systems",
+    ]
+  },
+  {
     version: "8.87.92",
     date: "2026-03-18",
     title: "Fix: Booking Owner Change Now Updates Booking Details Immediately",

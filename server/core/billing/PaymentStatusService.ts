@@ -159,7 +159,7 @@ export class PaymentStatusService {
           );
           if (existingCompleted.rows.length > 0) {
             await tx.execute(
-              sql`UPDATE booking_fee_snapshots SET status = 'superseded', used_at = NOW() WHERE id = ${snapshot.id}`
+              sql`UPDATE booking_fee_snapshots SET status = 'superseded', used_at = NOW(), updated_at = NOW() WHERE id = ${snapshot.id}`
             );
             logger.info(`[PaymentStatusService] Snapshot ${snapshot.id} superseded — session ${snapshot.session_id} already has completed snapshot ${(existingCompleted.rows[0] as Record<string, unknown>).id}`);
             return { success: true, participantsUpdated: 0, snapshotsUpdated: 0 } as PaymentStatusResult;
@@ -167,7 +167,7 @@ export class PaymentStatusService {
         }
         
         await tx.execute(
-          sql`UPDATE booking_fee_snapshots SET status = 'completed', used_at = NOW() WHERE id = ${snapshot.id}`
+          sql`UPDATE booking_fee_snapshots SET status = 'completed', used_at = NOW(), updated_at = NOW() WHERE id = ${snapshot.id}`
         );
         
         let participantsUpdated = 0;
@@ -242,7 +242,7 @@ export class PaymentStatusService {
           const snapshot = (snapshotResult.rows as unknown as SnapshotRow[])[0];
           
           await tx.execute(
-            sql`UPDATE booking_fee_snapshots SET status = 'refunded' WHERE id = ${snapshot.id}`
+            sql`UPDATE booking_fee_snapshots SET status = 'refunded', updated_at = NOW() WHERE id = ${snapshot.id}`
           );
           
           const participantFees = snapshot.participant_fees;
@@ -306,7 +306,7 @@ export class PaymentStatusService {
         
         if ((snapshotResult.rows as unknown as CancelSnapshotRow[]).length > 0) {
           await tx.execute(
-            sql`UPDATE booking_fee_snapshots SET status = 'cancelled' 
+            sql`UPDATE booking_fee_snapshots SET status = 'cancelled', updated_at = NOW() 
              WHERE stripe_payment_intent_id = ${paymentIntentId}`
           );
         }

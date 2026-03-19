@@ -445,7 +445,7 @@ router.post('/api/member/balance/pay', isAuthenticated, async (req: Request, res
         } else {
           // Expire stale snapshot (applyCredit changed or amounts/participants changed)
           await tx.execute(sql`
-            UPDATE booking_fee_snapshots SET status = 'expired' WHERE id = ${existing.id}
+            UPDATE booking_fee_snapshots SET status = 'expired', updated_at = NOW() WHERE id = ${existing.id}
           `);
           logger.info('[Member Balance] Expiring stale snapshot (applyCredit: -> , amountMatch: , participantsMatch: )', { extra: { existingId: existing.id, existingApplyCredit, applyCredit, existingTotal_cents_totalCents: existing.total_cents === totalCents, participantsMatch } });
         }
@@ -581,7 +581,7 @@ router.post('/api/member/balance/pay', isAuthenticated, async (req: Request, res
 
     const balancePaymentRef = paymentResult.paymentIntentId || paymentResult.balanceTransactionId || 'unknown';
     await db.execute(sql`
-      UPDATE booking_fee_snapshots SET stripe_payment_intent_id = ${balancePaymentRef} WHERE id = ${snapshotId}
+      UPDATE booking_fee_snapshots SET stripe_payment_intent_id = ${balancePaymentRef}, updated_at = NOW() WHERE id = ${snapshotId}
     `);
 
     // If fully paid by balance, mark participants as paid
@@ -594,7 +594,7 @@ router.post('/api/member/balance/pay', isAuthenticated, async (req: Request, res
       `);
       
       await db.execute(sql`
-        UPDATE booking_fee_snapshots SET status = 'paid' WHERE id = ${snapshotId}
+        UPDATE booking_fee_snapshots SET status = 'paid', updated_at = NOW() WHERE id = ${snapshotId}
       `);
     }
 

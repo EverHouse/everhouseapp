@@ -86,6 +86,7 @@ export const bookingFeeSnapshots = pgTable(
     stripePaymentIntentId: varchar("stripe_payment_intent_id", { length: 255 }),
     status: varchar("status", { length: 20 }).notNull().default("pending"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
     usedAt: timestamp("used_at", { withTimezone: true }),
   },
   (table) => [

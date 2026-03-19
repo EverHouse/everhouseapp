@@ -786,6 +786,15 @@ export async function runAllIntegrityChecks(triggeredBy: 'manual' | 'scheduled' 
     safeCheck(checkAuthLinkingDataIntegrity, 'Auth Linking Data Integrity'),
   ]);
 
+  if (!isProduction) {
+    for (const check of checks) {
+      check.checkName = `[DEV] ${check.checkName}`;
+      for (const issue of check.issues) {
+        issue.description = `[DEV ENV — runtime FK constraints disabled] ${issue.description}`;
+      }
+    }
+  }
+
   const now = new Date();
   const activeIgnores = await db.select()
     .from(integrityIgnores)

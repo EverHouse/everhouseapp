@@ -320,7 +320,7 @@ router.post('/api/stripe/create-payment-intent', isStaffOrAdmin, validateBody(cr
 
       if (invoiceResult.paidInFull) {
         if (snapshotId) {
-          await db.execute(sql`UPDATE booking_fee_snapshots SET stripe_payment_intent_id = ${invoiceResult.paymentIntentId}, status = 'paid' WHERE id = ${snapshotId}`);
+          await db.execute(sql`UPDATE booking_fee_snapshots SET stripe_payment_intent_id = ${invoiceResult.paymentIntentId}, status = 'paid', updated_at = NOW() WHERE id = ${snapshotId}`);
         }
 
         await db.execute(sql`INSERT INTO stripe_payment_intents 
@@ -354,7 +354,7 @@ router.post('/api/stripe/create-payment-intent', isStaffOrAdmin, validateBody(cr
       }
 
       if (snapshotId) {
-        await db.execute(sql`UPDATE booking_fee_snapshots SET stripe_payment_intent_id = ${invoiceResult.paymentIntentId} WHERE id = ${snapshotId}`);
+        await db.execute(sql`UPDATE booking_fee_snapshots SET stripe_payment_intent_id = ${invoiceResult.paymentIntentId}, updated_at = NOW() WHERE id = ${snapshotId}`);
       }
 
       await db.execute(sql`INSERT INTO stripe_payment_intents 
@@ -411,7 +411,7 @@ router.post('/api/stripe/create-payment-intent', isStaffOrAdmin, validateBody(cr
     }
 
     if (snapshotId) {
-      await db.execute(sql`UPDATE booking_fee_snapshots SET stripe_payment_intent_id = ${result.paymentIntentId} WHERE id = ${snapshotId}`);
+      await db.execute(sql`UPDATE booking_fee_snapshots SET stripe_payment_intent_id = ${result.paymentIntentId}, updated_at = NOW() WHERE id = ${snapshotId}`);
     }
 
     logFromRequest(req, 'record_charge', 'payment', result.paymentIntentId, email, {

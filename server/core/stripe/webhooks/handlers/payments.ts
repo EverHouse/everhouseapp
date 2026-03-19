@@ -840,7 +840,7 @@ export async function handlePaymentIntentSucceeded(client: PoolClient, paymentIn
     }
     
     await client.query(
-      `UPDATE booking_fee_snapshots SET status = 'completed', used_at = NOW() WHERE id = $1`,
+      `UPDATE booking_fee_snapshots SET status = 'completed', used_at = NOW(), updated_at = NOW() WHERE id = $1`,
       [feeSnapshotId]
     );
     
@@ -1226,7 +1226,7 @@ export async function handlePaymentIntentFailed(client: PoolClient, paymentInten
   );
 
   await client.query(
-    `UPDATE booking_fee_snapshots SET status = 'failed' WHERE stripe_payment_intent_id = $1 AND status = 'pending'`,
+    `UPDATE booking_fee_snapshots SET status = 'failed', updated_at = NOW() WHERE stripe_payment_intent_id = $1 AND status = 'pending'`,
     [id]
   );
   

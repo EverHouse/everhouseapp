@@ -103,7 +103,7 @@ async function reconcilePendingSnapshots(): Promise<{ synced: number; errors: nu
           const updateClient = await connectWithTimeout();
           try {
             await updateClient.query(
-              `UPDATE booking_fee_snapshots SET status = 'cancelled' WHERE id = $1`,
+              `UPDATE booking_fee_snapshots SET status = 'cancelled', updated_at = NOW() WHERE id = $1`,
               [snapshot.id]
             );
           } finally {
@@ -190,13 +190,13 @@ async function cancelAbandonedPaymentIntents(): Promise<{ cancelled: number; err
                   );
                   if (pi.status === 'succeeded') {
                     await txClient.query(
-                      `UPDATE booking_fee_snapshots SET status = 'completed' WHERE stripe_payment_intent_id = $1 AND status = 'pending'`,
+                      `UPDATE booking_fee_snapshots SET status = 'completed', updated_at = NOW() WHERE stripe_payment_intent_id = $1 AND status = 'pending'`,
                       [spi.stripe_payment_intent_id]
                     );
                     logger.info(`[Abandoned PI Cleanup] PI ${spi.stripe_payment_intent_id} succeeded — synced snapshot to completed`);
                   } else {
                     await txClient.query(
-                      `UPDATE booking_fee_snapshots SET status = 'cancelled' WHERE stripe_payment_intent_id = $1 AND status = 'pending'`,
+                      `UPDATE booking_fee_snapshots SET status = 'cancelled', updated_at = NOW() WHERE stripe_payment_intent_id = $1 AND status = 'pending'`,
                       [spi.stripe_payment_intent_id]
                     );
                   }
@@ -229,7 +229,7 @@ async function cancelAbandonedPaymentIntents(): Promise<{ cancelled: number; err
                 [spi.id]
               );
               await txClient.query(
-                `UPDATE booking_fee_snapshots SET status = 'cancelled' WHERE stripe_payment_intent_id = $1 AND status = 'pending'`,
+                `UPDATE booking_fee_snapshots SET status = 'cancelled', updated_at = NOW() WHERE stripe_payment_intent_id = $1 AND status = 'pending'`,
                 [spi.stripe_payment_intent_id]
               );
               await txClient.query('COMMIT');
@@ -410,7 +410,7 @@ async function reconcileStalePaymentIntents(): Promise<{ reconciled: number; err
                     [`Auto-reconciled: stale PI in ${pi.status} state for 7+ days`, spi.id]
                   );
                   await txClient.query(
-                    `UPDATE booking_fee_snapshots SET status = 'cancelled' WHERE stripe_payment_intent_id = $1 AND status = 'pending'`,
+                    `UPDATE booking_fee_snapshots SET status = 'cancelled', updated_at = NOW() WHERE stripe_payment_intent_id = $1 AND status = 'pending'`,
                     [spi.stripe_payment_intent_id]
                   );
                   await txClient.query('COMMIT');

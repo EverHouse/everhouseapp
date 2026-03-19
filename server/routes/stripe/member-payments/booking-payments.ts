@@ -392,7 +392,7 @@ router.post('/api/member/bookings/:id/pay-fees', isAuthenticated, paymentRateLim
         `);
       }
       await db.execute(sql`
-        UPDATE booking_fee_snapshots SET status = 'completed', used_at = NOW() WHERE id = ${snapshotId}
+        UPDATE booking_fee_snapshots SET status = 'completed', used_at = NOW(), updated_at = NOW() WHERE id = ${snapshotId}
       `);
       logger.info('[Stripe] New invoice auto-paid after finalization', { extra: { bookingId, invoiceId: draftResult.invoiceId } });
       await logPaymentAudit({
@@ -439,7 +439,7 @@ router.post('/api/member/bookings/:id/pay-fees', isAuthenticated, paymentRateLim
     }
 
     await db.execute(sql`
-      UPDATE booking_fee_snapshots SET stripe_payment_intent_id = ${invoicePiId}, status = 'pending' WHERE id = ${snapshotId}
+      UPDATE booking_fee_snapshots SET stripe_payment_intent_id = ${invoicePiId}, status = 'pending', updated_at = NOW() WHERE id = ${snapshotId}
     `);
     const newPiDescription = await buildInvoiceDescription(bookingId, trackmanId);
 
@@ -618,7 +618,7 @@ router.post('/api/member/bookings/:id/confirm-payment', isAuthenticated, async (
         }
 
         await tx.execute(sql`
-          UPDATE booking_fee_snapshots SET status = 'completed' WHERE id = ${snapshot.id}
+          UPDATE booking_fee_snapshots SET status = 'completed', updated_at = NOW() WHERE id = ${snapshot.id}
         `);
       });
 
