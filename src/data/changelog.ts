@@ -8,6 +8,24 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.87.99",
+    date: "2026-03-19",
+    title: "DB Integrity Hardening — State Machines, Guard Triggers & Dedup Indexes",
+    changes: [
+      "Hardened: Booking status changes are now enforced at the database level — only valid transitions are permitted (e.g. pending → approved → attended; attended bookings cannot revert)",
+      "Hardened: Membership status changes are now enforced at the database level — only valid transitions are permitted; archived and merged members cannot have their status changed",
+      "Hardened: Guest pass over-consumption is now prevented at the database level — concurrent holds cannot exceed a member's total allocation",
+      "Hardened: Archived members cannot accumulate new bookings, event RSVPs, wellness enrollments, guest pass holds, or push subscriptions at the database level",
+      "Hardened: Stale pending bookings cannot be approved if their start time passed more than 2 hours ago",
+      "Hardened: Bookings cannot be marked attended while unpaid fee snapshots are outstanding",
+      "Improved: Fee snapshots are automatically cancelled when a booking reaches a terminal status (cancelled, declined, expired)",
+      "Improved: Stale pending/scheduled tours (>7 days past) are automatically expired at the database level",
+      "Improved: Duplicate Stripe customers per email and duplicate invoice IDs on active bookings are now prevented by unique partial indexes (with pre-cleanup of any existing duplicates)",
+      "Improved: Database constraint violations now return structured 409 errors to the client instead of generic 500 errors",
+      "Fixed: Membership state machine now correctly allows trialing → suspended (needed for admin suspend of trial members) and suspended/frozen/past_due/grace_period/paused/unpaid → non-member (needed for admin tier-clear)",
+    ]
+  },
+  {
     version: "8.87.98",
     date: "2026-03-19",
     title: "Scheduler Reliability, Sync Race Conditions & HubSpot Safety (Full Audit Pass)",
