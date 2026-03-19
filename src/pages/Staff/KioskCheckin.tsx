@@ -15,7 +15,7 @@ interface Html5QrcodeInstance {
   ): Promise<null | void>;
 }
 
-type KioskState = 'scanning' | 'processing' | 'success' | 'already_checked_in' | 'error' | 'exiting';
+type KioskState = 'idle' | 'scanning' | 'processing' | 'success' | 'already_checked_in' | 'error' | 'exiting';
 
 interface CheckinResult {
   memberName: string;
@@ -30,11 +30,12 @@ const EXIT_HOLD_DURATION = 3000;
 const KioskCheckin: React.FC = () => {
   const { actualUser, sessionChecked } = useAuthData();
   const navigate = useNavigate();
-  const [state, setState] = useState<KioskState>('scanning');
+  const [state, setState] = useState<KioskState>('idle');
   const [checkinResult, setCheckinResult] = useState<CheckinResult | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [exitProgress, setExitProgress] = useState(0);
+  const [authError, setAuthError] = useState(false);
 
   const qrScannerRef = useRef<Html5QrcodeInstance | null>(null);
   const hasScannedRef = useRef(false);
@@ -137,7 +138,8 @@ const KioskCheckin: React.FC = () => {
         setState('already_checked_in');
       } else if (res.status === 401 || res.status === 403) {
         stopScanner();
-        navigate('/login', { replace: true });
+        setAuthError(true);
+        setState('idle');
         return;
       } else {
         setErrorMessage(data.error || 'Check-in failed. Please ask staff for help.');
@@ -147,7 +149,7 @@ const KioskCheckin: React.FC = () => {
       setErrorMessage('Connection error. Please try again.');
       setState('error');
     }
-  }, [navigate, stopScanner]);
+  }, [stopScanner]);
 
   const resetToScanning = useCallback(() => {
     setState('scanning');
@@ -175,33 +177,28 @@ const KioskCheckin: React.FC = () => {
       const res = await fetch('/api/kiosk/verify-staff', { credentials: 'include' });
       if (!res.ok) {
         stopScanner();
-        navigate('/login', { replace: true });
+        setAuthError(true);
+        setState('idle');
       }
     } catch {
       stopScanner();
-      navigate('/login', { replace: true });
+      setAuthError(true);
+      setState('idle');
     }
-  }, [navigate, stopScanner]);
+  }, [stopScanner]);
 
   useEffect(() => {
     if (!sessionChecked) return;
     if (!isStaff) {
-      navigate('/login', { replace: true });
+      setAuthError(true);
       return;
     }
     verifyStaffSession();
     verifyIntervalRef.current = setInterval(verifyStaffSession, 5 * 60 * 1000);
-    if (state === 'scanning') {
-      const timer = setTimeout(() => startScanner(), 500);
-      return () => {
-        clearTimeout(timer);
-        if (verifyIntervalRef.current) clearInterval(verifyIntervalRef.current);
-      };
-    }
     return () => {
       if (verifyIntervalRef.current) clearInterval(verifyIntervalRef.current);
     };
-  }, [sessionChecked, isStaff, navigate, verifyStaffSession]);
+  }, [sessionChecked, isStaff, verifyStaffSession]);
 
   useEffect(() => {
     return () => {
@@ -211,6 +208,12 @@ const KioskCheckin: React.FC = () => {
       if (verifyIntervalRef.current) clearInterval(verifyIntervalRef.current);
     };
   }, [stopScanner]);
+
+  const handleStartCheckin = useCallback(() => {
+    setAuthError(false);
+    setState('scanning');
+    setTimeout(() => startScanner(), 500);
+  }, [startScanner]);
 
   const handleExitStart = useCallback(() => {
     setExitProgress(0);
@@ -243,8 +246,6 @@ const KioskCheckin: React.FC = () => {
     );
   }
 
-  if (!isStaff) return null;
-
   return (
     <div className="fixed inset-0 bg-gray-950 flex flex-col select-none" style={{ touchAction: 'none' }}>
       <div className="absolute top-4 right-4 z-50">
@@ -275,6 +276,33 @@ const KioskCheckin: React.FC = () => {
       </div>
 
       <div className="flex-1 flex flex-col items-center justify-center px-6">
+        {state === 'idle' && (
+          <div className="w-full max-w-md flex flex-col items-center animate-in fade-in duration-500">
+            <div className="w-24 h-24 rounded-3xl bg-gradient-to-br from-emerald-500/20 to-emerald-600/10 flex items-center justify-center mx-auto mb-6">
+              <Icon name="qr_code_scanner" className="text-6xl text-emerald-400" />
+            </div>
+            <h1 className="text-4xl font-bold text-white tracking-tight mb-2">Self Check-In</h1>
+            <p className="text-white/50 text-lg mb-10 text-center">Tap the button below to scan your membership QR code</p>
+
+            {authError && (
+              <div className="mb-6 px-5 py-3 rounded-xl bg-red-500/10 border border-red-500/20">
+                <p className="text-red-300 text-sm text-center">Staff session expired. Please log in again from the admin portal.</p>
+              </div>
+            )}
+
+            <button
+              onClick={handleStartCheckin}
+              disabled={authError}
+              className="group relative px-10 py-5 rounded-2xl bg-emerald-500 hover:bg-emerald-400 active:bg-emerald-600 text-white text-xl font-semibold transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed shadow-lg shadow-emerald-500/25"
+            >
+              <span className="flex items-center gap-3">
+                <Icon name="photo_camera" className="text-2xl" />
+                Start Check-In
+              </span>
+            </button>
+          </div>
+        )}
+
         {state === 'scanning' && (
           <div className="w-full max-w-md flex flex-col items-center animate-in fade-in duration-300">
             <div className="mb-8 text-center">
