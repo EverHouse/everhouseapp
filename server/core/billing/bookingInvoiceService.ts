@@ -1270,7 +1270,7 @@ export async function recreateDraftInvoiceFromBooking(bookingId: number): Promis
   }
 }
 
-export async function syncBookingInvoice(bookingId: number, sessionId: number): Promise<void> {
+export async function syncBookingInvoice(bookingId: number, sessionId: number, _retryDepth = 0): Promise<void> {
   try {
     const invoiceResult = await db.execute(sql`SELECT br.stripe_invoice_id, br.user_email, br.trackman_booking_id, br.status, br.resource_id,
               COALESCE(r.type, ${RESOURCE_TYPE.SIMULATOR}) as resource_type,
@@ -1356,10 +1356,16 @@ export async function syncBookingInvoice(bookingId: number, sessionId: number): 
       const stripeErr = retrieveErr as { statusCode?: number };
       if (stripeErr.statusCode === 404) {
         logger.warn('[BookingInvoice] syncBookingInvoice: stale invoice reference — invoice not found in Stripe, clearing and retrying', {
-          extra: { bookingId, invoiceId: stripeInvoiceId }
+          extra: { bookingId, invoiceId: stripeInvoiceId, retryDepth: _retryDepth }
         });
         await db.execute(sql`UPDATE booking_requests SET stripe_invoice_id = NULL, updated_at = NOW() WHERE id = ${bookingId}`);
-        return syncBookingInvoice(bookingId, sessionId);
+        if (_retryDepth >= 1) {
+          logger.error('[BookingInvoice] syncBookingInvoice: stale invoice retry exhausted — giving up', {
+            extra: { bookingId, invoiceId: stripeInvoiceId }
+          });
+          return;
+        }
+        return syncBookingInvoice(bookingId, sessionId, _retryDepth + 1);
       }
       throw retrieveErr;
     }

@@ -58,8 +58,10 @@ router.post('/api/hubspot/webhooks', async (req, res) => {
             try {
               contact = await retryableHubSpotRequest(() => hubspot.crm.contacts.basicApi.getById(objectId, ['email', 'membership_status', 'membership_tier', 'mindbody_client_id']));
             } catch (fetchErr: unknown) {
-              const status = (fetchErr as { code?: number; statusCode?: number })?.code || (fetchErr as { code?: number; statusCode?: number })?.statusCode;
-              if (status === 404) {
+              const errObj = fetchErr as { code?: number; statusCode?: number; response?: { statusCode?: number }; message?: string };
+              const status = errObj?.code || errObj?.statusCode || errObj?.response?.statusCode;
+              const is404 = status === 404 || (typeof errObj?.message === 'string' && errObj.message.includes('HTTP-Code: 404'));
+              if (is404) {
                 logger.info('[HubSpot Webhook] Contact not found (deleted/merged) — skipping', { extra: { objectId, propertyName } });
                 continue;
               }
