@@ -632,18 +632,6 @@ export async function handleCheckoutSessionExpired(client: PoolClient, session: 
       userEmail = metadata.email?.toLowerCase() || metadata.user_email?.toLowerCase() || null;
     }
 
-    if (!userEmail && customerId) {
-      try {
-        const stripe = await getStripeClient();
-        const customer = await stripe.customers.retrieve(customerId);
-        if (customer && !customer.deleted) {
-          userEmail = customer.email?.toLowerCase() || null;
-        }
-      } catch (err: unknown) {
-        logger.warn('[Stripe Checkout] Failed to retrieve customer email for expired session', { extra: { error: getErrorMessage(err), customerId } });
-      }
-    }
-
     const displayEmail = userEmail || email || customerId || 'unknown';
     logger.info(`[Stripe Webhook] Checkout session expired: ${session.id}, email: ${displayEmail}, purpose: ${purpose}, source: ${source}, tier: ${tierSlug}`);
 
@@ -725,18 +713,6 @@ export async function handleCheckoutSessionAsyncPaymentFailed(client: PoolClient
 
     if (!userEmail) {
       userEmail = metadata.email?.toLowerCase() || metadata.user_email?.toLowerCase() || null;
-    }
-
-    if (!userEmail && customerId) {
-      try {
-        const stripe = await getStripeClient();
-        const customer = await stripe.customers.retrieve(customerId);
-        if (customer && !customer.deleted) {
-          userEmail = customer.email?.toLowerCase() || null;
-        }
-      } catch (err: unknown) {
-        logger.warn('[Stripe Checkout] Failed to retrieve customer email for async payment failure', { extra: { error: getErrorMessage(err), customerId } });
-      }
     }
 
     const displayEmail = userEmail || email || customerId || 'unknown';
