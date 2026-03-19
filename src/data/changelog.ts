@@ -8,6 +8,14 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.89.2",
+    date: "2026-03-19",
+    title: "Calendar Sync Fix",
+    changes: [
+      "Fixed: Wellness classes, events, and closures edited in the app were getting stuck in a sync loop and never finishing their push to Google Calendar — this was caused by a timestamp precision mismatch that made the system think every class was re-edited during sync",
+    ]
+  },
+  {
     version: "8.89.1",
     date: "2026-03-19",
     title: "Pull-to-Refresh — Production Overlay Fix & Android Scroll Fix",

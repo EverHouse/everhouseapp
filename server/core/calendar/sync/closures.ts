@@ -465,7 +465,7 @@ export async function syncInternalCalendarToClosures(): Promise<{ synced: number
         const existingClosure = existing.rows[0] as unknown as ClosureRow;
         const closureId = existingClosure.id;
         const googleUpdatedAt = event.updated ? new Date(event.updated) : null;
-        const appModifiedAt = existingClosure.app_last_modified_at ? new Date(existingClosure.app_last_modified_at) : null;
+        const appModifiedAt = existingClosure.app_last_modified_at instanceof Date ? existingClosure.app_last_modified_at : (existingClosure.app_last_modified_at ? new Date(existingClosure.app_last_modified_at) : null);
         
         if (existingClosure.locally_edited === true) {
           if (!appModifiedAt) {
@@ -543,7 +543,7 @@ export async function syncInternalCalendarToClosures(): Promise<{ synced: number
                 app_last_modified_at = NULL,
                 google_event_updated_at = ${lastPatchUpdated}
                 WHERE id = ${closureId}
-                  AND (app_last_modified_at IS NOT DISTINCT FROM ${appModifiedAt})`);
+                  AND (date_trunc('milliseconds', app_last_modified_at) IS NOT DISTINCT FROM ${appModifiedAt})`);
               if ((clearResult as { rowCount?: number }).rowCount === 0) {
                 logger.warn(`[Calendar Sync] Closure #${closureId} was re-edited during push-back; keeping locally_edited=true for next sync`);
               } else {

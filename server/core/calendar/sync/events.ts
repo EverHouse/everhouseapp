@@ -211,7 +211,7 @@ export async function syncGoogleCalendarEvents(options?: { suppressAlert?: boole
 
       if (existing.rows.length > 0) {
         const dbRow = existing.rows[0] as unknown as EventDbRow;
-        const appModifiedAt = dbRow.app_last_modified_at ? new Date(dbRow.app_last_modified_at as string) : null;
+        const appModifiedAt = dbRow.app_last_modified_at instanceof Date ? dbRow.app_last_modified_at : (dbRow.app_last_modified_at ? new Date(dbRow.app_last_modified_at) : null);
         
         if (dbRow.locally_edited === true && appModifiedAt) {
           const calendarIsNewer = googleUpdatedAt && googleUpdatedAt > appModifiedAt;
@@ -295,7 +295,7 @@ export async function syncGoogleCalendarEvents(options?: { suppressAlert?: boole
               
               const clearResult = await db.execute(sql`UPDATE events SET last_synced_at = NOW(), locally_edited = false, 
                  google_event_etag = ${newEtag}, google_event_updated_at = ${newUpdatedAt}, app_last_modified_at = NULL 
-                 WHERE id = ${dbRow.id} AND (app_last_modified_at IS NOT DISTINCT FROM ${appModifiedAt})`);
+                 WHERE id = ${dbRow.id} AND (date_trunc('milliseconds', app_last_modified_at) IS NOT DISTINCT FROM ${appModifiedAt})`);
               if ((clearResult as { rowCount?: number }).rowCount === 0) {
                 logger.warn(`[Events Sync] Event #${dbRow.id} was re-edited during push-back; keeping locally_edited=true for next sync`);
               } else {
