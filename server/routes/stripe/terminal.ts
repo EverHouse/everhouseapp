@@ -388,7 +388,8 @@ router.post('/api/stripe/terminal/process-payment', isStaffOrAdmin, async (req: 
     }
 
     const reader = await stripe.terminal.readers.processPaymentIntent(readerId, {
-      payment_intent: paymentIntent.id
+      payment_intent: paymentIntent.id,
+      process_config: { allow_redisplay: 'always' },
     });
     
     if (reader.device_type?.startsWith('simulated')) {
@@ -833,6 +834,7 @@ router.post('/api/stripe/terminal/process-subscription-payment', isStaffOrAdmin,
     try {
       reader = await stripe.terminal.readers.processPaymentIntent(readerId, {
         payment_intent: activePiId,
+        process_config: { allow_redisplay: 'always' },
       });
     } catch (processErr: unknown) {
       const errMsg = getErrorMessage(processErr);
@@ -862,6 +864,7 @@ router.post('/api/stripe/terminal/process-subscription-payment', isStaffOrAdmin,
         logger.info('[Terminal] Created fresh PI after stuck PI cleanup', { extra: { freshPiId: freshPi.id, stuckPiId: paymentIntent.id } });
         reader = await stripe.terminal.readers.processPaymentIntent(readerId, {
           payment_intent: activePiId,
+          process_config: { allow_redisplay: 'always' },
         });
       } else {
         throw processErr;
@@ -1304,6 +1307,7 @@ router.post('/api/stripe/terminal/process-existing-payment', isStaffOrAdmin, asy
 
     const reader = await stripe.terminal.readers.processPaymentIntent(readerId, {
       payment_intent: terminalPiId,
+      process_config: { allow_redisplay: 'always' },
     });
 
     if (reader.device_type?.startsWith('simulated')) {
@@ -1394,6 +1398,7 @@ router.post('/api/stripe/terminal/save-card', isStaffOrAdmin, async (req: Reques
 
     const reader = await stripe.terminal.readers.processSetupIntent(readerId, {
       setup_intent: setupIntent.id,
+      process_config: { allow_redisplay: 'always' },
     });
 
     if (reader.device_type?.startsWith('simulated')) {
