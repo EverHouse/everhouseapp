@@ -1,9 +1,10 @@
 import { schedulerTracker } from '../core/schedulerTracker';
-import { getPacificHour } from '../utils/dateUtils';
+import { getPacificHour, getTodayPacific } from '../utils/dateUtils';
 import { logger } from '../core/logger';
 
 let isRunning = false;
 let intervalId: NodeJS.Timeout | null = null;
+let lastRunDate: string | null = null;
 
 async function scheduleWebhookLogCleanup(): Promise<void> {
   try {
@@ -13,6 +14,7 @@ async function scheduleWebhookLogCleanup(): Promise<void> {
   } catch (err: unknown) {
     logger.error('[Webhook Cleanup] Scheduler error:', { error: err as Error });
     schedulerTracker.recordRun('Webhook Log Cleanup', false, String(err));
+    throw err;
   }
 }
 
@@ -25,12 +27,16 @@ export function startWebhookLogCleanupScheduler(): NodeJS.Timeout {
       return;
     }
     try {
-      if (getPacificHour() === 4) {
+      const currentHour = getPacificHour();
+      const today = getTodayPacific();
+      if (currentHour >= 4 && currentHour < 7 && lastRunDate !== today) {
         isRunning = true;
+        lastRunDate = today;
         await scheduleWebhookLogCleanup();
       }
     } catch (err: unknown) {
       logger.error('[Webhook Cleanup] Check error:', { error: err as Error });
+      lastRunDate = null;
     } finally {
       isRunning = false;
     }

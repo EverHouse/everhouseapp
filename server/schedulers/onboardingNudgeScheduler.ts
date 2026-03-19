@@ -1,17 +1,21 @@
 import { schedulerTracker } from '../core/schedulerTracker';
 import { queryWithRetry } from '../core/db';
-import { getPacificHour } from '../utils/dateUtils';
+import { getPacificHour, getTodayPacific } from '../utils/dateUtils';
 import { sendOnboardingNudge24h, sendOnboardingNudge72h, sendOnboardingNudge7d } from '../emails/onboardingNudgeEmails';
 import { logger } from '../core/logger';
 import { getSettingValue } from '../core/settingsHelper';
+import { getErrorMessage } from '../utils/errorUtils';
 
 const DEFAULT_NUDGE_CHECK_HOUR = 10;
+let lastNudgeDate: string | null = null;
 
 async function processOnboardingNudges(): Promise<void> {
   try {
     const currentHour = getPacificHour();
+    const today = getTodayPacific();
     const nudgeHour = Number(await getSettingValue('scheduling.onboarding_nudge_hour', String(DEFAULT_NUDGE_CHECK_HOUR)));
-    if (currentHour !== nudgeHour) return;
+    if (currentHour < nudgeHour || currentHour >= nudgeHour + 3 || lastNudgeDate === today) return;
+    lastNudgeDate = today;
 
     logger.info('[Onboarding Nudge] Starting onboarding nudge check...');
 
@@ -70,6 +74,13 @@ async function processOnboardingNudges(): Promise<void> {
     }
   } catch (error: unknown) {
     logger.error('[Onboarding Nudge] Scheduler error:', { error: error as Error });
+    lastNudgeDate = null;
+    try {
+      const { notifyAllStaff } = await import('../core/staffNotifications');
+      await notifyAllStaff('Onboarding Nudge Failed', `Scheduler error: ${getErrorMessage(error)}`, 'system_error');
+    } catch {
+      logger.error('[Onboarding Nudge] Failed to send staff alert for scheduler failure');
+    }
   }
 }
 

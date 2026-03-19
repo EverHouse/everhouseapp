@@ -360,10 +360,23 @@ export async function syncTierToHubSpot(params: {
       properties.billing_provider = hubspotBillingProvider;
     }
     
+    let lifecycleCleared = false;
+    let previousLifecycle: string | undefined;
+    
+    try {
+      const searchResponse = await retryableHubSpotRequest(() =>
+        hubspot.crm.contacts.basicApi.getById(hubspotContactId, ['lifecyclestage'])
+      );
+      previousLifecycle = searchResponse.properties?.lifecyclestage || undefined;
+    } catch {
+      previousLifecycle = undefined;
+    }
+
     try {
       await retryableHubSpotRequest(() =>
         hubspot.crm.contacts.basicApi.update(hubspotContactId, { properties: { lifecyclestage: '' } })
       );
+      lifecycleCleared = true;
     } catch (clearError: unknown) {
       logger.warn(`[HubSpot TierSync] Could not clear lifecyclestage for ${normalizedEmail} before setting to '${lifecyclestage}':`, { error: clearError });
     }
@@ -373,6 +386,17 @@ export async function syncTierToHubSpot(params: {
         hubspot.crm.contacts.basicApi.update(hubspotContactId, { properties })
       );
     } catch (updateError: unknown) {
+      if (lifecycleCleared) {
+        try {
+          await retryableHubSpotRequest(() =>
+            hubspot.crm.contacts.basicApi.update(hubspotContactId, { properties: { lifecyclestage: previousLifecycle || lifecyclestage } })
+          );
+          logger.warn(`[HubSpot TierSync] Restored lifecycle to '${previousLifecycle || lifecyclestage}' for contact ${hubspotContactId} after update failure`);
+        } catch (restoreErr: unknown) {
+          logger.error(`[HubSpot TierSync] CRITICAL: Contact ${hubspotContactId} (${normalizedEmail}) may have blank lifecycle after failed update + failed restore`, { error: restoreErr });
+        }
+      }
+
       const rawError = (updateError && typeof updateError === 'object' && 'originalError' in updateError)
         ? (updateError as { originalError: unknown }).originalError
         : updateError;

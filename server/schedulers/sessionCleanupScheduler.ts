@@ -1,9 +1,10 @@
 import { schedulerTracker } from '../core/schedulerTracker';
-import { getPacificHour } from '../utils/dateUtils';
+import { getPacificHour, getTodayPacific } from '../utils/dateUtils';
 import { logger } from '../core/logger';
 
 let isRunning = false;
 let intervalId: NodeJS.Timeout | null = null;
+let lastRunDate: string | null = null;
 
 export function startSessionCleanupScheduler(): NodeJS.Timeout {
   stopSessionCleanupScheduler();
@@ -14,8 +15,11 @@ export function startSessionCleanupScheduler(): NodeJS.Timeout {
       return;
     }
     try {
-      if (getPacificHour() === 2) {
+      const currentHour = getPacificHour();
+      const today = getTodayPacific();
+      if (currentHour >= 2 && currentHour < 5 && lastRunDate !== today) {
         isRunning = true;
+        lastRunDate = today;
         const { runSessionCleanup } = await import('../core/sessionCleanup');
         await runSessionCleanup();
         schedulerTracker.recordRun('Session Cleanup', true);
@@ -23,6 +27,7 @@ export function startSessionCleanupScheduler(): NodeJS.Timeout {
     } catch (err: unknown) {
       logger.error('[Session Cleanup] Scheduler error:', { error: err as Error });
       schedulerTracker.recordRun('Session Cleanup', false, String(err));
+      lastRunDate = null;
     } finally {
       isRunning = false;
     }

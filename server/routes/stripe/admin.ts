@@ -594,7 +594,7 @@ router.post('/api/stripe/sync-member-subscriptions', isStaffOrAdmin, sensitiveAc
       'trialing': 'trialing',
       'past_due': 'past_due',
       'incomplete': 'pending',
-      'incomplete_expired': 'pending',
+      'incomplete_expired': 'inactive',
       'canceled': 'cancelled',
       'unpaid': 'past_due',
       'paused': 'frozen'

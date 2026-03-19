@@ -8,6 +8,18 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.87.96",
+    date: "2026-03-19",
+    title: "Bug Fixes: Stripe Status, HubSpot Safety, Scheduler Reliability & Security",
+    changes: [
+      "Fixed: Members with expired incomplete Stripe subscriptions are now correctly marked as inactive instead of pending",
+      "Fixed: HubSpot contact lifecycle stage is now restored if a tier sync update fails — prevents contacts from being left with blank lifecycle data",
+      "Fixed: Daily scheduled tasks (session cleanup, webhook log cleanup, onboarding nudges) now use a date-based window instead of exact hour matching, preventing missed runs from timer drift",
+      "Fixed: Onboarding nudge scheduler now alerts staff when it encounters an error instead of failing silently",
+      "Improved: Password change endpoint now has rate limiting to prevent brute force attempts",
+    ]
+  },
+  {
     version: "8.87.95",
     date: "2026-03-19",
     title: "Security: WebSocket Mobile Auth & Rate Limiter Hardening",

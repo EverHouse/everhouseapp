@@ -1451,7 +1451,7 @@ router.post('/api/auth/password-login', ...authRateLimiter, async (req, res) => 
   }
 });
 
-router.post('/api/auth/set-password', async (req, res) => {
+router.post('/api/auth/set-password', authRateLimiterByIp, async (req, res) => {
   try {
     const sessionUser = getSessionUser(req);
     if (!sessionUser?.email) {

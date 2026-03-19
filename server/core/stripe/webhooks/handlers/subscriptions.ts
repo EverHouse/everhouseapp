@@ -124,14 +124,17 @@ export async function handleSubscriptionCreated(client: PoolClient, subscription
         'trialing': 'trialing',
         'past_due': 'past_due',
         'incomplete': 'pending',
-        'incomplete_expired': 'pending',
+        'incomplete_expired': 'inactive',
         'canceled': 'cancelled',
         'unpaid': 'past_due',
         'paused': 'frozen'
       };
       const actualStatus = statusMap[subscription.status] || 'pending';
-      if (subscription.status === 'incomplete' || subscription.status === 'incomplete_expired') {
-        logger.info(`[Stripe Webhook] Subscription ${subscription.id} has status '${subscription.status}' - member will stay pending until payment completes`);
+      if (subscription.status === 'incomplete') {
+        logger.info(`[Stripe Webhook] Subscription ${subscription.id} has status 'incomplete' - member will stay pending until payment completes`);
+      }
+      if (subscription.status === 'incomplete_expired') {
+        logger.info(`[Stripe Webhook] Subscription ${subscription.id} has terminal status 'incomplete_expired' - member set to inactive`);
       }
       
       const { resolveUserByEmail: resolveSubEmail } = await import('../../customers');
@@ -302,7 +305,7 @@ export async function handleSubscriptionCreated(client: PoolClient, subscription
         'trialing': 'trialing',
         'past_due': 'past_due',
         'incomplete': 'pending',
-        'incomplete_expired': 'pending',
+        'incomplete_expired': 'inactive',
         'canceled': 'cancelled',
         'unpaid': 'past_due',
         'paused': 'frozen'
