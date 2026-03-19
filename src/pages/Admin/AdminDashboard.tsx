@@ -268,7 +268,7 @@ const AdminDashboard: React.FC = () => {
         isAdmin={actualUser?.role === 'admin'}
       />
       
-      {createPortal(headerContent, document.body)}
+      {createPortal(headerContent, document.getElementById('header-root') ?? document.body)}
 
       <main className="flex-1 px-4 md:px-8 pt-[calc(env(safe-area-inset-top,0px)+112px)] relative z-0 md:ml-20 xl:ml-64 w-full md:w-auto">
         <PullToRefresh onRefresh={handleAdminRefresh}>
