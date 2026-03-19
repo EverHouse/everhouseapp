@@ -9,8 +9,8 @@ import { useNotificationSounds } from '../../../hooks/useNotificationSounds';
 import { AnimatedPage } from '../../../components/motion';
 import { fetchWithCredentials } from '../../../hooks/queries/useFetch';
 import type { Announcement } from '../../../types/data';
-import {
 import Icon from '../../../components/icons/Icon';
+import {
     useStaffNotifications,
     useMarkNotificationRead,
     useMarkAllNotificationsRead,

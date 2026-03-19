@@ -55,7 +55,6 @@ import BillingTab from './memberProfile/BillingTab';
 import ActivityTab from './memberProfile/ActivityTab';
 import NotesTab from './memberProfile/NotesTab';
 import CommunicationsTab from './memberProfile/CommunicationsTab';
-import Icon from './icons/Icon';
 
 interface MemberProfileDrawerProps {
   isOpen: boolean;
