@@ -3,6 +3,7 @@ const IS_DEV = RAW_BUILD_VERSION.includes('BUILD_VERSION');
 const BUILD_VERSION = IS_DEV ? 'development' : RAW_BUILD_VERSION;
 const CACHE_NAME = `ever-club-${BUILD_VERSION}`;
 const API_CACHE = `api-cache-${BUILD_VERSION}`;
+const FONTS_CACHE = 'google-fonts-v1';
 
 const STATIC_ASSETS = [
   '/',
@@ -102,7 +103,6 @@ self.addEventListener('message', function(event) {
   }
 });
 
-var FONT_CACHE = 'google-fonts-v1';
 
 self.addEventListener('fetch', function(event) {
   var request = event.request;
@@ -112,7 +112,7 @@ self.addEventListener('fetch', function(event) {
 
   if (url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com') {
     event.respondWith(
-      caches.open(FONT_CACHE).then(function(cache) {
+      caches.open(FONTS_CACHE).then(function(cache) {
         return cache.match(request).then(function(cachedResponse) {
           if (cachedResponse) {
             fetch(request).then(function(networkResponse) {

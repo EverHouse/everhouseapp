@@ -10,7 +10,7 @@ import DirectionalPageTransition, { TransitionContext } from './components/motio
 import Logo from './components/Logo';
 import MenuOverlay from './components/MenuOverlay';
 import MemberMenuOverlay from './components/MemberMenuOverlay';
-import ViewAsBanner from './components/ViewAsBanner';
+const ViewAsBanner = lazy(() => import('./components/ViewAsBanner'));
 import PageErrorBoundary from './components/PageErrorBoundary';
 import Avatar from './components/Avatar';
 import { ToastProvider } from './components/Toast';
@@ -26,12 +26,9 @@ import { useEdgeSwipe } from './hooks/useEdgeSwipe';
 import { useKeyboardDetection } from './hooks/useKeyboardDetection';
 import { useWebSocket } from './hooks/useWebSocket';
 import { useSupabaseRealtime } from './hooks/useSupabaseRealtime';
-import { StaffBookingToast } from './components/StaffBookingToast';
 import UpdateNotification from './components/UpdateNotification';
 import WaiverModal from './components/WaiverModal';
 import { fetchWithCredentials } from './hooks/queries/useFetch';
-import { StaffWebSocketProvider } from './contexts/StaffWebSocketContext';
-import { StaffMobileSidebar } from './components/StaffMobileSidebar';
 import PullToRefresh from './components/PullToRefresh';
 
 const MINIMUM_LOADER_DISPLAY_MS = 2000;
@@ -135,7 +132,10 @@ const AdminDashboard = lazy(() => import('./pages/Admin/AdminDashboard'));
 const DataIntegrity = lazy(() => import('./pages/Admin/DataIntegrity'));
 const Checkout = lazy(() => import('./pages/Checkout'));
 
-import StaffCommandCenter from './components/staff-command-center/StaffCommandCenter';
+const StaffCommandCenter = lazy(() => import('./components/staff-command-center/StaffCommandCenter'));
+const StaffBookingToast = lazy(() => import('./components/StaffBookingToast').then(m => ({ default: m.StaffBookingToast })));
+const StaffWebSocketProvider = lazy(() => import('./contexts/StaffWebSocketContext').then(m => ({ default: m.StaffWebSocketProvider })));
+const StaffMobileSidebar = lazy(() => import('./components/StaffMobileSidebar').then(m => ({ default: m.StaffMobileSidebar })));
 const SimulatorTab = lazy(() => import('./pages/Admin/tabs/SimulatorTab'));
 const DirectoryTab = lazy(() => import('./pages/Admin/tabs/DirectoryTab'));
 const EventsTab = lazy(() => import('./pages/Admin/tabs/EventsTab'));
@@ -471,9 +471,11 @@ const AnimatedRoutes: React.FC = () => {
 
             <Route path="/admin" element={
               <AdminProtectedRoute>
-                <StaffWebSocketProvider>
-                  <DirectionalPageTransition><PageErrorBoundary pageName="AdminDashboard"><AdminDashboard /></PageErrorBoundary></DirectionalPageTransition>
-                </StaffWebSocketProvider>
+                <Suspense fallback={null}>
+                  <StaffWebSocketProvider>
+                    <DirectionalPageTransition><PageErrorBoundary pageName="AdminDashboard"><AdminDashboard /></PageErrorBoundary></DirectionalPageTransition>
+                  </StaffWebSocketProvider>
+                </Suspense>
               </AdminProtectedRoute>
             }>
               <Route index element={<PageErrorBoundary pageName="StaffCommandCenter"><StaffCommandCenter /></PageErrorBoundary>} />
@@ -565,8 +567,8 @@ const AnimatedRoutes: React.FC = () => {
                 <Route path="/dev-preview/profile-dark" element={<PageErrorBoundary pageName="Profile"><Profile /></PageErrorBoundary>} />
                 <Route path="/dev-preview/updates-dark" element={<PageErrorBoundary pageName="Updates"><MemberUpdates /></PageErrorBoundary>} />
                 {/* Staff/Admin portal dev preview routes */}
-                <Route path="/dev-preview/admin" element={<StaffWebSocketProvider><PageErrorBoundary pageName="AdminDashboard"><AdminDashboard /></PageErrorBoundary></StaffWebSocketProvider>} />
-                <Route path="/dev-preview/admin-dark" element={<StaffWebSocketProvider><PageErrorBoundary pageName="AdminDashboard"><AdminDashboard /></PageErrorBoundary></StaffWebSocketProvider>} />
+                <Route path="/dev-preview/admin" element={<Suspense fallback={null}><StaffWebSocketProvider><PageErrorBoundary pageName="AdminDashboard"><AdminDashboard /></PageErrorBoundary></StaffWebSocketProvider></Suspense>} />
+                <Route path="/dev-preview/admin-dark" element={<Suspense fallback={null}><StaffWebSocketProvider><PageErrorBoundary pageName="AdminDashboard"><AdminDashboard /></PageErrorBoundary></StaffWebSocketProvider></Suspense>} />
               </>
             )}
             
@@ -876,7 +878,8 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       <div className="fixed inset-0 pointer-events-none z-0 opacity-[0.04] mix-blend-overlay" id="texture-bg"></div>
 
       <NotificationContext.Provider value={{ openNotifications }}>
-        <ViewAsBanner />
+        {isStaffOrAdmin && <Suspense fallback={null}><ViewAsBanner /></Suspense>}
+        {isStaffOrAdmin && <Suspense fallback={null}><StaffBookingToast /></Suspense>}
         
         {/* Header rendered via portal to escape transform context */}
         {headerContent && createPortal(headerContent, document.body)}
@@ -901,12 +904,16 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
             <MenuOverlay isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} />
             <MemberMenuOverlay isOpen={isMemberMenuOpen} onClose={() => setIsMemberMenuOpen(false)} />
-            <StaffMobileSidebar 
-              isOpen={isStaffMenuOpen} 
-              onClose={() => setIsStaffMenuOpen(false)} 
-              activeTab="home"
-              isAdmin={actualUser?.role === 'admin'}
-            />
+            {isStaffOrAdmin && (
+              <Suspense fallback={null}>
+                <StaffMobileSidebar 
+                  isOpen={isStaffMenuOpen} 
+                  onClose={() => setIsStaffMenuOpen(false)} 
+                  activeTab="home"
+                  isAdmin={actualUser?.role === 'admin'}
+                />
+              </Suspense>
+            )}
         </div>
       </NotificationContext.Provider>
     </div>
@@ -922,7 +929,6 @@ const App: React.FC = () => {
             <ToastProvider>
             <InitialLoadingScreen>
               <OfflineBanner />
-              <StaffBookingToast />
               <UpdateNotification />
               <BrowserRouter>
                 <ScrollToTop />
