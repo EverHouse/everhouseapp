@@ -71,9 +71,31 @@ export async function syncTierFeaturesToStripe(): Promise<{
               const refetch = await stripe.entitlements.features.list({ lookup_key: feature.lookupKey, limit: 1 });
               if (refetch.data.length > 0) {
                 existingFeatures.set(feature.lookupKey, refetch.data[0].id);
+                const existingFeature = refetch.data[0];
+                if (existingFeature.name !== feature.name) {
+                  try {
+                    await stripe.entitlements.features.update(existingFeature.id, { name: feature.name });
+                    logger.info(`[Feature Sync] Updated feature name: "${existingFeature.name}" → "${feature.name}"`);
+                  } catch (updateErr: unknown) {
+                    logger.debug(`[Feature Sync] Could not update feature name for ${feature.lookupKey}: ${getErrorMessage(updateErr)}`);
+                  }
+                }
               }
             } else {
               logger.error(`[Feature Sync] Error creating feature ${feature.lookupKey}:`, { extra: { detail: getErrorMessage(err) } });
+            }
+          }
+        } else {
+          const featureId = existingFeatures.get(feature.lookupKey);
+          if (featureId) {
+            try {
+              const existing = await stripe.entitlements.features.retrieve(featureId);
+              if (existing.name !== feature.name) {
+                await stripe.entitlements.features.update(featureId, { name: feature.name });
+                logger.info(`[Feature Sync] Updated feature name: "${existing.name}" → "${feature.name}"`);
+              }
+            } catch (updateErr: unknown) {
+              logger.debug(`[Feature Sync] Could not update feature name for ${feature.lookupKey}: ${getErrorMessage(updateErr)}`);
             }
           }
         }

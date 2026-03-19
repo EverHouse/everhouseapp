@@ -250,6 +250,31 @@ export async function seedDefaultNoticeTypes() {
 export async function ensureDatabaseConstraints() {
   try {
     await db.execute(sql`
+      DO $$
+      DECLARE
+        tbl RECORD;
+      BEGIN
+        FOR tbl IN
+          SELECT c.relname
+          FROM pg_class c
+          JOIN pg_namespace n ON c.relnamespace = n.oid
+          WHERE n.nspname = 'public'
+            AND c.relkind = 'r'
+            AND c.relrowsecurity = true
+        LOOP
+          EXECUTE format('ALTER TABLE public.%I DISABLE ROW LEVEL SECURITY', tbl.relname);
+          EXECUTE format('DROP POLICY IF EXISTS deny_all ON public.%I', tbl.relname);
+        END LOOP;
+      END
+      $$;
+    `);
+    logger.info('[DB Init] Row-Level Security disabled on all application tables');
+  } catch (rlsErr: unknown) {
+    logger.error('[DB Init] Failed to disable RLS:', { error: getErrorMessage(rlsErr) });
+  }
+
+  try {
+    await db.execute(sql`
       DELETE FROM booking_participants
       WHERE NOT EXISTS (
         SELECT 1 FROM booking_sessions WHERE booking_sessions.id = booking_participants.session_id
