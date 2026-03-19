@@ -200,7 +200,7 @@ export async function syncCompanyToHubSpot(
     };
 
   } catch (error: unknown) {
-    const errorMsg = error instanceof Error ? error.message : String(error);
+    const errorMsg = getErrorMessage(error);
     logger.error('[CompanyHubSpot] Error syncing company:', { error: error });
     return {
       success: false,

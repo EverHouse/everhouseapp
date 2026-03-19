@@ -40,7 +40,7 @@ export function startHubSpotFormSyncScheduler(): void {
   setTimeout(() => {
     runSync().catch(err => {
       logger.error('[HubSpot FormSync] Initial run failed:', { error: err as Error });
-      schedulerTracker.recordRun('HubSpot Form Sync', false, String(err));
+      schedulerTracker.recordRun('HubSpot Form Sync', false, getErrorMessage(err));
     });
   }, 60000);
 

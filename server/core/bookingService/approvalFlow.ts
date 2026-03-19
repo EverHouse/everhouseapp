@@ -600,7 +600,7 @@ async function notifyLinkedMembers(bookingId: number, updated: BookingUpdateResu
           url: '/sims'
         }, { sendPush: true }).catch((err) => {
           logger.error('[approval] Failed to send notification on approval', {
-            error: err instanceof Error ? err : new Error(String(err))
+            error: new Error(getErrorMessage(err))
           });
         });
 

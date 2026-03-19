@@ -7,6 +7,7 @@ import { findOrCreateHubSpotContact } from "../hubspot/members";
 import { syncCustomerMetadataToStripe } from "../stripe/customers";
 
 import { logger } from '../logger';
+import { getErrorMessage } from '../../utils/errorUtils';
 const PLACEHOLDER_EMAIL_PATTERNS = [
   '@visitors.evenhouse.club',
   '@trackman.local',
@@ -165,11 +166,11 @@ export async function upsertVisitor(data: VisitorData, createStripeCustomer: boo
           undefined,
           { role: 'visitor' }
         ).catch((err) => {
-          logger.error('[upsertVisitor] Background HubSpot sync failed:', { extra: { detail: err instanceof Error ? err.message : String(err) } });
+          logger.error('[upsertVisitor] Background HubSpot sync failed:', { extra: { detail: getErrorMessage(err) } });
         });
         if (updated[0].stripeCustomerId) {
           syncCustomerMetadataToStripe(updated[0].email).catch((err) => {
-            logger.error('[upsertVisitor] Background Stripe sync failed:', { extra: { detail: err instanceof Error ? err.message : String(err) } });
+            logger.error('[upsertVisitor] Background Stripe sync failed:', { extra: { detail: getErrorMessage(err) } });
           });
         }
       }
@@ -202,11 +203,11 @@ export async function upsertVisitor(data: VisitorData, createStripeCustomer: boo
         undefined,
         { role: 'visitor' }
       ).catch((err) => {
-        logger.error('[upsertVisitor] Background HubSpot sync failed:', { extra: { detail: err instanceof Error ? err.message : String(err) } });
+        logger.error('[upsertVisitor] Background HubSpot sync failed:', { extra: { detail: getErrorMessage(err) } });
       });
       if (updated[0].stripeCustomerId) {
         syncCustomerMetadataToStripe(updated[0].email).catch((err) => {
-          logger.error('[upsertVisitor] Background Stripe sync failed:', { extra: { detail: err instanceof Error ? err.message : String(err) } });
+          logger.error('[upsertVisitor] Background Stripe sync failed:', { extra: { detail: getErrorMessage(err) } });
         });
       }
     }

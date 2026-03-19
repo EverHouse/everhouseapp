@@ -201,7 +201,7 @@ async function getResourceIdsForAffectedAreas(affectedAreas: string | null | und
       if (idSet.size > 0) return Array.from(idSet);
     }
   } catch (err) {
-    logger.debug('[getResourceIdsForAffectedAreas] Failed to parse affected areas as JSON', { error: err instanceof Error ? err.message : err });
+    logger.debug('[getResourceIdsForAffectedAreas] Failed to parse affected areas as JSON', { error: getErrorMessage(err) });
   }
   
   const parts = affectedAreas.split(',').map(s => s.trim());

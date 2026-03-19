@@ -225,7 +225,7 @@ export async function syncCafeItemsToStripe(): Promise<{
               logger.info(`[Cafe Sync] Price changed for ${itemName}, creating new price`);
             }
           } catch (err) {
-            logger.debug('[Cafe Sync] Failed to retrieve existing Stripe price, will create new one', { error: err instanceof Error ? err.message : err });
+            logger.debug('[Cafe Sync] Failed to retrieve existing Stripe price, will create new one', { error: getErrorMessage(err) });
             needNewPrice = true;
           }
         } else {
@@ -508,7 +508,7 @@ export async function pullCafeItemsFromStripe(): Promise<{
             priceCents = price.unit_amount || 0;
             stripePriceId = price.id;
           } catch (err) {
-            logger.debug('[Reverse Sync] Failed to retrieve Stripe price by default_price ID', { error: err instanceof Error ? err.message : err });
+            logger.debug('[Reverse Sync] Failed to retrieve Stripe price by default_price ID', { error: getErrorMessage(err) });
           }
         }
 

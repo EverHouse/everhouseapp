@@ -1,5 +1,6 @@
 import pRetry, { AbortError, Options } from 'p-retry';
 import { logger } from './logger';
+import { getErrorMessage } from '../utils/errorUtils';
 
 export interface FailedAttemptError extends Error {
   attemptNumber: number;
@@ -23,7 +24,7 @@ function isRetryableError(error: unknown): boolean {
   const errObj = error as ErrorWithResponse;
   const response = errObj?.response;
   const statusCode = response?.status || response?.statusCode || errObj?.status || errObj?.code;
-  const errorMsg = error instanceof Error ? error.message : String(error);
+  const errorMsg = getErrorMessage(error);
   
   if (statusCode === 429) return true;
   if (typeof statusCode === 'number' && statusCode >= 500 && statusCode < 600) return true;
@@ -59,7 +60,7 @@ function isNonRetryableClientError(error: unknown): boolean {
     return true;
   }
   
-  const errorMsg = error instanceof Error ? error.message : String(error);
+  const errorMsg = getErrorMessage(error);
   const lowerMsg = errorMsg.toLowerCase();
   const clientErrorPatterns = [
     'not found',
@@ -114,14 +115,14 @@ export async function withRetry<T>(
       return await fn();
     } catch (error: unknown) {
       if (isNonRetryableClientError(error)) {
-        throw new AbortError(error instanceof Error ? error : String(error));
+        throw new AbortError(getErrorMessage(error));
       }
       
       if (isRetryableError(error)) {
         throw error;
       }
       
-      throw new AbortError(error instanceof Error ? error : String(error));
+      throw new AbortError(getErrorMessage(error));
     }
   }, retryOptions);
 }

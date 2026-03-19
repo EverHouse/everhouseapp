@@ -1,6 +1,7 @@
 import { schedulerTracker } from '../core/schedulerTracker';
 import { getPacificDateParts } from '../utils/dateUtils';
 import { logger } from '../core/logger';
+import { getErrorMessage } from '../utils/errorUtils';
 
 const CLEANUP_DAY = 0;
 const CLEANUP_HOUR = 3;
@@ -36,7 +37,7 @@ async function checkAndRunCleanup(): Promise<void> {
     }
   } catch (err: unknown) {
     logger.error('[Cleanup] Scheduler error:', { error: err as Error });
-    schedulerTracker.recordRun('Weekly Cleanup', false, String(err));
+    schedulerTracker.recordRun('Weekly Cleanup', false, getErrorMessage(err));
   } finally {
     isRunning = false;
   }

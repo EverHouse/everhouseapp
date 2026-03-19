@@ -1,6 +1,7 @@
 import { schedulerTracker } from '../core/schedulerTracker';
 import { getPacificHour, getTodayPacific } from '../utils/dateUtils';
 import { logger } from '../core/logger';
+import { getErrorMessage } from '../utils/errorUtils';
 
 let isRunning = false;
 let intervalId: NodeJS.Timeout | null = null;
@@ -13,7 +14,7 @@ async function scheduleWebhookLogCleanup(): Promise<void> {
     schedulerTracker.recordRun('Webhook Log Cleanup', true);
   } catch (err: unknown) {
     logger.error('[Webhook Cleanup] Scheduler error:', { error: err as Error });
-    schedulerTracker.recordRun('Webhook Log Cleanup', false, String(err));
+    schedulerTracker.recordRun('Webhook Log Cleanup', false, getErrorMessage(err));
     throw err;
   }
 }

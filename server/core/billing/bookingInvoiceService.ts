@@ -548,7 +548,7 @@ export async function getBookingInvoiceStatus(bookingId: number): Promise<{
       amountDue: invoice.amount_due,
     };
   } catch (err) {
-    logger.warn('[BookingInvoice] Failed to retrieve invoice status', { error: err instanceof Error ? err.message : err });
+    logger.warn('[BookingInvoice] Failed to retrieve invoice status', { error: getErrorMessage(err) });
     return null;
   }
 }

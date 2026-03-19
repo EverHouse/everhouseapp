@@ -7,6 +7,7 @@ import { getWalletConfig, getWebServiceURL } from './passService';
 import { sendPassUpdatePush } from './apnPushService';
 import { getSettingValue } from '../core/settingsHelper';
 import { logger } from '../core/logger';
+import { getErrorMessage } from '../utils/errorUtils';
 
 async function bumpSerialChangeTimestamp(serialNumber: string): Promise<void> {
   await db.update(walletPassDeviceRegistrations)
@@ -172,7 +173,7 @@ export async function generateBookingPass(bookingId: number, requestingMemberId?
     return await generateBookingPkPass(passData, walletConfig);
   } catch (err) {
     logger.error('[BookingWalletPass] Failed to generate booking pass', {
-      error: err instanceof Error ? err : new Error(String(err)),
+      error: new Error(getErrorMessage(err)),
       extra: { bookingId }
     });
     return null;
@@ -207,7 +208,7 @@ export async function voidBookingPass(bookingId: number): Promise<void> {
     }
   } catch (err) {
     logger.error('[BookingWalletPass] Failed to void booking pass', {
-      error: err instanceof Error ? err : new Error(String(err)),
+      error: new Error(getErrorMessage(err)),
       extra: { bookingId }
     });
   }
@@ -237,7 +238,7 @@ export async function refreshBookingPass(bookingId: number): Promise<void> {
     }
   } catch (err) {
     logger.error('[BookingWalletPass] Failed to refresh booking pass', {
-      error: err instanceof Error ? err : new Error(String(err)),
+      error: new Error(getErrorMessage(err)),
       extra: { bookingId }
     });
   }
@@ -258,7 +259,7 @@ export async function generateBookingPassForWebService(serialNumber: string): Pr
     return await generateBookingPass(passRecord.bookingId);
   } catch (err) {
     logger.error('[BookingWalletPass] Failed to generate pass for web service', {
-      error: err instanceof Error ? err : new Error(String(err)),
+      error: new Error(getErrorMessage(err)),
       extra: { serialNumber }
     });
     return null;

@@ -133,7 +133,7 @@ async function runDirectorySync(jobId: string, sessionCookie: string) {
     }
   } catch (err: unknown) {
     errors.push('pull');
-    logger.error('[DirectorySync] HubSpot pull failed', { error: err instanceof Error ? err : new Error(String(err)) });
+    logger.error('[DirectorySync] HubSpot pull failed', { error: new Error(getErrorMessage(err)) });
   }
 
   await updateJobProgress(jobId, { step: 'hubspot_push', pullCount });
@@ -152,7 +152,7 @@ async function runDirectorySync(jobId: string, sessionCookie: string) {
     }
   } catch (err: unknown) {
     errors.push('push');
-    logger.error('[DirectorySync] HubSpot push failed', { error: err instanceof Error ? err : new Error(String(err)) });
+    logger.error('[DirectorySync] HubSpot push failed', { error: new Error(getErrorMessage(err)) });
   }
 
   await updateJobProgress(jobId, { step: 'stripe', pullCount, pushCount });
@@ -172,7 +172,7 @@ async function runDirectorySync(jobId: string, sessionCookie: string) {
     }
   } catch (err: unknown) {
     errors.push('stripe');
-    logger.error('[DirectorySync] Stripe sync failed', { error: err instanceof Error ? err : new Error(String(err)) });
+    logger.error('[DirectorySync] Stripe sync failed', { error: new Error(getErrorMessage(err)) });
   }
 
   const syncResult = { pullCount, pushCount, pushErrors, stripeUpdated, stripeSkipped, errors };
@@ -207,16 +207,16 @@ router.post('/api/directory/sync', isStaffOrAdmin, async (req: Request, res: Res
     res.json({ started: true, jobId });
 
     runDirectorySync(jobId, sessionCookie).catch(async (err: unknown) => {
-      logger.error('[DirectorySync] Unexpected error in background sync', { error: err instanceof Error ? err : new Error(String(err)) });
+      logger.error('[DirectorySync] Unexpected error in background sync', { error: new Error(getErrorMessage(err)) });
       try {
         await failJob(jobId, getErrorMessage(err), { step: 'unexpected_error' });
         broadcastDirectorySyncUpdate({ status: 'failed', jobId, error: getErrorMessage(err) });
       } catch (failErr: unknown) {
-        logger.error('[DirectorySync] Failed to record job failure', { error: failErr instanceof Error ? failErr : new Error(String(failErr)) });
+        logger.error('[DirectorySync] Failed to record job failure', { error: new Error(getErrorMessage(failErr)) });
       }
     });
   } catch (error: unknown) {
-    logger.error('[DirectorySync] Failed to start sync', { error: error instanceof Error ? error : new Error(String(error)) });
+    logger.error('[DirectorySync] Failed to start sync', { error: new Error(getErrorMessage(error)) });
     res.status(500).json({ error: 'Failed to start directory sync' });
   }
 });
@@ -254,7 +254,7 @@ router.get('/api/directory/sync-status', isStaffOrAdmin, async (_req: Request, r
 
     res.json({ status: 'idle', lastSyncTime });
   } catch (error: unknown) {
-    logger.error('[DirectorySync] Failed to get sync status', { error: error instanceof Error ? error : new Error(String(error)) });
+    logger.error('[DirectorySync] Failed to get sync status', { error: new Error(getErrorMessage(error)) });
     res.status(500).json({ error: 'Failed to get sync status' });
   }
 });

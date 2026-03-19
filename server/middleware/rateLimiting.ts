@@ -3,6 +3,7 @@ import { Request, Response } from 'express';
 import { logger } from '../core/logger';
 import { db } from '../db';
 import { sql } from 'drizzle-orm';
+import { getErrorMessage } from '../utils/errorUtils';
 
 const getClientKey = (req: Request): string => {
   const userId = req.session?.user?.id;
@@ -163,7 +164,7 @@ async function ensureLocksTable(): Promise<boolean> {
     dbLocksInitialized = true;
     return true;
   } catch (err) {
-    logger.warn('[SubscriptionLock] Failed to create locks table, falling back to memory', { extra: { error: String(err) } });
+    logger.warn('[SubscriptionLock] Failed to create locks table, falling back to memory', { extra: { error: getErrorMessage(err) } });
     return false;
   }
 }
@@ -184,7 +185,7 @@ export async function acquireSubscriptionLock(email: string, lockedBy?: string):
       `);
       return result.rows.length > 0;
     } catch (err) {
-      logger.warn('[SubscriptionLock] DB lock failed, falling back to memory', { extra: { error: String(err) } });
+      logger.warn('[SubscriptionLock] DB lock failed, falling back to memory', { extra: { error: getErrorMessage(err) } });
     }
   }
 
@@ -204,7 +205,7 @@ export async function releaseSubscriptionLock(email: string): Promise<void> {
     try {
       await db.execute(sql`DELETE FROM subscription_locks WHERE email = ${key}`);
     } catch (err) {
-      logger.warn('[SubscriptionLock] DB lock release failed', { extra: { error: String(err) } });
+      logger.warn('[SubscriptionLock] DB lock release failed', { extra: { error: getErrorMessage(err) } });
     }
   }
 }

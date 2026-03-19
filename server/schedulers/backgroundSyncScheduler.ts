@@ -2,6 +2,7 @@ import { schedulerTracker } from '../core/schedulerTracker';
 import { syncGoogleCalendarEvents, syncWellnessCalendarEvents, syncInternalCalendarToClosures, syncConferenceRoomCalendarToBookings } from '../core/calendar/index';
 import { alertOnSyncFailure } from '../core/dataAlerts';
 import { logger } from '../core/logger';
+import { getErrorMessage } from '../utils/errorUtils';
 
 const SYNC_INTERVAL_MS = 5 * 60 * 1000;
 const consecutiveFailures: Record<string, number> = {};
@@ -98,7 +99,7 @@ const runBackgroundSync = async () => {
     schedulerTracker.recordRun('Background Sync', true);
   } catch (err: unknown) {
     logger.error('[Auto-sync] Calendar sync failed:', { error: err as Error });
-    schedulerTracker.recordRun('Background Sync', false, String(err));
+    schedulerTracker.recordRun('Background Sync', false, getErrorMessage(err));
   } finally {
     currentTimeoutId = setTimeout(runBackgroundSync, SYNC_INTERVAL_MS);
   }

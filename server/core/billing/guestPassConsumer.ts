@@ -148,7 +148,7 @@ export async function consumeGuestPassForParticipant(
     logger.info(`[GuestPassConsumer] Pass consumed for ${guestName} by ${ownerEmailLower}, ${passesRemaining} remaining`);
 
     sendPassUpdateForMemberByEmail(ownerEmailLower).catch(err =>
-      logger.warn('[GuestPassConsumer] Wallet pass push failed (non-fatal)', { extra: { email: ownerEmailLower, error: String(err) } })
+      logger.warn('[GuestPassConsumer] Wallet pass push failed (non-fatal)', { extra: { email: ownerEmailLower, error: getErrorMessage(err) } })
     );
 
     if (resolvedBookingId) {

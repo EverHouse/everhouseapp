@@ -9,6 +9,7 @@ import { getAppBaseUrl } from '../utils/urlUtils';
 import { logger } from '../core/logger';
 import { getSettingValue } from '../core/settingsHelper';
 import { sendPassUpdateForMemberByEmail } from '../walletPass/apnPushService';
+import { getErrorMessage } from '../utils/errorUtils';
 
 interface GracePeriodMemberRow {
   id: number;
@@ -132,7 +133,7 @@ async function processGracePeriodMembers(): Promise<void> {
           logger.info(`[Grace Period] TERMINATED membership for ${email} (was tier: ${tier})`);
 
           sendPassUpdateForMemberByEmail(email).catch(err =>
-            logger.warn('[Grace Period] Wallet pass push failed for termination (non-fatal)', { extra: { email, error: String(err) } })
+            logger.warn('[Grace Period] Wallet pass push failed for termination (non-fatal)', { extra: { email, error: getErrorMessage(err) } })
           );
 
           try {
@@ -156,7 +157,7 @@ async function processGracePeriodMembers(): Promise<void> {
         }
       } catch (error: unknown) {
         logger.error(`[Grace Period] Error processing member ${email}:`, { error: error as Error });
-        schedulerTracker.recordRun('Grace Period', false, String(error));
+        schedulerTracker.recordRun('Grace Period', false, getErrorMessage(error));
       }
     }
     
@@ -164,7 +165,7 @@ async function processGracePeriodMembers(): Promise<void> {
     schedulerTracker.recordRun('Grace Period', true);
   } catch (error: unknown) {
     logger.error('[Grace Period] Scheduler error:', { error: error as Error });
-    schedulerTracker.recordRun('Grace Period', false, String(error));
+    schedulerTracker.recordRun('Grace Period', false, getErrorMessage(error));
   }
 }
 
@@ -195,7 +196,7 @@ export function startGracePeriodScheduler(): void {
   intervalId = setInterval(() => {
     guardedProcessGracePeriodMembers().catch((err: unknown) => {
       logger.error('[Grace Period] Uncaught error:', { error: err as Error });
-      schedulerTracker.recordRun('Grace Period', false, String(err));
+      schedulerTracker.recordRun('Grace Period', false, getErrorMessage(err));
     });
   }, 60 * 60 * 1000);
 }

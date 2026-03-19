@@ -6,6 +6,7 @@ import { sendMorningClosureNotifications } from '../routes/push';
 import { getPacificHour, getTodayPacific } from '../utils/dateUtils';
 import { logger } from '../core/logger';
 import { getSettingValue } from '../core/settingsHelper';
+import { getErrorMessage } from '../utils/errorUtils';
 
 const DEFAULT_MORNING_HOUR = 8;
 const MORNING_SETTING_KEY = 'last_morning_closure_notification_date';
@@ -39,7 +40,7 @@ async function tryClaimMorningSlot(todayStr: string): Promise<boolean> {
     return result.length > 0;
   } catch (err: unknown) {
     logger.error('[Morning Closures] Database error:', { error: err as Error });
-    schedulerTracker.recordRun('Morning Closure', false, String(err));
+    schedulerTracker.recordRun('Morning Closure', false, getErrorMessage(err));
     return false;
   }
 }
@@ -79,14 +80,14 @@ async function checkAndSendMorningNotifications(): Promise<void> {
           await markMorningSlotCompleted(todayStr);
         } catch (err: unknown) {
           logger.error('[Morning Closures] Send failed:', { error: err as Error });
-          schedulerTracker.recordRun('Morning Closure', false, String(err));
+          schedulerTracker.recordRun('Morning Closure', false, getErrorMessage(err));
           await markMorningSlotFailed(todayStr);
         }
       }
     }
   } catch (err: unknown) {
     logger.error('[Morning Closures] Scheduler error:', { error: err as Error });
-    schedulerTracker.recordRun('Morning Closure', false, String(err));
+    schedulerTracker.recordRun('Morning Closure', false, getErrorMessage(err));
   }
 }
 
@@ -115,7 +116,7 @@ export function startMorningClosureScheduler(): void {
   intervalId = setInterval(() => {
     guardedCheckAndSendMorningNotifications().catch((err: unknown) => {
       logger.error('[Morning Closures] Uncaught error:', { error: err as Error });
-      schedulerTracker.recordRun('Morning Closure', false, String(err));
+      schedulerTracker.recordRun('Morning Closure', false, getErrorMessage(err));
     });
   }, 30 * 60 * 1000);
   logger.info('[Startup] Morning closure notification scheduler enabled (runs at 8am)');

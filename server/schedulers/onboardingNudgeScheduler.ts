@@ -105,7 +105,7 @@ export function startOnboardingNudgeScheduler(): void {
       .then(() => schedulerTracker.recordRun('Onboarding Nudge', true))
       .catch((err: unknown) => {
         logger.error('[Onboarding Nudge] Uncaught error:', { error: err as Error });
-        schedulerTracker.recordRun('Onboarding Nudge', false, String(err));
+        schedulerTracker.recordRun('Onboarding Nudge', false, getErrorMessage(err));
       })
       .finally(() => { isRunning = false; });
   }, interval);

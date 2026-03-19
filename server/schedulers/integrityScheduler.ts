@@ -9,6 +9,7 @@ import { alertOnScheduledTaskFailure } from '../core/dataAlerts';
 import { schedulerTracker } from '../core/schedulerTracker';
 import { logger } from '../core/logger';
 import { getSettingBoolean } from '../core/settingsHelper';
+import { getErrorMessage } from '../utils/errorUtils';
 
 const INTEGRITY_CHECK_HOUR = 0;
 const INTEGRITY_SETTING_KEY = 'last_integrity_check_date';
@@ -44,7 +45,7 @@ async function tryClaimIntegritySlot(todayStr: string): Promise<boolean> {
     logger.error('[Integrity Check] Database error claiming slot:', { error: err as Error });
     alertOnScheduledTaskFailure(
       'Daily Integrity Check',
-      err instanceof Error ? err : new Error(String(err)),
+      err instanceof Error ? err : new Error(getErrorMessage(err)),
       { context: 'Failed to claim daily integrity slot' }
     ).catch((alertErr: unknown) => {
       logger.error('[Integrity Check] Failed to send staff alert:', { error: alertErr as Error });
@@ -177,12 +178,12 @@ async function checkAndRunIntegrityCheck(): Promise<void> {
           await markIntegritySlotCompleted(todayStr);
         } catch (err: unknown) {
           logger.error('[Integrity Check] Check failed:', { error: err as Error });
-          schedulerTracker.recordRun('Integrity Check', false, String(err));
+          schedulerTracker.recordRun('Integrity Check', false, getErrorMessage(err));
           await markIntegritySlotFailed(todayStr);
           
           alertOnScheduledTaskFailure(
             'Daily Integrity Check',
-            err instanceof Error ? err : new Error(String(err)),
+            err instanceof Error ? err : new Error(getErrorMessage(err)),
             { context: 'Scheduled check at midnight Pacific' }
           ).catch((alertErr: unknown) => {
             logger.error('[Integrity Check] Failed to send staff alert:', { error: alertErr as Error });
@@ -192,11 +193,11 @@ async function checkAndRunIntegrityCheck(): Promise<void> {
     }
   } catch (err: unknown) {
     logger.error('[Integrity Check] Scheduler error:', { error: err as Error });
-    schedulerTracker.recordRun('Integrity Check', false, String(err));
+    schedulerTracker.recordRun('Integrity Check', false, getErrorMessage(err));
     
     alertOnScheduledTaskFailure(
       'Daily Integrity Check',
-      err instanceof Error ? err : new Error(String(err)),
+      err instanceof Error ? err : new Error(getErrorMessage(err)),
       { context: 'Scheduler loop error' }
     ).catch((alertErr: unknown) => {
       logger.error('[Integrity Check] Failed to send staff alert:', { error: alertErr as Error });
@@ -213,7 +214,7 @@ async function runPeriodicAutoFix(): Promise<void> {
     schedulerTracker.recordRun('Auto-Fix Tiers', true);
   } catch (err: unknown) {
     logger.error('[Auto-Fix] Periodic tier fix failed:', { error: err as Error });
-    schedulerTracker.recordRun('Auto-Fix Tiers', false, String(err));
+    schedulerTracker.recordRun('Auto-Fix Tiers', false, getErrorMessage(err));
   }
 }
 
@@ -266,7 +267,7 @@ async function cleanupAbandonedPendingUsers(): Promise<void> {
     schedulerTracker.recordRun('Abandoned Pending Cleanup', true);
   } catch (err: unknown) {
     logger.error('[Auto-Cleanup] Failed to cleanup abandoned pending users:', { error: err as Error });
-    schedulerTracker.recordRun('Abandoned Pending Cleanup', false, String(err));
+    schedulerTracker.recordRun('Abandoned Pending Cleanup', false, getErrorMessage(err));
   }
 }
 

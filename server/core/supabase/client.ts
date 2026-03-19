@@ -290,7 +290,7 @@ async function attemptRecovery(): Promise<void> {
         attemptRecovery();
       }
     } catch (err) {
-      logger.error(`[Supabase] Recovery attempt ${recoveryAttempts} error:`, { error: err instanceof Error ? err : new Error(String(err)) });
+      logger.error(`[Supabase] Recovery attempt ${recoveryAttempts} error:`, { error: new Error(getErrorMessage(err)) });
       attemptRecovery();
     }
   }, delayMs);

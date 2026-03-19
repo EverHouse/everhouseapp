@@ -5,6 +5,7 @@ import { sql } from 'drizzle-orm';
 import { reconcileDailyPayments, reconcileSubscriptions, reconcileDailyRefunds } from '../core/stripe/reconciliation';
 import { getPacificHour, getTodayPacific } from '../utils/dateUtils';
 import { logger } from '../core/logger';
+import { getErrorMessage } from '../utils/errorUtils';
 
 const RECONCILIATION_HOUR = 5;
 const RECONCILIATION_SETTING_KEY = 'last_stripe_reconciliation_date';
@@ -38,7 +39,7 @@ async function tryClaimReconciliationSlot(todayStr: string): Promise<boolean> {
     return result.length > 0;
   } catch (err: unknown) {
     logger.error('[Stripe Reconciliation] Database error:', { error: err as Error });
-    schedulerTracker.recordRun('Stripe Reconciliation', false, String(err));
+    schedulerTracker.recordRun('Stripe Reconciliation', false, getErrorMessage(err));
     return false;
   }
 }
@@ -92,13 +93,13 @@ async function checkAndRunReconciliation(): Promise<void> {
           await markReconciliationSlotCompleted(todayStr);
         } catch (error: unknown) {
           logger.error('[Stripe Reconciliation] Error running reconciliation:', { error: error as Error });
-          schedulerTracker.recordRun('Stripe Reconciliation', false, String(error));
+          schedulerTracker.recordRun('Stripe Reconciliation', false, getErrorMessage(error));
           await markReconciliationSlotFailed(todayStr);
           
           const { alertOnScheduledTaskFailure } = await import('../core/dataAlerts');
           await alertOnScheduledTaskFailure(
             'Daily Stripe Reconciliation',
-            error instanceof Error ? error : new Error(String(error)),
+            error instanceof Error ? error : new Error(getErrorMessage(error)),
             { context: 'Scheduled reconciliation at 5am Pacific' }
           );
         }
@@ -106,7 +107,7 @@ async function checkAndRunReconciliation(): Promise<void> {
     }
   } catch (error: unknown) {
     logger.error('[Stripe Reconciliation] Scheduler error:', { error: error as Error });
-    schedulerTracker.recordRun('Stripe Reconciliation', false, String(error));
+    schedulerTracker.recordRun('Stripe Reconciliation', false, getErrorMessage(error));
   }
 }
 
@@ -138,13 +139,13 @@ export function startStripeReconciliationScheduler(): void {
   
   guardedCheckAndRunReconciliation().catch((err: unknown) => {
     logger.error('[Stripe Reconciliation] Initial check error:', { error: err as Error });
-    schedulerTracker.recordRun('Stripe Reconciliation', false, String(err));
+    schedulerTracker.recordRun('Stripe Reconciliation', false, getErrorMessage(err));
   });
   
   intervalId = setInterval(() => {
     guardedCheckAndRunReconciliation().catch((err: unknown) => {
       logger.error('[Stripe Reconciliation] Uncaught error:', { error: err as Error });
-      schedulerTracker.recordRun('Stripe Reconciliation', false, String(err));
+      schedulerTracker.recordRun('Stripe Reconciliation', false, getErrorMessage(err));
     });
   }, 5 * 60 * 1000);
 }

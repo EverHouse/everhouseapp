@@ -128,7 +128,7 @@ async function reconcilePendingSnapshots(): Promise<{ synced: number; errors: nu
     } else {
       logger.error('[Fee Snapshot Reconciliation] Scheduler error:', { error: error as Error });
     }
-    schedulerTracker.recordRun('Fee Snapshot Reconciliation', false, String(error));
+    schedulerTracker.recordRun('Fee Snapshot Reconciliation', false, getErrorMessage(error));
     return { synced, errors: errors + 1 };
   }
 }
@@ -271,7 +271,7 @@ async function cancelAbandonedPaymentIntents(): Promise<{ cancelled: number; err
     } else {
       logger.error('[Abandoned PI Cleanup] Scheduler error:', { error: error as Error });
     }
-    schedulerTracker.recordRun('Fee Snapshot Reconciliation', false, String(error));
+    schedulerTracker.recordRun('Fee Snapshot Reconciliation', false, getErrorMessage(error));
     return { cancelled, errors: errors + 1 };
   }
 }
@@ -467,7 +467,7 @@ async function reconcileStalePaymentIntents(): Promise<{ reconciled: number; err
     } else {
       logger.error('[Payment Intent Reconciliation] Scheduler error:', { error: error as Error });
     }
-    schedulerTracker.recordRun('Fee Snapshot Reconciliation', false, String(error));
+    schedulerTracker.recordRun('Fee Snapshot Reconciliation', false, getErrorMessage(error));
     return { reconciled, errors: errors + 1 };
   }
 }
@@ -503,7 +503,7 @@ export function startFeeSnapshotReconciliationScheduler(): void {
       })
       .catch((err: unknown) => {
         logger.error('[Fee Snapshot Reconciliation] Initial run error:', { error: err as Error });
-        schedulerTracker.recordRun('Fee Snapshot Reconciliation', false, String(err));
+        schedulerTracker.recordRun('Fee Snapshot Reconciliation', false, getErrorMessage(err));
       }),
 
     reconcileStalePaymentIntents()
@@ -515,7 +515,7 @@ export function startFeeSnapshotReconciliationScheduler(): void {
       })
       .catch((err: unknown) => {
         logger.error('[Payment Intent Reconciliation] Initial run error:', { error: err as Error });
-        schedulerTracker.recordRun('Fee Snapshot Reconciliation', false, String(err));
+        schedulerTracker.recordRun('Fee Snapshot Reconciliation', false, getErrorMessage(err));
       }),
 
     cancelAbandonedPaymentIntents()
@@ -527,7 +527,7 @@ export function startFeeSnapshotReconciliationScheduler(): void {
       })
       .catch((err: unknown) => {
         logger.error('[Abandoned PI Cleanup] Initial run error:', { error: err as Error });
-        schedulerTracker.recordRun('Fee Snapshot Reconciliation', false, String(err));
+        schedulerTracker.recordRun('Fee Snapshot Reconciliation', false, getErrorMessage(err));
       }),
     ])
       .then(results => {

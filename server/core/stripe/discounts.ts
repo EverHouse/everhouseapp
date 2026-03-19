@@ -151,7 +151,7 @@ export async function getDiscountSyncStatus(): Promise<Array<{
         await stripe.coupons.retrieve(couponId);
         existsInStripe = true;
       } catch (err) {
-        logger.debug('[Discount Sync] Coupon not found in Stripe', { couponId, error: err instanceof Error ? err.message : err });
+        logger.debug('[Discount Sync] Coupon not found in Stripe', { couponId, error: getErrorMessage(err) });
         existsInStripe = false;
       }
       

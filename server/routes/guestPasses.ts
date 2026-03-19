@@ -314,7 +314,7 @@ export async function useGuestPass(
     if (msg === 'No guest passes remaining') {
       return { success: false, error: msg };
     }
-    logger.error('[useGuestPass] Error', { error: error instanceof Error ? error : new Error(String(error)) });
+    logger.error('[useGuestPass] Error', { error: new Error(getErrorMessage(error)) });
     return { success: false, error: 'Failed to use guest pass' };
   }
 }
@@ -371,7 +371,7 @@ export async function refundGuestPass(
     try { broadcastMemberStatsUpdated(normalizedEmail, { guestPasses: remaining }); } catch (err: unknown) { logger.error('[Broadcast] Stats update error', { extra: { error: err } }); }
 
     sendPassUpdateForMemberByEmail(normalizedEmail).catch(err =>
-      logger.warn('[refundGuestPass] Wallet pass push failed (non-fatal)', { extra: { email: normalizedEmail, error: String(err) } })
+      logger.warn('[refundGuestPass] Wallet pass push failed (non-fatal)', { extra: { email: normalizedEmail, error: getErrorMessage(err) } })
     );
 
     return { success: true, remaining };
@@ -380,7 +380,7 @@ export async function refundGuestPass(
     if (msg === 'Member guest pass record not found') {
       return { success: false, error: msg };
     }
-    logger.error('[refundGuestPass] Error', { error: error instanceof Error ? error : new Error(String(error)) });
+    logger.error('[refundGuestPass] Error', { error: new Error(getErrorMessage(error)) });
     return { success: false, error: 'Failed to refund guest pass' };
   }
 }
@@ -401,7 +401,7 @@ export async function getGuestPassesRemaining(memberEmail: string, tier?: string
     
     return Math.max(0, result[0].passesTotal - result[0].passesUsed);
   } catch (error: unknown) {
-    logger.error('[getGuestPassesRemaining] Error', { error: error instanceof Error ? error : new Error(String(error)) });
+    logger.error('[getGuestPassesRemaining] Error', { error: new Error(getErrorMessage(error)) });
     return 0;
   }
 }
@@ -428,7 +428,7 @@ export async function ensureGuestPassRecord(memberEmail: string, tier?: string):
         .onConflictDoNothing();
     }
   } catch (error: unknown) {
-    logger.error('[ensureGuestPassRecord] Error', { error: error instanceof Error ? error : new Error(String(error)) });
+    logger.error('[ensureGuestPassRecord] Error', { error: new Error(getErrorMessage(error)) });
   }
 }
 

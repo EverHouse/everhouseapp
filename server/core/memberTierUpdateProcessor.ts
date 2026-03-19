@@ -145,7 +145,7 @@ export async function processMemberTierUpdate(payload: MemberTierUpdatePayload):
     }
 
     sendPassUpdateForMemberByEmail(normalizedEmail).catch(err =>
-      logger.warn('[MemberTierUpdateProcessor] Wallet pass push failed (non-fatal)', { extra: { email: normalizedEmail, error: String(err) } })
+      logger.warn('[MemberTierUpdateProcessor] Wallet pass push failed (non-fatal)', { extra: { email: normalizedEmail, error: getErrorMessage(err) } })
     );
 
     logger.info(`[MemberTierUpdateProcessor] Successfully updated ${normalizedEmail}: ${oldTier || 'None'} → ${newTier}`);

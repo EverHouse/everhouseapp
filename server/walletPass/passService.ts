@@ -6,6 +6,7 @@ import { generatePkPass, type PassData, type WalletConfig, type TierColors } fro
 import { getOrCreateAuthToken } from './apnPushService';
 import { getSettingValue, getSettingBoolean } from '../core/settingsHelper';
 import { logger } from '../core/logger';
+import { getErrorMessage } from '../utils/errorUtils';
 
 export async function getWalletConfig(): Promise<WalletConfig | null> {
   const isEnabled = await getSettingBoolean('apple_wallet.enabled', false);
@@ -132,7 +133,7 @@ export async function generatePassForMember(memberId: string): Promise<Buffer | 
     return await generatePkPass(passData, walletConfig, dbColors);
   } catch (err) {
     logger.error('[WalletPass] Failed to generate pass for member', {
-      error: err instanceof Error ? err : new Error(String(err)),
+      error: new Error(getErrorMessage(err)),
       extra: { memberId }
     });
     return null;

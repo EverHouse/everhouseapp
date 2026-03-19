@@ -5,6 +5,7 @@ import { isProduction } from './db';
 import { notifyMember, notifyAllStaff } from './notificationService';
 import { TIER_NAMES } from '../../shared/constants/tiers';
 import { logger } from './logger';
+import { getErrorMessage } from '../utils/errorUtils';
 
 export interface SyncExclusionRow {
   email: string;
@@ -224,7 +225,7 @@ export const getNameFromContact = (contact: HubSpotContact): { firstName: string
 };
 
 export const isTransientDbError = (err: unknown): boolean => {
-  const msg = err instanceof Error ? err.message : String(err);
+  const msg = getErrorMessage(err);
   return /connection terminat|connection timeout|pool|too many clients|ECONNRESET|ECONNREFUSED|idle_in_transaction_session_timeout/i.test(msg);
 };
 

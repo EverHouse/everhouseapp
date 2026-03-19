@@ -3,6 +3,7 @@ import { facilityClosures, bookingRequests, availabilityBlocks } from '../../sha
 import { eq, and, or, sql } from 'drizzle-orm';
 import { parseAffectedAreasBatch } from './affectedAreas';
 import { logger } from './logger';
+import { getErrorMessage } from '../utils/errorUtils';
 
 interface ClosureCacheEntry {
   closures: Record<string, unknown>[];
@@ -154,7 +155,7 @@ export async function checkClosureConflict(
 
     return { hasConflict: false };
   } catch (error: unknown) {
-    logger.error('[checkClosureConflict] Error checking closure conflict:', { error: error instanceof Error ? error : new Error(String(error)) });
+    logger.error('[checkClosureConflict] Error checking closure conflict:', { error: new Error(getErrorMessage(error)) });
     throw error;
   }
 }
@@ -268,7 +269,7 @@ export async function checkBookingConflict(
 
     return { hasConflict: false };
   } catch (error: unknown) {
-    logger.error('[checkBookingConflict] Error checking booking conflict:', { error: error instanceof Error ? error : new Error(String(error)) });
+    logger.error('[checkBookingConflict] Error checking booking conflict:', { error: new Error(getErrorMessage(error)) });
     throw error;
   }
 }
@@ -305,7 +306,7 @@ export async function checkAvailabilityBlockConflict(
 
     return { hasConflict: false };
   } catch (error: unknown) {
-    logger.error('[checkAvailabilityBlockConflict] Error checking availability block conflict:', { error: error instanceof Error ? error : new Error(String(error)) });
+    logger.error('[checkAvailabilityBlockConflict] Error checking availability block conflict:', { error: new Error(getErrorMessage(error)) });
     throw error;
   }
 }

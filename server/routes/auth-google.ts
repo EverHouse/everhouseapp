@@ -186,7 +186,7 @@ router.post('/api/auth/google/verify', requireGoogleConfig, authRateLimiterByIp,
       res.json({ success: true, member });
     });
   } catch (error: unknown) {
-    logger.error('[Google Auth] Verify error', { error: error instanceof Error ? error : new Error(String(error)) });
+    logger.error('[Google Auth] Verify error', { error: new Error(getErrorMessage(error)) });
     if (getErrorMessage(error)?.includes('Token used too late') || getErrorMessage(error)?.includes('Invalid token')) {
       return res.status(401).json({ error: 'Google sign-in expired. Please try again.' });
     }
@@ -334,7 +334,7 @@ router.post('/api/auth/google/callback', requireGoogleConfig, async (req, res) =
       res.redirect(destination);
     });
   } catch (error: unknown) {
-    logger.error('[Google Auth Callback] Error', { error: error instanceof Error ? error : new Error(String(error)) });
+    logger.error('[Google Auth Callback] Error', { error: new Error(getErrorMessage(error)) });
     res.redirect('/login?error=google_failed');
   }
 });
@@ -413,7 +413,7 @@ router.post('/api/auth/google/link', requireGoogleConfig, async (req, res) => {
       resourceId: dbUserId,
       details: { action: 'google_link', googleEmail: googleUser.email },
       req,
-    }).catch(err => logger.error('[Google Auth] Failed to log google_link action', { error: err instanceof Error ? err : new Error(String(err)) }));
+    }).catch(err => logger.error('[Google Auth] Failed to log google_link action', { error: new Error(getErrorMessage(err)) }));
 
     res.json({ success: true, googleEmail: googleUser.email });
   } catch (error: unknown) {
@@ -421,7 +421,7 @@ router.post('/api/auth/google/link', requireGoogleConfig, async (req, res) => {
     if (dbError.code === '23505') {
       return res.status(409).json({ error: 'This Google account is already linked to another member.' });
     }
-    logger.error('[Google Auth] Link error', { error: error instanceof Error ? error : new Error(String(error)) });
+    logger.error('[Google Auth] Link error', { error: new Error(getErrorMessage(error)) });
     res.status(500).json({ error: 'Failed to link Google account' });
   }
 });
@@ -462,11 +462,11 @@ router.post('/api/auth/google/unlink', requireGoogleConfig, async (req, res) => 
       resourceId: dbUserId,
       details: { action: 'google_unlink' },
       req,
-    }).catch(err => logger.error('[Google Auth] Failed to log google_unlink action', { error: err instanceof Error ? err : new Error(String(err)) }));
+    }).catch(err => logger.error('[Google Auth] Failed to log google_unlink action', { error: new Error(getErrorMessage(err)) }));
 
     res.json({ success: true });
   } catch (error: unknown) {
-    logger.error('[Google Auth] Unlink error', { error: error instanceof Error ? error : new Error(String(error)) });
+    logger.error('[Google Auth] Unlink error', { error: new Error(getErrorMessage(error)) });
     res.status(500).json({ error: 'Failed to unlink Google account' });
   }
 });
@@ -500,7 +500,7 @@ router.get('/api/auth/google/status', requireGoogleConfig, async (req, res) => {
       linkedAt: googleLinkedAt ? googleLinkedAt.toISOString() : null,
     });
   } catch (error: unknown) {
-    logger.error('[Google Auth] Status error', { error: error instanceof Error ? error : new Error(String(error)) });
+    logger.error('[Google Auth] Status error', { error: new Error(getErrorMessage(error)) });
     res.status(500).json({ error: 'Failed to check Google link status' });
   }
 });
@@ -530,7 +530,7 @@ router.get('/api/auth/google/unlinked-report', isStaffOrAdmin, async (req, res) 
       members: result.rows,
     });
   } catch (error: unknown) {
-    logger.error('[Google Auth] Unlinked report error', { error: error instanceof Error ? error : new Error(String(error)) });
+    logger.error('[Google Auth] Unlinked report error', { error: new Error(getErrorMessage(error)) });
     res.status(500).json({ error: 'Failed to generate unlinked report' });
   }
 });

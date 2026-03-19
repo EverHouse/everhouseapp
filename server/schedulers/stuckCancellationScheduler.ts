@@ -3,6 +3,7 @@ import { queryWithRetry } from '../core/db';
 import { notifyAllStaff } from '../core/notificationService';
 import { logger } from '../core/logger';
 import { ensureTimeString } from '../utils/dateTimeUtils';
+import { getErrorMessage } from '../utils/errorUtils';
 
 interface StuckCancellationResult {
   id: number;
@@ -73,7 +74,7 @@ async function checkStuckCancellations(): Promise<void> {
 
   } catch (error: unknown) {
     logger.error('[Stuck Cancellations] Scheduler error:', { error: error as Error });
-    schedulerTracker.recordRun('Stuck Cancellation', false, String(error));
+    schedulerTracker.recordRun('Stuck Cancellation', false, getErrorMessage(error));
     logger.error('Failed to check stuck cancellation bookings', { error: error as Error, extra: { context: 'stuck_cancellation_scheduler' } });
   }
 }
@@ -106,7 +107,7 @@ export function startStuckCancellationScheduler(): void {
   intervalId = setInterval(() => {
     guardedCheck().catch((err: unknown) => {
       logger.error('[Stuck Cancellations] Uncaught error:', { error: err as Error });
-      schedulerTracker.recordRun('Stuck Cancellation', false, String(err));
+      schedulerTracker.recordRun('Stuck Cancellation', false, getErrorMessage(err));
     });
   }, 2 * 60 * 60 * 1000);
 
@@ -114,7 +115,7 @@ export function startStuckCancellationScheduler(): void {
     timeoutId = null;
     guardedCheck().catch((err: unknown) => {
       logger.error('[Stuck Cancellations] Initial run error:', { error: err as Error });
-      schedulerTracker.recordRun('Stuck Cancellation', false, String(err));
+      schedulerTracker.recordRun('Stuck Cancellation', false, getErrorMessage(err));
     });
   }, 60 * 1000);
 }

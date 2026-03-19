@@ -6,6 +6,7 @@ import { sendDailyReminders } from '../routes/push';
 import { getPacificHour, getTodayPacific } from '../utils/dateUtils';
 import { logger } from '../core/logger';
 import { getSettingValue } from '../core/settingsHelper';
+import { getErrorMessage } from '../utils/errorUtils';
 
 const DEFAULT_REMINDER_HOUR = 18;
 const REMINDER_SETTING_KEY = 'last_daily_reminder_date';
@@ -39,7 +40,7 @@ async function tryClaimReminderSlot(todayStr: string): Promise<boolean> {
     return result.length > 0;
   } catch (err: unknown) {
     logger.error('[Daily Reminders] Database error:', { error: err as Error });
-    schedulerTracker.recordRun('Daily Reminder', false, String(err));
+    schedulerTracker.recordRun('Daily Reminder', false, getErrorMessage(err));
     return false;
   }
 }
@@ -79,14 +80,14 @@ async function checkAndSendReminders(): Promise<void> {
           await markReminderSlotCompleted(todayStr);
         } catch (err: unknown) {
           logger.error('[Daily Reminders] Send failed:', { error: err as Error });
-          schedulerTracker.recordRun('Daily Reminder', false, String(err));
+          schedulerTracker.recordRun('Daily Reminder', false, getErrorMessage(err));
           await markReminderSlotFailed(todayStr);
         }
       }
     }
   } catch (err: unknown) {
     logger.error('[Daily Reminders] Scheduler error:', { error: err as Error });
-    schedulerTracker.recordRun('Daily Reminder', false, String(err));
+    schedulerTracker.recordRun('Daily Reminder', false, getErrorMessage(err));
   }
 }
 
@@ -115,7 +116,7 @@ export function startDailyReminderScheduler(): void {
   intervalId = setInterval(() => {
     guardedCheckAndSendReminders().catch((err: unknown) => {
       logger.error('[Daily Reminders] Uncaught error:', { error: err as Error });
-      schedulerTracker.recordRun('Daily Reminder', false, String(err));
+      schedulerTracker.recordRun('Daily Reminder', false, getErrorMessage(err));
     });
   }, 30 * 60 * 1000);
   logger.info('[Startup] Daily reminder scheduler enabled (runs at 6pm)');

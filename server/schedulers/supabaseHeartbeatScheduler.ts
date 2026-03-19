@@ -1,6 +1,7 @@
 import { schedulerTracker } from '../core/schedulerTracker';
 import { logger } from '../core/logger';
 import { isSupabaseConfigured, getSupabaseAdmin, isRealtimeEnabled, resetSupabaseAvailability, enableRealtimeWithRetry } from '../core/supabase/client';
+import { getErrorMessage } from '../utils/errorUtils';
 
 let intervalId: NodeJS.Timeout | null = null;
 let initialTimerId: NodeJS.Timeout | null = null;
@@ -56,7 +57,7 @@ export function startSupabaseHeartbeatScheduler(): void {
       schedulerTracker.recordRun('Supabase Heartbeat', true);
     } catch (err: unknown) {
       logger.error('[Supabase Heartbeat] Initial run error:', { error: err as Error });
-      schedulerTracker.recordRun('Supabase Heartbeat', false, String(err));
+      schedulerTracker.recordRun('Supabase Heartbeat', false, getErrorMessage(err));
     }
   }, 30 * 1000);
 
@@ -68,7 +69,7 @@ export function startSupabaseHeartbeatScheduler(): void {
       .then(() => schedulerTracker.recordRun('Supabase Heartbeat', true))
       .catch((err: unknown) => {
         logger.error('[Supabase Heartbeat] Scheduler error:', { error: err as Error });
-        schedulerTracker.recordRun('Supabase Heartbeat', false, String(err));
+        schedulerTracker.recordRun('Supabase Heartbeat', false, getErrorMessage(err));
       })
       .finally(() => { heartbeatRunning = false; });
   }, HEARTBEAT_INTERVAL);

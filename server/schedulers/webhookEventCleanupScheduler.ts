@@ -2,6 +2,7 @@ import { schedulerTracker } from '../core/schedulerTracker';
 import { db } from '../db';
 import { sql } from 'drizzle-orm';
 import { logger } from '../core/logger';
+import { getErrorMessage } from '../utils/errorUtils';
 
 async function cleanupOldWebhookEvents(): Promise<void> {
   try {
@@ -13,7 +14,7 @@ async function cleanupOldWebhookEvents(): Promise<void> {
     schedulerTracker.recordRun('Webhook Event Cleanup', true);
   } catch (error: unknown) {
     logger.error('[Webhook Event Cleanup] Scheduler error:', { error: error as Error });
-    schedulerTracker.recordRun('Webhook Event Cleanup', false, String(error));
+    schedulerTracker.recordRun('Webhook Event Cleanup', false, getErrorMessage(error));
   }
 }
 
@@ -44,14 +45,14 @@ export function startWebhookEventCleanupScheduler(): void {
   intervalId = setInterval(() => {
     guardedCleanup().catch((err: unknown) => {
       logger.error('[Webhook Event Cleanup] Uncaught error:', { error: err as Error });
-      schedulerTracker.recordRun('Webhook Event Cleanup', false, String(err));
+      schedulerTracker.recordRun('Webhook Event Cleanup', false, getErrorMessage(err));
     });
   }, 24 * 60 * 60 * 1000);
 
   setTimeout(() => {
     guardedCleanup().catch((err: unknown) => {
       logger.error('[Webhook Event Cleanup] Initial run error:', { error: err as Error });
-      schedulerTracker.recordRun('Webhook Event Cleanup', false, String(err));
+      schedulerTracker.recordRun('Webhook Event Cleanup', false, getErrorMessage(err));
     });
   }, 5 * 60 * 1000);
 }

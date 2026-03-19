@@ -6,6 +6,7 @@ import { validateAuthToken } from '../walletPass/apnPushService';
 import { logger } from '../core/logger';
 import { validateQuery } from '../middleware/validate';
 import { z } from 'zod';
+import { getErrorMessage } from '../utils/errorUtils';
 
 const router = Router();
 
@@ -80,7 +81,7 @@ router.post('/v1/devices/:deviceLibraryId/registrations/:passTypeId/:serialNumbe
     return res.status(201).send('');
   } catch (err) {
     logger.error('[WalletPass WebService] Device registration failed', {
-      error: err instanceof Error ? err : new Error(String(err))
+      error: new Error(getErrorMessage(err))
     });
     return res.status(500).send('Internal Server Error');
   }
@@ -175,7 +176,7 @@ router.get('/v1/devices/:deviceLibraryId/registrations/:passTypeId', validateQue
     });
   } catch (err) {
     logger.error('[WalletPass WebService] List serials failed', {
-      error: err instanceof Error ? err : new Error(String(err))
+      error: new Error(getErrorMessage(err))
     });
     return res.status(500).send('Internal Server Error');
   }
@@ -232,7 +233,7 @@ router.get('/v1/passes/:passTypeId/:serialNumber', async (req, res) => {
     return res.send(pkpassBuffer);
   } catch (err) {
     logger.error('[WalletPass WebService] Fetch pass failed', {
-      error: err instanceof Error ? err : new Error(String(err))
+      error: new Error(getErrorMessage(err))
     });
     return res.status(500).send('Internal Server Error');
   }
@@ -265,7 +266,7 @@ router.delete('/v1/devices/:deviceLibraryId/registrations/:passTypeId/:serialNum
     return res.status(200).send('');
   } catch (err) {
     logger.error('[WalletPass WebService] Device unregistration failed', {
-      error: err instanceof Error ? err : new Error(String(err))
+      error: new Error(getErrorMessage(err))
     });
     return res.status(500).send('Internal Server Error');
   }
@@ -283,7 +284,7 @@ router.post('/v1/log', async (req, res) => {
     return res.status(200).send('');
   } catch (err) {
     logger.error('[WalletPass WebService] Log endpoint failed', {
-      error: err instanceof Error ? err : new Error(String(err))
+      error: new Error(getErrorMessage(err))
     });
     return res.status(200).send('');
   }

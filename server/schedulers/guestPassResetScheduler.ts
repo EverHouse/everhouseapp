@@ -4,6 +4,7 @@ import { queryWithRetry } from '../core/db';
 import { getPacificHour, getPacificDayOfMonth, getPacificDateParts } from '../utils/dateUtils';
 import { logger } from '../core/logger';
 import { sendPassUpdateForMemberByEmail } from '../walletPass/apnPushService';
+import { getErrorMessage } from '../utils/errorUtils';
 
 const RESET_HOUR = 3;
 
@@ -21,10 +22,10 @@ async function tryClaimResetSlot(yearKey: string): Promise<boolean> {
     return (result.rowCount || 0) > 0;
   } catch (err: unknown) {
     logger.error('[Guest Pass Reset] Failed to claim reset slot:', { error: err as Error });
-    schedulerTracker.recordRun('Guest Pass Reset', false, String(err));
+    schedulerTracker.recordRun('Guest Pass Reset', false, getErrorMessage(err));
     alertOnScheduledTaskFailure(
       'Guest Pass Reset',
-      err instanceof Error ? err : new Error(String(err)),
+      err instanceof Error ? err : new Error(getErrorMessage(err)),
       { context: 'Failed to claim yearly reset slot' }
     ).catch((alertErr: unknown) => {
       logger.error('[Guest Pass Reset] Failed to send staff alert:', { error: alertErr as Error });
@@ -78,13 +79,13 @@ async function resetGuestPasses(): Promise<void> {
       schedulerTracker.recordRun('Guest Pass Reset', true);
 
       sendPassUpdateForMemberByEmail(row.member_email as string).catch(err => {
-        logger.warn('[Guest Pass Reset] Wallet pass push failed', { extra: { email: row.member_email, error: String(err) } });
+        logger.warn('[Guest Pass Reset] Wallet pass push failed', { extra: { email: row.member_email, error: getErrorMessage(err) } });
       });
     }
     
   } catch (error: unknown) {
     logger.error('[Guest Pass Reset] Scheduler error:', { error: error as Error });
-    schedulerTracker.recordRun('Guest Pass Reset', false, String(error));
+    schedulerTracker.recordRun('Guest Pass Reset', false, getErrorMessage(error));
   }
 }
 
@@ -117,7 +118,7 @@ export function startGuestPassResetScheduler(): void {
   intervalId = setInterval(() => {
     guardedResetGuestPasses().catch((err: unknown) => {
       logger.error('[Guest Pass Reset] Uncaught error:', { error: err as Error });
-      schedulerTracker.recordRun('Guest Pass Reset', false, String(err));
+      schedulerTracker.recordRun('Guest Pass Reset', false, getErrorMessage(err));
     });
   }, 60 * 60 * 1000);
 }

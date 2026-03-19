@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm';
 import { logger } from '../logger';
 import { formatTime12Hour } from '../../utils/dateUtils';
+import { getErrorMessage } from '../../utils/errorUtils';
 
 function isUndefinedTableError(err: unknown): boolean {
   const msg = String(err);
@@ -106,7 +107,7 @@ export async function checkResourceOverlap(
     if (isUndefinedTableError(err)) {
       trackmanBayCheck = { rows: [] };
     } else {
-      logger.error('[BookingGuard] Failed to check trackman_bay_slots', { extra: { error: String(err) } });
+      logger.error('[BookingGuard] Failed to check trackman_bay_slots', { extra: { error: getErrorMessage(err) } });
       throw new BookingConflictError(503, { error: 'Unable to verify slot availability. Please try again.' });
     }
   }
@@ -142,7 +143,7 @@ export async function checkResourceOverlap(
     if (isUndefinedTableError(err)) {
       unmatchedCheck = { rows: [] };
     } else {
-      logger.error('[BookingGuard] Failed to check trackman_unmatched_bookings', { extra: { error: String(err) } });
+      logger.error('[BookingGuard] Failed to check trackman_unmatched_bookings', { extra: { error: getErrorMessage(err) } });
       throw new BookingConflictError(503, { error: 'Unable to verify slot availability. Please try again.' });
     }
   }
@@ -177,7 +178,7 @@ export async function checkResourceOverlap(
     if (isUndefinedTableError(err)) {
       sessionCheck = { rows: [] };
     } else {
-      logger.error('[BookingGuard] Failed to check booking_sessions', { extra: { error: String(err) } });
+      logger.error('[BookingGuard] Failed to check booking_sessions', { extra: { error: getErrorMessage(err) } });
       throw new BookingConflictError(503, { error: 'Unable to verify slot availability. Please try again.' });
     }
   }

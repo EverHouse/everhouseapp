@@ -234,7 +234,7 @@ router.post('/api/data-tools/sync-subscription-status', isAdmin, async (req: Req
       dryRun
     });
   } catch (error: unknown) {
-    logger.error('[DataTools] Sync subscription status error', { error: error instanceof Error ? error : new Error(String(error)) });
+    logger.error('[DataTools] Sync subscription status error', { error: new Error(getErrorMessage(error)) });
     res.status(500).json({ error: 'Failed to sync subscription status', details: safeErrorDetail(error) });
   }
 });
@@ -344,7 +344,7 @@ router.post('/api/data-tools/clear-orphaned-stripe-ids', isAdmin, async (req: Re
       dryRun
     });
   } catch (error: unknown) {
-    logger.error('[DataTools] Clear orphaned Stripe IDs error', { error: error instanceof Error ? error : new Error(String(error)) });
+    logger.error('[DataTools] Clear orphaned Stripe IDs error', { error: new Error(getErrorMessage(error)) });
     res.status(500).json({ error: 'Failed to clear orphaned Stripe IDs', details: safeErrorDetail(error) });
   }
 });
@@ -497,7 +497,7 @@ router.post('/api/data-tools/link-stripe-hubspot', isAdmin, async (req: Request,
       dryRun
     });
   } catch (error: unknown) {
-    logger.error('[DataTools] Link Stripe-HubSpot error', { error: error instanceof Error ? error : new Error(String(error)) });
+    logger.error('[DataTools] Link Stripe-HubSpot error', { error: new Error(getErrorMessage(error)) });
     res.status(500).json({ error: 'Failed to link Stripe-HubSpot', details: safeErrorDetail(error) });
   }
 });
@@ -701,7 +701,7 @@ router.post('/api/data-tools/sync-payment-status', isAdmin, async (req: Request,
       dryRun
     });
   } catch (error: unknown) {
-    logger.error('[DataTools] Sync payment status error', { error: error instanceof Error ? error : new Error(String(error)) });
+    logger.error('[DataTools] Sync payment status error', { error: new Error(getErrorMessage(error)) });
     res.status(500).json({ error: 'Failed to sync payment status', details: safeErrorDetail(error) });
   }
 });
@@ -720,7 +720,7 @@ async function runCleanupInBackground(jobId: string, dryRun: boolean, staffEmail
   const syncProgress = async () => {
     currentCleanupProgress = { ...progress };
     await updateJobProgress(jobId, progress as unknown as Record<string, unknown>).catch((err: unknown) => {
-      logger.warn('[StripeTools] Failed to update job progress', { extra: { jobId, error: String(err) } });
+      logger.warn('[StripeTools] Failed to update job progress', { extra: { jobId, error: getErrorMessage(err) } });
     });
   };
 
@@ -906,7 +906,7 @@ async function runCleanupInBackground(jobId: string, dryRun: boolean, staffEmail
     currentCleanupProgress = { ...progress };
     broadcastToStaff({ type: 'stripe_cleanup_progress', data: progress, result: jobResult });
   } catch (error: unknown) {
-    logger.error('[DataTools] Stripe customer cleanup error', { error: error instanceof Error ? error : new Error(String(error)) });
+    logger.error('[DataTools] Stripe customer cleanup error', { error: new Error(getErrorMessage(error)) });
     progress.phase = 'done';
     await failJob(jobId, getErrorMessage(error), progress as unknown as Record<string, unknown>);
     currentCleanupProgress = { ...progress };
@@ -952,7 +952,7 @@ router.post('/api/data-tools/cleanup-stripe-customers', isAdmin, async (req: Req
     
     res.json({ success: true, jobId, message: 'Cleanup job started' });
   } catch (error: unknown) {
-    logger.error('[DataTools] Stripe customer cleanup error', { error: error instanceof Error ? error : new Error(String(error)) });
+    logger.error('[DataTools] Stripe customer cleanup error', { error: new Error(getErrorMessage(error)) });
     res.status(500).json({ error: 'Failed to start cleanup job', details: safeErrorDetail(error) });
   }
 });

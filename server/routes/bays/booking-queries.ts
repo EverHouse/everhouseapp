@@ -10,6 +10,7 @@ import { isAuthenticated } from '../../core/middleware';
 import { normalizeToISODate } from '../../utils/dateNormalize';
 import { validateQuery } from '../../middleware/validate';
 import { z } from 'zod';
+import { getErrorMessage } from '../../utils/errorUtils';
 
 const router = Router();
 
@@ -204,7 +205,7 @@ router.get('/api/fee-estimate', isAuthenticated, validateQuery(feeEstimateQueryS
           }
         }
       } catch (err: unknown) {
-        logger.error('[FeeEstimate] Failed to resolve member user IDs to emails', { error: err instanceof Error ? err : new Error(String(err)) });
+        logger.error('[FeeEstimate] Failed to resolve member user IDs to emails', { error: new Error(getErrorMessage(err)) });
       }
     }
     

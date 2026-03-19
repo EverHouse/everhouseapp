@@ -6,6 +6,7 @@ import { queryWithRetry } from '../core/db';
 import { notifyAllStaff } from '../core/notificationService';
 import { getPacificHour, getTodayPacific } from '../utils/dateUtils';
 import { logger } from '../core/logger';
+import { getErrorMessage } from '../utils/errorUtils';
 
 const UNRESOLVED_TRACKMAN_CHECK_HOUR = 9;
 const UNRESOLVED_TRACKMAN_SETTING_KEY = 'last_unresolved_trackman_check_date';
@@ -39,7 +40,7 @@ async function tryClaimUnresolvedTrackmanSlot(todayStr: string): Promise<boolean
     return result.length > 0;
   } catch (err: unknown) {
     logger.error('[Unresolved Trackman Check] Database error:', { error: err as Error });
-    schedulerTracker.recordRun('Unresolved Trackman', false, String(err));
+    schedulerTracker.recordRun('Unresolved Trackman', false, getErrorMessage(err));
     return false;
   }
 }
@@ -110,14 +111,14 @@ async function checkUnresolvedTrackmanBookings(): Promise<void> {
           await markTrackmanSlotCompleted(todayStr);
         } catch (err: unknown) {
           logger.error('[Unresolved Trackman Check] Check failed:', { error: err as Error });
-          schedulerTracker.recordRun('Unresolved Trackman', false, String(err));
+          schedulerTracker.recordRun('Unresolved Trackman', false, getErrorMessage(err));
           await markTrackmanSlotFailed(todayStr);
         }
       }
     }
   } catch (err: unknown) {
     logger.error('[Unresolved Trackman Check] Scheduler error:', { error: err as Error });
-    schedulerTracker.recordRun('Unresolved Trackman', false, String(err));
+    schedulerTracker.recordRun('Unresolved Trackman', false, getErrorMessage(err));
   }
 }
 
@@ -146,7 +147,7 @@ export function startUnresolvedTrackmanScheduler(): void {
   intervalId = setInterval(() => {
     guardedCheckUnresolvedTrackmanBookings().catch((err: unknown) => {
       logger.error('[Unresolved Trackman] Uncaught error:', { error: err as Error });
-      schedulerTracker.recordRun('Unresolved Trackman', false, String(err));
+      schedulerTracker.recordRun('Unresolved Trackman', false, getErrorMessage(err));
     });
   }, 15 * 60 * 1000);
   logger.info('[Startup] Unresolved Trackman check scheduler enabled (runs at 9am Pacific)');

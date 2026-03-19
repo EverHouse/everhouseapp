@@ -5,6 +5,7 @@ import { notifyAllStaff } from '../core/notificationService';
 import { ensureSessionForBooking } from '../core/bookingService/sessionManager';
 import { logger } from '../core/logger';
 import { refreshBookingPass } from '../walletPass/bookingPassService';
+import { getErrorMessage } from '../utils/errorUtils';
 
 interface AutoCompletedBookingResult {
   id: number;
@@ -172,7 +173,7 @@ async function autoCompletePastBookings(): Promise<void> {
 
     for (const booking of markedBookings.rows) {
       refreshBookingPass(booking.id).catch(err =>
-        logger.error('[Booking Auto-Complete] Wallet pass refresh failed', { extra: { bookingId: booking.id, error: String(err) } })
+        logger.error('[Booking Auto-Complete] Wallet pass refresh failed', { extra: { bookingId: booking.id, error: getErrorMessage(err) } })
       );
     }
 
@@ -197,7 +198,7 @@ async function autoCompletePastBookings(): Promise<void> {
 
   } catch (error: unknown) {
     logger.error('[Booking Auto-Complete] Error auto-completing bookings:', { error: error as Error });
-    schedulerTracker.recordRun('Booking Auto-Complete', false, String(error));
+    schedulerTracker.recordRun('Booking Auto-Complete', false, getErrorMessage(error));
   }
 }
 
@@ -337,7 +338,7 @@ export async function runManualBookingAutoComplete(): Promise<{ markedCount: num
 
   for (const booking of result.rows) {
     refreshBookingPass(booking.id).catch(err =>
-      logger.error('[Booking Auto-Complete] Manual: wallet pass refresh failed', { extra: { bookingId: booking.id, error: String(err) } })
+      logger.error('[Booking Auto-Complete] Manual: wallet pass refresh failed', { extra: { bookingId: booking.id, error: getErrorMessage(err) } })
     );
   }
 

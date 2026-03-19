@@ -1,6 +1,7 @@
 import { schedulerTracker } from '../core/schedulerTracker';
 import { getPacificHour, getTodayPacific } from '../utils/dateUtils';
 import { logger } from '../core/logger';
+import { getErrorMessage } from '../utils/errorUtils';
 
 let isRunning = false;
 let intervalId: NodeJS.Timeout | null = null;
@@ -26,7 +27,7 @@ export function startSessionCleanupScheduler(): NodeJS.Timeout {
       }
     } catch (err: unknown) {
       logger.error('[Session Cleanup] Scheduler error:', { error: err as Error });
-      schedulerTracker.recordRun('Session Cleanup', false, String(err));
+      schedulerTracker.recordRun('Session Cleanup', false, getErrorMessage(err));
       lastRunDate = null;
     } finally {
       isRunning = false;

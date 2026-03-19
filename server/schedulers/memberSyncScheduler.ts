@@ -2,6 +2,7 @@ import { schedulerTracker } from '../core/schedulerTracker';
 import { syncAllMembersFromHubSpot, setLastMemberSyncTime } from '../core/memberSync';
 import { getPacificDateParts } from '../utils/dateUtils';
 import { logger } from '../core/logger';
+import { getErrorMessage } from '../utils/errorUtils';
 
 const SYNC_HOUR = 3;
 let currentTimeoutId: NodeJS.Timeout | null = null;
@@ -37,7 +38,7 @@ async function runDailyMemberSync(): Promise<void> {
     await setLastMemberSyncTime(Date.now());
   } catch (err: unknown) {
     logger.error('[MemberSync] Daily reconciliation failed:', { error: err as Error });
-    schedulerTracker.recordRun('Member Sync', false, String(err));
+    schedulerTracker.recordRun('Member Sync', false, getErrorMessage(err));
   } finally {
     isRunning = false;
   }

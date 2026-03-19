@@ -6,6 +6,7 @@ import { broadcastAvailabilityUpdate } from '../core/websocket';
 import { logger } from '../core/logger';
 import { voidBookingPass } from '../walletPass/bookingPassService';
 import { cancelPendingPaymentIntentsForBooking } from '../core/billing/paymentIntentCleanup';
+import { getErrorMessage } from '../utils/errorUtils';
 
 interface ExpiredBookingResult {
   id: number;
@@ -116,7 +117,7 @@ async function expireStaleBookingRequests(): Promise<void> {
         logger.warn(`[Booking Expiry] Failed to cancel Stripe PIs for expired booking #${booking.id}`, { error: err });
       }
       voidBookingPass(booking.id).catch(err =>
-        logger.error('[Booking Expiry] Wallet pass void failed', { extra: { bookingId: booking.id, error: String(err) } })
+        logger.error('[Booking Expiry] Wallet pass void failed', { extra: { bookingId: booking.id, error: getErrorMessage(err) } })
       );
     }
 
@@ -180,7 +181,7 @@ async function expireStaleBookingRequests(): Promise<void> {
 
   } catch (error: unknown) {
     logger.error('[Booking Expiry] Error expiring stale bookings:', { error: error as Error });
-    schedulerTracker.recordRun('Booking Expiry', false, String(error));
+    schedulerTracker.recordRun('Booking Expiry', false, getErrorMessage(error));
     logger.error('Failed to expire stale booking requests', { error: error as Error, extra: { context: 'booking_expiry_scheduler' } });
   }
 }
@@ -291,7 +292,7 @@ export async function runManualBookingExpiry(): Promise<{ expiredCount: number }
         logger.warn(`[Booking Expiry] Manual: failed to cancel Stripe PIs for expired booking #${expiredId}`, { error: err });
       }
       voidBookingPass(expiredId).catch(err =>
-        logger.error('[Booking Expiry] Manual: wallet pass void failed', { extra: { bookingId: expiredId, error: String(err) } })
+        logger.error('[Booking Expiry] Manual: wallet pass void failed', { extra: { bookingId: expiredId, error: getErrorMessage(err) } })
       );
     }
   }

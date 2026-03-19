@@ -8,6 +8,7 @@ import { getMemberTierByEmail, getTierLimits } from '../../core/tierService';
 import { computeFeeBreakdown, recalculateSessionFees } from '../../core/billing/unifiedFeeService';
 import { PRICING } from '../../core/billing/pricingConfig';
 import { checkBookingPaymentStatus } from '../../core/billing/bookingInvoiceService';
+import { getErrorMessage } from '../../utils/errorUtils';
 import type { DbRow } from './admin-roster-shared';
 
 const router = Router();
@@ -205,7 +206,7 @@ router.get('/api/admin/booking/:id/members', isStaffOrAdmin, async (req, res) =>
           excludeSessionFromUsage: true
         });
       } catch (feeErr) {
-        logger.warn('computeFeeBreakdown failed for booking members, using fallback', { extra: { bookingId, sessionId, error: feeErr instanceof Error ? feeErr.message : String(feeErr) } });
+        logger.warn('computeFeeBreakdown failed for booking members, using fallback', { extra: { bookingId, sessionId, error: getErrorMessage(feeErr) } });
         feeBreakdownResult = { totals: { totalCents: 0, overageCents: 0, guestCents: 0, guestPassesUsed: 0, guestPassesAvailable: 0 }, participants: [], metadata: { effectivePlayerCount: expectedPlayerCount, declaredPlayerCount: expectedPlayerCount, actualPlayerCount: 0, sessionDuration: durationMinutes as number, sessionDate: String(requestDate || ''), source: 'preview' } };
       }
 
@@ -899,7 +900,7 @@ router.get('/api/admin/booking/:id/members', isStaffOrAdmin, async (req, res) =>
         try {
           breakdown = await recalculateSessionFees(sessionId as number, 'checkin');
         } catch (feeErr) {
-          logger.warn('recalculateSessionFees failed, using cached fees', { extra: { sessionId, error: feeErr instanceof Error ? feeErr.message : String(feeErr) } });
+          logger.warn('recalculateSessionFees failed, using cached fees', { extra: { sessionId, error: getErrorMessage(feeErr) } });
           breakdown = { totals: { totalCents: 0, overageCents: 0, guestCents: 0, guestPassesUsed: 0, guestPassesAvailable: 0 }, participants: [], metadata: { effectivePlayerCount: 1, declaredPlayerCount: 1, actualPlayerCount: 0, sessionDuration: 60, sessionDate: '', source: 'checkin' } };
         }
         

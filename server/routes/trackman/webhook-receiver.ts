@@ -97,7 +97,7 @@ async function notifyMemberBookingConfirmed(
       );
     }
   } catch (e: unknown) {
-    logger.error('[Trackman Webhook] Failed to notify member', { error: e instanceof Error ? e : new Error(String(e)) });
+    logger.error('[Trackman Webhook] Failed to notify member', { error: new Error(getErrorMessage(e)) });
   }
 }
 
@@ -421,7 +421,7 @@ router.post('/api/webhooks/trackman', async (req: Request, res: Response) => {
               `Bay ${resourceId} block removed for ${v2Result.normalized.parsedDate} ${v2Result.normalized.parsedStartTime}–${endTime}`,
               'trackman_booking',
               {}
-            ).catch(err => logger.warn('[Trackman Webhook] Failed to notify staff of block removal', { extra: { error: String(err) } }));
+            ).catch(err => logger.warn('[Trackman Webhook] Failed to notify staff of block removal', { extra: { error: getErrorMessage(err) } }));
           }
         } else {
           const cancelResult = await cancelBookingByTrackmanId(v2Result.normalized.trackmanBookingId!);
@@ -480,7 +480,7 @@ router.post('/api/webhooks/trackman', async (req: Request, res: Response) => {
               `Bay ${resourceId} blocked for ${blockDate} ${startTime}–${endTime}`,
               'trackman_booking',
               {}
-            ).catch(err => logger.warn('[Trackman Webhook] Failed to notify staff of block creation', { extra: { error: String(err) } }));
+            ).catch(err => logger.warn('[Trackman Webhook] Failed to notify staff of block creation', { extra: { error: getErrorMessage(err) } }));
           }
         } else {
           eventType = 'booking.block';
@@ -575,7 +575,7 @@ router.post('/api/webhooks/trackman', async (req: Request, res: Response) => {
     );
     
   } catch (error: unknown) {
-    logger.error('[Trackman Webhook] Processing error', { error: error instanceof Error ? error : new Error(String(error)) });
+    logger.error('[Trackman Webhook] Processing error', { error: new Error(getErrorMessage(error)) });
     
     await logWebhookEvent(
       'error',
@@ -588,7 +588,7 @@ router.post('/api/webhooks/trackman', async (req: Request, res: Response) => {
     );
   }
   } catch (error: unknown) {
-    logger.error('[Trackman Webhook] Unhandled error', { error: error instanceof Error ? error : new Error(String(error)) });
+    logger.error('[Trackman Webhook] Unhandled error', { error: new Error(getErrorMessage(error)) });
     if (!res.headersSent) {
       return res.status(500).json({ error: 'Internal server error' });
     }

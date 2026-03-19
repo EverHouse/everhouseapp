@@ -205,7 +205,7 @@ router.post('/api/auth/apple/verify', requireAppleConfig, authRateLimiterByIp, a
       res.json({ success: true, member });
     });
   } catch (error: unknown) {
-    logger.error('[Apple Auth] Verify error', { error: error instanceof Error ? error : new Error(String(error)) });
+    logger.error('[Apple Auth] Verify error', { error: new Error(getErrorMessage(error)) });
     const msg = getErrorMessage(error);
     if (msg?.includes('expired') || msg?.includes('invalid')) {
       return res.status(401).json({ error: 'Apple sign-in expired. Please try again.' });
@@ -288,7 +288,7 @@ router.post('/api/auth/apple/link', requireAppleConfig, async (req, res) => {
       resourceId: dbUserId,
       details: { action: 'apple_link', appleEmail: appleData.email },
       req,
-    }).catch(err => logger.error('[Apple Auth] Failed to log apple_link action', { error: err instanceof Error ? err : new Error(String(err)) }));
+    }).catch(err => logger.error('[Apple Auth] Failed to log apple_link action', { error: new Error(getErrorMessage(err)) }));
 
     res.json({ success: true, appleEmail: appleData.email });
   } catch (error: unknown) {
@@ -296,7 +296,7 @@ router.post('/api/auth/apple/link', requireAppleConfig, async (req, res) => {
     if (dbError.code === '23505') {
       return res.status(409).json({ error: 'This Apple account is already linked to another member.' });
     }
-    logger.error('[Apple Auth] Link error', { error: error instanceof Error ? error : new Error(String(error)) });
+    logger.error('[Apple Auth] Link error', { error: new Error(getErrorMessage(error)) });
     res.status(500).json({ error: 'Failed to link Apple account' });
   }
 });
@@ -337,11 +337,11 @@ router.post('/api/auth/apple/unlink', requireAppleConfig, async (req, res) => {
       resourceId: dbUserId,
       details: { action: 'apple_unlink' },
       req,
-    }).catch(err => logger.error('[Apple Auth] Failed to log apple_unlink action', { error: err instanceof Error ? err : new Error(String(err)) }));
+    }).catch(err => logger.error('[Apple Auth] Failed to log apple_unlink action', { error: new Error(getErrorMessage(err)) }));
 
     res.json({ success: true });
   } catch (error: unknown) {
-    logger.error('[Apple Auth] Unlink error', { error: error instanceof Error ? error : new Error(String(error)) });
+    logger.error('[Apple Auth] Unlink error', { error: new Error(getErrorMessage(error)) });
     res.status(500).json({ error: 'Failed to unlink Apple account' });
   }
 });
@@ -375,7 +375,7 @@ router.get('/api/auth/apple/status', requireAppleConfig, async (req, res) => {
       linkedAt: appleLinkedAt ? appleLinkedAt.toISOString() : null,
     });
   } catch (error: unknown) {
-    logger.error('[Apple Auth] Status error', { error: error instanceof Error ? error : new Error(String(error)) });
+    logger.error('[Apple Auth] Status error', { error: new Error(getErrorMessage(error)) });
     res.status(500).json({ error: 'Failed to check Apple link status' });
   }
 });

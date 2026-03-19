@@ -3,6 +3,7 @@ import { queryWithRetry } from '../core/db';
 import { notifyAllStaff } from '../core/notificationService';
 import { alertOnScheduledTaskFailure } from '../core/dataAlerts';
 import { logger } from '../core/logger';
+import { getErrorMessage } from '../utils/errorUtils';
 
 interface StaleWaiver {
   id: number;
@@ -82,7 +83,7 @@ export async function checkStaleWaivers(): Promise<{
     };
   } catch (error: unknown) {
     logger.error('[Waiver Review] Error checking stale waivers:', { error: error as Error });
-    schedulerTracker.recordRun('Waiver Review', false, String(error));
+    schedulerTracker.recordRun('Waiver Review', false, getErrorMessage(error));
     throw error;
   }
 }
@@ -100,11 +101,11 @@ async function scheduledCheck(): Promise<void> {
     await checkStaleWaivers();
   } catch (error: unknown) {
     logger.error('[Waiver Review] Scheduled check failed:', { error: error as Error });
-    schedulerTracker.recordRun('Waiver Review', false, String(error));
+    schedulerTracker.recordRun('Waiver Review', false, getErrorMessage(error));
     
     alertOnScheduledTaskFailure(
       'Waiver Review Check',
-      error instanceof Error ? error : new Error(String(error)),
+      error instanceof Error ? error : new Error(getErrorMessage(error)),
       { context: 'Scheduled check for stale waivers' }
     ).catch((alertErr: unknown) => {
       logger.error('[Waiver Review] Failed to send staff alert:', { error: alertErr as Error });
@@ -132,7 +133,7 @@ export function startWaiverReviewScheduler(): void {
     scheduledCheck()
       .catch((err: unknown) => {
         logger.error('[Waiver Review] Uncaught error:', { error: err as Error });
-        schedulerTracker.recordRun('Waiver Review', false, String(err));
+        schedulerTracker.recordRun('Waiver Review', false, getErrorMessage(err));
       })
       .finally(() => { isRunning = false; });
   }, CHECK_INTERVAL_MS);

@@ -10,7 +10,7 @@ import { isStaffOrAdmin } from '../../core/middleware';
 import { normalizeTierName, TIER_NAMES } from '../../../shared/constants/tiers';
 import { invalidateCache } from '../../core/queryCache';
 import { broadcastDirectoryUpdate } from '../../core/websocket';
-import { safeErrorDetail } from '../../utils/errorUtils';
+import { safeErrorDetail, getErrorMessage } from '../../utils/errorUtils';
 import { denormalizeTierForHubSpotAsync } from '../../utils/tierUtils';
 import { getHubSpotClient } from '../../core/integrations';
 import {
@@ -140,7 +140,7 @@ router.get('/api/hubspot/contacts', isStaffOrAdmin, validateQuery(hubspotContact
     const promise = fetchAllHubSpotContacts(true)
       .then(() => {})
       .catch(err => {
-        logger.warn('[HubSpot] Initial sync failed', { extra: { err: err instanceof Error ? err.message : String(err) } });
+        logger.warn('[HubSpot] Initial sync failed', { extra: { err: getErrorMessage(err) } });
       })
       .finally(() => {
         setBackgroundRefreshInProgress(false);
@@ -160,7 +160,7 @@ router.get('/api/hubspot/contacts', isStaffOrAdmin, validateQuery(hubspotContact
   
   return res.json(buildResponse([], true, false));
   } catch (error: unknown) {
-    logger.error('Failed to fetch contacts', { error: error instanceof Error ? error : new Error(String(error)) });
+    logger.error('Failed to fetch contacts', { error: new Error(getErrorMessage(error)) });
     return res.status(500).json({ error: 'Failed to fetch contacts' });
   }
 });
@@ -203,7 +203,7 @@ router.get('/api/hubspot/contacts/:id', isStaffOrAdmin, async (req, res) => {
       joinDate: normalizeDateToYYYYMMDD(contact.properties.createdate) || null
     });
   } catch (error: unknown) {
-    if (!isProduction) logger.error('API error', { error: error instanceof Error ? error : new Error(String(error)) });
+    if (!isProduction) logger.error('API error', { error: new Error(getErrorMessage(error)) });
     res.status(500).json({ error: 'Request failed' });
   }
 });
@@ -301,7 +301,7 @@ router.put('/api/hubspot/contacts/:id/tier', isStaffOrAdmin, async (req, res) =>
       updatedBy: staffUser?.name || 'Unknown'
     });
   } catch (error: unknown) {
-    logger.error('[Tier Update] Error updating contact', { error: error instanceof Error ? error : new Error(String(error)), extra: { contactId: req.params.id } });
+    logger.error('[Tier Update] Error updating contact', { error: new Error(getErrorMessage(error)), extra: { contactId: req.params.id } });
     res.status(500).json({ error: 'Failed to update tier', details: safeErrorDetail(error) });
   }
 });

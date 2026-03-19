@@ -95,7 +95,7 @@ router.put('/api/booking-requests/:id/member-cancel', isAuthenticated, async (re
     
     if (existing.status === 'cancellation_pending') {
       voidBookingPass(bookingId).catch(err =>
-        logger.warn('[BookingCancel] Self-heal void pass failed for already-pending booking (non-fatal)', { extra: { bookingId, error: String(err) } })
+        logger.warn('[BookingCancel] Self-heal void pass failed for already-pending booking (non-fatal)', { extra: { bookingId, error: getErrorMessage(err) } })
       );
       return res.status(400).json({ error: 'Cancellation is already in progress' });
     }

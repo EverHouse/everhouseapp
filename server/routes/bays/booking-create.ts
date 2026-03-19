@@ -581,7 +581,7 @@ router.post('/api/booking-requests', isAuthenticated, bookingRateLimiter, valida
           }
         } catch (confError) {
           logger.error('[ConferenceRoom] Post-response conference room processing failed', {
-            error: confError instanceof Error ? confError : new Error(String(confError)),
+            error: new Error(getErrorMessage(confError)),
             extra: { bookingId: row.id }
           });
           try {
@@ -598,12 +598,12 @@ router.post('/api/booking-requests', isAuthenticated, bookingRateLimiter, valida
             });
           } catch (fallbackErr) {
             logger.error('[ConferenceRoom] Fallback ensureSession also failed', {
-              error: fallbackErr instanceof Error ? fallbackErr : new Error(String(fallbackErr))
+              error: new Error(getErrorMessage(fallbackErr))
             });
           }
         }
       })().catch(err => logger.error('[ConferenceRoom] Unhandled error in post-response processing', {
-        error: err instanceof Error ? err : new Error(String(err))
+        error: new Error(getErrorMessage(err))
       }));
     }
 

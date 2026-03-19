@@ -20,6 +20,7 @@ import { invalidateCachedFees, recalculateSessionFees } from '../core/billing/un
 import { syncBookingInvoice } from '../core/billing/bookingInvoiceService';
 import { validateBody } from '../middleware/validate';
 import { addParticipantSchema, batchRosterSchema, previewFeesSchema, playerCountSchema, removeParticipantSchema } from '../../shared/validators/roster';
+import { getErrorMessage } from '../utils/errorUtils';
 
 interface OwnerRow {
   id: string;
@@ -325,7 +326,7 @@ router.post('/api/admin/booking/:bookingId/recalculate-fees', isStaffOrAdmin, as
     const recalcResult = await recalculateSessionFees(booking.session_id, 'roster_update');
 
     syncBookingInvoice(bookingId, booking.session_id).catch(err => {
-      logger.warn('[roster:recalcFees] Non-blocking: draft invoice sync failed after fee recalculation', { extra: { error: String(err), bookingId, sessionId: booking.session_id } });
+      logger.warn('[roster:recalcFees] Non-blocking: draft invoice sync failed after fee recalculation', { extra: { error: getErrorMessage(err), bookingId, sessionId: booking.session_id } });
     });
 
     let prepaymentCreated = false;

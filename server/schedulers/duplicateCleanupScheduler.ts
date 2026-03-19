@@ -2,6 +2,7 @@ import { schedulerTracker } from '../core/schedulerTracker';
 import { pool, safeRelease } from '../core/db';
 import { getPacificHour, getTodayPacific } from '../utils/dateUtils';
 import { logger } from '../core/logger';
+import { getErrorMessage } from '../utils/errorUtils';
 
 const CLEANUP_HOUR = 4;
 let lastCleanupDate = '';
@@ -83,7 +84,7 @@ async function checkAndRunCleanup(): Promise<void> {
     }
   } catch (error: unknown) {
     logger.error('[Duplicate Cleanup] Scheduler error:', { error: error as Error });
-    schedulerTracker.recordRun('Duplicate Cleanup', false, String(error));
+    schedulerTracker.recordRun('Duplicate Cleanup', false, getErrorMessage(error));
     lastCleanupDate = '';
   } finally {
     isRunning = false;
@@ -109,7 +110,7 @@ export function startDuplicateCleanupScheduler(): NodeJS.Timeout {
       }
     } catch (error: unknown) {
       logger.error('[Duplicate Cleanup] Startup cleanup error:', { error: error as Error });
-      schedulerTracker.recordRun('Duplicate Cleanup', false, String(error));
+      schedulerTracker.recordRun('Duplicate Cleanup', false, getErrorMessage(error));
     } finally {
       isRunning = false;
     }

@@ -4,6 +4,7 @@ import { sql } from 'drizzle-orm';
 import { logger } from '../core/logger';
 import { schedulerTracker } from '../core/schedulerTracker';
 import { getSettingValue, isSchedulerEnabled } from '../core/settingsHelper';
+import { getErrorMessage } from '../utils/errorUtils';
 
 let cronTask: cron.ScheduledTask | null = null;
 let isRunning = false;
@@ -39,7 +40,7 @@ async function cleanupNotificationTables(): Promise<void> {
   } catch (error: unknown) {
     const durationMs = Date.now() - startTime;
     logger.error('[Notification Cleanup] Scheduler error:', { error: error as Error });
-    schedulerTracker.recordRun('Notification Cleanup', false, String(error), durationMs);
+    schedulerTracker.recordRun('Notification Cleanup', false, getErrorMessage(error), durationMs);
   }
 }
 
@@ -67,7 +68,7 @@ export function startNotificationCleanupScheduler(): void {
   cronTask = cron.schedule('0 0 * * *', () => {
     guardedCleanup().catch((err: unknown) => {
       logger.error('[Notification Cleanup] Uncaught error:', { error: err as Error });
-      schedulerTracker.recordRun('Notification Cleanup', false, String(err));
+      schedulerTracker.recordRun('Notification Cleanup', false, getErrorMessage(err));
     });
   });
 }
