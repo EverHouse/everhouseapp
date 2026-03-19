@@ -70,16 +70,12 @@ async function resyncWellnessAvailabilityBlocks(
             createdBy: 'calendar_sync',
           },
         });
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      } catch (insertErr: any) {
-        const pgMessage = insertErr?.cause?.message || insertErr?.message || String(insertErr);
-        logger.warn(`[Wellness Sync] Insert failed for class #${wellnessClassId} resource ${resourceId}: ${pgMessage}`);
+      } catch (insertErr: unknown) {
+        logger.warn(`[Wellness Sync] Insert failed for class #${wellnessClassId} resource ${resourceId}: ${getErrorMessage(insertErr)}`);
       }
     }
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  } catch (err: any) {
-    const pgMessage = err?.cause?.message || err?.message || String(err);
-    logger.error(`[Wellness Sync] Failed to resync availability blocks for class #${wellnessClassId}: ${pgMessage}`);
+  } catch (err: unknown) {
+    logger.error(`[Wellness Sync] Failed to resync availability blocks for class #${wellnessClassId}: ${getErrorMessage(err)}`);
   }
 }
 export async function syncWellnessCalendarEvents(options?: { suppressAlert?: boolean }): Promise<{ synced: number; created: number; updated: number; deleted: number; pushedToCalendar: number; error?: string }> {
@@ -446,7 +442,7 @@ export async function syncWellnessCalendarEvents(options?: { suppressAlert?: boo
       alertOnSyncFailure(
         'calendar',
         'Wellness calendar sync',
-        error instanceof Error ? error : new Error(String(error)),
+        error instanceof Error ? error : new Error(getErrorMessage(error)),
         { calendarName: CALENDAR_CONFIG.wellness.name }
       ).catch((alertErr: unknown) => {
         logger.error('[Wellness Sync] Failed to send staff alert:', { error: alertErr });

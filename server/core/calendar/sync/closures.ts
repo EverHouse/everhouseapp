@@ -7,6 +7,7 @@ import { getPacificMidnightUTC } from '../../../utils/dateUtils';
 
 import { toIntArrayLiteral } from '../../../utils/sqlArrayLiteral';
 import { logger } from '../../logger';
+import { getErrorMessage } from '../../../utils/errorUtils';
 import { withCalendarRetry } from '../../retryUtils';
 import { findCoveringBlock } from '../../availabilityBlockService';
 
@@ -795,8 +796,7 @@ export async function backfillCalendarExtendedProperties(): Promise<BackfillResu
           
           result.closures.patched++;
         } catch (err: unknown) {
-          const msg = err instanceof Error ? err.message : String(err);
-          result.closures.errors.push(`Closure #${row.id} event ${eventId}: ${msg}`);
+          result.closures.errors.push(`Closure #${row.id} event ${eventId}: ${getErrorMessage(err)}`);
         }
       }
     }
@@ -855,8 +855,7 @@ export async function backfillCalendarExtendedProperties(): Promise<BackfillResu
         
         result.events.patched++;
       } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : String(err);
-        result.events.errors.push(`Event #${row.id}: ${msg}`);
+        result.events.errors.push(`Event #${row.id}: ${getErrorMessage(err)}`);
       }
     }
   }
@@ -912,8 +911,7 @@ export async function backfillCalendarExtendedProperties(): Promise<BackfillResu
         
         result.wellness.patched++;
       } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : String(err);
-        result.wellness.errors.push(`Wellness #${row.id}: ${msg}`);
+        result.wellness.errors.push(`Wellness #${row.id}: ${getErrorMessage(err)}`);
       }
     }
   }

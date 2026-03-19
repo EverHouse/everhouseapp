@@ -8,6 +8,7 @@ import { CALENDAR_CONFIG, ConferenceRoomBooking, MemberMatchResult, CalendarEven
 import { getCalendarIdByName } from '../cache';
 import { getConferenceRoomId } from '../../affectedAreas';
 import { ensureSessionForBooking } from '../../bookingService/sessionManager';
+import { getErrorMessage } from '../../../utils/errorUtils';
 import { broadcastAvailabilityUpdate } from '../../websocket';
 
 import { logger } from '../../logger';
@@ -657,6 +658,6 @@ export async function syncConferenceRoomCalendarToBookings(options?: { monthsBac
     return { synced, linked, created, skipped, cancelled, updated };
   } catch (error: unknown) {
     logger.error('Error syncing conference room calendar to bookings:', { error: error });
-    return { synced: 0, linked: 0, created: 0, skipped: 0, cancelled: 0, updated: 0, error: String(error) };
+    return { synced: 0, linked: 0, created: 0, skipped: 0, cancelled: 0, updated: 0, error: getErrorMessage(error) };
   }
 }

@@ -3,6 +3,7 @@ import { authStorage } from '../replit_integrations/auth/storage';
 import { logger } from '../core/logger';
 import { getSupabaseAnon } from '../core/supabase/client';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { getErrorMessage } from '../utils/errorUtils';
 
 const SUPABASE_ROUTE_TIMEOUT = 10000;
 
@@ -86,12 +87,12 @@ export function setupSupabaseAuthRoutes(app: Express) {
         user: data.user 
       });
     } catch (error: unknown) {
-      const msg = error instanceof Error ? error.message : String(error);
+      const msg = getErrorMessage(error);
       if (msg.includes('timed out')) {
         logger.warn('[Supabase Auth] Signup timed out');
         return res.status(504).json({ error: 'Authentication service timeout' });
       }
-      logger.error('Supabase signup error:', { error: error as Error });
+      logger.error('Supabase signup error:', { error: msg });
       res.status(500).json({ error: 'Signup failed' });
     }
   });
@@ -126,12 +127,12 @@ export function setupSupabaseAuthRoutes(app: Express) {
         session: data.session
       });
     } catch (error: unknown) {
-      const msg = error instanceof Error ? error.message : String(error);
+      const msg = getErrorMessage(error);
       if (msg.includes('timed out')) {
         logger.warn('[Supabase Auth] Login timed out');
         return res.status(504).json({ error: 'Authentication service timeout' });
       }
-      logger.error('Supabase login error:', { error: error as Error });
+      logger.error('Supabase login error:', { error: msg });
       res.status(500).json({ error: 'Login failed' });
     }
   });
@@ -149,12 +150,12 @@ export function setupSupabaseAuthRoutes(app: Express) {
       
       res.json({ message: 'Logged out successfully' });
     } catch (error: unknown) {
-      const msg = error instanceof Error ? error.message : String(error);
+      const msg = getErrorMessage(error);
       if (msg.includes('timed out')) {
         logger.warn('[Supabase Auth] Logout timed out');
         return res.status(504).json({ error: 'Authentication service timeout' });
       }
-      logger.error('Supabase logout error:', { error: error as Error });
+      logger.error('Supabase logout error:', { error: msg });
       res.status(500).json({ error: 'Logout failed' });
     }
   });
@@ -176,12 +177,12 @@ export function setupSupabaseAuthRoutes(app: Express) {
       
       res.json({ message: 'Check your email for the password reset link' });
     } catch (error: unknown) {
-      const msg = error instanceof Error ? error.message : String(error);
+      const msg = getErrorMessage(error);
       if (msg.includes('timed out')) {
         logger.warn('[Supabase Auth] Forgot password timed out');
         return res.status(504).json({ error: 'Authentication service timeout' });
       }
-      logger.error('Forgot password error:', { error: error as Error });
+      logger.error('Forgot password error:', { error: msg });
       res.status(500).json({ error: 'Failed to send reset email' });
     }
   });
@@ -213,12 +214,12 @@ export function setupSupabaseAuthRoutes(app: Express) {
         role: dbUser?.role || 'member',
       });
     } catch (error: unknown) {
-      const msg = error instanceof Error ? error.message : String(error);
+      const msg = getErrorMessage(error);
       if (msg.includes('timed out')) {
         logger.warn('[Supabase Auth] Get user timed out');
         return res.status(504).json({ error: 'Authentication service timeout' });
       }
-      logger.error('Get user error:', { error: error as Error });
+      logger.error('Get user error:', { error: msg });
       res.status(500).json({ error: 'Failed to get user' });
     }
   });
@@ -243,12 +244,12 @@ export function setupSupabaseAuthRoutes(app: Express) {
       
       res.json({ url: data.url });
     } catch (error: unknown) {
-      const msg = error instanceof Error ? error.message : String(error);
+      const msg = getErrorMessage(error);
       if (msg.includes('timed out')) {
         logger.warn('[Supabase Auth] OAuth timed out');
         return res.status(504).json({ error: 'Authentication service timeout' });
       }
-      logger.error('OAuth error:', { error: error as Error });
+      logger.error('OAuth error:', { error: msg });
       res.status(500).json({ error: 'OAuth failed' });
     }
   });
@@ -280,7 +281,7 @@ export const isSupabaseAuthenticated: RequestHandler = async (req, res, next) =>
     req.supabaseUser = user;
     next();
   } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : String(error);
+    const msg = getErrorMessage(error);
     if (msg.includes('timed out')) {
       logger.warn('[Supabase Auth] Middleware auth check timed out');
       return res.status(504).json({ error: 'Authentication service timeout' });

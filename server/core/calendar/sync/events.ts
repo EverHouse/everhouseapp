@@ -6,6 +6,7 @@ import { and, isNotNull, eq } from 'drizzle-orm';
 import { CALENDAR_CONFIG } from '../config';
 import { getCalendarIdByName } from '../cache';
 import { alertOnSyncFailure } from '../../dataAlerts';
+import { getErrorMessage } from '../../../utils/errorUtils';
 import { getPacificMidnightUTC } from '../../../utils/dateUtils';
 import { getAllActiveBayIds, getConferenceRoomId } from '../../affectedAreas';
 import { availabilityBlocks } from '../../../../shared/models/scheduling';
@@ -71,16 +72,12 @@ async function resyncEventAvailabilityBlocks(
             createdBy: 'calendar_sync',
           },
         });
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      } catch (insertErr: any) {
-        const pgMessage = insertErr?.cause?.message || insertErr?.message || String(insertErr);
-        logger.warn(`[Events Sync] Insert failed for event #${eventId} resource ${resourceId}: ${pgMessage}`);
+      } catch (insertErr: unknown) {
+        logger.warn(`[Events Sync] Insert failed for event #${eventId} resource ${resourceId}: ${getErrorMessage(insertErr)}`);
       }
     }
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  } catch (err: any) {
-    const pgMessage = err?.cause?.message || err?.message || String(err);
-    logger.error(`[Events Sync] Failed to resync availability blocks for event #${eventId}: ${pgMessage}`);
+  } catch (err: unknown) {
+    logger.error(`[Events Sync] Failed to resync availability blocks for event #${eventId}: ${getErrorMessage(err)}`);
   }
 }
 export async function syncGoogleCalendarEvents(options?: { suppressAlert?: boolean }): Promise<{ synced: number; created: number; updated: number; deleted: number; pushedToCalendar: number; error?: string }> {
@@ -387,7 +384,7 @@ export async function syncGoogleCalendarEvents(options?: { suppressAlert?: boole
       alertOnSyncFailure(
         'calendar',
         'Events calendar sync',
-        error instanceof Error ? error : new Error(String(error)),
+        error instanceof Error ? error : new Error(getErrorMessage(error)),
         { calendarName: CALENDAR_CONFIG.events.name }
       ).catch((alertErr: unknown) => {
         logger.error('[Events Sync] Failed to send staff alert:', { error: alertErr });
