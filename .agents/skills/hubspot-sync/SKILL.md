@@ -23,7 +23,7 @@ description: HubSpot CRM synchronization system — queue-based sync of contacts
 | Admin discount CRUD | `server/core/hubspot/admin.ts` | Discount rules, billing audit |
 | Request wrapper | `server/core/hubspot/request.ts` | Rate-limit-aware p-retry |
 | Form submissions | `server/core/hubspot/formSync.ts` | Form ingestion from HubSpot; `resolveFormId()` (async) uses 4-tier fallback: env var → admin setting → auto-discovered → hardcoded |
-| Form submission routes | `server/routes/hubspot.ts` | Public form submission endpoint; `VALID_HUBSPOT_CONTACT_FIELDS` allowlist controls which fields pass through to HubSpot |
+| Form submission routes | `server/routes/hubspot/forms.ts` | Public form submission endpoint; `VALID_HUBSPOT_CONTACT_FIELDS` allowlist controls which fields pass through to HubSpot |
 | Tour scheduler booking | `server/routes/tours.ts` | `bookHubSpotMeeting()` calls HubSpot Scheduler API; `parseHubSpotMeetingLink()` extracts slug + hublet; `pacificToUtcMs()` for timezone conversion |
 | Tour sync (inbound) | `server/routes/tours.ts` | `syncToursFromHubSpot()` pulls HubSpot meetings into local tours table; deduplicates by `hubspotMeetingId` or email+date+time fallback |
 | Full member sync | `server/core/memberSync.ts` | Daily inbound reconciliation |
@@ -32,14 +32,14 @@ description: HubSpot CRM synchronization system — queue-based sync of contacts
 | Queue scheduler | `server/schedulers/hubspotQueueScheduler.ts` | Every 2 min |
 | Member sync scheduler | `server/schedulers/memberSyncScheduler.ts` | Daily 3 AM Pacific |
 | Form sync scheduler | `server/schedulers/hubspotFormSyncScheduler.ts` | Every 30 min |
-| Routes + cache | `server/routes/hubspot.ts` | API, contact cache, webhooks |
+| Routes + cache | `server/routes/hubspot/` (index.ts + sub-modules: admin.ts, contacts.ts, forms.ts, sync.ts, webhooks.ts, shared.ts) | API, contact cache, webhooks |
 
 ## Read-Only Mode (Non-Production)
 
 All HubSpot **write** operations are blocked in dev/staging via `isHubSpotReadOnly()` in `server/core/hubspot/readOnlyGuard.ts`. This prevents dev from pushing stale data (membership status, tier, billing provider) to the shared HubSpot account, since dev lacks real Stripe subscriptions.
 
 - **Guard location**: Every write function in the HubSpot core modules (`members.ts`, `stages.ts`, `contacts.ts`, `companies.ts`, `queue.ts`) checks `isHubSpotReadOnly()` before making API calls.
-- **Route-level guards**: Direct HubSpot API calls in route files (`profile.ts`, `onboarding.ts`, `visitors.ts`, `admin-actions.ts`, `hubspot.ts`, `dataIntegrity.ts`, `stripe-tools.ts`, `maintenance.ts`) also use the guard.
+- **Route-level guards**: Direct HubSpot API calls in route files (`members/profile.ts`, `members/onboarding.ts`, `members/visitors.ts`, `members/admin-actions.ts`, `hubspot/admin.ts`, `hubspot/sync.ts`, `hubspot/contacts.ts`, `dataIntegrity/cleanup.ts`, `dataTools/stripe-tools.ts`, `dataTools/maintenance.ts`) also use the guard.
 - **Queue**: Jobs are still enqueued in dev (for testing flow), but `executeHubSpotOperation` skips the actual API call.
 - **Reads are unaffected**: Contact search, sync fetches, form submission ingestion, and directory reads all work normally in dev.
 - **Integrity auto-fixes**: The `checkHubSpotSyncMismatch` auto-fix (clearing stale hubspot_ids) is also guarded by `isProduction` to prevent dev from modifying the shared production database.
@@ -98,7 +98,7 @@ MindBody-billed active member's HubSpot status changes to non-active
 15. **Supersede includes 'processing' status.** `queueTierSync` supersedes jobs with `status IN ('pending', 'failed', 'processing')`. This prevents stale tier syncs from completing after a newer tier change has been queued.
 16. **Worker terminal updates have status guards.** All `UPDATE` queries that mark jobs as completed/failed/dead include `AND status = 'processing'` with `rowCount` checks. If `rowCount === 0`, the job was superseded mid-flight — no false staff alerts.
 17. **Retry backoff has random jitter.** Exponential backoff adds 0–5s random jitter (`Math.floor(Math.random() * 5000)` ms) to prevent thundering herd when multiple failed jobs retry simultaneously.
-18. **Form submissions use `VALID_HUBSPOT_CONTACT_FIELDS` allowlist (v8.87.6).** Only explicitly listed field names pass through to HubSpot — unlisted fields are silently dropped. The allowlist in `server/routes/hubspot.ts` includes: `firstname`, `lastname`, `email`, `phone`, `company`, `message`, `membership_interest`, `event_type`, `guest_count`, `eh_email_updates_opt_in`, `event_date`, `event_time`, `additional_details`, `event_services`, `topic`, `guest_firstname`, `guest_lastname`, `guest_email`, `guest_phone`, `member_name`, `member_email`. When adding new form fields, add them to this allowlist or they will be silently dropped.
+18. **Form submissions use `VALID_HUBSPOT_CONTACT_FIELDS` allowlist (v8.87.6).** Only explicitly listed field names pass through to HubSpot — unlisted fields are silently dropped. The allowlist in `server/routes/hubspot/forms.ts` includes: `firstname`, `lastname`, `email`, `phone`, `company`, `message`, `membership_interest`, `event_type`, `guest_count`, `eh_email_updates_opt_in`, `event_date`, `event_time`, `additional_details`, `event_services`, `topic`, `guest_firstname`, `guest_lastname`, `guest_email`, `guest_phone`, `member_name`, `member_email`. When adding new form fields, add them to this allowlist or they will be silently dropped.
 19. **`inferFormTypeStrict()` is the primary form classifier (v8.87.4).** `inferFormTypeFromName()` now delegates to `inferFormTypeStrict()` for consistent classification. Discovery map clears stale entries each sync and logs collisions.
 20. **Admin-configurable form IDs (v8.87.5).** 5 `hubspot.form_id.*` settings keys in the admin Settings page (`membership`, `private-hire`, `event-inquiry`, `guest-checkin`, `contact`). `tour-request` was removed in v8.87.33 — tours use `hubspot.tour_scheduler_url` instead (HubSpot Meeting Scheduler, not forms). `resolveFormId()` is async (awaits `getSettingValue()` with 30s cache). Startup calls `logFormIdResolutionStatus()` to log which form types have resolved IDs.
 21. **Supersede-then-enqueue is NOT atomic.** `queueTierSync` supersedes old jobs via Drizzle `db.execute()` then enqueues via `queryWithRetry()` (raw pg pool). These use different DB connections, so a crash between them could leave jobs superseded with no replacement. Risk is extremely low and self-healing (next tier change creates a new job).

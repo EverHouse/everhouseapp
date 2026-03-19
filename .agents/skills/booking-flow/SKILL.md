@@ -24,7 +24,7 @@ description: End-to-end booking lifecycle in the Ever Club Members App — booki
 | Auto-complete | `server/schedulers/bookingAutoCompleteScheduler.ts` | Auto check-in past bookings |
 | Draft invoices | `server/core/billing/bookingInvoiceService.ts` | Invoice lifecycle per booking |
 | Booking auth | `server/core/bookingAuth.ts` | Member booking permissions |
-| Frontend booking | `src/pages/Member/BookGolf.tsx`, `src/components/staff-command-center/` | Booking UI |
+| Frontend booking | `src/pages/Member/BookGolf/` (index.tsx + sub-components), `src/components/staff-command-center/` | Booking UI |
 
 ## Decision Trees
 
@@ -140,7 +140,7 @@ Approved bookings can generate Apple Wallet event tickets. The pass shows bay na
 | Refresh pass | `bookingPassService.ts` → `refreshBookingPass()` | Trackman import updates bay/time for a booking with an existing pass |
 | Web service | `server/routes/walletPassWebService.ts` | Apple device polls for updates (`/v1/passes/...`) — delegates to `generateBookingPassForWebService()` |
 | Email link | `server/emails/bookingEmails.ts` | Confirmation email includes optional "Add to Apple Wallet" link when `walletPassEnabled` |
-| Frontend button | `src/pages/Member/BookGolf.tsx` | "Add to Apple Wallet" button on booking cards |
+| Frontend button | `src/pages/Member/BookGolf/` | "Add to Apple Wallet" button on booking cards |
 | DB table | `booking_wallet_passes` in `shared/models/scheduling.ts` | Serial number, auth token, member ID, voided timestamp |
 | Route | `GET /api/member/booking-wallet-pass/:bookingId` | Member-authenticated download, ownership check, status guard |
 

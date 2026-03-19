@@ -8,6 +8,17 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.88.2",
+    date: "2026-03-19",
+    title: "Skill & Documentation Sync (Phase 7 Code Review)",
+    changes: [
+      "Documentation: Verified all file paths across 8 domain skill files against the codebase — fixed stale paths from directory splits (BookGolf.tsx → BookGolf/, staffCheckin.ts → staffCheckin/, hubspot.ts → hubspot/, member-payments.ts → member-payments/, Dashboard.tsx → Dashboard/, dataIntegrity.ts → dataIntegrity/), updated hubspot-sync route-level guards list with correct subdirectory paths, and corrected Convention 14a (booking_fee_snapshots now has updated_at column since v8.87.93)",
+      "Updated: scheduler-jobs skill now correctly documents 29 logical schedulers across 26 files (was 28/25) — added Notification Cleanup scheduler which runs daily at midnight via node-cron, deletes old notifications, push subscriptions, and dismissed notices with configurable retention",
+      "Fixed: Version files (src/config/version.ts and package.json) were stuck at 8.87.89 while changelog and replit.md had advanced to 8.88.1; all 4 version files are now in sync at 8.88.2",
+      "Updated: README.md tech stack now includes Stripe, Drizzle ORM, Zustand, React Query, Apple Wallet, and Web Push",
+    ]
+  },
+  {
     version: "8.88.1",
     date: "2026-03-19",
     title: "Data Integrity Architecture Hardening (Code Review Pass)",

@@ -202,7 +202,7 @@ All `setInterval()` calls in schedulers MUST return their `NodeJS.Timeout` ID. T
 All `stripe.*.create()` calls for **booking payments** MUST include an `idempotencyKey` parameter with a deterministic value (NOT `randomUUID()`). Pattern: `operation_type_${uniqueBusinessKey}`. POS payments use `customerId + SHA-256(sorted cart) + SHA-256(description)`. **Exception (v8.87.35):** Non-booking one-off payments (merchandise, cafe) use `crypto.randomUUID()` — these are inherently non-idempotent (each tap is a new charge), and time-bucketed keys caused false duplicate detection. Idempotency keys on `update()` calls are nice-to-have but not required.
 
 ### 14a. Database Connection — Replit Helium (v8.87.77)
-The app uses Replit's provisioned PostgreSQL database (helium). `DATABASE_URL` is managed at runtime by Replit — do NOT override it with secrets or set it to an external database. A Supabase DB migration was attempted and fully reverted. Supabase secrets (`SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SERVICE_ROLE_KEY`) are still used but ONLY for Supabase Realtime (WebSocket live updates) — NOT for database queries. `server/core/db.ts` has `FORCE_POOLER_REDIRECT` opt-in for Supabase pooler redirect (not used in production). The `booking_fee_snapshots` table has NO `updated_at` column — do not include it in UPDATE queries.
+The app uses Replit's provisioned PostgreSQL database (helium). `DATABASE_URL` is managed at runtime by Replit — do NOT override it with secrets or set it to an external database. A Supabase DB migration was attempted and fully reverted. Supabase secrets (`SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SERVICE_ROLE_KEY`) are still used but ONLY for Supabase Realtime (WebSocket live updates) — NOT for database queries. `server/core/db.ts` has `FORCE_POOLER_REDIRECT` opt-in for Supabase pooler redirect (not used in production). The `booking_fee_snapshots` table has an `updated_at` column (added v8.87.93).
 
 ### 15. Connection Pool Safety
 Never use `pool.connect()` inside `Promise.race()` without ensuring the connection is released regardless of which promise wins. Always use try/finally for connection release. Prefer `db.transaction()` over manual `pool.connect()` + `BEGIN`/`COMMIT` — Drizzle manages the connection lifecycle automatically (v8.75.0). The WebSocket session verification pool uses `max: 20` to handle reconnection storms during deploys. When using advisory locks with an externally-provided client (already in a transaction), use `pg_advisory_xact_lock` instead of `pg_advisory_lock` — transaction-scoped locks auto-release on COMMIT/ROLLBACK, preventing lock leaks if the transaction enters an aborted state (v8.69.0).
@@ -357,7 +357,7 @@ ALL booking actions (Check-in, Cancel, Pay/Charge) in the frontend are centraliz
 4. Inline check-in buttons without the BookingStatusDropdown — always use `BookingStatusDropdown` from `src/components/BookingStatusDropdown.tsx` for any check-in UI surface
 
 **Allowed exceptions:**
-- Member-facing cancel in `Dashboard.tsx` / `BookGolf.tsx` (different UX, hits `/api/bookings/:id/member-cancel`)
+- Member-facing cancel in `Dashboard/` / `BookGolf/` (different UX, hits `/api/bookings/:id/member-cancel`)
 - Tour check-in in `ToursTab.tsx` (tours are not bookings, hits `/api/tours/:id/checkin`)
 
 ---

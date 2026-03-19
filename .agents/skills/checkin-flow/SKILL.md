@@ -11,7 +11,7 @@ Two distinct paths: **Booking check-in** (billing + status change) and **QR/NFC 
 
 | Task | Primary File(s) | When to touch |
 |---|---|---|
-| Check-in API routes | `server/routes/staffCheckin.ts` | Check-in context, payment actions, staff direct-add |
+| Check-in API routes | `server/routes/staffCheckin/` (index.ts + sub-modules: context.ts, billing.ts, directAdd.ts, shared.ts) | Check-in context, payment actions, staff direct-add |
 | Booking check-in endpoint | `server/routes/bays/approval.ts` | `PUT /api/bookings/:id/checkin` |
 | Fee computation | `server/core/billing/unifiedFeeService.ts` | `computeFeeBreakdown()` |
 | Prepayment service | `server/core/billing/prepaymentService.ts` | Prepayment intent creation |

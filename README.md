@@ -1,5 +1,7 @@
 # Ever Club Members App
 
+**Current Version: 8.88.2**
+
 A private members club application for golf and wellness centers.
 
 ## Features
@@ -11,9 +13,9 @@ A private members club application for golf and wellness centers.
 
 ## Tech Stack
 
-- **Frontend**: React 19, Vite, Tailwind CSS
-- **Backend**: Express.js, PostgreSQL
-- **Integrations**: Google Calendar, HubSpot CRM, Resend Email
+- **Frontend**: React 19, Vite, Tailwind CSS, Zustand, React Query
+- **Backend**: Express.js, PostgreSQL (Replit-provisioned), Drizzle ORM
+- **Integrations**: Stripe (billing), Google Calendar, HubSpot CRM, Resend Email, Apple Wallet, Web Push (VAPID)
 
 ## Development
 

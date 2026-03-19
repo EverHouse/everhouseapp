@@ -1,11 +1,13 @@
 ---
 name: scheduler-jobs
-description: "Scheduled maintenance tasks — daily, hourly, and continuous background jobs. Covers all 28 logical schedulers (25 files — `integrityScheduler.ts` contains 3), their timing, idempotency, the scheduler tracker, and the job queue processor. Use when adding new scheduled tasks, debugging scheduler issues, understanding maintenance windows, or checking scheduler health via the admin dashboard."
+description: "Scheduled maintenance tasks — daily, hourly, and continuous background jobs. Covers all 29 logical schedulers (26 files — `integrityScheduler.ts` contains 3), their timing, idempotency, the scheduler tracker, and the job queue processor. Use when adding new scheduled tasks, debugging scheduler issues, understanding maintenance windows, or checking scheduler health via the admin dashboard."
 ---
 
 # Scheduler Jobs
 
 All schedulers registered in `server/schedulers/index.ts` via `initSchedulers()`. Health tracked by `schedulerTracker` (`server/core/schedulerTracker.ts`). Time gates use Pacific timezone via `getPacificHour()` / `getTodayPacific()`.
+
+Note: `notificationCleanupScheduler.ts` uses `node-cron` (not `setInterval`) — it is started/stopped in `initSchedulers()`/`stopSchedulers()` and registered with `schedulerTracker`. It uses `cron.schedule('0 0 * * *', ...)` for midnight scheduling. Its timer handle is a `ScheduledTask` object (not a `NodeJS.Timeout`), so it is stopped via `cronTask.stop()` rather than `clearInterval()`.
 
 ## File Map
 
@@ -16,7 +18,7 @@ All schedulers registered in `server/schedulers/index.ts` via `initSchedulers()`
 | Job queue processor | `server/core/jobQueue.ts` | Background job processing |
 | Individual schedulers | `server/schedulers/*.ts` | Each scheduler implementation |
 
-## Scheduler Registry (28 logical tasks across 25 files)
+## Scheduler Registry (29 logical tasks across 26 files)
 
 | Name | File | Interval | Time Gate | Purpose |
 |---|---|---|---|---|
@@ -47,6 +49,7 @@ All schedulers registered in `server/schedulers/index.ts` via `initSchedulers()`
 | Webhook Event Cleanup | webhookEventCleanupScheduler.ts | 24 hr | None | Remove 7-day-old processed events |
 | Onboarding Nudge | onboardingNudgeScheduler.ts | 1 hr | 10 AM Pacific | Stalled member nudge emails |
 | Supabase Heartbeat | supabaseHeartbeatScheduler.ts | 6 hr | None | Keep Supabase connection alive |
+| Notification Cleanup | notificationCleanupScheduler.ts | 24 hr (cron) | Midnight Pacific | Delete old notifications, push subscriptions, dismissed notices (configurable retention via `cleanup.notification_retention_days` setting, default 30 days) |
 | Job Queue Processor | jobQueue.ts | 5 sec | None | Process background jobs |
 
 ## Hard Rules — Adding a New Scheduler

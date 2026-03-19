@@ -140,6 +140,6 @@ Resolution order: cached → ledger → calculated.
 
 - Booking approval (`approval.ts`)
 - Roster changes: add/remove participant, update player count (`roster.ts`)
-- Staff direct-add during check-in (`staffCheckin.ts`)
+- Staff direct-add during check-in (`staffCheckin/`)
 - Trackman admin reassign/link/resolve (`trackman/admin.ts`)
 - Check-in payments use `settleBookingInvoiceAfterCheckin()` instead

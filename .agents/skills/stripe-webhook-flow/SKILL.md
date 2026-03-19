@@ -177,7 +177,7 @@ When `finalizeAndPayInvoice` fails on an existing invoice and the fallback tries
 - `server/core/billing/bookingInvoiceService.ts` — `finalizeAndPayInvoice()`
 - `server/core/stripe/invoices.ts` — `createBookingFeeInvoice()`
 - `server/routes/stripe/booking-fees.ts` — staff "Charge Card on File"
-- `server/routes/stripe/member-payments.ts` — member "Pay with Saved Card"
+- `server/routes/stripe/member-payments/` — member "Pay with Saved Card"
 - `server/routes/stripe/quick-charge.ts` — POS saved card charges
 
 **POS invoice settlement metadata (v8.87.33, Task #69):**
