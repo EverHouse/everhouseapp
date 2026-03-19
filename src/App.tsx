@@ -679,18 +679,19 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const isPublicPage = !isMemberRoute && !isAdminRoute;
   
   useEffect(() => {
-    // Add page-specific classes for CSS styling
     const html = document.documentElement;
     
-    // Remove all page-specific classes first
     html.classList.remove('page-public', 'page-dark', 'page-light');
     
     if (isPublicPage) {
       html.classList.add('page-public');
+      html.classList.remove('dark');
     } else if (isDarkTheme) {
       html.classList.add('page-dark');
+      html.classList.add('dark');
     } else {
       html.classList.add('page-light');
+      html.classList.remove('dark');
     }
   }, [isPublicPage, isDarkTheme]);
 
@@ -715,7 +716,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             navigate('/profile');
         } else {
             // On public pages, staff/admin go to Staff Portal, members go to dashboard
-            if (isStaffOrAdmin) {
+            if (isStaffOrAdmin && !isViewingAs) {
                 navigate('/admin');
             } else {
                 navigate('/dashboard');
@@ -880,7 +881,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         {user && !isStaffOrAdmin && <WaiverGate />}
         
         {/* Header rendered via portal to escape transform context */}
-        {headerContent && createPortal(headerContent, document.body)}
+        {headerContent && createPortal(headerContent, document.getElementById('header-root') ?? document.body)}
         
         <div className={`relative w-full h-auto overflow-visible ${isDarkTheme ? 'text-white' : 'text-primary'}`}>
 
@@ -926,9 +927,9 @@ const App: React.FC = () => {
           <DataProvider>
             <ToastProvider>
             <InitialLoadingScreen>
-              <OfflineBanner />
-              <UpdateNotification />
               <BrowserRouter>
+                <OfflineBanner />
+                <UpdateNotification />
                 <ScrollToTop />
                 <Layout>
                   <AnimatedRoutes />
