@@ -24,16 +24,16 @@ const FUZZY_TIER_PATTERNS: { pattern: string; slug: TierSlug }[] = [
   { pattern: 'group-lesson', slug: 'group-lessons' },
 ];
 
-export function normalizeTierSlug(rawName: string | null | undefined): TierSlug {
+export function normalizeTierSlug(rawName: string | null | undefined): TierSlug | null {
   if (!rawName || typeof rawName !== 'string') {
-    logger.warn('[normalizeTierSlug] Empty or invalid tier name, defaulting to social', { rawName });
-    return 'social';
+    logger.warn('[normalizeTierSlug] Empty or invalid tier name, returning null', { rawName });
+    return null;
   }
 
   const trimmed = rawName.trim();
   if (trimmed.length === 0) {
-    logger.warn('[normalizeTierSlug] Empty tier name after trim, defaulting to social');
-    return 'social';
+    logger.warn('[normalizeTierSlug] Empty tier name after trim, returning null');
+    return null;
   }
 
   const lowered = trimmed.toLowerCase();
@@ -48,7 +48,7 @@ export function normalizeTierSlug(rawName: string | null | undefined): TierSlug 
     if (lowered === canonicalName.toLowerCase()) {
       const matchedSlug = (Object.entries(CANONICAL_TIER_NAMES).find(
         ([, name]) => name.toLowerCase() === lowered
-      )?.[0] as TierSlug) || 'social';
+      )?.[0] as TierSlug) || null;
       return matchedSlug;
     }
   }
@@ -64,13 +64,13 @@ export function normalizeTierSlug(rawName: string | null | undefined): TierSlug 
     }
   }
 
-  logger.error('[normalizeTierSlug] No tier match found, defaulting to social. If this is a new tier, add it to TIER_SLUGS in server/utils/tierUtils.ts AND TIER_NAMES in shared/constants/tiers.ts', { rawName });
-  return 'social';
+  logger.error('[normalizeTierSlug] No tier match found, returning null. If this is a new tier, add it to TIER_SLUGS in server/utils/tierUtils.ts AND TIER_NAMES in shared/constants/tiers.ts', { rawName });
+  return null;
 }
 
-export function normalizeTierName(rawName: string | null | undefined): string {
+export function normalizeTierName(rawName: string | null | undefined): string | null {
   const slug = normalizeTierSlug(rawName);
-  return CANONICAL_TIER_NAMES[slug];
+  return slug ? CANONICAL_TIER_NAMES[slug] : null;
 }
 
 export function isSocialTier(tierName: string | null | undefined): boolean {

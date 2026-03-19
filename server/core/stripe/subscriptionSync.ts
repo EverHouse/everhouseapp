@@ -22,7 +22,7 @@ export interface SubscriptionSyncResult {
   }>;
 }
 
-function extractTierFromProduct(product: Stripe.Product): string {
+function extractTierFromProduct(product: Stripe.Product): string | null {
   if (product.metadata?.tier) {
     return normalizeTierName(product.metadata.tier);
   }

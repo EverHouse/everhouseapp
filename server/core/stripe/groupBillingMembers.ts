@@ -37,6 +37,9 @@ export async function addGroupMember(params: {
   addedByName: string;
 }): Promise<{ success: boolean; memberId?: number; error?: string }> {
   const normalizedTier = normalizeTierName(params.memberTier);
+  if (!normalizedTier) {
+    return { success: false, error: `Unable to resolve tier from: ${params.memberTier}` };
+  }
   
   try {
     const existingMember = await db.select()
@@ -321,6 +324,9 @@ export async function addCorporateMember(params: {
   addedByName: string;
 }): Promise<{ success: boolean; memberId?: number; error?: string }> {
   const normalizedTier = normalizeTierName(params.memberTier);
+  if (!normalizedTier) {
+    return { success: false, error: `Unable to resolve tier from: ${params.memberTier}` };
+  }
   
   try {
     let insertedMemberId: number | null = null;

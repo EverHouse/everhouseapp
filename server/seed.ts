@@ -53,7 +53,7 @@ function parseJoinedOnDate(dateStr: string): Date {
   return new Date();
 }
 
-function mapMembershipTier(csvTier: string): string {
+function mapMembershipTier(csvTier: string): string | null {
   return normalizeTierName(csvTier);
 }
 

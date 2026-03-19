@@ -380,7 +380,7 @@ router.post('/api/stripe/staff/quick-charge/confirm', isStaffOrAdmin, validateBo
       const stripeCustomerId = typeof paymentIntent.customer === 'string' ? paymentIntent.customer : paymentIntent.customer?.id;
       
       const tierResult = await db.execute(sql`SELECT name FROM membership_tiers WHERE slug = ${tierSlug} OR name = ${tierSlug}`);
-      const validatedTierName = (tierResult.rows[0] as { name: string } | undefined)?.name || normalizeTierName(tierName);
+      const validatedTierName = (tierResult.rows[0] as { name: string } | undefined)?.name || normalizeTierName(tierName) || null;
       
       const { resolveUserByEmail } = await import('../../core/stripe/customers');
       const resolved = await resolveUserByEmail(memberEmail);
