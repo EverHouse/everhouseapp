@@ -285,6 +285,7 @@ const SimulatorTab: React.FC = () => {
                         const isPlaceholderEmail = !email || 
                             email.includes('@trackman.local') ||
                             email.includes('@visitors.evenhouse.club') ||
+                            email.includes('@visitors.everclub.co') ||
                             email.startsWith('unmatched-') ||
                             email.startsWith('golfnow-') ||
                             email.startsWith('classpass-') ||
@@ -805,6 +806,7 @@ const SimulatorTab: React.FC = () => {
         const isPlaceholderEmail = !email || 
             email.includes('@trackman.local') ||
             email.includes('@visitors.evenhouse.club') ||
+            email.includes('@visitors.everclub.co') ||
             email.startsWith('unmatched-') ||
             email.startsWith('golfnow-') ||
             email.startsWith('classpass-') ||
@@ -871,6 +873,7 @@ const SimulatorTab: React.FC = () => {
         const isPlaceholderEmail = !email || 
             email.includes('@trackman.local') ||
             email.includes('@visitors.evenhouse.club') ||
+            email.includes('@visitors.everclub.co') ||
             email.startsWith('unmatched-') ||
             email.startsWith('golfnow-') ||
             email.startsWith('classpass-') ||

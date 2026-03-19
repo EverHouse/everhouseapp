@@ -3,7 +3,7 @@ import { eq, desc, sql, and, inArray } from 'drizzle-orm';
 import { db } from '../db';
 import { staffUsers, users } from '../../shared/schema';
 import { isAdmin, isStaffOrAdmin } from '../core/middleware';
-import { normalizeEmail } from '../core/utils/emailNormalization';
+import { normalizeEmail, getAlternateDomainEmail } from '../core/utils/emailNormalization';
 import { getErrorCode } from '../utils/errorUtils';
 import { logFromRequest } from '../core/auditLog';
 import { logger } from '../core/logger';
@@ -14,6 +14,8 @@ router.get('/api/staff-users/by-email/:email', isStaffOrAdmin, async (req, res) 
   try {
     const { email } = req.params;
     const normalizedEmail = normalizeEmail(decodeURIComponent(email as string));
+    const alternateEmail = getAlternateDomainEmail(normalizedEmail);
+    const emailsToCheck = alternateEmail ? [normalizedEmail, alternateEmail] : [normalizedEmail];
     
     const result = await db.select({
       id: staffUsers.id,
@@ -28,7 +30,7 @@ router.get('/api/staff-users/by-email/:email', isStaffOrAdmin, async (req, res) 
       created_by: staffUsers.createdBy
     })
       .from(staffUsers)
-      .where(eq(staffUsers.email, normalizedEmail));
+      .where(sql`${staffUsers.email} IN (${sql.join(emailsToCheck.map(e => sql`${e}`), sql`, `)})`);
     
     if (result.length === 0) {
       return res.status(404).json({ error: 'Staff user not found' });

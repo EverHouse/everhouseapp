@@ -10,6 +10,7 @@ import { logger } from '../logger';
 import { getErrorMessage } from '../../utils/errorUtils';
 const PLACEHOLDER_EMAIL_PATTERNS = [
   '@visitors.evenhouse.club',
+  '@visitors.everclub.co',
   '@trackman.local',
   'unmatched-',
   'golfnow-',

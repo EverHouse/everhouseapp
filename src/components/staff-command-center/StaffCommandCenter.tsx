@@ -319,7 +319,7 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
     const email = (b.user_email || '').toLowerCase();
     if (!email) return true;
     if (email.includes('@trackman.local')) return true;
-    if (email.includes('@visitors.evenhouse.club')) return true;
+    if (email.includes('@visitors.evenhouse.club') || email.includes('@visitors.everclub.co')) return true;
     if (email.startsWith('unmatched-')) return true;
     if (email.startsWith('golfnow-')) return true;
     if (email.startsWith('classpass-')) return true;

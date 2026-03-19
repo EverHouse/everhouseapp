@@ -5,6 +5,7 @@ import { logger } from '../core/logger';
 
 const PLACEHOLDER_EMAIL_PATTERNS = [
   '@visitors.evenhouse.club',
+  '@visitors.everclub.co',
   '@trackman.local',
   'lesson-',
   'classpass-',

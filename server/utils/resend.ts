@@ -13,6 +13,7 @@ let connectionSettings: Record<string, unknown> | null = null;
 const isDevelopment = process.env.NODE_ENV !== 'production' && !process.env.WEB_REPL_RENEWAL;
 
 const ALLOWED_DEV_EMAILS = [
+  '@everclub.co',
   '@evenhouse.club',
   'nicholasallanluu@gmail.com',
 ];

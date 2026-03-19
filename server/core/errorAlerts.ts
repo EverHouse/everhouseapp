@@ -3,7 +3,7 @@ import { logger } from './logger';
 import { db } from '../db';
 import { sql } from 'drizzle-orm';
 
-const ALERT_EMAIL = process.env.ALERT_EMAIL || 'nick@evenhouse.club';
+const ALERT_EMAIL = process.env.ALERT_EMAIL || 'nick@everclub.co';
 const ALERT_COOLDOWN_MS = 4 * 60 * 60 * 1000; // 4 hours between same-type alerts
 const MAX_ALERTS_PER_DAY = 3; // Strict daily limit
 const STARTUP_GRACE_PERIOD_MS = 5 * 60 * 1000; // No alerts for first 5 minutes after startup

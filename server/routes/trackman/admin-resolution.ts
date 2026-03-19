@@ -461,12 +461,14 @@ router.put('/api/admin/trackman/unmatched/:id/resolve', isStaffOrAdmin, async (r
       'anonymous@yourgolfbooking.com',
       'booking@evenhouse.club',
       'bookings@evenhouse.club',
-      'tccmembership@evenhouse.club'
+      'tccmembership@evenhouse.club',
+      'booking@everclub.co',
+      'bookings@everclub.co',
     ];
     const isPlaceholderEmail = (email: string): boolean => {
       const normalizedEmail = email.toLowerCase().trim();
       if (PLACEHOLDER_EMAILS.includes(normalizedEmail)) return true;
-      if (normalizedEmail.endsWith('@evenhouse.club') && normalizedEmail.length < 25) {
+      if ((normalizedEmail.endsWith('@evenhouse.club') || normalizedEmail.endsWith('@everclub.co')) && normalizedEmail.length < 25) {
         const localPart = normalizedEmail.split('@')[0];
         if (/^[a-z]{3,12}$/.test(localPart) && !/\d/.test(localPart)) {
           return true;

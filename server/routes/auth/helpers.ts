@@ -5,7 +5,7 @@ import { users, staffUsers, membershipTiers } from '../../../shared/schema';
 import { isProduction } from '../../core/db';
 import { normalizeTierName } from '../../../shared/constants/tiers';
 import { getSupabaseAdmin, isSupabaseAvailable } from '../../core/supabase/client';
-import { normalizeEmail } from '../../core/utils/emailNormalization';
+import { normalizeEmail, getAlternateDomainEmail } from '../../core/utils/emailNormalization';
 import { getErrorMessage } from '../../utils/errorUtils';
 import crypto from 'crypto';
 
@@ -27,6 +27,9 @@ export function normalizeRole(role: string | null | undefined): 'admin' | 'staff
 export async function getStaffUserByEmail(email: string): Promise<StaffUserData | null> {
   if (!email) return null;
   try {
+    const alternateEmail = getAlternateDomainEmail(email);
+    const emailsToCheck = alternateEmail ? [email, alternateEmail] : [email];
+
     const result = await db.select({
       id: staffUsers.id,
       firstName: staffUsers.firstName,
@@ -37,7 +40,7 @@ export async function getStaffUserByEmail(email: string): Promise<StaffUserData 
     })
       .from(staffUsers)
       .where(and(
-        sql`LOWER(${staffUsers.email}) = LOWER(${email})`,
+        sql`LOWER(${staffUsers.email}) IN (${sql.join(emailsToCheck.map(e => sql`LOWER(${e})`), sql`, `)})`,
         eq(staffUsers.isActive, true)
       ))
       .limit(1);

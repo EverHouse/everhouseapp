@@ -14,6 +14,7 @@ import { z } from 'zod';
 
 const PLACEHOLDER_EMAIL_PATTERNS = [
   '@visitors.evenhouse.club',
+  '@visitors.everclub.co',
   '@trackman.local',
   'unmatched-',
   'golfnow-',

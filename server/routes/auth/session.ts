@@ -364,7 +364,7 @@ sessionRouter.post('/api/auth/dev-login', async (req, res) => {
   }
   
   try {
-    const devEmail = req.body.email || 'nick@evenhouse.club';
+    const devEmail = req.body.email || 'nick@everclub.co';
     
     const existingUser = await db.select()
       .from(users)

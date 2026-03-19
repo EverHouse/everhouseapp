@@ -477,7 +477,7 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
                                     const isInactiveMember = booking && bookingEmail && isTrackmanMatched && hasKnownInactiveStatus;
                                     const isUnmatched = !!booking?.is_unmatched || (booking && (() => {
                                         const e = (booking.user_email || '').toLowerCase();
-                                        return !e || e.includes('@trackman.local') || e.includes('@visitors.evenhouse.club') || e.startsWith('unmatched-') || e.startsWith('golfnow-') || e.startsWith('classpass-') || e === 'unmatched@trackman.import' || booking.user_name === 'Unknown (Trackman)';
+                                        return !e || e.includes('@trackman.local') || e.includes('@visitors.evenhouse.club') || e.includes('@visitors.everclub.co') || e.startsWith('unmatched-') || e.startsWith('golfnow-') || e.startsWith('classpass-') || e === 'unmatched@trackman.import' || booking.user_name === 'Unknown (Trackman)';
                                     })());
                                     const declaredPlayers = booking?.declared_player_count ?? 1;
                                     const unfilledSlots = Number(booking?.unfilled_slots) || 0;

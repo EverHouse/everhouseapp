@@ -39,6 +39,7 @@ interface _HubspotRow {
 }
 const PLACEHOLDER_EMAIL_PATTERNS = [
   '@visitors.evenhouse.club',
+  '@visitors.everclub.co',
   '@trackman.local',
   '@trackman.import',
   'unmatched-',

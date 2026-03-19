@@ -922,7 +922,7 @@ export async function ensureDatabaseConstraints() {
     try {
       const needsFix = await db.execute(sql`
         SELECT id, stripe_customer_id FROM users 
-        WHERE LOWER(email) = 'nick@evenhouse.club' 
+        WHERE LOWER(email) IN ('nick@evenhouse.club', 'nick@everclub.co') 
           AND stripe_customer_id IS NOT NULL
         LIMIT 1
       `);
@@ -936,7 +936,7 @@ export async function ensureDatabaseConstraints() {
               tier_id = NULL,
               membership_status = 'non-member',
               updated_at = NOW()
-          WHERE LOWER(email) = 'nick@evenhouse.club'
+          WHERE LOWER(email) IN ('nick@evenhouse.club', 'nick@everclub.co')
         `);
         await db.execute(sql`
           UPDATE users 

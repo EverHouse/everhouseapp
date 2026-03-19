@@ -94,7 +94,8 @@ export interface FetchedContext {
 export const isPlaceholderEmail = (email: string): boolean => {
   if (!email) return true;
   const lower = email.toLowerCase();
-  return lower.includes('@visitors.evenhouse.club') || 
+  return lower.includes('@visitors.evenhouse.club') ||
+         lower.includes('@visitors.everclub.co') || 
          lower.includes('@trackman.local') || 
          lower.startsWith('classpass-') ||
          lower.startsWith('golfnow-') ||

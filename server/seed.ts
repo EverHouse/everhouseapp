@@ -89,8 +89,8 @@ async function seed() {
     // Seed Admin Users
     logger.info('Creating admin users...');
     const admins = [
-      { email: 'adam@evenhouse.club', first_name: 'Adam', last_name: 'Ever Club', role: 'admin' },
-      { email: 'nick@evenhouse.club', first_name: 'Nick', last_name: 'Luu', role: 'admin' },
+      { email: 'adam@everclub.co', first_name: 'Adam', last_name: 'Ever Club', role: 'admin' },
+      { email: 'nick@everclub.co', first_name: 'Nick', last_name: 'Luu', role: 'admin' },
     ];
 
     for (const admin of admins) {

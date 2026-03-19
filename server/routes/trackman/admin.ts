@@ -596,7 +596,10 @@ router.post('/api/trackman/admin/cleanup-lessons', isStaffOrAdmin, async (req, r
     const INSTRUCTOR_EMAILS = [
       'tim@evenhouse.club',
       'rebecca@evenhouse.club',
-      'instructors@evenhouse.club'
+      'instructors@evenhouse.club',
+      'tim@everclub.co',
+      'rebecca@everclub.co',
+      'instructors@everclub.co',
     ];
 
     let convertedBookings = 0;

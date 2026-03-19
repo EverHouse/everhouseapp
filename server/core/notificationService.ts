@@ -461,6 +461,7 @@ const SYNTHETIC_EMAIL_PATTERNS = [
   '@trackman.local',
   '@trackman.import',
   '@visitors.evenhouse.club',
+  '@visitors.everclub.co',
   'private-event@',
   'unmatched-',
   'unmatched@',

@@ -613,7 +613,7 @@ const Login: React.FC = () => {
                       {devLoading ? 'Logging in...' : 'Dev Login (Admin)'}
                     </button>
                     <p className="text-center text-xs text-amber-600 dark:text-amber-400">
-                      Development only - logs in as nick@evenhouse.club
+                      Development only - logs in as nick@everclub.co
                     </p>
                     <button
                       type="button"
