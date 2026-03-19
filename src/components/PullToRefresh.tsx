@@ -429,13 +429,13 @@ const PullToRefresh: React.FC<PullToRefreshProps> = ({ children, onRefresh, disa
               top: 0;
               left: 0;
               right: 0;
-              height: ${pullDistance}px;
+              height: calc(env(safe-area-inset-top, 0px) + 80px + ${pullDistance}px);
               background-color: #293515;
               z-index: 1500;
               display: flex;
               align-items: flex-end;
               justify-content: center;
-              padding-bottom: 10px;
+              padding-bottom: 12px;
               border-radius: 0 0 20px 20px;
               box-shadow: 0 4px 20px rgba(0,0,0,0.3);
               will-change: height;
