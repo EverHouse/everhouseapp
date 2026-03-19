@@ -30,17 +30,18 @@ Activate after completing ANY code change that:
 - Update both `version` and `date` to match the new changelog entry
 - This controls the "What's New" badge in the app
 
-### 3. Update `replit.md`
-- **Version number**: Update `**Current Version**:` at the top
-- **Recent Changes section**: Add a bullet at the top of "### Recent Changes" with:
-  - Version tag in bold
-  - Technical description of what changed and why
-  - Any new invariants or conventions established
-  - Key files affected
-- **Architecture sections**: If the change affects architecture (new patterns, new services, schema changes), update the relevant section
-- Keep Recent Changes to the last ~15 entries; older items are in `docs/CHANGELOG.md`
+### 3. Update Developer Changelog (`docs/CHANGELOG.md`)
+- Add a new version entry at the TOP (newest first)
+- Include technical details: files changed, patterns used, root causes
+- This is the single source of truth for detailed change history
+- Format: `## [version] - date` with categorized bullet points
 
-### 4. Update Custom Skills (when applicable)
+### 4. Update `replit.md`
+- **Version number**: Update `**Current Version**:` at the top
+- **Architecture sections**: If the change affects architecture (new patterns, new services, schema changes), update the relevant section
+- Do NOT add change-by-change entries — replit.md is for architecture and rules only, not a changelog
+
+### 5. Update Custom Skills (when applicable)
 If the change establishes or modifies:
 - A booking flow → update `.agents/skills/booking-flow/SKILL.md`
 - Fee calculation → update `.agents/skills/fee-calculation/SKILL.md`
@@ -73,6 +74,6 @@ If the change establishes or modifies:
 Before considering documentation complete:
 - [ ] `src/data/changelog.ts` has the new entry at the top
 - [ ] `src/data/changelog-version.ts` version and date match
-- [ ] `replit.md` version number updated
-- [ ] `replit.md` Recent Changes has the new bullet
+- [ ] `docs/CHANGELOG.md` has the new developer-facing entry at the top
+- [ ] `replit.md` version number updated (architecture sections updated if applicable)
 - [ ] Relevant custom skills updated (if applicable)

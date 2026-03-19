@@ -2,6 +2,380 @@
 
 All notable changes to the Ever Club Members App are documented here.
 
+## [8.89.2] - 2026-03-19
+
+### Calendar Sync Fix — Timestamp Precision
+- **Fixed**: Wellness classes, events, and closures edited in the app were getting stuck in an infinite sync loop — caused by a timestamp precision mismatch (microsecond vs millisecond) that made the system think every record was re-edited during sync
+- **Key files**: `server/core/calendar/sync/closures.ts`, `server/core/calendar/sync/events.ts`, `server/core/calendar/sync/wellness.ts`
+
+## [8.89.1] - 2026-03-19
+
+### Pull-to-Refresh — Production Overlay Fix & Android Scroll Fix
+- **Fixed**: Pull-to-refresh green sheet overlay was invisible in production — inline `<style>` tags were blocked by the Content Security Policy
+- **Fixed**: Moved all pull-to-refresh styles (pull bar, fill animation, refresh screen, dismiss animation) from inline style tags into the main stylesheet so they pass CSP
+- **Fixed**: Android/Pixel users could only scroll pages by touching the header bar — pull-to-refresh was using a document-level non-passive touch listener that blocked native scroll optimization
+- **Fixed**: Touch listeners now attach to the content container (not the whole document) and are fully passive — browser no longer waits for JavaScript before scrolling
+- **Key files**: `src/components/PullToRefresh.tsx`, `src/index.css`
+
+## [8.89.0] - 2026-03-19
+
+### Inline SVG Icons & Pull-to-Refresh Fix
+- **New**: All 241 icons migrated from Google Material Symbols font to inline SVGs via `<Icon name="..." />` component — icons render instantly without font loading, network requests, or font detection delays
+- **Fixed**: PWA icons show immediately on home screen launch — no more invisible icons in offline/standalone mode
+- **Fixed**: Pull-to-refresh shows the green sheet with walking golfer animation again — header stays solid while pulling
+- **Removed**: Google Material Symbols font dependency completely eliminated — no CDN requests, no font preloading, no icon font CSS
+- **Performance**: Icons are part of the DOM and render in the first paint — zero FOIT
+- **Key files**: `src/components/icons/Icon.tsx`, `src/components/icons/iconPaths.ts` (241 icons), `index.html`
+
+## [8.88.6] - 2026-03-19
+
+### Critical RLS Fix — Overage Fee False Positives
+- **Fixed**: Supabase had enabled Row-Level Security (RLS) with a `deny_all` policy on ALL 82 application tables, silently blocking every SELECT/INSERT/UPDATE from the application's database role
+- **Impact**: `getTierLimits()` returned 0 daily minutes for all tiers → every member was charged overage fees ($50/hr) because the fee calculator fell back to defaults. Also caused Stripe product sync and Apple Wallet pass generation failures
+- **Fix**: Added RLS disable + `deny_all` policy cleanup as the first step in `ensureDatabaseConstraints()` in `db-init.ts`
+- **Also**: Added Stripe feature name update logic to `syncTierFeaturesToStripe()` to correct stale "/month" labels to "/year" for guest pass features
+- **Key files**: `server/core/db-init.ts`, `server/core/stripe/syncTierFeatures.ts`
+
+## [8.88.5] - 2026-03-19
+
+### Code Review Fixes — DRY Violations, Dead Code & Duplicate Logic
+- **Fixed**: Removed duplicate `handleTrialWillEnd` function left in `customers.ts` after the Task #179 file split — webhook dispatcher already imported from `subscriptions/trialWillEnd.ts`
+- **Fixed**: Extracted 10 duplicated TypeScript interfaces from `AnalyticsTab.tsx` and `AnalyticsChartsSection.tsx` into shared `analyticsTypes.ts`
+- **Removed**: Deleted orphaned `GlassRow.tsx` component (zero usages in codebase)
+- **Key files**: `server/core/stripe/webhooks/customers.ts`, `src/pages/Admin/tabs/analytics/analyticsTypes.ts`
+
+## [8.88.4] - 2026-03-19
+
+### Performance — N+1 Query Batching, LIMIT Enforcement & Code Splitting
+- **Performance**: Visit count sync refactored from 3 queries per member to 3 bulk SQL queries per batch (up to 90% fewer DB round-trips)
+- **Performance**: Added LIMIT caps — inquiries 1000, announcements export 500, wellness classes 500
+- **Performance**: QR scanner module (`html5-qrcode`) dynamically imported on modal open — reduced initial bundle size
+- **Performance**: Analytics charts (`recharts`) lazy-loaded with `React.lazy()` — charting library only loads when viewing Analytics tab
+- **Performance**: `MotionListItem` wrapped in `React.memo` to reduce unnecessary re-renders in list views
+- **Key files**: `server/core/hubspot/visitSync.ts`, `src/components/staff-command-center/modals/CheckInModal.tsx`, `src/pages/Admin/tabs/AnalyticsTab.tsx`
+
+## [8.88.3] - 2026-03-19
+
+### Error Handling Consistency — Complete getErrorMessage() Adoption
+- **Fixed**: 100+ catch blocks across 55+ files migrated from manual `String(err)` / `err instanceof Error ? err.message : String(err)` patterns to `getErrorMessage()` from `server/utils/errorUtils.ts`
+- **Scope**: All 24 schedulers, rate limiting middleware, booking validation, calendar sync, Stripe product sync, HubSpot utilities, wallet pass services, and all route handlers
+- **Cleanup**: Removed stale `eslint-disable` comments for `@typescript-eslint/no-explicit-any` after catch block type annotations changed from `any` to `unknown`
+
+## [8.88.2] - 2026-03-19
+
+### Skill & Documentation Sync (Phase 7 Code Review)
+- **Documentation**: Audited all 8 domain skill files for accuracy — fixed stale file paths from directory splits across all 8 skills
+- **Updated**: Scheduler-jobs skill now documents 29 logical schedulers across 26 files (was 28/25) — added Notification Cleanup scheduler
+- **Fixed**: Version file drift — `src/config/version.ts` and `package.json` were stuck at `8.87.89`; all 4 version files now in sync
+- **Updated**: README.md tech stack now includes Stripe, Drizzle ORM, Zustand, React Query, Apple Wallet, and Web Push
+
+## [8.88.1] - 2026-03-19
+
+### Data Integrity Architecture Hardening (Code Review Pass)
+- **Hardened**: Database constraint violations from triggers (state machine, guest pass limits, etc.) now return structured 409 errors from all 41 fix/sync endpoints instead of generic 500s
+- **Fixed**: Cross-system drift and HubSpot member sync checks now return stable, deterministic results — both were using random sampling
+- **Hardened**: Guest pass hold limit trigger now also guards UPDATE operations (previously only INSERT)
+
+## [8.88.0] - 2026-03-19
+
+### Optimistic UI for Data Integrity Fixes
+- **Improved**: Fixing an issue in the data integrity panel now removes it from the list instantly (on click), rather than waiting for the API call
+- **Improved**: After a fix succeeds, the panel silently refreshes in the background — no more 'Running Checks...' banner after every fix
+- **Fixed**: If a fix fails, the issue is restored to its original position (rollback)
+- **Key files**: `src/pages/Admin/tabs/dataIntegrity/`
+
+## [8.87.99] - 2026-03-19
+
+### DB Integrity Hardening — State Machines, Guard Triggers & Dedup Indexes
+- **New**: `trg_booking_status_machine` — DB-level enforcement of valid booking status transitions (terminal: attended, no_show, cancelled, declined, expired)
+- **New**: `trg_membership_status_machine` — DB-level enforcement of valid membership status transitions (terminal: archived, merged)
+- **New**: Guest pass over-consumption prevention at DB level — concurrent holds cannot exceed allocation
+- **New**: `trg_prevent_archived_*` (5 tables) — blocks inserts for archived members on bookings, RSVPs, wellness, guest pass holds, push subscriptions
+- **New**: `trg_guard_stale_pending` — prevents approving bookings >2hr past start
+- **New**: `trg_guard_attended_unpaid` — blocks attended transition with unpaid fee snapshots
+- **New**: `trg_cleanup_fee_on_terminal` — auto-cancels fee snapshots on terminal booking status
+- **New**: `trg_auto_expire_stale_tours` — marks stale tours as no_show
+- **New**: Dedup indexes — `idx_users_email_stripe_unique`, `idx_bookings_invoice_unique`
+- **Escape hatch**: `current_setting('app.bypass_status_check', true)` for data migration/repair
+- **Key files**: `server/core/db-init.ts`, migration `0057`
+
+## [8.87.98] - 2026-03-19
+
+### Scheduler Reliability, Sync Race Conditions & HubSpot Safety
+- **Fixed**: Events and wellness calendar sync now use optimistic locking during push-back — edits during sync no longer silently lost
+- **Fixed**: Google Calendar events no longer retain stale extended properties when optional fields are removed
+- **Fixed**: 6 additional schedulers use hour-range window instead of exact-hour matching to prevent missed runs from timer drift
+- **Fixed**: Duplicate cleanup scheduler clears last-run memory on failure for retry
+- **Fixed**: HubSpot `syncMemberToHubSpot` now restores lifecycle stage if contact update fails after clearing it
+- **Fixed**: HubSpot day pass sync restores lifecycle stage on failure
+- **Fixed**: Stripe 'unpaid' status now consistently maps to 'suspended' across all sync paths
+- **Improved**: WebSocket token endpoint now rate-limited
+
+## [8.87.97] - 2026-03-19
+
+### Calendar Sync Hardening & Extended Property Fixes
+- **Fixed**: Google Calendar extended properties properly removed when no longer relevant — previously left as empty values
+- **Fixed**: Concurrent edits during calendar push-back detected via optimistic locking
+- **Fixed**: Closure push-back stores Google Calendar response timestamp after updating
+
+## [8.87.96] - 2026-03-19
+
+### Bug Fixes: Stripe Status, HubSpot Safety, Scheduler Reliability & Security
+- **Fixed**: Members with expired incomplete Stripe subscriptions now correctly marked inactive
+- **Fixed**: HubSpot contact lifecycle stage restored on failed tier sync update
+- **Fixed**: Daily scheduled tasks use date-based window instead of exact hour matching
+- **Fixed**: Onboarding nudge scheduler alerts staff on error instead of failing silently
+- **Improved**: Password change endpoint now rate-limited
+
+## [8.87.95] - 2026-03-19
+
+### Security: WebSocket Mobile Auth & Rate Limiter Hardening
+- **Fixed**: Mobile staff clients can now connect to real-time updates without cookies — WebSocket auth uses short-lived signed token via authenticated HTTP request
+- **Fixed**: Rate limiter key generators use strict type coercion to prevent crashes from malformed inputs
+
+## [8.87.94] - 2026-03-19
+
+### Guest Passes Now Reset Annually & Critical Bug Fixes
+- **Changed**: Guest passes reset annually (January 1st) instead of monthly
+- **Fixed**: Membership tiers page failing to load due to database column mismatch
+- **Fixed**: Removed leftover RLS policies from previous migration
+- **Key files**: `server/core/guestPassService.ts`, `server/schedulers/guestPassResetScheduler.ts`
+
+## [8.87.93] - 2026-03-19
+
+### Audit Fixes: Fee Snapshot Tracking & Integrity Check Improvements
+- **New**: Added `updated_at` column to `booking_fee_snapshots` table
+- **Fixed**: All 30 fee snapshot UPDATE paths now consistently set `updated_at = NOW()`
+- **Improved**: Dev-environment integrity check results prefixed with `[DEV]` to prevent confusion with production
+- **Key files**: `server/core/billing/unifiedFeeService.ts`, `server/core/integrity/`
+
+## [8.87.92] - 2026-03-18
+
+### Fix: Booking Owner Change Now Updates Details Immediately
+- **Fixed**: Changing a booking's owner now refreshes the booking header, owner name/email, and payment sections immediately — previously only the player roster updated
+- **Root cause**: `handleReassignOwner` only called `fetchRosterData()` but not the booking context re-fetch
+- **Fix**: Extracted `refetchBookingContext()`, called in parallel with roster refresh after reassign, added `onRosterUpdated()` callback + `booking-action-completed` event dispatch
+- **Also**: WebSocket `booking_updated` broadcast from server reassign endpoint for real-time cross-screen updates
+- **Key files**: `src/components/staff-command-center/modals/useUnifiedBookingLogic.ts`, `server/routes/trackman/admin-resolution.ts`
+
+## [8.87.91] - 2026-03-18
+
+### Fix: Session Creation Timeout During Trackman Webhook Processing
+- **Fixed**: Session creation no longer fails with statement timeouts when multiple Trackman webhooks arrive simultaneously — replaced blocking advisory lock with non-blocking retry pattern (`pg_try_advisory_lock` with up to 6 retries, 3s total)
+- **Improved**: Explicit 15-second statement timeout set during session creation
+
+## [8.87.90] - 2026-03-18
+
+### Fix: Bookings Queue Now Updates Instantly After Trackman Auto-Confirm
+- **Fixed**: Pending booking requests now disappear from the queue immediately when Trackman webhooks auto-confirm — previously UI didn't refresh due to notification data mismatch
+- **Fixed**: Member dashboard refreshes booking status in real-time on Trackman confirmation
+- **Improved**: Staff navigation badge count updates instantly on auto-confirmation
+
+## [8.87.89] - 2026-03-18
+
+### Fix: Stripe Reconnect Now Succeeds When Customer Has No Subscription
+- **Fixed**: Reconnecting a member to Stripe now correctly reports success for customer-only restoration (no active subscription)
+- **Fixed**: Stripe reconnect creates a new Stripe customer when none exists
+- **Improved**: Bulk reconnect shows fully reconnected vs customer-only restored counts
+
+## [8.87.88] - 2026-03-18
+
+### Architectural Audit: Security & Reliability Hardening
+- **Fixed**: HubSpot webhook now processes events before responding — failed processing will be retried by HubSpot
+- **Fixed**: Fee snapshot reconciliation scheduler prevents overlapping runs during startup
+- **Fixed**: Booking roster input validation rejects invalid IDs before processing
+- **Hardened**: Stripe error detection in invoice service uses type-safe property checks
+- **Security**: Auth middleware added to booking conflict checks, participant lists, and fee preview endpoints
+- **Security**: RSVP endpoint uses standard auth middleware
+- **Improved**: Cafe menu and FAQ queries include safety limits
+
+## [8.87.87] - 2026-03-18
+
+### Fix: WebSocket Reconnection Loop & Stripe Invoice Resilience
+- **Fixed**: WebSocket connections no longer stuck in infinite reconnect loop on session expiry
+- **Fixed**: WebSocket reconnection correctly resumes after user/view transitions
+- **Fixed**: Stripe invoice creation gracefully handles stale price IDs — falls back to custom-amount line items
+- **Hardened**: Stale-price detection uses structured error codes (`resource_missing`)
+- **Improved**: WebSocket auth failure logging upgraded from debug to warn
+
+## [8.87.85] - 2026-03-18
+
+### Fix: Group Member Validation
+- **Fixed**: Adding sub-members to a family group now validates required fields before proceeding to Review/Payment
+- **Improved**: Sub-member form shows red error highlighting and asterisks on required fields
+
+## [8.87.84] - 2026-03-18
+
+### Fix: Stripe Name Sync & Orphaned Customer ID Cleanup
+- **Fixed**: Member names no longer overwritten with email addresses from Stripe `customer.updated` webhooks
+- **Fixed**: Orphaned Stripe customer IDs now auto-relinked by searching Stripe for matching email
+
+## [8.87.82] - 2026-03-18
+
+### Fix: Audit Log Crash & Startup DB Connection Exhaustion
+- **Fixed**: Staff actions no longer crash with 'Cannot read properties of undefined' — audit logging function returns a promise correctly
+- **Fixed**: Server startup no longer exhausts connection pool — Stripe product init tasks run sequentially instead of concurrently
+- **Fixed**: Customer sync and corporate pricing pull run sequentially after product setup
+
+## [8.87.81] - 2026-03-18
+
+### Fix: WebSocket Auth Loop & Stripe Overage Billing
+- **Fixed**: WebSocket clients properly stop reconnecting on auth failure (close code 4002)
+- **Fixed**: Overage/guest fee billing no longer fails with deleted Stripe price IDs — validates on startup and auto-recreates
+
+## [8.87.80] - 2026-03-18
+
+### Fix: WebSocket Reconnection Loop Flooding Logs
+- **Fixed**: WebSocket connections with expired sessions no longer spam logs — server immediately closes with 'session invalid' signal
+- **Fixed**: App stops WebSocket reconnection on session expiry instead of retrying every 12 seconds
+- **Improved**: WebSocket auth warnings downgraded to debug-level
+
+## [8.87.79] - 2026-03-18
+
+### Fix: Cafe Delete Flow, Tier Safety & Dead Code Cleanup
+- **Fixed**: Deleted cafe menu items no longer reappear on 'Pull from Stripe' — sync respects locally-deleted items
+- **Fixed**: Unrecognized tier names log clear errors instead of silently downgrading to Social
+- **Fixed**: 'Seed Cafe' button works after all items deleted — no longer counts soft-deleted items
+- **Removed**: Unused auto-seed cafe menu code
+
+## [8.87.78] - 2026-03-18
+
+### Fix: Facility Notices & Onboarding Checklist Persistence
+- **Fixed**: Notice dismissals now persisted to database (`user_dismissed_notices` table) via `POST /api/notices/dismiss` — previously localStorage-only
+- **Fixed**: OnboardingChecklist concierge step: API call fires BEFORE VCF download — iOS Contacts dialog no longer interrupts completion
+- **Key files**: `src/components/ClosureAlert.tsx`, `server/routes/notices.ts`
+
+## [8.87.77] - 2026-03-18
+
+### Fix: Orphaned Payment Intent & Fee Snapshot Cleanup
+- **Fixed**: `cancelPendingPaymentIntentsForBooking` now cancels fee snapshots with NULL `stripe_payment_intent_id`
+- **Fixed**: Removed invalid `updated_at` column references
+- **Cleaned**: 2 lingering Stripe PIs and 43 stale fee snapshots from cancelled bookings
+- **Key files**: `server/core/billing/paymentIntentCleanup.ts`
+
+## [8.87.76] - 2026-03-18
+
+### Migrate Raw fetch() to apiRequest
+- **Migrated**: 5 raw `fetch()` calls in `useBookingActions.ts` to `apiRequest`
+- **Migrated**: 4 wallet pass downloads to `apiRequestBlob`
+- **Migrated**: Hand-rolled retry in `EventsTab.tsx` sync mutation to `apiRequest`
+- **Remaining**: Raw `fetch()` intentionally kept for React Query queryFn callbacks, file uploads, auth session check, error reporting
+
+## [8.87.75] - 2026-03-18
+
+### Fix: Remove Invalid .catch() on Synchronous sendNotificationToUser
+- **Fixed**: Removed all `.catch()` chains from `sendNotificationToUser` calls across 22 server files — function is synchronous, `.catch()` would throw TypeError
+- **Reverts**: v8.87.74 `.catch()` additions on the same function
+
+## [8.87.74] - 2026-03-18
+
+### Fix: Unhandled Async Error Boundaries
+- **Fixed**: Added `.catch()` to 2 `notifyLinkedMembers`/`notifyApprovalParticipants` calls in `approvalFlow.ts`
+- **Fixed**: Added `.catch()` to 2 `logFromRequest` calls in `admin-resolution.ts`
+- **Note**: `sendNotificationToUser` `.catch()` additions reverted in v8.87.75
+
+## [8.87.73] - 2026-03-18
+
+### Security Hardening: SQL Injection Prevention & Privacy
+- **Fixed**: Replaced 7 `sql.raw(ARRAY[...])` patterns with parameterized arrays across Trackman webhook handlers, `trackmanRescan.ts`, and `reconciliation.ts`
+- **Fixed**: Added allowlist validation guards on all DDL `sql.raw()` calls in `db-init.ts`
+- **Fixed**: Removed `memberEmail` and `cardLast4` from log output in `invoices.ts` and `saved-cards.ts`
+- **Fixed**: Added `shlex` escaping to Python diagnostic scripts
+
+## [8.87.72] - 2026-03-18
+
+### Fix: Database Connection Stability on Supabase
+- **Fixed**: Supabase session pooler returning connections with empty `search_path`, causing intermittent "relation does not exist" errors
+- **Fix**: Appends `-c search_path=public` to connection string options — set synchronously at connection startup
+- **Key files**: `server/core/db.ts` (both `pool` and `directPool`)
+
+## [8.87.71] - 2026-03-18
+
+### Bug Fixes: Cafe Soft Delete & Tier Sync Consistency
+- **Fixed**: Cafe item deletion now deactivates instead of permanently removing — preserves POS transaction history
+- **Fixed**: All 13 tier update paths keep tier name and tier ID in sync
+- **Fixed**: Tier ID lookup queries database instead of hardcoded map
+
+## [8.87.70] - 2026-03-18
+
+### Fix: Corporate Volume Pricing Startup Error
+- **Fixed**: Corporate Volume Pricing product init failing on startup due to stale Stripe idempotency key
+- **Improved**: Product creation searches Stripe for existing products before attempting to create
+
+## [8.87.69] - 2026-03-18
+
+### Bug Fixes: Cafe Admin, Route Validation & Tier Sync Safety
+- **Fixed**: Cafe admin tab shows inactive items (greyed out with badge) for reactivation
+- **Fixed**: Cafe route IDs validated as numbers — non-numeric IDs return 400
+- **Fixed**: Deleting non-existent cafe item returns 404
+- **Fixed**: Tier sync explicitly skips non-subscription product types
+- **Fixed**: Cafe admin errors show toast notifications
+
+## [8.87.68] - 2026-03-18
+
+### Fix: Wellness Calendar Sync — Missing recurring_event_id Column
+- **Fixed**: Added `recurring_event_id` column to `wellness_classes` schema and db-init migration
+- **Key files**: `shared/schema.ts`, `server/core/db-init.ts`
+
+## [8.87.67] - 2026-03-18
+
+### Accessibility: Facebook Pixel Alt Text & Thin Content Investigation
+- **Fixed**: Added empty alt attribute to Facebook pixel noscript tracker image (WCAG)
+- **Investigated**: Thin content warnings on 15 pages confirmed as SPA false positives
+
+## [8.87.66] - 2026-03-18
+
+### Security: Tightened Content Security Policy (CSP) Headers
+- **Removed**: `unsafe-eval` from `script-src` CSP directive
+- **Removed**: `unsafe-inline` from `script-src` — replaced with per-request cryptographic nonces
+- **Added**: Nonce-based CSP for inline scripts — unique nonce per HTML response
+- **Retained**: `unsafe-inline` in `style-src` (required by React inline styles and third-party widget CSS)
+- **Key files**: `server/index.ts`
+
+## [8.87.65] - 2026-03-18
+
+### Performance: LCP Preload Hints & Critical Request Chain Optimization
+- **Improved**: Server sends HTTP `Link` header with preload hints for LCP hero image, main CSS bundle, and font preconnects
+- **Improved**: Main CSS stylesheet preloaded via Link header
+- **Added**: `dns-prefetch` fallbacks for Google Fonts domains
+
+## [8.87.64] - 2026-03-18
+
+### SEO: Extended Meta Descriptions for Privacy & Terms Pages
+- **Improved**: Privacy policy meta description extended to 145 characters (was 93)
+- **Improved**: Terms of service meta description extended to 139 characters (was 89)
+
+## [8.87.63] - 2026-03-18
+
+### Accessibility Audit & SEO Canonical/OG URL Fixes
+- **Verified**: All public pages wrapped in `<main id="main-content">` via global layout
+- **Verified**: Skip-to-content link present on all pages (WCAG 2.4.1)
+- **Fixed**: `og:url` correctly updated on all pages including fallback routes
+- **Fixed**: Canonical tag replaced instead of duplicated
+- **Fixed**: Tour page route alignment — SEO meta, JSON-LD, breadcrumbs, and internal links all use `/tour`
+
+## [8.87.62] - 2026-03-18
+
+### Dev Environment Stability & Complete Database Schema Sync
+- **Fixed**: Created 7 missing tables, added 36 missing columns across 11 tables
+- **Fixed**: Login, rate limiting, staff portal, and all major API endpoints working in dev
+- **Improved**: Stripe initialization completes cleanly with all products and pricing ready
+- **Key files**: `server/core/db-init.ts`
+
+## [8.87.61] - 2026-03-17
+
+### Wallet Booking Pass Voids — Bulk Cancellation Coverage
+- **Fixed**: Trackman conflict-cancellation blocks in `webhook-billing.ts` now void wallet passes
+- **Fixed**: Member archive in `admin-actions.ts` now voids passes for bulk-cancelled bookings (`RETURNING id` + loop)
+- **Key files**: `server/core/stripe/webhooks/webhook-billing.ts`, `server/routes/admin-actions.ts`
+
+## [8.87.60] - 2026-03-17
+
+### Apple Wallet Pass — Complete Lifecycle Coverage
+- **New**: 15 files now call wallet pass update/void covering: tier changes, subscription status changes, sub-member propagation, checkout activation, group billing, profile name changes, guest pass use/refund/reset, grace period termination, archival, and reconciliation
+- **Fixed**: Booking pass void added to `cancellation_pending` in both staff and member paths with self-healing retry
+- **Fixed**: Resource type hardcoded as 'simulator' in staff manual bookings → now dynamic
+
 ## [8.87.59] - 2026-03-17
 
 ### Codebase Audit — Security & Reliability
