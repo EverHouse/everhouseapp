@@ -3,7 +3,7 @@ import { isPlaceholderEmail } from '../../core/stripe/customers';
 import { getStripeClient } from '../../core/stripe/client';
 import { getHubSpotClientWithFallback } from '../../core/integrations';
 import { retryableHubSpotRequest } from '../../core/hubspot/request';
-import { logger, isAdmin, validateBody, db, sql, pool, safeRelease, logFromRequest, getErrorMessage, safeErrorDetail } from './shared';
+import { logger, isAdmin, validateBody, db, sql, pool, safeRelease, logFromRequest, getErrorMessage, sendFixError } from './shared';
 import type { Request } from 'express';
 import { placeholderDeleteSchema } from '../../../shared/validators/dataIntegrity';
 
@@ -140,7 +140,7 @@ router.get('/api/data-integrity/placeholder-accounts', isAdmin, async (req, res)
     });
   } catch (error: unknown) {
     logger.error('[DataIntegrity] Placeholder scan error', { error: error instanceof Error ? error : new Error(String(error)) });
-    res.status(500).json({ error: 'Failed to scan for placeholder accounts', details: safeErrorDetail(error) });
+    sendFixError(res, error);
   }
 });
 
@@ -319,7 +319,7 @@ router.post('/api/data-integrity/placeholder-accounts/delete', isAdmin, validate
     });
   } catch (error: unknown) {
     logger.error('[DataIntegrity] Placeholder delete error', { error: error instanceof Error ? error : new Error(String(error)) });
-    res.status(500).json({ error: 'Failed to delete placeholder accounts', details: safeErrorDetail(error) });
+    sendFixError(res, error);
   }
 });
 

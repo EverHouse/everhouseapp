@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { cancelPaymentIntent } from '../../core/stripe/payments';
 import { queueIntegrityFixSync } from '../../core/hubspot/queueHelpers';
-import { logger, isAdmin, validateBody, db, sql, pool, safeRelease, logFromRequest, getSessionUser, getErrorMessage, safeErrorDetail, sendFixError } from './shared';
+import { logger, isAdmin, validateBody, db, sql, pool, safeRelease, logFromRequest, getSessionUser, getErrorMessage, sendFixError } from './shared';
 import type { Request } from 'express';
 import { unlinkHubspotSchema, mergeHubspotSchema, mergeStripeSchema, changeBillingProviderSchema, acceptTierSchema, userIdSchema, recordIdSchema, cancelOrphanedPiSchema, updateTourStatusSchema, clearStripeIdSchema, deleteOrphanByEmailSchema, bulkChangeBillingProviderSchema, linkStripeCustomerOnlySchema, reconnectStripeSubscriptionSchema, bulkReconnectStripeSchema } from '../../../shared/validators/dataIntegrity';
 

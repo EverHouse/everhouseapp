@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { logger, isAdmin, validateBody, db, sql, pool, safeRelease, logFromRequest, getSessionUser, getErrorMessage, safeErrorDetail, sendFixError } from './shared';
+import { logger, isAdmin, validateBody, db, sql, pool, safeRelease, logFromRequest, getSessionUser, getErrorMessage, sendFixError } from './shared';
 import type { ResourceType } from './shared';
 import type { Request } from 'express';
 import { recordIdSchema, dryRunSchema, reviewItemSchema, assignSessionOwnerSchema } from '../../../shared/validators/dataIntegrity';
