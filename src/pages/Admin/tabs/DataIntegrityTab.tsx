@@ -73,7 +73,7 @@ const DataIntegrityTab: React.FC = () => {
         </div>
         {actions.meta?.lastRun && actions.isCached && (
           <p className="text-sm text-primary/60 dark:text-white/60 text-center">
-            <Icon name="schedule" className="text-[14px] align-middle mr-1" />
+            <Icon name="schedule" className="text-[14px] inline-block align-middle mr-1" />
             Last checked {formatTimeAgo(actions.meta.lastRun)}
           </p>
         )}
