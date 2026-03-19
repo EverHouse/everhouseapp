@@ -16,8 +16,11 @@ async function isStaffUser(email: string): Promise<boolean> {
     const isAdmin = await isAdminEmail(email);
     if (isAdmin) return true;
     
+    const { getAlternateDomainEmail } = await import('../core/utils/emailNormalization');
+    const alt = getAlternateDomainEmail(email);
+    const emails = alt ? [email, alt] : [email];
     const result = await db.execute(
-      sql`SELECT id FROM staff_users WHERE LOWER(email) = LOWER(${email}) AND is_active = true`
+      sql`SELECT id FROM staff_users WHERE LOWER(email) IN (${sql.join(emails.map(e => sql`LOWER(${e})`), sql`, `)}) AND is_active = true`
     );
     return result.rows.length > 0;
   } catch (_error: unknown) {

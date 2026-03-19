@@ -17,10 +17,13 @@ import { sendPassUpdateForMemberByEmail } from '../walletPass/apnPushService';
 const router = Router();
 
 async function isStaffOrAdminCheck(email: string): Promise<boolean> {
+  const { getAlternateDomainEmail } = await import('../core/utils/emailNormalization');
+  const alt = getAlternateDomainEmail(email);
+  const emails = alt ? [email.toLowerCase(), alt.toLowerCase()] : [email.toLowerCase()];
   const [staff] = await db.select({ id: staffUsers.id })
     .from(staffUsers)
     .where(and(
-      eq(staffUsers.email, email.toLowerCase()),
+      sql`LOWER(${staffUsers.email}) IN (${sql.join(emails.map(e => sql`LOWER(${e})`), sql`, `)})`,
       eq(staffUsers.isActive, true)
     ))
     .limit(1);

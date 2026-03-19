@@ -335,7 +335,10 @@ router.put('/api/admin/trackman/unmatched/:id/resolve', isStaffOrAdmin, async (r
        WHERE LOWER(u.email) = LOWER(${resolveEmail.toLowerCase()})`);
     
     if (memberResult.rows.length === 0) {
-      const staffCheck = await db.execute(sql`SELECT id, email, first_name, last_name, role FROM staff_users WHERE LOWER(email) = LOWER(${resolveEmail.toLowerCase()}) AND is_active = true`);
+      const { getAlternateDomainEmail } = await import('../../core/utils/emailNormalization');
+      const altResolve = getAlternateDomainEmail(resolveEmail);
+      const resolveEmails = altResolve ? [resolveEmail.toLowerCase(), altResolve.toLowerCase()] : [resolveEmail.toLowerCase()];
+      const staffCheck = await db.execute(sql`SELECT id, email, first_name, last_name, role FROM staff_users WHERE LOWER(email) IN (${sql.join(resolveEmails.map(e => sql`LOWER(${e})`), sql`, `)}) AND is_active = true`);
       
       if (staffCheck.rows.length > 0) {
         return res.status(404).json({ 
@@ -907,8 +910,11 @@ router.post('/api/admin/trackman/auto-resolve-same-email', isStaffOrAdmin, async
         
         for (const booking of bookingRequestsResult.rows as DbRow[]) {
           try {
+            const { getAlternateDomainEmail: getAltInstructor } = await import('../../core/utils/emailNormalization');
+            const altInstructor = getAltInstructor(member.email as string);
+            const instructorEmails = altInstructor ? [member.email as string, altInstructor] : [member.email as string];
             if (member.role === 'golf_instructor' || 
-                (await db.execute(sql`SELECT 1 FROM staff_users WHERE LOWER(email) = LOWER(${member.email}) AND role = 'golf_instructor' AND is_active = true`)).rows.length > 0) {
+                (await db.execute(sql`SELECT 1 FROM staff_users WHERE LOWER(email) IN (${sql.join(instructorEmails.map(e => sql`LOWER(${e})`), sql`, `)}) AND role = 'golf_instructor' AND is_active = true`)).rows.length > 0) {
               continue;
             }
             

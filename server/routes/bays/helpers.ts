@@ -37,6 +37,7 @@ export async function dismissStaffNotificationsForBooking(bookingId: number): Pr
 
 export async function isStaffOrAdminCheck(email: string): Promise<boolean> {
   const { isAdminEmail, getAuthPool, queryWithRetry } = await import('../../replit_integrations/auth/replitAuth');
+  const { getAlternateDomainEmail } = await import('../../core/utils/emailNormalization');
   const isAdmin = await isAdminEmail(email);
   if (isAdmin) return true;
   
@@ -44,10 +45,13 @@ export async function isStaffOrAdminCheck(email: string): Promise<boolean> {
   if (!pool) return false;
   
   try {
+    const alt = getAlternateDomainEmail(email);
+    const emails = alt ? [email, alt] : [email];
+    const placeholders = emails.map((_, i) => `LOWER($${i + 1})`).join(', ');
     const result = await queryWithRetry(
       pool,
-      'SELECT id FROM staff_users WHERE LOWER(email) = LOWER($1) AND is_active = true',
-      [email]
+      `SELECT id FROM staff_users WHERE LOWER(email) IN (${placeholders}) AND is_active = true`,
+      emails
     );
     return (result as unknown as { rows: Array<Record<string, unknown>> }).rows.length > 0;
   } catch (_error: unknown) {

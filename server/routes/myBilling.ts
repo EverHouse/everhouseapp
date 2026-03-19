@@ -33,7 +33,10 @@ function requireAuth(req: Request, res: Response, next: NextFunction) {
 const requireStaffAuth = [requireAuth, isStaffOrAdmin];
 
 async function isDbVerifiedStaff(email: string): Promise<boolean> {
-  const result = await db.execute(sql`SELECT id FROM staff_users WHERE LOWER(email) = ${email.toLowerCase()} AND is_active = true`);
+  const { getAlternateDomainEmail } = await import('../core/utils/emailNormalization');
+  const alt = getAlternateDomainEmail(email);
+  const emails = alt ? [email.toLowerCase(), alt.toLowerCase()] : [email.toLowerCase()];
+  const result = await db.execute(sql`SELECT id FROM staff_users WHERE LOWER(email) IN (${sql.join(emails.map(e => sql`LOWER(${e})`), sql`, `)}) AND is_active = true`);
   return (result.rows as Array<Record<string, unknown>>).length > 0;
 }
 

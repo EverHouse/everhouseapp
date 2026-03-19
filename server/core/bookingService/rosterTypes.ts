@@ -269,10 +269,14 @@ export async function isStaffOrAdminCheck(email: string): Promise<boolean> {
   if (!authPool) return false;
 
   try {
+    const { getAlternateDomainEmail } = await import('../../core/utils/emailNormalization');
+    const alt = getAlternateDomainEmail(email);
+    const emails = alt ? [email, alt] : [email];
+    const placeholders = emails.map((_, i) => `LOWER($${i + 1})`).join(', ');
     const result = await queryWithRetry(
       authPool,
-      'SELECT id FROM staff_users WHERE LOWER(email) = LOWER($1) AND is_active = true',
-      [email]
+      `SELECT id FROM staff_users WHERE LOWER(email) IN (${placeholders}) AND is_active = true`,
+      emails
     );
     return (result as { rows: { id: string }[] }).rows.length > 0;
   } catch (error: unknown) {

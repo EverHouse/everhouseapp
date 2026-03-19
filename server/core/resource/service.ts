@@ -538,16 +538,20 @@ export async function getCascadePreview(bookingId: number) {
 
 export async function isStaffOrAdminEmail(sessionEmail: string): Promise<boolean> {
   const { isAdminEmail, getAuthPool, queryWithRetry } = await import('../../replit_integrations/auth/replitAuth');
+  const { getAlternateDomainEmail } = await import('../../core/utils/emailNormalization');
   const isAdmin = await isAdminEmail(sessionEmail);
   if (isAdmin) return true;
   
   const authPool = getAuthPool();
   if (authPool) {
     try {
+      const alt = getAlternateDomainEmail(sessionEmail);
+      const emails = alt ? [sessionEmail, alt] : [sessionEmail];
+      const placeholders = emails.map((_, i) => `LOWER($${i + 1})`).join(', ');
       const result = await queryWithRetry(
         authPool,
-        'SELECT id FROM staff_users WHERE LOWER(email) = LOWER($1) AND is_active = true',
-        [sessionEmail]
+        `SELECT id FROM staff_users WHERE LOWER(email) IN (${placeholders}) AND is_active = true`,
+        emails
       );
       return ((result as unknown as { rows: unknown[] }).rows).length > 0;
     } catch (e: unknown) {

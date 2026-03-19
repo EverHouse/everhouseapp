@@ -10,7 +10,7 @@ import { retryableHubSpotRequest } from '../../core/hubspot/request';
 import { normalizeTierName } from '../../../shared/constants/tiers';
 import { getSessionUser, SessionUser } from '../../types/session';
 import { sendWelcomeEmail } from '../../emails/welcomeEmail';
-import { normalizeEmail } from '../../core/utils/emailNormalization';
+import { normalizeEmail, getAlternateDomainEmail } from '../../core/utils/emailNormalization';
 import { FilterOperatorEnum } from '@hubspot/api-client/lib/codegen/crm/contacts';
 import { getErrorMessage } from '../../utils/errorUtils';
 import { authRateLimiterByIp } from '../../middleware/rateLimiting';
@@ -141,6 +141,8 @@ sessionRouter.get('/api/auth/check-staff-admin', authRateLimiterByIp, async (req
     
     const normalizedEmail = normalizeEmail(email);
     
+    const alternateEmail = getAlternateDomainEmail(normalizedEmail);
+    const emailsToCheck = alternateEmail ? [normalizedEmail, alternateEmail] : [normalizedEmail];
     const staffResult = await db.select({
       id: staffUsers.id,
       role: staffUsers.role,
@@ -148,7 +150,7 @@ sessionRouter.get('/api/auth/check-staff-admin', authRateLimiterByIp, async (req
     })
       .from(staffUsers)
       .where(and(
-        eq(staffUsers.email, normalizedEmail),
+        sql`LOWER(${staffUsers.email}) IN (${sql.join(emailsToCheck.map(e => sql`LOWER(${e})`), sql`, `)})`,
         eq(staffUsers.isActive, true)
       ));
     
@@ -182,6 +184,8 @@ sessionRouter.post('/api/auth/password-login', authRateLimiterByIp, async (req, 
     let userRecord: { id: number; email: string; name: string | null; passwordHash: string | null; role: string | null } | null = null;
     let userRole: 'admin' | 'staff' | 'member' = 'member';
     
+    const altEmailPw = getAlternateDomainEmail(normalizedEmail);
+    const emailsToCheckPw = altEmailPw ? [normalizedEmail, altEmailPw] : [normalizedEmail];
     const staffResult = await db.select({
       id: staffUsers.id,
       email: staffUsers.email,
@@ -191,7 +195,7 @@ sessionRouter.post('/api/auth/password-login', authRateLimiterByIp, async (req, 
     })
       .from(staffUsers)
       .where(and(
-        eq(staffUsers.email, normalizedEmail),
+        sql`LOWER(${staffUsers.email}) IN (${sql.join(emailsToCheckPw.map(e => sql`LOWER(${e})`), sql`, `)})`,
         eq(staffUsers.isActive, true)
       ));
     
@@ -253,7 +257,7 @@ sessionRouter.post('/api/auth/password-login', authRateLimiterByIp, async (req, 
       id: memberData?.id || userRecord.id.toString(),
       firstName: memberData?.firstName || userRecord.name?.split(' ')[0] || '',
       lastName: memberData?.lastName || userRecord.name?.split(' ').slice(1).join(' ') || '',
-      email: normalizedEmail,
+      email: userRecord.email,
       phone: memberData?.phone || '',
       tier: userRole === 'member' ? (memberData?.tier || null) : undefined,
       tags: memberData?.tags || [],
@@ -319,10 +323,12 @@ sessionRouter.post('/api/auth/set-password', authRateLimiterByIp, async (req, re
     
     const normalizedEmail = sessionUser.email.toLowerCase();
     
+    const altEmailSetPw = getAlternateDomainEmail(normalizedEmail);
+    const emailsSetPw = altEmailSetPw ? [normalizedEmail, altEmailSetPw] : [normalizedEmail];
     const staffRecord = await db.select({ id: staffUsers.id, passwordHash: staffUsers.passwordHash })
       .from(staffUsers)
       .where(and(
-        eq(staffUsers.email, normalizedEmail),
+        sql`LOWER(${staffUsers.email}) IN (${sql.join(emailsSetPw.map(e => sql`LOWER(${e})`), sql`, `)})`,
         eq(staffUsers.isActive, true)
       ))
       .limit(1);

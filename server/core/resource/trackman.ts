@@ -75,6 +75,9 @@ export async function resolveOwnerEmail(ownerEmail: string) {
 
 export async function checkIsInstructor(email: string) {
   const { staffUsers } = await import('../../../shared/schema');
+  const { getAlternateDomainEmail } = await import('../../core/utils/emailNormalization');
+  const alt = getAlternateDomainEmail(email);
+  const emails = alt ? [email, alt] : [email];
   const instructorCheck = await db.select({
     id: staffUsers.id,
     email: staffUsers.email,
@@ -84,7 +87,7 @@ export async function checkIsInstructor(email: string) {
   })
     .from(staffUsers)
     .where(and(
-      sql`LOWER(${staffUsers.email}) = ${email}`,
+      sql`LOWER(${staffUsers.email}) IN (${sql.join(emails.map(e => sql`LOWER(${e})`), sql`, `)})`,
       eq(staffUsers.role, 'golf_instructor'),
       eq(staffUsers.isActive, true)
     ))

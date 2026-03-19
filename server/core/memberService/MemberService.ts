@@ -418,6 +418,10 @@ class MemberServiceClass {
     const cached = memberCache.getStaffByEmail(normalized);
     if (cached) return cached;
     
+    const { getAlternateDomainEmail } = await import('../utils/emailNormalization');
+    const alt = getAlternateDomainEmail(normalized);
+    const emailsToCheck = alt ? [normalized, alt.toLowerCase()] : [normalized];
+    
     const result = await db.execute(sql`
       SELECT 
         id,
@@ -430,7 +434,7 @@ class MemberServiceClass {
         role,
         is_active
       FROM staff_users
-      WHERE LOWER(email) = ${normalized} AND is_active = true
+      WHERE LOWER(email) IN (${sql.join(emailsToCheck.map(e => sql`${e}`), sql`, `)}) AND is_active = true
       LIMIT 1
     `);
     

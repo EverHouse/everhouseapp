@@ -33,10 +33,14 @@ router.get('/api/rsvps', isAuthenticated, async (req, res) => {
         let isStaff = false;
         if (pool) {
           try {
+            const { getAlternateDomainEmail } = await import('../../core/utils/emailNormalization');
+            const altEmail = getAlternateDomainEmail(sessionEmail);
+            const emailsToCheck = altEmail ? [sessionEmail, altEmail] : [sessionEmail];
+            const placeholders = emailsToCheck.map((_, i) => `LOWER($${i + 1})`).join(', ');
             const result = await queryWithRetry(
               pool,
-              'SELECT id FROM staff_users WHERE LOWER(email) = LOWER($1) AND is_active = true',
-              [sessionEmail]
+              `SELECT id FROM staff_users WHERE LOWER(email) IN (${placeholders}) AND is_active = true`,
+              emailsToCheck
             );
             isStaff = (result as unknown as { rows: Array<Record<string, unknown>> }).rows.length > 0;
           } catch (error: unknown) {
