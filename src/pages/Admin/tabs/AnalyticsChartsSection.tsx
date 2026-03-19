@@ -16,67 +16,18 @@ import {
   Pie,
   Legend,
 } from 'recharts';
-
-interface PeakHourEntry {
-  day_of_week: number;
-  hour_of_day: number;
-  booking_count: number;
-}
-
-interface ResourceEntry {
-  resourceName: string;
-  totalHours: number;
-}
-
-interface TopMember {
-  memberName: string;
-  memberEmail: string;
-  totalHours: number;
-}
-
-interface BookingFrequencyEntry {
-  bucket: string;
-  memberCount: number;
-}
-
-interface RevenueEntry {
-  month: string;
-  subscriptionRevenue: number;
-  bookingRevenue: number;
-  overageRevenue: number;
-  posSaleRevenue: number;
-  accountBalanceRevenue: number;
-  guestFeeRevenue: number;
-  otherRevenue: number;
-  totalRevenue: number;
-}
-
-interface BookingsOverTimeEntry {
-  weekStart: string;
-  bookingCount: number;
-}
-
-interface DayOfWeekEntry {
-  dayOfWeek: number;
-  bookingCount: number;
-}
-
-interface UtilizationEntry {
-  hourSlot: number;
-  bookedCount: number;
-  utilizationPct: number;
-}
-
-interface TierDistributionEntry {
-  tier: string;
-  memberCount: number;
-}
-
-interface NewMemberGrowthEntry {
-  month: string;
-  newMembers: number;
-  lostMembers: number;
-}
+import type {
+  PeakHourEntry,
+  ResourceEntry,
+  TopMember,
+  BookingFrequencyEntry,
+  RevenueEntry,
+  BookingsOverTimeEntry,
+  DayOfWeekEntry,
+  UtilizationEntry,
+  TierDistributionEntry,
+  NewMemberGrowthEntry,
+} from './analyticsTypes';
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const HOUR_LABELS = Array.from({ length: 24 }, (_, i) => {
