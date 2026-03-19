@@ -8,7 +8,8 @@ const FONTS_CACHE = 'google-fonts-v1';
 const STATIC_ASSETS = [
   '/',
   '/manifest.webmanifest',
-  '/favicon.ico'
+  '/favicon.ico',
+  '/fonts/material-symbols-outlined.woff2'
 ];
 
 const CACHEABLE_API_ENDPOINTS = ['events', 'wellness-classes', 'cafe-menu', 'hours', 'faqs', 'announcements', 'gallery'];
@@ -189,6 +190,21 @@ self.addEventListener('fetch', function(event) {
             });
           });
         })
+    );
+    return;
+  }
+
+  if (url.pathname.startsWith('/fonts/')) {
+    event.respondWith(
+      caches.match(request).then(function(cached) {
+        return cached || fetch(request).then(function(response) {
+          if (response.ok) {
+            var clone = response.clone();
+            caches.open(CACHE_NAME).then(function(cache) { cache.put(request, clone); });
+          }
+          return response;
+        });
+      })
     );
     return;
   }

@@ -35,11 +35,11 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="dns-prefetch" href="https://fonts.googleapis.com">
     <link rel="dns-prefetch" href="https://fonts.gstatic.com">
-    <link rel="preload" href="https://fonts.gstatic.com/s/materialsymbolsoutlined/v321/kJESBvYX7BgnkSrUwT8OhrdQw4oELdPIeeII9v6oDMzBwG-RpA6RzaxHMO1W.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="/fonts/material-symbols-outlined.woff2" as="font" type="font/woff2" crossorigin>
     <link rel="dns-prefetch" href="https://js.stripe.com">
     <link rel="dns-prefetch" href="https://api.stripe.com">
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400..700;1,400..700&family=Newsreader:ital,opsz,wght@0,6..72,200..800;1,6..72,200..800&family=Material+Symbols+Outlined:opsz,wght,FILL@20..48,100..700,0..1&display=swap" media="all" />
-    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400..700;1,400..700&family=Newsreader:ital,opsz,wght@0,6..72,200..800;1,6..72,200..800&family=Material+Symbols+Outlined:opsz,wght,FILL@20..48,100..700,0..1&display=swap" /></noscript>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400..700;1,400..700&family=Newsreader:ital,opsz,wght@0,6..72,200..800;1,6..72,200..800&display=swap" media="all" />
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400..700;1,400..700&family=Newsreader:ital,opsz,wght@0,6..72,200..800;1,6..72,200..800&display=swap" /></noscript>
     <link rel="canonical" href="https://www.everclub.app/" />
     <style>
       :root { --z-splash-inline: 11000; --z-drawer-inline: 9500; }
@@ -69,6 +69,13 @@
       }
       html.dark #safari-tint-top {
         background-color: #293515;
+      }
+      @font-face {
+        font-family: 'Material Symbols Outlined';
+        font-style: normal;
+        font-weight: 100 700;
+        font-display: swap;
+        src: url('/fonts/material-symbols-outlined.woff2') format('woff2');
       }
       @font-face {
         font-family: 'Instrument Sans';
@@ -118,26 +125,22 @@
             return;
           }
 
-          if (document.fonts.ready) {
-            document.fonts.ready.then(function() {
-              if (document.fonts.check('1em Material Symbols Outlined')) {
-                markIconsLoaded();
-              }
-            });
+          document.fonts.ready.then(function() {
+            markIconsLoaded();
+          });
 
-            var pollingInterval = setInterval(function() {
-              if (iconsDone) { clearInterval(pollingInterval); return; }
-              if (document.fonts.check('1em Material Symbols Outlined')) {
-                clearInterval(pollingInterval);
-                markIconsLoaded();
-              }
-            }, 250);
-
-            setTimeout(function() {
+          var pollingInterval = setInterval(function() {
+            if (iconsDone) { clearInterval(pollingInterval); return; }
+            if (document.fonts.check('1em Material Symbols Outlined')) {
               clearInterval(pollingInterval);
               markIconsLoaded();
-            }, 3000);
-          }
+            }
+          }, 150);
+
+          setTimeout(function() {
+            clearInterval(pollingInterval);
+            markIconsLoaded();
+          }, 2000);
         }
 
         waitForIconFont();

@@ -8,6 +8,16 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.88.6",
+    date: "2026-03-19",
+    title: "PWA Icon Fix — Self-Hosted Material Symbols Font",
+    changes: [
+      "Fixed: Icons now show reliably in the PWA (home screen) app — the Material Symbols icon font is now bundled with the app instead of loaded from Google's CDN, which was failing in offline/PWA mode",
+      "Improved: Icon font detection is more robust — icons appear faster and the fallback timeout always triggers even if font detection APIs behave unexpectedly",
+      "Performance: Icon font is preloaded from local files and cached by the service worker for instant offline availability",
+    ]
+  },
+  {
     version: "8.88.5",
     date: "2026-03-19",
     title: "Code Review Fixes — DRY Violations, Dead Code & Duplicate Logic",
