@@ -57,11 +57,9 @@ export function useBookGolf() {
   const [resourcesRef] = useAutoAnimate();
   const [errorRef] = useAutoAnimate();
   const [playerSlotRef] = useAutoAnimate();
-  const playerSlotScrollRef = useRef<HTMLDivElement>(null);
   const [feeRef] = useAutoAnimate();
   const [timeSlotsAnimRef] = useAutoAnimate();
   const [showConfirmation, setShowConfirmation] = useState(false);
-  const [playerSlotError, setPlayerSlotError] = useState<string | null>(null);
   const isSubmittingRef = useRef(false);
   const [showViewAsConfirm, setShowViewAsConfirm] = useState(false);
   const [expandedHour, setExpandedHour] = useState<string | null>(null);
@@ -498,22 +496,21 @@ export function useBookGolf() {
     if (!selectedSlot || !selectedResource || !effectiveUser || !selectedDateObj) return;
     if (isSubmittingRef.current) return;
     isSubmittingRef.current = true;
-    setPlayerSlotError(null); setShowViewAsConfirm(false);
+    setShowViewAsConfirm(false);
     const consent = consentData || guardianConsentData;
     try {
       if (activeTab === 'simulator' && playerCount > 1) {
         const emptyMemberSlots = playerSlots.filter(slot => slot.type === 'member' && !slot.selectedId);
         if (emptyMemberSlots.length > 0) {
-          setPlayerSlotError('Please search and select a member for each Member slot, or switch unfilled slots to Guest.');
+          showToast('Please search and select a member for each Member slot, or switch unfilled slots to Guest.', 'error');
           haptic.error();
-          playerSlotScrollRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
           return;
         }
       }
       const invalidGuestSlot = playerSlots.find(slot => slot.type === 'guest' && !slot.selectedId && slot.email && !slot.email.includes('@'));
-      if (invalidGuestSlot) { setPlayerSlotError('Please enter a valid email address for each guest.'); haptic.error(); return; }
+      if (invalidGuestSlot) { showToast('Please enter a valid email address for each guest.', 'error'); haptic.error(); return; }
       const guestMissingEmail = playerSlots.find(slot => slot.type === 'guest' && slot.selectedId && !(slot.email && slot.email.includes('@')));
-      if (guestMissingEmail) { setPlayerSlotError('Guest slots require a valid email address. Please add an email for each guest.'); haptic.error(); playerSlotScrollRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
+      if (guestMissingEmail) { showToast('Guest slots require a valid email address. Please add an email for each guest.', 'error'); haptic.error(); return; }
       const freshAvailability = await postWithCredentials<Record<number, { slots: APISlot[] }>>('/api/availability/batch', {
         resource_ids: [selectedResource.dbId], date: selectedDateObj.date, duration, user_email: effectiveUser.email
       });
@@ -573,9 +570,8 @@ export function useBookGolf() {
     if (activeTab === 'simulator' && playerCount > 1) {
       const emptyMemberSlots = playerSlots.filter(slot => slot.type === 'member' && !slot.selectedId);
       if (emptyMemberSlots.length > 0) {
-        setPlayerSlotError(`Please search and select a member for each Member slot, or switch unfilled slots to Guest.`);
+        showToast('Please search and select a member for each Member slot, or switch unfilled slots to Guest.', 'error');
         haptic.error();
-        playerSlotScrollRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
         return;
       }
       const unfilledGuestSlots = playerSlots.filter(slot => slot.type === 'guest' && !slot.selectedId && !(slot.email && slot.email.includes('@')));
@@ -630,12 +626,12 @@ export function useBookGolf() {
     effectiveUser, isMinor, isAdminViewingAs, viewAsUser,
     tierPermissions, isTierLoaded, canBookSimulators, canBookConference,
     dates, resources, guestPassInfo, myRequests, closures, walletPassAvailable,
-    estimatedFees, isLoading, error, isBooking, isDark, playerSlotError, setPlayerSlotError,
+    estimatedFees, isLoading, error, isBooking, isDark,
     memberBayBookingsForDay, usedMinutesForDay, isAtDailyLimit,
     slotsByHour, activeClosures, canBook, availableSlots,
     handleCancelRequest, handleConfirm, handleGuardianConsentSubmit, submitBooking, getAvailableResourcesForSlot,
     guestFeeDollars, overageRatePerBlockDollars, cancelBookingMutation,
-    resourcesRef, errorRef, playerSlotRef, playerSlotScrollRef, feeRef, timeSlotsAnimRef,
+    resourcesRef, errorRef, playerSlotRef, feeRef, timeSlotsAnimRef,
     timeSlotsRef, baySelectionRef, requestButtonRef,
     showToast,
   };

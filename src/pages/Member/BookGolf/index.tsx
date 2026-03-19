@@ -34,12 +34,12 @@ const BookGolf: React.FC = () => {
     effectiveUser, viewAsUser,
     tierPermissions, isTierLoaded, canBookSimulators, canBookConference,
     dates, resources, guestPassInfo, walletPassAvailable,
-    estimatedFees, isLoading, error, isBooking, isDark, playerSlotError, setPlayerSlotError,
+    estimatedFees, isLoading, error, isBooking, isDark,
     memberBayBookingsForDay, usedMinutesForDay, isAtDailyLimit,
     slotsByHour, activeClosures, canBook,
     handleCancelRequest, handleConfirm, handleGuardianConsentSubmit, submitBooking, getAvailableResourcesForSlot,
     guestFeeDollars, overageRatePerBlockDollars, cancelBookingMutation,
-    resourcesRef, errorRef, playerSlotRef, playerSlotScrollRef, feeRef, timeSlotsAnimRef,
+    resourcesRef, errorRef, playerSlotRef, feeRef, timeSlotsAnimRef,
     timeSlotsRef, baySelectionRef, requestButtonRef, showToast,
   } = state;
 
@@ -102,14 +102,13 @@ const BookGolf: React.FC = () => {
           </section>
         ) : (
           <TabTransition activeKey={activeTab}>
-          <div ref={(el) => { playerSlotRef(el); (playerSlotScrollRef as React.MutableRefObject<HTMLDivElement | null>).current = el; }} className="relative z-10 animate-content-enter space-y-6">
+          <div ref={playerSlotRef} className="relative z-10 animate-content-enter space-y-6">
             {activeTab === 'simulator' && (
-              <>
               <PlayerSlotEditor
                 playerCount={playerCount}
                 onPlayerCountChange={(count) => { haptic.selection(); setPlayerCount(count); }}
                 slots={playerSlots}
-                onSlotsChange={(slots) => { setPlayerSlots(slots); if (playerSlotError) setPlayerSlotError(null); }}
+                onSlotsChange={setPlayerSlots}
                 guestPassesRemaining={guestPassInfo?.passes_remaining}
                 isDark={isDark}
                 privacyMode={true}
@@ -117,13 +116,6 @@ const BookGolf: React.FC = () => {
                 showPlayerCountSelector={true}
                 ownerMemberId={effectiveUser?.id}
               />
-              {playerSlotError && (
-                <div className={`p-3 rounded-xl text-sm flex items-center gap-2 ${isDark ? 'bg-red-500/20 border border-red-500/30 text-red-300' : 'bg-red-50 border border-red-200 text-red-700'}`}>
-                  <Icon name="error" className="text-lg flex-shrink-0" />
-                  {playerSlotError}
-                </div>
-              )}
-              </>
             )}
 
             <section>
