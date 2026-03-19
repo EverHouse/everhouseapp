@@ -879,6 +879,8 @@ router.post('/api/stripe/terminal/process-subscription-payment', isStaffOrAdmin,
             ...paymentIntent.metadata,
             retriedFromPiId: activePiId,
           }
+        }, {
+          idempotencyKey: `terminal_sub_retry_${subscriptionId}_${invoice.id}_${activePiId}`
         });
         activePiId = freshPi.id;
         logger.info('[Terminal] Created fresh PI after stuck PI cleanup', { extra: { freshPiId: freshPi.id, stuckPiId: paymentIntent.id } });
@@ -1036,6 +1038,8 @@ router.post('/api/stripe/terminal/confirm-subscription-payment', isStaffOrAdmin,
             : (typeof latestInvExpanded.payment_intent === 'object' && latestInvExpanded.payment_intent !== null) ? (latestInvExpanded.payment_intent as Stripe.PaymentIntent).id : null;
           if (invoicePiId) {
             try {
+              // NOTE: Direct cancel (not cancelPaymentIntent helper) — pre-OOB exception per stripe-webhook-flow Rule #10.
+              // invoices.pay(paid_out_of_band) follows immediately; using the helper would void the invoice.
               await stripe.paymentIntents.cancel(invoicePiId);
               logger.info('[Terminal] Cancelled invoice-generated PI before paying with terminal PI', { extra: { invoicePiId, actualInvoiceId } });
             } catch (cancelErr: unknown) {
@@ -1067,7 +1071,7 @@ router.post('/api/stripe/terminal/confirm-subscription-payment', isStaffOrAdmin,
     }
     
     const staffEmail = getSessionUser(req)?.email || 'unknown';
-    await db.insert(terminalPayments).values({
+    const insertResult = await db.insert(terminalPayments).values({
       userId,
       userEmail: existingUser?.email || piMetadata.email || 'unknown',
       stripePaymentIntentId: paymentIntentId,
@@ -1081,7 +1085,11 @@ router.post('/api/stripe/terminal/confirm-subscription-payment', isStaffOrAdmin,
       status: 'succeeded',
       processedBy: staffEmail,
     }).onConflictDoNothing({ target: terminalPayments.stripePaymentIntentId });
-    logger.info('[Terminal] Payment record ensured for PI', { extra: { paymentIntentId } });
+    const isFirstConfirm = (insertResult.rowCount ?? 0) > 0;
+    if (!isFirstConfirm) {
+      logger.warn('[Terminal] Duplicate confirm detected (PI already recorded), proceeding with idempotent side effects', { extra: { paymentIntentId } });
+    }
+    logger.info('[Terminal] Payment record ensured for PI', { extra: { paymentIntentId, isFirstConfirm } });
     
     let cardSaved = false;
     let cardSaveWarning: string | null = null;
@@ -1154,6 +1162,7 @@ router.post('/api/stripe/terminal/confirm-subscription-payment', isStaffOrAdmin,
     await db.update(users)
       .set({ 
         membershipStatus: 'active',
+        lastModifiedAt: new Date(),
         archivedAt: null,
         archivedBy: null,
         updatedAt: new Date()

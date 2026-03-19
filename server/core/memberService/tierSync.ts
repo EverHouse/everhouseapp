@@ -99,7 +99,7 @@ export async function syncMemberStatusFromStripe(
         membershipStatus = MEMBERSHIP_STATUS.INACTIVE;
     }
     
-    const updateResult = await db.execute(sql`UPDATE users SET membership_status = ${membershipStatus}, updated_at = NOW() 
+    const updateResult = await db.execute(sql`UPDATE users SET membership_status = ${membershipStatus}, membership_status_changed_at = CASE WHEN membership_status IS DISTINCT FROM ${membershipStatus} THEN NOW() ELSE membership_status_changed_at END, updated_at = NOW() 
        WHERE LOWER(email) = LOWER(${email})
        RETURNING id`);
     
