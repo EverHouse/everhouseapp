@@ -429,7 +429,7 @@ const useViewTransitionLocation = () => {
     } else {
       setDisplayLocation(location);
     }
-  }, [location, displayLocation]);
+  }, [location]);
 
   return displayLocation;
 };
@@ -459,8 +459,12 @@ const AnimatedRoutes: React.FC = () => {
     const prevPath = prevPathRef.current;
     const currentPath = location.pathname;
     
-    const prevIndex = ROUTE_INDICES[prevPath] ?? -1;
-    const currentIndex = ROUTE_INDICES[currentPath] ?? -1;
+    const getRouteIndex = (path: string) => {
+      const entry = Object.entries(ROUTE_INDICES).find(([key]) => path === key || path.startsWith(key + '/'));
+      return entry ? entry[1] : -1;
+    };
+    const prevIndex = getRouteIndex(prevPath);
+    const currentIndex = getRouteIndex(currentPath);
     
     if (prevIndex >= 0 && currentIndex >= 0 && prevPath !== currentPath) {
       const direction = currentIndex > prevIndex ? 1 : -1;
@@ -476,30 +480,29 @@ const AnimatedRoutes: React.FC = () => {
 
   return (
     <TransitionContext.Provider value={transitionState}>
-      <Suspense fallback={<PageSkeleton />}>
           <Routes location={displayLocation}>
-            <Route path="/" element={<DirectionalPageTransition><PageErrorBoundary pageName="Landing"><Landing /></PageErrorBoundary></DirectionalPageTransition>} />
-            <Route path="/membership/apply" element={<DirectionalPageTransition><PageErrorBoundary pageName="MembershipApply"><MembershipApply /></PageErrorBoundary></DirectionalPageTransition>} />
-            <Route path="/membership/*" element={<DirectionalPageTransition><PageErrorBoundary pageName="Membership"><Membership /></PageErrorBoundary></DirectionalPageTransition>} />
-            <Route path="/contact" element={<DirectionalPageTransition><PageErrorBoundary pageName="Contact"><Contact /></PageErrorBoundary></DirectionalPageTransition>} />
-            <Route path="/gallery" element={<DirectionalPageTransition><PageErrorBoundary pageName="Gallery"><Gallery /></PageErrorBoundary></DirectionalPageTransition>} />
-            <Route path="/whats-on" element={<DirectionalPageTransition><PageErrorBoundary pageName="WhatsOn"><WhatsOn /></PageErrorBoundary></DirectionalPageTransition>} />
-            <Route path="/private-hire" element={<DirectionalPageTransition><PageErrorBoundary pageName="PrivateHire"><PrivateHire /></PageErrorBoundary></DirectionalPageTransition>} />
-            <Route path="/private-hire/inquire" element={<DirectionalPageTransition><PageErrorBoundary pageName="PrivateHireInquire"><PrivateHireInquire /></PageErrorBoundary></DirectionalPageTransition>} />
-            <Route path="/menu" element={<DirectionalPageTransition><PageErrorBoundary pageName="Cafe"><PublicCafe /></PageErrorBoundary></DirectionalPageTransition>} />
-            <Route path="/faq" element={<DirectionalPageTransition><PageErrorBoundary pageName="FAQ"><FAQ /></PageErrorBoundary></DirectionalPageTransition>} />
-            <Route path="/about" element={<DirectionalPageTransition><PageErrorBoundary pageName="About"><About /></PageErrorBoundary></DirectionalPageTransition>} />
-            <Route path="/tour" element={<DirectionalPageTransition><PageErrorBoundary pageName="BookTour"><BookTour /></PageErrorBoundary></DirectionalPageTransition>} />
-            <Route path="/day-pass" element={<DirectionalPageTransition><PageErrorBoundary pageName="BuyDayPass"><BuyDayPass /></PageErrorBoundary></DirectionalPageTransition>} />
-            <Route path="/day-pass/success" element={<DirectionalPageTransition><PageErrorBoundary pageName="DayPassSuccess"><DayPassSuccess /></PageErrorBoundary></DirectionalPageTransition>} />
-            <Route path="/privacy" element={<DirectionalPageTransition><PageErrorBoundary pageName="Privacy"><PrivacyPolicy /></PageErrorBoundary></DirectionalPageTransition>} />
-            <Route path="/terms" element={<DirectionalPageTransition><PageErrorBoundary pageName="Terms"><TermsOfService /></PageErrorBoundary></DirectionalPageTransition>} />
-            <Route path="/login" element={<DirectionalPageTransition><PageErrorBoundary pageName="Login"><Login /></PageErrorBoundary></DirectionalPageTransition>} />
-            <Route path="/auth/callback" element={<DirectionalPageTransition><PageErrorBoundary pageName="AuthCallback"><AuthCallback /></PageErrorBoundary></DirectionalPageTransition>} />
-            <Route path="/reset-password" element={<DirectionalPageTransition><PageErrorBoundary pageName="ResetPassword"><Login /></PageErrorBoundary></DirectionalPageTransition>} />
-            <Route path="/nfc-checkin" element={<DirectionalPageTransition><PageErrorBoundary pageName="NfcCheckin"><NfcCheckin /></PageErrorBoundary></DirectionalPageTransition>} />
-            <Route path="/kiosk" element={<PageErrorBoundary pageName="KioskCheckin"><KioskCheckin /></PageErrorBoundary>} />
-            <Route path="/checkout/*" element={<DirectionalPageTransition><PageErrorBoundary pageName="Checkout"><Checkout /></PageErrorBoundary></DirectionalPageTransition>} />
+            <Route path="/" element={<DirectionalPageTransition><Suspense fallback={<PageSkeleton />}><PageErrorBoundary pageName="Landing"><Landing /></PageErrorBoundary></Suspense></DirectionalPageTransition>} />
+            <Route path="/membership/apply" element={<DirectionalPageTransition><Suspense fallback={<PageSkeleton />}><PageErrorBoundary pageName="MembershipApply"><MembershipApply /></PageErrorBoundary></Suspense></DirectionalPageTransition>} />
+            <Route path="/membership/*" element={<DirectionalPageTransition><Suspense fallback={<PageSkeleton />}><PageErrorBoundary pageName="Membership"><Membership /></PageErrorBoundary></Suspense></DirectionalPageTransition>} />
+            <Route path="/contact" element={<DirectionalPageTransition><Suspense fallback={<PageSkeleton />}><PageErrorBoundary pageName="Contact"><Contact /></PageErrorBoundary></Suspense></DirectionalPageTransition>} />
+            <Route path="/gallery" element={<DirectionalPageTransition><Suspense fallback={<PageSkeleton />}><PageErrorBoundary pageName="Gallery"><Gallery /></PageErrorBoundary></Suspense></DirectionalPageTransition>} />
+            <Route path="/whats-on" element={<DirectionalPageTransition><Suspense fallback={<PageSkeleton />}><PageErrorBoundary pageName="WhatsOn"><WhatsOn /></PageErrorBoundary></Suspense></DirectionalPageTransition>} />
+            <Route path="/private-hire" element={<DirectionalPageTransition><Suspense fallback={<PageSkeleton />}><PageErrorBoundary pageName="PrivateHire"><PrivateHire /></PageErrorBoundary></Suspense></DirectionalPageTransition>} />
+            <Route path="/private-hire/inquire" element={<DirectionalPageTransition><Suspense fallback={<PageSkeleton />}><PageErrorBoundary pageName="PrivateHireInquire"><PrivateHireInquire /></PageErrorBoundary></Suspense></DirectionalPageTransition>} />
+            <Route path="/menu" element={<DirectionalPageTransition><Suspense fallback={<PageSkeleton />}><PageErrorBoundary pageName="Cafe"><PublicCafe /></PageErrorBoundary></Suspense></DirectionalPageTransition>} />
+            <Route path="/faq" element={<DirectionalPageTransition><Suspense fallback={<PageSkeleton />}><PageErrorBoundary pageName="FAQ"><FAQ /></PageErrorBoundary></Suspense></DirectionalPageTransition>} />
+            <Route path="/about" element={<DirectionalPageTransition><Suspense fallback={<PageSkeleton />}><PageErrorBoundary pageName="About"><About /></PageErrorBoundary></Suspense></DirectionalPageTransition>} />
+            <Route path="/tour" element={<DirectionalPageTransition><Suspense fallback={<PageSkeleton />}><PageErrorBoundary pageName="BookTour"><BookTour /></PageErrorBoundary></Suspense></DirectionalPageTransition>} />
+            <Route path="/day-pass" element={<DirectionalPageTransition><Suspense fallback={<PageSkeleton />}><PageErrorBoundary pageName="BuyDayPass"><BuyDayPass /></PageErrorBoundary></Suspense></DirectionalPageTransition>} />
+            <Route path="/day-pass/success" element={<DirectionalPageTransition><Suspense fallback={<PageSkeleton />}><PageErrorBoundary pageName="DayPassSuccess"><DayPassSuccess /></PageErrorBoundary></Suspense></DirectionalPageTransition>} />
+            <Route path="/privacy" element={<DirectionalPageTransition><Suspense fallback={<PageSkeleton />}><PageErrorBoundary pageName="Privacy"><PrivacyPolicy /></PageErrorBoundary></Suspense></DirectionalPageTransition>} />
+            <Route path="/terms" element={<DirectionalPageTransition><Suspense fallback={<PageSkeleton />}><PageErrorBoundary pageName="Terms"><TermsOfService /></PageErrorBoundary></Suspense></DirectionalPageTransition>} />
+            <Route path="/login" element={<DirectionalPageTransition><Suspense fallback={<PageSkeleton />}><PageErrorBoundary pageName="Login"><Login /></PageErrorBoundary></Suspense></DirectionalPageTransition>} />
+            <Route path="/auth/callback" element={<DirectionalPageTransition><Suspense fallback={<PageSkeleton />}><PageErrorBoundary pageName="AuthCallback"><AuthCallback /></PageErrorBoundary></Suspense></DirectionalPageTransition>} />
+            <Route path="/reset-password" element={<DirectionalPageTransition><Suspense fallback={<PageSkeleton />}><PageErrorBoundary pageName="ResetPassword"><Login /></PageErrorBoundary></Suspense></DirectionalPageTransition>} />
+            <Route path="/nfc-checkin" element={<DirectionalPageTransition><Suspense fallback={<PageSkeleton />}><PageErrorBoundary pageName="NfcCheckin"><NfcCheckin /></PageErrorBoundary></Suspense></DirectionalPageTransition>} />
+            <Route path="/kiosk" element={<Suspense fallback={<PageSkeleton />}><PageErrorBoundary pageName="KioskCheckin"><KioskCheckin /></PageErrorBoundary></Suspense>} />
+            <Route path="/checkout/*" element={<DirectionalPageTransition><Suspense fallback={<PageSkeleton />}><PageErrorBoundary pageName="Checkout"><Checkout /></PageErrorBoundary></Suspense></DirectionalPageTransition>} />
 
             <Route path="/admin" element={
               <AdminProtectedRoute>
@@ -536,45 +539,45 @@ const AnimatedRoutes: React.FC = () => {
             </Route>
             <Route path="/admin/data-integrity-legacy" element={
               <AdminProtectedRoute>
-                <DirectionalPageTransition><PageErrorBoundary pageName="DataIntegrity"><DataIntegrity /></PageErrorBoundary></DirectionalPageTransition>
+                <DirectionalPageTransition><Suspense fallback={<PageSkeleton />}><PageErrorBoundary pageName="DataIntegrity"><DataIntegrity /></PageErrorBoundary></Suspense></DirectionalPageTransition>
               </AdminProtectedRoute>
             } />
 
             <Route path="/dashboard" element={
               <MemberPortalRoute>
-                <DirectionalPageTransition><PageErrorBoundary pageName="Dashboard"><Dashboard /></PageErrorBoundary></DirectionalPageTransition>
+                <DirectionalPageTransition><Suspense fallback={<PageSkeleton />}><PageErrorBoundary pageName="Dashboard"><Dashboard /></PageErrorBoundary></Suspense></DirectionalPageTransition>
               </MemberPortalRoute>
             } />
             <Route path="/book" element={
               <MemberPortalRoute>
-                <DirectionalPageTransition><PageErrorBoundary pageName="BookGolf"><BookGolf /></PageErrorBoundary></DirectionalPageTransition>
+                <DirectionalPageTransition><Suspense fallback={<PageSkeleton />}><PageErrorBoundary pageName="BookGolf"><BookGolf /></PageErrorBoundary></Suspense></DirectionalPageTransition>
               </MemberPortalRoute>
             } />
             <Route path="/events" element={
               <MemberPortalRoute>
-                <DirectionalPageTransition><PageErrorBoundary pageName="Events"><MemberEvents /></PageErrorBoundary></DirectionalPageTransition>
+                <DirectionalPageTransition><Suspense fallback={<PageSkeleton />}><PageErrorBoundary pageName="Events"><MemberEvents /></PageErrorBoundary></Suspense></DirectionalPageTransition>
               </MemberPortalRoute>
             } />
             <Route path="/wellness" element={
               <MemberPortalRoute>
-                <DirectionalPageTransition><PageErrorBoundary pageName="Wellness"><MemberWellness /></PageErrorBoundary></DirectionalPageTransition>
+                <DirectionalPageTransition><Suspense fallback={<PageSkeleton />}><PageErrorBoundary pageName="Wellness"><MemberWellness /></PageErrorBoundary></Suspense></DirectionalPageTransition>
               </MemberPortalRoute>
             } />
             <Route path="/member-events" element={<Navigate to="/events" replace />} />
             <Route path="/member-wellness" element={<Navigate to="/wellness" replace />} />
             <Route path="/profile" element={
               <MemberPortalRoute allowStaffAccess>
-                <DirectionalPageTransition><PageErrorBoundary pageName="Profile"><Profile /></PageErrorBoundary></DirectionalPageTransition>
+                <DirectionalPageTransition><Suspense fallback={<PageSkeleton />}><PageErrorBoundary pageName="Profile"><Profile /></PageErrorBoundary></Suspense></DirectionalPageTransition>
               </MemberPortalRoute>
             } />
             <Route path="/updates" element={
               <MemberPortalRoute>
-                <DirectionalPageTransition><PageErrorBoundary pageName="Updates"><MemberUpdates /></PageErrorBoundary></DirectionalPageTransition>
+                <DirectionalPageTransition><Suspense fallback={<PageSkeleton />}><PageErrorBoundary pageName="Updates"><MemberUpdates /></PageErrorBoundary></Suspense></DirectionalPageTransition>
               </MemberPortalRoute>
             } />
             <Route path="/history" element={
               <MemberPortalRoute>
-                <DirectionalPageTransition><PageErrorBoundary pageName="History"><MemberHistory /></PageErrorBoundary></DirectionalPageTransition>
+                <DirectionalPageTransition><Suspense fallback={<PageSkeleton />}><PageErrorBoundary pageName="History"><MemberHistory /></PageErrorBoundary></Suspense></DirectionalPageTransition>
               </MemberPortalRoute>
             } />
 
@@ -583,21 +586,21 @@ const AnimatedRoutes: React.FC = () => {
               <>
                 {/* Light mode (default) */}
                 <Route path="/dev-preview/test" element={<div className="min-h-screen flex items-center justify-center bg-brand-green text-white text-4xl">DEV PREVIEW WORKS</div>} />
-                <Route path="/dev-preview/dashboard" element={<PageErrorBoundary pageName="Dashboard"><Dashboard /></PageErrorBoundary>} />
-                <Route path="/dev-preview/book" element={<PageErrorBoundary pageName="BookGolf"><BookGolf /></PageErrorBoundary>} />
-                <Route path="/dev-preview/history" element={<PageErrorBoundary pageName="History"><MemberHistory /></PageErrorBoundary>} />
-                <Route path="/dev-preview/wellness" element={<PageErrorBoundary pageName="Wellness"><MemberWellness /></PageErrorBoundary>} />
-                <Route path="/dev-preview/events" element={<PageErrorBoundary pageName="Events"><MemberEvents /></PageErrorBoundary>} />
-                <Route path="/dev-preview/profile" element={<PageErrorBoundary pageName="Profile"><Profile /></PageErrorBoundary>} />
-                <Route path="/dev-preview/updates" element={<PageErrorBoundary pageName="Updates"><MemberUpdates /></PageErrorBoundary>} />
+                <Route path="/dev-preview/dashboard" element={<Suspense fallback={<PageSkeleton />}><PageErrorBoundary pageName="Dashboard"><Dashboard /></PageErrorBoundary></Suspense>} />
+                <Route path="/dev-preview/book" element={<Suspense fallback={<PageSkeleton />}><PageErrorBoundary pageName="BookGolf"><BookGolf /></PageErrorBoundary></Suspense>} />
+                <Route path="/dev-preview/history" element={<Suspense fallback={<PageSkeleton />}><PageErrorBoundary pageName="History"><MemberHistory /></PageErrorBoundary></Suspense>} />
+                <Route path="/dev-preview/wellness" element={<Suspense fallback={<PageSkeleton />}><PageErrorBoundary pageName="Wellness"><MemberWellness /></PageErrorBoundary></Suspense>} />
+                <Route path="/dev-preview/events" element={<Suspense fallback={<PageSkeleton />}><PageErrorBoundary pageName="Events"><MemberEvents /></PageErrorBoundary></Suspense>} />
+                <Route path="/dev-preview/profile" element={<Suspense fallback={<PageSkeleton />}><PageErrorBoundary pageName="Profile"><Profile /></PageErrorBoundary></Suspense>} />
+                <Route path="/dev-preview/updates" element={<Suspense fallback={<PageSkeleton />}><PageErrorBoundary pageName="Updates"><MemberUpdates /></PageErrorBoundary></Suspense>} />
                 {/* Dark mode variants - append -dark to route */}
-                <Route path="/dev-preview/dashboard-dark" element={<PageErrorBoundary pageName="Dashboard"><Dashboard /></PageErrorBoundary>} />
-                <Route path="/dev-preview/book-dark" element={<PageErrorBoundary pageName="BookGolf"><BookGolf /></PageErrorBoundary>} />
-                <Route path="/dev-preview/history-dark" element={<PageErrorBoundary pageName="History"><MemberHistory /></PageErrorBoundary>} />
-                <Route path="/dev-preview/wellness-dark" element={<PageErrorBoundary pageName="Wellness"><MemberWellness /></PageErrorBoundary>} />
-                <Route path="/dev-preview/events-dark" element={<PageErrorBoundary pageName="Events"><MemberEvents /></PageErrorBoundary>} />
-                <Route path="/dev-preview/profile-dark" element={<PageErrorBoundary pageName="Profile"><Profile /></PageErrorBoundary>} />
-                <Route path="/dev-preview/updates-dark" element={<PageErrorBoundary pageName="Updates"><MemberUpdates /></PageErrorBoundary>} />
+                <Route path="/dev-preview/dashboard-dark" element={<Suspense fallback={<PageSkeleton />}><PageErrorBoundary pageName="Dashboard"><Dashboard /></PageErrorBoundary></Suspense>} />
+                <Route path="/dev-preview/book-dark" element={<Suspense fallback={<PageSkeleton />}><PageErrorBoundary pageName="BookGolf"><BookGolf /></PageErrorBoundary></Suspense>} />
+                <Route path="/dev-preview/history-dark" element={<Suspense fallback={<PageSkeleton />}><PageErrorBoundary pageName="History"><MemberHistory /></PageErrorBoundary></Suspense>} />
+                <Route path="/dev-preview/wellness-dark" element={<Suspense fallback={<PageSkeleton />}><PageErrorBoundary pageName="Wellness"><MemberWellness /></PageErrorBoundary></Suspense>} />
+                <Route path="/dev-preview/events-dark" element={<Suspense fallback={<PageSkeleton />}><PageErrorBoundary pageName="Events"><MemberEvents /></PageErrorBoundary></Suspense>} />
+                <Route path="/dev-preview/profile-dark" element={<Suspense fallback={<PageSkeleton />}><PageErrorBoundary pageName="Profile"><Profile /></PageErrorBoundary></Suspense>} />
+                <Route path="/dev-preview/updates-dark" element={<Suspense fallback={<PageSkeleton />}><PageErrorBoundary pageName="Updates"><MemberUpdates /></PageErrorBoundary></Suspense>} />
                 {/* Staff/Admin portal dev preview routes */}
                 <Route path="/dev-preview/admin" element={<Suspense fallback={null}><StaffWebSocketProvider><PageErrorBoundary pageName="AdminDashboard"><AdminDashboard /></PageErrorBoundary></StaffWebSocketProvider></Suspense>} />
                 <Route path="/dev-preview/admin-dark" element={<Suspense fallback={null}><StaffWebSocketProvider><PageErrorBoundary pageName="AdminDashboard"><AdminDashboard /></PageErrorBoundary></StaffWebSocketProvider></Suspense>} />
@@ -606,7 +609,6 @@ const AnimatedRoutes: React.FC = () => {
             
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
-      </Suspense>
     </TransitionContext.Provider>
   );
 };

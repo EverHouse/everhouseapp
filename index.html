@@ -90,7 +90,7 @@
           var decoded = decodeURIComponent(window.location.pathname);
           var match = decoded.match(/#\/dev-preview\/([\w-]+)/);
           if (match) {
-            window.location.replace('/#/dev-preview/' + match[1]);
+            window.location.replace('/dev-preview/' + match[1]);
           }
         }
         
