@@ -99,6 +99,31 @@ export const StaffNavigationRail: React.FC<StaffNavigationRailProps> = ({
           </div>
         )}
       </nav>
+
+      <div className="px-1 py-3 border-t border-white/10 flex-shrink-0">
+        <button
+          onClick={() => {
+            const isPwa = window.matchMedia('(display-mode: standalone)').matches
+              || (navigator as any).standalone === true;
+            if (isPwa) {
+              startNavigation();
+              navigate('/kiosk');
+            } else {
+              window.open('/kiosk', '_blank', 'noopener,noreferrer');
+            }
+          }}
+          style={{ WebkitTapHighlightColor: 'transparent', fontFamily: 'var(--font-label)' }}
+          aria-label="Kiosk Check-in"
+          className="tactile-btn flex flex-col items-center gap-1 w-full min-h-[56px] py-2 px-1 transition-colors duration-normal ease-out"
+        >
+          <div className="flex items-center justify-center w-10 h-7 rounded-full hover:bg-white/10 transition-colors duration-normal">
+            <Icon name="qr_code_scanner" className="text-[20px] text-white/50 group-hover:text-white/70" />
+          </div>
+          <span className="text-[9px] uppercase tracking-[0.1em] leading-tight text-center truncate w-full px-0.5 text-white/50">
+            Kiosk
+          </span>
+        </button>
+      </div>
     </aside>
   );
 
