@@ -106,12 +106,13 @@ export const StaffSidebar: React.FC<StaffSidebarProps> = ({
 
       <div className="px-3 py-4 border-t border-white/10 flex-shrink-0 space-y-2">
         <button
-          onClick={() => { startNavigation(); navigate('/kiosk'); }}
+          onClick={() => window.open('/kiosk', '_blank', 'noopener,noreferrer')}
           style={{ WebkitTapHighlightColor: 'transparent', fontFamily: 'var(--font-label)' }}
           className="tactile-row w-full flex items-center gap-3 px-3 py-3 text-left transition-all duration-normal text-white/50 hover:text-white/80 border-l-2 border-transparent group/nav"
         >
           <Icon name="qr_code_scanner" className="text-[18px] group-hover/nav:text-white/70" />
           <span className="text-[11px] uppercase tracking-[0.2em] translate-y-[1px]">Kiosk Check-in</span>
+          <Icon name="open_in_new" className="text-[14px] text-white/30 ml-auto" />
         </button>
         <p className="text-white/40 text-[10px] text-center">
           v{getLatestVersion().version} · Updated {new Date(getLatestVersion().date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'America/Los_Angeles' })}
