@@ -10,10 +10,12 @@ export const changelog: ChangelogEntry[] = [
   {
     version: "8.89.1",
     date: "2026-03-19",
-    title: "Pull-to-Refresh Overlay Visible in Production",
+    title: "Pull-to-Refresh — Production Overlay Fix & Android Scroll Fix",
     changes: [
       "Fixed: Pull-to-refresh green sheet overlay was invisible in production — the inline style tags were being blocked by the Content Security Policy, so the overlay rendered with no styling and appeared invisible",
       "Fixed: Moved all pull-to-refresh styles (pull bar, fill animation, refresh screen, dismiss animation) from inline style tags into the main stylesheet so they pass the security policy and render correctly in production",
+      "Fixed: Android/Pixel users could only scroll pages by touching the header bar — pull-to-refresh was using a document-level non-passive touch listener that blocked the browser's native scroll optimization on the entire page",
+      "Fixed: Touch listeners now attach to the content container (not the whole document) and are fully passive — the browser no longer has to wait for JavaScript before scrolling, so Android/Pixel devices scroll smoothly everywhere",
     ]
   },
   {

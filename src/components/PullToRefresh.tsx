@@ -219,15 +219,15 @@ const PullToRefresh: React.FC<PullToRefreshProps> = ({ children, onRefresh, disa
   useEffect(() => {
     if (!isTouchCapable) return;
 
+    const container = containerRef.current;
+    if (!container) return;
+
     const DIRECTION_LOCK_THRESHOLD = 10;
 
     const onTouchStart = (e: TouchEvent) => {
       if (disabledRef.current || isModalOpenRef.current || isRefreshingRef.current || isSpringBackRef.current || hasActiveLocks()) return;
 
       if (document.body.hasAttribute('data-programmatic-scroll')) return;
-
-      const container = containerRef.current;
-      if (container && !container.contains(e.target as Node)) return;
 
       const scrollTop = window.scrollY || document.documentElement.scrollTop;
       if (scrollTop <= 5) {
@@ -278,8 +278,6 @@ const PullToRefresh: React.FC<PullToRefreshProps> = ({ children, onRefresh, disa
       }
 
       if (!isPullingRef.current) return;
-
-      e.preventDefault();
 
       const scrollTop = window.scrollY || document.documentElement.scrollTop;
       if (scrollTop > 5) {
@@ -345,16 +343,16 @@ const PullToRefresh: React.FC<PullToRefreshProps> = ({ children, onRefresh, disa
       }
     };
 
-    document.addEventListener('touchstart', onTouchStart, { passive: true });
-    document.addEventListener('touchmove', onTouchMove, { passive: false });
-    document.addEventListener('touchend', onTouchEnd);
-    document.addEventListener('touchcancel', onTouchEnd);
+    container.addEventListener('touchstart', onTouchStart, { passive: true });
+    container.addEventListener('touchmove', onTouchMove, { passive: true });
+    container.addEventListener('touchend', onTouchEnd, { passive: true });
+    container.addEventListener('touchcancel', onTouchEnd, { passive: true });
 
     return () => {
-      document.removeEventListener('touchstart', onTouchStart);
-      document.removeEventListener('touchmove', onTouchMove);
-      document.removeEventListener('touchend', onTouchEnd);
-      document.removeEventListener('touchcancel', onTouchEnd);
+      container.removeEventListener('touchstart', onTouchStart);
+      container.removeEventListener('touchmove', onTouchMove);
+      container.removeEventListener('touchend', onTouchEnd);
+      container.removeEventListener('touchcancel', onTouchEnd);
     };
   }, [isTouchCapable]);
 
