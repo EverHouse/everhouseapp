@@ -9,6 +9,34 @@ function isUndefinedTableError(err: unknown): boolean {
   return getErrorCode(err) === '42P01';
 }
 
+type TxLike = { execute: (query: ReturnType<typeof sql>) => Promise<{ rows: Record<string, unknown>[] }> };
+
+async function queryWithSavepoint(
+  tx: TxLike,
+  savepointName: string,
+  query: ReturnType<typeof sql>,
+  logLabel: string,
+): Promise<{ rows: Record<string, unknown>[] }> {
+  try {
+    await tx.execute(sql.raw(`SAVEPOINT ${savepointName}`));
+    return await tx.execute(query);
+  } catch (err: unknown) {
+    try {
+      await tx.execute(sql.raw(`ROLLBACK TO SAVEPOINT ${savepointName}`));
+    } catch (rollbackErr: unknown) {
+      logger.error(`[BookingGuard] ${logLabel}: ROLLBACK TO SAVEPOINT failed — transaction may be unrecoverable`, {
+        extra: { rollbackError: getErrorMessage(rollbackErr), originalError: getErrorMessage(err) }
+      });
+      throw new BookingConflictError(503, { error: 'Unable to verify slot availability. Please try again.' });
+    }
+    if (isUndefinedTableError(err)) {
+      return { rows: [] };
+    }
+    logger.error(`[BookingGuard] Failed to check ${logLabel}`, { extra: { error: getErrorMessage(err) } });
+    throw new BookingConflictError(503, { error: 'Unable to verify slot availability. Please try again.' });
+  }
+}
+
 function formatTimeField(value: unknown): string | null {
   if (typeof value === 'string') return value.substring(0, 5);
   if (value instanceof Date) {
@@ -116,34 +144,27 @@ export async function checkResourceOverlap(
     throw new BookingConflictError(503, { error: 'Unable to verify slot availability. Please try again.' });
   }
 
-  let trackmanBayCheck: { rows: Record<string, unknown>[] };
-  try {
-    trackmanBayCheck = await tx.execute(sql`
-      SELECT resource_id, start_time, end_time FROM trackman_bay_slots
+  const trackmanBayCheck = await queryWithSavepoint(
+    tx as unknown as TxLike,
+    'trackman_bay_check',
+    sql`SELECT resource_id, start_time, end_time FROM trackman_bay_slots
       WHERE resource_id = ${resourceId}
       AND slot_date = ${requestDate}
       AND status = 'booked'
       AND start_time < ${endTime} AND end_time > ${startTime}
-      LIMIT 1
-    `);
-  } catch (err: unknown) {
-    if (isUndefinedTableError(err)) {
-      trackmanBayCheck = { rows: [] };
-    } else {
-      logger.error('[BookingGuard] Failed to check trackman_bay_slots', { extra: { error: getErrorMessage(err) } });
-      throw new BookingConflictError(503, { error: 'Unable to verify slot availability. Please try again.' });
-    }
-  }
+      LIMIT 1`,
+    'trackman_bay_slots',
+  );
 
   if (trackmanBayCheck.rows.length > 0) {
     throwConflictError(trackmanBayCheck.rows[0] as Record<string, unknown>, 'a Trackman booking');
   }
 
   const resourceIdStr = String(resourceId);
-  let unmatchedCheck: { rows: Record<string, unknown>[] };
-  try {
-    unmatchedCheck = await tx.execute(sql`
-      SELECT tub.bay_number, tub.start_time, tub.end_time FROM trackman_unmatched_bookings tub
+  const unmatchedCheck = await queryWithSavepoint(
+    tx as unknown as TxLike,
+    'trackman_unmatched_check',
+    sql`SELECT tub.bay_number, tub.start_time, tub.end_time FROM trackman_unmatched_bookings tub
       WHERE tub.bay_number = ${resourceIdStr}
       AND tub.booking_date = ${requestDate}
       AND tub.resolved_at IS NULL
@@ -152,25 +173,18 @@ export async function checkResourceOverlap(
         WHERE br.trackman_booking_id = tub.trackman_booking_id::text
       )
       AND tub.start_time < ${endTime} AND tub.end_time > ${startTime}
-      LIMIT 1
-    `);
-  } catch (err: unknown) {
-    if (isUndefinedTableError(err)) {
-      unmatchedCheck = { rows: [] };
-    } else {
-      logger.error('[BookingGuard] Failed to check trackman_unmatched_bookings', { extra: { error: getErrorMessage(err) } });
-      throw new BookingConflictError(503, { error: 'Unable to verify slot availability. Please try again.' });
-    }
-  }
+      LIMIT 1`,
+    'trackman_unmatched_bookings',
+  );
 
   if (unmatchedCheck.rows.length > 0) {
     throwConflictError(unmatchedCheck.rows[0] as Record<string, unknown>, 'an unresolved Trackman booking');
   }
 
-  let sessionCheck: { rows: Record<string, unknown>[] };
-  try {
-    sessionCheck = await tx.execute(sql`
-      SELECT bs.id, bs.start_time, bs.end_time FROM booking_sessions bs
+  const sessionCheck = await queryWithSavepoint(
+    tx as unknown as TxLike,
+    'session_check',
+    sql`SELECT bs.id, bs.start_time, bs.end_time FROM booking_sessions bs
       WHERE bs.resource_id = ${resourceId}
       AND bs.session_date = ${requestDate}
       AND bs.start_time < ${endTime} AND bs.end_time > ${startTime}
@@ -179,16 +193,9 @@ export async function checkResourceOverlap(
         WHERE br.session_id = bs.id
         AND br.status NOT IN ('cancelled', 'deleted', 'declined')
       )
-      LIMIT 1
-    `);
-  } catch (err: unknown) {
-    if (isUndefinedTableError(err)) {
-      sessionCheck = { rows: [] };
-    } else {
-      logger.error('[BookingGuard] Failed to check booking_sessions', { extra: { error: getErrorMessage(err) } });
-      throw new BookingConflictError(503, { error: 'Unable to verify slot availability. Please try again.' });
-    }
-  }
+      LIMIT 1`,
+    'booking_sessions',
+  );
 
   if (sessionCheck.rows.length > 0) {
     throwConflictError(sessionCheck.rows[0] as Record<string, unknown>, 'an active session');
