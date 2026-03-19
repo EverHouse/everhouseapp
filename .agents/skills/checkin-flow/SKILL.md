@@ -5,7 +5,7 @@ description: Staff check-in flow for the Ever Club Members App. Covers check-in,
 
 # Staff Check-In Flow
 
-Two distinct paths: **Booking check-in** (billing + status change) and **QR/NFC walk-in** (visit tracking only).
+Three distinct paths: **Booking check-in** (billing + status change), **QR/NFC walk-in** (visit tracking only), and **Kiosk self-service** (member scans own QR on shared device).
 
 ## File Map
 
@@ -22,6 +22,8 @@ Two distinct paths: **Booking check-in** (billing + status change) and **QR/NFC 
 | Checkin billing modal | `src/components/staff-command-center/modals/CheckinBillingModal.tsx` | UI |
 | Unified booking sheet | `src/components/staff-command-center/modals/UnifiedBookingSheet.tsx` | Roster + billing UI |
 | QR scanner modal | `src/components/staff-command-center/modals/QrScannerModal.tsx` | QR/NFC scan UI |
+| Kiosk check-in API | `server/routes/kioskCheckin.ts` | `POST /api/kiosk/checkin`, `GET /api/kiosk/verify-staff` |
+| Kiosk check-in page | `src/pages/Staff/KioskCheckin.tsx` | Full-screen self-service check-in UI at `/kiosk` |
 | Booking status dropdown | `src/components/BookingStatusDropdown.tsx` | Status toggle UI |
 | Booking actions hook | `src/hooks/useBookingActions.ts` | Frontend API calls |
 
@@ -59,6 +61,22 @@ Staff scans QR code (MEMBER:<uuid>)
         ├── Sync to HubSpot (async)
         ├── Send first-visit email if trialing + visit #1
         └── Return pinned notes for staff display
+```
+
+### Kiosk self-service check-in
+
+```
+Staff activates kiosk mode (navigates to /kiosk)
+  → Full-screen QR scanner (always-on camera)
+  → Member scans membership QR code (MEMBER:<uuid>)
+    → POST /api/kiosk/checkin (staff session authenticates device)
+      ├── Validate member exists and status not blocked
+      ├── processWalkInCheckin (same as QR/NFC walk-in)
+      ├── Audit log with source: 'kiosk_qr'
+      └── Return member name, tier, visit count
+    → Success screen (4s auto-reset) or error screen (3s auto-reset)
+    → Scanner restarts automatically
+  → Staff exits by holding close button 3 seconds → redirects to /admin
 ```
 
 ## Hard Rules

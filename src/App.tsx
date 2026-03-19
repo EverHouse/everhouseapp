@@ -110,6 +110,7 @@ const Profile = lazyWithPrefetch(() => import('./pages/Member/Profile'));
 const MemberUpdates = lazyWithPrefetch(() => import('./pages/Member/Updates'));
 const MemberHistory = lazyWithPrefetch(() => import('./pages/Member/History'));
 const NfcCheckin = lazy(() => import('./pages/Member/NfcCheckin'));
+const KioskCheckin = lazy(() => import('./pages/Staff/KioskCheckin'));
 const Landing = lazy(() => import('./pages/Public/Landing'));
 const Membership = lazy(() => import('./pages/Public/Membership'));
 const Contact = lazy(() => import('./pages/Public/Contact'));
@@ -499,6 +500,7 @@ const AnimatedRoutes: React.FC = () => {
             <Route path="/auth/callback" element={<DirectionalPageTransition><PageErrorBoundary pageName="AuthCallback"><AuthCallback /></PageErrorBoundary></DirectionalPageTransition>} />
             <Route path="/reset-password" element={<DirectionalPageTransition><PageErrorBoundary pageName="ResetPassword"><Login /></PageErrorBoundary></DirectionalPageTransition>} />
             <Route path="/nfc-checkin" element={<DirectionalPageTransition><PageErrorBoundary pageName="NfcCheckin"><NfcCheckin /></PageErrorBoundary></DirectionalPageTransition>} />
+            <Route path="/kiosk" element={<PageErrorBoundary pageName="KioskCheckin"><KioskCheckin /></PageErrorBoundary>} />
             <Route path="/checkout/*" element={<DirectionalPageTransition><PageErrorBoundary pageName="Checkout"><Checkout /></PageErrorBoundary></DirectionalPageTransition>} />
 
             <Route path="/admin" element={

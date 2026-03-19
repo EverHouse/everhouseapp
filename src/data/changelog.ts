@@ -8,6 +8,19 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.90.0",
+    date: "2026-03-19",
+    title: "Kiosk Self-Service Check-In Mode",
+    isMajor: true,
+    changes: [
+      "New: Kiosk mode for self-service member check-in on a shared device (e.g., front desk tablet) — staff navigate to /kiosk to activate",
+      "New: Members can scan their membership QR code at the kiosk to check in without staff assistance",
+      "New: Full-screen kiosk interface with continuous QR scanning, success/error states, and automatic reset between check-ins",
+      "New: Staff exit kiosk mode by holding the close button for 3 seconds (prevents accidental exits)",
+      "New: Kiosk check-ins are tracked as walk-in visits with full audit logging, HubSpot sync, and staff notifications",
+    ]
+  },
+  {
     version: "8.89.2",
     date: "2026-03-19",
     title: "Calendar Sync Fix",

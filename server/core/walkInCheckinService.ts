@@ -36,7 +36,7 @@ export interface WalkInCheckinParams {
   memberId: string;
   checkedInBy: string;
   checkedInByName: string | null;
-  source: 'qr' | 'nfc';
+  source: 'qr' | 'nfc' | 'kiosk';
 }
 
 export interface WalkInCheckinResult {

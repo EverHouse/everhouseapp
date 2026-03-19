@@ -57,6 +57,7 @@ import idScannerRouter from '../routes/idScanner';
 import emailTemplatesRouter from '../routes/emailTemplates';
 import monitoringRouter from '../routes/monitoring';
 import nfcCheckinRouter from '../routes/nfcCheckin';
+import kioskCheckinRouter from '../routes/kioskCheckin';
 import analyticsRouter from '../routes/analytics';
 import walletPassRouter from '../routes/walletPass';
 import walletPassWebServiceRouter from '../routes/walletPassWebService';
@@ -123,6 +124,7 @@ export function registerRoutes(app: Express): void {
   app.use(emailTemplatesRouter);
   app.use(monitoringRouter);
   app.use(nfcCheckinRouter);
+  app.use(kioskCheckinRouter);
   app.use(analyticsRouter);
   app.use(walletPassRouter);
   app.use('/api/wallet', walletPassWebServiceRouter);
