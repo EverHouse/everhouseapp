@@ -490,6 +490,7 @@ export async function syncInternalCalendarToClosures(): Promise<{ synced: number
               const dbStartDate = existingClosure.start_date;
               const dbEndDate = existingClosure.end_date || dbStartDate;
               
+              let lastPatchUpdated: Date | null = null;
               if (dbStartTime && dbEndTime) {
                 const dayDates = getDayDatesBetween(dbStartDate, dbEndDate);
                 for (let ei = 0; ei < allEventIds.length; ei++) {
@@ -497,7 +498,7 @@ export async function syncInternalCalendarToClosures(): Promise<{ synced: number
                   const desc = allEventIds.length > 1
                     ? `${calendarDescription}\n\n(Day ${ei + 1} of ${allEventIds.length})`
                     : calendarDescription;
-                  await withCalendarRetry(() => calendar.events.patch({
+                  const patchRes = await withCalendarRetry(() => calendar.events.patch({
                     calendarId,
                     eventId: allEventIds[ei],
                     requestBody: {
@@ -508,12 +509,13 @@ export async function syncInternalCalendarToClosures(): Promise<{ synced: number
                       end: { dateTime: `${evDate}T${dbEndTime}`, timeZone: 'America/Los_Angeles' },
                     },
                   }), `closures-patch-${closureId}-${ei}`);
+                  if (patchRes.data.updated) lastPatchUpdated = new Date(patchRes.data.updated);
                 }
               } else {
                 const endDt = new Date(dbEndDate + 'T12:00:00');
                 endDt.setDate(endDt.getDate() + 1);
                 const gcEndDate = endDt.toISOString().split('T')[0];
-                await withCalendarRetry(() => calendar.events.patch({
+                const patchRes = await withCalendarRetry(() => calendar.events.patch({
                   calendarId,
                   eventId: allEventIds[0],
                   requestBody: {
@@ -524,14 +526,21 @@ export async function syncInternalCalendarToClosures(): Promise<{ synced: number
                     end: { date: gcEndDate },
                   },
                 }), `closures-patch-${closureId}`);
+                if (patchRes.data.updated) lastPatchUpdated = new Date(patchRes.data.updated);
               }
               
-              await db.execute(sql`UPDATE facility_closures SET 
+              const clearResult = await db.execute(sql`UPDATE facility_closures SET 
                 last_synced_at = NOW(), locally_edited = false,
-                app_last_modified_at = NULL
-                WHERE id = ${closureId}`);
-              pushedToCalendar++;
-              logger.info(`[Calendar Sync] Pushed local edits to calendar for closure #${closureId} (${allEventIds.length} event(s)): ${existingClosure.title}`);
+                app_last_modified_at = NULL,
+                google_event_updated_at = ${lastPatchUpdated}
+                WHERE id = ${closureId}
+                  AND (app_last_modified_at IS NOT DISTINCT FROM ${appModifiedAt})`);
+              if ((clearResult as { rowCount?: number }).rowCount === 0) {
+                logger.warn(`[Calendar Sync] Closure #${closureId} was re-edited during push-back; keeping locally_edited=true for next sync`);
+              } else {
+                pushedToCalendar++;
+                logger.info(`[Calendar Sync] Pushed local edits to calendar for closure #${closureId} (${allEventIds.length} event(s)): ${existingClosure.title}`);
+              }
             } catch (pushError: unknown) {
               logger.error(`[Calendar Sync] Failed to push local edits to calendar for closure #${closureId}:`, { error: pushError });
             }
@@ -708,11 +717,11 @@ function buildPatchProps(
   existing: Record<string, string>,
   expected: Record<string, string>,
   allOptionalKeys: string[]
-): Record<string, string> {
-  const merged = { ...existing, ...expected };
+): Record<string, string | null> {
+  const merged: Record<string, string | null> = { ...existing, ...expected };
   for (const key of allOptionalKeys) {
     if (!expected[key] && existing[key]) {
-      merged[key] = '';
+      merged[key] = null;
     }
   }
   return merged;

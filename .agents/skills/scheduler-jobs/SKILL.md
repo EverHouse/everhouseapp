@@ -68,7 +68,8 @@ All schedulers registered in `server/schedulers/index.ts` via `initSchedulers()`
 
 | Pattern | When to use | How |
 |---|---|---|
-| Time Gate | Scheduler runs on a specific hour | `if (getPacificHour() !== TARGET) return` |
+| Time Gate (deprecated) | Exact hour match — **AVOID** (drift-prone) | `if (getPacificHour() !== TARGET) return` |
+| Date-Windowed Time Gate (v8.87.96) | Once-per-day within an hour range | `const hour = getPacificHour(); if (hour < START || hour >= END) return; if (lastRunDate === getTodayPacific()) return;` Reset `lastRunDate = null` in catch for same-day retry |
 | Claim Slot (DB) | Once per day/month, crash-safe | `INSERT INTO system_settings ON CONFLICT DO UPDATE WHERE value IS DISTINCT FROM <key>` |
 | Local Variable | Simple hour gate, non-critical | `lastCleanupDate` in memory vs `getTodayPacific()` |
 | Yearly Gate | Once per year | Month + day-of-month check + year key claim slot |
@@ -82,6 +83,7 @@ See [references/idempotency-patterns.md](references/idempotency-patterns.md) for
 2. NEVER skip the `isRunning` overlap guard.
 3. NEVER leave timer IDs untracked — all must be clearable on shutdown.
 4. NEVER run time-gated schedulers without Pacific timezone helpers.
+5. NEVER use exact-hour matching (`getPacificHour() === N`) for daily tasks — `setInterval` drift can skip the target hour entirely. Always use the date-windowed pattern (v8.87.96).
 
 ## Cross-References
 

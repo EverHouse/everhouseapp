@@ -8,6 +8,16 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.87.97",
+    date: "2026-03-19",
+    title: "Calendar Sync Hardening & Extended Property Fixes",
+    changes: [
+      "Fixed: Google Calendar extended properties are now properly removed when no longer relevant — previously left as empty values instead of being deleted",
+      "Fixed: Concurrent edits during calendar push-back can no longer be silently overwritten — uses optimistic locking to detect if a closure was re-edited during sync",
+      "Fixed: Closure push-back now stores the Google Calendar response timestamp after updating, preventing stale data on the next sync cycle",
+    ]
+  },
+  {
     version: "8.87.96",
     date: "2026-03-19",
     title: "Bug Fixes: Stripe Status, HubSpot Safety, Scheduler Reliability & Security",
