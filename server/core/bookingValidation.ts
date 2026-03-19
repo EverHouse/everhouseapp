@@ -3,7 +3,7 @@ import { facilityClosures, bookingRequests, availabilityBlocks } from '../../sha
 import { eq, and, or, sql } from 'drizzle-orm';
 import { parseAffectedAreasBatch } from './affectedAreas';
 import { logger } from './logger';
-import { getErrorMessage } from '../utils/errorUtils';
+import { getErrorMessage, getErrorCode } from '../utils/errorUtils';
 
 interface ClosureCacheEntry {
   closures: Record<string, unknown>[];
@@ -211,9 +211,8 @@ export async function checkBookingConflict(
         return { hasConflict: true, conflictingBooking: trackmanBayResult.rows[0] as Record<string, unknown>, conflictSource: 'trackman_bay_slot' };
       }
     } catch (err: unknown) {
-      const msg = String(err);
-      if (!msg.includes('42P01') && !msg.includes('does not exist')) {
-        logger.error('[checkBookingConflict] Failed to check trackman_bay_slots', { error: err instanceof Error ? err : new Error(msg) });
+      if (getErrorCode(err) !== '42P01') {
+        logger.error('[checkBookingConflict] Failed to check trackman_bay_slots', { error: err instanceof Error ? err : new Error(String(err)) });
         throw err;
       }
     }
@@ -236,9 +235,8 @@ export async function checkBookingConflict(
         return { hasConflict: true, conflictingBooking: unmatchedResult.rows[0] as Record<string, unknown>, conflictSource: 'trackman_unmatched' };
       }
     } catch (err: unknown) {
-      const msg = String(err);
-      if (!msg.includes('42P01') && !msg.includes('does not exist')) {
-        logger.error('[checkBookingConflict] Failed to check trackman_unmatched_bookings', { error: err instanceof Error ? err : new Error(msg) });
+      if (getErrorCode(err) !== '42P01') {
+        logger.error('[checkBookingConflict] Failed to check trackman_unmatched_bookings', { error: err instanceof Error ? err : new Error(String(err)) });
         throw err;
       }
     }
@@ -260,9 +258,8 @@ export async function checkBookingConflict(
         return { hasConflict: true, conflictingBooking: sessionResult.rows[0] as Record<string, unknown>, conflictSource: 'booking_session' };
       }
     } catch (err: unknown) {
-      const msg = String(err);
-      if (!msg.includes('42P01') && !msg.includes('does not exist')) {
-        logger.error('[checkBookingConflict] Failed to check booking_sessions', { error: err instanceof Error ? err : new Error(msg) });
+      if (getErrorCode(err) !== '42P01') {
+        logger.error('[checkBookingConflict] Failed to check booking_sessions', { error: err instanceof Error ? err : new Error(String(err)) });
         throw err;
       }
     }

@@ -1,11 +1,34 @@
 import { sql } from 'drizzle-orm';
 import { logger } from '../logger';
 import { formatTime12Hour } from '../../utils/dateUtils';
-import { getErrorMessage } from '../../utils/errorUtils';
+import { getErrorMessage, getErrorCode } from '../../utils/errorUtils';
+import { ACTIVE_BOOKING_STATUSES } from '../../../shared/constants/statuses';
+import { toTextArrayLiteral } from '../../utils/sqlArrayLiteral';
 
 function isUndefinedTableError(err: unknown): boolean {
-  const msg = String(err);
-  return msg.includes('42P01') || msg.includes('does not exist');
+  return getErrorCode(err) === '42P01';
+}
+
+function formatTimeField(value: unknown): string | null {
+  if (typeof value === 'string') return value.substring(0, 5);
+  if (value instanceof Date) {
+    const h = String(value.getHours()).padStart(2, '0');
+    const m = String(value.getMinutes()).padStart(2, '0');
+    return `${h}:${m}`;
+  }
+  return null;
+}
+
+function throwConflictError(conflict: Record<string, unknown>, contextMessage: string): never {
+  const start = formatTimeField(conflict.start_time);
+  const end = formatTimeField(conflict.end_time);
+
+  if (start && end) {
+    throw new BookingConflictError(409, {
+      error: `This time slot conflicts with ${contextMessage} from ${formatTime12Hour(start)} to ${formatTime12Hour(end)}. Please choose a different time.`
+    });
+  }
+  throw new BookingConflictError(409, { error: `This time slot conflicts with ${contextMessage}.` });
 }
 
 export class BookingConflictError extends Error {
@@ -25,6 +48,8 @@ interface BookingCreationGuardParams {
   isViewAsMode: boolean;
   resourceType: string;
 }
+
+const OCCUPIED_STATUSES = [...ACTIVE_BOOKING_STATUSES, 'attended', 'cancellation_pending'];
 
 export async function acquireBookingLocks(
   tx: { execute: (query: unknown) => Promise<{ rows: Record<string, unknown>[] }> },
@@ -53,7 +78,7 @@ export async function acquireBookingLocks(
   if (needsUserLock && resourceType !== 'conference_room') {
     const pendingCheck = await tx.execute(sql`
       SELECT COUNT(*)::int AS cnt FROM booking_requests
-      WHERE LOWER(user_email) = LOWER(${requestEmail}) AND status = 'pending'
+      WHERE LOWER(user_email) = LOWER(${requestEmail}) AND status IN ('pending', 'pending_approval')
     `);
     if ((pendingCheck.rows[0] as Record<string, unknown>).cnt as number > 0) {
       throw new BookingConflictError(409, {
@@ -71,26 +96,24 @@ export async function checkResourceOverlap(
 
   if (!resourceId) return;
 
-  const overlapCheck = await tx.execute(sql`
-    SELECT id, start_time, end_time FROM booking_requests 
-    WHERE resource_id = ${resourceId} 
-    AND request_date = ${requestDate} 
-    AND status IN ('pending', 'pending_approval', 'approved', 'confirmed', 'attended', 'cancellation_pending')
-    AND start_time < ${endTime} AND end_time > ${startTime}
-    ORDER BY id ASC
-    FOR UPDATE
-  `);
+  try {
+    const overlapCheck = await tx.execute(sql`
+      SELECT id, start_time, end_time FROM booking_requests 
+      WHERE resource_id = ${resourceId} 
+      AND request_date = ${requestDate} 
+      AND status = ANY(${toTextArrayLiteral(OCCUPIED_STATUSES)}::text[])
+      AND start_time < ${endTime} AND end_time > ${startTime}
+      ORDER BY id ASC
+      FOR UPDATE
+    `);
 
-  if (overlapCheck.rows.length > 0) {
-    const conflict = overlapCheck.rows[0] as Record<string, unknown>;
-    const conflictStart = (conflict.start_time as string)?.substring(0, 5);
-    const conflictEnd = (conflict.end_time as string)?.substring(0, 5);
-
-    const errorMsg = conflictStart && conflictEnd
-      ? `This time slot conflicts with an existing booking from ${formatTime12Hour(conflictStart)} to ${formatTime12Hour(conflictEnd)}. Please adjust your time or duration.`
-      : 'This time slot is already booked';
-
-    throw new BookingConflictError(409, { error: errorMsg });
+    if (overlapCheck.rows.length > 0) {
+      throwConflictError(overlapCheck.rows[0] as Record<string, unknown>, 'an existing booking');
+    }
+  } catch (err: unknown) {
+    if (err instanceof BookingConflictError) throw err;
+    logger.error('[BookingGuard] Failed to check booking_requests overlap', { extra: { error: getErrorMessage(err) } });
+    throw new BookingConflictError(503, { error: 'Unable to verify slot availability. Please try again.' });
   }
 
   let trackmanBayCheck: { rows: Record<string, unknown>[] };
@@ -113,15 +136,7 @@ export async function checkResourceOverlap(
   }
 
   if (trackmanBayCheck.rows.length > 0) {
-    const conflict = trackmanBayCheck.rows[0] as Record<string, unknown>;
-    const conflictStart = (conflict.start_time as string)?.substring(0, 5);
-    const conflictEnd = (conflict.end_time as string)?.substring(0, 5);
-
-    const errorMsg = conflictStart && conflictEnd
-      ? `This time slot conflicts with a Trackman booking from ${formatTime12Hour(conflictStart)} to ${formatTime12Hour(conflictEnd)}. Please choose a different time.`
-      : 'This time slot conflicts with an existing Trackman booking';
-
-    throw new BookingConflictError(409, { error: errorMsg });
+    throwConflictError(trackmanBayCheck.rows[0] as Record<string, unknown>, 'a Trackman booking');
   }
 
   const resourceIdStr = String(resourceId);
@@ -149,15 +164,7 @@ export async function checkResourceOverlap(
   }
 
   if (unmatchedCheck.rows.length > 0) {
-    const conflict = unmatchedCheck.rows[0] as Record<string, unknown>;
-    const conflictStart = (conflict.start_time as string)?.substring(0, 5);
-    const conflictEnd = (conflict.end_time as string)?.substring(0, 5);
-
-    const errorMsg = conflictStart && conflictEnd
-      ? `This time slot conflicts with an unresolved Trackman booking from ${formatTime12Hour(conflictStart)} to ${formatTime12Hour(conflictEnd)}. Please choose a different time.`
-      : 'This time slot conflicts with an unresolved Trackman booking';
-
-    throw new BookingConflictError(409, { error: errorMsg });
+    throwConflictError(unmatchedCheck.rows[0] as Record<string, unknown>, 'an unresolved Trackman booking');
   }
 
   let sessionCheck: { rows: Record<string, unknown>[] };
@@ -184,14 +191,6 @@ export async function checkResourceOverlap(
   }
 
   if (sessionCheck.rows.length > 0) {
-    const conflict = sessionCheck.rows[0] as Record<string, unknown>;
-    const conflictStart = (conflict.start_time as string)?.substring(0, 5);
-    const conflictEnd = (conflict.end_time as string)?.substring(0, 5);
-
-    const errorMsg = conflictStart && conflictEnd
-      ? `This time slot conflicts with an active session from ${formatTime12Hour(conflictStart)} to ${formatTime12Hour(conflictEnd)}. Please choose a different time.`
-      : 'This time slot conflicts with an active session';
-
-    throw new BookingConflictError(409, { error: errorMsg });
+    throwConflictError(sessionCheck.rows[0] as Record<string, unknown>, 'an active session');
   }
 }

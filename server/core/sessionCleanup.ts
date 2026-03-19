@@ -1,11 +1,7 @@
 import { db } from '../db';
 import { sql } from 'drizzle-orm';
 import { logger } from './logger';
-
-interface DatabaseError {
-  code?: string;
-  message?: string;
-}
+import { getErrorCode } from '../utils/errorUtils';
 
 interface SessionStatsRow {
   total: string;
@@ -16,10 +12,7 @@ interface SessionStatsRow {
 }
 
 function isTableMissingError(error: unknown): boolean {
-  const code = (error as unknown as DatabaseError)?.code;
-  if (code === '42P01') return true;
-  const msg = error instanceof Error ? error.message : String(error);
-  return msg.includes('42P01') || msg.includes('does not exist');
+  return getErrorCode(error) === '42P01';
 }
 
 export async function cleanupExpiredSessions(): Promise<number> {
