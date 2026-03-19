@@ -83,7 +83,7 @@ export interface SafeSendOptions {
   replyTo?: string;
 }
 
-export async function safeSendEmail(options: SafeSendOptions): Promise<{ success: boolean; blocked?: boolean; id?: string }> {
+export async function safeSendEmail(options: SafeSendOptions): Promise<{ success: boolean; blocked?: boolean; suppressed?: boolean; id?: string }> {
   const recipients = Array.isArray(options.to) ? options.to : [options.to];
   
   if (isDevelopment) {
@@ -107,6 +107,22 @@ export async function safeSendEmail(options: SafeSendOptions): Promise<{ success
     }
   }
   
+  try {
+    const suppressedRecipients = await checkEmailSuppression(recipients);
+    if (suppressedRecipients.length > 0) {
+      const remaining = recipients.filter(e => !suppressedRecipients.includes(e.toLowerCase()));
+      logger.info('[Email] Suppressed delivery to bounced/complained recipients', {
+        extra: { suppressed: suppressedRecipients, subject: options.subject }
+      });
+      if (remaining.length === 0) {
+        return { success: true, suppressed: true };
+      }
+      options.to = remaining;
+    }
+  } catch (suppressErr: unknown) {
+    logger.warn('[Email] Suppression list check failed, proceeding with send', { error: suppressErr as Error });
+  }
+
   try {
     const { client, fromEmail } = await getResendClient();
     const senderEmail = options.from || fromEmail || 'noreply@everclub.app';
@@ -147,6 +163,21 @@ export async function safeSendEmail(options: SafeSendOptions): Promise<{ success
       extra: { subject: options.subject, to: options.to }
     });
     return { success: false };
+  }
+}
+
+async function checkEmailSuppression(emails: string[]): Promise<string[]> {
+  if (emails.length === 0) return [];
+  const lowerEmails = emails.map(e => e.toLowerCase());
+  try {
+    const result = await db.execute(sql`
+      SELECT LOWER(email) as email FROM users
+      WHERE LOWER(email) = ANY(${lowerEmails})
+        AND email_delivery_status IN ('bounced', 'complained')
+    `);
+    return (result.rows as Array<{ email: string }>).map(r => r.email);
+  } catch {
+    return [];
   }
 }
 

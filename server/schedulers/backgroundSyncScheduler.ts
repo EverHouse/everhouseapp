@@ -8,6 +8,23 @@ const consecutiveFailures: Record<string, number> = {};
 let currentTimeoutId: NodeJS.Timeout | null = null;
 const ALERT_THRESHOLD = 2;
 
+const lastSyncTimestamps: Record<string, { at: Date; success: boolean; error?: string }> = {};
+
+export function getCalendarSyncHealth(): Record<string, { lastSyncAt: string | null; success: boolean; consecutiveFailures: number; error?: string }> {
+  const names = ['Events', 'Wellness', 'Closures', 'ConfRoom'];
+  const result: Record<string, { lastSyncAt: string | null; success: boolean; consecutiveFailures: number; error?: string }> = {};
+  for (const name of names) {
+    const ts = lastSyncTimestamps[name];
+    result[name] = {
+      lastSyncAt: ts?.at?.toISOString() ?? null,
+      success: ts?.success ?? false,
+      consecutiveFailures: consecutiveFailures[name] || 0,
+      error: ts?.error,
+    };
+  }
+  return result;
+}
+
 async function syncWithRetry<T extends { error?: string }>(
   name: string,
   syncFn: () => Promise<T>,
@@ -26,6 +43,7 @@ async function syncWithRetry<T extends { error?: string }>(
       logger.info(`[Auto-sync] ${name} recovered after ${consecutiveFailures[name]} consecutive failure(s)`);
     }
     consecutiveFailures[name] = 0;
+    lastSyncTimestamps[name] = { at: new Date(), success: true };
     return result;
   }
 
@@ -41,11 +59,13 @@ async function syncWithRetry<T extends { error?: string }>(
 
   if (!result.error) {
     consecutiveFailures[name] = 0;
+    lastSyncTimestamps[name] = { at: new Date(), success: true };
     logger.info(`[Auto-sync] ${name} succeeded on retry`);
     return result;
   }
 
   consecutiveFailures[name] = (consecutiveFailures[name] || 0) + 1;
+  lastSyncTimestamps[name] = { at: new Date(), success: false, error: result.error };
   logger.error(`[Auto-sync] ${name} failed after retry (consecutive: ${consecutiveFailures[name]})`);
 
   if (consecutiveFailures[name] >= ALERT_THRESHOLD) {

@@ -26,7 +26,11 @@ export function validateTrackmanWebhookSignature(req: Request): boolean {
   const webhookSecret = process.env.TRACKMAN_WEBHOOK_SECRET;
   
   if (!webhookSecret) {
-    logger.info('[Trackman Webhook] No TRACKMAN_WEBHOOK_SECRET configured - allowing request (Trackman does not provide secrets)');
+    if (isProduction) {
+      logger.error('[Trackman Webhook] No TRACKMAN_WEBHOOK_SECRET configured in production — rejecting request for security');
+      return false;
+    }
+    logger.info('[Trackman Webhook] No TRACKMAN_WEBHOOK_SECRET configured - allowing request (development mode)');
     return true;
   }
   

@@ -244,6 +244,16 @@ router.get('/api/admin/monitoring/push-status', isStaffOrAdmin, async (_req, res
   }
 });
 
+router.get('/api/admin/monitoring/external-systems', isStaffOrAdmin, async (_req, res) => {
+  try {
+    const { getExternalSystemsHealth } = await import('../core/healthCheck');
+    const health = await getExternalSystemsHealth();
+    res.json(health);
+  } catch (error: unknown) {
+    res.status(500).json({ error: 'Failed to get external systems health', details: safeErrorDetail(error) });
+  }
+});
+
 router.get('/api/admin/monitoring/auto-approve-config', isStaffOrAdmin, async (_req, res) => {
   try {
     const conferenceRooms = await getSettingBoolean('booking.auto_approve.conference_rooms', true);

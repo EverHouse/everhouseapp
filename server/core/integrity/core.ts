@@ -754,7 +754,8 @@ export async function getIntegritySummary(): Promise<IntegritySummary> {
 
 export async function runAllIntegrityChecks(triggeredBy: 'manual' | 'scheduled' = 'manual', options?: { includeLegacy?: boolean }): Promise<IntegrityCheckResult[]> {
   const { checkUnmatchedTrackmanBookings, checkStalePastTours, checkBookingsWithoutSessions, checkOverlappingBookings, checkSessionsWithoutParticipants, checkGuestPassAccountingDrift, checkStalePendingBookings } = await import('./bookingChecks');
-  const { checkHubSpotSyncMismatch } = await import('./hubspotChecks');
+  const { checkHubSpotSyncMismatch, checkHubSpotIdDuplicates } = await import('./hubspotChecks');
+  const { checkCrossSystemDrift, checkEmailDeliveryHealth } = await import('./externalSystemChecks');
   const { checkStripeSubscriptionSync, checkDuplicateStripeCustomers, checkOrphanedPaymentIntents, checkBillingProviderHybridState, checkInvoiceBookingReconciliation, checkLateCancelPreservedPaymentIntents, checkBillingOrphans, checkOrphanedStripeSubscriptions } = await import('./stripeChecks');
   const { checkStuckTransitionalMembers, checkTierReconciliation, checkMindBodyStaleSyncMembers, checkMindBodyStatusMismatch, checkArchivedMemberLingeringData, checkActiveMembersWithoutWaivers, checkAuthLinkingDataIntegrity } = await import('./memberChecks');
 
@@ -787,6 +788,9 @@ export async function runAllIntegrityChecks(triggeredBy: 'manual' | 'scheduled' 
     safeCheck(checkOrphanedPaymentIntents, 'Orphaned Payment Intents'),
     safeCheck(checkBillingProviderHybridState, 'Billing Provider Hybrid State'),
     safeCheck(checkInvoiceBookingReconciliation, 'Invoice-Booking Reconciliation'),
+    safeCheck(checkHubSpotIdDuplicates, 'HubSpot ID Duplicates'),
+    safeCheck(checkCrossSystemDrift, 'Cross-System Drift Detection'),
+    safeCheck(checkEmailDeliveryHealth, 'Email Delivery Health'),
   ] : [];
 
   const checks = await Promise.all([...externalSystemChecks, ...dbEnforcedChecks]);

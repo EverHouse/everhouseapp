@@ -268,13 +268,43 @@ export async function reconcileSubscriptions() {
     } // end for loop over statuses
     
     logger.info(`[Reconcile] Phase 2 complete - ${subscriptionsChecked} subscriptions checked, ${usersCreated} users created`);
+
+    logger.info('[Reconcile] Phase 3: Checking for duplicate Stripe customers by email...');
+    let duplicateCustomerAlerts = 0;
+    try {
+      const dupResult = await db.execute(sql`
+        SELECT LOWER(email) as email, COUNT(*) as cnt,
+               ARRAY_AGG(stripe_customer_id) as customer_ids
+        FROM users
+        WHERE stripe_customer_id IS NOT NULL
+          AND email IS NOT NULL
+          AND archived_at IS NULL
+          AND membership_status != 'merged'
+        GROUP BY LOWER(email)
+        HAVING COUNT(DISTINCT stripe_customer_id) > 1
+        LIMIT 20
+      `);
+
+      for (const row of dupResult.rows as Array<{ email: string; cnt: string; customer_ids: string[] }>) {
+        duplicateCustomerAlerts++;
+        logger.warn(`[Reconcile] DUPLICATE STRIPE CUSTOMERS: ${row.email} has ${row.cnt} different Stripe customer IDs: ${row.customer_ids.join(', ')}`);
+      }
+
+      if (duplicateCustomerAlerts > 0) {
+        logger.warn(`[Reconcile] Found ${duplicateCustomerAlerts} email(s) with duplicate Stripe customer IDs — review in Data Integrity panel`);
+      }
+    } catch (dupErr: unknown) {
+      logger.warn(`[Reconcile] Duplicate customer check failed (non-fatal): ${getErrorMessage(dupErr)}`);
+    }
+
     logger.info(`[Reconcile] Subscription reconciliation complete`);
     
     return { 
       membersChecked: activeMembers.rows.length, 
       mismatches,
       subscriptionsChecked,
-      usersCreated
+      usersCreated,
+      duplicateCustomerAlerts,
     };
   } catch (error: unknown) {
     logger.error('[Reconcile] Error during subscription reconciliation:', { error: error });

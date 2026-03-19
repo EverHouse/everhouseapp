@@ -165,6 +165,8 @@ async function dispatchWebhookEvent(
   } else if (eventType === 'setup_intent.setup_failed') {
     return handleSetupIntentFailed(client, dataObject as Stripe.SetupIntent);
   }
+
+  logger.warn(`[Stripe Webhook] Received unhandled event type: ${eventType} — consider adding a handler or removing this event from the Stripe webhook endpoint configuration`);
   return [];
 }
 

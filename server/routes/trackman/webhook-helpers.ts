@@ -296,6 +296,9 @@ export function mapBayNameToResourceId(
   if (name.includes('three') || name.includes('third')) return 3;
   if (name.includes('four') || name.includes('fourth')) return 4;
   
+  logger.warn('[Trackman Webhook] Unable to map bay to resource ID — unmapped bay data received', {
+    extra: { bayName, bayId, baySerial, bayRef }
+  });
   return null;
 }
 
