@@ -85,28 +85,25 @@ export async function acquireBookingLocks(
 ): Promise<void> {
   const { resourceId, requestDate, requestEmail, isStaffRequest, isViewAsMode, resourceType } = params;
 
-  const lockIdentifiers: string[] = [];
+  const normalizedEmail = requestEmail.trim().toLowerCase();
+  const needsUserLock = !isStaffRequest || isViewAsMode;
 
   if (resourceId) {
-    lockIdentifiers.push(`${String(resourceId)}::${requestDate}`);
+    const resourceLockId = `resource::${String(resourceId)}::${requestDate}`;
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${resourceLockId}))`);
+    logger.debug('[BookingGuard] Acquired resource lock', { extra: { lockId: resourceLockId } });
   }
 
-  const needsUserLock = !isStaffRequest || isViewAsMode;
   if (needsUserLock) {
-    lockIdentifiers.push(requestEmail);
-  }
-
-  lockIdentifiers.sort();
-
-  for (const lockId of lockIdentifiers) {
-    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${lockId}))`);
-    logger.debug('[BookingGuard] Acquired advisory lock', { extra: { lockId } });
+    const userLockId = `user::${normalizedEmail}`;
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${userLockId}))`);
+    logger.debug('[BookingGuard] Acquired user lock', { extra: { lockId: userLockId } });
   }
 
   if (needsUserLock && resourceType !== 'conference_room') {
     const pendingCheck = await tx.execute(sql`
       SELECT COUNT(*)::int AS cnt FROM booking_requests
-      WHERE LOWER(user_email) = LOWER(${requestEmail}) AND status IN ('pending', 'pending_approval')
+      WHERE LOWER(user_email) = ${normalizedEmail} AND status IN ('pending', 'pending_approval')
     `);
     if ((pendingCheck.rows[0] as Record<string, unknown>).cnt as number > 0) {
       throw new BookingConflictError(409, {
@@ -152,6 +149,7 @@ export async function checkResourceOverlap(
       AND slot_date = ${requestDate}
       AND status = 'booked'
       AND start_time < ${endTime} AND end_time > ${startTime}
+      ORDER BY start_time ASC
       LIMIT 1`,
     'trackman_bay_slots',
   );
@@ -173,6 +171,7 @@ export async function checkResourceOverlap(
         WHERE br.trackman_booking_id = tub.trackman_booking_id::text
       )
       AND tub.start_time < ${endTime} AND tub.end_time > ${startTime}
+      ORDER BY tub.start_time ASC
       LIMIT 1`,
     'trackman_unmatched_bookings',
   );
@@ -193,6 +192,7 @@ export async function checkResourceOverlap(
         WHERE br.session_id = bs.id
         AND br.status NOT IN ('cancelled', 'deleted', 'declined')
       )
+      ORDER BY bs.start_time ASC
       LIMIT 1`,
     'booking_sessions',
   );
