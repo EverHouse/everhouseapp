@@ -548,6 +548,28 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
     await refresh();
   }, [refresh]);
 
+  const handlePaymentClick = useCallback((bookingId: number) => {
+    setBillingModal({ isOpen: true, bookingId });
+  }, []);
+
+  const handleRosterClick = useCallback((bookingId: number) => {
+    setBookingSheet({ isOpen: true, trackmanBookingId: null, bookingId, mode: 'manage' as const });
+  }, []);
+
+  const handleAssignMember = useCallback((booking: BookingRequest) => {
+    setBookingSheet({
+      isOpen: true,
+      trackmanBookingId: booking.trackman_booking_id || null,
+      bayName: booking.bay_name || `Bay ${booking.resource_id}`,
+      bookingDate: booking.request_date || booking.slot_date,
+      timeSlot: `${formatTime12Hour(booking.start_time)} - ${formatTime12Hour(booking.end_time)}`,
+      matchedBookingId: Number(booking.id),
+      isRelink: false,
+      importedName: booking.user_name || undefined,
+      notes: booking.notes || undefined
+    });
+  }, []);
+
   if (data.isLoading) {
     return <StaffCommandCenterSkeleton />;
   }
@@ -598,19 +620,9 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
               onDeny={handleDeny}
               onCheckIn={handleCheckIn}
               onCompleteCancellation={handleCompleteCancellation}
-              onPaymentClick={(bookingId) => setBillingModal({ isOpen: true, bookingId })}
-              onRosterClick={(bookingId) => setBookingSheet({ isOpen: true, trackmanBookingId: null, bookingId, mode: 'manage' as const })}
-              onAssignMember={(booking) => setBookingSheet({
-                isOpen: true,
-                trackmanBookingId: booking.trackman_booking_id || null,
-                bayName: booking.bay_name || `Bay ${booking.resource_id}`,
-                bookingDate: booking.request_date || booking.slot_date,
-                timeSlot: `${formatTime12Hour(booking.start_time)} - ${formatTime12Hour(booking.end_time)}`,
-                matchedBookingId: Number(booking.id),
-                isRelink: false,
-                importedName: booking.user_name || undefined,
-                notes: booking.notes || undefined
-              })}
+              onPaymentClick={handlePaymentClick}
+              onRosterClick={handleRosterClick}
+              onAssignMember={handleAssignMember}
               onRevertToApproved={revertToApprovedWithToast}
               variant="desktop-bottom"
             />
@@ -624,19 +636,9 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
               onDeny={handleDeny}
               onCheckIn={handleCheckIn}
               onCompleteCancellation={handleCompleteCancellation}
-              onPaymentClick={(bookingId) => setBillingModal({ isOpen: true, bookingId })}
-              onRosterClick={(bookingId) => setBookingSheet({ isOpen: true, trackmanBookingId: null, bookingId, mode: 'manage' as const })}
-              onAssignMember={(booking) => setBookingSheet({
-                isOpen: true,
-                trackmanBookingId: booking.trackman_booking_id || null,
-                bayName: booking.bay_name || `Bay ${booking.resource_id}`,
-                bookingDate: booking.request_date || booking.slot_date,
-                timeSlot: `${formatTime12Hour(booking.start_time)} - ${formatTime12Hour(booking.end_time)}`,
-                matchedBookingId: Number(booking.id),
-                isRelink: false,
-                importedName: booking.user_name || undefined,
-                notes: booking.notes || undefined
-              })}
+              onPaymentClick={handlePaymentClick}
+              onRosterClick={handleRosterClick}
+              onAssignMember={handleAssignMember}
               onRevertToApproved={revertToApprovedWithToast}
               variant="desktop-top"
             />
@@ -727,19 +729,9 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
             onDeny={handleDeny}
             onCheckIn={handleCheckIn}
             onCompleteCancellation={handleCompleteCancellation}
-            onPaymentClick={(bookingId) => setBillingModal({ isOpen: true, bookingId })}
-            onRosterClick={(bookingId) => setBookingSheet({ isOpen: true, trackmanBookingId: null, bookingId, mode: 'manage' as const })}
-            onAssignMember={(booking) => setBookingSheet({
-                isOpen: true,
-                trackmanBookingId: booking.trackman_booking_id || null,
-                bayName: booking.bay_name || `Bay ${booking.resource_id}`,
-                bookingDate: booking.request_date || booking.slot_date,
-                timeSlot: `${formatTime12Hour(booking.start_time)} - ${formatTime12Hour(booking.end_time)}`,
-                matchedBookingId: Number(booking.id),
-                isRelink: false,
-                importedName: booking.user_name || undefined,
-                notes: booking.notes || undefined
-              })}
+            onPaymentClick={handlePaymentClick}
+            onRosterClick={handleRosterClick}
+            onAssignMember={handleAssignMember}
             onRevertToApproved={revertToApprovedWithToast}
             variant="mobile"
           />

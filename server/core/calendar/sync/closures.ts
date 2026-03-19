@@ -193,11 +193,7 @@ async function getResourceIdsForAffectedAreas(affectedAreas: string | null | und
   try {
     const parsed = JSON.parse(affectedAreas);
     if (Array.isArray(parsed)) {
-      for (const item of parsed) {
-        if (typeof item === 'string') {
-          await processToken(item);
-        }
-      }
+      await Promise.all(parsed.filter((item): item is string => typeof item === 'string').map(processToken));
       if (idSet.size > 0) return Array.from(idSet);
     }
   } catch (err) {
@@ -205,9 +201,7 @@ async function getResourceIdsForAffectedAreas(affectedAreas: string | null | und
   }
   
   const parts = affectedAreas.split(',').map(s => s.trim());
-  for (const part of parts) {
-    await processToken(part);
-  }
+  await Promise.all(parts.map(processToken));
   
   if (idSet.size === 0) {
     logger.warn(`[getResourceIdsForAffectedAreas] Could not resolve resources for "${affectedAreas}", falling back to entire_facility`);

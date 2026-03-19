@@ -25,7 +25,16 @@ export const resetPrefetchState = () => {
   prefetchedAPIs.clear();
 };
 
+const shouldSkipPrefetch = (): boolean => {
+  const nav = navigator as Navigator & { connection?: { saveData?: boolean; effectiveType?: string } };
+  if (nav.connection?.saveData) return true;
+  if (nav.connection?.effectiveType === '2g' || nav.connection?.effectiveType === 'slow-2g') return true;
+  return false;
+};
+
 const doPrefetch = (path: string, imports: RouteImportMap, apis: RouteAPIMap) => {
+  if (shouldSkipPrefetch()) return;
+
   if (!prefetchedPaths.has(path)) {
     const importFn = imports[path];
     if (importFn) {
@@ -61,6 +70,8 @@ export const prefetchAllNavRoutes = () => {
 };
 
 export const prefetchOnIdle = (): (() => void) => {
+  if (shouldSkipPrefetch()) return () => {};
+
   if ('requestIdleCallback' in window) {
     const win = window as unknown as { requestIdleCallback: (cb: () => void, opts?: { timeout: number }) => number; cancelIdleCallback: (id: number) => void };
     const id = win.requestIdleCallback(() => prefetchAllNavRoutes(), { timeout: 2000 });

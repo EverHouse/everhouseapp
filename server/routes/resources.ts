@@ -60,6 +60,7 @@ const router = Router();
 router.get('/api/resources', async (req, res) => {
   try {
     const result = await fetchAllResources();
+    res.set('Cache-Control', 'private, max-age=60, stale-while-revalidate=300');
     res.json(result);
   } catch (error: unknown) {
     logAndRespond(req, res, 500, 'Failed to fetch resources', error, 'RESOURCES_ERROR');

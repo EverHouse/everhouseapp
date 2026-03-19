@@ -145,6 +145,9 @@ export default defineConfig({
       output: {
         manualChunks(id) {
           if (id.includes('node_modules')) {
+            if (id.includes('recharts') || id.includes('d3-') || id.includes('victory-vendor')) {
+              return 'vendor-recharts';
+            }
             if (id.includes('react-dom')) {
               return 'vendor-react-dom';
             }

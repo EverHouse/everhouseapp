@@ -219,7 +219,7 @@ interface ResourcesSectionProps {
   notifications?: StaffNotification[];
 }
 
-export const ResourcesSection: React.FC<ResourcesSectionProps> = ({
+export const ResourcesSection: React.FC<ResourcesSectionProps> = React.memo(({
   bayStatuses,
   closures,
   upcomingClosure,
@@ -283,7 +283,7 @@ export const ResourcesSection: React.FC<ResourcesSectionProps> = ({
       variant={variant}
     />
   );
-};
+});
 
 export const NoticeBoardWidget: React.FC<{
   closures: Closure[];

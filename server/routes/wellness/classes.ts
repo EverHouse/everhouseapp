@@ -318,6 +318,7 @@ router.get('/api/wellness-classes', async (req, res) => {
     fullQuery = sql`${fullQuery} ORDER BY wc.date ASC, wc.time ASC LIMIT 500`;
     
     const result = await db.execute(fullQuery);
+    res.set('Cache-Control', 'private, max-age=60, stale-while-revalidate=300');
     res.json(result.rows);
   } catch (error: unknown) {
     logger.error('API error', { error: error instanceof Error ? error : new Error(String(error)) });

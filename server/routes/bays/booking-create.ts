@@ -80,31 +80,32 @@ router.post('/api/booking-requests', isAuthenticated, bookingRateLimiter, valida
       resolvedUserId = resolved.userId;
     }
     
-    if (sessionEmail !== requestEmail) {
-      const sessionResolved = await resolveUserByEmail(sessionEmail);
+    const needsNameLookup = !user_name || user_name.includes('@');
+    const needsAuthCheck = sessionEmail !== requestEmail;
+
+    const [sessionResolved, isStaffRequest, dbUserResult] = await Promise.all([
+      needsAuthCheck ? resolveUserByEmail(sessionEmail) : Promise.resolve(null),
+      isStaffOrAdminCheck(sessionEmail),
+      needsNameLookup
+        ? db.select({ firstName: users.firstName, lastName: users.lastName })
+            .from(users)
+            .where(sql`LOWER(${users.email}) = ${requestEmail}`)
+            .limit(1)
+        : Promise.resolve(null)
+    ]);
+
+    if (needsAuthCheck) {
       const sessionPrimary = sessionResolved?.primaryEmail?.toLowerCase() || sessionEmail;
-      
-      if (sessionPrimary !== requestEmail) {
-        const hasStaffAccess = await isStaffOrAdminCheck(sessionEmail);
-        if (!hasStaffAccess) {
-          return res.status(403).json({ error: 'You can only create booking requests for yourself' });
-        }
+      if (sessionPrimary !== requestEmail && !isStaffRequest) {
+        return res.status(403).json({ error: 'You can only create booking requests for yourself' });
       }
     }
-    
+
     let resolvedUserName = user_name;
-    if (!resolvedUserName || resolvedUserName.includes('@')) {
-      const [dbUser] = await db.select({ firstName: users.firstName, lastName: users.lastName })
-        .from(users)
-        .where(sql`LOWER(${users.email}) = ${requestEmail}`)
-        .limit(1);
-      if (dbUser) {
-        const fullName = [dbUser.firstName, dbUser.lastName].filter(Boolean).join(' ').trim();
-        if (fullName) resolvedUserName = fullName;
-      }
+    if (needsNameLookup && dbUserResult && dbUserResult.length > 0) {
+      const fullName = [dbUserResult[0].firstName, dbUserResult[0].lastName].filter(Boolean).join(' ').trim();
+      if (fullName) resolvedUserName = fullName;
     }
-    
-    const isStaffRequest = await isStaffOrAdminCheck(sessionEmail);
     const isViewAsMode = isStaffRequest && sessionEmail !== requestEmail;
     
     if (typeof duration_minutes !== 'number' || !Number.isInteger(duration_minutes) || duration_minutes <= 0 || duration_minutes > 480) {

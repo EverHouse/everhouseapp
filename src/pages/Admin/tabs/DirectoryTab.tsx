@@ -2,7 +2,7 @@ import React, { useState, useCallback, type ErrorInfo } from 'react';
 import { createPortal } from 'react-dom';
 import FeatureErrorBoundary from '../../../components/FeatureErrorBoundary';
 import { useNavigate } from 'react-router-dom';
-import { useAuthData, useMemberData, MemberProfile } from '../../../contexts/DataContext';
+import { useAuthData, useMemberData, useMemberLoading, MemberProfile } from '../../../contexts/DataContext';
 import { usePageReady } from '../../../stores/pageReadyStore';
 import MemberProfileDrawer from '../../../components/MemberProfileDrawer';
 import { NewUserDrawer } from '../../../components/staff-command-center/drawers/NewUserDrawer';
@@ -24,7 +24,8 @@ import Icon from '../../../components/icons/Icon';
 const DirectoryTab: React.FC = () => {
     const { setPageReady } = usePageReady();
     const { setViewAsUser, actualUser } = useAuthData();
-    const { members, formerMembers, fetchFormerMembers, refreshMembers, isFetchingMembers } = useMemberData();
+    const { members, formerMembers, fetchFormerMembers, refreshMembers } = useMemberData();
+    const { isFetchingMembers } = useMemberLoading();
     const navigate = useNavigate();
 
     const [memberTab, setMemberTab] = useState<MemberTab>('active');

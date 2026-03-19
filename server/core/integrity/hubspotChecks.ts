@@ -55,93 +55,124 @@ export async function checkHubSpotSyncMismatch(): Promise<IntegrityCheckResult> 
   `);
   const appMembers = appMembersResult.rows as unknown as MemberRow[];
 
-  for (const member of appMembers) {
-    if (!member.hubspot_id) continue;
+  const membersWithHubspot = appMembers.filter(m => m.hubspot_id);
+  const hubspotContactMap = new Map<string, Record<string, string>>();
+  const notFoundIds = new Set<string>();
 
+  for (let i = 0; i < membersWithHubspot.length; i += 100) {
+    const batch = membersWithHubspot.slice(i, i + 100);
     try {
-      const hubspotContact = await retryableHubSpotRequest(() => hubspot.crm.contacts.basicApi.getById(
-        String(member.hubspot_id),
-        ['firstname', 'lastname', 'email', 'membership_tier']
-      ));
-
-      const props = hubspotContact.properties || {};
-      const comparisons: SyncComparisonData[] = [];
-
-      const appFirstName = String(member.first_name || '').trim().toLowerCase();
-      const hsFirstName = (props.firstname || '').trim().toLowerCase();
-      if (appFirstName !== hsFirstName) {
-        comparisons.push({
-          field: 'First Name',
-          appValue: member.first_name || null,
-          externalValue: props.firstname || null
-        });
+      const readResult = await retryableHubSpotRequest(() =>
+        hubspot.crm.contacts.batchApi.read({
+          inputs: batch.map(m => ({ id: String(m.hubspot_id) })),
+          properties: ['firstname', 'lastname', 'email', 'membership_tier']
+        } as unknown as Parameters<typeof hubspot.crm.contacts.batchApi.read>[0])
+      );
+      for (const contact of ((readResult as unknown as { results?: Array<{ id: string; properties?: Record<string, string> }> }).results || [])) {
+        hubspotContactMap.set(contact.id, contact.properties || {});
       }
+      const returnedIds = new Set(((readResult as unknown as { results?: Array<{ id: string }> }).results || []).map(c => c.id));
+      for (const m of batch) {
+        if (!returnedIds.has(String(m.hubspot_id))) {
+          notFoundIds.add(String(m.hubspot_id));
+        }
+      }
+    } catch (batchErr: unknown) {
+      logger.warn('[DataIntegrity] HubSpot batch sync read failed, skipping batch:', { error: batchErr });
+      issues.push({
+        category: 'sync_mismatch',
+        severity: 'info',
+        table: 'hubspot_sync',
+        recordId: 'hubspot_batch_api',
+        description: `HubSpot batch read failed for ${batch.length} contacts - skipping comparison`,
+        suggestion: 'Retry later or check HubSpot API availability'
+      });
+    }
+  }
 
-      const appLastName = String(member.last_name || '').trim().toLowerCase();
-      const hsLastName = (props.lastname || '').trim().toLowerCase();
-      if (appLastName !== hsLastName) {
-        comparisons.push({
-          field: 'Last Name',
-          appValue: member.last_name || null,
-          externalValue: props.lastname || null
-        });
-      }
+  for (const member of membersWithHubspot) {
+    const hsId = String(member.hubspot_id);
 
-      const memberStatus = String(member.membership_status || '').toLowerCase();
-      const isChurned = CHURNED_STATUSES.includes(memberStatus);
-      const isNoTierStatus = NO_TIER_STATUSES.includes(memberStatus);
-      const expectedHubSpotTier = (isChurned || isNoTierStatus || !member.tier)
-        ? null
-        : await denormalizeTierForHubSpotAsync(String(member.tier));
-      const hsTierRaw = props.membership_tier || null;
-      const expectedNorm = (expectedHubSpotTier || '').trim().toLowerCase();
-      const hsNorm = (hsTierRaw || '').trim().toLowerCase();
-      if ((expectedNorm || hsNorm) && expectedNorm !== hsNorm) {
-        comparisons.push({
-          field: 'Membership Tier',
-          appValue: expectedHubSpotTier || null,
-          externalValue: hsTierRaw
-        });
-      }
+    if (notFoundIds.has(hsId)) {
+      issues.push({
+        category: 'sync_mismatch',
+        severity: 'error',
+        table: 'users',
+        recordId: member.id as string | number,
+        description: `Member "${member.first_name} ${member.last_name}" (hubspot_id: ${member.hubspot_id}) not found in HubSpot`,
+        suggestion: 'Remove stale HubSpot ID or re-sync member',
+        context: {
+          memberName: `${member.first_name || ''} ${member.last_name || ''}`.trim() || undefined,
+          memberEmail: member.email || undefined,
+          syncType: 'hubspot',
+          hubspotContactId: member.hubspot_id,
+          userId: String(member.id)
+        }
+      });
+      continue;
+    }
 
-      if (comparisons.length > 0) {
-        const fieldList = comparisons.map(c => c.field).join(', ');
-        issues.push({
-          category: 'sync_mismatch',
-          severity: 'warning',
-          table: 'users',
-          recordId: member.id as string | number,
-          description: `Member "${member.first_name} ${member.last_name}" has mismatched data: ${fieldList}`,
-          suggestion: 'Sync data between app and HubSpot',
-          context: {
-            memberName: `${member.first_name || ''} ${member.last_name || ''}`.trim() || undefined,
-            memberEmail: member.email || undefined,
-            memberTier: member.tier || undefined,
-            syncType: 'hubspot',
-            syncComparison: comparisons,
-            hubspotContactId: member.hubspot_id,
-            userId: String(member.id)
-          }
-        });
-      }
-    } catch (err: unknown) {
-      if (getErrorStatusCode(err) === 404) {
-        issues.push({
-          category: 'sync_mismatch',
-          severity: 'error',
-          table: 'users',
-          recordId: member.id as string | number,
-          description: `Member "${member.first_name} ${member.last_name}" (hubspot_id: ${member.hubspot_id}) not found in HubSpot`,
-          suggestion: 'Remove stale HubSpot ID or re-sync member',
-          context: {
-            memberName: `${member.first_name || ''} ${member.last_name || ''}`.trim() || undefined,
-            memberEmail: member.email || undefined,
-            syncType: 'hubspot',
-            hubspotContactId: member.hubspot_id,
-            userId: String(member.id)
-          }
-        });
-      }
+    const props = hubspotContactMap.get(hsId);
+    if (!props) continue;
+
+    const comparisons: SyncComparisonData[] = [];
+
+    const appFirstName = String(member.first_name || '').trim().toLowerCase();
+    const hsFirstName = (props.firstname || '').trim().toLowerCase();
+    if (appFirstName !== hsFirstName) {
+      comparisons.push({
+        field: 'First Name',
+        appValue: member.first_name || null,
+        externalValue: props.firstname || null
+      });
+    }
+
+    const appLastName = String(member.last_name || '').trim().toLowerCase();
+    const hsLastName = (props.lastname || '').trim().toLowerCase();
+    if (appLastName !== hsLastName) {
+      comparisons.push({
+        field: 'Last Name',
+        appValue: member.last_name || null,
+        externalValue: props.lastname || null
+      });
+    }
+
+    const memberStatus = String(member.membership_status || '').toLowerCase();
+    const isChurned = CHURNED_STATUSES.includes(memberStatus);
+    const isNoTierStatus = NO_TIER_STATUSES.includes(memberStatus);
+    const expectedHubSpotTier = (isChurned || isNoTierStatus || !member.tier)
+      ? null
+      : await denormalizeTierForHubSpotAsync(String(member.tier));
+    const hsTierRaw = props.membership_tier || null;
+    const expectedNorm = (expectedHubSpotTier || '').trim().toLowerCase();
+    const hsNorm = (hsTierRaw || '').trim().toLowerCase();
+    if ((expectedNorm || hsNorm) && expectedNorm !== hsNorm) {
+      comparisons.push({
+        field: 'Membership Tier',
+        appValue: expectedHubSpotTier || null,
+        externalValue: hsTierRaw
+      });
+    }
+
+    if (comparisons.length > 0) {
+      const fieldList = comparisons.map(c => c.field).join(', ');
+      issues.push({
+        category: 'sync_mismatch',
+        severity: 'warning',
+        table: 'users',
+        recordId: member.id as string | number,
+        description: `Member "${member.first_name} ${member.last_name}" has mismatched data: ${fieldList}`,
+        suggestion: 'Sync data between app and HubSpot',
+        context: {
+          memberName: `${member.first_name || ''} ${member.last_name || ''}`.trim() || undefined,
+          memberEmail: member.email || undefined,
+          memberTier: member.tier || undefined,
+          syncType: 'hubspot',
+          syncComparison: comparisons,
+          hubspotContactId: member.hubspot_id,
+          userId: String(member.id)
+        }
+      });
     }
   }
 

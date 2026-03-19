@@ -253,27 +253,28 @@ router.get('/api/member/dashboard/wellness', isAuthenticated, async (req, res) =
       gte(wellnessClasses.date, todayPacific)
     ];
     
-    const enrollments = await db.select({
-      id: wellnessEnrollments.id,
-      class_id: wellnessEnrollments.classId,
-      user_email: wellnessEnrollments.userEmail,
-      status: wellnessEnrollments.status,
-      is_waitlisted: wellnessEnrollments.isWaitlisted,
-      created_at: wellnessEnrollments.createdAt,
-      title: wellnessClasses.title,
-      date: wellnessClasses.date,
-      time: wellnessClasses.time,
-      instructor: wellnessClasses.instructor,
-      duration: wellnessClasses.duration,
-      category: wellnessClasses.category,
-    })
-    .from(wellnessEnrollments)
-    .innerJoin(wellnessClasses, eq(wellnessEnrollments.classId, wellnessClasses.id))
-    .where(and(...conditions))
-    .orderBy(wellnessClasses.date, wellnessClasses.time)
-    .limit(100);
+    const [enrollments, classesResult] = await Promise.all([
+      db.select({
+        id: wellnessEnrollments.id,
+        class_id: wellnessEnrollments.classId,
+        user_email: wellnessEnrollments.userEmail,
+        status: wellnessEnrollments.status,
+        is_waitlisted: wellnessEnrollments.isWaitlisted,
+        created_at: wellnessEnrollments.createdAt,
+        title: wellnessClasses.title,
+        date: wellnessClasses.date,
+        time: wellnessClasses.time,
+        instructor: wellnessClasses.instructor,
+        duration: wellnessClasses.duration,
+        category: wellnessClasses.category,
+      })
+      .from(wellnessEnrollments)
+      .innerJoin(wellnessClasses, eq(wellnessEnrollments.classId, wellnessClasses.id))
+      .where(and(...conditions))
+      .orderBy(wellnessClasses.date, wellnessClasses.time)
+      .limit(100),
 
-    const classesResult = await db.execute(sql`
+      db.execute(sql`
       SELECT wc.*, 
         COALESCE(e.enrolled_count, 0)::integer as enrolled_count,
         COALESCE(w.waitlist_count, 0)::integer as waitlist_count,
@@ -299,7 +300,8 @@ router.get('/api/member/dashboard/wellness', isAuthenticated, async (req, res) =
       WHERE wc.archived_at IS NULL AND wc.date >= ${todayPacific}
       ORDER BY wc.date, wc.time
       LIMIT 5
-    `);
+    `),
+    ]);
 
     res.json({ enrollments, classes: classesResult.rows });
   } catch (error: unknown) {
@@ -383,20 +385,24 @@ router.get('/api/member/dashboard/stats', isAuthenticated, async (req, res) => {
     const { userEmail } = resolved;
 
     const fetchGuestPassesData = async () => {
-      const userResult = await withRetry(() =>
-        db.execute(sql`SELECT tier FROM users WHERE LOWER(email) = LOWER(${userEmail}) LIMIT 1`)
-      );
-      const actualTier = (userResult as unknown as Record<string, unknown> & { rows?: Record<string, unknown>[] }).rows?.[0]?.tier as string || null;
+      const [tierData, initialResult] = await Promise.all([
+        (async () => {
+          const userResult = await withRetry(() =>
+            db.execute(sql`SELECT tier FROM users WHERE LOWER(email) = LOWER(${userEmail}) LIMIT 1`)
+          );
+          const actualTier = (userResult as unknown as Record<string, unknown> & { rows?: Record<string, unknown>[] }).rows?.[0]?.tier as string || null;
+          return actualTier ? await getTierLimits(actualTier) : null;
+        })(),
+        withRetry(() => 
+          db.select()
+            .from(guestPasses)
+            .where(sql`LOWER(${guestPasses.memberEmail}) = ${userEmail}`)
+            .limit(1)
+        ),
+      ]);
+      const passesTotal = tierData?.guest_passes_per_year ?? 0;
       
-      const tierLimits = actualTier ? await getTierLimits(actualTier) : null;
-      const passesTotal = tierLimits?.guest_passes_per_year ?? 0;
-      
-      let result = await withRetry(() => 
-        db.select()
-          .from(guestPasses)
-          .where(sql`LOWER(${guestPasses.memberEmail}) = ${userEmail}`)
-          .limit(1)
-      );
+      let result = initialResult;
       
       if (result.length === 0) {
         await withRetry(() =>
@@ -750,8 +756,10 @@ router.get('/api/member/dashboard-data', isAuthenticated, async (req, res) => {
     
     const fetchConferenceRoomBookings = async () => {
       try {
-        const bookings = await getConferenceRoomBookingsFromCalendar(userName, userEmail);
-        const conferenceRoomId = await getConferenceRoomId();
+        const [bookings, conferenceRoomId] = await Promise.all([
+          getConferenceRoomBookingsFromCalendar(userName, userEmail),
+          getConferenceRoomId(),
+        ]);
         
         return bookings.map(booking => ({
           id: `cal_${booking.id}`,
@@ -843,20 +851,24 @@ router.get('/api/member/dashboard-data', isAuthenticated, async (req, res) => {
     
     const fetchGuestPassesData = async () => {
       try {
-        const userResult = await withRetry(() =>
-          db.execute(sql`SELECT tier FROM users WHERE LOWER(email) = LOWER(${userEmail}) LIMIT 1`)
-        );
-        const actualTier = (userResult as unknown as Record<string, unknown> & { rows?: Record<string, unknown>[] }).rows?.[0]?.tier as string || null;
+        const [tierData, initialResult] = await Promise.all([
+          (async () => {
+            const userResult = await withRetry(() =>
+              db.execute(sql`SELECT tier FROM users WHERE LOWER(email) = LOWER(${userEmail}) LIMIT 1`)
+            );
+            const actualTier = (userResult as unknown as Record<string, unknown> & { rows?: Record<string, unknown>[] }).rows?.[0]?.tier as string || null;
+            return actualTier ? await getTierLimits(actualTier) : null;
+          })(),
+          withRetry(() => 
+            db.select()
+              .from(guestPasses)
+              .where(sql`LOWER(${guestPasses.memberEmail}) = ${userEmail}`)
+              .limit(1)
+          ),
+        ]);
+        const passesTotal = tierData?.guest_passes_per_year ?? 0;
         
-        const tierLimits = actualTier ? await getTierLimits(actualTier) : null;
-        const passesTotal = tierLimits?.guest_passes_per_year ?? 0;
-        
-        let result = await withRetry(() => 
-          db.select()
-            .from(guestPasses)
-            .where(sql`LOWER(${guestPasses.memberEmail}) = ${userEmail}`)
-            .limit(1)
-        );
+        let result = initialResult;
         
         if (result.length === 0) {
           await withRetry(() =>

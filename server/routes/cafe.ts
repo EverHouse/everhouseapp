@@ -27,7 +27,10 @@ router.get('/api/cafe-menu', async (req, res) => {
     if (!category && !showInactive) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const cached = getCached<any[]>(CAFE_CACHE_KEY);
-      if (cached) return res.json(cached);
+      if (cached) {
+        res.set('Cache-Control', 'private, max-age=60, stale-while-revalidate=300');
+        return res.json(cached);
+      }
     }
 
     const conditions = [];
@@ -49,6 +52,7 @@ router.get('/api/cafe-menu', async (req, res) => {
       setCache(CAFE_CACHE_KEY, result, CAFE_CACHE_TTL);
     }
 
+    res.set('Cache-Control', 'private, max-age=60, stale-while-revalidate=300');
     res.json(result);
   } catch (error: unknown) {
     if (!isProduction) logger.error('Cafe menu error', { error: getErrorMessage(error) });

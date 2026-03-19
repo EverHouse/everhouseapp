@@ -343,7 +343,7 @@ interface BookingQueuesSectionProps {
   variant: 'desktop' | 'desktop-top' | 'desktop-bottom' | 'mobile';
 }
 
-export const BookingQueuesSection: React.FC<BookingQueuesSectionProps> = ({
+export const BookingQueuesSection: React.FC<BookingQueuesSectionProps> = memo(({
   pendingRequests,
   todaysBookings,
   unmatchedBookings = [],
@@ -658,4 +658,4 @@ export const BookingQueuesSection: React.FC<BookingQueuesSectionProps> = ({
       />
     </>
   );
-};
+});

@@ -20,6 +20,7 @@ router.get('/api/bays', async (req, res) => {
       isActive: sql<boolean>`true`,
       createdAt: resources.createdAt
     }).from(resources).where(eq(resources.type, 'simulator')).orderBy(asc(resources.name));
+    res.set('Cache-Control', 'private, max-age=60, stale-while-revalidate=300');
     res.json(result);
   } catch (error: unknown) {
     logAndRespond(req, res, 500, 'Failed to fetch bays', error);

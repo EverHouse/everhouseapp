@@ -78,12 +78,16 @@ interface MemberDataContextType {
   fetchFormerMembers: (forceRefresh?: boolean) => Promise<void>;
   fetchMembersPaginated: (options?: FetchMembersOptions) => Promise<PaginatedMembersResponse>;
   membersPagination: { total: number; page: number; totalPages: number; hasMore: boolean } | null;
-  isFetchingMembers: boolean;
   updateMember: (member: MemberProfile) => void;
   refreshMembers: () => Promise<{ success: boolean; count: number }>;
 }
 
+interface MemberLoadingContextType {
+  isFetchingMembers: boolean;
+}
+
 const MemberDataContext = createContext<MemberDataContextType | undefined>(undefined);
+const MemberLoadingContext = createContext<MemberLoadingContextType | undefined>(undefined);
 
 export const MemberDataProvider: React.FC<{children: ReactNode}> = ({ children }) => {
   const { sessionChecked, actualUser } = useAuthData();
@@ -289,13 +293,19 @@ export const MemberDataProvider: React.FC<{children: ReactNode}> = ({ children }
 
   const contextValue = useMemo(() => ({
     members, formerMembers, fetchFormerMembers, fetchMembersPaginated,
-    membersPagination, isFetchingMembers, updateMember, refreshMembers
+    membersPagination, updateMember, refreshMembers
   }), [members, formerMembers, fetchFormerMembers, fetchMembersPaginated,
-    membersPagination, isFetchingMembers, updateMember, refreshMembers]);
+    membersPagination, updateMember, refreshMembers]);
+
+  const loadingValue = useMemo(() => ({
+    isFetchingMembers
+  }), [isFetchingMembers]);
 
   return (
     <MemberDataContext.Provider value={contextValue}>
-      {children}
+      <MemberLoadingContext.Provider value={loadingValue}>
+        {children}
+      </MemberLoadingContext.Provider>
     </MemberDataContext.Provider>
   );
 };
@@ -305,6 +315,15 @@ export const useMemberData = () => {
   const context = useContext(MemberDataContext);
   if (!context) {
     throw new Error('useMemberData must be used within a MemberDataProvider');
+  }
+  return context;
+};
+
+// eslint-disable-next-line react-refresh/only-export-components
+export const useMemberLoading = () => {
+  const context = useContext(MemberLoadingContext);
+  if (!context) {
+    throw new Error('useMemberLoading must be used within a MemberDataProvider');
   }
   return context;
 };

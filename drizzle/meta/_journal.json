@@ -246,6 +246,13 @@
       "when": 1774569600000,
       "tag": "0061_rename_guest_passes_per_month_to_per_year",
       "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1774656000000,
+      "tag": "0062_add_booking_conflict_indexes",
+      "breakpoints": true
     }
   ]
 }

@@ -48,7 +48,7 @@ const redactEmail = (email: string): string => {
   return `${redacted}@${domain}`;
 };
 
-export const MemberSearchInput: React.FC<MemberSearchInputProps> = ({
+export const MemberSearchInput: React.FC<MemberSearchInputProps> = React.memo(({
   onSelect,
   onClear,
   placeholder = 'Search by name or email...',
@@ -422,6 +422,6 @@ export const MemberSearchInput: React.FC<MemberSearchInputProps> = ({
       </div>
     </div>
   );
-};
+});
 
 export default MemberSearchInput;

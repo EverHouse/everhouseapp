@@ -32,13 +32,17 @@ router.get('/api/membership-tiers', async (req, res) => {
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const cached = getCached<any[]>(cacheKey);
-    if (cached) return res.json(cached);
+    if (cached) {
+      res.set('Cache-Control', 'private, max-age=60, stale-while-revalidate=300');
+      return res.json(cached);
+    }
 
     const result = active === 'true'
       ? await db.execute(sql`SELECT * FROM membership_tiers WHERE is_active = true ORDER BY sort_order ASC, id ASC`)
       : await db.execute(sql`SELECT * FROM membership_tiers ORDER BY sort_order ASC, id ASC`);
 
     setCache(cacheKey, result.rows, TIERS_CACHE_TTL);
+    res.set('Cache-Control', 'private, max-age=60, stale-while-revalidate=300');
     res.json(result.rows);
   } catch (error: unknown) {
     logger.error('Membership tiers fetch error', { error: getErrorMessage(error) });

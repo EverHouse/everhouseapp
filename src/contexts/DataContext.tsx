@@ -11,7 +11,7 @@ export type { PaginatedMembersResponse, FetchMembersOptions } from './MemberData
 // eslint-disable-next-line react-refresh/only-export-components
 export { useAuthData } from './AuthDataContext';
 // eslint-disable-next-line react-refresh/only-export-components
-export { useMemberData } from './MemberDataContext';
+export { useMemberData, useMemberLoading } from './MemberDataContext';
 // eslint-disable-next-line react-refresh/only-export-components
 export { useCafeData } from './CafeDataContext';
 // eslint-disable-next-line react-refresh/only-export-components

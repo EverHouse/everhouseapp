@@ -130,6 +130,7 @@ router.get('/api/events', async (req, res) => {
       });
     }
     
+    res.set('Cache-Control', 'private, max-age=60, stale-while-revalidate=300');
     res.json(result);
   } catch (error: unknown) {
     logger.error('API error', { error: error instanceof Error ? error : new Error(String(error)) });

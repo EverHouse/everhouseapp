@@ -520,49 +520,53 @@ export async function checkArchivedMemberLingeringData(): Promise<IntegrityCheck
 
   const lingeringData = await db.execute(sql`
     WITH archived AS (
-      SELECT id, email, first_name, last_name FROM users
+      SELECT id, email, LOWER(email) AS email_lower, first_name, last_name FROM users
       WHERE membership_status = ${MEMBERSHIP_STATUS.ARCHIVED} AND archived_at IS NOT NULL
+    ),
+    active_bookings AS (
+      SELECT br.user_email, br.user_id
+      FROM booking_requests br
+      WHERE br.status IN (${BOOKING_STATUS.PENDING}, ${BOOKING_STATUS.PENDING_APPROVAL}, ${BOOKING_STATUS.APPROVED}, ${BOOKING_STATUS.CONFIRMED})
+        AND br.request_date >= (NOW() AT TIME ZONE 'America/Los_Angeles')::date
     )
     SELECT a.id, a.email, a.first_name, a.last_name, 'future_bookings' AS issue_type, COUNT(*)::text AS issue_count
     FROM archived a
-    JOIN booking_requests br ON (LOWER(br.user_email) = LOWER(a.email) OR br.user_id = a.id)
-    WHERE br.status IN (${BOOKING_STATUS.PENDING}, ${BOOKING_STATUS.PENDING_APPROVAL}, ${BOOKING_STATUS.APPROVED}, ${BOOKING_STATUS.CONFIRMED})
-      AND br.request_date >= (NOW() AT TIME ZONE 'America/Los_Angeles')::date
+    JOIN active_bookings ab ON (LOWER(ab.user_email) = a.email_lower OR ab.user_id = a.id)
     GROUP BY a.id, a.email, a.first_name, a.last_name
 
     UNION ALL
 
     SELECT a.id, a.email, a.first_name, a.last_name, 'guest_pass_holds' AS issue_type, COUNT(*)::text AS issue_count
     FROM archived a
-    JOIN guest_pass_holds gph ON LOWER(gph.member_email) = LOWER(a.email)
+    JOIN guest_pass_holds gph ON LOWER(gph.member_email) = a.email_lower
     GROUP BY a.id, a.email, a.first_name, a.last_name
 
     UNION ALL
 
     SELECT a.id, a.email, a.first_name, a.last_name, 'group_memberships' AS issue_type, COUNT(*)::text AS issue_count
     FROM archived a
-    JOIN group_members gm ON LOWER(gm.member_email) = LOWER(a.email)
+    JOIN group_members gm ON LOWER(gm.member_email) = a.email_lower
     GROUP BY a.id, a.email, a.first_name, a.last_name
 
     UNION ALL
 
     SELECT a.id, a.email, a.first_name, a.last_name, 'push_subscriptions' AS issue_type, COUNT(*)::text AS issue_count
     FROM archived a
-    JOIN push_subscriptions ps ON LOWER(ps.user_email) = LOWER(a.email)
+    JOIN push_subscriptions ps ON LOWER(ps.user_email) = a.email_lower
     GROUP BY a.id, a.email, a.first_name, a.last_name
 
     UNION ALL
 
     SELECT a.id, a.email, a.first_name, a.last_name, 'wellness_enrollments' AS issue_type, COUNT(*)::text AS issue_count
     FROM archived a
-    JOIN wellness_enrollments we ON LOWER(we.user_email) = LOWER(a.email) AND we.status = 'confirmed'
+    JOIN wellness_enrollments we ON LOWER(we.user_email) = a.email_lower AND we.status = 'confirmed'
     GROUP BY a.id, a.email, a.first_name, a.last_name
 
     UNION ALL
 
     SELECT a.id, a.email, a.first_name, a.last_name, 'future_event_rsvps' AS issue_type, COUNT(*)::text AS issue_count
     FROM archived a
-    JOIN event_rsvps er ON (LOWER(er.user_email) = LOWER(a.email) OR er.matched_user_id = a.id)
+    JOIN event_rsvps er ON (LOWER(er.user_email) = a.email_lower OR er.matched_user_id = a.id)
       AND COALESCE(er.source, 'local') = 'local'
     JOIN events e ON e.id = er.event_id AND e.event_date >= (NOW() AT TIME ZONE 'America/Los_Angeles')::date
     GROUP BY a.id, a.email, a.first_name, a.last_name

@@ -327,25 +327,28 @@ router.post('/api/closures', isStaffOrAdmin, async (req, res) => {
     
     const shouldNotifyMembers = affected_areas !== 'none' ? true : !!notify_members;
     
-    const [result] = await db.insert(facilityClosures).values({
-      title: title || 'Facility Closure',
-      reason,
-      memberNotice: member_notice || null,
-      notes: notes || null,
-      noticeType: notice_type || null,
-      startDate: start_date,
-      startTime: start_time || null,
-      endDate: end_date || start_date,
-      endTime: end_time || null,
-      affectedAreas: affected_areas,
-      visibility: shouldNotifyMembers ? 'Members' : 'Staff Only',
-      notifyMembers: shouldNotifyMembers,
-      isActive: true,
-      createdBy: created_by
-    }).returning();
+    const [[result], affectedBayIds, internalCalendarId] = await Promise.all([
+      db.insert(facilityClosures).values({
+        title: title || 'Facility Closure',
+        reason,
+        memberNotice: member_notice || null,
+        notes: notes || null,
+        noticeType: notice_type || null,
+        startDate: start_date,
+        startTime: start_time || null,
+        endDate: end_date || start_date,
+        endTime: end_time || null,
+        affectedAreas: affected_areas,
+        visibility: shouldNotifyMembers ? 'Members' : 'Staff Only',
+        notifyMembers: shouldNotifyMembers,
+        isActive: true,
+        createdBy: created_by
+      }).returning(),
+      getAffectedBayIds(affected_areas),
+      getCalendarIdByName(CALENDAR_CONFIG.internal.name).catch(() => null),
+    ]);
     
     const closureId = result.id;
-    const affectedBayIds = await getAffectedBayIds(affected_areas);
     const dates = getDatesBetween(start_date, end_date || start_date);
     
     if (affectedBayIds.length > 0) {
@@ -362,10 +365,7 @@ router.post('/api/closures', isStaffOrAdmin, async (req, res) => {
     
     let internalEventIds: string | null = null;
     
-    // Create calendar event ONLY on Internal Calendar (staff visibility)
-    // Availability blocking is handled by the availability_blocks table created above
     try {
-      const internalCalendarId = await getCalendarIdByName(CALENDAR_CONFIG.internal.name);
       
       if (internalCalendarId) {
         // Use notice_type for bracket prefix in calendar title
@@ -501,27 +501,22 @@ router.delete('/api/closures/:id', isStaffOrAdmin, async (req, res) => {
       .from(facilityClosures)
       .where(eq(facilityClosures.id, closureId));
     
-    // Delete calendar event from Internal Calendar only
-    // (Legacy golf/conference events are also cleaned up for backward compatibility)
     try {
-      // Delete from Internal Calendar (primary)
-      if (closure?.internalCalendarId) {
-        const internalCalendarId = await getCalendarIdByName(CALENDAR_CONFIG.internal.name);
-        if (internalCalendarId) {
-          await deleteClosureCalendarEvents(internalCalendarId, closure.internalCalendarId);
-          logger.info('[Closures] Deleted Internal Calendar event(s) for closure #', { extra: { closureId } });
-        }
-      }
-      
-      // Backward compatibility: clean up any legacy conference events
-      // Note: Golf calendar cleanup removed as golf calendar sync is deprecated
-      if (closure?.conferenceCalendarId) {
-        const conferenceCalendarId = await getCalendarIdByName(CALENDAR_CONFIG.conference.name);
-        if (conferenceCalendarId) {
-          await deleteClosureCalendarEvents(conferenceCalendarId, closure.conferenceCalendarId);
-          logger.info('[Closures] Cleaned up legacy Conference Room event(s) for closure #', { extra: { closureId } });
-        }
-      }
+      const [internalCalendarId, conferenceCalendarId] = await Promise.all([
+        closure?.internalCalendarId ? getCalendarIdByName(CALENDAR_CONFIG.internal.name) : Promise.resolve(null),
+        closure?.conferenceCalendarId ? getCalendarIdByName(CALENDAR_CONFIG.conference.name) : Promise.resolve(null),
+      ]);
+
+      await Promise.all([
+        internalCalendarId && closure?.internalCalendarId
+          ? deleteClosureCalendarEvents(internalCalendarId, closure.internalCalendarId).then(() =>
+              logger.info('[Closures] Deleted Internal Calendar event(s) for closure #', { extra: { closureId } }))
+          : Promise.resolve(),
+        conferenceCalendarId && closure?.conferenceCalendarId
+          ? deleteClosureCalendarEvents(conferenceCalendarId, closure.conferenceCalendarId).then(() =>
+              logger.info('[Closures] Cleaned up legacy Conference Room event(s) for closure #', { extra: { closureId } }))
+          : Promise.resolve(),
+      ]);
     } catch (calError: unknown) {
       logger.error('[Closures] Failed to delete calendar event', { extra: { calError } });
     }
@@ -646,11 +641,10 @@ router.put('/api/closures/:id', isStaffOrAdmin, async (req, res) => {
     }
     
     if (datesChanged || timesChanged || areasChanged) {
-      // Delete old availability blocks and recreate
-      await deleteAvailabilityBlocksForClosure(closureId);
-      
-      const newAffectedAreas = affected_areas || existing.affectedAreas;
-      const affectedBayIds = await getAffectedBayIds(newAffectedAreas);
+      const [, affectedBayIds] = await Promise.all([
+        deleteAvailabilityBlocksForClosure(closureId),
+        getAffectedBayIds(newAffectedAreas),
+      ]);
       const dates = getDatesBetween(
         start_date || existing.startDate,
         end_date || existing.endDate || start_date || existing.startDate
