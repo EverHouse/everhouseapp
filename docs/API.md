@@ -183,7 +183,7 @@
 | GET | `/api/admin/calendars` | 🛡️ | List Google Calendar connections |
 | GET | `/api/calendars` | 🛡️ | List calendars |
 | GET | `/api/calendar/availability` | 👤 | Get calendar availability |
-| GET | `/api/calendar-availability/golf` | 👤 | Get golf calendar availability |
+| GET | `/api/calendar-availability/golf` | 👤 | **DEPRECATED (410 Gone)** — Golf calendar availability removed; use `/api/availability/:date` instead |
 | GET | `/api/calendar-availability/conference` | 👤 | Get conference room calendar availability |
 | POST | `/api/admin/conference-room/backfill` | 🛡️ | Backfill conference room history |
 | POST | `/api/admin/bookings/sync-history` | 🛡️ | Sync booking history from calendar |

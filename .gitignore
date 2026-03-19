@@ -48,6 +48,9 @@ cert_b64.txt
 
 # Environment files
 .env
-tsconfig.tsbuildinfo
+
+# Database backups and temp files
 migration_backup/
-migration_backup/
+*.tmp_*
+*_backup.sql
+backup.sql
