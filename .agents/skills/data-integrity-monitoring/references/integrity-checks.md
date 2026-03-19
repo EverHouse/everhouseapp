@@ -54,7 +54,7 @@ These checks remain active but downgraded because DB triggers prevent new occurr
 - **Action**: Complete the transition or revert to a stable status.
 
 ### Active Bookings Without Sessions
-- **Detects**: Confirmed booking requests that have no corresponding booking sessions.
+- **Detects**: Confirmed booking requests that have no corresponding booking sessions. Excludes unassigned Trackman placeholder bookings (empty `user_email`) since those correctly defer session creation until a member is assigned (v8.87.93).
 - **Action**: Create sessions for the booking or cancel the orphaned request.
 
 ### Orphaned Payment Intents

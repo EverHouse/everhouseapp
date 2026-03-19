@@ -318,6 +318,7 @@ export async function checkBookingsWithoutSessions(): Promise<IntegrityCheckResu
     WHERE br.status IN ('approved', 'attended', 'confirmed')
       AND (br.session_id IS NULL OR bs.id IS NULL)
       AND (br.is_unmatched = false OR br.is_unmatched IS NULL)
+      AND br.user_email IS NOT NULL AND br.user_email != ''
       AND br.user_email NOT LIKE 'private-event@%'
       AND br.is_event IS NOT TRUE
       AND (
