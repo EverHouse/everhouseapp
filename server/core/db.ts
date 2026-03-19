@@ -82,7 +82,7 @@ const basePool = new Pool({
   connectionString: mainConnString,
   connectionTimeoutMillis: 10000,
   idleTimeoutMillis: 10000,
-  max: parseInt(process.env.DB_POOL_MAX || '20', 10),
+  max: parseInt(process.env.DB_POOL_MAX || '40', 10),
   ssl: needsSsl ? sslConfig : undefined,
   keepAlive: true,
   keepAliveInitialDelayMillis: 10000,

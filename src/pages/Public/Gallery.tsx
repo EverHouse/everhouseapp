@@ -197,21 +197,23 @@ const GalleryItem: React.FC<GalleryItemProps> = React.memo(({ img, title, catego
       tabIndex={0}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleClick(); } }}
     >
-      {!loaded && !error && (
-        <div className={`w-full ${skeletonHeight} bg-gradient-to-br from-gray-200 dark:from-white/10 via-gray-100 dark:via-white/5 to-gray-200 dark:to-white/10 rounded-xl overflow-hidden`}>
-          <div className="w-full h-full shimmer-effect" />
-        </div>
-      )}
-      <img 
-        src={img} 
-        className={`w-full h-auto object-cover transform group-hover:scale-105 transition-all duration-emphasis ease-out ${loaded ? 'opacity-100' : 'opacity-0 absolute top-0 left-0'}`}
-        alt={title || category || "Inside Ever Club — indoor golf and social club in Tustin, OC"}
-        loading="lazy"
-        fetchPriority="low"
-        decoding="async"
-        onLoad={() => setLoaded(true)}
-        onError={() => setError(true)}
-      />
+      <div className={`w-full ${skeletonHeight} relative`}>
+        {!loaded && !error && (
+          <div className="absolute inset-0 bg-gradient-to-br from-gray-200 dark:from-white/10 via-gray-100 dark:via-white/5 to-gray-200 dark:to-white/10 rounded-xl overflow-hidden">
+            <div className="w-full h-full shimmer-effect" />
+          </div>
+        )}
+        <img 
+          src={img} 
+          className={`absolute inset-0 w-full h-full object-cover transform group-hover:scale-105 transition-all duration-emphasis ease-out ${loaded ? 'opacity-100' : 'opacity-0'}`}
+          alt={title || category || "Inside Ever Club — indoor golf and social club in Tustin, OC"}
+          loading="lazy"
+          fetchPriority="low"
+          decoding="async"
+          onLoad={() => setLoaded(true)}
+          onError={() => setError(true)}
+        />
+      </div>
       {error && (
         <div className={`w-full ${skeletonHeight} bg-gray-200 dark:bg-white/5 flex items-center justify-center rounded-xl`}>
           <Icon name="broken_image" className="text-gray-400 dark:text-white/50 text-3xl" />

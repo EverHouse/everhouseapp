@@ -134,6 +134,8 @@ const Landing: React.FC = () => {
             loading="eager"
             fetchPriority="high"
             decoding="sync"
+            width={1920}
+            height={1080}
             style={{ 
               transform: 'translateY(0px) scale(1.03)'
             }}
@@ -353,7 +355,7 @@ const Landing: React.FC = () => {
             </p>
          </div>
          
-         <div className="grid grid-cols-1 lg:grid-cols-3 gap-px max-w-5xl mx-auto border border-primary/10 dark:border-white/10">
+         <div className="grid grid-cols-1 lg:grid-cols-3 gap-px max-w-5xl mx-auto border border-primary/10 dark:border-white/10" style={{ minHeight: '420px' }}>
             {socialTier && (
             <div className="p-8 md:p-10 bg-bone dark:bg-[#1a1a1a] transition-colors duration-[600ms] hover:bg-white/60 dark:hover:bg-white/5">
                 <div className="mb-6">

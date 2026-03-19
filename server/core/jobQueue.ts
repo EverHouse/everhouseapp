@@ -32,7 +32,7 @@ interface JobStatusCountRow {
 
 const WORKER_ID = `worker-${process.pid}-${Date.now()}`;
 const LOCK_TIMEOUT_MS = 5 * 60 * 1000;
-const BATCH_SIZE = 10;
+const BATCH_SIZE = 5;
 
 export type JobType = 
   | 'send_payment_receipt'
@@ -403,7 +403,9 @@ export async function processJobs(): Promise<number> {
   
   logger.info(`[JobQueue] Processing ${jobs.length} job(s)`);
   
-  await Promise.allSettled(jobs.map(job => executeJob(job)));
+  for (const job of jobs) {
+    await executeJob(job);
+  }
   
   return jobs.length;
 }

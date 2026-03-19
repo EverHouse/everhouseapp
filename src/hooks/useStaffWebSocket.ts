@@ -31,6 +31,7 @@ export function useStaffWebSocket(options: UseStaffWebSocketOptions = {}) {
   const { actualUser, sessionChecked } = useAuthData();
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const keepaliveIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const reconnectAttemptRef = useRef(0);
   const MAX_RECONNECT_ATTEMPTS = 20;
   const initTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -158,6 +159,15 @@ export function useStaffWebSocket(options: UseStaffWebSocketOptions = {}) {
           email: currentEmail,
           isStaff: true 
         }));
+
+        if (keepaliveIntervalRef.current) {
+          clearInterval(keepaliveIntervalRef.current);
+        }
+        keepaliveIntervalRef.current = setInterval(() => {
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: 'ping' }));
+          }
+        }, 25000);
       };
 
       ws.onmessage = (event) => {
@@ -410,6 +420,11 @@ export function useStaffWebSocket(options: UseStaffWebSocketOptions = {}) {
         setIsConnected(false);
         wsRef.current = null;
         activeConnectionUserRef.current = null;
+
+        if (keepaliveIntervalRef.current) {
+          clearInterval(keepaliveIntervalRef.current);
+          keepaliveIntervalRef.current = null;
+        }
         
         if (event.code >= 4001 && event.code <= 4003) {
           authRejectedRef.current = true;
@@ -470,6 +485,10 @@ export function useStaffWebSocket(options: UseStaffWebSocketOptions = {}) {
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
       debounceTimerRef.current = null;
+    }
+    if (keepaliveIntervalRef.current) {
+      clearInterval(keepaliveIntervalRef.current);
+      keepaliveIntervalRef.current = null;
     }
     if (reconnectTimeoutRef.current) {
       clearTimeout(reconnectTimeoutRef.current);
