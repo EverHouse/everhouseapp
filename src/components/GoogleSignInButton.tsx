@@ -141,8 +141,8 @@ const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({
   return (
     <div 
       ref={buttonRef} 
-      className={`w-full flex justify-center ${disabled ? 'opacity-50 pointer-events-none' : ''}`}
-      style={{ minHeight: 44 }}
+      className={`w-full flex justify-center overflow-hidden ${disabled ? 'opacity-50 pointer-events-none' : ''}`}
+      style={{ minHeight: 44, maxHeight: 50 }}
     />
   );
 };
