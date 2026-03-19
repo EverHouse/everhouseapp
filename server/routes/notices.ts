@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { isAuthenticated } from '../core/middleware';
 import { db } from '../db';
 import { userDismissedNotices } from '../../shared/schema';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { logAndRespond } from '../core/logger';
 import { getSessionUser } from '../types/session';
 
@@ -10,7 +10,7 @@ const router = Router();
 
 router.get('/api/notices/dismissed', isAuthenticated, async (req, res) => {
   try {
-    const userEmail = getSessionUser(req)?.email;
+    const userEmail = getSessionUser(req)?.email?.toLowerCase();
     if (!userEmail) {
       return res.status(401).json({ error: 'User email not found' });
     }
@@ -21,7 +21,7 @@ router.get('/api/notices/dismissed', isAuthenticated, async (req, res) => {
         noticeId: userDismissedNotices.noticeId
       })
       .from(userDismissedNotices)
-      .where(eq(userDismissedNotices.userEmail, userEmail));
+      .where(sql`LOWER(${userDismissedNotices.userEmail}) = ${userEmail}`);
 
     res.json(dismissed);
   } catch (error: unknown) {
@@ -31,7 +31,7 @@ router.get('/api/notices/dismissed', isAuthenticated, async (req, res) => {
 
 router.post('/api/notices/dismiss', isAuthenticated, async (req, res) => {
   try {
-    const userEmail = getSessionUser(req)?.email;
+    const userEmail = getSessionUser(req)?.email?.toLowerCase();
     if (!userEmail) {
       return res.status(401).json({ error: 'User email not found' });
     }
@@ -68,7 +68,7 @@ router.post('/api/notices/dismiss', isAuthenticated, async (req, res) => {
 
 router.post('/api/notices/dismiss-all', isAuthenticated, async (req, res) => {
   try {
-    const userEmail = getSessionUser(req)?.email;
+    const userEmail = getSessionUser(req)?.email?.toLowerCase();
     if (!userEmail) {
       return res.status(401).json({ error: 'User email not found' });
     }

@@ -140,13 +140,20 @@ const ClosureAlert: React.FC = () => {
       setIsExiting(false);
       exitTimer.current = null;
 
-      fetchWithCredentials('/api/notices/dismiss', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ noticeType: 'closure', noticeId: closure.id })
-      }).catch((err) => {
-        console.warn('[ClosureAlert] Failed to persist dismissal:', err);
-      });
+      const persistDismiss = (attempt = 1) => {
+        fetchWithCredentials('/api/notices/dismiss', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ noticeType: 'closure', noticeId: closure.id })
+        }).catch((err) => {
+          if (attempt < 3) {
+            setTimeout(() => persistDismiss(attempt + 1), 1000 * attempt);
+          } else {
+            console.warn('[ClosureAlert] Failed to persist dismissal after retries:', err);
+          }
+        });
+      };
+      persistDismiss();
     }, EXIT_DURATION);
   }, [activeClosures, dismissedIds, getStorageKey]);
 
